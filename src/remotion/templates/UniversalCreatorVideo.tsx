@@ -1319,7 +1319,7 @@ const KenBurnsImage: React.FC<{
   return (
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', opacity }}>
       {isValidRemoteUrl(imageUrl) ? (
-        <Img
+        <SafeImg
           src={imageUrl!}
           style={{
             width: '100%',
@@ -1351,7 +1351,7 @@ const ParallaxBackground: React.FC<{
   return (
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', opacity }}>
       {isValidRemoteUrl(imageUrl) ? (
-        <Img
+        <SafeImg
           src={imageUrl!}
           style={{
             position: 'absolute',
@@ -1709,17 +1709,31 @@ const SceneBackground: React.FC<{
   );
 };
 
-// SafeImg: wraps Img with onError fallback to prevent black frames in Lambda
-const SafeImg: React.FC<{ src: string; sceneType?: string; primaryColor?: string; secondaryColor?: string }> = ({ src, sceneType, primaryColor, secondaryColor }) => {
+// r45: SafeImg with timeout-based fallback for silent Lambda failures
+const SafeImg: React.FC<{ src: string; sceneType?: string; primaryColor?: string; secondaryColor?: string; style?: React.CSSProperties }> = ({ src, sceneType, primaryColor, secondaryColor, style }) => {
   const [failed, setFailed] = React.useState(false);
+  const [loaded, setLoaded] = React.useState(false);
+
+  // r45: Timeout guard — if neither onLoad nor onError fires within 8s, force fallback
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!loaded) {
+        console.warn(`[SafeImg] Timeout: image not loaded after 8s, forcing fallback for ${src?.slice(0, 60)}`);
+        setFailed(true);
+      }
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [src, loaded]);
+
   if (failed) {
     return <GradientFallback sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />;
   }
   return (
     <Img
       src={src}
+      onLoad={() => setLoaded(true)}
       onError={() => setFailed(true)}
-      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      style={style || { width: '100%', height: '100%', objectFit: 'cover' }}
     />
   );
 };
