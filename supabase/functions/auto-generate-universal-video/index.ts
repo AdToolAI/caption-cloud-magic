@@ -1845,8 +1845,8 @@ async function generateAIFallbackImage(
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   
   if (!LOVABLE_API_KEY || !supabaseUrl || !supabaseServiceKey) {
-    console.warn('[AI Fallback] Missing LOVABLE_API_KEY or Supabase config, falling back to placehold.co');
-    return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+    console.warn('[AI Fallback] Missing LOVABLE_API_KEY or Supabase config, using SVG fallback');
+    return await generateSVGFallbackToStorage(title, primaryColor, secondaryColor, supabaseUrl, supabaseServiceKey);
   }
 
   const scenePromptMap: Record<string, string> = {
@@ -1886,15 +1886,44 @@ async function generateAIFallbackImage(
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
       console.error(`[AI Fallback] Gemini failed (${aiResponse.status}):`, errText);
-      return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+      return await generateSVGFallbackToStorage(title, primaryColor, secondaryColor, supabaseUrl!, supabaseServiceKey!);
     }
 
     const aiData = await aiResponse.json();
-    const imageData = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    console.log('[AI Fallback] Gemini response keys:', JSON.stringify(Object.keys(aiData?.choices?.[0]?.message || {})));
+    
+    // Try multiple response formats for robustness
+    let imageData: string | undefined;
+    
+    // Format 1: message.images array (documented Lovable AI Gateway format)
+    imageData = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    
+    // Format 2: message.content array with image_url parts (OpenAI-compatible)
+    if (!imageData) {
+      const content = aiData.choices?.[0]?.message?.content;
+      if (Array.isArray(content)) {
+        const imagePart = content.find((part: any) => part.type === 'image_url');
+        if (imagePart?.image_url?.url) {
+          imageData = imagePart.image_url.url;
+        }
+      }
+    }
+    
+    // Format 3: inline_data in parts (raw Gemini format)
+    if (!imageData) {
+      const parts = aiData.choices?.[0]?.message?.parts;
+      if (Array.isArray(parts)) {
+        const imgPart = parts.find((p: any) => p.inline_data);
+        if (imgPart?.inline_data?.data) {
+          const mime = imgPart.inline_data.mime_type || 'image/png';
+          imageData = `data:${mime};base64,${imgPart.inline_data.data}`;
+        }
+      }
+    }
 
     if (!imageData || !imageData.startsWith('data:image')) {
-      console.warn('[AI Fallback] No image in Gemini response, falling back to placehold.co');
-      return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+      console.warn('[AI Fallback] No image in Gemini response. Response structure:', JSON.stringify(aiData.choices?.[0]?.message || {}).slice(0, 500));
+      return await generateSVGFallbackToStorage(title, primaryColor, secondaryColor, supabaseUrl!, supabaseServiceKey!);
     }
 
     // Upload base64 image to Supabase Storage
@@ -1910,7 +1939,7 @@ async function generateAIFallbackImage(
 
     if (uploadError) {
       console.error('[AI Fallback] Storage upload failed:', uploadError.message);
-      return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+      return await generateSVGFallbackToStorage(title, primaryColor, secondaryColor, supabaseUrl!, supabaseServiceKey!);
     }
 
     const { data: publicUrlData } = uploadClient.storage
@@ -1920,26 +1949,91 @@ async function generateAIFallbackImage(
     const publicUrl = publicUrlData?.publicUrl;
     if (!publicUrl) {
       console.error('[AI Fallback] Failed to get public URL');
-      return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+      return await generateSVGFallbackToStorage(title, primaryColor, secondaryColor, supabaseUrl!, supabaseServiceKey!);
     }
 
     console.log(`[AI Fallback] ✅ AI background generated and uploaded: ${publicUrl}`);
     return publicUrl;
   } catch (e) {
     console.error('[AI Fallback] Error generating AI fallback:', e);
-    return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+    return await generateSVGFallbackToStorage(title, primaryColor, secondaryColor, supabaseUrl!, supabaseServiceKey!);
   }
 }
 
-function generatePNGPlaceholder(title: string, primaryColor?: string, secondaryColor?: string): string {
-  const bgColor = (primaryColor || '#3b82f6').replace('#', '');
-  const endColor = (secondaryColor || '#1e293b').replace('#', '');
-  const url = `https://placehold.co/1920x1080/${bgColor}/${endColor}.png?text=+`;
-  console.log(`[auto-generate-universal-video] PNG placeholder (placehold.co): ${url}`);
-  return url;
+async function generateSVGFallbackToStorage(
+  title: string,
+  primaryColor?: string,
+  secondaryColor?: string,
+  supabaseUrl?: string,
+  supabaseServiceKey?: string
+): Promise<string> {
+  const pc = primaryColor || '#3b82f6';
+  const sc = secondaryColor || '#1e293b';
+  
+  // Create a visually appealing SVG with gradient + geometric patterns
+  const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:${pc};stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:${sc};stop-opacity:1"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" style="stop-color:white;stop-opacity:0.15"/>
+      <stop offset="100%" style="stop-color:white;stop-opacity:0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect width="1920" height="1080" fill="url(#glow)"/>
+  <circle cx="300" cy="200" r="150" fill="white" opacity="0.06"/>
+  <circle cx="1600" cy="800" r="200" fill="white" opacity="0.05"/>
+  <circle cx="960" cy="540" r="300" fill="white" opacity="0.04"/>
+  <rect x="100" y="600" width="400" height="400" rx="40" fill="white" opacity="0.03" transform="rotate(15 300 800)"/>
+  <rect x="1400" y="100" width="350" height="350" rx="30" fill="white" opacity="0.04" transform="rotate(-20 1575 275)"/>
+  <polygon points="960,200 1100,500 820,500" fill="white" opacity="0.05"/>
+</svg>`;
+
+  // Try uploading to Supabase Storage
+  if (supabaseUrl && supabaseServiceKey) {
+    try {
+      const uploadClient = createClient(supabaseUrl, supabaseServiceKey);
+      const fileName = `svg-fallback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.svg`;
+      const storagePath = `ai-fallbacks/${fileName}`;
+      
+      const svgBytes = new TextEncoder().encode(svgContent);
+      const { error: uploadError } = await uploadClient.storage
+        .from('video-assets')
+        .upload(storagePath, svgBytes, { contentType: 'image/svg+xml', upsert: true });
+
+      if (!uploadError) {
+        const { data: publicUrlData } = uploadClient.storage
+          .from('video-assets')
+          .getPublicUrl(storagePath);
+        
+        if (publicUrlData?.publicUrl) {
+          console.log(`[SVG Fallback] ✅ Uploaded to storage: ${publicUrlData.publicUrl}`);
+          return publicUrlData.publicUrl;
+        }
+      }
+      console.error('[SVG Fallback] Upload failed:', uploadError?.message);
+    } catch (e) {
+      console.error('[SVG Fallback] Storage error:', e);
+    }
+  }
+  
+  // Absolute last resort — inline data URI (may not work in Lambda but better than placehold.co)
+  const base64Svg = btoa(svgContent);
+  console.warn('[SVG Fallback] Using inline data URI as last resort');
+  return `data:image/svg+xml;base64,${base64Svg}`;
 }
 
-// Keep old SVG function for backwards compatibility but don't use it
+function generatePNGPlaceholder(title: string, primaryColor?: string, secondaryColor?: string): string {
+  // DEPRECATED: placehold.co is blocked in Lambda. Use generateSVGFallbackToStorage instead.
+  console.warn('[DEPRECATED] generatePNGPlaceholder called — placehold.co is unreliable in Lambda');
+  const bgColor = (primaryColor || '#3b82f6').replace('#', '');
+  const endColor = (secondaryColor || '#1e293b').replace('#', '');
+  return `https://placehold.co/1920x1080/${bgColor}/${endColor}.png?text=+`;
+}
+
 async function generateSVGPlaceholder(title: string, color?: string): Promise<string> {
   return generatePNGPlaceholder(title, color);
 }
