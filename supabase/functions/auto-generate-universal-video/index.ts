@@ -1949,7 +1949,7 @@ async function generateAIFallbackImage(
     const publicUrl = publicUrlData?.publicUrl;
     if (!publicUrl) {
       console.error('[AI Fallback] Failed to get public URL');
-      return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+      return await generateSVGFallbackToStorage(title, primaryColor, secondaryColor, supabaseUrl!, supabaseServiceKey!);
     }
 
     console.log(`[AI Fallback] ✅ AI background generated and uploaded: ${publicUrl}`);
