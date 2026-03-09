@@ -1960,15 +1960,80 @@ async function generateAIFallbackImage(
   }
 }
 
-function generatePNGPlaceholder(title: string, primaryColor?: string, secondaryColor?: string): string {
-  const bgColor = (primaryColor || '#3b82f6').replace('#', '');
-  const endColor = (secondaryColor || '#1e293b').replace('#', '');
-  const url = `https://placehold.co/1920x1080/${bgColor}/${endColor}.png?text=+`;
-  console.log(`[auto-generate-universal-video] PNG placeholder (placehold.co): ${url}`);
-  return url;
+async function generateSVGFallbackToStorage(
+  title: string,
+  primaryColor?: string,
+  secondaryColor?: string,
+  supabaseUrl?: string,
+  supabaseServiceKey?: string
+): Promise<string> {
+  const pc = primaryColor || '#3b82f6';
+  const sc = secondaryColor || '#1e293b';
+  
+  // Create a visually appealing SVG with gradient + geometric patterns
+  const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:${pc};stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:${sc};stop-opacity:1"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" style="stop-color:white;stop-opacity:0.15"/>
+      <stop offset="100%" style="stop-color:white;stop-opacity:0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect width="1920" height="1080" fill="url(#glow)"/>
+  <circle cx="300" cy="200" r="150" fill="white" opacity="0.06"/>
+  <circle cx="1600" cy="800" r="200" fill="white" opacity="0.05"/>
+  <circle cx="960" cy="540" r="300" fill="white" opacity="0.04"/>
+  <rect x="100" y="600" width="400" height="400" rx="40" fill="white" opacity="0.03" transform="rotate(15 300 800)"/>
+  <rect x="1400" y="100" width="350" height="350" rx="30" fill="white" opacity="0.04" transform="rotate(-20 1575 275)"/>
+  <polygon points="960,200 1100,500 820,500" fill="white" opacity="0.05"/>
+</svg>`;
+
+  // Try uploading to Supabase Storage
+  if (supabaseUrl && supabaseServiceKey) {
+    try {
+      const uploadClient = createClient(supabaseUrl, supabaseServiceKey);
+      const fileName = `svg-fallback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.svg`;
+      const storagePath = `ai-fallbacks/${fileName}`;
+      
+      const svgBytes = new TextEncoder().encode(svgContent);
+      const { error: uploadError } = await uploadClient.storage
+        .from('video-assets')
+        .upload(storagePath, svgBytes, { contentType: 'image/svg+xml', upsert: true });
+
+      if (!uploadError) {
+        const { data: publicUrlData } = uploadClient.storage
+          .from('video-assets')
+          .getPublicUrl(storagePath);
+        
+        if (publicUrlData?.publicUrl) {
+          console.log(`[SVG Fallback] ✅ Uploaded to storage: ${publicUrlData.publicUrl}`);
+          return publicUrlData.publicUrl;
+        }
+      }
+      console.error('[SVG Fallback] Upload failed:', uploadError?.message);
+    } catch (e) {
+      console.error('[SVG Fallback] Storage error:', e);
+    }
+  }
+  
+  // Absolute last resort — inline data URI (may not work in Lambda but better than placehold.co)
+  const base64Svg = btoa(svgContent);
+  console.warn('[SVG Fallback] Using inline data URI as last resort');
+  return `data:image/svg+xml;base64,${base64Svg}`;
 }
 
-// Keep old SVG function for backwards compatibility but don't use it
+function generatePNGPlaceholder(title: string, primaryColor?: string, secondaryColor?: string): string {
+  // DEPRECATED: placehold.co is blocked in Lambda. Use generateSVGFallbackToStorage instead.
+  console.warn('[DEPRECATED] generatePNGPlaceholder called — placehold.co is unreliable in Lambda');
+  const bgColor = (primaryColor || '#3b82f6').replace('#', '');
+  const endColor = (secondaryColor || '#1e293b').replace('#', '');
+  return `https://placehold.co/1920x1080/${bgColor}/${endColor}.png?text=+`;
+}
+
 async function generateSVGPlaceholder(title: string, color?: string): Promise<string> {
   return generatePNGPlaceholder(title, color);
 }
