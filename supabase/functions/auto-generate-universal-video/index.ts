@@ -1195,6 +1195,18 @@ async function runGenerationPipeline(
       const duration = scene.durationSeconds || scene.duration || 5;
       const sceneType = validateEnum(scene.sceneType || scene.type || 'content', VALID_SCENE_TYPES, 'feature');
 
+      // r48: GRADIENT SAFETY NET — always set gradientColors so even if image fails to load
+      // in the r42 bundle, a colored gradient appears instead of black
+      const hasValidImage = scene.imageUrl && typeof scene.imageUrl === 'string' && scene.imageUrl.startsWith('http');
+      const sceneGradientColors = briefing.brandColors?.length >= 2
+        ? [briefing.brandColors[0], briefing.brandColors[1]]
+        : ['#3b82f6', '#1e40af'];
+
+      // r48: If normalization already forced gradient, respect that
+      const bgType = scene.background?.type === 'gradient'
+        ? 'gradient'
+        : validateEnum(hasValidImage ? 'image' : 'gradient', ['color', 'gradient', 'video', 'image'], 'gradient');
+
       return {
         id: `scene-${index}`,
         order: index + 1,
@@ -1204,9 +1216,9 @@ async function runGenerationPipeline(
         startTime,
         endTime: startTime + duration,
         background: {
-          type: validateEnum(scene.imageUrl ? 'image' : 'gradient', ['color', 'gradient', 'video', 'image'], 'gradient'),
-          imageUrl: scene.imageUrl || undefined,
-          gradientColors: briefing.brandColors || ['#3b82f6', '#1e40af'],
+          type: bgType,
+          imageUrl: bgType === 'image' ? scene.imageUrl : undefined,
+          gradientColors: sceneGradientColors, // r48: ALWAYS set — fallback for image load failures
         },
         animation: validateEnum(scene.animation || getDefaultAnimation(sceneType), VALID_ANIMATIONS, 'fadeIn'),
         kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', VALID_KEN_BURNS, 'in'),
