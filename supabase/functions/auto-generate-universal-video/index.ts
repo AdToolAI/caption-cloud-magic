@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r46-asset-normalize-2026-03-09";
+const AUTO_GEN_BUILD_TAG = "r47-normalize-fix-2026-03-09";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -891,78 +891,114 @@ async function runGenerationPipeline(
     let normalizedCount = 0;
     let fallbackCount = 0;
     let gradientForcedCount = 0;
+    let skippedCount = 0;
 
-    for (let i = 0; i < script.scenes.length; i++) {
-      const scene = script.scenes[i];
-      if (!scene.imageUrl || !scene.imageUrl.startsWith('http')) continue;
-
-      try {
-        // Step 1: Download the image (10s timeout)
-        const dlController = new AbortController();
-        const dlTimeout = setTimeout(() => dlController.abort(), 10000);
-        const dlResp = await fetch(scene.imageUrl, { signal: dlController.signal });
-        clearTimeout(dlTimeout);
-
-        if (!dlResp.ok) throw new Error(`GET returned ${dlResp.status}`);
-
-        const imageBytes = new Uint8Array(await dlResp.arrayBuffer());
-        if (imageBytes.length < 500) throw new Error(`Image too small: ${imageBytes.length} bytes`);
-
-        // Step 2: Detect content-type
-        const ct = dlResp.headers.get('content-type') || 'image/png';
-        const ext = ct.includes('webp') ? 'webp' : ct.includes('svg') ? 'svg' : ct.includes('jpeg') || ct.includes('jpg') ? 'jpg' : 'png';
-
-        // Step 3: Re-upload to video-assets/render-ready/
-        const stableFileName = `render-ready/scene-${i}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
-        const { error: upErr } = await normalizeClient.storage
-          .from('video-assets')
-          .upload(stableFileName, imageBytes, { contentType: ct.includes('image') ? ct : 'image/png', upsert: true });
-
-        if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
-
-        const { data: pubData } = normalizeClient.storage
-          .from('video-assets')
-          .getPublicUrl(stableFileName);
-
-        if (!pubData?.publicUrl) throw new Error('No public URL returned');
-
-        const oldUrl = scene.imageUrl.slice(0, 60);
-        script.scenes[i].imageUrl = pubData.publicUrl;
-        normalizedCount++;
-        console.log(`[asset-normalize] Scene ${i + 1}: ${imageBytes.length} bytes re-uploaded → ${pubData.publicUrl.slice(0, 80)}`);
-      } catch (normErr: any) {
-        console.warn(`[asset-normalize] Scene ${i + 1} normalization failed (${normErr.message}), trying SVG fallback...`);
-        // Fallback: try SVG
-        try {
-          const fallbackUrl = await generateSVGFallbackToStorage(
-            scene.title || `Scene ${i + 1}`,
-            briefing.brandColors?.[0],
-            briefing.brandColors?.[1],
-            supabaseUrl,
-            supabaseServiceKey
-          );
-          // Check if fallback returned a data URI (which crashes Lambda)
-          if (fallbackUrl.startsWith('data:')) {
-            throw new Error('SVG fallback returned data-URI');
-          }
-          script.scenes[i].imageUrl = fallbackUrl;
-          fallbackCount++;
-          console.log(`[asset-normalize] Scene ${i + 1} replaced with SVG fallback: ${fallbackUrl.slice(0, 80)}`);
-        } catch (fbErr: any) {
-          // Last resort: force gradient background (no image at all)
-          console.error(`[asset-normalize] Scene ${i + 1} all fallbacks failed, forcing gradient background`);
-          script.scenes[i].imageUrl = undefined;
-          script.scenes[i].background = {
-            type: 'gradient',
-            gradientColors: [briefing.brandColors?.[0] || '#1e293b', briefing.brandColors?.[1] || '#0f172a'],
-          };
-          gradientForcedCount++;
+    // r47: Parallel normalization with Promise.allSettled — prevents single scene from crashing entire loop
+    try {
+      const normalizeScene = async (i: number) => {
+        const scene = script.scenes[i];
+        if (!scene.imageUrl || !scene.imageUrl.startsWith('http')) {
+          console.log(`[asset-normalize] Scene ${i + 1}: no imageUrl, skipping`);
+          skippedCount++;
+          return;
         }
-      }
-    }
-    console.log(`[asset-normalize] ${normalizedCount} normalized, ${fallbackCount} SVG fallback, ${gradientForcedCount} gradient forced`);
 
-    await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals, r46_assetNormalize: { normalized: normalizedCount, svgFallback: fallbackCount, gradientForced: gradientForcedCount } });
+        try {
+          // Step 1: Download the image (10s timeout)
+          const dlController = new AbortController();
+          const dlTimeout = setTimeout(() => dlController.abort(), 10000);
+          const dlResp = await fetch(scene.imageUrl, { signal: dlController.signal });
+          clearTimeout(dlTimeout);
+
+          if (!dlResp.ok) throw new Error(`GET returned ${dlResp.status}`);
+
+          const imageBytes = new Uint8Array(await dlResp.arrayBuffer());
+          if (imageBytes.length < 500) throw new Error(`Image too small: ${imageBytes.length} bytes`);
+
+          // Step 2: Re-upload as JPEG for fastest Chromium decoding
+          const stableFileName = `render-ready/scene-${i}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.jpg`;
+          const { error: upErr } = await normalizeClient.storage
+            .from('video-assets')
+            .upload(stableFileName, imageBytes, { contentType: 'image/jpeg', upsert: true });
+
+          if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
+
+          const { data: pubData } = normalizeClient.storage
+            .from('video-assets')
+            .getPublicUrl(stableFileName);
+
+          if (!pubData?.publicUrl) throw new Error('No public URL returned');
+
+          // Step 3: Verify the new URL is accessible (3s timeout)
+          const verifyController = new AbortController();
+          const verifyTimeout = setTimeout(() => verifyController.abort(), 3000);
+          try {
+            const verifyResp = await fetch(pubData.publicUrl, { method: 'HEAD', signal: verifyController.signal });
+            clearTimeout(verifyTimeout);
+            if (!verifyResp.ok) throw new Error(`Verify GET returned ${verifyResp.status}`);
+          } catch (verifyErr: any) {
+            clearTimeout(verifyTimeout);
+            throw new Error(`Verify failed: ${verifyErr.message}`);
+          }
+
+          script.scenes[i].imageUrl = pubData.publicUrl;
+          normalizedCount++;
+          console.log(`[asset-normalize] Scene ${i + 1}: ${imageBytes.length} bytes re-uploaded+verified → ${pubData.publicUrl.slice(0, 80)}`);
+        } catch (normErr: any) {
+          console.warn(`[asset-normalize] Scene ${i + 1} normalization failed (${normErr.message}), trying SVG fallback...`);
+          try {
+            const fallbackUrl = await generateSVGFallbackToStorage(
+              scene.title || `Scene ${i + 1}`,
+              briefing.brandColors?.[0],
+              briefing.brandColors?.[1],
+              supabaseUrl,
+              supabaseServiceKey
+            );
+            if (fallbackUrl.startsWith('data:')) {
+              throw new Error('SVG fallback returned data-URI');
+            }
+            script.scenes[i].imageUrl = fallbackUrl;
+            fallbackCount++;
+            console.log(`[asset-normalize] Scene ${i + 1} replaced with SVG fallback: ${fallbackUrl.slice(0, 80)}`);
+          } catch (fbErr: any) {
+            console.error(`[asset-normalize] Scene ${i + 1} all fallbacks failed, forcing gradient background`);
+            script.scenes[i].imageUrl = undefined;
+            script.scenes[i].background = {
+              type: 'gradient',
+              gradientColors: [briefing.brandColors?.[0] || '#1e293b', briefing.brandColors?.[1] || '#0f172a'],
+            };
+            gradientForcedCount++;
+          }
+        }
+      };
+
+      // Run all scenes in parallel
+      const results = await Promise.allSettled(
+        script.scenes.map((_: unknown, i: number) => normalizeScene(i))
+      );
+
+      // Log any unexpected rejections
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') {
+          console.error(`[asset-normalize] Scene ${i + 1} unexpected rejection: ${r.reason}`);
+          // Force gradient as ultimate safety net
+          if (script.scenes[i]) {
+            script.scenes[i].imageUrl = undefined;
+            script.scenes[i].background = {
+              type: 'gradient',
+              gradientColors: [briefing.brandColors?.[0] || '#1e293b', briefing.brandColors?.[1] || '#0f172a'],
+            };
+            gradientForcedCount++;
+          }
+        }
+      });
+    } catch (outerNormErr: any) {
+      console.error(`[asset-normalize] OUTER LOOP CRASH: ${outerNormErr.message}`);
+    }
+
+    console.log(`[asset-normalize] SUMMARY: ${normalizedCount} normalized, ${fallbackCount} SVG, ${gradientForcedCount} gradient, ${skippedCount} skipped (of ${script.scenes.length} total)`);
+
+    await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals, r47_assetNormalize: { normalized: normalizedCount, svgFallback: fallbackCount, gradientForced: gradientForcedCount, skipped: skippedCount } });
 
     // Step 4: Generate Voice-Over WITH TIMESTAMPS for Lip-Sync (60% - 70%)
     await updateProgress(supabase, progressId, 'generating_voiceover', 65, '🎙️ Voiceover wird erstellt...');
