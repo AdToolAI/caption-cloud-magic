@@ -783,11 +783,12 @@ async function runGenerationPipeline(
           };
           const sceneHint = sceneStyleHints[sceneType] || 'professional, well-composed';
 
+          const aspectHint = briefing.aspectRatio === '9:16' ? 'vertical portrait composition (9:16)' : 'wide landscape composition (16:9)';
           const prompt = attempt === 0
-            ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}. No text, no letters, no watermarks, no human faces with distortions.`
+            ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}. No text, no letters, no watermarks, no human faces.`
             : attempt === 1
-            ? `${scene.visualDescription}. ${briefing.visualStyle} style. ${sceneHint}. Professional quality. No text or letters in image.`
-            : `${scene.title || 'Scene'}. Simple, clean, ${briefing.visualStyle} style. No text.`;
+            ? `${scene.visualDescription}. ${briefing.visualStyle} style. ${sceneHint}. ${aspectHint}. Clean, professional. No text or letters.`
+            : `Abstract professional background for ${sceneType} scene. ${categoryHint}. ${aspectHint}. ${briefing.visualStyle} style. No text, no people.`;
 
           const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
             method: 'POST',
@@ -822,9 +823,18 @@ async function runGenerationPipeline(
         }
       }
 
-      // All retries failed — use placehold.co gradient fallback (reliable for Remotion Lambda)
-      console.warn(`[auto-generate-universal-video] Scene ${i + 1}: All ${maxRetries} retries failed, using placehold.co fallback`);
-      return await generatePNGPlaceholder(scene.title, briefing.brandColors?.[0], briefing.brandColors?.[1]);
+      // All retries failed — use AI-generated fallback image via Lovable AI (Gemini)
+      console.warn(`[auto-generate-universal-video] Scene ${i + 1}: All ${maxRetries} retries failed, generating AI fallback image`);
+      return await generateAIFallbackImage(
+        scene.title,
+        sceneType,
+        briefing.category || 'explainer',
+        briefing.brandColors?.[0],
+        briefing.brandColors?.[1],
+        briefing.visualStyle || 'modern-3d',
+        supabaseUrl,
+        supabaseServiceKey
+      );
     };
 
     // Phase A: Generate priority scenes FIRST (5 retries each, batch of 2)
@@ -1822,12 +1832,108 @@ async function selectBackgroundMusic(
   return MUSIC_FALLBACK[mood] || MUSIC_FALLBACK['corporate'];
 }
 
-async function generatePNGPlaceholder(title: string, primaryColor?: string, secondaryColor?: string): Promise<string> {
+async function generateAIFallbackImage(
+  title: string,
+  sceneType: string,
+  category: string,
+  primaryColor?: string,
+  secondaryColor?: string,
+  visualStyle?: string,
+  supabaseUrl?: string,
+  supabaseServiceKey?: string
+): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  
+  if (!LOVABLE_API_KEY || !supabaseUrl || !supabaseServiceKey) {
+    console.warn('[AI Fallback] Missing LOVABLE_API_KEY or Supabase config, falling back to placehold.co');
+    return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+  }
+
+  const scenePromptMap: Record<string, string> = {
+    'hook': 'dramatic wide establishing shot, bold abstract shapes converging to center, dynamic energy',
+    'problem': 'abstract visualization of challenge or tension, fragmented geometric shapes, moody atmosphere',
+    'solution': 'bright optimistic abstract composition, light rays breaking through, harmonious flowing shapes',
+    'feature': 'clean product showcase environment, spotlight on central area, organized grid elements',
+    'proof': 'data visualization aesthetic, abstract charts and graphs, trustworthy corporate feel',
+    'cta': 'energetic motivational background, arrows and directional elements, call to action energy',
+  };
+  
+  const sceneContext = scenePromptMap[sceneType] || 'professional abstract background, clean composition';
+  const colors = primaryColor && secondaryColor 
+    ? `dominant color palette: ${primaryColor} and ${secondaryColor}` 
+    : primaryColor 
+    ? `dominant color: ${primaryColor}` 
+    : 'professional blue and purple tones';
+
+  const prompt = `Create a 1920x1080 professional background illustration for a ${category} video scene about "${title}". ${sceneContext}. ${colors}. Style: ${visualStyle || 'modern'}, flat illustration with subtle gradients and geometric patterns. Absolutely NO text, NO letters, NO words, NO numbers, NO human faces, NO photography. Abstract, clean, visually striking. High contrast, vibrant.`;
+
+  try {
+    console.log(`[AI Fallback] Generating AI background for scene "${title}" (${sceneType})`);
+    
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-image',
+        messages: [{ role: 'user', content: prompt }],
+        modalities: ['image', 'text'],
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      const errText = await aiResponse.text();
+      console.error(`[AI Fallback] Gemini failed (${aiResponse.status}):`, errText);
+      return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+    }
+
+    const aiData = await aiResponse.json();
+    const imageData = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+    if (!imageData || !imageData.startsWith('data:image')) {
+      console.warn('[AI Fallback] No image in Gemini response, falling back to placehold.co');
+      return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+    }
+
+    // Upload base64 image to Supabase Storage
+    const base64Content = imageData.split(',')[1];
+    const imageBytes = Uint8Array.from(atob(base64Content), c => c.charCodeAt(0));
+    const fileName = `fallback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`;
+    const storagePath = `ai-fallbacks/${fileName}`;
+
+    const uploadClient = createClient(supabaseUrl, supabaseServiceKey);
+    const { error: uploadError } = await uploadClient.storage
+      .from('video-assets')
+      .upload(storagePath, imageBytes, { contentType: 'image/png', upsert: true });
+
+    if (uploadError) {
+      console.error('[AI Fallback] Storage upload failed:', uploadError.message);
+      return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+    }
+
+    const { data: publicUrlData } = uploadClient.storage
+      .from('video-assets')
+      .getPublicUrl(storagePath);
+
+    const publicUrl = publicUrlData?.publicUrl;
+    if (!publicUrl) {
+      console.error('[AI Fallback] Failed to get public URL');
+      return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+    }
+
+    console.log(`[AI Fallback] ✅ AI background generated and uploaded: ${publicUrl}`);
+    return publicUrl;
+  } catch (e) {
+    console.error('[AI Fallback] Error generating AI fallback:', e);
+    return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+  }
+}
+
+function generatePNGPlaceholder(title: string, primaryColor?: string, secondaryColor?: string): string {
   const bgColor = (primaryColor || '#3b82f6').replace('#', '');
   const endColor = (secondaryColor || '#1e293b').replace('#', '');
-  
-  // Use placehold.co directly — it returns a real PNG that Remotion Lambda can reliably load
-  // The 1x1 PNG + Supabase Storage approach was unreliable (upload failures → black scenes)
   const url = `https://placehold.co/1920x1080/${bgColor}/${endColor}.png?text=+`;
   console.log(`[auto-generate-universal-video] PNG placeholder (placehold.co): ${url}`);
   return url;
