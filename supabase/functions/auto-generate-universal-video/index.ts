@@ -861,10 +861,10 @@ async function runGenerationPipeline(
       if (batchStart + BATCH_SIZE < priorityIndices.length) await delay(500);
     }
 
-    // Phase B: Generate remaining scenes (3 retries each, batch of 2)
+    // Phase B: Generate remaining scenes (2 retries each, batch of 2) — reduced from 3 to save time budget
     for (let batchStart = 0; batchStart < normalIndices.length; batchStart += BATCH_SIZE) {
       const batch = normalIndices.slice(batchStart, batchStart + BATCH_SIZE);
-      const results = await Promise.all(batch.map(i => generateSceneVisual(i, 3)));
+      const results = await Promise.all(batch.map(i => generateSceneVisual(i, 2)));
       batch.forEach((idx, j) => { sceneVisuals[idx] = results[j]; });
 
       const completedCount = sceneVisuals.filter(v => v !== null).length;
