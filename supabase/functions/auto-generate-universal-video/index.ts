@@ -112,8 +112,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const functionStartTime = Date.now();
-  const FUNCTION_TIMEOUT_MS = 280_000; // 280s of 300s budget — leave 20s safety margin
+  console.log(`[auto-generate-universal-video] BUILD_TAG=${AUTO_GEN_BUILD_TAG}`);
+  const serveStartTime = Date.now();
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
