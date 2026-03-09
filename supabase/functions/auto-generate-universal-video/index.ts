@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r50-strict-validate-2026-03-09";
+const AUTO_GEN_BUILD_TAG = "r51-force-gradient-2026-03-09";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -1286,17 +1286,23 @@ async function runGenerationPipeline(
       const duration = scene.durationSeconds || scene.duration || 5;
       const sceneType = validateEnum(scene.sceneType || scene.type || 'content', VALID_SCENE_TYPES, 'feature');
 
-      // r48: GRADIENT SAFETY NET — always set gradientColors so even if image fails to load
-      // in the r42 bundle, a colored gradient appears instead of black
-      const hasValidImage = scene.imageUrl && typeof scene.imageUrl === 'string' && scene.imageUrl.startsWith('http');
+      // r51: FORCE GRADIENT for ALL scenes — r42 S3 bundle lacks SafeImg/delayRender
+      // Sending background.type='image' causes silent black frames when Lambda Chromium
+      // fails to load images (no onError handler in old bundle)
+      const typeGradients: Record<string, string[]> = {
+        'hook': ['#f59e0b', '#d97706'],
+        'problem': ['#ef4444', '#b91c1c'],
+        'solution': ['#10b981', '#059669'],
+        'feature': ['#3b82f6', '#1d4ed8'],
+        'proof': ['#8b5cf6', '#6d28d9'],
+        'cta': ['#f97316', '#ea580c'],
+        'intro': ['#06b6d4', '#0891b2'],
+        'outro': ['#6366f1', '#4f46e5'],
+        'transition': ['#64748b', '#475569'],
+      };
       const sceneGradientColors = briefing.brandColors?.length >= 2
         ? [briefing.brandColors[0], briefing.brandColors[1]]
-        : ['#3b82f6', '#1e40af'];
-
-      // r48: If normalization already forced gradient, respect that
-      const bgType = scene.background?.type === 'gradient'
-        ? 'gradient'
-        : validateEnum(hasValidImage ? 'image' : 'gradient', ['color', 'gradient', 'video', 'image'], 'gradient');
+        : typeGradients[sceneType] || ['#3b82f6', '#1e40af'];
 
       return {
         id: `scene-${index}`,
@@ -1307,9 +1313,8 @@ async function runGenerationPipeline(
         startTime,
         endTime: startTime + duration,
         background: {
-          type: bgType,
-          imageUrl: bgType === 'image' ? scene.imageUrl : undefined,
-          gradientColors: sceneGradientColors, // r48: ALWAYS set — fallback for image load failures
+          type: 'gradient' as const, // r51: NEVER 'image' — r42 bundle can't handle it safely
+          gradientColors: sceneGradientColors,
         },
         animation: validateEnum(scene.animation || getDefaultAnimation(sceneType), VALID_ANIMATIONS, 'fadeIn'),
         kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', VALID_KEN_BURNS, 'in'),
