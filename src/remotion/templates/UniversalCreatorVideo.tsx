@@ -1699,7 +1699,7 @@ const SceneBackground: React.FC<{
   return (
     <AbsoluteFill style={{ opacity }}>
       <div style={{ width: '100%', height: '100%', transform }}>
-        {renderBackgroundContent(background, safeImageUrl)}
+        {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
       </div>
       <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
       <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />

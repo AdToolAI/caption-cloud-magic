@@ -759,11 +759,35 @@ async function runGenerationPipeline(
       const scene = script.scenes[i];
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
+          // Enhanced prompt engineering for Loft-Film quality
+          const sceneType = (scene.sceneType || scene.type || 'feature').toLowerCase();
+          const categoryStyleHints: Record<string, string> = {
+            'storytelling': 'cinematic, warm lighting, shallow depth of field, dramatic composition',
+            'corporate': 'clean, professional, modern office environment, business atmosphere',
+            'tutorial': 'bright, clear, well-organized, educational diagram style',
+            'advertisement': 'bold, vibrant, eye-catching, product-focused, high contrast',
+            'social-content': 'trendy, colorful, dynamic, social media optimized',
+            'testimonial': 'authentic, warm, personal, soft lighting, portrait style',
+            'presentation': 'clean, structured, infographic style, data visualization',
+            'explainer': 'illustrated, clear metaphors, concept visualization, flat design',
+          };
+          const categoryHint = categoryStyleHints[briefing.category || ''] || 'professional, high quality';
+          
+          const sceneStyleHints: Record<string, string> = {
+            'hook': 'dramatic, attention-grabbing, bold composition, central focal point',
+            'problem': 'moody, tense atmosphere, visual tension, dark undertones',
+            'solution': 'bright, optimistic, open space, positive energy, uplifting',
+            'feature': 'detailed, showcase, close-up, product detail, clean background',
+            'proof': 'trustworthy, data-driven, charts, statistics visualization',
+            'cta': 'energetic, motivating, directional, clear path forward',
+          };
+          const sceneHint = sceneStyleHints[sceneType] || 'professional, well-composed';
+
           const prompt = attempt === 0
-            ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}.`
+            ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}. No text, no letters, no watermarks, no human faces with distortions.`
             : attempt === 1
-            ? `${scene.visualDescription}. ${briefing.visualStyle} style. Professional quality.`
-            : `${scene.title || 'Scene'}. Simple, clean, ${briefing.visualStyle} style.`;
+            ? `${scene.visualDescription}. ${briefing.visualStyle} style. ${sceneHint}. Professional quality. No text or letters in image.`
+            : `${scene.title || 'Scene'}. Simple, clean, ${briefing.visualStyle} style. No text.`;
 
           const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
             method: 'POST',
