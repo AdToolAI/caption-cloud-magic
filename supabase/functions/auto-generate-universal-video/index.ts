@@ -2117,10 +2117,9 @@ async function generateSVGFallbackToStorage(
     }
   }
   
-  // Absolute last resort — inline data URI (may not work in Lambda but better than placehold.co)
-  const base64Svg = btoa(svgContent);
-  console.warn('[SVG Fallback] Using inline data URI as last resort');
-  return `data:image/svg+xml;base64,${base64Svg}`;
+  // r46: NEVER return data-URI — it crashes Lambda. Throw so caller can force gradient.
+  console.error('[SVG Fallback] Storage upload failed and data-URI is forbidden. Throwing error.');
+  throw new Error('SVG fallback storage upload failed — data-URI forbidden for Lambda stability');
 }
 
 function generatePNGPlaceholder(title: string, primaryColor?: string, secondaryColor?: string): string {
