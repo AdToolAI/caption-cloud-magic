@@ -1939,7 +1939,7 @@ async function generateAIFallbackImage(
 
     if (uploadError) {
       console.error('[AI Fallback] Storage upload failed:', uploadError.message);
-      return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+      return await generateSVGFallbackToStorage(title, primaryColor, secondaryColor, supabaseUrl!, supabaseServiceKey!);
     }
 
     const { data: publicUrlData } = uploadClient.storage
