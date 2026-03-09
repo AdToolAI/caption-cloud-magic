@@ -26,23 +26,81 @@ import { getSoundUrlSync, type SoundEffectType } from '../components/EmbeddedSou
 import { RiveCharacter, type PhonemeTimestamp } from '../components/RiveCharacter';
 import { getGestureForSceneType, detectEmotionFromText } from '@/utils/phonemeMapping';
 
-// ✅ r22: CSS gradient fallback instead of data-URI (Remotion Lambda can't load data: URIs)
-// Now uses brand colors when available instead of static dark navy
+// ✅ r23: Professional fallback backgrounds with scene-type-aware patterns
 const DEFAULT_FALLBACK_GRADIENT = 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)';
 
-/** Returns true if url is a valid remote URL (not a data-URI or empty) */
-function isValidRemoteUrl(url?: string): boolean {
-  if (!url || url.length < 10) return false;
-  if (url.startsWith('data:')) return false;
-  return url.startsWith('http://') || url.startsWith('https://');
-}
+// Scene-type color palettes for fallback backgrounds
+const SCENE_FALLBACK_PALETTES: Record<string, { gradient: string; accent: string; pattern: string }> = {
+  hook: { gradient: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%)', accent: '#F59E0B', pattern: 'radial' },
+  problem: { gradient: 'linear-gradient(135deg, #1a0a0a 0%, #2d1117 40%, #3b1520 100%)', accent: '#EF4444', pattern: 'diagonal' },
+  solution: { gradient: 'linear-gradient(135deg, #0a1a14 0%, #0d2818 40%, #134e2a 100%)', accent: '#10B981', pattern: 'circles' },
+  feature: { gradient: 'linear-gradient(135deg, #0a0f1a 0%, #111d35 40%, #1e3a5f 100%)', accent: '#3B82F6', pattern: 'grid' },
+  proof: { gradient: 'linear-gradient(135deg, #150a1e 0%, #1e1133 40%, #2d1b4e 100%)', accent: '#8B5CF6', pattern: 'dots' },
+  cta: { gradient: 'linear-gradient(135deg, #1a0a18 0%, #2d1128 40%, #4a1942 100%)', accent: '#EC4899', pattern: 'waves' },
+  intro: { gradient: 'linear-gradient(135deg, #0f0a1e 0%, #1a1535 40%, #2a204e 100%)', accent: '#6366F1', pattern: 'radial' },
+  outro: { gradient: 'linear-gradient(135deg, #1a0a18 0%, #251228 40%, #3a1a3e 100%)', accent: '#EC4899', pattern: 'circles' },
+  transition: { gradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', accent: '#64748B', pattern: 'none' },
+};
 
-/** CSS gradient fallback div — uses brandColors when provided, otherwise default dark gradient */
-const GradientFallback: React.FC<{ style?: React.CSSProperties; primaryColor?: string; secondaryColor?: string }> = ({ style, primaryColor, secondaryColor }) => {
-  const gradient = primaryColor
-    ? `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor || '#1e293b'} 50%, ${primaryColor}88 100%)`
-    : DEFAULT_FALLBACK_GRADIENT;
-  return <AbsoluteFill style={{ background: gradient, ...style }} />;
+/** Professional CSS gradient fallback with geometric patterns */
+const GradientFallback: React.FC<{
+  style?: React.CSSProperties;
+  primaryColor?: string;
+  secondaryColor?: string;
+  sceneType?: string;
+}> = ({ style, primaryColor, secondaryColor, sceneType }) => {
+  const palette = SCENE_FALLBACK_PALETTES[sceneType || ''] || SCENE_FALLBACK_PALETTES.hook;
+  const accentColor = primaryColor || palette.accent;
+  const baseGradient = primaryColor
+    ? `linear-gradient(135deg, ${accentColor}15 0%, ${secondaryColor || '#1e293b'} 50%, ${accentColor}22 100%)`
+    : palette.gradient;
+
+  // Generate decorative SVG pattern overlay
+  const patternOverlay = (() => {
+    switch (palette.pattern) {
+      case 'radial':
+        return `radial-gradient(circle at 20% 30%, ${accentColor}18 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, ${accentColor}12 0%, transparent 40%)`;
+      case 'diagonal':
+        return `repeating-linear-gradient(45deg, transparent, transparent 80px, ${accentColor}08 80px, ${accentColor}08 82px)`;
+      case 'circles':
+        return `radial-gradient(circle at 15% 85%, ${accentColor}20 0%, transparent 25%),
+                radial-gradient(circle at 85% 15%, ${accentColor}15 0%, transparent 30%),
+                radial-gradient(circle at 50% 50%, ${accentColor}08 0%, transparent 45%)`;
+      case 'grid':
+        return `repeating-linear-gradient(0deg, transparent, transparent 60px, ${accentColor}06 60px, ${accentColor}06 61px),
+                repeating-linear-gradient(90deg, transparent, transparent 60px, ${accentColor}06 60px, ${accentColor}06 61px)`;
+      case 'dots':
+        return `radial-gradient(circle at 25% 25%, ${accentColor}12 2px, transparent 2px),
+                radial-gradient(circle at 75% 75%, ${accentColor}10 2px, transparent 2px)`;
+      case 'waves':
+        return `radial-gradient(ellipse at 50% 0%, ${accentColor}15 0%, transparent 60%),
+                radial-gradient(ellipse at 50% 100%, ${accentColor}10 0%, transparent 50%)`;
+      default:
+        return 'none';
+    }
+  })();
+
+  return (
+    <AbsoluteFill style={{ background: baseGradient, ...style }}>
+      {/* Pattern overlay */}
+      <div style={{ position: 'absolute', inset: 0, background: patternOverlay, pointerEvents: 'none' }} />
+      {/* Subtle accent glow */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        background: `radial-gradient(ellipse 60% 40% at 50% 50%, ${accentColor}10 0%, transparent 70%)`,
+        pointerEvents: 'none',
+      }} />
+      {/* Bottom gradient for text readability */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.4) 100%)',
+        pointerEvents: 'none',
+      }} />
+    </AbsoluteFill>
+  );
 };
 
 // Scene schema for Universal Creator
