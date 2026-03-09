@@ -1595,7 +1595,7 @@ const SceneBackground: React.FC<{
 };
 
 // Helper to render background content
-function renderBackgroundContent(background: UniversalCreatorScene['background'], safeImageUrl?: string) {
+function renderBackgroundContent(background: UniversalCreatorScene['background'], safeImageUrl?: string, sceneType?: string, primaryColor?: string, secondaryColor?: string) {
   if (background.type === 'color') {
     return <AbsoluteFill style={{ backgroundColor: background.color || '#000000' }} />;
   }
@@ -1627,7 +1627,7 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
     );
   }
   
-  return <GradientFallback />;
+  return <GradientFallback sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />;
 }
 
 // ============================================================
