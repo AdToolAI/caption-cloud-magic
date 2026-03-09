@@ -783,11 +783,12 @@ async function runGenerationPipeline(
           };
           const sceneHint = sceneStyleHints[sceneType] || 'professional, well-composed';
 
+          const aspectHint = briefing.aspectRatio === '9:16' ? 'vertical portrait composition (9:16)' : 'wide landscape composition (16:9)';
           const prompt = attempt === 0
-            ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}. No text, no letters, no watermarks, no human faces with distortions.`
+            ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}. No text, no letters, no watermarks, no human faces.`
             : attempt === 1
-            ? `${scene.visualDescription}. ${briefing.visualStyle} style. ${sceneHint}. Professional quality. No text or letters in image.`
-            : `${scene.title || 'Scene'}. Simple, clean, ${briefing.visualStyle} style. No text.`;
+            ? `${scene.visualDescription}. ${briefing.visualStyle} style. ${sceneHint}. ${aspectHint}. Clean, professional. No text or letters.`
+            : `Abstract professional background for ${sceneType} scene. ${categoryHint}. ${aspectHint}. ${briefing.visualStyle} style. No text, no people.`;
 
           const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
             method: 'POST',
