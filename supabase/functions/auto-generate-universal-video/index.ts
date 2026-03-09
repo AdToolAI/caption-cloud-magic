@@ -817,7 +817,8 @@ async function runGenerationPipeline(
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              prompt,
+              sceneDescription: prompt,
+              type: 'scene',
               style: briefing.visualStyle,
               aspectRatio: briefing.aspectRatio,
               characterSheetUrl: characterSheetUrl,

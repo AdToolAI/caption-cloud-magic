@@ -231,7 +231,7 @@ serve(async (req) => {
           {
             input: {
               prompt: fullPrompt,
-              aspect_ratio: '16:9',
+              aspect_ratio: request.aspectRatio || '16:9',
               output_format: 'webp',
               output_quality: 90,
               safety_tolerance: 2,

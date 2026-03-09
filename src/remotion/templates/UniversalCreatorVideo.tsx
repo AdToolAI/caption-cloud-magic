@@ -1737,7 +1737,7 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
   if (safeImageUrl) {
     return (
       <AbsoluteFill>
-        <Img src={safeImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <SafeImg src={safeImageUrl} sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />
       </AbsoluteFill>
     );
   }
