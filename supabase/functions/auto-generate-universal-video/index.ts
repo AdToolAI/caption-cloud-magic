@@ -481,6 +481,9 @@ async function runGenerationPipeline(
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+  const functionStartTime = Date.now();
+  const FUNCTION_TIMEOUT_MS = 280_000; // 280s of 300s budget — leave 20s safety margin
+
   try {
     // PROFILE L/N: SmokeTest Composition
     if (profileFlags.smokeTestComposition) {
