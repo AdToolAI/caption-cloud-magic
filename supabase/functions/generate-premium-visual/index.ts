@@ -16,6 +16,7 @@ interface PremiumVisualRequest {
   characterSheetUrl?: string;
   styleGuide?: any;
   customStyleDescription?: string;
+  aspectRatio?: string;
   // ✅ PHASE 2: Brand Colors from 15-Phase Interview
   brandColors?: {
     primary: string;
@@ -207,7 +208,7 @@ serve(async (req) => {
             {
               input: {
                 prompt: fallbackPrompt,
-                aspect_ratio: '16:9',
+                aspect_ratio: request.aspectRatio || '16:9',
                 output_format: 'webp',
                 output_quality: 90,
                 safety_tolerance: 2,
@@ -230,7 +231,7 @@ serve(async (req) => {
           {
             input: {
               prompt: fullPrompt,
-              aspect_ratio: '16:9',
+              aspect_ratio: request.aspectRatio || '16:9',
               output_format: 'webp',
               output_quality: 90,
               safety_tolerance: 2,

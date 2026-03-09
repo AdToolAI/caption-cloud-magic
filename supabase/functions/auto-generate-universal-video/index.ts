@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r43-scopefix-2026-03-09-1";
+const AUTO_GEN_BUILD_TAG = "r44-prompt-fix-2026-03-09";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -817,7 +817,8 @@ async function runGenerationPipeline(
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              prompt,
+              sceneDescription: prompt,
+              type: 'scene',
               style: briefing.visualStyle,
               aspectRatio: briefing.aspectRatio,
               characterSheetUrl: characterSheetUrl,

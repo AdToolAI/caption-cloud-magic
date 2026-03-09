@@ -1709,6 +1709,21 @@ const SceneBackground: React.FC<{
   );
 };
 
+// SafeImg: wraps Img with onError fallback to prevent black frames in Lambda
+const SafeImg: React.FC<{ src: string; sceneType?: string; primaryColor?: string; secondaryColor?: string }> = ({ src, sceneType, primaryColor, secondaryColor }) => {
+  const [failed, setFailed] = React.useState(false);
+  if (failed) {
+    return <GradientFallback sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />;
+  }
+  return (
+    <Img
+      src={src}
+      onError={() => setFailed(true)}
+      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+    />
+  );
+};
+
 // Helper to render background content
 function renderBackgroundContent(background: UniversalCreatorScene['background'], safeImageUrl?: string, sceneType?: string, primaryColor?: string, secondaryColor?: string) {
   if (background.type === 'color') {
@@ -1737,7 +1752,7 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
   if (safeImageUrl) {
     return (
       <AbsoluteFill>
-        <Img src={safeImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <SafeImg src={safeImageUrl} sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />
       </AbsoluteFill>
     );
   }
