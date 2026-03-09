@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r48-deploy-verify-2026-03-09";
+const AUTO_GEN_BUILD_TAG = "r49-format-detect-2026-03-09";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -913,13 +913,41 @@ async function runGenerationPipeline(
           if (!dlResp.ok) throw new Error(`GET returned ${dlResp.status}`);
 
           const imageBytes = new Uint8Array(await dlResp.arrayBuffer());
-          if (imageBytes.length < 500) throw new Error(`Image too small: ${imageBytes.length} bytes`);
+          if (imageBytes.length < 2000) throw new Error(`Image too small: ${imageBytes.length} bytes`);
 
-          // Step 2: Re-upload as JPEG for fastest Chromium decoding
-          const stableFileName = `render-ready/scene-${i}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.jpg`;
+          // r49: MAGIC-BYTE FORMAT DETECTION — detect actual format instead of assuming JPEG
+          let detectedContentType = 'image/jpeg';
+          let detectedExt = '.jpg';
+          if (imageBytes.length >= 12) {
+            // WebP: starts with "RIFF" + 4 bytes + "WEBP"
+            if (imageBytes[0] === 0x52 && imageBytes[1] === 0x49 && imageBytes[2] === 0x46 && imageBytes[3] === 0x46 &&
+                imageBytes[8] === 0x57 && imageBytes[9] === 0x45 && imageBytes[10] === 0x42 && imageBytes[11] === 0x50) {
+              detectedContentType = 'image/webp';
+              detectedExt = '.webp';
+            }
+            // PNG: starts with 0x89 0x50 0x4E 0x47
+            else if (imageBytes[0] === 0x89 && imageBytes[1] === 0x50 && imageBytes[2] === 0x4E && imageBytes[3] === 0x47) {
+              detectedContentType = 'image/png';
+              detectedExt = '.png';
+            }
+            // JPEG: starts with 0xFF 0xD8
+            else if (imageBytes[0] === 0xFF && imageBytes[1] === 0xD8) {
+              detectedContentType = 'image/jpeg';
+              detectedExt = '.jpg';
+            }
+            // GIF: starts with "GIF8"
+            else if (imageBytes[0] === 0x47 && imageBytes[1] === 0x49 && imageBytes[2] === 0x46 && imageBytes[3] === 0x38) {
+              detectedContentType = 'image/gif';
+              detectedExt = '.gif';
+            }
+          }
+          console.log(`[asset-normalize] Scene ${i + 1}: detected format=${detectedContentType} (${imageBytes.length} bytes)`);
+
+          // Step 2: Re-upload with CORRECT content-type and extension
+          const stableFileName = `render-ready/scene-${i}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}${detectedExt}`;
           const { error: upErr } = await normalizeClient.storage
             .from('video-assets')
-            .upload(stableFileName, imageBytes, { contentType: 'image/jpeg', upsert: true });
+            .upload(stableFileName, imageBytes, { contentType: detectedContentType, upsert: true });
 
           if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
 
