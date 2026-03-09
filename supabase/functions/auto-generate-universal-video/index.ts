@@ -823,9 +823,18 @@ async function runGenerationPipeline(
         }
       }
 
-      // All retries failed — use placehold.co gradient fallback (reliable for Remotion Lambda)
-      console.warn(`[auto-generate-universal-video] Scene ${i + 1}: All ${maxRetries} retries failed, using placehold.co fallback`);
-      return await generatePNGPlaceholder(scene.title, briefing.brandColors?.[0], briefing.brandColors?.[1]);
+      // All retries failed — use AI-generated fallback image via Lovable AI (Gemini)
+      console.warn(`[auto-generate-universal-video] Scene ${i + 1}: All ${maxRetries} retries failed, generating AI fallback image`);
+      return await generateAIFallbackImage(
+        scene.title,
+        sceneType,
+        briefing.category || 'explainer',
+        briefing.brandColors?.[0],
+        briefing.brandColors?.[1],
+        briefing.visualStyle || 'modern-3d',
+        supabaseUrl,
+        supabaseServiceKey
+      );
     };
 
     // Phase A: Generate priority scenes FIRST (5 retries each, batch of 2)
