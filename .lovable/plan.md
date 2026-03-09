@@ -1,55 +1,190 @@
 
+## r42 — Error Isolation Mode (IMPLEMENTED)
 
-# Diagnose: Warum Szenen immer noch schwarz sind
+### Problem
+- `lambda_crash` mit Lottie-Timeout dominiert, aber `disableAllLottie=true` hilft nicht
+- Scheduling erzeugt `framesPerLambda=1440, fps=24, estTime=2880s, timeout=600s` → garantierter Timeout
+- Keine Forensik pro Attempt → Fehlerquelle unklar
 
-## Das eigentliche Problem
+### Lösung
+1. **Timeout Budget Enforcement**: `calculateScheduling()` gibt `estRuntimeSec` + `timeoutBudgetOk` zurück. Render-Only Pipeline erzwingt fps=15 wenn Budget überschritten.
+2. **Isolation Ladder**: Statt generischem Retry feste A/B/C-Stufen:
+   - Step A: Standard Stability Mode
+   - Step B: Alle riskanten Subsysteme aus (Lottie, SceneFx, PrecisionSubtitles)
+   - Step C: Maximum Isolation + fps=15
+3. **Forensics**: `isolationStep`, `effectiveFlags`, `sourceErrorSignature`, `failureStage`, `estRuntimeSec`, `timeoutBudgetOk` in result_data und content_config
+4. **UI**: Diagnose-Panel zeigt Isolation-Step, effektive Flags, Error-Signatur, Budget-Status
 
-Alle bisherigen Fixes (r47-r49) haben an der **Normalisierung** gearbeitet — also daran, Bilder korrekt herunterzuladen und neu hochzuladen. Aber das Problem liegt tiefer:
+### Betroffene Dateien
+- `supabase/functions/_shared/remotion-payload.ts` (SchedulingResult + Budget-Check)
+- `supabase/functions/auto-generate-universal-video/index.ts` (Isolation Ladder + Budget Enforcement)
+- `supabase/functions/invoke-remotion-render/index.ts` (failure_stage + canary)
+- `supabase/functions/remotion-webhook/index.ts` (failure_stage + errorFingerprint in result_data)
+- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` (r42 Diagnose-Panel)
 
-1. **Das S3-Bundle (r42) hat KEIN `SafeImg` mit `delayRender`**. Die aktuelle Code-Version im Repository enthält `SafeImg` mit 15s-Timeout und Gradient-Fallback — aber das r42-Bundle auf S3 nutzt eine ältere Version OHNE diese Absicherung. Im r42-Bundle wird ein einfaches `<Img>` verwendet, das bei Ladefehler **still schwarz** bleibt.
+---
 
-2. **`background.gradientColors` wird ignoriert** wenn `background.type === 'image'`. Die Remotion-Template-Logik (Zeile 1758) prüft `background.type === 'gradient'` bevor sie Gradient-Farben nutzt. Wenn `type === 'image'` gesetzt ist und das Bild nicht lädt, greift KEIN Fallback.
+## r41 — Silent Render + Audio Mux (IMPLEMENTED)
 
-3. **Die Edge Function wurde erfolgreich deployed** (gerade erneut verifiziert), aber das ändert nichts, weil der Lambda-Renderer den S3-Bundle-Code ausführt, nicht den Edge-Function-Code.
+### Problem
+- UI zeigt generischen "non-2xx"-Fehler statt Cooldown-UI bei 429/capacity_cooldown
+- Stability-Scheduling griff nur bei 20% (zufällig), meiste Renders liefen distributed → rate_limit
+- Retries erzwangen Stability nur bei rate_limit, nicht bei timeout/lambda_crash/audio_corruption
 
-## Einzige Lösung ohne S3-Bundle-Update
+### Lösung
+- **UI**: `FunctionsHttpError.context.json()` robust parsen → Cooldown-UI statt Error
+- **Scheduling**: 100% Stability (Hotfix), hash-basiert statt random, alle retryable Kategorien → stability
+- **Retries**: `forceStability: true` für jeden Retry
+- **Observability**: schedulingMode, framesPerLambda, estimatedLambdas, fpsUsed in result_data
 
-Da wir das S3-Bundle nicht aus dieser Umgebung aktualisieren können, müssen wir die **Bildverwendung auf Edge-Function-Ebene absichern**:
 
-### Strategie: "Pre-Render Image Validation"
+## r37 — Rate-Limit Auto-Recovery Stabilisierung (IMPLEMENTED)
 
-Statt dem Lambda zu vertrauen, dass es Bilder laden kann, **prüfen wir jedes Bild doppelt** und setzen `background.type = 'gradient'` falls auch nur der geringste Zweifel besteht:
+### Problem
+- Realtime-DB und Render-Polling liefern denselben Fehler doppelt → `totalAttempts` wird künstlich aufgebläht
+- Im Polling-Pfad fehlte exponentielles Backoff für `rate_limit` (war pauschal 30s statt 60/120/180s)
+- Wenn `retryTriggeredRef=true` und ein zweiter retryabler Fehler eintrifft → fiel in `setError()` statt "Retry läuft"
+- `sourceProgressId` wurde nicht durch die Retry-Kette propagiert → Backend-Retry-Zählung unzuverlässig
 
-1. **Strikte Bildvalidierung nach Normalisierung**: Nach dem Re-Upload UND der Verify-GET-Prüfung wird eine ZWEITE Validierung durchgeführt: Ein vollständiger GET-Request (nicht nur HEAD), der den Response-Body liest und prüft ob:
-   - Content-Length > 5000 Bytes
-   - Content-Type header mit der tatsächlichen Datei übereinstimmt
-   - Response in < 2s vollständig ankommt
+### Lösung
 
-2. **Gradient bei JEDEM Fehler**: Wenn irgendein Schritt fehlschlägt, wird `background.type` auf `'gradient'` gesetzt — NICHT `'image'` mit einer fragwürdigen URL. Das ist der entscheidende Unterschied zu den bisherigen Fixes, die weiterhin `type: 'image'` setzten.
+#### Frontend (`UniversalAutoGenerationProgress.tsx`)
+1. `lastFailureSignatureRef` — Dedup-Guard für identische Failure-Events
+2. Retry-Guard: retryable Fehler bei bereits geplantem Retry → ignorieren statt `setError()`
+3. Polling-Pfad Backoff: `rate_limit` → 60s/120s/180s exponentiell mit Countdown-UI
+4. Failure-Signature Reset bei neuem Retry-Start
 
-3. **Timing-basierter Gradient-Guard**: Für jede Szene wird die Download-Zeit gemessen. Wenn der Download des normalisierten Bildes > 3s dauert, wird auf Gradient umgestellt — weil Lambda-Chromium unter Last noch langsamer laden wird.
+#### Backend (`auto-generate-universal-video/index.ts`)
+1. `chainSourceProgressId` = sourceProgressId-Kette bis zum Original
+2. Propagation in content_config, result_data (ready_to_render + failed)
+3. Retry-Zählung filtert auf chainSourceProgressId
 
-4. **Scene-spezifische Gradient-Farben**: Statt einheitlicher Brand-Farben bekommt jede Szene eine eigene Gradient-Kombination basierend auf `sceneType` (Hook=Amber, Problem=Red, Solution=Green, etc.).
+---
+
+
+## r33 — Audio-Corruption-Recovery (IMPLEMENTED)
+
+### Problem
+- Render crasht mit `ffprobe` exit code 1: korrupte MP3-Datei (HTML-Fehlerseite oder leerer Response als `.mp3` gespeichert)
+- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Audio-Strip)
+- Alle 3 Retries scheitern identisch, weil dieselbe korrupte Audio-Datei wiederverwendet wird
+
+### Lösung
+Audio-Corruption wird jetzt als eigene Kategorie `audio_corruption` erkannt. Retry-Strategie entfernt Audio-Quellen aus dem Payload.
 
 ### Änderungen
 
-**`supabase/functions/auto-generate-universal-video/index.ts`**:
-- Nach Normalisierungs-Loop: Zweite Validierungsrunde für JEDE Szene mit `background.type === 'image'`
-- Messung der Download-Zeit, Schwellenwert 3s
-- Content-Length-Check (>5000 bytes)
-- Bei Fehler: `background.type = 'gradient'` erzwingen (statt imageUrl beizubehalten)
-- Scene-Type-basierte Gradient-Farbpaletten
-- Build-Tag: `r50-strict-validate-2026-03-09`
+#### Fehlerklassifikation (3 Dateien)
+Neue Regex VOR `validation` (da "invalid" auch in ffprobe-Fehlern vorkommt):
+```
+/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i → 'audio_corruption'
+```
+- `remotion-webhook/index.ts` — classifyError()
+- `check-remotion-progress/index.ts` — errorCategory block
+- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError()
 
+#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
+`runRenderOnlyPipeline()` — Audio-Corruption-Branch:
+- **Audio-Corruption erkannt**: FPS bleibt bei 30, Audio wird gestripped
+  - `voiceoverUrl = undefined`, `backgroundMusicUrl = undefined`, `backgroundMusicVolume = 0`
+  - `subtitles.segments = []` (keine Untertitel ohne Audio)
+  - Flag `r33_audioStripped: true` in `inputProps.diag` + `result_data`
+- Frontend: 5s Wartezeit (statt 30s), Label "Audio-Fehler"
+
+### Erwartetes Ergebnis
 ```text
-Validierungs-Flow pro Szene (NEU nach Normalisierung):
-  1. Ist background.type === 'image'? 
-     JA → Weiter zu Schritt 2
-     NEIN → Überspringe (Gradient ist bereits gesetzt)
-  2. Full GET-Request auf imageUrl (2s Timeout)
-  3. Prüfe: status===200 AND body.length > 5000 AND content-type match
-  4. Prüfe: Download-Zeit < 3000ms
-  5. Alle Prüfungen bestanden → Behalte type='image'
-  6. Irgendein Fehler → Setze type='gradient' + sceneType-Farben
+Audio-Corruption, 1. Retry:
+  → Kategorie: audio_corruption (nicht mehr unknown)
+  → FPS: 30 (unverändert)
+  → Audio: komplett entfernt (voiceover + background music)
+  → Video wird ohne Ton fertiggestellt ✅
 ```
 
+---
+
+## r32 — Lottie-Stall-Recovery (IMPLEMENTED)
+
+### Problem
+- Render crasht mit `A delayRender() "Waiting for Lottie animation to load"` 
+- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Lottie-Fix)
+
+### Lösung
+Lottie-Stall wird jetzt als `lambda_crash` erkannt. Retry-Strategie deaktiviert gezielt Lottie statt FPS zu senken.
+
+### Änderungen
+
+#### Fehlerklassifikation (4 Dateien)
+Neue Regex VOR generischem `lambda_crash`:
+```
+/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i → 'lambda_crash'
+```
+- `remotion-webhook/index.ts` — classifyError()
+- `check-remotion-progress/index.ts` — errorCategory block
+- `invoke-remotion-render/index.ts` — classifyImmediate()
+- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError() (VOR timeout-Check, da Lottie-Errors docs-Links mit "timeout" enthalten können)
+
+#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
+`runRenderOnlyPipeline()` — Lottie-aware Branching:
+- **Lottie-Stall erkannt** (`lambda_crash` + Lottie-Regex in errorMessage):
+  - FPS bleibt bei 30 (kein Downgrade!)
+  - Retry 1: `disableLottieIcons=true`, `disableMorphTransitions=true`, `forceEmbeddedCharacterLottie=true`
+  - Retry 2/3: `disableAllLottie=true` (komplett)
+  - Flags werden in `inputProps.diag` injiziert + in `result_data` persistiert
+- **Sonstiger lambda_crash** (nicht Lottie): Defensive Lottie-Disable + FPS-Reduktion
+- Timeout/Rate-Limit/Unknown: Verhalten unverändert (wie r28/r31)
+
+#### Observability
+- `bundle_probe`: `r29-lambda240s` → `r32-lottieRecovery`
+
+### Erwartetes Ergebnis
+
+```text
+Lottie-Stall, 1. Retry:
+  → Kategorie: lambda_crash (nicht mehr unknown)
+  → FPS: 30 (unverändert)
+  → Flags: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie
+  → Render sollte durchgehen ✅
+
+Lottie-Stall, 2. Retry (falls nötig):
+  → disableAllLottie=true → alle Lottie-Komponenten aus
+  → Maximale Stabilität ✅
+
+Normaler Run ohne Lottie-Stall:
+  → Volle 30fps Qualität, alle Effekte ✅
+```
+
+---
+
+## r31 — Lambda 600s + Hybrid Backoff (IMPLEMENTED)
+
+### Problem
+- 8 Lambdas + 240s Timeout → 225 fpl × 2.1s = 472s → TIMEOUT ❌
+- 20 Lambdas + 240s Timeout → Rate Limit (AWS Concurrency ~10) ❌
+
+### Lösung
+Neue Lambda-Funktion mit **600s Timeout** deployed. 8 Lambdas bleiben unter dem Concurrency-Limit und haben genug Zeit.
+
+### Änderungen
+
+#### `_shared/remotion-payload.ts`
+- `LAMBDA_TIMEOUT_SECONDS`: 240 → **600**
+- `TARGET_MAX_LAMBDAS`: 20 → **8**
+- Soft-Max: 84 → **210** fpl
+- Hard-Max: 120 → **300** fpl
+- bundle_canary: `r31-lambda600s`
+
+#### Alle 5 Render Edge Functions (Fallback-Namen)
+- `240sec` → `600sec` in:
+  - `invoke-remotion-render/index.ts`
+  - `render-with-remotion/index.ts`
+  - `render-universal-video/index.ts`
+  - `render-directors-cut/index.ts`
+  - `auto-generate-universal-video/index.ts`
+
+#### `remotion-webhook/index.ts`
+- Timeout-Fehlermeldung: "240s" → "600s"
+
+#### `UniversalAutoGenerationProgress.tsx` (Frontend)
+- Rate-Limit-Retry: **exponentieller Backoff** (60s / 120s / 180s für Attempt 1/2/3)
+- Timeout/Crash-Retry: flat 30s (wie bisher)
+- Live-Countdown-Anzeige: "🔄 Rate-Limit — Auto-Retry in 58s (1/3)..."

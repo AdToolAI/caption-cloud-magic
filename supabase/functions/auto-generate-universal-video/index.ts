@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r49-format-detect-2026-03-09";
+const AUTO_GEN_BUILD_TAG = "r50-strict-validate-2026-03-09";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -1026,7 +1026,70 @@ async function runGenerationPipeline(
 
     console.log(`[asset-normalize] SUMMARY: ${normalizedCount} normalized, ${fallbackCount} SVG, ${gradientForcedCount} gradient, ${skippedCount} skipped (of ${script.scenes.length} total)`);
 
-    await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals, r47_assetNormalize: { normalized: normalizedCount, svgFallback: fallbackCount, gradientForced: gradientForcedCount, skipped: skippedCount } });
+    // ═══════════════════════════════════════════════════════════════
+    // r50: STRICT POST-NORMALIZATION VALIDATION
+    // The r42 S3 bundle has NO SafeImg fallback — if an image fails to load,
+    // it renders BLACK. We must guarantee every image is accessible BEFORE
+    // sending to Lambda, or force gradient (which the bundle handles correctly).
+    // ═══════════════════════════════════════════════════════════════
+    const SCENE_TYPE_GRADIENTS: Record<string, [string, string]> = {
+      'hook':       ['#f59e0b', '#d97706'],  // Amber
+      'problem':    ['#ef4444', '#b91c1c'],  // Red
+      'solution':   ['#10b981', '#059669'],  // Green
+      'feature':    ['#3b82f6', '#1d4ed8'],  // Blue
+      'proof':      ['#8b5cf6', '#6d28d9'],  // Purple
+      'cta':        ['#f97316', '#ea580c'],  // Orange
+      'intro':      ['#06b6d4', '#0891b2'],  // Cyan
+      'outro':      ['#6366f1', '#4f46e5'],  // Indigo
+      'transition': ['#64748b', '#475569'],  // Slate
+    };
+
+    let r50ValidatedCount = 0;
+    let r50GradientForcedCount = 0;
+
+    for (let i = 0; i < script.scenes.length; i++) {
+      const scene = script.scenes[i];
+      if (!scene.imageUrl || !scene.imageUrl.startsWith('http')) {
+        continue; // Already gradient or no image
+      }
+
+      try {
+        const validateStart = Date.now();
+        const valController = new AbortController();
+        const valTimeout = setTimeout(() => valController.abort(), 2000); // 2s strict timeout
+        const valResp = await fetch(scene.imageUrl, { signal: valController.signal });
+        clearTimeout(valTimeout);
+
+        const valBody = await valResp.arrayBuffer();
+        const downloadMs = Date.now() - validateStart;
+
+        // Strict checks:
+        // 1. HTTP 200
+        // 2. Body > 5000 bytes (small files are often error pages or corrupt)
+        // 3. Download completed in < 3s (Lambda will be even slower under load)
+        if (!valResp.ok || valBody.byteLength < 5000 || downloadMs > 3000) {
+          throw new Error(`r50: status=${valResp.status}, size=${valBody.byteLength}, time=${downloadMs}ms`);
+        }
+
+        r50ValidatedCount++;
+        console.log(`[r50-validate] Scene ${i + 1}: ✅ OK (${valBody.byteLength} bytes, ${downloadMs}ms)`);
+      } catch (valErr: any) {
+        const sceneType = (scene.sceneType || scene.type || 'feature').toLowerCase();
+        const gradientPair = SCENE_TYPE_GRADIENTS[sceneType] || SCENE_TYPE_GRADIENTS['feature'];
+
+        console.warn(`[r50-validate] Scene ${i + 1}: ❌ FAILED (${valErr.message}) → forcing gradient [${gradientPair}]`);
+        script.scenes[i].imageUrl = undefined;
+        script.scenes[i].background = {
+          type: 'gradient',
+          gradientColors: gradientPair,
+        };
+        r50GradientForcedCount++;
+      }
+    }
+
+    console.log(`[r50-validate] SUMMARY: ${r50ValidatedCount} validated, ${r50GradientForcedCount} forced to gradient`);
+
+    await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals, r47_assetNormalize: { normalized: normalizedCount, svgFallback: fallbackCount, gradientForced: gradientForcedCount, skipped: skippedCount }, r50_validation: { validated: r50ValidatedCount, gradientForced: r50GradientForcedCount } });
 
     // Step 4: Generate Voice-Over WITH TIMESTAMPS for Lip-Sync (60% - 70%)
     await updateProgress(supabase, progressId, 'generating_voiceover', 65, '🎙️ Voiceover wird erstellt...');
