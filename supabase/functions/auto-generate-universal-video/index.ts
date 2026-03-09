@@ -1886,7 +1886,7 @@ async function generateAIFallbackImage(
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
       console.error(`[AI Fallback] Gemini failed (${aiResponse.status}):`, errText);
-      return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+      return await generateSVGFallbackToStorage(title, primaryColor, secondaryColor, supabaseUrl!, supabaseServiceKey!);
     }
 
     const aiData = await aiResponse.json();
