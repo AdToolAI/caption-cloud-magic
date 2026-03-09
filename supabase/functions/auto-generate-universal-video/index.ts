@@ -1890,11 +1890,40 @@ async function generateAIFallbackImage(
     }
 
     const aiData = await aiResponse.json();
-    const imageData = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    console.log('[AI Fallback] Gemini response keys:', JSON.stringify(Object.keys(aiData?.choices?.[0]?.message || {})));
+    
+    // Try multiple response formats for robustness
+    let imageData: string | undefined;
+    
+    // Format 1: message.images array (documented Lovable AI Gateway format)
+    imageData = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    
+    // Format 2: message.content array with image_url parts (OpenAI-compatible)
+    if (!imageData) {
+      const content = aiData.choices?.[0]?.message?.content;
+      if (Array.isArray(content)) {
+        const imagePart = content.find((part: any) => part.type === 'image_url');
+        if (imagePart?.image_url?.url) {
+          imageData = imagePart.image_url.url;
+        }
+      }
+    }
+    
+    // Format 3: inline_data in parts (raw Gemini format)
+    if (!imageData) {
+      const parts = aiData.choices?.[0]?.message?.parts;
+      if (Array.isArray(parts)) {
+        const imgPart = parts.find((p: any) => p.inline_data);
+        if (imgPart?.inline_data?.data) {
+          const mime = imgPart.inline_data.mime_type || 'image/png';
+          imageData = `data:${mime};base64,${imgPart.inline_data.data}`;
+        }
+      }
+    }
 
     if (!imageData || !imageData.startsWith('data:image')) {
-      console.warn('[AI Fallback] No image in Gemini response, falling back to placehold.co');
-      return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+      console.warn('[AI Fallback] No image in Gemini response. Response structure:', JSON.stringify(aiData.choices?.[0]?.message || {}).slice(0, 500));
+      return await generateSVGFallbackToStorage(title, primaryColor, secondaryColor, supabaseUrl!, supabaseServiceKey!);
     }
 
     // Upload base64 image to Supabase Storage
