@@ -777,7 +777,7 @@ const SceneTypeEffects: React.FC<{
 // 🎬 CHARACTER ANIMATION (Phase 2)
 // ============================================================
 
-// Animated SVG Character (Loft-Film Style)
+// Animated SVG Character (Loft-Film Professional Style)
 const AnimatedCharacter: React.FC<{
   type: 'presenter' | 'user' | 'expert';
   action: 'pointing' | 'thinking' | 'celebrating' | 'explaining' | 'idle';
@@ -795,38 +795,60 @@ const AnimatedCharacter: React.FC<{
     config: { damping: 12, stiffness: 80 },
   });
   
-  const breathe = Math.sin(frame * 0.08) * 3;
-  const headTilt = Math.sin(frame * 0.05) * 3;
-  const blinkCycle = frame % 90;
-  const isBlinking = blinkCycle < 3;
+  const breathe = Math.sin(frame * 0.06) * 2;
+  const headTilt = Math.sin(frame * 0.04) * 2.5;
+  const blinkCycle = frame % 120;
+  const isBlinking = blinkCycle < 4;
   
+  // Smooth arm animations
   const armWave = action === 'pointing' 
-    ? Math.sin(frame * 0.12) * 10 
+    ? 15 + Math.sin(frame * 0.08) * 8 
     : action === 'explaining' 
-      ? Math.sin(frame * 0.15) * 15 
+      ? Math.sin(frame * 0.12) * 12 
+      : action === 'celebrating'
+        ? -25 + Math.sin(frame * 0.2) * 10
+        : 0;
+  
+  const leftArmWave = action === 'celebrating'
+    ? -20 + Math.sin(frame * 0.18 + 1) * 10
+    : action === 'explaining'
+      ? Math.sin(frame * 0.1 + 2) * 8
       : 0;
   
-  const celebrateBounce = action === 'celebrating' ? Math.abs(Math.sin(frame * 0.2)) * 15 : 0;
+  const celebrateBounce = action === 'celebrating' ? Math.abs(Math.sin(frame * 0.15)) * 8 : 0;
   
   const positionStyles: Record<string, React.CSSProperties> = {
-    left: { left: '5%', right: 'auto' },
-    right: { right: '5%', left: 'auto' },
+    left: { left: '3%', right: 'auto' },
+    right: { right: '3%', left: 'auto' },
     center: { left: '50%', transform: 'translateX(-50%)' },
   };
   
-  const characterColors = {
-    presenter: { skin: '#FFDAB9', shirt: primaryColor, pants: '#1E3A5F' },
-    user: { skin: '#D4A574', shirt: '#3B82F6', pants: '#374151' },
-    expert: { skin: '#F5DEB3', shirt: '#059669', pants: '#1F2937' },
+  // Professional character color sets
+  const characterSets = {
+    presenter: { skin: '#F5D0A9', hair: '#3D2314', shirt: primaryColor, pants: '#1E3A5F', tie: '#C0392B', shoes: '#1a1a1a', eyeColor: '#2D5F3E' },
+    user: { skin: '#D4A574', hair: '#1a1a1a', shirt: '#3B82F6', pants: '#374151', tie: '#6366F1', shoes: '#2a2a2a', eyeColor: '#3B2F2F' },
+    expert: { skin: '#F5DEB3', hair: '#8B6C42', shirt: '#059669', pants: '#1F2937', tie: '#F59E0B', shoes: '#1a1a1a', eyeColor: '#1a5276' },
   };
   
-  const colors = characterColors[type];
+  const c = characterSets[type];
+  
+  // Eyebrow expression
+  const eyebrowOffset = action === 'thinking' ? 3 : action === 'celebrating' ? -3 : action === 'explaining' ? -1 : 0;
+  
+  // Mouth shapes based on action
+  const mouthPath = action === 'celebrating' 
+    ? 'M 88 78 Q 100 92 112 78' // Wide smile
+    : action === 'thinking'
+      ? 'M 93 80 Q 100 77 107 80' // Slight frown
+      : action === 'explaining'
+        ? `M 92 78 Q 100 ${82 + Math.sin(frame * 0.15) * 3} 108 78` // Talking
+        : 'M 90 78 Q 100 83 110 78'; // Neutral smile
   
   return (
     <div
       style={{
         position: 'absolute',
-        bottom: '8%',
+        bottom: '5%',
         ...positionStyles[position],
         transform: `translateY(${breathe - celebrateBounce}px) scale(${0.3 + 0.7 * Math.max(0, entryProgress)})`,
         opacity: Math.max(0, entryProgress),
@@ -835,52 +857,145 @@ const AnimatedCharacter: React.FC<{
       }}
     >
       <svg 
-        width="200" 
-        height="350" 
-        viewBox="0 0 200 350" 
-        style={{ filter: 'drop-shadow(0 10px 30px rgba(0,0,0,0.3))' }}
+        width="180" 
+        height="340" 
+        viewBox="0 0 200 360" 
+        style={{ filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.35))' }}
       >
-        <g transform={`rotate(${headTilt}, 100, 60)`}>
-          <ellipse cx="100" cy="55" rx="40" ry="45" fill={colors.skin} />
-          <path d="M 60 45 Q 70 20 100 15 Q 130 20 140 45" fill="#2D1B0E" stroke="none" />
-          <g transform={isBlinking ? 'scaleY(0.1)' : ''} style={{ transformOrigin: '100px 50px' }}>
-            <ellipse cx="82" cy="50" rx="6" ry={isBlinking ? 1 : 4} fill="#2D1B0E" />
-            <ellipse cx="118" cy="50" rx="6" ry={isBlinking ? 1 : 4} fill="#2D1B0E" />
+        {/* Body / Torso - Professional jacket */}
+        <path d="M 60 118 C 55 118 48 125 45 140 L 40 215 C 40 220 45 225 55 225 L 145 225 C 155 225 160 220 160 215 L 155 140 C 152 125 145 118 140 118 Z" fill={c.shirt} />
+        {/* Jacket lapels */}
+        <path d="M 75 118 L 100 155 L 95 118" fill={`${c.shirt}DD`} stroke="rgba(0,0,0,0.15)" strokeWidth="1" />
+        <path d="M 125 118 L 100 155 L 105 118" fill={`${c.shirt}DD`} stroke="rgba(0,0,0,0.15)" strokeWidth="1" />
+        {/* Shirt collar */}
+        <path d="M 82 115 L 100 135 L 118 115" fill="white" />
+        {/* Tie */}
+        <path d="M 97 130 L 100 135 L 103 130 L 101 175 L 100 180 L 99 175 Z" fill={c.tie} />
+        
+        {/* Neck */}
+        <rect x="92" y="100" width="16" height="22" rx="4" fill={c.skin} />
+        
+        {/* Head */}
+        <g transform={`rotate(${headTilt}, 100, 65)`}>
+          {/* Head shape - rounder, more detailed */}
+          <ellipse cx="100" cy="62" rx="38" ry="42" fill={c.skin} />
+          {/* Ears */}
+          <ellipse cx="62" cy="62" rx="8" ry="12" fill={c.skin} />
+          <ellipse cx="63" cy="62" rx="5" ry="8" fill={`${c.skin}CC`} />
+          <ellipse cx="138" cy="62" rx="8" ry="12" fill={c.skin} />
+          <ellipse cx="137" cy="62" rx="5" ry="8" fill={`${c.skin}CC`} />
+          {/* Hair - professional style */}
+          <path d="M 62 50 Q 65 18 100 12 Q 135 18 138 50 Q 140 38 135 28 Q 125 15 100 10 Q 75 15 65 28 Q 60 38 62 50" fill={c.hair} />
+          <path d="M 62 50 Q 60 45 62 38 Q 64 30 70 25" fill={c.hair} stroke="none" />
+          <path d="M 138 50 Q 140 45 138 38 Q 136 30 130 25" fill={c.hair} stroke="none" />
+          
+          {/* Eyebrows */}
+          <path d={`M 76 ${42 + eyebrowOffset} Q 84 ${38 + eyebrowOffset} 92 ${41 + eyebrowOffset}`} stroke={c.hair} strokeWidth="2.5" fill="none" strokeLinecap="round" />
+          <path d={`M 108 ${41 + eyebrowOffset} Q 116 ${38 + eyebrowOffset} 124 ${42 + eyebrowOffset}`} stroke={c.hair} strokeWidth="2.5" fill="none" strokeLinecap="round" />
+          
+          {/* Eyes - detailed with iris */}
+          <g>
+            {/* Eye whites */}
+            <ellipse cx="84" cy="52" rx="9" ry={isBlinking ? 1 : 6} fill="white" />
+            <ellipse cx="116" cy="52" rx="9" ry={isBlinking ? 1 : 6} fill="white" />
             {!isBlinking && (
               <>
-                <circle cx="84" cy="48" r="2" fill="white" opacity="0.7" />
-                <circle cx="120" cy="48" r="2" fill="white" opacity="0.7" />
+                {/* Iris */}
+                <circle cx="85" cy="52" r="4" fill={c.eyeColor} />
+                <circle cx="117" cy="52" r="4" fill={c.eyeColor} />
+                {/* Pupil */}
+                <circle cx="85" cy="52" r="2" fill="#1a1a1a" />
+                <circle cx="117" cy="52" r="2" fill="#1a1a1a" />
+                {/* Eye highlight */}
+                <circle cx="87" cy="50" r="1.5" fill="white" opacity="0.8" />
+                <circle cx="119" cy="50" r="1.5" fill="white" opacity="0.8" />
+                {/* Lower eyelid line */}
+                <path d="M 75 55 Q 84 58 93 55" stroke={`${c.skin}AA`} strokeWidth="1" fill="none" />
+                <path d="M 107 55 Q 116 58 125 55" stroke={`${c.skin}AA`} strokeWidth="1" fill="none" />
               </>
             )}
           </g>
-          <path d="M 72 40 Q 82 37 92 40" stroke="#2D1B0E" strokeWidth="2" fill="none" />
-          <path d="M 108 40 Q 118 37 128 40" stroke="#2D1B0E" strokeWidth="2" fill="none" />
-          {action === 'celebrating' ? (
-            <path d="M 85 72 Q 100 85 115 72" fill="none" stroke="#C0392B" strokeWidth="3" />
-          ) : action === 'thinking' ? (
-            <ellipse cx="100" cy="75" rx="8" ry="5" fill="#C0392B" />
-          ) : (
-            <path d="M 88 72 Q 100 78 112 72" fill="none" stroke="#C0392B" strokeWidth="2" />
+          
+          {/* Nose */}
+          <path d="M 100 55 Q 98 65 94 70 Q 100 72 106 70 Q 102 65 100 55" fill={`${c.skin}DD`} stroke={`${c.skin}BB`} strokeWidth="0.5" />
+          
+          {/* Mouth */}
+          <path d={mouthPath} fill="none" stroke="#C0392B" strokeWidth="2.5" strokeLinecap="round" />
+          {action === 'celebrating' && (
+            <path d="M 90 78 Q 100 88 110 78" fill="#E8B4B8" stroke="none" />
+          )}
+          
+          {/* Cheek blush for happy/celebrating */}
+          {(action === 'celebrating' || action === 'explaining') && (
+            <>
+              <circle cx="72" cy="68" r="8" fill="#FFB6C1" opacity="0.25" />
+              <circle cx="128" cy="68" r="8" fill="#FFB6C1" opacity="0.25" />
+            </>
+          )}
+          
+          {/* Glasses for expert type */}
+          {type === 'expert' && (
+            <g stroke="#333" strokeWidth="1.5" fill="none">
+              <rect x="73" y="44" width="22" height="16" rx="4" />
+              <rect x="105" y="44" width="22" height="16" rx="4" />
+              <path d="M 95 52 Q 100 50 105 52" />
+              <path d="M 73 50 L 62 48" />
+              <path d="M 127 50 L 138 48" />
+            </g>
           )}
         </g>
-        <rect x="90" y="95" width="20" height="20" fill={colors.skin} />
-        <path d="M 60 115 L 65 110 L 135 110 L 140 115 L 145 200 L 55 200 Z" fill={colors.shirt} />
-        <path d="M 85 110 L 100 130 L 115 110" fill="white" stroke="none" />
-        <g>
-          <path d="M 60 120 Q 40 150 45 190" stroke={colors.shirt} strokeWidth="20" fill="none" strokeLinecap="round" />
-          <circle cx="45" cy="195" r="12" fill={colors.skin} />
+        
+        {/* Left arm */}
+        <g transform={`rotate(${leftArmWave}, 60, 130)`}>
+          <path d="M 60 130 Q 35 160 38 200" stroke={c.shirt} strokeWidth="22" fill="none" strokeLinecap="round" />
+          {/* Hand */}
+          <ellipse cx="38" cy="204" rx="11" ry="9" fill={c.skin} />
+          {/* Fingers hint */}
+          <path d="M 30 200 Q 28 195 30 190" stroke={c.skin} strokeWidth="4" fill="none" strokeLinecap="round" />
         </g>
-        <g transform={`rotate(${-30 + armWave}, 140, 120)`}>
-          <path d="M 140 120 Q 170 100 180 70" stroke={colors.shirt} strokeWidth="20" fill="none" strokeLinecap="round" />
-          <circle cx="182" cy="65" r="12" fill={colors.skin} />
+        
+        {/* Right arm */}
+        <g transform={`rotate(${-25 + armWave}, 140, 130)`}>
+          <path d="M 140 130 Q 170 110 175 80" stroke={c.shirt} strokeWidth="22" fill="none" strokeLinecap="round" />
+          {/* Hand */}
+          <ellipse cx="177" cy="75" rx="11" ry="9" fill={c.skin} />
+          {/* Pointing finger */}
           {action === 'pointing' && (
-            <path d="M 190 60 L 210 45" stroke={colors.skin} strokeWidth="6" strokeLinecap="round" />
+            <path d="M 185 70 L 200 55" stroke={c.skin} strokeWidth="5" strokeLinecap="round" />
+          )}
+          {/* Open hand for explaining */}
+          {action === 'explaining' && (
+            <>
+              <path d="M 183 68 L 190 60" stroke={c.skin} strokeWidth="3.5" strokeLinecap="round" />
+              <path d="M 180 66 L 185 56" stroke={c.skin} strokeWidth="3.5" strokeLinecap="round" />
+              <path d="M 177 66 L 180 55" stroke={c.skin} strokeWidth="3.5" strokeLinecap="round" />
+            </>
           )}
         </g>
-        <rect x="70" y="200" width="25" height="80" rx="5" fill={colors.pants} />
-        <rect x="105" y="200" width="25" height="80" rx="5" fill={colors.pants} />
-        <ellipse cx="82" cy="285" rx="18" ry="8" fill="#1a1a1a" />
-        <ellipse cx="118" cy="285" rx="18" ry="8" fill="#1a1a1a" />
+        
+        {/* Pants / Legs */}
+        <rect x="68" y="220" width="28" height="85" rx="8" fill={c.pants} />
+        <rect x="104" y="220" width="28" height="85" rx="8" fill={c.pants} />
+        {/* Belt */}
+        <rect x="55" y="218" width="90" height="8" rx="3" fill="#2a2a2a" />
+        <rect x="95" y="217" width="10" height="10" rx="2" fill="#C0A960" />
+        
+        {/* Shoes */}
+        <ellipse cx="82" cy="310" rx="20" ry="8" fill={c.shoes} />
+        <ellipse cx="118" cy="310" rx="20" ry="8" fill={c.shoes} />
+        {/* Shoe detail */}
+        <path d="M 64 310 Q 82 306 100 310" stroke="rgba(255,255,255,0.1)" strokeWidth="1" fill="none" />
+        <path d="M 100 310 Q 118 306 136 310" stroke="rgba(255,255,255,0.1)" strokeWidth="1" fill="none" />
+        
+        {/* Thinking bubble for thinking action */}
+        {action === 'thinking' && (
+          <g>
+            <circle cx="55" cy="25" r="3" fill="white" opacity="0.6" />
+            <circle cx="48" cy="15" r="5" fill="white" opacity="0.7" />
+            <ellipse cx="35" cy="0" rx="18" ry="12" fill="white" opacity="0.8" />
+            <text x="35" y="5" textAnchor="middle" fontSize="10" fill="#666">?</text>
+          </g>
+        )}
       </svg>
     </div>
   );
