@@ -2159,7 +2159,7 @@ const TextOverlay: React.FC<{
             fontFamily: "'Inter', sans-serif",
             letterSpacing: 0.5,
           }}>
-            {(scene as any).brandUrl}
+            {brandUrl}
           </span>
         </div>
       )}
