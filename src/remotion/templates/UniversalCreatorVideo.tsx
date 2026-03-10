@@ -1926,9 +1926,9 @@ const TextOverlay: React.FC<{
     : { bottom: 60, left: 0, right: 0 };
   
   // Font sizes based on scene type
-  // Phase 3: Larger headlines for problem scenes (emotionally important)
+  // Phase 5: Larger body fonts for mobile readability (was 28/24, now 32/28)
   const headlineFontSize = isHookOrCTA ? 72 : (isProblem ? 56 : 48);
-  const bodyFontSize = isHookOrCTA ? 28 : 24;
+  const bodyFontSize = isHookOrCTA ? 32 : 28;
   
   // Text alignment
   const textAlign = isHookOrCTA ? 'center' as const : 'left' as const;
