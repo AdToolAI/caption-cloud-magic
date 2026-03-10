@@ -1323,7 +1323,7 @@ async function runGenerationPipeline(
         kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', ['in', 'out', 'left', 'right'], 'in'),
         textOverlay: {
           enabled: true,
-          text: scene.voiceover || scene.title || '',
+          text: smartTruncateToSentences(scene.voiceover || scene.title || '', 2, 25),
           headline: scene.title || '',
           animation: validateEnum(scene.textAnimation || getDefaultTextAnimation(sceneType), VALID_TEXT_ANIMATIONS, 'fadeWords'),
           position: validateEnum(scene.textPosition || getDefaultTextPosition(sceneType), VALID_TEXT_POSITIONS, 'bottom'),
