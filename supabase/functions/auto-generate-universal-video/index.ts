@@ -1316,7 +1316,14 @@ async function runGenerationPipeline(
           type: 'gradient' as const, // r51: NEVER 'image' — r42 bundle can't handle it safely
           gradientColors: sceneGradientColors,
         },
-        animation: validateEnum(scene.animation || getDefaultAnimation(sceneType), VALID_ANIMATIONS, 'fadeIn'),
+        // r52: Force gradient-safe animations — parallax/kenBurns require images and cause black frames with gradient bg
+        animation: (() => {
+          const GRADIENT_SAFE_ANIMATIONS = ['fadeIn', 'slideUp', 'slideLeft', 'slideRight', 'zoomIn', 'zoomOut', 'bounce', 'popIn', 'flyIn', 'morphIn', 'none'];
+          const raw = validateEnum(scene.animation || getDefaultAnimation(sceneType), VALID_ANIMATIONS, 'fadeIn');
+          const safe = GRADIENT_SAFE_ANIMATIONS.includes(raw) ? raw : 'fadeIn';
+          if (raw !== safe) console.log(`[r52] Scene ${index}: animation "${raw}" → "${safe}" (not gradient-safe)`);
+          return safe;
+        })(),
         kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', VALID_KEN_BURNS, 'in'),
         textOverlay: {
           enabled: true,
