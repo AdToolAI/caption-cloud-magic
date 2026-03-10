@@ -1261,13 +1261,11 @@ async function runGenerationPipeline(
       mainScheduling = calculateScheduling(durationInFrames, { schedulingMode });
     }
     
-    // r42: INITIAL PATH BUDGET ENFORCEMENT — if still over budget, drop to 15fps
-    if (mainScheduling.timeoutBudgetOk === false && fps > 15) {
-      const oldFps = fps;
-      fps = 15;
-      durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
-      console.log(`[auto-generate-universal-video] ⚠️ r42 INITIAL BUDGET ENFORCEMENT: ${oldFps}fps → ${fps}fps, frames → ${durationInFrames} (was going to exceed ${LAMBDA_TIMEOUT_SECONDS}s timeout)`);
-      mainScheduling = calculateScheduling(durationInFrames, { schedulingMode });
+    // r55-phase5: REMOVED 15fps degradation — Loft-Film quality requires minimum 24fps
+    // Previously r42 dropped to 15fps here. Now we keep 24fps minimum and log a warning instead.
+    if (mainScheduling.timeoutBudgetOk === false && fps > 24) {
+      // Already handled above — this branch is a safety net only
+      console.warn(`[auto-generate-universal-video] ⚠️ r55-phase5: Budget tight at ${fps}fps but NOT dropping below 24fps (Loft-Film quality policy)`);
     }
     
     // r43: SOFT GUARD — if STILL over budget even at 15fps, LOG WARNING but continue with forensic flag
@@ -1444,6 +1442,7 @@ async function runGenerationPipeline(
       showProgressBar: isBareMinimum ? false : (briefing.showProgressBar !== false),
       showWatermark: isBareMinimum ? false : (briefing.showWatermark === true),
       watermarkText: isBareMinimum ? undefined : (briefing.watermarkText || undefined),
+      brandUrl: briefing.websiteUrl || briefing.companyName || undefined,
       beatSyncData: isBareMinimum ? undefined : sanitizedBeatSync,
       targetWidth: dimensions.width,
       targetHeight: dimensions.height,
@@ -1465,7 +1464,7 @@ async function runGenerationPipeline(
     }) as Record<string, unknown>;
 
     const inputPropsDiagnostics = {
-      canary: 'payload-sanitizer-v12-r55-phase3-text-upgrade',
+      canary: 'payload-sanitizer-v13-r55-phase5-quality-jump',
       category: (inputProps as any).category,
       storytellingStructure: (inputProps as any).storytellingStructure,
       style: (inputProps as any).style,

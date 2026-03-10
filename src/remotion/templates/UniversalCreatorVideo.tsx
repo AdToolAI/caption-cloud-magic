@@ -298,6 +298,9 @@ export const UniversalCreatorVideoSchema = z.object({
     transitionPoints: z.array(z.number()),
     downbeats: z.array(z.number()),
   }).optional(),
+  
+  // Phase 5: Branding
+  brandUrl: z.string().optional(),
 });
 
 export type UniversalCreatorVideoProps = z.infer<typeof UniversalCreatorVideoSchema>;
@@ -1887,7 +1890,8 @@ const TextOverlay: React.FC<{
   fps: number;
   showTitle?: boolean;
   disableAnimatedText?: boolean;
-}> = ({ scene, frame, durationInFrames, primaryColor, fps, showTitle = false, disableAnimatedText = false }) => {
+  brandUrl?: string;
+}> = ({ scene, frame, durationInFrames, primaryColor, fps, showTitle = false, disableAnimatedText = false, brandUrl }) => {
   const textOverlay = scene.textOverlay;
   if (!textOverlay?.enabled) return null;
   
@@ -1902,7 +1906,9 @@ const TextOverlay: React.FC<{
   const displayText = bodyText;
   
   const safeDur = safeDuration(durationInFrames, 60);
-  const safeIn = Math.min(15, safeDur * 0.25);
+  // Phase 5: Faster hook entry — reduced from 15 to 5 frames for punchy start
+  const isQuickEntry = ['hook', 'cta', 'intro', 'outro'].includes(sceneType);
+  const safeIn = isQuickEntry ? Math.min(5, safeDur * 0.15) : Math.min(15, safeDur * 0.25);
   const safeOut = Math.min(Math.max(safeIn + 2, safeDur - 15), safeDur - 2);
   
   const opacity = interpolate(
@@ -1923,9 +1929,9 @@ const TextOverlay: React.FC<{
     : { bottom: 60, left: 0, right: 0 };
   
   // Font sizes based on scene type
-  // Phase 3: Larger headlines for problem scenes (emotionally important)
+  // Phase 5: Larger body fonts for mobile readability (was 28/24, now 32/28)
   const headlineFontSize = isHookOrCTA ? 72 : (isProblem ? 56 : 48);
-  const bodyFontSize = isHookOrCTA ? 28 : 24;
+  const bodyFontSize = isHookOrCTA ? 32 : 28;
   
   // Text alignment
   const textAlign = isHookOrCTA ? 'center' as const : 'left' as const;
@@ -2140,6 +2146,24 @@ const TextOverlay: React.FC<{
         );
       })()}
       
+      {/* Phase 5: Brand URL under CTA button */}
+      {sceneType === 'cta' && brandUrl && (
+        <div style={{
+          marginTop: 12,
+          opacity: interpolate(frame, [30, 45], [0, 0.6], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
+          textAlign: 'center',
+        }}>
+          <span style={{
+            color: 'rgba(255,255,255,0.6)',
+            fontSize: 18,
+            fontFamily: "'Inter', sans-serif",
+            letterSpacing: 0.5,
+          }}>
+            {brandUrl}
+          </span>
+        </div>
+      )}
+      
       {/* Quote frame for proof/testimonial scenes */}
       {sceneType === 'proof' && displayText && (
         <div style={{
@@ -2341,6 +2365,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   characterType = 'svg',
   phonemeTimestamps,
   beatSyncData,
+  brandUrl,
   fps: propsFps,
   preferredFont = 'inter',
   category = 'social-reel',
@@ -2355,7 +2380,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-10-r55-phase4-loftfilm-polish');
+    console.error('UCV_BUNDLE_CANARY=2026-03-10-r55-phase5-quality-jump');
   }
   
   // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
@@ -2704,6 +2729,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   fps={effectiveFps}
                   showTitle={showSceneTitles}
                   disableAnimatedText={diagToggles.disableAnimatedText}
+                  brandUrl={brandUrl}
                 />
                 
                 {/* Phase 1: DrawOnEffect per scene type */}
