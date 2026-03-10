@@ -2147,7 +2147,7 @@ const TextOverlay: React.FC<{
       })()}
       
       {/* Phase 5: Brand URL under CTA button */}
-      {sceneType === 'cta' && (scene as any).brandUrl && (
+      {sceneType === 'cta' && brandUrl && (
         <div style={{
           marginTop: 12,
           opacity: interpolate(frame, [30, 45], [0, 0.6], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
