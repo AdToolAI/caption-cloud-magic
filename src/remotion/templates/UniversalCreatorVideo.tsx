@@ -965,14 +965,17 @@ const AnimatedCharacter: React.FC<{
           <path d="M 30 200 Q 28 195 30 190" stroke={c.skin} strokeWidth="4" fill="none" strokeLinecap="round" />
         </g>
         
-        {/* Right arm */}
+        {/* Right arm — Phase 3b: pointing arm reaches down-left toward text */}
         <g transform={`rotate(${-25 + armWave}, 140, 130)`}>
-          <path d="M 140 130 Q 170 110 175 80" stroke={c.shirt} strokeWidth="22" fill="none" strokeLinecap="round" />
+          <path d={action === 'pointing' 
+            ? "M 140 130 Q 110 170 80 200" 
+            : "M 140 130 Q 170 110 175 80"} 
+            stroke={c.shirt} strokeWidth="22" fill="none" strokeLinecap="round" />
           {/* Hand */}
-          <ellipse cx="177" cy="75" rx="11" ry="9" fill={c.skin} />
-          {/* Pointing finger */}
+          <ellipse cx={action === 'pointing' ? 76 : 177} cy={action === 'pointing' ? 204 : 75} rx="11" ry="9" fill={c.skin} />
+          {/* Pointing finger — extends toward text (down-left) */}
           {action === 'pointing' && (
-            <path d="M 185 70 L 200 55" stroke={c.skin} strokeWidth="5" strokeLinecap="round" />
+            <path d="M 68 208 L 50 220" stroke={c.skin} strokeWidth="5" strokeLinecap="round" />
           )}
           {/* Open hand for explaining */}
           {action === 'explaining' && (
