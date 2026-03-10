@@ -1805,7 +1805,7 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
 function truncateToWords(text: string, maxWords: number): string {
   const words = text.split(/\s+/);
   if (words.length <= maxWords) return text;
-  return words.slice(0, maxWords).join(' ') + '…';
+  return words.slice(0, maxWords).join(' ') + '.';
 }
 
 const SCENE_TYPE_LABELS: Record<string, string> = {
