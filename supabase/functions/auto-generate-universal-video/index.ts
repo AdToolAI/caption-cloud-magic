@@ -1340,8 +1340,8 @@ async function runGenerationPipeline(
 
     const sanitizedBeatSync = sanitizeBeatSyncData(beatSyncData);
 
-    // r54: Re-enable visual systems (morphTransitions stays disabled — r42-bundle bug)
-    const disableMorphTransitions = true;
+    // r55: All visual systems enabled (r55-bundle fixes dimension bugs)
+    const disableMorphTransitions = false;
     const disableLottieIcons = profileFlags.disableLottieIcons === true || profileFlags.forceLottieIconsEmoji === true;
     const forceEmbeddedCharacterLottie = true;
     const disablePrecisionSubtitles = profileFlags.disablePrecisionSubtitles === true;
