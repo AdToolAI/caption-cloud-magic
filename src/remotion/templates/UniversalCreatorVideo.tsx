@@ -2446,12 +2446,24 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   const currentScene = currentSceneIndex >= 0 ? sceneTimings[currentSceneIndex] : null;
   
-  // Phase 4: Context-based character visibility (extended for hook + intro)
+  // Phase 4: Character visible in ALL content scenes for Loft-Film quality
   const shouldShowCharacter = useMemo(() => {
     if (!useCharacter || !currentScene) return false;
-    // Show character in hook, intro, problem, solution, and cta scenes
-    return ['hook', 'intro', 'problem', 'solution', 'cta'].includes(currentScene.type);
+    return ['hook', 'intro', 'problem', 'solution', 'feature', 'proof', 'cta'].includes(currentScene.type);
   }, [useCharacter, currentScene]);
+  
+  // Phase 4: Character type rotation per scene for visual variety
+  const getCharacterType = (sceneType: string): 'presenter' | 'user' | 'expert' => {
+    switch (sceneType) {
+      case 'hook': return 'presenter';
+      case 'problem': return 'user';
+      case 'solution': return 'expert';
+      case 'feature': return 'presenter';
+      case 'proof': return 'expert';
+      case 'cta': return 'presenter';
+      default: return 'presenter';
+    }
+  };
   
   // Phase 3b: All characters on right — text is always on the left, character presents/points toward it
   const getContextBasedPosition = (sceneType: string): 'left' | 'right' | 'center' => {
