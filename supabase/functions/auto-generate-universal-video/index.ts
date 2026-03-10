@@ -2391,12 +2391,23 @@ function transformAlignmentToPhonemes(alignment: {
 }
 
 function getDefaultAnimation(sceneType: string): string {
+  // r55: Premium Loft-Film animations (unlocked with r55 dimension fixes)
   const map: Record<string, string> = {
-    hook: 'zoomIn', intro: 'fadeIn', problem: 'slideLeft',
-    solution: 'slideRight', feature: 'slideUp', proof: 'fadeIn',
-    cta: 'bounce', outro: 'fadeIn', transition: 'fadeIn',
+    hook: 'popIn', intro: 'fadeIn', problem: 'kenBurns',
+    solution: 'flyIn', feature: 'parallax', proof: 'zoomIn',
+    cta: 'popIn', outro: 'fadeIn', transition: 'fadeIn',
   };
   return map[sceneType] || 'fadeIn';
+}
+
+function getDefaultTransition(sceneType: string): string {
+  // r55: Scene-type-based transitions for cinematic feel
+  const map: Record<string, string> = {
+    hook: 'crossfade', intro: 'fade', problem: 'crossfade',
+    solution: 'slide', feature: 'fade', proof: 'wipe',
+    cta: 'wipe', outro: 'fade', transition: 'fade',
+  };
+  return map[sceneType] || 'fade';
 }
 
 function getDefaultTextAnimation(sceneType: string): string {
