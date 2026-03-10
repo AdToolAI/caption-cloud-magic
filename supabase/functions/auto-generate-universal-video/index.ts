@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r53-nuclear-diagnostic-2026-03-10";
+const AUTO_GEN_BUILD_TAG = "r55-animations-unlocked-2026-03-10";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -1286,26 +1286,20 @@ async function runGenerationPipeline(
       const duration = scene.durationSeconds || scene.duration || 5;
       const sceneType = validateEnum(scene.sceneType || scene.type || 'content', VALID_SCENE_TYPES, 'feature');
 
-      // r54: Restore images + safe animations (blacklist r42-bundle-broken ones)
-      const BLACKLISTED_ANIMATIONS = ['parallax', 'popIn', 'flyIn', 'morphIn'];
-      const BLACKLISTED_TRANSITIONS = ['morph'];
-
+      // r55: All animations unlocked (r55-bundle has dimension fixes for PopIn/FlyIn)
       const imageUrl = scene.imageUrl || scene.image_url || undefined;
       const rawAnimation = scene.animation || getDefaultAnimation(sceneType);
       const hasImage = !!imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('http');
 
-      // Animation guard: blacklist known broken animations, kenBurns only with images
+      // Animation guard: kenBurns only with images (no other blacklist needed with r55 bundle)
       let finalAnimation = rawAnimation;
-      if (BLACKLISTED_ANIMATIONS.includes(finalAnimation)) {
-        finalAnimation = 'fadeIn';
-      }
       if (finalAnimation === 'kenBurns' && !hasImage) {
         finalAnimation = 'fadeIn';
       }
 
-      // Transition guard
-      const rawTransition = scene.transition?.type || scene.transitionType || 'fade';
-      const finalTransition = BLACKLISTED_TRANSITIONS.includes(rawTransition) ? 'fade' : rawTransition;
+      // r55: Scene-type-based transitions instead of always 'fade'
+      const rawTransition = scene.transition?.type || scene.transitionType || getDefaultTransition(sceneType);
+      const finalTransition = rawTransition;
 
       // Background: image if available, otherwise gradient with brand colors
       const sceneBackground = hasImage
@@ -1346,8 +1340,8 @@ async function runGenerationPipeline(
 
     const sanitizedBeatSync = sanitizeBeatSyncData(beatSyncData);
 
-    // r54: Re-enable visual systems (morphTransitions stays disabled — r42-bundle bug)
-    const disableMorphTransitions = true;
+    // r55: All visual systems enabled (r55-bundle fixes dimension bugs)
+    const disableMorphTransitions = false;
     const disableLottieIcons = profileFlags.disableLottieIcons === true || profileFlags.forceLottieIconsEmoji === true;
     const forceEmbeddedCharacterLottie = true;
     const disablePrecisionSubtitles = profileFlags.disablePrecisionSubtitles === true;
@@ -1470,7 +1464,7 @@ async function runGenerationPipeline(
     }) as Record<string, unknown>;
 
     const inputPropsDiagnostics = {
-      canary: 'payload-sanitizer-v11-r54-restore-images-safe-animations',
+      canary: 'payload-sanitizer-v12-r55-animations-unlocked',
       category: (inputProps as any).category,
       storytellingStructure: (inputProps as any).storytellingStructure,
       style: (inputProps as any).style,
@@ -2397,12 +2391,23 @@ function transformAlignmentToPhonemes(alignment: {
 }
 
 function getDefaultAnimation(sceneType: string): string {
+  // r55: Premium Loft-Film animations (unlocked with r55 dimension fixes)
   const map: Record<string, string> = {
-    hook: 'zoomIn', intro: 'fadeIn', problem: 'slideLeft',
-    solution: 'slideRight', feature: 'slideUp', proof: 'fadeIn',
-    cta: 'bounce', outro: 'fadeIn', transition: 'fadeIn',
+    hook: 'popIn', intro: 'fadeIn', problem: 'kenBurns',
+    solution: 'flyIn', feature: 'parallax', proof: 'zoomIn',
+    cta: 'popIn', outro: 'fadeIn', transition: 'fadeIn',
   };
   return map[sceneType] || 'fadeIn';
+}
+
+function getDefaultTransition(sceneType: string): string {
+  // r55: Scene-type-based transitions for cinematic feel
+  const map: Record<string, string> = {
+    hook: 'crossfade', intro: 'fade', problem: 'crossfade',
+    solution: 'slide', feature: 'fade', proof: 'wipe',
+    cta: 'wipe', outro: 'fade', transition: 'fade',
+  };
+  return map[sceneType] || 'fade';
 }
 
 function getDefaultTextAnimation(sceneType: string): string {
