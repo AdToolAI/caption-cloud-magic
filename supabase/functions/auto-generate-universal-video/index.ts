@@ -1581,7 +1581,7 @@ async function runGenerationPipeline(
       overwrite: true,
       outName: `universal-video-${pendingRenderId}.mp4`,
       bucketName: DEFAULT_BUCKET_NAME,
-      durationInFrames: isBareMinimum ? 60 : durationInFrames,
+      durationInFrames: compositionDurationInFrames,
       fps: fps,
       width: dimensions.width,
       height: dimensions.height,
