@@ -2391,7 +2391,29 @@ function transformAlignmentToPhonemes(alignment: {
   return phonemes;
 }
 
-function getDefaultAnimation(sceneType: string): string {
+/** Phase 3: Smart truncation — keeps up to maxSentences complete sentences, max maxWords words */
+function smartTruncateToSentences(text: string, maxSentences: number, maxWords: number): string {
+  if (!text) return '';
+  // Split into sentences
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  let result = '';
+  let wordCount = 0;
+  for (let i = 0; i < Math.min(sentences.length, maxSentences); i++) {
+    const sentenceWords = sentences[i].trim().split(/\s+/);
+    if (wordCount + sentenceWords.length > maxWords && i > 0) break;
+    result += (result ? ' ' : '') + sentences[i].trim();
+    wordCount += sentenceWords.length;
+  }
+  // Fallback: if no sentence boundary found, truncate to maxWords
+  if (!result) {
+    const words = text.split(/\s+/);
+    result = words.slice(0, maxWords).join(' ');
+    if (words.length > maxWords) result += '…';
+  }
+  return result;
+}
+
+
   // r55: Premium Loft-Film animations (unlocked with r55 dimension fixes)
   const map: Record<string, string> = {
     hook: 'popIn', intro: 'fadeIn', problem: 'kenBurns',
