@@ -1621,6 +1621,9 @@ async function runGenerationPipeline(
       outName: `universal-video-${pendingRenderId}.mp4`,
       lambdaPayload: lambdaPayload,
       progressId: progressId,
+      r53_nuclear_diagnostic: true,
+      timingDiagnostics,
+      remotionScenes: finalScenes,
     });
 
     console.log(`[auto-generate-universal-video] Pipeline completed for ${progressId}.`);
