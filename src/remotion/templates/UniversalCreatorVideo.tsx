@@ -1981,7 +1981,7 @@ const TextOverlay: React.FC<{
               fontSize: headlineFontSize,
               fontWeight: 800,
               fontFamily: "'Poppins', 'DM Sans', sans-serif",
-              textShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              textShadow: `0 2px 8px rgba(0,0,0,0.4), 0 0 40px ${primaryColor}40`,
               margin: 0,
               marginBottom: displayText ? 16 : 0,
               lineHeight: 1.15,

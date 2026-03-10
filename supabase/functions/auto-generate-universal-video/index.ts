@@ -1465,7 +1465,7 @@ async function runGenerationPipeline(
     }) as Record<string, unknown>;
 
     const inputPropsDiagnostics = {
-      canary: 'payload-sanitizer-v12-r55-animations-unlocked',
+      canary: 'payload-sanitizer-v12-r55-phase3-text-upgrade',
       category: (inputProps as any).category,
       storytellingStructure: (inputProps as any).storytellingStructure,
       style: (inputProps as any).style,
