@@ -328,6 +328,10 @@ const PopInElement: React.FC<{
   
   return (
     <div style={{ 
+      position: 'absolute',
+      inset: 0,
+      width: '100%',
+      height: '100%',
       transform: `scale(${Math.max(0, scale)})`, 
       opacity: Math.max(0, opacity),
       transformOrigin: 'center center',
