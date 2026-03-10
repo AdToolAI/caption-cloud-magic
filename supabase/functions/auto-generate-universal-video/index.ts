@@ -1337,7 +1337,7 @@ async function runGenerationPipeline(
         soundEffectType: validateEnum(scene.soundEffect || getDefaultSoundEffect(sceneType), VALID_SOUND_EFFECTS, 'none'),
         beatAligned: scene.beatAligned === true,
         transition: {
-          type: validateEnum(finalTransition, VALID_TRANSITIONS, 'fade'),
+          type: validateEnum(finalTransition, VALID_TRANSITION_TYPES, 'fade'),
           duration: finalTransition === 'none' ? 0 : 0.5,
           direction: scene.transition?.direction || 'right',
         },
