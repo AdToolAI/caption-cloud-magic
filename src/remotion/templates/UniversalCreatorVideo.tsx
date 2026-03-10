@@ -2144,6 +2144,24 @@ const TextOverlay: React.FC<{
         );
       })()}
       
+      {/* Phase 5: Brand URL under CTA button */}
+      {sceneType === 'cta' && (scene as any).brandUrl && (
+        <div style={{
+          marginTop: 12,
+          opacity: interpolate(frame, [30, 45], [0, 0.6], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
+          textAlign: 'center',
+        }}>
+          <span style={{
+            color: 'rgba(255,255,255,0.6)',
+            fontSize: 18,
+            fontFamily: "'Inter', sans-serif",
+            letterSpacing: 0.5,
+          }}>
+            {(scene as any).brandUrl}
+          </span>
+        </div>
+      )}
+      
       {/* Quote frame for proof/testimonial scenes */}
       {sceneType === 'proof' && displayText && (
         <div style={{
