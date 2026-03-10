@@ -1931,28 +1931,80 @@ const TextOverlay: React.FC<{
   const textAlign = isHookOrCTA ? 'center' as const : 'left' as const;
   const padding = isHookOrCTA ? '0 80px' : '0 60px';
   
-  // Glassmorphism container for professional text framing
-  const glassStyle: React.CSSProperties = isHookOrCTA
-    ? {
+  // Phase 4: Differentiated glassmorphism per scene type for Loft-Film quality
+  const getGlassStyle = (): React.CSSProperties => {
+    if (isHookOrCTA) {
+      return {
         background: 'rgba(0, 0, 0, 0.35)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
         borderRadius: 20,
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        border: `1px solid ${primaryColor}30`,
         padding: '40px 48px',
         maxWidth: '85%',
-        boxShadow: `0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)`,
-      }
-    : {
-        background: 'rgba(0, 0, 0, 0.4)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        borderRadius: 16,
-        borderLeft: `4px solid ${primaryColor}`,
-        padding: '24px 32px',
-        maxWidth: '75%',
-        boxShadow: `0 4px 24px rgba(0,0,0,0.25)`,
+        boxShadow: `0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 60px ${primaryColor}15`,
       };
+    }
+    switch (sceneType) {
+      case 'problem':
+        return {
+          background: 'rgba(0, 0, 0, 0.45)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: 16,
+          borderLeft: '4px solid #EF4444',
+          padding: '24px 32px',
+          maxWidth: '75%',
+          boxShadow: '0 4px 24px rgba(239,68,68,0.15), 0 4px 24px rgba(0,0,0,0.25)',
+        };
+      case 'solution':
+        return {
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: 16,
+          borderLeft: '4px solid #10B981',
+          padding: '24px 32px',
+          maxWidth: '75%',
+          boxShadow: '0 4px 24px rgba(16,185,129,0.15), 0 4px 24px rgba(0,0,0,0.25)',
+        };
+      case 'feature':
+        return {
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: 16,
+          borderTop: '4px solid #3B82F6',
+          padding: '24px 32px',
+          maxWidth: '75%',
+          boxShadow: '0 4px 24px rgba(59,130,246,0.15), 0 4px 24px rgba(0,0,0,0.25)',
+        };
+      case 'proof':
+        return {
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+          borderRadius: 16,
+          border: '1px solid rgba(139,92,246,0.3)',
+          borderLeft: '4px solid #8B5CF6',
+          padding: '24px 32px',
+          maxWidth: '75%',
+          boxShadow: '0 4px 24px rgba(139,92,246,0.12), 0 4px 24px rgba(0,0,0,0.25)',
+        };
+      default:
+        return {
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: 16,
+          borderLeft: `4px solid ${primaryColor}`,
+          padding: '24px 32px',
+          maxWidth: '75%',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
+        };
+    }
+  };
+  const glassStyle = getGlassStyle();
   
   return (
     <div
