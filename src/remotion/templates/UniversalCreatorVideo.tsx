@@ -2728,6 +2728,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   fps={effectiveFps}
                   showTitle={showSceneTitles}
                   disableAnimatedText={diagToggles.disableAnimatedText}
+                  brandUrl={brandUrl}
                 />
                 
                 {/* Phase 1: DrawOnEffect per scene type */}
