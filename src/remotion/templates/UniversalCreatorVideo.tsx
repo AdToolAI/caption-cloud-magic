@@ -811,8 +811,9 @@ const AnimatedCharacter: React.FC<{
   const isBlinking = blinkCycle < 4;
   
   // Smooth arm animations
+  // Phase 3b: Pointing arm rotates down-left (toward text overlay) instead of up-right
   const armWave = action === 'pointing' 
-    ? 15 + Math.sin(frame * 0.08) * 8 
+    ? -15 + Math.sin(frame * 0.08) * 6 
     : action === 'explaining' 
       ? Math.sin(frame * 0.12) * 12 
       : action === 'celebrating'
