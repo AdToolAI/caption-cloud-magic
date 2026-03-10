@@ -368,6 +368,10 @@ const FlyInElement: React.FC<{
   
   return (
     <div style={{ 
+      position: 'absolute',
+      inset: 0,
+      width: '100%',
+      height: '100%',
       transform: `translate(${translateX}px, ${translateY}px)`,
       opacity: Math.max(0, progress),
     }}>
