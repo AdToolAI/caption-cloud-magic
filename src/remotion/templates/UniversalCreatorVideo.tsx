@@ -811,8 +811,9 @@ const AnimatedCharacter: React.FC<{
   const isBlinking = blinkCycle < 4;
   
   // Smooth arm animations
+  // Phase 3b: Pointing arm rotates down-left (toward text overlay) instead of up-right
   const armWave = action === 'pointing' 
-    ? 15 + Math.sin(frame * 0.08) * 8 
+    ? -15 + Math.sin(frame * 0.08) * 6 
     : action === 'explaining' 
       ? Math.sin(frame * 0.12) * 12 
       : action === 'celebrating'
@@ -964,14 +965,17 @@ const AnimatedCharacter: React.FC<{
           <path d="M 30 200 Q 28 195 30 190" stroke={c.skin} strokeWidth="4" fill="none" strokeLinecap="round" />
         </g>
         
-        {/* Right arm */}
+        {/* Right arm — Phase 3b: pointing arm reaches down-left toward text */}
         <g transform={`rotate(${-25 + armWave}, 140, 130)`}>
-          <path d="M 140 130 Q 170 110 175 80" stroke={c.shirt} strokeWidth="22" fill="none" strokeLinecap="round" />
+          <path d={action === 'pointing' 
+            ? "M 140 130 Q 110 170 80 200" 
+            : "M 140 130 Q 170 110 175 80"} 
+            stroke={c.shirt} strokeWidth="22" fill="none" strokeLinecap="round" />
           {/* Hand */}
-          <ellipse cx="177" cy="75" rx="11" ry="9" fill={c.skin} />
-          {/* Pointing finger */}
+          <ellipse cx={action === 'pointing' ? 76 : 177} cy={action === 'pointing' ? 204 : 75} rx="11" ry="9" fill={c.skin} />
+          {/* Pointing finger — extends toward text (down-left) */}
           {action === 'pointing' && (
-            <path d="M 185 70 L 200 55" stroke={c.skin} strokeWidth="5" strokeLinecap="round" />
+            <path d="M 68 208 L 50 220" stroke={c.skin} strokeWidth="5" strokeLinecap="round" />
           )}
           {/* Open hand for explaining */}
           {action === 'explaining' && (
@@ -1894,8 +1898,8 @@ const TextOverlay: React.FC<{
   // No text at all? Skip
   if (!bodyText && !headline) return null;
   
-  // Smart truncation: max 20 words for visual display (Phase 3 upgrade)
-  const displayText = truncateToWords(bodyText, 20);
+  // Phase 3b: No template-side truncation — Edge Function delivers clean text via smartTruncateToSentences
+  const displayText = bodyText;
   
   const safeDur = safeDuration(durationInFrames, 60);
   const safeIn = Math.min(15, safeDur * 0.25);
@@ -1913,11 +1917,10 @@ const TextOverlay: React.FC<{
   const isProblem = sceneType === 'problem';
   
   // Position: hook/cta = centered, problem/solution/feature = bottom
-  // Phase 3: Character collision guard — shift text right when character is on left (problem scenes)
-  const characterOnLeft = isProblem;
+  // Phase 3b: Characters now always on right → no collision guard needed
   const positionStyle: React.CSSProperties = isHookOrCTA
     ? { top: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }
-    : { bottom: 60, left: characterOnLeft ? '30%' : 0, right: 0 };
+    : { bottom: 60, left: 0, right: 0 };
   
   // Font sizes based on scene type
   // Phase 3: Larger headlines for problem scenes (emotionally important)
@@ -2293,7 +2296,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-10-r55-dimension-fix');
+    console.error('UCV_BUNDLE_CANARY=2026-03-10-r55-phase3b-text-character-fix');
   }
   
   // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
@@ -2450,11 +2453,8 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     return ['hook', 'intro', 'problem', 'solution', 'cta'].includes(currentScene.type);
   }, [useCharacter, currentScene]);
   
-  // Phase 4: Context-based character position
+  // Phase 3b: All characters on right — text is always on the left, character presents/points toward it
   const getContextBasedPosition = (sceneType: string): 'left' | 'right' | 'center' => {
-    // Problem scenes: character on left (showing concern)
-    // Solution/CTA: character on right (presenting)
-    if (sceneType === 'problem') return 'left';
     return 'right';
   };
   

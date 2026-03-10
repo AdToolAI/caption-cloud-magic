@@ -2404,11 +2404,10 @@ function smartTruncateToSentences(text: string, maxSentences: number, maxWords: 
     result += (result ? ' ' : '') + sentences[i].trim();
     wordCount += sentenceWords.length;
   }
-  // Fallback: if no sentence boundary found, truncate to maxWords
+  // Fallback: if no sentence boundary found, truncate to maxWords cleanly (no ellipsis)
   if (!result) {
     const words = text.split(/\s+/);
     result = words.slice(0, maxWords).join(' ');
-    if (words.length > maxWords) result += '…';
   }
   return result;
 }
