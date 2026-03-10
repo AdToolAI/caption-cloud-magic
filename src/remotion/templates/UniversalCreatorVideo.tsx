@@ -2449,11 +2449,8 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     return ['hook', 'intro', 'problem', 'solution', 'cta'].includes(currentScene.type);
   }, [useCharacter, currentScene]);
   
-  // Phase 4: Context-based character position
+  // Phase 3b: All characters on right — text is always on the left, character presents/points toward it
   const getContextBasedPosition = (sceneType: string): 'left' | 'right' | 'center' => {
-    // Problem scenes: character on left (showing concern)
-    // Solution/CTA: character on right (presenting)
-    if (sceneType === 'problem') return 'left';
     return 'right';
   };
   
