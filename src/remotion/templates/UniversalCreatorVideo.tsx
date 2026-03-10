@@ -1890,7 +1890,8 @@ const TextOverlay: React.FC<{
   fps: number;
   showTitle?: boolean;
   disableAnimatedText?: boolean;
-}> = ({ scene, frame, durationInFrames, primaryColor, fps, showTitle = false, disableAnimatedText = false }) => {
+  brandUrl?: string;
+}> = ({ scene, frame, durationInFrames, primaryColor, fps, showTitle = false, disableAnimatedText = false, brandUrl }) => {
   const textOverlay = scene.textOverlay;
   if (!textOverlay?.enabled) return null;
   
