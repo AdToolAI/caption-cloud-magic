@@ -1286,7 +1286,36 @@ async function runGenerationPipeline(
       const duration = scene.durationSeconds || scene.duration || 5;
       const sceneType = validateEnum(scene.sceneType || scene.type || 'content', VALID_SCENE_TYPES, 'feature');
 
-      // r53: Nuclear diagnostic - force minimal scene config for deterministic rendering
+      // r54: Restore images + safe animations (blacklist r42-bundle-broken ones)
+      const BLACKLISTED_ANIMATIONS = ['parallax', 'popIn', 'flyIn', 'morphIn'];
+      const BLACKLISTED_TRANSITIONS = ['morph'];
+
+      const imageUrl = scene.imageUrl || scene.image_url || undefined;
+      const rawAnimation = scene.animation || getDefaultAnimation(sceneType);
+      const hasImage = !!imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('http');
+
+      // Animation guard: blacklist known broken animations, kenBurns only with images
+      let finalAnimation = rawAnimation;
+      if (BLACKLISTED_ANIMATIONS.includes(finalAnimation)) {
+        finalAnimation = 'fadeIn';
+      }
+      if (finalAnimation === 'kenBurns' && !hasImage) {
+        finalAnimation = 'fadeIn';
+      }
+
+      // Transition guard
+      const rawTransition = scene.transition?.type || scene.transitionType || 'fade';
+      const finalTransition = BLACKLISTED_TRANSITIONS.includes(rawTransition) ? 'fade' : rawTransition;
+
+      // Background: image if available, otherwise gradient with brand colors
+      const sceneBackground = hasImage
+        ? { type: 'image' as const, imageUrl }
+        : {
+            type: 'gradient' as const,
+            gradientColors: scene.background?.gradientColors ||
+              [briefing.brandColors?.[0] || '#3b82f6', briefing.brandColors?.[1] || '#1e40af'],
+          };
+
       return {
         id: `scene-${index}`,
         order: index + 1,
@@ -1295,12 +1324,9 @@ async function runGenerationPipeline(
         duration,
         startTime,
         endTime: startTime + duration,
-        background: {
-          type: 'color' as const,
-          color: '#3b82f6',
-        },
-        animation: 'none' as const,
-        kenBurnsDirection: 'in' as const,
+        background: sceneBackground,
+        animation: validateEnum(finalAnimation, VALID_ANIMATIONS, 'fadeIn'),
+        kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', ['in', 'out', 'left', 'right'], 'in'),
         textOverlay: {
           enabled: true,
           text: scene.voiceover || scene.title || '',
@@ -1308,12 +1334,12 @@ async function runGenerationPipeline(
           animation: validateEnum(scene.textAnimation || getDefaultTextAnimation(sceneType), VALID_TEXT_ANIMATIONS, 'fadeWords'),
           position: validateEnum(scene.textPosition || getDefaultTextPosition(sceneType), VALID_TEXT_POSITIONS, 'bottom'),
         },
-        soundEffectType: 'none' as const,
-        beatAligned: false,
+        soundEffectType: validateEnum(scene.soundEffect || getDefaultSoundEffect(sceneType), VALID_SOUND_EFFECTS, 'none'),
+        beatAligned: scene.beatAligned === true,
         transition: {
-          type: 'none' as const,
-          duration: 0,
-          direction: 'right',
+          type: validateEnum(finalTransition, VALID_TRANSITIONS, 'fade'),
+          duration: finalTransition === 'none' ? 0 : 0.5,
+          direction: scene.transition?.direction || 'right',
         },
       };
     });
