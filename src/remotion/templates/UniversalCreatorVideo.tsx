@@ -1894,8 +1894,8 @@ const TextOverlay: React.FC<{
   // No text at all? Skip
   if (!bodyText && !headline) return null;
   
-  // Smart truncation: max 12 words for visual display
-  const displayText = truncateToWords(bodyText, 12);
+  // Smart truncation: max 20 words for visual display (Phase 3 upgrade)
+  const displayText = truncateToWords(bodyText, 20);
   
   const safeDur = safeDuration(durationInFrames, 60);
   const safeIn = Math.min(15, safeDur * 0.25);
