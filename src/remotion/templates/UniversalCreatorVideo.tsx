@@ -328,6 +328,10 @@ const PopInElement: React.FC<{
   
   return (
     <div style={{ 
+      position: 'absolute',
+      inset: 0,
+      width: '100%',
+      height: '100%',
       transform: `scale(${Math.max(0, scale)})`, 
       opacity: Math.max(0, opacity),
       transformOrigin: 'center center',
@@ -364,6 +368,10 @@ const FlyInElement: React.FC<{
   
   return (
     <div style={{ 
+      position: 'absolute',
+      inset: 0,
+      width: '100%',
+      height: '100%',
       transform: `translate(${translateX}px, ${translateY}px)`,
       opacity: Math.max(0, progress),
     }}>
@@ -2282,7 +2290,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-04-r9-profileJ-nonLottieIsolation');
+    console.error('UCV_BUNDLE_CANARY=2026-03-10-r55-dimension-fix');
   }
   
   // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
