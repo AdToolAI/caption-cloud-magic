@@ -1913,9 +1913,11 @@ const TextOverlay: React.FC<{
   const isProblem = sceneType === 'problem';
   
   // Position: hook/cta = centered, problem/solution/feature = bottom
+  // Phase 3: Character collision guard — shift text right when character is on left (problem scenes)
+  const characterOnLeft = isProblem;
   const positionStyle: React.CSSProperties = isHookOrCTA
     ? { top: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }
-    : { bottom: 60, left: 0, right: 0 };
+    : { bottom: 60, left: characterOnLeft ? '30%' : 0, right: 0 };
   
   // Font sizes based on scene type
   const headlineFontSize = isHookOrCTA ? 72 : 48;
