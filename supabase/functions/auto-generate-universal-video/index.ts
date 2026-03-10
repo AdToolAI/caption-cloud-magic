@@ -1286,26 +1286,20 @@ async function runGenerationPipeline(
       const duration = scene.durationSeconds || scene.duration || 5;
       const sceneType = validateEnum(scene.sceneType || scene.type || 'content', VALID_SCENE_TYPES, 'feature');
 
-      // r54: Restore images + safe animations (blacklist r42-bundle-broken ones)
-      const BLACKLISTED_ANIMATIONS = ['parallax', 'popIn', 'flyIn', 'morphIn'];
-      const BLACKLISTED_TRANSITIONS = ['morph'];
-
+      // r55: All animations unlocked (r55-bundle has dimension fixes for PopIn/FlyIn)
       const imageUrl = scene.imageUrl || scene.image_url || undefined;
       const rawAnimation = scene.animation || getDefaultAnimation(sceneType);
       const hasImage = !!imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('http');
 
-      // Animation guard: blacklist known broken animations, kenBurns only with images
+      // Animation guard: kenBurns only with images (no other blacklist needed with r55 bundle)
       let finalAnimation = rawAnimation;
-      if (BLACKLISTED_ANIMATIONS.includes(finalAnimation)) {
-        finalAnimation = 'fadeIn';
-      }
       if (finalAnimation === 'kenBurns' && !hasImage) {
         finalAnimation = 'fadeIn';
       }
 
-      // Transition guard
-      const rawTransition = scene.transition?.type || scene.transitionType || 'fade';
-      const finalTransition = BLACKLISTED_TRANSITIONS.includes(rawTransition) ? 'fade' : rawTransition;
+      // r55: Scene-type-based transitions instead of always 'fade'
+      const rawTransition = scene.transition?.type || scene.transitionType || getDefaultTransition(sceneType);
+      const finalTransition = rawTransition;
 
       // Background: image if available, otherwise gradient with brand colors
       const sceneBackground = hasImage
