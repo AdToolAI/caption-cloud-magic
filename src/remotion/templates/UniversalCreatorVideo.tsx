@@ -2701,7 +2701,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
           {/* SVG Character (default) */}
           {characterType === 'svg' && (
             <AnimatedCharacter
-              type="presenter"
+              type={getCharacterType(currentScene.type)}
               action={getCharacterAction(currentScene.type)}
               frame={frame - currentScene.startFrame}
               fps={effectiveFps}
