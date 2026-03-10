@@ -859,7 +859,7 @@ const AnimatedCharacter: React.FC<{
     <div
       style={{
         position: 'absolute',
-        bottom: '5%',
+        bottom: '2%',
         ...positionStyles[position],
         transform: `translateY(${breathe - celebrateBounce}px) scale(${0.3 + 0.7 * Math.max(0, entryProgress)})`,
         opacity: Math.max(0, entryProgress),
@@ -868,8 +868,8 @@ const AnimatedCharacter: React.FC<{
       }}
     >
       <svg 
-        width="180" 
-        height="340" 
+        width="220" 
+        height="400" 
         viewBox="0 0 200 360" 
         style={{ filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.35))' }}
       >
@@ -1805,7 +1805,7 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
 function truncateToWords(text: string, maxWords: number): string {
   const words = text.split(/\s+/);
   if (words.length <= maxWords) return text;
-  return words.slice(0, maxWords).join(' ') + '…';
+  return words.slice(0, maxWords).join(' ') + '.';
 }
 
 const SCENE_TYPE_LABELS: Record<string, string> = {
@@ -1931,28 +1931,80 @@ const TextOverlay: React.FC<{
   const textAlign = isHookOrCTA ? 'center' as const : 'left' as const;
   const padding = isHookOrCTA ? '0 80px' : '0 60px';
   
-  // Glassmorphism container for professional text framing
-  const glassStyle: React.CSSProperties = isHookOrCTA
-    ? {
+  // Phase 4: Differentiated glassmorphism per scene type for Loft-Film quality
+  const getGlassStyle = (): React.CSSProperties => {
+    if (isHookOrCTA) {
+      return {
         background: 'rgba(0, 0, 0, 0.35)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
         borderRadius: 20,
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        border: `1px solid ${primaryColor}30`,
         padding: '40px 48px',
         maxWidth: '85%',
-        boxShadow: `0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)`,
-      }
-    : {
-        background: 'rgba(0, 0, 0, 0.4)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        borderRadius: 16,
-        borderLeft: `4px solid ${primaryColor}`,
-        padding: '24px 32px',
-        maxWidth: '75%',
-        boxShadow: `0 4px 24px rgba(0,0,0,0.25)`,
+        boxShadow: `0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 60px ${primaryColor}15`,
       };
+    }
+    switch (sceneType) {
+      case 'problem':
+        return {
+          background: 'rgba(0, 0, 0, 0.45)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: 16,
+          borderLeft: '4px solid #EF4444',
+          padding: '24px 32px',
+          maxWidth: '75%',
+          boxShadow: '0 4px 24px rgba(239,68,68,0.15), 0 4px 24px rgba(0,0,0,0.25)',
+        };
+      case 'solution':
+        return {
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: 16,
+          borderLeft: '4px solid #10B981',
+          padding: '24px 32px',
+          maxWidth: '75%',
+          boxShadow: '0 4px 24px rgba(16,185,129,0.15), 0 4px 24px rgba(0,0,0,0.25)',
+        };
+      case 'feature':
+        return {
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: 16,
+          borderTop: '4px solid #3B82F6',
+          padding: '24px 32px',
+          maxWidth: '75%',
+          boxShadow: '0 4px 24px rgba(59,130,246,0.15), 0 4px 24px rgba(0,0,0,0.25)',
+        };
+      case 'proof':
+        return {
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+          borderRadius: 16,
+          border: '1px solid rgba(139,92,246,0.3)',
+          borderLeft: '4px solid #8B5CF6',
+          padding: '24px 32px',
+          maxWidth: '75%',
+          boxShadow: '0 4px 24px rgba(139,92,246,0.12), 0 4px 24px rgba(0,0,0,0.25)',
+        };
+      default:
+        return {
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: 16,
+          borderLeft: `4px solid ${primaryColor}`,
+          padding: '24px 32px',
+          maxWidth: '75%',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
+        };
+    }
+  };
+  const glassStyle = getGlassStyle();
   
   return (
     <div
@@ -2048,13 +2100,18 @@ const TextOverlay: React.FC<{
         )}
       </div>
       
-      {/* CTA Button Effect */}
-      {sceneType === 'cta' && headline && (
+      {/* Phase 4: CTA Button with pulse animation for Loft-Film quality */}
+      {sceneType === 'cta' && headline && (() => {
+        const ctaPulse = Math.sin(frame * 0.1) * 0.5 + 0.5; // 0-1 oscillation
+        const ctaScale = 1 + ctaPulse * 0.03; // 1.0 → 1.03
+        const ctaGlowIntensity = 60 + ctaPulse * 40; // 60% → 100% opacity hex
+        const ctaGlowHex = Math.round(ctaGlowIntensity * 2.55).toString(16).padStart(2, '0');
+        return (
         <div
           style={{
             marginTop: 32,
             opacity: interpolate(frame, [20, 35], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
-            transform: `scale(${spring({ frame: Math.max(0, frame - 20), fps, config: { damping: 10, stiffness: 120 } })})`,
+            transform: `scale(${spring({ frame: Math.max(0, frame - 20), fps, config: { damping: 10, stiffness: 120 } }) * ctaScale})`,
           }}
         >
           <div
@@ -2063,7 +2120,8 @@ const TextOverlay: React.FC<{
               padding: '18px 48px',
               backgroundColor: primaryColor,
               borderRadius: 12,
-              boxShadow: `0 4px 24px ${primaryColor}60, 0 8px 40px rgba(0,0,0,0.3)`,
+              boxShadow: `0 4px 24px ${primaryColor}${ctaGlowHex}, 0 8px 40px rgba(0,0,0,0.3), 0 0 60px ${primaryColor}30`,
+              transition: 'box-shadow 0.1s ease',
             }}
           >
             <span
@@ -2079,7 +2137,8 @@ const TextOverlay: React.FC<{
             </span>
           </div>
         </div>
-      )}
+        );
+      })()}
       
       {/* Quote frame for proof/testimonial scenes */}
       {sceneType === 'proof' && displayText && (
@@ -2296,7 +2355,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-10-r55-phase3b-text-character-fix');
+    console.error('UCV_BUNDLE_CANARY=2026-03-10-r55-phase4-loftfilm-polish');
   }
   
   // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
@@ -2446,12 +2505,24 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   const currentScene = currentSceneIndex >= 0 ? sceneTimings[currentSceneIndex] : null;
   
-  // Phase 4: Context-based character visibility (extended for hook + intro)
+  // Phase 4: Character visible in ALL content scenes for Loft-Film quality
   const shouldShowCharacter = useMemo(() => {
     if (!useCharacter || !currentScene) return false;
-    // Show character in hook, intro, problem, solution, and cta scenes
-    return ['hook', 'intro', 'problem', 'solution', 'cta'].includes(currentScene.type);
+    return ['hook', 'intro', 'problem', 'solution', 'feature', 'proof', 'cta'].includes(currentScene.type);
   }, [useCharacter, currentScene]);
+  
+  // Phase 4: Character type rotation per scene for visual variety
+  const getCharacterType = (sceneType: string): 'presenter' | 'user' | 'expert' => {
+    switch (sceneType) {
+      case 'hook': return 'presenter';
+      case 'problem': return 'user';
+      case 'solution': return 'expert';
+      case 'feature': return 'presenter';
+      case 'proof': return 'expert';
+      case 'cta': return 'presenter';
+      default: return 'presenter';
+    }
+  };
   
   // Phase 3b: All characters on right — text is always on the left, character presents/points toward it
   const getContextBasedPosition = (sceneType: string): 'left' | 'right' | 'center' => {
@@ -2689,7 +2760,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
           {/* SVG Character (default) */}
           {characterType === 'svg' && (
             <AnimatedCharacter
-              type="presenter"
+              type={getCharacterType(currentScene.type)}
               action={getCharacterAction(currentScene.type)}
               frame={frame - currentScene.startFrame}
               fps={effectiveFps}
