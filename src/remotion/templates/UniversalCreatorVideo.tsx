@@ -2365,6 +2365,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   characterType = 'svg',
   phonemeTimestamps,
   beatSyncData,
+  brandUrl,
   fps: propsFps,
   preferredFont = 'inter',
   category = 'social-reel',
