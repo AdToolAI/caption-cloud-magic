@@ -2100,13 +2100,18 @@ const TextOverlay: React.FC<{
         )}
       </div>
       
-      {/* CTA Button Effect */}
-      {sceneType === 'cta' && headline && (
+      {/* Phase 4: CTA Button with pulse animation for Loft-Film quality */}
+      {sceneType === 'cta' && headline && (() => {
+        const ctaPulse = Math.sin(frame * 0.1) * 0.5 + 0.5; // 0-1 oscillation
+        const ctaScale = 1 + ctaPulse * 0.03; // 1.0 → 1.03
+        const ctaGlowIntensity = 60 + ctaPulse * 40; // 60% → 100% opacity hex
+        const ctaGlowHex = Math.round(ctaGlowIntensity * 2.55).toString(16).padStart(2, '0');
+        return (
         <div
           style={{
             marginTop: 32,
             opacity: interpolate(frame, [20, 35], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
-            transform: `scale(${spring({ frame: Math.max(0, frame - 20), fps, config: { damping: 10, stiffness: 120 } })})`,
+            transform: `scale(${spring({ frame: Math.max(0, frame - 20), fps, config: { damping: 10, stiffness: 120 } }) * ctaScale})`,
           }}
         >
           <div
@@ -2115,7 +2120,8 @@ const TextOverlay: React.FC<{
               padding: '18px 48px',
               backgroundColor: primaryColor,
               borderRadius: 12,
-              boxShadow: `0 4px 24px ${primaryColor}60, 0 8px 40px rgba(0,0,0,0.3)`,
+              boxShadow: `0 4px 24px ${primaryColor}${ctaGlowHex}, 0 8px 40px rgba(0,0,0,0.3), 0 0 60px ${primaryColor}30`,
+              transition: 'box-shadow 0.1s ease',
             }}
           >
             <span
@@ -2131,7 +2137,8 @@ const TextOverlay: React.FC<{
             </span>
           </div>
         </div>
-      )}
+        );
+      })()}
       
       {/* Quote frame for proof/testimonial scenes */}
       {sceneType === 'proof' && displayText && (
