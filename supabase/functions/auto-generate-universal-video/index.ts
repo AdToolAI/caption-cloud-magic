@@ -1323,7 +1323,7 @@ async function runGenerationPipeline(
         kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', ['in', 'out', 'left', 'right'], 'in'),
         textOverlay: {
           enabled: true,
-          text: scene.voiceover || scene.title || '',
+          text: smartTruncateToSentences(scene.voiceover || scene.title || '', 2, 25),
           headline: scene.title || '',
           animation: validateEnum(scene.textAnimation || getDefaultTextAnimation(sceneType), VALID_TEXT_ANIMATIONS, 'fadeWords'),
           position: validateEnum(scene.textPosition || getDefaultTextPosition(sceneType), VALID_TEXT_POSITIONS, 'bottom'),
@@ -1440,6 +1440,7 @@ async function runGenerationPipeline(
         outlineColor: '#000000',
         outlineWidth: 2,
       },
+      showSceneTitles: isBareMinimum ? false : true,
       showProgressBar: isBareMinimum ? false : (briefing.showProgressBar !== false),
       showWatermark: isBareMinimum ? false : (briefing.showWatermark === true),
       watermarkText: isBareMinimum ? undefined : (briefing.watermarkText || undefined),
@@ -1464,7 +1465,7 @@ async function runGenerationPipeline(
     }) as Record<string, unknown>;
 
     const inputPropsDiagnostics = {
-      canary: 'payload-sanitizer-v12-r55-animations-unlocked',
+      canary: 'payload-sanitizer-v12-r55-phase3-text-upgrade',
       category: (inputProps as any).category,
       storytellingStructure: (inputProps as any).storytellingStructure,
       style: (inputProps as any).style,
@@ -2388,6 +2389,28 @@ function transformAlignmentToPhonemes(alignment: {
   }
   
   return phonemes;
+}
+
+/** Phase 3: Smart truncation — keeps up to maxSentences complete sentences, max maxWords words */
+function smartTruncateToSentences(text: string, maxSentences: number, maxWords: number): string {
+  if (!text) return '';
+  // Split into sentences
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  let result = '';
+  let wordCount = 0;
+  for (let i = 0; i < Math.min(sentences.length, maxSentences); i++) {
+    const sentenceWords = sentences[i].trim().split(/\s+/);
+    if (wordCount + sentenceWords.length > maxWords && i > 0) break;
+    result += (result ? ' ' : '') + sentences[i].trim();
+    wordCount += sentenceWords.length;
+  }
+  // Fallback: if no sentence boundary found, truncate to maxWords
+  if (!result) {
+    const words = text.split(/\s+/);
+    result = words.slice(0, maxWords).join(' ');
+    if (words.length > maxWords) result += '…';
+  }
+  return result;
 }
 
 function getDefaultAnimation(sceneType: string): string {

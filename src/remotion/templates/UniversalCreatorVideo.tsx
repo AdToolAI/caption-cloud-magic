@@ -1894,8 +1894,8 @@ const TextOverlay: React.FC<{
   // No text at all? Skip
   if (!bodyText && !headline) return null;
   
-  // Smart truncation: max 12 words for visual display
-  const displayText = truncateToWords(bodyText, 12);
+  // Smart truncation: max 20 words for visual display (Phase 3 upgrade)
+  const displayText = truncateToWords(bodyText, 20);
   
   const safeDur = safeDuration(durationInFrames, 60);
   const safeIn = Math.min(15, safeDur * 0.25);
@@ -1913,12 +1913,15 @@ const TextOverlay: React.FC<{
   const isProblem = sceneType === 'problem';
   
   // Position: hook/cta = centered, problem/solution/feature = bottom
+  // Phase 3: Character collision guard — shift text right when character is on left (problem scenes)
+  const characterOnLeft = isProblem;
   const positionStyle: React.CSSProperties = isHookOrCTA
     ? { top: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }
-    : { bottom: 60, left: 0, right: 0 };
+    : { bottom: 60, left: characterOnLeft ? '30%' : 0, right: 0 };
   
   // Font sizes based on scene type
-  const headlineFontSize = isHookOrCTA ? 72 : 48;
+  // Phase 3: Larger headlines for problem scenes (emotionally important)
+  const headlineFontSize = isHookOrCTA ? 72 : (isProblem ? 56 : 48);
   const bodyFontSize = isHookOrCTA ? 28 : 24;
   
   // Text alignment
@@ -1978,7 +1981,7 @@ const TextOverlay: React.FC<{
               fontSize: headlineFontSize,
               fontWeight: 800,
               fontFamily: "'Poppins', 'DM Sans', sans-serif",
-              textShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              textShadow: `0 2px 8px rgba(0,0,0,0.4), 0 0 40px ${primaryColor}40`,
               margin: 0,
               marginBottom: displayText ? 16 : 0,
               lineHeight: 1.15,
