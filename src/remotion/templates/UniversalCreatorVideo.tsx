@@ -298,6 +298,9 @@ export const UniversalCreatorVideoSchema = z.object({
     transitionPoints: z.array(z.number()),
     downbeats: z.array(z.number()),
   }).optional(),
+  
+  // Phase 5: Branding
+  brandUrl: z.string().optional(),
 });
 
 export type UniversalCreatorVideoProps = z.infer<typeof UniversalCreatorVideoSchema>;
