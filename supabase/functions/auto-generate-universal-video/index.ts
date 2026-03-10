@@ -1346,13 +1346,13 @@ async function runGenerationPipeline(
 
     const sanitizedBeatSync = sanitizeBeatSyncData(beatSyncData);
 
-    // r53: Force-disable all non-essential visual systems for isolation
+    // r54: Re-enable visual systems (morphTransitions stays disabled — r42-bundle bug)
     const disableMorphTransitions = true;
     const disableLottieIcons = profileFlags.disableLottieIcons === true || profileFlags.forceLottieIconsEmoji === true;
     const forceEmbeddedCharacterLottie = true;
     const disablePrecisionSubtitles = profileFlags.disablePrecisionSubtitles === true;
-    const disableSceneFx = true;
-    const disableAnimatedText = true;
+    const disableSceneFx = false;
+    const disableAnimatedText = false;
     const isBareMinimum = profileFlags.bareMinimum === true;
     const disableCharacter = profileFlags.disableCharacter === true;
     const disableAllLottie = profileFlags.disableAllLottie === true;
