@@ -1316,7 +1316,14 @@ async function runGenerationPipeline(
           type: 'gradient' as const, // r51: NEVER 'image' — r42 bundle can't handle it safely
           gradientColors: sceneGradientColors,
         },
-        animation: validateEnum(scene.animation || getDefaultAnimation(sceneType), VALID_ANIMATIONS, 'fadeIn'),
+        // r52: Force gradient-safe animations — parallax/kenBurns require images and cause black frames with gradient bg
+        animation: (() => {
+          const GRADIENT_SAFE_ANIMATIONS = ['fadeIn', 'slideUp', 'slideLeft', 'slideRight', 'zoomIn', 'zoomOut', 'bounce', 'popIn', 'flyIn', 'morphIn', 'none'];
+          const raw = validateEnum(scene.animation || getDefaultAnimation(sceneType), VALID_ANIMATIONS, 'fadeIn');
+          const safe = GRADIENT_SAFE_ANIMATIONS.includes(raw) ? raw : 'fadeIn';
+          if (raw !== safe) console.log(`[r52] Scene ${index}: animation "${raw}" → "${safe}" (not gradient-safe)`);
+          return safe;
+        })(),
         kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', VALID_KEN_BURNS, 'in'),
         textOverlay: {
           enabled: true,
@@ -1519,7 +1526,7 @@ async function runGenerationPipeline(
       render_id: pendingRenderId,
       bucket_name: DEFAULT_BUCKET_NAME,
       format_config: { format: 'mp4', aspect_ratio: briefing.aspectRatio || '16:9', width: dimensions.width, height: dimensions.height },
-      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required, diagnosticProfile: diagProfile, diag_flags: (inputProps as any).diag, progressId: progressId, schedulingMode },
+      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required, diagnosticProfile: diagProfile, diag_flags: (inputProps as any).diag, progressId: progressId, schedulingMode, r52_gradient_forced: true, scene_backgrounds: finalScenes.map((s: any) => s.background?.type), scene_animations: finalScenes.map((s: any) => s.animation) },
       subtitle_config: {},
       status: 'pending',
       started_at: new Date().toISOString(),
