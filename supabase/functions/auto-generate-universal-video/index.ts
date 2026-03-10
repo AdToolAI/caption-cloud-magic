@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r51-force-gradient-2026-03-09";
+const AUTO_GEN_BUILD_TAG = "r53-nuclear-diagnostic-2026-03-10";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -1286,45 +1286,21 @@ async function runGenerationPipeline(
       const duration = scene.durationSeconds || scene.duration || 5;
       const sceneType = validateEnum(scene.sceneType || scene.type || 'content', VALID_SCENE_TYPES, 'feature');
 
-      // r51: FORCE GRADIENT for ALL scenes — r42 S3 bundle lacks SafeImg/delayRender
-      // Sending background.type='image' causes silent black frames when Lambda Chromium
-      // fails to load images (no onError handler in old bundle)
-      const typeGradients: Record<string, string[]> = {
-        'hook': ['#f59e0b', '#d97706'],
-        'problem': ['#ef4444', '#b91c1c'],
-        'solution': ['#10b981', '#059669'],
-        'feature': ['#3b82f6', '#1d4ed8'],
-        'proof': ['#8b5cf6', '#6d28d9'],
-        'cta': ['#f97316', '#ea580c'],
-        'intro': ['#06b6d4', '#0891b2'],
-        'outro': ['#6366f1', '#4f46e5'],
-        'transition': ['#64748b', '#475569'],
-      };
-      const sceneGradientColors = briefing.brandColors?.length >= 2
-        ? [briefing.brandColors[0], briefing.brandColors[1]]
-        : typeGradients[sceneType] || ['#3b82f6', '#1e40af'];
-
+      // r53: Nuclear diagnostic - force minimal scene config for deterministic rendering
       return {
         id: `scene-${index}`,
         order: index + 1,
         type: sceneType,
         title: scene.title || '',
-        duration: duration,
+        duration,
         startTime,
         endTime: startTime + duration,
         background: {
-          type: 'gradient' as const, // r51: NEVER 'image' — r42 bundle can't handle it safely
-          gradientColors: sceneGradientColors,
+          type: 'color' as const,
+          color: '#3b82f6',
         },
-        // r52: Force gradient-safe animations — parallax/kenBurns require images and cause black frames with gradient bg
-        animation: (() => {
-          const GRADIENT_SAFE_ANIMATIONS = ['fadeIn', 'slideUp', 'slideLeft', 'slideRight', 'zoomIn', 'zoomOut', 'bounce', 'popIn', 'flyIn', 'morphIn', 'none'];
-          const raw = validateEnum(scene.animation || getDefaultAnimation(sceneType), VALID_ANIMATIONS, 'fadeIn');
-          const safe = GRADIENT_SAFE_ANIMATIONS.includes(raw) ? raw : 'fadeIn';
-          if (raw !== safe) console.log(`[r52] Scene ${index}: animation "${raw}" → "${safe}" (not gradient-safe)`);
-          return safe;
-        })(),
-        kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', VALID_KEN_BURNS, 'in'),
+        animation: 'none' as const,
+        kenBurnsDirection: 'in' as const,
         textOverlay: {
           enabled: true,
           text: scene.voiceover || scene.title || '',
@@ -1332,24 +1308,25 @@ async function runGenerationPipeline(
           animation: validateEnum(scene.textAnimation || getDefaultTextAnimation(sceneType), VALID_TEXT_ANIMATIONS, 'fadeWords'),
           position: validateEnum(scene.textPosition || getDefaultTextPosition(sceneType), VALID_TEXT_POSITIONS, 'bottom'),
         },
-        soundEffectType: validateEnum(scene.soundEffect || getDefaultSoundEffect(sceneType), VALID_SOUND_EFFECTS, 'none'),
-        beatAligned: scene.beatAligned ?? (sceneType === 'cta'),
+        soundEffectType: 'none' as const,
+        beatAligned: false,
         transition: {
-          type: validateEnum(scene.transitionIn || 'fade', VALID_TRANSITION_TYPES, 'fade'),
-          duration: 0.5,
+          type: 'none' as const,
+          duration: 0,
           direction: 'right',
         },
       };
     });
 
     const sanitizedBeatSync = sanitizeBeatSyncData(beatSyncData);
-    
-    const disableMorphTransitions = profileFlags.disableMorphTransitions === true;
+
+    // r53: Force-disable all non-essential visual systems for isolation
+    const disableMorphTransitions = true;
     const disableLottieIcons = profileFlags.disableLottieIcons === true || profileFlags.forceLottieIconsEmoji === true;
     const forceEmbeddedCharacterLottie = true;
     const disablePrecisionSubtitles = profileFlags.disablePrecisionSubtitles === true;
-    const disableSceneFx = profileFlags.disableSceneFx === true;
-    const disableAnimatedText = profileFlags.disableAnimatedText === true;
+    const disableSceneFx = true;
+    const disableAnimatedText = true;
     const isBareMinimum = profileFlags.bareMinimum === true;
     const disableCharacter = profileFlags.disableCharacter === true;
     const disableAllLottie = profileFlags.disableAllLottie === true;
@@ -1363,10 +1340,10 @@ async function runGenerationPipeline(
       startTime: 0,
       endTime: 2,
       background: {
-        type: 'gradient' as const,
-        gradientColors: ['#3b82f6', '#1e40af'],
+        type: 'color' as const,
+        color: '#3b82f6',
       },
-      animation: 'fadeIn' as const,
+      animation: 'none' as const,
       kenBurnsDirection: 'in' as const,
       textOverlay: {
         enabled: true,
@@ -1377,11 +1354,42 @@ async function runGenerationPipeline(
       soundEffectType: 'none' as const,
       beatAligned: false,
       transition: {
-        type: 'fade' as const,
-        duration: 0.5,
+        type: 'none' as const,
+        duration: 0,
         direction: 'right',
       },
     }] : remotionScenes;
+
+    const compositionDurationInFrames = isBareMinimum ? 60 : durationInFrames;
+    let runningStartFrame = 0;
+    const sceneFrameTimeline = finalScenes.map((scene: any) => {
+      const durationFrames = Math.max(1, Math.ceil((scene.duration || 5) * fps));
+      const startFrame = runningStartFrame;
+      runningStartFrame += durationFrames;
+      return {
+        id: scene.id,
+        type: scene.type,
+        startTime: scene.startTime,
+        durationSeconds: scene.duration,
+        startFrame,
+        durationFrames,
+        animation: scene.animation,
+        transitionType: scene.transition?.type || 'none',
+        backgroundType: scene.background?.type || 'unknown',
+      };
+    });
+    const totalSceneFrames = sceneFrameTimeline.reduce((acc: number, s: any) => acc + s.durationFrames, 0);
+    const frameOverflow = totalSceneFrames - compositionDurationInFrames;
+    const timingDiagnostics = {
+      totalSceneFrames,
+      compositionDurationInFrames,
+      frameOverflow,
+      hasTimingOverflow: frameOverflow > 0,
+      sceneTypes: finalScenes.map((s: any) => s.type),
+      sceneDurations: finalScenes.map((s: any) => s.duration),
+      sceneStartTimes: finalScenes.map((s: any) => s.startTime),
+      sceneTimeline: sceneFrameTimeline,
+    };
 
     const inputProps = deepStripNulls({
       category: validateEnum(briefing.category, VALID_CATEGORIES, 'social-reel'),
@@ -1436,20 +1444,21 @@ async function runGenerationPipeline(
     }) as Record<string, unknown>;
 
     const inputPropsDiagnostics = {
-      canary: 'payload-sanitizer-v10-profileK-bareMinimum-preflightZod',
+      canary: 'payload-sanitizer-v11-r53-nuclear-diagnostic',
       category: (inputProps as any).category,
       storytellingStructure: (inputProps as any).storytellingStructure,
       style: (inputProps as any).style,
       characterType: (inputProps as any).characterType,
       useCharacter: (inputProps as any).useCharacter,
-      sceneCount: remotionScenes.length,
-      sceneTypes: remotionScenes.map((s: any) => s.type),
-      sceneAnimations: remotionScenes.map((s: any) => s.animation),
+      sceneCount: finalScenes.length,
+      sceneTypes: finalScenes.map((s: any) => s.type),
+      sceneAnimations: finalScenes.map((s: any) => s.animation),
       hasBeatSync: !!sanitizedBeatSync,
       hasVoiceover: !!voiceoverUrl,
       hasMusic: !!musicUrl,
       hasPhonemes: !!(phonemeTimestamps && phonemeTimestamps.length > 0),
       hasSubtitleStyle: !!(inputProps as any).subtitleStyle,
+      timingDiagnostics,
       diagToggles: (inputProps as any).diag,
       nullFieldCount: JSON.stringify(inputProps).split(':null').length - 1,
       fieldCount: Object.keys(inputProps as any).length,
@@ -1526,7 +1535,25 @@ async function runGenerationPipeline(
       render_id: pendingRenderId,
       bucket_name: DEFAULT_BUCKET_NAME,
       format_config: { format: 'mp4', aspect_ratio: briefing.aspectRatio || '16:9', width: dimensions.width, height: dimensions.height },
-      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required, diagnosticProfile: diagProfile, diag_flags: (inputProps as any).diag, progressId: progressId, schedulingMode, r52_gradient_forced: true, scene_backgrounds: finalScenes.map((s: any) => s.background?.type), scene_animations: finalScenes.map((s: any) => s.animation) },
+      content_config: {
+        category: briefing.category,
+        scenes: finalScenes.length,
+        hasVoiceover: !!voiceoverUrl,
+        hasMusic: !!musicUrl,
+        credits_used: credits_required,
+        diagnosticProfile: diagProfile,
+        diag_flags: (inputProps as any).diag,
+        progressId: progressId,
+        schedulingMode,
+        r53_nuclear_diagnostic: true,
+        scene_backgrounds: finalScenes.map((s: any) => s.background?.type),
+        scene_animations: finalScenes.map((s: any) => s.animation),
+        scene_types: finalScenes.map((s: any) => s.type),
+        scene_durations: finalScenes.map((s: any) => s.duration),
+        scene_start_times: finalScenes.map((s: any) => s.startTime),
+        timing_diagnostics: timingDiagnostics,
+        remotion_scenes: finalScenes,
+      },
       subtitle_config: {},
       status: 'pending',
       started_at: new Date().toISOString(),
@@ -1554,7 +1581,7 @@ async function runGenerationPipeline(
       overwrite: true,
       outName: `universal-video-${pendingRenderId}.mp4`,
       bucketName: DEFAULT_BUCKET_NAME,
-      durationInFrames: isBareMinimum ? 60 : durationInFrames,
+      durationInFrames: compositionDurationInFrames,
       fps: fps,
       width: dimensions.width,
       height: dimensions.height,
@@ -1594,6 +1621,9 @@ async function runGenerationPipeline(
       outName: `universal-video-${pendingRenderId}.mp4`,
       lambdaPayload: lambdaPayload,
       progressId: progressId,
+      r53_nuclear_diagnostic: true,
+      timingDiagnostics,
+      remotionScenes: finalScenes,
     });
 
     console.log(`[auto-generate-universal-video] Pipeline completed for ${progressId}.`);
