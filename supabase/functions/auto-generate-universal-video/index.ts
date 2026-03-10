@@ -1526,7 +1526,7 @@ async function runGenerationPipeline(
       render_id: pendingRenderId,
       bucket_name: DEFAULT_BUCKET_NAME,
       format_config: { format: 'mp4', aspect_ratio: briefing.aspectRatio || '16:9', width: dimensions.width, height: dimensions.height },
-      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required, diagnosticProfile: diagProfile, diag_flags: (inputProps as any).diag, progressId: progressId, schedulingMode },
+      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required, diagnosticProfile: diagProfile, diag_flags: (inputProps as any).diag, progressId: progressId, schedulingMode, r52_gradient_forced: true, scene_backgrounds: finalScenes.map((s: any) => s.background?.type), scene_animations: finalScenes.map((s: any) => s.animation) },
       subtitle_config: {},
       status: 'pending',
       started_at: new Date().toISOString(),
