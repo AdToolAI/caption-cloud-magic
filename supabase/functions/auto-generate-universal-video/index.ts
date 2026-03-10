@@ -1250,23 +1250,10 @@ async function runGenerationPipeline(
     const schedulingMode = determineSchedulingMode();
     console.log(`[auto-generate-universal-video] r39B schedulingMode: ${schedulingMode}`);
     
-    // r27/r39: Check scheduling BEFORE building payload — reduce fps if needed
+    // r55-phase5: Loft-Film quality — ALWAYS 30fps, no reduction allowed
+    // With graduated stability scheduling (1/2/3 lambdas), 30fps fits within budget
     let mainScheduling = calculateScheduling(durationInFrames, { schedulingMode });
-    if (mainScheduling.needsFpsReduction && fps > 24) {
-      const originalFps = fps;
-      fps = 24;
-      durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
-      console.log(`[auto-generate-universal-video] 📉 r27 MAIN PATH FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${Math.ceil(totalDuration * originalFps)} → ${durationInFrames}`);
-      // r42: Re-check budget after 30→24 reduction
-      mainScheduling = calculateScheduling(durationInFrames, { schedulingMode });
-    }
-    
-    // r55-phase5: REMOVED 15fps degradation — Loft-Film quality requires minimum 24fps
-    // Previously r42 dropped to 15fps here. Now we keep 24fps minimum and log a warning instead.
-    if (mainScheduling.timeoutBudgetOk === false && fps > 24) {
-      // Already handled above — this branch is a safety net only
-      console.warn(`[auto-generate-universal-video] ⚠️ r55-phase5: Budget tight at ${fps}fps but NOT dropping below 24fps (Loft-Film quality policy)`);
-    }
+    console.log(`[auto-generate-universal-video] r55-phase5: LOCKED at ${fps}fps (Loft-Film policy), scheduling handles capacity via ${mainScheduling.estimatedLambdas} lambdas`);
     
     // r43: SOFT GUARD — if STILL over budget even at 15fps, LOG WARNING but continue with forensic flag
     // (Previously this was a hard throw, which blocked 60s videos unnecessarily)
