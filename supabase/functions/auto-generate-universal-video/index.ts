@@ -1442,6 +1442,7 @@ async function runGenerationPipeline(
       showProgressBar: isBareMinimum ? false : (briefing.showProgressBar !== false),
       showWatermark: isBareMinimum ? false : (briefing.showWatermark === true),
       watermarkText: isBareMinimum ? undefined : (briefing.watermarkText || undefined),
+      brandUrl: briefing.websiteUrl || briefing.companyName || undefined,
       beatSyncData: isBareMinimum ? undefined : sanitizedBeatSync,
       targetWidth: dimensions.width,
       targetHeight: dimensions.height,
