@@ -1905,7 +1905,8 @@ const TextOverlay: React.FC<{
   const displayText = bodyText;
   
   const safeDur = safeDuration(durationInFrames, 60);
-  const safeIn = Math.min(15, safeDur * 0.25);
+  // Phase 5: Faster hook entry — reduced from 15 to 5 frames for punchy start
+  const safeIn = isHookOrCTA ? Math.min(5, safeDur * 0.15) : Math.min(15, safeDur * 0.25);
   const safeOut = Math.min(Math.max(safeIn + 2, safeDur - 15), safeDur - 2);
   
   const opacity = interpolate(
