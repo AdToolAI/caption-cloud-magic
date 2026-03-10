@@ -859,7 +859,7 @@ const AnimatedCharacter: React.FC<{
     <div
       style={{
         position: 'absolute',
-        bottom: '5%',
+        bottom: '2%',
         ...positionStyles[position],
         transform: `translateY(${breathe - celebrateBounce}px) scale(${0.3 + 0.7 * Math.max(0, entryProgress)})`,
         opacity: Math.max(0, entryProgress),
@@ -868,8 +868,8 @@ const AnimatedCharacter: React.FC<{
       }}
     >
       <svg 
-        width="180" 
-        height="340" 
+        width="220" 
+        height="400" 
         viewBox="0 0 200 360" 
         style={{ filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.35))' }}
       >
