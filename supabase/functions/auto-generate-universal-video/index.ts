@@ -2413,7 +2413,7 @@ function smartTruncateToSentences(text: string, maxSentences: number, maxWords: 
   return result;
 }
 
-
+function getDefaultAnimation(sceneType: string): string {
   // r55: Premium Loft-Film animations (unlocked with r55 dimension fixes)
   const map: Record<string, string> = {
     hook: 'popIn', intro: 'fadeIn', problem: 'kenBurns',
