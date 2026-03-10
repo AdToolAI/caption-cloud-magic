@@ -1440,6 +1440,7 @@ async function runGenerationPipeline(
         outlineColor: '#000000',
         outlineWidth: 2,
       },
+      showSceneTitles: isBareMinimum ? false : true,
       showProgressBar: isBareMinimum ? false : (briefing.showProgressBar !== false),
       showWatermark: isBareMinimum ? false : (briefing.showWatermark === true),
       watermarkText: isBareMinimum ? undefined : (briefing.watermarkText || undefined),
