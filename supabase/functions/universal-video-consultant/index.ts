@@ -637,6 +637,7 @@ const extractRecommendation = (messages: any[], category: string) => {
     tone: tone.substring(0, 100),
     brandColors: colorResponse.substring(0, 100),
     duration,
+    videoDuration: duration,
     format: aspectRatio,
     aspectRatio,
     outputFormats: [aspectRatio],

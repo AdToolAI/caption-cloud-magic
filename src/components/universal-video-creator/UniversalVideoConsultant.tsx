@@ -428,7 +428,9 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
         
         <div className="p-5 min-h-[420px] max-h-[500px] overflow-y-auto relative">
           <AnimatePresence>
-            {messages.map((message, index) => (
+            {(() => {
+              const lastAssistantIdx = messages.reduce((acc, m, i) => m.role === 'assistant' ? i : acc, -1);
+              return messages.map((message, index) => (
               <motion.div
                 key={message.id}
                 initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -473,7 +475,7 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
                     </ReactMarkdown>
                   </div>
                   
-                  {message.role === 'assistant' && message.quickReplies && message.quickReplies.length > 0 && (
+                  {message.role === 'assistant' && message.quickReplies && message.quickReplies.length > 0 && index === lastAssistantIdx && (
                     <div className="mt-5 pt-4 border-t border-white/10">
                       <ConsultantQuickReplies
                         options={message.quickReplies}
@@ -484,7 +486,8 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
                   )}
                 </div>
               </motion.div>
-            ))}
+            ));
+            })()}
           </AnimatePresence>
           
           {/* Typing indicator */}
