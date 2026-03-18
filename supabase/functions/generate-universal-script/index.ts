@@ -503,7 +503,7 @@ ${moodInstructions}
 
 **Visueller Stil:** ${briefing.visualStyle || 'modern-3d'}
 **Emotionaler Ton:** ${briefing.emotionalTone || 'professionell'}
-**Markenfarben:** ${briefing.brandColors?.join(', ') || 'Standard'}
+**Markenfarben:** ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'Standard')}
 
 **Videolänge:** ${briefing.videoDuration} Sekunden
 **Format:** ${briefing.aspectRatio || '16:9'}
