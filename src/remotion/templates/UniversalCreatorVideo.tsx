@@ -1960,7 +1960,7 @@ const TextOverlay: React.FC<{
   // Phase 6: Non-hook panels repositioned higher with padding for cleaner composition
   const positionStyle: React.CSSProperties = isHookOrCTA
     ? { top: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }
-    : { bottom: 0, left: 0, right: 0, paddingBottom: 40 };
+    : { bottom: 60, left: 0, right: 0, paddingBottom: 40 };
   
   // Font sizes based on scene type
   // Phase 5: Larger body fonts for mobile readability (was 28/24, now 32/28)
@@ -1975,7 +1975,7 @@ const TextOverlay: React.FC<{
   const getGlassStyle = (): React.CSSProperties => {
     if (isHookOrCTA) {
       return {
-        background: 'rgba(0, 0, 0, 0.35)',
+        background: 'rgba(0, 0, 0, 0.55)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderRadius: 20,
@@ -1994,7 +1994,9 @@ const TextOverlay: React.FC<{
           borderRadius: 16,
           borderLeft: '4px solid #EF4444',
           padding: '24px 32px',
-          maxWidth: '75%',
+          maxWidth: '80%',
+          maxHeight: '42%',
+          overflow: 'hidden' as const,
           boxShadow: '0 4px 24px rgba(239,68,68,0.15), 0 4px 24px rgba(0,0,0,0.25)',
         };
       case 'solution':
@@ -2005,7 +2007,9 @@ const TextOverlay: React.FC<{
           borderRadius: 16,
           borderLeft: '4px solid #10B981',
           padding: '24px 32px',
-          maxWidth: '75%',
+          maxWidth: '80%',
+          maxHeight: '42%',
+          overflow: 'hidden' as const,
           boxShadow: '0 4px 24px rgba(16,185,129,0.15), 0 4px 24px rgba(0,0,0,0.25)',
         };
       case 'feature':
@@ -2016,7 +2020,9 @@ const TextOverlay: React.FC<{
           borderRadius: 16,
           borderTop: '4px solid #3B82F6',
           padding: '24px 32px',
-          maxWidth: '75%',
+          maxWidth: '80%',
+          maxHeight: '42%',
+          overflow: 'hidden' as const,
           boxShadow: '0 4px 24px rgba(59,130,246,0.15), 0 4px 24px rgba(0,0,0,0.25)',
         };
       case 'proof':
@@ -2028,7 +2034,9 @@ const TextOverlay: React.FC<{
           border: '1px solid rgba(139,92,246,0.3)',
           borderLeft: '4px solid #8B5CF6',
           padding: '24px 32px',
-          maxWidth: '75%',
+          maxWidth: '80%',
+          maxHeight: '42%',
+          overflow: 'hidden' as const,
           boxShadow: '0 4px 24px rgba(139,92,246,0.12), 0 4px 24px rgba(0,0,0,0.25)',
         };
       default:
@@ -2039,7 +2047,9 @@ const TextOverlay: React.FC<{
           borderRadius: 16,
           borderLeft: `4px solid ${primaryColor}`,
           padding: '24px 32px',
-          maxWidth: '75%',
+          maxWidth: '80%',
+          maxHeight: '42%',
+          overflow: 'hidden' as const,
           boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
         };
     }
@@ -2414,7 +2424,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-18-r56-phase6-visual-cleanup');
+    console.error('UCV_BUNDLE_CANARY=2026-03-18-r57-phase7-layout-fix');
   }
   
   // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
