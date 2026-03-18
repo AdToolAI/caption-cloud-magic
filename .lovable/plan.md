@@ -1,190 +1,88 @@
 
-## r42 — Error Isolation Mode (IMPLEMENTED)
 
-### Problem
-- `lambda_crash` mit Lottie-Timeout dominiert, aber `disableAllLottie=true` hilft nicht
-- Scheduling erzeugt `framesPerLambda=1440, fps=24, estTime=2880s, timeout=600s` → garantierter Timeout
-- Keine Forensik pro Attempt → Fehlerquelle unklar
+# Phase 9+10: Visual Prompt Engineering & Cinematic Post-Production
 
-### Lösung
-1. **Timeout Budget Enforcement**: `calculateScheduling()` gibt `estRuntimeSec` + `timeoutBudgetOk` zurück. Render-Only Pipeline erzwingt fps=15 wenn Budget überschritten.
-2. **Isolation Ladder**: Statt generischem Retry feste A/B/C-Stufen:
-   - Step A: Standard Stability Mode
-   - Step B: Alle riskanten Subsysteme aus (Lottie, SceneFx, PrecisionSubtitles)
-   - Step C: Maximum Isolation + fps=15
-3. **Forensics**: `isolationStep`, `effectiveFlags`, `sourceErrorSignature`, `failureStage`, `estRuntimeSec`, `timeoutBudgetOk` in result_data und content_config
-4. **UI**: Diagnose-Panel zeigt Isolation-Step, effektive Flags, Error-Signatur, Budget-Status
+## Aktueller Stand
 
-### Betroffene Dateien
-- `supabase/functions/_shared/remotion-payload.ts` (SchedulingResult + Budget-Check)
-- `supabase/functions/auto-generate-universal-video/index.ts` (Isolation Ladder + Budget Enforcement)
-- `supabase/functions/invoke-remotion-render/index.ts` (failure_stage + canary)
-- `supabase/functions/remotion-webhook/index.ts` (failure_stage + errorFingerprint in result_data)
-- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` (r42 Diagnose-Panel)
+Die Pipeline hat bereits:
+- **Negative Prompts** in `generate-premium-visual` (NEGATIVE_PROMPT + `sanitizePrompt()`)
+- **CategoryContrastOverlay** mit 5 Typen (cinematic, bold, subtle, clean, dramatic) in `UniversalCreatorVideo.tsx`
+- **SVG Filters** inkl. Film Grain, Bleach Bypass, Vignette in `SVGFilters.tsx`
+- **Saturation Filter** (`saturate(1.15)`) bereits als Memory dokumentiert
+
+Was **fehlt** fuer Loft-Film-Qualitaet:
 
 ---
 
-## r41 — Silent Render + Audio Mux (IMPLEMENTED)
+## Phase 9: Visual Prompt Engineering
 
-### Problem
-- UI zeigt generischen "non-2xx"-Fehler statt Cooldown-UI bei 429/capacity_cooldown
-- Stability-Scheduling griff nur bei 20% (zufällig), meiste Renders liefen distributed → rate_limit
-- Retries erzwangen Stability nur bei rate_limit, nicht bei timeout/lambda_crash/audio_corruption
+**Ziel:** QR-Codes, generische Logos, UI-Elemente und Artefakte aus KI-Bildern eliminieren.
 
-### Lösung
-- **UI**: `FunctionsHttpError.context.json()` robust parsen → Cooldown-UI statt Error
-- **Scheduling**: 100% Stability (Hotfix), hash-basiert statt random, alle retryable Kategorien → stability
-- **Retries**: `forceStability: true` für jeden Retry
-- **Observability**: schedulingMode, framesPerLambda, estimatedLambdas, fpsUsed in result_data
+### Aenderungen
 
+| Datei | Was |
+|-------|-----|
+| `generate-premium-visual/index.ts` | Erweiterte NEGATIVE_PROMPT + sanitizePrompt |
+| `auto-generate-universal-video/index.ts` | Prompt-Template verschaerfen |
 
-## r37 — Rate-Limit Auto-Recovery Stabilisierung (IMPLEMENTED)
-
-### Problem
-- Realtime-DB und Render-Polling liefern denselben Fehler doppelt → `totalAttempts` wird künstlich aufgebläht
-- Im Polling-Pfad fehlte exponentielles Backoff für `rate_limit` (war pauschal 30s statt 60/120/180s)
-- Wenn `retryTriggeredRef=true` und ein zweiter retryabler Fehler eintrifft → fiel in `setError()` statt "Retry läuft"
-- `sourceProgressId` wurde nicht durch die Retry-Kette propagiert → Backend-Retry-Zählung unzuverlässig
-
-### Lösung
-
-#### Frontend (`UniversalAutoGenerationProgress.tsx`)
-1. `lastFailureSignatureRef` — Dedup-Guard für identische Failure-Events
-2. Retry-Guard: retryable Fehler bei bereits geplantem Retry → ignorieren statt `setError()`
-3. Polling-Pfad Backoff: `rate_limit` → 60s/120s/180s exponentiell mit Countdown-UI
-4. Failure-Signature Reset bei neuem Retry-Start
-
-#### Backend (`auto-generate-universal-video/index.ts`)
-1. `chainSourceProgressId` = sourceProgressId-Kette bis zum Original
-2. Propagation in content_config, result_data (ready_to_render + failed)
-3. Retry-Zählung filtert auf chainSourceProgressId
+**Details:**
+1. `NEGATIVE_PROMPT` erweitern um: `QR code, barcode, logo, brand mark, icon overlay, UI element, button, screenshot, phone mockup, laptop screen, website screenshot, app interface, stock photo watermark, shutterstock, getty`
+2. `sanitizePrompt()` um Regex fuer QR/Logo-Begriffe erweitern
+3. In `auto-generate-universal-video` den Scene-Prompt mit explizitem `NO QR codes, NO logos, NO UI mockups, NO screenshots` anreichern — besonders fuer `feature` und `solution` Szenen wo diese Artefakte am haeufigsten auftreten
 
 ---
 
+## Phase 10: Cinematic Post-Production Layer
 
-## r33 — Audio-Corruption-Recovery (IMPLEMENTED)
+**Ziel:** Automatische cinematische Overlays pro Szene im Universal Video — Film Grain, Vignette, Color Grading — ohne manuellen Director's Cut.
 
-### Problem
-- Render crasht mit `ffprobe` exit code 1: korrupte MP3-Datei (HTML-Fehlerseite oder leerer Response als `.mp3` gespeichert)
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Audio-Strip)
-- Alle 3 Retries scheitern identisch, weil dieselbe korrupte Audio-Datei wiederverwendet wird
+### Aenderungen
 
-### Lösung
-Audio-Corruption wird jetzt als eigene Kategorie `audio_corruption` erkannt. Retry-Strategie entfernt Audio-Quellen aus dem Payload.
+| Datei | Was |
+|-------|-----|
+| `UniversalCreatorVideo.tsx` | `CinematicPostLayer` Komponente hinzufuegen |
+| `auto-generate-universal-video/index.ts` | `cinematicProfile` pro Kategorie in inputProps |
 
-### Änderungen
+**Details:**
 
-#### Fehlerklassifikation (3 Dateien)
-Neue Regex VOR `validation` (da "invalid" auch in ffprobe-Fehlern vorkommt):
-```
-/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i → 'audio_corruption'
-```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError()
+1. **Neue `CinematicPostLayer` Komponente** in `UniversalCreatorVideo.tsx`:
+   - Kombiniert 3 Effekte als CSS-Overlays (kein SVG noetig = Lambda-kompatibel):
+     - **Film Grain**: Pseudo-Element mit `noise` Background + Opacity 3-6% + `mix-blend-mode: overlay`
+     - **Vignette**: Radial-Gradient Overlay (bereits in CategoryContrastOverlay vorhanden, wird verstaerkt)
+     - **Color Grading**: CSS Filter-Kette pro Mood (`warm`, `cool`, `neutral`, `dramatic`)
+   - Wird **nach** CategoryContrastOverlay aber **vor** Text/Character-Overlays eingefuegt
 
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Audio-Corruption-Branch:
-- **Audio-Corruption erkannt**: FPS bleibt bei 30, Audio wird gestripped
-  - `voiceoverUrl = undefined`, `backgroundMusicUrl = undefined`, `backgroundMusicVolume = 0`
-  - `subtitles.segments = []` (keine Untertitel ohne Audio)
-  - Flag `r33_audioStripped: true` in `inputProps.diag` + `result_data`
-- Frontend: 5s Wartezeit (statt 30s), Label "Audio-Fehler"
-
-### Erwartetes Ergebnis
+2. **Cinematic Profile Mapping** (Edge Function):
 ```text
-Audio-Corruption, 1. Retry:
-  → Kategorie: audio_corruption (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Audio: komplett entfernt (voiceover + background music)
-  → Video wird ohne Ton fertiggestellt ✅
+advertisement  → warm grading, medium grain, strong vignette
+storytelling   → warm grading, heavy grain, cinematic vignette  
+tutorial       → neutral grading, no grain, light vignette
+corporate      → cool grading, light grain, subtle vignette
+testimonial    → warm grading, medium grain, cinematic vignette
+product-video  → neutral grading, no grain, dramatic vignette
+social-content → bold grading, no grain, no vignette
 ```
 
----
-
-## r32 — Lottie-Stall-Recovery (IMPLEMENTED)
-
-### Problem
-- Render crasht mit `A delayRender() "Waiting for Lottie animation to load"` 
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Lottie-Fix)
-
-### Lösung
-Lottie-Stall wird jetzt als `lambda_crash` erkannt. Retry-Strategie deaktiviert gezielt Lottie statt FPS zu senken.
-
-### Änderungen
-
-#### Fehlerklassifikation (4 Dateien)
-Neue Regex VOR generischem `lambda_crash`:
-```
-/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i → 'lambda_crash'
-```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `invoke-remotion-render/index.ts` — classifyImmediate()
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError() (VOR timeout-Check, da Lottie-Errors docs-Links mit "timeout" enthalten können)
-
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Lottie-aware Branching:
-- **Lottie-Stall erkannt** (`lambda_crash` + Lottie-Regex in errorMessage):
-  - FPS bleibt bei 30 (kein Downgrade!)
-  - Retry 1: `disableLottieIcons=true`, `disableMorphTransitions=true`, `forceEmbeddedCharacterLottie=true`
-  - Retry 2/3: `disableAllLottie=true` (komplett)
-  - Flags werden in `inputProps.diag` injiziert + in `result_data` persistiert
-- **Sonstiger lambda_crash** (nicht Lottie): Defensive Lottie-Disable + FPS-Reduktion
-- Timeout/Rate-Limit/Unknown: Verhalten unverändert (wie r28/r31)
-
-#### Observability
-- `bundle_probe`: `r29-lambda240s` → `r32-lottieRecovery`
-
-### Erwartetes Ergebnis
-
+3. **Color Grading CSS-Filter pro Mood**:
 ```text
-Lottie-Stall, 1. Retry:
-  → Kategorie: lambda_crash (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Flags: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie
-  → Render sollte durchgehen ✅
-
-Lottie-Stall, 2. Retry (falls nötig):
-  → disableAllLottie=true → alle Lottie-Komponenten aus
-  → Maximale Stabilität ✅
-
-Normaler Run ohne Lottie-Stall:
-  → Volle 30fps Qualität, alle Effekte ✅
+warm:     saturate(1.15) sepia(0.08) brightness(1.02)
+cool:     saturate(1.1) hue-rotate(-5deg) brightness(0.98)
+neutral:  saturate(1.05) contrast(1.05)
+dramatic: saturate(1.2) contrast(1.15) brightness(0.95)
+bold:     saturate(1.3) contrast(1.2) brightness(1.05)
 ```
+
+4. **Film Grain als animiertes CSS** (kein statisches Bild noetig):
+   - CSS `background-image` mit kleinem Noise-Pattern als Base64-encoded 4x4px PNG
+   - `opacity: 0.04` + `mix-blend-mode: overlay`
+   - Animiert via Remotion-Frame fuer subtile Variation
 
 ---
 
-## r31 — Lambda 600s + Hybrid Backoff (IMPLEMENTED)
+## Zusammenfassung
 
-### Problem
-- 8 Lambdas + 240s Timeout → 225 fpl × 2.1s = 472s → TIMEOUT ❌
-- 20 Lambdas + 240s Timeout → Rate Limit (AWS Concurrency ~10) ❌
+- **Phase 9**: 2 Edge Functions anpassen (Prompt-Haertung)
+- **Phase 10**: 1 Remotion-Komponente + 1 Edge Function (cinematische Overlays)
+- **Kein S3-Bundle-Redeploy** fuer Phase 9, **S3-Redeploy noetig** fuer Phase 10 (Remotion-Aenderung)
+- Geschaetzte Umsetzung: ~15-20 Minuten
 
-### Lösung
-Neue Lambda-Funktion mit **600s Timeout** deployed. 8 Lambdas bleiben unter dem Concurrency-Limit und haben genug Zeit.
-
-### Änderungen
-
-#### `_shared/remotion-payload.ts`
-- `LAMBDA_TIMEOUT_SECONDS`: 240 → **600**
-- `TARGET_MAX_LAMBDAS`: 20 → **8**
-- Soft-Max: 84 → **210** fpl
-- Hard-Max: 120 → **300** fpl
-- bundle_canary: `r31-lambda600s`
-
-#### Alle 5 Render Edge Functions (Fallback-Namen)
-- `240sec` → `600sec` in:
-  - `invoke-remotion-render/index.ts`
-  - `render-with-remotion/index.ts`
-  - `render-universal-video/index.ts`
-  - `render-directors-cut/index.ts`
-  - `auto-generate-universal-video/index.ts`
-
-#### `remotion-webhook/index.ts`
-- Timeout-Fehlermeldung: "240s" → "600s"
-
-#### `UniversalAutoGenerationProgress.tsx` (Frontend)
-- Rate-Limit-Retry: **exponentieller Backoff** (60s / 120s / 180s für Attempt 1/2/3)
-- Timeout/Crash-Retry: flat 30s (wie bisher)
-- Live-Countdown-Anzeige: "🔄 Rate-Limit — Auto-Retry in 58s (1/3)..."
