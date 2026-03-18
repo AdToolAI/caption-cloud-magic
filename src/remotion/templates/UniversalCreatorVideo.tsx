@@ -665,49 +665,68 @@ const PulseHighlight: React.FC<{
   );
 };
 
-// Floating Icons Effect
+// Phase 6: Floating geometric accents — replace emoji with subtle shapes
 const FloatingIcons: React.FC<{
   sceneType: string;
   frame: number;
   primaryColor: string;
 }> = ({ sceneType, frame, primaryColor }) => {
-  const icons: Record<string, string[]> = {
-    hook: ['✨', '💡', '🎯'],
-    problem: ['⚠️', '❌', '😰'],
-    solution: ['✅', '🎉', '💪'],
-    feature: ['⭐', '🔧', '📊'],
-    cta: ['🚀', '👉', '🔥'],
-    proof: ['📈', '🏆', '💯'],
-    intro: ['👋', '🌟', '✨'],
-    outro: ['🙏', '💫', '🎬'],
-    transition: [],
-  };
+  // Geometric shapes config per scene type: [shape, size, xOffset]
+  const shapes: Array<{ type: 'circle' | 'diamond' | 'line'; size: number; xPct: number; yBase: number }> = [
+    { type: 'circle', size: 10, xPct: 8, yBase: 50 },
+    { type: 'diamond', size: 8, xPct: 85, yBase: 120 },
+    { type: 'line', size: 16, xPct: 45, yBase: 35 },
+    { type: 'circle', size: 6, xPct: 70, yBase: 80 },
+  ];
   
-  const sceneIcons = icons[sceneType] || icons.hook;
-  if (sceneIcons.length === 0) return null;
+  if (sceneType === 'transition') return null;
   
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-      {sceneIcons.map((icon, i) => {
-        const baseX = 10 + i * 35;
-        const floatY = Math.sin((frame + i * 20) * 0.05) * 20;
-        const opacity = interpolate(frame, [0, 20, 100], [0, 0.7, 0.7], { extrapolateRight: 'clamp' });
+      {shapes.map((shape, i) => {
+        const floatY = Math.sin((frame + i * 25) * 0.03) * 12;
+        const floatX = Math.cos((frame + i * 15) * 0.02) * 8;
+        const opacity = interpolate(frame, [0, 30, 100], [0, 0.2, 0.15], { extrapolateRight: 'clamp' });
+        const rotation = Math.sin((frame + i * 40) * 0.02) * 20;
         
+        const shapeStyle: React.CSSProperties = {
+          position: 'absolute',
+          left: `${shape.xPct}%`,
+          top: shape.yBase + floatY,
+          opacity,
+          transform: `translate(${floatX}px, 0) rotate(${rotation}deg)`,
+        };
+        
+        if (shape.type === 'circle') {
+          return (
+            <div key={i} style={{
+              ...shapeStyle,
+              width: shape.size,
+              height: shape.size,
+              borderRadius: '50%',
+              border: `1.5px solid ${primaryColor}`,
+            }} />
+          );
+        }
+        if (shape.type === 'diamond') {
+          return (
+            <div key={i} style={{
+              ...shapeStyle,
+              width: shape.size,
+              height: shape.size,
+              border: `1.5px solid ${primaryColor}`,
+              transform: `${shapeStyle.transform} rotate(45deg)`,
+            }} />
+          );
+        }
+        // line
         return (
-          <div
-            key={i}
-            style={{
-              position: 'absolute',
-              left: `${baseX}%`,
-              top: 60 + floatY,
-              fontSize: 32,
-              opacity,
-              transform: `rotate(${Math.sin((frame + i * 30) * 0.03) * 15}deg)`,
-              filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
-            }}
-          >
-            {icon}
-          </div>
+          <div key={i} style={{
+            ...shapeStyle,
+            width: shape.size,
+            height: 1.5,
+            background: primaryColor,
+          }} />
         );
       })}
     </div>
