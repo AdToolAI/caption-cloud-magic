@@ -1863,12 +1863,15 @@ const SceneBackground: React.FC<{
       break;
   }
   
+  const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
+  
   return (
-    <AbsoluteFill style={{ opacity }}>
+    <AbsoluteFill style={{ opacity, filter: moodFilter }}>
       <div style={{ width: '100%', height: '100%', transform }}>
         {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
       </div>
       <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+      {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
       <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
       {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
       {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
