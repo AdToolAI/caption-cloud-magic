@@ -1824,7 +1824,7 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
   // Default: image with gradient fallback for invalid URLs
   if (safeImageUrl) {
     return (
-      <AbsoluteFill>
+      <AbsoluteFill style={{ filter: 'saturate(1.15) contrast(1.05)' }}>
         <SafeImg src={safeImageUrl} sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />
       </AbsoluteFill>
     );
