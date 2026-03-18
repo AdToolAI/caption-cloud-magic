@@ -807,9 +807,11 @@ async function runGenerationPipeline(
 
           const aspectHint = briefing.aspectRatio === '9:16' ? 'vertical portrait composition (9:16)' : 'wide landscape composition (16:9)';
           const antiArtifact = 'NO QR codes, NO logos, NO UI mockups, NO screenshots, NO phone screens, NO app interfaces, NO barcodes, NO watermarks.';
+          // ✅ Phase 9b: Anti-gibberish-text prefix — placed at START of prompt for maximum Flux attention
+          const antiTextPrefix = 'ABSOLUTE RULE: Zero text, zero letters, zero numbers, zero words in the image. All screens and dashboards show only abstract colorful shapes and graphs without any labels or writing. ';
           const prompt = attempt === 0
-            ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. No text, no letters, no human faces. ${antiArtifact}`
-            : `Abstract professional background for ${sceneType} scene. ${categoryHint}. ${aspectHint}. ${briefing.visualStyle} style. No text, no people. ${antiArtifact}`;
+            ? `${antiTextPrefix}${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. No human faces. ${antiArtifact}`
+            : `${antiTextPrefix}Abstract professional background for ${sceneType} scene. ${categoryHint}. ${aspectHint}. ${briefing.visualStyle} style. No people. ${antiArtifact}`;
 
           const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
             method: 'POST',

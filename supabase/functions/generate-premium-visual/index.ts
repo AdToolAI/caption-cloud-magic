@@ -225,8 +225,8 @@ serve(async (req) => {
         }
       } else {
         // Standard Flux 1.1 Pro for scenes without character
-        // Add strict negative prompt for no text/numbers
-        const fullPrompt = prompt + `. CRITICAL: Generate ONLY visual elements, absolutely NO text, NO letters, NO numbers, NO words anywhere in the image. Avoid: ${NEGATIVE_PROMPT}`;
+        // ✅ Phase 9b: Anti-text instruction at BEGINNING of prompt (Flux attention is front-weighted)
+        const fullPrompt = `STRICT RULE: This image must contain ZERO text, ZERO letters, ZERO numbers, ZERO words, ZERO writing of any kind. All screens, dashboards, and displays must show ONLY abstract shapes, graphs without labels, and color blocks — never any readable or unreadable text. ` + prompt + `. Avoid: ${NEGATIVE_PROMPT}`;
         
         console.log('Final prompt with negative guidance:', fullPrompt.substring(0, 300));
         
