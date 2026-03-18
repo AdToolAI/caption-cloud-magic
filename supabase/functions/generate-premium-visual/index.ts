@@ -51,6 +51,10 @@ function sanitizePrompt(prompt: string): string {
     /tabelle|liste|aufzählung|table|list/gi,
     /basic|pro|enterprise|premium|starter/gi,
     /\b(?:zeigt|shows?)\s+["']?[^"',]+["']?/gi,
+    /qr[\s-]?code|barcode|scan\s*code/gi,
+    /logo|brand\s*mark|trademark/gi,
+    /screenshot|mockup|wireframe|ui\s*element/gi,
+    /app\s*interface|website\s*design|browser\s*window/gi,
   ];
   
   let cleanPrompt = prompt;
