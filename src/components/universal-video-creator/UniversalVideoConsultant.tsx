@@ -163,6 +163,8 @@ Lass uns mit ein paar strategischen Fragen starten.
 
       // Check if consultation is complete
       if (data.isComplete && data.recommendation && data.progress >= 100) {
+        // ✅ r59: Persist recommendation so "Video erstellen" can use it
+        setLastRecommendation(data.recommendation);
         if (mode === 'full-service') {
           setTimeout(() => {
             const confirmMessageId = `confirm-${Date.now()}`;
