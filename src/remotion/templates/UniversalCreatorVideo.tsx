@@ -2880,6 +2880,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   primaryColor={primaryColor}
                    disableSceneFx={diagToggles.disableSceneFx}
                    contrastOverlayType={contrastOverlayType}
+                   cinematicProfile={cinematicProfile}
                  />
                 <TextOverlay
                   scene={(() => {
