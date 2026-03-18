@@ -1452,9 +1452,9 @@ const SceneTransition: React.FC<{
   // ✅ CRITICAL FIX: Use imported safeDuration function
   const safeDur = safeDuration(durationInFrames, 60);
   
-  const baseTransitionFrames = 15;
+  const baseTransitionFrames = 20;
   const transitionFrames = beatAligned && bpm 
-    ? Math.min(Math.round((60 / bpm) * fps * 0.5), 20)
+    ? Math.min(Math.round((60 / bpm) * fps * 0.5), 25)
     : baseTransitionFrames;
   
   // ✅ Ensure exit start is always valid (ascending array)
