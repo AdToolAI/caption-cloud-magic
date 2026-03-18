@@ -1770,24 +1770,28 @@ const SceneBackground: React.FC<{
   
   // Parallax
   if (animation === 'parallax') {
+    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
-      <>
+      <AbsoluteFill style={{ filter: moodFilter }}>
         <ParallaxBackground imageUrl={safeImageUrl} layers={3} frame={frame} durationInFrames={durationInFrames} />
         <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+        {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
         <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
         {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
-      </>
+      </AbsoluteFill>
     );
   }
   
   // Pop-In
   if (animation === 'popIn') {
+    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
       <PopInElement delay={0} frame={frame} fps={fps}>
-        <AbsoluteFill>
+        <AbsoluteFill style={{ filter: moodFilter }}>
           {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
           <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+          {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
           {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
           {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
@@ -1798,11 +1802,13 @@ const SceneBackground: React.FC<{
   
   // Fly-In
   if (animation === 'flyIn') {
+    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
       <FlyInElement direction="right" delay={0} frame={frame} fps={fps}>
-        <AbsoluteFill>
+        <AbsoluteFill style={{ filter: moodFilter }}>
           {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
           <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+          {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
           {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
           {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
