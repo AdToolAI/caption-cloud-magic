@@ -1,70 +1,190 @@
 
+## r42 — Error Isolation Mode (IMPLEMENTED)
 
-# Phase 8b + 9: Interview-Daten-Fix & Übergangs-Verfeinerung
+### Problem
+- `lambda_crash` mit Lottie-Timeout dominiert, aber `disableAllLottie=true` hilft nicht
+- Scheduling erzeugt `framesPerLambda=1440, fps=24, estTime=2880s, timeout=600s` → garantierter Timeout
+- Keine Forensik pro Attempt → Fehlerquelle unklar
 
-## Kritischer Bug: Interview-Daten gehen verloren
+### Lösung
+1. **Timeout Budget Enforcement**: `calculateScheduling()` gibt `estRuntimeSec` + `timeoutBudgetOk` zurück. Render-Only Pipeline erzwingt fps=15 wenn Budget überschritten.
+2. **Isolation Ladder**: Statt generischem Retry feste A/B/C-Stufen:
+   - Step A: Standard Stability Mode
+   - Step B: Alle riskanten Subsysteme aus (Lottie, SceneFx, PrecisionSubtitles)
+   - Step C: Maximum Isolation + fps=15
+3. **Forensics**: `isolationStep`, `effectiveFlags`, `sourceErrorSignature`, `failureStage`, `estRuntimeSec`, `timeoutBudgetOk` in result_data und content_config
+4. **UI**: Diagnose-Panel zeigt Isolation-Step, effektive Flags, Error-Signatur, Budget-Status
 
-**Das Hauptproblem:** Wenn der Nutzer alle 22 Phasen des Interviews durchläuft und dann "Video erstellen" klickt, werden die gesammelten Daten **verworfen**. Der Code erstellt stattdessen ein leeres Objekt mit Platzhaltern.
+### Betroffene Dateien
+- `supabase/functions/_shared/remotion-payload.ts` (SchedulingResult + Budget-Check)
+- `supabase/functions/auto-generate-universal-video/index.ts` (Isolation Ladder + Budget Enforcement)
+- `supabase/functions/invoke-remotion-render/index.ts` (failure_stage + canary)
+- `supabase/functions/remotion-webhook/index.ts` (failure_stage + errorFingerprint in result_data)
+- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` (r42 Diagnose-Panel)
 
-**Ursache:** In `UniversalVideoConsultant.tsx` (Zeile 164) kommt `data.recommendation` vom AI-Consultant mit allen Interview-Daten (Produktname, Zielgruppe, USPs, etc.). Diese wird in der Bestätigungsnachricht angezeigt, aber **nicht gespeichert**. Wenn der User dann "Video erstellen" klickt (Zeile 229-266), wird ein komplett neues, leeres `result`-Objekt erstellt:
+---
+
+## r41 — Silent Render + Audio Mux (IMPLEMENTED)
+
+### Problem
+- UI zeigt generischen "non-2xx"-Fehler statt Cooldown-UI bei 429/capacity_cooldown
+- Stability-Scheduling griff nur bei 20% (zufällig), meiste Renders liefen distributed → rate_limit
+- Retries erzwangen Stability nur bei rate_limit, nicht bei timeout/lambda_crash/audio_corruption
+
+### Lösung
+- **UI**: `FunctionsHttpError.context.json()` robust parsen → Cooldown-UI statt Error
+- **Scheduling**: 100% Stability (Hotfix), hash-basiert statt random, alle retryable Kategorien → stability
+- **Retries**: `forceStability: true` für jeden Retry
+- **Observability**: schedulingMode, framesPerLambda, estimatedLambdas, fpsUsed in result_data
+
+
+## r37 — Rate-Limit Auto-Recovery Stabilisierung (IMPLEMENTED)
+
+### Problem
+- Realtime-DB und Render-Polling liefern denselben Fehler doppelt → `totalAttempts` wird künstlich aufgebläht
+- Im Polling-Pfad fehlte exponentielles Backoff für `rate_limit` (war pauschal 30s statt 60/120/180s)
+- Wenn `retryTriggeredRef=true` und ein zweiter retryabler Fehler eintrifft → fiel in `setError()` statt "Retry läuft"
+- `sourceProgressId` wurde nicht durch die Retry-Kette propagiert → Backend-Retry-Zählung unzuverlässig
+
+### Lösung
+
+#### Frontend (`UniversalAutoGenerationProgress.tsx`)
+1. `lastFailureSignatureRef` — Dedup-Guard für identische Failure-Events
+2. Retry-Guard: retryable Fehler bei bereits geplantem Retry → ignorieren statt `setError()`
+3. Polling-Pfad Backoff: `rate_limit` → 60s/120s/180s exponentiell mit Countdown-UI
+4. Failure-Signature Reset bei neuem Retry-Start
+
+#### Backend (`auto-generate-universal-video/index.ts`)
+1. `chainSourceProgressId` = sourceProgressId-Kette bis zum Original
+2. Propagation in content_config, result_data (ready_to_render + failed)
+3. Retry-Zählung filtert auf chainSourceProgressId
+
+---
+
+
+## r33 — Audio-Corruption-Recovery (IMPLEMENTED)
+
+### Problem
+- Render crasht mit `ffprobe` exit code 1: korrupte MP3-Datei (HTML-Fehlerseite oder leerer Response als `.mp3` gespeichert)
+- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Audio-Strip)
+- Alle 3 Retries scheitern identisch, weil dieselbe korrupte Audio-Datei wiederverwendet wird
+
+### Lösung
+Audio-Corruption wird jetzt als eigene Kategorie `audio_corruption` erkannt. Retry-Strategie entfernt Audio-Quellen aus dem Payload.
+
+### Änderungen
+
+#### Fehlerklassifikation (3 Dateien)
+Neue Regex VOR `validation` (da "invalid" auch in ffprobe-Fehlern vorkommt):
+```
+/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i → 'audio_corruption'
+```
+- `remotion-webhook/index.ts` — classifyError()
+- `check-remotion-progress/index.ts` — errorCategory block
+- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError()
+
+#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
+`runRenderOnlyPipeline()` — Audio-Corruption-Branch:
+- **Audio-Corruption erkannt**: FPS bleibt bei 30, Audio wird gestripped
+  - `voiceoverUrl = undefined`, `backgroundMusicUrl = undefined`, `backgroundMusicVolume = 0`
+  - `subtitles.segments = []` (keine Untertitel ohne Audio)
+  - Flag `r33_audioStripped: true` in `inputProps.diag` + `result_data`
+- Frontend: 5s Wartezeit (statt 30s), Label "Audio-Fehler"
+
+### Erwartetes Ergebnis
+```text
+Audio-Corruption, 1. Retry:
+  → Kategorie: audio_corruption (nicht mehr unknown)
+  → FPS: 30 (unverändert)
+  → Audio: komplett entfernt (voiceover + background music)
+  → Video wird ohne Ton fertiggestellt ✅
+```
+
+---
+
+## r32 — Lottie-Stall-Recovery (IMPLEMENTED)
+
+### Problem
+- Render crasht mit `A delayRender() "Waiting for Lottie animation to load"` 
+- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Lottie-Fix)
+
+### Lösung
+Lottie-Stall wird jetzt als `lambda_crash` erkannt. Retry-Strategie deaktiviert gezielt Lottie statt FPS zu senken.
+
+### Änderungen
+
+#### Fehlerklassifikation (4 Dateien)
+Neue Regex VOR generischem `lambda_crash`:
+```
+/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i → 'lambda_crash'
+```
+- `remotion-webhook/index.ts` — classifyError()
+- `check-remotion-progress/index.ts` — errorCategory block
+- `invoke-remotion-render/index.ts` — classifyImmediate()
+- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError() (VOR timeout-Check, da Lottie-Errors docs-Links mit "timeout" enthalten können)
+
+#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
+`runRenderOnlyPipeline()` — Lottie-aware Branching:
+- **Lottie-Stall erkannt** (`lambda_crash` + Lottie-Regex in errorMessage):
+  - FPS bleibt bei 30 (kein Downgrade!)
+  - Retry 1: `disableLottieIcons=true`, `disableMorphTransitions=true`, `forceEmbeddedCharacterLottie=true`
+  - Retry 2/3: `disableAllLottie=true` (komplett)
+  - Flags werden in `inputProps.diag` injiziert + in `result_data` persistiert
+- **Sonstiger lambda_crash** (nicht Lottie): Defensive Lottie-Disable + FPS-Reduktion
+- Timeout/Rate-Limit/Unknown: Verhalten unverändert (wie r28/r31)
+
+#### Observability
+- `bundle_probe`: `r29-lambda240s` → `r32-lottieRecovery`
+
+### Erwartetes Ergebnis
 
 ```text
-companyName: ''        ← sollte "AdTool AI" sein
-productName: productSummary  ← nur ein Textschnipsel aus den Messages
-coreProblem: ''        ← verloren
-solution: ''           ← verloren
-uniqueSellingPoints: [] ← verloren
+Lottie-Stall, 1. Retry:
+  → Kategorie: lambda_crash (nicht mehr unknown)
+  → FPS: 30 (unverändert)
+  → Flags: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie
+  → Render sollte durchgehen ✅
+
+Lottie-Stall, 2. Retry (falls nötig):
+  → disableAllLottie=true → alle Lottie-Komponenten aus
+  → Maximale Stabilität ✅
+
+Normaler Run ohne Lottie-Stall:
+  → Volle 30fps Qualität, alle Effekte ✅
 ```
 
-Das erklärt, warum das Video generische Inhalte zeigt ("SocialReach Pro") statt "AdTool AI".
+---
 
-## Geplante Änderungen
+## r31 — Lambda 600s + Hybrid Backoff (IMPLEMENTED)
 
-### 1. Interview-Daten korrekt durchreichen (KRITISCH)
-**Datei:** `src/components/universal-video-creator/UniversalVideoConsultant.tsx`
+### Problem
+- 8 Lambdas + 240s Timeout → 225 fpl × 2.1s = 472s → TIMEOUT ❌
+- 20 Lambdas + 240s Timeout → Rate Limit (AWS Concurrency ~10) ❌
 
-- Neuen State `lastRecommendation` hinzufügen, der bei `data.isComplete` gesetzt wird
-- Im `handleQuickReply` ("Video erstellen"): statt dem leeren Fallback-Objekt `lastRecommendation` verwenden und mit dem category-spezifischen Kontext mergen
-- Fallback auf das alte Verhalten nur wenn `lastRecommendation` aus irgendeinem Grund null ist
+### Lösung
+Neue Lambda-Funktion mit **600s Timeout** deployed. 8 Lambdas bleiben unter dem Concurrency-Limit und haben genug Zeit.
 
-```typescript
-// NEU: State für die AI-Empfehlung
-const [lastRecommendation, setLastRecommendation] = useState<any>(null);
+### Änderungen
 
-// Bei data.isComplete:
-setLastRecommendation(data.recommendation);
+#### `_shared/remotion-payload.ts`
+- `LAMBDA_TIMEOUT_SECONDS`: 240 → **600**
+- `TARGET_MAX_LAMBDAS`: 20 → **8**
+- Soft-Max: 84 → **210** fpl
+- Hard-Max: 120 → **300** fpl
+- bundle_canary: `r31-lambda600s`
 
-// Bei "Video erstellen":
-if (lastRecommendation) {
-  onConsultationComplete({
-    ...lastRecommendation,
-    category,
-    modeChoice: 'full-service'
-  });
-} else {
-  // bisheriger Fallback...
-}
-```
+#### Alle 5 Render Edge Functions (Fallback-Namen)
+- `240sec` → `600sec` in:
+  - `invoke-remotion-render/index.ts`
+  - `render-with-remotion/index.ts`
+  - `render-universal-video/index.ts`
+  - `render-directors-cut/index.ts`
+  - `auto-generate-universal-video/index.ts`
 
-### 2. Szenen-Übergänge verfeinern (Phase 8b)
-**Datei:** `src/remotion/templates/UniversalCreatorVideo.tsx`
+#### `remotion-webhook/index.ts`
+- Timeout-Fehlermeldung: "240s" → "600s"
 
-- `baseTransitionFrames` von 15 → **20** für flüssigere Übergänge
-- Easing für Slide-Transitions hinzufügen (quadratische Kurve statt linear)
-
-### 3. Bundle-Canary
-`UCV_BUNDLE_CANARY` → `2026-03-18-r59-phase8b-interview-fix`
-
-## Dateien
-
-| Datei | Änderung |
-|-------|----------|
-| `UniversalVideoConsultant.tsx` | `lastRecommendation` State + korrekte Datenübergabe |
-| `UniversalCreatorVideo.tsx` | Transition-Frames 15→20, Easing |
-
-## Auswirkung
-
-Nach diesem Fix werden alle 22 Interview-Phasen (Produktname, Zielgruppe, Problem, Lösung, USPs, CTA-Text, Markenfarben, etc.) korrekt an die Script-Generierung weitergegeben. Das Video wird dann tatsächlich "AdTool AI" zeigen, nicht generische Platzhalter.
-
-S3-Bundle-Redeploy erforderlich für die Template-Änderungen (Transitions).
-
+#### `UniversalAutoGenerationProgress.tsx` (Frontend)
+- Rate-Limit-Retry: **exponentieller Backoff** (60s / 120s / 180s für Attempt 1/2/3)
+- Timeout/Crash-Retry: flat 30s (wie bisher)
+- Live-Countdown-Anzeige: "🔄 Rate-Limit — Auto-Retry in 58s (1/3)..."

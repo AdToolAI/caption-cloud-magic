@@ -77,6 +77,7 @@ Lass uns mit ein paar strategischen Fragen starten.
     return 0;
   });
   const [showModeChoice, setShowModeChoice] = useState(false);
+  const [lastRecommendation, setLastRecommendation] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageIdsRef = useRef<Set<string>>(new Set(['1'])); // Track message IDs to prevent duplicates
 
@@ -162,6 +163,8 @@ Lass uns mit ein paar strategischen Fragen starten.
 
       // Check if consultation is complete
       if (data.isComplete && data.recommendation && data.progress >= 100) {
+        // ✅ r59: Persist recommendation so "Video erstellen" can use it
+        setLastRecommendation(data.recommendation);
         if (mode === 'full-service') {
           setTimeout(() => {
             const confirmMessageId = `confirm-${Date.now()}`;
@@ -227,6 +230,20 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
     
     if (showModeChoice) {
       if (reply.includes('Video erstellen')) {
+        // ✅ r59: Use preserved interview data instead of empty fallback
+        if (lastRecommendation) {
+          console.log('[Consultant] Using lastRecommendation with interview data:', Object.keys(lastRecommendation));
+          onConsultationComplete({
+            ...lastRecommendation,
+            category,
+            completedAt: new Date().toISOString(),
+            modeChoice: 'full-service',
+          });
+          return;
+        }
+        
+        // Fallback: only if recommendation was somehow lost
+        console.warn('[Consultant] lastRecommendation is null, using fallback');
         const userMessages = messages.filter(m => m.role === 'user');
         const productMessage = userMessages.find((m, idx) => idx >= 1 && m.content.length > 20);
         const productSummary = productMessage?.content || userMessages.slice(1, 3).map(m => m.content).join(' ') || `${categoryInfo?.name}-Video`;
