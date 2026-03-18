@@ -461,13 +461,27 @@ const HandDrawReveal: React.FC<{
 // 🎬 PHASE 2: STATS OVERLAY (Loft-Film Style)
 // ============================================================
 
+// Phase 6: Sanitize stat strings — filter hex codes, too-short, too-long entries
+const isValidStat = (text: string): boolean => {
+  if (!text || text.length < 3) return false;
+  // Filter hex color codes like #F5C76A, #55760
+  if (/#[0-9A-Fa-f]{3,8}/i.test(text)) return false;
+  // Filter strings that are just numbers without context
+  if (/^\d+$/.test(text.trim())) return false;
+  // Max 8 words
+  if (text.split(/\s+/).length > 8) return false;
+  return true;
+};
+
 const StatsOverlay: React.FC<{
   stats: string[];
   frame: number;
   fps: number;
   primaryColor: string;
 }> = ({ stats, frame, fps, primaryColor }) => {
-  if (!stats || stats.length === 0) return null;
+  // Phase 6: Filter invalid stats before rendering
+  const validStats = (stats || []).filter(isValidStat);
+  if (validStats.length === 0) return null;
   
   return (
     <div
@@ -482,7 +496,7 @@ const StatsOverlay: React.FC<{
         zIndex: 50,
       }}
     >
-      {stats.map((stat, i) => {
+      {validStats.map((stat, i) => {
         const delay = i * 15;
         const entryProgress = spring({
           frame: frame - delay,
