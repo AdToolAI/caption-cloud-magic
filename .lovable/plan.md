@@ -1,4 +1,20 @@
 
+## r60 — Phase 9+10: Visual Prompt Engineering & Cinematic Post-Production (IMPLEMENTED)
+
+### Phase 9: Visual Prompt Engineering
+- Erweiterte `NEGATIVE_PROMPT` in `generate-premium-visual/index.ts` um QR codes, barcodes, logos, UI elements, screenshots, mockups, watermarks
+- Erweiterte `sanitizePrompt()` Regex um QR/Logo/Screenshot/Mockup-Begriffe
+- Anti-Artefakt-Suffix in `auto-generate-universal-video/index.ts` Scene-Prompts injiziert
+
+### Phase 10: Cinematic Post-Production Layer
+- `CinematicPostLayer` Komponente in `UniversalCreatorVideo.tsx` mit Film Grain (animiert via Frame), Vignette und Color Grading
+- `getCinematicProfile()` Mapping: 12 Kategorien → mood/grain/vignette Profile
+- Color Grading via CSS `filter` pro Mood (warm/cool/neutral/dramatic/bold)
+- Film Grain als animiertes Noise-Pattern mit `mix-blend-mode: overlay`
+- S3-Bundle-Redeploy noetig (Remotion-Aenderung), Bundle Canary: `r60-phase9-10-cinematic`
+
+---
+
 ## r42 — Error Isolation Mode (IMPLEMENTED)
 
 ### Problem
