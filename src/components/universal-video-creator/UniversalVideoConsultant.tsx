@@ -77,6 +77,7 @@ Lass uns mit ein paar strategischen Fragen starten.
     return 0;
   });
   const [showModeChoice, setShowModeChoice] = useState(false);
+  const [lastRecommendation, setLastRecommendation] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageIdsRef = useRef<Set<string>>(new Set(['1'])); // Track message IDs to prevent duplicates
 
