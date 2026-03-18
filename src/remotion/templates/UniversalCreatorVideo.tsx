@@ -1994,7 +1994,9 @@ const TextOverlay: React.FC<{
           borderRadius: 16,
           borderLeft: '4px solid #EF4444',
           padding: '24px 32px',
-          maxWidth: '75%',
+          maxWidth: '80%',
+          maxHeight: '42%',
+          overflow: 'hidden' as const,
           boxShadow: '0 4px 24px rgba(239,68,68,0.15), 0 4px 24px rgba(0,0,0,0.25)',
         };
       case 'solution':
@@ -2005,7 +2007,9 @@ const TextOverlay: React.FC<{
           borderRadius: 16,
           borderLeft: '4px solid #10B981',
           padding: '24px 32px',
-          maxWidth: '75%',
+          maxWidth: '80%',
+          maxHeight: '42%',
+          overflow: 'hidden' as const,
           boxShadow: '0 4px 24px rgba(16,185,129,0.15), 0 4px 24px rgba(0,0,0,0.25)',
         };
       case 'feature':
@@ -2016,7 +2020,9 @@ const TextOverlay: React.FC<{
           borderRadius: 16,
           borderTop: '4px solid #3B82F6',
           padding: '24px 32px',
-          maxWidth: '75%',
+          maxWidth: '80%',
+          maxHeight: '42%',
+          overflow: 'hidden' as const,
           boxShadow: '0 4px 24px rgba(59,130,246,0.15), 0 4px 24px rgba(0,0,0,0.25)',
         };
       case 'proof':
@@ -2028,7 +2034,9 @@ const TextOverlay: React.FC<{
           border: '1px solid rgba(139,92,246,0.3)',
           borderLeft: '4px solid #8B5CF6',
           padding: '24px 32px',
-          maxWidth: '75%',
+          maxWidth: '80%',
+          maxHeight: '42%',
+          overflow: 'hidden' as const,
           boxShadow: '0 4px 24px rgba(139,92,246,0.12), 0 4px 24px rgba(0,0,0,0.25)',
         };
       default:
@@ -2039,7 +2047,9 @@ const TextOverlay: React.FC<{
           borderRadius: 16,
           borderLeft: `4px solid ${primaryColor}`,
           padding: '24px 32px',
-          maxWidth: '75%',
+          maxWidth: '80%',
+          maxHeight: '42%',
+          overflow: 'hidden' as const,
           boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
         };
     }
