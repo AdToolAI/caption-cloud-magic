@@ -1957,9 +1957,10 @@ const TextOverlay: React.FC<{
   
   // Position: hook/cta = centered, problem/solution/feature = bottom
   // Phase 3b: Characters now always on right → no collision guard needed
+  // Phase 6: Non-hook panels repositioned higher with padding for cleaner composition
   const positionStyle: React.CSSProperties = isHookOrCTA
     ? { top: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }
-    : { bottom: 60, left: 0, right: 0 };
+    : { bottom: 0, left: 0, right: 0, paddingBottom: 40 };
   
   // Font sizes based on scene type
   // Phase 5: Larger body fonts for mobile readability (was 28/24, now 32/28)
