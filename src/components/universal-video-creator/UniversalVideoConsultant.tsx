@@ -230,6 +230,20 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
     
     if (showModeChoice) {
       if (reply.includes('Video erstellen')) {
+        // ✅ r59: Use preserved interview data instead of empty fallback
+        if (lastRecommendation) {
+          console.log('[Consultant] Using lastRecommendation with interview data:', Object.keys(lastRecommendation));
+          onConsultationComplete({
+            ...lastRecommendation,
+            category,
+            completedAt: new Date().toISOString(),
+            modeChoice: 'full-service',
+          });
+          return;
+        }
+        
+        // Fallback: only if recommendation was somehow lost
+        console.warn('[Consultant] lastRecommendation is null, using fallback');
         const userMessages = messages.filter(m => m.role === 'user');
         const productMessage = userMessages.find((m, idx) => idx >= 1 && m.content.length > 20);
         const productSummary = productMessage?.content || userMessages.slice(1, 3).map(m => m.content).join(' ') || `${categoryInfo?.name}-Video`;

@@ -2424,7 +2424,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-18-r58-phase8-textdensity');
+    console.error('UCV_BUNDLE_CANARY=2026-03-18-r59-phase8b-interview-fix');
   }
   
   // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
