@@ -495,7 +495,7 @@ ${moodInstructions}
 **Zielgruppe:** ${briefing.targetAudience || 'Allgemein'}
 **Kernproblem:** ${briefing.coreProblem || '-'}
 **Lösung:** ${briefing.solution || '-'}
-**USPs:** ${briefing.uniqueSellingPoints?.join(', ') || '-'}
+**USPs:** ${Array.isArray(briefing.uniqueSellingPoints) ? briefing.uniqueSellingPoints.join(', ') : (briefing.uniqueSellingPoints || '-')}
 
 **Kernbotschaft:** ${briefing.keyMessage || '-'}
 **Gewünschte Aktion:** ${briefing.desiredAction || '-'}
