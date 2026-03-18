@@ -2541,6 +2541,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // Category-aware contrast overlay type
   const contrastOverlayType = getCategoryContrastType(category);
+  const cinematicProfile = getCinematicProfile(category);
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
