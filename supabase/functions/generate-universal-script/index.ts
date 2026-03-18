@@ -352,7 +352,8 @@ serve(async (req) => {
 
     const structure = STORYTELLING_STRUCTURES[briefing.storytellingStructure] || STORYTELLING_STRUCTURES['problem-solution'];
     const scenesCount = structure.structure.length;
-    const sceneDuration = Math.floor(briefing.videoDuration / scenesCount);
+    const effectiveDuration = briefing.videoDuration || briefing.duration || 60;
+    const sceneDuration = Math.floor(effectiveDuration / scenesCount);
 
     // Build category-specific animation guide
     const categoryAnimationGuide = `
