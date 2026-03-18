@@ -1730,13 +1730,15 @@ const SceneBackground: React.FC<{
   // Hailuo animated video
   if (animatedVideoUrl && useAnimation) {
     const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
-      <AbsoluteFill style={{ opacity }}>
+      <AbsoluteFill style={{ opacity, filter: moodFilter }}>
         <Video
           src={animatedVideoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
         <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+        {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
         {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
       </AbsoluteFill>
