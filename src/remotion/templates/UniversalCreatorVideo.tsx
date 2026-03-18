@@ -1750,8 +1750,9 @@ const SceneBackground: React.FC<{
   
   // Ken Burns
   if (animation === 'kenBurns' && (background.type === 'image' || !background.type)) {
+    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
-      <>
+      <AbsoluteFill style={{ filter: moodFilter }}>
         <KenBurnsImage
           imageUrl={safeImageUrl}
           direction={kenBurnsDirection}
@@ -1759,10 +1760,11 @@ const SceneBackground: React.FC<{
           durationInFrames={durationInFrames}
         />
         <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+        {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
         <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
         {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
-      </>
+      </AbsoluteFill>
     );
   }
   
