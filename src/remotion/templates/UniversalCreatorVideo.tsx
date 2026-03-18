@@ -2414,7 +2414,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-10-r55-phase5-quality-jump');
+    console.error('UCV_BUNDLE_CANARY=2026-03-18-r56-phase6-visual-cleanup');
   }
   
   // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
