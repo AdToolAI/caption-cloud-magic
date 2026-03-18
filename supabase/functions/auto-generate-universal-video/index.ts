@@ -809,8 +809,6 @@ async function runGenerationPipeline(
           const prompt = attempt === 0
             ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. No text, no letters, no watermarks, no human faces.`
             : `Abstract professional background for ${sceneType} scene. ${categoryHint}. ${aspectHint}. ${briefing.visualStyle} style. No text, no people.`;
-            ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. No text, no letters, no watermarks, no human faces.`. No text, no letters, no watermarks, no human faces.`
-            : `Abstract professional background for ${sceneType} scene. ${categoryHint}. ${aspectHint}. ${briefing.visualStyle} style. No text, no people.`;
 
           const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
             method: 'POST',
