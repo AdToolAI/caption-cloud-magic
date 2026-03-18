@@ -2600,11 +2600,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   };
   
   // Phase 1: Get DrawOnEffect type for scene
+  // Phase 6: DrawOnEffect only for CTA scenes — other scenes looked like debug overlays
   const getDrawOnEffectType = (sceneType: string): 'highlight' | 'checkmark' | 'arrow' | 'circle' | 'underline' | null => {
     switch (sceneType) {
-      case 'hook': return 'highlight';
-      case 'problem': return 'circle';
-      case 'solution': return 'checkmark';
       case 'cta': return 'arrow';
       default: return null;
     }
