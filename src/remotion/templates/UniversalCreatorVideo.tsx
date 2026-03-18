@@ -1607,6 +1607,112 @@ function getCategoryContrastType(category?: string): ContrastOverlayType {
   return map[category || ''] || 'subtle';
 }
 
+// ============================================================
+// 🎬 CINEMATIC POST-PRODUCTION LAYER (Phase 10)
+// ============================================================
+
+type CinematicMood = 'warm' | 'cool' | 'neutral' | 'dramatic' | 'bold';
+
+interface CinematicProfile {
+  mood: CinematicMood;
+  grain: 'none' | 'light' | 'medium' | 'heavy';
+  vignette: 'none' | 'light' | 'subtle' | 'strong' | 'cinematic' | 'dramatic';
+}
+
+function getCinematicProfile(category?: string): CinematicProfile {
+  const profiles: Record<string, CinematicProfile> = {
+    'product-ad': { mood: 'warm', grain: 'medium', vignette: 'strong' },
+    'social-reel': { mood: 'bold', grain: 'none', vignette: 'none' },
+    'explainer': { mood: 'neutral', grain: 'none', vignette: 'light' },
+    'testimonial': { mood: 'warm', grain: 'medium', vignette: 'cinematic' },
+    'tutorial': { mood: 'neutral', grain: 'none', vignette: 'light' },
+    'event-promo': { mood: 'bold', grain: 'none', vignette: 'strong' },
+    'brand-story': { mood: 'warm', grain: 'heavy', vignette: 'cinematic' },
+    'educational': { mood: 'neutral', grain: 'none', vignette: 'light' },
+    'announcement': { mood: 'dramatic', grain: 'light', vignette: 'dramatic' },
+    'behind-scenes': { mood: 'warm', grain: 'heavy', vignette: 'cinematic' },
+    'comparison': { mood: 'neutral', grain: 'none', vignette: 'subtle' },
+    'showcase': { mood: 'dramatic', grain: 'light', vignette: 'dramatic' },
+  };
+  return profiles[category || ''] || { mood: 'neutral', grain: 'none', vignette: 'subtle' };
+}
+
+const MOOD_FILTERS: Record<CinematicMood, string> = {
+  warm: 'saturate(1.15) sepia(0.08) brightness(1.02)',
+  cool: 'saturate(1.1) hue-rotate(-5deg) brightness(0.98)',
+  neutral: 'saturate(1.05) contrast(1.05)',
+  dramatic: 'saturate(1.2) contrast(1.15) brightness(0.95)',
+  bold: 'saturate(1.3) contrast(1.2) brightness(1.05)',
+};
+
+const GRAIN_OPACITY: Record<string, number> = {
+  none: 0,
+  light: 0.025,
+  medium: 0.04,
+  heavy: 0.06,
+};
+
+const VIGNETTE_STYLES: Record<string, string> = {
+  none: 'transparent',
+  light: 'radial-gradient(ellipse 85% 80% at 50% 50%, transparent 55%, rgba(0,0,0,0.2) 100%)',
+  subtle: 'radial-gradient(ellipse 80% 75% at 50% 50%, transparent 50%, rgba(0,0,0,0.3) 100%)',
+  strong: 'radial-gradient(ellipse 75% 65% at 50% 50%, transparent 40%, rgba(0,0,0,0.45) 100%)',
+  cinematic: 'radial-gradient(ellipse 70% 60% at 50% 50%, transparent 35%, rgba(0,0,0,0.55) 100%)',
+  dramatic: 'radial-gradient(ellipse 60% 50% at 50% 45%, transparent 25%, rgba(0,0,0,0.6) 100%)',
+};
+
+// Tiny base64 noise pattern (4x4px) for film grain
+const NOISE_PATTERN = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2P89OnTfwYGBgZGRkYGJigAMYhiABOEMBhYAQBVfAoL/k2DRAAAAABJRU5ErkJggg==';
+
+const CinematicPostLayer: React.FC<{
+  profile: CinematicProfile;
+  frame: number;
+}> = ({ profile, frame }) => {
+  const grainOpacity = GRAIN_OPACITY[profile.grain] || 0;
+  const vignetteBackground = VIGNETTE_STYLES[profile.vignette] || 'transparent';
+  
+  // Subtle grain animation via position shift per frame
+  const grainOffsetX = (frame * 7) % 100;
+  const grainOffsetY = (frame * 13) % 100;
+  
+  return (
+    <>
+      {/* Color Grading — applied to scene content via parent filter */}
+      
+      {/* Film Grain Overlay */}
+      {grainOpacity > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `url(${NOISE_PATTERN})`,
+            backgroundRepeat: 'repeat',
+            backgroundPosition: `${grainOffsetX}% ${grainOffsetY}%`,
+            backgroundSize: '200px 200px',
+            opacity: grainOpacity,
+            mixBlendMode: 'overlay',
+            pointerEvents: 'none',
+            zIndex: 6,
+          }}
+        />
+      )}
+      
+      {/* Enhanced Vignette */}
+      {profile.vignette !== 'none' && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: vignetteBackground,
+            pointerEvents: 'none',
+            zIndex: 6,
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 // Scene Background Component
 const SceneBackground: React.FC<{
   scene: UniversalCreatorScene;
@@ -1617,19 +1723,22 @@ const SceneBackground: React.FC<{
   primaryColor: string;
   disableSceneFx?: boolean;
   contrastOverlayType?: ContrastOverlayType;
-}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle' }) => {
+  cinematicProfile?: CinematicProfile;
+}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle', cinematicProfile }) => {
   const { background, animation, kenBurnsDirection, animatedVideoUrl, useAnimation, type } = scene;
   
   // Hailuo animated video
   if (animatedVideoUrl && useAnimation) {
     const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
-      <AbsoluteFill style={{ opacity }}>
+      <AbsoluteFill style={{ opacity, filter: moodFilter }}>
         <Video
           src={animatedVideoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
         <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+        {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
         {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
       </AbsoluteFill>
@@ -1641,8 +1750,9 @@ const SceneBackground: React.FC<{
   
   // Ken Burns
   if (animation === 'kenBurns' && (background.type === 'image' || !background.type)) {
+    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
-      <>
+      <AbsoluteFill style={{ filter: moodFilter }}>
         <KenBurnsImage
           imageUrl={safeImageUrl}
           direction={kenBurnsDirection}
@@ -1650,33 +1760,38 @@ const SceneBackground: React.FC<{
           durationInFrames={durationInFrames}
         />
         <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+        {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
         <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
         {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
-      </>
+      </AbsoluteFill>
     );
   }
   
   // Parallax
   if (animation === 'parallax') {
+    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
-      <>
+      <AbsoluteFill style={{ filter: moodFilter }}>
         <ParallaxBackground imageUrl={safeImageUrl} layers={3} frame={frame} durationInFrames={durationInFrames} />
         <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+        {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
         <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
         {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
-      </>
+      </AbsoluteFill>
     );
   }
   
   // Pop-In
   if (animation === 'popIn') {
+    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
       <PopInElement delay={0} frame={frame} fps={fps}>
-        <AbsoluteFill>
+        <AbsoluteFill style={{ filter: moodFilter }}>
           {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
           <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+          {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
           {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
           {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
@@ -1687,11 +1802,13 @@ const SceneBackground: React.FC<{
   
   // Fly-In
   if (animation === 'flyIn') {
+    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
       <FlyInElement direction="right" delay={0} frame={frame} fps={fps}>
-        <AbsoluteFill>
+        <AbsoluteFill style={{ filter: moodFilter }}>
           {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
           <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+          {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
           {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
           {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
@@ -1746,12 +1863,15 @@ const SceneBackground: React.FC<{
       break;
   }
   
+  const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
+  
   return (
-    <AbsoluteFill style={{ opacity }}>
+    <AbsoluteFill style={{ opacity, filter: moodFilter }}>
       <div style={{ width: '100%', height: '100%', transform }}>
         {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
       </div>
       <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+      {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
       <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
       {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
       {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
@@ -2421,10 +2541,11 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // Category-aware contrast overlay type
   const contrastOverlayType = getCategoryContrastType(category);
+  const cinematicProfile = getCinematicProfile(category);
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-18-r59-phase8b-interview-fix');
+    console.error('UCV_BUNDLE_CANARY=2026-03-18-r60-phase9-10-cinematic');
   }
   
   // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
@@ -2759,6 +2880,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   primaryColor={primaryColor}
                    disableSceneFx={diagToggles.disableSceneFx}
                    contrastOverlayType={contrastOverlayType}
+                   cinematicProfile={cinematicProfile}
                  />
                 <TextOverlay
                   scene={(() => {

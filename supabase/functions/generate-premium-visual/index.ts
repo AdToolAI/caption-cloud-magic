@@ -38,7 +38,7 @@ const STYLE_PROMPTS: Record<string, string> = {
 
 // Enhanced negative prompt to strictly avoid text generation
 // ✅ Updated: Allow contextual text (product names, CTAs), forbid only gibberish/nonsense
-const NEGATIVE_PROMPT = 'photorealistic, photography, real human face, portrait, detailed face, hyperrealistic, 3D render, realistic skin, realistic eyes, nsfw, nude, violence, blurry, low quality, watermark, lorem ipsum, gibberish text, random letters, unreadable text, nonsense words, fantasy language, made up pricing, wrong numbers, nature scene, forest, trees, sunset, landscape';
+const NEGATIVE_PROMPT = 'photorealistic, photography, real human face, portrait, detailed face, hyperrealistic, 3D render, realistic skin, realistic eyes, nsfw, nude, violence, blurry, low quality, watermark, lorem ipsum, gibberish text, random letters, unreadable text, nonsense words, fantasy language, made up pricing, wrong numbers, nature scene, forest, trees, sunset, landscape, QR code, barcode, logo, brand mark, icon overlay, UI element, button, screenshot, phone mockup, laptop screen, website screenshot, app interface, stock photo watermark, shutterstock, getty, istock';
 
 // Function to sanitize prompts and remove forbidden elements
 function sanitizePrompt(prompt: string): string {
@@ -51,6 +51,10 @@ function sanitizePrompt(prompt: string): string {
     /tabelle|liste|aufzählung|table|list/gi,
     /basic|pro|enterprise|premium|starter/gi,
     /\b(?:zeigt|shows?)\s+["']?[^"',]+["']?/gi,
+    /qr[\s-]?code|barcode|scan\s*code/gi,
+    /logo|brand\s*mark|trademark/gi,
+    /screenshot|mockup|wireframe|ui\s*element/gi,
+    /app\s*interface|website\s*design|browser\s*window/gi,
   ];
   
   let cleanPrompt = prompt;
