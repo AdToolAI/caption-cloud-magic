@@ -1975,7 +1975,7 @@ const TextOverlay: React.FC<{
   const getGlassStyle = (): React.CSSProperties => {
     if (isHookOrCTA) {
       return {
-        background: 'rgba(0, 0, 0, 0.35)',
+        background: 'rgba(0, 0, 0, 0.55)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderRadius: 20,
