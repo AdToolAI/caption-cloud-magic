@@ -1723,7 +1723,8 @@ const SceneBackground: React.FC<{
   primaryColor: string;
   disableSceneFx?: boolean;
   contrastOverlayType?: ContrastOverlayType;
-}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle' }) => {
+  cinematicProfile?: CinematicProfile;
+}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle', cinematicProfile }) => {
   const { background, animation, kenBurnsDirection, animatedVideoUrl, useAnimation, type } = scene;
   
   // Hailuo animated video
