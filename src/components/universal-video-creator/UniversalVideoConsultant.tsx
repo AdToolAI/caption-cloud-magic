@@ -428,7 +428,9 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
         
         <div className="p-5 min-h-[420px] max-h-[500px] overflow-y-auto relative">
           <AnimatePresence>
-            {messages.map((message, index) => (
+            {(() => {
+              const lastAssistantIdx = messages.reduce((acc, m, i) => m.role === 'assistant' ? i : acc, -1);
+              return messages.map((message, index) => (
               <motion.div
                 key={message.id}
                 initial={{ opacity: 0, y: 12, scale: 0.98 }}
