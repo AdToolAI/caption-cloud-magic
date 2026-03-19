@@ -43,6 +43,9 @@ export function UniversalPreviewPlayer({
   const [volume, setVolume] = useState(0.8);
   const [currentTime, setCurrentTime] = useState(0);
   const [selectedAspect, setSelectedAspect] = useState<'16:9' | '9:16' | '1:1'>(aspectRatio);
+  const [isVideoEnded, setIsVideoEnded] = useState(false);
+
+  const brandUrl = project.brandUrl;
 
   const dimensions = ASPECT_DIMENSIONS[selectedAspect];
   
