@@ -144,9 +144,19 @@ Lass uns mit ein paar strategischen Fragen starten.
     }, 90000);
 
     try {
+      // Deduplicate messages by role+content before sending to API
+      const allMessages = [...messages, ...(retryCount === 0 ? [userMessage] : [])];
+      const seen = new Set<string>();
+      const deduped = allMessages.filter(m => {
+        const key = `${m.role}:${m.content}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
       const response = await supabase.functions.invoke('universal-video-consultant', {
         body: {
-          messages: [...messages, ...(retryCount === 0 ? [userMessage] : [])].map(m => ({
+          messages: deduped.map(m => ({
             role: m.role,
             content: m.content
           })),
