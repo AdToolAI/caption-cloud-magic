@@ -807,8 +807,8 @@ async function runGenerationPipeline(
 
           const aspectHint = briefing.aspectRatio === '9:16' ? 'vertical portrait composition (9:16)' : 'wide landscape composition (16:9)';
           const antiArtifact = 'NO QR codes, NO logos, NO UI mockups, NO screenshots, NO phone screens, NO app interfaces, NO barcodes, NO watermarks.';
-          // ✅ Phase 9b: Anti-gibberish-text prefix — placed at START of prompt for maximum Flux attention
-          const antiTextPrefix = 'ABSOLUTE RULE: Zero text, zero letters, zero numbers, zero words in the image. All screens and dashboards show only abstract colorful shapes and graphs without any labels or writing. ';
+          // ✅ Phase 9c: Anti-gibberish — forbid letters/words, ALLOW numbers on charts
+          const antiTextPrefix = 'STRICT RULE: ZERO letters, ZERO words, ZERO writing in the image. Numbers and digits on charts ARE allowed. All text labels, titles, headings, and UI copy must be abstract colored shapes or blank. Never generate readable or unreadable words in any language. ';
           const prompt = attempt === 0
             ? `${antiTextPrefix}${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. No human faces. ${antiArtifact}`
             : `${antiTextPrefix}Abstract professional background for ${sceneType} scene. ${categoryHint}. ${aspectHint}. ${briefing.visualStyle} style. No people. ${antiArtifact}`;

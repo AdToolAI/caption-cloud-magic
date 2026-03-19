@@ -558,18 +558,30 @@ function getContextAwareQuickReplies(aiMessage: string, phase: number, category:
 const extractRecommendation = (messages: any[], category: string) => {
   const userResponses = messages.filter(m => m.role === 'user').map(m => m.content);
   const aiMessages = messages.filter(m => m.role === 'assistant').map(m => m.content);
-  const allText = [...userResponses, ...aiMessages].join(' ').toLowerCase();
+  const allText = [...userResponses, ...aiMessages].join(' ');
+  const allTextLower = allText.toLowerCase();
   
-  // Semantic field extraction helpers
-  const findResponse = (keywords: string[], fromResponses: string[] = userResponses): string => {
-    // Search AI messages for phase context, then match user response
-    for (let i = 0; i < aiMessages.length && i < userResponses.length; i++) {
+  // ✅ Phase 9c: Fixed findResponse — AI[0] is Welcome (no user response), 
+  // so AI[i] question maps to userResponses[i-1] (offset by 1).
+  // But we also try direct index match as fallback.
+  const findResponse = (keywords: string[]): string => {
+    for (let i = 0; i < aiMessages.length; i++) {
       const aiMsg = (aiMessages[i] || '').toLowerCase();
       if (keywords.some(k => aiMsg.includes(k))) {
-        return userResponses[i] || '';
+        // AI[0] = Welcome → user response is userResponses[0] (first answer)
+        // AI[1] = Phase 2 question → userResponses[1]
+        // Direct mapping works because Welcome has no preceding user message
+        // but the first user message IS the response to Welcome/Phase1
+        return userResponses[i] || userResponses[i - 1] || '';
       }
     }
     return '';
+  };
+  
+  // ✅ Phase 9c: Extract URL from all text
+  const extractUrl = (text: string): string => {
+    const urlMatch = text.match(/(?:https?:\/\/|www\.)[^\s,;)]+/i);
+    return urlMatch ? urlMatch[0] : '';
   };
   
   // Extract format/aspect ratio
@@ -591,11 +603,16 @@ const extractRecommendation = (messages: any[], category: string) => {
   else if (durationResponse.includes('90')) duration = 90;
   else if (durationResponse.includes('120') || durationResponse.includes('2 min')) duration = 120;
 
-  // Extract key semantic fields
-  const zweck = userResponses[0] || '';  // Phase 1 is always purpose
-  const zielgruppe = userResponses[1] || '';  // Phase 2 is always target audience
-  const produkt = userResponses[2] || '';  // Phase 3 is always product/company
-  const usp = userResponses[3] || '';  // Phase 4 is always USP
+  // ✅ Phase 9c: Semantic extraction for core fields (no more fragile index-based)
+  const zweck = findResponse(['zweck', 'ziel', 'wofür', 'warum', 'purpose']) || userResponses[0] || '';
+  const zielgruppe = findResponse(['zielgruppe', 'publikum', 'audience', 'für wen']) || userResponses[1] || '';
+  const produkt = findResponse(['produkt', 'service', 'tool', 'angebot', 'dienstleistung', 'unternehmen', 'firma']) || userResponses[2] || '';
+  const usp = findResponse(['usp', 'alleinstellung', 'besonder', 'unterscheid', 'vorteil']) || userResponses[3] || '';
+  
+  // ✅ Phase 9c: Extract company/product name and website
+  const companyName = findResponse(['unternehmen', 'firma', 'marke', 'brand', 'company']).substring(0, 100);
+  const productName = findResponse(['produkt', 'service', 'tool', 'angebot', 'dienstleistung', 'name']).substring(0, 100);
+  const websiteUrl = extractUrl(allText);
   
   // Category-specific fields from phase 5-16 responses
   const categoryResponses = userResponses.slice(4, 16);
@@ -620,10 +637,15 @@ const extractRecommendation = (messages: any[], category: string) => {
   // Extract emotion
   const emotionResponse = findResponse(['emotion', 'gefühl', 'fühlen', 'stimmung']);
   
+  console.log(`[extractRecommendation] companyName="${companyName}", productName="${productName}", websiteUrl="${websiteUrl}"`);
+  
   return {
     // Core info (Block 1)
     purpose: zweck.substring(0, 200),
     productSummary: `${produkt} ${usp}`.substring(0, 500),
+    companyName: companyName || productName || '',
+    productName: productName || companyName || '',
+    websiteUrl,
     targetAudience: zielgruppe ? [zielgruppe.substring(0, 200)] : ['Allgemein'],
     usp: usp.substring(0, 200),
     
