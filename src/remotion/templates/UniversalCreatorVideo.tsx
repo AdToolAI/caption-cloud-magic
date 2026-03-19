@@ -2263,8 +2263,8 @@ const TextOverlay: React.FC<{
             background: `linear-gradient(90deg, ${primaryColor}, ${primaryColor}00)`,
             borderRadius: 2,
             marginBottom: 14,
-            marginLeft: isHookOrCTA ? 'auto' : 0,
-            marginRight: isHookOrCTA ? 'auto' : 'auto',
+            marginLeft: (isHookOrCTA || isProof) ? 'auto' : (isFeature ? 'auto' : 0),
+            marginRight: (isHookOrCTA || isProof) ? 'auto' : (isFeature ? 0 : 'auto'),
           }} />
         )}
         
