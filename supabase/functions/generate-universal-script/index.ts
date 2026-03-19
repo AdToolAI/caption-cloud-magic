@@ -435,12 +435,16 @@ REGELN:
 1. Erstelle genau ${scenesCount} Szenen entsprechend der Struktur
 2. Jede Szene hat ~${sceneDuration} Sekunden
 3. Schreibe den Sprechertext (voiceover) für jede Szene
-4. Beschreibe die visuelle Darstellung jeder Szene (für KI-Bildgenerierung)
+4. Die visualDescription MUSS auf ENGLISCH sein (wird direkt als KI-Bildgenerator-Prompt verwendet)
 5. Der Text muss natürlich klingen und zum Vorlesen geeignet sein
 6. Keine Füllwörter wie "Also", "Ich habe", etc.
 7. WICHTIG: Verwende NUR Animationen aus dem erlaubten Set für "${categoryKey}"!
 8. WICHTIG: Halte dich an das Pacing-Guide für "${categoryKey}"!
 9. Jede Szene braucht einen KONTRAST-OVERLAY-freundlichen Text (weiß auf dunklem Hintergrund)
+10. Die visualDescription MUSS eine KONKRETE Szene beschreiben die zum Voiceover passt — nicht abstrakt, sondern wie ein Filmstill
+11. Beziehe das Produkt/Unternehmen "${briefing.companyName || briefing.productName || ''}" in die Szenen ein — zeige realistische Nutzungssituationen
+12. Jede visualDescription folgt dem Schema: [WER/WAS] + [TUT WAS] + [WO] + [WIE BELEUCHTET/GESTIMMT]
+13. NICHT erlaubt in visualDescription: "Digital world", "Social media icons flying", "Abstract shapes", "City skyline" — stattdessen KONKRETE Szenen mit Menschen/Produkten in realistischen Situationen
 
 AUSGABEFORMAT (JSON):
 {
@@ -453,7 +457,7 @@ AUSGABEFORMAT (JSON):
       "sceneType": "hook|problem|solution|feature|proof|cta|intro|benefit|testimonial",
       "title": "Szenen-Titel (kurz, prägnant)",
       "voiceover": "Der gesprochene Text für diese Szene...",
-      "visualDescription": "Beschreibung des Bildes: Was sieht man? Welche Elemente? Welcher Stil?",
+      "visualDescription": "ENGLISH image prompt. Concrete scene: [Subject] doing [action] in [environment], [lighting/mood]. Example: 'A marketing manager reviewing colorful campaign analytics on a large curved monitor, modern bright office with glass walls, warm natural light through floor-to-ceiling windows, shallow depth of field'",
       "durationSeconds": ${sceneDuration},
       
       "animation": "NUR aus erlaubtem Set",

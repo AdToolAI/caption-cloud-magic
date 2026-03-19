@@ -806,12 +806,14 @@ async function runGenerationPipeline(
           const sceneHint = sceneStyleHints[sceneType] || 'professional, well-composed';
 
           const aspectHint = briefing.aspectRatio === '9:16' ? 'vertical portrait composition (9:16)' : 'wide landscape composition (16:9)';
-          const antiArtifact = 'NO QR codes, NO logos, NO UI mockups, NO screenshots, NO phone screens, NO app interfaces, NO barcodes, NO watermarks.';
-          // ✅ Phase 9c: Anti-gibberish — forbid letters/words, ALLOW numbers on charts
-          const antiTextPrefix = 'STRICT RULE: ZERO letters, ZERO words, ZERO writing in the image. Numbers and digits on charts ARE allowed. All text labels, titles, headings, and UI copy must be abstract colored shapes or blank. Never generate readable or unreadable words in any language. ';
+          // ✅ Phase 11: Product context injection + anti-text as SHORT suffix
+          const productContext = briefing.productDescription
+            ? `Context: "${briefing.companyName || briefing.productName || 'digital product'}" - ${(briefing.productDescription || '').slice(0, 120)}. `
+            : '';
+          const antiTextSuffix = 'No text, no letters, no words in image. Numbers on charts allowed. No QR codes, no logos, no UI mockups, no screenshots, no watermarks.';
           const prompt = attempt === 0
-            ? `${antiTextPrefix}${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. No human faces. ${antiArtifact}`
-            : `${antiTextPrefix}Abstract professional background for ${sceneType} scene. ${categoryHint}. ${aspectHint}. ${briefing.visualStyle} style. No people. ${antiArtifact}`;
+            ? `${productContext}${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. ${antiTextSuffix}`
+            : `${productContext}Professional ${sceneType} scene for ${briefing.companyName || briefing.productName || 'business'}. ${categoryHint}. ${aspectHint}. ${briefing.visualStyle} style. ${antiTextSuffix}`;
 
           const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
             method: 'POST',
