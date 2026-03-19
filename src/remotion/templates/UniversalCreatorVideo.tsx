@@ -2214,7 +2214,7 @@ const TextOverlay: React.FC<{
         pointerEvents: 'none',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: isHookOrCTA ? 'center' : 'flex-start',
+        alignItems: isHookOrCTA ? 'center' : (isFeature ? 'flex-end' : (isProof ? 'center' : 'flex-start')),
       }}
     >
       <div style={glassStyle}>
