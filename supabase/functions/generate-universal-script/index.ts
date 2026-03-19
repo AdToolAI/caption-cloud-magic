@@ -459,7 +459,7 @@ AUSGABEFORMAT (JSON):
       "sceneType": "hook|problem|solution|feature|proof|cta|intro|benefit|testimonial",
       "title": "Szenen-Titel (kurz, prägnant)",
       "voiceover": "Der gesprochene Text für diese Szene...",
-      "visualDescription": "ENGLISH image prompt. Concrete scene WITHOUT people: [Object/Scene] + [State/Detail] + [Environment] + [Lighting]. NEVER describe humans, persons, silhouettes, hands, or body parts. Example: 'A modern desk with multiple monitors showing colorful campaign interfaces, bright office with glass walls, warm natural light through floor-to-ceiling windows, shallow depth of field, empty workspace'",
+      "visualDescription": "ENGLISH image prompt. Concrete scene WITHOUT people and WITHOUT text-bearing objects: [Object/Scene] + [State/Detail] + [Environment] + [Lighting]. NEVER describe humans, persons, silhouettes, hands, or body parts. NEVER describe dashboards, calendars, charts, monitors showing data, analytics interfaces, spreadsheets, or any object that inherently displays text/numbers. Example: 'A tidy desk with a closed laptop, potted plants, a warm desk lamp, bright office with glass walls, golden hour light, shallow depth of field'",
       "durationSeconds": ${sceneDuration},
       
       "animation": "NUR aus erlaubtem Set",

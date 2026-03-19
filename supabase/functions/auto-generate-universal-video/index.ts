@@ -811,9 +811,32 @@ async function runGenerationPipeline(
             ? `Context: "${briefing.companyName || briefing.productName || 'digital product'}" - ${(briefing.productDescription || '').slice(0, 120)}. `
             : '';
           const antiTextSuffix = 'STRICT: This image must contain ZERO text, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels, ZERO letters, ZERO words. No dashboard numbers, no analytics data, no statistics, no charts with values, no data visualizations. No QR codes, no logos, no UI mockups, no screenshots, no watermarks. ABSOLUTELY NO human figures, people, silhouettes, hands, fingers, or body parts — replace any human subjects with empty furniture, equipment, or open space. Show ONLY the environment and objects.';
+          
+          // Phase 15: Keyword sanitizer — replace text-bearing objects before prompt construction
+          const sanitizeVisualDescription = (desc: string): string => {
+            return desc
+              .replace(/\bdashboard(s)?\b/gi, 'desk setup')
+              .replace(/\bcalendar(s)?\b/gi, 'organized workspace')
+              .replace(/\banalytics?\b/gi, 'clean workspace')
+              .replace(/\bchart(s)?\b/gi, 'clean workspace')
+              .replace(/\bgraph(s)?\b/gi, 'clean workspace')
+              .replace(/\bstatistic(s)?\b/gi, 'clean workspace')
+              .replace(/\bspreadsheet(s)?\b/gi, 'office supplies')
+              .replace(/\bmonitor(s)?\s+showing\b/gi, 'monitor on a desk with')
+              .replace(/\bscreen(s)?\s+displaying\b/gi, 'screen on a desk with')
+              .replace(/\bdata\s+visualization(s)?\b/gi, 'tidy workspace')
+              .replace(/\binfographic(s)?\b/gi, 'clean layout')
+              .replace(/\bdiagram(s)?\b/gi, 'workspace')
+              .replace(/\bUI\b/gi, 'interface design')
+              .replace(/\bwhiteboard(s)?\s+with\s+notes?\b/gi, 'whiteboard')
+              .replace(/\btable(s)?\s+with\s+data\b/gi, 'table with objects');
+          };
+          
+          const sanitizedVisualDesc = sanitizeVisualDescription(scene.visualDescription || '');
+          
           // Phase 14: visualStyle as dominant signal, sceneStyleHints as subtle mood only
           const prompt = attempt === 0
-            ? `ART STYLE: ${briefing.visualStyle}. ${productContext}${scene.visualDescription}. Subtle mood: ${sceneHint}. ${categoryHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. IMPORTANT: Maintain exact same visual art style across all scenes. ${antiTextSuffix}`
+            ? `ART STYLE: ${briefing.visualStyle}. ${productContext}${sanitizedVisualDesc}. Subtle mood: ${sceneHint}. ${categoryHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. IMPORTANT: Maintain exact same visual art style across all scenes. ${antiTextSuffix}`
             : `ART STYLE: ${briefing.visualStyle}. ${productContext}Professional ${sceneType} scene for ${briefing.companyName || briefing.productName || 'business'}. ${categoryHint}. ${aspectHint}. IMPORTANT: Maintain exact same visual art style across all scenes. ${antiTextSuffix}`;
 
           const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
