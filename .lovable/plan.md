@@ -1,32 +1,20 @@
 
 
-# Plan: Von ~91% auf 93-95% Loft-Film Qualität — UMGESETZT ✅
+# Plan: Von ~93% auf 95%+ Loft-Film Qualität — UMGESETZT ✅
 
 ## Durchgeführte Änderungen
 
-### ✅ Schritt 1: Zahlen-Artefakte eliminiert
-- `auto-generate-universal-video/index.ts`: antiTextSuffix verbietet jetzt ZERO text, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels
-- `generate-premium-visual/index.ts`: NEGATIVE_PROMPT um "numbers, digits, percentages, statistics, data labels, numeric values" erweitert
-- `generate-premium-visual/index.ts`: fullPrompt verbietet jetzt auch Zahlen und Digits explizit
+### ✅ Schritt 1: Anti-Zahlen und Anti-Personen Prompt verstärkt
+- `auto-generate-universal-video/index.ts`: antiTextSuffix erweitert um "dashboard numbers, analytics data, statistics, charts with values, human figures, people, silhouettes"
+- `auto-generate-universal-video/index.ts`: CTA sceneStyleHint erweitert um "NO people, NO silhouettes, NO human figures"
+- `generate-premium-visual/index.ts`: NEGATIVE_PROMPT erweitert um "human silhouette, person, people, man, woman, figure, human body, dashboard numbers, analytics data, charts with values"
 
-### ✅ Schritt 2: SVG-Charakter visuell aufgewertet
-- Viewbox von 200×280 auf 240×340 vergrößert
-- Breitere Schultern mit realistischer Schulterstruktur
-- Mehrstufige Haar-Gradienten + einzelne Strähnen-Details
-- Ohren hinzugefügt
-- Augen: Weiß → Iris → Pupille → Highlight (4-Schicht)
-- Wimpern-Andeutung
-- Wangenröte (Blush)
-- Hemd: Schatten-Overlay, sichtbare Knöpfe, detaillierter Kragen
-- Krawatte mit Knoten-Detail
-- Hosen mit Falten-Andeutung und Gradient
-- Schuhe mit Glanz-Highlight
-- Hände mit Highlight-Kreis für Tiefe
+### ✅ Schritt 2: CTA Glass-Panel Text-Overflow gefixt
+- `UniversalCreatorVideo.tsx`: Hook/CTA Glass-Panel maxWidth von 85% auf 90% erhöht
+- `wordBreak: 'break-word'` und `overflowWrap: 'break-word'` hinzugefügt
 
-### ✅ Schritt 3: CTA-Hintergrund beruhigt
-- CTA sceneStyleHint geändert zu: "clean minimal background, soft gradient or bokeh effect, no busy illustrations, calm and focused"
+## Hinweis
+- Prompt-Änderungen sind nach Edge-Function-Deploy sofort aktiv
+- CTA Text-Fix erfordert Bundle-Deploy (r58)
 
-## Nächster Schritt
-⚠️ **Remotion Lambda Bundle muss neu deployed werden (r57)**, damit die SVG-Charakter-Upgrades beim Render aktiv sind.
-
-## Geschätzter Stand: ~93-95% nach r57 Bundle-Deploy
+## Geschätzter Stand: ~95%
