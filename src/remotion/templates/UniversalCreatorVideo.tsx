@@ -2725,7 +2725,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   const currentScene = currentSceneIndex >= 0 ? sceneTimings[currentSceneIndex] : null;
   
-  // Phase 4: Character visible in ALL content scenes for Loft-Film quality
+  // Phase 13: Character visible in content scenes, but CTA limited to one presenter only
   const shouldShowCharacter = useMemo(() => {
     if (!useCharacter || !currentScene) return false;
     return ['hook', 'intro', 'problem', 'solution', 'feature', 'proof', 'cta'].includes(currentScene.type);
