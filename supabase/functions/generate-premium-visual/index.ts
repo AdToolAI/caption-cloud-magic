@@ -150,7 +150,7 @@ serve(async (req) => {
       // Generate scene visual - sanitize to remove any text/price references
       const cleanDescription = sanitizePrompt(request.sceneDescription || 'professional business scene');
       prompt += cleanDescription;
-      prompt += ', high quality, professional business illustration, 16:9 aspect ratio, clean visual without any text';
+      prompt += ', high quality, professional illustration, clean visual without any text or writing';
       
       console.log('Generated scene prompt (sanitized):', prompt);
 
