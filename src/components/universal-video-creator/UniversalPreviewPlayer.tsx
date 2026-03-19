@@ -76,6 +76,21 @@ export function UniversalPreviewPlayer({
     showWatermark: false,
   }), [project, isMuted, volume, dimensions]);
 
+  // Phase 12: Detect video end via polling current frame
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!playerRef.current) return;
+      const currentFrame = playerRef.current.getCurrentFrame();
+      const timeInSec = currentFrame / fps;
+      setCurrentTime(timeInSec);
+      if (currentFrame >= durationInFrames - 2 && !isVideoEnded) {
+        setIsVideoEnded(true);
+        setIsPlaying(false);
+      }
+    }, 250);
+    return () => clearInterval(interval);
+  }, [fps, durationInFrames, isVideoEnded]);
+
   const handlePlayPause = useCallback(() => {
     if (!playerRef.current) return;
     
@@ -83,6 +98,7 @@ export function UniversalPreviewPlayer({
       playerRef.current.pause();
     } else {
       playerRef.current.play();
+      setIsVideoEnded(false);
     }
     setIsPlaying(!isPlaying);
   }, [isPlaying]);
