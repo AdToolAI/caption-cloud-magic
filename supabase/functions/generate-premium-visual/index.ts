@@ -225,8 +225,8 @@ serve(async (req) => {
         }
       } else {
         // Standard Flux 1.1 Pro for scenes without character
-        // ✅ Phase 9b: Anti-text instruction at BEGINNING of prompt (Flux attention is front-weighted)
-        const fullPrompt = `STRICT RULE: This image must contain ZERO text, ZERO letters, ZERO numbers, ZERO words, ZERO writing of any kind. All screens, dashboards, and displays must show ONLY abstract shapes, graphs without labels, and color blocks — never any readable or unreadable text. ` + prompt + `. Avoid: ${NEGATIVE_PROMPT}`;
+        // ✅ Phase 9c: Anti-gibberish — forbid letters/words, ALLOW numbers on charts
+        const fullPrompt = `STRICT RULE: This image must contain ZERO letters, ZERO words, ZERO writing of any kind. Numbers and digits on charts and graphs ARE allowed. All text labels, titles, headings, button text, and UI copy must be replaced with abstract colored shapes or blank areas. Never generate readable or unreadable words in any language. ` + prompt + `. Avoid: ${NEGATIVE_PROMPT}`;
         
         console.log('Final prompt with negative guidance:', fullPrompt.substring(0, 300));
         

@@ -508,6 +508,7 @@ ${moodInstructions}
 
 **Videolänge:** ${briefing.videoDuration} Sekunden
 **Format:** ${briefing.aspectRatio || '16:9'}
+**Website/URL:** ${briefing.websiteUrl || '-'}
 
 ${briefing.hasCharacter ? `**Charakter:** ${briefing.characterName || 'Protagonist'} - ${briefing.characterDescription || 'Sympathische Figur'}` : `**Charakter:** Aktiviere showCharacter gemäß "${categoryKey}"-Profil`}
 
