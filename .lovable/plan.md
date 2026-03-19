@@ -1,50 +1,56 @@
 
 
-# Plan: Von ~88% auf 90%+ Loft-Film Qualität
+# Plan: Von ~91% auf 93-95% Loft-Film Qualität
 
-## Identifizierte Probleme (aus Screenshots)
+## Problem-Analyse
 
-1. **Text wird abgeschnitten in Feature-Szenen** — Das Panel ist rechts ausgerichtet (`alignItems: flex-end`), aber der Charakter steht ebenfalls rechts. Titel wie "Messbarer F..." werden vom Charakter verdeckt.
+### 1. Zahlen-Artefakte in Hintergründen
+Die "Numbers-Only"-Regel in den Prompts sagt aktuell: "No letters, words, or writing — only numbers and digits are allowed." Das führt dazu, dass die KI Zahlen wie "6,773", "56%", "10.74%" in die Bilder einbaut. Die Regel muss geändert werden: KEINE Texte UND keine Zahlen.
 
-2. **Inkonsistenter Bildstil zwischen Szenen** — Feature-Szene zeigt Illustration/Cartoon-Stil, während andere Szenen fotorealistisch wirken. Ursache: Die `sceneStyleHints` in der Edge Function überschreiben den gewählten `visualStyle` je nach Szenentyp unterschiedlich stark.
+### 2. SVG-Charakter-Stil-Gap
+Die SVG-Charaktere (200x280 Viewbox, einfache Formen) wirken neben den hochdetaillierten illustrierten Hintergründen wie Fremdkörper. Zwei Optionen:
+- **Option A**: SVG-Charaktere visuell aufwerten (mehr Details, Schattierung, proportionalere Körper)
+- **Option B**: Charakter-Opacity/Größe reduzieren, damit sie weniger auffallen
 
-3. **SVG-Charaktere noch nicht aktualisiert** — Die Phase-13-Verbesserungen (detaillierte Kleidung, Ken-Burns, Layout-Variation) sind im Code, aber das Remotion Lambda Bundle wurde noch nicht redeployed.
+Empfehlung: Option A — die Charaktere brauchen mehr visuelle Tiefe.
+
+### 3. CTA-Szene zu unruhig
+Der Hintergrund der CTA-Szene ist extrem bunt und detailliert. Lösung: CTA-Szenen-Prompt so anpassen, dass ein ruhigerer, fokussierterer Hintergrund generiert wird.
 
 ## Umsetzung
 
-### Schritt 1: Feature-Szene — Charakter-Position vs. Text-Position entflechten
-Das Feature-Panel ist rechts, der Charakter ist auch rechts — Kollision. Lösung: Feature-Szenen bekommen den Charakter **links** statt rechts, damit Text und Charakter sich nicht überlappen.
+### Schritt 1: Zahlen-Artefakte eliminieren
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+- Die "Numbers-Only"-Regel ändern zu: "This image must contain ZERO text, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels."
+- Auch in `supabase/functions/generate-premium-visual/index.ts` die NEGATIVE_PROMPT um "numbers, digits, percentages, statistics" erweitern
 
-**Datei:** `src/remotion/templates/UniversalCreatorVideo.tsx` — `getContextBasedPosition()` (Zeile 2801)
-- Änderung: `feature` gibt `'left'` statt `'right'` zurück
-- Feature-Text-Panel `maxWidth` von `75%` auf `65%` reduzieren für zusätzlichen Puffer
+### Schritt 2: SVG-Charakter visuell aufwerten
+**Datei:** `src/remotion/components/ProfessionalLottieCharacter.tsx` (ProfessionalSVGCharacter, ab Zeile 521)
+- Viewbox von 200x280 auf 240x340 vergrößern für mehr Detail-Raum
+- Körperproportionen verbessern: breitere Schultern, natürlichere Armansätze
+- Mehr Schattierung: Innere Schatten auf Kleidung, Gesicht-Highlights
+- Haare detaillierter: Mehrere Strähnen statt eine Form
+- Kleidung-Details: Knöpfe, Kragen-Schatten, Falten-Andeutung
+- Weichere Farbübergänge (mehr Gradient-Stops)
 
-### Schritt 2: Visuellen Stil-Konsistenz erzwingen
-Der `sceneStyleHints`-Block in der Edge Function gibt szenenspezifische Stimmungen vor, aber die überschreiben teilweise den gewählten `visualStyle`. Lösung: Den `visualStyle` als dominanten Stil-Anker im Prompt verstärken und `sceneStyleHints` abschwächen, damit sie nur atmosphärische Ergänzungen sind.
-
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts` (Zeile 814-816)
-- Den Prompt umstrukturieren: `visualStyle` wird als erstes, starkes Signal gesetzt
-- `sceneStyleHints` werden als "subtle mood hint" nachgestellt
-- Suffix hinzufügen: `"IMPORTANT: Maintain exact same visual art style across all scenes."`
-
-### Schritt 3: Feature-Panel maxWidth anpassen
-Das Feature-Panel hat `maxWidth: 75%`, was bei langen Titeln nicht reicht wenn der Charakter rechts steht. Nach Schritt 1 (Charakter links) kann das Panel auf `70%` bleiben, aber wir stellen sicher, dass `textOverflow: 'ellipsis'` nicht den Titel abschneidet, sondern der Titel komplett passt.
-
-**Datei:** `src/remotion/templates/UniversalCreatorVideo.tsx` — `getGlassStyle()` Feature-Case (Zeile 2215-2227)
-
-### Schritt 4: Bundle-Redeploy Hinweis
-Nach den Code-Änderungen muss das Remotion Lambda Bundle neu deployed werden (r56), damit Ken-Burns, Layout-Variation und die verbesserten SVG-Charaktere beim nächsten Render aktiv sind.
+### Schritt 3: CTA-Hintergrund beruhigen
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+- Spezielle CTA-Szenen-Anweisung im Prompt: "CTA scenes should use a clean, minimal background with soft gradient or bokeh effect — no busy illustrations"
 
 ## Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `src/remotion/templates/UniversalCreatorVideo.tsx` | Feature: Charakter links, Panel-Width anpassen |
-| `supabase/functions/auto-generate-universal-video/index.ts` | Stil-Konsistenz im Prompt erzwingen |
+| `supabase/functions/auto-generate-universal-video/index.ts` | Zahlen verbieten, CTA-Hintergrund beruhigen |
+| `supabase/functions/generate-premium-visual/index.ts` | NEGATIVE_PROMPT erweitern |
+| `src/remotion/components/ProfessionalLottieCharacter.tsx` | SVG-Charakter visuell aufwerten |
 
 ## Erwartetes Ergebnis
-- Kein abgeschnittener Text mehr in Feature-Szenen
-- Einheitlicher visueller Stil über alle Szenen hinweg
-- Nach Bundle-Redeploy: Ken-Burns, detaillierte Charaktere, Layout-Variation aktiv
-- **Geschätzter Stand: ~92-93%**
+- Keine Zahlen-Artefakte mehr in Hintergründen
+- Charaktere harmonieren visuell besser mit den Hintergründen
+- CTA-Szene: klarer Fokus auf den Call-to-Action
+- **Geschätzter Stand: ~93-95%**
+
+## Hinweis
+Nach den Änderungen muss das **Remotion Lambda Bundle erneut deployed werden** (r57), da die SVG-Charakter-Änderungen im Bundle leben.
 
