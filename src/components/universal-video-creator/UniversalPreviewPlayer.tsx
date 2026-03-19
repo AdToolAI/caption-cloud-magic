@@ -92,7 +92,9 @@ export function UniversalPreviewPlayer({
     const frame = Math.floor(newTime[0] * fps);
     playerRef.current.seekTo(frame);
     setCurrentTime(newTime[0]);
-  }, [fps]);
+    // Phase 12: Detect video end for clickable link overlay
+    setIsVideoEnded(newTime[0] >= totalDuration - 0.5);
+  }, [fps, totalDuration]);
 
   const handleVolumeChange = useCallback((newVolume: number[]) => {
     setVolume(newVolume[0]);
