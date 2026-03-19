@@ -290,7 +290,8 @@ export function UniversalVideoWizard() {
   };
 
   const handleAutoGenerationComplete = (project: any) => {
-    if (!project) {
+    if (!project || !project.outputUrl) {
+      console.warn('[UniversalVideoWizard] Phase12: onComplete called without valid project, staying in error state');
       setError('Video-Generierung fehlgeschlagen. Bitte versuche es erneut.');
       setIsAutoGenerating(false);
       return;
