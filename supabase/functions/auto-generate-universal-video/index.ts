@@ -1313,7 +1313,12 @@ async function runGenerationPipeline(
         kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', ['in', 'out', 'left', 'right'], 'in'),
         textOverlay: {
           enabled: true,
-          text: smartTruncateToSentences(scene.voiceover || scene.title || '', 1, 15),
+          // Phase 12: CTA/outro scenes get more room for URL + call-to-action
+          text: smartTruncateToSentences(
+            scene.voiceover || scene.title || '',
+            (sceneType === 'cta' || sceneType === 'outro') ? 2 : 1,
+            (sceneType === 'cta' || sceneType === 'outro') ? 25 : 15
+          ),
           headline: scene.title || '',
           animation: validateEnum(scene.textAnimation || getDefaultTextAnimation(sceneType), VALID_TEXT_ANIMATIONS, 'fadeWords'),
           position: validateEnum(scene.textPosition || getDefaultTextPosition(sceneType), VALID_TEXT_POSITIONS, 'bottom'),
@@ -2383,10 +2388,16 @@ function transformAlignmentToPhonemes(alignment: {
 }
 
 /** Phase 3: Smart truncation — keeps up to maxSentences complete sentences, max maxWords words */
+/** r60-phase12: URL-safe — protects dots inside URLs from being treated as sentence boundaries */
 function smartTruncateToSentences(text: string, maxSentences: number, maxWords: number): string {
   if (!text) return '';
+  // Phase 12: Protect URLs from dot-based sentence splitting
+  const URL_PLACEHOLDER = '\u2024'; // One-Dot-Leader as safe placeholder
+  const urlSafe = text.replace(/(https?:\/\/[^\s]+|www\.[^\s]+)/g, match =>
+    match.replace(/\./g, URL_PLACEHOLDER)
+  );
   // Split into sentences
-  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  const sentences = urlSafe.match(/[^.!?]+[.!?]+/g) || [urlSafe];
   let result = '';
   let wordCount = 0;
   for (let i = 0; i < Math.min(sentences.length, maxSentences); i++) {
@@ -2397,10 +2408,11 @@ function smartTruncateToSentences(text: string, maxSentences: number, maxWords: 
   }
   // Fallback: if no sentence boundary found, truncate to maxWords cleanly (no ellipsis)
   if (!result) {
-    const words = text.split(/\s+/);
+    const words = urlSafe.split(/\s+/);
     result = words.slice(0, maxWords).join(' ');
   }
-  return result;
+  // Restore URL dots
+  return result.replace(new RegExp(URL_PLACEHOLDER, 'g'), '.');
 }
 
 function getDefaultAnimation(sceneType: string): string {

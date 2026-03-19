@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw, Download, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ interface UniversalPreviewPlayerProps {
     category?: string;
     storytellingStructure?: string;
     outputUrl?: string;
+    brandUrl?: string;
   };
   aspectRatio?: '16:9' | '9:16' | '1:1';
   onExport?: () => void;
@@ -42,6 +43,9 @@ export function UniversalPreviewPlayer({
   const [volume, setVolume] = useState(0.8);
   const [currentTime, setCurrentTime] = useState(0);
   const [selectedAspect, setSelectedAspect] = useState<'16:9' | '9:16' | '1:1'>(aspectRatio);
+  const [isVideoEnded, setIsVideoEnded] = useState(false);
+
+  const brandUrl = project.brandUrl;
 
   const dimensions = ASPECT_DIMENSIONS[selectedAspect];
   
@@ -72,6 +76,21 @@ export function UniversalPreviewPlayer({
     showWatermark: false,
   }), [project, isMuted, volume, dimensions]);
 
+  // Phase 12: Detect video end via polling current frame
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!playerRef.current) return;
+      const currentFrame = playerRef.current.getCurrentFrame();
+      const timeInSec = currentFrame / fps;
+      setCurrentTime(timeInSec);
+      if (currentFrame >= durationInFrames - 2 && !isVideoEnded) {
+        setIsVideoEnded(true);
+        setIsPlaying(false);
+      }
+    }, 250);
+    return () => clearInterval(interval);
+  }, [fps, durationInFrames, isVideoEnded]);
+
   const handlePlayPause = useCallback(() => {
     if (!playerRef.current) return;
     
@@ -79,6 +98,7 @@ export function UniversalPreviewPlayer({
       playerRef.current.pause();
     } else {
       playerRef.current.play();
+      setIsVideoEnded(false);
     }
     setIsPlaying(!isPlaying);
   }, [isPlaying]);
@@ -88,7 +108,9 @@ export function UniversalPreviewPlayer({
     const frame = Math.floor(newTime[0] * fps);
     playerRef.current.seekTo(frame);
     setCurrentTime(newTime[0]);
-  }, [fps]);
+    // Phase 12: Detect video end for clickable link overlay
+    setIsVideoEnded(newTime[0] >= totalDuration - 0.5);
+  }, [fps, totalDuration]);
 
   const handleVolumeChange = useCallback((newVolume: number[]) => {
     setVolume(newVolume[0]);
@@ -105,6 +127,7 @@ export function UniversalPreviewPlayer({
     if (!playerRef.current) return;
     playerRef.current.seekTo(0);
     setCurrentTime(0);
+    setIsVideoEnded(false);
     playerRef.current.play();
     setIsPlaying(true);
   }, []);
@@ -191,6 +214,18 @@ export function UniversalPreviewPlayer({
                 numberOfSharedAudioTags={4}
               />
             </div>
+
+            {/* Phase 12: Clickable brand URL overlay when video ends */}
+            {brandUrl && isVideoEnded && (
+              <a
+                href={brandUrl.startsWith('http') ? brandUrl : `https://${brandUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 px-6 py-2 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 text-white/90 hover:text-white hover:bg-white/25 text-sm font-medium underline underline-offset-4 transition-colors"
+              >
+                🔗 {brandUrl}
+              </a>
+            )}
 
             {/* Custom Controls Overlay */}
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4">

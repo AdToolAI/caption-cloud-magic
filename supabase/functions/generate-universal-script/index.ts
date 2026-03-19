@@ -445,6 +445,7 @@ REGELN:
 11. Beziehe das Produkt/Unternehmen "${briefing.companyName || briefing.productName || ''}" in die Szenen ein — zeige realistische Nutzungssituationen
 12. Jede visualDescription folgt dem Schema: [WER/WAS] + [TUT WAS] + [WO] + [WIE BELEUCHTET/GESTIMMT]
 13. NICHT erlaubt in visualDescription: "Digital world", "Social media icons flying", "Abstract shapes", "City skyline" — stattdessen KONKRETE Szenen mit Menschen/Produkten in realistischen Situationen
+14. Die CTA-Szene MUSS die vollständige Website-URL "${briefing.websiteUrl || ''}" im Voiceover enthalten (z.B. "Besuchen Sie www.example.com"). URL NICHT abkürzen oder weglassen!
 
 AUSGABEFORMAT (JSON):
 {

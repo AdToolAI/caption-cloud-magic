@@ -2310,18 +2310,21 @@ const TextOverlay: React.FC<{
         );
       })()}
       
-      {/* Phase 5: Brand URL under CTA button */}
+      {/* Phase 5+12: Brand URL under CTA button — larger & more prominent */}
       {sceneType === 'cta' && brandUrl && (
         <div style={{
-          marginTop: 12,
-          opacity: interpolate(frame, [30, 45], [0, 0.6], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
+          marginTop: 16,
+          opacity: interpolate(frame, [30, 45], [0, 0.85], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
           textAlign: 'center',
         }}>
           <span style={{
-            color: 'rgba(255,255,255,0.6)',
-            fontSize: 18,
+            color: 'rgba(255,255,255,0.9)',
+            fontSize: 24,
+            fontWeight: 600,
             fontFamily: "'Inter', sans-serif",
             letterSpacing: 0.5,
+            textDecoration: 'underline',
+            textUnderlineOffset: 4,
           }}>
             {brandUrl}
           </span>
