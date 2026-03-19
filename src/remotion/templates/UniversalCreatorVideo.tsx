@@ -2087,21 +2087,35 @@ const TextOverlay: React.FC<{
   // Determine layout based on scene type
   const isHookOrCTA = ['hook', 'cta', 'intro', 'outro'].includes(sceneType);
   const isProblem = sceneType === 'problem';
+  const isFeature = sceneType === 'feature';
+  const isProof = sceneType === 'proof';
   
-  // Position: hook/cta = centered, problem/solution/feature = bottom
-  // Phase 3b: Characters now always on right → no collision guard needed
-  // Phase 6: Non-hook panels repositioned higher with padding for cleaner composition
-  const positionStyle: React.CSSProperties = isHookOrCTA
-    ? { top: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }
-    : { bottom: 60, left: 0, right: 0, paddingBottom: 40 };
+  // 🎬 Phase 13: Layout variation per scene type — break visual monotony
+  // Problem: bottom-left (default), Feature: bottom-right (mirrored), Proof: center-bottom (wider)
+  const getPositionStyle = (): React.CSSProperties => {
+    if (isHookOrCTA) {
+      return { top: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' };
+    }
+    if (isFeature) {
+      // Feature: bottom-right aligned for visual variety
+      return { bottom: 60, left: 0, right: 0, paddingBottom: 40, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' };
+    }
+    if (isProof) {
+      // Proof: centered bottom with quote style
+      return { bottom: 60, left: 0, right: 0, paddingBottom: 40, display: 'flex', flexDirection: 'column', alignItems: 'center' };
+    }
+    // Problem, Solution, default: bottom-left
+    return { bottom: 60, left: 0, right: 0, paddingBottom: 40 };
+  };
+  const positionStyle = getPositionStyle();
   
   // Font sizes based on scene type
   // Phase 5: Larger body fonts for mobile readability (was 28/24, now 32/28)
   const headlineFontSize = isHookOrCTA ? 72 : (isProblem ? 56 : 48);
   const bodyFontSize = isHookOrCTA ? 32 : 28;
   
-  // Text alignment
-  const textAlign = isHookOrCTA ? 'center' as const : 'left' as const;
+  // Text alignment — Phase 13: vary per scene type
+  const textAlign = isHookOrCTA ? 'center' as const : (isFeature ? 'right' as const : (isProof ? 'center' as const : 'left' as const));
   const padding = isHookOrCTA ? '0 80px' : '0 60px';
   
   // Phase 4: Differentiated glassmorphism per scene type for Loft-Film quality
