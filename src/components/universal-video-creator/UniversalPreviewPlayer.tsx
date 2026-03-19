@@ -196,6 +196,18 @@ export function UniversalPreviewPlayer({
               />
             </div>
 
+            {/* Phase 12: Clickable brand URL overlay when video ends */}
+            {brandUrl && isVideoEnded && (
+              <a
+                href={brandUrl.startsWith('http') ? brandUrl : `https://${brandUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 px-6 py-2 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 text-white/90 hover:text-white hover:bg-white/25 text-sm font-medium underline underline-offset-4 transition-colors"
+              >
+                🔗 {brandUrl}
+              </a>
+            )}
+
             {/* Custom Controls Overlay */}
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4">
               {/* Progress Bar */}
