@@ -80,20 +80,20 @@ Lass uns mit ein paar strategischen Fragen starten.
   const [lastRecommendation, setLastRecommendation] = useState<any>(null);
   const [quickReplyLocked, setQuickReplyLocked] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messageIdsRef = useRef<Set<string>>(() => {
-    // Initialize from localStorage to prevent duplicates after page refresh
-    const ids = new Set<string>(['1']);
+  const messageIdsRef = useRef<Set<string>>(new Set(['1']));
+
+  // Initialize messageIdsRef from localStorage on mount to prevent duplicates after refresh
+  useEffect(() => {
     try {
       const saved = localStorage.getItem('universal-video-consultant-state');
       if (saved) {
         const { messages: savedMessages } = JSON.parse(saved);
         if (savedMessages?.length) {
-          savedMessages.forEach((m: Message) => ids.add(m.id));
+          savedMessages.forEach((m: Message) => messageIdsRef.current.add(m.id));
         }
       }
     } catch {}
-    return ids;
-  });
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
