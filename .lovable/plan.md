@@ -1,49 +1,20 @@
 
 
-# Plan: Von ~93% auf 95%+ Loft-Film Qualitat
+# Plan: Von ~93% auf 95%+ Loft-Film Qualität — UMGESETZT ✅
 
-## Verbleibende Probleme
+## Durchgeführte Änderungen
 
-### 1. Zahlen-Artefakte immer noch sichtbar
-"139" und "21.55" erscheinen trotz der Prompt-Anderungen. Das `antiTextSuffix` muss noch aggressiver formuliert werden — die aktuelle Version wird vom Modell teilweise ignoriert, weil die Szenen-Beschreibungen (z.B. "dashboard", "analytics") Zahlen implizieren.
+### ✅ Schritt 1: Anti-Zahlen und Anti-Personen Prompt verstärkt
+- `auto-generate-universal-video/index.ts`: antiTextSuffix erweitert um "dashboard numbers, analytics data, statistics, charts with values, human figures, people, silhouettes"
+- `auto-generate-universal-video/index.ts`: CTA sceneStyleHint erweitert um "NO people, NO silhouettes, NO human figures"
+- `generate-premium-visual/index.ts`: NEGATIVE_PROMPT erweitert um "human silhouette, person, people, man, woman, figure, human body, dashboard numbers, analytics data, charts with values"
 
-### 2. CTA enthalt AI-generierte Person als Silhouette
-Der AI-Hintergrund der CTA-Szene zeigt einen realistischen Geschaftsmann, der mit dem SVG-Charakter kollidiert. Die CTA-Prompt-Anweisung muss explizit Personen/Silhouetten verbieten.
-
-### 3. CTA-Text wird abgeschnitten
-"Testphase!" faded am rechten Rand aus — das Glass-Panel muss breiteren Text besser handhaben.
-
-## Umsetzung
-
-### Schritt 1: Anti-Zahlen und Anti-Personen Prompt verstarken
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
-- `antiTextSuffix` erweitern: Auch "dashboard numbers", "analytics data", "statistics", "charts with values" explizit verbieten
-- CTA `sceneStyleHint` andern zu: "clean minimal background, soft gradient or abstract bokeh, NO people, NO silhouettes, NO human figures, calm and focused"
-- Fur ALLE Szenen hinzufugen: "Do NOT include any human figures or silhouettes in the background image"
-
-**Datei:** `supabase/functions/generate-premium-visual/index.ts`
-- `NEGATIVE_PROMPT` erweitern um: "human silhouette, person, people, man, woman, figure"
-
-### Schritt 2: CTA Glass-Panel Text-Overflow fixen
-**Datei:** `src/remotion/templates/UniversalCreatorVideo.tsx`
-- CTA-Szene Content-Text `maxWidth` erhohen oder `whiteSpace: normal` + `wordBreak: break-word` erzwingen, damit kein Text abgeschnitten wird
-
-### Schritt 3: Plan.md aktualisieren
-
-## Betroffene Dateien
-
-| Datei | Anderung |
-|-------|----------|
-| `supabase/functions/auto-generate-universal-video/index.ts` | Aggressiveres Anti-Zahlen + Anti-Personen Prompting |
-| `supabase/functions/generate-premium-visual/index.ts` | NEGATIVE_PROMPT um Personen/Silhouetten erweitern |
-| `src/remotion/templates/UniversalCreatorVideo.tsx` | CTA Text-Overflow Fix |
+### ✅ Schritt 2: CTA Glass-Panel Text-Overflow gefixt
+- `UniversalCreatorVideo.tsx`: Hook/CTA Glass-Panel maxWidth von 85% auf 90% erhöht
+- `wordBreak: 'break-word'` und `overflowWrap: 'break-word'` hinzugefügt
 
 ## Hinweis
-Die Prompt-Anderungen sind sofort nach Edge-Function-Deploy aktiv. Der CTA Text-Fix erfordert ein erneutes Bundle-Deploy (r58).
+- Prompt-Änderungen sind nach Edge-Function-Deploy sofort aktiv
+- CTA Text-Fix erfordert Bundle-Deploy (r58)
 
-## Erwartetes Ergebnis
-- Keine Zahlen/Text-Artefakte in Hintergrundbildern
-- Keine AI-generierten Personen-Silhouetten in CTA
-- CTA-Text vollstandig sichtbar
-- **Geschatzter Stand: ~95%**
-
+## Geschätzter Stand: ~95%
