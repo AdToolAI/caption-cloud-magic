@@ -109,6 +109,7 @@ export function UniversalPreviewPlayer({
     if (!playerRef.current) return;
     playerRef.current.seekTo(0);
     setCurrentTime(0);
+    setIsVideoEnded(false);
     playerRef.current.play();
     setIsPlaying(true);
   }, []);
