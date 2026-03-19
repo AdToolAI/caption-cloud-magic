@@ -2220,7 +2220,7 @@ const TextOverlay: React.FC<{
           borderRadius: 16,
           borderRight: '4px solid #3B82F6',
           padding: '24px 32px',
-          maxWidth: '75%',
+          maxWidth: '65%',
           maxHeight: '42%',
           overflow: 'hidden' as const,
           boxShadow: '0 4px 24px rgba(59,130,246,0.15), 0 4px 24px rgba(0,0,0,0.25)',
