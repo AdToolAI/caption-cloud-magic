@@ -801,7 +801,7 @@ async function runGenerationPipeline(
             'solution': 'bright, optimistic, open space, positive energy, uplifting',
             'feature': 'detailed, showcase, close-up, product detail, clean background',
             'proof': 'trustworthy, data-driven, charts, statistics visualization',
-            'cta': 'energetic, motivating, directional, clear path forward',
+            'cta': 'clean minimal background, soft gradient or bokeh effect, no busy illustrations, calm and focused',
           };
           const sceneHint = sceneStyleHints[sceneType] || 'professional, well-composed';
 
@@ -810,7 +810,7 @@ async function runGenerationPipeline(
           const productContext = briefing.productDescription
             ? `Context: "${briefing.companyName || briefing.productName || 'digital product'}" - ${(briefing.productDescription || '').slice(0, 120)}. `
             : '';
-          const antiTextSuffix = 'No text, no letters, no words in image. Numbers on charts allowed. No QR codes, no logos, no UI mockups, no screenshots, no watermarks.';
+          const antiTextSuffix = 'STRICT: This image must contain ZERO text, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels, ZERO letters, ZERO words. No QR codes, no logos, no UI mockups, no screenshots, no watermarks.';
           // Phase 14: visualStyle as dominant signal, sceneStyleHints as subtle mood only
           const prompt = attempt === 0
             ? `ART STYLE: ${briefing.visualStyle}. ${productContext}${scene.visualDescription}. Subtle mood: ${sceneHint}. ${categoryHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. IMPORTANT: Maintain exact same visual art style across all scenes. ${antiTextSuffix}`

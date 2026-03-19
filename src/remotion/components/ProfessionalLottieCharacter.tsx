@@ -616,122 +616,198 @@ const ProfessionalSVGCharacter: React.FC<{
 
   return (
     <svg 
-      width="200" 
-      height="280" 
-      viewBox="0 0 200 280" 
+      width="240" 
+      height="340" 
+      viewBox="0 0 240 340" 
       style={{ overflow: 'visible' }}
     >
       <defs>
         <linearGradient id="shirtGradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor={primaryColor} />
-          <stop offset="100%" stopColor={`${primaryColor}DD`} />
+          <stop offset="40%" stopColor={primaryColor} />
+          <stop offset="100%" stopColor={`${primaryColor}CC`} />
         </linearGradient>
-        <linearGradient id="skinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id="shirtShadow" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="rgba(0,0,0,0)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0.15)" />
+        </linearGradient>
+        <linearGradient id="skinGradient" x1="30%" y1="0%" x2="70%" y2="100%">
           <stop offset="0%" stopColor={skinTone} />
-          <stop offset="100%" stopColor={`${skinTone}EE`} />
+          <stop offset="50%" stopColor={skinTone} />
+          <stop offset="100%" stopColor={`${skinTone}DD`} />
+        </linearGradient>
+        <linearGradient id="skinHighlight" x1="40%" y1="0%" x2="60%" y2="100%">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.15)" />
+          <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+        </linearGradient>
+        <linearGradient id="hairGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#3D2B1F" />
+          <stop offset="50%" stopColor="#2D1B0E" />
+          <stop offset="100%" stopColor="#1A0F08" />
+        </linearGradient>
+        <linearGradient id="pantsGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#1E3A5F" />
+          <stop offset="100%" stopColor="#152A45" />
         </linearGradient>
         <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="4" stdDeviation="6" floodOpacity="0.25"/>
+          <feDropShadow dx="0" dy="4" stdDeviation="6" floodOpacity="0.2"/>
+        </filter>
+        <filter id="innerShadow" x="-10%" y="-10%" width="120%" height="120%">
+          <feDropShadow dx="1" dy="2" stdDeviation="3" floodOpacity="0.12"/>
         </filter>
         <linearGradient id="mouthGrad" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stopColor="#8B2323" />
           <stop offset="100%" stopColor="#C0392B" />
         </linearGradient>
+        <linearGradient id="shoeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#2a2a2a" />
+          <stop offset="100%" stopColor="#111111" />
+        </linearGradient>
       </defs>
       
-      {/* Body / Shirt */}
+      {/* Body / Shirt with shoulder structure */}
       <path 
-        d="M 55 115 Q 60 108 100 105 Q 140 108 145 115 L 152 195 L 48 195 Z" 
+        d="M 62 138 Q 55 132 55 128 Q 60 118 80 115 Q 100 112 120 112 Q 160 115 165 128 Q 165 132 158 138 L 172 240 L 48 240 Z" 
         fill="url(#shirtGradient)" 
         filter="url(#shadow)"
       />
+      {/* Shirt shading overlay */}
+      <path 
+        d="M 62 138 Q 55 132 55 128 Q 60 118 80 115 Q 100 112 120 112 Q 160 115 165 128 Q 165 132 158 138 L 172 240 L 48 240 Z" 
+        fill="url(#shirtShadow)" 
+      />
       
-      {/* Shirt collar */}
-      <path d="M 82 108 L 100 125 L 118 108" fill="white" stroke="#E5E5E5" strokeWidth="1" />
+      {/* Collar with depth */}
+      <path d="M 88 118 L 100 122 L 112 118" fill="none" stroke="white" strokeWidth="2.5" opacity="0.9" />
+      <path d="M 93 118 L 100 136 L 107 118" fill="white" opacity="0.85" />
       
-      {/* Tie */}
-      <path d="M 100 125 L 94 142 L 100 180 L 106 142 Z" fill="#1E3A5F" />
+      {/* Tie with gradient */}
+      <path d="M 100 136 L 93 155 L 100 225 L 107 155 Z" fill="url(#pantsGradient)" />
+      <path d="M 100 136 L 96 145 L 100 148 L 104 145 Z" fill="#1E3A5F" stroke="#152A45" strokeWidth="0.5" />
+      
+      {/* Shirt buttons */}
+      <circle cx="100" cy="165" r="2" fill="rgba(255,255,255,0.4)" />
+      <circle cx="100" cy="185" r="2" fill="rgba(255,255,255,0.4)" />
+      <circle cx="100" cy="205" r="2" fill="rgba(255,255,255,0.35)" />
       
       {/* Left arm */}
       <g>
         <path 
-          d={getLeftArmPath()}
+          d={getLeftArmPath().replace(/M 55/g, 'M 62').replace(/Q 35/g, 'Q 38').replace(/Q 30/g, 'Q 32')}
           stroke="url(#shirtGradient)" 
-          strokeWidth="22" 
+          strokeWidth="26" 
           fill="none" 
           strokeLinecap="round"
+          filter="url(#innerShadow)"
         />
-        <circle cx={leftHandPos.x} cy={leftHandPos.y} r="14" fill="url(#skinGradient)" />
+        <circle cx={leftHandPos.x} cy={leftHandPos.y} r="16" fill="url(#skinGradient)" />
+        <circle cx={leftHandPos.x - 2} cy={leftHandPos.y - 3} r="14" fill="url(#skinHighlight)" />
       </g>
       
       {/* Right arm */}
       <g>
         <path 
-          d={getRightArmPath()}
+          d={getRightArmPath().replace(/M 145/g, 'M 158')}
           stroke="url(#shirtGradient)" 
-          strokeWidth="22" 
+          strokeWidth="26" 
           fill="none" 
           strokeLinecap="round"
+          filter="url(#innerShadow)"
         />
-        <circle cx={rightHandPos.x} cy={rightHandPos.y} r="14" fill="url(#skinGradient)" />
+        <circle cx={rightHandPos.x} cy={rightHandPos.y} r="16" fill="url(#skinGradient)" />
+        <circle cx={rightHandPos.x - 2} cy={rightHandPos.y - 3} r="14" fill="url(#skinHighlight)" />
         
         {/* Pointing finger */}
         {action === 'pointing' && (
           <path 
-            d={`M ${rightHandPos.x} ${rightHandPos.y} L ${rightHandPos.x + 20} ${rightHandPos.y - 15}`}
+            d={`M ${rightHandPos.x} ${rightHandPos.y} L ${rightHandPos.x + 22} ${rightHandPos.y - 16}`}
             stroke="url(#skinGradient)" 
-            strokeWidth="7" 
+            strokeWidth="8" 
             strokeLinecap="round"
           />
         )}
       </g>
       
-      {/* Neck */}
-      <rect x="90" y="95" width="20" height="18" fill="url(#skinGradient)" />
+      {/* Neck with shadow */}
+      <rect x="92" y="103" width="24" height="20" rx="4" fill="url(#skinGradient)" />
+      <rect x="92" y="113" width="24" height="8" fill="rgba(0,0,0,0.06)" />
       
       {/* Head with movement */}
-      <g transform={`translate(0, ${headBob * 0.3})`}>
-        {/* Head shape */}
-        <ellipse cx="100" cy="55" rx="40" ry="45" fill="url(#skinGradient)" filter="url(#shadow)" />
+      <g transform={`translate(4, ${headBob * 0.3})`}>
+        {/* Head shape with subtle highlight */}
+        <ellipse cx="116" cy="60" rx="44" ry="48" fill="url(#skinGradient)" filter="url(#shadow)" />
+        <ellipse cx="112" cy="52" rx="30" ry="32" fill="url(#skinHighlight)" />
         
-        {/* Hair */}
+        {/* Hair — multiple layers for depth */}
         <path 
-          d="M 60 48 Q 70 18 100 12 Q 130 18 140 48 Q 135 30 100 28 Q 65 30 60 48" 
-          fill="#2D1B0E" 
+          d="M 72 52 Q 80 15 116 8 Q 152 15 160 52 Q 155 28 116 24 Q 77 28 72 52" 
+          fill="url(#hairGradient)" 
         />
+        {/* Hair strands for texture */}
+        <path d="M 82 42 Q 90 22 105 20" stroke="#3D2B1F" strokeWidth="1.5" fill="none" opacity="0.4" />
+        <path d="M 130 20 Q 142 22 148 38" stroke="#3D2B1F" strokeWidth="1.5" fill="none" opacity="0.4" />
+        <path d="M 95 18 Q 110 10 125 16" stroke="#1A0F08" strokeWidth="1" fill="none" opacity="0.3" />
         
-        {/* Eyebrows */}
+        {/* Ears */}
+        <ellipse cx="72" cy="60" rx="7" ry="10" fill="url(#skinGradient)" />
+        <ellipse cx="72" cy="60" rx="4" ry="6" fill={`${skinTone}CC`} />
+        <ellipse cx="160" cy="60" rx="7" ry="10" fill="url(#skinGradient)" />
+        <ellipse cx="160" cy="60" rx="4" ry="6" fill={`${skinTone}CC`} />
+        
+        {/* Eyebrows — thicker, more expressive */}
         <path 
-          d={`M 72 ${40 - eyebrowRaise} Q 82 ${36 - eyebrowRaise - eyebrowTilt} 92 ${40 - eyebrowRaise}`} 
-          stroke="#2D1B0E" 
-          strokeWidth="2.5" 
+          d={`M 88 ${44 - eyebrowRaise} Q 98 ${39 - eyebrowRaise - eyebrowTilt} 108 ${44 - eyebrowRaise}`} 
+          stroke="url(#hairGradient)" 
+          strokeWidth="3" 
           fill="none" 
+          strokeLinecap="round"
         />
         <path 
-          d={`M 108 ${40 - eyebrowRaise} Q 118 ${36 - eyebrowRaise + eyebrowTilt} 128 ${40 - eyebrowRaise}`} 
-          stroke="#2D1B0E" 
-          strokeWidth="2.5" 
+          d={`M 124 ${44 - eyebrowRaise} Q 134 ${39 - eyebrowRaise + eyebrowTilt} 144 ${44 - eyebrowRaise}`} 
+          stroke="url(#hairGradient)" 
+          strokeWidth="3" 
           fill="none" 
+          strokeLinecap="round"
         />
         
-        {/* Eyes */}
+        {/* Eyes — more detailed with iris */}
         <g opacity={isBlinking ? 0.1 : 1}>
-          <ellipse cx="82" cy="52" rx="7" ry={isBlinking ? 1 : 5} fill="#2D1B0E" />
-          <ellipse cx="118" cy="52" rx="7" ry={isBlinking ? 1 : 5} fill="#2D1B0E" />
+          {/* Left eye */}
+          <ellipse cx="98" cy="56" rx="9" ry={isBlinking ? 1 : 6.5} fill="white" />
+          <ellipse cx="98" cy="56" rx="6" ry={isBlinking ? 1 : 5.5} fill="#2D1B0E" />
+          <ellipse cx="98" cy="56" rx="4" ry={isBlinking ? 1 : 4} fill="#1a1a1a" />
           {!isBlinking && (
             <>
-              <circle cx="84" cy="50" r="2" fill="white" opacity="0.8" />
-              <circle cx="120" cy="50" r="2" fill="white" opacity="0.8" />
+              <circle cx="100" cy="53" r="2.5" fill="white" opacity="0.85" />
+              <circle cx="95" cy="57" r="1" fill="white" opacity="0.4" />
             </>
           )}
+          {/* Right eye */}
+          <ellipse cx="134" cy="56" rx="9" ry={isBlinking ? 1 : 6.5} fill="white" />
+          <ellipse cx="134" cy="56" rx="6" ry={isBlinking ? 1 : 5.5} fill="#2D1B0E" />
+          <ellipse cx="134" cy="56" rx="4" ry={isBlinking ? 1 : 4} fill="#1a1a1a" />
+          {!isBlinking && (
+            <>
+              <circle cx="136" cy="53" r="2.5" fill="white" opacity="0.85" />
+              <circle cx="131" cy="57" r="1" fill="white" opacity="0.4" />
+            </>
+          )}
+          {/* Eyelashes */}
+          <path d="M 89 52 Q 92 49 95 51" stroke="#2D1B0E" strokeWidth="1" fill="none" />
+          <path d="M 125 52 Q 128 49 131 51" stroke="#2D1B0E" strokeWidth="1" fill="none" />
         </g>
         
-        {/* Nose */}
-        <path d="M 100 58 Q 95 66 100 72 Q 105 66 100 58" fill={`${skinTone}DD`} />
+        {/* Nose — more defined */}
+        <path d="M 116 62 Q 110 72 114 78 Q 116 80 118 78 Q 122 72 116 62" fill={`${skinTone}CC`} />
+        <path d="M 112 77 Q 116 80 120 77" stroke={`${skinTone}AA`} strokeWidth="1.5" fill="none" />
+        
+        {/* Cheek blush */}
+        <circle cx="86" cy="70" r="8" fill="#FFB6C1" opacity="0.12" />
+        <circle cx="146" cy="70" r="8" fill="#FFB6C1" opacity="0.12" />
         
         {/* Animated mouth with lip-sync */}
         <path 
-          d={getMouthPath()}
+          d={getMouthPath().replace(/M (\d+)/g, (_, n) => `M ${parseInt(n) + 16}`).replace(/Q (\d+)/g, (_, n) => `Q ${parseInt(n) + 16}`)}
           fill={mouthConfig.openness > 0.3 ? 'url(#mouthGrad)' : 'none'}
           stroke="#C0392B" 
           strokeWidth="2.5" 
@@ -740,17 +816,22 @@ const ProfessionalSVGCharacter: React.FC<{
         
         {/* Teeth for certain visemes */}
         {(currentViseme === 'teeth' || currentViseme === 'teeth_lip' || currentViseme === 'wide') && mouthConfig.openness > 0.4 && (
-          <rect x="92" y="76" width="16" height="4" fill="white" rx="1" />
+          <rect x="108" y="80" width="16" height="4" fill="white" rx="1" />
         )}
       </g>
       
-      {/* Legs */}
-      <rect x="68" y="195" width="28" height="60" rx="6" fill="#1E3A5F" />
-      <rect x="104" y="195" width="28" height="60" rx="6" fill="#1E3A5F" />
+      {/* Legs with gradient */}
+      <rect x="72" y="240" width="32" height="68" rx="8" fill="url(#pantsGradient)" />
+      <rect x="118" y="240" width="32" height="68" rx="8" fill="url(#pantsGradient)" />
+      {/* Leg crease detail */}
+      <path d="M 88 260 Q 86 275 88 290" stroke="rgba(0,0,0,0.08)" strokeWidth="1" fill="none" />
+      <path d="M 134 260 Q 132 275 134 290" stroke="rgba(0,0,0,0.08)" strokeWidth="1" fill="none" />
       
-      {/* Shoes */}
-      <ellipse cx="82" cy="260" rx="20" ry="10" fill="#1a1a1a" />
-      <ellipse cx="118" cy="260" rx="20" ry="10" fill="#1a1a1a" />
+      {/* Shoes with gradient */}
+      <ellipse cx="88" cy="312" rx="24" ry="12" fill="url(#shoeGradient)" />
+      <ellipse cx="88" cy="308" rx="22" ry="4" fill="rgba(255,255,255,0.08)" />
+      <ellipse cx="134" cy="312" rx="24" ry="12" fill="url(#shoeGradient)" />
+      <ellipse cx="134" cy="308" rx="22" ry="4" fill="rgba(255,255,255,0.08)" />
     </svg>
   );
 };

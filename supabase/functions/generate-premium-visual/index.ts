@@ -39,7 +39,7 @@ const STYLE_PROMPTS: Record<string, string> = {
 
 // Enhanced negative prompt to strictly avoid text generation
 // ✅ Updated: Allow contextual text (product names, CTAs), forbid only gibberish/nonsense
-const NEGATIVE_PROMPT = 'photorealistic, photography, real human face, portrait, detailed face, hyperrealistic, 3D render, realistic skin, realistic eyes, nsfw, nude, violence, blurry, low quality, watermark, lorem ipsum, gibberish text, random letters, unreadable text, nonsense words, fantasy language, made up pricing, wrong numbers, nature scene, forest, trees, sunset, landscape, QR code, barcode, logo, brand mark, icon overlay, UI element, button, screenshot, phone mockup, laptop screen, website screenshot, app interface, stock photo watermark, shutterstock, getty, istock';
+const NEGATIVE_PROMPT = 'photorealistic, photography, real human face, portrait, detailed face, hyperrealistic, 3D render, realistic skin, realistic eyes, nsfw, nude, violence, blurry, low quality, watermark, lorem ipsum, gibberish text, random letters, unreadable text, nonsense words, fantasy language, made up pricing, wrong numbers, numbers, digits, percentages, statistics, data labels, numeric values, nature scene, forest, trees, sunset, landscape, QR code, barcode, logo, brand mark, icon overlay, UI element, button, screenshot, phone mockup, laptop screen, website screenshot, app interface, stock photo watermark, shutterstock, getty, istock';
 
 // Function to sanitize prompts and remove forbidden elements
 function sanitizePrompt(prompt: string): string {
@@ -226,8 +226,8 @@ serve(async (req) => {
         }
       } else {
         // Standard Flux 1.1 Pro for scenes without character
-        // ✅ Phase 9c: Anti-gibberish — forbid letters/words, ALLOW numbers on charts
-        const fullPrompt = `STRICT RULE: This image must contain ZERO letters, ZERO words, ZERO writing of any kind. Numbers and digits on charts and graphs ARE allowed. All text labels, titles, headings, button text, and UI copy must be replaced with abstract colored shapes or blank areas. Never generate readable or unreadable words in any language. ` + prompt + `. Avoid: ${NEGATIVE_PROMPT}`;
+        // ✅ Phase 15: Anti-gibberish — forbid ALL text AND numbers
+        const fullPrompt = `STRICT RULE: This image must contain ZERO text, ZERO letters, ZERO words, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels of any kind. All text, numbers, and data visualizations must be replaced with abstract colored shapes or blank areas. Never generate readable or unreadable content in any language. ` + prompt + `. Avoid: ${NEGATIVE_PROMPT}`;
         
         console.log('Final prompt with negative guidance:', fullPrompt.substring(0, 300));
         
