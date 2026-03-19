@@ -28,12 +28,12 @@ interface PremiumVisualRequest {
 // Style-specific prompt templates for Flux 1.1 Pro - Loft-Film Quality
 // ✅ Phase 11: Style prompts focus on visual quality — anti-text rules moved to suffix
 const STYLE_PROMPTS: Record<string, string> = {
-  'flat-design': 'professional flat 2D illustration for business explainer video, clean minimal infographic style like Loft-Film or Kurzgesagt, corporate color palette, simple geometric shapes, stylized human figures in realistic business scenarios, warm professional lighting, ',
-  'isometric': 'isometric 2D business illustration, bright flat colors, technical diagram style, clean lines, professional infographic aesthetic, stylized figures in workplace scenarios, ',
-  'whiteboard': 'clean whiteboard business illustration, black line art on pure white background, simple figures and professional icons, minimal educational diagram style, clean marker drawing, ',
-  'comic': 'clean business cartoon illustration, simplified character design, bold outlines, flat colors, friendly professional style, vector art, people in business context, ',
-  'corporate': 'professional corporate illustration, muted business colors (navy, teal, gold), stylized professional people in office settings, tech infographic style, minimal elegant design, ',
-  'modern-3d': 'soft 3D render business illustration, pastel gradient backgrounds, stylized characters in professional environments, glass morphism elements, modern tech aesthetic, warm lighting, ',
+  'flat-design': 'professional flat 2D illustration for business explainer video, clean minimal infographic style like Loft-Film or Kurzgesagt, corporate color palette, simple geometric shapes, empty workspaces and environments without people, warm professional lighting, ',
+  'isometric': 'isometric 2D business illustration, bright flat colors, technical diagram style, clean lines, professional infographic aesthetic, empty workplace environments and equipment, ',
+  'whiteboard': 'clean whiteboard business illustration, black line art on pure white background, professional icons and objects, minimal educational diagram style, clean marker drawing, no figures, ',
+  'comic': 'clean business cartoon illustration, bold outlines, flat colors, friendly professional style, vector art, objects and environments without people, ',
+  'corporate': 'professional corporate illustration, muted business colors (navy, teal, gold), empty office settings with furniture and equipment, tech infographic style, minimal elegant design, ',
+  'modern-3d': 'soft 3D render business illustration, pastel gradient backgrounds, empty professional environments with modern furniture, glass morphism elements, modern tech aesthetic, warm lighting, ',
   'custom': '', // Will be filled with custom description
 };
 
@@ -227,7 +227,7 @@ serve(async (req) => {
       } else {
         // Standard Flux 1.1 Pro for scenes without character
         // ✅ Phase 15: Anti-gibberish — forbid ALL text AND numbers
-        const fullPrompt = `STRICT RULE: This image must contain ZERO text, ZERO letters, ZERO words, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels of any kind. All text, numbers, and data visualizations must be replaced with abstract colored shapes or blank areas. Never generate readable or unreadable content in any language. ` + prompt + `. Avoid: ${NEGATIVE_PROMPT}`;
+        const fullPrompt = `STRICT RULE: This image must contain ZERO text, ZERO letters, ZERO words, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels of any kind. All text, numbers, and data visualizations must be replaced with abstract colored shapes or blank areas. Never generate readable or unreadable content in any language. CRITICAL: Remove ALL human subjects — show ONLY environments, objects, furniture, and equipment. No people, no silhouettes, no hands, no body parts. ` + prompt + `. Avoid: ${NEGATIVE_PROMPT}`;
         
         console.log('Final prompt with negative guidance:', fullPrompt.substring(0, 300));
         

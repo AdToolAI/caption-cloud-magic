@@ -442,9 +442,9 @@ REGELN:
 8. WICHTIG: Halte dich an das Pacing-Guide für "${categoryKey}"!
 9. Jede Szene braucht einen KONTRAST-OVERLAY-freundlichen Text (weiß auf dunklem Hintergrund)
 10. Die visualDescription MUSS eine KONKRETE Szene beschreiben die zum Voiceover passt — nicht abstrakt, sondern wie ein Filmstill
-11. Beziehe das Produkt/Unternehmen "${briefing.companyName || briefing.productName || ''}" in die Szenen ein — zeige realistische Nutzungssituationen
-12. Jede visualDescription folgt dem Schema: [WER/WAS] + [TUT WAS] + [WO] + [WIE BELEUCHTET/GESTIMMT]
-13. NICHT erlaubt in visualDescription: "Digital world", "Social media icons flying", "Abstract shapes", "City skyline" — stattdessen KONKRETE Szenen mit Menschen/Produkten in realistischen Situationen
+11. Beziehe das Produkt/Unternehmen "${briefing.companyName || briefing.productName || ''}" in die Szenen ein — zeige realistische Nutzungssituationen der UMGEBUNG und OBJEKTE
+12. Jede visualDescription folgt dem Schema: [OBJEKT/SZENE] + [ZUSTAND/DETAIL] + [UMGEBUNG] + [BELEUCHTUNG] — NIEMALS Menschen, Personen, Silhouetten, Hände, Finger oder Körperteile beschreiben! Die Szene zeigt NUR die Umgebung, Möbel, Geräte und Objekte. Animierte Charaktere werden separat hinzugefügt.
+13. NICHT erlaubt in visualDescription: "Digital world", "Social media icons flying", "Abstract shapes", "City skyline", "A person", "A man", "A woman", "someone", "manager", "user", "customer", "employee", "hand", "finger" — stattdessen KONKRETE Umgebungen und Objekte OHNE Menschen (z.B. "A modern desk with monitors, bright office, warm light")
 14. Die CTA-Szene MUSS die vollständige Website-URL "${briefing.websiteUrl || ''}" im Voiceover enthalten (z.B. "Besuchen Sie www.example.com"). URL NICHT abkürzen oder weglassen!
 
 AUSGABEFORMAT (JSON):
@@ -458,7 +458,7 @@ AUSGABEFORMAT (JSON):
       "sceneType": "hook|problem|solution|feature|proof|cta|intro|benefit|testimonial",
       "title": "Szenen-Titel (kurz, prägnant)",
       "voiceover": "Der gesprochene Text für diese Szene...",
-      "visualDescription": "ENGLISH image prompt. Concrete scene: [Subject] doing [action] in [environment], [lighting/mood]. Example: 'A marketing manager reviewing colorful campaign analytics on a large curved monitor, modern bright office with glass walls, warm natural light through floor-to-ceiling windows, shallow depth of field'",
+      "visualDescription": "ENGLISH image prompt. Concrete scene WITHOUT people: [Object/Scene] + [State/Detail] + [Environment] + [Lighting]. NEVER describe humans, persons, silhouettes, hands, or body parts. Example: 'A modern desk with multiple monitors showing colorful campaign interfaces, bright office with glass walls, warm natural light through floor-to-ceiling windows, shallow depth of field, empty workspace'",
       "durationSeconds": ${sceneDuration},
       
       "animation": "NUR aus erlaubtem Set",
