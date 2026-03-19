@@ -78,8 +78,22 @@ Lass uns mit ein paar strategischen Fragen starten.
   });
   const [showModeChoice, setShowModeChoice] = useState(false);
   const [lastRecommendation, setLastRecommendation] = useState<any>(null);
+  const [quickReplyLocked, setQuickReplyLocked] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messageIdsRef = useRef<Set<string>>(new Set(['1'])); // Track message IDs to prevent duplicates
+  const messageIdsRef = useRef<Set<string>>(() => {
+    // Initialize from localStorage to prevent duplicates after page refresh
+    const ids = new Set<string>(['1']);
+    try {
+      const saved = localStorage.getItem('universal-video-consultant-state');
+      if (saved) {
+        const { messages: savedMessages } = JSON.parse(saved);
+        if (savedMessages?.length) {
+          savedMessages.forEach((m: Message) => ids.add(m.id));
+        }
+      }
+    } catch {}
+    return ids;
+  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
