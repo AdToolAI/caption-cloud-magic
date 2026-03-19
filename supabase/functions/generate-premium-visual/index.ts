@@ -26,13 +26,14 @@ interface PremiumVisualRequest {
 }
 
 // Style-specific prompt templates for Flux 1.1 Pro - Loft-Film Quality
+// ✅ Phase 11: Style prompts focus on visual quality — anti-text rules moved to suffix
 const STYLE_PROMPTS: Record<string, string> = {
-  'flat-design': 'professional flat 2D vector illustration for business explainer video, corporate blue and gold color palette (#0066CC #F5C76A #1a365d), simple geometric shapes and icons, abstract human figures as simple silhouettes without faces, clean minimal infographic style exactly like Loft-Film or Kurzgesagt, ONLY solid colors NO gradients NO shadows, business context, NO text NO letters NO numbers NO words in image, ',
-  'isometric': 'isometric 2D vector business illustration, simple geometric shapes, bright flat colors (#4A90D9 #F5C76A #22d3ee), technical diagram style, clean lines, professional infographic aesthetic, abstract figures without faces, NO text NO letters NO numbers, ',
-  'whiteboard': 'clean whiteboard business illustration, black line art on pure white background, simple stick figures and professional icons, minimal educational diagram style, clean marker drawing, NO text NO letters NO numbers NO words, ',
-  'comic': 'clean business cartoon illustration, simplified character design as geometric shapes, bold outlines, flat colors, friendly professional style, NO realistic proportions, abstract circle faces, vector art, NO text NO letters NO numbers, ',
-  'corporate': 'professional corporate 2D vector illustration, muted business colors (navy #1a365d, teal #0891b2, gold #F5C76A), simple geometric people as abstract silhouettes, tech infographic style, minimal elegant design, NO photography NO realistic humans NO text NO letters NO numbers, ',
-  'modern-3d': 'soft 3D render business illustration, pastel gradient backgrounds, simple geometric abstract characters, glass morphism elements, modern tech aesthetic, abstract shapes, NO realistic faces NO text NO letters NO numbers, ',
+  'flat-design': 'professional flat 2D illustration for business explainer video, clean minimal infographic style like Loft-Film or Kurzgesagt, corporate color palette, simple geometric shapes, stylized human figures in realistic business scenarios, warm professional lighting, ',
+  'isometric': 'isometric 2D business illustration, bright flat colors, technical diagram style, clean lines, professional infographic aesthetic, stylized figures in workplace scenarios, ',
+  'whiteboard': 'clean whiteboard business illustration, black line art on pure white background, simple figures and professional icons, minimal educational diagram style, clean marker drawing, ',
+  'comic': 'clean business cartoon illustration, simplified character design, bold outlines, flat colors, friendly professional style, vector art, people in business context, ',
+  'corporate': 'professional corporate illustration, muted business colors (navy, teal, gold), stylized professional people in office settings, tech infographic style, minimal elegant design, ',
+  'modern-3d': 'soft 3D render business illustration, pastel gradient backgrounds, stylized characters in professional environments, glass morphism elements, modern tech aesthetic, warm lighting, ',
   'custom': '', // Will be filled with custom description
 };
 
@@ -65,8 +66,8 @@ function sanitizePrompt(prompt: string): string {
   // Remove multiple spaces and clean up
   cleanPrompt = cleanPrompt.replace(/\s+/g, ' ').trim();
   
-  // Append strict no-text instruction
-  return cleanPrompt + ', absolutely NO text NO letters NO numbers NO words in the image, clean visual only';
+  // ✅ Phase 11: Short anti-text suffix instead of dominating the prompt
+  return cleanPrompt + ', no text no letters no words in the image, clean visual only';
 }
 
 serve(async (req) => {
@@ -149,7 +150,7 @@ serve(async (req) => {
       // Generate scene visual - sanitize to remove any text/price references
       const cleanDescription = sanitizePrompt(request.sceneDescription || 'professional business scene');
       prompt += cleanDescription;
-      prompt += ', high quality, professional business illustration, 16:9 aspect ratio, clean visual without any text';
+      prompt += ', high quality, professional illustration, clean visual without any text or writing';
       
       console.log('Generated scene prompt (sanitized):', prompt);
 
