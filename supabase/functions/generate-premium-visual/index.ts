@@ -66,8 +66,8 @@ function sanitizePrompt(prompt: string): string {
   // Remove multiple spaces and clean up
   cleanPrompt = cleanPrompt.replace(/\s+/g, ' ').trim();
   
-  // Append strict no-text instruction
-  return cleanPrompt + ', absolutely NO text NO letters NO numbers NO words in the image, clean visual only';
+  // ✅ Phase 11: Short anti-text suffix instead of dominating the prompt
+  return cleanPrompt + ', no text no letters no words in the image, clean visual only';
 }
 
 serve(async (req) => {
