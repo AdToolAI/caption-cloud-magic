@@ -801,7 +801,7 @@ async function runGenerationPipeline(
             'solution': 'bright, optimistic, open space, positive energy, uplifting',
             'feature': 'detailed, showcase, close-up, product detail, clean background',
             'proof': 'trustworthy, data-driven, charts, statistics visualization',
-            'cta': 'energetic, motivating, directional, clear path forward',
+            'cta': 'clean minimal background, soft gradient or bokeh effect, no busy illustrations, calm and focused',
           };
           const sceneHint = sceneStyleHints[sceneType] || 'professional, well-composed';
 
