@@ -18,6 +18,7 @@ interface UniversalPreviewPlayerProps {
     category?: string;
     storytellingStructure?: string;
     outputUrl?: string;
+    brandUrl?: string;
   };
   aspectRatio?: '16:9' | '9:16' | '1:1';
   onExport?: () => void;

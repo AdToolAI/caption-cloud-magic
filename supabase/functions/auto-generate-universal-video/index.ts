@@ -1313,7 +1313,12 @@ async function runGenerationPipeline(
         kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', ['in', 'out', 'left', 'right'], 'in'),
         textOverlay: {
           enabled: true,
-          text: smartTruncateToSentences(scene.voiceover || scene.title || '', 1, 15),
+          // Phase 12: CTA/outro scenes get more room for URL + call-to-action
+          text: smartTruncateToSentences(
+            scene.voiceover || scene.title || '',
+            (sceneType === 'cta' || sceneType === 'outro') ? 2 : 1,
+            (sceneType === 'cta' || sceneType === 'outro') ? 25 : 15
+          ),
           headline: scene.title || '',
           animation: validateEnum(scene.textAnimation || getDefaultTextAnimation(sceneType), VALID_TEXT_ANIMATIONS, 'fadeWords'),
           position: validateEnum(scene.textPosition || getDefaultTextPosition(sceneType), VALID_TEXT_POSITIONS, 'bottom'),
