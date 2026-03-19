@@ -2220,7 +2220,7 @@ const TextOverlay: React.FC<{
           borderRadius: 16,
           borderRight: '4px solid #3B82F6',
           padding: '24px 32px',
-          maxWidth: '75%',
+          maxWidth: '65%',
           maxHeight: '42%',
           overflow: 'hidden' as const,
           boxShadow: '0 4px 24px rgba(59,130,246,0.15), 0 4px 24px rgba(0,0,0,0.25)',
@@ -2797,8 +2797,11 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     }
   };
   
-  // Phase 3b: All characters on right — text is always on the left, character presents/points toward it
+  // Phase 3b: Characters positioned to avoid text panel collision
+  // Feature scenes have right-aligned text → character goes LEFT
+  // All other scenes have left-aligned text → character stays RIGHT
   const getContextBasedPosition = (sceneType: string): 'left' | 'right' | 'center' => {
+    if (sceneType === 'feature') return 'left';
     return 'right';
   };
   

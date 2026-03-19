@@ -811,9 +811,10 @@ async function runGenerationPipeline(
             ? `Context: "${briefing.companyName || briefing.productName || 'digital product'}" - ${(briefing.productDescription || '').slice(0, 120)}. `
             : '';
           const antiTextSuffix = 'No text, no letters, no words in image. Numbers on charts allowed. No QR codes, no logos, no UI mockups, no screenshots, no watermarks.';
+          // Phase 14: visualStyle as dominant signal, sceneStyleHints as subtle mood only
           const prompt = attempt === 0
-            ? `${productContext}${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. ${antiTextSuffix}`
-            : `${productContext}Professional ${sceneType} scene for ${briefing.companyName || briefing.productName || 'business'}. ${categoryHint}. ${aspectHint}. ${briefing.visualStyle} style. ${antiTextSuffix}`;
+            ? `ART STYLE: ${briefing.visualStyle}. ${productContext}${scene.visualDescription}. Subtle mood: ${sceneHint}. ${categoryHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. IMPORTANT: Maintain exact same visual art style across all scenes. ${antiTextSuffix}`
+            : `ART STYLE: ${briefing.visualStyle}. ${productContext}Professional ${sceneType} scene for ${briefing.companyName || briefing.productName || 'business'}. ${categoryHint}. ${aspectHint}. IMPORTANT: Maintain exact same visual art style across all scenes. ${antiTextSuffix}`;
 
           const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
             method: 'POST',
