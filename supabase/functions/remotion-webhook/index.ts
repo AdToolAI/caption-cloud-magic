@@ -198,14 +198,18 @@ serve(async (req) => {
           try {
             let progressUpdated = false;
             
-            // Primary: direct progressId match
+            // Primary: direct progressId match — ✅ Phase 12: MERGE result_data to preserve buildTag etc.
             if (progressIdFromWebhook) {
+              const { data: existingProg } = await supabaseAdmin.from('universal_video_progress')
+                .select('result_data').eq('id', progressIdFromWebhook).maybeSingle();
+              const existingRd = (existingProg?.result_data as any) || {};
+              
               const { error: pErr } = await supabaseAdmin.from('universal_video_progress').update({
                 status: 'completed', progress_percent: 100, current_step: 'completed',
-                result_data: { renderId: matchedRender.render_id, outputUrl: finalOutputUrl, r41_muxed: hasAudioToMux && finalOutputUrl !== outputFile },
+                result_data: { ...existingRd, renderId: matchedRender.render_id, outputUrl: finalOutputUrl, r41_muxed: hasAudioToMux && finalOutputUrl !== outputFile, completedAt: new Date().toISOString() },
               }).eq('id', progressIdFromWebhook);
               if (!pErr) {
-                console.log('✅ universal_video_progress completed via progressId:', progressIdFromWebhook);
+                console.log('✅ universal_video_progress completed via progressId (merged):', progressIdFromWebhook);
                 progressUpdated = true;
               }
             }
