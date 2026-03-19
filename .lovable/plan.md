@@ -1,20 +1,21 @@
 
 
-# Plan: Von ~93% auf 95%+ Loft-Film Qualität — UMGESETZT ✅
+# Plan: Von ~95% auf 97%+ Loft-Film Qualität — UMGESETZT ✅
+
+## Kern-Problem identifiziert & behoben
+
+Die Ursache für die persistierenden menschlichen Figuren lag im **Script-Generator**, der explizit Menschen in den `visualDescription`-Texten anforderte. Positiv-Prompts schlagen Negativ-Prompts immer.
 
 ## Durchgeführte Änderungen
 
-### ✅ Schritt 1: Anti-Zahlen und Anti-Personen Prompt verstärkt
-- `auto-generate-universal-video/index.ts`: antiTextSuffix erweitert um "dashboard numbers, analytics data, statistics, charts with values, human figures, people, silhouettes"
-- `auto-generate-universal-video/index.ts`: CTA sceneStyleHint erweitert um "NO people, NO silhouettes, NO human figures"
-- `generate-premium-visual/index.ts`: NEGATIVE_PROMPT erweitert um "human silhouette, person, people, man, woman, figure, human body, dashboard numbers, analytics data, charts with values"
+### ✅ Schritt 1: Script-Generator — visualDescription-Schema umgestellt
+- `generate-universal-script/index.ts`: Schema von `[WER/WAS] + [TUT WAS]` auf `[OBJEKT/SZENE] + [ZUSTAND/DETAIL] + [UMGEBUNG] + [BELEUCHTUNG]` geändert
+- Explizite Regel: NIEMALS Menschen, Personen, Silhouetten, Hände, Finger oder Körperteile beschreiben
+- Beispiel geändert auf "A modern desk with monitors... empty workspace"
 
-### ✅ Schritt 2: CTA Glass-Panel Text-Overflow gefixt
-- `UniversalCreatorVideo.tsx`: Hook/CTA Glass-Panel maxWidth von 85% auf 90% erhöht
-- `wordBreak: 'break-word'` und `overflowWrap: 'break-word'` hinzugefügt
+### ✅ Schritt 2: Anti-Personen Prompting in Bild-Generator verstärkt
+- `auto-generate-universal-video/index.ts`: antiTextSuffix erweitert um "replace human subjects with empty furniture/equipment/space"
+- `generate-premium-visual/index.ts`: fullPrompt-Präpend erweitert um "Remove ALL human subjects"
+- `generate-premium-visual/index.ts`: STYLE_PROMPTS von "stylized human figures" auf "empty workspaces/environments" umgestellt
 
-## Hinweis
-- Prompt-Änderungen sind nach Edge-Function-Deploy sofort aktiv
-- CTA Text-Fix erfordert Bundle-Deploy (r58)
-
-## Geschätzter Stand: ~95%
+## Geschätzter Stand: ~97%
