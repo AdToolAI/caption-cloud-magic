@@ -1,206 +1,78 @@
 
-## r60 — Phase 9+10: Visual Prompt Engineering & Cinematic Post-Production (IMPLEMENTED)
 
-### Phase 9: Visual Prompt Engineering
-- Erweiterte `NEGATIVE_PROMPT` in `generate-premium-visual/index.ts` um QR codes, barcodes, logos, UI elements, screenshots, mockups, watermarks
-- Erweiterte `sanitizePrompt()` Regex um QR/Logo/Screenshot/Mockup-Begriffe
-- Anti-Artefakt-Suffix in `auto-generate-universal-video/index.ts` Scene-Prompts injiziert
+# Phase 11: Praezises Drehbuch mit detaillierten Szenen-Beschreibungen
 
-### Phase 10: Cinematic Post-Production Layer
-- `CinematicPostLayer` Komponente in `UniversalCreatorVideo.tsx` mit Film Grain (animiert via Frame), Vignette und Color Grading
-- `getCinematicProfile()` Mapping: 12 Kategorien → mood/grain/vignette Profile
-- Color Grading via CSS `filter` pro Mood (warm/cool/neutral/dramatic/bold)
-- Film Grain als animiertes Noise-Pattern mit `mix-blend-mode: overlay`
-- S3-Bundle-Redeploy noetig (Remotion-Aenderung), Bundle Canary: `r60-phase9-10-cinematic`
+## Problem
 
----
+Das Drehbuch gibt dem KI-Bildgenerator nur vage `visualDescription`-Anweisungen wie "Beschreibung des Bildes: Was sieht man?". Das fuehrt zu generischen Bildern (Skylines, abstrakte Icons), die nicht zum Voiceover oder Produkt passen. Der Produktkontext (Name, Beschreibung, Website) fliesst nicht in den Bild-Prompt ein.
 
-## r42 — Error Isolation Mode (IMPLEMENTED)
+## Loesung: Drehbuch als Single Source of Truth
 
-### Problem
-- `lambda_crash` mit Lottie-Timeout dominiert, aber `disableAllLottie=true` hilft nicht
-- Scheduling erzeugt `framesPerLambda=1440, fps=24, estTime=2880s, timeout=600s` → garantierter Timeout
-- Keine Forensik pro Attempt → Fehlerquelle unklar
+Das Drehbuch wird zum vollstaendigen Regieplan erweitert — jede Szene bekommt eine **praezise Bild-Anweisung** die direkt als Flux-Prompt verwendbar ist, plus den exakten Voiceover-Text.
 
-### Lösung
-1. **Timeout Budget Enforcement**: `calculateScheduling()` gibt `estRuntimeSec` + `timeoutBudgetOk` zurück. Render-Only Pipeline erzwingt fps=15 wenn Budget überschritten.
-2. **Isolation Ladder**: Statt generischem Retry feste A/B/C-Stufen:
-   - Step A: Standard Stability Mode
-   - Step B: Alle riskanten Subsysteme aus (Lottie, SceneFx, PrecisionSubtitles)
-   - Step C: Maximum Isolation + fps=15
-3. **Forensics**: `isolationStep`, `effectiveFlags`, `sourceErrorSignature`, `failureStage`, `estRuntimeSec`, `timeoutBudgetOk` in result_data und content_config
-4. **UI**: Diagnose-Panel zeigt Isolation-Step, effektive Flags, Error-Signatur, Budget-Status
+### Aenderung 1: Script-Generator verschaerfen (`generate-universal-script/index.ts`)
 
-### Betroffene Dateien
-- `supabase/functions/_shared/remotion-payload.ts` (SchedulingResult + Budget-Check)
-- `supabase/functions/auto-generate-universal-video/index.ts` (Isolation Ladder + Budget Enforcement)
-- `supabase/functions/invoke-remotion-render/index.ts` (failure_stage + canary)
-- `supabase/functions/remotion-webhook/index.ts` (failure_stage + errorFingerprint in result_data)
-- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` (r42 Diagnose-Panel)
-
----
-
-## r41 — Silent Render + Audio Mux (IMPLEMENTED)
-
-### Problem
-- UI zeigt generischen "non-2xx"-Fehler statt Cooldown-UI bei 429/capacity_cooldown
-- Stability-Scheduling griff nur bei 20% (zufällig), meiste Renders liefen distributed → rate_limit
-- Retries erzwangen Stability nur bei rate_limit, nicht bei timeout/lambda_crash/audio_corruption
-
-### Lösung
-- **UI**: `FunctionsHttpError.context.json()` robust parsen → Cooldown-UI statt Error
-- **Scheduling**: 100% Stability (Hotfix), hash-basiert statt random, alle retryable Kategorien → stability
-- **Retries**: `forceStability: true` für jeden Retry
-- **Observability**: schedulingMode, framesPerLambda, estimatedLambdas, fpsUsed in result_data
-
-
-## r37 — Rate-Limit Auto-Recovery Stabilisierung (IMPLEMENTED)
-
-### Problem
-- Realtime-DB und Render-Polling liefern denselben Fehler doppelt → `totalAttempts` wird künstlich aufgebläht
-- Im Polling-Pfad fehlte exponentielles Backoff für `rate_limit` (war pauschal 30s statt 60/120/180s)
-- Wenn `retryTriggeredRef=true` und ein zweiter retryabler Fehler eintrifft → fiel in `setError()` statt "Retry läuft"
-- `sourceProgressId` wurde nicht durch die Retry-Kette propagiert → Backend-Retry-Zählung unzuverlässig
-
-### Lösung
-
-#### Frontend (`UniversalAutoGenerationProgress.tsx`)
-1. `lastFailureSignatureRef` — Dedup-Guard für identische Failure-Events
-2. Retry-Guard: retryable Fehler bei bereits geplantem Retry → ignorieren statt `setError()`
-3. Polling-Pfad Backoff: `rate_limit` → 60s/120s/180s exponentiell mit Countdown-UI
-4. Failure-Signature Reset bei neuem Retry-Start
-
-#### Backend (`auto-generate-universal-video/index.ts`)
-1. `chainSourceProgressId` = sourceProgressId-Kette bis zum Original
-2. Propagation in content_config, result_data (ready_to_render + failed)
-3. Retry-Zählung filtert auf chainSourceProgressId
-
----
-
-
-## r33 — Audio-Corruption-Recovery (IMPLEMENTED)
-
-### Problem
-- Render crasht mit `ffprobe` exit code 1: korrupte MP3-Datei (HTML-Fehlerseite oder leerer Response als `.mp3` gespeichert)
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Audio-Strip)
-- Alle 3 Retries scheitern identisch, weil dieselbe korrupte Audio-Datei wiederverwendet wird
-
-### Lösung
-Audio-Corruption wird jetzt als eigene Kategorie `audio_corruption` erkannt. Retry-Strategie entfernt Audio-Quellen aus dem Payload.
-
-### Änderungen
-
-#### Fehlerklassifikation (3 Dateien)
-Neue Regex VOR `validation` (da "invalid" auch in ffprobe-Fehlern vorkommt):
-```
-/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i → 'audio_corruption'
-```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError()
-
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Audio-Corruption-Branch:
-- **Audio-Corruption erkannt**: FPS bleibt bei 30, Audio wird gestripped
-  - `voiceoverUrl = undefined`, `backgroundMusicUrl = undefined`, `backgroundMusicVolume = 0`
-  - `subtitles.segments = []` (keine Untertitel ohne Audio)
-  - Flag `r33_audioStripped: true` in `inputProps.diag` + `result_data`
-- Frontend: 5s Wartezeit (statt 30s), Label "Audio-Fehler"
-
-### Erwartetes Ergebnis
-```text
-Audio-Corruption, 1. Retry:
-  → Kategorie: audio_corruption (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Audio: komplett entfernt (voiceover + background music)
-  → Video wird ohne Ton fertiggestellt ✅
-```
-
----
-
-## r32 — Lottie-Stall-Recovery (IMPLEMENTED)
-
-### Problem
-- Render crasht mit `A delayRender() "Waiting for Lottie animation to load"` 
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Lottie-Fix)
-
-### Lösung
-Lottie-Stall wird jetzt als `lambda_crash` erkannt. Retry-Strategie deaktiviert gezielt Lottie statt FPS zu senken.
-
-### Änderungen
-
-#### Fehlerklassifikation (4 Dateien)
-Neue Regex VOR generischem `lambda_crash`:
-```
-/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i → 'lambda_crash'
-```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `invoke-remotion-render/index.ts` — classifyImmediate()
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError() (VOR timeout-Check, da Lottie-Errors docs-Links mit "timeout" enthalten können)
-
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Lottie-aware Branching:
-- **Lottie-Stall erkannt** (`lambda_crash` + Lottie-Regex in errorMessage):
-  - FPS bleibt bei 30 (kein Downgrade!)
-  - Retry 1: `disableLottieIcons=true`, `disableMorphTransitions=true`, `forceEmbeddedCharacterLottie=true`
-  - Retry 2/3: `disableAllLottie=true` (komplett)
-  - Flags werden in `inputProps.diag` injiziert + in `result_data` persistiert
-- **Sonstiger lambda_crash** (nicht Lottie): Defensive Lottie-Disable + FPS-Reduktion
-- Timeout/Rate-Limit/Unknown: Verhalten unverändert (wie r28/r31)
-
-#### Observability
-- `bundle_probe`: `r29-lambda240s` → `r32-lottieRecovery`
-
-### Erwartetes Ergebnis
+**System-Prompt erweitern** — die `visualDescription` wird von einer vagen Beschreibung zu einem konkreten KI-Bild-Prompt:
 
 ```text
-Lottie-Stall, 1. Retry:
-  → Kategorie: lambda_crash (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Flags: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie
-  → Render sollte durchgehen ✅
+// VORHER (Zeile 456):
+"visualDescription": "Beschreibung des Bildes: Was sieht man? Welche Elemente? Welcher Stil?"
 
-Lottie-Stall, 2. Retry (falls nötig):
-  → disableAllLottie=true → alle Lottie-Komponenten aus
-  → Maximale Stabilität ✅
-
-Normaler Run ohne Lottie-Stall:
-  → Volle 30fps Qualität, alle Effekte ✅
+// NACHHER:
+"visualDescription": "KONKRETER KI-Bild-Prompt in Englisch. 
+  Beschreibe eine spezifische Szene die zum Voiceover passt. 
+  Format: [Subjekt] + [Aktion/Zustand] + [Umgebung] + [Licht/Stimmung]
+  Beispiel: 'A marketing professional reviewing colorful campaign 
+  analytics on a large monitor, modern bright office, warm natural 
+  light through floor-to-ceiling windows, shallow depth of field'
+  NICHT: 'Digitale Welt' oder 'Social Media Icons'"
 ```
+
+**Neue Regeln** im System-Prompt hinzufuegen:
+
+```text
+10. Die visualDescription MUSS auf Englisch sein (fuer Flux-Bildgenerierung)
+11. Die visualDescription MUSS eine KONKRETE Szene beschreiben die zum 
+    Voiceover passt — nicht abstrakt, sondern wie ein Filmstill
+12. Beziehe das Produkt/Unternehmen "${briefing.companyName || briefing.productName}" 
+    in die Szenen ein — zeige realistische Nutzungssituationen
+13. Jede visualDescription folgt dem Schema: 
+    [WER/WAS] + [TUT WAS] + [WO] + [WIE BELEUCHTET/GESTIMMT]
+```
+
+### Aenderung 2: Produktkontext in Bild-Prompt (`auto-generate-universal-video/index.ts`)
+
+Den Produktkontext aus dem Briefing direkt in den Flux-Prompt einweben, damit das Modell weiss worum es geht:
+
+```typescript
+// NEU: Produktkontext als Prompt-Prefix
+const productContext = briefing.productDescription
+  ? `Context: "${briefing.companyName || briefing.productName || 'digital product'}" - ${briefing.productDescription.slice(0, 120)}. `
+  : '';
+
+// Anti-Text als kurzes Suffix statt langer Prefix
+const antiTextSuffix = 'No text, no letters, no words in image. Numbers on charts allowed.';
+
+const prompt = attempt === 0
+  ? `${productContext}${scene.visualDescription}. ${categoryHint}. ${sceneHint}. ${aspectHint}. ${antiTextSuffix}`
+  : `${productContext}Abstract professional ${sceneType} scene. ${categoryHint}. ${aspectHint}. ${antiTextSuffix}`;
+```
+
+**Wichtig:** Anti-Text-Regeln werden von langem Prefix zu kurzem Suffix verschoben, damit der eigentliche Bildinhalt die volle Aufmerksamkeit des Modells bekommt.
+
+### Aenderung 3: Anti-Text in `generate-premium-visual/index.ts` ebenfalls kuerzen
+
+Gleiche Logik: Anti-Text-Anweisung kuerzen und ans Ende verschieben, statt den Prompt-Anfang zu dominieren.
 
 ---
 
-## r31 — Lambda 600s + Hybrid Backoff (IMPLEMENTED)
+## Zusammenfassung
 
-### Problem
-- 8 Lambdas + 240s Timeout → 225 fpl × 2.1s = 472s → TIMEOUT ❌
-- 20 Lambdas + 240s Timeout → Rate Limit (AWS Concurrency ~10) ❌
+| Datei | Aenderung |
+|-------|----------|
+| `generate-universal-script/index.ts` | `visualDescription` auf Englisch + konkret + Produkt-bezogen erzwingen |
+| `auto-generate-universal-video/index.ts` | Produktkontext injizieren, Anti-Text als kurzes Suffix |
+| `generate-premium-visual/index.ts` | Anti-Text kuerzen, ans Ende verschieben |
 
-### Lösung
-Neue Lambda-Funktion mit **600s Timeout** deployed. 8 Lambdas bleiben unter dem Concurrency-Limit und haben genug Zeit.
+Kein S3-Redeploy noetig — nur Edge Function Deployment.
 
-### Änderungen
-
-#### `_shared/remotion-payload.ts`
-- `LAMBDA_TIMEOUT_SECONDS`: 240 → **600**
-- `TARGET_MAX_LAMBDAS`: 20 → **8**
-- Soft-Max: 84 → **210** fpl
-- Hard-Max: 120 → **300** fpl
-- bundle_canary: `r31-lambda600s`
-
-#### Alle 5 Render Edge Functions (Fallback-Namen)
-- `240sec` → `600sec` in:
-  - `invoke-remotion-render/index.ts`
-  - `render-with-remotion/index.ts`
-  - `render-universal-video/index.ts`
-  - `render-directors-cut/index.ts`
-  - `auto-generate-universal-video/index.ts`
-
-#### `remotion-webhook/index.ts`
-- Timeout-Fehlermeldung: "240s" → "600s"
-
-#### `UniversalAutoGenerationProgress.tsx` (Frontend)
-- Rate-Limit-Retry: **exponentieller Backoff** (60s / 120s / 180s für Attempt 1/2/3)
-- Timeout/Crash-Retry: flat 30s (wie bisher)
-- Live-Countdown-Anzeige: "🔄 Rate-Limit — Auto-Retry in 58s (1/3)..."
