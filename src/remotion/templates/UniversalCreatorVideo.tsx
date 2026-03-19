@@ -870,11 +870,11 @@ const AnimatedCharacter: React.FC<{
     center: { left: '50%', transform: 'translateX(-50%)' },
   };
   
-  // Professional character color sets
+  // Professional character color sets — Phase 13: richer palette with hair detail
   const characterSets = {
-    presenter: { skin: '#F5D0A9', hair: '#3D2314', shirt: primaryColor, pants: '#1E3A5F', tie: '#C0392B', shoes: '#1a1a1a', eyeColor: '#2D5F3E' },
-    user: { skin: '#D4A574', hair: '#1a1a1a', shirt: '#3B82F6', pants: '#374151', tie: '#6366F1', shoes: '#2a2a2a', eyeColor: '#3B2F2F' },
-    expert: { skin: '#F5DEB3', hair: '#8B6C42', shirt: '#059669', pants: '#1F2937', tie: '#F59E0B', shoes: '#1a1a1a', eyeColor: '#1a5276' },
+    presenter: { skin: '#F5D0A9', skinShadow: '#E8B88A', hair: '#3D2314', hairHighlight: '#5A3A28', shirt: primaryColor, shirtShadow: `${primaryColor}CC`, pants: '#1E3A5F', pantsShadow: '#142C4A', tie: '#C0392B', shoes: '#1a1a1a', eyeColor: '#2D5F3E', collar: '#FFFFFF' },
+    user: { skin: '#D4A574', skinShadow: '#C2905E', hair: '#1a1a1a', hairHighlight: '#333333', shirt: '#3B82F6', shirtShadow: '#2563EB', pants: '#374151', pantsShadow: '#1F2937', tie: '#6366F1', shoes: '#2a2a2a', eyeColor: '#3B2F2F', collar: '#F3F4F6' },
+    expert: { skin: '#F5DEB3', skinShadow: '#E6CF9E', hair: '#8B6C42', hairHighlight: '#A07D52', shirt: '#059669', shirtShadow: '#047857', pants: '#1F2937', pantsShadow: '#111827', tie: '#F59E0B', shoes: '#1a1a1a', eyeColor: '#1a5276', collar: '#ECFDF5' },
   };
   
   const c = characterSets[type];
