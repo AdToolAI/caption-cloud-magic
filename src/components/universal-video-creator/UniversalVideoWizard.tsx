@@ -95,6 +95,8 @@ export function UniversalVideoWizard() {
     } catch {}
     return null;
   });
+  const activeProgressIdRef = useRef<string | null>(null);
+  const generationStartedAtRef = useRef<string | null>(null);
   const [moodConfig, setMoodConfig] = useState<MoodConfig | null>(() => {
     try {
       const saved = localStorage.getItem('universal-video-wizard-state');
