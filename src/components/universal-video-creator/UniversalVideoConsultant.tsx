@@ -78,8 +78,22 @@ Lass uns mit ein paar strategischen Fragen starten.
   });
   const [showModeChoice, setShowModeChoice] = useState(false);
   const [lastRecommendation, setLastRecommendation] = useState<any>(null);
+  const [quickReplyLocked, setQuickReplyLocked] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messageIdsRef = useRef<Set<string>>(new Set(['1'])); // Track message IDs to prevent duplicates
+  const messageIdsRef = useRef<Set<string>>(new Set(['1']));
+
+  // Initialize messageIdsRef from localStorage on mount to prevent duplicates after refresh
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('universal-video-consultant-state');
+      if (saved) {
+        const { messages: savedMessages } = JSON.parse(saved);
+        if (savedMessages?.length) {
+          savedMessages.forEach((m: Message) => messageIdsRef.current.add(m.id));
+        }
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -130,9 +144,19 @@ Lass uns mit ein paar strategischen Fragen starten.
     }, 90000);
 
     try {
+      // Deduplicate messages by role+content before sending to API
+      const allMessages = [...messages, ...(retryCount === 0 ? [userMessage] : [])];
+      const seen = new Set<string>();
+      const deduped = allMessages.filter(m => {
+        const key = `${m.role}:${m.content}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
       const response = await supabase.functions.invoke('universal-video-consultant', {
         body: {
-          messages: [...messages, ...(retryCount === 0 ? [userMessage] : [])].map(m => ({
+          messages: deduped.map(m => ({
             role: m.role,
             content: m.content
           })),
@@ -219,10 +243,14 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
       addMessageSafely(errorMessage);
     } finally {
       setIsLoading(false);
+      setQuickReplyLocked(false);
     }
   };
 
   const handleQuickReply = async (reply: string) => {
+    if (quickReplyLocked || isLoading) return;
+    setQuickReplyLocked(true);
+    
     if (reply === 'Beratung überspringen') {
       onSkip();
       return;
