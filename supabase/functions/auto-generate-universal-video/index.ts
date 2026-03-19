@@ -810,7 +810,7 @@ async function runGenerationPipeline(
           const productContext = briefing.productDescription
             ? `Context: "${briefing.companyName || briefing.productName || 'digital product'}" - ${(briefing.productDescription || '').slice(0, 120)}. `
             : '';
-          const antiTextSuffix = 'STRICT: This image must contain ZERO text, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels, ZERO letters, ZERO words. No QR codes, no logos, no UI mockups, no screenshots, no watermarks.';
+          const antiTextSuffix = 'STRICT: This image must contain ZERO text, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels, ZERO letters, ZERO words. No dashboard numbers, no analytics data, no statistics, no charts with values, no data visualizations. No QR codes, no logos, no UI mockups, no screenshots, no watermarks. Do NOT include any human figures, people, or silhouettes in the background image.';
           // Phase 14: visualStyle as dominant signal, sceneStyleHints as subtle mood only
           const prompt = attempt === 0
             ? `ART STYLE: ${briefing.visualStyle}. ${productContext}${scene.visualDescription}. Subtle mood: ${sceneHint}. ${categoryHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. IMPORTANT: Maintain exact same visual art style across all scenes. ${antiTextSuffix}`
