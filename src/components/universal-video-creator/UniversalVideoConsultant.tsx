@@ -243,6 +243,7 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
       addMessageSafely(errorMessage);
     } finally {
       setIsLoading(false);
+      setQuickReplyLocked(false);
     }
   };
 
