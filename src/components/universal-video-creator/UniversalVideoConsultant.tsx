@@ -247,6 +247,9 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
   };
 
   const handleQuickReply = async (reply: string) => {
+    if (quickReplyLocked || isLoading) return;
+    setQuickReplyLocked(true);
+    
     if (reply === 'Beratung überspringen') {
       onSkip();
       return;
