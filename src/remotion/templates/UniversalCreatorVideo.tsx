@@ -1826,6 +1826,13 @@ const SceneBackground: React.FC<{
   const safeDur = safeDuration(durationInFrames, 30);
   const progress = frame / safeDur;
   
+  // 🎬 Phase 13: Ken-Burns "breathing" on ALL image backgrounds
+  // Subtle scale 1.0→1.06 + slight pan so static images feel alive
+  const kenBurnsAutoScale = interpolate(progress, [0, 1], [1.0, 1.06], { extrapolateRight: 'clamp' });
+  const kenBurnsAutoPanX = interpolate(progress, [0, 1], [0, -8], { extrapolateRight: 'clamp' });
+  const kenBurnsAutoPanY = interpolate(progress, [0, 1], [0, -4], { extrapolateRight: 'clamp' });
+  const isImageBackground = background.type === 'image' && safeImageUrl;
+  
   switch (animation) {
     case 'zoomIn':
       const scale = interpolate(progress, [0, 1], [1, 1.15], { extrapolateRight: 'clamp' });
@@ -1861,13 +1868,19 @@ const SceneBackground: React.FC<{
       transform = `scale(${morphScale}) rotate(${morphRotate}deg)`;
       opacity = morphProgress;
       break;
+    default:
+      // Phase 13: For fadeIn/none with image backgrounds, apply auto Ken-Burns
+      if (isImageBackground) {
+        transform = `scale(${kenBurnsAutoScale}) translate(${kenBurnsAutoPanX}px, ${kenBurnsAutoPanY}px)`;
+      }
+      break;
   }
   
   const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
   
   return (
     <AbsoluteFill style={{ opacity, filter: moodFilter }}>
-      <div style={{ width: '100%', height: '100%', transform }}>
+      <div style={{ width: '100%', height: '100%', transform, overflow: 'hidden' }}>
         {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
       </div>
       <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
