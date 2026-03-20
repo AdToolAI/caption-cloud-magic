@@ -1946,9 +1946,9 @@ async function runRenderOnlyPipeline(
       }
     }
     
-    // r41: Force muted + no audioCodec on retries too
-    newPayload.muted = true;
-    newPayload.audioCodec = null;
+    // r59: Render WITH audio on retries too
+    newPayload.muted = false;
+    newPayload.audioCodec = 'aac';
     
     const newFPL = scheduling.framesPerLambda;
     const estimatedLambdas = scheduling.estimatedLambdas;
