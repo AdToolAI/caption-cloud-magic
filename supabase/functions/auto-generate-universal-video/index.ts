@@ -1134,6 +1134,7 @@ async function runGenerationPipeline(
       },
       body: JSON.stringify({
         scriptText: fullScript,
+        voice: briefing.voiceGender === 'female' ? 'sarah' : 'roger',
         voiceGender: briefing.voiceGender || 'male',
         language: briefing.voiceLanguage || 'de',
         withTimestamps: true,
