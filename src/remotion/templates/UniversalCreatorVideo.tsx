@@ -3017,7 +3017,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   />
                 )}
                 
-                {/* Phase 3: Smart Sound Effect (r41: skip in silentRender mode) */}
+                {/* Phase 3: Smart Sound Effect (r41: skip in silentRender mode, r61: also skip when audio stripped) */}
                 {!diagToggles.silentRender && !diagToggles.r33_audioStripped && (
                   <SceneSoundEffect
                     scene={scene}
