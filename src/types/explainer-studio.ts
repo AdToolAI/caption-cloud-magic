@@ -7,6 +7,18 @@ export type ExplainerStyle =
   | 'comic' 
   | 'corporate' 
   | 'modern-3d'
+  | 'cinematic'
+  | 'photo-realistic'
+  | 'hand-drawn'
+  | 'vintage-retro'
+  | 'bold-colorful'
+  | 'minimalist'
+  | 'cartoon'
+  | 'watercolor'
+  | 'neon-cyberpunk'
+  | 'paper-cutout'
+  | 'clay-3d'
+  | 'anime'
   | 'custom';
 
 export type ExplainerTone = 
