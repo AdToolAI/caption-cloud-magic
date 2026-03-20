@@ -7,6 +7,18 @@ export type ExplainerStyle =
   | 'comic' 
   | 'corporate' 
   | 'modern-3d'
+  | 'cinematic'
+  | 'photo-realistic'
+  | 'hand-drawn'
+  | 'vintage-retro'
+  | 'bold-colorful'
+  | 'minimalist'
+  | 'cartoon'
+  | 'watercolor'
+  | 'neon-cyberpunk'
+  | 'paper-cutout'
+  | 'clay-3d'
+  | 'anime'
   | 'custom';
 
 export type ExplainerTone = 
@@ -327,6 +339,102 @@ export const STYLE_PRESETS: StylePreset[] = [
     previewImage: '/placeholder.svg',
     colors: ['#8B5CF6', '#EC4899', '#06B6D4'],
     characteristics: ['Glassmorphism', 'Gradients', 'Premium-Look']
+  },
+  {
+    id: 'cinematic',
+    name: 'Cinematic',
+    description: 'Filmische Tiefenschärfe und dramatische Beleuchtung.',
+    previewImage: '/placeholder.svg',
+    colors: ['#1a1a2e', '#e94560', '#f5c76a'],
+    characteristics: ['Dramatisch', 'Tiefenschärfe', 'Filmisch']
+  },
+  {
+    id: 'photo-realistic',
+    name: 'Fotorealistisch',
+    description: 'Fotorealistische Szenen mit natürlichen Texturen.',
+    previewImage: '/placeholder.svg',
+    colors: ['#8B7355', '#D4C5A9', '#2E4057'],
+    characteristics: ['Fotorealistisch', 'Natürlich', 'Professionell']
+  },
+  {
+    id: 'hand-drawn',
+    name: 'Handgezeichnet',
+    description: 'Bleistift-Skizzen mit künstlerischem Charme.',
+    previewImage: '/placeholder.svg',
+    colors: ['#2C2C2C', '#B0B0B0', '#E8DCC8'],
+    characteristics: ['Skizzenhaft', 'Künstlerisch', 'Authentisch']
+  },
+  {
+    id: 'vintage-retro',
+    name: 'Vintage Retro',
+    description: '70er/80er Retro-Look mit warmen Erdtönen.',
+    previewImage: '/placeholder.svg',
+    colors: ['#C17817', '#8B4513', '#D2691E'],
+    characteristics: ['Retro', 'Warme Töne', 'Nostalgisch']
+  },
+  {
+    id: 'bold-colorful',
+    name: 'Bold & Colorful',
+    description: 'Kräftige Pop-Art-Farben für maximale Aufmerksamkeit.',
+    previewImage: '/placeholder.svg',
+    colors: ['#FF1493', '#00FF7F', '#FFD700'],
+    characteristics: ['Pop-Art', 'Kräftig', 'Auffällig']
+  },
+  {
+    id: 'minimalist',
+    name: 'Minimalistisch',
+    description: 'Extrem reduziert mit viel Weißraum und einem Akzent.',
+    previewImage: '/placeholder.svg',
+    colors: ['#F5F5F5', '#333333', '#FF4444'],
+    characteristics: ['Reduziert', 'Weißraum', 'Fokussiert']
+  },
+  {
+    id: 'cartoon',
+    name: 'Cartoon',
+    description: 'Bunter Cartoon-Stil mit übertriebenen Proportionen.',
+    previewImage: '/placeholder.svg',
+    colors: ['#FF6B6B', '#4ECDC4', '#FFE66D'],
+    characteristics: ['Verspielt', 'Bunt', 'Übertrieben']
+  },
+  {
+    id: 'watercolor',
+    name: 'Aquarell',
+    description: 'Weiche Aquarell-Ästhetik mit künstlerischen Verläufen.',
+    previewImage: '/placeholder.svg',
+    colors: ['#7FB3D8', '#F0C8A8', '#A8D8B9'],
+    characteristics: ['Weich', 'Künstlerisch', 'Fließend']
+  },
+  {
+    id: 'neon-cyberpunk',
+    name: 'Neon Cyberpunk',
+    description: 'Futuristischer Neon-Stil mit leuchtenden Kanten.',
+    previewImage: '/placeholder.svg',
+    colors: ['#0D0D0D', '#00FFFF', '#FF00FF'],
+    characteristics: ['Futuristisch', 'Neon', 'Dunkel']
+  },
+  {
+    id: 'paper-cutout',
+    name: 'Scherenschnitt',
+    description: 'Papier-Scherenschnitt mit geschichteten Texturen.',
+    previewImage: '/placeholder.svg',
+    colors: ['#E8D5B7', '#C75B39', '#4A7C59'],
+    characteristics: ['Papier', 'Geschichtet', 'Handgemacht']
+  },
+  {
+    id: 'clay-3d',
+    name: 'Clay / Knete',
+    description: 'Claymation-Look wie Stop-Motion mit Knete-Texturen.',
+    previewImage: '/placeholder.svg',
+    colors: ['#E8A87C', '#85CDCA', '#D72638'],
+    characteristics: ['Knete', 'Stop-Motion', 'Taktil']
+  },
+  {
+    id: 'anime',
+    name: 'Anime',
+    description: 'Japanischer Anime-Stil mit Cel-Shading und lebhaften Farben.',
+    previewImage: '/placeholder.svg',
+    colors: ['#FF6B9D', '#C44DFF', '#4DA6FF'],
+    characteristics: ['Cel-Shading', 'Japanisch', 'Lebhaft']
   },
   {
     id: 'custom',

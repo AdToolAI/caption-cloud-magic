@@ -28,7 +28,7 @@ const VALID_TEXT_ANIMATIONS = ['typewriter', 'fadeWords', 'highlight', 'splitRev
 const VALID_TRANSITION_TYPES = ['none', 'fade', 'crossfade', 'slide', 'zoom', 'wipe', 'blur', 'push', 'morph', 'dissolve'] as const;
 const VALID_TEXT_POSITIONS = ['top', 'center', 'bottom'] as const;
 const VALID_SOUND_EFFECTS = ['whoosh', 'pop', 'success', 'alert', 'none'] as const;
-const VALID_STYLES = ['flat-design', 'isometric', 'whiteboard', 'comic', 'corporate', 'modern-3d'] as const;
+const VALID_STYLES = ['flat-design', 'isometric', 'whiteboard', 'comic', 'corporate', 'modern-3d', 'cinematic', 'documentary', 'minimalist', 'bold-colorful', 'vintage-retro', 'hand-drawn', 'motion-graphics', 'photo-realistic', 'cartoon', 'watercolor', 'neon-cyberpunk', 'paper-cutout', 'clay-3d', 'anime'] as const;
 const VALID_SUBTITLE_ANIMATIONS = ['none', 'fade', 'slide', 'bounce', 'typewriter', 'highlight', 'scaleUp', 'glitch', 'wordByWord'] as const;
 const VALID_OUTLINE_STYLES = ['none', 'stroke', 'box', 'box-stroke', 'glow', 'shadow'] as const;
 

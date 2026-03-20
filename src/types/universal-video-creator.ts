@@ -33,6 +33,12 @@ export type UniversalVideoStyle =
   | 'hand-drawn'
   | 'motion-graphics'
   | 'photo-realistic'
+  | 'cartoon'
+  | 'watercolor'
+  | 'neon-cyberpunk'
+  | 'paper-cutout'
+  | 'clay-3d'
+  | 'anime'
   | 'custom';
 
 // Storytelling Structures

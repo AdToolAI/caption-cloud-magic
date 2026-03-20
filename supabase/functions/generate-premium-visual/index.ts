@@ -34,6 +34,20 @@ const STYLE_PROMPTS: Record<string, string> = {
   'comic': 'clean business cartoon illustration, bold outlines, flat colors, friendly professional style, vector art, objects and environments without people, ',
   'corporate': 'professional corporate illustration, muted business colors (navy, teal, gold), empty office settings with furniture and equipment, tech infographic style, minimal elegant design, ',
   'modern-3d': 'soft 3D render business illustration, pastel gradient backgrounds, empty professional environments with modern furniture, glass morphism elements, modern tech aesthetic, warm lighting, ',
+  'cinematic': 'cinematic still frame, dramatic volumetric lighting, shallow depth of field, film grain, anamorphic lens flare, moody atmosphere, empty environments and architectural spaces without people, golden hour or blue hour lighting, ',
+  'documentary': 'documentary-style illustration, observational naturalistic composition, muted earthy tones, authentic real-world environments, journalistic visual storytelling, empty spaces with objects and architecture, ',
+  'minimalist': 'ultra minimalist illustration, vast negative space, single accent color on white or light background, one simple object in focus, zen-like simplicity, clean geometric composition, no clutter, ',
+  'bold-colorful': 'bold pop-art illustration, vivid saturated colors, strong graphic shapes, high contrast, energetic visual style, flat bold color blocks, Memphis design influence, abstract shapes and objects, ',
+  'vintage-retro': 'retro vintage illustration, warm muted 70s color palette (burnt orange, mustard yellow, avocado green, brown), halftone dot texture, rounded typography aesthetic, nostalgic atmosphere, old-fashioned objects and environments, ',
+  'hand-drawn': 'hand-drawn pencil sketch illustration, artistic crosshatching and linework, charcoal and graphite texture, sketchbook aesthetic, visible paper grain, loose artistic drawing style, objects and scenes without people, ',
+  'motion-graphics': 'motion graphics key frame, bold geometric shapes, vibrant gradient colors, dynamic composition with implied movement, abstract data visualization shapes, clean vector aesthetic, ',
+  'photo-realistic': 'photorealistic scene, natural textures and materials, professional photography lighting, realistic shadows and reflections, high detail environment, architectural photography style, empty spaces without people, ',
+  'cartoon': 'bright colorful cartoon illustration, bold black outlines, exaggerated proportions, playful rounded shapes, saturated primary colors, Pixar-inspired environment design, whimsical scene without people, fun and energetic, ',
+  'watercolor': 'watercolor painting, soft washes and bleeds, artistic wet-on-wet technique, delicate color transitions, visible brushstrokes, paper texture, ethereal dreamy atmosphere, pastel and muted tones, objects and landscapes, ',
+  'neon-cyberpunk': 'cyberpunk neon-lit scene, dark background with glowing neon edges, electric blue and magenta and purple, futuristic technology aesthetic, holographic reflections, rain-slicked surfaces, sci-fi atmosphere, empty futuristic environments, ',
+  'paper-cutout': 'paper cut-out craft illustration, layered paper textures with visible shadows between layers, handmade collage aesthetic, torn and cut paper edges, warm craft paper colors, tactile dimensional look, ',
+  'clay-3d': 'claymation 3D render, plasticine texture, stop-motion aesthetic, soft rounded shapes, fingerprint impressions on surfaces, warm studio lighting, miniature set design, playful clay characters replaced with clay objects, ',
+  'anime': 'anime illustration, cel-shaded flat coloring, vibrant Japanese animation style, detailed background art like Studio Ghibli, dynamic composition, atmospheric lighting, beautiful environment art without characters, ',
   'custom': '', // Will be filled with custom description
 };
 

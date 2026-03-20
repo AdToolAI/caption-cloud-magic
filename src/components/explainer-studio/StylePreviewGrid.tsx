@@ -42,6 +42,19 @@ export function StylePreviewGrid({ selectedStyle, onSelectStyle }: StylePreviewG
                 {preset.id === 'comic' && '💥'}
                 {preset.id === 'corporate' && '📊'}
                 {preset.id === 'modern-3d' && '◈'}
+                {preset.id === 'cinematic' && '🎬'}
+                {preset.id === 'photo-realistic' && '📷'}
+                {preset.id === 'hand-drawn' && '✏️'}
+                {preset.id === 'vintage-retro' && '📻'}
+                {preset.id === 'bold-colorful' && '🎨'}
+                {preset.id === 'minimalist' && '◯'}
+                {preset.id === 'cartoon' && '🖍'}
+                {preset.id === 'watercolor' && '💧'}
+                {preset.id === 'neon-cyberpunk' && '⬡'}
+                {preset.id === 'paper-cutout' && '✂️'}
+                {preset.id === 'clay-3d' && '🏺'}
+                {preset.id === 'anime' && '⛩'}
+                {preset.id === 'custom' && '✨'}
               </div>
             </div>
 
