@@ -2102,6 +2102,18 @@ async function updateProgress(
 /**
  * Proxy an external audio URL to Supabase Storage to avoid hotlink 403 errors from Lambda.
  */
+/**
+ * Validate MP3 magic bytes — returns true if the file starts with valid MP3/ID3 headers.
+ */
+function isValidMp3(bytes: Uint8Array): boolean {
+  if (bytes.length < 4) return false;
+  // ID3 tag header (ID3v2): 0x49 0x44 0x33
+  if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return true;
+  // MPEG frame sync: 0xFF followed by 0xFB/0xF3/0xF2/0xFA (various MPEG versions/layers)
+  if (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) return true;
+  return false;
+}
+
 async function proxyAudioToStorage(
   supabase: any,
   externalUrl: string,
@@ -2119,6 +2131,15 @@ async function proxyAudioToStorage(
       console.warn(`[proxyAudio] File too small (${audioBytes.length} bytes), skipping`);
       return null;
     }
+
+    // r60: Magic-byte validation — reject HTML error pages masquerading as MP3
+    if (!isValidMp3(audioBytes)) {
+      const headerHex = Array.from(audioBytes.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+      const headerAscii = new TextDecoder().decode(audioBytes.slice(0, 40));
+      console.warn(`[proxyAudio] ❌ INVALID MP3: magic bytes [${headerHex}], ascii: "${headerAscii.substring(0, 40)}"`);
+      return null;
+    }
+    console.log(`[proxyAudio] ✅ Valid MP3 header detected (${audioBytes.length} bytes)`);
 
     const fileName = `${prefix}/${crypto.randomUUID()}.mp3`;
     const { error: uploadError } = await supabase.storage
