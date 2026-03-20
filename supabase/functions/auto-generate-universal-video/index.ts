@@ -1920,8 +1920,8 @@ async function runRenderOnlyPipeline(
         if (props.fps) props.fps = fps;
         if (props.durationInFrames) props.durationInFrames = dif;
         
-        // r41: Always set silentRender on retries (audio muxed after render)
-        props.diag = { ...(props.diag || {}), silentRender: true };
+        // r59: Render WITH audio directly (no post-mux needed)
+        props.diag = { ...(props.diag || {}), silentRender: false };
         
         // r32: Merge Lottie fallback flags into diag
         if (Object.keys(lottieFallbackFlags).length > 0) {
