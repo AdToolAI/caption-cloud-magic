@@ -2020,7 +2020,7 @@ async function runRenderOnlyPipeline(
       fpsUsed: fps,
       effectiveFlags: {
         ...lottieFallbackFlags,
-        silentRender: true,
+        silentRender: audioStripped ? !props?.voiceoverUrl : false, // r62: match actual payload state
         audioStripped,
         isLottieStall,
         isolationStep,

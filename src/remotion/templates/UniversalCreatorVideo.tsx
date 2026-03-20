@@ -2852,10 +2852,10 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     return (
       <AbsoluteFill style={{ backgroundColor: '#0f172a' }}>
       {!diagToggles.silentRender && voiceoverUrl && (
-          <Html5Audio src={voiceoverUrl} volume={masterVolume} pauseWhenBuffering />
+          <Html5Audio key="stable-voiceover-audio" src={voiceoverUrl} volume={masterVolume} startFrom={0} loop={false} pauseWhenBuffering />
         )}
         {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && (
-          <Html5Audio src={backgroundMusicUrl} volume={backgroundMusicVolume * masterVolume} pauseWhenBuffering />
+          <Html5Audio key="stable-music-audio" src={backgroundMusicUrl} volume={backgroundMusicVolume * masterVolume} startFrom={0} loop={false} pauseWhenBuffering />
         )}
         
         <AbsoluteFill style={{
@@ -2901,30 +2901,30 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   return (
     <AbsoluteFill style={{ backgroundColor: '#000000' }}>
-      {/* Voiceover audio - plays linearly (r61: voiceover independent of r33_audioStripped) */}
+      {/* ============================================================
+        * r62: UNIFIED AUDIO LAYER — same architecture as UniversalVideo.tsx
+        * One root-level audio layer, no SceneAudioManager duplication.
+        * Voiceover: always plays when available (independent of r33_audioStripped)
+        * Music: only plays when not stripped by audio-corruption recovery
+        * ============================================================ */}
       {!diagToggles.silentRender && voiceoverUrl && (
-        <Html5Audio src={voiceoverUrl} volume={masterVolume} startFrom={0} pauseWhenBuffering />
+        <Html5Audio
+          key="stable-voiceover-audio"
+          src={voiceoverUrl}
+          volume={masterVolume}
+          startFrom={0}
+          loop={false}
+          pauseWhenBuffering
+        />
       )}
-      
-      {/* Phase 2: SceneAudioManager with dynamic ducking & crossfades (r41: skip in silentRender mode) */}
       {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && backgroundMusicUrl.startsWith('http') && (
-        <SceneAudioManager
-          backgroundMusicUrl={backgroundMusicUrl}
-          voiceoverUrl={voiceoverUrl}
-          scenes={sceneTimings.map((scene, index) => {
-            const sceneStartTime = sceneTimings.slice(0, index).reduce((acc, s) => acc + s.duration, 0);
-            const sceneEndTime = sceneStartTime + scene.duration;
-            return {
-              sceneType: scene.type || 'hook',
-              startTime: sceneStartTime,
-              endTime: sceneEndTime,
-              hasVoiceover: !!voiceoverUrl,
-            } as SceneAudioConfig;
-          })}
-          baseMusicVolume={backgroundMusicVolume}
-          masterVolume={masterVolume}
-          enableDucking={true}
-          enableCrossfade={true}
+        <Html5Audio
+          key="stable-music-audio"
+          src={backgroundMusicUrl}
+          volume={backgroundMusicVolume * masterVolume}
+          startFrom={0}
+          loop={false}
+          pauseWhenBuffering
         />
       )}
       
