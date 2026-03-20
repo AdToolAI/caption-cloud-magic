@@ -1478,7 +1478,7 @@ async function runGenerationPipeline(
         disableAllLottie,
         disableSceneFx,
         disableAnimatedText,
-        silentRender: true, // r41: always render silent, mux audio afterwards
+        silentRender: false, // r59: render WITH audio directly
         sanitizerVersion: 'v11-r43-softGuard',
         diagnosticProfile: diagProfile,
         ...(r43_budgetOverride ? { r43_budgetOverride: true, r43_estRuntimeSec: mainScheduling.estRuntimeSec } : {}),
