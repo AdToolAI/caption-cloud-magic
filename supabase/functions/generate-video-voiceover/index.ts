@@ -30,13 +30,40 @@ const VOICE_MAP: Record<string, string> = {
   'bill': 'pqHfZKP75CvOlQylNhV4',
 };
 
+// Gender-to-voice mapping for when callers send voiceGender instead of voice name
+const GENDER_MAP: Record<string, string> = {
+  'male': 'roger',
+  'female': 'sarah',
+  'männlich': 'roger',
+  'weiblich': 'sarah',
+};
+
+function resolveVoice(voice?: string, voiceGender?: string): string {
+  // If voice is a known name or ID, use it directly
+  if (voice && (VOICE_MAP[voice.toLowerCase()] || voice.length > 10)) {
+    return voice;
+  }
+  // If voice is actually a gender string, map it
+  if (voice && GENDER_MAP[voice.toLowerCase()]) {
+    return GENDER_MAP[voice.toLowerCase()];
+  }
+  // If voiceGender is provided, map it
+  if (voiceGender && GENDER_MAP[voiceGender.toLowerCase()]) {
+    return GENDER_MAP[voiceGender.toLowerCase()];
+  }
+  // Default
+  return 'aria';
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { scriptText, voice = 'aria', speed = 1.0, withTimestamps = false } = await req.json();
+    const body = await req.json();
+    const { scriptText, speed = 1.0, withTimestamps = false } = body;
+    const voice = resolveVoice(body.voice, body.voiceGender);
 
     if (!scriptText) {
       throw new Error('scriptText is required');
