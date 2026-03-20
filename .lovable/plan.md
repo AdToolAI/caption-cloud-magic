@@ -1,29 +1,52 @@
 
-# Plan: Voiceover Phase 1 — Audio direkt im Lambda-Render
 
-## Status: ✅ Implementiert (r59)
+# Plan: Audio-Corruption Fix — MP3-Validierung + Graceful Degradation
 
-## Was wurde geändert
+## Problem
 
-### Kernproblem erkannt
-Die `mux-audio-to-video` Edge Function nutzt `Deno.Command('ffmpeg')` — **Subprocess-Spawning ist in Supabase Edge Functions nicht erlaubt**. Der bisherige "Silent Render + Audio Mux" Ansatz konnte daher nie funktionieren.
+Der ffprobe-Crash in Lambda (`"Failed to find two consecutive MPEG audio frames"`) wird durch eine korrupte/ungültige MP3-Datei verursacht. Die `proxyAudioToStorage`-Funktion validiert nur die Dateigröße (>10KB), prüft aber nicht die **Magic Bytes** des MP3-Headers. Wenn Pixabay z.B. eine HTML-Fehlerseite (>10KB) zurückgibt, wird diese als `.mp3` gespeichert.
 
-### Lösung: Audio direkt im Remotion Lambda rendern
-Statt stummem Render + nachträglichem Muxing wird jetzt **direkt mit Audio gerendert**:
-- `_silentRender: false` + `muted: false` + `audioCodec: 'aac'`
-- Das Remotion-Template (`UniversalCreatorVideo.tsx`) hat bereits volle Audio-Unterstützung mit `Html5Audio` Komponenten
-- Voiceover + Hintergrundmusik werden direkt in der Lambda-Composition abgespielt
+**Ablauf aktuell:**
+1. Render 1: Audio URLs werden an Lambda übergeben → ffprobe crasht → `audio_corruption`
+2. Retry: `silentRender: true` → Video ohne Ton ✅ aber stumm
 
-### Änderungen
+**Lösung:** MP3-Magic-Byte-Validierung + bei Audio-Corruption nicht komplett stumm schalten, sondern nur die korrupte Quelle entfernen.
+
+## Umsetzung
+
+### Schritt 1: MP3 Magic-Byte-Validierung in `proxyAudioToStorage`
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+
+Nach dem Download die ersten Bytes prüfen:
+- MP3: `0xFF 0xFB`, `0xFF 0xF3`, `0xFF 0xF2` (MPEG frame sync)
+- MP3 mit ID3: `0x49 0x44 0x33` ("ID3")
+- Wenn keine gültigen Magic Bytes → `return null` statt Upload
+
+### Schritt 2: Audio-Corruption-Retry intelligenter machen
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts` (Render-Only Retry, Zeile 1938-1942)
+
+Statt bei `audio_corruption` komplett auf `silentRender: true` zu fallen:
+- Background-Music-URL aus den inputProps entfernen (wahrscheinliche Ursache)
+- Voiceover-URL behalten (ElevenLabs-Dateien sind zuverlässig)
+- `muted: false` und `audioCodec: 'aac'` beibehalten
+- Nur wenn der zweite Versuch ebenfalls mit `audio_corruption` fehlschlägt, dann `silentRender: true`
+
+### Schritt 3: Voiceover-URL ebenfalls validieren
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+
+Vor dem Render einen schnellen HEAD-Check auf die Voiceover-URL ausführen (Content-Type + Größe), um ungültige URLs frühzeitig auszuschließen.
+
+## Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `generate-video-voiceover/index.ts` | Gender-Mapping (`male`→`roger`, `female`→`sarah`) + `voiceGender` Parameter-Support |
-| `auto-generate-universal-video/index.ts` | r59: `silentRender: false`, `muted: false`, `audioCodec: 'aac'` — Audio wird direkt gerendert |
-| `remotion-webhook/index.ts` | Diagnostik-Logging für audioTracks |
+| `supabase/functions/auto-generate-universal-video/index.ts` | Magic-Byte-Validierung, intelligenteres Audio-Corruption-Recovery |
 
-### Fallback-Strategie
-Bei Audio-Korruption (r33) fällt das System auf `silentRender: true` zurück — dann kommt das Video ohne Ton, statt zu crashen.
+## Erwartetes Ergebnis
+- Korrupte Audio-Dateien werden VOR dem Lambda-Render erkannt und verworfen
+- Bei Audio-Corruption wird nur die problematische Quelle entfernt, Voiceover bleibt erhalten
+- Video hat Voiceover auch nach einem Retry
 
-## Phase 2 (nächster Schritt)
-Hintergrundmusik hinzufügen — die Architektur ist bereits vorbereitet.
+## Hinweis
+Reine Edge-Function-Änderung — kein Bundle-Redeploy nötig.
+
