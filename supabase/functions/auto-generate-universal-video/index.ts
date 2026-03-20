@@ -2099,6 +2099,53 @@ async function updateProgress(
   }
 }
 
+/**
+ * Proxy an external audio URL to Supabase Storage to avoid hotlink 403 errors from Lambda.
+ */
+async function proxyAudioToStorage(
+  supabase: any,
+  externalUrl: string,
+  prefix: string = 'music'
+): Promise<string | null> {
+  try {
+    console.log(`[proxyAudio] Downloading: ${externalUrl.substring(0, 80)}...`);
+    const resp = await fetch(externalUrl);
+    if (!resp.ok) {
+      console.warn(`[proxyAudio] Download failed: ${resp.status} for ${externalUrl}`);
+      return null;
+    }
+    const audioBytes = new Uint8Array(await resp.arrayBuffer());
+    if (audioBytes.length < 10000) {
+      console.warn(`[proxyAudio] File too small (${audioBytes.length} bytes), skipping`);
+      return null;
+    }
+
+    const fileName = `${prefix}/${crypto.randomUUID()}.mp3`;
+    const { error: uploadError } = await supabase.storage
+      .from('video-assets')
+      .upload(fileName, audioBytes, {
+        contentType: 'audio/mpeg',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('[proxyAudio] Upload failed:', uploadError);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('video-assets')
+      .getPublicUrl(fileName);
+
+    const publicUrl = urlData?.publicUrl;
+    console.log(`[proxyAudio] ✅ Proxied to: ${publicUrl}`);
+    return publicUrl;
+  } catch (e) {
+    console.error('[proxyAudio] Error:', e);
+    return null;
+  }
+}
+
 async function selectBackgroundMusic(
   supabase: any,
   style: string,
@@ -2107,6 +2154,8 @@ async function selectBackgroundMusic(
   serviceKey: string
 ): Promise<string | null> {
   // r39C: Fetch multiple candidates and validate via HEAD request
+  let candidateUrl: string | null = null;
+
   try {
     const searchResponse = await fetch(`${supabaseUrl}/functions/v1/search-stock-music`, {
       method: 'POST',
@@ -2116,57 +2165,67 @@ async function selectBackgroundMusic(
       },
       body: JSON.stringify({
         query: `${style} ${mood}`,
-        limit: 5, // r39C: fetch 5 candidates instead of 1
+        limit: 5,
       }),
     });
 
     if (searchResponse.ok) {
       const { results } = await searchResponse.json();
       if (results?.length) {
-        // r39C: Validate each track via HEAD request
         for (const track of results) {
           const url = track?.url;
           if (!url) continue;
           try {
             const headResp = await fetch(url, { method: 'HEAD' });
             if (!headResp.ok) {
-              console.warn(`[selectBackgroundMusic] r39C HEAD failed for ${url}: ${headResp.status}`);
+              console.warn(`[selectBackgroundMusic] HEAD failed for ${url}: ${headResp.status}`);
               continue;
             }
             const contentType = headResp.headers.get('content-type') || '';
             const contentLength = parseInt(headResp.headers.get('content-length') || '0', 10);
             if (!contentType.startsWith('audio/') && !contentType.includes('mpeg') && !contentType.includes('mp3')) {
-              console.warn(`[selectBackgroundMusic] r39C invalid content-type: ${contentType} for ${url}`);
+              console.warn(`[selectBackgroundMusic] invalid content-type: ${contentType} for ${url}`);
               continue;
             }
-            if (contentLength < 10000) { // < 10KB is likely corrupt/error page
-              console.warn(`[selectBackgroundMusic] r39C too small: ${contentLength} bytes for ${url}`);
+            if (contentLength < 10000) {
+              console.warn(`[selectBackgroundMusic] too small: ${contentLength} bytes for ${url}`);
               continue;
             }
-            console.log(`[selectBackgroundMusic] r39C validated: ${url} (${contentType}, ${contentLength} bytes)`);
-            return url;
+            console.log(`[selectBackgroundMusic] validated: ${url} (${contentType}, ${contentLength} bytes)`);
+            candidateUrl = url;
+            break;
           } catch (headErr) {
-            console.warn(`[selectBackgroundMusic] r39C HEAD error for ${url}:`, headErr);
+            console.warn(`[selectBackgroundMusic] HEAD error for ${url}:`, headErr);
             continue;
           }
         }
-        console.warn(`[selectBackgroundMusic] r39C: All ${results.length} candidates failed validation, using fallback`);
       }
     }
   } catch (e) {
     console.error('[auto-generate-universal-video] Music search failed:', e);
   }
 
-  // r39C: Known-good fallback URLs (verified working Pixabay CDN)
-  const MUSIC_FALLBACK: Record<string, string> = {
-    'upbeat': 'https://cdn.pixabay.com/audio/2024/11/12/audio_c09a6e2f0d.mp3',
-    'calm': 'https://cdn.pixabay.com/audio/2024/09/10/audio_6e5d7d1912.mp3',
-    'corporate': 'https://cdn.pixabay.com/audio/2022/10/25/audio_b36e8b618a.mp3',
-    'inspirational': 'https://cdn.pixabay.com/audio/2024/04/17/audio_db71c3e9ba.mp3',
-    'energetic': 'https://cdn.pixabay.com/audio/2023/07/13/audio_3d4a5a0c0b.mp3',
-  };
+  // Fallback to known URLs if no candidate found
+  if (!candidateUrl) {
+    const MUSIC_FALLBACK: Record<string, string> = {
+      'upbeat': 'https://cdn.pixabay.com/audio/2024/11/12/audio_c09a6e2f0d.mp3',
+      'calm': 'https://cdn.pixabay.com/audio/2024/09/10/audio_6e5d7d1912.mp3',
+      'corporate': 'https://cdn.pixabay.com/audio/2022/10/25/audio_b36e8b618a.mp3',
+      'inspirational': 'https://cdn.pixabay.com/audio/2024/04/17/audio_db71c3e9ba.mp3',
+      'energetic': 'https://cdn.pixabay.com/audio/2023/07/13/audio_3d4a5a0c0b.mp3',
+    };
+    candidateUrl = MUSIC_FALLBACK[mood] || MUSIC_FALLBACK['corporate'];
+  }
 
-  return MUSIC_FALLBACK[mood] || MUSIC_FALLBACK['corporate'];
+  // Proxy external URL to Supabase Storage to avoid hotlink 403 from Lambda
+  if (candidateUrl && !candidateUrl.includes('supabase.co')) {
+    const proxied = await proxyAudioToStorage(supabase, candidateUrl, 'bg-music');
+    if (proxied) return proxied;
+    console.warn('[selectBackgroundMusic] Proxy failed, returning null to avoid 403 in Lambda');
+    return null;
+  }
+
+  return candidateUrl;
 }
 
 async function generateAIFallbackImage(
