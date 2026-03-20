@@ -1934,12 +1934,29 @@ async function runRenderOnlyPipeline(
           console.log(`[render-only] 🎭 r32 injected Lottie fallback flags into inputProps.diag:`, JSON.stringify(lottieFallbackFlags));
         }
         
-        // r33: Strip corrupt audio sources from inputProps
+        // r60: Smart audio-corruption recovery — strip music but KEEP voiceover
         if (audioStripped) {
           props.diag = { ...props.diag, r33_audioStripped: true, r33_retryAttempt: retryAttempt };
-          // r59: On audio corruption, render silently as fallback
-          props.diag.silentRender = true;
-          console.log(`[render-only] 🔊 r33 audio corruption flagged, falling back to silent render`);
+          // Remove background music (most likely corrupt source) but keep voiceover
+          if (props.backgroundMusicUrl) {
+            console.log(`[render-only] 🔊 r60 Removing backgroundMusicUrl: ${props.backgroundMusicUrl.substring(0, 60)}...`);
+            delete props.backgroundMusicUrl;
+          }
+          if (props.musicUrl) {
+            console.log(`[render-only] 🔊 r60 Removing musicUrl: ${props.musicUrl.substring(0, 60)}...`);
+            delete props.musicUrl;
+          }
+          // Keep voiceover — ElevenLabs audio is reliable
+          if (props.voiceoverUrl) {
+            console.log(`[render-only] 🎤 r60 KEEPING voiceoverUrl: ${props.voiceoverUrl.substring(0, 60)}...`);
+            // Keep silentRender=false so voiceover still plays
+            props.diag.silentRender = false;
+          } else {
+            // No voiceover either — fall back to fully silent
+            props.diag.silentRender = true;
+            console.log(`[render-only] 🔇 r60 No voiceover available, falling back to silent render`);
+          }
+          console.log(`[render-only] 🔊 r60 audio corruption recovery: music stripped, voiceover=${!!props.voiceoverUrl}, silentRender=${props.diag.silentRender}`);
         }
         
         newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
@@ -2102,6 +2119,18 @@ async function updateProgress(
 /**
  * Proxy an external audio URL to Supabase Storage to avoid hotlink 403 errors from Lambda.
  */
+/**
+ * Validate MP3 magic bytes — returns true if the file starts with valid MP3/ID3 headers.
+ */
+function isValidMp3(bytes: Uint8Array): boolean {
+  if (bytes.length < 4) return false;
+  // ID3 tag header (ID3v2): 0x49 0x44 0x33
+  if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return true;
+  // MPEG frame sync: 0xFF followed by 0xFB/0xF3/0xF2/0xFA (various MPEG versions/layers)
+  if (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) return true;
+  return false;
+}
+
 async function proxyAudioToStorage(
   supabase: any,
   externalUrl: string,
@@ -2119,6 +2148,15 @@ async function proxyAudioToStorage(
       console.warn(`[proxyAudio] File too small (${audioBytes.length} bytes), skipping`);
       return null;
     }
+
+    // r60: Magic-byte validation — reject HTML error pages masquerading as MP3
+    if (!isValidMp3(audioBytes)) {
+      const headerHex = Array.from(audioBytes.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+      const headerAscii = new TextDecoder().decode(audioBytes.slice(0, 40));
+      console.warn(`[proxyAudio] ❌ INVALID MP3: magic bytes [${headerHex}], ascii: "${headerAscii.substring(0, 40)}"`);
+      return null;
+    }
+    console.log(`[proxyAudio] ✅ Valid MP3 header detected (${audioBytes.length} bytes)`);
 
     const fileName = `${prefix}/${crypto.randomUUID()}.mp3`;
     const { error: uploadError } = await supabase.storage
