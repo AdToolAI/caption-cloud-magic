@@ -1628,8 +1628,9 @@ async function runGenerationPipeline(
       width: dimensions.width,
       height: dimensions.height,
       _schedulingMode: schedulingMode, // r39B: pass scheduling mode
-      _silentRender: true, // r41: force muted + no audioCodec
-      muted: true, // r41: explicit muted flag
+      _silentRender: false, // r59: render WITH audio directly (mux-audio-to-video doesn't work in Edge Functions)
+      muted: false, // r59: enable audio in Lambda render
+      audioCodec: 'aac', // r59: encode audio directly
       webhook: {
         url: webhookUrl,
         secret: null,
@@ -1640,8 +1641,8 @@ async function runGenerationPipeline(
           credits_used: credits_required,
           source: 'universal-creator',
           progressId: progressId,
-          // r41: Store audio URLs for post-render muxing
-          silentRender: true,
+          // r59: No longer using post-render muxing — audio is rendered directly
+          silentRender: false,
           audioTracks: {
             voiceoverUrl: isBareMinimum ? undefined : (voiceoverUrl || undefined),
             backgroundMusicUrl: isBareMinimum ? undefined : (musicUrl || undefined),
