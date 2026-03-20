@@ -2851,7 +2851,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   if (scenes.length === 0) {
     return (
       <AbsoluteFill style={{ backgroundColor: '#0f172a' }}>
-      {!diagToggles.silentRender && !diagToggles.r33_audioStripped && voiceoverUrl && (
+      {!diagToggles.silentRender && voiceoverUrl && (
           <Html5Audio src={voiceoverUrl} volume={masterVolume} pauseWhenBuffering />
         )}
         {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && (
