@@ -315,6 +315,9 @@ serve(async (req) => {
       maxRetries: 1,
       timeoutInMilliseconds: 300000,
       privacy: 'public',
+      // r61: Enable audio rendering for voiceover/music
+      muted: false,
+      audioCodec: 'aac',
       webhook: {
         url: webhookUrl,
         secret: 'remotion-webhook-secret-adtool-2024',
