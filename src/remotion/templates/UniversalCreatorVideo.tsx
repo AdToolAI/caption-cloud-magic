@@ -2851,7 +2851,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   if (scenes.length === 0) {
     return (
       <AbsoluteFill style={{ backgroundColor: '#0f172a' }}>
-      {!diagToggles.silentRender && !diagToggles.r33_audioStripped && voiceoverUrl && (
+      {!diagToggles.silentRender && voiceoverUrl && (
           <Html5Audio src={voiceoverUrl} volume={masterVolume} pauseWhenBuffering />
         )}
         {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && (
@@ -2901,8 +2901,8 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   return (
     <AbsoluteFill style={{ backgroundColor: '#000000' }}>
-      {/* Voiceover audio - plays linearly (r41: skip in silentRender mode) */}
-      {!diagToggles.silentRender && !diagToggles.r33_audioStripped && voiceoverUrl && (
+      {/* Voiceover audio - plays linearly (r61: voiceover independent of r33_audioStripped) */}
+      {!diagToggles.silentRender && voiceoverUrl && (
         <Html5Audio src={voiceoverUrl} volume={masterVolume} startFrom={0} pauseWhenBuffering />
       )}
       
@@ -3017,7 +3017,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   />
                 )}
                 
-                {/* Phase 3: Smart Sound Effect (r41: skip in silentRender mode) */}
+                {/* Phase 3: Smart Sound Effect (r41: skip in silentRender mode, r61: also skip when audio stripped) */}
                 {!diagToggles.silentRender && !diagToggles.r33_audioStripped && (
                   <SceneSoundEffect
                     scene={scene}

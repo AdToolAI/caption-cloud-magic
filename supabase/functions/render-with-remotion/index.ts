@@ -377,6 +377,10 @@ serve(async (req) => {
       imageFormat: 'jpeg',
       jpegQuality: 80,
       
+      // r61: Enable audio rendering for voiceover/music
+      muted: false,
+      audioCodec: 'aac',
+      
       // Execution
       maxRetries: 1,
       timeoutInMilliseconds: 300000,
