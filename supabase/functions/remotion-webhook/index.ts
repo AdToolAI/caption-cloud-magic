@@ -43,6 +43,15 @@ serve(async (req) => {
       const audioTracks = customData?.audioTracks;
       const hasAudioToMux = isSilentRender && audioTracks && (audioTracks.voiceoverUrl || audioTracks.backgroundMusicUrl);
 
+      console.log(`🔊 Audio mux diagnostics:`, {
+        isSilentRender,
+        hasAudioTracks: !!audioTracks,
+        voiceoverUrl: audioTracks?.voiceoverUrl ? audioTracks.voiceoverUrl.substring(0, 80) + '...' : 'NONE',
+        backgroundMusicUrl: audioTracks?.backgroundMusicUrl ? 'present' : 'NONE',
+        backgroundMusicVolume: audioTracks?.backgroundMusicVolume,
+        willMux: hasAudioToMux,
+      });
+
       let finalOutputUrl = outputFile;
 
       if (hasAudioToMux) {

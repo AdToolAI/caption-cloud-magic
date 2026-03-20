@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r56-phase12-fallback-fix-2026-03-19";
+const AUTO_GEN_BUILD_TAG = "r59-audio-direct-render-2026-03-20";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -1134,6 +1134,7 @@ async function runGenerationPipeline(
       },
       body: JSON.stringify({
         scriptText: fullScript,
+        voice: briefing.voiceGender === 'female' ? 'sarah' : 'roger',
         voiceGender: briefing.voiceGender || 'male',
         language: briefing.voiceLanguage || 'de',
         withTimestamps: true,
@@ -1477,7 +1478,7 @@ async function runGenerationPipeline(
         disableAllLottie,
         disableSceneFx,
         disableAnimatedText,
-        silentRender: true, // r41: always render silent, mux audio afterwards
+        silentRender: false, // r59: render WITH audio directly
         sanitizerVersion: 'v11-r43-softGuard',
         diagnosticProfile: diagProfile,
         ...(r43_budgetOverride ? { r43_budgetOverride: true, r43_estRuntimeSec: mainScheduling.estRuntimeSec } : {}),
@@ -1627,8 +1628,9 @@ async function runGenerationPipeline(
       width: dimensions.width,
       height: dimensions.height,
       _schedulingMode: schedulingMode, // r39B: pass scheduling mode
-      _silentRender: true, // r41: force muted + no audioCodec
-      muted: true, // r41: explicit muted flag
+      _silentRender: false, // r59: render WITH audio directly (mux-audio-to-video doesn't work in Edge Functions)
+      muted: false, // r59: enable audio in Lambda render
+      audioCodec: 'aac', // r59: encode audio directly
       webhook: {
         url: webhookUrl,
         secret: null,
@@ -1639,8 +1641,8 @@ async function runGenerationPipeline(
           credits_used: credits_required,
           source: 'universal-creator',
           progressId: progressId,
-          // r41: Store audio URLs for post-render muxing
-          silentRender: true,
+          // r59: No longer using post-render muxing — audio is rendered directly
+          silentRender: false,
           audioTracks: {
             voiceoverUrl: isBareMinimum ? undefined : (voiceoverUrl || undefined),
             backgroundMusicUrl: isBareMinimum ? undefined : (musicUrl || undefined),
@@ -1918,8 +1920,8 @@ async function runRenderOnlyPipeline(
         if (props.fps) props.fps = fps;
         if (props.durationInFrames) props.durationInFrames = dif;
         
-        // r41: Always set silentRender on retries (audio muxed after render)
-        props.diag = { ...(props.diag || {}), silentRender: true };
+        // r59: Render WITH audio directly (no post-mux needed)
+        props.diag = { ...(props.diag || {}), silentRender: false };
         
         // r32: Merge Lottie fallback flags into diag
         if (Object.keys(lottieFallbackFlags).length > 0) {
@@ -1932,10 +1934,12 @@ async function runRenderOnlyPipeline(
           console.log(`[render-only] 🎭 r32 injected Lottie fallback flags into inputProps.diag:`, JSON.stringify(lottieFallbackFlags));
         }
         
-        // r33: Strip corrupt audio sources from inputProps (r41: always stripped since silentRender)
+        // r33: Strip corrupt audio sources from inputProps
         if (audioStripped) {
           props.diag = { ...props.diag, r33_audioStripped: true, r33_retryAttempt: retryAttempt };
-          console.log(`[render-only] 🔊 r33+r41 audio corruption flagged, silentRender handles audio skip`);
+          // r59: On audio corruption, render silently as fallback
+          props.diag.silentRender = true;
+          console.log(`[render-only] 🔊 r33 audio corruption flagged, falling back to silent render`);
         }
         
         newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
@@ -1944,9 +1948,9 @@ async function runRenderOnlyPipeline(
       }
     }
     
-    // r41: Force muted + no audioCodec on retries too
-    newPayload.muted = true;
-    newPayload.audioCodec = null;
+    // r59: Render WITH audio on retries too
+    newPayload.muted = false;
+    newPayload.audioCodec = 'aac';
     
     const newFPL = scheduling.framesPerLambda;
     const estimatedLambdas = scheduling.estimatedLambdas;
@@ -1967,8 +1971,8 @@ async function runRenderOnlyPipeline(
           source: 'universal-creator-render-only',
           progressId: newProgressId,
           retryAttempt,
-          // r41: Propagate silentRender + audioTracks for post-render muxing
-          silentRender: true,
+          // r59: Audio is rendered directly, no post-mux
+          silentRender: false,
         },
       };
     }
