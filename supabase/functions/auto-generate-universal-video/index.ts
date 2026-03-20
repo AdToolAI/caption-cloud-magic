@@ -1934,12 +1934,29 @@ async function runRenderOnlyPipeline(
           console.log(`[render-only] 🎭 r32 injected Lottie fallback flags into inputProps.diag:`, JSON.stringify(lottieFallbackFlags));
         }
         
-        // r33: Strip corrupt audio sources from inputProps
+        // r60: Smart audio-corruption recovery — strip music but KEEP voiceover
         if (audioStripped) {
           props.diag = { ...props.diag, r33_audioStripped: true, r33_retryAttempt: retryAttempt };
-          // r59: On audio corruption, render silently as fallback
-          props.diag.silentRender = true;
-          console.log(`[render-only] 🔊 r33 audio corruption flagged, falling back to silent render`);
+          // Remove background music (most likely corrupt source) but keep voiceover
+          if (props.backgroundMusicUrl) {
+            console.log(`[render-only] 🔊 r60 Removing backgroundMusicUrl: ${props.backgroundMusicUrl.substring(0, 60)}...`);
+            delete props.backgroundMusicUrl;
+          }
+          if (props.musicUrl) {
+            console.log(`[render-only] 🔊 r60 Removing musicUrl: ${props.musicUrl.substring(0, 60)}...`);
+            delete props.musicUrl;
+          }
+          // Keep voiceover — ElevenLabs audio is reliable
+          if (props.voiceoverUrl) {
+            console.log(`[render-only] 🎤 r60 KEEPING voiceoverUrl: ${props.voiceoverUrl.substring(0, 60)}...`);
+            // Keep silentRender=false so voiceover still plays
+            props.diag.silentRender = false;
+          } else {
+            // No voiceover either — fall back to fully silent
+            props.diag.silentRender = true;
+            console.log(`[render-only] 🔇 r60 No voiceover available, falling back to silent render`);
+          }
+          console.log(`[render-only] 🔊 r60 audio corruption recovery: music stripped, voiceover=${!!props.voiceoverUrl}, silentRender=${props.diag.silentRender}`);
         }
         
         newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
