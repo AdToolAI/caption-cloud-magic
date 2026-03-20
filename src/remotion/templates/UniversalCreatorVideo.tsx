@@ -2852,10 +2852,10 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     return (
       <AbsoluteFill style={{ backgroundColor: '#0f172a' }}>
       {!diagToggles.silentRender && voiceoverUrl && (
-          <Html5Audio src={voiceoverUrl} volume={masterVolume} pauseWhenBuffering />
+          <Html5Audio key="stable-voiceover-audio" src={voiceoverUrl} volume={masterVolume} startFrom={0} loop={false} pauseWhenBuffering />
         )}
         {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && (
-          <Html5Audio src={backgroundMusicUrl} volume={backgroundMusicVolume * masterVolume} pauseWhenBuffering />
+          <Html5Audio key="stable-music-audio" src={backgroundMusicUrl} volume={backgroundMusicVolume * masterVolume} startFrom={0} loop={false} pauseWhenBuffering />
         )}
         
         <AbsoluteFill style={{
