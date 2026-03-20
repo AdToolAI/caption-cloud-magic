@@ -1934,10 +1934,12 @@ async function runRenderOnlyPipeline(
           console.log(`[render-only] 🎭 r32 injected Lottie fallback flags into inputProps.diag:`, JSON.stringify(lottieFallbackFlags));
         }
         
-        // r33: Strip corrupt audio sources from inputProps (r41: always stripped since silentRender)
+        // r33: Strip corrupt audio sources from inputProps
         if (audioStripped) {
           props.diag = { ...props.diag, r33_audioStripped: true, r33_retryAttempt: retryAttempt };
-          console.log(`[render-only] 🔊 r33+r41 audio corruption flagged, silentRender handles audio skip`);
+          // r59: On audio corruption, render silently as fallback
+          props.diag.silentRender = true;
+          console.log(`[render-only] 🔊 r33 audio corruption flagged, falling back to silent render`);
         }
         
         newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
