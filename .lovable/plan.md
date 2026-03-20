@@ -1,29 +1,26 @@
 
 # Plan: Voiceover Phase 1 — Audio direkt im Lambda-Render
 
-## Status: ✅ Implementiert (r59)
+## Status: ✅ Implementiert (r60)
 
 ## Was wurde geändert
 
-### Kernproblem erkannt
-Die `mux-audio-to-video` Edge Function nutzt `Deno.Command('ffmpeg')` — **Subprocess-Spawning ist in Supabase Edge Functions nicht erlaubt**. Der bisherige "Silent Render + Audio Mux" Ansatz konnte daher nie funktionieren.
+### r59: Direct Audio Rendering
+- `_silentRender: false` + `muted: false` + `audioCodec: 'aac'` — Audio wird direkt im Lambda gerendert
+- Gender-Mapping (`male`→`roger`, `female`→`sarah`) in `generate-video-voiceover`
 
-### Lösung: Audio direkt im Remotion Lambda rendern
-Statt stummem Render + nachträglichem Muxing wird jetzt **direkt mit Audio gerendert**:
-- `_silentRender: false` + `muted: false` + `audioCodec: 'aac'`
-- Das Remotion-Template (`UniversalCreatorVideo.tsx`) hat bereits volle Audio-Unterstützung mit `Html5Audio` Komponenten
-- Voiceover + Hintergrundmusik werden direkt in der Lambda-Composition abgespielt
+### r60: Audio-Corruption Fix — MP3-Validierung + Smart Recovery
+- **Magic-Byte-Validierung** in `proxyAudioToStorage`: Prüft ID3-Header (`0x49 0x44 0x33`) und MPEG frame sync (`0xFF 0xE0+`) — HTML-Fehlerseiten werden erkannt und verworfen
+- **Intelligente Retry-Logik**: Bei `audio_corruption` wird nur die Background-Music entfernt, Voiceover bleibt erhalten
+- Nur wenn kein Voiceover vorhanden → Fallback auf `silentRender: true`
 
 ### Änderungen
 
 | Datei | Änderung |
 |-------|----------|
-| `generate-video-voiceover/index.ts` | Gender-Mapping (`male`→`roger`, `female`→`sarah`) + `voiceGender` Parameter-Support |
-| `auto-generate-universal-video/index.ts` | r59: `silentRender: false`, `muted: false`, `audioCodec: 'aac'` — Audio wird direkt gerendert |
-| `remotion-webhook/index.ts` | Diagnostik-Logging für audioTracks |
-
-### Fallback-Strategie
-Bei Audio-Korruption (r33) fällt das System auf `silentRender: true` zurück — dann kommt das Video ohne Ton, statt zu crashen.
+| `auto-generate-universal-video/index.ts` | r60: MP3 Magic-Byte-Validierung + Smart Audio-Corruption Recovery |
+| `generate-video-voiceover/index.ts` | r59: Gender-Mapping |
+| `remotion-webhook/index.ts` | r59: Audio-Diagnose-Logging |
 
 ## Phase 2 (nächster Schritt)
 Hintergrundmusik hinzufügen — die Architektur ist bereits vorbereitet.
