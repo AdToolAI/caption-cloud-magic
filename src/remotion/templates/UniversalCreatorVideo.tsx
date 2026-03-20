@@ -2901,8 +2901,8 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   return (
     <AbsoluteFill style={{ backgroundColor: '#000000' }}>
-      {/* Voiceover audio - plays linearly (r41: skip in silentRender mode) */}
-      {!diagToggles.silentRender && !diagToggles.r33_audioStripped && voiceoverUrl && (
+      {/* Voiceover audio - plays linearly (r61: voiceover independent of r33_audioStripped) */}
+      {!diagToggles.silentRender && voiceoverUrl && (
         <Html5Audio src={voiceoverUrl} volume={masterVolume} startFrom={0} pauseWhenBuffering />
       )}
       
