@@ -2915,7 +2915,17 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
           pauseWhenBuffering
         />
       )}
-      {/* r64: Background music removed from Lambda template — added post-render via mux-audio-to-video */}
+      {/* r67: Background music rendered directly in Lambda — same as UniversalVideo.tsx */}
+      {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && isValidRemoteUrl(backgroundMusicUrl) && (
+        <Audio
+          key="stable-background-music"
+          src={backgroundMusicUrl}
+          volume={backgroundMusicVolume * masterVolume}
+          startFrom={0}
+          loop={true}
+          pauseWhenBuffering
+        />
+      )}
       
       {/* Render scenes as sequences */}
       {sceneTimings.map((scene, index) => {

@@ -38,23 +38,21 @@ serve(async (req) => {
     if (type === 'success') {
       console.log(`✅ Render ${renderId} completed`);
 
-      // r64: Check if we need post-render audio muxing
-      // Two cases: (1) silentRender=true with any audio, (2) silentRender=false but backgroundMusic needs post-render muxing
+      // r67: Audio is now rendered directly in Lambda template (voiceover + music)
+      // Post-render muxing only needed for silentRender fallback (voiceover recovery)
       const isSilentRender = customData?.silentRender === true;
       const audioTracks = customData?.audioTracks;
-      const hasBackgroundMusic = !!audioTracks?.backgroundMusicUrl;
       const hasVoiceoverForMux = isSilentRender && !!audioTracks?.voiceoverUrl;
-      // r64: Mux if silentRender with any audio, OR if there's background music to add post-render
-      const hasAudioToMux = (isSilentRender && audioTracks && (audioTracks.voiceoverUrl || audioTracks.backgroundMusicUrl)) || hasBackgroundMusic;
+      // r67: Only mux if silentRender with voiceover — background music is now in Lambda directly
+      const hasAudioToMux = isSilentRender && hasVoiceoverForMux;
 
-      console.log(`🔊 r64 Audio mux diagnostics:`, {
+      console.log(`🔊 r67 Audio diagnostics:`, {
         isSilentRender,
         hasAudioTracks: !!audioTracks,
         voiceoverUrl: audioTracks?.voiceoverUrl ? audioTracks.voiceoverUrl.substring(0, 80) + '...' : 'NONE',
         backgroundMusicUrl: audioTracks?.backgroundMusicUrl ? audioTracks.backgroundMusicUrl.substring(0, 80) + '...' : 'NONE',
-        backgroundMusicVolume: audioTracks?.backgroundMusicVolume,
         willMux: hasAudioToMux,
-        reason: hasBackgroundMusic ? 'r64-post-render-music' : (hasVoiceoverForMux ? 'silent-render-voiceover' : 'none'),
+        reason: hasVoiceoverForMux ? 'silent-render-voiceover-recovery' : 'none (r67: music rendered in Lambda)',
       });
 
       let finalOutputUrl = outputFile;
