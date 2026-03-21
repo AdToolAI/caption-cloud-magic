@@ -55,3 +55,13 @@
 | `src/remotion/templates/UniversalCreatorVideo.tsx` | r64: Html5Audio→Audio, Musik aus Template entfernt |
 | `supabase/functions/auto-generate-universal-video/index.ts` | r64: backgroundMusicUrl aus inputProps entfernt |
 | `supabase/functions/remotion-webhook/index.ts` | r64: Post-render music muxing für non-silent renders |
+
+## Phase 4: ✅ Implementiert (r65) — Retry Scope-Bug Fix + Musik-Pipeline Hardening
+- **Scope-Bug**: `props` war nur innerhalb eines `try`-Blocks definiert, wurde aber außerhalb referenziert → `ReferenceError: props is not defined`
+- **Fix**: `recoveredSilentRender` und `recoveredHasVoiceover` werden vor dem `try`-Block deklariert und innerhalb gesetzt
+- **Retry audioTracks**: Webhook customData propagiert jetzt `audioTracks` korrekt, strippt Musik bei `audioStripped`
+- **Pixabay-Fallback entfernt**: Unreliable externe Fallback-URLs (konsistent HTML statt MP3) durch graceful `null`-Return ersetzt
+
+| Datei | Änderung |
+|-------|----------|
+| `supabase/functions/auto-generate-universal-video/index.ts` | r65: Scope-Bug fix, audioTracks in Retry, Pixabay-Fallback entfernt |
