@@ -2261,9 +2261,26 @@ async function selectBackgroundMusic(
     }
   }
 
-  // Fallback: any valid track
+  // Fallback: any validated track
   if (tracks.length === 0) {
-    console.log('[selectBackgroundMusic] No mood match, fetching random fallback');
+    console.log('[selectBackgroundMusic] No mood match, fetching random validated fallback');
+    const { data, error } = await supabase
+      .from('background_music_tracks')
+      .select('*')
+      .eq('is_valid', true)
+      .eq('validation_status', 'validated')
+      .limit(50);
+
+    if (error) {
+      console.warn('[selectBackgroundMusic] Fallback query error:', error.message);
+      return null;
+    }
+    tracks = data || [];
+  }
+
+  // r69: Last resort — any track with is_valid=true (even pending validation)
+  if (tracks.length === 0) {
+    console.log('[selectBackgroundMusic] No validated tracks, trying any is_valid track as last resort');
     const { data, error } = await supabase
       .from('background_music_tracks')
       .select('*')
@@ -2271,7 +2288,7 @@ async function selectBackgroundMusic(
       .limit(50);
 
     if (error) {
-      console.warn('[selectBackgroundMusic] Fallback query error:', error.message);
+      console.warn('[selectBackgroundMusic] Last resort query error:', error.message);
       return null;
     }
     tracks = data || [];
