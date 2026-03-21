@@ -1442,8 +1442,9 @@ async function runGenerationPipeline(
       fontFamily: briefing.fontFamily || 'Inter',
       style: validateEnum(briefing.visualStyle, VALID_STYLES, 'modern-3d'),
       voiceoverUrl: isBareMinimum ? undefined : (voiceoverUrl || undefined),
-      backgroundMusicUrl: isBareMinimum ? undefined : (musicUrl || undefined),
-      backgroundMusicVolume: isBareMinimum ? 0 : 0.3,
+      // r64: backgroundMusicUrl removed from inputProps — music added post-render via mux-audio-to-video
+      // This prevents Lambda ffprobe crashes on Jamendo/Pixabay MP3 encoding variants
+      backgroundMusicVolume: 0,
       masterVolume: 1,
       useCharacter: isBareMinimum ? false : ((disableCharacter || disableAllLottie) ? false : (briefing.hasCharacter !== false)),
       // r44: forceCharacterSvg ensures SVG character (no <Lottie> mount) while keeping character visible
