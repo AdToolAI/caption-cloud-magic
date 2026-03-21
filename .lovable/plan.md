@@ -1,107 +1,92 @@
 
-## Diagnose
 
-Ja — es ist sehr wahrscheinlich **ein anderes Grundproblem** als „nur der falsche Soundtrack“.
+# Plan: Musik-Bibliothek auf 100+ Tracks skalieren
 
-Ich habe Code, Laufzeitdaten und die Backend-Funktionen geprüft. Dabei zeigen sich **drei harte Ursachen**:
+## Aktueller Stand
+- 8 hardcodierte Tracks in `MUSIC_CATALOG` (auto-generate-universal-video)
+- 13 hardcodierte Jamendo-IDs in `seed-background-music`
+- Tracks liegen im `background-music` Storage-Bucket
 
-1. **Im Universal Video Creator wird Musik aktuell gar nicht im Render-Template abgespielt**
-   - In `src/remotion/templates/UniversalCreatorVideo.tsx` ist nur noch das Voiceover als `<Audio />` aktiv.
-   - Die Musik wurde dort bewusst entfernt mit Kommentar: „added post-render via mux-audio-to-video“.
+## Problem mit dem aktuellen Ansatz
+100+ Tracks als hardcodierte Jamendo-IDs pflegen ist nicht wartbar. Stattdessen brauchen wir:
+1. Eine **Datenbank-Tabelle** für Track-Metadaten (statt hardcodierter Konstante)
+2. Eine **dynamische Seed-Funktion** die per Jamendo-API automatisch Tracks pro Kategorie sucht und herunterlädt
+3. Die **Auswahl-Logik** liest zur Render-Zeit aus der DB statt aus einer Konstante
 
-2. **Das Post-Render-Muxing kann in der aktuellen Backend-Umgebung nicht funktionieren**
-   - `supabase/functions/mux-audio-to-video/index.ts` nutzt `ffmpeg` / `ffprobe` via `Deno.Command`.
-   - Ein direkter Test der Funktion liefert:
-     `Spawning subprocesses is not allowed on Supabase Edge Runtime.`
-   - Das heißt: **der aktuelle Musik-Fallback ist technisch tot**.
+## Umsetzung
 
-3. **Der Retry-Pfad entfernt die Musik zusätzlich aus den Webhook-Daten**
-   - In `auto-generate-universal-video/index.ts` wird bei `audioStripped` die `backgroundMusicUrl` aus den `audioTracks` für den Retry entfernt.
-   - Genau das sieht man auch in den Webhook-Logs:
-     - erster Render: `backgroundMusicUrl` vorhanden
-     - erfolgreicher Retry: `backgroundMusicUrl: "NONE"`, `willMux: false`
-   - Ergebnis: selbst wenn Muxing funktionieren würde, bekäme der Erfolgs-Webhook oft **gar keine Musik mehr**.
+### Schritt 1: DB-Tabelle `background_music_tracks` anlegen
 
-## Was das praktisch bedeutet
-
-Der aktuelle Aufbau ist widersprüchlich:
-
-```text
-Template:
-  Voiceover direkt im Lambda
-  Musik NICHT im Lambda
-
-Webhook:
-  Musik soll nachträglich gemuxt werden
-
-Backend:
-  Mux per ffmpeg in Edge Function nicht erlaubt
+```sql
+CREATE TABLE public.background_music_tracks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  storage_path TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  mood TEXT NOT NULL,
+  genre TEXT NOT NULL,
+  moods TEXT[] NOT NULL DEFAULT '{}',
+  source_id TEXT,          -- Jamendo Track ID
+  duration_seconds INTEGER,
+  file_size_bytes INTEGER,
+  is_valid BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
-Damit ist der jetzige Pfad strukturell so gebaut, dass **Voiceover funktionieren kann, Musik aber nicht zuverlässig jemals ankommt**.
+Keine RLS nötig — wird nur von Edge Functions mit Service Role Key gelesen.
 
-## Plan zur Behebung
+### Schritt 2: Seed-Funktion komplett umbauen
+**Datei:** `supabase/functions/seed-background-music/index.ts`
 
-### 1. Dead-End-Muxing aus dem Universal Video Creator entfernen
-`mux-audio-to-video` sollte für diesen Flow nicht mehr die Hauptlösung sein, weil es in dieser Runtime keine tragfähige Architektur ist.
+Statt hardcodierter IDs: **Jamendo-API per Kategorie abfragen** und automatisch 15-20 Tracks pro Kategorie herunterladen.
 
-### 2. Musik wieder direkt im Remotion-Render aktivieren
-In `src/remotion/templates/UniversalCreatorVideo.tsx` die Hintergrundmusik wieder als **Root-Level `<Audio />`** einbauen — analog zum funktionierenden Audio-Grundprinzip des Universal Content Creators.
+Kategorien (7 Stück × ~15 Tracks = ~105 Tracks):
 
-Wichtig:
-- nur interne, validierte Storage-Tracks verwenden
-- Voiceover + Musik beide direkt im Lambda rendern
-- kein Edge-FFmpeg mehr als Voraussetzung
+| Kategorie | Jamendo-Tags |
+|-----------|-------------|
+| Corporate | corporate, business, professional |
+| Energetic | energetic, upbeat, dynamic |
+| Calm | calm, relax, ambient |
+| Cinematic | cinematic, dramatic, epic |
+| Happy | happy, cheerful, fun |
+| Inspirational | inspirational, motivational |
+| Acoustic | acoustic, folk, warm |
 
-### 3. `backgroundMusicUrl` wieder in die echten Render-Props geben
-In `supabase/functions/auto-generate-universal-video/index.ts`:
-- `backgroundMusicUrl` wieder in `inputProps`
-- nicht nur in `customData.audioTracks`
-- Retry-Logik so ändern, dass bei Problemen **nicht automatisch Musik dauerhaft verloren geht**
+Ablauf pro Kategorie:
+1. Jamendo API: `GET /tracks/?tags={tag}&limit=20&audioformat=mp32`
+2. Für jeden Track: Download → Magic-Byte-Validierung → Re-Upload zu Storage
+3. Metadaten in `background_music_tracks` Tabelle speichern
+4. Bereits vorhandene Tracks überspringen (Duplikat-Check via `source_id`)
 
-Sinnvoller Fallback:
-- erst auf einen anderen internen Track wechseln
-- nur als letzte Eskalation Musik deaktivieren
+### Schritt 3: `selectBackgroundMusic` auf DB umstellen
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
 
-### 4. Bundle-Synchronisation ausdrücklich absichern
-Die Laufzeitdaten passen nicht ganz sauber zum aktuellen Repo-Zustand. Deshalb würde ich zusätzlich den aktiven Remotion-Bundle-Stand hart verifizieren.
+Die hardcodierte `MUSIC_CATALOG`-Konstante ersetzen durch einen DB-Query:
 
-Ziel:
-- sicherstellen, dass Lambda wirklich den aktuellen `UniversalCreatorVideo`-Code nutzt
-- Versions-/Canary-Logging für Audio aktiv mitprüfen
+```typescript
+const { data: tracks } = await supabase
+  .from('background_music_tracks')
+  .select('*')
+  .eq('is_valid', true)
+  .overlaps('moods', searchTerms);
+```
 
-### 5. Audio-Forensik präziser machen
-Für den nächsten Testlauf würde ich die tatsächlichen Audioquellen sauber persistieren/loggen:
-- verwendete `voiceoverUrl`
-- verwendete `backgroundMusicUrl`
-- Quelle/Track-ID aus dem internen Katalog
-- ob Musik im Template gerendert wurde oder deaktiviert wurde
+Fallback: wenn kein Mood-Match, zufälligen Track aus der ganzen Tabelle nehmen.
 
-Dann sehen wir bei einem erneuten Fehler sofort:
-- war es das Voiceover?
-- war es ein bestimmter Musik-Track?
-- oder war es ein Bundle-Mismatch?
+### Schritt 4: Seed ausführen
+Die Funktion einmal aufrufen — sie füllt automatisch ~100+ Tracks in Storage + DB.
 
 ## Betroffene Dateien
 
 | Datei | Änderung |
-|---|---|
-| `src/remotion/templates/UniversalCreatorVideo.tsx` | Musik wieder direkt als `<Audio />` einbauen |
-| `supabase/functions/auto-generate-universal-video/index.ts` | `backgroundMusicUrl` wieder in `inputProps`, Retry-Fallback korrigieren |
-| `supabase/functions/remotion-webhook/index.ts` | Muxing für diesen Flow zurückstufen / nur noch Diagnose |
-| `supabase/functions/mux-audio-to-video/index.ts` | nicht mehr als Hauptpfad für UVC behandeln |
+|-------|----------|
+| Migration | Neue Tabelle `background_music_tracks` |
+| `supabase/functions/seed-background-music/index.ts` | Komplett umbauen: dynamisch per Kategorie von Jamendo |
+| `supabase/functions/auto-generate-universal-video/index.ts` | `MUSIC_CATALOG` → DB-Query ersetzen |
 
-## Technische Kurzfassung
+## Erwartetes Ergebnis
+- 100+ validierte Tracks im Storage, nach Mood/Genre getaggt
+- Jede Kategorie hat mindestens 15 passende Tracks
+- Track-Auswahl ist dynamisch und erweiterbar (neue Tracks = neuer Seed-Run)
+- Keine hardcodierten Listen mehr
 
-Das aktuelle Problem ist sehr wahrscheinlich **nicht** „falscher Track aus der Bibliothek“, sondern ein Architekturproblem:
-
-- Musik wurde aus dem Template entfernt
-- das Ersatz-Muxing ist in dieser Runtime nicht ausführbar
-- der Retry wirft die Musik zusätzlich oft aus den Erfolgsdaten
-
-## Erwartetes Ergebnis nach der Umstellung
-
-- Voiceover bleibt hörbar
-- Hintergrundmusik wird wieder direkt im finalen Render erzeugt
-- kein Abhängigkeitsproblem mehr von FFmpeg in Edge Functions
-- danach können wir Track-Auswahl, Lautstärke und Fade-Out sauber feinjustieren
