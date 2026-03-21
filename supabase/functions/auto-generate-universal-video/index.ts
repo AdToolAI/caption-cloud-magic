@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r67-music-direct-render-2026-03-21";
+const AUTO_GEN_BUILD_TAG = "r68-db-music-catalog-2026-03-21";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -2201,31 +2201,14 @@ async function proxyAudioToStorage(
   }
 }
 
-// r66: Internal curated music library — no external API calls during render
-const MUSIC_CATALOG = [
-  // Corporate / Professional
-  { path: 'library/corporate-professional-001.mp3', moods: ['professional', 'corporate', 'clean', 'business'], genre: 'corporate' },
-  { path: 'library/corporate-professional-002.mp3', moods: ['professional', 'corporate', 'clean', 'business'], genre: 'corporate' },
-  // Energetic / Upbeat
-  { path: 'library/energetic-upbeat-001.mp3', moods: ['energetic', 'upbeat', 'dynamic', 'werbung', 'advertisement'], genre: 'pop' },
-  { path: 'library/energetic-dynamic-001.mp3', moods: ['dynamic', 'energetic', 'upbeat', 'power'], genre: 'electronic' },
-  // Calm / Relaxing
-  { path: 'library/calm-relaxing-001.mp3', moods: ['calm', 'relaxing', 'tutorial', 'erklärung', 'explanation', 'friendly', 'light', 'warm'], genre: 'ambient' },
-  // Happy / Cheerful
-  { path: 'library/happy-cheerful-001.mp3', moods: ['happy', 'cheerful', 'fröhlich', 'social', 'trendy'], genre: 'pop' },
-  // Inspirational / Motivational
-  { path: 'library/inspirational-epic-001.mp3', moods: ['inspirational', 'epic', 'motivation', 'powerful', 'dramatic', 'cinematic', 'storytelling'], genre: 'cinematic' },
-  { path: 'library/inspirational-powerful-001.mp3', moods: ['powerful', 'inspirational', 'motivation', 'epic', 'emotional', 'cinematic'], genre: 'rock' },
-];
-
-// Category-to-mood mapping for briefing categories
+// r68: Category-to-mood mapping for briefing categories
 const CATEGORY_MOOD_MAP: Record<string, string[]> = {
   'corporate': ['professional', 'corporate', 'clean'],
   'business': ['professional', 'corporate', 'clean'],
   'werbung': ['energetic', 'upbeat', 'dynamic'],
   'advertisement': ['energetic', 'upbeat', 'dynamic'],
   'marketing': ['energetic', 'upbeat', 'dynamic'],
-  'storytelling': ['emotional', 'cinematic', 'warm'],
+  'storytelling': ['cinematic', 'emotional', 'dramatic'],
   'tutorial': ['calm', 'friendly', 'light'],
   'erklärung': ['calm', 'friendly', 'light'],
   'explanation': ['calm', 'friendly', 'light'],
@@ -2242,7 +2225,7 @@ async function selectBackgroundMusic(
   supabaseUrl: string,
   _serviceKey: string
 ): Promise<string | null> {
-  console.log(`[selectBackgroundMusic] r66: Using internal catalog. style="${style}", mood="${mood}"`);
+  console.log(`[selectBackgroundMusic] r68: Using DB catalog. style="${style}", mood="${mood}"`);
 
   // Build search terms from style and mood
   const searchTerms = [
@@ -2257,29 +2240,65 @@ async function selectBackgroundMusic(
     if (mapped) mapped.forEach(m => expandedTerms.add(m));
   }
 
-  console.log(`[selectBackgroundMusic] Search terms: ${[...expandedTerms].join(', ')}`);
+  const searchArray = [...expandedTerms].filter(Boolean);
+  console.log(`[selectBackgroundMusic] Search terms: ${searchArray.join(', ')}`);
 
-  // Score each track by mood match count
-  const scored = MUSIC_CATALOG.map(track => {
-    const score = track.moods.filter(m => expandedTerms.has(m)).length;
+  // Query DB: find tracks with overlapping moods
+  let tracks: any[] = [];
+  if (searchArray.length > 0) {
+    const { data, error } = await supabase
+      .from('background_music_tracks')
+      .select('*')
+      .eq('is_valid', true)
+      .overlaps('moods', searchArray)
+      .limit(50);
+
+    if (error) {
+      console.warn('[selectBackgroundMusic] DB query error:', error.message);
+    } else {
+      tracks = data || [];
+    }
+  }
+
+  // Fallback: any valid track
+  if (tracks.length === 0) {
+    console.log('[selectBackgroundMusic] No mood match, fetching random fallback');
+    const { data, error } = await supabase
+      .from('background_music_tracks')
+      .select('*')
+      .eq('is_valid', true)
+      .limit(50);
+
+    if (error) {
+      console.warn('[selectBackgroundMusic] Fallback query error:', error.message);
+      return null;
+    }
+    tracks = data || [];
+  }
+
+  if (tracks.length === 0) {
+    console.warn('[selectBackgroundMusic] No tracks in DB. Run seed-background-music first.');
+    return null;
+  }
+
+  // Score each track by mood match count for better ranking
+  const scored = tracks.map((track: any) => {
+    const score = (track.moods || []).filter((m: string) => expandedTerms.has(m)).length;
     return { ...track, score };
   });
+  scored.sort((a: any, b: any) => b.score - a.score);
 
-  // Sort by score descending, then pick randomly from top matches
-  scored.sort((a, b) => b.score - a.score);
   const maxScore = scored[0]?.score || 0;
-  const topMatches = scored.filter(t => t.score === maxScore && t.score > 0);
-
-  // If no mood match, use all tracks as fallback
-  const candidates = topMatches.length > 0 ? topMatches : MUSIC_CATALOG;
+  const topMatches = scored.filter((t: any) => t.score === maxScore && t.score > 0);
+  const candidates = topMatches.length > 0 ? topMatches : scored;
   const selected = candidates[Math.floor(Math.random() * candidates.length)];
 
-  console.log(`[selectBackgroundMusic] Selected: ${selected.path} (score: ${selected.score || 0}, from ${candidates.length} candidates)`);
+  console.log(`[selectBackgroundMusic] Selected: ${selected.storage_path} (score: ${selected.score}, from ${candidates.length} candidates, total in DB: ${tracks.length})`);
 
   // Construct public URL from Supabase Storage
   const { data: urlData } = supabase.storage
     .from('background-music')
-    .getPublicUrl(selected.path);
+    .getPublicUrl(selected.storage_path);
 
   const publicUrl = urlData?.publicUrl;
   if (!publicUrl) {
@@ -2291,11 +2310,13 @@ async function selectBackgroundMusic(
   try {
     const headResp = await fetch(publicUrl, { method: 'HEAD' });
     if (!headResp.ok) {
-      console.warn(`[selectBackgroundMusic] Track not in storage (${headResp.status}): ${selected.path}. Run seed-background-music first.`);
+      console.warn(`[selectBackgroundMusic] Track not in storage (${headResp.status}): ${selected.storage_path}`);
+      // Mark as invalid so it's not selected again
+      await supabase.from('background_music_tracks').update({ is_valid: false }).eq('id', selected.id);
       return null;
     }
     const contentLength = parseInt(headResp.headers.get('content-length') || '0', 10);
-    console.log(`[selectBackgroundMusic] ✅ Verified in storage: ${selected.path} (${(contentLength / 1024).toFixed(0)} KB)`);
+    console.log(`[selectBackgroundMusic] ✅ Verified: ${selected.storage_path} (${(contentLength / 1024).toFixed(0)} KB)`);
   } catch (e) {
     console.warn('[selectBackgroundMusic] HEAD check failed:', e);
     return null;
