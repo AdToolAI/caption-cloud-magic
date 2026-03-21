@@ -1,4 +1,3 @@
-
 # Plan: Voiceover Phase 1 — Audio direkt im Lambda-Render
 
 ## Status: ✅ Implementiert (r62)
@@ -65,3 +64,19 @@
 | Datei | Änderung |
 |-------|----------|
 | `supabase/functions/auto-generate-universal-video/index.ts` | r65: Scope-Bug fix, audioTracks in Retry, Pixabay-Fallback entfernt |
+
+## Phase 5: ✅ Implementiert (r66) — Kuratierte Musik-Bibliothek
+
+- **Problem**: Jamendo-URLs liefern konsistent HTML statt MP3 → `audio_corruption` bei jedem Render
+- **Lösung**: Interne Musik-Bibliothek in Supabase Storage (`background-music/library/`)
+- **8 validierte Tracks** nach Mood/Kategorie: Corporate, Energetic, Calm, Happy, Cinematic, Inspirational
+- **selectBackgroundMusic** komplett ersetzt: MUSIC_CATALOG-Konstante statt Jamendo-API-Call
+- **Mood-Matching**: KI wählt Track basierend auf Briefing-Stimmung (professional, upbeat, calm, etc.)
+- **FFmpeg Fade-Out**: 3s Fade-Out am Ende des Tracks via `afade` Filter in `mux-audio-to-video`
+- **seed-background-music**: Einmalige Edge Function zum Befüllen des Storage-Buckets
+
+| Datei | Änderung |
+|-------|----------|
+| `supabase/functions/seed-background-music/index.ts` | Neu: Seed-Funktion für Musik-Bibliothek |
+| `supabase/functions/auto-generate-universal-video/index.ts` | r66: MUSIC_CATALOG + internes Mood-Matching |
+| `supabase/functions/mux-audio-to-video/index.ts` | r66: Fade-Out + Duration-Probe |
