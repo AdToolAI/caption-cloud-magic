@@ -37,5 +37,7 @@
 | `src/remotion/templates/UniversalCreatorVideo.tsx` | r62: SceneAudioManager durch einfachen Html5Audio-Layer ersetzt |
 | `supabase/functions/auto-generate-universal-video/index.ts` | r62: effectiveFlags.silentRender Diagnostik korrigiert |
 
-## Phase 2 (nächster Schritt)
-Hintergrundmusik re-aktivieren — sobald Voiceover stabil bestätigt ist.
+## Phase 2: ✅ Implementiert (r63)
+- Background music re-aktiviert via `selectBackgroundMusic()`
+- Musik wird über den stabilen Root-Level `Html5Audio`-Layer gerendert (r62-Architektur)
+- Bei `audio_corruption` wird nur Musik entfernt, Voiceover bleibt erhalten
