@@ -10,6 +10,7 @@ import { VIDEO_CATEGORIES, type VideoCategory, type UniversalConsultationResult 
 import { ALL_CATEGORY_INTERVIEWS } from '@/config/universal-video-interviews';
 import type { UniversalGenerationMode } from './UniversalModeSelector';
 import ReactMarkdown from 'react-markdown';
+import { getConsultantDraft, saveConsultantDraft } from '@/lib/universal-video-draft';
 
 interface Message {
   id: string;
@@ -57,57 +58,54 @@ Lass uns mit ein paar strategischen Fragen starten.
     quickReplies: firstPhase?.quickReplies || ['Mehr Verkäufe', 'Brand Awareness', 'Kundenschulung', 'Produkt erklären']
   };
 
+  // Restore full state from draft
+  const draft = getConsultantDraft();
+  const draftMatchesCurrent = draft && draft.category === category && draft.mode === mode;
+
   const [messages, setMessages] = useState<Message[]>(() => {
-    try {
-      const saved = localStorage.getItem('universal-video-consultant-state');
-      if (saved) {
-        const { messages: savedMessages } = JSON.parse(saved);
-        if (savedMessages?.length > 0) return savedMessages;
-      }
-    } catch {}
+    if (draftMatchesCurrent && draft.messages?.length > 0) return draft.messages;
     return [initialMessage];
   });
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [consultationProgress, setConsultationProgress] = useState(() => {
-    try {
-      const saved = localStorage.getItem('universal-video-consultant-state');
-      if (saved) return JSON.parse(saved).progress || 0;
-    } catch {}
+    if (draftMatchesCurrent) return draft.progress || 0;
     return 0;
   });
-  const [showModeChoice, setShowModeChoice] = useState(false);
-  const [lastRecommendation, setLastRecommendation] = useState<any>(null);
+  const [showModeChoice, setShowModeChoice] = useState(() => {
+    if (draftMatchesCurrent) return draft.showModeChoice || false;
+    return false;
+  });
+  const [lastRecommendation, setLastRecommendation] = useState<any>(() => {
+    if (draftMatchesCurrent) return draft.lastRecommendation || null;
+    return null;
+  });
   const [quickReplyLocked, setQuickReplyLocked] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageIdsRef = useRef<Set<string>>(new Set(['1']));
 
-  // Initialize messageIdsRef from localStorage on mount to prevent duplicates after refresh
+  // Initialize messageIdsRef from saved messages on mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('universal-video-consultant-state');
-      if (saved) {
-        const { messages: savedMessages } = JSON.parse(saved);
-        if (savedMessages?.length) {
-          savedMessages.forEach((m: Message) => messageIdsRef.current.add(m.id));
-        }
-      }
-    } catch {}
+    messages.forEach((m: Message) => messageIdsRef.current.add(m.id));
   }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Persist chat state to localStorage
+  // Persist full chat state to localStorage
   useEffect(() => {
     if (messages.length > 1) {
-      localStorage.setItem('universal-video-consultant-state', JSON.stringify({
+      saveConsultantDraft({
+        category,
+        mode,
         messages,
         progress: consultationProgress,
-      }));
+        lastRecommendation,
+        showModeChoice,
+      });
     }
-  }, [messages, consultationProgress]);
+  }, [messages, consultationProgress, lastRecommendation, showModeChoice, category, mode]);
 
   // Deduplicate and add message safely
   const addMessageSafely = useCallback((message: Message) => {
