@@ -10,6 +10,7 @@ import { VIDEO_CATEGORIES, type VideoCategory, type UniversalConsultationResult 
 import { ALL_CATEGORY_INTERVIEWS } from '@/config/universal-video-interviews';
 import type { UniversalGenerationMode } from './UniversalModeSelector';
 import ReactMarkdown from 'react-markdown';
+import { getConsultantDraft, saveConsultantDraft } from '@/lib/universal-video-draft';
 
 interface Message {
   id: string;
