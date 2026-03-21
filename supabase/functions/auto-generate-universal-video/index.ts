@@ -1198,16 +1198,14 @@ async function runGenerationPipeline(
     }
 
     // Step 5: Select Background Music (75% - 78%)
-    // r61 Phase 1: Background music DISABLED — focus on voiceover stability first
-    // Music will be re-enabled in Phase 2 once voiceover is confirmed working
-    await updateProgress(supabase, progressId, 'selecting_music', 76, '🎵 Musik wird vorbereitet...');
+    // r63 Phase 2: Background music RE-ENABLED — voiceover confirmed stable in r62
+    await updateProgress(supabase, progressId, 'selecting_music', 76, '🎵 Hintergrundmusik wird ausgewählt...');
     await delay(500);
 
-    // const musicUrl = await selectBackgroundMusic(supabase, briefing.musicStyle, briefing.musicMood, supabaseUrl, supabaseServiceKey);
-    const musicUrl: string | null = null; // r61: Phase 1 — voiceover only
-    console.log('[auto-generate] r61 Phase 1: Background music disabled, voiceover-only mode');
+    const musicUrl = await selectBackgroundMusic(supabase, briefing.musicStyle, briefing.musicMood, supabaseUrl, supabaseServiceKey);
+    console.log(`[auto-generate] r63 Phase 2: Background music ${musicUrl ? 'selected' : 'not found'}: ${musicUrl?.substring(0, 80)}`);
 
-    await updateProgress(supabase, progressId, 'music_complete', 78, '✅ Audio vorbereitet (Voiceover-Modus)');
+    await updateProgress(supabase, progressId, 'music_complete', 78, musicUrl ? '✅ Hintergrundmusik ausgewählt!' : '✅ Audio vorbereitet (nur Voiceover)');
     await delay(500);
 
     // Step 5b: Analyze Music Beats (78% - 82%)
