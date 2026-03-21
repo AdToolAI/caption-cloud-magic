@@ -2205,22 +2205,16 @@ const MUSIC_CATALOG = [
   // Corporate / Professional
   { path: 'library/corporate-professional-001.mp3', moods: ['professional', 'corporate', 'clean', 'business'], genre: 'corporate' },
   { path: 'library/corporate-professional-002.mp3', moods: ['professional', 'corporate', 'clean', 'business'], genre: 'corporate' },
-  { path: 'library/corporate-clean-001.mp3', moods: ['clean', 'corporate', 'professional', 'neutral'], genre: 'corporate' },
   // Energetic / Upbeat
   { path: 'library/energetic-upbeat-001.mp3', moods: ['energetic', 'upbeat', 'dynamic', 'werbung', 'advertisement'], genre: 'pop' },
   { path: 'library/energetic-dynamic-001.mp3', moods: ['dynamic', 'energetic', 'upbeat', 'power'], genre: 'electronic' },
   // Calm / Relaxing
-  { path: 'library/calm-relaxing-001.mp3', moods: ['calm', 'relaxing', 'tutorial', 'erklärung', 'explanation'], genre: 'ambient' },
-  { path: 'library/calm-friendly-001.mp3', moods: ['friendly', 'calm', 'light', 'warm', 'tutorial'], genre: 'acoustic' },
-  // Cinematic / Emotional
-  { path: 'library/cinematic-dramatic-001.mp3', moods: ['dramatic', 'cinematic', 'epic', 'storytelling'], genre: 'cinematic' },
-  { path: 'library/cinematic-emotional-001.mp3', moods: ['emotional', 'cinematic', 'warm', 'storytelling'], genre: 'cinematic' },
+  { path: 'library/calm-relaxing-001.mp3', moods: ['calm', 'relaxing', 'tutorial', 'erklärung', 'explanation', 'friendly', 'light', 'warm'], genre: 'ambient' },
   // Happy / Cheerful
-  { path: 'library/happy-cheerful-001.mp3', moods: ['happy', 'cheerful', 'fröhlich', 'social'], genre: 'pop' },
-  { path: 'library/happy-trendy-001.mp3', moods: ['trendy', 'happy', 'social', 'upbeat'], genre: 'pop' },
+  { path: 'library/happy-cheerful-001.mp3', moods: ['happy', 'cheerful', 'fröhlich', 'social', 'trendy'], genre: 'pop' },
   // Inspirational / Motivational
-  { path: 'library/inspirational-epic-001.mp3', moods: ['inspirational', 'epic', 'motivation', 'powerful'], genre: 'cinematic' },
-  { path: 'library/inspirational-powerful-001.mp3', moods: ['powerful', 'inspirational', 'motivation', 'epic'], genre: 'rock' },
+  { path: 'library/inspirational-epic-001.mp3', moods: ['inspirational', 'epic', 'motivation', 'powerful', 'dramatic', 'cinematic', 'storytelling'], genre: 'cinematic' },
+  { path: 'library/inspirational-powerful-001.mp3', moods: ['powerful', 'inspirational', 'motivation', 'epic', 'emotional', 'cinematic'], genre: 'rock' },
 ];
 
 // Category-to-mood mapping for briefing categories
