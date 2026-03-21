@@ -38,24 +38,30 @@ serve(async (req) => {
     if (type === 'success') {
       console.log(`✅ Render ${renderId} completed`);
 
-      // r41: Check if this was a silent render that needs audio muxing
+      // r64: Check if we need post-render audio muxing
+      // Two cases: (1) silentRender=true with any audio, (2) silentRender=false but backgroundMusic needs post-render muxing
       const isSilentRender = customData?.silentRender === true;
       const audioTracks = customData?.audioTracks;
-      const hasAudioToMux = isSilentRender && audioTracks && (audioTracks.voiceoverUrl || audioTracks.backgroundMusicUrl);
+      const hasBackgroundMusic = !!audioTracks?.backgroundMusicUrl;
+      const hasVoiceoverForMux = isSilentRender && !!audioTracks?.voiceoverUrl;
+      // r64: Mux if silentRender with any audio, OR if there's background music to add post-render
+      const hasAudioToMux = (isSilentRender && audioTracks && (audioTracks.voiceoverUrl || audioTracks.backgroundMusicUrl)) || hasBackgroundMusic;
 
-      console.log(`🔊 Audio mux diagnostics:`, {
+      console.log(`🔊 r64 Audio mux diagnostics:`, {
         isSilentRender,
         hasAudioTracks: !!audioTracks,
         voiceoverUrl: audioTracks?.voiceoverUrl ? audioTracks.voiceoverUrl.substring(0, 80) + '...' : 'NONE',
-        backgroundMusicUrl: audioTracks?.backgroundMusicUrl ? 'present' : 'NONE',
+        backgroundMusicUrl: audioTracks?.backgroundMusicUrl ? audioTracks.backgroundMusicUrl.substring(0, 80) + '...' : 'NONE',
         backgroundMusicVolume: audioTracks?.backgroundMusicVolume,
         willMux: hasAudioToMux,
+        reason: hasBackgroundMusic ? 'r64-post-render-music' : (hasVoiceoverForMux ? 'silent-render-voiceover' : 'none'),
       });
 
       let finalOutputUrl = outputFile;
 
       if (hasAudioToMux) {
-        console.log(`🔊 r41: Silent render detected — triggering audio mux...`);
+        const muxReason = hasBackgroundMusic ? 'r64 post-render background music' : 'r41 silent render audio';
+        console.log(`🔊 ${muxReason} — triggering audio mux...`);
         try {
           const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
           const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -68,7 +74,12 @@ serve(async (req) => {
             },
             body: JSON.stringify({
               videoUrl: outputFile,
-              audioTracks,
+              // r64: For post-render music muxing when video already has voiceover baked in,
+              // only pass the backgroundMusic to mux (voiceover is already in the video)
+              audioTracks: isSilentRender ? audioTracks : {
+                backgroundMusicUrl: audioTracks.backgroundMusicUrl,
+                backgroundMusicVolume: audioTracks.backgroundMusicVolume ?? 0.3,
+              },
               userId,
               renderId: pendingRenderId || renderId,
               progressId: progressIdFromWebhook,

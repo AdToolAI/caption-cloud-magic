@@ -2852,11 +2852,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     return (
       <AbsoluteFill style={{ backgroundColor: '#0f172a' }}>
       {!diagToggles.silentRender && voiceoverUrl && (
-          <Html5Audio key="stable-voiceover-audio" src={voiceoverUrl} volume={masterVolume} startFrom={0} loop={false} pauseWhenBuffering />
+          <Audio key="stable-voiceover-audio" src={voiceoverUrl} volume={masterVolume} startFrom={0} loop={false} pauseWhenBuffering />
         )}
-        {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && (
-          <Html5Audio key="stable-music-audio" src={backgroundMusicUrl} volume={backgroundMusicVolume * masterVolume} startFrom={0} loop={false} pauseWhenBuffering />
-        )}
+        {/* r64: Background music removed from template — added post-render via mux-audio-to-video */}
         
         <AbsoluteFill style={{
           background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -2908,7 +2906,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
         * Music: only plays when not stripped by audio-corruption recovery
         * ============================================================ */}
       {!diagToggles.silentRender && voiceoverUrl && (
-        <Html5Audio
+        <Audio
           key="stable-voiceover-audio"
           src={voiceoverUrl}
           volume={masterVolume}
@@ -2917,16 +2915,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
           pauseWhenBuffering
         />
       )}
-      {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && backgroundMusicUrl.startsWith('http') && (
-        <Html5Audio
-          key="stable-music-audio"
-          src={backgroundMusicUrl}
-          volume={backgroundMusicVolume * masterVolume}
-          startFrom={0}
-          loop={false}
-          pauseWhenBuffering
-        />
-      )}
+      {/* r64: Background music removed from Lambda template — added post-render via mux-audio-to-video */}
       
       {/* Render scenes as sequences */}
       {sceneTimings.map((scene, index) => {
