@@ -10,6 +10,7 @@ import { LongFormVideo, LongFormVideoSchema } from './templates/LongFormVideo';
 import { ExplainerVideo, ExplainerVideoSchema } from './templates/ExplainerVideo';
 import { UniversalCreatorVideo, UniversalCreatorVideoSchema } from './templates/UniversalCreatorVideo';
 import { SmokeTestVideo } from './templates/SmokeTestVideo';
+import { AudioSmokeTest, AudioSmokeTestSchema } from './templates/AudioSmokeTest';
 
 export const RemotionRoot: React.FC = () => {
   return (
