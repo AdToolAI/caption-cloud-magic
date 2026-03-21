@@ -1985,6 +1985,12 @@ async function runRenderOnlyPipeline(
     newPayload.framesPerLambda = newFPL;
     
     if (newPayload.webhook) {
+      // r65: Propagate audioTracks from original webhook, strip music if audioStripped
+      const originalAudioTracks = newPayload.webhook.customData?.audioTracks || {};
+      const retryAudioTracks = audioStripped 
+        ? { voiceoverUrl: originalAudioTracks.voiceoverUrl, backgroundMusicVolume: originalAudioTracks.backgroundMusicVolume ?? 0.3 }
+        : originalAudioTracks;
+      
       newPayload.webhook = {
         ...newPayload.webhook,
         url: webhookUrl,
@@ -1997,8 +2003,9 @@ async function runRenderOnlyPipeline(
           source: 'universal-creator-render-only',
           progressId: newProgressId,
           retryAttempt,
-          // r59: Audio is rendered directly, no post-mux
-          silentRender: false,
+          // r65: Use recovered state instead of hardcoded false
+          silentRender: recoveredSilentRender,
+          audioTracks: retryAudioTracks,
         },
       };
     }
