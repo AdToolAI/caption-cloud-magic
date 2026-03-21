@@ -113,27 +113,7 @@ Deno.serve(async (req) => {
     const hasVoiceover = filterParts.some(p => p.includes('[vo]'));
     const hasMusic = filterParts.some(p => p.includes('[bg]'));
 
-    if (hasVoiceover && hasMusic) {
-      // Mix voiceover + music
-      ffmpegArgs.push(
-        '-filter_complex',
-        `${filterParts.join(';')};[vo][bg]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
-        '-map', '0:v',
-        '-map', '[aout]',
-      );
-    } else if (hasVoiceover) {
-      ffmpegArgs.push(
-        '-filter_complex', filterParts[0],
-        '-map', '0:v',
-        '-map', '[vo]',
-      );
-    } else if (hasMusic) {
-      ffmpegArgs.push(
-        '-filter_complex', filterParts[0],
-        '-map', '0:v',
-        '-map', '[bg]',
-      );
-    }
+    // Filter complex will be built after duration probe (for fade-out support)
 
     // Get video duration for fade-out calculation
     let videoDuration = 0;
