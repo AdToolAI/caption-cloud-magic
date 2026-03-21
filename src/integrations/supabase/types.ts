@@ -898,6 +898,48 @@ export type Database = {
           },
         ]
       }
+      background_music_tracks: {
+        Row: {
+          created_at: string | null
+          duration_seconds: number | null
+          file_size_bytes: number | null
+          genre: string
+          id: string
+          is_valid: boolean | null
+          mood: string
+          moods: string[]
+          name: string
+          source_id: string | null
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          file_size_bytes?: number | null
+          genre: string
+          id?: string
+          is_valid?: boolean | null
+          mood: string
+          moods?: string[]
+          name: string
+          source_id?: string | null
+          storage_path: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          file_size_bytes?: number | null
+          genre?: string
+          id?: string
+          is_valid?: boolean | null
+          mood?: string
+          moods?: string[]
+          name?: string
+          source_id?: string | null
+          storage_path?: string
+        }
+        Relationships: []
+      }
       background_projects: {
         Row: {
           brand_kit_id: string | null
