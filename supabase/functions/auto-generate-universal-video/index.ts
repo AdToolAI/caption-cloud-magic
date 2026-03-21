@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r66-internal-music-catalog-2026-03-21";
+const AUTO_GEN_BUILD_TAG = "r67-music-direct-render-2026-03-21";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -1442,9 +1442,10 @@ async function runGenerationPipeline(
       fontFamily: briefing.fontFamily || 'Inter',
       style: validateEnum(briefing.visualStyle, VALID_STYLES, 'modern-3d'),
       voiceoverUrl: isBareMinimum ? undefined : (voiceoverUrl || undefined),
-      // r64: backgroundMusicUrl removed from inputProps — music added post-render via mux-audio-to-video
-      // This prevents Lambda ffprobe crashes on Jamendo/Pixabay MP3 encoding variants
-      backgroundMusicVolume: 0,
+      // r67: backgroundMusicUrl back in inputProps — rendered directly in Lambda via <Audio />
+      // Internal curated tracks from Supabase Storage are pre-validated (no ffprobe crashes)
+      backgroundMusicUrl: isBareMinimum ? undefined : (musicUrl || undefined),
+      backgroundMusicVolume: isBareMinimum ? 0 : 0.15,
       masterVolume: 1,
       useCharacter: isBareMinimum ? false : ((disableCharacter || disableAllLottie) ? false : (briefing.hasCharacter !== false)),
       // r44: forceCharacterSvg ensures SVG character (no <Lottie> mount) while keeping character visible
