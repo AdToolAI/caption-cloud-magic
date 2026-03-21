@@ -1,82 +1,41 @@
-# Plan: Voiceover Phase 1 — Audio direkt im Lambda-Render
 
-## Status: ✅ Implementiert (r62)
 
-## Was wurde geändert
+# Plan: Edge Functions redeployen + Musik-Seed ausführen
 
-### r59: Direct Audio Rendering
-- `_silentRender: false` + `muted: false` + `audioCodec: 'aac'` — Audio wird direkt im Lambda gerendert
-- Gender-Mapping (`male`→`roger`, `female`→`sarah`) in `generate-video-voiceover`
+## Diagnose
 
-### r60: Audio-Corruption Fix — MP3-Validierung + Smart Recovery
-- **Magic-Byte-Validierung** in `proxyAudioToStorage`: Prüft ID3-Header (`0x49 0x44 0x33`) und MPEG frame sync (`0xFF 0xE0+`) — HTML-Fehlerseiten werden erkannt und verworfen
-- **Intelligente Retry-Logik**: Bei `audio_corruption` wird nur die Background-Music entfernt, Voiceover bleibt erhalten
-- Nur wenn kein Voiceover vorhanden → Fallback auf `silentRender: true`
+**Die r66-Änderungen wurden nie deployed.** Die Runtime-Logs zeigen `BUILD_TAG=r59`, obwohl der Code im Repo bereits den MUSIC_CATALOG und die interne Musikauswahl enthält. Zusätzlich wurde die `seed-background-music` Funktion nie aufgerufen — der `background-music` Storage-Bucket ist leer.
 
-### r61: Voiceover-Audio wirklich hörbar machen
-- **Template-Fix**: `r33_audioStripped` blockiert jetzt NUR noch Musik/SFX, nicht mehr das Voiceover
-  - Voiceover-Bedingung: `!silentRender && voiceoverUrl` (unabhängig von `r33_audioStripped`)
-  - Musik-Bedingung: `!silentRender && !r33_audioStripped && backgroundMusicUrl`
-  - SFX-Bedingung: `!silentRender && !r33_audioStripped`
-- **Export-Pfad**: `render-with-remotion` und `render-universal-video` setzen jetzt `muted: false` + `audioCodec: 'aac'`
-- **Phase 1 Voiceover-Only**: Background-Music temporär deaktiviert bis Voiceover stabil bestätigt
+Das erklärt, warum nie Hintergrundmusik ankommt:
+- Im **deployed** Code (r59) wird noch die alte Jamendo-basierte Musiksuche verwendet
+- Diese scheitert konsistent (HTML statt MP3), daher `musicUrl = null`
+- Der Webhook bekommt `backgroundMusicUrl: "NONE"` → kein Muxing
 
-### r62: Unified Audio Layer — UCC-Architektur portiert
-- **Kernproblem**: Doppeltes Voiceover — Root-Level `Html5Audio` UND `SceneAudioManager` renderten beide Voiceover
-- **Fix**: `SceneAudioManager` komplett durch einfachen Root-Level `Html5Audio`-Layer ersetzt (wie in `UniversalVideo.tsx`)
-  - Voiceover: `<Html5Audio key="stable-voiceover-audio" startFrom={0} loop={false} />`
-  - Musik: `<Html5Audio key="stable-music-audio" startFrom={0} loop={false} />`
-- **Diagnostik-Fix**: `effectiveFlags.silentRender` in `auto-generate-universal-video` zeigt jetzt den echten Payload-Wert statt hart `true`
-- Stabile Keys (`key="stable-voiceover-audio"`) verhindern unnötiges Remounting
+## Was zu tun ist
 
-### Änderungen
+### Schritt 1: BUILD_TAG auf r66 aktualisieren
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
 
-| Datei | Änderung |
-|-------|----------|
-| `src/remotion/templates/UniversalCreatorVideo.tsx` | r62: SceneAudioManager durch einfachen Html5Audio-Layer ersetzt |
-| `supabase/functions/auto-generate-universal-video/index.ts` | r62: effectiveFlags.silentRender Diagnostik korrigiert |
+Den BUILD_TAG von `r59-audio-direct-render-2026-03-20` auf `r66-internal-music-catalog-2026-03-21` ändern, damit wir in den Logs sehen können, dass die richtige Version läuft.
 
-## Phase 2: ✅ Implementiert (r63)
-- Background music re-aktiviert via `selectBackgroundMusic()`
-- Musik wird über den stabilen Root-Level `Html5Audio`-Layer gerendert (r62-Architektur)
-- Bei `audio_corruption` wird nur Musik entfernt, Voiceover bleibt erhalten
+### Schritt 2: Edge Functions deployen
+Alle drei betroffenen Funktionen deployen:
+- `auto-generate-universal-video` (MUSIC_CATALOG + interne Auswahl)
+- `mux-audio-to-video` (Fade-Out + Duration-Trimming)
+- `seed-background-music` (zum Befüllen des Buckets)
 
-## Phase 3: ✅ Implementiert (r64) — Post-Render Music Muxing
-- **Problem**: Jamendo/Pixabay MP3s crashen Lambda ffprobe trotz gültiger Magic Bytes (Encoding-Varianten)
-- **Lösung**: Musik wird NICHT mehr im Lambda-Template gerendert, sondern post-render via `mux-audio-to-video` (FFmpeg) hinzugefügt
-- **Template**: `Html5Audio` → Remotion `Audio` für Voiceover, Musik komplett entfernt aus Template
-- **auto-generate**: `backgroundMusicUrl` aus `inputProps` entfernt, nur noch in `customData.audioTracks`
-- **Webhook**: Erkennt `backgroundMusicUrl` in `audioTracks` und triggert `mux-audio-to-video` auch bei `silentRender=false`
-- **Ergebnis**: Lambda rendert stabil Video+Voiceover, FFmpeg fügt Musik sicher hinzu
+### Schritt 3: Seed-Funktion aufrufen
+`seed-background-music` ausführen, um die 8 kuratierten Tracks in den `background-music` Bucket hochzuladen.
+
+### Schritt 4: Validieren
+Prüfen, dass die Tracks im Storage liegen und die URLs erreichbar sind.
+
+## Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `src/remotion/templates/UniversalCreatorVideo.tsx` | r64: Html5Audio→Audio, Musik aus Template entfernt |
-| `supabase/functions/auto-generate-universal-video/index.ts` | r64: backgroundMusicUrl aus inputProps entfernt |
-| `supabase/functions/remotion-webhook/index.ts` | r64: Post-render music muxing für non-silent renders |
+| `supabase/functions/auto-generate-universal-video/index.ts` | BUILD_TAG aktualisieren |
 
-## Phase 4: ✅ Implementiert (r65) — Retry Scope-Bug Fix + Musik-Pipeline Hardening
-- **Scope-Bug**: `props` war nur innerhalb eines `try`-Blocks definiert, wurde aber außerhalb referenziert → `ReferenceError: props is not defined`
-- **Fix**: `recoveredSilentRender` und `recoveredHasVoiceover` werden vor dem `try`-Block deklariert und innerhalb gesetzt
-- **Retry audioTracks**: Webhook customData propagiert jetzt `audioTracks` korrekt, strippt Musik bei `audioStripped`
-- **Pixabay-Fallback entfernt**: Unreliable externe Fallback-URLs (konsistent HTML statt MP3) durch graceful `null`-Return ersetzt
+## Technischer Kern
+Der Code ist korrekt, er war nur nie deployed. Nach dem Deployment + Seed sollte die Musik funktionieren.
 
-| Datei | Änderung |
-|-------|----------|
-| `supabase/functions/auto-generate-universal-video/index.ts` | r65: Scope-Bug fix, audioTracks in Retry, Pixabay-Fallback entfernt |
-
-## Phase 5: ✅ Implementiert (r66) — Kuratierte Musik-Bibliothek
-
-- **Problem**: Jamendo-URLs liefern konsistent HTML statt MP3 → `audio_corruption` bei jedem Render
-- **Lösung**: Interne Musik-Bibliothek in Supabase Storage (`background-music/library/`)
-- **8 validierte Tracks** nach Mood/Kategorie: Corporate, Energetic, Calm, Happy, Cinematic, Inspirational
-- **selectBackgroundMusic** komplett ersetzt: MUSIC_CATALOG-Konstante statt Jamendo-API-Call
-- **Mood-Matching**: KI wählt Track basierend auf Briefing-Stimmung (professional, upbeat, calm, etc.)
-- **FFmpeg Fade-Out**: 3s Fade-Out am Ende des Tracks via `afade` Filter in `mux-audio-to-video`
-- **seed-background-music**: Einmalige Edge Function zum Befüllen des Storage-Buckets
-
-| Datei | Änderung |
-|-------|----------|
-| `supabase/functions/seed-background-music/index.ts` | Neu: Seed-Funktion für Musik-Bibliothek |
-| `supabase/functions/auto-generate-universal-video/index.ts` | r66: MUSIC_CATALOG + internes Mood-Matching |
-| `supabase/functions/mux-audio-to-video/index.ts` | r66: Fade-Out + Duration-Probe |
