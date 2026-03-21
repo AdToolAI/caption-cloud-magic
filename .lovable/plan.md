@@ -1,43 +1,50 @@
 
-# Plan: Voiceover Phase 1 — Audio direkt im Lambda-Render
 
-## Status: ✅ Implementiert (r62)
+# Plan: Hintergrundmusik zum Laufen bringen
 
-## Was wurde geändert
+## Problem
 
-### r59: Direct Audio Rendering
-- `_silentRender: false` + `muted: false` + `audioCodec: 'aac'` — Audio wird direkt im Lambda gerendert
-- Gender-Mapping (`male`→`roger`, `female`→`sarah`) in `generate-video-voiceover`
+Die Logs zeigen eindeutig: **Jeder Render crasht beim ersten Versuch** mit `audio_corruption` wegen der Hintergrundmusik. Der Retry entfernt dann die Musik und behält nur das Voiceover. Das passiert konsistent — die Musik kommt nie im fertigen Video an.
 
-### r60: Audio-Corruption Fix — MP3-Validierung + Smart Recovery
-- **Magic-Byte-Validierung** in `proxyAudioToStorage`: Prüft ID3-Header (`0x49 0x44 0x33`) und MPEG frame sync (`0xFF 0xE0+`) — HTML-Fehlerseiten werden erkannt und verworfen
-- **Intelligente Retry-Logik**: Bei `audio_corruption` wird nur die Background-Music entfernt, Voiceover bleibt erhalten
-- Nur wenn kein Voiceover vorhanden → Fallback auf `silentRender: true`
+**Ursache:** Die Musik-MP3s von Jamendo haben gültige Magic Bytes (bestehen die r60-Validierung), aber enthalten Encoding-Eigenheiten, die ffprobe in der Lambda-Umgebung nicht verarbeiten kann. Es gibt kein ffmpeg in Edge Functions, um die Dateien vor dem Upload zu re-encoden.
 
-### r61: Voiceover-Audio wirklich hörbar machen
-- **Template-Fix**: `r33_audioStripped` blockiert jetzt NUR noch Musik/SFX, nicht mehr das Voiceover
-  - Voiceover-Bedingung: `!silentRender && voiceoverUrl` (unabhängig von `r33_audioStripped`)
-  - Musik-Bedingung: `!silentRender && !r33_audioStripped && backgroundMusicUrl`
-  - SFX-Bedingung: `!silentRender && !r33_audioStripped`
-- **Export-Pfad**: `render-with-remotion` und `render-universal-video` setzen jetzt `muted: false` + `audioCodec: 'aac'`
-- **Phase 1 Voiceover-Only**: Background-Music temporär deaktiviert bis Voiceover stabil bestätigt
+## Lösung: Zweistufiger Ansatz
 
-### r62: Unified Audio Layer — UCC-Architektur portiert
-- **Kernproblem**: Doppeltes Voiceover — Root-Level `Html5Audio` UND `SceneAudioManager` renderten beide Voiceover
-- **Fix**: `SceneAudioManager` komplett durch einfachen Root-Level `Html5Audio`-Layer ersetzt (wie in `UniversalVideo.tsx`)
-  - Voiceover: `<Html5Audio key="stable-voiceover-audio" startFrom={0} loop={false} />`
-  - Musik: `<Html5Audio key="stable-music-audio" startFrom={0} loop={false} />`
-- **Diagnostik-Fix**: `effectiveFlags.silentRender` in `auto-generate-universal-video` zeigt jetzt den echten Payload-Wert statt hart `true`
-- Stabile Keys (`key="stable-voiceover-audio"`) verhindern unnötiges Remounting
+### Schritt 1: Audio-Rendering im Template von `Html5Audio` auf `Audio` umstellen
+**Datei:** `src/remotion/templates/UniversalCreatorVideo.tsx`
 
-### Änderungen
+`Html5Audio` ist für Browser-Preview gedacht. Für den Lambda-Render ist die Remotion `Audio`-Komponente robuster und toleranter gegenüber Encoding-Varianten. Der Universal Content Creator (`UniversalVideo.tsx`) nutzt möglicherweise bereits `Audio` — ich prüfe das und gleiche die Implementierung an.
+
+### Schritt 2: Musik direkt ins Lambda-Rendering einbinden statt über Template
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+
+Statt die Musik-URL als `inputProps` an das Template zu übergeben (wo ffprobe sie beim Bundling analysiert und crasht), die Musik **als separaten Audio-Track im Lambda-Render-Aufruf** übergeben. Remotion Lambda unterstützt einen `audioTracks`-Parameter, der Audio extern beimixt — ähnlich wie der `mux-audio-to-video` Ansatz, aber nativ in Lambda.
+
+Falls `audioTracks` in der aktuellen Lambda-Version nicht verfügbar ist, Alternative:
+
+### Schritt 2b: Post-Render Audio-Muxing für Musik
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+
+Nach dem erfolgreichen Voiceover-Render die Musik separat via `mux-audio-to-video` Edge Function (FFmpeg) auf das fertige Video legen. Der Ablauf wäre:
+1. Lambda rendert Video + Voiceover (funktioniert bereits stabil)
+2. Nach Webhook-Callback: `mux-audio-to-video` fügt Musik hinzu (mit niedrigerem Volume)
+3. Fertiges Video hat beides
+
+### Schritt 3: Fallback-Musik auf bekannt funktionierende Dateien umstellen
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+
+Die Pixabay-Fallback-URLs (Zeilen 2250-2257) durch vorvalidierte, in Supabase Storage hochgeladene MP3s ersetzen. Damit ist die Musikquelle immer kontrolliert.
+
+## Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `src/remotion/templates/UniversalCreatorVideo.tsx` | r62: SceneAudioManager durch einfachen Html5Audio-Layer ersetzt |
-| `supabase/functions/auto-generate-universal-video/index.ts` | r62: effectiveFlags.silentRender Diagnostik korrigiert |
+| `src/remotion/templates/UniversalCreatorVideo.tsx` | `Html5Audio` → `Audio` für Lambda-Kompatibilität |
+| `supabase/functions/auto-generate-universal-video/index.ts` | Post-Render Musik-Muxing oder Lambda audioTracks |
+| `supabase/functions/remotion-webhook/index.ts` | Musik-Muxing nach erfolgreichem Render triggern |
 
-## Phase 2: ✅ Implementiert (r63)
-- Background music re-aktiviert via `selectBackgroundMusic()`
-- Musik wird über den stabilen Root-Level `Html5Audio`-Layer gerendert (r62-Architektur)
-- Bei `audio_corruption` wird nur Musik entfernt, Voiceover bleibt erhalten
+## Erwartetes Ergebnis
+- Voiceover bleibt stabil (wie bisher)
+- Hintergrundmusik wird zuverlässig hinzugefügt, ohne Lambda-Crashes
+- Kein `audio_corruption` Retry mehr nötig
+
