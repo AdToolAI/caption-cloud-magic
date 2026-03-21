@@ -2200,81 +2200,107 @@ async function proxyAudioToStorage(
   }
 }
 
+// r66: Internal curated music library — no external API calls during render
+const MUSIC_CATALOG = [
+  // Corporate / Professional
+  { path: 'library/corporate-professional-001.mp3', moods: ['professional', 'corporate', 'clean', 'business'], genre: 'corporate' },
+  { path: 'library/corporate-professional-002.mp3', moods: ['professional', 'corporate', 'clean', 'business'], genre: 'corporate' },
+  // Energetic / Upbeat
+  { path: 'library/energetic-upbeat-001.mp3', moods: ['energetic', 'upbeat', 'dynamic', 'werbung', 'advertisement'], genre: 'pop' },
+  { path: 'library/energetic-dynamic-001.mp3', moods: ['dynamic', 'energetic', 'upbeat', 'power'], genre: 'electronic' },
+  // Calm / Relaxing
+  { path: 'library/calm-relaxing-001.mp3', moods: ['calm', 'relaxing', 'tutorial', 'erklärung', 'explanation', 'friendly', 'light', 'warm'], genre: 'ambient' },
+  // Happy / Cheerful
+  { path: 'library/happy-cheerful-001.mp3', moods: ['happy', 'cheerful', 'fröhlich', 'social', 'trendy'], genre: 'pop' },
+  // Inspirational / Motivational
+  { path: 'library/inspirational-epic-001.mp3', moods: ['inspirational', 'epic', 'motivation', 'powerful', 'dramatic', 'cinematic', 'storytelling'], genre: 'cinematic' },
+  { path: 'library/inspirational-powerful-001.mp3', moods: ['powerful', 'inspirational', 'motivation', 'epic', 'emotional', 'cinematic'], genre: 'rock' },
+];
+
+// Category-to-mood mapping for briefing categories
+const CATEGORY_MOOD_MAP: Record<string, string[]> = {
+  'corporate': ['professional', 'corporate', 'clean'],
+  'business': ['professional', 'corporate', 'clean'],
+  'werbung': ['energetic', 'upbeat', 'dynamic'],
+  'advertisement': ['energetic', 'upbeat', 'dynamic'],
+  'marketing': ['energetic', 'upbeat', 'dynamic'],
+  'storytelling': ['emotional', 'cinematic', 'warm'],
+  'tutorial': ['calm', 'friendly', 'light'],
+  'erklärung': ['calm', 'friendly', 'light'],
+  'explanation': ['calm', 'friendly', 'light'],
+  'social': ['happy', 'trendy', 'upbeat'],
+  'social media': ['happy', 'trendy', 'upbeat'],
+  'motivation': ['inspirational', 'epic', 'powerful'],
+  'inspirational': ['inspirational', 'epic', 'powerful'],
+};
+
 async function selectBackgroundMusic(
   supabase: any,
   style: string,
   mood: string,
   supabaseUrl: string,
-  serviceKey: string
+  _serviceKey: string
 ): Promise<string | null> {
-  // r39C: Fetch multiple candidates and validate via HEAD request
-  let candidateUrl: string | null = null;
+  console.log(`[selectBackgroundMusic] r66: Using internal catalog. style="${style}", mood="${mood}"`);
 
+  // Build search terms from style and mood
+  const searchTerms = [
+    ...(style || '').toLowerCase().split(/[\s,]+/),
+    ...(mood || '').toLowerCase().split(/[\s,]+/),
+  ].filter(Boolean);
+
+  // Expand via category map
+  const expandedTerms = new Set(searchTerms);
+  for (const term of searchTerms) {
+    const mapped = CATEGORY_MOOD_MAP[term];
+    if (mapped) mapped.forEach(m => expandedTerms.add(m));
+  }
+
+  console.log(`[selectBackgroundMusic] Search terms: ${[...expandedTerms].join(', ')}`);
+
+  // Score each track by mood match count
+  const scored = MUSIC_CATALOG.map(track => {
+    const score = track.moods.filter(m => expandedTerms.has(m)).length;
+    return { ...track, score };
+  });
+
+  // Sort by score descending, then pick randomly from top matches
+  scored.sort((a, b) => b.score - a.score);
+  const maxScore = scored[0]?.score || 0;
+  const topMatches = scored.filter(t => t.score === maxScore && t.score > 0);
+
+  // If no mood match, use all tracks as fallback
+  const candidates = topMatches.length > 0 ? topMatches : MUSIC_CATALOG;
+  const selected = candidates[Math.floor(Math.random() * candidates.length)];
+
+  console.log(`[selectBackgroundMusic] Selected: ${selected.path} (score: ${selected.score || 0}, from ${candidates.length} candidates)`);
+
+  // Construct public URL from Supabase Storage
+  const { data: urlData } = supabase.storage
+    .from('background-music')
+    .getPublicUrl(selected.path);
+
+  const publicUrl = urlData?.publicUrl;
+  if (!publicUrl) {
+    console.warn('[selectBackgroundMusic] Could not construct public URL');
+    return null;
+  }
+
+  // Quick HEAD check to verify the file actually exists in storage
   try {
-    const searchResponse = await fetch(`${supabaseUrl}/functions/v1/search-stock-music`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${serviceKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: `${style} ${mood}`,
-        limit: 5,
-      }),
-    });
-
-    if (searchResponse.ok) {
-      const { results } = await searchResponse.json();
-      if (results?.length) {
-        for (const track of results) {
-          const url = track?.url;
-          if (!url) continue;
-          try {
-            const headResp = await fetch(url, { method: 'HEAD' });
-            if (!headResp.ok) {
-              console.warn(`[selectBackgroundMusic] HEAD failed for ${url}: ${headResp.status}`);
-              continue;
-            }
-            const contentType = headResp.headers.get('content-type') || '';
-            const contentLength = parseInt(headResp.headers.get('content-length') || '0', 10);
-            if (!contentType.startsWith('audio/') && !contentType.includes('mpeg') && !contentType.includes('mp3')) {
-              console.warn(`[selectBackgroundMusic] invalid content-type: ${contentType} for ${url}`);
-              continue;
-            }
-            if (contentLength < 10000) {
-              console.warn(`[selectBackgroundMusic] too small: ${contentLength} bytes for ${url}`);
-              continue;
-            }
-            console.log(`[selectBackgroundMusic] validated: ${url} (${contentType}, ${contentLength} bytes)`);
-            candidateUrl = url;
-            break;
-          } catch (headErr) {
-            console.warn(`[selectBackgroundMusic] HEAD error for ${url}:`, headErr);
-            continue;
-          }
-        }
-      }
+    const headResp = await fetch(publicUrl, { method: 'HEAD' });
+    if (!headResp.ok) {
+      console.warn(`[selectBackgroundMusic] Track not in storage (${headResp.status}): ${selected.path}. Run seed-background-music first.`);
+      return null;
     }
+    const contentLength = parseInt(headResp.headers.get('content-length') || '0', 10);
+    console.log(`[selectBackgroundMusic] ✅ Verified in storage: ${selected.path} (${(contentLength / 1024).toFixed(0)} KB)`);
   } catch (e) {
-    console.error('[auto-generate-universal-video] Music search failed:', e);
-  }
-
-  // r65: Skip unreliable external fallback URLs — they consistently return HTML instead of MP3
-  // Background music is optional; better to render without music than crash the Lambda
-  if (!candidateUrl) {
-    console.warn('[selectBackgroundMusic] No valid music candidate found, skipping background music');
+    console.warn('[selectBackgroundMusic] HEAD check failed:', e);
     return null;
   }
 
-  // Proxy external URL to Supabase Storage to avoid hotlink 403 from Lambda
-  if (candidateUrl && !candidateUrl.includes('supabase.co')) {
-    const proxied = await proxyAudioToStorage(supabase, candidateUrl, 'bg-music');
-    if (proxied) return proxied;
-    console.warn('[selectBackgroundMusic] Proxy failed, returning null to avoid 403 in Lambda');
-    return null;
-  }
-
-  return candidateUrl;
+  return publicUrl;
 }
 
 async function generateAIFallbackImage(

@@ -1,67 +1,82 @@
+# Plan: Voiceover Phase 1 — Audio direkt im Lambda-Render
 
-# Plan: Kuratierte Musik-Bibliothek mit Kategorie-Mapping
+## Status: ✅ Implementiert (r62)
 
-## Idee
-Statt bei jedem Render auf die unzuverlässige Jamendo API zu setzen, eine **feste Bibliothek validierter Tracks** in Supabase Storage (`background-music` Bucket, existiert bereits) vorhalten. Die KI wählt basierend auf Kategorie/Mood einen passenden Track aus der Liste, ein zufälliger Abschnitt in der Video-Länge wird per FFmpeg geschnitten und als Hintergrundmusik hinzugefügt.
+## Was wurde geändert
 
-## Umsetzung
+### r59: Direct Audio Rendering
+- `_silentRender: false` + `muted: false` + `audioCodec: 'aac'` — Audio wird direkt im Lambda gerendert
+- Gender-Mapping (`male`→`roger`, `female`→`sarah`) in `generate-video-voiceover`
 
-### Schritt 1: Seed-Edge-Function — Tracks herunterladen und in Storage speichern
-**Neue Datei:** `supabase/functions/seed-background-music/index.ts`
+### r60: Audio-Corruption Fix — MP3-Validierung + Smart Recovery
+- **Magic-Byte-Validierung** in `proxyAudioToStorage`: Prüft ID3-Header (`0x49 0x44 0x33`) und MPEG frame sync (`0xFF 0xE0+`) — HTML-Fehlerseiten werden erkannt und verworfen
+- **Intelligente Retry-Logik**: Bei `audio_corruption` wird nur die Background-Music entfernt, Voiceover bleibt erhalten
+- Nur wenn kein Voiceover vorhanden → Fallback auf `silentRender: true`
 
-Einmalige Funktion die 10-15 lizenzfreie Tracks (von Jamendo Streaming-URLs, die zuverlässiger sind als Download-URLs) herunterlädt, Magic-Bytes validiert und in den `background-music` Bucket hochlädt. Dateinamen enthalten Mood-Tags, z.B.:
-- `corporate-professional-001.mp3`
-- `energetic-upbeat-001.mp3`
-- `calm-relaxing-001.mp3`
-- `cinematic-dramatic-001.mp3`
-- `happy-cheerful-001.mp3`
+### r61: Voiceover-Audio wirklich hörbar machen
+- **Template-Fix**: `r33_audioStripped` blockiert jetzt NUR noch Musik/SFX, nicht mehr das Voiceover
+  - Voiceover-Bedingung: `!silentRender && voiceoverUrl` (unabhängig von `r33_audioStripped`)
+  - Musik-Bedingung: `!silentRender && !r33_audioStripped && backgroundMusicUrl`
+  - SFX-Bedingung: `!silentRender && !r33_audioStripped`
+- **Export-Pfad**: `render-with-remotion` und `render-universal-video` setzen jetzt `muted: false` + `audioCodec: 'aac'`
+- **Phase 1 Voiceover-Only**: Background-Music temporär deaktiviert bis Voiceover stabil bestätigt
 
-### Schritt 2: Musik-Katalog als Konstante
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+### r62: Unified Audio Layer — UCC-Architektur portiert
+- **Kernproblem**: Doppeltes Voiceover — Root-Level `Html5Audio` UND `SceneAudioManager` renderten beide Voiceover
+- **Fix**: `SceneAudioManager` komplett durch einfachen Root-Level `Html5Audio`-Layer ersetzt (wie in `UniversalVideo.tsx`)
+  - Voiceover: `<Html5Audio key="stable-voiceover-audio" startFrom={0} loop={false} />`
+  - Musik: `<Html5Audio key="stable-music-audio" startFrom={0} loop={false} />`
+- **Diagnostik-Fix**: `effectiveFlags.silentRender` in `auto-generate-universal-video` zeigt jetzt den echten Payload-Wert statt hart `true`
+- Stabile Keys (`key="stable-voiceover-audio"`) verhindern unnötiges Remounting
 
-Eine `MUSIC_CATALOG`-Konstante mit Track-Metadaten (Storage-Pfad, Mood-Tags, Genre, Dauer). Die `selectBackgroundMusic`-Funktion wird komplett ersetzt:
-
-1. Mood/Style aus dem Briefing matchen → passende Tracks filtern
-2. Zufällig einen Track auswählen
-3. Public URL aus Supabase Storage konstruieren (kein Jamendo-API-Call, kein HEAD-Check, kein Proxy nötig)
-
-### Schritt 3: Track auf Video-Länge schneiden via mux-audio-to-video
-**Datei:** `supabase/functions/mux-audio-to-video/index.ts`
-
-FFmpeg-Befehl erweitern: Der Track wird mit `-t {videoDuration}` auf die exakte Video-Länge geschnitten und mit Fade-Out (letzte 3 Sekunden) versehen. Da `mux-audio-to-video` bereits FFmpeg nutzt, ist das ein minimaler Zusatz:
-```
--af "afade=t=out:st={duration-3}:d=3"
-```
-
-### Schritt 4: Pipeline-Integration
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
-
-- `selectBackgroundMusic` nutzt nur noch den internen Katalog
-- Musik-URL wird wie bisher in `customData.audioTracks.backgroundMusicUrl` geschrieben
-- Webhook → `mux-audio-to-video` Pfad bleibt unverändert (funktioniert bereits)
-- Kein Jamendo-API-Call mehr im Render-Pfad
-
-## Kategorie-Mood-Mapping
-
-| Kategorie | Mood-Tags |
-|-----------|-----------|
-| Corporate/Business | professional, corporate, clean |
-| Werbung/Advertisement | energetic, upbeat, dynamic |
-| Storytelling | emotional, cinematic, warm |
-| Tutorial/Erklärung | calm, friendly, light |
-| Social Media | happy, trendy, upbeat |
-| Motivation | inspirational, epic, powerful |
-
-## Betroffene Dateien
+### Änderungen
 
 | Datei | Änderung |
 |-------|----------|
-| `supabase/functions/seed-background-music/index.ts` | Neu: Einmalige Seed-Funktion |
-| `supabase/functions/auto-generate-universal-video/index.ts` | `selectBackgroundMusic` auf internen Katalog umstellen |
-| `supabase/functions/mux-audio-to-video/index.ts` | Fade-Out + Dauer-Trimming hinzufügen |
+| `src/remotion/templates/UniversalCreatorVideo.tsx` | r62: SceneAudioManager durch einfachen Html5Audio-Layer ersetzt |
+| `supabase/functions/auto-generate-universal-video/index.ts` | r62: effectiveFlags.silentRender Diagnostik korrigiert |
 
-## Warum das funktioniert
-- Tracks liegen in Supabase Storage → gleiche Domain, kein CORS, kein 403, kein HTML statt MP3
-- Einmal validiert, immer gültig — keine externen API-Abhängigkeiten im Render-Pfad
-- FFmpeg schneidet den Track auf die Video-Länge → kein abruptes Ende
-- Exakt das Prinzip das beim Universal Content Creator funktioniert
+## Phase 2: ✅ Implementiert (r63)
+- Background music re-aktiviert via `selectBackgroundMusic()`
+- Musik wird über den stabilen Root-Level `Html5Audio`-Layer gerendert (r62-Architektur)
+- Bei `audio_corruption` wird nur Musik entfernt, Voiceover bleibt erhalten
+
+## Phase 3: ✅ Implementiert (r64) — Post-Render Music Muxing
+- **Problem**: Jamendo/Pixabay MP3s crashen Lambda ffprobe trotz gültiger Magic Bytes (Encoding-Varianten)
+- **Lösung**: Musik wird NICHT mehr im Lambda-Template gerendert, sondern post-render via `mux-audio-to-video` (FFmpeg) hinzugefügt
+- **Template**: `Html5Audio` → Remotion `Audio` für Voiceover, Musik komplett entfernt aus Template
+- **auto-generate**: `backgroundMusicUrl` aus `inputProps` entfernt, nur noch in `customData.audioTracks`
+- **Webhook**: Erkennt `backgroundMusicUrl` in `audioTracks` und triggert `mux-audio-to-video` auch bei `silentRender=false`
+- **Ergebnis**: Lambda rendert stabil Video+Voiceover, FFmpeg fügt Musik sicher hinzu
+
+| Datei | Änderung |
+|-------|----------|
+| `src/remotion/templates/UniversalCreatorVideo.tsx` | r64: Html5Audio→Audio, Musik aus Template entfernt |
+| `supabase/functions/auto-generate-universal-video/index.ts` | r64: backgroundMusicUrl aus inputProps entfernt |
+| `supabase/functions/remotion-webhook/index.ts` | r64: Post-render music muxing für non-silent renders |
+
+## Phase 4: ✅ Implementiert (r65) — Retry Scope-Bug Fix + Musik-Pipeline Hardening
+- **Scope-Bug**: `props` war nur innerhalb eines `try`-Blocks definiert, wurde aber außerhalb referenziert → `ReferenceError: props is not defined`
+- **Fix**: `recoveredSilentRender` und `recoveredHasVoiceover` werden vor dem `try`-Block deklariert und innerhalb gesetzt
+- **Retry audioTracks**: Webhook customData propagiert jetzt `audioTracks` korrekt, strippt Musik bei `audioStripped`
+- **Pixabay-Fallback entfernt**: Unreliable externe Fallback-URLs (konsistent HTML statt MP3) durch graceful `null`-Return ersetzt
+
+| Datei | Änderung |
+|-------|----------|
+| `supabase/functions/auto-generate-universal-video/index.ts` | r65: Scope-Bug fix, audioTracks in Retry, Pixabay-Fallback entfernt |
+
+## Phase 5: ✅ Implementiert (r66) — Kuratierte Musik-Bibliothek
+
+- **Problem**: Jamendo-URLs liefern konsistent HTML statt MP3 → `audio_corruption` bei jedem Render
+- **Lösung**: Interne Musik-Bibliothek in Supabase Storage (`background-music/library/`)
+- **8 validierte Tracks** nach Mood/Kategorie: Corporate, Energetic, Calm, Happy, Cinematic, Inspirational
+- **selectBackgroundMusic** komplett ersetzt: MUSIC_CATALOG-Konstante statt Jamendo-API-Call
+- **Mood-Matching**: KI wählt Track basierend auf Briefing-Stimmung (professional, upbeat, calm, etc.)
+- **FFmpeg Fade-Out**: 3s Fade-Out am Ende des Tracks via `afade` Filter in `mux-audio-to-video`
+- **seed-background-music**: Einmalige Edge Function zum Befüllen des Storage-Buckets
+
+| Datei | Änderung |
+|-------|----------|
+| `supabase/functions/seed-background-music/index.ts` | Neu: Seed-Funktion für Musik-Bibliothek |
+| `supabase/functions/auto-generate-universal-video/index.ts` | r66: MUSIC_CATALOG + internes Mood-Matching |
+| `supabase/functions/mux-audio-to-video/index.ts` | r66: Fade-Out + Duration-Probe |
