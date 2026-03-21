@@ -1916,6 +1916,10 @@ async function runRenderOnlyPipeline(
     newPayload.fps = fps;
     newPayload.frameRange = [0, dif - 1];
     
+    // r65: Track recovered audio state OUTSIDE the try block to avoid scope bugs
+    let recoveredSilentRender = false;
+    let recoveredHasVoiceover = false;
+    
     // Also update inputProps if they contain fps/durationInFrames + r32: inject Lottie fallback flags + r41: silentRender
     if (newPayload.inputProps?.type === 'payload') {
       try {
@@ -1952,15 +1956,17 @@ async function runRenderOnlyPipeline(
           // Keep voiceover — ElevenLabs audio is reliable
           if (props.voiceoverUrl) {
             console.log(`[render-only] 🎤 r60 KEEPING voiceoverUrl: ${props.voiceoverUrl.substring(0, 60)}...`);
-            // Keep silentRender=false so voiceover still plays
             props.diag.silentRender = false;
           } else {
-            // No voiceover either — fall back to fully silent
             props.diag.silentRender = true;
             console.log(`[render-only] 🔇 r60 No voiceover available, falling back to silent render`);
           }
           console.log(`[render-only] 🔊 r60 audio corruption recovery: music stripped, voiceover=${!!props.voiceoverUrl}, silentRender=${props.diag.silentRender}`);
         }
+        
+        // r65: Capture recovered state for use outside try block
+        recoveredHasVoiceover = !!props.voiceoverUrl;
+        recoveredSilentRender = props.diag?.silentRender ?? false;
         
         newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
       } catch (e) {
@@ -1979,6 +1985,12 @@ async function runRenderOnlyPipeline(
     newPayload.framesPerLambda = newFPL;
     
     if (newPayload.webhook) {
+      // r65: Propagate audioTracks from original webhook, strip music if audioStripped
+      const originalAudioTracks = newPayload.webhook.customData?.audioTracks || {};
+      const retryAudioTracks = audioStripped 
+        ? { voiceoverUrl: originalAudioTracks.voiceoverUrl, backgroundMusicVolume: originalAudioTracks.backgroundMusicVolume ?? 0.3 }
+        : originalAudioTracks;
+      
       newPayload.webhook = {
         ...newPayload.webhook,
         url: webhookUrl,
@@ -1991,8 +2003,9 @@ async function runRenderOnlyPipeline(
           source: 'universal-creator-render-only',
           progressId: newProgressId,
           retryAttempt,
-          // r59: Audio is rendered directly, no post-mux
-          silentRender: false,
+          // r65: Use recovered state instead of hardcoded false
+          silentRender: recoveredSilentRender,
+          audioTracks: retryAudioTracks,
         },
       };
     }
@@ -2019,7 +2032,7 @@ async function runRenderOnlyPipeline(
       fpsUsed: fps,
       effectiveFlags: {
         ...lottieFallbackFlags,
-        silentRender: audioStripped ? !props?.voiceoverUrl : false, // r62: match actual payload state
+        silentRender: recoveredSilentRender, // r65: use recovered state, not props (scope bug fix)
         audioStripped,
         isLottieStall,
         isolationStep,
@@ -2246,16 +2259,11 @@ async function selectBackgroundMusic(
     console.error('[auto-generate-universal-video] Music search failed:', e);
   }
 
-  // Fallback to known URLs if no candidate found
+  // r65: Skip unreliable external fallback URLs — they consistently return HTML instead of MP3
+  // Background music is optional; better to render without music than crash the Lambda
   if (!candidateUrl) {
-    const MUSIC_FALLBACK: Record<string, string> = {
-      'upbeat': 'https://cdn.pixabay.com/audio/2024/11/12/audio_c09a6e2f0d.mp3',
-      'calm': 'https://cdn.pixabay.com/audio/2024/09/10/audio_6e5d7d1912.mp3',
-      'corporate': 'https://cdn.pixabay.com/audio/2022/10/25/audio_b36e8b618a.mp3',
-      'inspirational': 'https://cdn.pixabay.com/audio/2024/04/17/audio_db71c3e9ba.mp3',
-      'energetic': 'https://cdn.pixabay.com/audio/2023/07/13/audio_3d4a5a0c0b.mp3',
-    };
-    candidateUrl = MUSIC_FALLBACK[mood] || MUSIC_FALLBACK['corporate'];
+    console.warn('[selectBackgroundMusic] No valid music candidate found, skipping background music');
+    return null;
   }
 
   // Proxy external URL to Supabase Storage to avoid hotlink 403 from Lambda
