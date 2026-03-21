@@ -41,3 +41,17 @@
 - Background music re-aktiviert via `selectBackgroundMusic()`
 - Musik wird über den stabilen Root-Level `Html5Audio`-Layer gerendert (r62-Architektur)
 - Bei `audio_corruption` wird nur Musik entfernt, Voiceover bleibt erhalten
+
+## Phase 3: ✅ Implementiert (r64) — Post-Render Music Muxing
+- **Problem**: Jamendo/Pixabay MP3s crashen Lambda ffprobe trotz gültiger Magic Bytes (Encoding-Varianten)
+- **Lösung**: Musik wird NICHT mehr im Lambda-Template gerendert, sondern post-render via `mux-audio-to-video` (FFmpeg) hinzugefügt
+- **Template**: `Html5Audio` → Remotion `Audio` für Voiceover, Musik komplett entfernt aus Template
+- **auto-generate**: `backgroundMusicUrl` aus `inputProps` entfernt, nur noch in `customData.audioTracks`
+- **Webhook**: Erkennt `backgroundMusicUrl` in `audioTracks` und triggert `mux-audio-to-video` auch bei `silentRender=false`
+- **Ergebnis**: Lambda rendert stabil Video+Voiceover, FFmpeg fügt Musik sicher hinzu
+
+| Datei | Änderung |
+|-------|----------|
+| `src/remotion/templates/UniversalCreatorVideo.tsx` | r64: Html5Audio→Audio, Musik aus Template entfernt |
+| `supabase/functions/auto-generate-universal-video/index.ts` | r64: backgroundMusicUrl aus inputProps entfernt |
+| `supabase/functions/remotion-webhook/index.ts` | r64: Post-render music muxing für non-silent renders |
