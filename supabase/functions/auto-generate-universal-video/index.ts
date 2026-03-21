@@ -1802,9 +1802,14 @@ async function runRenderOnlyPipeline(
     let audioStripped = false;
     
     if (isAudioCorruption) {
-      // r33: AUDIO CORRUPTION → keep 30fps, strip all audio sources
-      console.log(`[render-only] 🔊 r33 AUDIO CORRUPTION detected — keeping ${fps}fps, stripping audio sources`);
-      audioStripped = true;
+      // r69: AUDIO CORRUPTION → try alternative track first, only strip if retryAttempt >= 3
+      if (retryAttempt >= 3) {
+        console.log(`[render-only] 🔊 r69 AUDIO CORRUPTION (attempt ${retryAttempt}) — stripping music as last resort`);
+        audioStripped = true;
+      } else {
+        console.log(`[render-only] 🔊 r69 AUDIO CORRUPTION (attempt ${retryAttempt}) — will try alternative track, NOT stripping yet`);
+        // audioStripped stays false — we'll swap the track below
+      }
     } else if (isolationStep === 'C') {
       // r42: STEP C — maximum isolation: disable EVERYTHING risky + reduce fps
       console.log(`[render-only] 🔬 r42 STEP C: MAXIMUM ISOLATION — disabling all subsystems`);
