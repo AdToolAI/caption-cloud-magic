@@ -10,6 +10,7 @@ import { LongFormVideo, LongFormVideoSchema } from './templates/LongFormVideo';
 import { ExplainerVideo, ExplainerVideoSchema } from './templates/ExplainerVideo';
 import { UniversalCreatorVideo, UniversalCreatorVideoSchema } from './templates/UniversalCreatorVideo';
 import { SmokeTestVideo } from './templates/SmokeTestVideo';
+import { AudioSmokeTest, AudioSmokeTestSchema } from './templates/AudioSmokeTest';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -392,6 +393,18 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1080}
         height={1920}
+      />
+      <Composition
+        id="AudioSmokeTest"
+        component={AudioSmokeTest}
+        durationInFrames={60}
+        fps={30}
+        width={640}
+        height={360}
+        schema={AudioSmokeTestSchema}
+        defaultProps={{
+          audioUrl: '',
+        }}
       />
     </>
   );

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r68-db-music-catalog-2026-03-21";
+const AUTO_GEN_BUILD_TAG = "r69-validated-music-pipeline-2026-03-21";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -1802,9 +1802,14 @@ async function runRenderOnlyPipeline(
     let audioStripped = false;
     
     if (isAudioCorruption) {
-      // r33: AUDIO CORRUPTION → keep 30fps, strip all audio sources
-      console.log(`[render-only] 🔊 r33 AUDIO CORRUPTION detected — keeping ${fps}fps, stripping audio sources`);
-      audioStripped = true;
+      // r69: AUDIO CORRUPTION → try alternative track first, only strip if retryAttempt >= 3
+      if (retryAttempt >= 3) {
+        console.log(`[render-only] 🔊 r69 AUDIO CORRUPTION (attempt ${retryAttempt}) — stripping music as last resort`);
+        audioStripped = true;
+      } else {
+        console.log(`[render-only] 🔊 r69 AUDIO CORRUPTION (attempt ${retryAttempt}) — will try alternative track, NOT stripping yet`);
+        // audioStripped stays false — we'll swap the track below
+      }
     } else if (isolationStep === 'C') {
       // r42: STEP C — maximum isolation: disable EVERYTHING risky + reduce fps
       console.log(`[render-only] 🔬 r42 STEP C: MAXIMUM ISOLATION — disabling all subsystems`);
@@ -1942,27 +1947,61 @@ async function runRenderOnlyPipeline(
           console.log(`[render-only] 🎭 r32 injected Lottie fallback flags into inputProps.diag:`, JSON.stringify(lottieFallbackFlags));
         }
         
-        // r60: Smart audio-corruption recovery — strip music but KEEP voiceover
+        // r69: Smart audio-corruption recovery
         if (audioStripped) {
           props.diag = { ...props.diag, r33_audioStripped: true, r33_retryAttempt: retryAttempt };
           // Remove background music (most likely corrupt source) but keep voiceover
           if (props.backgroundMusicUrl) {
-            console.log(`[render-only] 🔊 r60 Removing backgroundMusicUrl: ${props.backgroundMusicUrl.substring(0, 60)}...`);
+            console.log(`[render-only] 🔊 r69 Removing backgroundMusicUrl: ${props.backgroundMusicUrl.substring(0, 60)}...`);
             delete props.backgroundMusicUrl;
           }
           if (props.musicUrl) {
-            console.log(`[render-only] 🔊 r60 Removing musicUrl: ${props.musicUrl.substring(0, 60)}...`);
             delete props.musicUrl;
           }
-          // Keep voiceover — ElevenLabs audio is reliable
           if (props.voiceoverUrl) {
-            console.log(`[render-only] 🎤 r60 KEEPING voiceoverUrl: ${props.voiceoverUrl.substring(0, 60)}...`);
+            console.log(`[render-only] 🎤 r69 KEEPING voiceoverUrl`);
             props.diag.silentRender = false;
           } else {
             props.diag.silentRender = true;
-            console.log(`[render-only] 🔇 r60 No voiceover available, falling back to silent render`);
           }
-          console.log(`[render-only] 🔊 r60 audio corruption recovery: music stripped, voiceover=${!!props.voiceoverUrl}, silentRender=${props.diag.silentRender}`);
+          console.log(`[render-only] 🔊 r69 audio corruption FINAL: music stripped, voiceover=${!!props.voiceoverUrl}`);
+        } else if (isAudioCorruption && props.backgroundMusicUrl) {
+          // r69: NOT stripped yet — swap to alternative track
+          console.log(`[render-only] 🔄 r69 Swapping corrupt track: ${props.backgroundMusicUrl.substring(0, 60)}...`);
+          
+          // Mark current track as failed in DB
+          const failedPath = props.backgroundMusicUrl.split('/background-music/').pop();
+          if (failedPath) {
+            const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+            const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+            const tmpClient = createClient(supabaseUrl, supabaseServiceKey);
+            
+            // Mark failed track
+            await tmpClient.from('background_music_tracks')
+              .update({ validation_status: 'failed', validation_error: 'audio_corruption_in_render', is_valid: false })
+              .eq('storage_path', decodeURIComponent(failedPath));
+            
+            // Pick a different validated track
+            const { data: altTracks } = await tmpClient
+              .from('background_music_tracks')
+              .select('storage_path')
+              .eq('is_valid', true)
+              .neq('storage_path', decodeURIComponent(failedPath))
+              .limit(10);
+            
+            if (altTracks && altTracks.length > 0) {
+              const alt = altTracks[Math.floor(Math.random() * altTracks.length)];
+              const { data: urlData } = tmpClient.storage.from('background-music').getPublicUrl(alt.storage_path);
+              if (urlData?.publicUrl) {
+                props.backgroundMusicUrl = urlData.publicUrl;
+                console.log(`[render-only] 🔄 r69 Swapped to alternative track: ${alt.storage_path}`);
+                props.diag = { ...props.diag, r69_trackSwapped: true, r69_altTrack: alt.storage_path };
+              }
+            } else {
+              console.log(`[render-only] 🔄 r69 No alternative tracks available, removing music`);
+              delete props.backgroundMusicUrl;
+            }
+          }
         }
         
         // r65: Capture recovered state for use outside try block
@@ -2225,7 +2264,7 @@ async function selectBackgroundMusic(
   supabaseUrl: string,
   _serviceKey: string
 ): Promise<string | null> {
-  console.log(`[selectBackgroundMusic] r68: Using DB catalog. style="${style}", mood="${mood}"`);
+  console.log(`[selectBackgroundMusic] r69: Using DB catalog with validation. style="${style}", mood="${mood}"`);
 
   // Build search terms from style and mood
   const searchTerms = [
@@ -2250,6 +2289,7 @@ async function selectBackgroundMusic(
       .from('background_music_tracks')
       .select('*')
       .eq('is_valid', true)
+      .eq('validation_status', 'validated')
       .overlaps('moods', searchArray)
       .limit(50);
 
@@ -2260,9 +2300,26 @@ async function selectBackgroundMusic(
     }
   }
 
-  // Fallback: any valid track
+  // Fallback: any validated track
   if (tracks.length === 0) {
-    console.log('[selectBackgroundMusic] No mood match, fetching random fallback');
+    console.log('[selectBackgroundMusic] No mood match, fetching random validated fallback');
+    const { data, error } = await supabase
+      .from('background_music_tracks')
+      .select('*')
+      .eq('is_valid', true)
+      .eq('validation_status', 'validated')
+      .limit(50);
+
+    if (error) {
+      console.warn('[selectBackgroundMusic] Fallback query error:', error.message);
+      return null;
+    }
+    tracks = data || [];
+  }
+
+  // r69: Last resort — any track with is_valid=true (even pending validation)
+  if (tracks.length === 0) {
+    console.log('[selectBackgroundMusic] No validated tracks, trying any is_valid track as last resort');
     const { data, error } = await supabase
       .from('background_music_tracks')
       .select('*')
@@ -2270,7 +2327,7 @@ async function selectBackgroundMusic(
       .limit(50);
 
     if (error) {
-      console.warn('[selectBackgroundMusic] Fallback query error:', error.message);
+      console.warn('[selectBackgroundMusic] Last resort query error:', error.message);
       return null;
     }
     tracks = data || [];

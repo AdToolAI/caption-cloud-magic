@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Insert metadata into DB
+          // Insert metadata into DB — mark as PENDING until Lambda-validated
           const { error: dbError } = await supabase
             .from('background_music_tracks')
             .insert({
@@ -215,6 +215,7 @@ Deno.serve(async (req) => {
               duration_seconds: track.duration || null,
               file_size_bytes: bytes.length,
               is_valid: true,
+              validation_status: 'pending',
             });
 
           if (dbError) {
