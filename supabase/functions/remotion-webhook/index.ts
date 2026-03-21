@@ -74,7 +74,12 @@ serve(async (req) => {
             },
             body: JSON.stringify({
               videoUrl: outputFile,
-              audioTracks,
+              // r64: For post-render music muxing when video already has voiceover baked in,
+              // only pass the backgroundMusic to mux (voiceover is already in the video)
+              audioTracks: isSilentRender ? audioTracks : {
+                backgroundMusicUrl: audioTracks.backgroundMusicUrl,
+                backgroundMusicVolume: audioTracks.backgroundMusicVolume ?? 0.3,
+              },
               userId,
               renderId: pendingRenderId || renderId,
               progressId: progressIdFromWebhook,
