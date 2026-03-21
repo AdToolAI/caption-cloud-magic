@@ -1916,6 +1916,10 @@ async function runRenderOnlyPipeline(
     newPayload.fps = fps;
     newPayload.frameRange = [0, dif - 1];
     
+    // r65: Track recovered audio state OUTSIDE the try block to avoid scope bugs
+    let recoveredSilentRender = false;
+    let recoveredHasVoiceover = false;
+    
     // Also update inputProps if they contain fps/durationInFrames + r32: inject Lottie fallback flags + r41: silentRender
     if (newPayload.inputProps?.type === 'payload') {
       try {
@@ -1952,15 +1956,17 @@ async function runRenderOnlyPipeline(
           // Keep voiceover — ElevenLabs audio is reliable
           if (props.voiceoverUrl) {
             console.log(`[render-only] 🎤 r60 KEEPING voiceoverUrl: ${props.voiceoverUrl.substring(0, 60)}...`);
-            // Keep silentRender=false so voiceover still plays
             props.diag.silentRender = false;
           } else {
-            // No voiceover either — fall back to fully silent
             props.diag.silentRender = true;
             console.log(`[render-only] 🔇 r60 No voiceover available, falling back to silent render`);
           }
           console.log(`[render-only] 🔊 r60 audio corruption recovery: music stripped, voiceover=${!!props.voiceoverUrl}, silentRender=${props.diag.silentRender}`);
         }
+        
+        // r65: Capture recovered state for use outside try block
+        recoveredHasVoiceover = !!props.voiceoverUrl;
+        recoveredSilentRender = props.diag?.silentRender ?? false;
         
         newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
       } catch (e) {
