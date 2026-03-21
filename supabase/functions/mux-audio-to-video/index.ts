@@ -135,6 +135,60 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get video duration for fade-out calculation
+    let videoDuration = 0;
+    try {
+      const probeCmd = new Deno.Command('ffprobe', {
+        args: ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', videoPath],
+        stdout: 'piped',
+        stderr: 'piped',
+      });
+      const probeResult = await probeCmd.output();
+      const durationStr = new TextDecoder().decode(probeResult.stdout).trim();
+      videoDuration = parseFloat(durationStr) || 0;
+      console.log(`[mux-audio] Video duration: ${videoDuration.toFixed(1)}s`);
+    } catch {
+      console.warn('[mux-audio] Could not probe video duration, skipping fade-out');
+    }
+
+    // Apply fade-out to background music if we have duration info
+    if (hasMusic && videoDuration > 4) {
+      // Rebuild the filter to add fade-out on background music
+      const fadeStart = Math.max(0, videoDuration - 3);
+      const bgFilterIdx = filterParts.findIndex(p => p.includes('[bg]'));
+      if (bgFilterIdx >= 0) {
+        // Replace [bg] filter to include fade-out
+        const volMatch = filterParts[bgFilterIdx].match(/volume=([\d.]+)/);
+        const vol = volMatch ? volMatch[1] : '0.30';
+        const bgInputNum = hasVoiceover ? 2 : 1;
+        filterParts[bgFilterIdx] = `[${bgInputNum}:a]volume=${vol},afade=t=out:st=${fadeStart.toFixed(1)}:d=3[bg]`;
+        console.log(`[mux-audio] Added 3s fade-out starting at ${fadeStart.toFixed(1)}s`);
+      }
+    }
+
+    // Rebuild filter_complex with updated filters
+    if (hasVoiceover && hasMusic) {
+      // Clear previous -filter_complex args and rebuild
+      ffmpegArgs.push(
+        '-filter_complex',
+        `${filterParts.join(';')};[vo][bg]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
+        '-map', '0:v',
+        '-map', '[aout]',
+      );
+    } else if (hasVoiceover) {
+      ffmpegArgs.push(
+        '-filter_complex', filterParts[0],
+        '-map', '0:v',
+        '-map', '[vo]',
+      );
+    } else if (hasMusic) {
+      ffmpegArgs.push(
+        '-filter_complex', filterParts[0],
+        '-map', '0:v',
+        '-map', '[bg]',
+      );
+    }
+
     // Output settings: copy video codec (instant), encode audio as AAC
     ffmpegArgs.push(
       '-c:v', 'copy',
