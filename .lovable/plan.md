@@ -1,57 +1,103 @@
 
-# Plan: Voiceover Phase 1 — Audio direkt im Lambda-Render
+Plan: Render-Only-Regression fixen und Musik-Pipeline sauber entkoppeln
 
-## Status: ✅ Implementiert (r62)
+## Diagnose
 
-## Was wurde geändert
+Do I know what the issue is? Ja.
 
-### r59: Direct Audio Rendering
-- `_silentRender: false` + `muted: false` + `audioCodec: 'aac'` — Audio wird direkt im Lambda gerendert
-- Gender-Mapping (`male`→`roger`, `female`→`sarah`) in `generate-video-voiceover`
+Die Logs zeigen jetzt sehr klar **zwei getrennte Probleme**:
 
-### r60: Audio-Corruption Fix — MP3-Validierung + Smart Recovery
-- **Magic-Byte-Validierung** in `proxyAudioToStorage`: Prüft ID3-Header (`0x49 0x44 0x33`) und MPEG frame sync (`0xFF 0xE0+`) — HTML-Fehlerseiten werden erkannt und verworfen
-- **Intelligente Retry-Logik**: Bei `audio_corruption` wird nur die Background-Music entfernt, Voiceover bleibt erhalten
-- Nur wenn kein Voiceover vorhanden → Fallback auf `silentRender: true`
+1. **Akuter Crash im Retry-Pfad**
+   - `auto-generate-universal-video` wirft im Render-Only-Retry:
+     `ReferenceError: props is not defined`
+   - Ursache: In `runRenderOnlyPipeline()` wird `const props = JSON.parse(...)` nur **innerhalb** des `if/try`-Blocks erzeugt, später aber in `updateProgress(... effectiveFlags.silentRender: audioStripped ? !props?.voiceoverUrl : false ...)` **außerhalb** dieses Scopes referenziert.
+   - Dadurch crasht der Retry, **bevor** der Fallback-Render überhaupt gestartet wird.
 
-### r61: Voiceover-Audio wirklich hörbar machen
-- **Template-Fix**: `r33_audioStripped` blockiert jetzt NUR noch Musik/SFX, nicht mehr das Voiceover
-  - Voiceover-Bedingung: `!silentRender && voiceoverUrl` (unabhängig von `r33_audioStripped`)
-  - Musik-Bedingung: `!silentRender && !r33_audioStripped && backgroundMusicUrl`
-  - SFX-Bedingung: `!silentRender && !r33_audioStripped`
-- **Export-Pfad**: `render-with-remotion` und `render-universal-video` setzen jetzt `muted: false` + `audioCodec: 'aac'`
-- **Phase 1 Voiceover-Only**: Background-Music temporär deaktiviert bis Voiceover stabil bestätigt
+2. **Musik ist in diesem Lauf gar nicht aktiv gewesen**
+   - `selectBackgroundMusic` hat nur ungültige Jamendo/Pixabay-Kandidaten gesehen (`content-type: text/html`), danach `Proxy failed`.
+   - In den Runtime-Logs steht danach: `hasMusic: false`.
+   - Das heißt: Der aktuelle Fehler ist **nicht** „Muxing kaputt“, sondern zuerst ein **Retry-Regression-Bug**. Zusätzlich fehlt eine **verlässliche Musikquelle**.
 
-### r62: Unified Audio Layer — UCC-Architektur portiert
-- **Kernproblem**: Doppeltes Voiceover — Root-Level `Html5Audio` UND `SceneAudioManager` renderten beide Voiceover
-- **Fix**: `SceneAudioManager` komplett durch einfachen Root-Level `Html5Audio`-Layer ersetzt (wie in `UniversalVideo.tsx`)
-  - Voiceover: `<Html5Audio key="stable-voiceover-audio" startFrom={0} loop={false} />`
-  - Musik: `<Html5Audio key="stable-music-audio" startFrom={0} loop={false} />`
-- **Diagnostik-Fix**: `effectiveFlags.silentRender` in `auto-generate-universal-video` zeigt jetzt den echten Payload-Wert statt hart `true`
-- Stabile Keys (`key="stable-voiceover-audio"`) verhindern unnötiges Remounting
+Wichtiger Nebenaspekt:
+- `generate-video-voiceover` war erfolgreich (`sizeBytes: 851008`), also die Voiceover-Erzeugung selbst ist nicht der unmittelbare Absturzpunkt.
+- `remotion-webhook` sieht aktuell grundsätzlich plausibel aus; der Blocker sitzt vorher.
 
-### Änderungen
+## Umsetzung
+
+### Schritt 1: Render-Only-Retry Scope-Bug fixen
+Datei: `supabase/functions/auto-generate-universal-video/index.ts`
+
+Ich würde den Retry so umbauen, dass der Code **nie** mehr auf ein blocklokales `props` außerhalb seines Scopes zugreift.
+
+Konkret:
+- Vor dem `updateProgress()` einen stabilen Wert berechnen, z. B.:
+  - `recoveredHasVoiceover`
+  - `recoveredSilentRender`
+- Diese Werte aus dem **aktualisierten Payload** oder aus einer außerhalb gespeicherten Variable ableiten
+- `effectiveFlags` nur noch aus diesen sicheren Variablen aufbauen
+
+Ziel:
+- Kein `ReferenceError` mehr
+- Retry startet wirklich
+- Voiceover-Fallback kann wieder funktionieren
+
+### Schritt 2: Retry-Forensik robust machen
+Datei: `supabase/functions/auto-generate-universal-video/index.ts`
+
+Die Forensik-/Statusdaten sollten aus derselben finalen Retry-Quelle kommen wie der tatsächliche Render-Payload.
+
+Ich würde:
+- `effectiveFlags.silentRender`
+- `effectiveFlags.audioStripped`
+- `effectiveFlags.hasVoiceover`
+
+aus einer gemeinsamen finalen Retry-State-Struktur ableiten, statt aus temporären Variablen im Try-Block.
+
+Damit vermeiden wir:
+- Scope-Fehler
+- irreführende Statusmeldungen
+- Unterschiede zwischen tatsächlichem Payload und UI-Diagnose
+
+### Schritt 3: Musikquelle stabilisieren
+Datei: `supabase/functions/auto-generate-universal-video/index.ts`
+
+Da die externen Musikquellen aktuell regelmäßig HTML statt MP3 liefern, würde ich die Musik-Selektion härten:
+
+- wenn Proxy/Validierung fehlschlägt: **kein halber Musikzustand**
+- `audioTracks` nur mit `backgroundMusicUrl`, wenn URL wirklich vorhanden ist
+- für Phase 2 eine kleine Menge **vorvalidierter interner Musikdateien** aus Storage als Fallback verwenden
+
+Ziel:
+- Kein „Musik angeblich aktiv, aber faktisch null“
+- kein unnötiger Audio-Corruption-Pfad wegen externer Quellen
+- reproduzierbare Musik-Renders
+
+### Schritt 4: Erst danach Post-Render-Mux validieren
+Dateien:
+- `supabase/functions/remotion-webhook/index.ts`
+- optional `supabase/functions/mux-audio-to-video/index.ts`
+
+Sobald Schritt 1 und 3 stehen, würde ich erst danach den Musikpfad validieren:
+- Voiceover-only Retry muss wieder sauber laufen
+- danach erst Background-Music per Mux prüfen
+- falls nötig Logging im Webhook ergänzen, aber das ist nach aktuellem Stand **nicht** der primäre Defekt
+
+## Betroffene Dateien
 
 | Datei | Änderung |
-|-------|----------|
-| `src/remotion/templates/UniversalCreatorVideo.tsx` | r62: SceneAudioManager durch einfachen Html5Audio-Layer ersetzt |
-| `supabase/functions/auto-generate-universal-video/index.ts` | r62: effectiveFlags.silentRender Diagnostik korrigiert |
+|---|---|
+| `supabase/functions/auto-generate-universal-video/index.ts` | Scope-Bug im Retry fixen, Retry-State zentralisieren, Musik-Fallback härten |
+| `supabase/functions/remotion-webhook/index.ts` | nur sekundär, falls nach Retry-Fix noch Mux-Diagnose nötig ist |
+| `supabase/functions/mux-audio-to-video/index.ts` | vermutlich keine Erstmaßnahme |
 
-## Phase 2: ✅ Implementiert (r63)
-- Background music re-aktiviert via `selectBackgroundMusic()`
-- Musik wird über den stabilen Root-Level `Html5Audio`-Layer gerendert (r62-Architektur)
-- Bei `audio_corruption` wird nur Musik entfernt, Voiceover bleibt erhalten
+## Erwartetes Ergebnis
 
-## Phase 3: ✅ Implementiert (r64) — Post-Render Music Muxing
-- **Problem**: Jamendo/Pixabay MP3s crashen Lambda ffprobe trotz gültiger Magic Bytes (Encoding-Varianten)
-- **Lösung**: Musik wird NICHT mehr im Lambda-Template gerendert, sondern post-render via `mux-audio-to-video` (FFmpeg) hinzugefügt
-- **Template**: `Html5Audio` → Remotion `Audio` für Voiceover, Musik komplett entfernt aus Template
-- **auto-generate**: `backgroundMusicUrl` aus `inputProps` entfernt, nur noch in `customData.audioTracks`
-- **Webhook**: Erkennt `backgroundMusicUrl` in `audioTracks` und triggert `mux-audio-to-video` auch bei `silentRender=false`
-- **Ergebnis**: Lambda rendert stabil Video+Voiceover, FFmpeg fügt Musik sicher hinzu
+Nach dem Fix:
+1. der Render-Only-Retry crasht nicht mehr mit `props is not defined`
+2. Voiceover-Fallback kann wieder tatsächlich rendern
+3. Musik wird nur noch verwendet, wenn eine valide Quelle existiert
+4. danach kann die Background-Music gezielt und sauber weiter aktiviert werden
 
-| Datei | Änderung |
-|-------|----------|
-| `src/remotion/templates/UniversalCreatorVideo.tsx` | r64: Html5Audio→Audio, Musik aus Template entfernt |
-| `supabase/functions/auto-generate-universal-video/index.ts` | r64: backgroundMusicUrl aus inputProps entfernt |
-| `supabase/functions/remotion-webhook/index.ts` | r64: Post-render music muxing für non-silent renders |
+## Technischer Kern in einem Satz
+
+Der aktuelle Produktionsfehler ist primär **ein Scope-Regression-Bug im Retry-Code**, nicht das Template; parallel dazu fehlt für Musik derzeit eine **zuverlässige validierte Audioquelle**.
