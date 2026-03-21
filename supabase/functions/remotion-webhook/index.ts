@@ -60,7 +60,8 @@ serve(async (req) => {
       let finalOutputUrl = outputFile;
 
       if (hasAudioToMux) {
-        console.log(`🔊 r41: Silent render detected — triggering audio mux...`);
+        const muxReason = hasBackgroundMusic ? 'r64 post-render background music' : 'r41 silent render audio';
+        console.log(`🔊 ${muxReason} — triggering audio mux...`);
         try {
           const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
           const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
