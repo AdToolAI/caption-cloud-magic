@@ -1,92 +1,73 @@
 
 
-# Plan: Musik-Bibliothek auf 100+ Tracks skalieren
+# Plan: Hintergrundmusik endlich hörbar machen + Interview-Entwurf speichern
 
-## Aktueller Stand
-- 8 hardcodierte Tracks in `MUSIC_CATALOG` (auto-generate-universal-video)
-- 13 hardcodierte Jamendo-IDs in `seed-background-music`
-- Tracks liegen im `background-music` Storage-Bucket
+## Teil 1: Hintergrundmusik — Kernursache gefunden
 
-## Problem mit dem aktuellen Ansatz
-100+ Tracks als hardcodierte Jamendo-IDs pflegen ist nicht wartbar. Stattdessen brauchen wir:
-1. Eine **Datenbank-Tabelle** für Track-Metadaten (statt hardcodierter Konstante)
-2. Eine **dynamische Seed-Funktion** die per Jamendo-API automatisch Tracks pro Kategorie sucht und herunterlädt
-3. Die **Auswahl-Logik** liest zur Render-Zeit aus der DB statt aus einer Konstante
+### Diagnose
+Die Daten sind jetzt eindeutig:
 
-## Umsetzung
+- **Erster Render:** `backgroundMusicUrl = professional-corporate-019.mp3` → Lambda crasht: `Failed to find two consecutive MPEG audio frames`
+- **Retry:** `backgroundMusicUrl = NONE`, `voiceoverUrl = vorhanden` → Video wird ohne Musik gerendert
+- **BUILD_TAG in Produktion:** `r67-music-direct-render` (nicht r68!)
 
-### Schritt 1: DB-Tabelle `background_music_tracks` anlegen
+**Ursache:** Die Jamendo-Tracks werden **nicht re-encoded** beim Seeding. Sie werden 1:1 von Jamendo heruntergeladen und in Storage gespeichert. Der Magic-Byte-Check (`isValidMp3`) besteht (ID3-Header vorhanden), aber die interne Frame-Struktur ist nicht Lambda-kompatibel. Das ist genau derselbe Fehler wie vorher mit den externen Jamendo-URLs — jetzt nur mit einer lokalen Kopie desselben kaputten MP3.
 
-```sql
-CREATE TABLE public.background_music_tracks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  storage_path TEXT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  mood TEXT NOT NULL,
-  genre TEXT NOT NULL,
-  moods TEXT[] NOT NULL DEFAULT '{}',
-  source_id TEXT,          -- Jamendo Track ID
-  duration_seconds INTEGER,
-  file_size_bytes INTEGER,
-  is_valid BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
+**Lösung:** Die 114 Tracks im Storage müssen mit FFmpeg **re-encoded** werden, damit sie standardkonforme MPEG-Frames haben. FFmpeg steht in der Sandbox-Umgebung zur Verfügung.
 
-Keine RLS nötig — wird nur von Edge Functions mit Service Role Key gelesen.
+### Schritt 1: Tracks re-encoden und im Storage ersetzen
 
-### Schritt 2: Seed-Funktion komplett umbauen
-**Datei:** `supabase/functions/seed-background-music/index.ts`
+Per `lov-exec` im Sandbox:
+1. Die aktuellen Tracks aus dem `background-music` Bucket herunterladen (direkt via Public URL)
+2. Jeden Track mit FFmpeg zu einem standardkonformen MP3 re-encoden: `ffmpeg -i input.mp3 -codec:a libmp3lame -b:a 128k -ar 44100 -ac 2 output.mp3`
+3. Re-encodete Dateien via Supabase Storage API zurück hochladen (upsert)
+4. Start mit den 5 `professional-corporate` Tracks als Proof-of-Concept
 
-Statt hardcodierter IDs: **Jamendo-API per Kategorie abfragen** und automatisch 15-20 Tracks pro Kategorie herunterladen.
+### Schritt 2: Validierung
+Nach dem Re-Encoding einen Track mit `ffprobe` lokal testen, um zu bestätigen, dass Lambda ihn akzeptieren würde.
 
-Kategorien (7 Stück × ~15 Tracks = ~105 Tracks):
+### Schritt 3: Edge Function auf r68 bringen
+Der BUILD_TAG in Produktion ist noch `r67`. Die Edge Function `auto-generate-universal-video` muss redeployed werden, damit der DB-basierte MUSIC_CATALOG (r68) aktiv wird.
 
-| Kategorie | Jamendo-Tags |
-|-----------|-------------|
-| Corporate | corporate, business, professional |
-| Energetic | energetic, upbeat, dynamic |
-| Calm | calm, relax, ambient |
-| Cinematic | cinematic, dramatic, epic |
-| Happy | happy, cheerful, fun |
-| Inspirational | inspirational, motivational |
-| Acoustic | acoustic, folk, warm |
-
-Ablauf pro Kategorie:
-1. Jamendo API: `GET /tracks/?tags={tag}&limit=20&audioformat=mp32`
-2. Für jeden Track: Download → Magic-Byte-Validierung → Re-Upload zu Storage
-3. Metadaten in `background_music_tracks` Tabelle speichern
-4. Bereits vorhandene Tracks überspringen (Duplikat-Check via `source_id`)
-
-### Schritt 3: `selectBackgroundMusic` auf DB umstellen
+### Schritt 4: Retry-Logik bei audio_corruption verbessern
 **Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
 
-Die hardcodierte `MUSIC_CATALOG`-Konstante ersetzen durch einen DB-Query:
+Statt beim Retry die Musik komplett zu entfernen, einen **anderen Track** aus der DB auswählen und erneut versuchen. Nur wenn der zweite Track ebenfalls fehlschlägt, Musik deaktivieren.
 
-```typescript
-const { data: tracks } = await supabase
-  .from('background_music_tracks')
-  .select('*')
-  .eq('is_valid', true)
-  .overlaps('moods', searchTerms);
-```
+## Teil 2: Interview-Antworten speichern (Browser-lokal + Entwurf anbieten)
 
-Fallback: wenn kein Mood-Match, zufälligen Track aus der ganzen Tabelle nehmen.
+### Aktueller Stand
+Die Interview-Daten werden bereits in `localStorage` gespeichert:
+- `universal-video-wizard-state`: Kategorie, Modus, Schritt, Ergebnis
+- `universal-video-consultant-state`: Chat-Nachrichten, Fortschritt
 
-### Schritt 4: Seed ausführen
-Die Funktion einmal aufrufen — sie füllt automatisch ~100+ Tracks in Storage + DB.
+Beim Klick auf "Neues Video starten" wird beides gelöscht. Das Verhalten ist fast komplett — es fehlt nur die **Wiederaufnahme-UI**.
+
+### Schritt 5: Entwurf-Dialog beim Laden anzeigen
+**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
+
+Beim Mounten prüfen, ob ein `universal-video-wizard-state` mit `step > 0` existiert. Falls ja, einen Dialog anzeigen:
+
+- "Du hast ein angefangenes Interview. Möchtest du fortfahren oder neu starten?"
+- **Fortfahren**: State wird wie bisher geladen (funktioniert bereits)
+- **Neu starten**: `handleResetWizard()` aufrufen → State wird gelöscht
+
+### Schritt 6: "Neues Video" klar vom Zurück-Button trennen
+**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
+
+Der "Neues Video starten" Button löscht bereits alles korrekt. Sicherstellen, dass der "Zurück" Button bei Schritt 0 **nicht** den gespeicherten State löscht, damit der Entwurf erhalten bleibt.
 
 ## Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| Migration | Neue Tabelle `background_music_tracks` |
-| `supabase/functions/seed-background-music/index.ts` | Komplett umbauen: dynamisch per Kategorie von Jamendo |
-| `supabase/functions/auto-generate-universal-video/index.ts` | `MUSIC_CATALOG` → DB-Query ersetzen |
+| Storage: `background-music/library/*.mp3` | 114 Tracks re-encoden |
+| `supabase/functions/auto-generate-universal-video/index.ts` | r68 BUILD_TAG deploy + Retry mit alternativem Track |
+| `src/components/universal-video-creator/UniversalVideoWizard.tsx` | Entwurf-Dialog beim Laden |
 
 ## Erwartetes Ergebnis
-- 100+ validierte Tracks im Storage, nach Mood/Genre getaggt
-- Jede Kategorie hat mindestens 15 passende Tracks
-- Track-Auswahl ist dynamisch und erweiterbar (neue Tracks = neuer Seed-Run)
-- Keine hardcodierten Listen mehr
+- Re-encodete MP3s bestehen Lambda's ffprobe → kein `audio_corruption` mehr
+- Hintergrundmusik ist endlich hörbar im fertigen Video
+- Interview-Antworten bleiben erhalten und werden beim nächsten Besuch als Entwurf angeboten
+- "Neues Video starten" löscht den Entwurf wie gewohnt
 
