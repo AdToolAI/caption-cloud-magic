@@ -394,6 +394,18 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
       />
+      <Composition
+        id="AudioSmokeTest"
+        component={AudioSmokeTest}
+        durationInFrames={60}
+        fps={30}
+        width={640}
+        height={360}
+        schema={AudioSmokeTestSchema}
+        defaultProps={{
+          audioUrl: '',
+        }}
+      />
     </>
   );
 };
