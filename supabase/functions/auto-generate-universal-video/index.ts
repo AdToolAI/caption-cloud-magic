@@ -2032,7 +2032,7 @@ async function runRenderOnlyPipeline(
       fpsUsed: fps,
       effectiveFlags: {
         ...lottieFallbackFlags,
-        silentRender: audioStripped ? !props?.voiceoverUrl : false, // r62: match actual payload state
+        silentRender: recoveredSilentRender, // r65: use recovered state, not props (scope bug fix)
         audioStripped,
         isLottieStall,
         isolationStep,
