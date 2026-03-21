@@ -1947,27 +1947,61 @@ async function runRenderOnlyPipeline(
           console.log(`[render-only] 🎭 r32 injected Lottie fallback flags into inputProps.diag:`, JSON.stringify(lottieFallbackFlags));
         }
         
-        // r60: Smart audio-corruption recovery — strip music but KEEP voiceover
+        // r69: Smart audio-corruption recovery
         if (audioStripped) {
           props.diag = { ...props.diag, r33_audioStripped: true, r33_retryAttempt: retryAttempt };
           // Remove background music (most likely corrupt source) but keep voiceover
           if (props.backgroundMusicUrl) {
-            console.log(`[render-only] 🔊 r60 Removing backgroundMusicUrl: ${props.backgroundMusicUrl.substring(0, 60)}...`);
+            console.log(`[render-only] 🔊 r69 Removing backgroundMusicUrl: ${props.backgroundMusicUrl.substring(0, 60)}...`);
             delete props.backgroundMusicUrl;
           }
           if (props.musicUrl) {
-            console.log(`[render-only] 🔊 r60 Removing musicUrl: ${props.musicUrl.substring(0, 60)}...`);
             delete props.musicUrl;
           }
-          // Keep voiceover — ElevenLabs audio is reliable
           if (props.voiceoverUrl) {
-            console.log(`[render-only] 🎤 r60 KEEPING voiceoverUrl: ${props.voiceoverUrl.substring(0, 60)}...`);
+            console.log(`[render-only] 🎤 r69 KEEPING voiceoverUrl`);
             props.diag.silentRender = false;
           } else {
             props.diag.silentRender = true;
-            console.log(`[render-only] 🔇 r60 No voiceover available, falling back to silent render`);
           }
-          console.log(`[render-only] 🔊 r60 audio corruption recovery: music stripped, voiceover=${!!props.voiceoverUrl}, silentRender=${props.diag.silentRender}`);
+          console.log(`[render-only] 🔊 r69 audio corruption FINAL: music stripped, voiceover=${!!props.voiceoverUrl}`);
+        } else if (isAudioCorruption && props.backgroundMusicUrl) {
+          // r69: NOT stripped yet — swap to alternative track
+          console.log(`[render-only] 🔄 r69 Swapping corrupt track: ${props.backgroundMusicUrl.substring(0, 60)}...`);
+          
+          // Mark current track as failed in DB
+          const failedPath = props.backgroundMusicUrl.split('/background-music/').pop();
+          if (failedPath) {
+            const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+            const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+            const tmpClient = createClient(supabaseUrl, supabaseServiceKey);
+            
+            // Mark failed track
+            await tmpClient.from('background_music_tracks')
+              .update({ validation_status: 'failed', validation_error: 'audio_corruption_in_render', is_valid: false })
+              .eq('storage_path', decodeURIComponent(failedPath));
+            
+            // Pick a different validated track
+            const { data: altTracks } = await tmpClient
+              .from('background_music_tracks')
+              .select('storage_path')
+              .eq('is_valid', true)
+              .neq('storage_path', decodeURIComponent(failedPath))
+              .limit(10);
+            
+            if (altTracks && altTracks.length > 0) {
+              const alt = altTracks[Math.floor(Math.random() * altTracks.length)];
+              const { data: urlData } = tmpClient.storage.from('background-music').getPublicUrl(alt.storage_path);
+              if (urlData?.publicUrl) {
+                props.backgroundMusicUrl = urlData.publicUrl;
+                console.log(`[render-only] 🔄 r69 Swapped to alternative track: ${alt.storage_path}`);
+                props.diag = { ...props.diag, r69_trackSwapped: true, r69_altTrack: alt.storage_path };
+              }
+            } else {
+              console.log(`[render-only] 🔄 r69 No alternative tracks available, removing music`);
+              delete props.backgroundMusicUrl;
+            }
+          }
         }
         
         // r65: Capture recovered state for use outside try block
