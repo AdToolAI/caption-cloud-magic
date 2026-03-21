@@ -2225,7 +2225,7 @@ async function selectBackgroundMusic(
   supabaseUrl: string,
   _serviceKey: string
 ): Promise<string | null> {
-  console.log(`[selectBackgroundMusic] r68: Using DB catalog. style="${style}", mood="${mood}"`);
+  console.log(`[selectBackgroundMusic] r69: Using DB catalog with validation. style="${style}", mood="${mood}"`);
 
   // Build search terms from style and mood
   const searchTerms = [
