@@ -2259,16 +2259,11 @@ async function selectBackgroundMusic(
     console.error('[auto-generate-universal-video] Music search failed:', e);
   }
 
-  // Fallback to known URLs if no candidate found
+  // r65: Skip unreliable external fallback URLs — they consistently return HTML instead of MP3
+  // Background music is optional; better to render without music than crash the Lambda
   if (!candidateUrl) {
-    const MUSIC_FALLBACK: Record<string, string> = {
-      'upbeat': 'https://cdn.pixabay.com/audio/2024/11/12/audio_c09a6e2f0d.mp3',
-      'calm': 'https://cdn.pixabay.com/audio/2024/09/10/audio_6e5d7d1912.mp3',
-      'corporate': 'https://cdn.pixabay.com/audio/2022/10/25/audio_b36e8b618a.mp3',
-      'inspirational': 'https://cdn.pixabay.com/audio/2024/04/17/audio_db71c3e9ba.mp3',
-      'energetic': 'https://cdn.pixabay.com/audio/2023/07/13/audio_3d4a5a0c0b.mp3',
-    };
-    candidateUrl = MUSIC_FALLBACK[mood] || MUSIC_FALLBACK['corporate'];
+    console.warn('[selectBackgroundMusic] No valid music candidate found, skipping background music');
+    return null;
   }
 
   // Proxy external URL to Supabase Storage to avoid hotlink 403 from Lambda
