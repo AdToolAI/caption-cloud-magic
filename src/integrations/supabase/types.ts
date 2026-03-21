@@ -906,11 +906,15 @@ export type Database = {
           genre: string
           id: string
           is_valid: boolean | null
+          last_validated_at: string | null
           mood: string
           moods: string[]
           name: string
           source_id: string | null
           storage_path: string
+          validation_attempts: number
+          validation_error: string | null
+          validation_status: string
         }
         Insert: {
           created_at?: string | null
@@ -919,11 +923,15 @@ export type Database = {
           genre: string
           id?: string
           is_valid?: boolean | null
+          last_validated_at?: string | null
           mood: string
           moods?: string[]
           name: string
           source_id?: string | null
           storage_path: string
+          validation_attempts?: number
+          validation_error?: string | null
+          validation_status?: string
         }
         Update: {
           created_at?: string | null
@@ -932,11 +940,15 @@ export type Database = {
           genre?: string
           id?: string
           is_valid?: boolean | null
+          last_validated_at?: string | null
           mood?: string
           moods?: string[]
           name?: string
           source_id?: string | null
           storage_path?: string
+          validation_attempts?: number
+          validation_error?: string | null
+          validation_status?: string
         }
         Relationships: []
       }
