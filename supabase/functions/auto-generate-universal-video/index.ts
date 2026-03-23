@@ -2292,6 +2292,7 @@ async function selectBackgroundMusic(
       .select('*')
       .eq('is_valid', true)
       .eq('validation_status', 'validated')
+      .not('last_validated_at', 'is', null)
       .overlaps('moods', searchArray)
       .limit(50);
 
