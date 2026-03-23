@@ -225,7 +225,7 @@ const Generator = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <div className="container mx-auto px-6 py-4">
-        <Breadcrumbs category="create" feature={t("nav.generator")} />
+        <Breadcrumbs category="create" feature={t("nav.textStudio")} />
       </div>
       
       <main className="flex-1 py-8 px-4">
