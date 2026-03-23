@@ -35,6 +35,7 @@ const Generator = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [contentLength, setContentLength] = useState<'short' | 'medium' | 'long'>('medium');
   const [hashtagCount, setHashtagCount] = useState(5);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
   const lengthMap: Record<string, number> = {
     short: 120,
