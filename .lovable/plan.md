@@ -1,65 +1,68 @@
 
 
-# Plan: Sicherstellen, dass der gewählte Stil tatsächlich in der Bildgenerierung ankommt
+# Plan: Visuellen Stil in die Bildgenerierung durchdrücken
 
-## Analyse
+## Problem gefunden
 
-Die Code-Kette sieht korrekt aus:
-1. `FilmStyleSelector` → setzt `selectedVisualStyle` (z.B. `'comic'`)
-2. `handleConsultationComplete` → überschreibt `result.visualStyle = selectedVisualStyle`
-3. Edge Function → nutzt `briefing.visualStyle` in `ART STYLE: comic` Prompt
-4. `generate-premium-visual` → nutzt `STYLE_PROMPTS['comic']` für Flux-Bildgenerierung
+Die Logs beweisen: `visualStyle: "comic"` kommt korrekt an. Auch der Prompt enthält `ART STYLE: comic` und der Style-Prefix `"clean business cartoon illustration, bold outlines, flat colors..."` wird gesetzt.
 
-**Mögliche Ursachen, warum es trotzdem gleich aussieht:**
+**Aber:** Die Scene-Descriptions vom Script-Generator enthalten weiterhin cinematic Sprache wie `"moving golden particles, dark void, bright central glow, dramatic volumetric lighting"`. Diese überstimmen den Comic-Prefix, weil Flux das Letztgenannte stärker gewichtet.
 
-1. **Consultant überschreibt den Stil zurück**: Der Consultant extrahiert `visualStyle` als Freitext aus dem Chat (z.B. `'modern'`). Der Wizard überschreibt das zwar, aber vielleicht nur im `lastRecommendation`-Pfad — nicht im Fallback-Pfad (Zeile 293: `visualStyle: 'flat-design'`).
+**Ursache in 2 Stellen:**
 
-2. **Kein Log zur Verifizierung**: Aktuell wird `visualStyle` nirgends geloggt — weder im Wizard noch in der Edge Function. Wir können nicht beweisen, was tatsächlich ankam.
+1. **Script-Generator** (`generate-script-inline.ts`, Zeile 387): Die `visualDescription`-Regel sagt nur `[OBJEKT] + [ZUSTAND] + [UMGEBUNG] + [BELEUCHTUNG]` — aber erwähnt den gewählten Stil nicht. Das AI-Modell generiert immer cinematic/realistische Beschreibungen, egal ob Comic oder Watercolor gewählt wurde.
 
-3. **Edge Function `validateEnum` Fallback**: In Zeile 1445 wird `style: validateEnum(briefing.visualStyle, VALID_STYLES, 'modern-3d')` gesetzt. Wenn `briefing.visualStyle` nicht exakt einem der `VALID_STYLES` entspricht, wird es auf `'modern-3d'` zurückgesetzt. Der Wert `'comic'` IST in `VALID_STYLES` — aber falls der Consultant z.B. `'Comic'` (Großbuchstabe) liefert und der Wizard-Override nicht greift, fällt es auf `'modern-3d'` zurück.
+2. **Prompt-Bau** (`generate-premium-visual/index.ts`): Der Style-Prefix steht am Anfang, die detaillierte Scene-Description kommt danach und dominiert.
 
-## Umsetzung
+## Lösung
 
-### 1. Logging in der Edge Function hinzufügen
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+### 1. Script-Generator: Stil in die visualDescription-Regel einbauen
+**Datei:** `supabase/functions/_shared/generate-script-inline.ts`
 
-Nach Zeile 406 ein explizites Log ergänzen:
+Die Regel 7 im System-Prompt erweitern:
+
 ```
-console.log(`[auto-generate-universal-video] visualStyle: ${actualBriefing.visualStyle}`);
-```
-
-### 2. Logging im Wizard hinzufügen
-**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
-
-In `handleConsultationComplete` nach dem Override loggen:
-```
-console.log('[Wizard] Final visualStyle for generation:', result.visualStyle, 'selectedVisualStyle:', selectedVisualStyle);
+7. Jede visualDescription folgt: [OBJEKT/SZENE] + [ZUSTAND/DETAIL] + [UMGEBUNG] + [BELEUCHTUNG]
+   WICHTIG: Passe die visualDescription an den visuellen Stil "${briefing.visualStyle}" an!
+   - Bei "comic": Beschreibe Szenen wie Comic-Panels (bold lines, flat colors, speech bubbles, panels)
+   - Bei "cartoon": Beschreibe Szenen wie Cartoon-Welten (rounded shapes, bright colors, playful)
+   - Bei "cinematic": Beschreibe Szenen kinoreif (volumetric lighting, shallow depth of field)
+   - Bei "watercolor": Beschreibe Szenen wie Aquarelle (soft washes, paper texture, gentle colors)
+   - NIEMALS cinematic/realistische Beschreibungen für cartoon/comic Stile verwenden!
 ```
 
-### 3. visualStyle in Progress-Daten speichern
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+Zusätzlich eine Style-Mapping-Tabelle in den Prompt einfügen, die für jeden der 20 Stile 2-3 passende Bildbeschreibungs-Keywords vorgibt.
 
-In der `briefing_json` wird der Style bereits gespeichert. Zusätzlich im Progress-Update beim Bildgenerierungsschritt den tatsächlich verwendeten Style loggen.
+### 2. Prompt-Bau: Stil doppelt verstärken
+**Datei:** `supabase/functions/generate-premium-visual/index.ts`
 
-### 4. Sicherheitshalber: Consultant-Fallback ebenfalls überschreiben
-**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
+Den Style-Prefix nicht nur am Anfang, sondern auch am Ende als Suffix wiederholen:
 
-Im `handleConsultationSkip` (Zeile 257-308) ebenfalls den `selectedVisualStyle` injizieren — aktuell wird dort `visualStyle: 'flat-design'` hardcoded, und der Override-Code greift nur in `handleConsultationComplete`, nicht in `handleConsultationSkip`.
+```
+[STYLE_PREFIX] + [scene description] + [anti-text rules] + "OVERRIDE STYLE: [STYLE_SUFFIX]"
+```
 
-### 5. Consultant Style-Extraktion auf enum-kompatiblen Wert mappen
-**Datei:** `supabase/functions/universal-video-consultant/index.ts`
+Für "comic" würde das bedeuten:
+- Prefix: `"clean business cartoon illustration, bold outlines, flat colors..."`
+- Suffix: `"MUST be in comic book cartoon style with bold outlines and flat colors, NOT photorealistic, NOT cinematic"`
 
-Die Zeile `const visualStyle = styleResponse || 'modern';` setzt einen Freitext-Wert. Wenn der Wizard-Override greift, ist das kein Problem. Aber als Absicherung: den extrahierten Wert gegen die gültigen Styles mappen.
+### 3. Style-spezifische Negative Prompts
+Für Cartoon/Comic-Stile explizit ausschließen:
+- `"photorealistic, volumetric lighting, film grain, lens flare, shallow depth of field"`
+
+Für Cinematic-Stile ausschließen:
+- `"cartoon, flat colors, bold outlines, vector art"`
 
 ## Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `supabase/functions/auto-generate-universal-video/index.ts` | `visualStyle` explizit loggen |
-| `src/components/universal-video-creator/UniversalVideoWizard.tsx` | Override-Logging + `handleConsultationSkip` Fix |
+| `supabase/functions/_shared/generate-script-inline.ts` | Regel 7 um stilspezifische visualDescription-Anweisungen erweitern |
+| `supabase/functions/generate-premium-visual/index.ts` | Style-Suffix am Ende wiederholen + stilspezifische Negative Prompts |
 
 ## Erwartetes Ergebnis
-- Beim nächsten Testrender sehen wir in den Logs exakt, welcher `visualStyle` ankam
-- Falls der Override nicht greift, finden wir sofort die Stelle
-- `handleConsultationSkip` nutzt ebenfalls den gewählten Stil
+- Bei "Comic": Bilder sehen aus wie Comic-Illustrationen (bold outlines, flat colors)
+- Bei "Cinematic": Bilder bleiben kinoreif (wie bisher)
+- Bei "Watercolor": Bilder haben Aquarell-Ästhetik
+- Der Stil wird sowohl in der Scene-Description als auch im Flux-Prompt doppelt durchgesetzt
 
