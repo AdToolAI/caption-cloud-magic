@@ -18,7 +18,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { PlatformBadge } from "@/components/ui/PlatformBadge";
 import { toast } from "sonner";
 import { FeatureGrid } from "@/components/home/FeatureGrid";
-import { HeroBanner } from "@/components/home/HeroBanner";
+import { DashboardVideoCarousel } from "@/components/dashboard/DashboardVideoCarousel";
 import { RecoCard } from "@/features/recommendations/RecoCard";
 import { PRICING_V21 } from "@/config/pricing";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
