@@ -53,7 +53,56 @@ const STYLE_PROMPTS: Record<string, string> = {
 
 // Enhanced negative prompt to strictly avoid text generation
 // ✅ Updated: Allow contextual text (product names, CTAs), forbid only gibberish/nonsense
-const NEGATIVE_PROMPT = 'photorealistic, photography, real human face, portrait, detailed face, hyperrealistic, 3D render, realistic skin, realistic eyes, human silhouette, person, people, man, woman, figure, human body, nsfw, nude, violence, blurry, low quality, watermark, lorem ipsum, gibberish text, random letters, unreadable text, nonsense words, fantasy language, made up pricing, wrong numbers, numbers, digits, percentages, statistics, data labels, numeric values, dashboard numbers, analytics data, charts with values, nature scene, forest, trees, sunset, landscape, QR code, barcode, logo, brand mark, icon overlay, UI element, button, screenshot, phone mockup, laptop screen, website screenshot, app interface, stock photo watermark, shutterstock, getty, istock';
+const BASE_NEGATIVE_PROMPT = 'photorealistic, photography, real human face, portrait, detailed face, hyperrealistic, 3D render, realistic skin, realistic eyes, human silhouette, person, people, man, woman, figure, human body, nsfw, nude, violence, blurry, low quality, watermark, lorem ipsum, gibberish text, random letters, unreadable text, nonsense words, fantasy language, made up pricing, wrong numbers, numbers, digits, percentages, statistics, data labels, numeric values, dashboard numbers, analytics data, charts with values, nature scene, forest, trees, sunset, landscape, QR code, barcode, logo, brand mark, icon overlay, UI element, button, screenshot, phone mockup, laptop screen, website screenshot, app interface, stock photo watermark, shutterstock, getty, istock';
+
+// Style-specific negative prompts to prevent style contamination
+const STYLE_NEGATIVE_ADDITIONS: Record<string, string> = {
+  'comic': ', volumetric lighting, film grain, lens flare, shallow depth of field, photorealistic, cinematic, 3D render',
+  'cartoon': ', volumetric lighting, film grain, lens flare, shallow depth of field, photorealistic, cinematic, 3D render',
+  'anime': ', photorealistic, film grain, western cartoon, 3D render, volumetric lighting',
+  'watercolor': ', sharp edges, neon, 3D render, bold outlines, vector art, photorealistic',
+  'hand-drawn': ', 3D render, neon, photorealistic, clean vector, smooth gradients',
+  'paper-cutout': ', 3D render, photorealistic, smooth gradients, neon',
+  'clay-3d': ', flat 2D, pencil sketch, watercolor, vector art',
+  'cinematic': ', cartoon, flat colors, bold outlines, vector art, anime, cel-shaded',
+  'neon-cyberpunk': ', pastel, watercolor, hand-drawn, vintage, retro, warm tones',
+  'vintage-retro': ', neon, cyberpunk, modern 3D, futuristic, holographic',
+  'minimalist': ', busy, cluttered, many objects, complex, detailed background',
+  'bold-colorful': ', muted, pastel, minimal, monochrome, subdued',
+};
+
+function getStyleNegativePrompt(style: string): string {
+  return BASE_NEGATIVE_PROMPT + (STYLE_NEGATIVE_ADDITIONS[style] || '');
+}
+
+// Style suffix for double-reinforcement at end of prompt
+function getStyleSuffix(style: string): string {
+  const suffixes: Record<string, string> = {
+    'comic': 'MUST be comic book cartoon style with bold outlines and flat cel-shaded colors, NOT photorealistic, NOT cinematic',
+    'cartoon': 'MUST be bright colorful cartoon with bold outlines and playful shapes, NOT photorealistic, NOT cinematic',
+    'anime': 'MUST be Japanese anime cel-shaded illustration style, NOT photorealistic, NOT western cartoon',
+    'watercolor': 'MUST be watercolor painting with soft washes and paper texture, NOT digital, NOT sharp edges',
+    'cinematic': 'MUST be cinematic with dramatic lighting and film grain, NOT cartoon, NOT flat design',
+    'hand-drawn': 'MUST be hand-drawn pencil sketch with crosshatching, NOT 3D, NOT clean vector',
+    'clay-3d': 'MUST be claymation 3D with plasticine texture, NOT flat 2D, NOT sketch',
+    'paper-cutout': 'MUST be paper cut-out craft collage with layered paper textures, NOT 3D render',
+    'neon-cyberpunk': 'MUST be cyberpunk neon-lit with dark background and electric glow, NOT pastel, NOT vintage',
+    'vintage-retro': 'MUST be retro 70s vintage with muted warm tones and halftone dots, NOT modern, NOT neon',
+    'documentary': 'MUST be documentary naturalistic style with earthy muted tones',
+    'minimalist': 'MUST be ultra minimalist with vast negative space and single focal point',
+    'bold-colorful': 'MUST be bold pop-art with vivid saturated colors and high contrast shapes',
+    'isometric': 'MUST be isometric 2D business illustration with clean lines and flat colors',
+    'whiteboard': 'MUST be whiteboard illustration with black line art on white background',
+    'motion-graphics': 'MUST be motion graphics key frame with bold geometric shapes and gradients',
+    'photo-realistic': 'MUST be photorealistic with natural textures and professional photography lighting',
+    'modern-3d': 'MUST be soft 3D render with pastel gradients and glass morphism elements',
+    'flat-design': 'MUST be flat 2D minimal illustration with clean geometric shapes',
+    'corporate': 'MUST be professional corporate illustration with muted business colors',
+  };
+  return suffixes[style] || '';
+}
+
+const NEGATIVE_PROMPT = BASE_NEGATIVE_PROMPT;
 
 // Function to sanitize prompts and remove forbidden elements
 function sanitizePrompt(prompt: string): string {
@@ -166,6 +215,12 @@ serve(async (req) => {
       prompt += cleanDescription;
       prompt += ', high quality, professional illustration, clean visual without any text or writing';
       
+      // ✅ STYLE DOUBLE-REINFORCEMENT: Repeat style at the end to override scene description dominance
+      const styleSuffix = getStyleSuffix(request.style);
+      if (styleSuffix) {
+        prompt += `, OVERRIDE STYLE: ${styleSuffix}`;
+      }
+      
       console.log('Generated scene prompt (sanitized):', prompt);
 
       // Check if we have a character sheet for consistency via IP-Adapter
@@ -241,7 +296,8 @@ serve(async (req) => {
       } else {
         // Standard Flux 1.1 Pro for scenes without character
         // ✅ Phase 15: Anti-gibberish — forbid ALL text AND numbers
-        const fullPrompt = `STRICT RULE: This image must contain ZERO text, ZERO letters, ZERO words, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels of any kind. All text, numbers, and data visualizations must be replaced with abstract colored shapes or blank areas. Never generate readable or unreadable content in any language. CRITICAL: Remove ALL human subjects — show ONLY environments, objects, furniture, and equipment. No people, no silhouettes, no hands, no body parts. ` + prompt + `. Avoid: ${NEGATIVE_PROMPT}`;
+        const styleNegative = getStyleNegativePrompt(request.style);
+        const fullPrompt = `STRICT RULE: This image must contain ZERO text, ZERO letters, ZERO words, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels of any kind. All text, numbers, and data visualizations must be replaced with abstract colored shapes or blank areas. Never generate readable or unreadable content in any language. CRITICAL: Remove ALL human subjects — show ONLY environments, objects, furniture, and equipment. No people, no silhouettes, no hands, no body parts. ` + prompt + `. Avoid: ${styleNegative}`;
         
         console.log('Final prompt with negative guidance:', fullPrompt.substring(0, 300));
         

@@ -385,6 +385,22 @@ REGELN:
 5. Der Text muss natürlich klingen und zum Vorlesen geeignet sein
 6. Verwende NUR Animationen aus dem erlaubten Set für "${categoryKey}"!
 7. Jede visualDescription folgt: [OBJEKT/SZENE] + [ZUSTAND/DETAIL] + [UMGEBUNG] + [BELEUCHTUNG] — NIEMALS Menschen beschreiben!
+   KRITISCH: Passe JEDE visualDescription an den visuellen Stil "${briefing.visualStyle || 'modern-3d'}" an!
+   Style-spezifische Beschreibungsregeln:
+   - comic/cartoon: "bold outlines, flat colors, cel-shaded, comic panel composition" — NIEMALS "volumetric lighting", "film grain", "shallow depth of field"
+   - cinematic: "dramatic volumetric lighting, shallow depth of field, film grain, anamorphic" — NIEMALS "flat colors", "bold outlines"
+   - watercolor: "soft watercolor washes, paper texture, gentle color bleeds, wet-on-wet" — NIEMALS "sharp edges", "neon", "3D render"
+   - anime: "cel-shaded, vibrant anime colors, Studio Ghibli style background" — NIEMALS "photorealistic", "film grain"
+   - neon-cyberpunk: "neon glow, dark background, electric colors, holographic" — NIEMALS "pastel", "watercolor", "hand-drawn"
+   - vintage-retro: "muted 70s tones, halftone texture, nostalgic warm colors" — NIEMALS "neon", "cyberpunk", "modern 3D"
+   - hand-drawn: "pencil sketch, crosshatching, charcoal texture, sketchbook" — NIEMALS "3D render", "neon", "photorealistic"
+   - clay-3d: "claymation texture, plasticine, stop-motion, soft rounded shapes" — NIEMALS "flat 2D", "pencil sketch"
+   - paper-cutout: "layered paper textures, cut paper edges, collage, craft paper" — NIEMALS "3D render", "photorealistic"
+   - documentary: "naturalistic, muted earthy tones, observational composition" — OK mit "natural lighting"
+   - minimalist: "vast negative space, single object, zen simplicity" — NIEMALS "busy", "cluttered", "many objects"
+   - bold-colorful: "vivid saturated pop-art colors, Memphis design, high contrast" — NIEMALS "muted", "pastel", "minimal"
+   - Für alle anderen Stile: passende Beschreibungen zum gewählten Stil verwenden!
+   WICHTIG: Die visualDescription MUSS den gewählten Stil widerspiegeln, nicht den Standard-Cinematic-Look!
 8. NICHT erlaubt in visualDescription: "A person", "A man", "A woman", "hand", "finger", "Digital world", "Abstract shapes"
 9. Die CTA-Szene MUSS die Website-URL "${briefing.websiteUrl || ''}" im Voiceover enthalten
 10. NIEMALS Objekte mit Text/Zahlen beschreiben (keine Dashboards, Charts, Monitore)
