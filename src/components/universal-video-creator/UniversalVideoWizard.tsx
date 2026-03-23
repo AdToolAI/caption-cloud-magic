@@ -186,12 +186,17 @@ export function UniversalVideoWizard() {
 
   const handleMoodConfirm = (config: MoodConfig) => {
     setMoodConfig(config);
-    setCurrentStep(2);
+    setCurrentStep(2); // → visual-style
+  };
+
+  const handleVisualStyleConfirm = (style: UniversalVideoStyle) => {
+    setSelectedVisualStyle(style);
+    setCurrentStep(3); // → mode-select
   };
 
   const handleModeSelect = (mode: UniversalGenerationMode) => {
     setGenerationMode(mode);
-    setCurrentStep(3);
+    setCurrentStep(4); // → consultation
   };
 
   const handleBackToCategory = () => {
