@@ -41,27 +41,11 @@ const STORAGE_SOUND_URLS: Record<SoundEffectType, string> = {
 };
 
 // ============================================
-// GET SOUND URL WITH FALLBACK CHAIN
+// GET SOUND URL — always returns Storage HTTP URL
 // ============================================
 
 export async function getSoundUrl(type: SoundEffectType): Promise<string> {
-  // Try CDN URLs first
-  const urls = CDN_SOUND_URLS[type];
-  
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, { method: 'HEAD' });
-      if (response.ok) {
-        return url;
-      }
-    } catch (e) {
-      console.log(`CDN URL failed for ${type}: ${url}`);
-    }
-  }
-  
-  // Fallback to embedded Base64
-  console.log(`Using embedded fallback for ${type}`);
-  return EMBEDDED_FALLBACKS[type];
+  return STORAGE_SOUND_URLS[type];
 }
 
 // ============================================
@@ -151,8 +135,7 @@ export function getSoundEffectsForScene(
 // ============================================
 
 export function getSoundUrlSync(type: SoundEffectType): string {
-  // Always return embedded first for sync usage (guaranteed to work)
-  return EMBEDDED_FALLBACKS[type];
+  return STORAGE_SOUND_URLS[type];
 }
 
 // ============================================
@@ -163,12 +146,9 @@ export async function preloadAllSounds(): Promise<Map<SoundEffectType, string>> 
   const soundMap = new Map<SoundEffectType, string>();
   const types: SoundEffectType[] = ['whoosh', 'pop', 'success', 'alert', 'click', 'swoosh', 'chime'];
   
-  await Promise.all(
-    types.map(async (type) => {
-      const url = await getSoundUrl(type);
-      soundMap.set(type, url);
-    })
-  );
+  for (const type of types) {
+    soundMap.set(type, STORAGE_SOUND_URLS[type]);
+  }
   
   return soundMap;
 }
@@ -178,6 +158,5 @@ export default {
   getSoundUrlSync,
   getSoundEffectsForScene,
   preloadAllSounds,
-  EMBEDDED_FALLBACKS,
-  CDN_SOUND_URLS,
+  STORAGE_SOUND_URLS,
 };
