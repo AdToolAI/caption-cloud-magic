@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r70-synth-only-music-2026-03-23";
+const AUTO_GEN_BUILD_TAG = "r71-lambda-validated-tones-2026-03-23";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -1981,11 +1981,13 @@ async function runRenderOnlyPipeline(
               .update({ validation_status: 'failed', validation_error: 'audio_corruption_in_render', is_valid: false })
               .eq('storage_path', decodeURIComponent(failedPath));
             
-            // Pick a different validated track
+            // Pick a different validated track — MUST check validation_status
             const { data: altTracks } = await tmpClient
               .from('background_music_tracks')
               .select('storage_path')
               .eq('is_valid', true)
+              .eq('validation_status', 'validated')
+              .not('last_validated_at', 'is', null)
               .neq('storage_path', decodeURIComponent(failedPath))
               .limit(10);
             
@@ -2264,7 +2266,7 @@ async function selectBackgroundMusic(
   supabaseUrl: string,
   _serviceKey: string
 ): Promise<string | null> {
-  console.log(`[selectBackgroundMusic] r69: Using DB catalog with validation. style="${style}", mood="${mood}"`);
+  console.log(`[selectBackgroundMusic] r71: Using DB catalog with strict validation. style="${style}", mood="${mood}"`);
 
   // Build search terms from style and mood
   const searchTerms = [
@@ -2290,6 +2292,7 @@ async function selectBackgroundMusic(
       .select('*')
       .eq('is_valid', true)
       .eq('validation_status', 'validated')
+      .not('last_validated_at', 'is', null)
       .overlaps('moods', searchArray)
       .limit(50);
 
@@ -2308,6 +2311,7 @@ async function selectBackgroundMusic(
       .select('*')
       .eq('is_valid', true)
       .eq('validation_status', 'validated')
+      .not('last_validated_at', 'is', null)
       .limit(50);
 
     if (error) {
@@ -2317,20 +2321,10 @@ async function selectBackgroundMusic(
     tracks = data || [];
   }
 
-  // r69: Last resort — any track with is_valid=true (even pending validation)
+  // r71: NO last resort — only validated tracks with last_validated_at
   if (tracks.length === 0) {
-    console.log('[selectBackgroundMusic] No validated tracks, trying any is_valid track as last resort');
-    const { data, error } = await supabase
-      .from('background_music_tracks')
-      .select('*')
-      .eq('is_valid', true)
-      .limit(50);
-
-    if (error) {
-      console.warn('[selectBackgroundMusic] Last resort query error:', error.message);
-      return null;
-    }
-    tracks = data || [];
+    console.warn('[selectBackgroundMusic] r71: No validated tracks available. All tracks failed Lambda validation.');
+    return null;
   }
 
   if (tracks.length === 0) {
