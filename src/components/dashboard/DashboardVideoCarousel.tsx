@@ -13,7 +13,6 @@ import { supabase } from '@/integrations/supabase/client';
 /** Resolve a possibly-relative storage path to a full public URL */
 const resolveVideoUrl = (rawUrl: string): string => {
   if (!rawUrl) return '';
-  // Already a full URL — return as-is
   if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) return rawUrl;
 
   const buckets = ['universal-videos', 'video-assets', 'ai-videos'];
@@ -24,7 +23,6 @@ const resolveVideoUrl = (rawUrl: string): string => {
       const { data } = supabase.storage.from(bucket).getPublicUrl(path);
       return data.publicUrl;
     }
-    // Handle paths like "storage/v1/object/public/bucket/..."
     const bucketSegment = `/${bucket}/`;
     if (rawUrl.includes(bucketSegment)) {
       const path = rawUrl.split(bucketSegment).pop() || '';
@@ -33,7 +31,6 @@ const resolveVideoUrl = (rawUrl: string): string => {
     }
   }
 
-  // Fallback: treat entire rawUrl as a path in universal-videos
   const { data } = supabase.storage.from('universal-videos').getPublicUrl(rawUrl);
   console.warn('[Carousel] Could not match bucket for path, falling back to universal-videos:', rawUrl);
   return data.publicUrl;
@@ -45,15 +42,19 @@ export const DashboardVideoCarousel = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const [errorVideos, setErrorVideos] = useState<Set<number>>(new Set());
+  const [retriedVideos, setRetriedVideos] = useState<Set<number>>(new Set());
   const wheelTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const sortedVideos = [...videos]
     .filter((v: any) => v.status === 'completed' && v.output_url)
     .sort((a: any, b: any) => {
       const scoreA = (a.download_count || 0) + (a.share_count || 0);
       const scoreB = (b.download_count || 0) + (b.share_count || 0);
-      if (scoreB !== scoreA) return scoreB - scoreA;
+      // Videos with actual analytics data first
+      if (scoreA > 0 && scoreB === 0) return -1;
+      if (scoreB > 0 && scoreA === 0) return 1;
+      if (scoreA > 0 && scoreB > 0 && scoreB !== scoreA) return scoreB - scoreA;
+      // Otherwise: newest first
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     })
     .slice(0, 10);
@@ -64,6 +65,7 @@ export const DashboardVideoCarousel = () => {
     skipSnaps: false,
     containScroll: false,
     slidesToScroll: 1,
+    watchDrag: false,
   });
 
   const onSelect = useCallback(() => {
@@ -109,18 +111,20 @@ export const DashboardVideoCarousel = () => {
     };
   }, [emblaApi, onSelect]);
 
-  // Scroll-to-rotate: wheel event
+  // Scroll-to-rotate: wheel event on the embla viewport
   useEffect(() => {
-    const node = containerRef.current;
-    if (!node || !emblaApi) return;
+    if (!emblaApi) return;
+    const rootNode = emblaApi.rootNode();
+    if (!rootNode) return;
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      if (wheelTimeout.current) return; // debounce active
+      if (wheelTimeout.current) return;
 
-      if (e.deltaY > 0) {
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (delta > 0) {
         emblaApi.scrollNext();
-      } else if (e.deltaY < 0) {
+      } else if (delta < 0) {
         emblaApi.scrollPrev();
       }
 
@@ -129,8 +133,8 @@ export const DashboardVideoCarousel = () => {
       }, 150);
     };
 
-    node.addEventListener('wheel', handleWheel, { passive: false });
-    return () => node.removeEventListener('wheel', handleWheel);
+    rootNode.addEventListener('wheel', handleWheel, { passive: false });
+    return () => rootNode.removeEventListener('wheel', handleWheel);
   }, [emblaApi]);
 
   const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
@@ -139,8 +143,19 @@ export const DashboardVideoCarousel = () => {
   const getVideoTitle = (video: any) =>
     (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
 
-  const handleVideoError = (index: number) => {
-    setErrorVideos(prev => new Set(prev).add(index));
+  const handleVideoError = (index: number, videoUrl: string) => {
+    if (!retriedVideos.has(index)) {
+      console.warn(`[Carousel] Retrying video ${index}:`, videoUrl);
+      setRetriedVideos(prev => new Set(prev).add(index));
+      const el = videoRefs.current[index];
+      if (el) {
+        el.src = videoUrl;
+        el.load();
+      }
+    } else {
+      console.error(`[Carousel] Video ${index} failed after retry:`, videoUrl);
+      setErrorVideos(prev => new Set(prev).add(index));
+    }
   };
 
   const handleCardClick = (index: number, videoUrl: string, title: string) => {
@@ -213,7 +228,7 @@ export const DashboardVideoCarousel = () => {
       </div>
 
       {/* 3D Perspective Carousel */}
-      <div ref={containerRef} style={{ perspective: '1200px' }}>
+      <div style={{ perspective: '1200px' }}>
         <div className="overflow-hidden py-8" ref={emblaRef}>
           <div className="flex items-center" style={{ transformStyle: 'preserve-3d' }}>
             {sortedVideos.map((video: any, index: number) => {
@@ -282,7 +297,7 @@ export const DashboardVideoCarousel = () => {
                           }}
                           onError={(e) => {
                             console.error(`[Carousel] Video ${index} failed to load:`, videoUrl, e);
-                            handleVideoError(index);
+                            handleVideoError(index, videoUrl);
                           }}
                         />
                       ) : (
