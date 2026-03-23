@@ -1,44 +1,51 @@
 
 
-# Plan: Video-Karussell reparieren und modernisieren
+# Plan: Video-Karussell überarbeiten — Hover-Autoplay + Zahnrad-Design
 
-## Probleme identifiziert
+## Probleme
 
-1. **Videos sind leer / Play reagiert nicht**: Der Code greift auf `video.video_url` und `video.title` zu — diese Felder existieren nicht in der DB. Die richtigen Felder sind `output_url` und Titel aus `metadata` (JSON-Feld).
+1. **Hälfte der Videos funktioniert nicht**: `video.output_url` zeigt auf Storage-Pfade ohne vollständige URL. Manche Videos haben relative Pfade (z.B. `video-assets/...`) statt absolute URLs (`https://...supabase.co/storage/v1/object/public/...`).
 
-2. **Design nicht wie Zahnrad/Skizze**: Die Karten sind aktuell flach nebeneinander mit Lücken statt eng überlappend wie ein Zahnrad.
+2. **Kein Zahnrad-Feeling**: Karten haben zu viel Abstand, keine echte Überlappung. Braucht engere Anordnung mit negativem Margin.
+
+3. **Kein Hover-Autoplay**: Aktuell muss man klicken. Stattdessen soll das Video bei Hover/Scroll automatisch (muted) abspielen, Klick öffnet dann den großen Player.
 
 ## Umsetzung
 
-### 1. Feldnamen korrigieren
-**Datei:** `src/components/dashboard/DashboardVideoCarousel.tsx`
+### 1. URL-Reparatur für alle Videos
+Beim Rendern jeder Karte die `output_url` prüfen:
+- Wenn sie mit `http` beginnt → direkt nutzen
+- Wenn sie ein relativer Storage-Pfad ist → Supabase Public URL konstruieren via `supabase.storage.from(bucket).getPublicUrl(path)`
+- Mehrere Buckets prüfen: `universal-videos`, `video-assets`, `ai-videos`
 
-- `video.video_url` → `video.output_url`
-- `video.title` → `(video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8)`
+### 2. Zahnrad-Design mit echter Überlappung
+- `flexBasis` auf `30%` reduzieren (statt 38%)
+- Negativer Margin (`-16px`) zwischen Karten für Überlappung
+- Aktive Karte: `scale(1.15)`, `z-20`, prominent
+- Seitliche Karten: `scale(0.75)`, `z-0`, stärker gedreht (`rotateY(8deg)`)
+- 2. Reihe seitlich: noch kleiner, fast verdeckt — echtes "Rad"-Gefühl
+- Dunklerer Gradient auf inaktiven Karten
 
-### 2. Design modernisieren — eng überlappende Karten
-Gleiche Datei, Carousel-Bereich komplett überarbeiten:
+### 3. Hover-Autoplay mit `<video>` Tag
+Jede Karte bekommt ein echtes `<video>` Element statt nur Thumbnail:
+- **Standard**: Video zeigt erstes Frame (Poster/Thumbnail), pausiert
+- **Hover (mouseenter)**: Video startet muted autoplay — sofortige Vorschau
+- **Mouseleave**: Video pausiert, springt zurück zum Anfang
+- **Klick**: Öffnet den großen `VideoPreviewPlayer` Dialog (mit Sound)
+- Ref-Array für alle Video-Elemente, um play/pause per Hover zu steuern
 
-- `flexBasis` von `45%` auf `35%` reduzieren, damit 3 Karten sichtbar
-- Kein `px-2` Gap, sondern negatives Margin für Überlappungs-Effekt
-- Aktive Karte: `scale-105`, `z-10`, volle Opacity, Glassmorphism-Border
-- Seitliche Karten: `scale-85`, `z-0`, `opacity-50`, leicht gedreht mit `perspective`
-- Thumbnail-Bereich: subtiler Gradient-Overlay statt flachem Grau
-- Play-Button: größer, mit Glow-Effekt auf der aktiven Karte
-- Info-Bar: Glassmorphism-Hintergrund statt solidem `bg-card`
-- Dots: modernere Pill-Form
-
-### 3. Nur fertige Videos anzeigen
-Videos mit `status !== 'completed'` oder ohne `output_url` filtern, damit keine leeren Karten erscheinen.
+### 4. Thumbnail-Fallback
+Wenn kein `thumbnail_url` vorhanden, das `<video>` Element selbst als Poster nutzen (`preload="metadata"` zeigt erstes Frame).
 
 ## Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `src/components/dashboard/DashboardVideoCarousel.tsx` | Feldnamen fix + Design-Overhaul |
+| `src/components/dashboard/DashboardVideoCarousel.tsx` | URL-Fix, Zahnrad-Layout, Hover-Autoplay |
 
 ## Erwartetes Ergebnis
-- Videos werden korrekt angezeigt (Thumbnails + Play funktioniert)
-- Karten überlappen sich eng wie ein Zahnrad
-- Moderneres Glassmorphism-Design mit Tiefeneffekt
+- Alle Videos spielen ab (keine kaputten URLs mehr)
+- Karten überlappen sich eng wie ein Zahnrad/Rad
+- Hover über eine Karte startet stumme Vorschau
+- Klick öffnet den großen Player mit Ton
 
