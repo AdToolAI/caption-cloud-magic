@@ -1682,6 +1682,7 @@ export const translations: Record<Language, any> = {
       contentStudio: "Content Studio",
       generator: "AI Caption Generator",
       textStudio: "AI Text Studio",
+      carousel: "Carousel Generator",
       promptWizard: "Prompt Assistant",
       reelScript: "AI Reel Script",
       hookGenerator: "Hook Generator",
