@@ -246,10 +246,10 @@ export function UniversalVideoWizard() {
       dbFallbackAttempted.current = false;
       
       setIsAutoGenerating(true);
-      setCurrentStep(4);
+      setCurrentStep(5); // → generating
       toast.info('🚀 Video-Generierung gestartet!');
     } else {
-      setCurrentStep(4);
+      setCurrentStep(5);
     }
   };
 
