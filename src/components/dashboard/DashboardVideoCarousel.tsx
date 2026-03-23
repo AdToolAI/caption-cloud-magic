@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
-import { Play, ChevronLeft, ChevronRight, Video, Sparkles, Expand } from 'lucide-react';
+import { Play, ChevronLeft, ChevronRight, Video, Sparkles, Expand, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoHistory } from '@/hooks/useVideoHistory';
 import { VideoPreviewPlayer } from '@/components/video/VideoPreviewPlayer';
@@ -41,20 +41,16 @@ export const DashboardVideoCarousel = () => {
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
-  const [errorVideos, setErrorVideos] = useState<Set<number>>(new Set());
-  const [retriedVideos, setRetriedVideos] = useState<Set<number>>(new Set());
+  const [errorVideos, setErrorVideos] = useState<Set<string>>(new Set());
+  const [retriedVideos, setRetriedVideos] = useState<Set<string>>(new Set());
+  const [isMuted, setIsMuted] = useState(true);
   const wheelTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  // Strict newest-first sorting — no download_count/share_count ranking
   const sortedVideos = [...videos]
     .filter((v: any) => v.status === 'completed' && v.output_url)
     .sort((a: any, b: any) => {
-      const scoreA = (a.download_count || 0) + (a.share_count || 0);
-      const scoreB = (b.download_count || 0) + (b.share_count || 0);
-      // Videos with actual analytics data first
-      if (scoreA > 0 && scoreB === 0) return -1;
-      if (scoreB > 0 && scoreA === 0) return 1;
-      if (scoreA > 0 && scoreB > 0 && scoreB !== scoreA) return scoreB - scoreA;
-      // Otherwise: newest first
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     })
     .slice(0, 10);
@@ -65,7 +61,7 @@ export const DashboardVideoCarousel = () => {
     skipSnaps: false,
     containScroll: false,
     slidesToScroll: 1,
-    watchDrag: false,
+    watchDrag: true,
   });
 
   const onSelect = useCallback(() => {
@@ -78,18 +74,12 @@ export const DashboardVideoCarousel = () => {
     videoRefs.current.forEach((el, i) => {
       if (!el) return;
       if (i === selectedIndex) {
-        el.muted = true;
-        // Force load + play with fallback
-        if (el.readyState === 0) {
-          el.load();
-        }
-        const tryPlay = () => {
-          el.play().catch(() => {});
-        };
+        el.muted = isMuted;
+        if (el.readyState === 0) el.load();
+        const tryPlay = () => { el.play().catch(() => {}); };
         if (el.readyState >= 2) {
           tryPlay();
         } else {
-          // Wait a bit then try anyway
           const t = setTimeout(tryPlay, 300);
           return () => clearTimeout(t);
         }
@@ -98,7 +88,7 @@ export const DashboardVideoCarousel = () => {
         el.currentTime = 0;
       }
     });
-  }, [selectedIndex]);
+  }, [selectedIndex, isMuted]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -111,30 +101,25 @@ export const DashboardVideoCarousel = () => {
     };
   }, [emblaApi, onSelect]);
 
-  // Scroll-to-rotate: wheel event on the embla viewport
-  useEffect(() => {
+  // Scroll-to-rotate: capture wheel on entire container so it works everywhere
+  const handleWheelCapture = useCallback((e: React.WheelEvent) => {
     if (!emblaApi) return;
-    const rootNode = emblaApi.rootNode();
-    if (!rootNode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (wheelTimeout.current) return;
 
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      if (wheelTimeout.current) return;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (Math.abs(delta) < 2) return;
 
-      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      if (delta > 0) {
-        emblaApi.scrollNext();
-      } else if (delta < 0) {
-        emblaApi.scrollPrev();
-      }
+    if (delta > 0) {
+      emblaApi.scrollNext();
+    } else {
+      emblaApi.scrollPrev();
+    }
 
-      wheelTimeout.current = setTimeout(() => {
-        wheelTimeout.current = null;
-      }, 150);
-    };
-
-    rootNode.addEventListener('wheel', handleWheel, { passive: false });
-    return () => rootNode.removeEventListener('wheel', handleWheel);
+    wheelTimeout.current = setTimeout(() => {
+      wheelTimeout.current = null;
+    }, 200);
   }, [emblaApi]);
 
   const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
@@ -143,18 +128,18 @@ export const DashboardVideoCarousel = () => {
   const getVideoTitle = (video: any) =>
     (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
 
-  const handleVideoError = (index: number, videoUrl: string) => {
-    if (!retriedVideos.has(index)) {
-      console.warn(`[Carousel] Retrying video ${index}:`, videoUrl);
-      setRetriedVideos(prev => new Set(prev).add(index));
+  const handleVideoError = (videoId: string, index: number, videoUrl: string) => {
+    if (!retriedVideos.has(videoId)) {
+      console.warn(`[Carousel] Retrying video ${videoId}:`, videoUrl);
+      setRetriedVideos(prev => new Set(prev).add(videoId));
       const el = videoRefs.current[index];
       if (el) {
         el.src = videoUrl;
         el.load();
       }
     } else {
-      console.error(`[Carousel] Video ${index} failed after retry:`, videoUrl);
-      setErrorVideos(prev => new Set(prev).add(index));
+      console.error(`[Carousel] Video ${videoId} failed after retry:`, videoUrl);
+      setErrorVideos(prev => new Set(prev).add(videoId));
     }
   };
 
@@ -165,6 +150,16 @@ export const DashboardVideoCarousel = () => {
       emblaApi?.scrollTo(index);
     }
   };
+
+  const toggleMute = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMuted(prev => {
+      const next = !prev;
+      const el = videoRefs.current[selectedIndex];
+      if (el) el.muted = next;
+      return next;
+    });
+  }, [selectedIndex]);
 
   // Signed distance for 3D rotation
   const getSignedDist = (index: number): number => {
@@ -227,30 +222,32 @@ export const DashboardVideoCarousel = () => {
         </div>
       </div>
 
-      {/* 3D Perspective Carousel */}
-      <div style={{ perspective: '1200px' }}>
+      {/* 3D Perspective Carousel — onWheelCapture on outer container */}
+      <div
+        ref={containerRef}
+        style={{ perspective: '1200px' }}
+        onWheelCapture={handleWheelCapture}
+      >
         <div className="overflow-hidden py-8" ref={emblaRef}>
           <div className="flex items-center" style={{ transformStyle: 'preserve-3d' }}>
             {sortedVideos.map((video: any, index: number) => {
               const isActive = index === selectedIndex;
               const signedDist = getSignedDist(index);
               const absDist = Math.abs(signedDist);
-              const performanceScore = (video.download_count || 0) + (video.share_count || 0);
               const title = getVideoTitle(video);
               const videoUrl = resolveVideoUrl(video.output_url);
+              const videoId = video.id;
 
               // 3D transforms
               const scale = isActive ? 1.05 : absDist === 1 ? 0.85 : 0.7;
               const zIndex = isActive ? 30 : absDist === 1 ? 20 : 10;
               const cardOpacity = isActive ? 1 : absDist === 1 ? 0.7 : 0.4;
-              // rotateY: cards rotate away from center
               const rotateY = isActive ? 0 : absDist === 1 ? signedDist * -25 : signedDist > 0 ? -40 : 40;
-              // translateX for tighter grouping
               const translateX = isActive ? 0 : signedDist * -20;
 
               return (
                 <div
-                  key={video.id}
+                  key={videoId}
                   className="flex-shrink-0 flex-grow-0 cursor-pointer"
                   style={{
                     flexBasis: sortedVideos.length === 1 ? '70%' : '50%',
@@ -278,11 +275,11 @@ export const DashboardVideoCarousel = () => {
                   >
                     {/* Video element */}
                     <div className="aspect-video relative overflow-hidden bg-black">
-                      {!errorVideos.has(index) ? (
+                      {!errorVideos.has(videoId) ? (
                         <video
                           ref={(el) => { videoRefs.current[index] = el; }}
                           src={videoUrl}
-                          muted
+                          muted={isMuted}
                           playsInline
                           loop
                           preload="auto"
@@ -291,13 +288,13 @@ export const DashboardVideoCarousel = () => {
                           onCanPlay={() => {
                             const el = videoRefs.current[index];
                             if (el && index === selectedIndex) {
-                              el.muted = true;
+                              el.muted = isMuted;
                               el.play().catch(() => {});
                             }
                           }}
                           onError={(e) => {
-                            console.error(`[Carousel] Video ${index} failed to load:`, videoUrl, e);
-                            handleVideoError(index, videoUrl);
+                            console.error(`[Carousel] Video ${videoId} failed to load:`, videoUrl, e);
+                            handleVideoError(videoId, index, videoUrl);
                           }}
                         />
                       ) : (
@@ -308,7 +305,7 @@ export const DashboardVideoCarousel = () => {
                       )}
 
                       {/* Play icon overlay — only on inactive cards */}
-                      {!isActive && !errorVideos.has(index) && (
+                      {!isActive && !errorVideos.has(videoId) && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                           <Play className="h-8 w-8 text-white/60" />
                         </div>
@@ -322,9 +319,19 @@ export const DashboardVideoCarousel = () => {
                           : 'bg-gradient-to-t from-black/70 via-black/20 to-black/10'
                       )} />
 
-                      {/* Expand button on active card */}
+                      {/* Active card controls: Expand + Mute */}
                       {isActive && (
-                        <div className="absolute top-2 right-2 z-10">
+                        <div className="absolute top-2 right-2 z-10 flex gap-1.5">
+                          <button
+                            onClick={toggleMute}
+                            className="w-9 h-9 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md hover:bg-primary/80 transition-colors"
+                          >
+                            {isMuted ? (
+                              <VolumeX className="h-4 w-4 text-white" />
+                            ) : (
+                              <Volume2 className="h-4 w-4 text-white" />
+                            )}
+                          </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -334,15 +341,6 @@ export const DashboardVideoCarousel = () => {
                           >
                             <Expand className="h-4 w-4 text-white" />
                           </button>
-                        </div>
-                      )}
-
-                      {/* Performance Badge */}
-                      {performanceScore > 0 && index === 0 && (
-                        <div className="absolute top-2 left-2 z-10">
-                          <Badge className="bg-primary/90 text-primary-foreground text-[10px] px-2 py-0.5 backdrop-blur-sm">
-                            ⭐ Best
-                          </Badge>
                         </div>
                       )}
 
