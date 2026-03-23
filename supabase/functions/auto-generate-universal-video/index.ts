@@ -2319,20 +2319,10 @@ async function selectBackgroundMusic(
     tracks = data || [];
   }
 
-  // r69: Last resort — any track with is_valid=true (even pending validation)
+  // r71: NO last resort — only validated tracks with last_validated_at
   if (tracks.length === 0) {
-    console.log('[selectBackgroundMusic] No validated tracks, trying any is_valid track as last resort');
-    const { data, error } = await supabase
-      .from('background_music_tracks')
-      .select('*')
-      .eq('is_valid', true)
-      .limit(50);
-
-    if (error) {
-      console.warn('[selectBackgroundMusic] Last resort query error:', error.message);
-      return null;
-    }
-    tracks = data || [];
+    console.warn('[selectBackgroundMusic] r71: No validated tracks available. All tracks failed Lambda validation.');
+    return null;
   }
 
   if (tracks.length === 0) {
