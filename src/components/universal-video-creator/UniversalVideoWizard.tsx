@@ -359,7 +359,7 @@ export function UniversalVideoWizard() {
       if (consultationResult && generationMode === 'full-service') {
         console.log('[UniversalVideoWizard] Re-mounting with isAutoGenerating=true, profile:', diagProfile);
         setIsAutoGenerating(true);
-        setCurrentStep(3);
+        setCurrentStep(5); // → generating
       }
     }, 150);
   };
