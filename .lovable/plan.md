@@ -1,129 +1,59 @@
 
-## Plan: Das Restproblem jetzt als Mix-/Auswahlproblem beheben, nicht mehr als „Musik fehlt komplett“
 
-### Was ich gerade im aktuellen Stand verifiziert habe
-- Der letzte erfolgreiche Render (`r72`) hatte **wirklich eine Hintergrundmusik-URL**:
-  `video-assets/jamendo-music/69c77d80-891c-44c2-9c73-077bed8a5d0e.mp3`
-- Diese Datei ist **erreichbar und korrekt ausgeliefert**:
-  - HTTP 200
-  - `content-type: audio/mpeg`
-  - ca. **2.1 MB**
-- In `UniversalCreatorVideo.tsx` wird Musik auch tatsächlich gerendert:
-  - `backgroundMusicUrl` ist aktiv
-  - Volume ist aktuell fest auf `backgroundMusicVolume * masterVolume`
-- In `auto-generate-universal-video/index.ts` ist das effektive Render-Volume aktuell nur **0.15**
-- Die Musikauswahl nimmt aktuell einfach **den ersten Jamendo-Treffer**
-- Der aktuelle erste „upbeat“-Treffer ist z. B. **„PTICE NA NEBU“** – also kein klarer, kurzer, sofort hörbarer Werbe-/Corporate-Track
+# Plan: Filmart & Stil als eigenen Wizard-Schritt vor dem Interview
 
-### Wahrscheinlichste Restursache
-Das ist sehr wahrscheinlich **nicht mehr** das alte Lambda-/ffprobe-Problem.
+## Überblick
+Neuer Schritt zwischen "Stimmung" (Step 1) und "Modus" (Step 2), in dem alle 20 visuellen Stile direkt auswählbar sind — aufgeteilt in **6 Filmarten** und **14 Stilrichtungen**. Die Frage nach dem visuellen Stil entfällt dann aus dem Interview.
 
-Das aktuelle Problem sieht eher so aus:
-```text
-Musikdatei wird gefunden
--> Render läuft erfolgreich durch
--> Track ist aber für den Use-Case schlecht gewählt
-   und/oder startet zu subtil
-   und/oder ist mit 0.15 unter dem Voiceover zu leise
--> Nutzer nimmt praktisch keine Hintergrundmusik wahr
-```
+## Aufteilung der 20 Stile
+
+**6 Filmarten** (generative Stile, die die Bildästhetik grundlegend verändern):
+- Comic, Cinematic, Documentary, Cartoon, Anime, Vintage-Retro
+
+**14 Stilrichtungen** (Design-/Rendering-Stile):
+- Flat Design, Isometric, Whiteboard, Corporate, Modern 3D, Minimalist, Bold Colorful, Hand-Drawn, Motion Graphics, Photo-Realistic, Watercolor, Neon Cyberpunk, Paper Cutout, Clay 3D
 
 ## Umsetzung
 
-### 1. Musikauswahl von „erstes Ergebnis“ auf „geeigneter Kandidat“ umstellen
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+### 1. Neue Komponente `FilmStyleSelector.tsx`
+Zwei visuelle Sektionen mit Karten-Grid:
+- **Sektion 1: "Filmart"** — 6 große Karten mit Icon, Name, Beschreibung
+- **Sektion 2: "Stilrichtung"** — 14 Karten im gleichen Format
+- Nutzer wählt genau **eine** Option aus einer der beiden Sektionen (mutual exclusive)
+- "Weiter"-Button nach Auswahl
 
-Ich würde `selectBackgroundMusic()` so umbauen, dass nicht mehr stumpf `results[0]` genommen wird, sondern ein kleines Ranking läuft:
+### 2. Wizard-Schritte anpassen
+**Datei:** `UniversalVideoWizard.tsx`
 
-- Tracks mit passender Dauer bevorzugen (z. B. 20–120s)
-- klare Corporate-/Upbeat-/Cinematic-Titel bevorzugen
-- ungeeignete oder zu diffuse Treffer abwerten
-- mehrere Kandidaten in Reihenfolge testen statt nur 1
-
-Ziel:
-- nicht irgendein Jamendo-Track
-- sondern ein Track, der **im fertigen Video sofort hörbar und passend** ist
-
-### 2. Musik im Universal Creator hörbar mischen
-**Dateien:**
-- `supabase/functions/auto-generate-universal-video/index.ts`
-- `src/remotion/templates/UniversalCreatorVideo.tsx`
-
-Ich würde die Mischung für den Universal Creator explizit anheben:
-
-- Startwert für Musik testweise auf **0.3 bis 0.4** statt 0.15
-- optional sanftes Fade-in statt sofort leiser Bettung
-- Voiceover/Music-Verhältnis klarer definieren
-
-Wichtig:
-Der aktuelle Wert 0.15 ist für „deutlich hörbare Hintergrundmusik“ sehr konservativ.
-
-### 3. Determinischen Audio-Diagnosemodus einbauen
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
-
-Für einen Render soll man gezielt erzwingen können:
+Neuer Step `visual-style` zwischen `mood` und `mode-select` einfügen:
 
 ```text
-- forceBackgroundMusicUrl
-- forceBackgroundMusicVolume
-- disableRandomTrackSelection
-- voiceoverOff
-- musicOnly
+Vorher:  0-Category → 1-Mood → 2-ModeSelect → 3-Consultation → ...
+Nachher: 0-Category → 1-Mood → 2-VisualStyle → 3-ModeSelect → 4-Consultation → ...
 ```
 
-Damit können wir in 1 Testlauf sauber unterscheiden:
-- Track hörbar, wenn nur Musik läuft?
-- Track hörbar zusammen mit Voiceover?
-- Ist es Auswahl oder Mix?
+- `STEPS_FULL_SERVICE` und `STEPS_MANUAL` erweitern
+- Alle Index-basierten Navigationsaufrufe (handleConsultationComplete → step 4→5, handleAutoGenerationComplete → step 5→6) um +1 verschieben
+- `MoodConfig` um `visualStyle: UniversalVideoStyle` erweitern
+- Neuer State `selectedVisualStyle` + Handler
 
-### 4. Gewählten Track und effektive Lautstärke sauber persistieren
-**Bereiche:**
-- `auto-generate-universal-video`
-- `universal_video_progress` result_data
-- optional Progress-UI
+### 3. Interview-Phase für Stil entfernen
+Der Consultant fragt aktuell nach dem visuellen Stil (Phase ~18). Diese Frage wird übersprungen, da der Stil bereits gewählt ist. Der gewählte Stil wird stattdessen direkt ins `consultationResult.visualStyle` geschrieben.
 
-Ich würde künftig speichern:
-- Track-Titel
-- Artist
-- finale Musik-URL
-- effektive Lautstärke
-- ob Kandidat 1, 2 oder 3 gewählt wurde
-- ob Fallback benutzt wurde
-
-Dann sehen wir sofort:
-```text
-Welcher Track lief wirklich?
-Mit welcher Lautstärke?
-War es ein Fallback?
-```
-
-### 5. Optional: kurze „Musik zuerst“-Einleitung
-Wenn gewünscht, würde ich zusätzlich die ersten ~0.8–1.5 Sekunden so mischen, dass Musik kurz deutlicher hörbar ist, bevor das Voiceover voll einsetzt.
-
-Das ist keine Pflicht, aber sehr hilfreich, wenn Nutzer sofort prüfen sollen:
-- „Ja, da ist jetzt wirklich Musik drin.“
+### 4. Stil an Render-Pipeline durchreichen
+`consultationResult.visualStyle` wird bereits heute an `auto-generate-universal-video` weitergegeben und dort für Prompt-Engineering genutzt — das bleibt unverändert, nur die Quelle wechselt von Interview-Antwort zu direkter UI-Auswahl.
 
 ## Betroffene Dateien
-- `supabase/functions/auto-generate-universal-video/index.ts`
-- `src/remotion/templates/UniversalCreatorVideo.tsx`
-- optional `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+
+| Datei | Änderung |
+|-------|----------|
+| `src/components/universal-video-creator/FilmStyleSelector.tsx` | **Neu** — Auswahl-UI mit 6 Filmarten + 14 Stilrichtungen |
+| `src/components/universal-video-creator/UniversalVideoWizard.tsx` | Neuen Step einfügen, Indizes anpassen |
+| `src/components/universal-video-creator/MoodPresetSelector.tsx` | `MoodConfig` um `visualStyle` erweitern |
+| `src/components/universal-video-creator/index.ts` | Export hinzufügen |
 
 ## Erwartetes Ergebnis
-Nach der Umstellung soll das Verhalten so sein:
+- Nutzer wählt vor dem Interview visuell die Filmart oder Stilrichtung
+- Interview fragt nicht mehr nach dem Stil
+- Gewählter Stil fließt direkt in die Bildgenerierung
 
-```text
-Video startet
--> Musik ist sofort eindeutig wahrnehmbar
--> Voiceover bleibt verständlich
--> Track passt besser zur Stimmung
--> wir können jeden Render forensisch nachvollziehen
-```
-
-## Technische Kurzfassung
-Der aktuelle Stand spricht dafür, dass die Musik **nicht mehr fehlt**, sondern **zu subtil / zu leise / unpassend ausgewählt** wird.
-
-Der nächste sinnvolle Fix ist deshalb:
-1. **bessere Track-Auswahl**
-2. **lautere, klarere Mischung**
-3. **determinischer Musik-Only-/Mix-Debugmodus**
-4. **saubere Persistenz des tatsächlich verwendeten Tracks**
