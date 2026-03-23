@@ -13,7 +13,7 @@ import { UniversalAutoGenerationProgress } from './UniversalAutoGenerationProgre
 import { UniversalPreviewPlayer } from './UniversalPreviewPlayer';
 import { UniversalExportStep } from './UniversalExportStep';
 import { toast } from 'sonner';
-import { VIDEO_CATEGORIES, type VideoCategory, type UniversalConsultationResult } from '@/types/universal-video-creator';
+import { VIDEO_CATEGORIES, type VideoCategory, type UniversalConsultationResult, type UniversalVideoStyle } from '@/types/universal-video-creator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { getWizardDraft, saveWizardDraft, clearAllDrafts, hasMeaningfulDraft } from '@/lib/universal-video-draft';
 
