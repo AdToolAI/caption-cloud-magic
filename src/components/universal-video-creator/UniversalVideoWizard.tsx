@@ -235,7 +235,9 @@ export function UniversalVideoWizard() {
     // Inject pre-selected visual style
     if (selectedVisualStyle) {
       result.visualStyle = selectedVisualStyle;
+      console.log('[Wizard] Injected selectedVisualStyle into consultation result:', selectedVisualStyle);
     }
+    console.log('[Wizard] Final visualStyle for generation:', result.visualStyle, '| selectedVisualStyle:', selectedVisualStyle);
 
     setConsultationResult(result);
     setError(null);
