@@ -1,51 +1,42 @@
 
 
-# Plan: Video-Karussell überarbeiten — Hover-Autoplay + Zahnrad-Design
+# Plan: Video-Karussell komplett überarbeiten
 
-## Probleme
+## Analyse der Probleme
 
-1. **Hälfte der Videos funktioniert nicht**: `video.output_url` zeigt auf Storage-Pfade ohne vollständige URL. Manche Videos haben relative Pfade (z.B. `video-assets/...`) statt absolute URLs (`https://...supabase.co/storage/v1/object/public/...`).
+1. **Videos sind schwarz/leer**: Die URLs sind gültig (AWS S3 Links), aber `preload="metadata"` lädt bei Cross-Origin oft kein Frame. Ohne `thumbnail_url` (alle `null`) bleibt alles schwarz.
+2. **Hover-Autoplay funktioniert nicht**: Embla Carousel fängt Pointer-Events für Drag-Gesten ab — `mouseenter`/`mouseleave` werden blockiert.
+3. **Kein Zahnrad-Gefühl**: Die Karten liegen nicht dicht genug übereinander.
 
-2. **Kein Zahnrad-Feeling**: Karten haben zu viel Abstand, keine echte Überlappung. Braucht engere Anordnung mit negativem Margin.
+## Lösungen
 
-3. **Kein Hover-Autoplay**: Aktuell muss man klicken. Stattdessen soll das Video bei Hover/Scroll automatisch (muted) abspielen, Klick öffnet dann den großen Player.
+### 1. Video-Vorschau reparieren
+- `preload` von `"metadata"` auf `"auto"` ändern und `crossOrigin="anonymous"` hinzufügen
+- Fallback: Wenn kein Poster/Thumbnail, ein dunkles Gradient-Overlay mit Play-Icon zeigen
+- `onLoadedData` Event nutzen um zu erkennen ob Video geladen wurde
 
-## Umsetzung
+### 2. Hover-Autoplay ohne Embla-Konflikt
+- Statt `mouseenter`/`mouseleave` auf dem Embla-Container: **IntersectionObserver** + Embla's `select` Event nutzen
+- Das **aktive** (zentrierte) Video spielt automatisch muted ab
+- Alle anderen Videos pausieren automatisch
+- Beim Swipen: altes Video pausiert, neues startet
 
-### 1. URL-Reparatur für alle Videos
-Beim Rendern jeder Karte die `output_url` prüfen:
-- Wenn sie mit `http` beginnt → direkt nutzen
-- Wenn sie ein relativer Storage-Pfad ist → Supabase Public URL konstruieren via `supabase.storage.from(bucket).getPublicUrl(path)`
-- Mehrere Buckets prüfen: `universal-videos`, `video-assets`, `ai-videos`
+### 3. Echtes Zahnrad-Design
+- Embla-Einstellungen: `slidesToScroll: 1`, `containScroll: false`, `align: 'center'`
+- `flexBasis: 50%` für die aktive Karte (größer), Karten überlappen sich durch CSS `margin: -24px`
+- Aktive Karte: `scale(1.0)`, `z-index: 30`, volle Opacity, primärer Glow-Ring
+- 1. Nachbar: `scale(0.82)`, `z-index: 20`, `opacity: 0.6`, `translateX(±10px)` nach innen geschoben
+- 2. Nachbar: `scale(0.65)`, `z-index: 10`, `opacity: 0.3`
+- **Kein `rotateY`** — die Skizze zeigt flache Überlappung, kein 3D-Drehen
+- Runde Ecken (`rounded-2xl`) auf allen Karten
 
-### 2. Zahnrad-Design mit echter Überlappung
-- `flexBasis` auf `30%` reduzieren (statt 38%)
-- Negativer Margin (`-16px`) zwischen Karten für Überlappung
-- Aktive Karte: `scale(1.15)`, `z-20`, prominent
-- Seitliche Karten: `scale(0.75)`, `z-0`, stärker gedreht (`rotateY(8deg)`)
-- 2. Reihe seitlich: noch kleiner, fast verdeckt — echtes "Rad"-Gefühl
-- Dunklerer Gradient auf inaktiven Karten
-
-### 3. Hover-Autoplay mit `<video>` Tag
-Jede Karte bekommt ein echtes `<video>` Element statt nur Thumbnail:
-- **Standard**: Video zeigt erstes Frame (Poster/Thumbnail), pausiert
-- **Hover (mouseenter)**: Video startet muted autoplay — sofortige Vorschau
-- **Mouseleave**: Video pausiert, springt zurück zum Anfang
-- **Klick**: Öffnet den großen `VideoPreviewPlayer` Dialog (mit Sound)
-- Ref-Array für alle Video-Elemente, um play/pause per Hover zu steuern
-
-### 4. Thumbnail-Fallback
-Wenn kein `thumbnail_url` vorhanden, das `<video>` Element selbst als Poster nutzen (`preload="metadata"` zeigt erstes Frame).
+### 4. Klick zum Vergrößern
+- Klick auf aktive Karte öffnet den `VideoPreviewPlayer` Dialog (mit Ton)
+- Klick auf inaktive Karte scrollt zu dieser Karte (wird zur aktiven)
 
 ## Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `src/components/dashboard/DashboardVideoCarousel.tsx` | URL-Fix, Zahnrad-Layout, Hover-Autoplay |
-
-## Erwartetes Ergebnis
-- Alle Videos spielen ab (keine kaputten URLs mehr)
-- Karten überlappen sich eng wie ein Zahnrad/Rad
-- Hover über eine Karte startet stumme Vorschau
-- Klick öffnet den großen Player mit Ton
+| `src/components/dashboard/DashboardVideoCarousel.tsx` | Komplett überarbeitet |
 
