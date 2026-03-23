@@ -1,30 +1,26 @@
 
 
-# Plan: Zahnrad-Karussell mit Schräglage + Auto-Play fix
+# Plan: Video-Ladezeit reparieren
 
-## Probleme
+## Problem
+Das aktive Video zeigt ewig einen Spinner, weil `onCanPlay` nie feuert. Das passiert weil:
+1. `preload="auto"` bei Cross-Origin S3-Videos oft nicht genug Daten lädt um `canplay` auszulösen
+2. Der Spinner-Overlay verdeckt das Video komplett und verschwindet nie
+3. Kein Error-Handling — wenn die URL fehlschlägt, dreht der Spinner ewig
 
-1. **Keine Schräglage / kein echtes Zahnrad**: Karten stehen gerade nebeneinander. Die Skizze zeigt Karten die sich überlappen UND leicht schräg stehen (wie Karten in einem Fächer).
-2. **Auto-Play funktioniert nicht**: Das `useEffect` feuert korrekt, aber `video.play()` schlägt fehl weil das `<video>` Element noch nicht geladen ist oder `preload="auto"` bei Cross-Origin nicht greift. Braucht `onCanPlay` statt `onLoadedData`.
+## Lösung (1 Datei: `DashboardVideoCarousel.tsx`)
 
-## Umsetzung (1 Datei)
+### 1. Spinner-Logik entfernen / durch sanften Fallback ersetzen
+- Statt `loadedVideos` State + Spinner: Video direkt anzeigen lassen
+- Nur ein kurzes Fade-In wenn das Video geladen ist (via CSS `opacity` Transition)
+- `onLoadedMetadata` statt `onCanPlay` als "geladen"-Signal (feuert viel früher)
 
-**`src/components/dashboard/DashboardVideoCarousel.tsx`**
+### 2. Error-Handling hinzufügen
+- `onError` auf dem `<video>` Element: bei Fehler ein statisches Fallback-UI zeigen (Film-Icon + "Video nicht verfügbar")
+- Fehlerhafte Videos nicht ewig laden lassen
 
-### 1. Schräglage für Zahnrad-Effekt
-Statt nur `scale` jetzt auch `rotate()` (2D-Rotation, kein 3D):
-- Karten links vom Zentrum: `rotate(-3deg)` (1. Nachbar), `rotate(-5deg)` (2.)
-- Karten rechts vom Zentrum: `rotate(3deg)` (1. Nachbar), `rotate(5deg)` (2.)
-- Aktive Karte: `rotate(0deg)`, `scale(1.05)`
-- Negativen Margin von `-24px` auf `-32px` erhöhen für engere Überlappung
-
-### 2. Auto-Play reparieren
-- `onLoadedData` durch `onCanPlay` ersetzen — dieses Event feuert wenn genug Daten zum Abspielen geladen sind
-- Im Auto-Play-Effect: prüfen ob `readyState >= 3` bevor `play()` aufgerufen wird
-- Fallback: bei jedem `onCanPlay` Event prüfen ob dieses Video das aktive ist und dann starten
-- `crossOrigin` entfernen (verursacht CORS-Fehler bei S3 URLs die keine CORS-Header senden)
-
-### 3. Play-Overlay anpassen
-- Play-Icon Overlay nur auf **inaktiven** Karten zeigen (aktive spielt ja automatisch)
-- Aktive Karte: kein Play-Overlay, Video läuft
+### 3. Auto-Play robuster machen
+- Im `onLoadedMetadata` Callback direkt `play()` aufrufen wenn es das aktive Video ist
+- Zusätzlich `onCanPlay` als Backup behalten
+- `preload="metadata"` statt `"auto"` (lädt schneller, reicht für erstes Frame + Autoplay)
 
