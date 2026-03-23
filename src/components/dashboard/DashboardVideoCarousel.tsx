@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
-import { Play, ChevronLeft, ChevronRight, Video, Sparkles } from 'lucide-react';
+import { Play, ChevronLeft, ChevronRight, Video, Sparkles, Expand } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoHistory } from '@/hooks/useVideoHistory';
 import { VideoPreviewPlayer } from '@/components/video/VideoPreviewPlayer';
@@ -8,13 +8,34 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+
+/** Resolve a possibly-relative storage path to a full public URL */
+const resolveVideoUrl = (rawUrl: string): string => {
+  if (!rawUrl) return '';
+  if (rawUrl.startsWith('http')) return rawUrl;
+
+  // Try known buckets in order
+  const buckets = ['universal-videos', 'video-assets', 'ai-videos'];
+  for (const bucket of buckets) {
+    if (rawUrl.startsWith(`${bucket}/`) || rawUrl.includes(`/${bucket}/`)) {
+      const path = rawUrl.startsWith(`${bucket}/`) ? rawUrl.slice(bucket.length + 1) : rawUrl;
+      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+      return data.publicUrl;
+    }
+  }
+
+  // Default: try first bucket
+  const { data } = supabase.storage.from('universal-videos').getPublicUrl(rawUrl);
+  return data.publicUrl;
+};
 
 export const DashboardVideoCarousel = () => {
   const { videos, isLoading } = useVideoHistory();
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
-  // Filter to only completed videos with output_url, then sort by performance
   const sortedVideos = [...videos]
     .filter((v: any) => v.status === 'completed' && v.output_url)
     .sort((a: any, b: any) => {
@@ -49,6 +70,22 @@ export const DashboardVideoCarousel = () => {
 
   const getVideoTitle = (video: any) =>
     (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
+
+  const handleMouseEnter = (index: number) => {
+    const el = videoRefs.current[index];
+    if (el) {
+      el.muted = true;
+      el.play().catch(() => {});
+    }
+  };
+
+  const handleMouseLeave = (index: number) => {
+    const el = videoRefs.current[index];
+    if (el) {
+      el.pause();
+      el.currentTime = 0;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -100,93 +137,107 @@ export const DashboardVideoCarousel = () => {
         </div>
       </div>
 
-      {/* Carousel — overlapping gear-style */}
-      <div className="overflow-hidden py-4" ref={emblaRef}>
-        <div className="flex" style={{ marginLeft: '-8px', marginRight: '-8px' }}>
+      {/* Carousel — gear-style overlapping */}
+      <div className="overflow-hidden py-6" ref={emblaRef}>
+        <div className="flex" style={{ perspective: '1200px' }}>
           {sortedVideos.map((video: any, index: number) => {
             const isActive = index === selectedIndex;
+            const distFromActive = Math.abs(index - selectedIndex);
+            const isLeft = index < selectedIndex;
             const performanceScore = (video.download_count || 0) + (video.share_count || 0);
             const title = getVideoTitle(video);
+            const videoUrl = resolveVideoUrl(video.output_url);
+
+            // Gear-style transforms
+            const scale = isActive ? 1.12 : distFromActive === 1 ? 0.78 : 0.65;
+            const rotateY = isActive ? 0 : isLeft ? 12 : -12;
+            const zIndex = isActive ? 20 : 10 - distFromActive;
+            const opacity = isActive ? 1 : distFromActive === 1 ? 0.55 : 0.3;
 
             return (
               <div
                 key={video.id}
                 className="flex-shrink-0 flex-grow-0"
                 style={{
-                  flexBasis: sortedVideos.length === 1 ? '75%' : '38%',
-                  paddingLeft: '4px',
-                  paddingRight: '4px',
+                  flexBasis: sortedVideos.length === 1 ? '70%' : '30%',
+                  marginLeft: index === 0 ? '0px' : '-16px',
+                  marginRight: '-16px',
+                  zIndex,
+                  position: 'relative',
                 }}
               >
                 <div
                   className={cn(
-                    'relative rounded-2xl overflow-hidden cursor-pointer transition-all duration-500 group border',
+                    'relative rounded-2xl overflow-hidden transition-all duration-500 group',
                     isActive
-                      ? 'scale-105 opacity-100 z-10 border-primary/40 shadow-xl shadow-primary/20'
-                      : 'scale-[0.85] opacity-50 z-0 border-border/30 hover:opacity-70'
+                      ? 'ring-2 ring-primary/60 shadow-2xl shadow-primary/30'
+                      : 'ring-1 ring-border/20'
                   )}
                   style={{
-                    transform: isActive
-                      ? 'scale(1.05) perspective(800px) rotateY(0deg)'
-                      : index < selectedIndex
-                        ? 'scale(0.85) perspective(800px) rotateY(5deg)'
-                        : 'scale(0.85) perspective(800px) rotateY(-5deg)',
-                    transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transform: `scale(${scale}) rotateY(${rotateY}deg)`,
+                    opacity,
+                    transformOrigin: isActive ? 'center center' : isLeft ? 'right center' : 'left center',
+                    transition: 'all 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)',
                   }}
-                  onClick={() => {
-                    if (video.output_url) {
-                      setSelectedVideo({ url: video.output_url, title });
-                    }
-                  }}
+                  onMouseEnter={() => handleMouseEnter(index)}
+                  onMouseLeave={() => handleMouseLeave(index)}
                 >
-                  {/* Thumbnail */}
-                  <div className="aspect-video relative overflow-hidden">
-                    {video.thumbnail_url ? (
-                      <img
-                        src={video.thumbnail_url}
-                        alt={title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 via-accent/10 to-primary/5">
-                        <Video className="h-10 w-10 text-muted-foreground/60" />
-                      </div>
-                    )}
+                  {/* Video element with hover autoplay */}
+                  <div className="aspect-video relative overflow-hidden bg-black">
+                    <video
+                      ref={(el) => { videoRefs.current[index] = el; }}
+                      src={videoUrl}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      poster={video.thumbnail_url || undefined}
+                      className="w-full h-full object-cover"
+                    />
 
-                    {/* Gradient overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-                    {/* Play Button */}
+                    {/* Dark gradient overlay */}
                     <div className={cn(
-                      'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
-                      isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      'absolute inset-0 transition-opacity duration-300',
+                      isActive
+                        ? 'bg-gradient-to-t from-black/50 via-transparent to-transparent'
+                        : 'bg-gradient-to-t from-black/70 via-black/20 to-black/10'
+                    )} />
+
+                    {/* Play/Expand overlay */}
+                    <div className={cn(
+                      'absolute inset-0 flex items-center justify-center gap-3 transition-opacity duration-300',
+                      isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-80'
                     )}>
-                      <div className={cn(
-                        'w-14 h-14 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-300',
-                        isActive
-                          ? 'bg-primary/90 shadow-lg shadow-primary/40'
-                          : 'bg-white/20'
-                      )}>
-                        <Play className="h-6 w-6 text-primary-foreground ml-0.5" />
-                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (videoUrl) setSelectedVideo({ url: videoUrl, title });
+                        }}
+                        className={cn(
+                          'w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-300',
+                          isActive
+                            ? 'bg-primary/80 shadow-lg shadow-primary/40 hover:bg-primary'
+                            : 'bg-white/20 hover:bg-white/30'
+                        )}
+                      >
+                        <Expand className="h-5 w-5 text-white" />
+                      </button>
                     </div>
 
                     {/* Performance Badge */}
                     {performanceScore > 0 && index === 0 && (
-                      <div className="absolute top-2 left-2">
+                      <div className="absolute top-2 left-2 z-10">
                         <Badge className="bg-primary/90 text-primary-foreground text-[10px] px-2 py-0.5 backdrop-blur-sm">
-                          ⭐ Best Performance
+                          ⭐ Best
                         </Badge>
                       </div>
                     )}
 
-                    {/* Bottom info overlay */}
-                    <div className="absolute bottom-0 left-0 right-0 p-3">
+                    {/* Bottom info — glassmorphism bar */}
+                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/30 backdrop-blur-sm">
                       <p className="text-sm font-medium text-white truncate drop-shadow-md">
                         {title}
                       </p>
-                      <p className="text-[11px] text-white/70 mt-0.5">
+                      <p className="text-[10px] text-white/60 mt-0.5">
                         {new Date(video.created_at).toLocaleDateString('de-DE', {
                           day: '2-digit',
                           month: 'short',
@@ -202,7 +253,7 @@ export const DashboardVideoCarousel = () => {
         </div>
       </div>
 
-      {/* Dots */}
+      {/* Dots — pill style */}
       {sortedVideos.length > 1 && (
         <div className="flex justify-center gap-1.5">
           {sortedVideos.map((_: any, i: number) => (
