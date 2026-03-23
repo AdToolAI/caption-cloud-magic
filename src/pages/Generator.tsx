@@ -261,15 +261,26 @@ const Generator = () => {
                 <Label htmlFor="topic" className="text-sm font-medium text-muted-foreground">
                   {t('input_topic')}
                 </Label>
-                <Input
-                  id="topic"
-                  placeholder={t('input_topic_placeholder')}
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  disabled={isGenerating}
-                  className="h-12 bg-muted/20 border-white/10 focus:border-primary/60 
-                             focus:ring-2 focus:ring-primary/20 transition-all"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="topic"
+                    placeholder={t('input_topic_placeholder')}
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    disabled={isGenerating}
+                    className="h-12 bg-muted/20 border-white/10 focus:border-primary/60 
+                               focus:ring-2 focus:ring-primary/20 transition-all flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsAssistantOpen(true)}
+                    className="h-12 px-4 border-white/20 hover:border-primary/60 hover:bg-primary/10 shrink-0"
+                    title="Prompt-Assistent öffnen"
+                  >
+                    <Wand2 className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Prompt-Assistent</span>
+                  </Button>
+                </div>
               </div>
 
               {/* Tone & Platform */}
