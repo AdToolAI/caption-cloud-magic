@@ -1,49 +1,29 @@
 
-Plan: Dashboard-Karussell auf „neueste zuerst“ umstellen, echte Publish-Logik ergänzen, Rotation robust machen, Mute-Button hinzufügen
 
-Warum es aktuell noch falsch ist
-- Der aktuelle Sortiercode bevorzugt weiterhin Videos mit `download_count/share_count > 0`. Genau dadurch bleiben die drei November-Videos vorne.
-- Diese Metrik ist kein verlässlicher Beweis für „wirklich gepostet“ und passt nicht zu deinem gewünschten Verhalten.
-- Die Scroll-Rotation hängt zu tief im Carousel und verpasst Events über Header, Pfeilen und Seitenkarten.
-- Der aktive Clip ist hart auf `muted`, aber ohne sichtbaren Sound-Schalter.
-- Fehler-/Retry-Zustände werden per Array-Index gespeichert; bei neuer Sortierung können dadurch falsche Karten betroffen sein.
+# Plan: Social-Media-Plattform-Icons in der Status-Bar mit Verbindungsstatus
 
-Umsetzung
-1. Ranking korrigieren
-- Hero-Karussell standardmäßig strikt nach `created_at DESC` aufbauen.
-- `download_count/share_count` komplett aus dem Hero-Ranking entfernen.
-- Nur die 10 neuesten erfolgreichen Videos zeigen.
-- Das aktuelle „Best“-Badge nur noch anzeigen, wenn es echte veröffentlichte Performance-Daten gibt.
+## Zusammenfassung
+Die hartcodierten Instagram/TikTok-Icons im rechten Bereich der Hero-Status-Bar (Zeilen 143-147 in `Home.tsx`) werden durch alle 6 Plattform-Icons ersetzt. Jedes Icon zeigt visuell den Verbindungsstatus an und ist klickbar, um direkt zur Verbindungsseite zu navigieren.
 
-2. „Wenn gepostet, dann bevorzugen“ sauber lösen
-- Nicht mehr Downloads/Shares als Proxy verwenden.
-- Stattdessen Videos nur dann boosten, wenn sie mit echten Publish-/Analytics-Daten verknüpft werden können.
-- Matching über normalisierte Video-URL zu bestehenden Publish-Daten aufbauen.
-- Falls kein Match existiert: rein „neueste zuerst“.
+## Umsetzung
 
-3. Rotation endlich zuverlässig machen
-- Wheel-Steuerung auf den gesamten Carousel-Bereich per `onWheelCapture` legen.
-- `deltaX` und `deltaY` normalisieren, damit Maus, Trackpad und Magic Mouse funktionieren.
-- Drag/Swipe in Embla wieder aktivieren, damit Rotation auch ohne Wheel möglich ist.
-- Throttle beibehalten, damit pro Scroll-Geste nur ein sauberer Schritt passiert.
+### 1. Neue Komponente: `SocialConnectionIcons`
+Neue Datei `src/components/dashboard/SocialConnectionIcons.tsx`:
+- Nutzt den bestehenden `usePlatformCredentials`-Hook um den Live-Verbindungsstatus abzufragen
+- Zeigt Icons für alle 6 Plattformen: Instagram, TikTok, LinkedIn, YouTube, Facebook, X
+- Verbundene Plattformen: Icon in Plattform-Farbe + kleiner grüner Punkt
+- Nicht verbundene: Icon ausgegraut/gedimmt
+- Klick navigiert zu `/social-media-settings?connect={platform}` (nutzt bestehende Highlight-Logik dort)
+- Tooltip mit Plattformname + Status
+- Zähler daneben: "X verbunden"
 
-4. Sichtbaren Mute-Button ergänzen
-- Auf der aktiven mittleren Karte einen Mute/Unmute-Button neben dem Expand-Button anzeigen.
-- Autoplay aus Browsergründen weiterhin stumm starten.
-- Nach User-Interaktion Ton aktivierbar machen und den Zustand beim Weiterdrehen beibehalten.
-- Optional denselben Zustand in den großen Preview-Dialog mitgeben.
+### 2. Home.tsx anpassen (Zeilen 141-147)
+- Bestehende hartcodierte Icons + "3 verbunden"-Text ersetzen durch `<SocialConnectionIcons />`
+- Überflüssige `Instagram`/`Music`-Imports entfernen falls nicht anderweitig genutzt
 
-5. State robuster machen
-- `errorVideos`, `retriedVideos` und ähnliche UI-Zustände auf `video.id` statt auf Index umstellen.
-- `selectedIndex` zurücksetzen bzw. sauber normalisieren, wenn sich die sichtbare Liste ändert.
-- Legacy-/defekte URLs nach erstem echten Fehlversuch aus dem Hero entfernen oder als Fallback überspringen.
+### Betroffene Dateien
+| Datei | Änderung |
+|-------|----------|
+| `src/components/dashboard/SocialConnectionIcons.tsx` | Neue Komponente |
+| `src/pages/Home.tsx` | Hartcodierte Icons durch neue Komponente ersetzen |
 
-Betroffene Dateien
-- `src/components/dashboard/DashboardVideoCarousel.tsx` — Sortierung, Publish-Boost, Rotation, Mute-Button, ID-basierter Zustand
-- optional `src/components/video/VideoPreviewPlayer.tsx` — Mute-Zustand im großen Player übernehmen
-
-Erwartetes Ergebnis
-- Zuerst werden immer die neuesten Videos angezeigt.
-- Sobald es wirklich veröffentlichte Videos mit Analytics-Bezug gibt, können genau diese priorisiert werden.
-- Das Karussell dreht per Scroll und Drag zuverlässig.
-- Im aktiven Fenster ist ein sichtbarer Sound-Button vorhanden.
