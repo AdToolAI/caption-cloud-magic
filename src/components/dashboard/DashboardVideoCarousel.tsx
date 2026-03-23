@@ -143,8 +143,19 @@ export const DashboardVideoCarousel = () => {
   const getVideoTitle = (video: any) =>
     (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
 
-  const handleVideoError = (index: number) => {
-    setErrorVideos(prev => new Set(prev).add(index));
+  const handleVideoError = (index: number, videoUrl: string) => {
+    if (!retriedVideos.has(index)) {
+      console.warn(`[Carousel] Retrying video ${index}:`, videoUrl);
+      setRetriedVideos(prev => new Set(prev).add(index));
+      const el = videoRefs.current[index];
+      if (el) {
+        el.src = videoUrl;
+        el.load();
+      }
+    } else {
+      console.error(`[Carousel] Video ${index} failed after retry:`, videoUrl);
+      setErrorVideos(prev => new Set(prev).add(index));
+    }
   };
 
   const handleCardClick = (index: number, videoUrl: string, title: string) => {
