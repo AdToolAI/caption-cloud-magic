@@ -289,7 +289,7 @@ export function UniversalVideoWizard() {
       briefingSummary: '',
     };
     setConsultationResult(defaultResult);
-    setCurrentStep(3);
+    setCurrentStep(4); // → consultation
   };
 
   const handleAutoGenerationComplete = (project: any) => {
