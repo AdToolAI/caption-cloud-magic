@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { CategorySelector } from './CategorySelector';
 import { MoodPresetSelector, type MoodConfig } from './MoodPresetSelector';
+import { FilmStyleSelector } from './FilmStyleSelector';
 import { UniversalModeSelector, type UniversalGenerationMode } from './UniversalModeSelector';
 import { UniversalVideoConsultant } from './UniversalVideoConsultant';
 import { UniversalAutoGenerationProgress } from './UniversalAutoGenerationProgress';
