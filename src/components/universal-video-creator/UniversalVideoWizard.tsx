@@ -277,7 +277,7 @@ export function UniversalVideoWizard() {
       keyMessage: '',
       desiredAction: '',
       ctaText: '',
-      visualStyle: 'flat-design',
+      visualStyle: selectedVisualStyle || 'flat-design',
       brandColors: [],
       hasCharacter: false,
       voiceGender: 'male',
