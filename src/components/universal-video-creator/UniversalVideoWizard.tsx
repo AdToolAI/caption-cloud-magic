@@ -373,7 +373,7 @@ export function UniversalVideoWizard() {
     setTimeout(() => {
       if (consultationResult && generationMode === 'full-service') {
         setIsAutoGenerating(true);
-        setCurrentStep(3);
+        setCurrentStep(5); // → generating
       }
     }, 150);
   };
