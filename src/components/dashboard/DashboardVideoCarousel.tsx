@@ -228,7 +228,7 @@ export const DashboardVideoCarousel = () => {
       </div>
 
       {/* 3D Perspective Carousel */}
-      <div ref={containerRef} style={{ perspective: '1200px' }}>
+      <div style={{ perspective: '1200px' }}>
         <div className="overflow-hidden py-8" ref={emblaRef}>
           <div className="flex items-center" style={{ transformStyle: 'preserve-3d' }}>
             {sortedVideos.map((video: any, index: number) => {
