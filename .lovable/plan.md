@@ -1,68 +1,79 @@
 
 
-# Plan: Visuellen Stil in die Bildgenerierung durchdrücken
+# Plan: Dashboard Hero durch Video-Karussell ersetzen
 
-## Problem gefunden
+## Überblick
+Der aktuelle `HeroBanner` (KI-gestützt Badge, CTAs, Trust Section) wird durch ein swipbares Video-Karussell ersetzt. Mittleres Video groß, seitliche Videos kleiner sichtbar — genau wie in der Skizze.
 
-Die Logs beweisen: `visualStyle: "comic"` kommt korrekt an. Auch der Prompt enthält `ART STYLE: comic` und der Style-Prefix `"clean business cartoon illustration, bold outlines, flat colors..."` wird gesetzt.
+## Datenquellen
 
-**Aber:** Die Scene-Descriptions vom Script-Generator enthalten weiterhin cinematic Sprache wie `"moving golden particles, dark void, bright central glow, dramatic volumetric lighting"`. Diese überstimmen den Comic-Prefix, weil Flux das Letztgenannte stärker gewichtet.
+**Priorität 1: Best-performendes Video**
+- Aus `video_creations` Tabelle: sortiert nach `download_count + share_count` (= Performance-Score)
+- Platz 1 = höchster Score, wird initial zentriert angezeigt
 
-**Ursache in 2 Stellen:**
+**Priorität 2: Letzte 10 selbst erstellte Videos**
+- Wenn kein Video Performance-Daten hat: `video_creations` sortiert nach `created_at DESC LIMIT 10`
 
-1. **Script-Generator** (`generate-script-inline.ts`, Zeile 387): Die `visualDescription`-Regel sagt nur `[OBJEKT] + [ZUSTAND] + [UMGEBUNG] + [BELEUCHTUNG]` — aber erwähnt den gewählten Stil nicht. Das AI-Modell generiert immer cinematic/realistische Beschreibungen, egal ob Comic oder Watercolor gewählt wurde.
+**News-Player (Platzhalter)**
+- Eigener Bereich unter/neben dem Karussell für Update-/Feature-/Demo-Videos
+- Aktuell mit Platzhalter-Karten, da Videomaterial noch kommt
 
-2. **Prompt-Bau** (`generate-premium-visual/index.ts`): Der Style-Prefix steht am Anfang, die detaillierte Scene-Description kommt danach und dominiert.
+## UI-Aufbau (basierend auf Skizze)
 
-## Lösung
-
-### 1. Script-Generator: Stil in die visualDescription-Regel einbauen
-**Datei:** `supabase/functions/_shared/generate-script-inline.ts`
-
-Die Regel 7 im System-Prompt erweitern:
-
-```
-7. Jede visualDescription folgt: [OBJEKT/SZENE] + [ZUSTAND/DETAIL] + [UMGEBUNG] + [BELEUCHTUNG]
-   WICHTIG: Passe die visualDescription an den visuellen Stil "${briefing.visualStyle}" an!
-   - Bei "comic": Beschreibe Szenen wie Comic-Panels (bold lines, flat colors, speech bubbles, panels)
-   - Bei "cartoon": Beschreibe Szenen wie Cartoon-Welten (rounded shapes, bright colors, playful)
-   - Bei "cinematic": Beschreibe Szenen kinoreif (volumetric lighting, shallow depth of field)
-   - Bei "watercolor": Beschreibe Szenen wie Aquarelle (soft washes, paper texture, gentle colors)
-   - NIEMALS cinematic/realistische Beschreibungen für cartoon/comic Stile verwenden!
-```
-
-Zusätzlich eine Style-Mapping-Tabelle in den Prompt einfügen, die für jeden der 20 Stile 2-3 passende Bildbeschreibungs-Keywords vorgibt.
-
-### 2. Prompt-Bau: Stil doppelt verstärken
-**Datei:** `supabase/functions/generate-premium-visual/index.ts`
-
-Den Style-Prefix nicht nur am Anfang, sondern auch am Ende als Suffix wiederholen:
-
-```
-[STYLE_PREFIX] + [scene description] + [anti-text rules] + "OVERRIDE STYLE: [STYLE_SUFFIX]"
+```text
+┌──────────────────────────────────────────────┐
+│  ┌─────┐   ┌───────────┐   ┌─────┐          │
+│  │  ▶  │   │     ▶     │   │  ▶  │          │
+│  │small│   │   GROSS   │   │small│          │
+│  └─────┘   └───────────┘   └─────┘          │
+│         ← swipe links / rechts →             │
+│  ● ○ ○ ○ ○  (Dots)                          │
+└──────────────────────────────────────────────┘
 ```
 
-Für "comic" würde das bedeuten:
-- Prefix: `"clean business cartoon illustration, bold outlines, flat colors..."`
-- Suffix: `"MUST be in comic book cartoon style with bold outlines and flat colors, NOT photorealistic, NOT cinematic"`
+- Embla Carousel (bereits im Projekt vorhanden)
+- Mittlere Karte skaliert größer (`scale-100`), seitliche kleiner (`scale-85 opacity-60`)
+- Play-Button Overlay auf jeder Karte
+- Klick öffnet `VideoPreviewPlayer` Dialog (existiert bereits)
 
-### 3. Style-spezifische Negative Prompts
-Für Cartoon/Comic-Stile explizit ausschließen:
-- `"photorealistic, volumetric lighting, film grain, lens flare, shallow depth of field"`
+## Umsetzung
 
-Für Cinematic-Stile ausschließen:
-- `"cartoon, flat colors, bold outlines, vector art"`
+### 1. Neue Komponente `DashboardVideoCarousel.tsx`
+**Datei:** `src/components/dashboard/DashboardVideoCarousel.tsx`
+
+- Nutzt `useVideoHistory()` für eigene Videos
+- Sortiert nach Performance-Score (downloads + shares), Fallback: `created_at`
+- Embla Carousel mit `loop: true`, `align: 'center'`
+- Jede Karte zeigt: Thumbnail (erstes Frame oder Platzhalter), Titel, Erstellungsdatum, Play-Button
+- Aktive Karte (Mitte) ist größer, seitliche sind kleiner und leicht transparent
+- Swipe-Gesten + optionale Pfeile links/rechts
+- Pagination Dots unterhalb
+
+### 2. News-Sektion (Platzhalter)
+Unterhalb des Video-Karussells ein kleiner Bereich "News & Updates":
+- 2-3 Platzhalter-Karten mit "Demnächst" Badge
+- Wird später mit echten Demo-/Feature-Videos gefüllt
+
+### 3. HeroBanner ersetzen
+**Datei:** `src/pages/Home.tsx`
+
+- `<HeroBanner />` (Zeile 185) durch `<DashboardVideoCarousel />` ersetzen
+- Wenn keine Videos vorhanden: Fallback-UI mit "Erstelle dein erstes Video" CTA
+
+### 4. Auto-Update
+- `useVideoHistory()` nutzt bereits `react-query` mit `queryKey: ['video-history']`
+- Nach jedem neuen Video-Render wird `invalidateQueries(['video-history'])` aufgerufen → Karussell aktualisiert sich automatisch
 
 ## Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `supabase/functions/_shared/generate-script-inline.ts` | Regel 7 um stilspezifische visualDescription-Anweisungen erweitern |
-| `supabase/functions/generate-premium-visual/index.ts` | Style-Suffix am Ende wiederholen + stilspezifische Negative Prompts |
+| `src/components/dashboard/DashboardVideoCarousel.tsx` | **Neu** — Video-Karussell mit Performance-Ranking |
+| `src/pages/Home.tsx` | `HeroBanner` → `DashboardVideoCarousel` ersetzen |
 
 ## Erwartetes Ergebnis
-- Bei "Comic": Bilder sehen aus wie Comic-Illustrationen (bold outlines, flat colors)
-- Bei "Cinematic": Bilder bleiben kinoreif (wie bisher)
-- Bei "Watercolor": Bilder haben Aquarell-Ästhetik
-- Der Stil wird sowohl in der Scene-Description als auch im Flux-Prompt doppelt durchgesetzt
+- Dashboard zeigt sofort die besten/neuesten Videos im Karussell
+- Swipebar links/rechts mit zentriertem Fokus-Video
+- Klick auf Play öffnet Video im Dialog
+- Neue Videos erscheinen automatisch nach Erstellung
 
