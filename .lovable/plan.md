@@ -1,36 +1,22 @@
 
 
-# Plan: 3D-Karussell mit Auto-Play & Scroll-Steuerung
+# Plan: Scroll-Steuerung fixen + Video-Fehler beheben
 
-## Probleme
-1. **Videos spielen nicht ab** — `onLoadedMetadata` feuert, aber `readyState` ist oft noch 0 bei Cross-Origin. Das `opacity: 0` versteckt das Video und der User sieht nur schwarz/"nicht verfügbar".
-2. **Schräglage (rotate)** soll weg → stattdessen echter 3D-Perspektive-Effekt mit `perspective` + `rotateY`.
-3. **Scroll-Steuerung** fehlt — Mausrad/Scroll über dem Karussell soll die Slides drehen.
+## Problem 1: Scroll-to-Rotate funktioniert nicht
+Der `containerRef` liegt auf dem äußeren `div.space-y-4`, das den Header, Dots und News-Bereich einschließt. Embla's internes Scroll-Handling fängt Wheel-Events ab bevor unser Handler sie bekommt. Der `onWheel`-Handler muss direkt auf dem **Perspektive-Wrapper** (das `div` mit `perspective: 1200px`) liegen, nicht auf dem äußeren Container.
 
-## Lösung (1 Datei: `DashboardVideoCarousel.tsx`)
+**Fix**: `containerRef` auf das Perspektive-Wrapper-`div` verschieben (Zeile 205) statt auf den äußeren Container (Zeile 187). Zusätzlich Embla mit `watchDrag: true` aber ohne eigenes Scroll-Handling konfigurieren.
 
-### 1. Video-Playback endlich zuverlässig machen
-- **Opacity-Gate entfernen**: Video sofort mit `opacity: 1` anzeigen (kein Fade-In-Warten auf Events die nie kommen)
-- **`preload="auto"`** zurück (metadata reicht nicht für Autoplay bei Cross-Origin)
-- **Auto-Play Strategie**: Im `useEffect` bei Slide-Wechsel `video.load()` aufrufen falls `readyState === 0`, dann `play()` mit kurzem Timeout als Fallback
-- **Error-Fallback** bleibt bestehen
+## Problem 2: 3 von 10 Videos laden nicht
+Wahrscheinlich löst `resolveVideoUrl` manche Pfade falsch auf — z.B. Pfade die keinem bekannten Bucket zugeordnet werden. 
 
-### 2. Echten 3D-Effekt statt Schräglage
-- `rotate()` (2D) komplett entfernen
-- Wrapper mit `perspective: 1200px` um das Karussell
-- Aktive Karte: `rotateY(0deg)`, `scale(1.05)`, `z-index: 30`
-- 1. Nachbar links: `rotateY(25deg)`, rechts: `rotateY(-25deg)`, `scale(0.85)`, `z-index: 20`
-- 2. Nachbar: `rotateY(±40deg)`, `scale(0.7)`, `z-index: 10`, `opacity: 0.4`
-- `transformStyle: preserve-3d` für echte Tiefenwirkung
+**Fix**:
+- Besseres Logging im `onError` Callback: die fehlgeschlagene URL in der Konsole ausgeben damit wir debuggen können
+- `resolveVideoUrl` robuster machen: auch Pfade ohne Bucket-Prefix besser handhaben, und bei bereits vollständigen Supabase-URLs nichts verändern
+- Retry-Mechanismus: bei `onError` einmal mit alternativem Bucket versuchen bevor "nicht verfügbar" angezeigt wird
 
-### 3. Scroll-to-Rotate (Mausrad-Steuerung)
-- `onWheel` Event auf dem Karussell-Container
-- `deltaY > 0` → `emblaApi.scrollNext()`, `deltaY < 0` → `emblaApi.scrollPrev()`
-- Debounce mit 150ms um schnelles Durchscrollen zu verhindern
-- `e.preventDefault()` um Page-Scroll zu blockieren während über dem Karussell
-
-### Betroffene Datei
+## Betroffene Datei
 | Datei | Änderung |
 |-------|----------|
-| `src/components/dashboard/DashboardVideoCarousel.tsx` | 3D-Effekt, Autoplay-Fix, Scroll-Steuerung |
+| `src/components/dashboard/DashboardVideoCarousel.tsx` | containerRef verschieben, URL-Auflösung verbessern, Error-Logging |
 
