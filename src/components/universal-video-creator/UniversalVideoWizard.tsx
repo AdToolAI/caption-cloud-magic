@@ -379,7 +379,7 @@ export function UniversalVideoWizard() {
   };
 
   const handleBackToConsultation = () => {
-    setCurrentStep(3);
+    setCurrentStep(4); // → consultation
     setIsAutoGenerating(false);
     setError(null);
   };
