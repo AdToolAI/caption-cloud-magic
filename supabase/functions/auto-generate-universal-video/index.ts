@@ -1981,11 +1981,13 @@ async function runRenderOnlyPipeline(
               .update({ validation_status: 'failed', validation_error: 'audio_corruption_in_render', is_valid: false })
               .eq('storage_path', decodeURIComponent(failedPath));
             
-            // Pick a different validated track
+            // Pick a different validated track — MUST check validation_status
             const { data: altTracks } = await tmpClient
               .from('background_music_tracks')
               .select('storage_path')
               .eq('is_valid', true)
+              .eq('validation_status', 'validated')
+              .not('last_validated_at', 'is', null)
               .neq('storage_path', decodeURIComponent(failedPath))
               .limit(10);
             
