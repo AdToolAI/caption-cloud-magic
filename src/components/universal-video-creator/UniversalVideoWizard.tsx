@@ -582,6 +582,11 @@ export function UniversalVideoWizard() {
             <MoodPresetSelector onConfirm={handleMoodConfirm} />
           )}
 
+          {/* Visual Style Selection */}
+          {currentStepId === 'visual-style' && selectedCategory && (
+            <FilmStyleSelector onConfirm={handleVisualStyleConfirm} />
+          )}
+
           {/* Mode Selection */}
           {currentStepId === 'mode-select' && selectedCategory && (
             <UniversalModeSelector
