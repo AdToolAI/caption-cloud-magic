@@ -231,6 +231,11 @@ export function UniversalVideoWizard() {
       result.moodConfig = moodConfig;
     }
 
+    // Inject pre-selected visual style
+    if (selectedVisualStyle) {
+      result.visualStyle = selectedVisualStyle;
+    }
+
     setConsultationResult(result);
     setError(null);
     
