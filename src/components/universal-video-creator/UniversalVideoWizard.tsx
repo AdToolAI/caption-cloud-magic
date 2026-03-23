@@ -321,9 +321,9 @@ export function UniversalVideoWizard() {
     setError(null);
     
     if (partialProject?.script) {
-      setCurrentStep(5);
+      setCurrentStep(6);
     } else {
-      setCurrentStep(3);
+      setCurrentStep(4);
     }
     toast.info('Zum manuellen Modus gewechselt');
   };
