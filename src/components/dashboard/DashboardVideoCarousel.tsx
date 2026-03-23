@@ -297,7 +297,7 @@ export const DashboardVideoCarousel = () => {
                           }}
                           onError={(e) => {
                             console.error(`[Carousel] Video ${index} failed to load:`, videoUrl, e);
-                            handleVideoError(index);
+                            handleVideoError(index, videoUrl);
                           }}
                         />
                       ) : (
