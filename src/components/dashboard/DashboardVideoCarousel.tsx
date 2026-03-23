@@ -111,18 +111,20 @@ export const DashboardVideoCarousel = () => {
     };
   }, [emblaApi, onSelect]);
 
-  // Scroll-to-rotate: wheel event
+  // Scroll-to-rotate: wheel event on the embla viewport
   useEffect(() => {
-    const node = containerRef.current;
-    if (!node || !emblaApi) return;
+    if (!emblaApi) return;
+    const rootNode = emblaApi.rootNode();
+    if (!rootNode) return;
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      if (wheelTimeout.current) return; // debounce active
+      if (wheelTimeout.current) return;
 
-      if (e.deltaY > 0) {
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (delta > 0) {
         emblaApi.scrollNext();
-      } else if (e.deltaY < 0) {
+      } else if (delta < 0) {
         emblaApi.scrollPrev();
       }
 
@@ -131,8 +133,8 @@ export const DashboardVideoCarousel = () => {
       }, 150);
     };
 
-    node.addEventListener('wheel', handleWheel, { passive: false });
-    return () => node.removeEventListener('wheel', handleWheel);
+    rootNode.addEventListener('wheel', handleWheel, { passive: false });
+    return () => rootNode.removeEventListener('wheel', handleWheel);
   }, [emblaApi]);
 
   const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
