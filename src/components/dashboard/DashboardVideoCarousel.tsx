@@ -223,29 +223,32 @@ export const DashboardVideoCarousel = () => {
                 >
                   {/* Video element */}
                   <div className="aspect-video relative overflow-hidden bg-black">
-                    <video
-                      ref={(el) => { videoRefs.current[index] = el; }}
-                      src={videoUrl}
-                      muted
-                      playsInline
-                      loop
-                      preload="auto"
-                      poster={video.thumbnail_url || undefined}
-                      className="w-full h-full object-cover"
-                      onCanPlay={() => handleVideoCanPlay(index)}
-                    />
-
-                    {/* Play icon overlay — only on inactive cards */}
-                    {!isActive && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                        <Play className="h-8 w-8 text-white/60" />
+                    {!errorVideos.has(index) ? (
+                      <video
+                        ref={(el) => { videoRefs.current[index] = el; }}
+                        src={videoUrl}
+                        muted
+                        playsInline
+                        loop
+                        preload="metadata"
+                        poster={video.thumbnail_url || undefined}
+                        className="w-full h-full object-cover transition-opacity duration-500"
+                        style={{ opacity: readyVideos.has(index) ? 1 : 0 }}
+                        onLoadedMetadata={() => handleVideoReady(index)}
+                        onCanPlay={() => handleVideoReady(index)}
+                        onError={() => handleVideoError(index)}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-muted/80">
+                        <Video className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                        <p className="text-xs text-muted-foreground">Video nicht verfügbar</p>
                       </div>
                     )}
 
-                    {/* Fallback when video hasn't loaded yet */}
-                    {!loadedVideos.has(index) && isActive && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted/80 to-muted">
-                        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    {/* Play icon overlay — only on inactive cards */}
+                    {!isActive && !errorVideos.has(index) && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                        <Play className="h-8 w-8 text-white/60" />
                       </div>
                     )}
 
