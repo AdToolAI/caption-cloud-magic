@@ -6305,7 +6305,7 @@ export const translations: Record<Language, any> = {
       postTimeAdvisor: "Asesor de Horarios",
       contentStudio: "Content Studio",
       generator: "Generador AI de Captions",
-      carousel: "Generador de Carrusel",
+      textStudio: "AI Text Studio",
       promptWizard: "Asistente de Prompts",
       reelScript: "Script AI para Reels",
       hookGenerator: "Generador de Hooks",
