@@ -2311,6 +2311,7 @@ async function selectBackgroundMusic(
       .select('*')
       .eq('is_valid', true)
       .eq('validation_status', 'validated')
+      .not('last_validated_at', 'is', null)
       .limit(50);
 
     if (error) {
