@@ -65,7 +65,10 @@ export const DashboardVideoCarousel = () => {
       if (!el) return;
       if (i === selectedIndex) {
         el.muted = true;
-        el.play().catch(() => {});
+        if (el.readyState >= 3) {
+          el.play().catch(() => {});
+        }
+        // If not ready yet, onCanPlay will trigger play
       } else {
         el.pause();
         el.currentTime = 0;
@@ -90,8 +93,14 @@ export const DashboardVideoCarousel = () => {
   const getVideoTitle = (video: any) =>
     (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
 
-  const handleVideoLoaded = (index: number) => {
+  const handleVideoCanPlay = (index: number) => {
     setLoadedVideos(prev => new Set(prev).add(index));
+    // If this is the active video, auto-play it now
+    const el = videoRefs.current[index];
+    if (el && index === selectedIndex) {
+      el.muted = true;
+      el.play().catch(() => {});
+    }
   };
 
   const handleCardClick = (index: number, videoUrl: string, title: string) => {
@@ -100,6 +109,18 @@ export const DashboardVideoCarousel = () => {
     } else {
       emblaApi?.scrollTo(index);
     }
+  };
+
+  // Compute signed direction for rotation: negative = left of center, positive = right
+  const getSignedDist = (index: number): number => {
+    const len = sortedVideos.length;
+    let diff = index - selectedIndex;
+    if (len > 2) {
+      // Handle loop wrapping
+      if (diff > len / 2) diff -= len;
+      if (diff < -len / 2) diff += len;
+    }
+    return diff;
   };
 
   if (isLoading) {
@@ -152,23 +173,23 @@ export const DashboardVideoCarousel = () => {
         </div>
       </div>
 
-      {/* Carousel — gear-style overlapping */}
-      <div className="overflow-hidden py-6" ref={emblaRef}>
+      {/* Carousel — gear-style overlapping with slant */}
+      <div className="overflow-hidden py-8" ref={emblaRef}>
         <div className="flex items-center">
           {sortedVideos.map((video: any, index: number) => {
             const isActive = index === selectedIndex;
-            const dist = Math.min(
-              Math.abs(index - selectedIndex),
-              sortedVideos.length > 2 ? sortedVideos.length - Math.abs(index - selectedIndex) : Infinity
-            );
+            const signedDist = getSignedDist(index);
+            const absDist = Math.abs(signedDist);
             const performanceScore = (video.download_count || 0) + (video.share_count || 0);
             const title = getVideoTitle(video);
             const videoUrl = resolveVideoUrl(video.output_url);
 
-            // Gear-style: flat overlap, no 3D rotation
-            const scale = isActive ? 1.0 : dist === 1 ? 0.82 : 0.65;
-            const zIndex = isActive ? 30 : dist === 1 ? 20 : 10;
-            const opacity = isActive ? 1 : dist === 1 ? 0.6 : 0.3;
+            // Gear-style: flat overlap with 2D rotation (slant)
+            const scale = isActive ? 1.05 : absDist === 1 ? 0.82 : 0.65;
+            const zIndex = isActive ? 30 : absDist === 1 ? 20 : 10;
+            const opacity = isActive ? 1 : absDist === 1 ? 0.6 : 0.3;
+            // Slant: cards tilt away from center like a fan
+            const rotation = isActive ? 0 : absDist === 1 ? signedDist * 3 : signedDist > 0 ? 5 : -5;
 
             return (
               <div
@@ -176,8 +197,8 @@ export const DashboardVideoCarousel = () => {
                 className="flex-shrink-0 flex-grow-0 cursor-pointer"
                 style={{
                   flexBasis: sortedVideos.length === 1 ? '70%' : '50%',
-                  marginLeft: index === 0 ? '0' : '-24px',
-                  marginRight: '-24px',
+                  marginLeft: index === 0 ? '0' : '-32px',
+                  marginRight: '-32px',
                   zIndex,
                   position: 'relative',
                 }}
@@ -191,9 +212,10 @@ export const DashboardVideoCarousel = () => {
                       : 'ring-1 ring-border/20'
                   )}
                   style={{
-                    transform: `scale(${scale})`,
+                    transform: `scale(${scale}) rotate(${rotation}deg)`,
                     opacity,
                     transition: 'all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1)',
+                    transformOrigin: 'center bottom',
                   }}
                 >
                   {/* Video element */}
@@ -203,17 +225,24 @@ export const DashboardVideoCarousel = () => {
                       src={videoUrl}
                       muted
                       playsInline
+                      loop
                       preload="auto"
-                      crossOrigin="anonymous"
                       poster={video.thumbnail_url || undefined}
                       className="w-full h-full object-cover"
-                      onLoadedData={() => handleVideoLoaded(index)}
+                      onCanPlay={() => handleVideoCanPlay(index)}
                     />
 
-                    {/* Fallback play icon when video hasn't loaded */}
-                    {!loadedVideos.has(index) && (
+                    {/* Play icon overlay — only on inactive cards */}
+                    {!isActive && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                        <Play className="h-8 w-8 text-white/60" />
+                      </div>
+                    )}
+
+                    {/* Fallback when video hasn't loaded yet */}
+                    {!loadedVideos.has(index) && isActive && (
                       <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted/80 to-muted">
-                        <Play className="h-10 w-10 text-muted-foreground/60" />
+                        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                       </div>
                     )}
 
