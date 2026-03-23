@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
 import { GeneratorHeroHeader } from "@/components/generator/GeneratorHeroHeader";
+import { PromptAssistantDialog } from "@/components/generator/PromptAssistantDialog";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
@@ -16,7 +17,7 @@ import { useAICall } from "@/hooks/useAICall";
 import { supabase } from "@/integrations/supabase/client";
 
 import { Slider } from "@/components/ui/slider";
-import { Copy, Sparkles, RefreshCw, Loader2, Calendar, CheckCircle2 } from "lucide-react";
+import { Copy, Sparkles, RefreshCw, Loader2, Calendar, CheckCircle2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
@@ -34,6 +35,7 @@ const Generator = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [contentLength, setContentLength] = useState<'short' | 'medium' | 'long'>('medium');
   const [hashtagCount, setHashtagCount] = useState(5);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
   const lengthMap: Record<string, number> = {
     short: 120,
@@ -223,7 +225,7 @@ const Generator = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <div className="container mx-auto px-6 py-4">
-        <Breadcrumbs category="create" feature={t("nav.generator")} />
+        <Breadcrumbs category="create" feature={t("nav.textStudio")} />
       </div>
       
       <main className="flex-1 py-8 px-4">
@@ -259,15 +261,26 @@ const Generator = () => {
                 <Label htmlFor="topic" className="text-sm font-medium text-muted-foreground">
                   {t('input_topic')}
                 </Label>
-                <Input
-                  id="topic"
-                  placeholder={t('input_topic_placeholder')}
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  disabled={isGenerating}
-                  className="h-12 bg-muted/20 border-white/10 focus:border-primary/60 
-                             focus:ring-2 focus:ring-primary/20 transition-all"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="topic"
+                    placeholder={t('input_topic_placeholder')}
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    disabled={isGenerating}
+                    className="h-12 bg-muted/20 border-white/10 focus:border-primary/60 
+                               focus:ring-2 focus:ring-primary/20 transition-all flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsAssistantOpen(true)}
+                    className="h-12 px-4 border-white/20 hover:border-primary/60 hover:bg-primary/10 shrink-0"
+                    title="Prompt-Assistent öffnen"
+                  >
+                    <Wand2 className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Prompt-Assistent</span>
+                  </Button>
+                </div>
               </div>
 
               {/* Tone & Platform */}
@@ -455,6 +468,12 @@ const Generator = () => {
           </motion.div>
         </div>
       </main>
+
+      <PromptAssistantDialog
+        open={isAssistantOpen}
+        onOpenChange={setIsAssistantOpen}
+        onApply={(prompt) => setTopic(prompt)}
+      />
 
       <Footer />
     </div>

@@ -55,7 +55,7 @@ export function GeneratorHeroHeader({ status }: GeneratorHeroHeaderProps) {
         </span>
         <MessageSquare className="h-3.5 w-3.5 text-primary" />
         <span className="text-xs font-medium text-primary uppercase tracking-wider">
-          KI-Caption-Generator
+          KI Text-Studio
         </span>
       </motion.div>
 
@@ -66,7 +66,7 @@ export function GeneratorHeroHeader({ status }: GeneratorHeroHeaderProps) {
         transition={{ delay: 0.3 }}
         className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary via-primary to-accent bg-clip-text text-transparent"
       >
-        Textgenerator
+        KI Text-Studio
       </motion.h1>
 
       {/* Credits Card */}
