@@ -2268,114 +2268,68 @@ async function selectBackgroundMusic(
   supabaseUrl: string,
   _serviceKey: string
 ): Promise<string | null> {
-  console.log(`[selectBackgroundMusic] r71: Using DB catalog with strict validation. style="${style}", mood="${mood}"`);
+  console.log(`[selectBackgroundMusic] r73: Using Jamendo API (same as Content Creator). style="${style}", mood="${mood}"`);
 
-  // Build search terms from style and mood
-  const searchTerms = [
-    ...(style || '').toLowerCase().split(/[\s,]+/),
-    ...(mood || '').toLowerCase().split(/[\s,]+/),
-  ].filter(Boolean);
+  // Map style/mood to Jamendo search terms (same mapping as Content Creator)
+  const jamendoMoodMap: Record<string, string> = {
+    'upbeat': 'happy energetic',
+    'calm': 'relaxing peaceful',
+    'corporate': 'business professional',
+    'inspirational': 'inspiring uplifting',
+    'energetic': 'dynamic powerful',
+    'emotional': 'emotional touching',
+    'professional': 'corporate modern',
+    'cinematic': 'cinematic epic',
+    'dramatic': 'dramatic epic',
+    'happy': 'happy upbeat',
+    'relaxed': 'relaxing chill',
+    'motivational': 'inspiring powerful',
+  };
 
-  // Expand via category map
-  const expandedTerms = new Set(searchTerms);
-  for (const term of searchTerms) {
-    const mapped = CATEGORY_MOOD_MAP[term];
-    if (mapped) mapped.forEach(m => expandedTerms.add(m));
-  }
+  const searchMood = jamendoMoodMap[style?.toLowerCase()] || jamendoMoodMap[mood?.toLowerCase()] || style || mood || 'corporate';
 
-  const searchArray = [...expandedTerms].filter(Boolean);
-  console.log(`[selectBackgroundMusic] Search terms: ${searchArray.join(', ')}`);
-
-  // Query DB: find tracks with overlapping moods
-  let tracks: any[] = [];
-  if (searchArray.length > 0) {
-    const { data, error } = await supabase
-      .from('background_music_tracks')
-      .select('*')
-      .eq('is_valid', true)
-      .eq('validation_status', 'validated')
-      .not('last_validated_at', 'is', null)
-      .overlaps('moods', searchArray)
-      .limit(50);
-
-    if (error) {
-      console.warn('[selectBackgroundMusic] DB query error:', error.message);
-    } else {
-      tracks = data || [];
-    }
-  }
-
-  // Fallback: any validated track
-  if (tracks.length === 0) {
-    console.log('[selectBackgroundMusic] No mood match, fetching random validated fallback');
-    const { data, error } = await supabase
-      .from('background_music_tracks')
-      .select('*')
-      .eq('is_valid', true)
-      .eq('validation_status', 'validated')
-      .not('last_validated_at', 'is', null)
-      .limit(50);
-
-    if (error) {
-      console.warn('[selectBackgroundMusic] Fallback query error:', error.message);
-      return null;
-    }
-    tracks = data || [];
-  }
-
-  // r71: NO last resort — only validated tracks with last_validated_at
-  if (tracks.length === 0) {
-    console.warn('[selectBackgroundMusic] r71: No validated tracks available. All tracks failed Lambda validation.');
-    return null;
-  }
-
-  if (tracks.length === 0) {
-    console.warn('[selectBackgroundMusic] No tracks in DB. Run seed-background-music first.');
-    return null;
-  }
-
-  // Score each track by mood match count for better ranking
-  const scored = tracks.map((track: any) => {
-    const score = (track.moods || []).filter((m: string) => expandedTerms.has(m)).length;
-    return { ...track, score };
-  });
-  scored.sort((a: any, b: any) => b.score - a.score);
-
-  const maxScore = scored[0]?.score || 0;
-  const topMatches = scored.filter((t: any) => t.score === maxScore && t.score > 0);
-  const candidates = topMatches.length > 0 ? topMatches : scored;
-  const selected = candidates[Math.floor(Math.random() * candidates.length)];
-
-  console.log(`[selectBackgroundMusic] Selected: ${selected.storage_path} (score: ${selected.score}, from ${candidates.length} candidates, total in DB: ${tracks.length})`);
-
-  // Construct public URL from Supabase Storage
-  const { data: urlData } = supabase.storage
-    .from('background-music')
-    .getPublicUrl(selected.storage_path);
-
-  const publicUrl = urlData?.publicUrl;
-  if (!publicUrl) {
-    console.warn('[selectBackgroundMusic] Could not construct public URL');
-    return null;
-  }
-
-  // Quick HEAD check to verify the file actually exists in storage
   try {
-    const headResp = await fetch(publicUrl, { method: 'HEAD' });
-    if (!headResp.ok) {
-      console.warn(`[selectBackgroundMusic] Track not in storage (${headResp.status}): ${selected.storage_path}`);
-      // Mark as invalid so it's not selected again
-      await supabase.from('background_music_tracks').update({ is_valid: false }).eq('id', selected.id);
+    // Call search-stock-music (same as Content Creator / auto-generate-explainer)
+    const musicResponse = await supabase.functions.invoke('search-stock-music', {
+      body: {
+        query: searchMood,
+        mood: mood || style || '',
+        genre: 'instrumental'
+      }
+    });
+
+    console.log(`[selectBackgroundMusic] Jamendo response: ${musicResponse.data?.results?.length || 0} tracks found`);
+
+    let jamendoUrl: string | null = null;
+
+    if (musicResponse.data?.results?.[0]?.url) {
+      jamendoUrl = musicResponse.data.results[0].url;
+    } else if (musicResponse.data?.results?.[0]?.preview_url) {
+      jamendoUrl = musicResponse.data.results[0].preview_url;
+    }
+
+    if (!jamendoUrl) {
+      console.warn('[selectBackgroundMusic] No Jamendo tracks found');
       return null;
     }
-    const contentLength = parseInt(headResp.headers.get('content-length') || '0', 10);
-    console.log(`[selectBackgroundMusic] ✅ Verified: ${selected.storage_path} (${(contentLength / 1024).toFixed(0)} KB)`);
+
+    console.log(`[selectBackgroundMusic] Jamendo URL: ${jamendoUrl.substring(0, 80)}...`);
+
+    // Proxy through storage for Lambda stability (avoid hotlink issues)
+    const proxiedUrl = await proxyAudioToStorage(supabase, jamendoUrl, 'jamendo-music');
+    if (proxiedUrl) {
+      console.log(`[selectBackgroundMusic] ✅ Proxied to storage: ${proxiedUrl.substring(0, 80)}...`);
+      return proxiedUrl;
+    }
+
+    // If proxy fails, try direct URL (works in Content Creator)
+    console.log(`[selectBackgroundMusic] Proxy failed, using direct Jamendo URL`);
+    return jamendoUrl;
+
   } catch (e) {
-    console.warn('[selectBackgroundMusic] HEAD check failed:', e);
+    console.error('[selectBackgroundMusic] Jamendo API error:', e);
     return null;
   }
-
-  return publicUrl;
 }
 
 async function generateAIFallbackImage(
