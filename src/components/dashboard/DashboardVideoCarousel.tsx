@@ -66,16 +66,15 @@ export const DashboardVideoCarousel = () => {
       if (!el) return;
       if (i === selectedIndex) {
         el.muted = true;
-        if (el.readyState >= 3) {
+        if (el.readyState >= 1) {
           el.play().catch(() => {});
         }
-        // If not ready yet, onCanPlay will trigger play
       } else {
         el.pause();
         el.currentTime = 0;
       }
     });
-  }, [selectedIndex, loadedVideos]);
+  }, [selectedIndex, readyVideos]);
 
   useEffect(() => {
     if (!emblaApi) return;
