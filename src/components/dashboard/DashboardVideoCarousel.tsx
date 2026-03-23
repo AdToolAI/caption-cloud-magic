@@ -14,9 +14,10 @@ export const DashboardVideoCarousel = () => {
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // Sort by performance (downloads + shares), fallback to created_at
+  // Filter to only completed videos with output_url, then sort by performance
   const sortedVideos = [...videos]
-    .sort((a, b) => {
+    .filter((v: any) => v.status === 'completed' && v.output_url)
+    .sort((a: any, b: any) => {
       const scoreA = (a.download_count || 0) + (a.share_count || 0);
       const scoreB = (b.download_count || 0) + (b.share_count || 0);
       if (scoreB !== scoreA) return scoreB - scoreA;
@@ -45,6 +46,9 @@ export const DashboardVideoCarousel = () => {
 
   const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
   const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
+
+  const getVideoTitle = (video: any) =>
+    (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
 
   if (isLoading) {
     return (
@@ -96,53 +100,74 @@ export const DashboardVideoCarousel = () => {
         </div>
       </div>
 
-      {/* Carousel */}
-      <div className="overflow-hidden" ref={emblaRef}>
-        <div className="flex">
-          {sortedVideos.map((video, index) => {
+      {/* Carousel — overlapping gear-style */}
+      <div className="overflow-hidden py-4" ref={emblaRef}>
+        <div className="flex" style={{ marginLeft: '-8px', marginRight: '-8px' }}>
+          {sortedVideos.map((video: any, index: number) => {
             const isActive = index === selectedIndex;
             const performanceScore = (video.download_count || 0) + (video.share_count || 0);
+            const title = getVideoTitle(video);
 
             return (
               <div
                 key={video.id}
-                className="flex-shrink-0 flex-grow-0 px-2"
-                style={{ flexBasis: sortedVideos.length === 1 ? '80%' : '45%' }}
+                className="flex-shrink-0 flex-grow-0"
+                style={{
+                  flexBasis: sortedVideos.length === 1 ? '75%' : '38%',
+                  paddingLeft: '4px',
+                  paddingRight: '4px',
+                }}
               >
                 <div
                   className={cn(
-                    'relative rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 group border',
+                    'relative rounded-2xl overflow-hidden cursor-pointer transition-all duration-500 group border',
                     isActive
-                      ? 'scale-100 opacity-100 border-primary/50 shadow-lg shadow-primary/10'
-                      : 'scale-90 opacity-50 border-border hover:opacity-70'
+                      ? 'scale-105 opacity-100 z-10 border-primary/40 shadow-xl shadow-primary/20'
+                      : 'scale-[0.85] opacity-50 z-0 border-border/30 hover:opacity-70'
                   )}
+                  style={{
+                    transform: isActive
+                      ? 'scale(1.05) perspective(800px) rotateY(0deg)'
+                      : index < selectedIndex
+                        ? 'scale(0.85) perspective(800px) rotateY(5deg)'
+                        : 'scale(0.85) perspective(800px) rotateY(-5deg)',
+                    transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                  }}
                   onClick={() => {
-                    if (video.video_url) {
-                      setSelectedVideo({ url: video.video_url, title: video.title || 'Video' });
+                    if (video.output_url) {
+                      setSelectedVideo({ url: video.output_url, title });
                     }
                   }}
                 >
-                  {/* Thumbnail / Video Preview */}
-                  <div className="aspect-video bg-muted relative">
+                  {/* Thumbnail */}
+                  <div className="aspect-video relative overflow-hidden">
                     {video.thumbnail_url ? (
                       <img
                         src={video.thumbnail_url}
-                        alt={video.title || 'Video'}
+                        alt={title}
                         className="w-full h-full object-cover"
                         loading="lazy"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-accent/10">
-                        <Video className="h-10 w-10 text-muted-foreground" />
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 via-accent/10 to-primary/5">
+                        <Video className="h-10 w-10 text-muted-foreground/60" />
                       </div>
                     )}
 
-                    {/* Play Overlay */}
+                    {/* Gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+
+                    {/* Play Button */}
                     <div className={cn(
-                      'absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity',
+                      'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
                       isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                     )}>
-                      <div className="w-14 h-14 rounded-full bg-primary/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                      <div className={cn(
+                        'w-14 h-14 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-300',
+                        isActive
+                          ? 'bg-primary/90 shadow-lg shadow-primary/40'
+                          : 'bg-white/20'
+                      )}>
                         <Play className="h-6 w-6 text-primary-foreground ml-0.5" />
                       </div>
                     </div>
@@ -150,25 +175,25 @@ export const DashboardVideoCarousel = () => {
                     {/* Performance Badge */}
                     {performanceScore > 0 && index === 0 && (
                       <div className="absolute top-2 left-2">
-                        <Badge className="bg-primary/90 text-primary-foreground text-[10px] px-2 py-0.5">
+                        <Badge className="bg-primary/90 text-primary-foreground text-[10px] px-2 py-0.5 backdrop-blur-sm">
                           ⭐ Best Performance
                         </Badge>
                       </div>
                     )}
-                  </div>
 
-                  {/* Info Bar */}
-                  <div className="p-3 bg-card">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {video.title || 'Untitled Video'}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {new Date(video.created_at).toLocaleDateString('de-DE', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                      })}
-                    </p>
+                    {/* Bottom info overlay */}
+                    <div className="absolute bottom-0 left-0 right-0 p-3">
+                      <p className="text-sm font-medium text-white truncate drop-shadow-md">
+                        {title}
+                      </p>
+                      <p className="text-[11px] text-white/70 mt-0.5">
+                        {new Date(video.created_at).toLocaleDateString('de-DE', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric'
+                        })}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -180,12 +205,12 @@ export const DashboardVideoCarousel = () => {
       {/* Dots */}
       {sortedVideos.length > 1 && (
         <div className="flex justify-center gap-1.5">
-          {sortedVideos.map((_, i) => (
+          {sortedVideos.map((_: any, i: number) => (
             <button
               key={i}
               className={cn(
-                'w-2 h-2 rounded-full transition-all duration-200',
-                i === selectedIndex ? 'bg-primary w-5' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+                'h-1.5 rounded-full transition-all duration-300',
+                i === selectedIndex ? 'bg-primary w-6' : 'bg-muted-foreground/20 w-1.5 hover:bg-muted-foreground/40'
               )}
               onClick={() => emblaApi?.scrollTo(i)}
             />
@@ -193,8 +218,8 @@ export const DashboardVideoCarousel = () => {
         </div>
       )}
 
-      {/* News Section Placeholder */}
-      <div className="mt-6 pt-6 border-t border-border">
+      {/* News Section */}
+      <div className="mt-6 pt-6 border-t border-border/50">
         <div className="flex items-center gap-2 mb-3">
           <Sparkles className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold text-foreground">News & Updates</h3>
@@ -202,8 +227,8 @@ export const DashboardVideoCarousel = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {['Feature Updates', 'Tutorials', 'Demo Videos'].map((label) => (
-            <div key={label} className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-center">
-              <Video className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+            <div key={label} className="rounded-xl border border-dashed border-border/50 bg-muted/20 p-4 text-center backdrop-blur-sm">
+              <Video className="h-6 w-6 text-muted-foreground/50 mx-auto mb-2" />
               <p className="text-xs text-muted-foreground font-medium">{label}</p>
             </div>
           ))}
