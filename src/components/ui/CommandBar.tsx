@@ -61,8 +61,7 @@ export function CommandBar({ inline = false }: CommandBarProps) {
     { name: t("nav.postTimeAdvisor"), path: "/post-time-advisor", icon: Clock, category: t("hubs.planen") },
     
     // Erstellen
-    { name: t("nav.generator"), path: "/generator", icon: Sparkles, category: t("hubs.erstellen") },
-    { name: t("nav.promptWizard"), path: "/prompt-wizard", icon: Wand2, category: t("hubs.erstellen") },
+    { name: t("nav.textStudio"), path: "/generator", icon: Sparkles, category: t("hubs.erstellen") },
     { name: t("nav.reelScript"), path: "/reel-script-generator", icon: Film, category: t("hubs.erstellen") },
     { name: t("nav.hookGenerator"), path: "/hook-generator", icon: Zap, category: t("hubs.erstellen") },
     
