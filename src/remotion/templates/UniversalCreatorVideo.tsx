@@ -2598,7 +2598,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   subtitles,
   voiceoverUrl,
   backgroundMusicUrl,
-  backgroundMusicVolume = 0.2,
+  backgroundMusicVolume = 0.35,
   masterVolume = 1.0,
   soundEffects,
   style = 'flat-design',
