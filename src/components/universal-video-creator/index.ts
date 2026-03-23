@@ -1,5 +1,6 @@
 export { UniversalVideoWizard } from './UniversalVideoWizard';
 export { CategorySelector } from './CategorySelector';
+export { FilmStyleSelector } from './FilmStyleSelector';
 export { UniversalModeSelector } from './UniversalModeSelector';
 export { UniversalVideoConsultant } from './UniversalVideoConsultant';
 export { UniversalAutoGenerationProgress } from './UniversalAutoGenerationProgress';
