@@ -296,7 +296,8 @@ serve(async (req) => {
       } else {
         // Standard Flux 1.1 Pro for scenes without character
         // ✅ Phase 15: Anti-gibberish — forbid ALL text AND numbers
-        const fullPrompt = `STRICT RULE: This image must contain ZERO text, ZERO letters, ZERO words, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels of any kind. All text, numbers, and data visualizations must be replaced with abstract colored shapes or blank areas. Never generate readable or unreadable content in any language. CRITICAL: Remove ALL human subjects — show ONLY environments, objects, furniture, and equipment. No people, no silhouettes, no hands, no body parts. ` + prompt + `. Avoid: ${NEGATIVE_PROMPT}`;
+        const styleNegative = getStyleNegativePrompt(request.style);
+        const fullPrompt = `STRICT RULE: This image must contain ZERO text, ZERO letters, ZERO words, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels of any kind. All text, numbers, and data visualizations must be replaced with abstract colored shapes or blank areas. Never generate readable or unreadable content in any language. CRITICAL: Remove ALL human subjects — show ONLY environments, objects, furniture, and equipment. No people, no silhouettes, no hands, no body parts. ` + prompt + `. Avoid: ${styleNegative}`;
         
         console.log('Final prompt with negative guidance:', fullPrompt.substring(0, 300));
         
