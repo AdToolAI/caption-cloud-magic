@@ -211,6 +211,7 @@ export function UniversalVideoWizard() {
     setSelectedCategory(null);
     setGenerationMode(null);
     setMoodConfig(null);
+    setSelectedVisualStyle(null);
     setCurrentStep(0);
     setError(null);
     setIsAutoGenerating(false);
