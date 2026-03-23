@@ -100,8 +100,7 @@ export function AppSidebar() {
       { route: "/posting-times", titleKey: "nav.postTimeAdvisor", icon: Clock },
     ],
     erstellen: [
-      { route: "/generator", titleKey: "nav.generator", icon: Sparkles },
-      { route: "/prompt-wizard", titleKey: "nav.promptWizard", icon: Wand2 },
+      { route: "/generator", titleKey: "nav.textStudio", icon: Sparkles },
       { route: "/reel-script-generator", titleKey: "nav.reelScript", icon: Film },
       { route: "/hook-generator", titleKey: "nav.hookGenerator", icon: Zap },
       { route: "/ai-post-generator", titleKey: "nav.aiPostGenerator", icon: Bot },

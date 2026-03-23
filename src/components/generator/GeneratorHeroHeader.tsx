@@ -66,7 +66,7 @@ export function GeneratorHeroHeader({ status }: GeneratorHeroHeaderProps) {
         transition={{ delay: 0.3 }}
         className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary via-primary to-accent bg-clip-text text-transparent"
       >
-        Textgenerator
+        KI Text-Studio
       </motion.h1>
 
       {/* Credits Card */}
