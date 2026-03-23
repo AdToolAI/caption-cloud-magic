@@ -55,7 +55,7 @@ export function GeneratorHeroHeader({ status }: GeneratorHeroHeaderProps) {
         </span>
         <MessageSquare className="h-3.5 w-3.5 text-primary" />
         <span className="text-xs font-medium text-primary uppercase tracking-wider">
-          KI-Caption-Generator
+          KI Text-Studio
         </span>
       </motion.div>
 
