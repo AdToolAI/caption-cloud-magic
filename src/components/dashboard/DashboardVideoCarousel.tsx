@@ -13,18 +13,29 @@ import { supabase } from '@/integrations/supabase/client';
 /** Resolve a possibly-relative storage path to a full public URL */
 const resolveVideoUrl = (rawUrl: string): string => {
   if (!rawUrl) return '';
-  if (rawUrl.startsWith('http')) return rawUrl;
+  // Already a full URL — return as-is
+  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) return rawUrl;
 
   const buckets = ['universal-videos', 'video-assets', 'ai-videos'];
   for (const bucket of buckets) {
-    if (rawUrl.startsWith(`${bucket}/`) || rawUrl.includes(`/${bucket}/`)) {
-      const path = rawUrl.startsWith(`${bucket}/`) ? rawUrl.slice(bucket.length + 1) : rawUrl;
+    const prefix = `${bucket}/`;
+    if (rawUrl.startsWith(prefix)) {
+      const path = rawUrl.slice(prefix.length);
+      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+      return data.publicUrl;
+    }
+    // Handle paths like "storage/v1/object/public/bucket/..."
+    const bucketSegment = `/${bucket}/`;
+    if (rawUrl.includes(bucketSegment)) {
+      const path = rawUrl.split(bucketSegment).pop() || '';
       const { data } = supabase.storage.from(bucket).getPublicUrl(path);
       return data.publicUrl;
     }
   }
 
+  // Fallback: treat entire rawUrl as a path in universal-videos
   const { data } = supabase.storage.from('universal-videos').getPublicUrl(rawUrl);
+  console.warn('[Carousel] Could not match bucket for path, falling back to universal-videos:', rawUrl);
   return data.publicUrl;
 };
 
