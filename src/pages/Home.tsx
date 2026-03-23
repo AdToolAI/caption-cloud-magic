@@ -140,11 +140,7 @@ const Home = () => {
             </div>
             <div className="flex items-center gap-6">
               <div className="text-xs"><CreditBalance /></div>
-              <div className="flex items-center gap-2">
-                <Instagram className="h-4 w-4 text-primary" />
-                <Music className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground">3 {t("dashboard.statusBar.connectedAccounts")}</span>
-              </div>
+              <SocialConnectionIcons />
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-warning" />
                 <span>{t("dashboard.statusBar.nextPost")}: {language === "de" ? "Heute 18:00" : "Today 6:00 PM"}</span>
