@@ -280,7 +280,10 @@ export const DashboardVideoCarousel = () => {
                               el.play().catch(() => {});
                             }
                           }}
-                          onError={() => handleVideoError(index)}
+                          onError={(e) => {
+                            console.error(`[Carousel] Video ${index} failed to load:`, videoUrl, e);
+                            handleVideoError(index);
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-muted/80">
