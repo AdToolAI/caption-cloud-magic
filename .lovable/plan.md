@@ -1,122 +1,54 @@
 
-## Plan: Musikproblem jetzt wirklich isolieren statt weiter blind zu raten
 
-### Was ich gerade eindeutig verifiziert habe
-- Die Runtime läuft auf **r71**, also kein reines Deploy-Problem mehr.
-- Der erste Render bekommt **wirklich eine `backgroundMusicUrl`**.
-- Der Render scheitert dann an **`ffprobe` / `Failed to find two consecutive MPEG audio frames`**.
-- Danach läuft ein späterer Retry **ohne Musik** erfolgreich durch.
-- Es gibt zwar `AudioSmokeTest`, aber ich finde **keine echte Pipeline**, die Tracks damit validiert.
-- In `universal_video_progress` werden **ausgewählter Track / Retry-Track aktuell nicht sauber persistiert**. Dadurch ist die Ursache im Nachhinein kaum belegbar.
+# Plan: Sound Effects crashen Lambda — nicht die Hintergrundmusik
 
-## Ziel
-Nicht mehr “noch einen möglichen Fix” bauen, sondern eine **deterministische Isolationsstrecke**, mit der wir in 1-2 Testläufen sicher wissen, ob das Problem ist:
+## Root Cause gefunden
 
-```text
-A) einzelne Track-Dateien
-B) die gesamte Musikbibliothek / Storage-Auslieferung
-C) die Retry-Logik (Track wird gar nicht wirklich gewechselt)
-D) nur die Kombination aus Voiceover + Musik
-E) der UniversalCreator-Renderpfad selbst
-```
+Das Problem war **nie** die Hintergrundmusik. Der ffprobe-Crash kommt von den **Sound Effects**.
 
-## Umsetzung
+Beweis:
+- Im Lambda-Payload des letzten Renders fehlt `backgroundMusicUrl` komplett
+- Trotzdem crasht Lambda mit `Failed to find two consecutive MPEG audio frames`
+- Jede Szene hat `soundEffectType: "whoosh"`, `"alert"`, `"success"`, `"pop"`
+- `getSoundUrlSync()` gibt **immer** `data:audio/mp3;base64,...` zurück (Zeile 213-215 in EmbeddedSoundLibrary.ts)
+- Remotion Lambda lädt data-URIs als Assets herunter, speichert sie als `.mp3` im temp-Verzeichnis
+- ffprobe kann die resultierenden Dateien nicht parsen → Crash
+- Der Retry strippt die **Hintergrundmusik** (falscher Schuldiger) aber lässt die Sound Effects aktiv → nächster Crash
+- Erst wenn `audioStripped=true` greift UND `r33_audioStripped` das Sound-Effect-Rendering in Zeile 3020 deaktiviert, läuft der Render durch
 
-### 1. Deterministischen Debug-Modus für einen Render einbauen
-In `auto-generate-universal-video` würde ich einen temporären Diagnosemodus ergänzen:
+## Lösung
 
-- `forceBackgroundMusicUrl`
-- `disableMusicSelection`
-- `disableRetryTrackSwap`
-- `forceVoiceoverOff`
-- `forceMusicOff`
+### Schritt 1: Sound Effects auf echte HTTP-URLs umstellen
+**Datei:** `src/remotion/components/EmbeddedSoundLibrary.ts`
 
-Damit können wir gezielt exakt **einen** Track und **eine** Audio-Kombination rendern, statt Zufall + Auto-Retry im Weg zu haben.
+`getSoundUrlSync()` darf in Lambda **keine** `data:` URIs zurückgeben. Stattdessen:
+- Die Base64-Sounds als echte MP3-Dateien in den `background-music` oder `audio-assets` Storage-Bucket hochladen
+- `EMBEDDED_FALLBACKS` Map auf die echten Storage-URLs umstellen
+- Alternativ: CDN-URLs als primäre Quelle nutzen (Pixabay-URLs sind bereits definiert, aber nie im Sync-Pfad verwendet)
 
-### 2. Echte Track-Validierung über `AudioSmokeTest` bauen
-Statt Tracks nur per DB-Flag als “validated” zu markieren:
+### Schritt 2: Hintergrundmusik wieder aktivieren
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
 
-- neue dedizierte Funktion, die **einen Track** mit `AudioSmokeTest` rendert
-- Ergebnis in `background_music_tracks` speichern:
-  - `validated`
-  - `failed`
-  - `validation_error`
-  - `last_validated_at`
-  - `validation_attempts`
+Sobald die Sound Effects nicht mehr crashen, wird auch die Hintergrundmusik durchlaufen. Die validierten Tracks aus der DB können dann genutzt werden.
 
-Wichtig: Nur diese Smoke-Test-Funktion darf künftig `validation_status='validated'` setzen.
-
-### 3. Drei isolierte Testfälle schaffen
-Ich würde exakt diese drei Diagnoseläufe ermöglichen:
-
-1. **Music only**
-   - `AudioSmokeTest` oder `UniversalCreatorVideo` nur mit Musik, ohne Voiceover  
-   -> isoliert, ob der Track selbst in Lambda lesbar ist
-
-2. **Voiceover only**
-   - aktueller Baseline-Test  
-   -> bestätigt, dass der Rest des Renderpfads stabil ist
-
-3. **Voiceover + exakt derselbe Musiktrack**
-   - gleiche Musikdatei, gleicher Renderpfad  
-   -> zeigt, ob das Problem nur bei der Kombination entsteht
-
-So wissen wir sofort, ob der Fehler an der Datei oder an der Template-/Audio-Kombination liegt.
-
-### 4. Retry-Forensik vollständig persistieren
-Im Progress/Render-Record zusätzlich speichern:
-
-- `selectedBackgroundMusicUrl`
-- `selectedBackgroundMusicTrack`
-- `retryTrack`
-- `retryAttempt`
-- `audioStripped`
-- `validation_status`
-- `validation_error`
-- `failure_stage`
-- `error_signature`
-
-Aktuell fehlt genau diese Sichtbarkeit. Ohne sie bleibt jeder Versuch teilweise Blindflug.
-
-### 5. Zufällige Musikauswahl für Diagnose abschalten
-Während Diagnose:
-- **kein random**
-- **kein Mood-Ranking**
-- **kein stilles Fallback auf andere Tracks**
-
-Stattdessen:
-```text
-Track X -> Testlauf
-Track X + Voiceover -> Testlauf
-Track Y -> Testlauf
-```
-
-Nur so sehen wir, ob wirklich der Track gewechselt wurde und welcher exakt crasht.
-
-### 6. Auswahl-Logik danach härten
-Sobald die Isolation steht:
-- Produktivauswahl nur noch aus **echten Smoke-Test-Passes**
-- kein Track ohne `last_validated_at`
-- kein stilles Wiederverwenden fraglicher Dateien
+### Schritt 3: Remotion-Bundle deployen
+Da die Änderung in `EmbeddedSoundLibrary.ts` (Client-seitig im Bundle) liegt, muss das Remotion-Bundle nach dem Fix neu deployed werden, damit Lambda den aktuellen Code nutzt.
 
 ## Betroffene Dateien
-- `supabase/functions/auto-generate-universal-video/index.ts`
-- neue Edge Function für Musik-Smoke-Tests
-- `src/remotion/templates/AudioSmokeTest.tsx` (nur falls kleine Diagnose-Erweiterung nötig)
-- `src/remotion/Root.tsx` (falls zusätzliche Diagnose-Composition gebraucht wird)
-- optional `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` für sichtbare Forensik
+
+| Datei | Änderung |
+|-------|----------|
+| `src/remotion/components/EmbeddedSoundLibrary.ts` | `data:` URIs → echte Storage/CDN URLs |
+| Sound-Dateien in Storage hochladen | 5-7 kurze MP3s (whoosh, pop, success, alert, click, swoosh, chime) |
+
+## Warum alle bisherigen Fixes nicht geholfen haben
+- Wir haben immer die **Hintergrundmusik** verdächtigt und repariert
+- Aber die Sound Effects waren **immer aktiv** und haben **immer** den Crash verursacht
+- Erst wenn `r33_audioStripped=true` gesetzt wurde, wurden auch Sound Effects deaktiviert (Zeile 3020)
+- Deshalb funktionierte der finale Retry (ohne Musik UND ohne Sound Effects) — aber das wurde als "Voiceover-only funktioniert" interpretiert
 
 ## Erwartetes Ergebnis
-Nach dieser Isolation wissen wir belastbar:
+- Sound Effects laden als echte HTTP-URLs → ffprobe kann sie parsen
+- Hintergrundmusik funktioniert wieder (war nie das eigentliche Problem)
+- Kein Retry-Karussell mehr nötig
 
-```text
-- ob ein einzelner Track alleine in Lambda funktioniert
-- ob Voiceover + Musik zusammen das Problem sind
-- ob der Retry wirklich auf einen anderen Track wechselt
-- welche Datei konkret crasht
-- ob der "validated"-Status überhaupt echt ist
-```
-
-## Kurz gesagt
-Ja — wir müssen das Problem jetzt **instrumentieren**, nicht weiter raten.  
-Der nächste sinnvolle Schritt ist eine **deterministische Audio-Diagnose-Pipeline** mit Track-Smoke-Test, festen Testtracks und vollständiger Retry-Forensik. Erst damit können wir die eigentliche Ursache sauber beweisen und danach gezielt beheben.
