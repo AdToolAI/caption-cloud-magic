@@ -1,76 +1,135 @@
 
+# Plan: Das echte Restproblem beheben — „validiert“ ist aktuell nur ein DB-Label
 
-# Plan: Hintergrundmusik endgültig zum Laufen bringen
+## Was ich jetzt eindeutig verifiziert habe
 
-## Diagnose — Warum es immer noch nicht funktioniert
+Der Fehler ist inzwischen klarer:
 
-Die Logs vom letzten Render (23. März 2026) zeigen:
+- **Produktion läuft auf r70**  
+  `auto-generate-universal-video` loggt: `BUILD_TAG=r70-synth-only-music-2026-03-23`  
+  -> Es ist **kein Deploy-Mismatch** mehr.
 
+- **Musik kommt weiterhin bis in den ersten Lambda-Render**  
+  `remotion-webhook` zeigt beim Fehlrender:
+  `backgroundMusicUrl = .../background-music/library/corporate-ambient-synth-001.mp3`
+
+- **Dann crasht Lambda weiter beim Einlesen der Musik**
+  Fehler:
+  `Failed to find two consecutive MPEG audio frames`
+  -> Danach greift der Retry und entfernt die Musik.
+
+- **Die aktuelle Bibliothek ist faktisch nicht echt validiert**
+  In der DB gibt es aktuell:
+  - `validated_count = 4`
+  - `failed_count = 1`
+  - `pending_invalid_count = 114`
+
+- **Der entscheidende Punkt:**  
+  `AudioSmokeTest.tsx` ist zwar im Bundle registriert, aber ich finde **keinen Code**, der diesen Smoke-Test wirklich für Tracks ausführt.  
+  Gleichzeitig macht `seed-background-music` weiterhin nur:
+  - Download
+  - Magic-Byte-Check
+  - Upload
+  - DB-Eintrag
+
+Das heißt: Das eigentliche Problem ist sehr wahrscheinlich **nicht mehr Template, UI oder Voiceover**, sondern:
+
+```text
+validation_status = 'validated'
+bedeutet aktuell nicht:
+"dieser Track wurde erfolgreich in Lambda getestet"
+sondern nur:
+"dieser Track wurde irgendwann als gültig markiert"
 ```
-BUILD_TAG=r67-music-direct-render-2026-03-21
-audio_corruption: Failed to find two consecutive MPEG audio frames
-r60 Removing backgroundMusicUrl → music stripped, voiceover=true
-```
 
-**Drei klare Ursachen:**
+## Konsequenz
 
-1. **Edge Function nie redeployed** — Produktion läuft auf r67, Code ist r69. Die Smart-Retry-Logik (alternativen Track versuchen statt Musik sofort entfernen) war nie aktiv.
+Der aktuelle Musikpfad baut auf einer Annahme auf, die nicht abgesichert ist.  
+Darum landen weiterhin „validierte“ Tracks im Render, die dort sofort ffprobe sprengen.
 
-2. **MP3-Tracks sind Lambda-inkompatibel** — Alle 114 Tracks wurden 1:1 von Jamendo heruntergeladen. Nur 30 davon wurden im Sandbox re-encoded, aber ob die Re-Uploads tatsächlich in Storage angekommen sind, ist unklar. Lambda's ffprobe verweigert diese Dateien konsistent.
+## Umsetzung
 
-3. **Re-Encoding war unvollständig** — 84 von 114 Tracks wurden nie re-encoded. Selbst die 30 "re-encoded" Tracks sind vermutlich nicht korrekt ersetzt worden, da der letzte Render trotzdem `audio_corruption` liefert.
+### 1. Echte Track-Validierung einführen
+Neue dedizierte Validierungsfunktion bauen, die für jeden Track einen **realen Lambda-Smoke-Test** mit `AudioSmokeTest` startet.
 
-## Lösung — Diesmal definitiv
+Ablauf pro Track:
+1. Public URL aus Storage holen
+2. `render-with-remotion` mit `AudioSmokeTest` aufrufen
+3. Ergebnis auswerten
+4. DB aktualisieren:
+   - `validated`, wenn Render startet/abschließt
+   - `failed`, wenn `audio_corruption`
 
-### Schritt 1: Einen einzigen garantiert funktionierenden Track erzeugen
+Wichtig:
+- `validation_status` darf nur noch durch diesen Test gesetzt werden
+- nicht mehr manuell oder implizit
 
-Statt 114 externe Tracks zu reparieren, erzeuge ich **einen synthetischen MP3-Track direkt per FFmpeg** im Sandbox — komplett ohne externe Quelle:
+### 2. Die 4 aktuell „validierten“ Tracks sofort nachprüfen
+Bevor weitere Musik ausgewählt wird:
+- die 4 aktuellen Synth-Tracks einzeln durch den Smoke-Test schicken
+- alles, was fehlschlägt, direkt auf `failed`
+- nur echte Passes dürfen auswählbar bleiben
 
-```bash
-ffmpeg -f lavfi -i "sine=frequency=220:duration=120" -codec:a libmp3lame -b:a 128k -ar 44100 -ac 2 test-tone.mp3
-```
+Damit sehen wir sofort:
+- ob das Problem wirklich an allen aktuellen Audiodateien hängt
+- oder ob mindestens ein Track tatsächlich Lambda-tauglich ist
 
-Diesen Track lade ich in den `background-music` Bucket hoch und erstelle einen DB-Eintrag mit `validation_status = 'validated'`.
+### 3. Auswahl-Logik hart absichern
+`selectBackgroundMusic()` verschärfen:
 
-Wenn dieser synthetische Track in Lambda funktioniert, wissen wir definitiv, dass das Problem die Quelldateien sind (nicht die Pipeline).
+- nur `validation_status = 'validated'`
+- nur Tracks mit echtem `last_validated_at`
+- kein Fallback mehr auf „irgendein is_valid=true“
 
-### Schritt 2: Echte Musik-Tracks per FFmpeg generieren
+Zusätzlich auch im Retry:
+- Alternativtrack nur aus **echt validierten** Tracks wählen
+- wenn kein validierter Track verfügbar ist:
+  - sauberer Status „kein validierter Track verfügbar“
+  - nicht stillschweigend wieder riskante Quellen nehmen
 
-Statt Jamendo-Downloads zu re-encoden, erzeuge ich 5-10 **ambient/corporate-taugliche Tracks per FFmpeg-Synthese** (harmonische Sinuswellen, leises Pad-artiges Audio). Diese sind garantiert Lambda-kompatibel.
+### 4. Forensik pro Render sichtbar speichern
+Im Progress/Result speichern:
+- ausgewählte `track_id`
+- `storage_path`
+- `validation_status`
+- `last_validated_at`
+- ob Alternativtrack genutzt wurde
+- finaler Grund, warum Musik entfernt wurde
 
-Alternativ: Einen einzigen bekanntermaßen funktionierenden Track von einer zuverlässigen Quelle (z.B. ein CC0-Track von archive.org) herunterladen, re-encoden und testen.
+So ist beim nächsten Test sofort sichtbar, ob wirklich ein getesteter Track verwendet wurde.
 
-### Schritt 3: Edge Function deployen (r69 → Produktion)
+### 5. Bibliothek erst danach wieder skalieren
+Erst wenn 1-2 Tracks den Smoke-Test wirklich bestehen:
+- Seed/Import-Pipeline erweitern
+- neue Tracks zunächst immer als `pending`
+- danach automatisch validieren
+- nur bestandene Tracks in die Produktionsauswahl aufnehmen
 
-Damit die Smart-Retry-Logik aktiv wird und der BUILD_TAG-Mismatch behoben ist.
+## Betroffene Bereiche
 
-### Schritt 4: Testrender mit dem validierten Track
-
-Einen Video-Render starten und in den Logs prüfen, ob der Track ohne `audio_corruption` durchläuft.
-
-### Schritt 5: Erst nach Erfolg die Bibliothek skalieren
-
-Wenn der Proof-of-Concept funktioniert, die restlichen Tracks systematisch re-encoden oder durch neue ersetzen.
-
-## Warum dieser Ansatz anders ist
-
-Alle bisherigen Versuche haben die MP3-Dateien von Jamendo genommen und gehofft, dass sie funktionieren. Das Problem: **Jamendo-MP3s haben nicht-standardkonforme MPEG-Frames**, die im Browser funktionieren aber in Lambda's ffprobe crashen.
-
-Diesmal:
-- Synthetischer Track = 100% kontrollierte Byte-Struktur
-- Kein Verlass auf externe Quellen
-- Erst Proof-of-Concept, dann skalieren
-
-## Betroffene Dateien
-
-| Datei | Änderung |
-|-------|----------|
-| Storage: `background-music/library/` | Synthetischen + validierten Track hochladen |
-| DB: `background_music_tracks` | Neuen Track-Eintrag mit validated Status |
-| `supabase/functions/auto-generate-universal-video/index.ts` | Deploy (r69 live bringen) |
+- `supabase/functions/seed-background-music/index.ts`
+- `supabase/functions/auto-generate-universal-video/index.ts`
+- neue Funktion für Track-Validierung
+- optional Progress/Diagnose-UI für Track-Forensik
+- bestehende `AudioSmokeTest`-Composition wird endlich aktiv genutzt
 
 ## Erwartetes Ergebnis
-- Mindestens ein Track der garantiert in Lambda funktioniert
-- Edge Function auf r69 mit Smart-Retry
-- Hintergrundmusik endlich hörbar im fertigen Video
 
+Nach der Umstellung gibt es keinen Blindflug mehr:
+
+```text
+Track in Storage
+-> pending
+-> echter Lambda-Smoke-Test
+-> validated oder failed
+-> nur validated darf in reale Video-Renders
+```
+
+Damit lösen wir das eigentliche Restproblem:
+Nicht „Musik wird falsch eingebunden“, sondern  
+**„die Bibliothek enthält Tracks, die als validiert gelten, ohne jemals wirklich gegen Lambda geprüft worden zu sein“.**
+
+## Technische Kurzfassung
+
+Ja — es ist tatsächlich ein anderes Problem:
+**Die Produktionspipeline ist live, Voiceover funktioniert, Musik wird an Lambda übergeben — aber der aktuelle Validierungsstatus der Tracks ist nicht belastbar, weil die vorhandene AudioSmokeTest-Architektur noch gar nicht in die Musikbibliothek eingebunden ist.**
