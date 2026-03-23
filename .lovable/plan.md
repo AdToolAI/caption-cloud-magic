@@ -1,29 +1,48 @@
 
 
-# Plan: Social-Media-Plattform-Icons in der Status-Bar mit Verbindungsstatus
+# Plan: KI Text-Studio — Prompt-Assistent als Dialog in den Caption-Generator integrieren
 
 ## Zusammenfassung
-Die hartcodierten Instagram/TikTok-Icons im rechten Bereich der Hero-Status-Bar (Zeilen 143-147 in `Home.tsx`) werden durch alle 6 Plattform-Icons ersetzt. Jedes Icon zeigt visuell den Verbindungsstatus an und ist klickbar, um direkt zur Verbindungsseite zu navigieren.
+Der **Prompt-Assistent** wird als Slide-over-Dialog direkt in den **Caption-Generator** eingebettet. Beide Features leben dann unter dem neuen Namen **"KI Text-Studio"** auf einer einzigen Route (`/generator`). Die separate `/prompt-wizard`-Route wird als Redirect beibehalten (Backward-Compat). In der Sidebar erscheint nur noch ein Eintrag.
 
 ## Umsetzung
 
-### 1. Neue Komponente: `SocialConnectionIcons`
-Neue Datei `src/components/dashboard/SocialConnectionIcons.tsx`:
-- Nutzt den bestehenden `usePlatformCredentials`-Hook um den Live-Verbindungsstatus abzufragen
-- Zeigt Icons für alle 6 Plattformen: Instagram, TikTok, LinkedIn, YouTube, Facebook, X
-- Verbundene Plattformen: Icon in Plattform-Farbe + kleiner grüner Punkt
-- Nicht verbundene: Icon ausgegraut/gedimmt
-- Klick navigiert zu `/social-media-settings?connect={platform}` (nutzt bestehende Highlight-Logik dort)
-- Tooltip mit Plattformname + Status
-- Zähler daneben: "X verbunden"
+### 1. Neuer Dialog: `PromptAssistantDialog`
+Neue Datei `src/components/generator/PromptAssistantDialog.tsx`:
+- Sheet/Dialog, der von rechts einslided
+- Enthält die komplette Prompt-Wizard-Logik (Plattform, Ziel, Tonalität, Keywords, Business-Typ)
+- Ruft `generate-optimized-prompt` Edge Function auf
+- "In Generator übernehmen"-Button setzt den generierten Prompt als Topic im Caption-Generator
+- Zeigt Erklärung und Sample-Caption inline an
 
-### 2. Home.tsx anpassen (Zeilen 141-147)
-- Bestehende hartcodierte Icons + "3 verbunden"-Text ersetzen durch `<SocialConnectionIcons />`
-- Überflüssige `Instagram`/`Music`-Imports entfernen falls nicht anderweitig genutzt
+### 2. Generator-Seite erweitern (`Generator.tsx`)
+- Button "Prompt-Assistent" neben dem Topic-Eingabefeld hinzufügen (Wand2-Icon)
+- Öffnet den `PromptAssistantDialog`
+- Callback `onPromptGenerated` setzt den optimierten Prompt direkt ins Topic-Feld
+
+### 3. Hero-Header umbenennen (`GeneratorHeroHeader.tsx`)
+- Badge-Text: "KI-Caption-Generator" → "KI Text-Studio"
+- Headline anpassen auf "KI Text-Studio"
+- Subtitle: Hinweis auf integrierten Prompt-Assistenten
+
+### 4. Sidebar anpassen (`AppSidebar.tsx`)
+- Den `/prompt-wizard`-Eintrag entfernen
+- Den `/generator`-Eintrag umbenennen: `titleKey` → `"nav.textStudio"` mit neuem Icon (z.B. `PenTool` oder `Sparkles`)
+
+### 5. Translations aktualisieren (`translations.ts`)
+- Neuer Key `nav.textStudio: "KI Text-Studio"`
+- Bestehende Wizard-Translations bleiben (werden im Dialog verwendet)
+
+### 6. Route-Redirect (`App.tsx`)
+- `/prompt-wizard` → Redirect zu `/generator` (damit alte Links/Bookmarks funktionieren)
 
 ### Betroffene Dateien
 | Datei | Änderung |
 |-------|----------|
-| `src/components/dashboard/SocialConnectionIcons.tsx` | Neue Komponente |
-| `src/pages/Home.tsx` | Hartcodierte Icons durch neue Komponente ersetzen |
+| `src/components/generator/PromptAssistantDialog.tsx` | Neu — Dialog mit Prompt-Wizard-Logik |
+| `src/pages/Generator.tsx` | Button + Dialog-Integration |
+| `src/components/generator/GeneratorHeroHeader.tsx` | Umbenennung zu "KI Text-Studio" |
+| `src/components/AppSidebar.tsx` | Prompt-Wizard-Eintrag entfernen, Generator umbenennen |
+| `src/lib/translations.ts` | Neuer `nav.textStudio`-Key |
+| `src/App.tsx` | Redirect `/prompt-wizard` → `/generator` |
 
