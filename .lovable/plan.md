@@ -1,59 +1,65 @@
 
 
-# Plan: Filmart & Stil als eigenen Wizard-Schritt vor dem Interview
+# Plan: Sicherstellen, dass der gewählte Stil tatsächlich in der Bildgenerierung ankommt
 
-## Überblick
-Neuer Schritt zwischen "Stimmung" (Step 1) und "Modus" (Step 2), in dem alle 20 visuellen Stile direkt auswählbar sind — aufgeteilt in **6 Filmarten** und **14 Stilrichtungen**. Die Frage nach dem visuellen Stil entfällt dann aus dem Interview.
+## Analyse
 
-## Aufteilung der 20 Stile
+Die Code-Kette sieht korrekt aus:
+1. `FilmStyleSelector` → setzt `selectedVisualStyle` (z.B. `'comic'`)
+2. `handleConsultationComplete` → überschreibt `result.visualStyle = selectedVisualStyle`
+3. Edge Function → nutzt `briefing.visualStyle` in `ART STYLE: comic` Prompt
+4. `generate-premium-visual` → nutzt `STYLE_PROMPTS['comic']` für Flux-Bildgenerierung
 
-**6 Filmarten** (generative Stile, die die Bildästhetik grundlegend verändern):
-- Comic, Cinematic, Documentary, Cartoon, Anime, Vintage-Retro
+**Mögliche Ursachen, warum es trotzdem gleich aussieht:**
 
-**14 Stilrichtungen** (Design-/Rendering-Stile):
-- Flat Design, Isometric, Whiteboard, Corporate, Modern 3D, Minimalist, Bold Colorful, Hand-Drawn, Motion Graphics, Photo-Realistic, Watercolor, Neon Cyberpunk, Paper Cutout, Clay 3D
+1. **Consultant überschreibt den Stil zurück**: Der Consultant extrahiert `visualStyle` als Freitext aus dem Chat (z.B. `'modern'`). Der Wizard überschreibt das zwar, aber vielleicht nur im `lastRecommendation`-Pfad — nicht im Fallback-Pfad (Zeile 293: `visualStyle: 'flat-design'`).
+
+2. **Kein Log zur Verifizierung**: Aktuell wird `visualStyle` nirgends geloggt — weder im Wizard noch in der Edge Function. Wir können nicht beweisen, was tatsächlich ankam.
+
+3. **Edge Function `validateEnum` Fallback**: In Zeile 1445 wird `style: validateEnum(briefing.visualStyle, VALID_STYLES, 'modern-3d')` gesetzt. Wenn `briefing.visualStyle` nicht exakt einem der `VALID_STYLES` entspricht, wird es auf `'modern-3d'` zurückgesetzt. Der Wert `'comic'` IST in `VALID_STYLES` — aber falls der Consultant z.B. `'Comic'` (Großbuchstabe) liefert und der Wizard-Override nicht greift, fällt es auf `'modern-3d'` zurück.
 
 ## Umsetzung
 
-### 1. Neue Komponente `FilmStyleSelector.tsx`
-Zwei visuelle Sektionen mit Karten-Grid:
-- **Sektion 1: "Filmart"** — 6 große Karten mit Icon, Name, Beschreibung
-- **Sektion 2: "Stilrichtung"** — 14 Karten im gleichen Format
-- Nutzer wählt genau **eine** Option aus einer der beiden Sektionen (mutual exclusive)
-- "Weiter"-Button nach Auswahl
+### 1. Logging in der Edge Function hinzufügen
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
 
-### 2. Wizard-Schritte anpassen
-**Datei:** `UniversalVideoWizard.tsx`
-
-Neuer Step `visual-style` zwischen `mood` und `mode-select` einfügen:
-
-```text
-Vorher:  0-Category → 1-Mood → 2-ModeSelect → 3-Consultation → ...
-Nachher: 0-Category → 1-Mood → 2-VisualStyle → 3-ModeSelect → 4-Consultation → ...
+Nach Zeile 406 ein explizites Log ergänzen:
+```
+console.log(`[auto-generate-universal-video] visualStyle: ${actualBriefing.visualStyle}`);
 ```
 
-- `STEPS_FULL_SERVICE` und `STEPS_MANUAL` erweitern
-- Alle Index-basierten Navigationsaufrufe (handleConsultationComplete → step 4→5, handleAutoGenerationComplete → step 5→6) um +1 verschieben
-- `MoodConfig` um `visualStyle: UniversalVideoStyle` erweitern
-- Neuer State `selectedVisualStyle` + Handler
+### 2. Logging im Wizard hinzufügen
+**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
 
-### 3. Interview-Phase für Stil entfernen
-Der Consultant fragt aktuell nach dem visuellen Stil (Phase ~18). Diese Frage wird übersprungen, da der Stil bereits gewählt ist. Der gewählte Stil wird stattdessen direkt ins `consultationResult.visualStyle` geschrieben.
+In `handleConsultationComplete` nach dem Override loggen:
+```
+console.log('[Wizard] Final visualStyle for generation:', result.visualStyle, 'selectedVisualStyle:', selectedVisualStyle);
+```
 
-### 4. Stil an Render-Pipeline durchreichen
-`consultationResult.visualStyle` wird bereits heute an `auto-generate-universal-video` weitergegeben und dort für Prompt-Engineering genutzt — das bleibt unverändert, nur die Quelle wechselt von Interview-Antwort zu direkter UI-Auswahl.
+### 3. visualStyle in Progress-Daten speichern
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+
+In der `briefing_json` wird der Style bereits gespeichert. Zusätzlich im Progress-Update beim Bildgenerierungsschritt den tatsächlich verwendeten Style loggen.
+
+### 4. Sicherheitshalber: Consultant-Fallback ebenfalls überschreiben
+**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
+
+Im `handleConsultationSkip` (Zeile 257-308) ebenfalls den `selectedVisualStyle` injizieren — aktuell wird dort `visualStyle: 'flat-design'` hardcoded, und der Override-Code greift nur in `handleConsultationComplete`, nicht in `handleConsultationSkip`.
+
+### 5. Consultant Style-Extraktion auf enum-kompatiblen Wert mappen
+**Datei:** `supabase/functions/universal-video-consultant/index.ts`
+
+Die Zeile `const visualStyle = styleResponse || 'modern';` setzt einen Freitext-Wert. Wenn der Wizard-Override greift, ist das kein Problem. Aber als Absicherung: den extrahierten Wert gegen die gültigen Styles mappen.
 
 ## Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `src/components/universal-video-creator/FilmStyleSelector.tsx` | **Neu** — Auswahl-UI mit 6 Filmarten + 14 Stilrichtungen |
-| `src/components/universal-video-creator/UniversalVideoWizard.tsx` | Neuen Step einfügen, Indizes anpassen |
-| `src/components/universal-video-creator/MoodPresetSelector.tsx` | `MoodConfig` um `visualStyle` erweitern |
-| `src/components/universal-video-creator/index.ts` | Export hinzufügen |
+| `supabase/functions/auto-generate-universal-video/index.ts` | `visualStyle` explizit loggen |
+| `src/components/universal-video-creator/UniversalVideoWizard.tsx` | Override-Logging + `handleConsultationSkip` Fix |
 
 ## Erwartetes Ergebnis
-- Nutzer wählt vor dem Interview visuell die Filmart oder Stilrichtung
-- Interview fragt nicht mehr nach dem Stil
-- Gewählter Stil fließt direkt in die Bildgenerierung
+- Beim nächsten Testrender sehen wir in den Logs exakt, welcher `visualStyle` ankam
+- Falls der Override nicht greift, finden wir sofort die Stelle
+- `handleConsultationSkip` nutzt ebenfalls den gewählten Stil
 
