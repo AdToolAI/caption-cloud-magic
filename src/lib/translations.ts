@@ -3962,7 +3962,7 @@ export const translations: Record<Language, any> = {
       textStudio: "KI Text-Studio",
       carousel: "Karussell-Generator",
       promptWizard: "Prompt-Assistent",
-      reelScript: "KI-Reel-Skript",
+      
       hookGenerator: "Hook-Generator",
       aiPostGenerator: "KI Post-Generator",
       imageCaptionPairing: "Bild-Text-Pairing",
