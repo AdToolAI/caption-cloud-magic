@@ -39,7 +39,7 @@ export const RecoCard = () => {
       icon: TrendingUp,
       text: 'Kurzvideo statt Karussell: +9% Views',
       impact: '+9%',
-      action: () => navigate('/reel-script-generator')
+      action: () => navigate('/generator')
     },
     {
       id: 'hook_1',

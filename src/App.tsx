@@ -182,7 +182,7 @@ function AppLayout() {
                     <Route path="/ai-post-generator" element={<AIPostGenerator />} />
           <Route path="/background-replacer" element={<BackgroundReplacer />} />
           <Route path="/trend-radar" element={<TrendRadar />} />
-          <Route path="/reel-script-generator" element={<ReelScriptGenerator />} />
+          
                     <Route path="/comment-manager" element={<CommentManager />} />
           <Route path="/all-comments" element={<AllComments />} />
           <Route path="/comment-manager" element={<CommentManager />} />
