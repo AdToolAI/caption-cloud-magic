@@ -72,6 +72,7 @@ export function UniversalVideoWizard() {
   const activeProgressIdRef = useRef<string | null>(null);
   const generationStartedAtRef = useRef<string | null>(null);
   const [moodConfig, setMoodConfig] = useState<MoodConfig | null>(null);
+  const [selectedVisualStyle, setSelectedVisualStyle] = useState<UniversalVideoStyle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [rateLimitRetryKey, setRateLimitRetryKey] = useState(0);
