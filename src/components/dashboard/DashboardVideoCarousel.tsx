@@ -13,7 +13,6 @@ import { supabase } from '@/integrations/supabase/client';
 /** Resolve a possibly-relative storage path to a full public URL */
 const resolveVideoUrl = (rawUrl: string): string => {
   if (!rawUrl) return '';
-  // Already a full URL — return as-is
   if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) return rawUrl;
 
   const buckets = ['universal-videos', 'video-assets', 'ai-videos'];
@@ -24,7 +23,6 @@ const resolveVideoUrl = (rawUrl: string): string => {
       const { data } = supabase.storage.from(bucket).getPublicUrl(path);
       return data.publicUrl;
     }
-    // Handle paths like "storage/v1/object/public/bucket/..."
     const bucketSegment = `/${bucket}/`;
     if (rawUrl.includes(bucketSegment)) {
       const path = rawUrl.split(bucketSegment).pop() || '';
@@ -33,7 +31,6 @@ const resolveVideoUrl = (rawUrl: string): string => {
     }
   }
 
-  // Fallback: treat entire rawUrl as a path in universal-videos
   const { data } = supabase.storage.from('universal-videos').getPublicUrl(rawUrl);
   console.warn('[Carousel] Could not match bucket for path, falling back to universal-videos:', rawUrl);
   return data.publicUrl;
@@ -45,15 +42,19 @@ export const DashboardVideoCarousel = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const [errorVideos, setErrorVideos] = useState<Set<number>>(new Set());
+  const [retriedVideos, setRetriedVideos] = useState<Set<number>>(new Set());
   const wheelTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const sortedVideos = [...videos]
     .filter((v: any) => v.status === 'completed' && v.output_url)
     .sort((a: any, b: any) => {
       const scoreA = (a.download_count || 0) + (a.share_count || 0);
       const scoreB = (b.download_count || 0) + (b.share_count || 0);
-      if (scoreB !== scoreA) return scoreB - scoreA;
+      // Videos with actual analytics data first
+      if (scoreA > 0 && scoreB === 0) return -1;
+      if (scoreB > 0 && scoreA === 0) return 1;
+      if (scoreA > 0 && scoreB > 0 && scoreB !== scoreA) return scoreB - scoreA;
+      // Otherwise: newest first
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     })
     .slice(0, 10);
@@ -64,6 +65,7 @@ export const DashboardVideoCarousel = () => {
     skipSnaps: false,
     containScroll: false,
     slidesToScroll: 1,
+    watchDrag: false,
   });
 
   const onSelect = useCallback(() => {
