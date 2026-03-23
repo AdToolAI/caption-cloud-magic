@@ -4024,7 +4024,7 @@ export const translations: Record<Language, any> = {
       postTimeAdvisor: "Posting-Zeit-Berater",
       contentStudio: "Content Studio",
       generator: "KI Caption-Generator",
-      carousel: "Karussell-Generator",
+      textStudio: "KI Text-Studio",
       promptWizard: "Prompt-Assistent",
       reelScript: "KI-Reel-Skript",
       hookGenerator: "Hook-Generator",
