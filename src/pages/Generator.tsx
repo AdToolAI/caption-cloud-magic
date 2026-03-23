@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
 import { GeneratorHeroHeader } from "@/components/generator/GeneratorHeroHeader";
+import { PromptAssistantDialog } from "@/components/generator/PromptAssistantDialog";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
@@ -16,7 +17,7 @@ import { useAICall } from "@/hooks/useAICall";
 import { supabase } from "@/integrations/supabase/client";
 
 import { Slider } from "@/components/ui/slider";
-import { Copy, Sparkles, RefreshCw, Loader2, Calendar, CheckCircle2 } from "lucide-react";
+import { Copy, Sparkles, RefreshCw, Loader2, Calendar, CheckCircle2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
