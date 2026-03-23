@@ -123,6 +123,7 @@ serve(async (req) => {
     const { briefing, consultationResult, userId, diagnosticProfile, debugMode, renderOnly, existingProgressId } = await req.json();
     
     const actualBriefing = briefing || consultationResult;
+    console.log(`[auto-generate] visualStyle from briefing: "${actualBriefing?.visualStyle}"`);
     
     if (!userId) {
       throw new Error('userId is required');
