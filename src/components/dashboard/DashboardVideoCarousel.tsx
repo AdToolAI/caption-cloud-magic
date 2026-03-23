@@ -13,18 +13,29 @@ import { supabase } from '@/integrations/supabase/client';
 /** Resolve a possibly-relative storage path to a full public URL */
 const resolveVideoUrl = (rawUrl: string): string => {
   if (!rawUrl) return '';
-  if (rawUrl.startsWith('http')) return rawUrl;
+  // Already a full URL — return as-is
+  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) return rawUrl;
 
   const buckets = ['universal-videos', 'video-assets', 'ai-videos'];
   for (const bucket of buckets) {
-    if (rawUrl.startsWith(`${bucket}/`) || rawUrl.includes(`/${bucket}/`)) {
-      const path = rawUrl.startsWith(`${bucket}/`) ? rawUrl.slice(bucket.length + 1) : rawUrl;
+    const prefix = `${bucket}/`;
+    if (rawUrl.startsWith(prefix)) {
+      const path = rawUrl.slice(prefix.length);
+      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+      return data.publicUrl;
+    }
+    // Handle paths like "storage/v1/object/public/bucket/..."
+    const bucketSegment = `/${bucket}/`;
+    if (rawUrl.includes(bucketSegment)) {
+      const path = rawUrl.split(bucketSegment).pop() || '';
       const { data } = supabase.storage.from(bucket).getPublicUrl(path);
       return data.publicUrl;
     }
   }
 
+  // Fallback: treat entire rawUrl as a path in universal-videos
   const { data } = supabase.storage.from('universal-videos').getPublicUrl(rawUrl);
+  console.warn('[Carousel] Could not match bucket for path, falling back to universal-videos:', rawUrl);
   return data.publicUrl;
 };
 
@@ -184,7 +195,7 @@ export const DashboardVideoCarousel = () => {
   }
 
   return (
-    <div className="space-y-4" ref={containerRef}>
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Video className="h-5 w-5 text-primary" />
@@ -202,7 +213,7 @@ export const DashboardVideoCarousel = () => {
       </div>
 
       {/* 3D Perspective Carousel */}
-      <div style={{ perspective: '1200px' }}>
+      <div ref={containerRef} style={{ perspective: '1200px' }}>
         <div className="overflow-hidden py-8" ref={emblaRef}>
           <div className="flex items-center" style={{ transformStyle: 'preserve-3d' }}>
             {sortedVideos.map((video: any, index: number) => {
@@ -269,7 +280,10 @@ export const DashboardVideoCarousel = () => {
                               el.play().catch(() => {});
                             }
                           }}
-                          onError={() => handleVideoError(index)}
+                          onError={(e) => {
+                            console.error(`[Carousel] Video ${index} failed to load:`, videoUrl, e);
+                            handleVideoError(index);
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-muted/80">
