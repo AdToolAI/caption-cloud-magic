@@ -169,6 +169,7 @@ export function UniversalVideoWizard() {
                 [
                   { id: 'category', label: 'Kategorie', icon: Video, description: 'Video-Typ wählen' },
                   { id: 'mood', label: 'Stimmung', icon: Palette, description: 'Stil & Stimmung' },
+                  { id: 'visual-style', label: 'Filmart', icon: Film, description: 'Visueller Stil' },
                   { id: 'mode-select', label: 'Modus', icon: Sparkles, description: 'Wähle deinen Weg' }
                 ];
 
