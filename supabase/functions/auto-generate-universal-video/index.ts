@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r71-lambda-validated-tones-2026-03-23";
+const AUTO_GEN_BUILD_TAG = "r72-inline-script-gen-2026-03-23";
+import { generateScriptInline } from "../_shared/generate-script-inline.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -685,27 +686,28 @@ async function runGenerationPipeline(
       return;
     }
 
-    // Step 1: Generate Script (10%)
+    // Step 1: Generate Script INLINE (no Edge-to-Edge fetch → no 504 cold-start timeout)
     await updateProgress(supabase, progressId, 'generating_script', 5, '📝 Drehbuch wird erstellt...');
     await delay(500);
 
-    const scriptResponse = await fetch(`${supabaseUrl}/functions/v1/generate-universal-script`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ briefing: { ...briefing, moodConfig: briefing.moodConfig } }),
-    });
-
-    if (!scriptResponse.ok) {
-      const errorText = await scriptResponse.text();
-      console.error('[auto-generate-universal-video] Script generation failed:', scriptResponse.status, errorText);
-      throw new Error(`Script generation failed: ${errorText}`);
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const { script } = await scriptResponse.json();
-    console.log(`[auto-generate-universal-video] Script generated: ${script.scenes.length} scenes`);
+    let script: any;
+    try {
+      script = await generateScriptInline(
+        { ...briefing, moodConfig: briefing.moodConfig },
+        LOVABLE_API_KEY,
+        120000, // 120s timeout with AbortController
+      );
+    } catch (scriptErr: any) {
+      console.error('[auto-generate-universal-video] Inline script generation failed:', scriptErr.message);
+      throw new Error(`Script generation failed: ${scriptErr.message}`);
+    }
+
+    console.log(`[auto-generate-universal-video] Script generated inline: ${script.scenes.length} scenes`);
 
     await updateProgress(supabase, progressId, 'script_complete', 15, '✅ Drehbuch fertig!', { script });
     await delay(500);
