@@ -375,7 +375,7 @@ export const RemotionRoot: React.FC = () => {
           subtitles: [],
           voiceoverUrl: '',
           backgroundMusicUrl: '',
-          backgroundMusicVolume: 0.2,
+          backgroundMusicVolume: 0.35,
           masterVolume: 1.0,
           category: 'social-reel',
           storytellingStructure: 'hook-problem-solution',

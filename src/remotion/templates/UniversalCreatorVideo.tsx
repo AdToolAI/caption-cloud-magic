@@ -224,7 +224,7 @@ export const UniversalCreatorVideoSchema = z.object({
   voiceoverUrl: z.string().optional(),
   voiceoverDuration: z.number().optional(),
   backgroundMusicUrl: z.string().optional(),
-  backgroundMusicVolume: z.number().default(0.2),
+  backgroundMusicVolume: z.number().default(0.35),
   masterVolume: z.number().default(1.0),
   soundEffects: z.array(z.object({
     sceneId: z.string(),
@@ -2598,7 +2598,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   subtitles,
   voiceoverUrl,
   backgroundMusicUrl,
-  backgroundMusicVolume = 0.2,
+  backgroundMusicVolume = 0.35,
   masterVolume = 1.0,
   soundEffects,
   style = 'flat-design',

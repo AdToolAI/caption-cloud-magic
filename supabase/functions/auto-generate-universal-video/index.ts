@@ -1447,7 +1447,7 @@ async function runGenerationPipeline(
       // r67: backgroundMusicUrl back in inputProps — rendered directly in Lambda via <Audio />
       // Internal curated tracks from Supabase Storage are pre-validated (no ffprobe crashes)
       backgroundMusicUrl: isBareMinimum ? undefined : (musicUrl || undefined),
-      backgroundMusicVolume: isBareMinimum ? 0 : 0.15,
+      backgroundMusicVolume: isBareMinimum ? 0 : 0.35,
       masterVolume: 1,
       useCharacter: isBareMinimum ? false : ((disableCharacter || disableAllLottie) ? false : (briefing.hasCharacter !== false)),
       // r44: forceCharacterSvg ensures SVG character (no <Lottie> mount) while keeping character visible
@@ -2298,22 +2298,43 @@ async function selectBackgroundMusic(
       }
     });
 
-    console.log(`[selectBackgroundMusic] Jamendo response: ${musicResponse.data?.results?.length || 0} tracks found`);
+    const results = musicResponse.data?.results || [];
+    console.log(`[selectBackgroundMusic] Jamendo response: ${results.length} tracks found`);
 
-    let jamendoUrl: string | null = null;
-
-    if (musicResponse.data?.results?.[0]?.url) {
-      jamendoUrl = musicResponse.data.results[0].url;
-    } else if (musicResponse.data?.results?.[0]?.preview_url) {
-      jamendoUrl = musicResponse.data.results[0].preview_url;
-    }
-
-    if (!jamendoUrl) {
+    if (results.length === 0) {
       console.warn('[selectBackgroundMusic] No Jamendo tracks found');
       return null;
     }
 
-    console.log(`[selectBackgroundMusic] Jamendo URL: ${jamendoUrl.substring(0, 80)}...`);
+    // r74: Smart track ranking — prefer tracks with suitable duration and clear titles
+    const rankedResults = [...results].sort((a: any, b: any) => {
+      let scoreA = 0, scoreB = 0;
+      const durA = a.duration || 0, durB = b.duration || 0;
+      // Prefer 20-120s tracks (ideal for background music)
+      if (durA >= 20 && durA <= 120) scoreA += 3;
+      else if (durA >= 10 && durA <= 180) scoreA += 1;
+      if (durB >= 20 && durB <= 120) scoreB += 3;
+      else if (durB >= 10 && durB <= 180) scoreB += 1;
+      // Prefer tracks with 'corporate', 'upbeat', 'background' in title
+      const titleA = (a.title || '').toLowerCase();
+      const titleB = (b.title || '').toLowerCase();
+      const goodKeywords = ['corporate', 'upbeat', 'background', 'happy', 'bright', 'positive', 'energy', 'modern'];
+      for (const kw of goodKeywords) {
+        if (titleA.includes(kw)) scoreA += 2;
+        if (titleB.includes(kw)) scoreB += 2;
+      }
+      return scoreB - scoreA;
+    });
+
+    const chosen = rankedResults[0];
+    const jamendoUrl = chosen.url || chosen.preview_url;
+
+    if (!jamendoUrl) {
+      console.warn('[selectBackgroundMusic] Best track has no URL');
+      return null;
+    }
+
+    console.log(`[selectBackgroundMusic] r74 Selected: "${chosen.title}" by ${chosen.artist} (${chosen.duration}s) — URL: ${jamendoUrl.substring(0, 80)}...`);
 
     // Proxy through storage for Lambda stability (avoid hotlink issues)
     const proxiedUrl = await proxyAudioToStorage(supabase, jamendoUrl, 'jamendo-music');
