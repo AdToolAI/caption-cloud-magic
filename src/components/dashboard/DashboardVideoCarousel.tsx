@@ -33,7 +33,8 @@ export const DashboardVideoCarousel = () => {
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
-  const [loadedVideos, setLoadedVideos] = useState<Set<number>>(new Set());
+  const [readyVideos, setReadyVideos] = useState<Set<number>>(new Set());
+  const [errorVideos, setErrorVideos] = useState<Set<number>>(new Set());
 
   const sortedVideos = [...videos]
     .filter((v: any) => v.status === 'completed' && v.output_url)
