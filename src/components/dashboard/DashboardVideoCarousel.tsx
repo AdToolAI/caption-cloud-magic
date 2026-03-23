@@ -93,14 +93,17 @@ export const DashboardVideoCarousel = () => {
   const getVideoTitle = (video: any) =>
     (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
 
-  const handleVideoCanPlay = (index: number) => {
-    setLoadedVideos(prev => new Set(prev).add(index));
-    // If this is the active video, auto-play it now
+  const handleVideoReady = (index: number) => {
+    setReadyVideos(prev => new Set(prev).add(index));
     const el = videoRefs.current[index];
     if (el && index === selectedIndex) {
       el.muted = true;
       el.play().catch(() => {});
     }
+  };
+
+  const handleVideoError = (index: number) => {
+    setErrorVideos(prev => new Set(prev).add(index));
   };
 
   const handleCardClick = (index: number, videoUrl: string, title: string) => {
