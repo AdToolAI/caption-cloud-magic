@@ -15,7 +15,6 @@ const resolveVideoUrl = (rawUrl: string): string => {
   if (!rawUrl) return '';
   if (rawUrl.startsWith('http')) return rawUrl;
 
-  // Try known buckets in order
   const buckets = ['universal-videos', 'video-assets', 'ai-videos'];
   for (const bucket of buckets) {
     if (rawUrl.startsWith(`${bucket}/`) || rawUrl.includes(`/${bucket}/`)) {
@@ -25,7 +24,6 @@ const resolveVideoUrl = (rawUrl: string): string => {
     }
   }
 
-  // Default: try first bucket
   const { data } = supabase.storage.from('universal-videos').getPublicUrl(rawUrl);
   return data.publicUrl;
 };
@@ -35,6 +33,7 @@ export const DashboardVideoCarousel = () => {
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  const [loadedVideos, setLoadedVideos] = useState<Set<number>>(new Set());
 
   const sortedVideos = [...videos]
     .filter((v: any) => v.status === 'completed' && v.output_url)
@@ -51,18 +50,38 @@ export const DashboardVideoCarousel = () => {
     align: 'center',
     skipSnaps: false,
     containScroll: false,
+    slidesToScroll: 1,
   });
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
-    setSelectedIndex(emblaApi.selectedScrollSnap());
+    const idx = emblaApi.selectedScrollSnap();
+    setSelectedIndex(idx);
   }, [emblaApi]);
+
+  // Auto-play active video, pause others on slide change
+  useEffect(() => {
+    videoRefs.current.forEach((el, i) => {
+      if (!el) return;
+      if (i === selectedIndex) {
+        el.muted = true;
+        el.play().catch(() => {});
+      } else {
+        el.pause();
+        el.currentTime = 0;
+      }
+    });
+  }, [selectedIndex, loadedVideos]);
 
   useEffect(() => {
     if (!emblaApi) return;
     onSelect();
     emblaApi.on('select', onSelect);
-    return () => { emblaApi.off('select', onSelect); };
+    emblaApi.on('reInit', onSelect);
+    return () => {
+      emblaApi.off('select', onSelect);
+      emblaApi.off('reInit', onSelect);
+    };
   }, [emblaApi, onSelect]);
 
   const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
@@ -71,19 +90,15 @@ export const DashboardVideoCarousel = () => {
   const getVideoTitle = (video: any) =>
     (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
 
-  const handleMouseEnter = (index: number) => {
-    const el = videoRefs.current[index];
-    if (el) {
-      el.muted = true;
-      el.play().catch(() => {});
-    }
+  const handleVideoLoaded = (index: number) => {
+    setLoadedVideos(prev => new Set(prev).add(index));
   };
 
-  const handleMouseLeave = (index: number) => {
-    const el = videoRefs.current[index];
-    if (el) {
-      el.pause();
-      el.currentTime = 0;
+  const handleCardClick = (index: number, videoUrl: string, title: string) => {
+    if (index === selectedIndex) {
+      if (videoUrl) setSelectedVideo({ url: videoUrl, title });
+    } else {
+      emblaApi?.scrollTo(index);
     }
   };
 
@@ -139,89 +154,91 @@ export const DashboardVideoCarousel = () => {
 
       {/* Carousel — gear-style overlapping */}
       <div className="overflow-hidden py-6" ref={emblaRef}>
-        <div className="flex" style={{ perspective: '1200px' }}>
+        <div className="flex items-center">
           {sortedVideos.map((video: any, index: number) => {
             const isActive = index === selectedIndex;
-            const distFromActive = Math.abs(index - selectedIndex);
-            const isLeft = index < selectedIndex;
+            const dist = Math.min(
+              Math.abs(index - selectedIndex),
+              sortedVideos.length > 2 ? sortedVideos.length - Math.abs(index - selectedIndex) : Infinity
+            );
             const performanceScore = (video.download_count || 0) + (video.share_count || 0);
             const title = getVideoTitle(video);
             const videoUrl = resolveVideoUrl(video.output_url);
 
-            // Gear-style transforms
-            const scale = isActive ? 1.12 : distFromActive === 1 ? 0.78 : 0.65;
-            const rotateY = isActive ? 0 : isLeft ? 12 : -12;
-            const zIndex = isActive ? 20 : 10 - distFromActive;
-            const opacity = isActive ? 1 : distFromActive === 1 ? 0.55 : 0.3;
+            // Gear-style: flat overlap, no 3D rotation
+            const scale = isActive ? 1.0 : dist === 1 ? 0.82 : 0.65;
+            const zIndex = isActive ? 30 : dist === 1 ? 20 : 10;
+            const opacity = isActive ? 1 : dist === 1 ? 0.6 : 0.3;
 
             return (
               <div
                 key={video.id}
-                className="flex-shrink-0 flex-grow-0"
+                className="flex-shrink-0 flex-grow-0 cursor-pointer"
                 style={{
-                  flexBasis: sortedVideos.length === 1 ? '70%' : '30%',
-                  marginLeft: index === 0 ? '0px' : '-16px',
-                  marginRight: '-16px',
+                  flexBasis: sortedVideos.length === 1 ? '70%' : '50%',
+                  marginLeft: index === 0 ? '0' : '-24px',
+                  marginRight: '-24px',
                   zIndex,
                   position: 'relative',
                 }}
+                onClick={() => handleCardClick(index, videoUrl, title)}
               >
                 <div
                   className={cn(
-                    'relative rounded-2xl overflow-hidden transition-all duration-500 group',
+                    'relative rounded-2xl overflow-hidden transition-all duration-500',
                     isActive
                       ? 'ring-2 ring-primary/60 shadow-2xl shadow-primary/30'
                       : 'ring-1 ring-border/20'
                   )}
                   style={{
-                    transform: `scale(${scale}) rotateY(${rotateY}deg)`,
+                    transform: `scale(${scale})`,
                     opacity,
-                    transformOrigin: isActive ? 'center center' : isLeft ? 'right center' : 'left center',
-                    transition: 'all 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)',
+                    transition: 'all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1)',
                   }}
-                  onMouseEnter={() => handleMouseEnter(index)}
-                  onMouseLeave={() => handleMouseLeave(index)}
                 >
-                  {/* Video element with hover autoplay */}
+                  {/* Video element */}
                   <div className="aspect-video relative overflow-hidden bg-black">
                     <video
                       ref={(el) => { videoRefs.current[index] = el; }}
                       src={videoUrl}
                       muted
                       playsInline
-                      preload="metadata"
+                      preload="auto"
+                      crossOrigin="anonymous"
                       poster={video.thumbnail_url || undefined}
                       className="w-full h-full object-cover"
+                      onLoadedData={() => handleVideoLoaded(index)}
                     />
+
+                    {/* Fallback play icon when video hasn't loaded */}
+                    {!loadedVideos.has(index) && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted/80 to-muted">
+                        <Play className="h-10 w-10 text-muted-foreground/60" />
+                      </div>
+                    )}
 
                     {/* Dark gradient overlay */}
                     <div className={cn(
-                      'absolute inset-0 transition-opacity duration-300',
+                      'absolute inset-0 pointer-events-none transition-opacity duration-300',
                       isActive
                         ? 'bg-gradient-to-t from-black/50 via-transparent to-transparent'
                         : 'bg-gradient-to-t from-black/70 via-black/20 to-black/10'
                     )} />
 
-                    {/* Play/Expand overlay */}
-                    <div className={cn(
-                      'absolute inset-0 flex items-center justify-center gap-3 transition-opacity duration-300',
-                      isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-80'
-                    )}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (videoUrl) setSelectedVideo({ url: videoUrl, title });
-                        }}
-                        className={cn(
-                          'w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-300',
-                          isActive
-                            ? 'bg-primary/80 shadow-lg shadow-primary/40 hover:bg-primary'
-                            : 'bg-white/20 hover:bg-white/30'
-                        )}
-                      >
-                        <Expand className="h-5 w-5 text-white" />
-                      </button>
-                    </div>
+                    {/* Expand button on active card */}
+                    {isActive && (
+                      <div className="absolute top-2 right-2 z-10">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (videoUrl) setSelectedVideo({ url: videoUrl, title });
+                          }}
+                          className="w-9 h-9 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md hover:bg-primary/80 transition-colors"
+                        >
+                          <Expand className="h-4 w-4 text-white" />
+                        </button>
+                      </div>
+                    )}
 
                     {/* Performance Badge */}
                     {performanceScore > 0 && index === 0 && (
@@ -232,8 +249,8 @@ export const DashboardVideoCarousel = () => {
                       </div>
                     )}
 
-                    {/* Bottom info — glassmorphism bar */}
-                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/30 backdrop-blur-sm">
+                    {/* Bottom info */}
+                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/30 backdrop-blur-sm pointer-events-none">
                       <p className="text-sm font-medium text-white truncate drop-shadow-md">
                         {title}
                       </p>
@@ -253,7 +270,7 @@ export const DashboardVideoCarousel = () => {
         </div>
       </div>
 
-      {/* Dots — pill style */}
+      {/* Dots */}
       {sortedVideos.length > 1 && (
         <div className="flex justify-center gap-1.5">
           {sortedVideos.map((_: any, i: number) => (
