@@ -1447,7 +1447,7 @@ async function runGenerationPipeline(
       // r67: backgroundMusicUrl back in inputProps — rendered directly in Lambda via <Audio />
       // Internal curated tracks from Supabase Storage are pre-validated (no ffprobe crashes)
       backgroundMusicUrl: isBareMinimum ? undefined : (musicUrl || undefined),
-      backgroundMusicVolume: isBareMinimum ? 0 : 0.15,
+      backgroundMusicVolume: isBareMinimum ? 0 : 0.35,
       masterVolume: 1,
       useCharacter: isBareMinimum ? false : ((disableCharacter || disableAllLottie) ? false : (briefing.hasCharacter !== false)),
       // r44: forceCharacterSvg ensures SVG character (no <Lottie> mount) while keeping character visible
