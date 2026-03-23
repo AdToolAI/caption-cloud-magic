@@ -1,42 +1,30 @@
 
 
-# Plan: Video-Karussell komplett überarbeiten
+# Plan: Zahnrad-Karussell mit Schräglage + Auto-Play fix
 
-## Analyse der Probleme
+## Probleme
 
-1. **Videos sind schwarz/leer**: Die URLs sind gültig (AWS S3 Links), aber `preload="metadata"` lädt bei Cross-Origin oft kein Frame. Ohne `thumbnail_url` (alle `null`) bleibt alles schwarz.
-2. **Hover-Autoplay funktioniert nicht**: Embla Carousel fängt Pointer-Events für Drag-Gesten ab — `mouseenter`/`mouseleave` werden blockiert.
-3. **Kein Zahnrad-Gefühl**: Die Karten liegen nicht dicht genug übereinander.
+1. **Keine Schräglage / kein echtes Zahnrad**: Karten stehen gerade nebeneinander. Die Skizze zeigt Karten die sich überlappen UND leicht schräg stehen (wie Karten in einem Fächer).
+2. **Auto-Play funktioniert nicht**: Das `useEffect` feuert korrekt, aber `video.play()` schlägt fehl weil das `<video>` Element noch nicht geladen ist oder `preload="auto"` bei Cross-Origin nicht greift. Braucht `onCanPlay` statt `onLoadedData`.
 
-## Lösungen
+## Umsetzung (1 Datei)
 
-### 1. Video-Vorschau reparieren
-- `preload` von `"metadata"` auf `"auto"` ändern und `crossOrigin="anonymous"` hinzufügen
-- Fallback: Wenn kein Poster/Thumbnail, ein dunkles Gradient-Overlay mit Play-Icon zeigen
-- `onLoadedData` Event nutzen um zu erkennen ob Video geladen wurde
+**`src/components/dashboard/DashboardVideoCarousel.tsx`**
 
-### 2. Hover-Autoplay ohne Embla-Konflikt
-- Statt `mouseenter`/`mouseleave` auf dem Embla-Container: **IntersectionObserver** + Embla's `select` Event nutzen
-- Das **aktive** (zentrierte) Video spielt automatisch muted ab
-- Alle anderen Videos pausieren automatisch
-- Beim Swipen: altes Video pausiert, neues startet
+### 1. Schräglage für Zahnrad-Effekt
+Statt nur `scale` jetzt auch `rotate()` (2D-Rotation, kein 3D):
+- Karten links vom Zentrum: `rotate(-3deg)` (1. Nachbar), `rotate(-5deg)` (2.)
+- Karten rechts vom Zentrum: `rotate(3deg)` (1. Nachbar), `rotate(5deg)` (2.)
+- Aktive Karte: `rotate(0deg)`, `scale(1.05)`
+- Negativen Margin von `-24px` auf `-32px` erhöhen für engere Überlappung
 
-### 3. Echtes Zahnrad-Design
-- Embla-Einstellungen: `slidesToScroll: 1`, `containScroll: false`, `align: 'center'`
-- `flexBasis: 50%` für die aktive Karte (größer), Karten überlappen sich durch CSS `margin: -24px`
-- Aktive Karte: `scale(1.0)`, `z-index: 30`, volle Opacity, primärer Glow-Ring
-- 1. Nachbar: `scale(0.82)`, `z-index: 20`, `opacity: 0.6`, `translateX(±10px)` nach innen geschoben
-- 2. Nachbar: `scale(0.65)`, `z-index: 10`, `opacity: 0.3`
-- **Kein `rotateY`** — die Skizze zeigt flache Überlappung, kein 3D-Drehen
-- Runde Ecken (`rounded-2xl`) auf allen Karten
+### 2. Auto-Play reparieren
+- `onLoadedData` durch `onCanPlay` ersetzen — dieses Event feuert wenn genug Daten zum Abspielen geladen sind
+- Im Auto-Play-Effect: prüfen ob `readyState >= 3` bevor `play()` aufgerufen wird
+- Fallback: bei jedem `onCanPlay` Event prüfen ob dieses Video das aktive ist und dann starten
+- `crossOrigin` entfernen (verursacht CORS-Fehler bei S3 URLs die keine CORS-Header senden)
 
-### 4. Klick zum Vergrößern
-- Klick auf aktive Karte öffnet den `VideoPreviewPlayer` Dialog (mit Ton)
-- Klick auf inaktive Karte scrollt zu dieser Karte (wird zur aktiven)
-
-## Betroffene Dateien
-
-| Datei | Änderung |
-|-------|----------|
-| `src/components/dashboard/DashboardVideoCarousel.tsx` | Komplett überarbeitet |
+### 3. Play-Overlay anpassen
+- Play-Icon Overlay nur auf **inaktiven** Karten zeigen (aktive spielt ja automatisch)
+- Aktive Karte: kein Play-Overlay, Video läuft
 
