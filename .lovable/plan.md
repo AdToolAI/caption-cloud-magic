@@ -1,135 +1,122 @@
 
-# Plan: Das echte Restproblem beheben — „validiert“ ist aktuell nur ein DB-Label
+## Plan: Musikproblem jetzt wirklich isolieren statt weiter blind zu raten
 
-## Was ich jetzt eindeutig verifiziert habe
+### Was ich gerade eindeutig verifiziert habe
+- Die Runtime läuft auf **r71**, also kein reines Deploy-Problem mehr.
+- Der erste Render bekommt **wirklich eine `backgroundMusicUrl`**.
+- Der Render scheitert dann an **`ffprobe` / `Failed to find two consecutive MPEG audio frames`**.
+- Danach läuft ein späterer Retry **ohne Musik** erfolgreich durch.
+- Es gibt zwar `AudioSmokeTest`, aber ich finde **keine echte Pipeline**, die Tracks damit validiert.
+- In `universal_video_progress` werden **ausgewählter Track / Retry-Track aktuell nicht sauber persistiert**. Dadurch ist die Ursache im Nachhinein kaum belegbar.
 
-Der Fehler ist inzwischen klarer:
-
-- **Produktion läuft auf r70**  
-  `auto-generate-universal-video` loggt: `BUILD_TAG=r70-synth-only-music-2026-03-23`  
-  -> Es ist **kein Deploy-Mismatch** mehr.
-
-- **Musik kommt weiterhin bis in den ersten Lambda-Render**  
-  `remotion-webhook` zeigt beim Fehlrender:
-  `backgroundMusicUrl = .../background-music/library/corporate-ambient-synth-001.mp3`
-
-- **Dann crasht Lambda weiter beim Einlesen der Musik**
-  Fehler:
-  `Failed to find two consecutive MPEG audio frames`
-  -> Danach greift der Retry und entfernt die Musik.
-
-- **Die aktuelle Bibliothek ist faktisch nicht echt validiert**
-  In der DB gibt es aktuell:
-  - `validated_count = 4`
-  - `failed_count = 1`
-  - `pending_invalid_count = 114`
-
-- **Der entscheidende Punkt:**  
-  `AudioSmokeTest.tsx` ist zwar im Bundle registriert, aber ich finde **keinen Code**, der diesen Smoke-Test wirklich für Tracks ausführt.  
-  Gleichzeitig macht `seed-background-music` weiterhin nur:
-  - Download
-  - Magic-Byte-Check
-  - Upload
-  - DB-Eintrag
-
-Das heißt: Das eigentliche Problem ist sehr wahrscheinlich **nicht mehr Template, UI oder Voiceover**, sondern:
+## Ziel
+Nicht mehr “noch einen möglichen Fix” bauen, sondern eine **deterministische Isolationsstrecke**, mit der wir in 1-2 Testläufen sicher wissen, ob das Problem ist:
 
 ```text
-validation_status = 'validated'
-bedeutet aktuell nicht:
-"dieser Track wurde erfolgreich in Lambda getestet"
-sondern nur:
-"dieser Track wurde irgendwann als gültig markiert"
+A) einzelne Track-Dateien
+B) die gesamte Musikbibliothek / Storage-Auslieferung
+C) die Retry-Logik (Track wird gar nicht wirklich gewechselt)
+D) nur die Kombination aus Voiceover + Musik
+E) der UniversalCreator-Renderpfad selbst
 ```
-
-## Konsequenz
-
-Der aktuelle Musikpfad baut auf einer Annahme auf, die nicht abgesichert ist.  
-Darum landen weiterhin „validierte“ Tracks im Render, die dort sofort ffprobe sprengen.
 
 ## Umsetzung
 
-### 1. Echte Track-Validierung einführen
-Neue dedizierte Validierungsfunktion bauen, die für jeden Track einen **realen Lambda-Smoke-Test** mit `AudioSmokeTest` startet.
+### 1. Deterministischen Debug-Modus für einen Render einbauen
+In `auto-generate-universal-video` würde ich einen temporären Diagnosemodus ergänzen:
 
-Ablauf pro Track:
-1. Public URL aus Storage holen
-2. `render-with-remotion` mit `AudioSmokeTest` aufrufen
-3. Ergebnis auswerten
-4. DB aktualisieren:
-   - `validated`, wenn Render startet/abschließt
-   - `failed`, wenn `audio_corruption`
+- `forceBackgroundMusicUrl`
+- `disableMusicSelection`
+- `disableRetryTrackSwap`
+- `forceVoiceoverOff`
+- `forceMusicOff`
 
-Wichtig:
-- `validation_status` darf nur noch durch diesen Test gesetzt werden
-- nicht mehr manuell oder implizit
+Damit können wir gezielt exakt **einen** Track und **eine** Audio-Kombination rendern, statt Zufall + Auto-Retry im Weg zu haben.
 
-### 2. Die 4 aktuell „validierten“ Tracks sofort nachprüfen
-Bevor weitere Musik ausgewählt wird:
-- die 4 aktuellen Synth-Tracks einzeln durch den Smoke-Test schicken
-- alles, was fehlschlägt, direkt auf `failed`
-- nur echte Passes dürfen auswählbar bleiben
+### 2. Echte Track-Validierung über `AudioSmokeTest` bauen
+Statt Tracks nur per DB-Flag als “validated” zu markieren:
 
-Damit sehen wir sofort:
-- ob das Problem wirklich an allen aktuellen Audiodateien hängt
-- oder ob mindestens ein Track tatsächlich Lambda-tauglich ist
+- neue dedizierte Funktion, die **einen Track** mit `AudioSmokeTest` rendert
+- Ergebnis in `background_music_tracks` speichern:
+  - `validated`
+  - `failed`
+  - `validation_error`
+  - `last_validated_at`
+  - `validation_attempts`
 
-### 3. Auswahl-Logik hart absichern
-`selectBackgroundMusic()` verschärfen:
+Wichtig: Nur diese Smoke-Test-Funktion darf künftig `validation_status='validated'` setzen.
 
-- nur `validation_status = 'validated'`
-- nur Tracks mit echtem `last_validated_at`
-- kein Fallback mehr auf „irgendein is_valid=true“
+### 3. Drei isolierte Testfälle schaffen
+Ich würde exakt diese drei Diagnoseläufe ermöglichen:
 
-Zusätzlich auch im Retry:
-- Alternativtrack nur aus **echt validierten** Tracks wählen
-- wenn kein validierter Track verfügbar ist:
-  - sauberer Status „kein validierter Track verfügbar“
-  - nicht stillschweigend wieder riskante Quellen nehmen
+1. **Music only**
+   - `AudioSmokeTest` oder `UniversalCreatorVideo` nur mit Musik, ohne Voiceover  
+   -> isoliert, ob der Track selbst in Lambda lesbar ist
 
-### 4. Forensik pro Render sichtbar speichern
-Im Progress/Result speichern:
-- ausgewählte `track_id`
-- `storage_path`
+2. **Voiceover only**
+   - aktueller Baseline-Test  
+   -> bestätigt, dass der Rest des Renderpfads stabil ist
+
+3. **Voiceover + exakt derselbe Musiktrack**
+   - gleiche Musikdatei, gleicher Renderpfad  
+   -> zeigt, ob das Problem nur bei der Kombination entsteht
+
+So wissen wir sofort, ob der Fehler an der Datei oder an der Template-/Audio-Kombination liegt.
+
+### 4. Retry-Forensik vollständig persistieren
+Im Progress/Render-Record zusätzlich speichern:
+
+- `selectedBackgroundMusicUrl`
+- `selectedBackgroundMusicTrack`
+- `retryTrack`
+- `retryAttempt`
+- `audioStripped`
 - `validation_status`
-- `last_validated_at`
-- ob Alternativtrack genutzt wurde
-- finaler Grund, warum Musik entfernt wurde
+- `validation_error`
+- `failure_stage`
+- `error_signature`
 
-So ist beim nächsten Test sofort sichtbar, ob wirklich ein getesteter Track verwendet wurde.
+Aktuell fehlt genau diese Sichtbarkeit. Ohne sie bleibt jeder Versuch teilweise Blindflug.
 
-### 5. Bibliothek erst danach wieder skalieren
-Erst wenn 1-2 Tracks den Smoke-Test wirklich bestehen:
-- Seed/Import-Pipeline erweitern
-- neue Tracks zunächst immer als `pending`
-- danach automatisch validieren
-- nur bestandene Tracks in die Produktionsauswahl aufnehmen
+### 5. Zufällige Musikauswahl für Diagnose abschalten
+Während Diagnose:
+- **kein random**
+- **kein Mood-Ranking**
+- **kein stilles Fallback auf andere Tracks**
 
-## Betroffene Bereiche
-
-- `supabase/functions/seed-background-music/index.ts`
-- `supabase/functions/auto-generate-universal-video/index.ts`
-- neue Funktion für Track-Validierung
-- optional Progress/Diagnose-UI für Track-Forensik
-- bestehende `AudioSmokeTest`-Composition wird endlich aktiv genutzt
-
-## Erwartetes Ergebnis
-
-Nach der Umstellung gibt es keinen Blindflug mehr:
-
+Stattdessen:
 ```text
-Track in Storage
--> pending
--> echter Lambda-Smoke-Test
--> validated oder failed
--> nur validated darf in reale Video-Renders
+Track X -> Testlauf
+Track X + Voiceover -> Testlauf
+Track Y -> Testlauf
 ```
 
-Damit lösen wir das eigentliche Restproblem:
-Nicht „Musik wird falsch eingebunden“, sondern  
-**„die Bibliothek enthält Tracks, die als validiert gelten, ohne jemals wirklich gegen Lambda geprüft worden zu sein“.**
+Nur so sehen wir, ob wirklich der Track gewechselt wurde und welcher exakt crasht.
 
-## Technische Kurzfassung
+### 6. Auswahl-Logik danach härten
+Sobald die Isolation steht:
+- Produktivauswahl nur noch aus **echten Smoke-Test-Passes**
+- kein Track ohne `last_validated_at`
+- kein stilles Wiederverwenden fraglicher Dateien
 
-Ja — es ist tatsächlich ein anderes Problem:
-**Die Produktionspipeline ist live, Voiceover funktioniert, Musik wird an Lambda übergeben — aber der aktuelle Validierungsstatus der Tracks ist nicht belastbar, weil die vorhandene AudioSmokeTest-Architektur noch gar nicht in die Musikbibliothek eingebunden ist.**
+## Betroffene Dateien
+- `supabase/functions/auto-generate-universal-video/index.ts`
+- neue Edge Function für Musik-Smoke-Tests
+- `src/remotion/templates/AudioSmokeTest.tsx` (nur falls kleine Diagnose-Erweiterung nötig)
+- `src/remotion/Root.tsx` (falls zusätzliche Diagnose-Composition gebraucht wird)
+- optional `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` für sichtbare Forensik
+
+## Erwartetes Ergebnis
+Nach dieser Isolation wissen wir belastbar:
+
+```text
+- ob ein einzelner Track alleine in Lambda funktioniert
+- ob Voiceover + Musik zusammen das Problem sind
+- ob der Retry wirklich auf einen anderen Track wechselt
+- welche Datei konkret crasht
+- ob der "validated"-Status überhaupt echt ist
+```
+
+## Kurz gesagt
+Ja — wir müssen das Problem jetzt **instrumentieren**, nicht weiter raten.  
+Der nächste sinnvolle Schritt ist eine **deterministische Audio-Diagnose-Pipeline** mit Track-Smoke-Test, festen Testtracks und vollständiger Retry-Forensik. Erst damit können wir die eigentliche Ursache sauber beweisen und danach gezielt beheben.
