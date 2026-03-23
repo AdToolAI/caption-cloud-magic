@@ -469,6 +469,12 @@ const Generator = () => {
         </div>
       </main>
 
+      <PromptAssistantDialog
+        open={isAssistantOpen}
+        onOpenChange={setIsAssistantOpen}
+        onApply={(prompt) => setTopic(prompt)}
+      />
+
       <Footer />
     </div>
   );
