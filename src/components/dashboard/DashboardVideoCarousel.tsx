@@ -33,8 +33,9 @@ export const DashboardVideoCarousel = () => {
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
-  const [readyVideos, setReadyVideos] = useState<Set<number>>(new Set());
   const [errorVideos, setErrorVideos] = useState<Set<number>>(new Set());
+  const wheelTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const sortedVideos = [...videos]
     .filter((v: any) => v.status === 'completed' && v.output_url)
@@ -56,25 +57,35 @@ export const DashboardVideoCarousel = () => {
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
-    const idx = emblaApi.selectedScrollSnap();
-    setSelectedIndex(idx);
+    setSelectedIndex(emblaApi.selectedScrollSnap());
   }, [emblaApi]);
 
-  // Auto-play active video, pause others on slide change
+  // Auto-play active video, pause others
   useEffect(() => {
     videoRefs.current.forEach((el, i) => {
       if (!el) return;
       if (i === selectedIndex) {
         el.muted = true;
-        if (el.readyState >= 1) {
+        // Force load + play with fallback
+        if (el.readyState === 0) {
+          el.load();
+        }
+        const tryPlay = () => {
           el.play().catch(() => {});
+        };
+        if (el.readyState >= 2) {
+          tryPlay();
+        } else {
+          // Wait a bit then try anyway
+          const t = setTimeout(tryPlay, 300);
+          return () => clearTimeout(t);
         }
       } else {
         el.pause();
         el.currentTime = 0;
       }
     });
-  }, [selectedIndex, readyVideos]);
+  }, [selectedIndex]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -87,20 +98,35 @@ export const DashboardVideoCarousel = () => {
     };
   }, [emblaApi, onSelect]);
 
+  // Scroll-to-rotate: wheel event
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node || !emblaApi) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (wheelTimeout.current) return; // debounce active
+
+      if (e.deltaY > 0) {
+        emblaApi.scrollNext();
+      } else if (e.deltaY < 0) {
+        emblaApi.scrollPrev();
+      }
+
+      wheelTimeout.current = setTimeout(() => {
+        wheelTimeout.current = null;
+      }, 150);
+    };
+
+    node.addEventListener('wheel', handleWheel, { passive: false });
+    return () => node.removeEventListener('wheel', handleWheel);
+  }, [emblaApi]);
+
   const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
   const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
 
   const getVideoTitle = (video: any) =>
     (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
-
-  const handleVideoReady = (index: number) => {
-    setReadyVideos(prev => new Set(prev).add(index));
-    const el = videoRefs.current[index];
-    if (el && index === selectedIndex) {
-      el.muted = true;
-      el.play().catch(() => {});
-    }
-  };
 
   const handleVideoError = (index: number) => {
     setErrorVideos(prev => new Set(prev).add(index));
@@ -114,12 +140,11 @@ export const DashboardVideoCarousel = () => {
     }
   };
 
-  // Compute signed direction for rotation: negative = left of center, positive = right
+  // Signed distance for 3D rotation
   const getSignedDist = (index: number): number => {
     const len = sortedVideos.length;
     let diff = index - selectedIndex;
     if (len > 2) {
-      // Handle loop wrapping
       if (diff > len / 2) diff -= len;
       if (diff < -len / 2) diff += len;
     }
@@ -159,7 +184,7 @@ export const DashboardVideoCarousel = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={containerRef}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Video className="h-5 w-5 text-primary" />
@@ -176,132 +201,141 @@ export const DashboardVideoCarousel = () => {
         </div>
       </div>
 
-      {/* Carousel — gear-style overlapping with slant */}
-      <div className="overflow-hidden py-8" ref={emblaRef}>
-        <div className="flex items-center">
-          {sortedVideos.map((video: any, index: number) => {
-            const isActive = index === selectedIndex;
-            const signedDist = getSignedDist(index);
-            const absDist = Math.abs(signedDist);
-            const performanceScore = (video.download_count || 0) + (video.share_count || 0);
-            const title = getVideoTitle(video);
-            const videoUrl = resolveVideoUrl(video.output_url);
+      {/* 3D Perspective Carousel */}
+      <div style={{ perspective: '1200px' }}>
+        <div className="overflow-hidden py-8" ref={emblaRef}>
+          <div className="flex items-center" style={{ transformStyle: 'preserve-3d' }}>
+            {sortedVideos.map((video: any, index: number) => {
+              const isActive = index === selectedIndex;
+              const signedDist = getSignedDist(index);
+              const absDist = Math.abs(signedDist);
+              const performanceScore = (video.download_count || 0) + (video.share_count || 0);
+              const title = getVideoTitle(video);
+              const videoUrl = resolveVideoUrl(video.output_url);
 
-            // Gear-style: flat overlap with 2D rotation (slant)
-            const scale = isActive ? 1.05 : absDist === 1 ? 0.82 : 0.65;
-            const zIndex = isActive ? 30 : absDist === 1 ? 20 : 10;
-            const opacity = isActive ? 1 : absDist === 1 ? 0.6 : 0.3;
-            // Slant: cards tilt away from center like a fan
-            const rotation = isActive ? 0 : absDist === 1 ? signedDist * 3 : signedDist > 0 ? 5 : -5;
+              // 3D transforms
+              const scale = isActive ? 1.05 : absDist === 1 ? 0.85 : 0.7;
+              const zIndex = isActive ? 30 : absDist === 1 ? 20 : 10;
+              const cardOpacity = isActive ? 1 : absDist === 1 ? 0.7 : 0.4;
+              // rotateY: cards rotate away from center
+              const rotateY = isActive ? 0 : absDist === 1 ? signedDist * -25 : signedDist > 0 ? -40 : 40;
+              // translateX for tighter grouping
+              const translateX = isActive ? 0 : signedDist * -20;
 
-            return (
-              <div
-                key={video.id}
-                className="flex-shrink-0 flex-grow-0 cursor-pointer"
-                style={{
-                  flexBasis: sortedVideos.length === 1 ? '70%' : '50%',
-                  marginLeft: index === 0 ? '0' : '-32px',
-                  marginRight: '-32px',
-                  zIndex,
-                  position: 'relative',
-                }}
-                onClick={() => handleCardClick(index, videoUrl, title)}
-              >
+              return (
                 <div
-                  className={cn(
-                    'relative rounded-2xl overflow-hidden transition-all duration-500',
-                    isActive
-                      ? 'ring-2 ring-primary/60 shadow-2xl shadow-primary/30'
-                      : 'ring-1 ring-border/20'
-                  )}
+                  key={video.id}
+                  className="flex-shrink-0 flex-grow-0 cursor-pointer"
                   style={{
-                    transform: `scale(${scale}) rotate(${rotation}deg)`,
-                    opacity,
-                    transition: 'all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1)',
-                    transformOrigin: 'center bottom',
+                    flexBasis: sortedVideos.length === 1 ? '70%' : '50%',
+                    marginLeft: index === 0 ? '0' : '-32px',
+                    marginRight: '-32px',
+                    zIndex,
+                    position: 'relative',
                   }}
+                  onClick={() => handleCardClick(index, videoUrl, title)}
                 >
-                  {/* Video element */}
-                  <div className="aspect-video relative overflow-hidden bg-black">
-                    {!errorVideos.has(index) ? (
-                      <video
-                        ref={(el) => { videoRefs.current[index] = el; }}
-                        src={videoUrl}
-                        muted
-                        playsInline
-                        loop
-                        preload="metadata"
-                        poster={video.thumbnail_url || undefined}
-                        className="w-full h-full object-cover transition-opacity duration-500"
-                        style={{ opacity: readyVideos.has(index) ? 1 : 0 }}
-                        onLoadedMetadata={() => handleVideoReady(index)}
-                        onCanPlay={() => handleVideoReady(index)}
-                        onError={() => handleVideoError(index)}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-muted/80">
-                        <Video className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                        <p className="text-xs text-muted-foreground">Video nicht verfügbar</p>
-                      </div>
-                    )}
-
-                    {/* Play icon overlay — only on inactive cards */}
-                    {!isActive && !errorVideos.has(index) && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                        <Play className="h-8 w-8 text-white/60" />
-                      </div>
-                    )}
-
-                    {/* Dark gradient overlay */}
-                    <div className={cn(
-                      'absolute inset-0 pointer-events-none transition-opacity duration-300',
+                  <div
+                    className={cn(
+                      'relative rounded-2xl overflow-hidden',
                       isActive
-                        ? 'bg-gradient-to-t from-black/50 via-transparent to-transparent'
-                        : 'bg-gradient-to-t from-black/70 via-black/20 to-black/10'
-                    )} />
-
-                    {/* Expand button on active card */}
-                    {isActive && (
-                      <div className="absolute top-2 right-2 z-10">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (videoUrl) setSelectedVideo({ url: videoUrl, title });
+                        ? 'ring-2 ring-primary/60 shadow-2xl shadow-primary/30'
+                        : 'ring-1 ring-border/20'
+                    )}
+                    style={{
+                      transform: `perspective(1200px) rotateY(${rotateY}deg) scale(${scale}) translateX(${translateX}px)`,
+                      opacity: cardOpacity,
+                      transition: 'all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1)',
+                      transformOrigin: 'center center',
+                      backfaceVisibility: 'hidden',
+                    }}
+                  >
+                    {/* Video element */}
+                    <div className="aspect-video relative overflow-hidden bg-black">
+                      {!errorVideos.has(index) ? (
+                        <video
+                          ref={(el) => { videoRefs.current[index] = el; }}
+                          src={videoUrl}
+                          muted
+                          playsInline
+                          loop
+                          preload="auto"
+                          poster={video.thumbnail_url || undefined}
+                          className="w-full h-full object-cover"
+                          onCanPlay={() => {
+                            const el = videoRefs.current[index];
+                            if (el && index === selectedIndex) {
+                              el.muted = true;
+                              el.play().catch(() => {});
+                            }
                           }}
-                          className="w-9 h-9 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md hover:bg-primary/80 transition-colors"
-                        >
-                          <Expand className="h-4 w-4 text-white" />
-                        </button>
-                      </div>
-                    )}
+                          onError={() => handleVideoError(index)}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-muted/80">
+                          <Video className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                          <p className="text-xs text-muted-foreground">Video nicht verfügbar</p>
+                        </div>
+                      )}
 
-                    {/* Performance Badge */}
-                    {performanceScore > 0 && index === 0 && (
-                      <div className="absolute top-2 left-2 z-10">
-                        <Badge className="bg-primary/90 text-primary-foreground text-[10px] px-2 py-0.5 backdrop-blur-sm">
-                          ⭐ Best
-                        </Badge>
-                      </div>
-                    )}
+                      {/* Play icon overlay — only on inactive cards */}
+                      {!isActive && !errorVideos.has(index) && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <Play className="h-8 w-8 text-white/60" />
+                        </div>
+                      )}
 
-                    {/* Bottom info */}
-                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/30 backdrop-blur-sm pointer-events-none">
-                      <p className="text-sm font-medium text-white truncate drop-shadow-md">
-                        {title}
-                      </p>
-                      <p className="text-[10px] text-white/60 mt-0.5">
-                        {new Date(video.created_at).toLocaleDateString('de-DE', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric'
-                        })}
-                      </p>
+                      {/* Dark gradient overlay */}
+                      <div className={cn(
+                        'absolute inset-0 pointer-events-none transition-opacity duration-300',
+                        isActive
+                          ? 'bg-gradient-to-t from-black/50 via-transparent to-transparent'
+                          : 'bg-gradient-to-t from-black/70 via-black/20 to-black/10'
+                      )} />
+
+                      {/* Expand button on active card */}
+                      {isActive && (
+                        <div className="absolute top-2 right-2 z-10">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (videoUrl) setSelectedVideo({ url: videoUrl, title });
+                            }}
+                            className="w-9 h-9 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md hover:bg-primary/80 transition-colors"
+                          >
+                            <Expand className="h-4 w-4 text-white" />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Performance Badge */}
+                      {performanceScore > 0 && index === 0 && (
+                        <div className="absolute top-2 left-2 z-10">
+                          <Badge className="bg-primary/90 text-primary-foreground text-[10px] px-2 py-0.5 backdrop-blur-sm">
+                            ⭐ Best
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Bottom info */}
+                      <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/30 backdrop-blur-sm pointer-events-none">
+                        <p className="text-sm font-medium text-white truncate drop-shadow-md">
+                          {title}
+                        </p>
+                        <p className="text-[10px] text-white/60 mt-0.5">
+                          {new Date(video.created_at).toLocaleDateString('de-DE', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
 
