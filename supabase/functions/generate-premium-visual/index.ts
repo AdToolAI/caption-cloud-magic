@@ -166,6 +166,12 @@ serve(async (req) => {
       prompt += cleanDescription;
       prompt += ', high quality, professional illustration, clean visual without any text or writing';
       
+      // ✅ STYLE DOUBLE-REINFORCEMENT: Repeat style at the end to override scene description dominance
+      const styleSuffix = getStyleSuffix(request.style);
+      if (styleSuffix) {
+        prompt += `, OVERRIDE STYLE: ${styleSuffix}`;
+      }
+      
       console.log('Generated scene prompt (sanitized):', prompt);
 
       // Check if we have a character sheet for consistency via IP-Adapter
