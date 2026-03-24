@@ -1,50 +1,28 @@
 
 
-## Posting-Zeit-Berater: Immer Empfehlungen anzeigen & Genauigkeit verbessern
+## Fix: Publishing schlaegt fehl -- fehlende `content_hash` Spalte
 
-### Problem-Analyse
+### Ursache
 
-Die Edge Function `posting-times-api` generiert bereits Branchen-Benchmarks als Fallback, und die Logs zeigen erfolgreiche Cache-Hits mit Daten. Das Problem liegt an zwei Stellen:
+Die Edge Function `publish/index.ts` versucht bei jedem Publish-Vorgang einen `content_hash` in die Tabelle `publish_jobs` zu schreiben (Zeile 1362). Diese Spalte existiert aber nicht in der Datenbank. Dadurch schlaegt **jeder** Insert fehl mit "Failed to create publish job" -- unabhaengig von der Plattform.
 
-1. **Stale Cache**: Alte Cache-Eintraege mit leeren `platforms`-Objekten (von vor dem Benchmark-Fallback) werden noch ausgeliefert und blockieren neue Daten fuer 1 Stunde
-2. **Frontend zeigt leeren Zustand**: Wenn `platformData.length === 0` wird sofort "Noch keine Daten" angezeigt, ohne zwischen "wirklich keine Daten" und "Daten laden noch" zu unterscheiden
-3. **Keine Empfehlungen ohne Verbindung**: Die Seite suggeriert, dass man erst synchronisieren muss, obwohl Branchen-Benchmarks sofort verfuegbar sein sollten
+Die Logs bestaetigen: `[Orchestrator] Fatal error: Error: Failed to create publish job`
 
-### Aenderungen
+### Loesung
 
-**1. Edge Function `posting-times-api/index.ts` -- Robusterer Fallback**
-- Nach dem Cache-Hit pruefen, ob die gecachten `platforms`-Daten tatsaechlich Slots enthalten. Falls leer: Cache ignorieren und Benchmarks neu generieren
-- Benchmarks IMMER als Grundlage verwenden, dann mit echten User-Daten (aus `posting_slots` und `posts_history`) anreichern/ueberschreiben
-- Wenn User-History vorhanden: Scores aus echten Engagement-Daten berechnen und mit Benchmark-Scores blenden (70% History / 30% Benchmark)
-- Cache-TTL auf 30 Minuten reduzieren fuer schnellere Aktualisierung
+**1. Datenbank-Migration**: `content_hash` Spalte hinzufuegen
 
-**2. Frontend `PostingTimes.tsx` -- Immer Empfehlungen anzeigen**
-- Den leeren Zustand ("Noch keine Daten") komplett entfernen -- es gibt immer mindestens Benchmark-Daten
-- Stattdessen: Wenn `!hasHistory`, einen dezenten Hinweis-Banner ueber der Heatmap anzeigen ("Basiert auf Branchen-Durchschnitten -- verbinde deine Accounts fuer personalisierte Empfehlungen")
-- Heatmap und Top-Slots werden IMMER gerendert, nie versteckt
-- `refetchInterval` auf 15 Minuten reduzieren fuer automatische Aktualisierung
+```sql
+ALTER TABLE public.publish_jobs 
+ADD COLUMN content_hash TEXT;
 
-**3. Hook `usePostingTimes.ts` -- Besseres Caching**
-- `staleTime` auf 2 Minuten reduzieren
-- `refetchOnWindowFocus` aktivieren, damit bei Tab-Wechsel aktualisiert wird
-- Retry-Logik hinzufuegen (3 Retries bei Fehler)
+CREATE INDEX idx_publish_jobs_content_hash 
+ON public.publish_jobs (user_id, content_hash, created_at);
+```
 
-**4. Edge Function Enhancement -- AI-gestuetzte Scores**
-- Bestehende `PLATFORM_PEAKS` mit dynamischen Faktoren anreichern:
-  - Feiertage/Events erkennen (Datum-basiert, z.B. Wochenenden vs. Werktage bereits vorhanden)
-  - Saisonale Anpassungen (Sommer vs. Winter, Tageslaenge)
-  - Wenn User-Nische bekannt (aus `profiles` oder `brand_kits`): branchenspezifische Anpassungen der Scores
+Das ist alles. Keine Code-Aenderungen noetig -- die Edge Function ist bereits korrekt implementiert, ihr fehlt nur die Spalte in der Datenbank.
 
-### Technische Aenderungen
+### Ergebnis
 
-| Datei | Aenderung |
-|---|---|
-| `supabase/functions/posting-times-api/index.ts` | Cache-Validierung, Benchmark-Blending mit User-History, saisonale Score-Anpassungen, kuerzerer Cache-TTL |
-| `src/pages/PostingTimes.tsx` | Leeren Zustand entfernen, immer Heatmap zeigen, Hinweis-Banner wenn keine History |
-| `src/hooks/usePostingTimes.ts` | Kuerzere staleTime, refetchOnWindowFocus, Retry-Logik |
-
-### Nicht angefasst
-- Keine neuen Datenbank-Tabellen noetig
-- Keine neuen Edge Functions
-- Bestehende Heatmap/TopSlots-Komponenten bleiben unveraendert
+Nach der Migration funktioniert das gleichzeitige Posten auf Facebook, YouTube, Instagram und alle anderen Kanaele wieder.
 
