@@ -64,6 +64,28 @@ export function UserMenu() {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          {t("hubs.automatisieren")}
+        </DropdownMenuLabel>
+        <DropdownMenuItem asChild>
+          <Link to="/campaigns" className="flex items-center gap-2 cursor-pointer">
+            <Workflow className="h-4 w-4" />
+            <span>{t("nav.campaigns")}</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/integrations" className="flex items-center gap-2 cursor-pointer">
+            <Share2 className="h-4 w-4" />
+            <span>{t("nav.integrations")}</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/instagram-publishing" className="flex items-center gap-2 cursor-pointer">
+            <Share2 className="h-4 w-4" />
+            <span>{t("nav.instagramPublishing")}</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to="/account" className="flex items-center gap-2 cursor-pointer">
             <Settings className="h-4 w-4" />
