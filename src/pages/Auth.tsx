@@ -352,7 +352,7 @@ const Auth = () => {
         }}
       />
 
-      <Footer />
+      <BlackTieFooter />
     </div>
   );
 };
