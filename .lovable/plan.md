@@ -1,54 +1,50 @@
 
 
-## Next-Level Intelligenter Kalender -- Redesign & Bugfixes
+## Posting-Zeit-Berater: Immer Empfehlungen anzeigen & Genauigkeit verbessern
 
-### Identifizierte Fehler
+### Problem-Analyse
 
-1. **Doppeltes Media-Label**: `ScheduleQuickForm` zeigt "Media (optional)" UND `MediaUploader` zeigt intern nochmal "Medien (optional)" -- doppelt sichtbar
-2. **Gemischte Sprachen**: Labels sind teilweise Englisch ("Title (optional)", "Media (optional)", "Publish Date & Time", "Platforms", "Schedule Post", "Quick Schedule Post", "Publishing Queue") und teilweise Deutsch -- inkonsistent
-3. **Toolbar klebt nicht korrekt**: `sticky top-0` funktioniert nicht richtig im verschachtelten Container
+Die Edge Function `posting-times-api` generiert bereits Branchen-Benchmarks als Fallback, und die Logs zeigen erfolgreiche Cache-Hits mit Daten. Das Problem liegt an zwei Stellen:
 
-### Next-Level Visual Upgrades
+1. **Stale Cache**: Alte Cache-Eintraege mit leeren `platforms`-Objekten (von vor dem Benchmark-Fallback) werden noch ausgeliefert und blockieren neue Daten fuer 1 Stunde
+2. **Frontend zeigt leeren Zustand**: Wenn `platformData.length === 0` wird sofort "Noch keine Daten" angezeigt, ohne zwischen "wirklich keine Daten" und "Daten laden noch" zu unterscheiden
+3. **Keine Empfehlungen ohne Verbindung**: Die Seite suggeriert, dass man erst synchronisieren muss, obwohl Branchen-Benchmarks sofort verfuegbar sein sollten
 
-**A. Hero Header aufwerten**
-- Animierte Partikel/Glow-Effekte im Hintergrund (passend zum bestehenden Sci-Fi-Design)
-- Pulsierender Gradient-Ring um das Event-Counter-Icon
-- Subtile Shimmer-Animation auf dem "Content Command Center" Titel
+### Aenderungen
 
-**B. Kalender-Grid Premium-Look**
-- Hover-Effekt: sanfter Neon-Glow um Tageszellen
-- Heute-Markierung: animierter pulsierender Ring statt statischem Border
-- Post-Cards im Grid: Glassmorphism-Effekt mit leichtem Blur
-- Drag-Indikator: animierte gestrichelte Linie mit Glow beim Draggen
+**1. Edge Function `posting-times-api/index.ts` -- Robusterer Fallback**
+- Nach dem Cache-Hit pruefen, ob die gecachten `platforms`-Daten tatsaechlich Slots enthalten. Falls leer: Cache ignorieren und Benchmarks neu generieren
+- Benchmarks IMMER als Grundlage verwenden, dann mit echten User-Daten (aus `posting_slots` und `posts_history`) anreichern/ueberschreiben
+- Wenn User-History vorhanden: Scores aus echten Engagement-Daten berechnen und mit Benchmark-Scores blenden (70% History / 30% Benchmark)
+- Cache-TTL auf 30 Minuten reduzieren fuer schnellere Aktualisierung
 
-**C. Quick Schedule Form modernisieren**
-- Card mit Shimmer-Border-Effekt (wie die Hub-Seiten)
-- Plattform-Checkboxen als visuelle Chips mit Platform-Icons und -Farben statt einfacher Checkboxen
-- Submit-Button mit animiertem Gradient und Glow-Effekt
-- Formular-Sections mit subtilen Divider-Lines
+**2. Frontend `PostingTimes.tsx` -- Immer Empfehlungen anzeigen**
+- Den leeren Zustand ("Noch keine Daten") komplett entfernen -- es gibt immer mindestens Benchmark-Daten
+- Stattdessen: Wenn `!hasHistory`, einen dezenten Hinweis-Banner ueber der Heatmap anzeigen ("Basiert auf Branchen-Durchschnitten -- verbinde deine Accounts fuer personalisierte Empfehlungen")
+- Heatmap und Top-Slots werden IMMER gerendert, nie versteckt
+- `refetchInterval` auf 15 Minuten reduzieren fuer automatische Aktualisierung
 
-**D. Publishing Queue aufwerten**
-- Leerer Zustand: animierte Illustration statt "No active publishing tasks"
-- Status-Badges mit Pulse-Animation fuer aktive Tasks
+**3. Hook `usePostingTimes.ts` -- Besseres Caching**
+- `staleTime` auf 2 Minuten reduzieren
+- `refetchOnWindowFocus` aktivieren, damit bei Tab-Wechsel aktualisiert wird
+- Retry-Logik hinzufuegen (3 Retries bei Fehler)
 
-**E. Metrics Dashboard**
-- Metric-Cards mit subtiler Hover-Scale und Glow
-- Trend-Pfeile animiert (fade-in bei Sichtbarkeit)
+**4. Edge Function Enhancement -- AI-gestuetzte Scores**
+- Bestehende `PLATFORM_PEAKS` mit dynamischen Faktoren anreichern:
+  - Feiertage/Events erkennen (Datum-basiert, z.B. Wochenenden vs. Werktage bereits vorhanden)
+  - Saisonale Anpassungen (Sommer vs. Winter, Tageslaenge)
+  - Wenn User-Nische bekannt (aus `profiles` oder `brand_kits`): branchenspezifische Anpassungen der Scores
 
 ### Technische Aenderungen
 
 | Datei | Aenderung |
 |---|---|
-| `src/components/calendar/ScheduleQuickForm.tsx` | Doppeltes Label fixen (Zeile 375 entfernen), alle Labels auf Deutsch uebersetzen, Platform-Chips statt Checkboxen, Shimmer-Border Card, animierter Submit-Button |
-| `src/components/composer/MediaUploader.tsx` | Label-Prop akzeptieren oder internes Label entfernen (da ScheduleQuickForm eigenes setzt) |
-| `src/components/calendar/CalendarHeroHeader.tsx` | Animierte Partikel, Shimmer-Titel, pulsierender Glow-Ring um Counter |
-| `src/components/calendar/views/MonthView.tsx` | Animierter Today-Ring, verbesserte Drag-States, Glow-Hover auf Zellen |
-| `src/components/calendar/CalendarMetricsDashboard.tsx` | Hover-Glow auf Metrics, animierte Trend-Indikatoren |
-| `src/components/calendar/PublishingStatusPanel.tsx` | Animierter Empty-State, bessere Status-Badges |
-| `src/components/calendar/CalendarToolbar.tsx` | Toolbar-Sticky-Fix, konsistente deutsche Labels |
+| `supabase/functions/posting-times-api/index.ts` | Cache-Validierung, Benchmark-Blending mit User-History, saisonale Score-Anpassungen, kuerzerer Cache-TTL |
+| `src/pages/PostingTimes.tsx` | Leeren Zustand entfernen, immer Heatmap zeigen, Hinweis-Banner wenn keine History |
+| `src/hooks/usePostingTimes.ts` | Kuerzere staleTime, refetchOnWindowFocus, Retry-Logik |
 
 ### Nicht angefasst
-- Keine Aenderungen an Funktionslogik (Drag&Drop, Event-CRUD, API-Calls, Publishing)
-- Keine Aenderungen an Datenbank oder Edge Functions
-- Bestehende Glassmorphism-Container bleiben erhalten und werden ergaenzt
+- Keine neuen Datenbank-Tabellen noetig
+- Keine neuen Edge Functions
+- Bestehende Heatmap/TopSlots-Komponenten bleiben unveraendert
 
