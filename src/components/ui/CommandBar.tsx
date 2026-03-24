@@ -19,8 +19,6 @@ import {
   Wand2,
   RefreshCw,
   MessageSquare,
-  RefreshCw,
-  MessageSquare,
   User,
   MessageCircle,
   TrendingUp,
