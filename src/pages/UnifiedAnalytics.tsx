@@ -22,6 +22,9 @@ import { CaptionInsightsTab } from "@/components/performance/CaptionInsightsTab"
 import { ConnectionsTab } from "@/components/performance/ConnectionsTab";
 import { ReportBuilder } from "@/components/analytics/ReportBuilder";
 import { ScheduledReports } from "@/components/analytics/ScheduledReports";
+import { PlatformOverviewCards } from "@/components/analytics/PlatformOverviewCards";
+import { AIStrategyPanel } from "@/components/analytics/AIStrategyPanel";
+import { CommentsAnalyticsTab } from "@/components/analytics/CommentsAnalyticsTab";
 
 interface MetricsSummary {
   provider: string;
