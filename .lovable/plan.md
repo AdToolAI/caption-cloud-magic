@@ -2,42 +2,38 @@
 
 ## Problem
 
-The Facebook Page sync fails because Meta deprecated `page_impressions`, `page_post_engagements`, `page_total_actions`, `page_video_views`, and `page_fans` from the Page Insights API as of **November 15, 2025**. The API now returns error code 100: "The value must be a valid insights metric."
+The `sync-social-posts-v2` Edge Function only auto-refreshes YouTube tokens before syncing. X (Twitter) OAuth2 tokens expire every ~2 hours, but the function never refreshes them — it just tries to use the expired token, gets a 401, and throws a generic Edge Function error.
 
 ## Solution
 
-Update the `facebook-page-sync` Edge Function to use the **new replacement metrics** introduced by Meta:
-
-| Old (Deprecated) | New Replacement |
-|---|---|
-| `page_impressions` | `page_media_view` |
-| `page_post_engagements` | *(removed — sum likes/comments/shares from posts)* |
-| `page_total_actions` | *(removed — no direct replacement)* |
-| `page_video_views` | `page_media_view` (includes video) |
-| `page_fans` | `page_follows` (lifetime) |
+Add X token auto-refresh to `sync-social-posts-v2` and improve error messages when reconnection is needed.
 
 ## Changes
 
-### 1. Update `supabase/functions/facebook-page-sync/index.ts`
+### 1. Add `refreshXToken()` to `supabase/functions/_shared/token-refresh.ts`
 
-- Replace the daily insights metric request:
-  - Old: `page_impressions,page_post_engagements,page_total_actions,page_video_views`
-  - New: `page_media_view` (period=day) — this is the unified "views" metric
-- Replace the lifetime metric:
-  - Old: `page_fans` (lifetime)
-  - New: `page_follows` (day) — follower count
-- Update metric parsing to match new metric names
-- Keep the same DB columns but map new metrics to them (e.g., `page_media_view` → `impressions` column, `page_follows` → `fans_total` column)
-- For `post_engagements` and `total_actions`: set to 0 or fetch from recent posts if needed (these metrics no longer exist at page level)
+- New function similar to `refreshYouTubeToken`
+- Calls `https://api.twitter.com/2/oauth2/token` with Basic auth (`X_CLIENT_ID:X_CLIENT_SECRET`)
+- Updates `social_connections` with new encrypted access + refresh tokens
+- Returns `{ accessToken, error }` like YouTube version
 
-### 2. Update `fb_page_daily` table (migration)
+### 2. Update `supabase/functions/sync-social-posts-v2/index.ts`
 
-- Optionally rename columns to better reflect new metrics, or keep existing columns for backward compatibility and just store the new data in them
+- Import `refreshXToken` from shared module
+- Extend the token refresh block (lines 97-118) to also handle `provider === 'x'`:
+  - Check `token_expires_at`, if expired → call `refreshXToken()`
+  - On unrecoverable errors → return `{ success: false, reconnect_required: true, provider: 'x' }` with HTTP 200
+- Update `fetchXPosts` to use `api.x.com` instead of `api.twitter.com`
+
+### 3. Update `src/components/performance/ConnectionsTab.tsx`
+
+- After sync response, check for `reconnect_required` flag
+- Show specific toast: "X Token abgelaufen. Bitte trenne die Verbindung und verbinde X erneut."
 
 ## Technical Details
 
-- The Graph API version stays at `v24.0` (supports new metrics)
-- `page_media_view` with `period=day` replaces impressions
-- `page_follows` with `period=day` gives follower snapshot
-- Error handling remains the same
+- X OAuth2 refresh uses Basic auth with `btoa(CLIENT_ID:CLIENT_SECRET)`
+- X returns a new `refresh_token` with each refresh (must update both tokens)
+- `X_CLIENT_ID` and `X_CLIENT_SECRET` secrets are already configured
+- Uses `api.x.com` endpoint per Twitter API best practices
 
