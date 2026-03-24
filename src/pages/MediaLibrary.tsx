@@ -871,7 +871,7 @@ export default function MediaLibrary() {
                   onClick={bulkSendToBackgroundReplacer}
                 >
                   <Layers className="h-4 w-4 mr-2" />
-                  Hintergrund-Ersatz ({selectedAssets.length})
+                  Smart Background ({selectedAssets.length})
                 </Button>
                 <Button
                   variant="destructive"

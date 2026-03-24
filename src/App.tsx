@@ -204,7 +204,7 @@ function AppLayout() {
           <Route path="/ai-video-studio" element={<AIVideoStudio />} />
           <Route path="/audio-studio" element={<AudioStudio />} />
           <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
-          <Route path="/explainer-studio" element={<ExplainerStudio />} />
+          <Route path="/explainer-studio" element={<Navigate to="/home" replace />} />
           <Route path="/templates" element={<ComingSoon />} />
           <Route path="/brand-visualizer" element={<ComingSoon />} />
           <Route path="/design-assistant" element={<ComingSoon />} />

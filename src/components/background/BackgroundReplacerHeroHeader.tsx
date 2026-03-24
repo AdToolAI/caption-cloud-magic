@@ -63,7 +63,7 @@ export function BackgroundReplacerHeroHeader() {
               className="text-4xl md:text-5xl font-bold mb-3"
             >
               <span className="bg-gradient-to-r from-primary via-amber-400 to-cyan-400 bg-clip-text text-transparent">
-                Professionelle Produktbilder
+                Smart Background
               </span>
             </motion.h1>
 
