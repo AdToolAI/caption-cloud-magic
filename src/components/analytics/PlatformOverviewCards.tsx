@@ -4,15 +4,15 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { Eye, Heart, MessageCircle, Share2, TrendingUp } from "lucide-react";
+import { Eye, Heart, MessageCircle, TrendingUp, Instagram, Facebook, Youtube, Music, Linkedin, Twitter } from "lucide-react";
 
 const PLATFORMS = [
-  { id: "instagram", label: "Instagram", color: "bg-pink-500", icon: "📸" },
-  { id: "facebook", label: "Facebook", color: "bg-blue-600", icon: "📘" },
-  { id: "youtube", label: "YouTube", color: "bg-red-600", icon: "▶️" },
-  { id: "tiktok", label: "TikTok", color: "bg-black", icon: "🎵" },
-  { id: "linkedin", label: "LinkedIn", color: "bg-blue-700", icon: "💼" },
-  { id: "x", label: "X", color: "bg-zinc-800", icon: "𝕏" },
+  { id: "instagram", label: "Instagram", icon: Instagram, color: "text-pink-500", glow: "drop-shadow-[0_0_8px_rgba(236,72,153,0.6)]" },
+  { id: "facebook", label: "Facebook", icon: Facebook, color: "text-blue-500", glow: "drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]" },
+  { id: "youtube", label: "YouTube", icon: Youtube, color: "text-red-600", glow: "drop-shadow-[0_0_8px_rgba(220,38,38,0.6)]" },
+  { id: "tiktok", label: "TikTok", icon: Music, color: "text-foreground", glow: "drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" },
+  { id: "linkedin", label: "LinkedIn", icon: Linkedin, color: "text-blue-600", glow: "drop-shadow-[0_0_8px_rgba(37,99,235,0.6)]" },
+  { id: "x", label: "X", icon: Twitter, color: "text-foreground", glow: "drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" },
 ];
 
 interface PlatformMetrics {
@@ -106,12 +106,12 @@ export function PlatformOverviewCards() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <span className="text-xl">{p.icon}</span>
+                  <p.icon className={`h-5 w-5 transition-all ${m?.connected ? `${p.color} ${p.glow}` : 'text-muted-foreground/40'}`} />
                   {p.label}
                 </CardTitle>
-                <Badge variant={m?.connected ? "default" : "secondary"}>
-                  {m?.connected ? "Verbunden" : "Nicht verbunden"}
-                </Badge>
+                {m?.connected && (
+                  <span className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]" />
+                )}
               </div>
             </CardHeader>
             <CardContent>
