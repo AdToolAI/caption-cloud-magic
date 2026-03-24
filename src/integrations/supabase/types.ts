@@ -6048,6 +6048,7 @@ export type Database = {
         Row: {
           channel_offsets: Json | null
           channels: string[]
+          content_hash: string | null
           created_at: string
           id: string
           media: Json | null
@@ -6057,6 +6058,7 @@ export type Database = {
         Insert: {
           channel_offsets?: Json | null
           channels: string[]
+          content_hash?: string | null
           created_at?: string
           id?: string
           media?: Json | null
@@ -6066,6 +6068,7 @@ export type Database = {
         Update: {
           channel_offsets?: Json | null
           channels?: string[]
+          content_hash?: string | null
           created_at?: string
           id?: string
           media?: Json | null
