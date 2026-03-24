@@ -746,6 +746,7 @@ export const ConnectionsTab = () => {
                     onSync={() => connection && handleSync(connection.id, provider.id)}
                     isSyncing={loading}
                     userPlan={userPlan as any}
+                    callbackError={xCallbackError}
                   />
                 );
               }
