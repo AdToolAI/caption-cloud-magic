@@ -1,37 +1,49 @@
 
+Ich habe es geprüft.
 
-## Problem
+Was ich verifiziert habe
+- `health-x` antwortet mit `ok: true`. Die X-Secrets sind also vorhanden; es ist kein fehlender API-Key.
+- Die aktuellen Backend-Logs von `x-oauth-callback` zeigen den echten Fehler: X lehnt die App bei `GET https://api.x.com/2/users/me` mit `Client Forbidden`, `reason: client-not-enrolled`, `required_enrollment: Appropriate Level of API Access` ab.
+- In `social_connections` existiert aktuell keine Zeile für `provider = 'x'`. X ist also derzeit nicht wirklich verbunden.
 
-Zwei Fehler in `x-oauth-callback/index.ts`:
+Warum du trotzdem keine Fehlermeldung siehst
+- `supabase/functions/x-oauth-callback/index.ts` leitet bei Fehlern auf `/performance?provider=x&status=error&message=...` weiter.
+- Die Fehlermeldung wird aber erst in `ConnectionsTab` / `XConnectionCard` ausgewertet.
+- `src/pages/PerformanceTracker.tsx` öffnet standardmäßig immer den Tab `overview`, nicht `connections`.
+- Dadurch landet man nach dem Redirect zwar auf `/performance`, aber nicht direkt in dem Bereich, der die X-Fehlermeldung sichtbar macht.
+- Zusätzlich ist der Redirect hart an `APP_BASE_URL` gebunden. Wenn du den Flow aus Preview oder einer anderen URL startest, kann die Rückleitung auf einer anderen Domain/Ansicht landen als die, die du gerade beobachtest.
 
-1. **Crash in Error-Handler (Zeile 159)**: `supabase.from(...).delete(...).eq(...).catch()` ist kein gültiger Aufruf — der Supabase Query Builder gibt kein thenable mit `.catch()` zurück. Das führt zum `TypeError` und zum **"Internal Server Error"** statt einer sauberen Redirect-Antwort.
+Fazit
+- Ja: Die X-Credentials sind technisch hinterlegt.
+- Nein: X ist nicht korrekt verbunden.
+- Der aktuelle Blocker ist nicht „API-Key fehlt“, sondern: Die hinterlegte X-App wird von X selbst für v2 abgelehnt (Projektbindung/API-Level passt nicht).
+- Der sichtbare UX-Bug ist: Die App zeigt den Fehler nicht zuverlässig, weil sie nach dem Callback auf der falschen Ansicht landet.
 
-2. **X API Enrollment-Fehler**: Die X-App-Credentials werden weiterhin von X abgelehnt (`client-not-enrolled`). Das ist ein externes Konfigurationsproblem — aber der User sieht es nicht, weil Fehler 1 den Redirect verhindert.
+Implementierungsplan
+1. `supabase/functions/x-oauth-callback/index.ts` anpassen
+   - Bei Erfolg und Fehler auf `/performance?tab=connections...` weiterleiten.
+   - `provider`, `status` und `message` beibehalten.
+   - Optional einen Rücksprungpfad/origin mitgeben, damit Preview und Live-Domain sauber unterstützt werden.
 
-## Changes
+2. `src/pages/PerformanceTracker.tsx` URL-gesteuert machen
+   - `tab` aus der URL lesen.
+   - Bei `tab=connections` direkt den Connections-Tab öffnen.
+   - Standardverhalten für normale Aufrufe beibehalten.
 
-### File: `supabase/functions/x-oauth-callback/index.ts`
+3. `src/components/performance/ConnectionsTab.tsx` robuster machen
+   - Erfolg nur anzeigen, wenn nach dem Redirect wirklich eine frische `social_connections`-Zeile für `x` gefunden wird.
+   - `status=error` sofort als sichtbaren Fehler behandeln.
+   - Query-Parameter erst entfernen, nachdem Toast/Banner sicher angezeigt wurden.
 
-**Fix the `.catch()` crash** (Zeile 157-160):
+4. `src/components/performance/XConnectionCard.tsx` Diagnose weiter schärfen
+   - Die vorhandene Inline-Fehlermeldung beibehalten.
+   - Für `client-not-enrolled` einen klaren Hinweis anzeigen: X-App/Projekt/API-Zugang wird von X abgelehnt.
 
-Replace the broken `.catch()` pattern with a proper try/catch:
+5. Nach Umsetzung validieren
+   - Fehlerfall: Redirect landet direkt im Connections-Tab und zeigt die echte X-Meldung.
+   - Erfolgsfall: X wird erst dann als verbunden angezeigt, wenn wirklich ein `social_connections`-Datensatz existiert.
 
-```typescript
-// Clean up oauth state on failure too
-if (state) {
-  try {
-    await supabase.from('oauth_states').delete().eq('csrf_token', state);
-  } catch (_) {
-    // ignore cleanup errors
-  }
-}
-```
-
-Also fix the same pattern on the success path (around line 145) if it uses the same `.catch()` syntax.
-
-This single fix will ensure that instead of "Internal Server Error", the user gets properly redirected back to `/performance?provider=x&status=error&message=...` with the real X API error message visible.
-
-## What the user will see after this fix
-
-Instead of "Internal Server Error", they will be redirected back to the app with a clear error message explaining that the X Developer Portal app needs to be attached to a Project with at least "Basic" API access.
-
+Technische Details
+- Keine Datenbankmigration nötig.
+- Aktueller nachweisbarer Root Cause im Backend: `client-not-enrolled`.
+- Aktueller nachweisbarer Root Cause im Frontend: Redirect landet nicht direkt in der Ansicht, die den Fehler ausliest und anzeigt.
