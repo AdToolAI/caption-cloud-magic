@@ -151,6 +151,7 @@ function AppLayout() {
                     {/* Direct public routes for TikTok OAuth compliance */}
                     <Route path="/privacy" element={<Legal />} />
                     <Route path="/terms" element={<Legal />} />
+                    <Route path="/imprint" element={<Legal />} />
                     <Route path="/delete-data" element={<DeleteData />} />
                     
                     {/* Feature pages - enabled */}

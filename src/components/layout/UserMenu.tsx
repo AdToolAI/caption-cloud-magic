@@ -120,7 +120,7 @@ export function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem 
-          onClick={signOut}
+          onClick={async () => { await signOut(); navigate('/'); }}
           className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
         >
           <LogOut className="h-4 w-4" />

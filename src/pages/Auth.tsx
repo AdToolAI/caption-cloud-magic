@@ -345,7 +345,7 @@ const Auth = () => {
         open={requiresMfa}
         onSuccess={() => {
           clearMfaRequirement();
-          navigate('/generator');
+          navigate('/home');
         }}
         onCancel={() => {
           clearMfaRequirement();
