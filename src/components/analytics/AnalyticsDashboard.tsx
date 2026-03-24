@@ -21,7 +21,7 @@ export const AnalyticsDashboard = () => {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState<Metrics>({
     totalPosts: 0,
-    totalHooks: 0,
+    
     postsThisWeek: 0,
     weekOverWeekGrowth: 0,
     goalsCompleted: 0,
