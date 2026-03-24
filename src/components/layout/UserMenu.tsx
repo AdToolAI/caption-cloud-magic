@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { User, Settings, CreditCard, HelpCircle, LogOut, Coins } from "lucide-react";
+import { User, Settings, CreditCard, HelpCircle, LogOut, Coins, Briefcase, Tag } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +57,12 @@ export function UserMenu() {
             )}
           </Link>
         </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/brand-kit" className="flex items-center gap-2 cursor-pointer">
+            <Briefcase className="h-4 w-4" />
+            <span>{t("nav.brandKit")}</span>
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to="/account" className="flex items-center gap-2 cursor-pointer">
@@ -68,6 +74,19 @@ export function UserMenu() {
           <Link to="/billing" className="flex items-center gap-2 cursor-pointer">
             <CreditCard className="h-4 w-4" />
             <span>{t("header.billing")}</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/pricing" className="flex items-center gap-2 cursor-pointer">
+            <Tag className="h-4 w-4" />
+            <span>{t("nav.pricing")}</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/faq" className="flex items-center gap-2 cursor-pointer">
+            <HelpCircle className="h-4 w-4" />
+            <span>{t("nav.faq")}</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

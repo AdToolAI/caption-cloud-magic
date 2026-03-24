@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Briefcase, Coins, Settings, CreditCard, ChevronRight, Star, Video, Edit, ShieldCheck, ChevronLeft, Mic2 } from "lucide-react";
+import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Coins, Settings, ChevronRight, Star, Video, Edit, ShieldCheck, ChevronLeft, Mic2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
@@ -138,12 +138,6 @@ export function AppSidebar() {
     team: [
       { route: "/team-workspace", titleKey: "nav.teamWorkspace", icon: Users, plan: "pro" },
       { route: "/white-label", titleKey: "nav.whiteLabel", icon: Palette, plan: "enterprise" },
-    ],
-    verwaltung: [
-      { route: "/brand-kit", titleKey: "nav.brandKit", icon: Briefcase },
-      { route: "/credits", titleKey: "nav.credits", icon: Coins },
-      { route: "/account", titleKey: "nav.account", icon: Settings },
-      { route: "/billing", titleKey: "nav.billing", icon: CreditCard },
     ],
     admin: [
       { route: "/admin", titleKey: "Admin Dashboard", icon: ShieldCheck },
@@ -325,32 +319,6 @@ export function AppSidebar() {
           .filter(([hubKey]) => hubKey !== 'admin' || isAdmin)
           .map(([hubKey, hubItems]) => renderHub(hubKey, hubItems))}
 
-        {/* Auxiliary Pages */}
-        <SidebarGroup>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-smooth">
-                <Link to="/pricing" className="flex items-center gap-3">
-                  {!isCollapsed && <span className="text-sm">{t("nav.pricing")}</span>}
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-smooth">
-                <Link to="/faq" className="flex items-center gap-3">
-                  {!isCollapsed && <span className="text-sm">{t("nav.faq")}</span>}
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-smooth">
-                <Link to="/support" className="flex items-center gap-3">
-                  {!isCollapsed && <span className="text-sm">{t("support")}</span>}
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
 
         {/* Animated Collapse Indicator at Bottom */}
         <div className="mt-auto pb-4 flex justify-center">
