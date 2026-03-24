@@ -11,24 +11,34 @@ export function CommentsAnalyticsTab() {
   const { user } = useAuth();
   const [platform, setPlatform] = useState("all");
 
-  const { data: comments, isLoading } = useQuery({
-    queryKey: ["analytics-comments", user?.id, platform],
-    queryFn: async (): Promise<any[]> => {
-      if (!user) return [];
-      const baseQuery = supabase
-        .from("comments")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
+  const [comments, setComments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-      const query = platform !== "all" ? baseQuery.eq("platform", platform) : baseQuery;
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data || []) as any[];
-    },
-    enabled: !!user,
-  });
+  useEffect(() => {
+    if (!user) return;
+    setIsLoading(true);
+    const load = async () => {
+      try {
+        let query = supabase
+          .from("comments" as any)
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (platform !== "all") {
+          query = query.eq("platform", platform);
+        }
+        const { data } = await query;
+        setComments((data || []) as any[]);
+      } catch (err) {
+        console.error("Error loading comments:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, [user, platform]);
 
   const sentimentCounts = {
     positive: (comments || []).filter(c => (c as any).sentiment === "positive").length,
