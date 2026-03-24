@@ -121,7 +121,7 @@ export const Header = () => {
                 <Link to="/auth">{t("auth.login")}</Link>
               </Button>
               <Button asChild size="sm" className="hidden sm:flex" aria-label={t("hero.cta")}>
-                <Link to="/generator">{t("hero.cta")}</Link>
+                <Link to="/auth">{t("hero.cta")}</Link>
               </Button>
             </>
           )}
