@@ -32,8 +32,15 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Extract auth header if available
+    // Extract return URL and auth header
     const authHeader = req.headers.get('Authorization');
+    let returnTo: string | null = null;
+    try {
+      const body = await req.json();
+      returnTo = body?.returnTo || null;
+    } catch (_) {
+      // no body is fine
+    }
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
