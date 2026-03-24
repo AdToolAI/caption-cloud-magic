@@ -28,7 +28,6 @@ interface PlatformPost {
   comments: number | null;
   shares: number | null;
   engagement_rate: number | null;
-  permalink: string | null;
 }
 
 export default function PlatformAnalytics() {
