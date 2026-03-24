@@ -46,10 +46,9 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan }: XCo
       return;
     }
 
-    setLastError(null);
+    setIsConnecting(true);
 
     try {
-      setIsConnecting(true);
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
