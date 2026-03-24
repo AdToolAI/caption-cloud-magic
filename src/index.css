@@ -89,40 +89,68 @@
                      radial-gradient(ellipse at 70% 80%, hsla(187, 84%, 55%, 0.06) 0%, transparent 50%);
   }
 
-  /* Dark mode is now the default - light mode override */
+  /* Futuristic Light Mode - Electric Silver */
   .light {
-    --background: 210 20% 98%;
+    --background: 220 25% 97%;
     --foreground: 222 47% 11%;
 
-    --card: 0 0% 100%;
+    --card: 220 20% 100%;
     --card-foreground: 222 47% 11%;
 
-    --popover: 0 0% 100%;
+    --popover: 220 20% 99%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 243 75% 59%;
+    --primary: 230 85% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 9% 46%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 220 15% 88%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 220 20% 94%;
+    --muted-foreground: 215 16% 42%;
 
-    --accent: 189 94% 43%;
+    --accent: 187 84% 45%;
     --accent-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 239 84% 67%;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
 
-    --sidebar: 0 0% 100%;
+    --warning: 43 90% 50%;
+    --warning-foreground: 222 47% 11%;
+
+    --danger: 355 80% 50%;
+    --danger-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 18% 88%;
+    --input: 220 18% 88%;
+    --ring: 230 85% 55%;
+
+    --sidebar: 220 25% 98%;
     --sidebar-foreground: 222 47% 11%;
 
-    --glass-bg: rgba(255, 255, 255, 0.7);
-    --glass-border: rgba(0, 0, 0, 0.08);
-    
-    --shadow-glow: 0 0 40px hsla(243, 75%, 59%, 0.25);
+    --radius: 1rem;
+
+    --shadow-sm: 0 1px 3px 0 rgba(100, 120, 180, 0.08);
+    --shadow-md: 0 4px 12px 0 rgba(100, 120, 180, 0.1);
+    --shadow-lg: 0 10px 25px -3px rgba(100, 120, 180, 0.12);
+    --shadow-xl: 0 20px 40px -5px rgba(100, 120, 180, 0.15);
+
+    --shadow-glow-gold: 0 0 30px hsla(230, 85%, 55%, 0.15);
+    --shadow-glow-cyan: 0 0 30px hsla(187, 84%, 45%, 0.15);
+    --shadow-glow: 0 0 40px hsla(230, 85%, 55%, 0.12);
+    --shadow-elegant: 0 15px 40px -15px hsla(230, 85%, 55%, 0.15);
+
+    --glass-bg: rgba(255, 255, 255, 0.75);
+    --glass-border: rgba(100, 120, 180, 0.12);
+
+    --gradient-primary: linear-gradient(135deg, hsl(230 85% 55%), hsl(187 84% 45%));
+    --gradient-gold: linear-gradient(135deg, hsl(230 85% 55%), hsl(230 75% 45%));
+    --gradient-cyan: linear-gradient(135deg, hsl(187 84% 45%), hsl(187 84% 35%));
+    --gradient-hero: radial-gradient(ellipse at 30% 20%, hsla(230, 85%, 55%, 0.06) 0%, transparent 50%),
+                     radial-gradient(ellipse at 70% 80%, hsla(187, 84%, 45%, 0.04) 0%, transparent 50%);
   }
 }
 
