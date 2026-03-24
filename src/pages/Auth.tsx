@@ -37,7 +37,7 @@ const Auth = () => {
         console.log('[Auth] Found composer import, redirecting to /composer');
         navigate('/composer');
       } else {
-        navigate('/generator');
+        navigate('/home');
       }
     }
   }, [user, navigate]);
