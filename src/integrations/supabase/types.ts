@@ -5031,6 +5031,7 @@ export type Database = {
           expires_at: string
           id: string
           provider: string
+          redirect_url: string | null
           state: string | null
           user_id: string
         }
@@ -5043,6 +5044,7 @@ export type Database = {
           expires_at: string
           id?: string
           provider: string
+          redirect_url?: string | null
           state?: string | null
           user_id: string
         }
@@ -5055,6 +5057,7 @@ export type Database = {
           expires_at?: string
           id?: string
           provider?: string
+          redirect_url?: string | null
           state?: string | null
           user_id?: string
         }
