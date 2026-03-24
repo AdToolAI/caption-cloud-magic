@@ -94,20 +94,35 @@ serve(async (req) => {
     }
     console.log(`✅ Connection ownership verified for user ${user.id}`);
 
-    // Check if YouTube token needs refresh
+    // Check if token needs refresh (YouTube or X)
     let accessToken: string;
-    if (provider === 'youtube' && connection.token_expires_at) {
+    if ((provider === 'youtube' || provider === 'x') && connection.token_expires_at) {
       const tokenExpiry = new Date(connection.token_expires_at);
       if (tokenExpiry < new Date()) {
-        console.log('🔄 YouTube token expired, refreshing...');
-        const { accessToken: refreshedToken, error: refreshError } = await refreshYouTubeToken(connection, serviceClient);
+        console.log(`🔄 ${provider} token expired, refreshing...`);
         
-        if (refreshError || !refreshedToken) {
-          throw new Error(refreshError || 'Token refresh failed. Please reconnect YouTube.');
+        const refreshResult = provider === 'youtube'
+          ? await refreshYouTubeToken(connection, serviceClient)
+          : await refreshXToken(connection, serviceClient);
+        
+        if (refreshResult.error || !refreshResult.accessToken) {
+          // Return a structured 200 so the frontend can show actionable guidance
+          if (refreshResult.reconnectRequired) {
+            return new Response(
+              JSON.stringify({
+                success: false,
+                reconnect_required: true,
+                provider,
+                error: refreshResult.error
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          throw new Error(refreshResult.error || `Token refresh failed. Please reconnect ${provider}.`);
         }
         
-        accessToken = refreshedToken;
-        console.log('✅ YouTube token refreshed successfully');
+        accessToken = refreshResult.accessToken;
+        console.log(`✅ ${provider} token refreshed successfully`);
       } else {
         // Token still valid, decode it
         accessToken = await decodeProviderToken(provider, connection.access_token_hash);
