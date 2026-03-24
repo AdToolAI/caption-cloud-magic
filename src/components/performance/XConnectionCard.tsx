@@ -16,6 +16,7 @@ interface XConnectionCardProps {
   onSync: () => void;
   isSyncing: boolean;
   userPlan?: PlanId | null;
+  callbackError?: string | null;
 }
 
 export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan }: XConnectionCardProps) => {
