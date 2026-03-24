@@ -1,15 +1,15 @@
 
 
-## Doppelte Notification-Glocke entfernen
+## Notification-Glocke: Sidebar entfernen, Header wiederherstellen
 
-### Problem
-Es gibt zwei Notification-Glocken: eine in der Sidebar (links) und eine im AppHeader (rechts oben). Die rechte im Header soll entfernt werden.
+### Aenderungen
 
-### Aenderung
+**1. `src/components/layout/AppHeader.tsx`** — NotificationBell zurueck in den Header:
+- Import `NotificationBell` aus `@/components/NotificationBell` hinzufuegen
+- Zwischen ThemeToggle und UserMenu einfuegen: `{user && <NotificationBell />}`
 
-**`src/components/layout/AppHeader.tsx`** (Zeile 51):
-- `{user && <NotificationBell />}` entfernen
-- Den `NotificationBell` Import entfernen
-
-Die Sidebar-Glocke bleibt bestehen als einziger Zugang zu Benachrichtigungen.
+**2. `src/components/AppSidebar.tsx`** — Glocke aus der Sidebar entfernen:
+- Den `NotificationBadge`-Block (Zeilen 47-49) und den zugehoerigen Import entfernen
+- Den `NotificationCenter`-Block und Import entfernen
+- Den `useState` fuer `showNotifications` entfernen
 
