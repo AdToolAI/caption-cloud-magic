@@ -1,22 +1,37 @@
 
 
-## Footer und Navigation auf Legal-Seiten fixen
+## Drei Bugs fixen: Impressum-Route, Logout-Redirect, Login-Redirect
 
-### Problem
-1. Die Legal-Seiten nutzen den alten `Footer` (englisch, anderes Layout) statt den `BlackTieFooter` der Startseite
-2. Den Legal-Seiten fehlt ein Header/Navigation - man kann nicht zurueck navigieren
+### Probleme
 
-### Loesung
+1. **Impressum-Link fuehrt zur Startseite**: Der Footer-Link zeigt auf `/imprint`, aber es gibt keine Route dafuer. Der Catch-All (`*`) leitet zu `/home` weiter.
 
-**Datei: `src/pages/Legal.tsx`**
-- `Footer` Import durch `BlackTieFooter` ersetzen
-- Einen einfachen Header mit Logo und Zurueck-Link zur Startseite hinzufuegen (oder den bestehenden `Header` einbinden)
-- Alle 4 Render-Bloecke (privacy, terms, avv, imprint) aktualisieren
+2. **Logout leitet nicht zur Startseite**: Nach `signOut()` gibt es keinen expliziten Redirect zu `/`. Der User landet auf der aktuellen Seite oder wird durch den Catch-All umgeleitet.
 
-**Optional: `src/components/Footer.tsx`**
-- Pruefen ob dieser Footer noch irgendwo anders verwendet wird; falls nicht, kann er spaeter entfernt werden
+3. **Login leitet zum KI-Text-Studio statt Dashboard**: In `Auth.tsx` Zeile 40 steht `navigate('/generator')` statt `navigate('/home')`.
 
-### Ergebnis
-- Einheitlicher Footer auf allen Seiten (deutsch, gleiches Design)
-- Navigation zurueck zur Startseite verfuegbar
+### Aenderungen
+
+**1. `src/App.tsx`** — Direkte Route fuer `/imprint` hinzufuegen (wie bei `/privacy` und `/terms`):
+```tsx
+<Route path="/imprint" element={<Legal />} />
+```
+Ausserdem `/imprint` zur `isLandingRoute`-Liste hinzufuegen.
+
+**2. `src/pages/Legal.tsx`** — In der `actualPage`-Logik `/imprint` ergaenzen, damit die Seite den richtigen Inhalt zeigt.
+
+**3. `src/components/layout/UserMenu.tsx`** — Nach `signOut()` zur Startseite navigieren:
+```tsx
+const navigate = useNavigate();
+// onClick:
+await signOut();
+navigate('/');
+```
+
+**4. `src/pages/Auth.tsx`** Zeile 40 — Login-Redirect von `/generator` auf `/home` aendern:
+```tsx
+navigate('/home');
+```
+
+**5. `src/pages/Auth.tsx`** — `Footer` Import durch `BlackTieFooter` ersetzen (gleicher Fix wie bei Legal-Seiten).
 
