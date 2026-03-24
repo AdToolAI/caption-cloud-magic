@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
 
     // Fetch user info
     const userResponse = await fetch(
-      'https://api.twitter.com/2/users/me?user.fields=name,username,profile_image_url',
+      'https://api.x.com/2/users/me?user.fields=name,username,profile_image_url',
       {
         headers: { 'Authorization': `Bearer ${tokenData.access_token}` },
       }
