@@ -113,7 +113,7 @@ function AppLayout() {
   useSessionTracking(user?.id);
   
   // Landing page routes
-  const isLandingRoute = ['/', '/auth', '/pricing', '/faq', '/legal', '/privacy', '/terms', '/delete-data'].includes(location.pathname) || location.pathname.startsWith('/legal/');
+  const isLandingRoute = ['/', '/auth', '/pricing', '/faq', '/legal', '/privacy', '/terms', '/imprint', '/delete-data'].includes(location.pathname) || location.pathname.startsWith('/legal/');
   
   return (
     <div className="flex min-h-screen w-full">
