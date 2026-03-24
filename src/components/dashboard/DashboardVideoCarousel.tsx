@@ -189,18 +189,87 @@ export const DashboardVideoCarousel = () => {
   }
 
   if (sortedVideos.length === 0) {
+    const demoVideoUrl = 'https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/public/ai-videos/8948d3d9-2c5e-4405-9e9c-1624448e7189/a028c06a-764d-44a3-8856-e3b1fa1855d4.mp4';
+
     return (
-      <Card className="p-8 text-center">
-        <Video className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-foreground mb-2">Noch keine Videos erstellt</h3>
-        <p className="text-sm text-muted-foreground mb-4">Erstelle dein erstes Video und es erscheint hier!</p>
-        <Button asChild>
-          <Link to="/universal-video-creator">
-            <Sparkles className="h-4 w-4 mr-2" />
-            Video erstellen
-          </Link>
-        </Button>
-      </Card>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Video className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-bold text-foreground">Deine Videos</h2>
+        </div>
+
+        <div className="flex justify-center" style={{ perspective: '1200px' }}>
+          <div
+            className="relative rounded-2xl overflow-hidden ring-2 ring-primary/60 shadow-2xl shadow-primary/30 w-full max-w-2xl"
+            style={{
+              transform: 'perspective(1200px) rotateY(0deg) scale(1)',
+              transformOrigin: 'center center',
+            }}
+          >
+            <div className="aspect-video relative overflow-hidden bg-black">
+              <video
+                src={demoVideoUrl}
+                muted={isMuted}
+                autoPlay
+                playsInline
+                loop
+                preload="auto"
+                className="w-full h-full object-cover"
+              />
+
+              {/* Controls */}
+              <div className="absolute top-2 right-2 z-10 flex gap-1.5">
+                <button
+                  onClick={() => setIsMuted(prev => !prev)}
+                  className="w-9 h-9 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md hover:bg-primary/80 transition-colors"
+                >
+                  {isMuted ? <VolumeX className="h-4 w-4 text-white" /> : <Volume2 className="h-4 w-4 text-white" />}
+                </button>
+                <button
+                  onClick={() => setSelectedVideo({ url: demoVideoUrl, title: 'AdTool AI: Die Lösung' })}
+                  className="w-9 h-9 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md hover:bg-primary/80 transition-colors"
+                >
+                  <Expand className="h-4 w-4 text-white" />
+                </button>
+              </div>
+
+              {/* Badge */}
+              <div className="absolute top-3 left-3 z-10">
+                <Badge className="bg-primary/90 text-primary-foreground text-[10px] font-bold backdrop-blur-sm">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  DEMO
+                </Badge>
+              </div>
+
+              {/* Bottom info */}
+              <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent">
+                <p className="text-sm font-medium text-white drop-shadow-md">AdTool AI: Die Lösung</p>
+                <p className="text-[10px] text-white/60 mt-0.5">Dein erstes Video könnte so aussehen</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div className="flex justify-center pt-2">
+          <Button asChild size="lg" className="shadow-glow">
+            <Link to="/universal-video-creator">
+              <Sparkles className="h-4 w-4 mr-2" />
+              Dein erstes Video erstellen
+            </Link>
+          </Button>
+        </div>
+
+        {/* Video Player Dialog */}
+        {selectedVideo && (
+          <VideoPreviewPlayer
+            open={!!selectedVideo}
+            onOpenChange={(open) => !open && setSelectedVideo(null)}
+            videoUrl={selectedVideo.url}
+            title={selectedVideo.title}
+          />
+        )}
+      </div>
     );
   }
 
