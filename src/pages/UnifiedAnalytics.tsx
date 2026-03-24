@@ -467,6 +467,16 @@ export default function UnifiedAnalytics() {
             </Card>
           </TabsContent>
 
+          {/* KI-Analyse Tab */}
+          <TabsContent value="ai-strategy" className="space-y-6">
+            <AIStrategyPanel />
+          </TabsContent>
+
+          {/* Kommentare Tab */}
+          <TabsContent value="comments" className="space-y-6">
+            <CommentsAnalyticsTab />
+          </TabsContent>
+
           {/* Berichte Tab */}
           <TabsContent value="reports" className="space-y-6">
             <Card>
