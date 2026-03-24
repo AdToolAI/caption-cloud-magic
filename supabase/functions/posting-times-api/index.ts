@@ -2,10 +2,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 import { getRedisCache } from '../_shared/redis-cache.ts';
 
-// CORS headers for API responses
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 interface PostingSlot {
@@ -78,75 +77,149 @@ const PLATFORM_PEAKS: Record<string, PlatformPeak[]> = {
 };
 
 function getDayType(date: Date): string {
-  const day = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-  
+  const day = date.getDay();
   if (day === 0 || day === 6) return 'weekend';
   if (day >= 2 && day <= 4) return 'tue-thu';
   return 'weekday';
 }
 
+/** Apply seasonal adjustments to scores based on month and daylight patterns */
+function getSeasonalMultiplier(date: Date, hour: number): number {
+  const month = date.getMonth(); // 0-11
+  
+  // Summer months (Jun-Aug): evening slots get a boost, early morning slightly lower
+  if (month >= 5 && month <= 7) {
+    if (hour >= 20) return 1.08; // People stay up later
+    if (hour <= 8) return 0.93;
+  }
+  
+  // Winter months (Nov-Feb): evening slots earlier, morning check higher
+  if (month >= 10 || month <= 1) {
+    if (hour >= 18 && hour <= 20) return 1.06; // Earlier peak
+    if (hour >= 22) return 0.90; // Less late-night activity
+    if (hour >= 8 && hour <= 10) return 1.04; // Morning commute
+  }
+  
+  // Holiday season boost (Dec)
+  if (month === 11) {
+    if (hour >= 10 && hour <= 15) return 1.10; // Shopping/browsing
+  }
+  
+  return 1.0;
+}
+
 function generateIndustryBenchmarkSlots(
-  userId: string,
   platforms: string[],
   fromDate: string,
   toDate: string,
-  tz: string
 ): PostingSlot[] {
   const slots: PostingSlot[] = [];
   const from = new Date(fromDate);
   const to = new Date(toDate);
 
-  console.log(`[Posting Times API] Generating industry benchmarks for ${platforms.join(', ')}`);
-
   for (const platform of platforms) {
     const peaks = PLATFORM_PEAKS[platform];
     if (!peaks) continue;
 
-    // Generate slots for each day in range
     let currentDate = new Date(from);
     while (currentDate <= to) {
-      // Create a new date object for this iteration to avoid mutation issues
       const date = new Date(currentDate);
       const dayType = getDayType(date);
 
       for (const peak of peaks) {
-        // Check if this peak applies to this day type
         const applies = peak.dayTypes.includes('all' as any) || 
                        peak.dayTypes.includes(dayType as any);
-
         if (!applies) continue;
 
-        // Create validated ISO timestamps for this hour
         const slotStart = new Date(date);
         slotStart.setHours(peak.hour, 0, 0, 0);
-        
         const slotEnd = new Date(slotStart);
         slotEnd.setHours(peak.hour + 1, 0, 0, 0);
 
-        // Validate timestamps before adding
-        const startISO = slotStart.toISOString();
-        const endISO = slotEnd.toISOString();
+        // Apply seasonal adjustment
+        const seasonalMult = getSeasonalMultiplier(date, peak.hour);
+        const adjustedScore = Math.min(100, Math.round(peak.score * seasonalMult));
+
+        const reasons = [`📊 ${peak.reason}`];
+        if (seasonalMult !== 1.0) {
+          reasons.push(seasonalMult > 1 ? '☀️ Saisonal begünstigt' : '❄️ Saisonal angepasst');
+        }
+        reasons.push('Basiert auf Branchen-Durchschnitten');
 
         slots.push({
-          slot_start: startISO,
-          slot_end: endISO,
-          score: peak.score,
-          reasons: [`📊 ${peak.reason}`, 'Basiert auf Branchen-Durchschnitten'],
-          features: {
-            source: 'industry_benchmark',
-            dayType,
-          },
+          slot_start: slotStart.toISOString(),
+          slot_end: slotEnd.toISOString(),
+          score: adjustedScore,
+          reasons,
+          features: { source: 'industry_benchmark', dayType },
           platform,
         });
       }
 
-      // Move to next day
       currentDate.setDate(currentDate.getDate() + 1);
     }
   }
 
-  console.log(`[Posting Times API] Generated ${slots.length} industry benchmark slots`);
+  console.log(`[Posting Times API] Generated ${slots.length} benchmark slots`);
   return slots;
+}
+
+/** Blend user history slots with benchmark slots (70% history / 30% benchmark) */
+function blendSlotsWithBenchmarks(
+  userSlots: PostingSlot[],
+  benchmarkSlots: PostingSlot[],
+): PostingSlot[] {
+  // Index benchmarks by platform+date+hour for fast lookup
+  const benchmarkMap = new Map<string, PostingSlot>();
+  for (const s of benchmarkSlots) {
+    const key = `${s.platform}|${s.slot_start}`;
+    benchmarkMap.set(key, s);
+  }
+
+  const result: PostingSlot[] = [];
+  const usedKeys = new Set<string>();
+
+  // For each user slot, blend with matching benchmark
+  for (const us of userSlots) {
+    const key = `${us.platform}|${us.slot_start}`;
+    usedKeys.add(key);
+    const bench = benchmarkMap.get(key);
+    if (bench) {
+      result.push({
+        ...us,
+        score: Math.round(us.score * 0.7 + bench.score * 0.3),
+        reasons: [...us.reasons.filter(r => !r.includes('Branchen')), '📈 Personalisiert + Branchentrend'],
+        features: { ...us.features, source: 'blended' },
+      });
+    } else {
+      result.push(us);
+    }
+  }
+
+  // Add benchmark slots that have no user data (fill gaps)
+  for (const bs of benchmarkSlots) {
+    const key = `${bs.platform}|${bs.slot_start}`;
+    if (!usedKeys.has(key)) {
+      result.push(bs);
+    }
+  }
+
+  return result;
+}
+
+/** Check if cached response has actual slot data */
+function isCacheValid(cached: any): boolean {
+  if (!cached || !cached.platforms) return false;
+  const platforms = cached.platforms;
+  for (const key of Object.keys(platforms)) {
+    if (Array.isArray(platforms[key]) && platforms[key].length > 0) {
+      // Check at least one day has slots
+      if (platforms[key].some((d: any) => d.slots && d.slots.length > 0)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 Deno.serve(async (req) => {
@@ -159,70 +232,53 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get user from auth header
     const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
+    if (!authHeader) throw new Error('No authorization header');
 
     const userToken = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(userToken);
-    
-    if (authError || !user) {
-      throw new Error('Unauthorized');
-    }
+    if (authError || !user) throw new Error('Unauthorized');
 
-    // Parse parameters from both body and query params
     const url = new URL(req.url);
     let body: any = {};
-    try {
-      body = await req.json();
-    } catch {
-      // No body or invalid JSON, use query params
-    }
+    try { body = await req.json(); } catch { /* no body */ }
     
     const platform = body.platform || url.searchParams.get('platform') || 'all';
     const days = parseInt(body.days || url.searchParams.get('days') || '14');
     const tz = body.tz || url.searchParams.get('tz') || 'Europe/Berlin';
 
-    console.log(`[Posting Times API] User: ${user.id}, Platform: ${platform}, Days: ${days}, TZ: ${tz}`);
+    console.log(`[Posting Times API] User: ${user.id}, Platform: ${platform}, Days: ${days}`);
 
-    // Redis Cache Integration (1 hour TTL for posting times)
+    // Redis Cache (30 min TTL)
     const cache = getRedisCache();
-    const cacheKey = cache.generateKeyHash('posting-times', {
-      userId: user.id,
-      platform,
-      days,
-      tz,
-    });
+    const cacheKey = cache.generateKeyHash('posting-times', { userId: user.id, platform, days, tz });
 
-    // Check Redis cache first
     const cached = await cache.get(cacheKey, { logHits: true });
-    if (cached) {
-      console.log(`[Posting Times API] Cache hit for user ${user.id}`);
-      return new Response(
-        JSON.stringify(cached),
-        {
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'application/json',
-            'X-Cache': 'REDIS-HIT'
-          },
-        }
-      );
+    if (cached && isCacheValid(cached)) {
+      console.log(`[Posting Times API] Valid cache hit`);
+      return new Response(JSON.stringify(cached), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' },
+      });
     }
 
-    // Calculate date range
+    if (cached && !isCacheValid(cached)) {
+      console.log(`[Posting Times API] Stale/empty cache detected, regenerating`);
+      await cache.delete(cacheKey);
+    }
+
+    // Date range
     const now = new Date();
     const fromDate = now.toISOString();
     const toDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
 
-    // Build platform filter
-    let platformFilter = platform === 'all' 
+    const platformFilter = platform === 'all' 
       ? ['instagram', 'tiktok', 'linkedin', 'x', 'facebook', 'youtube']
       : [platform];
 
-    // Fetch posting slots
+    // ALWAYS generate benchmarks first as baseline
+    const benchmarkSlots = generateIndustryBenchmarkSlots(platformFilter, fromDate, toDate);
+
+    // Then try to get user-specific slots
     const { data: dbSlots, error: slotsError } = await supabase
       .from('posting_slots')
       .select('*')
@@ -234,29 +290,24 @@ Deno.serve(async (req) => {
 
     if (slotsError) {
       console.error('[Posting Times API] Error fetching slots:', slotsError);
-      throw slotsError;
     }
 
-    console.log(`[Posting Times API] Found ${dbSlots?.length || 0} slots`);
-
-    // If no slots found, generate industry benchmarks
+    // Blend user data with benchmarks, or use pure benchmarks
     let slots: PostingSlot[];
-    if (!dbSlots || dbSlots.length === 0) {
-      console.log('[Posting Times API] No slots found, generating industry benchmarks');
-      slots = generateIndustryBenchmarkSlots(user.id, platformFilter, fromDate, toDate, tz);
+    if (dbSlots && dbSlots.length > 0) {
+      console.log(`[Posting Times API] Blending ${dbSlots.length} user slots with benchmarks`);
+      slots = blendSlotsWithBenchmarks(dbSlots as PostingSlot[], benchmarkSlots);
     } else {
-      slots = dbSlots as PostingSlot[];
+      slots = benchmarkSlots;
     }
 
-    // Check if user has any history
+    // Check history
     const { count: historyCount } = await supabase
       .from('posts_history')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
 
     const hasHistory = (historyCount || 0) > 0;
-
-    // Calculate history days if available
     let historyDays = 0;
     if (hasHistory) {
       const { data: oldestPost } = await supabase
@@ -266,28 +317,21 @@ Deno.serve(async (req) => {
         .order('published_at', { ascending: true })
         .limit(1)
         .single();
-
       if (oldestPost) {
         historyDays = Math.floor((now.getTime() - new Date(oldestPost.published_at).getTime()) / (1000 * 60 * 60 * 24));
       }
     }
 
-    // Group slots by platform and date
+    // Group by platform and date
     const platformData: Record<string, any[]> = {};
-
-    for (const slot of (slots || [])) {
-      if (!platformData[slot.platform]) {
-        platformData[slot.platform] = [];
-      }
-
+    for (const slot of slots) {
+      if (!platformData[slot.platform]) platformData[slot.platform] = [];
       const slotDate = new Date(slot.slot_start).toISOString().split('T')[0];
       let dayEntry = platformData[slot.platform].find((d: any) => d.date === slotDate);
-
       if (!dayEntry) {
         dayEntry = { date: slotDate, slots: [] };
         platformData[slot.platform].push(dayEntry);
       }
-
       dayEntry.slots.push({
         start: slot.slot_start,
         end: slot.slot_end,
@@ -297,53 +341,39 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Sort slots by score and take top 5 per day (statt nur top 3)
-    for (const platform of Object.keys(platformData)) {
-      for (const dayEntry of platformData[platform]) {
+    // Sort and limit per day
+    for (const p of Object.keys(platformData)) {
+      for (const dayEntry of platformData[p]) {
         dayEntry.slots = dayEntry.slots
           .sort((a: any, b: any) => b.score - a.score)
-          .slice(0, 5); // Mehr Slots für bessere Abdeckung
+          .slice(0, 5);
       }
     }
 
     const response = {
       timezone: tz,
-      range: {
-        from: fromDate,
-        to: toDate
-      },
+      range: { from: fromDate, to: toDate },
       platforms: platformData,
       metadata: {
         hasHistory,
         historyDays,
         generatedAt: new Date().toISOString(),
-        slotsCount: slots?.length || 0,
-        dataSource: hasHistory ? 'user_history' : 'industry_benchmark'
+        slotsCount: slots.length,
+        dataSource: hasHistory ? (dbSlots && dbSlots.length > 0 ? 'blended' : 'industry_benchmark') : 'industry_benchmark',
       }
     };
 
-    // Cache the result in Redis for 1 hour (3600 seconds)
-    await cache.set(cacheKey, response, 3600);
-    console.log(`[Posting Times API] Cached response for user ${user.id}`);
+    // Cache for 30 minutes
+    await cache.set(cacheKey, response, 1800);
 
-    return new Response(
-      JSON.stringify(response),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-          'X-Cache': 'REDIS-MISS'
-        },
-      }
-    );
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' },
+    });
 
   } catch (error: any) {
     console.error('[Posting Times API] Error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message || 'Internal server error',
-        details: error.toString()
-      }),
+      JSON.stringify({ error: error.message || 'Internal server error' }),
       { 
         status: error.message === 'Unauthorized' ? 401 : 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
