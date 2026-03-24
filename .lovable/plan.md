@@ -1,29 +1,22 @@
 
 
-## TikTok-Verifizierungsdatei aktualisieren
+## Footer und Navigation auf Legal-Seiten fixen
 
-Der Benutzer hat eine neue TikTok-Verifizierungsdatei hochgeladen mit einem anderen Verifizierungscode.
+### Problem
+1. Die Legal-Seiten nutzen den alten `Footer` (englisch, anderes Layout) statt den `BlackTieFooter` der Startseite
+2. Den Legal-Seiten fehlt ein Header/Navigation - man kann nicht zurueck navigieren
 
-### Was passiert
+### Loesung
 
-1. **Neue Verifizierungsdatei erstellen**: `public/tiktokV6OfUdRsbIJIUZazTvdRXuQh3ByGQXoK.txt` mit dem Inhalt:
-   ```
-   tiktok-developers-site-verification=V6OfUdRsbIJIUZazTvdRXuQh3ByGQXoK
-   ```
+**Datei: `src/pages/Legal.tsx`**
+- `Footer` Import durch `BlackTieFooter` ersetzen
+- Einen einfachen Header mit Logo und Zurueck-Link zur Startseite hinzufuegen (oder den bestehenden `Header` einbinden)
+- Alle 4 Render-Bloecke (privacy, terms, avv, imprint) aktualisieren
 
-2. **Alte Edge Function entfernen**: `supabase/functions/tiktok-verify/index.ts` loeschen (nicht mehr noetig)
+**Optional: `src/components/Footer.tsx`**
+- Pruefen ob dieser Footer noch irgendwo anders verwendet wird; falls nicht, kann er spaeter entfernt werden
 
 ### Ergebnis
-
-Die neue Datei wird erreichbar sein unter:
-```
-https://caption-cloud-magic.lovable.app/tiktokV6OfUdRsbIJIUZazTvdRXuQh3ByGQXoK.txt
-```
-
-Diese URL im TikTok Developer Portal eingeben und auf **Verify** klicken.
-
-### Technische Details
-
-- Statische Datei im `public/`-Ordner, wird direkt von Vite bereitgestellt
-- Kein Backend noetig, keine Slug-Einschraenkungen
+- Einheitlicher Footer auf allen Seiten (deutsch, gleiches Design)
+- Navigation zurueck zur Startseite verfuegbar
 
