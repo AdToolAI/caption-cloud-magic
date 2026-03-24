@@ -17,8 +17,8 @@ import {
   Edit3,
   Clock,
   Wand2,
-  
-  Zap,
+  RefreshCw,
+  MessageSquare,
   RefreshCw,
   MessageSquare,
   User,
