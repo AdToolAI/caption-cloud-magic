@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
     const codeVerifier = await decryptToken(oauthState.code_verifier);
 
     // Exchange code for tokens
-    const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
+    const tokenResponse = await fetch('https://api.x.com/2/oauth2/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
 
     // Fetch user info
     const userResponse = await fetch(
-      'https://api.twitter.com/2/users/me?user.fields=name,username,profile_image_url',
+      'https://api.x.com/2/users/me?user.fields=name,username,profile_image_url',
       {
         headers: { 'Authorization': `Bearer ${tokenData.access_token}` },
       }
