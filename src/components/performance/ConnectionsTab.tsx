@@ -53,12 +53,20 @@ export const ConnectionsTab = () => {
       if (connected && status === 'error') {
         // OAuth callback returned an error
         const errorMessage = params.get('message') || 'Verbindung fehlgeschlagen';
+        const decodedMessage = decodeURIComponent(errorMessage);
+        
+        // If this is an X error, store it for the XConnectionCard
+        if (connected === 'x') {
+          setXCallbackError(decodedMessage);
+        }
+        
         toast({
           title: t('common.error'),
-          description: decodeURIComponent(errorMessage),
+          description: decodedMessage,
           variant: "destructive"
         });
-        window.history.replaceState({}, '', window.location.pathname);
+        // Clean up URL params AFTER setting state
+        window.history.replaceState({}, '', window.location.pathname + '?tab=connections');
       } else if (connected && status === 'success') {
         // New OAuth callback format with auto-sync
         toast({
