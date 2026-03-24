@@ -3,17 +3,24 @@ import { Button } from "./button";
 import { useEffect, useState } from "react";
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark';
+    }
+    return 'dark';
+  });
 
   useEffect(() => {
-    const isDark = document.documentElement.classList.contains('dark');
-    setTheme(isDark ? 'dark' : 'light');
+    const saved = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    const initial = saved || 'dark';
+    setTheme(initial);
+    document.documentElement.classList.toggle('light', initial === 'light');
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    document.documentElement.classList.toggle('dark');
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
+    document.documentElement.classList.toggle('light', newTheme === 'light');
     localStorage.setItem('theme', newTheme);
   };
 
@@ -25,10 +32,10 @@ export function ThemeToggle() {
       aria-label="Toggle theme"
       className="rounded-xl hover:bg-muted/50 transition-smooth"
     >
-      {theme === 'light' ? (
-        <Moon className="h-5 w-5" />
-      ) : (
+      {theme === 'dark' ? (
         <Sun className="h-5 w-5" />
+      ) : (
+        <Moon className="h-5 w-5" />
       )}
     </Button>
   );
