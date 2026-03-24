@@ -397,6 +397,17 @@ export default function AudioStudio() {
                         />
                       </motion.div>
                     )}
+
+                    {activeTab === 'voices' && (
+                      <motion.div
+                        key="voices"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <VoiceLibraryPanel />
+                      </motion.div>
+                    )}
                   </AnimatePresence>
                 </div>
 
