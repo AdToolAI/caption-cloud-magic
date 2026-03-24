@@ -81,11 +81,13 @@ export const LinkedAccountsCard = () => {
 
     setActionLoading(platform);
     try {
+      const credential = getCredential(platform);
+      if (!credential?.connection_id) return;
+
       const { error } = await supabase
-        .from("platform_credentials")
-        .update({ is_connected: false })
-        .eq("user_id", user.id)
-        .eq("platform", platform);
+        .from("social_connections")
+        .delete()
+        .eq("id", credential.connection_id);
 
       if (error) throw error;
 
