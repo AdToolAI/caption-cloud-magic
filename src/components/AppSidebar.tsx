@@ -40,9 +40,6 @@ export function AppSidebar() {
         {/* Brand icon */}
         <div className="flex flex-col items-center py-4 border-b border-border bg-card">
           <Brand compact showText={false} />
-          <div className="mt-2">
-            <NotificationBadge onClick={() => setShowNotifications(true)} />
-          </div>
         </div>
 
         <SidebarContent className="bg-card border-r border-border h-full flex flex-col items-center py-3 gap-1">
