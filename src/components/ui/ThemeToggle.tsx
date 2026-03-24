@@ -32,10 +32,10 @@ export function ThemeToggle() {
       aria-label="Toggle theme"
       className="rounded-xl hover:bg-muted/50 transition-smooth"
     >
-      {theme === 'dark' ? (
-        <Sun className="h-5 w-5" />
-      ) : (
+{theme === 'dark' ? (
         <Moon className="h-5 w-5" />
+      ) : (
+        <Sun className="h-5 w-5" />
       )}
     </Button>
   );
