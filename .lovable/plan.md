@@ -1,24 +1,31 @@
 
 
-# Plan: Demo-Video für neue User ohne eigene Videos anzeigen
+# Plan: Theme-Toggle reparieren & futuristischen Light-Mode erstellen
 
-## Zusammenfassung
-Im `DashboardVideoCarousel` wird der leere Zustand (keine Videos) durch ein automatisch abspielendes Demo-Video ersetzt. Neue User, die noch keine Videos generiert haben, sehen so ein Einführungsvideo.
+## Problem
+Der Dark-Mode ist der Default (`:root` = dunkel), aber der ThemeToggle sucht nach einer `dark`-Klasse und toggled diese. Da Dark der Default ohne Klasse ist, funktioniert der Toggle nicht korrekt. Der Light-Mode muss stattdessen über die `.light`-Klasse aktiviert werden.
 
-## Änderung
+Außerdem ist der aktuelle Light-Mode generisch — er braucht ein futuristisches Redesign passend zum James-Bond-Theme.
 
-### `src/components/dashboard/DashboardVideoCarousel.tsx` — Empty State ersetzen (Zeilen 191-204)
+## Änderungen
 
-Statt der einfachen Card mit "Noch keine Videos erstellt" wird ein vollwertiger Video-Player mit dem existierenden Demo-Video angezeigt:
+### 1. `src/components/ui/ThemeToggle.tsx` — Toggle-Logik fixen
+- Default-State auf `'dark'` setzen (da Dark der Default ist)
+- Statt `dark`-Klasse zu togglen, die `light`-Klasse hinzufügen/entfernen
+- localStorage beim Start auslesen und anwenden
+- Icons tauschen: Im Dark-Mode → Sun-Icon zeigen (zu Light wechseln), im Light-Mode → Moon-Icon (zu Dark wechseln)
 
-- **Demo-Video**: Die bereits vorhandene URL aus dem Projekt verwenden (`ai-videos` Bucket)
-- **Auto-Play**: Video startet automatisch (muted), mit Mute-Toggle und Fullscreen-Button
-- **Styling**: Gleicher 3D-Carousel-Look wie bei normalen Videos, mit einem "LÖSUNG"-ähnlichen Badge und Titel "AdTool AI: Die Lösung"
-- **CTA darunter**: Button "Dein erstes Video erstellen" → navigiert zum Video Creator
-- **Dismissable**: Kein Dismiss nötig — verschwindet automatisch sobald der User sein erstes eigenes Video generiert hat (da dann `sortedVideos.length > 0`)
+### 2. `src/index.css` — Futuristischen Light-Mode designen
+Die `.light`-Klasse bekommt ein modernes, futuristisches Farbschema:
+- **Background**: Helles Silber-Weiß mit leichtem Blau-Schimmer (`220 25% 96%`)
+- **Primary**: Elektro-Blau/Violet statt langweiligem Lila (`230 85% 55%`)
+- **Accent**: Beibehaltenes Cyan für Konsistenz
+- **Cards**: Reines Weiß mit subtilen blauen Schatten
+- **Shadows/Glows**: Blaue Glows statt Gold (Light-Mode-Version)
+- **Gradient-Variablen**: Light-Mode Gradients (blau→cyan statt gold→cyan)
+- **Glass**: Helleres Glassmorphism mit weißem Frost-Effekt
 
 ### Technisch
-- Nur eine Datei wird geändert: `DashboardVideoCarousel.tsx`
-- Die Demo-Video-URL ist bereits im Projekt vorhanden (aus `GadgetCardDynamic.tsx`)
-- Kein neuer State, keine DB-Änderungen — das Feature basiert rein auf der bestehenden Logik `sortedVideos.length === 0`
+- 2 Dateien: `ThemeToggle.tsx` + `index.css`
+- Keine neuen Dependencies
 
