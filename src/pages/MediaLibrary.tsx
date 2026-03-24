@@ -545,7 +545,7 @@ export default function MediaLibrary() {
     if (mediaItem.type !== 'image') {
       toast({
         title: "⚠️ Nur Bilder erlaubt",
-        description: "Der Hintergrund-Ersatz funktioniert nur mit Bildern.",
+        description: "Smart Background funktioniert nur mit Bildern.",
         variant: "destructive",
       });
       return;
