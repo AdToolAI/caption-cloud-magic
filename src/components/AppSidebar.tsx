@@ -113,8 +113,6 @@ export function AppSidebar() {
 
         <SidebarRail className="hover:after:bg-primary/40 transition-colors" />
       </Sidebar>
-
-      <NotificationCenter open={showNotifications} onClose={() => setShowNotifications(false)} />
     </>
   );
 }

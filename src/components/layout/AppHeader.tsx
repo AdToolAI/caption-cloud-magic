@@ -49,8 +49,8 @@ export function AppHeader() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          
           <ThemeToggle />
+          {user && <NotificationBell />}
           <UserMenu />
         </div>
       </div>
