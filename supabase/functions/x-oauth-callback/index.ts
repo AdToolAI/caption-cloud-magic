@@ -143,10 +143,12 @@ Deno.serve(async (req) => {
     if (connectionError) throw connectionError;
 
     // Clean up oauth state on success
-    await supabase.from('oauth_states').delete().eq('csrf_token', state);
+    await supabase.from('oauth_states').delete().eq('id', oauthState.id);
 
-    // Redirect to app
-    const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?tab=connections&provider=x&status=success`;
+    // Redirect to the stored return URL or fallback to APP_BASE_URL
+    const baseUrl = oauthState.redirect_url || `${Deno.env.get('APP_BASE_URL')}/performance?tab=connections`;
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const redirectUrl = `${baseUrl}${separator}provider=x&status=success`;
     return new Response(null, {
       status: 302,
       headers: { ...corsHeaders, 'Location': redirectUrl },
