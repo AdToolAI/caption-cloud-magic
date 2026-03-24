@@ -461,7 +461,7 @@ async function fetchYouTubePosts(userId: string, accountId: string, accessToken:
 async function fetchXPosts(userId: string, accountId: string, accessToken: string): Promise<any[]> {
   try {
     const response = await fetch(
-      `https://api.twitter.com/2/users/${accountId}/tweets?tweet.fields=created_at,public_metrics,entities&max_results=25`,
+      `https://api.x.com/2/users/${accountId}/tweets?tweet.fields=created_at,public_metrics,entities&max_results=25`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
