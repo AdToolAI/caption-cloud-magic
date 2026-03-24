@@ -3,7 +3,7 @@ import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Brand } from "./Brand";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { NotificationBell } from "@/components/NotificationBell";
+
 import { UserMenu } from "./UserMenu";
 import { CommandBar } from "@/components/ui/CommandBar";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -48,7 +48,7 @@ export function AppHeader() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          {user && <NotificationBell />}
+          
           <ThemeToggle />
           <UserMenu />
         </div>
