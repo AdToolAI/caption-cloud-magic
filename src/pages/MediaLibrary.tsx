@@ -558,7 +558,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "🎨 Media gesendet",
-      description: "Wird im Hintergrund-Ersatz geladen...",
+      description: "Wird in Smart Background geladen...",
     });
     
     navigate('/background-replacer');
