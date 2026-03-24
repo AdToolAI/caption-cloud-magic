@@ -79,7 +79,7 @@ const UniversalCreator = lazy(() => import("./pages/UniversalCreator"));
 const UniversalVideoCreator = lazy(() => import("./pages/UniversalVideoCreator"));
 const UniversalDirectorsCut = lazy(() => import("./pages/DirectorsCut"));
 
-const VoiceLibrary = lazy(() => import("./pages/VoiceLibrary"));
+
 const PersonalizedDashboard = lazy(() => import("./pages/PersonalizedDashboard"));
 // Admin routes - lazy loaded for better performance
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
