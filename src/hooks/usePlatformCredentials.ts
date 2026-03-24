@@ -22,13 +22,24 @@ export function usePlatformCredentials() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Read from social_connections as the single source of truth
       const { data, error } = await supabase
-        .from('platform_credentials')
-        .select('*')
+        .from('social_connections')
+        .select('id, provider, token_expires_at, last_sync_at')
         .eq('user_id', user.id);
 
       if (error) throw error;
-      setCredentials((data || []) as PlatformCredential[]);
+
+      // Map social_connections rows to PlatformCredential shape
+      const mapped: PlatformCredential[] = (data || []).map((row: any) => ({
+        id: row.id,
+        platform: row.provider as Platform,
+        is_connected: true,
+        token_expires_at: row.token_expires_at,
+        last_verified_at: row.last_sync_at,
+      }));
+
+      setCredentials(mapped);
     } catch (error) {
       console.error('Error fetching credentials:', error);
     } finally {
@@ -37,33 +48,32 @@ export function usePlatformCredentials() {
   };
 
   const isConnected = (platform: Platform): boolean => {
-    const cred = credentials.find(c => c.platform === platform);
-    return cred?.is_connected || false;
+    return credentials.some(c => c.platform === platform && c.is_connected);
   };
 
   const updateConnectionStatus = async (
     platform: Platform,
-    isConnected: boolean
+    connected: boolean
   ): Promise<boolean> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
-        .from('platform_credentials')
-        .upsert({
-          user_id: user.id,
-          platform,
-          is_connected: isConnected,
-          last_verified_at: new Date().toISOString(),
-        });
+      if (!connected) {
+        // Disconnect: remove the social_connections row
+        const { error } = await supabase
+          .from('social_connections')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('provider', platform);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       await fetchCredentials();
       toast({
-        title: isConnected ? '✅ Verbunden' : '❌ Getrennt',
-        description: `${platform} wurde ${isConnected ? 'verbunden' : 'getrennt'}`,
+        title: connected ? '✅ Verbunden' : '❌ Getrennt',
+        description: `${platform} wurde ${connected ? 'verbunden' : 'getrennt'}`,
       });
 
       return true;

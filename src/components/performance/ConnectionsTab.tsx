@@ -49,7 +49,16 @@ export const ConnectionsTab = () => {
       const status = params.get('status');
       const error = params.get('error');
 
-      if (connected && status === 'success') {
+      if (connected && status === 'error') {
+        // OAuth callback returned an error
+        const errorMessage = params.get('message') || 'Verbindung fehlgeschlagen';
+        toast({
+          title: t('common.error'),
+          description: decodeURIComponent(errorMessage),
+          variant: "destructive"
+        });
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (connected && status === 'success') {
         // New OAuth callback format with auto-sync
         toast({
           title: t('common.success'),
@@ -105,7 +114,7 @@ export const ConnectionsTab = () => {
         
         window.history.replaceState({}, '', window.location.pathname);
       } else if (connected) {
-        // Legacy callback format (backwards compatibility)
+        // Legacy callback format (backwards compatibility) - only if no status param
         toast({
           title: t('common.success'),
           description: `Successfully connected to ${connected}`

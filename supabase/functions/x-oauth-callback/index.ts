@@ -98,8 +98,13 @@ Deno.serve(async (req) => {
     const userData = await userResponse.json();
 
     if (!userResponse.ok) {
-      console.error('User fetch error:', userData);
-      throw new Error('Failed to fetch user data');
+      console.error('User fetch error:', JSON.stringify(userData));
+      const reason = userData?.detail || userData?.errors?.[0]?.message || 'Unknown error';
+      const isAccessError = reason.includes('client-not-enrolled') || reason.includes('Appropriate Level of API Access');
+      const userMessage = isAccessError
+        ? 'X API Zugriff verweigert: Bitte stelle sicher, dass deine X App einem Projekt zugeordnet ist und mindestens Basic-Zugang hat (developer.x.com).'
+        : `X Profilabruf fehlgeschlagen: ${reason}`;
+      throw new Error(userMessage);
     }
 
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
