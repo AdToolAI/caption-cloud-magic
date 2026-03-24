@@ -24,7 +24,6 @@ export function AppSidebar() {
   const { isAdmin } = useUserRoles();
   const location = useLocation();
   const navigate = useNavigate();
-  const [showNotifications, setShowNotifications] = useState(false);
 
   const isHubActive = (hubKey: string) => {
     if (hubKey === "home") return location.pathname === "/home" || location.pathname === "/";
