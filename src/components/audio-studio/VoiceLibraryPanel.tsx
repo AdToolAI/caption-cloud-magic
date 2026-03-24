@@ -6,7 +6,7 @@ import { Mic, Plus, Trash2, Play, Pause } from 'lucide-react';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoiceCloneDialog } from '@/components/voice/VoiceCloneDialog';
 
-export default function VoiceLibrary() {
+export function VoiceLibraryPanel() {
   const { voices, loading, deleteVoice, toggleVoiceActive } = useCustomVoices();
   const [showCloneDialog, setShowCloneDialog] = useState(false);
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
@@ -18,15 +18,15 @@ export default function VoiceLibrary() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
-      <div className="flex items-center justify-between mb-8">
+    <Card className="backdrop-blur-xl bg-card/60 border-border/50 p-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Voice Library</h1>
-          <p className="text-muted-foreground">
-            Verwalte deine Custom Voices und erstelle Multi-Language Voiceovers
+          <h3 className="text-lg font-semibold">Custom Voices</h3>
+          <p className="text-sm text-muted-foreground">
+            Verwalte deine geklonten Stimmen für Voiceovers
           </p>
         </div>
-        <Button onClick={() => setShowCloneDialog(true)} className="gap-2">
+        <Button onClick={() => setShowCloneDialog(true)} size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
           Voice klonen
         </Button>
@@ -34,14 +34,14 @@ export default function VoiceLibrary() {
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {voices.map((voice) => (
-          <Card key={voice.id} className="p-4">
+          <Card key={voice.id} className="p-4 bg-muted/30 border-border/50">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center">
                   <Mic className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">{voice.name}</h3>
+                  <h4 className="font-semibold">{voice.name}</h4>
                   <Badge variant="secondary" className="text-xs">
                     {voice.language}
                   </Badge>
@@ -67,7 +67,6 @@ export default function VoiceLibrary() {
                   size="sm"
                   className="flex-1 gap-2"
                   onClick={() => {
-                    // Play first sample
                     if (playingVoice === voice.id) {
                       setPlayingVoice(null);
                     } else {
@@ -97,7 +96,7 @@ export default function VoiceLibrary() {
               </div>
             </div>
 
-            <div className="mt-3 pt-3 border-t">
+            <div className="mt-3 pt-3 border-t border-border/50">
               <p className="text-xs text-muted-foreground">
                 Erstellt: {new Date(voice.created_at).toLocaleDateString('de-DE')}
               </p>
@@ -106,7 +105,7 @@ export default function VoiceLibrary() {
         ))}
 
         {voices.length === 0 && !loading && (
-          <Card className="col-span-full p-12 text-center">
+          <div className="col-span-full p-12 text-center">
             <Mic className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-semibold mb-2">Keine Custom Voices</h3>
             <p className="text-sm text-muted-foreground mb-4">
@@ -116,11 +115,11 @@ export default function VoiceLibrary() {
               <Plus className="h-4 w-4" />
               Erste Voice erstellen
             </Button>
-          </Card>
+          </div>
         )}
       </div>
 
       <VoiceCloneDialog open={showCloneDialog} onOpenChange={setShowCloneDialog} />
-    </div>
+    </Card>
   );
 }

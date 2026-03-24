@@ -412,7 +412,7 @@ export default function AudioStudio() {
                 </div>
 
                 {/* Right: AI Sidebar (only when not in enhance tab) */}
-                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && (
+                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
