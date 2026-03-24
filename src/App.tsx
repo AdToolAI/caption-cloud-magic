@@ -92,6 +92,7 @@ const PostHogDashboard = lazy(() => import("./pages/PostHogDashboard"));
 const PostHogEventTester = lazy(() => import("./pages/debug/PostHogEventTester"));
 const FeatureFlagDemo = lazy(() => import("./pages/FeatureFlagDemo"));
 const UsageReports = lazy(() => import("./pages/Analytics/UsageReports"));
+const PlatformAnalytics = lazy(() => import("./pages/Analytics/PlatformAnalytics"));
 const Admin = lazy(() => import("./pages/Admin"));
 
 const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
@@ -238,7 +239,8 @@ function AppLayout() {
           
           <Route path="/analytics" element={<UnifiedAnalytics />} />
           <Route path="/analytics/posthog" element={<PostHogDashboard />} />
-          <Route path="/analytics/usage-reports" element={<UsageReports />} />
+           <Route path="/analytics/usage-reports" element={<UsageReports />} />
+           <Route path="/analytics/platform/:platform" element={<PlatformAnalytics />} />
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/debug/posthog" element={<PostHogEventTester />} />
           <Route path="/debug/feature-flags" element={<FeatureFlagDemo />} />

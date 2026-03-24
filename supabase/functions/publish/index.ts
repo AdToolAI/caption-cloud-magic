@@ -1482,6 +1482,35 @@ Deno.serve(withTelemetry('publish', async (req) => {
       }
     }
 
+    // Auto-track successful publishes in post_metrics
+    const successfulResults = publishResults.filter((r) => r.ok);
+    if (successfulResults.length > 0) {
+      const metricsToInsert = successfulResults.map((result) => ({
+        user_id: user.id,
+        provider: result.provider,
+        account_id: 'auto_track',
+        post_id: result.external_id || `publish_${job.id}_${result.provider}`,
+        caption_text: payload.text?.substring(0, 2000) || null,
+        posted_at: new Date().toISOString(),
+        impressions: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        saves: 0,
+        permalink: result.permalink || null,
+      }));
+
+      const { error: metricsError } = await supabase
+        .from('post_metrics')
+        .insert(metricsToInsert);
+
+      if (metricsError) {
+        console.warn('[Orchestrator] Failed to auto-track metrics:', metricsError);
+      } else {
+        console.log(`[Orchestrator] Auto-tracked ${metricsToInsert.length} posts in post_metrics`);
+      }
+    }
+
     // Remove from active publishes
     await supabase.from('active_publishes').delete().eq('job_id', job.id);
 

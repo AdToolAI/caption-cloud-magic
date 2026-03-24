@@ -5153,6 +5153,30 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_analyses: {
+        Row: {
+          analysis_json: Json
+          created_at: string
+          id: string
+          platform: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis_json?: Json
+          created_at?: string
+          id?: string
+          platform?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis_json?: Json
+          created_at?: string
+          id?: string
+          platform?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       plan_rate_limits: {
         Row: {
           ai_calls_per_minute: number

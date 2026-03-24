@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { RefreshCw, Hash, TrendingUp, Award, DollarSign, FileText, Mail, Settings } from "lucide-react";
+import { RefreshCw, Hash, TrendingUp, Award, DollarSign, FileText, Mail, Settings, Brain, MessageSquare, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
@@ -22,6 +22,9 @@ import { CaptionInsightsTab } from "@/components/performance/CaptionInsightsTab"
 import { ConnectionsTab } from "@/components/performance/ConnectionsTab";
 import { ReportBuilder } from "@/components/analytics/ReportBuilder";
 import { ScheduledReports } from "@/components/analytics/ScheduledReports";
+import { PlatformOverviewCards } from "@/components/analytics/PlatformOverviewCards";
+import { AIStrategyPanel } from "@/components/analytics/AIStrategyPanel";
+import { CommentsAnalyticsTab } from "@/components/analytics/CommentsAnalyticsTab";
 
 interface MetricsSummary {
   provider: string;
@@ -250,12 +253,24 @@ export default function UnifiedAnalytics() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="overview">{t('analytics.unified.tabs.overview')}</TabsTrigger>
+            <TabsTrigger value="platforms">
+              <LayoutGrid className="h-3.5 w-3.5 mr-1" />
+              Plattformen
+            </TabsTrigger>
             <TabsTrigger value="performance">{t('analytics.unified.tabs.performance')}</TabsTrigger>
             <TabsTrigger value="top-content">{t('analytics.unified.tabs.topContent')}</TabsTrigger>
             <TabsTrigger value="hashtags">{t('analytics.unified.tabs.hashtags')}</TabsTrigger>
             <TabsTrigger value="campaigns">{t('analytics.unified.tabs.campaigns')}</TabsTrigger>
+            <TabsTrigger value="ai-strategy">
+              <Brain className="h-3.5 w-3.5 mr-1" />
+              KI-Analyse
+            </TabsTrigger>
+            <TabsTrigger value="comments">
+              <MessageSquare className="h-3.5 w-3.5 mr-1" />
+              Kommentare
+            </TabsTrigger>
             <TabsTrigger value="reports">{t('analytics.unified.tabs.reports')}</TabsTrigger>
           </TabsList>
 
@@ -263,6 +278,11 @@ export default function UnifiedAnalytics() {
           <TabsContent value="overview" className="space-y-6">
             <OverviewMetrics data={metricsSummary} loading={loading} />
             <MetricsChart data={metricsSummary} loading={loading} />
+          </TabsContent>
+
+          {/* Plattformen Tab */}
+          <TabsContent value="platforms" className="space-y-6">
+            <PlatformOverviewCards />
           </TabsContent>
 
           {/* Performance Tab */}
@@ -445,6 +465,16 @@ export default function UnifiedAnalytics() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* KI-Analyse Tab */}
+          <TabsContent value="ai-strategy" className="space-y-6">
+            <AIStrategyPanel />
+          </TabsContent>
+
+          {/* Kommentare Tab */}
+          <TabsContent value="comments" className="space-y-6">
+            <CommentsAnalyticsTab />
           </TabsContent>
 
           {/* Berichte Tab */}
