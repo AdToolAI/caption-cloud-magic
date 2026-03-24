@@ -98,6 +98,7 @@ const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
+const HubPage = lazy(() => import("./pages/HubPage"));
 
 const queryClient = new QueryClient();
 

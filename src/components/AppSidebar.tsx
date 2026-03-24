@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Coins, Settings, ChevronRight, Star, Video, Edit, ShieldCheck, ChevronLeft, Mic2 } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Home, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,354 +10,118 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { NotificationBadge } from "@/components/calendar/NotificationBadge";
 import { NotificationCenter } from "@/components/calendar/NotificationCenter";
+import { hubDefinitions } from "@/config/hubConfig";
 import {
   Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   SidebarRail,
-  useSidebar,
 } from "@/components/ui/sidebar";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-interface HubItem {
-  route: string;
-  titleKey: string;
-  icon: any;
-  plan?: string;
-}
-
-
 export function AppSidebar() {
-  const sidebar = useSidebar();
   const { t } = useTranslation();
   const { user } = useAuth();
   const { isAdmin } = useUserRoles();
   const location = useLocation();
-  const [userPlan, setUserPlan] = useState<string>("free");
-  const [expandedHubs, setExpandedHubs] = useState<string[]>(["planen", "medien"]);
+  const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
-  
-  const isCollapsed = sidebar.state === "collapsed";
 
-  const toggleHub = (hubKey: string) => {
-    setExpandedHubs(prev => 
-      prev.includes(hubKey) 
-        ? prev.filter(k => k !== hubKey)
-        : [...prev, hubKey]
-    );
+  const isHubActive = (hubKey: string) => {
+    if (hubKey === "home") return location.pathname === "/home" || location.pathname === "/";
+    const hub = hubDefinitions.find((h) => h.key === hubKey);
+    if (!hub) return false;
+    return hub.items.some((item) => location.pathname === item.route) || location.pathname === `/hub/${hubKey}`;
   };
 
-  useEffect(() => {
-    if (user) {
-      loadUserPlan();
-    }
-  }, [user]);
-
-  const loadUserPlan = async () => {
-    if (!user) return;
-    
-    const { data } = await supabase
-      .from("profiles")
-      .select("plan, test_mode_plan")
-      .eq("id", user.id)
-      .single();
-    
-    if (data) {
-      setUserPlan(data.test_mode_plan || data.plan);
-    }
-  };
-
-  const isActive = (path: string) => location.pathname === path;
-  
-  const isFeatureLocked = (item: HubItem) => {
-    if (!item.plan) return false;
-    
-    const planHierarchy: Record<string, number> = {
-      'free': 0,
-      'basic': 1,
-      'pro': 2,
-      'enterprise': 3
-    };
-    
-    const requiredLevel = planHierarchy[item.plan] || 0;
-    const userLevel = planHierarchy[userPlan] || 0;
-    
-    return userLevel < requiredLevel;
-  };
-
-  const hubStructure: Record<string, HubItem[]> = {
-    planen: [
-      { route: "/calendar", titleKey: "nav.calendar", icon: Calendar },
-      { route: "/planner", titleKey: "nav.contentPlanner", icon: LayoutGrid },
-      { route: "/composer", titleKey: "nav.composer", icon: Edit3 },
-      { route: "/posting-times", titleKey: "nav.postTimeAdvisor", icon: Clock },
-    ],
-    erstellen: [
-      { route: "/generator", titleKey: "nav.textStudio", icon: Sparkles },
-      
-      
-      { route: "/ai-post-generator", titleKey: "nav.aiPostGenerator", icon: Bot },
-      { route: "/image-caption-pairing", titleKey: "nav.imageCaptionPairing", icon: ImagePlus },
-    ],
-    optimieren: [
-      { route: "/coach", titleKey: "nav.coach", icon: MessageSquare },
-      { route: "/comment-manager", titleKey: "nav.commentManager", icon: MessageCircle },
-      { route: "/template-manager", titleKey: "nav.templateManager", icon: BookTemplate },
-    ],
-    analysieren: [
-      { route: "/analytics", titleKey: "nav.analytics", icon: LineChart },
-      { route: "/analytics/posthog", titleKey: "PostHog Dashboard", icon: BarChart3 },
-      { route: "/analytics/usage-reports", titleKey: "Usage Reports", icon: Coins },
-      { route: "/trend-radar", titleKey: "nav.trendRadar", icon: Radar },
-      { route: "/audit", titleKey: "nav.audit", icon: Shield },
-    ],
-    medien: [
-      { route: "/media-library", titleKey: "nav.mediaLibrary", icon: FolderOpen },
-      { route: "/audio-studio", titleKey: "VoicePro", icon: Mic2 },
-      
-      { route: "/universal-creator", titleKey: "Universal Content Creator", icon: Video },
-      { route: "/universal-video-creator", titleKey: "Universal Video Creator", icon: Film },
-      { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", icon: Edit },
-      { route: "/sora-long-form", titleKey: "Sora 2 Long-Form", icon: Film },
-      { route: "/ai-video-studio", titleKey: "AI Video Studio", icon: Sparkles },
-      
-      { route: "/background-replacer", titleKey: "nav.backgroundReplacer", icon: Layers },
-    ],
-    team: [
-      { route: "/team-workspace", titleKey: "nav.teamWorkspace", icon: Users, plan: "pro" },
-      { route: "/white-label", titleKey: "nav.whiteLabel", icon: Palette, plan: "enterprise" },
-    ],
-    admin: [
-      { route: "/admin", titleKey: "Admin Dashboard", icon: ShieldCheck },
-      { route: "/admin/monitoring", titleKey: "System Monitoring", icon: BarChart3 },
-      { route: "/admin/feature-flags", titleKey: "Feature Flags", icon: Settings },
-      { route: "/admin/cache-monitor", titleKey: "Cache Monitor", icon: LineChart },
-    ],
-  };
-
-  const renderHubItem = (item: HubItem, index: number) => {
-    const IconComponent = item.icon;
-    const locked = isFeatureLocked(item);
-    const title = t(item.titleKey);
-    const active = isActive(item.route);
-
-    const menuButton = (
-      <SidebarMenuButton 
-        asChild 
-        isActive={active}
-        className={`relative transition-smooth h-8 py-1.5 ${active ? 'bg-primary/10 text-primary font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:bg-primary before:rounded-r-full' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
-      >
-        <Link to={locked ? "#" : item.route} className="flex items-center gap-3">
-          <IconComponent className={`h-[18px] w-[18px] shrink-0 transition-smooth`} />
-          {!isCollapsed && <span className="flex-1 text-sm">{title}</span>}
-          {!isCollapsed && locked && <Lock className="h-3 w-3 text-muted-foreground" />}
-        </Link>
-      </SidebarMenuButton>
-    );
-
-    // Show tooltip in collapsed mode for all items
-    if (isCollapsed) {
-      return (
-        <TooltipProvider key={index} delayDuration={0}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              {menuButton}
-            </TooltipTrigger>
-            <TooltipContent 
-              side="right" 
-              className="bg-background/95 backdrop-blur-xl border-white/10 shadow-xl"
-            >
-              <p className="font-medium">{title}</p>
-              {locked && <p className="text-xs text-muted-foreground">{t("common.requiresPro")}</p>}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    }
-
-    if (locked) {
-      return (
-        <TooltipProvider key={index}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              {menuButton}
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>{t("common.requiresPro")}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    }
-
-    return menuButton;
-  };
-
-  const renderHub = (hubKey: string, hubItems: HubItem[]) => {
-    const isExpanded = expandedHubs.includes(hubKey);
-    
-    return (
-      <SidebarGroup key={hubKey}>
-        <Collapsible open={isExpanded} onOpenChange={() => toggleHub(hubKey)}>
-          <CollapsibleTrigger className="w-full">
-            <SidebarGroupLabel className="cursor-pointer hover:text-primary flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 px-3 mt-3 mb-0.5">
-              {!isCollapsed && (
-                <>
-                  <ChevronRight className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")} />
-                  {t(`hubs.${hubKey}`)}
-                </>
-              )}
-            </SidebarGroupLabel>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {hubItems.map((item, idx) => (
-                  <SidebarMenuItem key={idx}>
-                    {renderHubItem(item, idx)}
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </CollapsibleContent>
-        </Collapsible>
-      </SidebarGroup>
-    );
-  };
+  const visibleHubs = hubDefinitions.filter((h) => !h.adminOnly || isAdmin);
 
   return (
     <>
-      <Sidebar className={isCollapsed ? "w-14" : "w-60"} collapsible="icon">
-        <div className="flex items-center justify-between p-4 border-b border-border bg-card">
-          {!isCollapsed && <Brand compact showText />}
-          {isCollapsed && <Brand compact showText={false} />}
-          <div className="flex items-center gap-2">
+      <Sidebar className="w-[68px] min-w-[68px] max-w-[68px]" collapsible="none">
+        {/* Brand icon */}
+        <div className="flex flex-col items-center py-4 border-b border-border bg-card">
+          <Brand compact showText={false} />
+          <div className="mt-2">
             <NotificationBadge onClick={() => setShowNotifications(true)} />
-            {/* Glassmorphism Toggle Button with Tooltip */}
-            <TooltipProvider delayDuration={0}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <SidebarTrigger 
-                    className={cn(
-                      "h-8 w-8 rounded-lg",
-                      "bg-white/5 backdrop-blur-sm border border-white/10",
-                      "hover:bg-white/10 hover:border-primary/50",
-                      "hover:shadow-[0_0_15px_rgba(124,58,237,0.3)]",
-                      "transition-all duration-300 ease-out"
-                    )}
-                  />
-                </TooltipTrigger>
-                <TooltipContent 
-                  side="right" 
-                  className="bg-background/95 backdrop-blur-xl border-white/10 shadow-xl flex items-center gap-2"
-                >
-                  <span>{isCollapsed ? 'Sidebar öffnen' : 'Sidebar schließen'}</span>
-                  <kbd className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-mono">⌘B</kbd>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
         </div>
 
-      <SidebarContent className="bg-card border-r border-border h-full flex flex-col gap-1">
-        {/* Home Link */}
-        <SidebarGroup>
-          <SidebarMenu>
+        <SidebarContent className="bg-card border-r border-border h-full flex flex-col items-center py-3 gap-1">
+          {/* Home */}
+          <SidebarMenu className="w-full px-2">
             <SidebarMenuItem>
-              {isCollapsed ? (
-                <TooltipProvider delayDuration={0}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <SidebarMenuButton 
-                        asChild 
-                        isActive={isActive("/home") || isActive("/")}
-                        className={`relative transition-smooth ${isActive("/home") || isActive("/") ? 'bg-primary/10 text-primary font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:bg-primary before:rounded-r-full' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
-                      >
-                        <Link to="/home" className="flex items-center gap-3">
-                          <Home className={`h-[18px] w-[18px] transition-smooth`} />
-                        </Link>
-                      </SidebarMenuButton>
-                    </TooltipTrigger>
-                    <TooltipContent 
-                      side="right" 
-                      className="bg-background/95 backdrop-blur-xl border-white/10 shadow-xl"
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isHubActive("home")}
+                      className={cn(
+                        "h-11 w-11 mx-auto flex items-center justify-center rounded-xl transition-all duration-200",
+                        isHubActive("home")
+                          ? "bg-primary/15 text-primary shadow-[0_0_12px_rgba(124,58,237,0.25)]"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      )}
                     >
-                      <p className="font-medium">{t("home")}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ) : (
-                <SidebarMenuButton 
-                  asChild 
-                  isActive={isActive("/home") || isActive("/")}
-                  className={`relative transition-smooth ${isActive("/home") || isActive("/") ? 'bg-primary/10 text-primary font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:bg-primary before:rounded-r-full' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
-                >
-                  <Link to="/home" className="flex items-center gap-3">
-                    <Home className={`h-[18px] w-[18px] transition-smooth`} />
-                    <span className="text-sm">{t("home")}</span>
-                  </Link>
-                </SidebarMenuButton>
-              )}
+                      <Link to="/home">
+                        <Home className="h-5 w-5" />
+                      </Link>
+                    </SidebarMenuButton>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="bg-background/95 backdrop-blur-xl border-border shadow-xl">
+                    <p className="font-medium">{t("home")}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </SidebarMenuItem>
           </SidebarMenu>
-        </SidebarGroup>
 
-        {/* Hub Groups */}
-        {Object.entries(hubStructure)
-          .filter(([hubKey]) => hubKey !== 'admin' || isAdmin)
-          .map(([hubKey, hubItems]) => renderHub(hubKey, hubItems))}
+          {/* Divider */}
+          <div className="w-8 h-px bg-border my-1" />
 
+          {/* Hub Icons */}
+          <SidebarMenu className="w-full px-2 flex-1 space-y-1">
+            {visibleHubs.map((hub) => {
+              const HubIcon = hub.icon;
+              const active = isHubActive(hub.key);
 
-        {/* Animated Collapse Indicator at Bottom */}
-        <div className="mt-auto pb-4 flex justify-center">
-          <TooltipProvider delayDuration={0}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <motion.button
-                  onClick={() => sidebar.toggleSidebar()}
-                  className={cn(
-                    "p-2 rounded-full cursor-pointer",
-                    "bg-white/5 hover:bg-white/10 border border-white/10",
-                    "hover:border-primary/50 hover:shadow-[0_0_20px_rgba(124,58,237,0.4)]",
-                    "transition-all duration-300"
-                  )}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <motion.div
-                    animate={{ rotate: isCollapsed ? 180 : 0 }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
-                  >
-                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-                  </motion.div>
-                </motion.button>
-              </TooltipTrigger>
-              <TooltipContent 
-                side="right"
-                className="bg-background/95 backdrop-blur-xl border-white/10 shadow-xl"
-              >
-                <span>{isCollapsed ? 'Erweitern' : 'Einklappen'}</span>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </SidebarContent>
+              return (
+                <SidebarMenuItem key={hub.key}>
+                  <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <motion.button
+                          onClick={() => navigate(`/hub/${hub.key}`)}
+                          whileHover={{ scale: 1.08 }}
+                          whileTap={{ scale: 0.95 }}
+                          className={cn(
+                            "h-11 w-11 mx-auto flex items-center justify-center rounded-xl transition-all duration-200 cursor-pointer",
+                            active
+                              ? "bg-primary/15 text-primary shadow-[0_0_12px_rgba(124,58,237,0.25)]"
+                              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                          )}
+                        >
+                          <HubIcon className="h-5 w-5" />
+                        </motion.button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="bg-background/95 backdrop-blur-xl border-border shadow-xl">
+                        <p className="font-medium">{t(hub.titleKey)}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarContent>
 
-      {/* Clickable Rail for quick toggle */}
-      <SidebarRail className="hover:after:bg-primary/40 transition-colors" />
-    </Sidebar>
+        <SidebarRail className="hover:after:bg-primary/40 transition-colors" />
+      </Sidebar>
 
-    <NotificationCenter
-      open={showNotifications}
-      onClose={() => setShowNotifications(false)}
-    />
-  </>
+      <NotificationCenter open={showNotifications} onClose={() => setShowNotifications(false)} />
+    </>
   );
 }
