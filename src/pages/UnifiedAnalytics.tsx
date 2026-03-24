@@ -253,12 +253,24 @@ export default function UnifiedAnalytics() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="overview">{t('analytics.unified.tabs.overview')}</TabsTrigger>
+            <TabsTrigger value="platforms">
+              <LayoutGrid className="h-3.5 w-3.5 mr-1" />
+              Plattformen
+            </TabsTrigger>
             <TabsTrigger value="performance">{t('analytics.unified.tabs.performance')}</TabsTrigger>
             <TabsTrigger value="top-content">{t('analytics.unified.tabs.topContent')}</TabsTrigger>
             <TabsTrigger value="hashtags">{t('analytics.unified.tabs.hashtags')}</TabsTrigger>
             <TabsTrigger value="campaigns">{t('analytics.unified.tabs.campaigns')}</TabsTrigger>
+            <TabsTrigger value="ai-strategy">
+              <Brain className="h-3.5 w-3.5 mr-1" />
+              KI-Analyse
+            </TabsTrigger>
+            <TabsTrigger value="comments">
+              <MessageSquare className="h-3.5 w-3.5 mr-1" />
+              Kommentare
+            </TabsTrigger>
             <TabsTrigger value="reports">{t('analytics.unified.tabs.reports')}</TabsTrigger>
           </TabsList>
 
