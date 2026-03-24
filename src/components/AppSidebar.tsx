@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, Lock } from "lucide-react";
 import { motion } from "framer-motion";
@@ -8,8 +7,6 @@ import { useUserRoles } from "@/hooks/useUserRoles";
 import { Brand } from "@/components/layout/Brand";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-import { NotificationBadge } from "@/components/calendar/NotificationBadge";
-import { NotificationCenter } from "@/components/calendar/NotificationCenter";
 import { hubDefinitions } from "@/config/hubConfig";
 import {
   Sidebar,
