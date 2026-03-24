@@ -139,12 +139,6 @@ export function AppSidebar() {
       { route: "/team-workspace", titleKey: "nav.teamWorkspace", icon: Users, plan: "pro" },
       { route: "/white-label", titleKey: "nav.whiteLabel", icon: Palette, plan: "enterprise" },
     ],
-    verwaltung: [
-      { route: "/brand-kit", titleKey: "nav.brandKit", icon: Briefcase },
-      { route: "/credits", titleKey: "nav.credits", icon: Coins },
-      { route: "/account", titleKey: "nav.account", icon: Settings },
-      { route: "/billing", titleKey: "nav.billing", icon: CreditCard },
-    ],
     admin: [
       { route: "/admin", titleKey: "Admin Dashboard", icon: ShieldCheck },
       { route: "/admin/monitoring", titleKey: "System Monitoring", icon: BarChart3 },
