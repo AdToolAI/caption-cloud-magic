@@ -4405,7 +4405,7 @@ export const translations: Record<Language, any> = {
     aipost_tone_professional: "Professionell",
     
     // Background Replacer
-    bg_title: "KI-Hintergrund-Ersteller",
+    bg_title: "Smart Background",
     bg_subtitle: "Verwandeln Sie Produktfotos mit KI-generierten thematischen Hintergründen",
     bg_upload_product: "Produktbild hochladen",
     bg_choose_theme: "Thema wählen",
