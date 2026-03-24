@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 interface Post {
   id: string;
@@ -35,7 +36,6 @@ const statusColors: Record<string, string> = {
   published: "bg-purple-500",
 };
 
-// Platform-specific colors (James Bond 2028 style)
 const platformColors: Record<string, { bg: string; border: string; text: string; glow: string }> = {
   instagram: { 
     bg: "bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400", 
@@ -61,7 +61,6 @@ const platformColors: Record<string, { bg: string; border: string; text: string;
     text: "text-white",
     glow: "hover:shadow-[0_0_20px_rgba(34,211,238,0.5)]"
   },
-  // X/Twitter kommt später
   youtube: { 
     bg: "bg-[#FF0000]", 
     border: "border-[#FF0000]", 
@@ -250,24 +249,36 @@ export function MonthView({
           const isToday = isSameDay(day, new Date());
           
           return (
-            <div
+            <motion.div
               key={day.toISOString()}
               onClick={() => !readOnly && isCurrentMonth && onDateClick?.(day)}
               onDragOver={isCurrentMonth ? handleDragOver : undefined}
               onDrop={isCurrentMonth ? (e) => handleDrop(e, day) : undefined}
+              whileHover={isCurrentMonth ? { scale: 1.03 } : undefined}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
               className={cn(
-                "min-h-[100px] p-3 border-2 rounded-xl transition-all cursor-pointer group relative bg-card",
-                isToday && "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20",
+                "min-h-[100px] p-3 border-2 rounded-xl transition-all cursor-pointer group relative",
+                "backdrop-blur-sm bg-card/60",
+                isToday && "border-primary bg-primary/5 shadow-[0_0_20px_hsla(var(--primary)/0.15)]",
                 !isCurrentMonth && "opacity-30 bg-muted/10",
-                isCurrentMonth && !isToday && "hover:border-primary/60 hover:shadow-lg hover:bg-accent/40 hover:scale-[1.02]",
-                draggedPostId && isCurrentMonth && "border-dashed border-primary/60 bg-primary/10",
+                isCurrentMonth && !isToday && "border-white/10 hover:border-primary/40 hover:shadow-[0_0_15px_hsla(var(--primary)/0.1)] hover:bg-accent/30",
+                draggedPostId && isCurrentMonth && "border-dashed border-primary/60 bg-primary/10 shadow-[0_0_15px_hsla(var(--primary)/0.2)]",
                 "flex flex-col"
               )}
             >
+              {/* Animated today ring */}
+              {isToday && (
+                <motion.div
+                  className="absolute -inset-[2px] rounded-xl border-2 border-primary/40 pointer-events-none"
+                  animate={{ opacity: [0.4, 0.8, 0.4] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                />
+              )}
+
               <div className="flex items-center justify-between mb-2">
                 <span className={cn(
                   "text-sm font-semibold",
-                  isToday && "bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center font-bold text-base shadow-sm"
+                  isToday && "bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center font-bold text-base shadow-[0_0_10px_hsla(var(--primary)/0.4)]"
                 )}>
                   {format(day, "d")}
                 </span>
@@ -310,7 +321,7 @@ export function MonthView({
                       onDragStart={(e) => handleDragStart(e, post.id)}
                       onDragEnd={handleDragEnd}
                       className={cn(
-                        "text-[10px] px-2 py-1 rounded-md transition-all duration-200 border",
+                        "text-[10px] px-2 py-1 rounded-md transition-all duration-200 border backdrop-blur-sm",
                         !readOnly && "cursor-grab active:cursor-grabbing",
                         readOnly && "cursor-pointer",
                         platformStyle.bg,
@@ -342,7 +353,7 @@ export function MonthView({
                   </div>
                 )}
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>

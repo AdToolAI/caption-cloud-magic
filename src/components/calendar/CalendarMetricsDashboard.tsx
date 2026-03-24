@@ -26,18 +26,15 @@ export function CalendarMetricsDashboard({
 }: CalendarMetricsDashboardProps) {
   const [expanded, setExpanded] = useState(false);
   
-  // Calculate metrics
   const totalEvents = events.length;
   const publishedEvents = events.filter(e => e.status === 'published').length;
   const scheduledEvents = events.filter(e => e.status === 'scheduled').length;
   const draftEvents = events.filter(e => e.status === 'briefing' || e.status === 'in_progress').length;
   
-  // Calculate publish rate
   const publishRate = totalEvents > 0 
     ? Math.round((publishedEvents / totalEvents) * 100) 
     : 0;
   
-  // Events per week
   const calculateWeeklyAverage = (events: any[], range: {start: Date; end: Date}): number => {
     const days = Math.ceil((range.end.getTime() - range.start.getTime()) / (1000 * 60 * 60 * 24));
     const weeks = days / 7;
@@ -48,13 +45,11 @@ export function CalendarMetricsDashboard({
     ? calculateWeeklyAverage(events, dateRange)
     : 0;
   
-  // Team utilization
   const assignedEvents = events.filter(e => e.assignees && e.assignees.length > 0).length;
   const teamUtilization = totalEvents > 0
     ? Math.round((assignedEvents / totalEvents) * 100)
     : 0;
   
-  // Average ETA
   const eventsWithETA = events.filter(e => e.eta_minutes);
   const avgETA = eventsWithETA.length > 0
     ? Math.round(eventsWithETA.reduce((sum, e) => sum + (e.eta_minutes || 0), 0) / eventsWithETA.length)
@@ -62,14 +57,14 @@ export function CalendarMetricsDashboard({
 
   const metrics: CalendarMetric[] = [
     {
-      label: "Total",
+      label: "Gesamt",
       value: totalEvents,
       numericValue: totalEvents,
       icon: <Calendar className="w-4 h-4" />,
       trend: "neutral"
     },
     {
-      label: "Published",
+      label: "Veröffentlicht",
       value: publishedEvents,
       numericValue: publishedEvents,
       change: `${publishRate}%`,
@@ -77,7 +72,7 @@ export function CalendarMetricsDashboard({
       trend: publishRate > 70 ? "up" : "neutral"
     },
     {
-      label: "Scheduled",
+      label: "Geplant",
       value: scheduledEvents,
       numericValue: scheduledEvents,
       icon: <Clock className="w-4 h-4" />,
@@ -114,7 +109,6 @@ export function CalendarMetricsDashboard({
     }
   };
 
-  // Compact inline view (first 3 metrics)
   const compactMetrics = metrics.slice(0, 3);
   const expandedMetrics = metrics.slice(3);
 
@@ -124,8 +118,13 @@ export function CalendarMetricsDashboard({
         {/* Compact Metrics Row */}
         <div className="flex items-center gap-6">
           {compactMetrics.map((metric, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+            <motion.div 
+              key={index} 
+              className="flex items-center gap-2 group cursor-default"
+              whileHover={{ scale: 1.05 }}
+              transition={{ type: "spring", stiffness: 400 }}
+            >
+              <div className="p-1.5 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_12px_hsla(var(--primary)/0.3)] transition-all duration-300">
                 {metric.icon}
               </div>
               <div className="flex items-center gap-1.5">
@@ -138,12 +137,17 @@ export function CalendarMetricsDashboard({
                   )}
                 </span>
                 {metric.change && (
-                  <span className={`text-xs ${getTrendColor(metric.trend || 'neutral')}`}>
+                  <motion.span 
+                    initial={{ opacity: 0, x: -5 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 + index * 0.1 }}
+                    className={`text-xs ${getTrendColor(metric.trend || 'neutral')}`}
+                  >
                     ({metric.change})
-                  </span>
+                  </motion.span>
                 )}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
 
@@ -174,8 +178,15 @@ export function CalendarMetricsDashboard({
           >
             <div className="flex items-center gap-6 pt-2.5 mt-2.5 border-t border-white/10">
               {expandedMetrics.map((metric, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                <motion.div 
+                  key={index} 
+                  className="flex items-center gap-2 group cursor-default"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  whileHover={{ scale: 1.05 }}
+                >
+                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_12px_hsla(var(--primary)/0.3)] transition-all duration-300">
                     {metric.icon}
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -188,7 +199,7 @@ export function CalendarMetricsDashboard({
                       )}
                     </span>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </motion.div>
