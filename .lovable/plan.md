@@ -1,20 +1,18 @@
 
 
-# Plan: Theme-Toggle Icons tauschen
+# Plan: Social-Media-Icons zur Integrationsseite verlinken
 
 ## Problem
-Die Icons sind vertauscht — der Mond sollte den Dark-Mode repräsentieren und die Sonne den Light-Mode. Aktuell zeigt der Dark-Mode die Sonne und der Light-Mode den Mond.
+Die Social-Connection-Icons im Dashboard navigieren zu `/social-media-settings?connect=...`, aber diese Route existiert nicht. Die korrekte Route ist `/integrations`.
 
 ## Änderung
 
-### `src/components/ui/ThemeToggle.tsx` — Icons swappen (Zeile 33-37)
-Aktuell:
+### `src/components/dashboard/SocialConnectionIcons.tsx` — Route ändern (Zeile 30)
 ```tsx
-{theme === 'dark' ? <Sun /> : <Moon />}
-```
-Ändern zu:
-```tsx
-{theme === 'dark' ? <Moon /> : <Sun />}
+// Von:
+onClick={() => navigate(`/social-media-settings?connect=${id}`)}
+// Zu:
+onClick={() => navigate(`/integrations?connect=${id}`)}
 ```
 
 Eine Zeile, fertig.
