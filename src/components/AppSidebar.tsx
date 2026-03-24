@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Coins, Settings, ChevronRight, Star, Video, Edit, ShieldCheck, ChevronLeft, Mic2 } from "lucide-react";
+import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Coins, Settings, ChevronRight, Star, Video, Edit, ShieldCheck, ChevronLeft, Mic2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
@@ -117,11 +117,6 @@ export function AppSidebar() {
       { route: "/analytics/usage-reports", titleKey: "Usage Reports", icon: Coins },
       { route: "/trend-radar", titleKey: "nav.trendRadar", icon: Radar },
       { route: "/audit", titleKey: "nav.audit", icon: Shield },
-    ],
-    automatisieren: [
-      { route: "/campaigns", titleKey: "nav.campaigns", icon: Workflow, plan: "pro" },
-      { route: "/integrations", titleKey: "nav.integrations", icon: Share2 },
-      { route: "/instagram-publishing", titleKey: "nav.instagramPublishing", icon: Share2 },
     ],
     medien: [
       { route: "/media-library", titleKey: "nav.mediaLibrary", icon: FolderOpen },
