@@ -1,37 +1,51 @@
 
 
-## Drei Bugs fixen: Impressum-Route, Logout-Redirect, Login-Redirect
+## Fix: Legal-Seiten, tote Links und Navigation
 
-### Probleme
+### Problem-Analyse
 
-1. **Impressum-Link fuehrt zur Startseite**: Der Footer-Link zeigt auf `/imprint`, aber es gibt keine Route dafuer. Der Catch-All (`*`) leitet zu `/home` weiter.
+1. **Doppelter Header auf Legal-Seiten**: AppLayout rendert den `<Header />` fuer Landing-Routen (inkl. `/imprint`), UND Legal.tsx rendert seine eigene `<nav>`. Das ergibt zwei Header uebereinander.
 
-2. **Logout leitet nicht zur Startseite**: Nach `signOut()` gibt es keinen expliziten Redirect zu `/`. Der User landet auf der aktuellen Seite oder wird durch den Catch-All umgeleitet.
+2. **Tote Links im Footer**: Viele Links in `BlackTieFooter.tsx` zeigen auf `#` (Blog, Tutorials, API Docs, Status, Ueber uns, Karriere, Kontakt, Presse, Roadmap, Cookie-Einstellungen).
 
-3. **Login leitet zum KI-Text-Studio statt Dashboard**: In `Auth.tsx` Zeile 40 steht `navigate('/generator')` statt `navigate('/home')`.
+3. **Header-Links funktionieren nur auf Startseite**: "Preise" (`#pricing`) und "FAQ" (`#faq`) sind Anker-Links, die nur auf der Index-Seite funktionieren.
+
+4. **"Kostenlos starten" Button**: Verlinkt auf `/generator` statt `/auth` fuer nicht-eingeloggte Nutzer.
+
+---
 
 ### Aenderungen
 
-**1. `src/App.tsx`** — Direkte Route fuer `/imprint` hinzufuegen (wie bei `/privacy` und `/terms`):
-```tsx
-<Route path="/imprint" element={<Legal />} />
-```
-Ausserdem `/imprint` zur `isLandingRoute`-Liste hinzufuegen.
+**1. `src/pages/Legal.tsx`** -- Eigene `<nav>` aus allen 4 Bloecken entfernen
+- Die Navigation kommt bereits vom AppLayout-Header
+- Stattdessen einen einfachen "Zurueck zur Startseite"-Link als Breadcrumb oben im Content-Bereich einbauen
 
-**2. `src/pages/Legal.tsx`** — In der `actualPage`-Logik `/imprint` ergaenzen, damit die Seite den richtigen Inhalt zeigt.
+**2. `src/components/landing/BlackTieFooter.tsx`** -- Tote Links fixen
+- Alle `#`-Links entweder auf echte Seiten verlinken oder auf `/coming-soon` umleiten:
+  - Blog, Tutorials, API Docs, Status -> `/coming-soon`
+  - Ueber uns, Karriere, Kontakt, Presse -> `/coming-soon`
+  - Roadmap -> `/coming-soon`
+  - Cookie-Einstellungen -> Cookie-Consent-Dialog oeffnen (oder `/coming-soon`)
+- AVV-Link hinzufuegen unter "Rechtliches"
 
-**3. `src/components/layout/UserMenu.tsx`** — Nach `signOut()` zur Startseite navigieren:
-```tsx
-const navigate = useNavigate();
-// onClick:
-await signOut();
-navigate('/');
-```
+**3. `src/components/Header.tsx`** -- Navigation-Links fixen
+- "Preise" von `#pricing` auf `/pricing` aendern
+- "FAQ" von `#faq` auf `/faq` aendern
+- "Kostenlos starten" Button von `/generator` auf `/auth` aendern (fuer nicht-eingeloggte Nutzer)
 
-**4. `src/pages/Auth.tsx`** Zeile 40 — Login-Redirect von `/generator` auf `/home` aendern:
-```tsx
-navigate('/home');
-```
+**4. `src/App.tsx`** -- `/coming-soon` Route hinzufuegen (falls noch nicht vorhanden)
+- Pruefen ob `/coming-soon` bereits existiert, sonst Route anlegen
 
-**5. `src/pages/Auth.tsx`** — `Footer` Import durch `BlackTieFooter` ersetzen (gleicher Fix wie bei Legal-Seiten).
+**5. Englisch-Kompatibilitaet pruefen**
+- Footer-Labels und Legal-Inhalte sind aktuell nur Deutsch
+- Footer-Labels sollten ueber das Translation-System (`t()`) laufen statt hardcoded Deutsch
+- Alternativ: Footer bleibt Deutsch (da Impressum/AGB deutsches Recht), aber UI-Labels uebersetzen
+
+---
+
+### Betroffene Dateien
+- `src/pages/Legal.tsx` -- Nav entfernen
+- `src/components/landing/BlackTieFooter.tsx` -- Links fixen, i18n
+- `src/components/Header.tsx` -- Anker-Links und CTA fixen
+- Ggf. `src/App.tsx` -- Coming-Soon Route
 
