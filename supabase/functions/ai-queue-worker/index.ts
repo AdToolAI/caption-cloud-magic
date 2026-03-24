@@ -283,7 +283,7 @@ async function invokeAIFunction(supabase: any, job: AIJob): Promise<any> {
     'caption': 'generate-caption',
     'hooks': 'generate-hooks',
     'carousel': 'generate-carousel',
-    'reel_script': 'generate-reel-script',
+    
     'reply_suggestions': 'generate-reply-suggestions',
     'bio': 'generate-bio'
   };

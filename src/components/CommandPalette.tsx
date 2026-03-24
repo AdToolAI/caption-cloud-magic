@@ -34,7 +34,7 @@ export const CommandPalette = () => {
     { id: "hooks", label: t("nav.hookGenerator"), icon: "Zap", route: "/hook-generator", category: "create", keywords: ["hook", "opener", "einstieg"] },
     { id: "rewriter", label: t("nav.rewriter"), icon: "RefreshCw", route: "/rewriter", category: "create", keywords: ["rewrite", "umschreiben", "verbessern"] },
     { id: "carousel", label: "Carousel Generator", icon: "LayoutGrid", route: "/carousel", category: "create", keywords: ["carousel", "slides", "präsentation"] },
-    { id: "reel", label: "Reel Script", icon: "Video", route: "/reel-script", category: "create", keywords: ["reel", "script", "video"] },
+    
     
     // Optimize
     { id: "wizard", label: t("nav.wizard"), icon: "Wand2", route: "/wizard", category: "optimize", keywords: ["prompt", "optimize", "optimieren"] },
