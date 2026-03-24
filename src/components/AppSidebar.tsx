@@ -319,32 +319,6 @@ export function AppSidebar() {
           .filter(([hubKey]) => hubKey !== 'admin' || isAdmin)
           .map(([hubKey, hubItems]) => renderHub(hubKey, hubItems))}
 
-        {/* Auxiliary Pages */}
-        <SidebarGroup>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-smooth">
-                <Link to="/pricing" className="flex items-center gap-3">
-                  {!isCollapsed && <span className="text-sm">{t("nav.pricing")}</span>}
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-smooth">
-                <Link to="/faq" className="flex items-center gap-3">
-                  {!isCollapsed && <span className="text-sm">{t("nav.faq")}</span>}
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-smooth">
-                <Link to="/support" className="flex items-center gap-3">
-                  {!isCollapsed && <span className="text-sm">{t("support")}</span>}
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
 
         {/* Animated Collapse Indicator at Bottom */}
         <div className="mt-auto pb-4 flex justify-center">
