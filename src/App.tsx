@@ -96,7 +96,7 @@ const Admin = lazy(() => import("./pages/Admin"));
 
 const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
-const ExplainerStudio = lazy(() => import("./pages/ExplainerStudio"));
+
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 
 const queryClient = new QueryClient();
