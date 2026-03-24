@@ -98,6 +98,7 @@ const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
+const HubPage = lazy(() => import("./pages/HubPage"));
 
 const queryClient = new QueryClient();
 
@@ -133,6 +134,7 @@ function AppLayout() {
                     
                     {/* Main pages */}
                     <Route path="/home" element={<Home />} />
+                    <Route path="/hub/:hubKey" element={<HubPage />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
