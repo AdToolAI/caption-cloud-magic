@@ -56,7 +56,11 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan }: XCo
         return;
       }
 
+      // Send current origin so callback redirects back here
+      const returnTo = `${window.location.origin}/performance?tab=connections`;
+      
       const { data, error } = await supabase.functions.invoke('x-oauth-start', {
+        body: { returnTo },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
