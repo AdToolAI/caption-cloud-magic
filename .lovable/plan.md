@@ -1,53 +1,37 @@
 
-Do I know what the issue is? Yes.
 
-What I verified:
-- The X OAuth start step works: new `oauth_states` rows are created for your user on every attempt.
-- The X callback still fails before saving the account.
-- There is currently no `social_connections` row for provider `x`, so the UI has nothing to mark as connected.
-- Latest backend log shows the real blocker:
-  `Client Forbidden / reason: client-not-enrolled`
-  during the `GET /2/users/me` call in `supabase/functions/x-oauth-callback/index.ts`.
+## Problem
 
-What the problem actually is:
-- The app is not failing at the UI layer.
-- It is failing in the backend callback after X sends the user back successfully.
-- The access token is obtained, but X rejects that token for v2 user lookup, so the app never reaches the `social_connections.upsert(...)`.
-- That means “not connected” is currently correct: the connection is never persisted.
+Zwei Fehler in `x-oauth-callback/index.ts`:
 
-Most important implication:
-- The active X credentials being used by the backend are the ones X is rejecting.
-- So even if you already attached an app to a project in the portal, the credentials currently configured in the app still appear to belong to an app/access setup that X does not accept for `/2/users/me`.
+1. **Crash in Error-Handler (Zeile 159)**: `supabase.from(...).delete(...).eq(...).catch()` ist kein gültiger Aufruf — der Supabase Query Builder gibt kein thenable mit `.catch()` zurück. Das führt zum `TypeError` und zum **"Internal Server Error"** statt einer sauberen Redirect-Antwort.
 
-Implementation plan:
-1. Improve `supabase/functions/x-oauth-callback/index.ts`
-   - Detect X errors using `userData.reason`, `required_enrollment`, and `client_id` instead of only `detail`.
-   - Return a much clearer message such as:
-     “Die aktuell hinterlegten X-App-Credentials werden von X für v2 abgelehnt.”
-   - Clean up `oauth_states` on both success and failure so old attempts don’t pile up.
+2. **X API Enrollment-Fehler**: Die X-App-Credentials werden weiterhin von X abgelehnt (`client-not-enrolled`). Das ist ein externes Konfigurationsproblem — aber der User sieht es nicht, weil Fehler 1 den Redirect verhindert.
 
-2. Tighten success handling in `src/components/performance/ConnectionsTab.tsx`
-   - Only show “connected” if a fresh `social_connections` row for `x` actually exists after redirect.
-   - If the callback returns `status=error`, surface that exact message immediately and avoid any optimistic success state.
+## Changes
 
-3. Add clearer inline diagnostics to the X card
-   - Update `src/components/performance/XConnectionCard.tsx` so failed callbacks are visible directly on the card, not only as a toast.
-   - Show a short provider-specific hint that the backend X app/access is being rejected by X.
+### File: `supabase/functions/x-oauth-callback/index.ts`
 
-4. Preserve proof of the real failure
-   - Keep the raw sanitized X failure reason in logs and expose a user-safe version in the UI.
-   - This will make it obvious whether the blocker is:
-     - wrong app credentials
-     - app not actually attached to the correct project
-     - missing API access tier
-     - another X-side enrollment restriction
+**Fix the `.catch()` crash** (Zeile 157-160):
 
-5. Validate after implementation
-   - Success path: callback creates a `social_connections` row and X immediately shows as connected.
-   - Failure path: the UI explicitly says X rejected the configured app credentials, instead of just staying disconnected.
+Replace the broken `.catch()` pattern with a proper try/catch:
 
-Technical note:
-- No database migration is needed.
-- The core issue is not the card rendering or source-of-truth logic anymore.
-- The real blocker is the X API response in the callback.
-- The only code gap left is that the app still does not explain this clearly enough in the UI, and it should verify persistence before claiming success.
+```typescript
+// Clean up oauth state on failure too
+if (state) {
+  try {
+    await supabase.from('oauth_states').delete().eq('csrf_token', state);
+  } catch (_) {
+    // ignore cleanup errors
+  }
+}
+```
+
+Also fix the same pattern on the success path (around line 145) if it uses the same `.catch()` syntax.
+
+This single fix will ensure that instead of "Internal Server Error", the user gets properly redirected back to `/performance?provider=x&status=error&message=...` with the real X API error message visible.
+
+## What the user will see after this fix
+
+Instead of "Internal Server Error", they will be redirected back to the app with a clear error message explaining that the X Developer Portal app needs to be attached to a Project with at least "Basic" API access.
+
