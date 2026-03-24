@@ -92,6 +92,7 @@ const PostHogDashboard = lazy(() => import("./pages/PostHogDashboard"));
 const PostHogEventTester = lazy(() => import("./pages/debug/PostHogEventTester"));
 const FeatureFlagDemo = lazy(() => import("./pages/FeatureFlagDemo"));
 const UsageReports = lazy(() => import("./pages/Analytics/UsageReports"));
+const PlatformAnalytics = lazy(() => import("./pages/Analytics/PlatformAnalytics"));
 const Admin = lazy(() => import("./pages/Admin"));
 
 const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
