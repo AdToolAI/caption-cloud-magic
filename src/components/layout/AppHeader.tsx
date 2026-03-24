@@ -8,6 +8,7 @@ import { UserMenu } from "./UserMenu";
 import { CommandBar } from "@/components/ui/CommandBar";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export function AppHeader() {
   const { toggleSidebar } = useSidebar();
