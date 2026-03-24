@@ -1,9 +1,10 @@
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { encryptToken, decryptToken } from './crypto.ts';
 
-interface RefreshResult {
+export interface RefreshResult {
   accessToken: string | null;
   error: string | null;
+  reconnectRequired?: boolean;
 }
 
 /**
