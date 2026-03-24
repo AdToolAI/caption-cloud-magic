@@ -51,7 +51,7 @@ export function BackgroundReplacerHeroHeader() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                 </span>
-                KI-Hintergrund-Ersteller v2
+                Smart Background
               </Badge>
             </motion.div>
 
