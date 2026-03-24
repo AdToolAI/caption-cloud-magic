@@ -130,7 +130,7 @@ function AppLayout() {
             }>
               <Routes>
                     {/* Public Landing Page - SEO optimiert */}
-                    <Route path="/" element={<Index />} />
+                    <Route path="/" element={user ? <Navigate to="/home" replace /> : <Index />} />
                     
                     {/* Main pages */}
                     <Route path="/home" element={<Home />} />
