@@ -663,7 +663,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "🎨 Media gesendet",
-      description: `Erstes Bild wird im Hintergrund-Ersatz geladen...`,
+      description: `Erstes Bild wird in Smart Background geladen...`,
     });
     
     navigate('/background-replacer');
