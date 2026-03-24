@@ -41,7 +41,7 @@ const BrandKit = lazy(() => import("./pages/BrandKit"));
 const Carousel = lazy(() => import("./pages/Carousel"));
 const Coach = lazy(() => import("./pages/Coach"));
 const Campaigns = lazy(() => import("./pages/Campaigns"));
-const Audit = lazy(() => import("./pages/Audit"));
+
 const AIPostGenerator = lazy(() => import("./pages/AIPostGenerator"));
 const Planner = lazy(() => import("./pages/Planner"));
 const BackgroundReplacer = lazy(() => import("./pages/BackgroundReplacer"));
