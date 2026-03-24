@@ -79,7 +79,7 @@ const UniversalCreator = lazy(() => import("./pages/UniversalCreator"));
 const UniversalVideoCreator = lazy(() => import("./pages/UniversalVideoCreator"));
 const UniversalDirectorsCut = lazy(() => import("./pages/DirectorsCut"));
 
-const VoiceLibrary = lazy(() => import("./pages/VoiceLibrary"));
+
 const PersonalizedDashboard = lazy(() => import("./pages/PersonalizedDashboard"));
 // Admin routes - lazy loaded for better performance
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
@@ -194,7 +194,7 @@ function AppLayout() {
                 <Route path="/universal-creator/library" element={<Navigate to="/media-library" replace />} />
                 <Route path="/universal-video-creator" element={<UniversalVideoCreator />} />
                 <Route path="/universal-directors-cut" element={<UniversalDirectorsCut />} />
-                <Route path="/voice-library" element={<VoiceLibrary />} />
+                <Route path="/voice-library" element={<Navigate to="/audio-studio" replace />} />
                 <Route path="/personalized-dashboard" element={<PersonalizedDashboard />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
           <Route path="/smart-scheduler" element={<SmartScheduler />} />

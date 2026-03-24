@@ -11,6 +11,7 @@ import { BeatSyncTimeline } from '@/components/audio-studio/BeatSyncTimeline';
 import { FillerWordPanel } from '@/components/audio-studio/FillerWordPanel';
 import { AudioBeforeAfterComparison } from '@/components/audio-studio/AudioBeforeAfterComparison';
 import { SoundLibrary } from '@/components/audio-studio/SoundLibrary';
+import { VoiceLibraryPanel } from '@/components/audio-studio/VoiceLibraryPanel';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,7 +27,7 @@ export default function AudioStudio() {
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler' | 'compare' | 'library'>('enhance');
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler' | 'compare' | 'library' | 'voices'>('enhance');
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
 
@@ -270,7 +271,8 @@ export default function AudioStudio() {
                       { id: 'transcript', label: 'Transcript', icon: Mic },
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
                       { id: 'filler', label: 'Filler-Wörter', icon: Volume2 },
-                      { id: 'library', label: 'Bibliothek', icon: Library }
+                      { id: 'library', label: 'Bibliothek', icon: Library },
+                      { id: 'voices', label: 'Custom Voices', icon: Mic }
                     ].map((tab) => (
                       <Button
                         key={tab.id}
@@ -395,11 +397,22 @@ export default function AudioStudio() {
                         />
                       </motion.div>
                     )}
+
+                    {activeTab === 'voices' && (
+                      <motion.div
+                        key="voices"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <VoiceLibraryPanel />
+                      </motion.div>
+                    )}
                   </AnimatePresence>
                 </div>
 
                 {/* Right: AI Sidebar (only when not in enhance tab) */}
-                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && (
+                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}

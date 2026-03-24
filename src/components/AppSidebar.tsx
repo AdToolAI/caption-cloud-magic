@@ -132,7 +132,7 @@ export function AppSidebar() {
       { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", icon: Edit },
       { route: "/sora-long-form", titleKey: "Sora 2 Long-Form", icon: Film },
       { route: "/ai-video-studio", titleKey: "AI Video Studio", icon: Sparkles },
-      { route: "/voice-library", titleKey: "Voice Library", icon: MessageSquare },
+      
       { route: "/background-replacer", titleKey: "nav.backgroundReplacer", icon: Layers },
     ],
     team: [
