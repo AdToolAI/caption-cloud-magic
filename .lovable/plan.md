@@ -1,32 +1,24 @@
 
 
-## TikTok Domain-Verifizierung
+## TikTok Verifizierungs-URL korrigieren
 
-TikTok erwartet, dass die Datei unter einer bestimmten URL abrufbar ist. Wir erstellen eine Edge Function, die den Verifizierungsinhalt zurückgibt.
+TikTok sucht die Datei unter:
+```
+https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/tiktoklR1KqASHK1XQ0Is9kpAAqGUUFhhA8riW.txt
+```
+
+Unsere aktuelle Function heisst `tiktok-verify` und ist daher unter `/functions/v1/tiktok-verify` erreichbar -- falsche URL.
 
 ### Was passiert
 
-1. **Neue Edge Function erstellen**: `tiktok-verify` – gibt den exakten Verifizierungstext zurück:
-   ```
-   tiktok-developers-site-verification=lR1KqASHK1XQ0Is9kpAAqGUUFhhA8riW
-   ```
+1. **Alte Edge Function loeschen**: `supabase/functions/tiktok-verify/index.ts`
+2. **Neue Edge Function erstellen**: `supabase/functions/tiktoklR1KqASHK1XQ0Is9kpAAqGUUFhhA8riW.txt/index.ts` -- der Ordnername wird zur URL
 
-2. **Content-Type**: `text/plain` (TikTok erwartet eine reine Textdatei)
-
-3. **Kein Auth nötig**: Die Funktion muss öffentlich erreichbar sein (kein JWT-Check)
-
-### Ergebnis
-
-Die Verifizierungsdatei wird unter dieser URL erreichbar sein:
-```
-https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/tiktok-verify
-```
-
-Nach dem Deployment gibst du diese URL im TikTok Developer Portal als Domain-Verifizierung ein und klickst auf "Verify".
+Der Inhalt bleibt identisch: gibt `tiktok-developers-site-verification=lR1KqASHK1XQ0Is9kpAAqGUUFhhA8riW` als `text/plain` zurueck.
 
 ### Technische Details
 
-- Datei: `supabase/functions/tiktok-verify/index.ts`
-- Einfache Funktion, die auf GET/POST mit dem Verifizierungstext antwortet
-- CORS-Headers für Kompatibilität
+- Edge Function Ordnername = URL-Pfad nach `/functions/v1/`
+- Punkte im Ordnernamen koennten problematisch sein bei Supabase Edge Functions
+- Falls der Punkt im Namen nicht funktioniert, muessten wir einen alternativen Ansatz waehlen
 
