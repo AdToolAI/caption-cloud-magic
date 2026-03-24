@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { Footer } from "@/components/Footer";
+import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
+import { Brand } from "@/components/layout/Brand";
+import { ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { SEO } from "@/components/SEO";
 import { getCanonicalUrl } from "@/config/seo";
