@@ -118,11 +118,6 @@ export function AppSidebar() {
       { route: "/trend-radar", titleKey: "nav.trendRadar", icon: Radar },
       { route: "/audit", titleKey: "nav.audit", icon: Shield },
     ],
-    automatisieren: [
-      { route: "/campaigns", titleKey: "nav.campaigns", icon: Workflow, plan: "pro" },
-      { route: "/integrations", titleKey: "nav.integrations", icon: Share2 },
-      { route: "/instagram-publishing", titleKey: "nav.instagramPublishing", icon: Share2 },
-    ],
     medien: [
       { route: "/media-library", titleKey: "nav.mediaLibrary", icon: FolderOpen },
       { route: "/audio-studio", titleKey: "VoicePro", icon: Mic2 },
