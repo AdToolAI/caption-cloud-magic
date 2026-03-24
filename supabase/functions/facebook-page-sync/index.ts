@@ -99,40 +99,46 @@ Deno.serve(async (req) => {
     // Get Page Access Token dynamically
     const pageToken = await getPageToken(fbUserToken, fbPageId);
 
-    // Fetch Facebook Page Daily Insights (period=day, last completed day)
-    console.log('[FB Insights] Fetching daily metrics...');
-    const dailyInsights = await graphGet(
-      `/${fbPageId}/insights`,
-      {
-        metric: 'page_impressions,page_post_engagements,page_total_actions,page_video_views',
-        period: 'day',
-      },
-      pageToken
-    );
-
-    // Fetch Facebook Page Fans (lifetime snapshot)
-    console.log('[FB Insights] Fetching fans total...');
-    let fansData;
+    // Fetch Facebook Page Daily Insights (new metrics after Nov 2025 deprecation)
+    console.log('[FB Insights] Fetching daily metrics (new API)...');
+    let dailyInsights;
     try {
-      fansData = await graphGet(
+      dailyInsights = await graphGet(
         `/${fbPageId}/insights`,
         {
-          metric: 'page_fans',
-          period: 'lifetime',
+          metric: 'page_media_view',
+          period: 'day',
         },
         pageToken
       );
     } catch (error) {
-      console.warn('[FB Insights] page_fans metric not available (likely new page):', error);
-      fansData = { data: [] };
+      console.warn('[FB Insights] page_media_view not available:', error);
+      dailyInsights = { data: [] };
     }
 
-    // Parse metrics
-    const impressions = parseMetricValue(dailyInsights, 'page_impressions');
-    const postEngagements = parseMetricValue(dailyInsights, 'page_post_engagements');
-    const totalActions = parseMetricValue(dailyInsights, 'page_total_actions');
-    const videoViews = parseMetricValue(dailyInsights, 'page_video_views');
-    const fansTotal = parseMetricValue(fansData, 'page_fans');
+    // Fetch Facebook Page Follows (replaces deprecated page_fans)
+    console.log('[FB Insights] Fetching follows total...');
+    let followsData;
+    try {
+      followsData = await graphGet(
+        `/${fbPageId}/insights`,
+        {
+          metric: 'page_follows',
+          period: 'day',
+        },
+        pageToken
+      );
+    } catch (error) {
+      console.warn('[FB Insights] page_follows metric not available:', error);
+      followsData = { data: [] };
+    }
+
+    // Parse metrics — map new metric names to existing DB columns
+    const impressions = parseMetricValue(dailyInsights, 'page_media_view');
+    const postEngagements = 0; // Deprecated — no page-level replacement
+    const totalActions = 0;    // Deprecated — no page-level replacement
+    const videoViews = 0;      // Now included in page_media_view
+    const fansTotal = parseMetricValue(followsData, 'page_follows');
 
     // Get today's date in ISO format (YYYY-MM-DD)
     const today = new Date().toISOString().split('T')[0];
