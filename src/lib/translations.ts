@@ -6103,7 +6103,7 @@ export const translations: Record<Language, any> = {
       carousel: "Generador de Carrusel",
       promptWizard: "Asistente de Prompts",
       
-      hookGenerator: "Generador de Hooks",
+      
       aiPostGenerator: "Generador AI de Posts",
       imageCaptionPairing: "Emparejamiento Imagen-Texto",
       backgroundReplacer: "Reemplazo de Fondo",
