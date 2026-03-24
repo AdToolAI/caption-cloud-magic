@@ -1,24 +1,29 @@
 
 
-## TikTok Verifizierungs-URL korrigieren
+## TikTok-Verifizierungsdatei aktualisieren
 
-TikTok sucht die Datei unter:
-```
-https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/tiktoklR1KqASHK1XQ0Is9kpAAqGUUFhhA8riW.txt
-```
-
-Unsere aktuelle Function heisst `tiktok-verify` und ist daher unter `/functions/v1/tiktok-verify` erreichbar -- falsche URL.
+Der Benutzer hat eine neue TikTok-Verifizierungsdatei hochgeladen mit einem anderen Verifizierungscode.
 
 ### Was passiert
 
-1. **Alte Edge Function loeschen**: `supabase/functions/tiktok-verify/index.ts`
-2. **Neue Edge Function erstellen**: `supabase/functions/tiktoklR1KqASHK1XQ0Is9kpAAqGUUFhhA8riW.txt/index.ts` -- der Ordnername wird zur URL
+1. **Neue Verifizierungsdatei erstellen**: `public/tiktokV6OfUdRsbIJIUZazTvdRXuQh3ByGQXoK.txt` mit dem Inhalt:
+   ```
+   tiktok-developers-site-verification=V6OfUdRsbIJIUZazTvdRXuQh3ByGQXoK
+   ```
 
-Der Inhalt bleibt identisch: gibt `tiktok-developers-site-verification=lR1KqASHK1XQ0Is9kpAAqGUUFhhA8riW` als `text/plain` zurueck.
+2. **Alte Edge Function entfernen**: `supabase/functions/tiktok-verify/index.ts` loeschen (nicht mehr noetig)
+
+### Ergebnis
+
+Die neue Datei wird erreichbar sein unter:
+```
+https://caption-cloud-magic.lovable.app/tiktokV6OfUdRsbIJIUZazTvdRXuQh3ByGQXoK.txt
+```
+
+Diese URL im TikTok Developer Portal eingeben und auf **Verify** klicken.
 
 ### Technische Details
 
-- Edge Function Ordnername = URL-Pfad nach `/functions/v1/`
-- Punkte im Ordnernamen koennten problematisch sein bei Supabase Edge Functions
-- Falls der Punkt im Namen nicht funktioniert, muessten wir einen alternativen Ansatz waehlen
+- Statische Datei im `public/`-Ordner, wird direkt von Vite bereitgestellt
+- Kein Backend noetig, keine Slug-Einschraenkungen
 
