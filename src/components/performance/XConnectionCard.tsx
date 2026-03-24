@@ -19,26 +19,16 @@ interface XConnectionCardProps {
   callbackError?: string | null;
 }
 
-export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan }: XConnectionCardProps) => {
+export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callbackError }: XConnectionCardProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
-  const [lastError, setLastError] = useState<string | null>(null);
 
   const hasAccess = canUseXTwitter(userPlan);
 
-  // Pick up error from OAuth callback redirect
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const provider = params.get('provider') || params.get('connected');
-    const status = params.get('status');
-    const message = params.get('message');
-
-    if (provider === 'x' && status === 'error' && message) {
-      setLastError(decodeURIComponent(message));
-    }
-  }, []);
+  // Use callback error passed from parent (centralized handling)
+  const lastError = callbackError || null;
 
   const handleConnect = async () => {
     if (!hasAccess) {

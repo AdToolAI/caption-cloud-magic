@@ -36,6 +36,7 @@ export const ConnectionsTab = () => {
   const [showTokenDialog, setShowTokenDialog] = useState(false);
   const [syncError, setSyncError] = useState<Record<string, boolean>>({});
   const [userPlan, setUserPlan] = useState<string>('free');
+  const [xCallbackError, setXCallbackError] = useState<string | null>(null);
 
   useEffect(() => {
     const initializeAndHandleCallback = async () => {
