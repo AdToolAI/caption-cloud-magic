@@ -1,49 +1,45 @@
 
-Ich habe es geprüft.
+Do I know what the issue is? Yes.
 
-Was ich verifiziert habe
-- `health-x` antwortet mit `ok: true`. Die X-Secrets sind also vorhanden; es ist kein fehlender API-Key.
-- Die aktuellen Backend-Logs von `x-oauth-callback` zeigen den echten Fehler: X lehnt die App bei `GET https://api.x.com/2/users/me` mit `Client Forbidden`, `reason: client-not-enrolled`, `required_enrollment: Appropriate Level of API Access` ab.
-- In `social_connections` existiert aktuell keine Zeile für `provider = 'x'`. X ist also derzeit nicht wirklich verbunden.
+What I verified
+- X is still not actually connected: there is no `social_connections` row for `provider = 'x'`.
+- The latest backend log from `x-oauth-callback` still shows the real blocker:
+  `Client Forbidden` / `reason: client-not-enrolled` / `required_enrollment: Appropriate Level of API Access`.
+- The secrets exist and `health-x` returns `ok: true`, so this is not a missing API key problem.
+- The current code still has two UX gaps:
+  1. `x-oauth-callback` always redirects to `APP_BASE_URL`, so if the flow starts from Preview and returns to Published (or vice versa), the user can miss the result.
+  2. `ConnectionsTab` clears the query params immediately after toast handling, while `XConnectionCard` separately tries to read the same params. That makes the inline error fragile.
 
-Warum du trotzdem keine Fehlermeldung siehst
-- `supabase/functions/x-oauth-callback/index.ts` leitet bei Fehlern auf `/performance?provider=x&status=error&message=...` weiter.
-- Die Fehlermeldung wird aber erst in `ConnectionsTab` / `XConnectionCard` ausgewertet.
-- `src/pages/PerformanceTracker.tsx` öffnet standardmäßig immer den Tab `overview`, nicht `connections`.
-- Dadurch landet man nach dem Redirect zwar auf `/performance`, aber nicht direkt in dem Bereich, der die X-Fehlermeldung sichtbar macht.
-- Zusätzlich ist der Redirect hart an `APP_BASE_URL` gebunden. Wenn du den Flow aus Preview oder einer anderen URL startest, kann die Rückleitung auf einer anderen Domain/Ansicht landen als die, die du gerade beobachtest.
+What the actual problem is
+- The true connection failure is external: the configured X app is being rejected by X itself for v2 access.
+- The app-side bug is that the failure is not shown reliably in the same environment where the user started the flow.
 
-Fazit
-- Ja: Die X-Credentials sind technisch hinterlegt.
-- Nein: X ist nicht korrekt verbunden.
-- Der aktuelle Blocker ist nicht „API-Key fehlt“, sondern: Die hinterlegte X-App wird von X selbst für v2 abgelehnt (Projektbindung/API-Level passt nicht).
-- Der sichtbare UX-Bug ist: Die App zeigt den Fehler nicht zuverlässig, weil sie nach dem Callback auf der falschen Ansicht landet.
+Implementation plan
+1. Make the callback return to the exact origin that started the flow
+   - Update `supabase/functions/x-oauth-start/index.ts` to accept/store a safe `returnTo` target in `oauth_states.state`.
+   - Update `src/components/performance/XConnectionCard.tsx` to send the current `/performance?tab=connections` URL when starting OAuth.
+   - Update `supabase/functions/x-oauth-callback/index.ts` to read that stored return target, validate it, and redirect there instead of always using `APP_BASE_URL`.
 
-Implementierungsplan
-1. `supabase/functions/x-oauth-callback/index.ts` anpassen
-   - Bei Erfolg und Fehler auf `/performance?tab=connections...` weiterleiten.
-   - `provider`, `status` und `message` beibehalten.
-   - Optional einen Rücksprungpfad/origin mitgeben, damit Preview und Live-Domain sauber unterstützt werden.
+2. Centralize callback status handling in one place
+   - Move X callback parsing out of `XConnectionCard` and let `ConnectionsTab` become the single source of truth for `provider/status/message`.
+   - Pass the resolved X error/success state into `XConnectionCard` as props instead of making the card read `window.location.search` itself.
+   - Remove the race where params are cleared before the card can show the banner.
 
-2. `src/pages/PerformanceTracker.tsx` URL-gesteuert machen
-   - `tab` aus der URL lesen.
-   - Bei `tab=connections` direkt den Connections-Tab öffnen.
-   - Standardverhalten für normale Aufrufe beibehalten.
+3. Only show success if the X row really exists
+   - In `src/components/performance/ConnectionsTab.tsx`, after `status=success`, re-fetch `social_connections` and verify a fresh `provider='x'` row exists before showing “connected”.
+   - If the row is missing, downgrade to an error state and show a clear message instead of optimistic success.
 
-3. `src/components/performance/ConnectionsTab.tsx` robuster machen
-   - Erfolg nur anzeigen, wenn nach dem Redirect wirklich eine frische `social_connections`-Zeile für `x` gefunden wird.
-   - `status=error` sofort als sichtbaren Fehler behandeln.
-   - Query-Parameter erst entfernen, nachdem Toast/Banner sicher angezeigt wurden.
+4. Sharpen the X-specific diagnostic message
+   - Keep the raw X reason in backend logs.
+   - Surface a shorter user-safe inline message on the X card, e.g.:
+     “X hat die aktuell hinterlegte App abgelehnt. Die App muss in X Developer korrekt einem Project zugeordnet sein und den nötigen API-Zugang haben.”
+   - Preserve the detailed backend message for debugging.
 
-4. `src/components/performance/XConnectionCard.tsx` Diagnose weiter schärfen
-   - Die vorhandene Inline-Fehlermeldung beibehalten.
-   - Für `client-not-enrolled` einen klaren Hinweis anzeigen: X-App/Projekt/API-Zugang wird von X abgelehnt.
+5. Harden callback cleanup and fallback behavior
+   - In `x-oauth-callback`, delete `oauth_states` via the loaded row id (`oauthState.id`) and log cleanup failures explicitly.
+   - Add a safe fallback to `APP_BASE_URL` only if no valid stored return URL exists.
 
-5. Nach Umsetzung validieren
-   - Fehlerfall: Redirect landet direkt im Connections-Tab und zeigt die echte X-Meldung.
-   - Erfolgsfall: X wird erst dann als verbunden angezeigt, wenn wirklich ein `social_connections`-Datensatz existiert.
-
-Technische Details
-- Keine Datenbankmigration nötig.
-- Aktueller nachweisbarer Root Cause im Backend: `client-not-enrolled`.
-- Aktueller nachweisbarer Root Cause im Frontend: Redirect landet nicht direkt in der Ansicht, die den Fehler ausliest und anzeigt.
+Technical notes
+- No database migration is needed; `oauth_states.state` already exists and can hold the return target metadata.
+- The code changes will fix the “I still don’t see the error” problem.
+- They will not by themselves make X connect until the X app credentials are valid for X v2 access; the current backend evidence still points to `client-not-enrolled`.
