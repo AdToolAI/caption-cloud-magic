@@ -3928,7 +3928,7 @@ export const translations: Record<Language, any> = {
       
       aiPostGenerator: "KI Post-Generator",
       imageCaptionPairing: "Bild-Text-Pairing",
-      backgroundReplacer: "Hintergrund-Ersatz",
+      backgroundReplacer: "Smart Background",
       rewriter: "Caption-Umschreiber",
       coach: "KI-Content-Coach",
       bioOptimizer: "KI Bio-Optimierer",
