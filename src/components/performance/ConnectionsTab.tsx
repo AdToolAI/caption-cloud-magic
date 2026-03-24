@@ -537,6 +537,18 @@ export const ConnectionsTab = () => {
 
         if (error) throw error;
 
+        // Check if reconnection is required (token permanently expired)
+        if (data?.reconnect_required) {
+          const providerLabel = provider === 'x' ? 'X' : provider.charAt(0).toUpperCase() + provider.slice(1);
+          toast({
+            title: `${providerLabel} Token abgelaufen`,
+            description: `Bitte trenne die Verbindung und verbinde ${providerLabel} erneut.`,
+            variant: "destructive"
+          });
+          setSyncError(prev => ({ ...prev, [connectionId]: true }));
+          return;
+        }
+
         const connection = connections.find(c => c.id === connectionId);
         
         await emit({

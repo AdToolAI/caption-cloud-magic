@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { decryptToken, encryptToken } from "../_shared/crypto.ts";
-import { refreshYouTubeToken } from "../_shared/token-refresh.ts";
+import { refreshYouTubeToken, refreshXToken } from "../_shared/token-refresh.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -94,20 +94,35 @@ serve(async (req) => {
     }
     console.log(`✅ Connection ownership verified for user ${user.id}`);
 
-    // Check if YouTube token needs refresh
+    // Check if token needs refresh (YouTube or X)
     let accessToken: string;
-    if (provider === 'youtube' && connection.token_expires_at) {
+    if ((provider === 'youtube' || provider === 'x') && connection.token_expires_at) {
       const tokenExpiry = new Date(connection.token_expires_at);
       if (tokenExpiry < new Date()) {
-        console.log('🔄 YouTube token expired, refreshing...');
-        const { accessToken: refreshedToken, error: refreshError } = await refreshYouTubeToken(connection, serviceClient);
+        console.log(`🔄 ${provider} token expired, refreshing...`);
         
-        if (refreshError || !refreshedToken) {
-          throw new Error(refreshError || 'Token refresh failed. Please reconnect YouTube.');
+        const refreshResult = provider === 'youtube'
+          ? await refreshYouTubeToken(connection, serviceClient)
+          : await refreshXToken(connection, serviceClient);
+        
+        if (refreshResult.error || !refreshResult.accessToken) {
+          // Return a structured 200 so the frontend can show actionable guidance
+          if (refreshResult.reconnectRequired) {
+            return new Response(
+              JSON.stringify({
+                success: false,
+                reconnect_required: true,
+                provider,
+                error: refreshResult.error
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          throw new Error(refreshResult.error || `Token refresh failed. Please reconnect ${provider}.`);
         }
         
-        accessToken = refreshedToken;
-        console.log('✅ YouTube token refreshed successfully');
+        accessToken = refreshResult.accessToken;
+        console.log(`✅ ${provider} token refreshed successfully`);
       } else {
         // Token still valid, decode it
         accessToken = await decodeProviderToken(provider, connection.access_token_hash);
@@ -446,7 +461,7 @@ async function fetchYouTubePosts(userId: string, accountId: string, accessToken:
 async function fetchXPosts(userId: string, accountId: string, accessToken: string): Promise<any[]> {
   try {
     const response = await fetch(
-      `https://api.twitter.com/2/users/${accountId}/tweets?tweet.fields=created_at,public_metrics,entities&max_results=25`,
+      `https://api.x.com/2/users/${accountId}/tweets?tweet.fields=created_at,public_metrics,entities&max_results=25`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
