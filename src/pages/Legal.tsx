@@ -506,7 +506,7 @@ const Legal = () => {
             © 2025 AdTool AI – All rights reserved.
           </motion.div>
         </main>
-        <Footer />
+        <BlackTieFooter />
       </div>
     </>
   );
