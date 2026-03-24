@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useSearchParams } from "react-router-dom";
 import { Footer } from "@/components/Footer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,9 +11,14 @@ import { ConnectionsTab } from "@/components/performance/ConnectionsTab";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+const VALID_TABS = ["overview", "trends", "insights", "connections"];
+
 const PerformanceTracker = () => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const initialTab = tabFromUrl && VALID_TABS.includes(tabFromUrl) ? tabFromUrl : "overview";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [metricsUpdateKey, setMetricsUpdateKey] = useState(0);
 
   useEffect(() => {

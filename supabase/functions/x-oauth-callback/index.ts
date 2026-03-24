@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
     await supabase.from('oauth_states').delete().eq('csrf_token', state);
 
     // Redirect to app
-    const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?provider=x&status=success`;
+    const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?tab=connections&provider=x&status=success`;
     return new Response(null, {
       status: 302,
       headers: { ...corsHeaders, 'Location': redirectUrl },
@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
     }
     
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?provider=x&status=error&message=${encodeURIComponent(errorMessage)}`;
+    const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?tab=connections&provider=x&status=error&message=${encodeURIComponent(errorMessage)}`;
     return new Response(null, {
       status: 302,
       headers: { ...corsHeaders, 'Location': redirectUrl },
