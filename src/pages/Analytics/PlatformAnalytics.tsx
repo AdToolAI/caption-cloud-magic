@@ -56,7 +56,7 @@ export default function PlatformAnalytics() {
 
       const { data, error } = await supabase
         .from("post_metrics")
-        .select("id, caption_text, posted_at, impressions, likes, comments, shares, engagement_rate, permalink")
+        .select("id, caption_text, posted_at, impressions, likes, comments, shares, engagement_rate")
         .eq("user_id", user.id)
         .eq("provider", platform)
         .gte("posted_at", cutoff.toISOString())
