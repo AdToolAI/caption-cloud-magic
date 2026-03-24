@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Footer } from "@/components/Footer";
+import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, Loader2, Eye, EyeOff, Shield } from "lucide-react";
