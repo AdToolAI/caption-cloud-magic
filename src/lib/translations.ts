@@ -6106,7 +6106,7 @@ export const translations: Record<Language, any> = {
       
       aiPostGenerator: "Generador AI de Posts",
       imageCaptionPairing: "Emparejamiento Imagen-Texto",
-      backgroundReplacer: "Reemplazo de Fondo",
+      backgroundReplacer: "Smart Background",
       rewriter: "Reescritor de Captions",
       coach: "Coach AI de Contenido",
       bioOptimizer: "Optimizador AI de Bio",
