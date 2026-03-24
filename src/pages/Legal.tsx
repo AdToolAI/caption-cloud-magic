@@ -19,7 +19,7 @@ const Legal = () => {
   
   // Support direct routes /privacy and /terms (for TikTok OAuth)
   const location = window.location.pathname;
-  const actualPage = page || (location === '/privacy' ? 'privacy' : location === '/terms' ? 'terms' : null);
+  const actualPage = page || (location === '/privacy' ? 'privacy' : location === '/terms' ? 'terms' : location === '/imprint' ? 'imprint' : null);
 
   // Determine page type
   const pageType = actualPage === 'privacy' ? 'privacy' 

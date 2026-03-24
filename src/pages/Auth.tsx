@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Footer } from "@/components/Footer";
+import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, Loader2, Eye, EyeOff, Shield } from "lucide-react";
@@ -37,7 +37,7 @@ const Auth = () => {
         console.log('[Auth] Found composer import, redirecting to /composer');
         navigate('/composer');
       } else {
-        navigate('/generator');
+        navigate('/home');
       }
     }
   }, [user, navigate]);
@@ -345,14 +345,14 @@ const Auth = () => {
         open={requiresMfa}
         onSuccess={() => {
           clearMfaRequirement();
-          navigate('/generator');
+          navigate('/home');
         }}
         onCancel={() => {
           clearMfaRequirement();
         }}
       />
 
-      <Footer />
+      <BlackTieFooter />
     </div>
   );
 };

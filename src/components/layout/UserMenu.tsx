@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { User, Settings, CreditCard, HelpCircle, LogOut, Coins, Briefcase, Tag, Workflow, Share2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { balance, loading } = useCredits();
 
@@ -119,7 +120,7 @@ export function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem 
-          onClick={signOut}
+          onClick={async () => { await signOut(); navigate('/'); }}
           className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
         >
           <LogOut className="h-4 w-4" />
