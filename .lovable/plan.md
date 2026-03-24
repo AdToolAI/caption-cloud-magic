@@ -1,43 +1,37 @@
 
 
-# Plan: VoicePro + Voice Library zusammenführen
+# Plan: Erklärvideo Studio löschen + Hintergrund-Ersatz → Smart Background umbenennen
 
-## Zusammenfassung
-Die **Voice Library** (Custom Voice Verwaltung, Voice Cloning) wird als neuer Tab in **VoicePro** (AudioStudio) integriert. Die separate `/voice-library`-Route wird als Redirect beibehalten. In der Sidebar bleibt nur ein Eintrag: **VoicePro**.
+## 1. Erklärvideo Studio vollständig löschen
 
-## Umsetzung
+### Zu löschende Dateien
+- `src/pages/ExplainerStudio.tsx`
+- `src/components/explainer-studio/` (ganzer Ordner, 14+ Dateien)
+- `src/types/explainer-studio.ts`
+- `src/hooks/useExplainerScript.ts`
+- `supabase/functions/generate-explainer-script/index.ts`
+- `supabase/functions/auto-generate-explainer/index.ts`
+- `supabase/functions/render-explainer-video/index.ts`
+- `supabase/functions/check-explainer-render/index.ts`
 
-### 1. Neuen Tab „Voices" in AudioStudio hinzufügen (`AudioStudio.tsx`)
-- Neuen Tab `voices` in die Tab-Navigation einfügen (Icon: `Mic`, Label: „Custom Voices")
-- Tab zeigt die Voice Library inline an (Custom Voices Grid + Voice Clone Button)
-- Der Tab ist **immer verfügbar** (auch ohne geladenes Audio), daher muss der Tab-Bereich auch im Upload-Screen erreichbar sein — oder besser: den Voices-Tab als eigenständigen Bereich neben dem Upload anzeigen
-
-### 2. Voice Library als eingebettete Komponente extrahieren
-- Neue Datei `src/components/audio-studio/VoiceLibraryPanel.tsx`
-- Enthält die gesamte Logik aus `VoiceLibrary.tsx` (Voices-Grid, Play/Pause, Delete, Active-Toggle)
-- Inkl. `VoiceCloneDialog`-Trigger
-- Wird im `voices`-Tab des AudioStudios gerendert
-
-### 3. Sidebar bereinigen (`AppSidebar.tsx`)
-- Eintrag `/voice-library` entfernen
-- `/audio-studio` bleibt als „VoicePro"
-
-### 4. Route-Redirect (`App.tsx`)
-- `/voice-library` → Redirect zu `/audio-studio` (Backward-Compat)
-- `VoiceLibrary.tsx` Seite löschen
-
-### 5. Command-Bar/Palette bereinigen
-- Voice-Library-Einträge in `CommandBar.tsx` und `CommandPalette.tsx` entfernen oder auf `/audio-studio` umleiten
-
-## Betroffene Dateien
+### Zu bearbeitende Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `src/components/audio-studio/VoiceLibraryPanel.tsx` | Neu — Voice-Verwaltung als Panel |
-| `src/pages/AudioStudio.tsx` | Neuer Tab „Custom Voices" mit VoiceLibraryPanel |
-| `src/pages/VoiceLibrary.tsx` | Löschen |
-| `src/components/AppSidebar.tsx` | `/voice-library`-Eintrag entfernen |
-| `src/App.tsx` | Redirect `/voice-library` → `/audio-studio`, Import entfernen |
-| `src/components/ui/CommandBar.tsx` | Voice-Library-Eintrag anpassen |
-| `src/components/CommandPalette.tsx` | Voice-Library-Command anpassen |
+| `src/App.tsx` | Import + Route `/explainer-studio` entfernen |
+| `src/components/AppSidebar.tsx` | Eintrag `/explainer-studio` entfernen |
+
+**Hinweis:** Die `explainer`-Kategorie im Universal Video Creator bleibt bestehen — das ist ein separates Feature mit eigener Pipeline.
+
+---
+
+## 2. Hintergrund-Ersatz → „Smart Background" umbenennen
+
+| Datei | Änderung |
+|-------|----------|
+| `src/components/AppSidebar.tsx` | `titleKey` von `nav.backgroundReplacer` → neuen Key oder direkt „Smart Background" |
+| `src/lib/translations.ts` | `backgroundReplacer` → „Smart Background" (EN), „Smart Background" (DE), „Smart Background" (ES) |
+| `src/components/background/BackgroundReplacerHeroHeader.tsx` | Titel-Text auf „Smart Background" ändern |
+| `src/pages/BackgroundReplacer.tsx` | Seitentitel/Header auf „Smart Background" |
+| `src/pages/MediaLibrary.tsx` | Toast-Texte „Hintergrund-Ersatz" → „Smart Background" |
 
