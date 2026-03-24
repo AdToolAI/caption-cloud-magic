@@ -28,7 +28,7 @@ const Home = lazy(() => import("./pages/Home"));
 const Generator = lazy(() => import("./pages/Generator"));
 const PromptWizard = lazy(() => import("./pages/PromptWizard"));
 const PostingTimes = lazy(() => import("./pages/PostingTimes"));
-const HookGenerator = lazy(() => import("./pages/HookGenerator"));
+
 const Rewriter = lazy(() => import("./pages/Rewriter"));
 const GoalsDashboard = lazy(() => import("./pages/GoalsDashboard"));
 const PerformanceTracker = lazy(() => import("./pages/PerformanceTracker"));
