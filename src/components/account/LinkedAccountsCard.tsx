@@ -30,6 +30,7 @@ interface Credential {
   platform: Platform;
   is_connected: boolean;
   last_verified_at: string | null;
+  connection_id?: string;
 }
 
 export const LinkedAccountsCard = () => {
