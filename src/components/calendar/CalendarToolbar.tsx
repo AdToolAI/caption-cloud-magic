@@ -151,7 +151,7 @@ export function CalendarToolbar({
               onClick={onSelectAllDrafts}
               className="h-8 text-xs bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10"
             >
-              Select Drafts
+              Entwürfe wählen
             </Button>
           )}
           
@@ -162,7 +162,7 @@ export function CalendarToolbar({
               onClick={onDeselectAll}
               className="h-8 text-xs bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10"
             >
-              Deselect ({selectedEventsCount})
+              Abwählen ({selectedEventsCount})
             </Button>
           )}
           

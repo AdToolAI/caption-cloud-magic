@@ -134,8 +134,6 @@ export function MediaUploader({ selectedMedia, onMediaChange }: MediaUploaderPro
 
   return (
     <div className="space-y-3">
-      <label className="text-sm font-medium text-foreground">Medien (optional)</label>
-
       {/* Upload Area */}
       <motion.div
         onDrop={handleDrop}
