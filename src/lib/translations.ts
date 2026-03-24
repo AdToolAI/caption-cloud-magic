@@ -1685,7 +1685,7 @@ export const translations: Record<Language, any> = {
       carousel: "Carousel Generator",
       promptWizard: "Prompt Assistant",
       
-      hookGenerator: "Hook Generator",
+      
       aiPostGenerator: "AI Post Generator",
       imageCaptionPairing: "Image Caption Pairing",
       backgroundReplacer: "Background Replacer",
