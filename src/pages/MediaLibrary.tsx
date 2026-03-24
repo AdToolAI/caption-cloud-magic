@@ -650,7 +650,7 @@ export default function MediaLibrary() {
     if (!firstImageItem) {
       toast({
         title: "⚠️ Kein Bild ausgewählt",
-        description: "Der Hintergrund-Ersatz funktioniert nur mit Bildern.",
+        description: "Smart Background funktioniert nur mit Bildern.",
         variant: "destructive",
       });
       return;
