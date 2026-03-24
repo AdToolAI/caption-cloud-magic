@@ -14,7 +14,7 @@ const CRITICAL_FUNCTIONS = [
   'get-credits',
   'render-with-remotion',
   'generate-caption',
-  'generate-hooks',
+  
 ];
 
 Deno.serve(async (req) => {

@@ -47,7 +47,7 @@ export const RecoCard = () => {
       icon: MessageSquare,
       text: 'Hook-Stil "Neugier" performt +18%',
       impact: '+18%',
-      action: () => navigate('/hook-generator')
+      action: () => navigate('/generator')
     }
   ];
 

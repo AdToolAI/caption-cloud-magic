@@ -281,7 +281,7 @@ async function invokeAIFunction(supabase: any, job: AIJob): Promise<any> {
   // Map other job types to edge functions
   const functionMap: Record<string, string> = {
     'caption': 'generate-caption',
-    'hooks': 'generate-hooks',
+    
     'carousel': 'generate-carousel',
     
     'reply_suggestions': 'generate-reply-suggestions',

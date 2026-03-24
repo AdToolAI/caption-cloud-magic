@@ -7,7 +7,7 @@ import { TrendingUp, TrendingDown, Target, Zap, Calendar, Trophy } from "lucide-
 
 interface Metrics {
   totalPosts: number;
-  totalHooks: number;
+  
   postsThisWeek: number;
   weekOverWeekGrowth: number;
   goalsCompleted: number;
@@ -21,7 +21,7 @@ export const AnalyticsDashboard = () => {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState<Metrics>({
     totalPosts: 0,
-    totalHooks: 0,
+    
     postsThisWeek: 0,
     weekOverWeekGrowth: 0,
     goalsCompleted: 0,
@@ -44,12 +44,6 @@ export const AnalyticsDashboard = () => {
       // Get total posts
       const { count: totalPosts } = await supabase
         .from("captions")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
-
-      // Get total hooks
-      const { count: totalHooks } = await supabase
-        .from("hooks_history")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id);
 
@@ -106,7 +100,7 @@ export const AnalyticsDashboard = () => {
 
       setMetrics({
         totalPosts: totalPosts || 0,
-        totalHooks: totalHooks || 0,
+        
         postsThisWeek: postsThisWeek || 0,
         weekOverWeekGrowth: growth,
         goalsCompleted: goalsCompleted || 0,
@@ -124,7 +118,7 @@ export const AnalyticsDashboard = () => {
   const statCards = [
     {
       title: t("analytics.totalContent"),
-      value: metrics.totalPosts + metrics.totalHooks,
+      value: metrics.totalPosts,
       icon: Zap,
       description: t("analytics.totalContentDesc"),
       color: "text-primary"

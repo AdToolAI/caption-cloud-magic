@@ -17,8 +17,6 @@ import {
   Edit3,
   Clock,
   Wand2,
-  
-  Zap,
   RefreshCw,
   MessageSquare,
   User,
@@ -63,7 +61,7 @@ export function CommandBar({ inline = false }: CommandBarProps) {
     // Erstellen
     { name: t("nav.textStudio"), path: "/generator", icon: Sparkles, category: t("hubs.erstellen") },
     
-    { name: t("nav.hookGenerator"), path: "/hook-generator", icon: Zap, category: t("hubs.erstellen") },
+    
     
     // Optimieren
     { name: t("nav.rewriter"), path: "/rewriter", icon: RefreshCw, category: t("hubs.optimieren") },

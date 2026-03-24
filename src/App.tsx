@@ -28,7 +28,7 @@ const Home = lazy(() => import("./pages/Home"));
 const Generator = lazy(() => import("./pages/Generator"));
 const PromptWizard = lazy(() => import("./pages/PromptWizard"));
 const PostingTimes = lazy(() => import("./pages/PostingTimes"));
-const HookGenerator = lazy(() => import("./pages/HookGenerator"));
+
 const Rewriter = lazy(() => import("./pages/Rewriter"));
 const GoalsDashboard = lazy(() => import("./pages/GoalsDashboard"));
 const PerformanceTracker = lazy(() => import("./pages/PerformanceTracker"));
@@ -154,7 +154,7 @@ function AppLayout() {
                     {/* Feature pages - enabled */}
                     <Route path="/generator" element={<Generator />} />
                     <Route path="/prompt-wizard" element={<Navigate to="/generator" replace />} />
-                    <Route path="/hook-generator" element={<HookGenerator />} />
+                    
                     <Route path="/rewriter" element={<Rewriter />} />
                     <Route path="/post-time-advisor" element={<PostingTimes />} />
                     <Route path="/posting-times" element={<PostingTimes />} />

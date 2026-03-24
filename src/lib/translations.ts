@@ -1685,7 +1685,7 @@ export const translations: Record<Language, any> = {
       carousel: "Carousel Generator",
       promptWizard: "Prompt Assistant",
       
-      hookGenerator: "Hook Generator",
+      
       aiPostGenerator: "AI Post Generator",
       imageCaptionPairing: "Image Caption Pairing",
       backgroundReplacer: "Background Replacer",
@@ -2313,44 +2313,6 @@ export const translations: Record<Language, any> = {
       copied: "Prompt copied to clipboard!"
     },
     
-    // Hook Generator
-    hooks: {
-      title: "Hook Generator",
-      subtitle: "Find attention-grabbing openings for your posts",
-      usageCounter: "Created hooks: {used}/{total} today",
-      inputTitle: "Topic or Content",
-      inputDescription: "Enter your topic and choose platform & tone",
-      topic: "Topic",
-      platform: "Platform",
-      tone: "Tone",
-      audience: "Target Audience",
-      styles: "Hook Styles",
-      generate: "Generate Hooks",
-      topicPlaceholder: "Example: Motivation for Monday morning",
-      audiencePlaceholder: "Enter target audience",
-      selectPlatform: "Select platform",
-      selectTone: "Select tone",
-      styleCuriosity: "Curiosity",
-      styleProvocation: "Provocation",
-      styleRelatable: "Relatable",
-      styleHumor: "Humor",
-      styleAuthority: "Authority",
-      results: "Generated Hooks",
-      chars: "chars",
-      copy: "Copy",
-      copyAll: "Copy All",
-      copiedAll: "All hooks copied!",
-      copied: "Hook copied!",
-      useInGenerator: "Use in Generator",
-      generating: "Generating...",
-      success: "Hooks generated!",
-      regenerated: "Hooks regenerated!",
-      fillFields: "Please fill all fields",
-      selectStyle: "Please select at least one style",
-      limitTitle: "Daily Limit Reached",
-      limitMessage: "You've reached your daily limit for free hooks. Upgrade to Pro for unlimited access.",
-      helperText: "Tip: Use these hooks as opening lines for your captions"
-    },
     
     // Rewriter
     rewriter_title: "Caption Rewriter",
@@ -3963,7 +3925,7 @@ export const translations: Record<Language, any> = {
       carousel: "Karussell-Generator",
       promptWizard: "Prompt-Assistent",
       
-      hookGenerator: "Hook-Generator",
+      
       aiPostGenerator: "KI Post-Generator",
       imageCaptionPairing: "Bild-Text-Pairing",
       backgroundReplacer: "Hintergrund-Ersatz",
@@ -4591,44 +4553,6 @@ export const translations: Record<Language, any> = {
       copied: "Prompt in Zwischenablage kopiert!"
     },
     
-    // Hook Generator
-    hooks: {
-      title: "Hook-Generator",
-      subtitle: "Finde aufmerksamkeitsstarke Einstiege für deine Posts",
-      usageCounter: "Erstellte Hooks: {used}/{total} heute",
-      inputTitle: "Thema oder Inhalt",
-      inputDescription: "Gib dein Thema ein und wähle Plattform & Tonalität.",
-      topic: "Thema",
-      platform: "Plattform",
-      tone: "Tonalität",
-      audience: "Zielgruppe",
-      styles: "Hook-Stile",
-      generate: "Hooks erstellen",
-      topicPlaceholder: "Beispiel: Motivation für Montagmorgen",
-      audiencePlaceholder: "Zielgruppe eingeben",
-      selectPlatform: "Plattform auswählen",
-      selectTone: "Tonalität auswählen",
-      styleCuriosity: "Neugier",
-      styleProvocation: "Provokation",
-      styleRelatable: "Nahbar",
-      styleHumor: "Humor",
-      styleAuthority: "Autorität",
-      results: "Generierte Hooks",
-      chars: "Zeichen",
-      copy: "Kopieren",
-      copyAll: "Alle kopieren",
-      copiedAll: "Alle Hooks kopiert!",
-      copied: "Hook kopiert!",
-      useInGenerator: "Im Generator verwenden",
-      generating: "Generiere...",
-      success: "Hooks erfolgreich erstellt!",
-      regenerated: "Hooks neu generiert!",
-      fillFields: "Bitte fülle alle Felder aus",
-      selectStyle: "Bitte wähle mindestens einen Stil aus",
-      limitTitle: "Tageslimit erreicht",
-      limitMessage: "Du hast dein kostenloses Tageslimit für Hooks erreicht. Upgrade auf Pro für unbegrenzten Zugriff.",
-      helperText: "Tipp: Verwende diese Hooks als Eröffnungszeilen für deine Captions"
-    },
     
     // Rewriter
     rewriter_title: "Caption-Umschreiber",
@@ -6179,7 +6103,7 @@ export const translations: Record<Language, any> = {
       carousel: "Generador de Carrusel",
       promptWizard: "Asistente de Prompts",
       
-      hookGenerator: "Generador de Hooks",
+      
       aiPostGenerator: "Generador AI de Posts",
       imageCaptionPairing: "Emparejamiento Imagen-Texto",
       backgroundReplacer: "Reemplazo de Fondo",
@@ -6754,44 +6678,6 @@ export const translations: Record<Language, any> = {
       copied: "¡Prompt copiado al portapapeles!"
     },
     
-    // Hook Generator
-    hooks: {
-      title: "Generador de Hooks",
-      subtitle: "Encuentra aperturas que capten la atención para tus publicaciones",
-      usageCounter: "Hooks creados: {used}/{total} hoy",
-      inputTitle: "Tema o contenido",
-      inputDescription: "Ingresa tu tema y elige plataforma y tono",
-      topic: "Tema",
-      platform: "Plataforma",
-      tone: "Tono",
-      audience: "Público Objetivo",
-      styles: "Estilos de Hook",
-      generate: "Generar Hooks",
-      topicPlaceholder: "Ejemplo: Motivación para el lunes por la mañana",
-      audiencePlaceholder: "Ingresar público objetivo",
-      selectPlatform: "Seleccionar plataforma",
-      selectTone: "Seleccionar tono",
-      styleCuriosity: "Curiosidad",
-      styleProvocation: "Provocación",
-      styleRelatable: "Cercano",
-      styleHumor: "Humor",
-      styleAuthority: "Autoridad",
-      results: "Hooks Generados",
-      chars: "caracteres",
-      copy: "Copiar",
-      copyAll: "Copiar Todo",
-      copiedAll: "¡Todos los hooks copiados!",
-      copied: "¡Hook copiado!",
-      useInGenerator: "Usar en Generador",
-      generating: "Generando...",
-      success: "¡Hooks generados!",
-      regenerated: "¡Hooks regenerados!",
-      fillFields: "Por favor completa todos los campos",
-      selectStyle: "Por favor selecciona al menos un estilo",
-      limitTitle: "Límite Diario Alcanzado",
-      limitMessage: "Has alcanzado tu límite diario gratuito de hooks. Actualiza a Pro para acceso ilimitado.",
-      helperText: "Consejo: Usa estos hooks como líneas de apertura para tus captions"
-    },
     
     // Rewriter
     rewriter_title: "Reescritor de Captions",
