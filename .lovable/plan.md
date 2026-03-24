@@ -1,60 +1,61 @@
 
 
-# Plan: Icon-Only Sidebar + Hub-Detailseiten
+# Plan: Hub-Seiten futuristisch & aufregend gestalten
 
-## Konzept
-Die Sidebar wird dauerhaft schmal (Icon-only, ~w-16) und zeigt nur ein Icon pro Hub-Kategorie (Startseite, Planen, Erstellen, Optimieren, Analysieren, Medien, Team). Klick auf ein Icon navigiert zu einer neuen **Hub-Seite**, die alle Unterpunkte der Kategorie in einem modernen Card-Grid mit Animationen anzeigt.
+## Zusammenfassung
+Die aktuellen Hub-Seiten wirken schlicht und statisch. Wir machen sie visuell spektakulär mit animierten Hintergründen, Neon-Glow-Effekten, interaktiven Hover-Animationen und einem futuristischen Sci-Fi-Feeling passend zum James-Bond-Theme.
+
+## Designkonzept
 
 ```text
-┌──────┬──────────────────────────────────┐
-│  🏠  │                                  │
-│  📅  │   [Hub-Seite: z.B. "Planen"]     │
-│  ✨  │                                  │
-│  ⚙️  │   ┌─────┐ ┌─────┐ ┌─────┐       │
-│  📊  │   │Card │ │Card │ │Card │       │
-│  🎬  │   │     │ │     │ │     │       │
-│  👥  │   └─────┘ └─────┘ └─────┘       │
-│      │                                  │
-│  ◀   │                                  │
-└──────┘──────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  ✦ Animated gradient background (subtle pulse)  │
+│                                                 │
+│  [Icon mit Glow-Ring]  MEDIEN                   │
+│  Verwalte Medien, Videos und Audio              │
+│  ─────── animated line divider ───────          │
+│                                                 │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐      │
+│  │ ◆ glow   │  │ ◆ glow   │  │ ◆ glow   │      │
+│  │ icon     │  │ icon     │  │ icon     │      │
+│  │ gradient │  │ gradient │  │ gradient │      │
+│  │ border   │  │ border   │  │ border   │      │
+│  │ shimmer  │  │ shimmer  │  │ shimmer  │      │
+│  └──────────┘  └──────────┘  └──────────┘      │
+│    hover: 3D tilt + neon border + particles     │
+└─────────────────────────────────────────────────┘
 ```
 
-## Änderungen
+## Änderungen an `src/pages/HubPage.tsx`
 
-### 1. Neue Hub-Seite Komponente (`src/pages/HubPage.tsx`)
-- Generische Seite, die per URL-Param (`/hub/:hubKey`) den Hub identifiziert
-- Zeigt Hub-Titel + Beschreibung oben
-- **Bento-Grid Layout**: Unterpunkte als animierte Cards (Framer Motion staggered reveal, hover-lift mit Glow-Effekt passend zum James-Bond-Theme)
-- Jede Card zeigt: Icon, Name, kurze Beschreibung, und navigiert bei Klick zur Zielroute
-- Glassmorphism-Styling konsistent mit bestehendem Design
-- Für gesperrte Features (plan-locked): Lock-Overlay mit Upgrade-Hinweis
+### 1. Animated Background
+- Subtiler animierter Gradient-Hintergrund (radial gradient mit sanfter Pulsation via CSS animation)
+- Floating Particles: 5-8 kleine leuchtende Punkte die sanft schweben (pure CSS / Framer Motion)
 
-### 2. Sidebar umbauen (`src/components/AppSidebar.tsx`)
-- Sidebar permanent im Icon-only Modus (kein Expand/Collapse mehr nötig)
-- Breite fix auf ~w-16 (4rem)
-- Pro Hub ein einzelnes Icon-Button mit Tooltip
-- Hub-Icons: Home → `Home`, Planen → `Calendar`, Erstellen → `Sparkles`, Optimieren → `MessageSquare`, Analysieren → `BarChart3`, Medien → `Film`, Team → `Users`
-- Klick navigiert zu `/hub/:hubKey` statt Collapsible zu öffnen
-- Aktiver Hub wird visuell hervorgehoben (primary border/glow)
-- Brand-Logo oben (compact, nur Icon)
-- Collapse-Button unten entfernen (nicht mehr nötig)
+### 2. Hero Header redesign
+- Hub-Icon bekommt einen **animierten Glow-Ring** (pulsierender Ring-Effekt um das Icon)
+- Titel mit **Gradient-Text** (gold → cyan, passend zum Bond-Theme)
+- Animierte Trennlinie darunter (line that draws itself von links nach rechts)
 
-### 3. Routing (`src/App.tsx`)
-- Neue Route: `<Route path="/hub/:hubKey" element={<HubPage />} />`
-- Import für HubPage hinzufügen
+### 3. Cards komplett neu gestalten
+- **Glassmorphism** mit sichtbarem Gradient-Border (border-image mit gold→cyan)
+- **Animated border shimmer**: Ein Lichtstreifen wandert über den Card-Rand (CSS animation)
+- **Hover-Effekt**: Card hebt sich stärker an (-translate-y-2), Neon-Glow wird sichtbar (box-shadow mit primary-color), Icon bekommt Glow
+- **Icon-Bereich**: Größer, mit subtiler animated gradient bg hinter dem Icon
+- **Animated Arrow**: Bei Hover erscheint ein → Pfeil der reinslided (zeigt "klickbar")
+- **Stagger-Animation verbessern**: Mehr Dramatik (scale von 0.8, blur rein → klar)
 
-### 4. Hub-Metadaten (`src/config/hubConfig.ts`)
-- Neue Config-Datei mit Hub-Definitionen: Key, Icon, Beschreibung, und Sub-Items (Route, Name, Icon, Description, Plan-Requirement)
-- Wird von Sidebar UND HubPage gemeinsam genutzt (Single Source of Truth)
-- Bestehende `hubStructure` aus AppSidebar hierhin extrahieren
+### 4. Locked-Cards
+- Behalten den Lock-Overlay, aber mit einem eleganten "frosted glass" Effekt
+- Pulsierender Upgrade-Badge statt statischem
 
-### 5. Translations ergänzen (`src/lib/translations.ts`)
-- Kurze Beschreibungstexte für jeden Hub und jeden Unterpunkt hinzufügen (DE/EN/ES)
+### 5. Responsive Polish
+- Auf Mobile: 1 Spalte, Cards etwas kompakter
+- Tablet: 2 Spalten
 
-## Design der Hub-Seite
-- Dunkler Hintergrund mit subtilen Gradient-Akzenten
-- Cards: Glassmorphism (`bg-white/5 backdrop-blur border-white/10`)
-- Hover: Card hebt sich an, Gold/Cyan-Glow am Rand
-- Staggered Entrance Animation (Framer Motion)
-- Responsive: 3 Spalten Desktop, 2 Tablet, 1 Mobile
+## Technisch
+- Alles in `HubPage.tsx` selbst (keine neuen Dateien)
+- CSS-Animationen für den Border-Shimmer als inline `@keyframes` via style-Tag oder Tailwind arbitrary values
+- Framer Motion für Entrance-Animationen und Hover-States
+- Keine externen Dependencies nötig
 
