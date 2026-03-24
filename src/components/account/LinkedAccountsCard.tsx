@@ -30,6 +30,7 @@ interface Credential {
   platform: Platform;
   is_connected: boolean;
   last_verified_at: string | null;
+  connection_id?: string;
 }
 
 export const LinkedAccountsCard = () => {
@@ -44,12 +45,17 @@ export const LinkedAccountsCard = () => {
 
       try {
         const { data, error } = await supabase
-          .from("platform_credentials")
-          .select("platform, is_connected, last_verified_at")
+          .from("social_connections")
+          .select("id, provider, last_sync_at")
           .eq("user_id", user.id);
 
         if (error) throw error;
-        setCredentials((data as Credential[]) || []);
+        setCredentials((data || []).map((row: any) => ({
+          platform: row.provider as Platform,
+          is_connected: true,
+          last_verified_at: row.last_sync_at,
+          connection_id: row.id,
+        })));
       } catch (error) {
         console.error("Error loading credentials:", error);
       } finally {
@@ -75,11 +81,13 @@ export const LinkedAccountsCard = () => {
 
     setActionLoading(platform);
     try {
+      const credential = getCredential(platform);
+      if (!credential?.connection_id) return;
+
       const { error } = await supabase
-        .from("platform_credentials")
-        .update({ is_connected: false })
-        .eq("user_id", user.id)
-        .eq("platform", platform);
+        .from("social_connections")
+        .delete()
+        .eq("id", credential.connection_id);
 
       if (error) throw error;
 
