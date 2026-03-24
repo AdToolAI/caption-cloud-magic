@@ -133,7 +133,7 @@ export function AppSidebar() {
       { route: "/sora-long-form", titleKey: "Sora 2 Long-Form", icon: Film },
       { route: "/ai-video-studio", titleKey: "AI Video Studio", icon: Sparkles },
       
-      { route: "/background-replacer", titleKey: "nav.backgroundReplacer", icon: Layers },  // Smart Background
+      { route: "/background-replacer", titleKey: "nav.backgroundReplacer", icon: Layers },
     ],
     team: [
       { route: "/team-workspace", titleKey: "nav.teamWorkspace", icon: Users, plan: "pro" },
