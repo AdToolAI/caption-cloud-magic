@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { balance, loading } = useCredits();
 
