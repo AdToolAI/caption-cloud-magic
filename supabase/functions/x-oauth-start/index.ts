@@ -32,8 +32,15 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Extract auth header if available
+    // Extract return URL and auth header
     const authHeader = req.headers.get('Authorization');
+    let returnTo: string | null = null;
+    try {
+      const body = await req.json();
+      returnTo = body?.returnTo || null;
+    } catch (_) {
+      // no body is fine
+    }
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -96,7 +103,21 @@ Deno.serve(async (req) => {
     const codeChallenge = await generateCodeChallenge(codeVerifier);
     const state = crypto.randomUUID();
 
-    // Store PKCE and state
+    // Validate returnTo is a safe URL (same origin or relative)
+    let safeReturnTo: string | null = null;
+    if (returnTo) {
+      try {
+        const parsed = new URL(returnTo);
+        // Only allow https origins
+        if (parsed.protocol === 'https:') {
+          safeReturnTo = returnTo;
+        }
+      } catch (_) {
+        // relative path or invalid - ignore
+      }
+    }
+
+    // Store PKCE, state, and return URL
     const { error: stateError } = await supabase
       .from('oauth_states')
       .insert({
@@ -106,7 +127,8 @@ Deno.serve(async (req) => {
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
         code_verifier: await encryptToken(codeVerifier),
         code_challenge: codeChallenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        redirect_url: safeReturnTo,
       });
 
     if (stateError) throw stateError;

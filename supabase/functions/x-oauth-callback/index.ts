@@ -143,10 +143,12 @@ Deno.serve(async (req) => {
     if (connectionError) throw connectionError;
 
     // Clean up oauth state on success
-    await supabase.from('oauth_states').delete().eq('csrf_token', state);
+    await supabase.from('oauth_states').delete().eq('id', oauthState.id);
 
-    // Redirect to app
-    const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?tab=connections&provider=x&status=success`;
+    // Redirect to the stored return URL or fallback to APP_BASE_URL
+    const baseUrl = oauthState.redirect_url || `${Deno.env.get('APP_BASE_URL')}/performance?tab=connections`;
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const redirectUrl = `${baseUrl}${separator}provider=x&status=success`;
     return new Response(null, {
       status: 302,
       headers: { ...corsHeaders, 'Location': redirectUrl },
@@ -154,17 +156,31 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('X OAuth callback error:', error);
     
-    // Clean up oauth state on failure too
+    // Try to get stored return URL before cleaning up
+    let storedReturnUrl: string | null = null;
     if (state) {
       try {
-        await supabase.from('oauth_states').delete().eq('csrf_token', state);
-      } catch (_) {
-        // ignore cleanup errors
+        const { data: stateRow } = await supabase
+          .from('oauth_states')
+          .select('id, redirect_url')
+          .eq('csrf_token', state)
+          .eq('provider', 'x')
+          .maybeSingle();
+        
+        storedReturnUrl = stateRow?.redirect_url || null;
+        
+        if (stateRow?.id) {
+          await supabase.from('oauth_states').delete().eq('id', stateRow.id);
+        }
+      } catch (cleanupErr) {
+        console.error('OAuth state cleanup failed:', cleanupErr);
       }
     }
     
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?tab=connections&provider=x&status=error&message=${encodeURIComponent(errorMessage)}`;
+    const baseUrl = storedReturnUrl || `${Deno.env.get('APP_BASE_URL')}/performance?tab=connections`;
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const redirectUrl = `${baseUrl}${separator}provider=x&status=error&message=${encodeURIComponent(errorMessage)}`;
     return new Response(null, {
       status: 302,
       headers: { ...corsHeaders, 'Location': redirectUrl },

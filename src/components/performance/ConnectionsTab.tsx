@@ -36,6 +36,7 @@ export const ConnectionsTab = () => {
   const [showTokenDialog, setShowTokenDialog] = useState(false);
   const [syncError, setSyncError] = useState<Record<string, boolean>>({});
   const [userPlan, setUserPlan] = useState<string>('free');
+  const [xCallbackError, setXCallbackError] = useState<string | null>(null);
 
   useEffect(() => {
     const initializeAndHandleCallback = async () => {
@@ -52,67 +53,68 @@ export const ConnectionsTab = () => {
       if (connected && status === 'error') {
         // OAuth callback returned an error
         const errorMessage = params.get('message') || 'Verbindung fehlgeschlagen';
+        const decodedMessage = decodeURIComponent(errorMessage);
+        
+        // If this is an X error, store it for the XConnectionCard
+        if (connected === 'x') {
+          setXCallbackError(decodedMessage);
+        }
+        
         toast({
           title: t('common.error'),
-          description: decodeURIComponent(errorMessage),
+          description: decodedMessage,
           variant: "destructive"
         });
-        window.history.replaceState({}, '', window.location.pathname);
+        // Clean up URL params AFTER setting state
+        window.history.replaceState({}, '', window.location.pathname + '?tab=connections');
       } else if (connected && status === 'success') {
-        // New OAuth callback format with auto-sync
-        toast({
-          title: t('common.success'),
-          description: `Successfully connected to ${connected}`
-        });
+        // Verify the connection actually exists before showing success
+        console.log(`🔄 Verifying connection for provider: ${connected}`);
         
-        console.log(`🔄 Auto-sync triggered for provider: ${connected}`);
-        
-        // Wait for state to settle and trigger auto-sync
         setTimeout(async () => {
           try {
-            console.log('🔄 Refreshing session after OAuth redirect...');
-            
-            // 1. Force session refresh FIRST
             const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
             
             if (sessionError || !session) {
               console.error('❌ Session refresh failed:', sessionError);
-              toast({
-                title: t('common.error'),
-                description: 'Session refresh failed. Please try syncing manually.',
-                variant: "destructive"
-              });
+              if (connected === 'x') {
+                setXCallbackError('Session konnte nicht erneuert werden. Bitte erneut verbinden.');
+              }
               return;
             }
             
-            console.log('✅ Session refreshed successfully');
-            
-            // 2. Fetch fresh connections with the new session
             const { data: freshConnections } = await supabase
               .from('social_connections')
               .select('*')
               .eq('user_id', session.user.id);
             
-            if (freshConnections) {
-              const newConnection = freshConnections.find(c => c.provider === connected);
-              if (newConnection) {
-                console.log(`✅ Found new connection, starting auto-sync...`);
-                await handleSync(newConnection.id, connected);
-              } else {
-                console.warn(`⚠️ Could not find connection for provider: ${connected}`);
+            const newConnection = freshConnections?.find(c => c.provider === connected);
+            
+            if (newConnection) {
+              console.log(`✅ Connection verified, starting auto-sync...`);
+              toast({
+                title: t('common.success'),
+                description: `Successfully connected to ${connected}`
+              });
+              await fetchConnections();
+              await handleSync(newConnection.id, connected);
+            } else {
+              console.warn(`⚠️ No connection row found for provider: ${connected}`);
+              if (connected === 'x') {
+                setXCallbackError('Verbindung konnte nicht gespeichert werden. Bitte erneut versuchen.');
               }
+              toast({
+                title: t('common.error'),
+                description: `${connected} Verbindung wurde nicht gespeichert. Bitte erneut verbinden.`,
+                variant: "destructive"
+              });
             }
           } catch (error) {
-            console.error('Auto-sync failed:', error);
-            toast({
-              title: t('common.error'),
-              description: 'Auto-sync failed. Please try syncing manually.',
-              variant: "destructive"
-            });
+            console.error('Connection verification failed:', error);
           }
         }, 1500);
         
-        window.history.replaceState({}, '', window.location.pathname);
+        window.history.replaceState({}, '', window.location.pathname + '?tab=connections');
       } else if (connected) {
         // Legacy callback format (backwards compatibility) - only if no status param
         toast({
@@ -737,6 +739,7 @@ export const ConnectionsTab = () => {
                     onSync={() => connection && handleSync(connection.id, provider.id)}
                     isSyncing={loading}
                     userPlan={userPlan as any}
+                    callbackError={xCallbackError}
                   />
                 );
               }
