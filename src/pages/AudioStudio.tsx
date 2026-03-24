@@ -27,7 +27,7 @@ export default function AudioStudio() {
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler' | 'compare' | 'library'>('enhance');
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler' | 'compare' | 'library' | 'voices'>('enhance');
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
 
