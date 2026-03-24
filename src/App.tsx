@@ -239,7 +239,8 @@ function AppLayout() {
           
           <Route path="/analytics" element={<UnifiedAnalytics />} />
           <Route path="/analytics/posthog" element={<PostHogDashboard />} />
-          <Route path="/analytics/usage-reports" element={<UsageReports />} />
+           <Route path="/analytics/usage-reports" element={<UsageReports />} />
+           <Route path="/analytics/platform/:platform" element={<PlatformAnalytics />} />
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/debug/posthog" element={<PostHogEventTester />} />
           <Route path="/debug/feature-flags" element={<FeatureFlagDemo />} />
