@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
-import { Footer } from "@/components/Footer";
+import { useParams, Link } from "react-router-dom";
+import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
+import { Brand } from "@/components/layout/Brand";
+import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { SEO } from "@/components/SEO";
 import { getCanonicalUrl } from "@/config/seo";
@@ -55,6 +57,14 @@ const Legal = () => {
           canonical={getCanonicalUrl('/legal/privacy')}
         />
         <div className="min-h-screen flex flex-col bg-background">
+          <nav className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
+            <div className="container flex h-14 items-center gap-4">
+              <Brand compact showText />
+              <Link to="/" className="ml-auto flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft className="h-4 w-4" /> Zurück
+              </Link>
+            </div>
+          </nav>
           <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
             <LegalHeroHeader type="privacy" lastUpdated="18. Oktober 2025" />
             <LanguageToggle currentLang={contentLang} onToggle={setContentLang} />
@@ -77,7 +87,7 @@ const Legal = () => {
               © 2025 AdTool AI – All rights reserved.
             </motion.div>
           </main>
-          <Footer />
+          <BlackTieFooter />
         </div>
       </>
     );
@@ -93,6 +103,14 @@ const Legal = () => {
           canonical={getCanonicalUrl('/legal/terms')}
         />
         <div className="min-h-screen flex flex-col bg-background">
+          <nav className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
+            <div className="container flex h-14 items-center gap-4">
+              <Brand compact showText />
+              <Link to="/" className="ml-auto flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft className="h-4 w-4" /> Zurück
+              </Link>
+            </div>
+          </nav>
           <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
             <LegalHeroHeader type="terms" />
             
@@ -164,7 +182,7 @@ const Legal = () => {
               © 2025 AdTool AI – All rights reserved.
             </motion.div>
           </main>
-          <Footer />
+          <BlackTieFooter />
         </div>
       </>
     );
@@ -180,6 +198,14 @@ const Legal = () => {
           canonical={getCanonicalUrl('/legal/avv')}
         />
         <div className="min-h-screen flex flex-col bg-background">
+          <nav className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
+            <div className="container flex h-14 items-center gap-4">
+              <Brand compact showText />
+              <Link to="/" className="ml-auto flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft className="h-4 w-4" /> Zurück
+              </Link>
+            </div>
+          </nav>
           <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
             <LegalHeroHeader type="avv" />
             
@@ -353,7 +379,7 @@ const Legal = () => {
               © 2025 AdTool AI – All rights reserved.
             </motion.div>
           </main>
-          <Footer />
+          <BlackTieFooter />
         </div>
       </>
     );
@@ -368,6 +394,14 @@ const Legal = () => {
         canonical={getCanonicalUrl('/legal/imprint')}
       />
       <div className="min-h-screen flex flex-col bg-background">
+        <nav className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
+          <div className="container flex h-14 items-center gap-4">
+            <Brand compact showText />
+            <Link to="/" className="ml-auto flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="h-4 w-4" /> Zurück
+            </Link>
+          </div>
+        </nav>
         <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
           <LegalHeroHeader type="imprint" />
           
@@ -471,7 +505,7 @@ const Legal = () => {
             © 2025 AdTool AI – All rights reserved.
           </motion.div>
         </main>
-        <Footer />
+        <BlackTieFooter />
       </div>
     </>
   );
