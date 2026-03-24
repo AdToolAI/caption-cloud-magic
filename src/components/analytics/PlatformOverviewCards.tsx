@@ -106,12 +106,12 @@ export function PlatformOverviewCards() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <span className="text-xl">{p.icon}</span>
+                  <p.icon className={`h-5 w-5 transition-all ${m?.connected ? `${p.color} ${p.glow}` : 'text-muted-foreground/40'}`} />
                   {p.label}
                 </CardTitle>
-                <Badge variant={m?.connected ? "default" : "secondary"}>
-                  {m?.connected ? "Verbunden" : "Nicht verbunden"}
-                </Badge>
+                {m?.connected && (
+                  <span className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]" />
+                )}
               </div>
             </CardHeader>
             <CardContent>
