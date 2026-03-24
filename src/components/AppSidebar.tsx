@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, Lock } from "lucide-react";
 import { motion } from "framer-motion";
@@ -8,8 +7,6 @@ import { useUserRoles } from "@/hooks/useUserRoles";
 import { Brand } from "@/components/layout/Brand";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-import { NotificationBadge } from "@/components/calendar/NotificationBadge";
-import { NotificationCenter } from "@/components/calendar/NotificationCenter";
 import { hubDefinitions } from "@/config/hubConfig";
 import {
   Sidebar,
@@ -27,7 +24,6 @@ export function AppSidebar() {
   const { isAdmin } = useUserRoles();
   const location = useLocation();
   const navigate = useNavigate();
-  const [showNotifications, setShowNotifications] = useState(false);
 
   const isHubActive = (hubKey: string) => {
     if (hubKey === "home") return location.pathname === "/home" || location.pathname === "/";
@@ -44,9 +40,6 @@ export function AppSidebar() {
         {/* Brand icon */}
         <div className="flex flex-col items-center py-4 border-b border-border bg-card">
           <Brand compact showText={false} />
-          <div className="mt-2">
-            <NotificationBadge onClick={() => setShowNotifications(true)} />
-          </div>
         </div>
 
         <SidebarContent className="bg-card border-r border-border h-full flex flex-col items-center py-3 gap-1">
@@ -120,8 +113,6 @@ export function AppSidebar() {
 
         <SidebarRail className="hover:after:bg-primary/40 transition-colors" />
       </Sidebar>
-
-      <NotificationCenter open={showNotifications} onClose={() => setShowNotifications(false)} />
     </>
   );
 }

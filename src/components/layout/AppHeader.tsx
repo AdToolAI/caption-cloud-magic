@@ -8,6 +8,7 @@ import { UserMenu } from "./UserMenu";
 import { CommandBar } from "@/components/ui/CommandBar";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export function AppHeader() {
   const { toggleSidebar } = useSidebar();
@@ -48,8 +49,8 @@ export function AppHeader() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          
           <ThemeToggle />
+          {user && <NotificationBell />}
           <UserMenu />
         </div>
       </div>
