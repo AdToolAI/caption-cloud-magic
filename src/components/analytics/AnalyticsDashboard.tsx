@@ -7,7 +7,7 @@ import { TrendingUp, TrendingDown, Target, Zap, Calendar, Trophy } from "lucide-
 
 interface Metrics {
   totalPosts: number;
-  totalHooks: number;
+  
   postsThisWeek: number;
   weekOverWeekGrowth: number;
   goalsCompleted: number;
