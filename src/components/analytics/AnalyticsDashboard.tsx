@@ -47,12 +47,6 @@ export const AnalyticsDashboard = () => {
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id);
 
-      // Get total hooks
-      const { count: totalHooks } = await supabase
-        .from("hooks_history")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
-
       // Get this week's posts
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
