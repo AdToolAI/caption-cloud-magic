@@ -118,7 +118,7 @@ export const AnalyticsDashboard = () => {
   const statCards = [
     {
       title: t("analytics.totalContent"),
-      value: metrics.totalPosts + metrics.totalHooks,
+      value: metrics.totalPosts,
       icon: Zap,
       description: t("analytics.totalContentDesc"),
       color: "text-primary"

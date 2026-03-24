@@ -154,7 +154,7 @@ function AppLayout() {
                     {/* Feature pages - enabled */}
                     <Route path="/generator" element={<Generator />} />
                     <Route path="/prompt-wizard" element={<Navigate to="/generator" replace />} />
-                    <Route path="/hook-generator" element={<HookGenerator />} />
+                    
                     <Route path="/rewriter" element={<Rewriter />} />
                     <Route path="/post-time-advisor" element={<PostingTimes />} />
                     <Route path="/posting-times" element={<PostingTimes />} />

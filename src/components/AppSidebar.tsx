@@ -102,7 +102,7 @@ export function AppSidebar() {
     erstellen: [
       { route: "/generator", titleKey: "nav.textStudio", icon: Sparkles },
       
-      { route: "/hook-generator", titleKey: "nav.hookGenerator", icon: Zap },
+      
       { route: "/ai-post-generator", titleKey: "nav.aiPostGenerator", icon: Bot },
       { route: "/image-caption-pairing", titleKey: "nav.imageCaptionPairing", icon: ImagePlus },
     ],
