@@ -26,6 +26,7 @@ export interface PostingTimesData {
     historyDays: number;
     generatedAt: string;
     slotsCount: number;
+    dataSource?: string;
   };
 }
 
@@ -56,8 +57,11 @@ export function usePostingTimes({
 
       return data as PostingTimesData;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchInterval: 60 * 60 * 1000, // 1 hour
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    refetchInterval: 15 * 60 * 1000, // 15 minutes
+    refetchOnWindowFocus: true,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
     enabled,
   });
 }
