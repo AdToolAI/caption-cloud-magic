@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Loader2, RefreshCw, Unlink, Twitter, Crown, AlertTriangle } from "lucide-react";
 import { TokenStatusBadge } from "./TokenStatusBadge";
 import { TokenExpiryBadge } from "./TokenExpiryBadge";
