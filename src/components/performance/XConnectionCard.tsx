@@ -1,11 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useState } from "react";
-import { Loader2, RefreshCw, Unlink, Twitter, Crown } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Loader2, RefreshCw, Unlink, Twitter, Crown, AlertTriangle } from "lucide-react";
 import { TokenStatusBadge } from "./TokenStatusBadge";
 import { TokenExpiryBadge } from "./TokenExpiryBadge";
 import { canUseXTwitter } from "@/lib/entitlements";
@@ -24,14 +23,29 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan }: XCo
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const hasAccess = canUseXTwitter(userPlan);
+
+  // Pick up error from OAuth callback redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const provider = params.get('provider') || params.get('connected');
+    const status = params.get('status');
+    const message = params.get('message');
+
+    if (provider === 'x' && status === 'error' && message) {
+      setLastError(decodeURIComponent(message));
+    }
+  }, []);
 
   const handleConnect = async () => {
     if (!hasAccess) {
       setShowUpgradePrompt(true);
       return;
     }
+
+    setLastError(null);
 
     try {
       setIsConnecting(true);
@@ -155,6 +169,14 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan }: XCo
           </div>
           
           <div className="space-y-3">
+            {/* Inline error banner when X callback failed */}
+            {lastError && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{lastError}</span>
+              </div>
+            )}
+
             <p className="text-sm text-muted-foreground">
               {hasAccess 
                 ? "Verbinde dein X-Konto, um Posts zu veröffentlichen und Performance-Daten zu tracken."
@@ -173,7 +195,7 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan }: XCo
               variant={hasAccess ? "default" : "outline"}
             >
               {isConnecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {hasAccess ? "Mit X verbinden" : (
+              {hasAccess ? (lastError ? "Erneut verbinden" : "Mit X verbinden") : (
                 <>
                   <Crown className="mr-2 h-4 w-4" />
                   Auf Enterprise upgraden
