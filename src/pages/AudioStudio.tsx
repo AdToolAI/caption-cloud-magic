@@ -11,6 +11,7 @@ import { BeatSyncTimeline } from '@/components/audio-studio/BeatSyncTimeline';
 import { FillerWordPanel } from '@/components/audio-studio/FillerWordPanel';
 import { AudioBeforeAfterComparison } from '@/components/audio-studio/AudioBeforeAfterComparison';
 import { SoundLibrary } from '@/components/audio-studio/SoundLibrary';
+import { VoiceLibraryPanel } from '@/components/audio-studio/VoiceLibraryPanel';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
