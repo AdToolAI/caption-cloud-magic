@@ -1688,7 +1688,7 @@ export const translations: Record<Language, any> = {
       
       aiPostGenerator: "AI Post Generator",
       imageCaptionPairing: "Image Caption Pairing",
-      backgroundReplacer: "Background Replacer",
+      backgroundReplacer: "Smart Background",
       rewriter: "Caption Rewriter",
       coach: "AI Content Coach",
       bioOptimizer: "AI Bio Optimizer",
@@ -2165,7 +2165,7 @@ export const translations: Record<Language, any> = {
     aipost_tone_professional: "Professional",
     
     // Background Replacer
-    bg_title: "AI Background Replacer",
+    bg_title: "Smart Background",
     bg_subtitle: "Transform product photos with AI-generated themed backgrounds",
     bg_upload_product: "Upload Product Image",
     bg_choose_theme: "Choose Theme",
@@ -3928,7 +3928,7 @@ export const translations: Record<Language, any> = {
       
       aiPostGenerator: "KI Post-Generator",
       imageCaptionPairing: "Bild-Text-Pairing",
-      backgroundReplacer: "Hintergrund-Ersatz",
+      backgroundReplacer: "Smart Background",
       rewriter: "Caption-Umschreiber",
       coach: "KI-Content-Coach",
       bioOptimizer: "KI Bio-Optimierer",
@@ -4405,7 +4405,7 @@ export const translations: Record<Language, any> = {
     aipost_tone_professional: "Professionell",
     
     // Background Replacer
-    bg_title: "KI-Hintergrund-Ersteller",
+    bg_title: "Smart Background",
     bg_subtitle: "Verwandeln Sie Produktfotos mit KI-generierten thematischen Hintergründen",
     bg_upload_product: "Produktbild hochladen",
     bg_choose_theme: "Thema wählen",
@@ -6106,7 +6106,7 @@ export const translations: Record<Language, any> = {
       
       aiPostGenerator: "Generador AI de Posts",
       imageCaptionPairing: "Emparejamiento Imagen-Texto",
-      backgroundReplacer: "Reemplazo de Fondo",
+      backgroundReplacer: "Smart Background",
       rewriter: "Reescritor de Captions",
       coach: "Coach AI de Contenido",
       bioOptimizer: "Optimizador AI de Bio",
@@ -6556,7 +6556,7 @@ export const translations: Record<Language, any> = {
     aipost_tone_professional: "Profesional",
     
     // Background Replacer
-    bg_title: "Reemplazador de Fondo IA",
+    bg_title: "Smart Background",
     bg_subtitle: "Transforma fotos de productos con fondos temáticos generados por IA",
     bg_upload_product: "Subir imagen del producto",
     bg_choose_theme: "Elegir tema",

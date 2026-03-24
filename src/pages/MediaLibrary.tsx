@@ -545,7 +545,7 @@ export default function MediaLibrary() {
     if (mediaItem.type !== 'image') {
       toast({
         title: "⚠️ Nur Bilder erlaubt",
-        description: "Der Hintergrund-Ersatz funktioniert nur mit Bildern.",
+        description: "Smart Background funktioniert nur mit Bildern.",
         variant: "destructive",
       });
       return;
@@ -558,7 +558,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "🎨 Media gesendet",
-      description: "Wird im Hintergrund-Ersatz geladen...",
+      description: "Wird in Smart Background geladen...",
     });
     
     navigate('/background-replacer');
@@ -650,7 +650,7 @@ export default function MediaLibrary() {
     if (!firstImageItem) {
       toast({
         title: "⚠️ Kein Bild ausgewählt",
-        description: "Der Hintergrund-Ersatz funktioniert nur mit Bildern.",
+        description: "Smart Background funktioniert nur mit Bildern.",
         variant: "destructive",
       });
       return;
@@ -663,7 +663,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "🎨 Media gesendet",
-      description: `Erstes Bild wird im Hintergrund-Ersatz geladen...`,
+      description: `Erstes Bild wird in Smart Background geladen...`,
     });
     
     navigate('/background-replacer');
@@ -871,7 +871,7 @@ export default function MediaLibrary() {
                   onClick={bulkSendToBackgroundReplacer}
                 >
                   <Layers className="h-4 w-4 mr-2" />
-                  Hintergrund-Ersatz ({selectedAssets.length})
+                  Smart Background ({selectedAssets.length})
                 </Button>
                 <Button
                   variant="destructive"
