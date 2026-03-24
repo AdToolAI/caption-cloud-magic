@@ -63,20 +63,20 @@ export const Header = () => {
         </Link>
         
         <nav className="hidden md:flex items-center gap-6" aria-label="Main navigation">
-          <a 
-            href="#pricing" 
+          <Link 
+            to="/pricing" 
             className="text-sm font-medium transition-colors hover:text-primary"
             aria-label={t("nav.pricing")}
           >
             {t("nav.pricing")}
-          </a>
-          <a 
-            href="#faq" 
+          </Link>
+          <Link 
+            to="/faq" 
             className="text-sm font-medium transition-colors hover:text-primary"
             aria-label={t("nav.faq")}
           >
             {t("nav.faq")}
-          </a>
+          </Link>
           {user && (
             <Link 
               to="/home"
