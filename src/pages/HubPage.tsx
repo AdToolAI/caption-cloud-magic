@@ -34,7 +34,7 @@ const cardVariant = {
     y: 0,
     scale: 1,
     filter: "blur(0px)",
-    transition: { type: "spring", stiffness: 200, damping: 20 },
+    transition: { type: "spring" as const, stiffness: 200, damping: 20 },
   },
 };
 
