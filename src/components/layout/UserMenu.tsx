@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { User, Settings, CreditCard, HelpCircle, LogOut, Coins } from "lucide-react";
+import { User, Settings, CreditCard, HelpCircle, LogOut, Coins, Briefcase, Tag } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
