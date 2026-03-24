@@ -11,19 +11,21 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
+  let state: string | null = null;
+
   try {
     const url = new URL(req.url);
     const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state');
+    state = url.searchParams.get('state');
 
     if (!code || !state) {
-      throw new Error('Missing code or state');
+      throw new Error('Fehlende OAuth-Parameter (code/state)');
     }
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
 
     // Verify state and get code_verifier
     const { data: oauthState, error: stateError } = await supabase
@@ -35,7 +37,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (stateError || !oauthState) {
-      throw new Error('Invalid or expired state');
+      throw new Error('Ungültiger oder abgelaufener OAuth-State. Bitte erneut verbinden.');
     }
 
     // Check if user has Enterprise plan (X/Twitter access)
@@ -47,20 +49,12 @@ Deno.serve(async (req) => {
 
     if (profileError) {
       console.error('Profile fetch error:', profileError);
-      const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?provider=x&status=error&message=${encodeURIComponent('Fehler beim Abrufen des Profils')}`;
-      return new Response(null, {
-        status: 302,
-        headers: { ...corsHeaders, 'Location': redirectUrl },
-      });
+      throw new Error('Fehler beim Abrufen des Benutzerprofils');
     }
 
     if (profile?.plan !== 'enterprise') {
       console.log('User does not have Enterprise plan:', profile?.plan);
-      const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?provider=x&status=error&message=${encodeURIComponent('X/Twitter ist nur für Enterprise verfügbar')}`;
-      return new Response(null, {
-        status: 302,
-        headers: { ...corsHeaders, 'Location': redirectUrl },
-      });
+      throw new Error('X/Twitter ist nur für Enterprise-Kunden verfügbar. Bitte upgrade deinen Plan.');
     }
 
     const codeVerifier = await decryptToken(oauthState.code_verifier);
@@ -83,8 +77,8 @@ Deno.serve(async (req) => {
     const tokenData = await tokenResponse.json();
 
     if (!tokenResponse.ok) {
-      console.error('Token exchange error:', tokenData);
-      throw new Error(tokenData.error_description || 'Token exchange failed');
+      console.error('Token exchange error:', JSON.stringify(tokenData));
+      throw new Error(`Token-Austausch fehlgeschlagen: ${tokenData.error_description || tokenData.error || 'Unbekannter Fehler'}`);
     }
 
     // Fetch user info
@@ -99,12 +93,29 @@ Deno.serve(async (req) => {
 
     if (!userResponse.ok) {
       console.error('User fetch error:', JSON.stringify(userData));
-      const reason = userData?.detail || userData?.errors?.[0]?.message || 'Unknown error';
-      const isAccessError = reason.includes('client-not-enrolled') || reason.includes('Appropriate Level of API Access');
-      const userMessage = isAccessError
-        ? 'X API Zugriff verweigert: Bitte stelle sicher, dass deine X App einem Projekt zugeordnet ist und mindestens Basic-Zugang hat (developer.x.com).'
-        : `X Profilabruf fehlgeschlagen: ${reason}`;
-      throw new Error(userMessage);
+      
+      // Detect specific X API enrollment/access errors
+      const reason = userData?.reason || '';
+      const detail = userData?.detail || '';
+      const title = userData?.title || '';
+      const errorMessages = userData?.errors?.map((e: any) => e.message).join('; ') || '';
+      
+      const isEnrollmentError = 
+        reason.includes('client-not-enrolled') ||
+        detail.includes('client-not-enrolled') ||
+        title.includes('Forbidden') ||
+        detail.includes('Appropriate Level of API Access') ||
+        errorMessages.includes('client-not-enrolled');
+      
+      if (isEnrollmentError) {
+        throw new Error(
+          'X API Zugriff verweigert: Die X-App ist nicht korrekt konfiguriert. ' +
+          'Bitte stelle im X Developer Portal (developer.x.com) sicher, dass die App ' +
+          'einem Projekt zugeordnet ist und mindestens "Basic" API-Zugang hat.'
+        );
+      }
+      
+      throw new Error(`X Profilabruf fehlgeschlagen: ${detail || title || errorMessages || 'Unbekannter Fehler'}`);
     }
 
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
@@ -131,7 +142,7 @@ Deno.serve(async (req) => {
 
     if (connectionError) throw connectionError;
 
-    // Clean up oauth state
+    // Clean up oauth state on success
     await supabase.from('oauth_states').delete().eq('csrf_token', state);
 
     // Redirect to app
@@ -142,6 +153,12 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error('X OAuth callback error:', error);
+    
+    // Clean up oauth state on failure too
+    if (state) {
+      await supabase.from('oauth_states').delete().eq('csrf_token', state).catch(() => {});
+    }
+    
     const errorMessage = error instanceof Error ? error.message : String(error);
     const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?provider=x&status=error&message=${encodeURIComponent(errorMessage)}`;
     return new Response(null, {
