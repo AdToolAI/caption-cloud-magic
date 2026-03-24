@@ -27,7 +27,7 @@ export function SocialConnectionIcons() {
             <Tooltip key={id}>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => navigate(`/social-media-settings?connect=${id}`)}
+                  onClick={() => navigate(`/integrations?connect=${id}`)}
                   className="relative p-1 rounded-md hover:bg-muted transition-colors"
                 >
                   <Icon
