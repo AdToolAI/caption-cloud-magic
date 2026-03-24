@@ -100,7 +100,7 @@ export const AnalyticsDashboard = () => {
 
       setMetrics({
         totalPosts: totalPosts || 0,
-        totalHooks: totalHooks || 0,
+        
         postsThisWeek: postsThisWeek || 0,
         weekOverWeekGrowth: growth,
         goalsCompleted: goalsCompleted || 0,
