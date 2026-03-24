@@ -156,7 +156,11 @@ Deno.serve(async (req) => {
     
     // Clean up oauth state on failure too
     if (state) {
-      await supabase.from('oauth_states').delete().eq('csrf_token', state).catch(() => {});
+      try {
+        await supabase.from('oauth_states').delete().eq('csrf_token', state);
+      } catch (_) {
+        // ignore cleanup errors
+      }
     }
     
     const errorMessage = error instanceof Error ? error.message : String(error);
