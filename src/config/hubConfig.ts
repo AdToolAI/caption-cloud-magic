@@ -71,7 +71,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/analytics/posthog", titleKey: "PostHog Dashboard", descKey: "hubItemDesc.posthog", icon: BarChart3 },
       { route: "/analytics/usage-reports", titleKey: "Usage Reports", descKey: "hubItemDesc.usageReports", icon: Coins },
       { route: "/trend-radar", titleKey: "nav.trendRadar", descKey: "hubItemDesc.trendRadar", icon: Radar },
-      { route: "/audit", titleKey: "nav.audit", descKey: "hubItemDesc.audit", icon: Shield },
+      
     ],
   },
   {

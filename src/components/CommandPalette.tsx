@@ -44,7 +44,7 @@ export const CommandPalette = () => {
     // Analyze
     { id: "performance", label: t("nav.performance"), icon: "TrendingUp", route: "/performance", category: "analyze", keywords: ["performance", "analytics", "statistik"] },
     { id: "goals", label: t("nav.goals"), icon: "Target", route: "/goals", category: "analyze", keywords: ["goals", "ziele", "tracking"] },
-    { id: "audit", label: "Content Audit", icon: "Search", route: "/audit", category: "analyze", keywords: ["audit", "analyse", "review"] },
+    
     
     // Design
     { id: "image-caption", label: "Image Caption", icon: "Image", route: "/image-caption", category: "design", keywords: ["image", "bild", "foto"] },

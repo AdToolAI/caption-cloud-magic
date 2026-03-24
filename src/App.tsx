@@ -178,7 +178,7 @@ function AppLayout() {
                     <Route path="/campaign-reports" element={<ComingSoon />} />
                     <Route path="/coach" element={<Coach />} />
                     <Route path="/campaigns" element={<Campaigns />} />
-                    <Route path="/audit" element={<Audit />} />
+                    
                     
                     {/* Design & Visuals features */}
                     <Route path="/image-caption-pairing" element={<ImageCaptionPairing />} />
