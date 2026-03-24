@@ -280,6 +280,11 @@ export default function UnifiedAnalytics() {
             <MetricsChart data={metricsSummary} loading={loading} />
           </TabsContent>
 
+          {/* Plattformen Tab */}
+          <TabsContent value="platforms" className="space-y-6">
+            <PlatformOverviewCards />
+          </TabsContent>
+
           {/* Performance Tab */}
           <TabsContent value="performance" className="space-y-6">
             <Card>
