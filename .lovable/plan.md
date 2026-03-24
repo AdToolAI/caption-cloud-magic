@@ -1,37 +1,21 @@
 
 
-# Plan: Erklärvideo Studio löschen + Hintergrund-Ersatz → Smart Background umbenennen
+# Plan: Verwaltungs-Einträge in UserMenu verschieben
 
-## 1. Erklärvideo Studio vollständig löschen
+## Zusammenfassung
+Die Sidebar-Einträge unter „Verwaltung" (Brand-Kit, Credits, Konto, Abrechnung) sowie die „Auxiliary Pages" (Preise, FAQ, Support) werden aus der Sidebar entfernt und stattdessen ins UserMenu-Dropdown (oben rechts) integriert.
 
-### Zu löschende Dateien
-- `src/pages/ExplainerStudio.tsx`
-- `src/components/explainer-studio/` (ganzer Ordner, 14+ Dateien)
-- `src/types/explainer-studio.ts`
-- `src/hooks/useExplainerScript.ts`
-- `supabase/functions/generate-explainer-script/index.ts`
-- `supabase/functions/auto-generate-explainer/index.ts`
-- `supabase/functions/render-explainer-video/index.ts`
-- `supabase/functions/check-explainer-render/index.ts`
+## Änderungen
 
-### Zu bearbeitende Dateien
+### 1. UserMenu erweitern (`src/components/layout/UserMenu.tsx`)
+- **Brand-Kit** hinzufügen (Icon: `Briefcase`, Route: `/brand-kit`)
+- **Preise** hinzufügen (Icon: `Tag`, Route: `/pricing`)
+- **FAQ** hinzufügen (Icon: `HelpCircle`, Route: `/faq`)
+- Credits, Konto, Abrechnung, Support bleiben (sind bereits vorhanden)
+- Gruppierung mit Separatoren: User-Info → Credits + Brand-Kit → Konto + Abrechnung → Preise + FAQ + Support → Abmelden
 
-| Datei | Änderung |
-|-------|----------|
-| `src/App.tsx` | Import + Route `/explainer-studio` entfernen |
-| `src/components/AppSidebar.tsx` | Eintrag `/explainer-studio` entfernen |
-
-**Hinweis:** Die `explainer`-Kategorie im Universal Video Creator bleibt bestehen — das ist ein separates Feature mit eigener Pipeline.
-
----
-
-## 2. Hintergrund-Ersatz → „Smart Background" umbenennen
-
-| Datei | Änderung |
-|-------|----------|
-| `src/components/AppSidebar.tsx` | `titleKey` von `nav.backgroundReplacer` → neuen Key oder direkt „Smart Background" |
-| `src/lib/translations.ts` | `backgroundReplacer` → „Smart Background" (EN), „Smart Background" (DE), „Smart Background" (ES) |
-| `src/components/background/BackgroundReplacerHeroHeader.tsx` | Titel-Text auf „Smart Background" ändern |
-| `src/pages/BackgroundReplacer.tsx` | Seitentitel/Header auf „Smart Background" |
-| `src/pages/MediaLibrary.tsx` | Toast-Texte „Hintergrund-Ersatz" → „Smart Background" |
+### 2. Sidebar bereinigen (`src/components/AppSidebar.tsx`)
+- Gesamten `verwaltung`-Hub entfernen (Zeilen 142–147: Brand-Kit, Credits, Konto, Abrechnung)
+- „Auxiliary Pages"-Block entfernen (Zeilen 328–353: Preise, FAQ, Support)
+- `expandedHubs` Default-Wert anpassen (kein `verwaltung` mehr)
 
