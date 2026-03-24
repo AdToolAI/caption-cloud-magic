@@ -271,7 +271,8 @@ export default function AudioStudio() {
                       { id: 'transcript', label: 'Transcript', icon: Mic },
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
                       { id: 'filler', label: 'Filler-Wörter', icon: Volume2 },
-                      { id: 'library', label: 'Bibliothek', icon: Library }
+                      { id: 'library', label: 'Bibliothek', icon: Library },
+                      { id: 'voices', label: 'Custom Voices', icon: Mic }
                     ].map((tab) => (
                       <Button
                         key={tab.id}
