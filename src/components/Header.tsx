@@ -63,20 +63,20 @@ export const Header = () => {
         </Link>
         
         <nav className="hidden md:flex items-center gap-6" aria-label="Main navigation">
-          <a 
-            href="#pricing" 
+          <Link 
+            to="/pricing" 
             className="text-sm font-medium transition-colors hover:text-primary"
             aria-label={t("nav.pricing")}
           >
             {t("nav.pricing")}
-          </a>
-          <a 
-            href="#faq" 
+          </Link>
+          <Link 
+            to="/faq" 
             className="text-sm font-medium transition-colors hover:text-primary"
             aria-label={t("nav.faq")}
           >
             {t("nav.faq")}
-          </a>
+          </Link>
           {user && (
             <Link 
               to="/home"
@@ -121,7 +121,7 @@ export const Header = () => {
                 <Link to="/auth">{t("auth.login")}</Link>
               </Button>
               <Button asChild size="sm" className="hidden sm:flex" aria-label={t("hero.cta")}>
-                <Link to="/generator">{t("hero.cta")}</Link>
+                <Link to="/auth">{t("hero.cta")}</Link>
               </Button>
             </>
           )}

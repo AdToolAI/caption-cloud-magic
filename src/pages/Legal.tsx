@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
-import { Brand } from "@/components/layout/Brand";
 import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { SEO } from "@/components/SEO";
@@ -12,16 +11,22 @@ import { LanguageToggle } from "@/components/legal/LanguageToggle";
 import { PrivacyContent } from "@/components/legal/PrivacyContent";
 import { LegalSection } from "@/components/legal/LegalSection";
 
+const BackBreadcrumb = () => (
+  <div className="mb-6">
+    <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <ArrowLeft className="h-4 w-4" /> Zurück zur Startseite
+    </Link>
+  </div>
+);
+
 const Legal = () => {
   const { page } = useParams<{ page: string }>();
   const { language } = useTranslation();
   const [contentLang, setContentLang] = useState<"de" | "en">("de");
   
-  // Support direct routes /privacy and /terms (for TikTok OAuth)
   const location = window.location.pathname;
   const actualPage = page || (location === '/privacy' ? 'privacy' : location === '/terms' ? 'terms' : location === '/imprint' ? 'imprint' : null);
 
-  // Determine page type
   const pageType = actualPage === 'privacy' ? 'privacy' 
     : actualPage === 'terms' ? 'terms' 
     : actualPage === 'avv' ? 'avv' 
@@ -57,15 +62,8 @@ const Legal = () => {
           canonical={getCanonicalUrl('/legal/privacy')}
         />
         <div className="min-h-screen flex flex-col bg-background">
-          <nav className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
-            <div className="container flex h-14 items-center gap-4">
-              <Brand compact showText />
-              <Link to="/" className="ml-auto flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                <ArrowLeft className="h-4 w-4" /> Zurück
-              </Link>
-            </div>
-          </nav>
           <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
+            <BackBreadcrumb />
             <LegalHeroHeader type="privacy" lastUpdated="18. Oktober 2025" />
             <LanguageToggle currentLang={contentLang} onToggle={setContentLang} />
             
@@ -77,7 +75,6 @@ const Legal = () => {
               <PrivacyContent lang={contentLang} />
             </motion.div>
 
-            {/* Footer Note */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -93,7 +90,6 @@ const Legal = () => {
     );
   }
 
-  // Terms and Imprint pages - simplified versions
   if (pageType === 'terms') {
     return (
       <>
@@ -103,15 +99,8 @@ const Legal = () => {
           canonical={getCanonicalUrl('/legal/terms')}
         />
         <div className="min-h-screen flex flex-col bg-background">
-          <nav className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
-            <div className="container flex h-14 items-center gap-4">
-              <Brand compact showText />
-              <Link to="/" className="ml-auto flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                <ArrowLeft className="h-4 w-4" /> Zurück
-              </Link>
-            </div>
-          </nav>
           <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
+            <BackBreadcrumb />
             <LegalHeroHeader type="terms" />
             
             <motion.div
@@ -188,7 +177,6 @@ const Legal = () => {
     );
   }
 
-  // AVV (Auftragsverarbeitungsvertrag) page
   if (pageType === 'avv') {
     return (
       <>
@@ -198,15 +186,8 @@ const Legal = () => {
           canonical={getCanonicalUrl('/legal/avv')}
         />
         <div className="min-h-screen flex flex-col bg-background">
-          <nav className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
-            <div className="container flex h-14 items-center gap-4">
-              <Brand compact showText />
-              <Link to="/" className="ml-auto flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                <ArrowLeft className="h-4 w-4" /> Zurück
-              </Link>
-            </div>
-          </nav>
           <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
+            <BackBreadcrumb />
             <LegalHeroHeader type="avv" />
             
             <motion.div
@@ -394,15 +375,8 @@ const Legal = () => {
         canonical={getCanonicalUrl('/legal/imprint')}
       />
       <div className="min-h-screen flex flex-col bg-background">
-        <nav className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
-          <div className="container flex h-14 items-center gap-4">
-            <Brand compact showText />
-            <Link to="/" className="ml-auto flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="h-4 w-4" /> Zurück
-            </Link>
-          </div>
-        </nav>
         <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
+          <BackBreadcrumb />
           <LegalHeroHeader type="imprint" />
           
           <motion.div

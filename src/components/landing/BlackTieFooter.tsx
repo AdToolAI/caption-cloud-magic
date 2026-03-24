@@ -1,33 +1,6 @@
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Sparkles, Twitter, Linkedin, Instagram, Youtube, Mail } from "lucide-react";
-
-const footerLinks = {
-  product: [
-    { label: "Features", href: "/#features" },
-    { label: "Preise", href: "/pricing" },
-    { label: "FAQ", href: "/#faq" },
-    { label: "Roadmap", href: "#" },
-  ],
-  resources: [
-    { label: "Blog", href: "#" },
-    { label: "Tutorials", href: "#" },
-    { label: "API Docs", href: "#" },
-    { label: "Status", href: "#" },
-  ],
-  company: [
-    { label: "Über uns", href: "#" },
-    { label: "Karriere", href: "#" },
-    { label: "Kontakt", href: "#" },
-    { label: "Presse", href: "#" },
-  ],
-  legal: [
-    { label: "Datenschutz", href: "/privacy" },
-    { label: "AGB", href: "/terms" },
-    { label: "Impressum", href: "/imprint" },
-    { label: "Cookie-Einstellungen", href: "#" },
-  ],
-};
+import { Sparkles, Twitter, Linkedin, Instagram, Youtube } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const socialLinks = [
   { icon: Twitter, href: "#", label: "Twitter" },
@@ -37,9 +10,38 @@ const socialLinks = [
 ];
 
 export const BlackTieFooter = () => {
+  const { t } = useTranslation();
+
+  const footerLinks = {
+    product: [
+      { label: "Features", href: "/#features" },
+      { label: t("nav.pricing"), href: "/pricing" },
+      { label: t("nav.faq"), href: "/faq" },
+      { label: "Roadmap", href: "/coming-soon" },
+    ],
+    resources: [
+      { label: "Blog", href: "/coming-soon" },
+      { label: "Tutorials", href: "/coming-soon" },
+      { label: "API Docs", href: "/coming-soon" },
+      { label: "Status", href: "/coming-soon" },
+    ],
+    company: [
+      { label: "Über uns", href: "/coming-soon" },
+      { label: "Karriere", href: "/coming-soon" },
+      { label: "Kontakt", href: "/coming-soon" },
+      { label: "Presse", href: "/coming-soon" },
+    ],
+    legal: [
+      { label: "Datenschutz", href: "/privacy" },
+      { label: "AGB", href: "/terms" },
+      { label: "Impressum", href: "/imprint" },
+      { label: "AVV", href: "/legal/avv" },
+      { label: "Cookie-Einstellungen", href: "#", onClick: () => window.dispatchEvent(new CustomEvent('openCookiePreferences')) },
+    ],
+  };
+
   return (
     <footer className="relative border-t border-border/50 bg-card/30 backdrop-blur-sm">
-      {/* Top gradient line */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
       
       <div className="container max-w-7xl mx-auto px-4 py-16">
@@ -56,7 +58,6 @@ export const BlackTieFooter = () => {
               Dein KI-gestütztes Marketing-Arsenal für Social Media Erfolg. 
               Erstelle, plane und analysiere wie ein Profi.
             </p>
-            {/* Social Links */}
             <div className="flex items-center gap-3">
               {socialLinks.map((social) => (
                 <a
@@ -77,10 +78,7 @@ export const BlackTieFooter = () => {
             <ul className="space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.label}>
-                  <Link 
-                    to={link.href} 
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                  >
+                  <Link to={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">
                     {link.label}
                   </Link>
                 </li>
@@ -94,12 +92,9 @@ export const BlackTieFooter = () => {
             <ul className="space-y-3">
               {footerLinks.resources.map((link) => (
                 <li key={link.label}>
-                  <a 
-                    href={link.href} 
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                  >
+                  <Link to={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">
                     {link.label}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -111,12 +106,9 @@ export const BlackTieFooter = () => {
             <ul className="space-y-3">
               {footerLinks.company.map((link) => (
                 <li key={link.label}>
-                  <a 
-                    href={link.href} 
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                  >
+                  <Link to={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">
                     {link.label}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -128,12 +120,18 @@ export const BlackTieFooter = () => {
             <ul className="space-y-3">
               {footerLinks.legal.map((link) => (
                 <li key={link.label}>
-                  <Link 
-                    to={link.href} 
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    {link.label}
-                  </Link>
+                  {'onClick' in link && link.onClick ? (
+                    <button
+                      onClick={link.onClick}
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      {link.label}
+                    </button>
+                  ) : (
+                    <Link to={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                      {link.label}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>

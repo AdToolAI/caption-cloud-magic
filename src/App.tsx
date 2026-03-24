@@ -113,7 +113,7 @@ function AppLayout() {
   useSessionTracking(user?.id);
   
   // Landing page routes
-  const isLandingRoute = ['/', '/auth', '/pricing', '/faq', '/legal', '/privacy', '/terms', '/imprint', '/delete-data'].includes(location.pathname) || location.pathname.startsWith('/legal/');
+  const isLandingRoute = ['/', '/auth', '/pricing', '/faq', '/legal', '/privacy', '/terms', '/imprint', '/delete-data', '/coming-soon'].includes(location.pathname) || location.pathname.startsWith('/legal/');
   
   return (
     <div className="flex min-h-screen w-full">
@@ -153,6 +153,7 @@ function AppLayout() {
                     <Route path="/terms" element={<Legal />} />
                     <Route path="/imprint" element={<Legal />} />
                     <Route path="/delete-data" element={<DeleteData />} />
+                    <Route path="/coming-soon" element={<ComingSoon />} />
                     
                     {/* Feature pages - enabled */}
                     <Route path="/generator" element={<Generator />} />
