@@ -1,21 +1,22 @@
 
 
-# Plan: Verwaltungs-Einträge in UserMenu verschieben
+# Plan: „Automatisieren" aus Sidebar ins UserMenu verschieben
 
 ## Zusammenfassung
-Die Sidebar-Einträge unter „Verwaltung" (Brand-Kit, Credits, Konto, Abrechnung) sowie die „Auxiliary Pages" (Preise, FAQ, Support) werden aus der Sidebar entfernt und stattdessen ins UserMenu-Dropdown (oben rechts) integriert.
+Die drei Unterpunkte von „Automatisieren" (Kampagnen-Assistent, Integrationen, Instagram-Publishing) werden aus der Sidebar entfernt und als Gruppe im UserMenu-Dropdown unter einem „Automatisieren"-Label eingefügt.
 
 ## Änderungen
 
 ### 1. UserMenu erweitern (`src/components/layout/UserMenu.tsx`)
-- **Brand-Kit** hinzufügen (Icon: `Briefcase`, Route: `/brand-kit`)
-- **Preise** hinzufügen (Icon: `Tag`, Route: `/pricing`)
-- **FAQ** hinzufügen (Icon: `HelpCircle`, Route: `/faq`)
-- Credits, Konto, Abrechnung, Support bleiben (sind bereits vorhanden)
-- Gruppierung mit Separatoren: User-Info → Credits + Brand-Kit → Konto + Abrechnung → Preise + FAQ + Support → Abmelden
+- Icons `Workflow` und `Share2` importieren
+- Neuen Abschnitt nach Brand-Kit einfügen mit `DropdownMenuLabel` „Automatisieren" (über `t("hubs.automatisieren")`)
+- Drei neue Einträge: Kampagnen (`/campaigns`), Integrationen (`/integrations`), Instagram-Publishing (`/instagram-publishing`)
+- Separator davor und danach
 
 ### 2. Sidebar bereinigen (`src/components/AppSidebar.tsx`)
-- Gesamten `verwaltung`-Hub entfernen (Zeilen 142–147: Brand-Kit, Credits, Konto, Abrechnung)
-- „Auxiliary Pages"-Block entfernen (Zeilen 328–353: Preise, FAQ, Support)
-- `expandedHubs` Default-Wert anpassen (kein `verwaltung` mehr)
+- `automatisieren`-Hub aus der `hubItems`-Definition entfernen (Zeilen 121–125)
+- `expandedHubs` Default-Wert anpassen (kein `automatisieren` mehr)
+
+### 3. CommandBar anpassen (`src/components/ui/CommandBar.tsx`)
+- Automatisieren-Einträge bleiben (Suche soll weiterhin funktionieren), keine Änderung nötig
 
