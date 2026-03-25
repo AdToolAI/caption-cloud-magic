@@ -408,24 +408,24 @@ const Home = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <MetricCard
                 label={t("dashboard.metrics.reach7d")}
-                value="45.2K"
+                value={performanceKPIs.reach >= 1000 ? `${(performanceKPIs.reach / 1000).toFixed(1)}K` : String(performanceKPIs.reach)}
                 subtitle={t("dashboard.metrics.vsLastWeek")}
                 icon={<TrendingUp className="h-5 w-5" />}
-                trend={{ value: 12, isPositive: true }}
+                trend={{ value: Math.abs(performanceKPIs.reachTrend), isPositive: performanceKPIs.reachTrend >= 0 }}
               />
               <MetricCard
                 label={t("dashboard.metrics.engagementRate")}
-                value="5.8%"
+                value={`${performanceKPIs.engagementRate}%`}
                 subtitle={t("dashboard.metrics.avgAllPosts")}
                 icon={<TrendingUp className="h-5 w-5" />}
-                trend={{ value: 8, isPositive: true }}
+                trend={{ value: Math.abs(performanceKPIs.engagementTrend), isPositive: performanceKPIs.engagementTrend >= 0 }}
               />
               <MetricCard
                 label={t("dashboard.metrics.publishedPosts")}
-                value="18"
+                value={String(performanceKPIs.publishedPosts)}
                 subtitle={t("dashboard.metrics.thisMonth")}
                 icon={<Send className="h-5 w-5" />}
-                trend={{ value: 3, isPositive: false }}
+                trend={{ value: Math.abs(performanceKPIs.postsTrend), isPositive: performanceKPIs.postsTrend >= 0 }}
               />
             </div>
           </Section>
