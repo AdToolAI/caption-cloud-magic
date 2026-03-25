@@ -318,6 +318,36 @@ const Home = () => {
     toast.success("Post wird erneut versucht...");
   };
 
+  const handleEditPost = (post: WeekPost) => {
+    setEditingPost(post);
+    setEditingDate(post.id); // will be overridden below
+    setEditorOpen(true);
+  };
+
+  const handleUploadPost = (post: WeekPost) => {
+    setEditingPost(post);
+    setEditorOpen(true);
+  };
+
+  const handleAddPost = (date: string) => {
+    setEditingPost(null);
+    setEditingDate(date);
+    setEditorOpen(true);
+  };
+
+  const handleEditorSaved = () => {
+    loadDashboardData();
+  };
+
+  // Find the date string for an editing post
+  const getEditDate = () => {
+    if (editingPost) {
+      const day = weekDays.find(d => d.posts.some(p => p.id === editingPost.id));
+      return day?.date || editingDate;
+    }
+    return editingDate;
+  };
+
   const getPlatformColor = (platform: string) => {
     const colors: Record<string, string> = {
       instagram: 'bg-pink-500',
