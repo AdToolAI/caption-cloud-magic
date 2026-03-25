@@ -15,6 +15,7 @@ interface ImageCardProps {
   onDownload?: (url: string) => void;
   onSaveToAlbum?: (image: any) => void;
   onOpenLightbox?: (image: any) => void;
+  onDelete?: (image: any) => void;
 }
 
 export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLightbox }: ImageCardProps) {
