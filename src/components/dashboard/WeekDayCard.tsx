@@ -26,6 +26,7 @@ interface WeekDayCardProps {
   onEdit: (post: WeekPost) => void;
   onUpload: (post: WeekPost) => void;
   onAddPost: (date: string) => void;
+  onDelete: (post: WeekPost) => void;
 }
 
 const statusConfig = {
