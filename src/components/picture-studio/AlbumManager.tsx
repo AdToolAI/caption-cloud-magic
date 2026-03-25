@@ -227,6 +227,7 @@ export function AlbumManager() {
                 key={img.id}
                 image={{ id: img.id, url: img.image_url, prompt: img.prompt || undefined, style: img.style || undefined }}
                 index={i}
+                onDelete={handleDeleteImage}
               />
             ))}
           </div>
