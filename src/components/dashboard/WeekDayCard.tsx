@@ -31,7 +31,8 @@ interface WeekDayCardProps {
 const statusConfig = {
   suggested: { icon: Sparkles, color: 'bg-muted text-muted-foreground', border: 'border-border', label: 'Vorgeschlagen' },
   scheduled: { icon: Clock, color: 'bg-primary/10 text-primary', border: 'border-primary/30', label: 'Geplant' },
-  published: { icon: Check, color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', border: 'border-green-300 dark:border-green-700', label: 'Erledigt' },
+  published: { icon: CheckCircle2, color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', border: 'border-green-400 dark:border-green-500', label: 'Erledigt ✓' },
+  missed: { icon: AlertCircle, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', border: 'border-orange-300 dark:border-orange-700', label: 'Verpasst' },
 };
 
 export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, onUpload, onAddPost }: WeekDayCardProps) {
