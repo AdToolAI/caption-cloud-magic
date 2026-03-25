@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, GripVertical } from "lucide-react";
+import { X, GripVertical, Download, FolderPlus, Check } from "lucide-react";
 
 interface Scene {
   variant: number;
@@ -24,9 +24,12 @@ interface ImageLightboxProps {
   cutoutPreview: string;
   open: boolean;
   onClose: () => void;
+  onDownload?: () => void;
+  onSaveToAlbum?: () => void;
+  onAcceptScene?: () => void;
 }
 
-export function ImageLightbox({ scene, cutoutPreview, open, onClose }: ImageLightboxProps) {
+export function ImageLightbox({ scene, cutoutPreview, open, onClose, onDownload, onSaveToAlbum, onAcceptScene }: ImageLightboxProps) {
   const [sliderPos, setSliderPos] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
@@ -61,6 +64,17 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose }: ImageLigh
     return "text-red-400";
   };
 
+  const handleDownload = () => {
+    if (onDownload) {
+      onDownload();
+    } else {
+      const a = document.createElement('a');
+      a.href = scene.imageUrl;
+      a.download = `scene-${scene.sceneName || scene.variant}.png`;
+      a.click();
+    }
+  };
+
   return (
     <AnimatePresence>
       {open && (
@@ -79,15 +93,49 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose }: ImageLigh
             className="relative max-w-4xl w-full mx-4 flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="absolute -top-12 right-0 text-white/70 hover:text-white hover:bg-white/10 z-10"
-            >
-              <X className="h-6 w-6" />
-            </Button>
+            {/* Top action bar */}
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownload}
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                >
+                  <Download className="h-4 w-4 mr-1.5" />
+                  Download
+                </Button>
+                {onSaveToAlbum && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onSaveToAlbum}
+                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  >
+                    <FolderPlus className="h-4 w-4 mr-1.5" />
+                    In Album
+                  </Button>
+                )}
+                {onAcceptScene && (
+                  <Button
+                    size="sm"
+                    onClick={onAcceptScene}
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  >
+                    <Check className="h-4 w-4 mr-1.5" />
+                    Übernehmen
+                  </Button>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="text-white/70 hover:text-white hover:bg-white/10"
+              >
+                <X className="h-6 w-6" />
+              </Button>
+            </div>
 
             {/* Before/After Slider */}
             <div
@@ -113,7 +161,7 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose }: ImageLigh
                 <img
                   src={cutoutPreview}
                   alt="Original cutout"
-                  className="w-full h-full object-contain bg-[#1a1a2e]"
+                  className="w-full h-full object-contain bg-[hsl(var(--background))]"
                   draggable={false}
                 />
               </div>

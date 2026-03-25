@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Expand } from "lucide-react";
+import { CheckCircle2, Expand, FolderPlus, Check as CheckIcon } from "lucide-react";
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Scene {
   variant: number;
@@ -26,9 +27,11 @@ interface SceneGalleryProps {
   selectedImages: Set<number>;
   onToggleSelection: (index: number) => void;
   onOpenLightbox?: (index: number) => void;
+  onSaveToAlbum?: (index: number) => void;
+  onAcceptScene?: (index: number) => void;
 }
 
-export const SceneGallery = ({ scenes, selectedImages, onToggleSelection, onOpenLightbox }: SceneGalleryProps) => {
+export const SceneGallery = ({ scenes, selectedImages, onToggleSelection, onOpenLightbox, onSaveToAlbum, onAcceptScene }: SceneGalleryProps) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const getQualityGlow = (score?: number) => {
@@ -64,7 +67,7 @@ export const SceneGallery = ({ scenes, selectedImages, onToggleSelection, onOpen
                   ? 'border-primary/60 ring-2 ring-primary/30 ' + getQualityGlow(scene.qualityScores?.overall) 
                   : 'border-white/10 hover:border-primary/30'}
                 hover:shadow-[0_0_30px_hsla(43,90%,68%,0.15)] hover:-translate-y-1`}
-              onClick={() => onToggleSelection(index)}
+              onClick={() => onOpenLightbox?.(index)}
               onMouseEnter={() => setHoveredIndex(index)}
               onMouseLeave={() => setHoveredIndex(null)}
             >
@@ -75,7 +78,7 @@ export const SceneGallery = ({ scenes, selectedImages, onToggleSelection, onOpen
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
                 
-                {/* Quality Badge - Top Left with glow */}
+                {/* Quality Badge - Top Left */}
                 {scene.quality && (
                   <div className="absolute top-2 left-2">
                     <Badge 
@@ -87,30 +90,53 @@ export const SceneGallery = ({ scenes, selectedImages, onToggleSelection, onOpen
                   </div>
                 )}
 
-                {/* Selection Indicator - Top Right */}
-                {isSelected && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute top-2 right-2"
+                {/* Selection Checkbox - Top Right */}
+                <div
+                  className="absolute top-2 right-2 z-10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleSelection(index);
+                  }}
+                >
+                  <div className={`h-6 w-6 rounded-md border-2 flex items-center justify-center transition-all
+                    ${isSelected 
+                      ? 'bg-primary border-primary shadow-[0_0_8px_hsla(43,90%,68%,0.6)]' 
+                      : 'bg-black/40 border-white/40 hover:border-primary/60 backdrop-blur-sm'}`}
                   >
-                    <CheckCircle2 className="h-6 w-6 text-primary drop-shadow-[0_0_8px_hsla(43,90%,68%,0.6)]" />
-                  </motion.div>
-                )}
+                    {isSelected && <CheckIcon className="h-4 w-4 text-primary-foreground" />}
+                  </div>
+                </div>
 
-                {/* Expand button */}
-                {isHovered && onOpenLightbox && (
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-black/60 backdrop-blur-sm border border-white/20 hover:bg-black/80 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenLightbox(index);
-                    }}
+                {/* Action buttons on hover */}
+                {isHovered && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="absolute bottom-2 right-2 flex gap-1.5 z-10"
                   >
-                    <Expand className="h-4 w-4 text-white" />
-                  </motion.button>
+                    {onSaveToAlbum && (
+                      <button
+                        className="p-1.5 rounded-lg bg-black/60 backdrop-blur-sm border border-white/20 hover:bg-black/80 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSaveToAlbum(index);
+                        }}
+                      >
+                        <FolderPlus className="h-4 w-4 text-white" />
+                      </button>
+                    )}
+                    {onAcceptScene && (
+                      <button
+                        className="px-2 py-1.5 rounded-lg bg-primary/80 backdrop-blur-sm border border-primary/40 hover:bg-primary transition-colors text-xs font-medium text-primary-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAcceptScene(index);
+                        }}
+                      >
+                        Übernehmen
+                      </button>
+                    )}
+                  </motion.div>
                 )}
 
                 {/* Scene Name - Bottom gradient */}
@@ -125,7 +151,7 @@ export const SceneGallery = ({ scenes, selectedImages, onToggleSelection, onOpen
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="absolute inset-0 bg-black/85 backdrop-blur-sm text-white p-3 flex flex-col justify-between text-xs"
+                    className="absolute inset-0 bg-black/85 backdrop-blur-sm text-white p-3 flex flex-col justify-between text-xs pointer-events-none"
                   >
                     <div>
                       <p className="font-semibold mb-1">{scene.sceneName || `Scene ${index + 1}`}</p>
