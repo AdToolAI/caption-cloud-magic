@@ -29,7 +29,9 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle,
-  FileText
+  FileText,
+  Play,
+  Video
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -53,6 +55,13 @@ interface RelatedArticle {
   title: string;
   url: string;
   description: string;
+  source?: string;
+}
+
+interface RelatedVideo {
+  title: string;
+  channel: string;
+  video_id: string;
 }
 
 interface AnalysisData {
@@ -93,7 +102,7 @@ interface TrendDetailModalProps {
   analysisData?: AnalysisData | null;
   onAnalyze?: (trend: Trend) => void;
   isAnalyzing?: boolean;
-  defaultTab?: 'overview' | 'analysis' | 'articles';
+  defaultTab?: 'overview' | 'analysis' | 'articles' | 'media';
 }
 
 export function TrendDetailModal({
@@ -110,26 +119,29 @@ export function TrendDetailModal({
 }: TrendDetailModalProps) {
   const { toast } = useToast();
   const [articles, setArticles] = useState<RelatedArticle[]>([]);
+  const [videos, setVideos] = useState<RelatedVideo[]>([]);
   const [loadingArticles, setLoadingArticles] = useState(false);
   const [activeTab, setActiveTab] = useState(defaultTab);
+  const [mediaLoaded, setMediaLoaded] = useState(false);
 
   useEffect(() => {
     if (open && trend) {
       setActiveTab(defaultTab);
-      if (defaultTab === 'articles' || activeTab === 'articles') {
-        fetchRelatedArticles();
+      setMediaLoaded(false);
+      if (defaultTab === 'articles' || defaultTab === 'media') {
+        fetchMedia();
       }
     }
   }, [open, trend?.id, defaultTab]);
 
   useEffect(() => {
-    if (activeTab === 'articles' && articles.length === 0 && !loadingArticles) {
-      fetchRelatedArticles();
+    if ((activeTab === 'articles' || activeTab === 'media') && !mediaLoaded && !loadingArticles) {
+      fetchMedia();
     }
   }, [activeTab]);
 
-  const fetchRelatedArticles = async () => {
-    if (!trend) return;
+  const fetchMedia = async () => {
+    if (!trend || mediaLoaded) return;
     
     setLoadingArticles(true);
     try {
@@ -144,6 +156,8 @@ export function TrendDetailModal({
 
       if (error) throw error;
       setArticles(data.articles || []);
+      setVideos(data.videos || []);
+      setMediaLoaded(true);
     } catch (error) {
       console.error('Error fetching articles:', error);
     } finally {
@@ -245,6 +259,20 @@ export function TrendDetailModal({
               <TabsTrigger value="articles" className="flex-1 gap-2 data-[state=active]:bg-primary/20">
                 <Link2 className="w-4 h-4" />
                 Artikel
+                {articles.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-xs bg-blue-500/20 text-blue-400">
+                    {articles.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="media" className="flex-1 gap-2 data-[state=active]:bg-primary/20">
+                <Video className="w-4 h-4" />
+                Medien
+                {videos.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-xs bg-red-500/20 text-red-400">
+                    {videos.length}
+                  </Badge>
+                )}
               </TabsTrigger>
             </TabsList>
           </div>
@@ -481,7 +509,7 @@ export function TrendDetailModal({
                     </div>
                   )}
 
-                  {/* Best Posting Times - Handle both string and array */}
+                  {/* Best Posting Times */}
                   {analysisData.best_posting_times && (
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2">
@@ -590,49 +618,115 @@ export function TrendDetailModal({
               )}
             </TabsContent>
 
-            {/* Articles Tab */}
+            {/* Articles Tab - upgraded with favicons and real URLs */}
             <TabsContent value="articles" className="p-6 space-y-4 mt-0">
               {loadingArticles ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                  <span className="ml-2 text-muted-foreground">Suche Artikel...</span>
+                  <span className="ml-2 text-muted-foreground">Suche echte Artikel via Web-Suche...</span>
                 </div>
               ) : articles.length > 0 ? (
                 <div className="space-y-3">
-                  {articles.map((article, idx) => (
-                    <motion.a
-                      key={idx}
-                      href={article.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.1 }}
-                      className="block p-4 bg-muted/20 rounded-lg border border-white/5 hover:border-primary/50 hover:bg-muted/30 transition-all group"
-                      title="Öffnet Google-Suche zu diesem Thema"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1 flex-1">
-                          <h4 className="font-medium group-hover:text-primary transition-colors line-clamp-2">
-                            {article.title}
-                          </h4>
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {article.description}
-                          </p>
-                          <span className="text-xs text-muted-foreground/60 flex items-center gap-1 mt-1">
-                            <Search className="w-3 h-3" />
-                            Google-Suche öffnen
-                          </span>
+                  {articles.map((article, idx) => {
+                    const source = article.source || (() => {
+                      try { return new URL(article.url).hostname.replace('www.', ''); } catch { return ''; }
+                    })();
+                    return (
+                      <motion.a
+                        key={idx}
+                        href={article.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className="block p-4 bg-muted/20 rounded-lg border border-white/5 hover:border-primary/50 hover:bg-muted/30 transition-all group"
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Favicon */}
+                          {source && (
+                            <img 
+                              src={`https://www.google.com/s2/favicons?domain=${source}&sz=32`}
+                              alt=""
+                              className="w-5 h-5 rounded mt-0.5 shrink-0"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          )}
+                          <div className="space-y-1 flex-1">
+                            <h4 className="font-medium group-hover:text-primary transition-colors line-clamp-2">
+                              {article.title}
+                            </h4>
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {article.description}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              {source && (
+                                <span className="text-xs text-muted-foreground/80 px-2 py-0.5 bg-muted/30 rounded-full border border-white/5">
+                                  {source}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
                         </div>
-                        <Search className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-                      </div>
-                    </motion.a>
-                  ))}
+                      </motion.a>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-muted-foreground text-sm py-4 text-center">
                   Keine verwandten Artikel gefunden
                 </p>
+              )}
+            </TabsContent>
+
+            {/* Media Tab - YouTube Videos */}
+            <TabsContent value="media" className="p-6 space-y-4 mt-0">
+              {loadingArticles ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  <span className="ml-2 text-muted-foreground">Suche Videos...</span>
+                </div>
+              ) : videos.length > 0 ? (
+                <div className="space-y-4">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Play className="w-5 h-5 text-red-500" />
+                    YouTube-Videos ({videos.length})
+                  </h4>
+                  {videos.map((video, idx) => (
+                    <motion.div
+                      key={idx}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.15 }}
+                      className="space-y-2"
+                    >
+                      <Card className="bg-muted/20 border-white/5 overflow-hidden">
+                        <div className="aspect-video">
+                          <iframe
+                            src={`https://www.youtube.com/embed/${video.video_id}`}
+                            title={video.title}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            className="w-full h-full"
+                          />
+                        </div>
+                        <CardContent className="p-3">
+                          <h5 className="font-medium text-sm line-clamp-2">{video.title}</h5>
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                            <Play className="w-3 h-3" />
+                            {video.channel}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                  <Video className="w-12 h-12 text-muted-foreground/30" />
+                  <p className="text-muted-foreground text-sm">Keine Videos gefunden</p>
+                </div>
               )}
             </TabsContent>
           </ScrollArea>
