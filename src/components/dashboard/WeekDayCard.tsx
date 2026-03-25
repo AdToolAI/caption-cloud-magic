@@ -1,7 +1,6 @@
-import { useState } from "react";
 import { PlatformBadge } from "@/components/ui/PlatformBadge";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, Edit2, Upload, Plus, Sparkles } from "lucide-react";
+import { Check, Clock, Edit2, Upload, Plus, Sparkles, AlertCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface WeekPost {
@@ -10,7 +9,8 @@ export interface WeekPost {
   contentIdea: string;
   caption?: string;
   suggestedTime: string;
-  status: 'suggested' | 'scheduled' | 'published';
+  originalTime?: string;
+  status: 'suggested' | 'scheduled' | 'published' | 'missed';
   mediaUrl?: string;
   hashtags?: string[];
   sourceType: 'starter_plan' | 'calendar_event';
@@ -31,7 +31,8 @@ interface WeekDayCardProps {
 const statusConfig = {
   suggested: { icon: Sparkles, color: 'bg-muted text-muted-foreground', border: 'border-border', label: 'Vorgeschlagen' },
   scheduled: { icon: Clock, color: 'bg-primary/10 text-primary', border: 'border-primary/30', label: 'Geplant' },
-  published: { icon: Check, color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', border: 'border-green-300 dark:border-green-700', label: 'Erledigt' },
+  published: { icon: CheckCircle2, color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', border: 'border-green-400 dark:border-green-500', label: 'Erledigt ✓' },
+  missed: { icon: AlertCircle, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', border: 'border-orange-300 dark:border-orange-700', label: 'Verpasst' },
 };
 
 export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, onUpload, onAddPost }: WeekDayCardProps) {
@@ -87,11 +88,20 @@ export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, 
               <div
                 key={post.id}
                 className={cn(
-                  "rounded-lg border p-3 transition-all hover:shadow-sm",
+                  "rounded-lg border p-3 transition-all hover:shadow-sm relative",
                   config.border,
-                  post.status === 'published' ? 'bg-green-50/50 dark:bg-green-950/20' : 'bg-background'
+                  post.status === 'published' && 'bg-green-50/50 dark:bg-green-950/20 border-green-400 dark:border-green-500 shadow-[0_0_8px_rgba(34,197,94,0.3)]',
+                  post.status === 'missed' && 'bg-orange-50/50 dark:bg-orange-950/20',
+                  post.status !== 'published' && post.status !== 'missed' && 'bg-background'
                 )}
               >
+                {/* Published glow checkmark */}
+                {post.status === 'published' && (
+                  <div className="absolute -top-2 -right-2 bg-green-500 rounded-full p-0.5 shadow-[0_0_10px_rgba(34,197,94,0.6)]">
+                    <CheckCircle2 className="h-5 w-5 text-white" />
+                  </div>
+                )}
+
                 {/* Status + Time + Platform */}
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
@@ -99,7 +109,12 @@ export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, 
                       <StatusIcon className="h-3 w-3" />
                       {config.label}
                     </div>
-                    <span className="text-xs font-mono text-muted-foreground">{post.suggestedTime}</span>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {post.suggestedTime}
+                      {post.status === 'missed' && post.originalTime && (
+                        <span className="line-through ml-1 text-orange-400">{post.originalTime}</span>
+                      )}
+                    </span>
                   </div>
                   <PlatformBadge platform={post.platform} />
                 </div>
