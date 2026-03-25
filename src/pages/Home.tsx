@@ -290,6 +290,34 @@ const Home = () => {
         }
       }
 
+      // Auto-reschedule missed posts for today
+      const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      for (const day of days) {
+        if (!day.isToday) continue;
+        for (const post of day.posts) {
+          if (post.status === 'published') continue;
+          const [h, m] = post.suggestedTime.split(":").map(Number);
+          const postMinutes = h * 60 + m;
+          if (currentMinutes > postMinutes) {
+            // Calculate new time: next full/half hour + 1h
+            let newMinutes = Math.ceil((currentMinutes + 60) / 30) * 30;
+            post.originalTime = post.suggestedTime;
+            if (newMinutes >= 22 * 60) {
+              // Too late, mark as missed but keep original time
+              post.status = 'missed';
+            } else {
+              const newH = Math.floor(newMinutes / 60);
+              const newM = newMinutes % 60;
+              post.suggestedTime = `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+              post.status = 'missed';
+            }
+          }
+        }
+      }
+
       setWeekDays(days);
 
       // Set today posts
