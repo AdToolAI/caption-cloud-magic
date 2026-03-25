@@ -1,33 +1,29 @@
 
 
-## Performance-Überblick: Echte Daten statt Hardcoded Values
+## RecoCard: Fake-Daten durch echte Insights ersetzen
 
-### Problem
-Die 3 MetricCards im Home-Dashboard (Zeile 306-326) zeigen feste Fake-Werte (45.2K, 5.8%, 18) statt echter Daten aus der Datenbank. Das widerspricht den realen Werten im Analytics Dashboard.
+### Ist-Zustand
+Die `RecoCard` (Zeile 27) hat **hardcodierte Mock-Empfehlungen** — die Texte sind fix und basieren auf keinen echten Daten.
+
+### Gute Nachricht
+Es existiert bereits ein vollstaendiges Insight-System in `CaptionInsightsTab.tsx` + `insightRules.ts`, das echte `post_metrics`-Daten aus der Datenbank aggregiert und daraus regelbasierte Empfehlungen generiert (beste Posting-Zeit, bester Post-Typ, Top-Hashtags, Caption-Laenge, Engagement-Trend).
 
 ### Loesung
-Daten aus denselben Tabellen laden die auch das Analytics Dashboard nutzt. Wenn keine Daten vorhanden: `0` anzeigen.
+Die `RecoCard` soll dieselbe Logik nutzen wie `CaptionInsightsTab`:
 
-### Aenderungen in `src/pages/Home.tsx`
+| Datei | Aenderung |
+|---|---|
+| `src/features/recommendations/RecoCard.tsx` | Mock-Array entfernen. Stattdessen `post_metrics` per Supabase laden, `generateAllInsights()` aufrufen, und die Top-3 Insights als Empfehlungen anzeigen. Mapping von `InsightCardData` auf das bestehende UI-Format (icon, text, impact, action). Wenn keine Daten/Posts: leere Liste → Komponente wird ausgeblendet (bestehendes Verhalten). |
 
-**Neuer State + useEffect** fuer Performance-KPIs:
+### Mapping InsightCardData → RecoCard-Format
+- `title` → `text` (z.B. "Beste Zeit: Dienstag 18:00 für Instagram")
+- `delta` → `impact` (z.B. "+15%")
+- `icon` → bleibt (Clock, TrendingUp, etc. kommen schon aus insightRules)
+- `actions[0].href` → Navigation beim "Uebernehmen"-Click
 
-| KPI | Datenquelle | Query |
-|---|---|---|
-| **Reichweite (7 Tage)** | `post_metrics` | Summe `reach` der letzten 7 Tage, user_id Filter |
-| **Engagement-Rate** | `post_metrics` | Durchschnitt `engagement_rate`, user_id Filter |
-| **Veroeffentlichte Posts** | `post_metrics` | Count wo `posted_at >= Monatsanfang`, user_id Filter |
+### Aggregation
+Die Aggregationsfunktionen aus `CaptionInsightsTab` werden in eine shared Utility extrahiert oder direkt in `RecoCard` wiederverwendet (Import oder Inline-Copy der Helfer).
 
-**Trend-Berechnung:**
-- Reichweite: Vergleich letzte 7 Tage vs. 7 Tage davor → Prozent-Differenz
-- Engagement: Vergleich letzte 30 Tage vs. 30 Tage davor
-- Posts: Vergleich dieser Monat vs. letzter Monat
-
-**Formatierung:**
-- Reichweite >= 1000 → "1.2K" Format, sonst Zahl direkt
-- Engagement → eine Dezimalstelle + "%"
-- Posts → ganzzahlig
-- Keine Daten → `0` bzw. `0%`, Trend `{ value: 0, isPositive: true }`
-
-Nur `Home.tsx` wird geaendert — die hardcoded Werte werden durch dynamischen State ersetzt.
+### Fallback
+Weniger als 10 Posts → keine Empfehlungen → RecoCard wird nicht angezeigt (wie bisher bei leerem Array).
 
