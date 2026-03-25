@@ -363,6 +363,25 @@ const Home = () => {
     setEditorOpen(true);
   };
 
+  const handleDeletePost = async (post: WeekPost) => {
+    try {
+      if (post.sourceType === 'starter_plan') {
+        await supabase.from("starter_week_plans").delete().eq("id", post.sourceId);
+      } else if (post.sourceType === 'calendar_event') {
+        await supabase.from("calendar_events").delete().eq("id", post.sourceId);
+      }
+      // Remove from local state immediately
+      setWeekDays(prev => prev.map(day => ({
+        ...day,
+        posts: day.posts.filter(p => p.id !== post.id),
+      })));
+      toast.success("Post gelöscht");
+    } catch (err) {
+      console.error("Delete failed:", err);
+      toast.error("Post konnte nicht gelöscht werden");
+    }
+  };
+
   const handleEditorSaved = () => {
     loadDashboardData();
   };
