@@ -1,41 +1,60 @@
 
 
-## Nischen-Tutorial fuer bestehende Accounts erzwingen
+## Erweiterte Wochenuebersicht mit Post-Details, Upload & Bearbeitung
 
 ### Problem
-Das Nischen-Tutorial (Nische, Plattformen, Ziele) wird nur bei der Erstregistrierung im `/onboarding`-Flow durchlaufen. Bestehende Accounts haben kein `onboarding_profiles`-Eintrag und bekommen daher keine personalisierten Starter-Plaene oder KI-Empfehlungen.
+Die aktuelle Wochenuebersicht zeigt nur Tagesnummern und kleine Farbstreifen pro Plattform. Es fehlen: Content-Beschreibung, Uhrzeit, Erledigungsstatus (gruen), Upload-Moeglichkeit und Inline-Bearbeitung.
 
 ### Loesung
 
-Beim Login auf `/home` pruefen, ob der User bereits ein `onboarding_profiles`-Eintrag hat. Wenn nicht, wird ein modaler Nischen-Wizard angezeigt (nicht die komplette Onboarding-Seite, da Sprache/Brand bereits gesetzt sind). Erst nach Abschluss sieht der User das Dashboard mit personalisiertem Starter-Plan.
+Die 7-Tage-Grid-Ansicht wird zu erweiterbaren Tageskarten umgebaut. Jeder Tag zeigt Posts mit Details, Uhrzeit, Status und Aktionsbuttons.
 
 ```text
-Bestehender User loggt sich ein
-  → Home.tsx prueft: hat User onboarding_profiles?
-  → NEIN → Nischen-Tutorial-Modal (4 Schritte: Nische → Plattformen → Ziele → Plan generieren)
-  → JA → Normales Dashboard
+┌─ MI 25 (heute) ────────────────────────────────┐
+│ ✅ 18:00  📷 Instagram                         │
+│ "5 Tipps fuer bessere Reels"                   │
+│ [Bearbeiten] [Hochladen]                       │
+├─────────────────────────────────────────────────┤
+│ ⏳ 20:00  🎵 TikTok                            │
+│ "Behind the Scenes deines Workflows"           │
+│ [Bearbeiten] [Hochladen]                       │
+└─────────────────────────────────────────────────┘
 ```
 
 ### Aenderungen
 
 | Datei | Aenderung |
 |---|---|
-| `src/components/onboarding/NicheTutorialModal.tsx` | NEU — Modal-Wizard mit 4 Schritten: NicheStep, PlatformStep, GoalsStep, StarterPlanPreview. Nutzt bestehende Step-Komponenten. Speichert in `onboarding_profiles`, ruft `generate-starter-plan` auf, zeigt Plan-Vorschau. |
-| `src/pages/Home.tsx` | Beim Laden pruefen ob `onboarding_profiles` fuer User existiert. Wenn nicht: `NicheTutorialModal` anzeigen (blockierend). Nach Abschluss: `loadDashboardData()` neu aufrufen um Starter-Plan zu laden. |
+| `src/components/dashboard/WeekDayCard.tsx` | NEU — Einzelne Tageskarte: zeigt Posts mit Uhrzeit, Plattform-Badge, Content-Idee/Caption, Status-Indikator (gruen=erledigt, gelb=geplant, grau=offen). Buttons: "Bearbeiten" (oeffnet Inline-Editor oder navigiert zu Post-Generator mit Prefill), "Hochladen" (Datei-Upload der direkt in calendar_events + post-generator Pipeline geht). |
+| `src/components/dashboard/WeekPostEditor.tsx` | NEU — Inline-Edit-Dialog: Caption bearbeiten, Hashtags anpassen, Bild/Video hochladen. Speichert als calendar_event und triggert optional den AI Post Generator fuer Text-Optimierung. |
+| `src/pages/Home.tsx` | Wochenuebersicht: weekDays-Daten erweitern um content_idea, suggested_time, tips, status pro Post. Grid von 7-Spalten-Dots zu vertikaler Tageskarten-Liste oder scrollbares horizontales Layout umbauen. Upload-Handler der Medien in Storage speichert und calendar_event erstellt. |
+| `src/pages/Home.tsx` (loadDashboardData) | Starter-Plan Posts und echte calendar_events mit vollen Daten laden (content_idea, caption, time, status). Status "created"/"published" = gruen, "scheduled" = gelb, "suggested"/"draft" = grau. |
 
-### Technische Details
+### Datenfluss: Upload → Auto-Post
 
-**NicheTutorialModal.tsx**:
-- Vollbild-Dialog (nicht schliessbar ohne Abschluss)
-- Nutzt existierende Komponenten: `NicheStep`, `PlatformStep`, `GoalsStep`, `StarterPlanPreview`
-- Speichert Profil via `supabase.from("onboarding_profiles").upsert()`
-- Ruft `generate-starter-plan` Edge Function auf
-- Nach "Los geht's" schliesst Modal und laedt Dashboard neu
+```text
+User klickt "Hochladen" bei Tag X
+  → Datei-Upload in Storage (media bucket)
+  → Neuer calendar_event wird erstellt (Datum/Uhrzeit vom Slot)
+  → Optional: AI Post Generator Edge Function wird aufgerufen (Caption + Hashtags generieren)
+  → calendar_event wird aktualisiert mit generiertem Text
+  → Wochenuebersicht refresht → Post erscheint als "geplant" (gelb)
+  → Bei Veroeffentlichung → Status wird "published" (gruen)
+```
 
-**Home.tsx Aenderungen**:
-- Neuer State: `showNicheTutorial` (boolean)
-- In `useEffect` beim Laden: Query auf `onboarding_profiles` wo `user_id = user.id`
-- Wenn kein Eintrag: `setShowNicheTutorial(true)`
-- Render: `{showNicheTutorial && <NicheTutorialModal onComplete={handleTutorialComplete} />}`
-- `handleTutorialComplete`: setzt `showNicheTutorial = false`, ruft `loadDashboardData()` auf
+### Status-Farben
+
+| Status | Farbe | Bedeutung |
+|---|---|---|
+| suggested/draft | Grau | Vorgeschlagen, noch nicht bearbeitet |
+| scheduled | Gelb/Primary | Geplant, wartet auf Veroeffentlichung |
+| published/created | Gruen | Erledigt/Veroeffentlicht |
+
+### Implementierungsreihenfolge
+
+1. WeekDayCard-Komponente mit erweiterter Darstellung (Details, Zeit, Status-Farben)
+2. Home.tsx weekDays-Daten erweitern (volle Post-Infos statt nur platform)
+3. WeekPostEditor-Dialog fuer Inline-Bearbeitung (Caption, Hashtags, Media-Upload)
+4. Upload-Flow: Storage + calendar_event erstellen + optional AI Post Generator aufrufen
+5. Status-Tracking: Gruen faerben wenn Post erledigt/veroeffentlicht
 
