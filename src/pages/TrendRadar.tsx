@@ -782,73 +782,79 @@ export default function TrendRadar() {
                 initial="hidden"
                 animate="visible"
               >
-                {filteredTrends.map((trend, index) => (
+                {filteredTrends.map((trend, index) => {
+                  const gradient = getPlatformGradient(trend.platform);
+                  return (
                   <motion.div
                     key={trend.id}
                     variants={itemVariants}
                     whileHover={{ y: -8 }}
                   >
                     <Card 
-                      className="group cursor-pointer relative overflow-hidden backdrop-blur-xl bg-card/60 border-white/10 hover:border-primary/50 hover:shadow-[0_0_30px_hsla(43,90%,68%,0.15)] transition-all duration-300"
+                      className="group cursor-pointer relative overflow-hidden backdrop-blur-xl bg-card/40 border-white/10 hover:border-primary/50 hover:shadow-[0_0_35px_hsla(43,90%,68%,0.2)] transition-all duration-500 h-full"
                       onClick={() => analyzeTrend(trend)}
                     >
-                      {/* Top Gradient Line */}
-                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-purple-500 to-pink-500 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      {/* Platform Gradient Header */}
+                      <div className={`relative h-20 bg-gradient-to-br ${gradient} overflow-hidden`}>
+                        {/* Scanline texture */}
+                        <div className="absolute inset-0 opacity-[0.08]" style={{
+                          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.4) 2px, rgba(0,0,0,0.4) 4px)',
+                        }} />
+                        {/* Shimmer */}
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                          animate={{ x: ['-100%', '200%'] }}
+                          transition={{ duration: 3, repeat: Infinity, repeatDelay: 4, ease: 'easeInOut' }}
+                        />
+                        {/* Platform badge */}
+                        <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-xs font-semibold border border-white/20 uppercase tracking-wider">
+                          {trend.platform}
+                        </div>
+                        {/* Virality badge */}
+                        {trend.data_json?.estimated_virality && (
+                          <motion.div
+                            className="absolute top-3 right-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-xs font-bold border border-white/20"
+                            animate={{ scale: [1, 1.05, 1] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                          >
+                            🔥 {trend.data_json.estimated_virality}
+                          </motion.div>
+                        )}
+                        {/* Type badge */}
+                        <div className="absolute bottom-3 left-3 px-2 py-0.5 rounded bg-black/20 backdrop-blur-sm text-white/80 text-[10px] font-medium border border-white/10">
+                          {trend.trend_type}
+                        </div>
+                      </div>
                       
-                      <CardContent className="p-6 space-y-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="space-y-2 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPlatformColor(trend.platform)}`}>
-                                {trend.platform}
-                              </span>
-                              <span className="px-3 py-1 rounded-full text-xs font-medium bg-muted/50 border border-white/10">
-                                {trend.trend_type}
-                              </span>
-                              {trend.data_json?.estimated_virality && (
-                                <motion.span 
-                                  className="px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-400 border border-orange-500/30"
-                                  animate={{ scale: [1, 1.05, 1] }}
-                                  transition={{ duration: 1.5, repeat: Infinity }}
-                                >
-                                  🔥 {trend.data_json.estimated_virality}
-                                </motion.span>
-                              )}
-                            </div>
-                            <h3 className="font-bold text-xl group-hover:text-primary transition-colors">
-                              {trend.name}
-                            </h3>
-                          </div>
+                      <CardContent className="p-5 space-y-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-2 flex-1">
+                            {trend.name}
+                          </h3>
                           
-                          {/* Improved Bookmark Button */}
+                          {/* Bookmark Button */}
                           <Button
                             variant={bookmarked.includes(trend.id) ? "default" : "outline"}
-                            size="sm"
+                            size="icon"
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleBookmark(trend.id);
                             }}
-                            className={`shrink-0 gap-1.5 transition-all ${
+                            className={`shrink-0 h-8 w-8 transition-all ${
                               bookmarked.includes(trend.id) 
                                 ? 'bg-primary text-primary-foreground shadow-[0_0_15px_hsla(43,90%,68%,0.4)]' 
                                 : 'border-white/10 hover:border-primary/50'
                             }`}
                           >
                             {bookmarked.includes(trend.id) ? (
-                              <>
-                                <BookmarkCheck className="w-4 h-4" />
-                                <span className="hidden sm:inline">Gespeichert</span>
-                              </>
+                              <BookmarkCheck className="w-4 h-4" />
                             ) : (
-                              <>
-                                <Bookmark className="w-4 h-4" />
-                                <span className="hidden sm:inline">Speichern</span>
-                              </>
+                              <Bookmark className="w-4 h-4" />
                             )}
                           </Button>
                         </div>
 
-                        <p className="text-sm text-muted-foreground line-clamp-3">
+                        <p className="text-sm text-muted-foreground line-clamp-2">
                           {trend.description}
                         </p>
 
@@ -938,20 +944,27 @@ export default function TrendRadar() {
                         )}
 
                         {trend.data_json?.audience_fit && (
-                          <div className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg border border-white/5">
+                          <div className="flex items-start gap-2 p-3 bg-muted/20 rounded-lg border border-white/5">
                             <Target className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                             <p className="text-xs text-muted-foreground">{trend.data_json.audience_fit}</p>
                           </div>
                         )}
 
+                        {/* Neon Popularity Bar */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">{t('trends.popularity')}</span>
                             <span className="font-bold text-primary">{trend.popularity_index}/100</span>
                           </div>
-                          <div className="w-full bg-muted/30 rounded-full h-2 overflow-hidden">
+                          <div className="w-full bg-muted/20 rounded-full h-2 overflow-hidden relative">
                             <motion.div 
-                              className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 h-2 rounded-full"
+                              className={`bg-gradient-to-r ${gradient} h-2 rounded-full relative z-10`}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${trend.popularity_index}%` }}
+                              transition={{ duration: 1, delay: index * 0.05 }}
+                            />
+                            <motion.div
+                              className={`absolute top-0 left-0 h-2 rounded-full bg-gradient-to-r ${gradient} blur-sm opacity-50`}
                               initial={{ width: 0 }}
                               animate={{ width: `${trend.popularity_index}%` }}
                               transition={{ duration: 1, delay: index * 0.05 }}
@@ -961,7 +974,7 @@ export default function TrendRadar() {
 
                         <div className="flex items-center gap-2 flex-wrap">
                           {trend.category && (
-                            <div className="flex items-center gap-1 text-xs px-2 py-1 bg-muted/30 rounded-md border border-white/5">
+                            <div className="flex items-center gap-1 text-xs px-2 py-1 bg-muted/20 rounded-md border border-white/5">
                               <Tag className="w-3 h-3" />
                               <span>{trend.category}</span>
                             </div>
@@ -974,8 +987,7 @@ export default function TrendRadar() {
                           )}
                         </div>
 
-                        <div className="pt-2 border-t border-white/5 flex gap-2">
-                          {/* More Info Button */}
+                        <div className="pt-3 border-t border-white/5 flex gap-2">
                           <Button
                             variant="outline"
                             size="sm"
@@ -989,7 +1001,6 @@ export default function TrendRadar() {
                             Mehr erfahren
                           </Button>
                           
-                          {/* Analyze Button */}
                           <Button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1020,7 +1031,8 @@ export default function TrendRadar() {
                       </CardContent>
                     </Card>
                   </motion.div>
-                ))}
+                  );
+                })}
               </motion.div>
             </>
           )}
