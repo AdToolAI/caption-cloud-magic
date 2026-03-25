@@ -28,7 +28,6 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
       link.click();
       toast.success("Bild wird heruntergeladen");
     } else {
-      // Multiple images - create ZIP
       await handleExportBundle();
     }
   };
@@ -47,15 +46,10 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
 
       for (const index of Array.from(selectedImages)) {
         const scene = scenes[index];
-        
-        // Fetch image as blob
         const response = await fetch(scene.imageUrl);
         const blob = await response.blob();
-        
-        // Add to ZIP
         folder?.file(`variant_${scene.variant}.png`, blob);
         
-        // Add metadata
         const meta = {
           variant: scene.variant,
           sceneName: scene.sceneName,
@@ -89,7 +83,6 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
       return;
     }
     
-    // Store selected scenes in sessionStorage for the post generator
     const selectedScenes = Array.from(selectedImages).map(i => scenes[i]);
     sessionStorage.setItem('backgroundScenes', JSON.stringify(selectedScenes));
     
@@ -111,16 +104,18 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
   };
 
   return (
-    <div className="flex flex-wrap gap-2 items-center justify-between p-4 border-t bg-muted/20">
+    <div className="flex flex-wrap gap-2 items-center justify-between p-4 border-t border-white/10 backdrop-blur-xl bg-card/40">
       <div className="flex gap-2">
         <Button 
           onClick={handleDownloadSelected} 
           variant="outline" 
           size="sm"
           disabled={selectedImages.size === 0}
+          className="relative overflow-hidden group border-white/10 bg-card/40 hover:border-primary/40"
         >
+          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
           <Download className="h-4 w-4 mr-2" />
-          Ausgewählte herunterladen ({selectedImages.size})
+          Download ({selectedImages.size})
         </Button>
         
         {selectedImages.size > 1 && (
@@ -128,9 +123,11 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
             onClick={handleExportBundle} 
             variant="outline" 
             size="sm"
+            className="relative overflow-hidden group border-white/10 bg-card/40 hover:border-primary/40"
           >
+            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
             <Package className="h-4 w-4 mr-2" />
-            Als Bundle exportieren
+            ZIP Bundle
           </Button>
         )}
       </div>
@@ -138,12 +135,13 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
       <div className="flex gap-2">
         <Button 
           onClick={handleUseInPostGenerator} 
-          variant="default" 
           size="sm"
           disabled={selectedImages.size === 0}
+          className="relative overflow-hidden group bg-gradient-to-r from-primary to-amber-500 border-0 hover:from-primary/90 hover:to-amber-500/90"
         >
+          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
           <ArrowRight className="h-4 w-4 mr-2" />
-          Im Post-Generator verwenden
+          Post-Generator
         </Button>
         
         <Button 
@@ -151,7 +149,9 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
           variant="secondary" 
           size="sm"
           disabled={selectedImages.size === 0}
+          className="relative overflow-hidden group"
         >
+          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
           <Calendar className="h-4 w-4 mr-2" />
           Post planen
         </Button>

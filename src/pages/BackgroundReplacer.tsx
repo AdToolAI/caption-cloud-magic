@@ -23,6 +23,8 @@ import { ExportControls } from "@/components/background/ExportControls";
 import { RateLimitIndicator } from "@/components/ai/RateLimitIndicator";
 import { AICallStatus } from "@/components/ai/AICallStatus";
 import { BackgroundReplacerHeroHeader } from "@/components/background/BackgroundReplacerHeroHeader";
+import { ProductInsightBanner } from "@/components/background/ProductInsightBanner";
+import { ImageLightbox } from "@/components/background/ImageLightbox";
 import { ESTIMATED_COSTS } from "@/lib/featureCosts";
 
 const CATEGORIES = [
@@ -37,6 +39,14 @@ const CATEGORIES = [
 
 const LIGHTING_OPTIONS = ['natural', 'studio', 'dramatic', 'neutral'];
 const VARIANT_OPTIONS = [5, 10];
+
+interface AISuggestion {
+  productType: string;
+  suggestedCategory: string;
+  suggestedLighting: string;
+  suggestedIntensity: number;
+  reasoning: string;
+}
 
 export default function BackgroundReplacer() {
   const { t } = useTranslation();
@@ -62,28 +72,26 @@ export default function BackgroundReplacer() {
   const [selectedBrandKit, setSelectedBrandKit] = useState<string>("none");
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
   const [edgeQuality, setEdgeQuality] = useState<number>(0);
+  const [aiSuggestion, setAiSuggestion] = useState<AISuggestion | null>(null);
+  const [suggestionApplied, setSuggestionApplied] = useState(false);
+  const [lightboxScene, setLightboxScene] = useState<number | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchBrandKits();
     }
 
-    // Load media import from Media Library
     const mediaImport = sessionStorage.getItem('bg_replacer_import');
     if (mediaImport) {
       try {
         const data = JSON.parse(mediaImport);
-        
-        // Check expiry (5 minutes)
         if (Date.now() - data.timestamp < 5 * 60 * 1000) {
-          // Load image from URL
           fetch(data.imageUrl)
             .then(res => res.blob())
             .then(blob => {
               const file = new File([blob], 'imported-image.jpg', { type: 'image/jpeg' });
               setImageFile(file);
               setImagePreview(URL.createObjectURL(blob));
-              
               toast.success("✅ Bild aus Media Library importiert");
             })
             .catch(err => {
@@ -91,7 +99,6 @@ export default function BackgroundReplacer() {
               toast.error("Fehler beim Laden des Bildes");
             });
         }
-        
         sessionStorage.removeItem('bg_replacer_import');
       } catch (e) {
         console.error('Error loading media import:', e);
@@ -99,7 +106,6 @@ export default function BackgroundReplacer() {
     }
   }, [user]);
 
-  // Update scene pool when category changes
   useEffect(() => {
     updateScenePool(category);
   }, [category]);
@@ -125,6 +131,14 @@ export default function BackgroundReplacer() {
     setScenePool(pools[cat] || pools['workspace']);
   };
 
+  const handleApplySuggestion = (suggestion: AISuggestion) => {
+    setCategory(suggestion.suggestedCategory);
+    setLighting(suggestion.suggestedLighting);
+    setStyleIntensity([suggestion.suggestedIntensity]);
+    setSuggestionApplied(true);
+    toast.success(`Einstellungen für "${suggestion.productType}" übernommen`);
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -138,6 +152,10 @@ export default function BackgroundReplacer() {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+      
+      // Reset AI suggestion on new image
+      setAiSuggestion(null);
+      setSuggestionApplied(false);
       
       await handleRemoveBackground(file);
     }
@@ -209,7 +227,7 @@ export default function BackgroundReplacer() {
         .from('background-projects')
         .getPublicUrl(fileName);
 
-      const dynamicCost = variantCount; // 5 or 10 credits
+      const dynamicCost = variantCount;
       
       const data = await executeAICall({
         featureCode: 'background_generate',
@@ -225,7 +243,8 @@ export default function BackgroundReplacer() {
               brandKitId: selectedBrandKit === 'none' ? null : selectedBrandKit,
               originalImageUrl: publicUrl,
               variantCount,
-              diversify
+              diversify,
+              analyzeProduct: !aiSuggestion // Only analyze if no suggestion yet
             }
           });
 
@@ -238,6 +257,11 @@ export default function BackgroundReplacer() {
 
       console.log('Generated scenes response:', data);
       setGeneratedScenes(data.results_json || []);
+      
+      // Set AI suggestion if returned
+      if (data.aiSuggestion && !aiSuggestion) {
+        setAiSuggestion(data.aiSuggestion);
+      }
       
       if (data.results_json && data.results_json.length > 0) {
         const scenesUsed = data.metadata?.scenesUsed || [];
@@ -278,6 +302,15 @@ export default function BackgroundReplacer() {
         
         {/* Premium Hero Header */}
         <BackgroundReplacerHeroHeader />
+
+        {/* AI Product Insight Banner */}
+        {aiSuggestion && (
+          <ProductInsightBanner
+            suggestion={aiSuggestion}
+            onApply={handleApplySuggestion}
+            applied={suggestionApplied}
+          />
+        )}
         
         {/* AI Status & Rate Limit */}
         <div className="mb-6 flex items-center gap-4">
@@ -290,7 +323,7 @@ export default function BackgroundReplacer() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Input Panel - Glassmorphism */}
+          {/* Input Panel */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -298,7 +331,7 @@ export default function BackgroundReplacer() {
           >
             <Card className="backdrop-blur-xl bg-card/60 border-white/10 shadow-[0_0_30px_hsla(43,90%,68%,0.08)] hover:shadow-[0_0_40px_hsla(43,90%,68%,0.12)] transition-all duration-300">
               <CardContent className="p-6 space-y-6">
-                {/* Image Upload - Premium Zone */}
+                {/* Image Upload */}
                 <div>
                   <Label className="text-sm font-medium">Produktbild hochladen</Label>
                   <motion.div 
@@ -359,7 +392,7 @@ export default function BackgroundReplacer() {
                   </motion.div>
                 </div>
 
-                {/* Category - Premium Select */}
+                {/* Category */}
                 <div>
                   <Label className="text-sm font-medium">Kategorie</Label>
                   <Select value={category} onValueChange={setCategory}>
@@ -374,7 +407,7 @@ export default function BackgroundReplacer() {
                   </Select>
                 </div>
 
-                {/* Scene Pool Display - Premium Badges */}
+                {/* Scene Pool */}
                 {scenePool.length > 0 && (
                   <motion.div 
                     className="backdrop-blur-md bg-muted/20 border border-white/10 p-4 rounded-xl"
@@ -432,7 +465,7 @@ export default function BackgroundReplacer() {
                   </Select>
                 </div>
 
-                {/* Diversity Toggle - Premium Switch */}
+                {/* Diversity Toggle */}
                 <div className="flex items-center justify-between p-3 rounded-lg bg-muted/10 border border-white/5">
                   <Label htmlFor="diversity" className="text-sm font-medium cursor-pointer">Szenen-Diversität maximieren</Label>
                   <Switch
@@ -468,7 +501,7 @@ export default function BackgroundReplacer() {
                   </Select>
                 </div>
 
-                {/* Style Intensity - Premium Slider */}
+                {/* Style Intensity */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <Label className="text-sm font-medium">Style Intensity</Label>
@@ -504,7 +537,7 @@ export default function BackgroundReplacer() {
                   </div>
                 )}
 
-                {/* Generate Button - Premium */}
+                {/* Generate Button */}
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -515,7 +548,6 @@ export default function BackgroundReplacer() {
                     className="w-full relative overflow-hidden group bg-gradient-to-r from-primary to-amber-500 hover:from-primary/90 hover:to-amber-500/90 border-0 shadow-lg hover:shadow-[0_0_25px_hsla(43,90%,68%,0.3)] transition-all duration-300"
                     size="lg"
                   >
-                    {/* Shimmer Effect */}
                     <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                     {isGenerating ? (
                       <>
@@ -534,7 +566,7 @@ export default function BackgroundReplacer() {
             </Card>
           </motion.div>
 
-          {/* Preview Panel - Glassmorphism */}
+          {/* Preview Panel */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -549,12 +581,12 @@ export default function BackgroundReplacer() {
                         <div>
                           <h3 className="text-lg font-semibold">Vorschau-Galerie</h3>
                           <p className="text-sm text-muted-foreground">
-                            {generatedScenes.length} Varianten mit unterschiedlichen Settings
+                            {generatedScenes.length} Varianten · KI-bewertet
                           </p>
                         </div>
-                        <Badge variant="default" className="gap-2 bg-gradient-to-r from-primary/80 to-amber-500/80 border-0">
+                        <Badge variant="default" className="gap-2 bg-gradient-to-r from-primary/80 to-cyan-500/80 border-0">
                           <Sparkles className="h-3 w-3" />
-                          {variantCount} Varianten
+                          v3
                         </Badge>
                       </div>
                       
@@ -569,12 +601,6 @@ export default function BackgroundReplacer() {
                           </Badge>
                         </div>
                       )}
-
-                      {diversify && (
-                        <p className="text-xs text-primary mt-2">
-                          ℹ️ Diversität aktiv: Unterschiedliche Hintergründe, Props und Blickwinkel
-                        </p>
-                      )}
                     </div>
 
                     <div className="p-6 max-h-[500px] overflow-y-auto">
@@ -582,6 +608,7 @@ export default function BackgroundReplacer() {
                         scenes={generatedScenes}
                         selectedImages={selectedImages}
                         onToggleSelection={toggleImageSelection}
+                        onOpenLightbox={(index) => setLightboxScene(index)}
                       />
                     </div>
 
@@ -608,11 +635,11 @@ export default function BackgroundReplacer() {
                         <Sparkles className="h-16 w-16 mx-auto mb-4 text-primary/50" />
                       </motion.div>
                       <p className="text-lg font-medium mb-2 bg-gradient-to-r from-primary to-cyan-400 bg-clip-text text-transparent">
-                        KI-Hintergrund-Ersteller v2
+                        KI-Hintergrund-Ersteller v3
                       </p>
                       <p className="text-sm">
                         Laden Sie ein Produktbild hoch und generieren Sie<br />
-                        5 oder 10 professionelle Varianten mit maximaler Szenen-Diversität
+                        professionelle Varianten mit KI-Produkterkennung & Qualitätsbewertung
                       </p>
                     </div>
                   </div>
@@ -624,6 +651,16 @@ export default function BackgroundReplacer() {
       </main>
 
       <Footer />
+
+      {/* Fullscreen Lightbox */}
+      {lightboxScene !== null && generatedScenes[lightboxScene] && (
+        <ImageLightbox
+          scene={generatedScenes[lightboxScene]}
+          cutoutPreview={cutoutPreview}
+          open={true}
+          onClose={() => setLightboxScene(null)}
+        />
+      )}
     </div>
   );
 }
