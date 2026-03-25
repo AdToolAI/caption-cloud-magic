@@ -1,35 +1,38 @@
 
 
-## Medien-Tab "Next Level" Redesign
+## TrendRadar Hauptseite - "Next Level" Media-First Redesign
 
-### Problem
-Der Medien-Tab zeigt nur textbasierte Suchlinks mit kleinen Play-Buttons - das wirkt wie eine einfache Linkliste statt einer modernen Medien-Erfahrung. Es fehlen echte visuelle Elemente (Thumbnails, Previews).
+Die bisherigen Aenderungen betrafen nur das **Modal** (TrendDetailModal.tsx). Die **Hauptseite** (`TrendRadar.tsx`) mit den Trend-Cards, Top-Trends und Nischen-Kategorien wurde noch nicht angefasst. Das aendern wir jetzt.
 
-### Loesung: Visuelles Medien-Erlebnis
+### Was sich aendert
 
-**1. YouTube-Karten als grosse visuelle Thumbnail-Cards**
-- Statt kleine Text-Links: Grossflaechige Cards im 16:9 Format mit Gradient-Overlay
-- Zentrierter Play-Button mit Neon-Glow und Pulse-Animation
-- Suchbegriff als Overlay-Text unten im Card
-- Hover-Effekt: Card hebt sich, Play-Button skaliert, Glow intensiviert sich
+**1. Top-Trends der Woche - Hero Cards mit Media-Thumbnails**
+- Statt flache Text-Cards: Grosse Cards mit gradient-basierten visuellen Thumbnails (aehnlich dem Medien-Tab-Design)
+- Hintergrund-Gradient basierend auf Plattform-Farbe (TikTok: pink-cyan, Instagram: purple-pink, etc.)
+- Scanline-Overlay und Glassmorphism-Effekte
+- Groessere Darstellung: Top 3 als Feature-Cards, Rest als kompaktere Row
 
-**2. Grid-Layout statt Liste**
-- 2-Spalten Grid fuer Video-Cards (statt vertikale Liste)
-- Erste Card kann als "Featured" groeszer dargestellt werden (full-width)
-- Glassmorphism-Rahmen mit animiertem Gradient-Border
+**2. Nischen-Kategorien - Glassmorphism Upgrade**
+- Groessere Icons mit Glow-Ring und Neon-Border auf Hover
+- Animierter Gradient-Hintergrund statt flacher Farbe
+- Aktive Kategorie mit pulsierendem Border-Glow
 
-**3. Artikel-Tab ebenfalls aufwerten**
-- Artikel als Cards mit grossem Thumbnail-Platzhalter (Gradient basierend auf Source-Domain)
-- Source-Favicon prominenter mit Glow-Ring
-- Hover: Neon-Border-Shimmer-Animation
+**3. Trend-Cards Grid - Visuelles Upgrade**
+- Jede Card bekommt einen visuellen Header-Bereich mit Plattform-Gradient (wie die Artikel-Thumbnails im Modal)
+- Plattform-Logo/Icon prominent im Gradient-Bereich
+- Popularity-Bar mit Neon-Glow-Effekt statt flachem Balken
+- Subtile Scanline-Textur im Hintergrund
+- Hover: Card hebt sich staerker, Border glowed in Plattform-Farbe
 
-**4. Futuristischer Loading-State**
-- Skeleton-Cards im gleichen Grid-Layout
-- Shimmer mit Neon-Gradient statt grauem Pulse
+**4. Filter-Bar Redesign**
+- Glassmorphism-Upgrade mit subtilen Neon-Borders
+- Such-Input mit animiertem Focus-Glow
+- Plattform-Dropdown mit Farb-Chips
 
 ### Technische Aenderungen
 
 | Datei | Aenderung |
 |---|---|
-| `src/components/trends/TrendDetailModal.tsx` | Medien-Tab: Grid-Layout mit grossen visuellen Thumbnail-Cards, animierte Glow-Effekte. Artikel-Tab: Visuellere Cards mit Gradient-Thumbnails |
+| `src/pages/TrendRadar.tsx` | Top-Trends Cards mit Gradient-Thumbnails, Trend-Cards mit visuellem Header, Filter-Bar Glassmorphism, Popularity-Bar Glow |
+| `src/components/trends/TrendRadarHeroHeader.tsx` | Feintuning der Glow-Effekte fuer Konsistenz |
 
