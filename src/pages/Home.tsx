@@ -577,19 +577,17 @@ const Home = () => {
               </Button>
             }
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="flex items-start gap-2 overflow-x-auto pb-4 justify-between">
               {weekDays.map(day => (
-                <WeekDayCard
+                <WeekTimelineDay
                   key={day.date}
                   date={day.date}
                   dayName={day.name}
                   dayNumber={day.day}
                   isToday={day.isToday}
                   posts={day.posts}
-                  onEdit={handleEditPost}
-                  onUpload={handleUploadPost}
+                  onRingClick={handleEditPost}
                   onAddPost={handleAddPost}
-                  onDelete={handleDeletePost}
                 />
               ))}
             </div>
