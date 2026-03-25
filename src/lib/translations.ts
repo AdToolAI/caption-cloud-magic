@@ -3796,7 +3796,7 @@ export const translations: Record<Language, any> = {
     hubs: {
       planen: "Planen",
       erstellen: "Erstellen",
-      optimieren: "Optimieren",
+      optimieren: "Erstellen & Optimieren",
       analysieren: "Analysieren",
       automatisieren: "Automatisieren",
       medien: "Medien",
