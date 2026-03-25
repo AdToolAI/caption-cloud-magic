@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Check, Plus, Calendar as CalendarIcon, FileText, TrendingUp, Lightbulb, Clock, Eye, Send, RefreshCw, ImageIcon } from "lucide-react";
-import { SocialConnectionIcons } from "@/components/dashboard/SocialConnectionIcons";
+
 import { SEO } from "@/components/SEO";
 import { supabase } from "@/integrations/supabase/client";
 import { QuickActions } from "@/components/dashboard/QuickActions";
