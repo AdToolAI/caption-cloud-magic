@@ -6047,7 +6047,7 @@ export const translations: Record<Language, any> = {
     hubs: {
       planen: "Planificar",
       erstellen: "Crear",
-      optimieren: "Optimizar",
+      optimieren: "Crear y Optimizar",
       analysieren: "Analizar",
       automatisieren: "Automatizar",
       medien: "Medios",
