@@ -1516,7 +1516,7 @@ export const translations: Record<Language, any> = {
     hubDesc: {
       planen: "Plan, schedule, and organize your content calendar",
       erstellen: "Create videos, audio, and visual media content",
-      optimieren: "Create and optimize captions, posts, and content with AI",
+      optimieren: "Optimize captions, posts, and content with AI",
       analysieren: "Track performance and discover trends",
       medien: "Manage media assets, videos, and audio",
       team: "Collaborate with your team and manage workspaces",
