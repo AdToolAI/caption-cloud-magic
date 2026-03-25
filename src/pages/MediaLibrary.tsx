@@ -561,7 +561,7 @@ export default function MediaLibrary() {
       description: "Wird in Smart Background geladen...",
     });
     
-    navigate('/background-replacer');
+    navigate('/picture-studio?tab=background');
   };
 
   // Bulk send to Composer
@@ -666,7 +666,7 @@ export default function MediaLibrary() {
       description: `Erstes Bild wird in Smart Background geladen...`,
     });
     
-    navigate('/background-replacer');
+    navigate('/picture-studio?tab=background');
   };
 
   const getSourceBadge = (source: string) => {
