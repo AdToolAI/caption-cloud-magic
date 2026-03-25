@@ -1,6 +1,6 @@
 import { PlatformBadge } from "@/components/ui/PlatformBadge";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, Edit2, Upload, Plus, Sparkles, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Check, Clock, Edit2, Upload, Plus, Sparkles, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface WeekPost {
