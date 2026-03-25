@@ -36,18 +36,19 @@ serve(async (req) => {
 
     const {
       cutoutImageUrl,
-      category,
-      lighting,
-      styleIntensity,
+      category: requestedCategory,
+      lighting: requestedLighting,
+      styleIntensity: requestedIntensity,
       language,
       brandKitId,
       originalImageUrl,
       variantCount = 5,
-      diversify = true
+      diversify = true,
+      analyzeProduct = false
     } = await req.json();
 
-    if (!cutoutImageUrl || !category || !lighting) {
-      throw new Error('Missing required parameters');
+    if (!cutoutImageUrl) {
+      throw new Error('Missing cutout image URL');
     }
 
     if (variantCount !== 5 && variantCount !== 10) {
@@ -57,6 +58,77 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
+    }
+
+    // ═══════════════════════════════════════════
+    // STEP 1: AI Product Analysis (if requested)
+    // ═══════════════════════════════════════════
+    let aiSuggestion = null;
+    if (analyzeProduct) {
+      console.log('Analyzing product with AI...');
+      try {
+        const analysisResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-3-flash-preview',
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: `Analyze this product image. Determine what type of product it is and suggest the best background settings for professional product photography.`
+                  },
+                  { type: 'image_url', image_url: { url: cutoutImageUrl } }
+                ]
+              }
+            ],
+            tools: [{
+              type: 'function',
+              function: {
+                name: 'suggest_product_settings',
+                description: 'Suggest optimal background settings for this product',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    productType: { type: 'string', description: 'What type of product this is (e.g. Headphones, Sneaker, Watch, Perfume, Laptop, etc.)' },
+                    suggestedCategory: { type: 'string', enum: ['workspace', 'outdoor', 'urban', 'studio', 'wellness', 'tech', 'luxury'] },
+                    suggestedLighting: { type: 'string', enum: ['natural', 'studio', 'dramatic', 'neutral'] },
+                    suggestedIntensity: { type: 'number', description: 'Style intensity 1-10' },
+                    reasoning: { type: 'string', description: 'Brief explanation why these settings are optimal (in German)' }
+                  },
+                  required: ['productType', 'suggestedCategory', 'suggestedLighting', 'suggestedIntensity', 'reasoning']
+                }
+              }
+            }],
+            tool_choice: { type: 'function', function: { name: 'suggest_product_settings' } }
+          })
+        });
+
+        if (analysisResponse.ok) {
+          const analysisData = await analysisResponse.json();
+          const toolCall = analysisData.choices?.[0]?.message?.tool_calls?.[0];
+          if (toolCall?.function?.arguments) {
+            aiSuggestion = JSON.parse(toolCall.function.arguments);
+            console.log('AI Product Analysis:', aiSuggestion);
+          }
+        }
+      } catch (err) {
+        console.error('Product analysis failed (non-fatal):', err);
+      }
+    }
+
+    // Use AI suggestion or requested values
+    const category = requestedCategory || aiSuggestion?.suggestedCategory || 'workspace';
+    const lighting = requestedLighting || aiSuggestion?.suggestedLighting || 'natural';
+    const intensity = requestedIntensity || aiSuggestion?.suggestedIntensity || 5;
+
+    if (!category || !lighting) {
+      throw new Error('Missing required parameters: category and lighting');
     }
 
     // Get brand kit if provided
@@ -132,17 +204,16 @@ serve(async (req) => {
       ]
     };
 
-    // Lighting descriptions and compositing instructions
+    // Enhanced lighting descriptions with v3 compositing
     const lightingInstructions: Record<string, string> = {
-      natural: 'soft natural daylight with gentle shadows, ambient occlusion at contact points, subtle light wrap on edges (5-10%), color temperature 5500K',
-      studio: 'professional studio lighting with controlled soft shadows, precise contact shadow under product, clean highlights, neutral white balance',
-      dramatic: 'dramatic high-contrast lighting with strong directional shadows, deep ambient occlusion, rim light on edges, increased contrast',
-      neutral: 'even neutral lighting with minimal shadows, soft ambient light, balanced exposure'
+      natural: 'soft natural daylight with gentle shadows, ambient occlusion at contact points, subtle light wrap on edges (5-10%), color temperature 5500K, environment reflection mapping on glossy surfaces',
+      studio: 'professional 3-point studio lighting with key light at 45°, fill light at 30%, precise contact shadow under product, clean specular highlights, neutral 5000K white balance, rim light separation from background',
+      dramatic: 'dramatic chiaroscuro lighting with strong directional key, deep ambient occlusion, pronounced rim light on edges, increased contrast ratio 4:1, warm-cool color split, volumetric light rays where appropriate',
+      neutral: 'even neutral lighting with minimal shadows, soft ambient hemisphere light, balanced exposure, subtle gradient falloff at edges'
     };
 
     const availableScenes = scenePools[category] || scenePools['workspace'];
     const lightingInst = lightingInstructions[lighting] || lightingInstructions['natural'];
-    const intensity = styleIntensity || 5;
 
     // Determine how many unique scenes to use
     const scenesToUse = variantCount === 5 ? Math.min(4, availableScenes.length) : Math.min(7, availableScenes.length);
@@ -184,33 +255,45 @@ serve(async (req) => {
         const cameraSetup = cameraVariations[(variantNum - 1) % cameraVariations.length];
         const seed = Date.now() + variantNum * 1000 + Math.floor(Math.random() * 1000);
         
-        const prompt = `PRODUCT PHOTOGRAPHY SCENE - Background Environment Only
+        // v3 Enhanced prompt with advanced compositing
+        const prompt = `PROFESSIONAL PRODUCT PHOTOGRAPHY COMPOSITING — v3 Pro Quality
 
-Scene: ${scene.description}
-Props: ${scene.props || 'minimal'}
-Lighting: ${lightingInst}
+Scene Environment: ${scene.description}
+Scene Props: ${scene.props || 'minimal'}
+Lighting Setup: ${lightingInst}
 Camera: ${cameraSetup}
 Style Intensity: ${intensity}/10
 ${brandContext}
+${aiSuggestion ? `\nProduct Type: ${aiSuggestion.productType} — optimize scene for this product category` : ''}
 
-CRITICAL PRODUCT PLACEMENT RULES:
-1. NEVER CROP OR CUT OFF THE PRODUCT - keep it 100% intact and complete
-2. The product must remain FULLY VISIBLE - all edges must be within frame
+═══ PRODUCT PLACEMENT (CRITICAL) ═══
+1. NEVER CROP OR CUT OFF THE PRODUCT — keep it 100% intact and complete
+2. The product must remain FULLY VISIBLE — all edges within frame
 3. Leave 20% padding around the product on all sides
-4. Product should be CENTERED in the composition
-5. Background scene should complement but NOT overlap or obscure the product
+4. Product CENTERED in composition
+5. Background complements but NEVER overlaps or obscures the product
 
-COMPOSITING REQUIREMENTS:
-1. CONTACT SHADOW: Subtle soft shadow where product meets surface (3-8px blur)
-2. AMBIENT OCCLUSION: Very soft darkening at contact area (opacity 20-40%)
-3. LIGHT WRAP: Minimal light wrap on product edges (2-5% intensity only)
-4. COLOR HARMONY: Match scene color temperature to product
-5. DEPTH OF FIELD: Sharp product, background appropriate to camera settings
-6. REFLECTION: If surface is reflective, add 15-30% opacity reflection
+═══ PRO COMPOSITING PIPELINE ═══
+1. CONTACT SHADOW: Physically-accurate soft shadow where product meets surface
+   - Shadow angle matches key light direction
+   - Soft penumbra with 5-12px gaussian blur
+   - Shadow opacity 25-45% depending on lighting setup
+2. AMBIENT OCCLUSION: Subtle darkening at contact area (opacity 20-35%)
+   - Extended AO for heavier products, lighter for small items
+3. ENVIRONMENT REFLECTION MAPPING:
+   - If surface is reflective: 15-30% opacity reflection with fresnel falloff
+   - Distort reflection subtly to match surface texture
+4. LIGHT WRAP & COLOR BLEED:
+   - Minimal light wrap on product edges (2-5% intensity)
+   - Background color bleeding into shadow areas for integration
+5. COLOR TEMPERATURE MATCHING:
+   - Match scene white balance to product
+   - Ensure shadow color temperature shifts warm-to-cool naturally
+6. DEPTH OF FIELD: Sharp product, bokeh matched to camera f-stop setting
+7. ATMOSPHERIC PERSPECTIVE: Slight haze on distant background elements
 
-The product must appear naturally placed but COMPLETELY INTACT - no cropping, no cutting off edges.
-Variation ${variantNum}/${variantCount}: Scene "${scene.name}"
-Seed: ${seed}`;
+The product must appear NATURALLY PLACED but COMPLETELY INTACT.
+Variation ${variantNum}/${variantCount}: Scene "${scene.name}" | Seed: ${seed}`;
 
         console.log(`Generating variant ${variantNum}/${variantCount} (Scene: ${scene.name})...`);
 
@@ -222,7 +305,7 @@ Seed: ${seed}`;
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'google/gemini-2.5-flash-image-preview',
+              model: 'google/gemini-3.1-flash-image-preview',
               messages: [
                 {
                   role: 'user',
@@ -263,11 +346,63 @@ Seed: ${seed}`;
             imageUrl = imageUrl.value;
           }
 
-          // Calculate quality scores
-          const shadowScore = 75 + Math.floor(Math.random() * 20);
-          const colorScore = 80 + Math.floor(Math.random() * 15);
-          const overallScore = Math.round((shadowScore + colorScore) / 2);
-          const quality = overallScore >= 85 ? 'Excellent' : 'Good';
+          // ═══════════════════════════════════════════
+          // STEP 3: AI Quality Assessment per image
+          // ═══════════════════════════════════════════
+          let qualityScores = { overall: 80, shadow: 78, color: 82 };
+          let qualityLabel = 'Good';
+          
+          try {
+            const qualityResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'google/gemini-3-flash-preview',
+                messages: [{
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'text',
+                      text: 'Rate this product photography compositing quality. Assess: (1) Shadow realism at contact points, (2) Color harmony between product and background, (3) Overall compositing believability. Be strict — only truly excellent composites score above 85.'
+                    },
+                    { type: 'image_url', image_url: { url: imageUrl } }
+                  ]
+                }],
+                tools: [{
+                  type: 'function',
+                  function: {
+                    name: 'rate_quality',
+                    description: 'Rate the compositing quality',
+                    parameters: {
+                      type: 'object',
+                      properties: {
+                        overall: { type: 'number', description: 'Overall quality 0-100' },
+                        shadow: { type: 'number', description: 'Shadow realism 0-100' },
+                        color: { type: 'number', description: 'Color harmony 0-100' }
+                      },
+                      required: ['overall', 'shadow', 'color']
+                    }
+                  }
+                }],
+                tool_choice: { type: 'function', function: { name: 'rate_quality' } }
+              })
+            });
+
+            if (qualityResponse.ok) {
+              const qData = await qualityResponse.json();
+              const toolCall = qData.choices?.[0]?.message?.tool_calls?.[0];
+              if (toolCall?.function?.arguments) {
+                qualityScores = JSON.parse(toolCall.function.arguments);
+              }
+            }
+          } catch (qErr) {
+            console.warn('Quality assessment failed, using defaults:', qErr);
+          }
+
+          qualityLabel = qualityScores.overall >= 85 ? 'Excellent' : qualityScores.overall >= 70 ? 'Good' : 'Fair';
 
           results.push({
             id: `${category}-${scene.name}-${variantNum}`,
@@ -279,12 +414,8 @@ Seed: ${seed}`;
             sceneDescription: scene.description,
             cameraSetup,
             seed,
-            qualityScores: {
-              overall: overallScore,
-              shadow: shadowScore,
-              color: colorScore
-            },
-            quality,
+            qualityScores,
+            quality: qualityLabel,
             meta: {
               category,
               scene: scene.name,
@@ -295,9 +426,13 @@ Seed: ${seed}`;
             }
           });
 
-          console.log(`Variant ${variantNum} generated (${scene.name}, quality: ${overallScore}/100)`);
+          console.log(`Variant ${variantNum} generated (${scene.name}, quality: ${qualityScores.overall}/100 — ${qualityLabel})`);
         } catch (error) {
           console.error(`Error generating variant ${variantNum}:`, error);
+          // Re-throw rate limit / payment errors
+          if (error instanceof Error && (error.message.includes('Rate limit') || error.message.includes('Payment required'))) {
+            throw error;
+          }
         }
       }
     }
@@ -306,7 +441,6 @@ Seed: ${seed}`;
       throw new Error('Failed to generate any scenes');
     }
 
-    // Verify we got the requested count
     if (results.length < variantCount && results.length > 0) {
       console.warn(`Generated ${results.length} variants but ${variantCount} were requested`);
     }
@@ -334,11 +468,13 @@ Seed: ${seed}`;
 
     return new Response(JSON.stringify({ 
       results_json: results,
+      aiSuggestion,
       metadata: {
         category,
         variantCount: results.length,
         requestedCount: variantCount,
-        scenesUsed: selectedScenes.map(s => s.name)
+        scenesUsed: selectedScenes.map(s => s.name),
+        modelUsed: 'google/gemini-3.1-flash-image-preview'
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
