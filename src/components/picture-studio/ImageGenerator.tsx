@@ -13,7 +13,7 @@ import { useAICall } from "@/hooks/useAICall";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageCard } from "./ImageCard";
-import { ESTIMATED_COSTS } from "@/lib/featureCosts";
+import { FEATURE_COSTS, ESTIMATED_COSTS } from "@/lib/featureCosts";
 
 const STYLES = [
   { value: 'realistic', label: 'Realistisch' },
