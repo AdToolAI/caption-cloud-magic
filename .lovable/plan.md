@@ -1,38 +1,46 @@
 
 
-## TrendRadar Hauptseite - "Next Level" Media-First Redesign
+## TrendRadar "Lebendig machen" - Media & Teaser Upgrade
 
-Die bisherigen Aenderungen betrafen nur das **Modal** (TrendDetailModal.tsx). Die **Hauptseite** (`TrendRadar.tsx`) mit den Trend-Cards, Top-Trends und Nischen-Kategorien wurde noch nicht angefasst. Das aendern wir jetzt.
+### Was fehlt
+Die Seite ist trotz Glassmorphism und Gradients immer noch sehr **textlastig**. Es fehlen bewegte, lebendige Elemente die sofort Aufmerksamkeit erzeugen.
 
-### Was sich aendert
+### Neue Elemente
 
-**1. Top-Trends der Woche - Hero Cards mit Media-Thumbnails**
-- Statt flache Text-Cards: Grosse Cards mit gradient-basierten visuellen Thumbnails (aehnlich dem Medien-Tab-Design)
-- Hintergrund-Gradient basierend auf Plattform-Farbe (TikTok: pink-cyan, Instagram: purple-pink, etc.)
-- Scanline-Overlay und Glassmorphism-Effekte
-- Groessere Darstellung: Top 3 als Feature-Cards, Rest als kompaktere Row
+**1. Animated Trend-Ticker (Laufband)**
+- Horizontaler Marquee unter dem Hero-Header mit live scrollenden Trend-Namen
+- Neon-glowing Text, animierte Plattform-Icons
+- Erzeugt sofort das Gefuhl "hier passiert etwas"
 
-**2. Nischen-Kategorien - Glassmorphism Upgrade**
-- Groessere Icons mit Glow-Ring und Neon-Border auf Hover
-- Animierter Gradient-Hintergrund statt flacher Farbe
-- Aktive Kategorie mit pulsierendem Border-Glow
+**2. Top-Trends als Hero-Carousel mit Teaser-Cards**
+- Statt statisches 3er-Grid: Auto-rotierendes Carousel (alle 5s)
+- Jede Slide ist eine grosse, immersive Card mit:
+  - Animiertem Hintergrund-Gradient der sich langsam bewegt
+  - Grosser Trend-Name mit TypeWriter-Effekt
+  - 3 Key-Facts als animierte Chips die nacheinander einblenden
+  - "Jetzt analysieren" CTA mit Pulse-Glow
+- Dots-Navigation unten
 
-**3. Trend-Cards Grid - Visuelles Upgrade**
-- Jede Card bekommt einen visuellen Header-Bereich mit Plattform-Gradient (wie die Artikel-Thumbnails im Modal)
-- Plattform-Logo/Icon prominent im Gradient-Bereich
-- Popularity-Bar mit Neon-Glow-Effekt statt flachem Balken
-- Subtile Scanline-Textur im Hintergrund
-- Hover: Card hebt sich staerker, Border glowed in Plattform-Farbe
+**3. Trend-Cards mit Live-Teaser-Elementen**
+- Animiertes "TRENDING NOW" Badge mit Pulse auf heissen Trends (popularity > 85)
+- Mini animated chart-sparkline (SVG) die Popularitaet visuell zeigt statt nur Bar
+- Hover: Card flippt und zeigt Rueckseite mit Quick-Facts (Plattform, Zielgruppe, Top-Hashtag)
 
-**4. Filter-Bar Redesign**
-- Glassmorphism-Upgrade mit subtilen Neon-Borders
-- Such-Input mit animiertem Focus-Glow
-- Plattform-Dropdown mit Farb-Chips
+**4. Floating Stats-Counter Section**
+- Zwischen Top-Trends und Grid: animierte Zaehler
+- "127 Trends analysiert" / "23 neue heute" / "5 Plattformen"
+- Count-up Animation beim Scrollen ins Viewport
+
+**5. Category Cards mit animierten Preview-Icons**
+- Statt statische Emojis: Lottie-aehnliche CSS-Animationen (bounce, rotate, pulse je nach Kategorie)
+- Mini-Preview der Top-3 Trends als Hover-Tooltip
 
 ### Technische Aenderungen
 
 | Datei | Aenderung |
 |---|---|
-| `src/pages/TrendRadar.tsx` | Top-Trends Cards mit Gradient-Thumbnails, Trend-Cards mit visuellem Header, Filter-Bar Glassmorphism, Popularity-Bar Glow |
-| `src/components/trends/TrendRadarHeroHeader.tsx` | Feintuning der Glow-Effekte fuer Konsistenz |
+| `src/pages/TrendRadar.tsx` | Trend-Ticker Marquee, Hero-Carousel statt Grid, Floating Stats, Card-Flip auf Hover, Sparkline-Charts, "TRENDING NOW" Badges |
+| `src/components/trends/TrendRadarHeroHeader.tsx` | Platz fuer Ticker darunter |
+
+Keine neuen Dependencies - alles mit framer-motion, CSS-Animationen und inline SVG fuer Sparklines.
 
