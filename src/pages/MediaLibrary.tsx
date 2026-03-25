@@ -666,7 +666,7 @@ export default function MediaLibrary() {
       description: `Erstes Bild wird in Smart Background geladen...`,
     });
     
-    navigate('/background-replacer');
+    navigate('/picture-studio?tab=background');
   };
 
   const getSourceBadge = (source: string) => {
