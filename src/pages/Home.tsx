@@ -25,6 +25,8 @@ import { PRICING_V21 } from "@/config/pricing";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
 import { NicheTutorialModal } from "@/components/onboarding/NicheTutorialModal";
+import { WeekDayCard, type WeekPost } from "@/components/dashboard/WeekDayCard";
+import { WeekPostEditor } from "@/components/dashboard/WeekPostEditor";
 
 interface Post {
   id: string;
@@ -40,10 +42,14 @@ const Home = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
-  const [weekDays, setWeekDays] = useState<any[]>([]);
+  const [weekDays, setWeekDays] = useState<{ date: string; name: string; day: number; isToday: boolean; posts: WeekPost[] }[]>([]);
   const [loading, setLoading] = useState(false);
   const [showNicheTutorial, setShowNicheTutorial] = useState(false);
   const [nicheCheckDone, setNicheCheckDone] = useState(false);
+  const [editingPost, setEditingPost] = useState<WeekPost | null>(null);
+  const [editingDate, setEditingDate] = useState<string>("");
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState<string>("");
 
   // Performance KPI state
   const [performanceKPIs, setPerformanceKPIs] = useState({
@@ -190,89 +196,117 @@ const Home = () => {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Check for real calendar events first
+      // Get workspace ID
+      const { data: wsMember } = await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("user_id", user!.id)
+        .limit(1)
+        .maybeSingle();
+      
+      if (wsMember?.workspace_id) setWorkspaceId(wsMember.workspace_id);
+
+      // Build the next 7 days
+      const days: { date: string; name: string; day: number; isToday: boolean; posts: WeekPost[] }[] = [];
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + 7);
+
+      for (let i = 0; i < 7; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() + i);
+        days.push({
+          date: date.toISOString(),
+          name: date.toLocaleDateString(language, { weekday: "short" }),
+          day: date.getDate(),
+          isToday: i === 0,
+          posts: [],
+        });
+      }
+
+      // Fetch real calendar events for the week
       const { data: realEvents } = await supabase
         .from("calendar_events")
-        .select("id, title, channels, start_at, caption")
-        .gte("start_at", new Date().toISOString().split("T")[0])
-        .order("start_at", { ascending: true })
-        .limit(10);
+        .select("id, title, channels, start_at, caption, status, hashtags, assets_json")
+        .gte("start_at", startDate.toISOString().split("T")[0])
+        .lte("start_at", endDate.toISOString())
+        .order("start_at", { ascending: true });
 
-      if (realEvents && realEvents.length > 0) {
-        // Use real events
-        const today = new Date().toISOString().split("T")[0];
-        const todayEvents = realEvents
-          .filter((e) => e.start_at?.startsWith(today))
-          .map((e) => ({
-            id: e.id,
-            caption: e.caption || e.title || "Post",
-            platform: (e.channels?.[0] || "instagram") as Post["platform"],
-            status: "scheduled" as const,
-            scheduledTime: e.start_at ? new Date(e.start_at).toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" }) : "",
-          }));
-        setTodayPosts(todayEvents);
-      } else {
-        // Fallback: check for starter_week_plans
-        const { data: starterPlans } = await supabase
-          .from("starter_week_plans")
-          .select("*")
-          .eq("status", "suggested")
-          .order("suggested_date", { ascending: true });
+      // Fetch starter week plans
+      const { data: starterPlans } = await supabase
+        .from("starter_week_plans")
+        .select("*")
+        .order("suggested_date", { ascending: true });
 
-        if (starterPlans && starterPlans.length > 0) {
-          const today = new Date().toISOString().split("T")[0];
-          const todayStarter = starterPlans
-            .filter((p) => p.suggested_date === today)
-            .map((p) => ({
-              id: p.id,
-              caption: `💡 ${p.content_idea}`,
-              platform: (p.platform || "instagram") as Post["platform"],
-              status: "draft" as const,
-              scheduledTime: p.suggested_time?.slice(0, 5) || "12:00",
-            }));
-          setTodayPosts(todayStarter.length > 0 ? todayStarter : []);
-
-          // Build week from starter plans
-          const days = [];
-          for (let i = 0; i < 7; i++) {
-            const date = new Date();
-            date.setDate(date.getDate() + i);
-            const dateStr = date.toISOString().split("T")[0];
-            const dayPlans = starterPlans.filter((p) => p.suggested_date === dateStr);
-            days.push({
-              date: date.toISOString(),
-              name: date.toLocaleDateString(language, { weekday: "short" }),
-              day: date.getDate(),
-              isToday: i === 0,
-              posts: dayPlans.map((p) => ({ platform: p.platform })),
+      // Map real events to days
+      if (realEvents) {
+        for (const ev of realEvents) {
+          const evDate = ev.start_at?.split("T")[0];
+          const dayIdx = days.findIndex(d => d.date.split("T")[0] === evDate);
+          if (dayIdx >= 0) {
+            const evTime = ev.start_at ? new Date(ev.start_at).toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" }) : "12:00";
+            const mapStatus = (s: string): 'suggested' | 'scheduled' | 'published' => {
+              if (s === 'published') return 'published';
+              if (s === 'scheduled' || s === 'rendering' || s === 'publishing') return 'scheduled';
+              return 'suggested';
+            };
+            days[dayIdx].posts.push({
+              id: ev.id,
+              platform: (ev.channels?.[0] || "instagram") as WeekPost["platform"],
+              contentIdea: ev.title || ev.caption || "Post",
+              caption: ev.caption || undefined,
+              suggestedTime: evTime,
+              status: mapStatus(ev.status),
+              mediaUrl: Array.isArray(ev.assets_json) && ev.assets_json.length > 0 ? (ev.assets_json[0] as any)?.url : undefined,
+              hashtags: ev.hashtags || undefined,
+              sourceType: 'calendar_event',
+              sourceId: ev.id,
             });
           }
-          setWeekDays(days);
-          setLoading(false);
-          return;
-        } else {
-          setTodayPosts([]);
         }
       }
+
+      // Map starter plans to days (only where no calendar event exists)
+      if (starterPlans) {
+        for (const sp of starterPlans) {
+          const dayIdx = days.findIndex(d => d.date.split("T")[0] === sp.suggested_date);
+          if (dayIdx >= 0) {
+            // Don't duplicate if already a calendar event for same content
+            const alreadyHas = days[dayIdx].posts.some(p => p.sourceType === 'calendar_event');
+            if (!alreadyHas || sp.status === 'suggested') {
+              days[dayIdx].posts.push({
+                id: sp.id,
+                platform: (sp.platform || "instagram") as WeekPost["platform"],
+                contentIdea: sp.content_idea || "Post-Idee",
+                caption: undefined,
+                suggestedTime: sp.suggested_time?.slice(0, 5) || "12:00",
+                status: sp.status === 'scheduled' ? 'scheduled' : sp.status === 'published' ? 'published' : 'suggested',
+                hashtags: undefined,
+                sourceType: 'starter_plan',
+                sourceId: sp.id,
+              });
+            }
+          }
+        }
+      }
+
+      setWeekDays(days);
+
+      // Set today posts
+      const todayDate = new Date().toISOString().split("T")[0];
+      const todayWeekPosts = days.find(d => d.isToday)?.posts || [];
+      setTodayPosts(todayWeekPosts.map(p => ({
+        id: p.id,
+        caption: p.caption || `💡 ${p.contentIdea}`,
+        platform: p.platform,
+        status: p.status === 'published' ? 'published' as const : p.status === 'scheduled' ? 'scheduled' as const : 'draft' as const,
+        scheduledTime: p.suggestedTime,
+        mediaUrl: p.mediaUrl,
+      })));
     } catch (err) {
       console.error("Dashboard data error:", err);
       setTodayPosts([]);
     }
-
-    // Generate week calendar (next 7 days)
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() + i);
-      days.push({
-        date: date.toISOString(),
-        name: date.toLocaleDateString(language, { weekday: "short" }),
-        day: date.getDate(),
-        isToday: i === 0,
-        posts: [],
-      });
-    }
-    setWeekDays(days);
     setLoading(false);
   };
 
@@ -282,6 +316,36 @@ const Home = () => {
 
   const retry = async (postId: string) => {
     toast.success("Post wird erneut versucht...");
+  };
+
+  const handleEditPost = (post: WeekPost) => {
+    setEditingPost(post);
+    setEditingDate(post.id); // will be overridden below
+    setEditorOpen(true);
+  };
+
+  const handleUploadPost = (post: WeekPost) => {
+    setEditingPost(post);
+    setEditorOpen(true);
+  };
+
+  const handleAddPost = (date: string) => {
+    setEditingPost(null);
+    setEditingDate(date);
+    setEditorOpen(true);
+  };
+
+  const handleEditorSaved = () => {
+    loadDashboardData();
+  };
+
+  // Find the date string for an editing post
+  const getEditDate = () => {
+    if (editingPost) {
+      const day = weekDays.find(d => d.posts.some(p => p.id === editingPost.id));
+      return day?.date || editingDate;
+    }
+    return editingDate;
   };
 
   const getPlatformColor = (platform: string) => {
@@ -456,30 +520,33 @@ const Home = () => {
               </Button>
             }
           >
-            <Card className="rounded-2xl shadow-soft">
-              <CardContent className="p-6">
-                <div className="grid grid-cols-7 gap-4">
-                  {weekDays.map(day => (
-                    <div key={day.date} className="flex flex-col items-center">
-                      <span className="text-xs text-muted-foreground uppercase mb-2">{day.name}</span>
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold ${day.isToday ? 'bg-primary text-white' : 'bg-muted text-foreground'}`}>
-                        {day.day}
-                      </div>
-                      <div className="mt-2 flex flex-col gap-1">
-                        {day.posts.map((post: any, i: number) => (
-                          <div key={i} className={`w-8 h-1 rounded-full ${getPlatformColor(post.platform)}`} />
-                        ))}
-                      </div>
-                      {day.posts.length === 0 && (
-                        <span className="text-xs text-muted-foreground mt-2">–</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {weekDays.map(day => (
+                <WeekDayCard
+                  key={day.date}
+                  date={day.date}
+                  dayName={day.name}
+                  dayNumber={day.day}
+                  isToday={day.isToday}
+                  posts={day.posts}
+                  onEdit={handleEditPost}
+                  onUpload={handleUploadPost}
+                  onAddPost={handleAddPost}
+                />
+              ))}
+            </div>
           </Section>
         )}
+
+        {/* Week Post Editor */}
+        <WeekPostEditor
+          open={editorOpen}
+          onOpenChange={setEditorOpen}
+          post={editingPost}
+          date={getEditDate()}
+          workspaceId={workspaceId}
+          onSaved={handleEditorSaved}
+        />
 
         {/* Feature Cards Grid */}
         {user && (
