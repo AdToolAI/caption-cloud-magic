@@ -371,35 +371,55 @@ export default function TrendRadar() {
               initial="hidden"
               animate="visible"
             >
-              {categories.map((cat, index) => (
-                <motion.div
-                  key={cat.id}
-                  variants={itemVariants}
-                  whileHover={{ scale: 1.05, y: -5 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Card 
-                    className={`cursor-pointer transition-all duration-300 backdrop-blur-xl bg-card/60 border-white/10 
-                      bg-gradient-to-br ${cat.color} ${cat.glowColor}
-                      ${categoryFilter === cat.id 
-                        ? 'ring-2 ring-primary shadow-[0_0_30px_hsla(43,90%,68%,0.3)] border-primary/50' 
-                        : 'hover:border-primary/30'
-                      }`}
-                    onClick={() => setCategoryFilter(categoryFilter === cat.id ? 'all' : cat.id)}
+              {categories.map((cat) => {
+                const isActive = categoryFilter === cat.id;
+                return (
+                  <motion.div
+                    key={cat.id}
+                    variants={itemVariants}
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    whileTap={{ scale: 0.98 }}
                   >
-                    <CardContent className="p-4 text-center space-y-2">
-                      <motion.div 
-                        className="text-3xl"
-                        animate={categoryFilter === cat.id ? { scale: [1, 1.2, 1] } : {}}
-                        transition={{ duration: 0.5 }}
-                      >
-                        {cat.icon}
-                      </motion.div>
-                      <p className="font-semibold text-sm">{cat.name}</p>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
+                    <Card 
+                      className={`cursor-pointer transition-all duration-500 backdrop-blur-xl border overflow-hidden relative
+                        ${isActive 
+                          ? 'bg-gradient-to-br ' + cat.color + ' border-primary/50 shadow-[0_0_40px_hsla(43,90%,68%,0.3)]' 
+                          : 'bg-card/40 border-white/10 hover:border-primary/30 ' + cat.glowColor
+                        }`}
+                      onClick={() => setCategoryFilter(isActive ? 'all' : cat.id)}
+                    >
+                      {/* Animated border glow for active */}
+                      {isActive && (
+                        <motion.div
+                          className="absolute inset-0 rounded-2xl"
+                          animate={{
+                            boxShadow: [
+                              'inset 0 0 20px hsla(43,90%,68%,0.1)',
+                              'inset 0 0 30px hsla(43,90%,68%,0.2)',
+                              'inset 0 0 20px hsla(43,90%,68%,0.1)',
+                            ]
+                          }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        />
+                      )}
+                      <CardContent className="p-5 text-center space-y-3 relative z-10">
+                        <motion.div 
+                          className={`text-4xl mx-auto w-14 h-14 flex items-center justify-center rounded-xl ${
+                            isActive 
+                              ? 'bg-primary/20 shadow-[0_0_25px_hsla(43,90%,68%,0.4)]' 
+                              : 'bg-muted/20'
+                          } transition-all duration-300`}
+                          animate={isActive ? { scale: [1, 1.1, 1] } : {}}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                        >
+                          {cat.icon}
+                        </motion.div>
+                        <p className={`font-semibold text-sm ${isActive ? 'text-primary' : ''}`}>{cat.name}</p>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                );
+              })}
             </motion.div>
           </motion.div>
 
