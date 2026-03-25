@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Check, Zap } from 'lucide-react';
+import { Sparkles, Check, Zap, Target, Clock, Hash } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,6 +26,30 @@ interface Recommendation {
   href: string;
 }
 
+const BEGINNER_RECOMMENDATIONS: Recommendation[] = [
+  {
+    id: 'beginner_1',
+    icon: Target,
+    text: 'Poste mindestens 3x pro Woche für stetiges Wachstum',
+    impact: 'Grundlage',
+    href: '/calendar',
+  },
+  {
+    id: 'beginner_2',
+    icon: Clock,
+    text: 'Probiere verschiedene Uhrzeiten und beobachte dein Engagement',
+    impact: 'Strategie',
+    href: '/performance',
+  },
+  {
+    id: 'beginner_3',
+    icon: Hash,
+    text: 'Verwende 5–10 relevante Hashtags pro Post',
+    impact: 'Reichweite',
+    href: '/composer',
+  },
+];
+
 function mapInsightsToRecommendations(insights: InsightCardData[]): Recommendation[] {
   return insights.slice(0, 3).map((insight, i) => ({
     id: `insight_${i}`,
@@ -43,6 +67,7 @@ export const RecoCard = () => {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [isBeginnerMode, setIsBeginnerMode] = useState(false);
 
   useEffect(() => {
     fetchRecommendations();
@@ -64,7 +89,8 @@ export const RecoCard = () => {
       if (error) throw error;
 
       if (!posts || posts.length < 10) {
-        setRecommendations([]);
+        setIsBeginnerMode(true);
+        setRecommendations(BEGINNER_RECOMMENDATIONS);
         setLoading(false);
         return;
       }
@@ -100,7 +126,7 @@ export const RecoCard = () => {
 
   const ffEnabled = FEATURE_FLAGS.ff_reco_card;
 
-  if (!ffEnabled || (!loading && recommendations.length === 0)) return null;
+  if (!ffEnabled) return null;
 
   return (
     <motion.div
@@ -121,7 +147,7 @@ export const RecoCard = () => {
               <Sparkles className="h-5 w-5 text-primary" />
             </motion.div>
             <h3 className="text-lg font-semibold text-foreground">
-              KI-Empfehlungen für dich
+              {isBeginnerMode ? 'Starter-Tipps für dich' : 'KI-Empfehlungen für dich'}
             </h3>
             <motion.div
               animate={{ scale: [1, 1.2, 1] }}
@@ -229,7 +255,9 @@ export const RecoCard = () => {
               transition={{ duration: 2, repeat: Infinity }}
               className="w-2 h-2 rounded-full bg-accent"
             />
-            Basierend auf deinen Performance-Daten der letzten 28 Tage
+            {isBeginnerMode
+              ? 'Ab 10 Posts erhältst du personalisierte KI-Empfehlungen'
+              : 'Basierend auf deinen Performance-Daten der letzten 28 Tage'}
           </p>
         </div>
       </Card>
