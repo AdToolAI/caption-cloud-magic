@@ -673,11 +673,27 @@ export default function TrendRadar() {
             >
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <motion.div key={i} variants={itemVariants}>
-                  <Card className="backdrop-blur-xl bg-card/60 border-white/10 overflow-hidden">
-                    <CardContent className="p-6 space-y-4">
-                      <div className="h-6 bg-gradient-to-r from-muted/50 via-muted to-muted/50 rounded animate-pulse" />
-                      <div className="h-4 bg-gradient-to-r from-muted/50 via-muted to-muted/50 rounded w-3/4 animate-pulse" />
-                      <div className="h-20 bg-gradient-to-r from-muted/50 via-muted to-muted/50 rounded animate-pulse" />
+                  <Card className="backdrop-blur-xl bg-card/40 border-white/10 overflow-hidden">
+                    {/* Skeleton gradient header */}
+                    <div className="h-28 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-muted/60 via-muted/40 to-muted/60 animate-pulse" />
+                      <motion.div
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent"
+                        animate={{ x: ['-100%', '200%'] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                      />
+                    </div>
+                    <CardContent className="p-5 space-y-3">
+                      <div className="h-5 bg-gradient-to-r from-muted/50 via-muted to-muted/50 rounded-lg animate-pulse w-3/4" />
+                      <div className="h-4 bg-gradient-to-r from-muted/50 via-muted to-muted/50 rounded-lg animate-pulse w-full" />
+                      <div className="h-4 bg-gradient-to-r from-muted/50 via-muted to-muted/50 rounded-lg animate-pulse w-1/2" />
+                      <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 rounded-full"
+                          animate={{ width: ['30%', '70%', '30%'] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        />
+                      </div>
                     </CardContent>
                   </Card>
                 </motion.div>
