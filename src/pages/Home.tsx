@@ -304,6 +304,7 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {showNicheTutorial && <NicheTutorialModal onComplete={handleTutorialComplete} />}
       <SEO
         title={language === "de" ? "KI Social Media Manager" : language === "es" ? "Gestor de Redes Sociales con IA" : "AI Social Media Manager"}
         description={language === "de" 
