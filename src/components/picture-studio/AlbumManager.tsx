@@ -170,8 +170,26 @@ export function AlbumManager() {
     if (selectedImageId) {
       setUnsortedImages(prev => prev.filter(img => img.id !== selectedImageId));
       setSelectedImageId(null);
-      // Refresh album counts
       loadAlbums();
+    }
+  };
+
+  const handleDeleteImage = async (image: any) => {
+    if (!image.id) return;
+    try {
+      const url = new URL(image.url);
+      const pathMatch = url.pathname.match(/\/object\/public\/background-projects\/(.+)/);
+      if (pathMatch) {
+        await supabase.storage.from('background-projects').remove([pathMatch[1]]);
+      }
+      await supabase.from('studio_images').delete().eq('id', image.id);
+      setUnsortedImages(prev => prev.filter(img => img.id !== image.id));
+      setAlbumImages(prev => prev.filter(img => img.id !== image.id));
+      toast.success("Bild gelöscht 🗑️");
+      loadAlbums();
+    } catch (err) {
+      console.error(err);
+      toast.error("Fehler beim Löschen");
     }
   };
 
