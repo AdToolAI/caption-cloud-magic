@@ -159,11 +159,33 @@ const Home = () => {
   // Transform API data to heatmap format
   const heatmapData = transformPostingSlotsToHeatmap(postingTimesData, 7);
 
+  // Check if user has onboarding profile
   useEffect(() => {
-    if (user) {
+    if (!user) return;
+    const checkOnboardingProfile = async () => {
+      const { data } = await supabase
+        .from("onboarding_profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!data) {
+        setShowNicheTutorial(true);
+      }
+      setNicheCheckDone(true);
+    };
+    checkOnboardingProfile();
+  }, [user]);
+
+  useEffect(() => {
+    if (user && nicheCheckDone && !showNicheTutorial) {
       loadDashboardData();
     }
-  }, [user]);
+  }, [user, nicheCheckDone, showNicheTutorial]);
+
+  const handleTutorialComplete = () => {
+    setShowNicheTutorial(false);
+    loadDashboardData();
+  };
 
   const loadDashboardData = async () => {
     setLoading(true);
