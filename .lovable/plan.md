@@ -1,66 +1,47 @@
 
-## Fix: Edge Function failed beim Bild-Generieren
 
-### Ursache
-Ich habe die Runtime-Logs der Backend-Funktion geprüft. Der Fehler ist **nicht mehr CORS** und auch **nicht Deploy**.
+## Album-Zuordnung fuer Bilder: Ordner-Button, Drag & Drop, Auto-Ausblenden
 
-Der echte Fehler ist:
+### Uebersicht
+Der FolderPlus-Button auf Bildern oeffnet ein Popover/Dialog mit Album-Auswahl. Bilder koennen per Drag & Drop auf Album-Karten gezogen werden. Nach Zuordnung verschwinden sie aus der Generierungs-Ansicht.
 
-```text
-Upload error: StorageApiError: new row violates row-level security policy
-Failed to upload image
-```
+### Aenderungen
 
-### Exaktes Problem
-In `supabase/functions/generate-studio-image/index.ts` wird aktuell in diesen Pfad hochgeladen:
+#### 1. Neue Komponente: `src/components/picture-studio/SaveToAlbumDialog.tsx`
+- Dialog mit Liste aller bestehenden Alben (aus `studio_albums`)
+- Button "Neues Album erstellen" mit Inline-Input
+- Klick auf Album → `UPDATE studio_images SET album_id = X WHERE id = Y`
+- Toast-Bestaetigung, Callback zum Entfernen des Bildes aus der aktuellen Liste
 
-```ts
-studio/${user.id}/${Date.now()}_${style}.png
-```
+#### 2. `src/components/picture-studio/ImageGenerator.tsx`
+- State: `albums` laden beim Mount (einfacher Supabase-Query)
+- `onSaveToAlbum` Handler: oeffnet den `SaveToAlbumDialog`
+- Nach erfolgreichem Speichern: Bild aus `generatedImages` entfernen
+- `onSaveToAlbum` an jede `ImageCard` weitergeben
 
-Die Storage-Policy fuer den Bucket `background-projects` verlangt aber, dass **der erste Ordnername die User-ID ist**:
+#### 3. `src/components/picture-studio/ImageCard.tsx`
+- Der FolderPlus-Button ruft bereits `onSaveToAlbum` auf — das funktioniert schon, es fehlt nur der Handler
+- Drag-Support hinzufuegen: `draggable`, `onDragStart` setzt `image`-Daten ins DataTransfer
 
-```sql
-auth.uid()::text = (storage.foldername(name))[1]
-```
+#### 4. `src/components/picture-studio/AlbumManager.tsx`
+- Album-Karten als Drop-Targets: `onDragOver`, `onDrop`
+- Bei Drop: `album_id` updaten, Bild aus `unsortedImages` entfernen, Album-Count erhoehen
+- Visuelles Feedback: Border-Highlight beim Drag-Over
 
-Das heisst:
-- aktuell: erster Ordner = `studio` -> **RLS blockiert**
-- korrekt: erster Ordner = `user.id` -> **Upload erlaubt**
+#### 5. `src/pages/PictureStudio.tsx`
+- Shared State oder Callback zwischen `ImageGenerator` und `AlbumManager` (z.B. `onImageSaved` Callback der die Album-Daten refreshed)
+- Alternativ: Einfacher Ansatz — jeder Tab laedt seine eigenen Daten beim Mount
 
-Zum Vergleich: Der bestehende Smart-Background-Code in `src/pages/BackgroundReplacer.tsx` nutzt bereits korrekt:
-
-```ts
-${user.id}/${Date.now()}...
-```
-
-### Aenderung
-#### `supabase/functions/generate-studio-image/index.ts`
-Den Upload-Pfad an die bestehende Bucket-Policy anpassen, z. B.:
-
-```ts
-const fileName = `${user.id}/studio/${Date.now()}_${style}.png`;
-```
-
-oder einfacher:
-
-```ts
-const fileName = `${user.id}/${Date.now()}_${style}.png`;
-```
-
-Wichtig ist nur: **`user.id` muss der erste Pfadteil sein**.
-
-### Zusaetzliche Haertung
-In derselben Funktion verbessere ich noch die Fehlerbehandlung:
-- Storage-Fehler klar loggen
-- bei Upload-Fehlern eine praezisere Fehlermeldung zurueckgeben statt nur generischem 500
+### Technische Details
+- Drag & Drop: Native HTML5 `draggable` + DataTransfer API (kein Extra-Library noetig)
+- Album-Query: `supabase.from('studio_albums').select('id, name').eq('user_id', user.id)`
+- Image-Update: `supabase.from('studio_images').update({ album_id }).eq('id', imageId)`
+- SaveToAlbumDialog zeigt Alben als klickbare Liste + "Neu erstellen" Option
 
 ### Dateien
-1. `supabase/functions/generate-studio-image/index.ts` — Upload-Pfad korrigieren
-2. optional derselbe File — klarere Storage-Error-Responses
+1. `src/components/picture-studio/SaveToAlbumDialog.tsx` — NEU
+2. `src/components/picture-studio/ImageGenerator.tsx` — onSaveToAlbum Handler + Album-State
+3. `src/components/picture-studio/ImageCard.tsx` — draggable + onSaveToAlbum durchreichen
+4. `src/components/picture-studio/AlbumManager.tsx` — Drop-Targets auf Album-Karten
+5. `src/pages/PictureStudio.tsx` — ggf. minimale Anpassung fuer Tab-Kommunikation
 
-### Ergebnis nach dem Fix
-- Bildgenerierung laeuft durch
-- Datei wird korrekt im Bucket gespeichert
-- `studio_images` kann anschliessend normal beschrieben werden
-- der 500-Fehler beim Funktionsaufruf verschwindet
