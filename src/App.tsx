@@ -100,6 +100,7 @@ const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const HubPage = lazy(() => import("./pages/HubPage"));
+const Community = lazy(() => import("./pages/Community"));
 
 const queryClient = new QueryClient();
 
