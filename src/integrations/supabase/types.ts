@@ -2811,6 +2811,39 @@ export type Database = {
         }
         Relationships: []
       }
+      collaboration_posts: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          skills_needed: string[]
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          skills_needed?: string[]
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          skills_needed?: string[]
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       comment_analysis: {
         Row: {
           action: string | null
@@ -3926,6 +3959,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      direct_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          read_at: string | null
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: []
       }
       director_cut_enhancements: {
         Row: {
@@ -5304,6 +5364,33 @@ export type Database = {
           plan_code?: string
           storage_quota_mb?: number
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      platform_announcements: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          priority: string
+          title: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          priority?: string
+          title: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          priority?: string
+          title?: string
         }
         Relationships: []
       }
