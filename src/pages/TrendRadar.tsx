@@ -491,54 +491,92 @@ export default function TrendRadar() {
               </div>
               
               <motion.div 
-                className="grid gap-4 md:grid-cols-2 lg:grid-cols-5"
+                className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
               >
-                {topTrends.map((trend, index) => (
-                  <motion.div
-                    key={trend.id}
-                    variants={itemVariants}
-                    whileHover={{ y: -8, scale: 1.02 }}
-                  >
-                    <Card 
-                      className="relative overflow-hidden cursor-pointer group backdrop-blur-xl bg-card/60 border-white/10 hover:border-primary/50 hover:shadow-[0_0_30px_hsla(43,90%,68%,0.15)] transition-all duration-300"
-                      onClick={() => analyzeTrend(trend)}
+                {topTrends.map((trend, index) => {
+                  const isFeatured = index === 0;
+                  const platformGradient = (() => {
+                    switch (trend.platform) {
+                      case 'tiktok': return 'from-pink-600 via-purple-600 to-cyan-500';
+                      case 'instagram': return 'from-purple-600 via-pink-500 to-orange-400';
+                      case 'youtube': return 'from-red-700 via-red-600 to-red-500';
+                      case 'linkedin': return 'from-blue-700 via-blue-600 to-blue-500';
+                      case 'twitter': return 'from-sky-600 via-sky-500 to-blue-400';
+                      default: return 'from-primary via-purple-500 to-pink-500';
+                    }
+                  })();
+                  return (
+                    <motion.div
+                      key={trend.id}
+                      variants={itemVariants}
+                      whileHover={{ y: -8, scale: 1.02 }}
+                      className={isFeatured ? 'md:col-span-2 lg:col-span-1' : ''}
                     >
-                      {/* Ranking Badge */}
-                      <motion.div 
-                        className="absolute top-2 left-2 z-10 flex items-center justify-center w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-full text-white font-bold text-sm shadow-[0_0_15px_hsla(30,80%,50%,0.5)]"
-                        whileHover={{ scale: 1.1, rotate: 10 }}
+                      <Card 
+                        className="relative overflow-hidden cursor-pointer group backdrop-blur-xl bg-card/40 border-white/10 hover:border-primary/50 hover:shadow-[0_0_40px_hsla(43,90%,68%,0.2)] transition-all duration-500 h-full"
+                        onClick={() => analyzeTrend(trend)}
                       >
-                        #{index + 1}
-                      </motion.div>
-
-                      <CardContent className="p-6 space-y-3">
-                        <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getPlatformColor(trend.platform)}`}>
-                          {trend.platform}
-                        </div>
-                        <h3 className="font-bold text-lg group-hover:text-primary transition-colors">
-                          {trend.name}
-                        </h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {trend.description}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-muted/50 rounded-full h-2 overflow-hidden">
-                            <motion.div 
-                              className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full"
-                              initial={{ width: 0 }}
-                              animate={{ width: `${trend.popularity_index}%` }}
-                              transition={{ duration: 1, delay: index * 0.1 }}
-                            />
+                        {/* Platform Gradient Header with Scanlines */}
+                        <div className={`relative h-32 bg-gradient-to-br ${platformGradient} overflow-hidden`}>
+                          {/* Scanline overlay */}
+                          <div className="absolute inset-0 opacity-10" style={{
+                            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)',
+                          }} />
+                          {/* Animated shimmer */}
+                          <motion.div
+                            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent"
+                            animate={{ x: ['-100%', '200%'] }}
+                            transition={{ duration: 3, repeat: Infinity, repeatDelay: 2, ease: 'easeInOut' }}
+                          />
+                          {/* Ranking Badge */}
+                          <motion.div 
+                            className="absolute top-3 left-3 z-10 flex items-center justify-center w-10 h-10 bg-black/40 backdrop-blur-md rounded-full text-white font-bold text-base border border-white/20 shadow-[0_0_20px_hsla(0,0%,100%,0.2)]"
+                            whileHover={{ scale: 1.15, rotate: 10 }}
+                          >
+                            #{index + 1}
+                          </motion.div>
+                          {/* Platform label */}
+                          <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-xs font-semibold border border-white/20 uppercase tracking-wider">
+                            {trend.platform}
                           </div>
-                          <span className="text-xs font-bold text-orange-400">{trend.popularity_index}</span>
+                          {/* Popularity score */}
+                          <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-sm font-bold border border-white/20">
+                            🔥 {trend.popularity_index}
+                          </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))}
+
+                        <CardContent className="p-5 space-y-3">
+                          <h3 className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-2">
+                            {trend.name}
+                          </h3>
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {trend.description}
+                          </p>
+                          {/* Neon Popularity Bar */}
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-muted/30 rounded-full h-2 overflow-hidden relative">
+                              <motion.div 
+                                className={`bg-gradient-to-r ${platformGradient} h-2 rounded-full relative`}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${trend.popularity_index}%` }}
+                                transition={{ duration: 1.2, delay: index * 0.1, ease: 'easeOut' }}
+                              />
+                              <motion.div
+                                className={`absolute top-0 left-0 h-2 rounded-full bg-gradient-to-r ${platformGradient} blur-sm opacity-60`}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${trend.popularity_index}%` }}
+                                transition={{ duration: 1.2, delay: index * 0.1, ease: 'easeOut' }}
+                              />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
               </motion.div>
             </motion.div>
           )}
