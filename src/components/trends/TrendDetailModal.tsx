@@ -60,8 +60,9 @@ interface RelatedArticle {
 
 interface RelatedVideo {
   title: string;
-  channel: string;
-  video_id: string;
+  search_url: string;
+  thumbnail: string | null;
+  query: string;
 }
 
 interface AnalysisData {
