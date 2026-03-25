@@ -1,18 +1,37 @@
 
 
-## Suchleiste weiter links + breiter machen
+## Naechster Post: immer den echten naechsten zeigen + Reschedule fuer alle Tage
 
-### Aenderung in `src/components/layout/AppHeader.tsx`
+### Problem
+1. Die Reschedule-Logik (Zeile 307-308) prueft nur `isToday` — Posts von vergangenen Tagen werden nie als "missed" markiert oder neu geplant
+2. Wenn ein Post auf "09:00" am naechsten Tag verschoben wird, bleibt er trotzdem auf der alten Tageskarte — er wird nicht wirklich auf den naechsten Tag verschoben
+3. `getNextPost()` zeigt dadurch manchmal veraltete Posts
 
-1. **`ml-auto` entfernen** vom CommandBar+SocialIcons Container (Zeile 48) — damit rutscht der Block nach links
-2. **`max-w-md` durch `max-w-2xl`** ersetzen (Zeile 49) — macht die Suchleiste ca. 1,5x breiter (md=28rem → 2xl=42rem)
-3. **`flex-1`** beibehalten damit die Leiste den verfuegbaren Platz nutzt
+### Aenderungen in `src/pages/Home.tsx`
+
+#### 1. Reschedule-Logik erweitern (Zeile 303-329)
+
+Statt nur `isToday` zu pruefen, alle Tage durchgehen deren Datum+Uhrzeit in der Vergangenheit liegt:
 
 ```text
-Vorher:  [Brand] .................. [CommandBar(max-w-md)] [SocialIcons]  gap-12  [Actions]
-Nachher: [Brand] ... [CommandBar(max-w-2xl)] [SocialIcons]               gap-12  [Actions]
+Fuer jeden Tag in days:
+  Fuer jeden Post (nicht published):
+    postDateTime = day.date + suggestedTime
+    if (now > postDateTime):
+      originalTime = suggestedTime
+      newDateTime = postDateTime + 6 Stunden
+      if newDateTime < now: newDateTime = now + 6h (aufgerundet auf halbe Stunde)
+      if newDateTime.hours >= 22: naechster Tag 09:00
+      → Post auf neuen Tag verschieben (aus altem Tag entfernen, in neuen Tag einfuegen)
+      status = 'missed'
 ```
 
-### Datei
-- `src/components/layout/AppHeader.tsx` — Zeile 48-49 anpassen
+Kernpunkt: Posts werden tatsaechlich auf den richtigen zukuenftigen Tag verschoben, nicht nur die Uhrzeit geaendert.
+
+#### 2. getNextPost() bleibt wie es ist
+
+Wenn die Reschedule-Logik korrekt Posts in die Zukunft verschiebt, findet `getNextPost()` automatisch den richtigen naechsten Post.
+
+### Dateien
+- `src/pages/Home.tsx` — Reschedule-Block (Zeile 303-329) neu schreiben
 
