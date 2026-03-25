@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { FolderPlus, Image as ImageIcon, ArrowLeft, Trash2, Pencil, Loader2 } from "lucide-react";
+import { FolderPlus, Image as ImageIcon, ArrowLeft, Trash2, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageCard } from "./ImageCard";
+import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 
 interface Album {
   id: string;
@@ -39,6 +40,11 @@ export function AlbumManager() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newAlbumName, setNewAlbumName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [dragOverAlbumId, setDragOverAlbumId] = useState<string | null>(null);
+
+  // Album dialog for unsorted images
+  const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) loadAlbums();
@@ -54,7 +60,6 @@ export function AlbumManager() {
       ]);
 
       if (albumsRes.data) {
-        // Get image counts per album
         const { data: countData } = await supabase
           .from('studio_images')
           .select('album_id')
@@ -111,6 +116,61 @@ export function AlbumManager() {
     if (!error) {
       toast.success("Album gelöscht");
       setSelectedAlbum(null);
+      loadAlbums();
+    }
+  };
+
+  // Drag & Drop handlers
+  const handleDragOver = (e: React.DragEvent, albumId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverAlbumId(albumId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverAlbumId(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, albumId: string) => {
+    e.preventDefault();
+    setDragOverAlbumId(null);
+
+    try {
+      const imageData = JSON.parse(e.dataTransfer.getData('application/json'));
+      if (!imageData?.id) return;
+
+      const { error } = await supabase
+        .from('studio_images')
+        .update({ album_id: albumId })
+        .eq('id', imageData.id);
+
+      if (error) {
+        toast.error("Fehler beim Verschieben");
+        return;
+      }
+
+      toast.success("Bild verschoben! 📁");
+      // Remove from unsorted + update album count
+      setUnsortedImages(prev => prev.filter(img => img.id !== imageData.id));
+      setAlbums(prev => prev.map(a =>
+        a.id === albumId ? { ...a, image_count: (a.image_count || 0) + 1 } : a
+      ));
+    } catch {
+      // Invalid drag data
+    }
+  };
+
+  const handleSaveToAlbum = (image: any) => {
+    if (!image.id) return;
+    setSelectedImageId(image.id);
+    setAlbumDialogOpen(true);
+  };
+
+  const handleUnsortedImageSaved = () => {
+    if (selectedImageId) {
+      setUnsortedImages(prev => prev.filter(img => img.id !== selectedImageId));
+      setSelectedImageId(null);
+      // Refresh album counts
       loadAlbums();
     }
   };
@@ -177,8 +237,13 @@ export function AlbumManager() {
             transition={{ delay: i * 0.05 }}
           >
             <Card
-              className="cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group overflow-hidden"
+              className={`cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group overflow-hidden ${
+                dragOverAlbumId === album.id ? 'border-primary border-2 shadow-lg shadow-primary/20 scale-[1.02]' : ''
+              }`}
               onClick={() => loadAlbumImages(album)}
+              onDragOver={(e) => handleDragOver(e, album.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, album.id)}
             >
               <div className="aspect-video bg-muted/30 relative overflow-hidden">
                 {album.cover_image_url ? (
@@ -186,6 +251,11 @@ export function AlbumManager() {
                 ) : (
                   <div className="flex items-center justify-center h-full">
                     <FolderPlus className="h-8 w-8 text-muted-foreground/30" />
+                  </div>
+                )}
+                {dragOverAlbumId === album.id && (
+                  <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                    <FolderPlus className="h-8 w-8 text-primary animate-pulse" />
                   </div>
                 )}
               </div>
@@ -203,13 +273,16 @@ export function AlbumManager() {
         <div>
           <h4 className="text-md font-medium mb-3 text-muted-foreground">Unsortierte Bilder ({unsortedImages.length})</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {unsortedImages.map((img, i) => (
-              <ImageCard
-                key={img.id}
-                image={{ id: img.id, url: img.image_url, prompt: img.prompt || undefined, style: img.style || undefined }}
-                index={i}
-              />
-            ))}
+            <AnimatePresence>
+              {unsortedImages.map((img, i) => (
+                <ImageCard
+                  key={img.id}
+                  image={{ id: img.id, url: img.image_url, prompt: img.prompt || undefined, style: img.style || undefined }}
+                  index={i}
+                  onSaveToAlbum={handleSaveToAlbum}
+                />
+              ))}
+            </AnimatePresence>
           </div>
         </div>
       )}
@@ -243,6 +316,16 @@ export function AlbumManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Save to Album Dialog for unsorted images */}
+      {selectedImageId && (
+        <SaveToAlbumDialog
+          open={albumDialogOpen}
+          onOpenChange={setAlbumDialogOpen}
+          imageId={selectedImageId}
+          onSaved={handleUnsortedImageSaved}
+        />
+      )}
     </div>
   );
 }

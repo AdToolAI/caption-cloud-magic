@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X } from "lucide-react";
@@ -13,6 +12,7 @@ import { useAICall } from "@/hooks/useAICall";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageCard } from "./ImageCard";
+import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 import { FEATURE_COSTS, ESTIMATED_COSTS } from "@/lib/featureCosts";
 
 const STYLES = [
@@ -65,6 +65,10 @@ export function ImageGenerator() {
   const [editMode, setEditMode] = useState(false);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+  
+  // Album save state
+  const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
+  const [selectedImageForAlbum, setSelectedImageForAlbum] = useState<GeneratedImage | null>(null);
 
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -120,6 +124,22 @@ export function ImageGenerator() {
       if (error.code !== 'INSUFFICIENT_CREDITS') {
         toast.error(error.message || "Fehler bei der Bildgenerierung");
       }
+    }
+  };
+
+  const handleSaveToAlbum = (image: GeneratedImage) => {
+    if (!image.id) {
+      toast.error("Dieses Bild hat keine ID — bitte warte bis es gespeichert ist.");
+      return;
+    }
+    setSelectedImageForAlbum(image);
+    setAlbumDialogOpen(true);
+  };
+
+  const handleImageSaved = () => {
+    if (selectedImageForAlbum) {
+      setGeneratedImages(prev => prev.filter(img => img.id !== selectedImageForAlbum.id));
+      setSelectedImageForAlbum(null);
     }
   };
 
@@ -232,13 +252,30 @@ export function ImageGenerator() {
               Generierte Bilder ({generatedImages.length})
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {generatedImages.map((img, i) => (
-                <ImageCard key={img.url + i} image={img} index={i} />
-              ))}
+              <AnimatePresence>
+                {generatedImages.map((img, i) => (
+                  <ImageCard
+                    key={img.id || img.url}
+                    image={img}
+                    index={i}
+                    onSaveToAlbum={handleSaveToAlbum}
+                  />
+                ))}
+              </AnimatePresence>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Save to Album Dialog */}
+      {selectedImageForAlbum?.id && (
+        <SaveToAlbumDialog
+          open={albumDialogOpen}
+          onOpenChange={setAlbumDialogOpen}
+          imageId={selectedImageForAlbum.id}
+          onSaved={handleImageSaved}
+        />
+      )}
     </div>
   );
 }

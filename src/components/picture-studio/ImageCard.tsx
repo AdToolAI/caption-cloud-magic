@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Download, FolderPlus, Copy, Maximize2 } from "lucide-react";
+import { Download, FolderPlus, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -33,12 +33,21 @@ export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLight
     URL.revokeObjectURL(url);
   };
 
+  const handleDragStart = (e: React.DragEvent) => {
+    if (!image.id) return;
+    e.dataTransfer.setData('application/json', JSON.stringify(image));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
       transition={{ delay: index * 0.08, duration: 0.4 }}
       className="group relative rounded-xl overflow-hidden border border-border/50 bg-card/50 backdrop-blur-sm hover:border-primary/40 hover:shadow-[0_0_20px_rgba(var(--primary),0.15)] transition-all duration-300"
+      draggable={!!image.id}
+      onDragStart={handleDragStart}
     >
       <div className="aspect-square overflow-hidden cursor-pointer" onClick={() => onOpenLightbox?.(image)}>
         <img
@@ -65,9 +74,11 @@ export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLight
           <Button size="icon" variant="ghost" className="h-7 w-7 bg-muted/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleDownload(); }}>
             <Download className="h-3.5 w-3.5" />
           </Button>
-          <Button size="icon" variant="ghost" className="h-7 w-7 bg-muted/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); onSaveToAlbum?.(image); }}>
-            <FolderPlus className="h-3.5 w-3.5" />
-          </Button>
+          {onSaveToAlbum && (
+            <Button size="icon" variant="ghost" className="h-7 w-7 bg-muted/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); onSaveToAlbum(image); }}>
+              <FolderPlus className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button size="icon" variant="ghost" className="h-7 w-7 bg-muted/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); onOpenLightbox?.(image); }}>
             <Maximize2 className="h-3.5 w-3.5" />
           </Button>
