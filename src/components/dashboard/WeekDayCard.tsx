@@ -36,7 +36,7 @@ const statusConfig = {
   missed: { icon: AlertCircle, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', border: 'border-orange-300 dark:border-orange-700', label: 'Verpasst' },
 };
 
-export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, onUpload, onAddPost }: WeekDayCardProps) {
+export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, onUpload, onAddPost, onDelete }: WeekDayCardProps) {
   return (
     <div className={cn(
       "rounded-xl border p-4 transition-all",
