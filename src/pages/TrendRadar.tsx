@@ -56,7 +56,7 @@ export default function TrendRadar() {
   const [bookmarked, setBookmarked] = useState<string[]>([]);
   const [selectedTrend, setSelectedTrend] = useState<Trend | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [modalDefaultTab, setModalDefaultTab] = useState<'overview' | 'analysis' | 'articles'>('overview');
+  const [modalDefaultTab, setModalDefaultTab] = useState<'overview' | 'analysis' | 'articles' | 'media'>('overview');
   
   const [platformFilter, setPlatformFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -131,7 +131,7 @@ export default function TrendRadar() {
     }
   };
 
-  const openTrendDetail = (trend: Trend, tab: 'overview' | 'analysis' | 'articles' = 'overview') => {
+  const openTrendDetail = (trend: Trend, tab: 'overview' | 'analysis' | 'articles' | 'media' = 'overview') => {
     setSelectedTrend(trend);
     setModalDefaultTab(tab);
     setDetailModalOpen(true);
