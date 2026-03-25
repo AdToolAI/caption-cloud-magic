@@ -304,6 +304,18 @@ export default function TrendRadar() {
     { id: 'produktivität', name: 'Produktivität & Arbeitsalltag', icon: '💼' },
   ];
 
+  const getPlatformGradient = (platform: string) => {
+    switch (platform) {
+      case 'tiktok': return 'from-pink-600 via-purple-600 to-cyan-500';
+      case 'instagram': return 'from-purple-600 via-pink-500 to-orange-400';
+      case 'youtube': return 'from-red-700 via-red-600 to-red-500';
+      case 'linkedin': return 'from-blue-700 via-blue-600 to-blue-500';
+      case 'twitter': return 'from-sky-600 via-sky-500 to-blue-400';
+      case 'pinterest': return 'from-red-600 via-pink-500 to-rose-400';
+      default: return 'from-primary via-purple-500 to-pink-500';
+    }
+  };
+
   const getPlatformColor = (platform: string) => {
     switch (platform) {
       case 'tiktok': return 'bg-gradient-to-r from-pink-500/80 to-cyan-500/80 text-white shadow-[0_0_15px_hsla(340,80%,60%,0.3)]';
@@ -371,35 +383,55 @@ export default function TrendRadar() {
               initial="hidden"
               animate="visible"
             >
-              {categories.map((cat, index) => (
-                <motion.div
-                  key={cat.id}
-                  variants={itemVariants}
-                  whileHover={{ scale: 1.05, y: -5 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Card 
-                    className={`cursor-pointer transition-all duration-300 backdrop-blur-xl bg-card/60 border-white/10 
-                      bg-gradient-to-br ${cat.color} ${cat.glowColor}
-                      ${categoryFilter === cat.id 
-                        ? 'ring-2 ring-primary shadow-[0_0_30px_hsla(43,90%,68%,0.3)] border-primary/50' 
-                        : 'hover:border-primary/30'
-                      }`}
-                    onClick={() => setCategoryFilter(categoryFilter === cat.id ? 'all' : cat.id)}
+              {categories.map((cat) => {
+                const isActive = categoryFilter === cat.id;
+                return (
+                  <motion.div
+                    key={cat.id}
+                    variants={itemVariants}
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    whileTap={{ scale: 0.98 }}
                   >
-                    <CardContent className="p-4 text-center space-y-2">
-                      <motion.div 
-                        className="text-3xl"
-                        animate={categoryFilter === cat.id ? { scale: [1, 1.2, 1] } : {}}
-                        transition={{ duration: 0.5 }}
-                      >
-                        {cat.icon}
-                      </motion.div>
-                      <p className="font-semibold text-sm">{cat.name}</p>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
+                    <Card 
+                      className={`cursor-pointer transition-all duration-500 backdrop-blur-xl border overflow-hidden relative
+                        ${isActive 
+                          ? 'bg-gradient-to-br ' + cat.color + ' border-primary/50 shadow-[0_0_40px_hsla(43,90%,68%,0.3)]' 
+                          : 'bg-card/40 border-white/10 hover:border-primary/30 ' + cat.glowColor
+                        }`}
+                      onClick={() => setCategoryFilter(isActive ? 'all' : cat.id)}
+                    >
+                      {/* Animated border glow for active */}
+                      {isActive && (
+                        <motion.div
+                          className="absolute inset-0 rounded-2xl"
+                          animate={{
+                            boxShadow: [
+                              'inset 0 0 20px hsla(43,90%,68%,0.1)',
+                              'inset 0 0 30px hsla(43,90%,68%,0.2)',
+                              'inset 0 0 20px hsla(43,90%,68%,0.1)',
+                            ]
+                          }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        />
+                      )}
+                      <CardContent className="p-5 text-center space-y-3 relative z-10">
+                        <motion.div 
+                          className={`text-4xl mx-auto w-14 h-14 flex items-center justify-center rounded-xl ${
+                            isActive 
+                              ? 'bg-primary/20 shadow-[0_0_25px_hsla(43,90%,68%,0.4)]' 
+                              : 'bg-muted/20'
+                          } transition-all duration-300`}
+                          animate={isActive ? { scale: [1, 1.1, 1] } : {}}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                        >
+                          {cat.icon}
+                        </motion.div>
+                        <p className={`font-semibold text-sm ${isActive ? 'text-primary' : ''}`}>{cat.name}</p>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                );
+              })}
             </motion.div>
           </motion.div>
 
@@ -491,54 +523,92 @@ export default function TrendRadar() {
               </div>
               
               <motion.div 
-                className="grid gap-4 md:grid-cols-2 lg:grid-cols-5"
+                className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
               >
-                {topTrends.map((trend, index) => (
-                  <motion.div
-                    key={trend.id}
-                    variants={itemVariants}
-                    whileHover={{ y: -8, scale: 1.02 }}
-                  >
-                    <Card 
-                      className="relative overflow-hidden cursor-pointer group backdrop-blur-xl bg-card/60 border-white/10 hover:border-primary/50 hover:shadow-[0_0_30px_hsla(43,90%,68%,0.15)] transition-all duration-300"
-                      onClick={() => analyzeTrend(trend)}
+                {topTrends.map((trend, index) => {
+                  const isFeatured = index === 0;
+                  const platformGradient = (() => {
+                    switch (trend.platform) {
+                      case 'tiktok': return 'from-pink-600 via-purple-600 to-cyan-500';
+                      case 'instagram': return 'from-purple-600 via-pink-500 to-orange-400';
+                      case 'youtube': return 'from-red-700 via-red-600 to-red-500';
+                      case 'linkedin': return 'from-blue-700 via-blue-600 to-blue-500';
+                      case 'twitter': return 'from-sky-600 via-sky-500 to-blue-400';
+                      default: return 'from-primary via-purple-500 to-pink-500';
+                    }
+                  })();
+                  return (
+                    <motion.div
+                      key={trend.id}
+                      variants={itemVariants}
+                      whileHover={{ y: -8, scale: 1.02 }}
+                      className={isFeatured ? 'md:col-span-2 lg:col-span-1' : ''}
                     >
-                      {/* Ranking Badge */}
-                      <motion.div 
-                        className="absolute top-2 left-2 z-10 flex items-center justify-center w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-full text-white font-bold text-sm shadow-[0_0_15px_hsla(30,80%,50%,0.5)]"
-                        whileHover={{ scale: 1.1, rotate: 10 }}
+                      <Card 
+                        className="relative overflow-hidden cursor-pointer group backdrop-blur-xl bg-card/40 border-white/10 hover:border-primary/50 hover:shadow-[0_0_40px_hsla(43,90%,68%,0.2)] transition-all duration-500 h-full"
+                        onClick={() => analyzeTrend(trend)}
                       >
-                        #{index + 1}
-                      </motion.div>
-
-                      <CardContent className="p-6 space-y-3">
-                        <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getPlatformColor(trend.platform)}`}>
-                          {trend.platform}
-                        </div>
-                        <h3 className="font-bold text-lg group-hover:text-primary transition-colors">
-                          {trend.name}
-                        </h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {trend.description}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-muted/50 rounded-full h-2 overflow-hidden">
-                            <motion.div 
-                              className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full"
-                              initial={{ width: 0 }}
-                              animate={{ width: `${trend.popularity_index}%` }}
-                              transition={{ duration: 1, delay: index * 0.1 }}
-                            />
+                        {/* Platform Gradient Header with Scanlines */}
+                        <div className={`relative h-32 bg-gradient-to-br ${platformGradient} overflow-hidden`}>
+                          {/* Scanline overlay */}
+                          <div className="absolute inset-0 opacity-10" style={{
+                            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)',
+                          }} />
+                          {/* Animated shimmer */}
+                          <motion.div
+                            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent"
+                            animate={{ x: ['-100%', '200%'] }}
+                            transition={{ duration: 3, repeat: Infinity, repeatDelay: 2, ease: 'easeInOut' }}
+                          />
+                          {/* Ranking Badge */}
+                          <motion.div 
+                            className="absolute top-3 left-3 z-10 flex items-center justify-center w-10 h-10 bg-black/40 backdrop-blur-md rounded-full text-white font-bold text-base border border-white/20 shadow-[0_0_20px_hsla(0,0%,100%,0.2)]"
+                            whileHover={{ scale: 1.15, rotate: 10 }}
+                          >
+                            #{index + 1}
+                          </motion.div>
+                          {/* Platform label */}
+                          <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-xs font-semibold border border-white/20 uppercase tracking-wider">
+                            {trend.platform}
                           </div>
-                          <span className="text-xs font-bold text-orange-400">{trend.popularity_index}</span>
+                          {/* Popularity score */}
+                          <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-sm font-bold border border-white/20">
+                            🔥 {trend.popularity_index}
+                          </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))}
+
+                        <CardContent className="p-5 space-y-3">
+                          <h3 className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-2">
+                            {trend.name}
+                          </h3>
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {trend.description}
+                          </p>
+                          {/* Neon Popularity Bar */}
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-muted/30 rounded-full h-2 overflow-hidden relative">
+                              <motion.div 
+                                className={`bg-gradient-to-r ${platformGradient} h-2 rounded-full relative`}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${trend.popularity_index}%` }}
+                                transition={{ duration: 1.2, delay: index * 0.1, ease: 'easeOut' }}
+                              />
+                              <motion.div
+                                className={`absolute top-0 left-0 h-2 rounded-full bg-gradient-to-r ${platformGradient} blur-sm opacity-60`}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${trend.popularity_index}%` }}
+                                transition={{ duration: 1.2, delay: index * 0.1, ease: 'easeOut' }}
+                              />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
               </motion.div>
             </motion.div>
           )}
@@ -549,26 +619,32 @@ export default function TrendRadar() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <Card className="mb-8 backdrop-blur-xl bg-card/60 border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
-              <CardContent className="p-6 space-y-4">
+            <Card className="mb-8 backdrop-blur-xl bg-card/30 border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.15)] relative overflow-hidden">
+              {/* Subtle animated border */}
+              <div className="absolute inset-0 rounded-2xl opacity-30 pointer-events-none" style={{
+                background: 'linear-gradient(135deg, hsla(43,90%,68%,0.1), transparent 40%, transparent 60%, hsla(187,80%,50%,0.1))',
+              }} />
+              <CardContent className="p-6 space-y-4 relative z-10">
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-2">
                     <label className="text-sm font-medium flex items-center gap-2">
                       <Search className="w-4 h-4 text-primary" />
                       {t('trends.search')}
                     </label>
-                    <Input
-                      placeholder={t('trends.searchPlaceholder')}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
+                    <div className="relative group/input">
+                      <Input
+                        placeholder={t('trends.searchPlaceholder')}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="bg-muted/10 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 focus:shadow-[0_0_20px_hsla(43,90%,68%,0.15)] transition-all duration-300"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">{t('trends.platform')}</label>
                     <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                      <SelectTrigger className="bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
+                      <SelectTrigger className="bg-muted/10 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="backdrop-blur-xl bg-card/95 border-white/10">
@@ -586,7 +662,7 @@ export default function TrendRadar() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">{t('trends.category')}</label>
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                      <SelectTrigger className="bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
+                      <SelectTrigger className="bg-muted/10 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="backdrop-blur-xl bg-card/95 border-white/10">
@@ -615,11 +691,27 @@ export default function TrendRadar() {
             >
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <motion.div key={i} variants={itemVariants}>
-                  <Card className="backdrop-blur-xl bg-card/60 border-white/10 overflow-hidden">
-                    <CardContent className="p-6 space-y-4">
-                      <div className="h-6 bg-gradient-to-r from-muted/50 via-muted to-muted/50 rounded animate-pulse" />
-                      <div className="h-4 bg-gradient-to-r from-muted/50 via-muted to-muted/50 rounded w-3/4 animate-pulse" />
-                      <div className="h-20 bg-gradient-to-r from-muted/50 via-muted to-muted/50 rounded animate-pulse" />
+                  <Card className="backdrop-blur-xl bg-card/40 border-white/10 overflow-hidden">
+                    {/* Skeleton gradient header */}
+                    <div className="h-28 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-muted/60 via-muted/40 to-muted/60 animate-pulse" />
+                      <motion.div
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent"
+                        animate={{ x: ['-100%', '200%'] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                      />
+                    </div>
+                    <CardContent className="p-5 space-y-3">
+                      <div className="h-5 bg-gradient-to-r from-muted/50 via-muted to-muted/50 rounded-lg animate-pulse w-3/4" />
+                      <div className="h-4 bg-gradient-to-r from-muted/50 via-muted to-muted/50 rounded-lg animate-pulse w-full" />
+                      <div className="h-4 bg-gradient-to-r from-muted/50 via-muted to-muted/50 rounded-lg animate-pulse w-1/2" />
+                      <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 rounded-full"
+                          animate={{ width: ['30%', '70%', '30%'] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        />
+                      </div>
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -696,73 +788,79 @@ export default function TrendRadar() {
                 initial="hidden"
                 animate="visible"
               >
-                {filteredTrends.map((trend, index) => (
+                {filteredTrends.map((trend, index) => {
+                  const gradient = getPlatformGradient(trend.platform);
+                  return (
                   <motion.div
                     key={trend.id}
                     variants={itemVariants}
                     whileHover={{ y: -8 }}
                   >
                     <Card 
-                      className="group cursor-pointer relative overflow-hidden backdrop-blur-xl bg-card/60 border-white/10 hover:border-primary/50 hover:shadow-[0_0_30px_hsla(43,90%,68%,0.15)] transition-all duration-300"
+                      className="group cursor-pointer relative overflow-hidden backdrop-blur-xl bg-card/40 border-white/10 hover:border-primary/50 hover:shadow-[0_0_35px_hsla(43,90%,68%,0.2)] transition-all duration-500 h-full"
                       onClick={() => analyzeTrend(trend)}
                     >
-                      {/* Top Gradient Line */}
-                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-purple-500 to-pink-500 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      {/* Platform Gradient Header */}
+                      <div className={`relative h-20 bg-gradient-to-br ${gradient} overflow-hidden`}>
+                        {/* Scanline texture */}
+                        <div className="absolute inset-0 opacity-[0.08]" style={{
+                          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.4) 2px, rgba(0,0,0,0.4) 4px)',
+                        }} />
+                        {/* Shimmer */}
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                          animate={{ x: ['-100%', '200%'] }}
+                          transition={{ duration: 3, repeat: Infinity, repeatDelay: 4, ease: 'easeInOut' }}
+                        />
+                        {/* Platform badge */}
+                        <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-xs font-semibold border border-white/20 uppercase tracking-wider">
+                          {trend.platform}
+                        </div>
+                        {/* Virality badge */}
+                        {trend.data_json?.estimated_virality && (
+                          <motion.div
+                            className="absolute top-3 right-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-xs font-bold border border-white/20"
+                            animate={{ scale: [1, 1.05, 1] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                          >
+                            🔥 {trend.data_json.estimated_virality}
+                          </motion.div>
+                        )}
+                        {/* Type badge */}
+                        <div className="absolute bottom-3 left-3 px-2 py-0.5 rounded bg-black/20 backdrop-blur-sm text-white/80 text-[10px] font-medium border border-white/10">
+                          {trend.trend_type}
+                        </div>
+                      </div>
                       
-                      <CardContent className="p-6 space-y-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="space-y-2 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPlatformColor(trend.platform)}`}>
-                                {trend.platform}
-                              </span>
-                              <span className="px-3 py-1 rounded-full text-xs font-medium bg-muted/50 border border-white/10">
-                                {trend.trend_type}
-                              </span>
-                              {trend.data_json?.estimated_virality && (
-                                <motion.span 
-                                  className="px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-400 border border-orange-500/30"
-                                  animate={{ scale: [1, 1.05, 1] }}
-                                  transition={{ duration: 1.5, repeat: Infinity }}
-                                >
-                                  🔥 {trend.data_json.estimated_virality}
-                                </motion.span>
-                              )}
-                            </div>
-                            <h3 className="font-bold text-xl group-hover:text-primary transition-colors">
-                              {trend.name}
-                            </h3>
-                          </div>
+                      <CardContent className="p-5 space-y-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-2 flex-1">
+                            {trend.name}
+                          </h3>
                           
-                          {/* Improved Bookmark Button */}
+                          {/* Bookmark Button */}
                           <Button
                             variant={bookmarked.includes(trend.id) ? "default" : "outline"}
-                            size="sm"
+                            size="icon"
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleBookmark(trend.id);
                             }}
-                            className={`shrink-0 gap-1.5 transition-all ${
+                            className={`shrink-0 h-8 w-8 transition-all ${
                               bookmarked.includes(trend.id) 
                                 ? 'bg-primary text-primary-foreground shadow-[0_0_15px_hsla(43,90%,68%,0.4)]' 
                                 : 'border-white/10 hover:border-primary/50'
                             }`}
                           >
                             {bookmarked.includes(trend.id) ? (
-                              <>
-                                <BookmarkCheck className="w-4 h-4" />
-                                <span className="hidden sm:inline">Gespeichert</span>
-                              </>
+                              <BookmarkCheck className="w-4 h-4" />
                             ) : (
-                              <>
-                                <Bookmark className="w-4 h-4" />
-                                <span className="hidden sm:inline">Speichern</span>
-                              </>
+                              <Bookmark className="w-4 h-4" />
                             )}
                           </Button>
                         </div>
 
-                        <p className="text-sm text-muted-foreground line-clamp-3">
+                        <p className="text-sm text-muted-foreground line-clamp-2">
                           {trend.description}
                         </p>
 
@@ -852,20 +950,27 @@ export default function TrendRadar() {
                         )}
 
                         {trend.data_json?.audience_fit && (
-                          <div className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg border border-white/5">
+                          <div className="flex items-start gap-2 p-3 bg-muted/20 rounded-lg border border-white/5">
                             <Target className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                             <p className="text-xs text-muted-foreground">{trend.data_json.audience_fit}</p>
                           </div>
                         )}
 
+                        {/* Neon Popularity Bar */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">{t('trends.popularity')}</span>
                             <span className="font-bold text-primary">{trend.popularity_index}/100</span>
                           </div>
-                          <div className="w-full bg-muted/30 rounded-full h-2 overflow-hidden">
+                          <div className="w-full bg-muted/20 rounded-full h-2 overflow-hidden relative">
                             <motion.div 
-                              className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 h-2 rounded-full"
+                              className={`bg-gradient-to-r ${gradient} h-2 rounded-full relative z-10`}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${trend.popularity_index}%` }}
+                              transition={{ duration: 1, delay: index * 0.05 }}
+                            />
+                            <motion.div
+                              className={`absolute top-0 left-0 h-2 rounded-full bg-gradient-to-r ${gradient} blur-sm opacity-50`}
                               initial={{ width: 0 }}
                               animate={{ width: `${trend.popularity_index}%` }}
                               transition={{ duration: 1, delay: index * 0.05 }}
@@ -875,7 +980,7 @@ export default function TrendRadar() {
 
                         <div className="flex items-center gap-2 flex-wrap">
                           {trend.category && (
-                            <div className="flex items-center gap-1 text-xs px-2 py-1 bg-muted/30 rounded-md border border-white/5">
+                            <div className="flex items-center gap-1 text-xs px-2 py-1 bg-muted/20 rounded-md border border-white/5">
                               <Tag className="w-3 h-3" />
                               <span>{trend.category}</span>
                             </div>
@@ -888,8 +993,7 @@ export default function TrendRadar() {
                           )}
                         </div>
 
-                        <div className="pt-2 border-t border-white/5 flex gap-2">
-                          {/* More Info Button */}
+                        <div className="pt-3 border-t border-white/5 flex gap-2">
                           <Button
                             variant="outline"
                             size="sm"
@@ -903,7 +1007,6 @@ export default function TrendRadar() {
                             Mehr erfahren
                           </Button>
                           
-                          {/* Analyze Button */}
                           <Button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -934,7 +1037,8 @@ export default function TrendRadar() {
                       </CardContent>
                     </Card>
                   </motion.div>
-                ))}
+                  );
+                })}
               </motion.div>
             </>
           )}
