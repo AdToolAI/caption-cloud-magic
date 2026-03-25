@@ -40,22 +40,14 @@ export const hubDefinitions: HubDefinition[] = [
     ],
   },
   {
-    key: "erstellen",
+    key: "optimieren",
     icon: Sparkles,
-    titleKey: "hubs.erstellen",
-    descKey: "hubDesc.erstellen",
+    titleKey: "hubs.optimieren",
+    descKey: "hubDesc.optimieren",
     items: [
       { route: "/generator", titleKey: "nav.textStudio", descKey: "hubItemDesc.generator", icon: Sparkles },
       { route: "/ai-post-generator", titleKey: "nav.aiPostGenerator", descKey: "hubItemDesc.aiPost", icon: Bot },
       { route: "/image-caption-pairing", titleKey: "nav.imageCaptionPairing", descKey: "hubItemDesc.imageCaption", icon: ImagePlus },
-    ],
-  },
-  {
-    key: "optimieren",
-    icon: MessageSquare,
-    titleKey: "hubs.optimieren",
-    descKey: "hubDesc.optimieren",
-    items: [
       { route: "/coach", titleKey: "nav.coach", descKey: "hubItemDesc.coach", icon: MessageSquare },
       { route: "/comment-manager", titleKey: "nav.commentManager", descKey: "hubItemDesc.comments", icon: MessageCircle },
       { route: "/template-manager", titleKey: "nav.templateManager", descKey: "hubItemDesc.templates", icon: BookTemplate },
