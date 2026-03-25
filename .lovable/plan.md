@@ -1,35 +1,19 @@
 
 
-## Hub-Reorganisation: Erstellen + Optimieren zusammenlegen, Medien -> Erstellen
+## Hub-Umbenennung: "Erstellen & Optimieren" -> "Optimieren"
 
-### Aenderungen
+Einfache Textaenderung in 3 Sprachen, um die Dopplung von "Erstellen" zu beseitigen.
 
-**1. hubConfig.ts - Hub-Struktur umbauen**
-- "Erstellen" Hub entfernen
-- Die 3 Items (Text-Studio, Post-Generator, Bild-Text-Pairing) in "Optimieren" verschieben
-- "Medien" Hub umbenennen zu key: "erstellen", mit neuem Titel/Beschreibung die auf Content-Erstellung fokussiert
-- Icon von "Optimieren" anpassen (bleibt MessageSquare oder wird zu Sparkles da es jetzt auch KI-Erstellung umfasst)
+### Aenderungen in `src/lib/translations.ts`
 
-**Neues "Optimieren"** (6 Items):
-- KI Text-Studio, KI Post-Generator, Bild-Text-Pairing (von Erstellen)
-- KI-Content-Coach, Kommentar-Manager, Vorlagen-Manager (bestehend)
+| Sprache | Zeile | Alt | Neu |
+|---|---|---|---|
+| DE | 3799 | `optimieren: "Erstellen & Optimieren"` | `optimieren: "Optimieren"` |
+| DE | 3809 | `optimieren: "Erstelle und optimiere Captions..."` | `optimieren: "Optimiere Captions, Posts und Content mit KI"` |
+| EN | 1508 | `optimieren: "Create & Optimize"` | `optimieren: "Optimize"` |
+| EN | 1519 | `optimieren: "Create and optimize captions..."` | `optimieren: "Optimize captions, posts, and content with AI"` |
+| ES | 6050 | `optimieren: "Crear y Optimizar"` | `optimieren: "Optimizar"` |
+| ES (desc) | | analog anpassen | |
 
-**Neues "Erstellen"** (ehemals Medien, 8 Items):
-- Media Library, VoicePro, Universal Content Creator, Universal Video Creator, Director's Cut, Sora Long-Form, AI Video Studio, Background Replacer
-
-**2. translations.ts - Texte anpassen (DE, EN, ES)**
-- `hubs.erstellen` / `hubDesc.erstellen` -> neue Beschreibung fuer den Medien/Content-Hub
-- `hubs.optimieren` / `hubDesc.optimieren` -> erweiterte Beschreibung die auch KI-Text-Erstellung umfasst
-- `hubs.medien` -> entfernen oder als Alias behalten
-
-**3. CommandBar.tsx - Kategorien aktualisieren**
-- Text-Studio Kategorie von `hubs.erstellen` auf `hubs.optimieren` aendern
-
-### Technische Aenderungen
-
-| Datei | Aenderung |
-|---|---|
-| `src/config/hubConfig.ts` | Erstellen-Hub entfernen, Items nach Optimieren, Medien zu Erstellen umbenennen |
-| `src/lib/translations.ts` | Hub-Titel und Beschreibungen in allen 3 Sprachen anpassen |
-| `src/components/ui/CommandBar.tsx` | Kategorie-Zuordnung aktualisieren |
+Keine Aenderungen an hubConfig.ts oder CommandBar.tsx noetig - nur die Translation-Strings.
 
