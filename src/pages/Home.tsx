@@ -164,17 +164,75 @@ const Home = () => {
 
   const loadDashboardData = async () => {
     setLoading(true);
-    // Fetch today's posts (mock data for now)
-    setTodayPosts([
-      {
-        id: "1",
-        caption: "Neue Produktvorstellung 🚀",
-        platform: "instagram",
-        status: "scheduled",
-        scheduledTime: "18:00",
-        mediaUrl: undefined
+    try {
+      // Check for real calendar events first
+      const { data: realEvents } = await supabase
+        .from("calendar_events")
+        .select("id, title, channels, start_at, caption")
+        .gte("start_at", new Date().toISOString().split("T")[0])
+        .order("start_at", { ascending: true })
+        .limit(10);
+
+      if (realEvents && realEvents.length > 0) {
+        // Use real events
+        const today = new Date().toISOString().split("T")[0];
+        const todayEvents = realEvents
+          .filter((e) => e.start_at?.startsWith(today))
+          .map((e) => ({
+            id: e.id,
+            caption: e.caption || e.title || "Post",
+            platform: (e.channels?.[0] || "instagram") as Post["platform"],
+            status: "scheduled" as const,
+            scheduledTime: e.start_at ? new Date(e.start_at).toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" }) : "",
+          }));
+        setTodayPosts(todayEvents);
+      } else {
+        // Fallback: check for starter_week_plans
+        const { data: starterPlans } = await supabase
+          .from("starter_week_plans")
+          .select("*")
+          .eq("status", "suggested")
+          .order("suggested_date", { ascending: true });
+
+        if (starterPlans && starterPlans.length > 0) {
+          const today = new Date().toISOString().split("T")[0];
+          const todayStarter = starterPlans
+            .filter((p) => p.suggested_date === today)
+            .map((p) => ({
+              id: p.id,
+              caption: `💡 ${p.content_idea}`,
+              platform: (p.platform || "instagram") as Post["platform"],
+              status: "draft" as const,
+              scheduledTime: p.suggested_time?.slice(0, 5) || "12:00",
+            }));
+          setTodayPosts(todayStarter.length > 0 ? todayStarter : []);
+
+          // Build week from starter plans
+          const days = [];
+          for (let i = 0; i < 7; i++) {
+            const date = new Date();
+            date.setDate(date.getDate() + i);
+            const dateStr = date.toISOString().split("T")[0];
+            const dayPlans = starterPlans.filter((p) => p.suggested_date === dateStr);
+            days.push({
+              date: date.toISOString(),
+              name: date.toLocaleDateString(language, { weekday: "short" }),
+              day: date.getDate(),
+              isToday: i === 0,
+              posts: dayPlans.map((p) => ({ platform: p.platform })),
+            });
+          }
+          setWeekDays(days);
+          setLoading(false);
+          return;
+        } else {
+          setTodayPosts([]);
+        }
       }
-    ]);
+    } catch (err) {
+      console.error("Dashboard data error:", err);
+      setTodayPosts([]);
+    }
 
     // Generate week calendar (next 7 days)
     const days = [];
@@ -183,10 +241,10 @@ const Home = () => {
       date.setDate(date.getDate() + i);
       days.push({
         date: date.toISOString(),
-        name: date.toLocaleDateString(language, { weekday: 'short' }),
+        name: date.toLocaleDateString(language, { weekday: "short" }),
         day: date.getDate(),
         isToday: i === 0,
-        posts: i === 0 ? [{ platform: 'instagram' }] : []
+        posts: [],
       });
     }
     setWeekDays(days);
