@@ -89,7 +89,8 @@ export const RecoCard = () => {
       if (error) throw error;
 
       if (!posts || posts.length < 10) {
-        setRecommendations([]);
+        setIsBeginnerMode(true);
+        setRecommendations(BEGINNER_RECOMMENDATIONS);
         setLoading(false);
         return;
       }
