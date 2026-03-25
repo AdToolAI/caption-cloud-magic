@@ -5223,6 +5223,42 @@ export type Database = {
         }
         Relationships: []
       }
+      onboarding_profiles: {
+        Row: {
+          business_type: string
+          created_at: string
+          experience_level: string
+          id: string
+          niche: string
+          platforms: string[]
+          posting_goal: string
+          posts_per_week: number
+          user_id: string
+        }
+        Insert: {
+          business_type?: string
+          created_at?: string
+          experience_level?: string
+          id?: string
+          niche?: string
+          platforms?: string[]
+          posting_goal?: string
+          posts_per_week?: number
+          user_id: string
+        }
+        Update: {
+          business_type?: string
+          created_at?: string
+          experience_level?: string
+          id?: string
+          niche?: string
+          platforms?: string[]
+          posting_goal?: string
+          posts_per_week?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       payouts: {
         Row: {
           affiliate_id: string
@@ -7740,6 +7776,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      starter_week_plans: {
+        Row: {
+          content_idea: string
+          created_at: string
+          day_of_week: number
+          id: string
+          platform: string
+          status: string
+          suggested_date: string
+          suggested_time: string
+          tips: string
+          user_id: string
+        }
+        Insert: {
+          content_idea: string
+          created_at?: string
+          day_of_week: number
+          id?: string
+          platform: string
+          status?: string
+          suggested_date: string
+          suggested_time: string
+          tips?: string
+          user_id: string
+        }
+        Update: {
+          content_idea?: string
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          platform?: string
+          status?: string
+          suggested_date?: string
+          suggested_time?: string
+          tips?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       storage_files: {
         Row: {
