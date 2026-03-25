@@ -58,8 +58,8 @@ export function CommandBar({ inline = false }: CommandBarProps) {
     { name: t("nav.composer"), path: "/composer", icon: Edit3, category: t("hubs.planen") },
     { name: t("nav.postTimeAdvisor"), path: "/post-time-advisor", icon: Clock, category: t("hubs.planen") },
     
-    // Erstellen
-    { name: t("nav.textStudio"), path: "/generator", icon: Sparkles, category: t("hubs.erstellen") },
+    // Optimieren (KI-Tools)
+    { name: t("nav.textStudio"), path: "/generator", icon: Sparkles, category: t("hubs.optimieren") },
     
     
     

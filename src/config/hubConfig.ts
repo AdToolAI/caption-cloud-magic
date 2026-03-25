@@ -67,10 +67,10 @@ export const hubDefinitions: HubDefinition[] = [
     ],
   },
   {
-    key: "medien",
+    key: "erstellen",
     icon: Film,
-    titleKey: "hubs.medien",
-    descKey: "hubDesc.medien",
+    titleKey: "hubs.erstellen",
+    descKey: "hubDesc.erstellen",
     items: [
       { route: "/media-library", titleKey: "nav.mediaLibrary", descKey: "hubItemDesc.mediaLibrary", icon: FolderOpen },
       { route: "/audio-studio", titleKey: "VoicePro", descKey: "hubItemDesc.audioStudio", icon: Mic2 },

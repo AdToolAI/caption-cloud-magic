@@ -6056,8 +6056,8 @@ export const translations: Record<Language, any> = {
     },
     hubDesc: {
       planen: "Planifica, programa y organiza tu calendario de contenido",
-      erstellen: "Crea captions, posts y contenido visual con IA",
-      optimieren: "Optimiza tu estrategia de contenido y engagement",
+      erstellen: "Crea videos, audio y contenido multimedia visual",
+      optimieren: "Crea y optimiza captions, posts y contenido con IA",
       analysieren: "Rastrea el rendimiento y descubre tendencias",
       medien: "Gestiona archivos multimedia, videos y audio",
       team: "Colabora con tu equipo y gestiona espacios",
