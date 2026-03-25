@@ -10,6 +10,7 @@ import { CommandBar } from "@/components/ui/CommandBar";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/NotificationBell";
+import { SocialConnectionIcons } from "@/components/dashboard/SocialConnectionIcons";
 
 export function AppHeader() {
   const { toggleSidebar } = useSidebar();
@@ -51,6 +52,11 @@ export function AppHeader() {
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
           <ThemeToggle />
+          {user && (
+            <div className="hidden md:flex">
+              <SocialConnectionIcons />
+            </div>
+          )}
           {user && (
             <Button asChild variant="ghost" size="icon" className="rounded-xl" aria-label="Community">
               <Link to="/community">
