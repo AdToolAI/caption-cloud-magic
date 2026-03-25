@@ -1,22 +1,19 @@
 
 
-## Fix: Dashboard-Fehler + Header-Icon-Sortierung
+## Header-Icons neu sortieren
 
-### Problem 1: "Cannot read properties of undefined (reading 'color')"
-Die `StatusPill`-Komponente kennt nur `draft | scheduled | published | failed`, aber `WeekPost.status` kann `suggested` oder `missed` sein. Wenn der naechste Post z.B. Status `suggested` hat, crasht `statusConfig[status]` mit `undefined`.
+### Aenderung in `src/components/layout/AppHeader.tsx`
 
-**Fix in `src/components/ui/StatusPill.tsx`:**
-- `suggested` und `missed` zum `statusConfig` hinzufuegen
-- Fallback einbauen falls ein unbekannter Status kommt
+Die 6 Social-Connection-Icons nach links verschieben (direkt am Anfang des rechten Bereichs), die 4 anderen Icons (ThemeToggle, Community, NotificationBell, UserMenu) nach rechts.
 
-### Problem 2: Header-Icons schlecht sortiert
-Aktuell sind die 6 Social-Icons direkt neben ThemeToggle, VOR den 4 bisherigen Icons (Community, Notifications etc.). Die Social-Icons sollen weiter rechts stehen.
+**Neue Reihenfolge im `flex items-center gap-2` Container:**
 
-**Fix in `src/components/layout/AppHeader.tsx`:**
-- `SocialConnectionIcons` nach rechts verschieben: nach Community + NotificationBell, vor UserMenu
-- Reihenfolge: ThemeToggle → Community → NotificationBell → SocialConnectionIcons → UserMenu
+1. `SocialConnectionIcons` (hidden md:flex, nur wenn user)
+2. Spacer oder gap
+3. `ThemeToggle`
+4. Community Button
+5. `NotificationBell`
+6. `UserMenu`
 
-### Dateien
-1. `src/components/ui/StatusPill.tsx` — `suggested` + `missed` Status hinzufuegen + Fallback
-2. `src/components/layout/AppHeader.tsx` — SocialConnectionIcons Position aendern
+Einfach die Position des `SocialConnectionIcons`-Blocks von Zeile 63-67 nach oben verschieben, direkt als erstes Element im Actions-div (Zeile 53).
 
