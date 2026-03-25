@@ -1505,7 +1505,7 @@ export const translations: Record<Language, any> = {
     hubs: {
       planen: "Plan",
       erstellen: "Create",
-      optimieren: "Optimize",
+      optimieren: "Create & Optimize",
       analysieren: "Analyze",
       automatisieren: "Automate",
       einstellungen: "Settings",
