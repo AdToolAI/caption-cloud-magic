@@ -619,15 +619,34 @@ export function TrendDetailModal({
               )}
             </TabsContent>
 
-            {/* Articles Tab - upgraded with favicons and real URLs */}
+            {/* Articles Tab - Sci-Fi Glassmorphism Design */}
             <TabsContent value="articles" className="p-6 space-y-4 mt-0">
               {loadingArticles ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                  <span className="ml-2 text-muted-foreground">Suche echte Artikel via Web-Suche...</span>
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <motion.div
+                    className="relative w-16 h-16"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                  >
+                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary border-r-primary/50 animate-pulse" />
+                    <div className="absolute inset-2 rounded-full border border-transparent border-b-cyan-500/60" />
+                    <Search className="absolute inset-0 m-auto w-6 h-6 text-primary" />
+                  </motion.div>
+                  <p className="text-sm text-muted-foreground font-medium tracking-wide">
+                    Web-Suche läuft...
+                  </p>
                 </div>
               ) : articles.length > 0 ? (
                 <div className="space-y-3">
+                  {/* Powered by badge */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/5 border border-primary/20 text-xs text-primary/80">
+                      <Zap className="w-3 h-3" />
+                      <span className="tracking-wider uppercase font-semibold">Live Web-Suche</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{articles.length} Quellen</span>
+                  </div>
+
                   {articles.map((article, idx) => {
                     const source = article.source || (() => {
                       try { return new URL(article.url).hostname.replace('www.', ''); } catch { return ''; }
@@ -638,94 +657,152 @@ export function TrendDetailModal({
                         href={article.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={{ opacity: 0, y: 15 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.1 }}
-                        className="block p-4 bg-muted/20 rounded-lg border border-white/5 hover:border-primary/50 hover:bg-muted/30 transition-all group"
+                        transition={{ delay: idx * 0.08, type: "spring", stiffness: 200 }}
+                        className="group relative block p-4 rounded-xl border border-white/[0.06] bg-gradient-to-br from-white/[0.03] to-transparent backdrop-blur-sm hover:border-primary/40 hover:shadow-[0_0_30px_-5px_hsl(var(--primary)/0.15)] transition-all duration-300"
                       >
-                        <div className="flex items-start gap-3">
-                          {/* Favicon */}
+                        {/* Shimmer border on hover */}
+                        <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none overflow-hidden">
+                          <div className="absolute inset-0 rounded-xl border border-primary/20" />
+                        </div>
+
+                        <div className="relative flex items-start gap-4">
+                          {/* Favicon with glow ring */}
                           {source && (
-                            <img 
-                              src={`https://www.google.com/s2/favicons?domain=${source}&sz=32`}
-                              alt=""
-                              className="w-5 h-5 rounded mt-0.5 shrink-0"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                            />
+                            <div className="relative shrink-0 mt-0.5">
+                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-white/10 to-white/[0.02] border border-white/10 flex items-center justify-center group-hover:border-primary/30 group-hover:shadow-[0_0_12px_-2px_hsl(var(--primary)/0.3)] transition-all duration-300">
+                                <img 
+                                  src={`https://www.google.com/s2/favicons?domain=${source}&sz=64`}
+                                  alt=""
+                                  className="w-5 h-5 rounded"
+                                  onError={(e) => { (e.target as HTMLImageElement).src = ''; (e.target as HTMLImageElement).style.display = 'none'; }}
+                                />
+                              </div>
+                            </div>
                           )}
-                          <div className="space-y-1 flex-1">
-                            <h4 className="font-medium group-hover:text-primary transition-colors line-clamp-2">
+                          
+                          <div className="space-y-2 flex-1 min-w-0">
+                            <h4 className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors duration-200 line-clamp-2">
                               {article.title}
                             </h4>
-                            <p className="text-sm text-muted-foreground line-clamp-2">
+                            <p className="text-xs text-muted-foreground/80 leading-relaxed line-clamp-2">
                               {article.description}
                             </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              {source && (
-                                <span className="text-xs text-muted-foreground/80 px-2 py-0.5 bg-muted/30 rounded-full border border-white/5">
-                                  {source}
-                                </span>
-                              )}
-                            </div>
+                            {source && (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] text-muted-foreground/70 font-medium tracking-wide">
+                                <div className="w-1.5 h-1.5 rounded-full bg-green-500/60 animate-pulse" />
+                                {source}
+                              </div>
+                            )}
                           </div>
-                          <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                          
+                          <ExternalLink className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary/60 shrink-0 mt-1 transition-colors" />
                         </div>
                       </motion.a>
                     );
                   })}
                 </div>
               ) : (
-                <p className="text-muted-foreground text-sm py-4 text-center">
-                  Keine verwandten Artikel gefunden
-                </p>
+                <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                  <div className="p-4 rounded-full bg-muted/20 border border-white/5">
+                    <Search className="w-8 h-8 text-muted-foreground/30" />
+                  </div>
+                  <p className="text-muted-foreground text-sm">Keine verwandten Artikel gefunden</p>
+                </div>
               )}
             </TabsContent>
 
-            {/* Media Tab - YouTube Videos */}
+            {/* Media Tab - YouTube Search Links with futuristic design */}
             <TabsContent value="media" className="p-6 space-y-4 mt-0">
               {loadingArticles ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                  <span className="ml-2 text-muted-foreground">Suche Videos...</span>
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <motion.div
+                    className="relative w-16 h-16"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                  >
+                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-red-500 border-r-red-500/50" />
+                    <div className="absolute inset-2 rounded-full border border-transparent border-b-pink-500/60" />
+                    <Play className="absolute inset-0 m-auto w-6 h-6 text-red-500" />
+                  </motion.div>
+                  <p className="text-sm text-muted-foreground font-medium">Suche Videos...</p>
                 </div>
               ) : videos.length > 0 ? (
                 <div className="space-y-4">
-                  <h4 className="font-semibold flex items-center gap-2">
-                    <Play className="w-5 h-5 text-red-500" />
-                    YouTube-Videos ({videos.length})
-                  </h4>
-                  {videos.map((video, idx) => (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.15 }}
-                      className="space-y-2"
-                    >
-                      <Card className="bg-muted/20 border-white/5 overflow-hidden">
-                        <div className="aspect-video">
-                          <iframe
-                            src={`https://www.youtube.com/embed/${video.video_id}`}
-                            title={video.title}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                            className="w-full h-full"
-                          />
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+                        <Play className="w-3 h-3" />
+                        <span className="tracking-wider uppercase font-semibold">YouTube</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{videos.length} Suchanfragen</span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {videos.map((video, idx) => (
+                      <motion.a
+                        key={idx}
+                        href={video.search_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1, type: "spring", stiffness: 200 }}
+                        className="group relative flex items-center gap-4 p-4 rounded-xl border border-white/[0.06] bg-gradient-to-br from-red-500/[0.03] to-transparent backdrop-blur-sm hover:border-red-500/30 hover:shadow-[0_0_30px_-5px_rgba(239,68,68,0.15)] transition-all duration-300"
+                      >
+                        {/* Play button thumbnail */}
+                        <div className="relative shrink-0 w-20 h-14 rounded-lg bg-gradient-to-br from-red-500/20 to-red-900/30 border border-red-500/10 flex items-center justify-center overflow-hidden group-hover:border-red-500/30 transition-all duration-300">
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                          <motion.div 
+                            className="relative z-10 w-8 h-8 rounded-full bg-red-600/90 flex items-center justify-center shadow-lg"
+                            whileHover={{ scale: 1.1 }}
+                          >
+                            <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                          </motion.div>
+                          {/* Scanlines effect */}
+                          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
+                            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px)'
+                          }} />
                         </div>
-                        <CardContent className="p-3">
-                          <h5 className="font-medium text-sm line-clamp-2">{video.title}</h5>
-                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                            <Play className="w-3 h-3" />
-                            {video.channel}
+
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <h5 className="font-semibold text-sm group-hover:text-red-400 transition-colors line-clamp-1">
+                            {video.title}
+                          </h5>
+                          <p className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
+                            <Search className="w-3 h-3" />
+                            <span className="truncate">{video.query}</span>
                           </p>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
+                        </div>
+
+                        <ExternalLink className="w-4 h-4 text-muted-foreground/30 group-hover:text-red-400/60 shrink-0 transition-colors" />
+                      </motion.a>
+                    ))}
+                  </div>
+
+                  {/* Direct search CTA */}
+                  <motion.a
+                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(trend?.name || '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-white/10 text-sm text-muted-foreground hover:border-red-500/30 hover:text-red-400 transition-all"
+                  >
+                    <Search className="w-4 h-4" />
+                    Alle Videos auf YouTube suchen
+                    <ExternalLink className="w-3 h-3" />
+                  </motion.a>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 space-y-3">
-                  <Video className="w-12 h-12 text-muted-foreground/30" />
+                  <div className="p-4 rounded-full bg-muted/20 border border-white/5">
+                    <Video className="w-8 h-8 text-muted-foreground/30" />
+                  </div>
                   <p className="text-muted-foreground text-sm">Keine Videos gefunden</p>
                 </div>
               )}
