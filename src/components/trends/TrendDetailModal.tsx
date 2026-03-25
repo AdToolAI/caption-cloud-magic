@@ -619,27 +619,24 @@ export function TrendDetailModal({
               )}
             </TabsContent>
 
-            {/* Articles Tab - Sci-Fi Glassmorphism Design */}
+            {/* Articles Tab - Next Level Glassmorphism */}
             <TabsContent value="articles" className="p-6 space-y-4 mt-0">
               {loadingArticles ? (
-                <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                  <motion.div
-                    className="relative w-16 h-16"
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                  >
-                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary border-r-primary/50 animate-pulse" />
-                    <div className="absolute inset-2 rounded-full border border-transparent border-b-cyan-500/60" />
-                    <Search className="absolute inset-0 m-auto w-6 h-6 text-primary" />
-                  </motion.div>
-                  <p className="text-sm text-muted-foreground font-medium tracking-wide">
-                    Web-Suche läuft...
-                  </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="rounded-xl border border-white/[0.06] overflow-hidden">
+                      <div className="aspect-[16/9] bg-gradient-to-br from-primary/10 to-accent/5 animate-pulse" />
+                      <div className="p-3 space-y-2">
+                        <div className="h-4 w-3/4 bg-muted/30 rounded animate-pulse" />
+                        <div className="h-3 w-1/2 bg-muted/20 rounded animate-pulse" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : articles.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {/* Powered by badge */}
-                  <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/5 border border-primary/20 text-xs text-primary/80">
                       <Zap className="w-3 h-3" />
                       <span className="tracking-wider uppercase font-semibold">Live Web-Suche</span>
@@ -647,61 +644,85 @@ export function TrendDetailModal({
                     <span className="text-xs text-muted-foreground">{articles.length} Quellen</span>
                   </div>
 
-                  {articles.map((article, idx) => {
-                    const source = article.source || (() => {
-                      try { return new URL(article.url).hostname.replace('www.', ''); } catch { return ''; }
-                    })();
-                    return (
-                      <motion.a
-                        key={idx}
-                        href={article.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.08, type: "spring", stiffness: 200 }}
-                        className="group relative block p-4 rounded-xl border border-white/[0.06] bg-gradient-to-br from-white/[0.03] to-transparent backdrop-blur-sm hover:border-primary/40 hover:shadow-[0_0_30px_-5px_hsl(var(--primary)/0.15)] transition-all duration-300"
-                      >
-                        {/* Shimmer border on hover */}
-                        <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none overflow-hidden">
-                          <div className="absolute inset-0 rounded-xl border border-primary/20" />
-                        </div>
-
-                        <div className="relative flex items-start gap-4">
-                          {/* Favicon with glow ring */}
-                          {source && (
-                            <div className="relative shrink-0 mt-0.5">
-                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-white/10 to-white/[0.02] border border-white/10 flex items-center justify-center group-hover:border-primary/30 group-hover:shadow-[0_0_12px_-2px_hsl(var(--primary)/0.3)] transition-all duration-300">
-                                <img 
-                                  src={`https://www.google.com/s2/favicons?domain=${source}&sz=64`}
-                                  alt=""
-                                  className="w-5 h-5 rounded"
-                                  onError={(e) => { (e.target as HTMLImageElement).src = ''; (e.target as HTMLImageElement).style.display = 'none'; }}
-                                />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {articles.map((article, idx) => {
+                      const source = article.source || (() => {
+                        try { return new URL(article.url).hostname.replace('www.', ''); } catch { return ''; }
+                      })();
+                      // Generate a unique gradient based on source name
+                      const gradientHue = source ? (source.charCodeAt(0) * 7 + (source.charCodeAt(1) || 0) * 13) % 360 : 200;
+                      return (
+                        <motion.a
+                          key={idx}
+                          href={article.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          transition={{ delay: idx * 0.08, type: "spring", stiffness: 200, damping: 20 }}
+                          className={`group relative block rounded-xl border border-white/[0.06] bg-card/50 backdrop-blur-sm overflow-hidden hover:border-primary/40 hover:shadow-[0_0_40px_-10px_hsl(var(--primary)/0.2)] hover:-translate-y-1 transition-all duration-300 ${idx === 0 ? 'sm:col-span-2' : ''}`}
+                        >
+                          {/* Visual thumbnail area with source-based gradient */}
+                          <div className="relative aspect-[16/9] overflow-hidden" style={{
+                            background: `linear-gradient(135deg, hsla(${gradientHue}, 60%, 30%, 0.4) 0%, hsla(${(gradientHue + 60) % 360}, 50%, 20%, 0.3) 100%)`
+                          }}>
+                            {/* Decorative grid pattern */}
+                            <div className="absolute inset-0 opacity-[0.04]" style={{
+                              backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+                              backgroundSize: '20px 20px'
+                            }} />
+                            {/* Large centered favicon */}
+                            {source && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="relative">
+                                  <div className="absolute inset-0 rounded-full blur-xl bg-primary/20 scale-150 group-hover:bg-primary/30 transition-all" />
+                                  <div className="relative w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-sm group-hover:scale-110 group-hover:border-primary/40 transition-all duration-300">
+                                    <img 
+                                      src={`https://www.google.com/s2/favicons?domain=${source}&sz=64`}
+                                      alt=""
+                                      className="w-8 h-8 rounded"
+                                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                  </div>
+                                </div>
                               </div>
+                            )}
+                            {/* Bottom gradient overlay for text */}
+                            <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-card to-transparent" />
+                            {/* External link icon */}
+                            <div className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/10 border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-sm">
+                              <ExternalLink className="w-4 h-4 text-white/80" />
                             </div>
-                          )}
-                          
-                          <div className="space-y-2 flex-1 min-w-0">
+                          </div>
+
+                          {/* Content */}
+                          <div className="p-4 space-y-2">
                             <h4 className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors duration-200 line-clamp-2">
                               {article.title}
                             </h4>
-                            <p className="text-xs text-muted-foreground/80 leading-relaxed line-clamp-2">
+                            <p className="text-xs text-muted-foreground/70 leading-relaxed line-clamp-2">
                               {article.description}
                             </p>
                             {source && (
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] text-muted-foreground/70 font-medium tracking-wide">
-                                <div className="w-1.5 h-1.5 rounded-full bg-green-500/60 animate-pulse" />
-                                {source}
+                              <div className="flex items-center gap-2 pt-1">
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] text-muted-foreground/70 font-medium">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-green-500/60 animate-pulse" />
+                                  {source}
+                                </div>
                               </div>
                             )}
                           </div>
-                          
-                          <ExternalLink className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary/60 shrink-0 mt-1 transition-colors" />
-                        </div>
-                      </motion.a>
-                    );
-                  })}
+
+                          {/* Hover glow border */}
+                          <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+                            <div className="absolute inset-0 rounded-xl" style={{
+                              background: 'linear-gradient(135deg, hsla(43,90%,68%,0.1), transparent 50%, hsla(187,84%,55%,0.08))',
+                            }} />
+                          </div>
+                        </motion.a>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 space-y-3">
@@ -713,89 +734,121 @@ export function TrendDetailModal({
               )}
             </TabsContent>
 
-            {/* Media Tab - YouTube Search Links with futuristic design */}
+            {/* Media Tab - Next Level Visual Grid */}
             <TabsContent value="media" className="p-6 space-y-4 mt-0">
               {loadingArticles ? (
-                <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                  <motion.div
-                    className="relative w-16 h-16"
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                  >
-                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-red-500 border-r-red-500/50" />
-                    <div className="absolute inset-2 rounded-full border border-transparent border-b-pink-500/60" />
-                    <Play className="absolute inset-0 m-auto w-6 h-6 text-red-500" />
-                  </motion.div>
-                  <p className="text-sm text-muted-foreground font-medium">Suche Videos...</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className={`rounded-xl border border-white/[0.06] overflow-hidden ${i === 1 ? 'col-span-2' : ''}`}>
+                      <div className={`${i === 1 ? 'aspect-video' : 'aspect-[16/9]'} bg-gradient-to-br from-red-500/10 to-red-900/5 animate-pulse flex items-center justify-center`}>
+                        <div className="w-12 h-12 rounded-full bg-red-500/20 animate-pulse" />
+                      </div>
+                      <div className="p-3 space-y-2">
+                        <div className="h-4 w-3/4 bg-muted/30 rounded animate-pulse" />
+                        <div className="h-3 w-1/2 bg-muted/20 rounded animate-pulse" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : videos.length > 0 ? (
                 <div className="space-y-4">
-                  {/* Header */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-xs text-red-400">
-                        <Play className="w-3 h-3" />
-                        <span className="tracking-wider uppercase font-semibold">YouTube</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">{videos.length} Suchanfragen</span>
+                  {/* Header badge */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+                      <Play className="w-3 h-3" />
+                      <span className="tracking-wider uppercase font-semibold">YouTube</span>
                     </div>
+                    <span className="text-xs text-muted-foreground">{videos.length} Suchanfragen</span>
                   </div>
 
-                  <div className="grid gap-3">
+                  {/* Visual Grid - first item featured full-width */}
+                  <div className="grid grid-cols-2 gap-3">
                     {videos.map((video, idx) => (
                       <motion.a
                         key={idx}
                         href={video.search_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.1, type: "spring", stiffness: 200 }}
-                        className="group relative flex items-center gap-4 p-4 rounded-xl border border-white/[0.06] bg-gradient-to-br from-red-500/[0.03] to-transparent backdrop-blur-sm hover:border-red-500/30 hover:shadow-[0_0_30px_-5px_rgba(239,68,68,0.15)] transition-all duration-300"
+                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ delay: idx * 0.1, type: "spring", stiffness: 180, damping: 20 }}
+                        className={`group relative block rounded-xl border border-white/[0.06] bg-card/50 backdrop-blur-sm overflow-hidden hover:border-red-500/40 hover:shadow-[0_0_40px_-10px_rgba(239,68,68,0.2)] hover:-translate-y-1 transition-all duration-300 ${idx === 0 ? 'col-span-2' : ''}`}
                       >
-                        {/* Play button thumbnail */}
-                        <div className="relative shrink-0 w-20 h-14 rounded-lg bg-gradient-to-br from-red-500/20 to-red-900/30 border border-red-500/10 flex items-center justify-center overflow-hidden group-hover:border-red-500/30 transition-all duration-300">
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                          <motion.div 
-                            className="relative z-10 w-8 h-8 rounded-full bg-red-600/90 flex items-center justify-center shadow-lg"
-                            whileHover={{ scale: 1.1 }}
-                          >
-                            <Play className="w-4 h-4 text-white fill-white ml-0.5" />
-                          </motion.div>
-                          {/* Scanlines effect */}
-                          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
-                            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px)'
+                        {/* Video thumbnail area */}
+                        <div className={`relative ${idx === 0 ? 'aspect-video' : 'aspect-[16/9]'} overflow-hidden bg-gradient-to-br from-red-950/60 via-red-900/30 to-card`}>
+                          {/* YouTube-style gradient background */}
+                          <div className="absolute inset-0" style={{
+                            background: `radial-gradient(ellipse at 30% 40%, rgba(239,68,68,0.15) 0%, transparent 60%), radial-gradient(ellipse at 70% 70%, rgba(220,38,38,0.1) 0%, transparent 50%)`
                           }} />
+                          {/* Decorative scanlines */}
+                          <div className="absolute inset-0 opacity-[0.03]" style={{
+                            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.05) 2px, rgba(255,255,255,0.05) 4px)'
+                          }} />
+
+                          {/* Central play button with glow */}
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="relative">
+                              {/* Outer glow ring */}
+                              <motion.div
+                                className="absolute inset-0 rounded-full blur-xl bg-red-500/30 scale-[2]"
+                                animate={{ 
+                                  opacity: [0.3, 0.6, 0.3],
+                                  scale: [1.8, 2.2, 1.8]
+                                }}
+                                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                              />
+                              {/* Play button */}
+                              <div className={`relative ${idx === 0 ? 'w-16 h-16' : 'w-12 h-12'} rounded-full bg-red-600/90 border-2 border-red-400/40 flex items-center justify-center shadow-[0_0_30px_rgba(239,68,68,0.4)] group-hover:scale-110 group-hover:shadow-[0_0_50px_rgba(239,68,68,0.6)] group-hover:bg-red-600 transition-all duration-300`}>
+                                <Play className={`${idx === 0 ? 'w-7 h-7' : 'w-5 h-5'} text-white fill-white ml-0.5`} />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Bottom gradient with search query text */}
+                          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-card via-card/80 to-transparent">
+                            <p className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
+                              <Search className="w-3 h-3" />
+                              <span className="truncate">{video.query}</span>
+                            </p>
+                          </div>
                         </div>
 
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                          <h5 className="font-semibold text-sm group-hover:text-red-400 transition-colors line-clamp-1">
+                        {/* Card content */}
+                        <div className="p-3 space-y-1">
+                          <h5 className="font-semibold text-sm group-hover:text-red-400 transition-colors line-clamp-2 leading-snug">
                             {video.title}
                           </h5>
-                          <p className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
-                            <Search className="w-3 h-3" />
-                            <span className="truncate">{video.query}</span>
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
+                              <ExternalLink className="w-3 h-3" />
+                              YouTube durchsuchen
+                            </div>
+                          </div>
                         </div>
 
-                        <ExternalLink className="w-4 h-4 text-muted-foreground/30 group-hover:text-red-400/60 shrink-0 transition-colors" />
+                        {/* Hover neon border glow */}
+                        <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+                          <div className="absolute inset-0 rounded-xl" style={{
+                            background: 'linear-gradient(135deg, rgba(239,68,68,0.08), transparent 50%, rgba(220,38,38,0.06))',
+                          }} />
+                        </div>
                       </motion.a>
                     ))}
                   </div>
 
-                  {/* Direct search CTA */}
+                  {/* Direct YouTube search CTA */}
                   <motion.a
                     href={`https://www.youtube.com/results?search_query=${encodeURIComponent(trend?.name || '')}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                    className="flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-white/10 text-sm text-muted-foreground hover:border-red-500/30 hover:text-red-400 transition-all"
+                    transition={{ delay: 0.5 }}
+                    className="group flex items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/10 text-sm text-muted-foreground hover:border-red-500/30 hover:text-red-400 hover:bg-red-500/[0.03] transition-all duration-300"
                   >
                     <Search className="w-4 h-4" />
                     Alle Videos auf YouTube suchen
-                    <ExternalLink className="w-3 h-3" />
+                    <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </motion.a>
                 </div>
               ) : (
