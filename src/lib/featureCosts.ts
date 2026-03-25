@@ -29,6 +29,9 @@ export const FEATURE_COSTS = {
   // Explainer Video Animation (Hailuo 2.3)
   EXPLAINER_SCENE_ANIMATE: 'explainer_scene_animate',
   EXPLAINER_CHARACTER_ANIMATE: 'explainer_character_animate',
+  
+  // KI Picture Studio
+  STUDIO_IMAGE_GENERATE: 'studio_image_generate',
 } as const;
 
 export type FeatureCost = typeof FEATURE_COSTS[keyof typeof FEATURE_COSTS];
