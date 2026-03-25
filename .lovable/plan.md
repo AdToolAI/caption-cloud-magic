@@ -1,19 +1,17 @@
 
 
-## Header-Icons neu sortieren
+## Social-Icons: Dashboard entfernen + Header weiter links
 
-### Aenderung in `src/components/layout/AppHeader.tsx`
+### Aenderung 1: `src/pages/Home.tsx`
+- Zeile 482: `<SocialConnectionIcons />` entfernen
+- Zeile 8: Import entfernen
 
-Die 6 Social-Connection-Icons nach links verschieben (direkt am Anfang des rechten Bereichs), die 4 anderen Icons (ThemeToggle, Community, NotificationBell, UserMenu) nach rechts.
+### Aenderung 2: `src/components/layout/AppHeader.tsx`
+- `SocialConnectionIcons` aus dem rechten Actions-`div` herausnehmen
+- Als eigenes Element zwischen CommandBar und Actions-div platzieren, mit `hidden md:flex items-center`
+- So stehen die Social-Icons visuell links, getrennt von den 4 System-Icons rechts
 
-**Neue Reihenfolge im `flex items-center gap-2` Container:**
-
-1. `SocialConnectionIcons` (hidden md:flex, nur wenn user)
-2. Spacer oder gap
-3. `ThemeToggle`
-4. Community Button
-5. `NotificationBell`
-6. `UserMenu`
-
-Einfach die Position des `SocialConnectionIcons`-Blocks von Zeile 63-67 nach oben verschieben, direkt als erstes Element im Actions-div (Zeile 53).
+```text
+[Brand] ... [CommandBar] ... [SocialIcons]    [ThemeToggle | Community | Bell | UserMenu]
+```
 
