@@ -1505,7 +1505,7 @@ export const translations: Record<Language, any> = {
     hubs: {
       planen: "Plan",
       erstellen: "Create",
-      optimieren: "Optimize",
+      optimieren: "Create & Optimize",
       analysieren: "Analyze",
       automatisieren: "Automate",
       einstellungen: "Settings",
@@ -1515,8 +1515,8 @@ export const translations: Record<Language, any> = {
     },
     hubDesc: {
       planen: "Plan, schedule, and organize your content calendar",
-      erstellen: "Create captions, posts, and visual content with AI",
-      optimieren: "Optimize your content strategy and engagement",
+      erstellen: "Create videos, audio, and visual media content",
+      optimieren: "Create and optimize captions, posts, and content with AI",
       analysieren: "Track performance and discover trends",
       medien: "Manage media assets, videos, and audio",
       team: "Collaborate with your team and manage workspaces",
@@ -3796,7 +3796,7 @@ export const translations: Record<Language, any> = {
     hubs: {
       planen: "Planen",
       erstellen: "Erstellen",
-      optimieren: "Optimieren",
+      optimieren: "Erstellen & Optimieren",
       analysieren: "Analysieren",
       automatisieren: "Automatisieren",
       medien: "Medien",
@@ -3805,8 +3805,8 @@ export const translations: Record<Language, any> = {
     },
     hubDesc: {
       planen: "Plane, terminiere und organisiere deinen Content-Kalender",
-      erstellen: "Erstelle Captions, Posts und visuellen Content mit KI",
-      optimieren: "Optimiere deine Content-Strategie und dein Engagement",
+      erstellen: "Erstelle Videos, Audio und visuelle Medieninhalte",
+      optimieren: "Erstelle und optimiere Captions, Posts und Content mit KI",
       analysieren: "Verfolge Performance und entdecke Trends",
       medien: "Verwalte Medien, Videos und Audio",
       team: "Arbeite mit deinem Team zusammen",
@@ -6047,7 +6047,7 @@ export const translations: Record<Language, any> = {
     hubs: {
       planen: "Planificar",
       erstellen: "Crear",
-      optimieren: "Optimizar",
+      optimieren: "Crear y Optimizar",
       analysieren: "Analizar",
       automatisieren: "Automatizar",
       medien: "Medios",
@@ -6056,8 +6056,8 @@ export const translations: Record<Language, any> = {
     },
     hubDesc: {
       planen: "Planifica, programa y organiza tu calendario de contenido",
-      erstellen: "Crea captions, posts y contenido visual con IA",
-      optimieren: "Optimiza tu estrategia de contenido y engagement",
+      erstellen: "Crea videos, audio y contenido multimedia visual",
+      optimieren: "Crea y optimiza captions, posts y contenido con IA",
       analysieren: "Rastrea el rendimiento y descubre tendencias",
       medien: "Gestiona archivos multimedia, videos y audio",
       team: "Colabora con tu equipo y gestiona espacios",
