@@ -42,6 +42,109 @@ const Home = () => {
   const [weekDays, setWeekDays] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Performance KPI state
+  const [performanceKPIs, setPerformanceKPIs] = useState({
+    reach: 0,
+    reachTrend: 0,
+    engagementRate: 0,
+    engagementTrend: 0,
+    publishedPosts: 0,
+    postsTrend: 0,
+  });
+
+  // Fetch performance KPIs from post_metrics
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchPerformanceKPIs = async () => {
+      try {
+        const now = new Date();
+        const weekAgo = new Date(now);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const twoWeeksAgo = new Date(now);
+        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
+        // Parallel queries
+        const [
+          reachThisWeek,
+          reachLastWeek,
+          engagementAll,
+          postsThisMonth,
+          postsLastMonth,
+        ] = await Promise.all([
+          // Reach last 7 days
+          supabase
+            .from("post_metrics")
+            .select("reach")
+            .eq("user_id", user.id)
+            .gte("posted_at", weekAgo.toISOString()),
+          // Reach 7-14 days ago
+          supabase
+            .from("post_metrics")
+            .select("reach")
+            .eq("user_id", user.id)
+            .gte("posted_at", twoWeeksAgo.toISOString())
+            .lt("posted_at", weekAgo.toISOString()),
+          // Engagement rate all posts
+          supabase
+            .from("post_metrics")
+            .select("engagement_rate")
+            .eq("user_id", user.id)
+            .not("engagement_rate", "is", null),
+          // Posts this month
+          supabase
+            .from("post_metrics")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .gte("posted_at", monthStart.toISOString()),
+          // Posts last month
+          supabase
+            .from("post_metrics")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .gte("posted_at", lastMonthStart.toISOString())
+            .lt("posted_at", monthStart.toISOString()),
+        ]);
+
+        const sumReach = (data: any[] | null) =>
+          (data || []).reduce((s, r) => s + (r.reach || 0), 0);
+
+        const thisWeekReach = sumReach(reachThisWeek.data);
+        const lastWeekReach = sumReach(reachLastWeek.data);
+        const reachTrend = lastWeekReach > 0
+          ? Math.round(((thisWeekReach - lastWeekReach) / lastWeekReach) * 100)
+          : 0;
+
+        const engData = engagementAll.data || [];
+        const avgEngagement = engData.length > 0
+          ? engData.reduce((s, r) => s + (r.engagement_rate || 0), 0) / engData.length
+          : 0;
+
+        const thisMonthPosts = postsThisMonth.count || 0;
+        const lastMonthPosts = postsLastMonth.count || 0;
+        const postsTrend = lastMonthPosts > 0
+          ? Math.round(((thisMonthPosts - lastMonthPosts) / lastMonthPosts) * 100)
+          : 0;
+
+        setPerformanceKPIs({
+          reach: thisWeekReach,
+          reachTrend,
+          engagementRate: Math.round(avgEngagement * 10) / 10,
+          engagementTrend: 0,
+          publishedPosts: thisMonthPosts,
+          postsTrend,
+        });
+      } catch (err) {
+        console.error("Error fetching performance KPIs:", err);
+      }
+    };
+
+    fetchPerformanceKPIs();
+  }, [user]);
+
   // Fetch posting times for all platforms
   const { data: postingTimesData, isLoading: postingTimesLoading } = usePostingTimes({
     platform: "all",
@@ -305,24 +408,24 @@ const Home = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <MetricCard
                 label={t("dashboard.metrics.reach7d")}
-                value="45.2K"
+                value={performanceKPIs.reach >= 1000 ? `${(performanceKPIs.reach / 1000).toFixed(1)}K` : String(performanceKPIs.reach)}
                 subtitle={t("dashboard.metrics.vsLastWeek")}
                 icon={<TrendingUp className="h-5 w-5" />}
-                trend={{ value: 12, isPositive: true }}
+                trend={{ value: Math.abs(performanceKPIs.reachTrend), isPositive: performanceKPIs.reachTrend >= 0 }}
               />
               <MetricCard
                 label={t("dashboard.metrics.engagementRate")}
-                value="5.8%"
+                value={`${performanceKPIs.engagementRate}%`}
                 subtitle={t("dashboard.metrics.avgAllPosts")}
                 icon={<TrendingUp className="h-5 w-5" />}
-                trend={{ value: 8, isPositive: true }}
+                trend={{ value: Math.abs(performanceKPIs.engagementTrend), isPositive: performanceKPIs.engagementTrend >= 0 }}
               />
               <MetricCard
                 label={t("dashboard.metrics.publishedPosts")}
-                value="18"
+                value={String(performanceKPIs.publishedPosts)}
                 subtitle={t("dashboard.metrics.thisMonth")}
                 icon={<Send className="h-5 w-5" />}
-                trend={{ value: 3, isPositive: false }}
+                trend={{ value: Math.abs(performanceKPIs.postsTrend), isPositive: performanceKPIs.postsTrend >= 0 }}
               />
             </div>
           </Section>
