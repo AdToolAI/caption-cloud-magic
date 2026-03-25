@@ -452,7 +452,14 @@ const Home = () => {
               <SocialConnectionIcons />
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-warning" />
-                <span>{t("dashboard.statusBar.nextPost")}: {language === "de" ? "Heute 18:00" : "Today 6:00 PM"}</span>
+                <span>{t("dashboard.statusBar.nextPost")}: {(() => {
+                  const next = getNextPost();
+                  if (!next) return language === "de" ? "Kein Post geplant" : "No post scheduled";
+                  const d = new Date(next.date);
+                  const dd = String(d.getDate()).padStart(2, '0');
+                  const mm = String(d.getMonth() + 1).padStart(2, '0');
+                  return `${dd}.${mm}. ${next.post.suggestedTime || "12:00"}`;
+                })()}</span>
               </div>
             </div>
           </div>
