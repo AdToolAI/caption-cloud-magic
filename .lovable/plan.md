@@ -1,59 +1,37 @@
 
 
-## Wochenansicht neu gestalten: Horizontale Linie mit Plattform-Ringen
+## Editor-Voreinstellung + KI-Auto-Beschreibung aus Video
 
 ### Problem
-1. Verpasste Posts bekommen nur +1h neue Zeit statt mindestens +6h
-2. Layout ist ein Grid statt der gewuenschten horizontalen Linie (Mo-So)
-3. Fehlende visuelle Plattform-Ringe mit Glow-Effekt
-4. Klick auf Ring soll Composer/Editor oeffnen und Post in Kalender speichern
+1. Wenn der Editor geoeffnet wird, zeigt er immer 12:00 statt der tatsaechlichen (ggf. neu berechneten) Post-Zeit
+2. Es gibt keine "KI Auto-Ausfuellen"-Funktion, die anhand des Videos automatisch Caption und Hashtags generiert
 
 ### Aenderungen
 
-#### 1. `src/components/dashboard/WeekDayCard.tsx` — Komplett neu als horizontale Timeline-Karte
+#### 1. `src/components/dashboard/WeekPostEditor.tsx` — Zeit-Voreinstellung + KI-Auto-Button
 
-Neues Design pro Tag:
-- Kompakte horizontale Darstellung in einer Reihe (Mo–So), scrollbar auf Mobile
-- Jeder Tag zeigt: Tagesname + Nummer oben, darunter **leuchtende Plattform-Ringe**
-- Ring-Farben:
-  - YouTube: `ring-red-500 shadow-red-500/60`
-  - Instagram: `ring-purple-500 shadow-purple-500/60`
-  - Facebook: `ring-blue-500 shadow-blue-500/60`
-  - LinkedIn: `ring-green-500 shadow-green-500/60`
-  - X: `ring-violet-300 shadow-violet-300/60` (Schwarzlicht-Effekt)
-  - TikTok: `ring-white shadow-white/60`
-- Ring leuchtet (Glow via `shadow-[0_0_12px_...]`) **nur wenn Post published ist**
-- Nicht-published Posts: Ring mit gedaempfter Farbe, kein Glow
-- Klick auf Ring → oeffnet `WeekPostEditor` Dialog fuer diesen Post
-- Plus-Button bleibt fuer neue Posts
+**Zeit-Fix**: Der `useState`-Initialwert fuer `time` nutzt bereits `post?.suggestedTime`, aber der Reset-Effekt (aktuell faelschlicherweise als `useState(() => ...)` statt `useEffect`) wird korrigiert zu einem richtigen `useEffect` mit `[post]` Dependency, damit bei jedem neuen Post die korrekte `suggestedTime` (z.B. "21:00" bei rescheduled Posts) gesetzt wird.
 
-#### 2. `src/pages/Home.tsx` — Layout + Reschedule-Logik
+**Neuer "KI Auto-Ausfuellen" Button**: Neben dem bestehenden "KI optimieren" Button kommt ein neuer Button, der:
+- Prüft ob ein Video/Bild vorhanden ist (`mediaUrl`)
+- Die `mediaUrl` + Plattform + Content-Idee an die Edge Function `generate-post-caption` sendet
+- Caption und Hashtags automatisch befuellt
+- Falls kein Medium vorhanden: nur anhand der `contentIdea` generieren
 
-**Layout**: Grid ersetzen durch horizontale Flex-Reihe mit 7 Tagen (Mo–So statt ab heute), `overflow-x-auto` auf Mobile.
+#### 2. `supabase/functions/generate-post-caption/index.ts` — Neue Edge Function
 
-**Woche berechnen**: Start am Montag der aktuellen Woche, nicht ab heute.
+Diese Edge Function existiert noch nicht. Sie wird erstellt mit:
+- Empfaengt `description`, `platform`, `language`, `tone`, optional `media_url`
+- Nutzt Lovable AI Gateway um Caption + Hashtags zu generieren
+- Bei `media_url`: Sendet die URL als Kontext mit (Beschreibung: "Erstelle eine Caption fuer dieses Video/Bild")
+- Rueckgabe: `{ caption: string, hashtags: string[] }`
 
-**Reschedule-Logik anpassen**: Statt `currentMinutes + 60` → mindestens **+6 Stunden** nach der urspruenglichen Post-Zeit:
-```text
-newTime = originalPostTime + 6h
-Falls newTime > 22:00 → naechster Tag 09:00
-Falls newTime < jetzt → jetzt + 1h aufgerundet
-```
+#### 3. `useEffect`-Fix in WeekPostEditor
 
-**Ring-Click Handler**: `onRingClick(post)` → oeffnet `WeekPostEditor` mit dem Post, der beim Speichern ein `calendar_event` erstellt (schon implementiert im Editor).
+Aktuell wird `useState(() => { ... })` als Effekt missbraucht (Zeile 36-43). Das wird zu `useEffect` korrigiert, damit sich das Formular korrekt aktualisiert wenn ein neuer Post geklickt wird.
 
-#### 3. `src/components/dashboard/WeekTimelineDay.tsx` — Neue Komponente
-
-Kompakte Tagesdarstellung:
-- Tagesname (MO, DI, ...) + Nummer
-- Darunter: Plattform-Ringe als klickbare Kreise
-- Heute-Markierung mit Primary-Farbe
-- Leerer Tag: kleiner "+" Button
-- Ringe zeigen Plattform-Icon in der Mitte
-
-### Verhalten
-- Posts werden weiterhin in den Kalender gespeichert (createEvent/updateEvent via WeekPostEditor)
-- Glow-Animation nur bei `status === 'published'`
-- Verpasste Posts: mindestens 6h spaeter neu geplant
-- Woche geht immer Mo–So
+### Zusammenfassung
+- Editor oeffnet mit korrekter rescheduled Zeit (z.B. 21:00)
+- "KI Auto-Ausfuellen" analysiert das vorhandene Video/Bild und generiert Caption + Hashtags
+- Edge Function wird neu erstellt mit Lovable AI Gateway
 
