@@ -25,6 +25,8 @@ import { PRICING_V21 } from "@/config/pricing";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
 import { NicheTutorialModal } from "@/components/onboarding/NicheTutorialModal";
+import { WeekDayCard, type WeekPost } from "@/components/dashboard/WeekDayCard";
+import { WeekPostEditor } from "@/components/dashboard/WeekPostEditor";
 
 interface Post {
   id: string;
