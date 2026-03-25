@@ -1,37 +1,29 @@
 
 
-## Editor-Voreinstellung + KI-Auto-Beschreibung aus Video
-
-### Problem
-1. Wenn der Editor geoeffnet wird, zeigt er immer 12:00 statt der tatsaechlichen (ggf. neu berechneten) Post-Zeit
-2. Es gibt keine "KI Auto-Ausfuellen"-Funktion, die anhand des Videos automatisch Caption und Hashtags generiert
+## "Naechster Post" Anzeige korrigieren
 
 ### Aenderungen
 
-#### 1. `src/components/dashboard/WeekPostEditor.tsx` — Zeit-Voreinstellung + KI-Auto-Button
+#### 1. `src/pages/Home.tsx` — Status Bar: echten naechsten Post anzeigen
 
-**Zeit-Fix**: Der `useState`-Initialwert fuer `time` nutzt bereits `post?.suggestedTime`, aber der Reset-Effekt (aktuell faelschlicherweise als `useState(() => ...)` statt `useEffect`) wird korrigiert zu einem richtigen `useEffect` mit `[post]` Dependency, damit bei jedem neuen Post die korrekte `suggestedTime` (z.B. "21:00" bei rescheduled Posts) gesetzt wird.
+Zeile 454-455: Statt hardcoded "Heute 18:00" den tatsaechlich naechsten geplanten Post aus `weekDays` berechnen (erster Post mit `status !== 'published'` und Zeitpunkt in der Zukunft). Datum + Uhrzeit dynamisch anzeigen, z.B. "25.03.2026 21:00".
 
-**Neuer "KI Auto-Ausfuellen" Button**: Neben dem bestehenden "KI optimieren" Button kommt ein neuer Button, der:
-- Prüft ob ein Video/Bild vorhanden ist (`mediaUrl`)
-- Die `mediaUrl` + Plattform + Content-Idee an die Edge Function `generate-post-caption` sendet
-- Caption und Hashtags automatisch befuellt
-- Falls kein Medium vorhanden: nur anhand der `contentIdea` generieren
+#### 2. `src/pages/Home.tsx` — "Heute" Section → "Naechster Post"
 
-#### 2. `supabase/functions/generate-post-caption/index.ts` — Neue Edge Function
+- Section-Titel von `t("dashboard.sections.today")` zu "Naechster Post" aendern
+- Statt alle heutigen Posts als Liste: nur den **naechsten** anstehenden Post anzeigen
+- Content-Idee auf bis zu 3 Zeilen anzeigen (`line-clamp-3`) statt 1 Zeile
+- "Oeffnen" Button entfernen
+- Plattform-Badge und Status-Pill bleiben
+- Thumbnail bleibt wenn vorhanden
+- Falls kein naechster Post: Empty State wie bisher
 
-Diese Edge Function existiert noch nicht. Sie wird erstellt mit:
-- Empfaengt `description`, `platform`, `language`, `tone`, optional `media_url`
-- Nutzt Lovable AI Gateway um Caption + Hashtags zu generieren
-- Bei `media_url`: Sendet die URL als Kontext mit (Beschreibung: "Erstelle eine Caption fuer dieses Video/Bild")
-- Rueckgabe: `{ caption: string, hashtags: string[] }`
+#### 3. Naechsten Post berechnen
 
-#### 3. `useEffect`-Fix in WeekPostEditor
+Neue Hilfsfunktion `getNextPost()`: Iteriert ueber alle `weekDays` und findet den chronologisch naechsten Post, der noch nicht `published` ist. Beruecksichtigt sowohl Datum als auch `suggestedTime`.
 
-Aktuell wird `useState(() => { ... })` als Effekt missbraucht (Zeile 36-43). Das wird zu `useEffect` korrigiert, damit sich das Formular korrekt aktualisiert wenn ein neuer Post geklickt wird.
-
-### Zusammenfassung
-- Editor oeffnet mit korrekter rescheduled Zeit (z.B. 21:00)
-- "KI Auto-Ausfuellen" analysiert das vorhandene Video/Bild und generiert Caption + Hashtags
-- Edge Function wird neu erstellt mit Lovable AI Gateway
+### Ergebnis
+- Status Bar zeigt echte naechste Post-Zeit (z.B. "25.03. 21:00")
+- "Naechster Post" Section zeigt den einen naechsten Post mit voller Beschreibung auf 3 Zeilen
+- Kein "Oeffnen" Button mehr
 
