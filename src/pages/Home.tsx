@@ -520,30 +520,33 @@ const Home = () => {
               </Button>
             }
           >
-            <Card className="rounded-2xl shadow-soft">
-              <CardContent className="p-6">
-                <div className="grid grid-cols-7 gap-4">
-                  {weekDays.map(day => (
-                    <div key={day.date} className="flex flex-col items-center">
-                      <span className="text-xs text-muted-foreground uppercase mb-2">{day.name}</span>
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold ${day.isToday ? 'bg-primary text-white' : 'bg-muted text-foreground'}`}>
-                        {day.day}
-                      </div>
-                      <div className="mt-2 flex flex-col gap-1">
-                        {day.posts.map((post: any, i: number) => (
-                          <div key={i} className={`w-8 h-1 rounded-full ${getPlatformColor(post.platform)}`} />
-                        ))}
-                      </div>
-                      {day.posts.length === 0 && (
-                        <span className="text-xs text-muted-foreground mt-2">–</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {weekDays.map(day => (
+                <WeekDayCard
+                  key={day.date}
+                  date={day.date}
+                  dayName={day.name}
+                  dayNumber={day.day}
+                  isToday={day.isToday}
+                  posts={day.posts}
+                  onEdit={handleEditPost}
+                  onUpload={handleUploadPost}
+                  onAddPost={handleAddPost}
+                />
+              ))}
+            </div>
           </Section>
         )}
+
+        {/* Week Post Editor */}
+        <WeekPostEditor
+          open={editorOpen}
+          onOpenChange={setEditorOpen}
+          post={editingPost}
+          date={getEditDate()}
+          workspaceId={workspaceId}
+          onSaved={handleEditorSaved}
+        />
 
         {/* Feature Cards Grid */}
         {user && (
