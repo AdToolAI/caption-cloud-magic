@@ -312,10 +312,11 @@ export default function BackgroundReplacer() {
       .from('studio_images')
       .insert({
         user_id: user.id,
-        url: imageUrl,
+        image_url: imageUrl,
         prompt: `Smart Background: ${category} / ${lighting}`,
         style: category,
         aspect_ratio: '1:1',
+        source: 'smart_background',
       })
       .select('id')
       .single();
