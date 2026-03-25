@@ -255,7 +255,9 @@ export const RecoCard = () => {
               transition={{ duration: 2, repeat: Infinity }}
               className="w-2 h-2 rounded-full bg-accent"
             />
-            Basierend auf deinen Performance-Daten der letzten 28 Tage
+            {isBeginnerMode
+              ? 'Ab 10 Posts erhältst du personalisierte KI-Empfehlungen'
+              : 'Basierend auf deinen Performance-Daten der letzten 28 Tage'}
           </p>
         </div>
       </Card>
