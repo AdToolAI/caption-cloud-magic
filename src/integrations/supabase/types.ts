@@ -2992,6 +2992,145 @@ export type Database = {
           },
         ]
       }
+      community_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      community_channels: {
+        Row: {
+          allowed_user_ids: string[]
+          created_at: string
+          created_by: string | null
+          id: string
+          moderation_rules: Json
+          name: string
+          topic: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          allowed_user_ids?: string[]
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          moderation_rules?: Json
+          name: string
+          topic: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          allowed_user_ids?: string[]
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          moderation_rules?: Json
+          name?: string
+          topic?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_channels_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_message_tags: {
+        Row: {
+          created_at: string
+          id: string
+          tag: string
+          usage_count: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          tag: string
+          usage_count?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          tag?: string
+          usage_count?: number
+        }
+        Relationships: []
+      }
+      community_messages: {
+        Row: {
+          channel_id: string
+          content: string
+          created_at: string
+          id: string
+          is_spotlight: boolean
+          moderated_at: string | null
+          moderation_status: string
+          tags: string[]
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          content: string
+          created_at?: string
+          id?: string
+          is_spotlight?: boolean
+          moderated_at?: string | null
+          moderation_status?: string
+          tags?: string[]
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_spotlight?: boolean
+          moderated_at?: string | null
+          moderation_status?: string
+          tags?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "community_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companion_conversations: {
         Row: {
           context_type: string | null
@@ -4822,6 +4961,50 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mentor_slots: {
+        Row: {
+          booked_by: string | null
+          channel_id: string | null
+          created_at: string
+          duration_min: number
+          id: string
+          mentor_user_id: string
+          slot_time: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          booked_by?: string | null
+          channel_id?: string | null
+          created_at?: string
+          duration_min?: number
+          id?: string
+          mentor_user_id: string
+          slot_time: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          booked_by?: string | null
+          channel_id?: string | null
+          created_at?: string
+          duration_min?: number
+          id?: string
+          mentor_user_id?: string
+          slot_time?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mentor_slots_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "community_channels"
             referencedColumns: ["id"]
           },
         ]
@@ -7428,6 +7611,45 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "sora_long_form_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spotlight_rotation: {
+        Row: {
+          channel_id: string
+          current_post_id: string | null
+          id: string
+          rotated_at: string
+          rotation_interval_days: number
+        }
+        Insert: {
+          channel_id: string
+          current_post_id?: string | null
+          id?: string
+          rotated_at?: string
+          rotation_interval_days?: number
+        }
+        Update: {
+          channel_id?: string
+          current_post_id?: string | null
+          id?: string
+          rotated_at?: string
+          rotation_interval_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spotlight_rotation_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: true
+            referencedRelation: "community_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spotlight_rotation_current_post_id_fkey"
+            columns: ["current_post_id"]
+            isOneToOne: false
+            referencedRelation: "community_messages"
             referencedColumns: ["id"]
           },
         ]
