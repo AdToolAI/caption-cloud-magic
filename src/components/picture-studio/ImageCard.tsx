@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Download, FolderPlus, Maximize2 } from "lucide-react";
+import { Download, FolderPlus, Maximize2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
