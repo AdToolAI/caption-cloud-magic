@@ -18,7 +18,7 @@ interface ImageCardProps {
   onDelete?: (image: any) => void;
 }
 
-export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLightbox }: ImageCardProps) {
+export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLightbox, onDelete }: ImageCardProps) {
   const handleDownload = async () => {
     if (onDownload) {
       onDownload(image.url);
