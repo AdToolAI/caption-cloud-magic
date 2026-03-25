@@ -281,7 +281,7 @@ const Home = () => {
                 caption: undefined,
                 suggestedTime: sp.suggested_time?.slice(0, 5) || "12:00",
                 status: sp.status === 'scheduled' ? 'scheduled' : sp.status === 'published' ? 'published' : 'suggested',
-                hashtags: sp.hashtags ? (Array.isArray(sp.hashtags) ? sp.hashtags as string[] : undefined) : undefined,
+                hashtags: undefined,
                 sourceType: 'starter_plan',
                 sourceId: sp.id,
               });
