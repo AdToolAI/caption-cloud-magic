@@ -5,7 +5,7 @@ import { NotificationBell } from "./NotificationBell";
 import { ThemeToggle } from "./ui/ThemeToggle";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
-import { Sparkles, LogOut, User, LayoutDashboard } from "lucide-react";
+import { Sparkles, LogOut, User, LayoutDashboard, MessageSquare } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
