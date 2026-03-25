@@ -207,20 +207,29 @@ const Home = () => {
       
       if (wsMember?.workspace_id) setWorkspaceId(wsMember.workspace_id);
 
-      // Build the next 7 days
+      // Build Mon–Sun of the current week
       const days: { date: string; name: string; day: number; isToday: boolean; posts: WeekPost[] }[] = [];
-      const startDate = new Date();
-      const endDate = new Date();
+      const today = new Date();
+      const todayDateStr = today.toISOString().split("T")[0];
+      // Find Monday of this week
+      const monday = new Date(today);
+      const dow = monday.getDay(); // 0=Sun
+      const diffToMon = dow === 0 ? -6 : 1 - dow;
+      monday.setDate(monday.getDate() + diffToMon);
+
+      const startDate = new Date(monday);
+      const endDate = new Date(monday);
       endDate.setDate(endDate.getDate() + 7);
 
       for (let i = 0; i < 7; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() + i);
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + i);
+        const dateStr = date.toISOString().split("T")[0];
         days.push({
           date: date.toISOString(),
           name: date.toLocaleDateString(language, { weekday: "short" }),
           day: date.getDate(),
-          isToday: i === 0,
+          isToday: dateStr === todayDateStr,
           posts: [],
         });
       }
