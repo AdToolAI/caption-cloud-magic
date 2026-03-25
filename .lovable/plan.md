@@ -1,40 +1,56 @@
 
 
-## Varianten: Fullscreen-Lightbox, Album-Speichern, Uebernehmen-Logik
+## Fix: Universal Content Creator — Preview zeigt nur 4s + Render schlaegt fehl
 
-### Problem
-1. Die Lightbox oeffnet sich beim Klick auf den Expand-Button, aber ein normaler Klick auf das Bild toggelt nur die Selektion — kein Vollbild
-2. Kein "In Album speichern"-Button in der Lightbox oder Galerie
-3. "Uebernehmen" im ProductInsightBanner aendert nur Kategorie/Licht-Einstellungen, zeigt aber nicht das ausgewaehlte Bild einzeln an
+### Ursache
+
+**Problem 1 — Preview nur 4s:**
+In `UniversalCreator.tsx` (Zeile 536-539) wird `durationInFrames` berechnet als:
+```
+(contentConfig?.voiceoverDuration || scenes.reduce(...)) * 30
+```
+Die `voiceoverDuration` aus der API-Response (`data.duration`) ist oft falsch/kurz. Die Audio-Metadaten-Korrektur in `ContentVoiceStep.tsx` (Zeile 198-219) aktualisiert den Wert zwar korrekt, aber der `useEffect` dort hat `value` als Dependency, was zu Endlosschleifen oder Race Conditions fuehren kann. Ausserdem: wenn Szenen existieren aber keine Voiceover, wird `scenes.reduce()` verwendet — die Szenen-Dauer ist aber oft nur 1-5s pro Szene und stimmt nicht mit der tatsaechlichen Video-Laenge ueberein.
+
+**Problem 2 — Render schlaegt fehl (durationInFrames Mismatch):**
+In `render-with-remotion` (Zeile 296-304) berechnet die Edge Function `totalDurationSeconds` **nur aus den Szenen**, ignoriert aber `voiceoverDuration` komplett. Wenn die Szenen z.B. 4s total dauern, aber das Voiceover 27s lang ist, schickt Lambda `durationInFrames=120` (4s*30fps), waehrend die Remotion-Composition intern `durationInFrames=810` (27s*30fps) erwartet.
 
 ### Aenderungen
 
-#### 1. `src/components/background/SceneGallery.tsx`
-- Klick auf Bild oeffnet Lightbox (statt Toggle-Selektion)
-- Selektion nur noch per Checkbox/CheckCircle in der Ecke
-- Neuer `onSaveToAlbum` Callback-Prop fuer Folder-Button auf jeder Karte (wie bei ImageCard)
+#### 1. `src/pages/UniversalCreator/UniversalCreator.tsx` — Korrekte Duration fuer Preview
+- `durationInFrames`-Berechnung (Zeile 536-539) aendern: `Math.max()` aus Voiceover-Dauer UND Szenen-Dauer nehmen, damit immer der laengere Wert gewinnt
+- `actualVoiceoverDuration` bevorzugen falls vorhanden (ist die korrigierte Dauer aus Audio-Metadaten)
 
-#### 2. `src/components/background/ImageLightbox.tsx`
-- Download-Button + "In Album speichern"-Button in der Lightbox hinzufuegen
-- Props erweitern: `onDownload`, `onSaveToAlbum`
+```
+durationInFrames={Math.ceil(
+  Math.max(
+    contentConfig?.actualVoiceoverDuration || contentConfig?.voiceoverDuration || 0,
+    scenes.reduce((sum, s) => sum + s.duration, 0)
+  ) * 30
+) || 150}
+```
 
-#### 3. `src/pages/BackgroundReplacer.tsx`
-- Klick auf Variante oeffnet Lightbox (nicht mehr Toggle)
-- "Uebernehmen"-Logik: Neuer State `acceptedScene` — wenn gesetzt, zeigt die Vorschau-Galerie NUR dieses eine Bild gross an (anstatt aller Varianten)
-- Button "Alle Varianten anzeigen" um zurueck zur Galerie zu kommen
-- SaveToAlbumDialog integrieren (bereits vorhanden als Komponente)
-- Dafuer muss das Bild erst in `studio_images` gespeichert werden, dann kann der Album-Dialog geoeffnet werden
+#### 2. `src/components/universal-creator/steps/ContentVoiceStep.tsx` — Audio-Duration Fix
+- Zeile 219: `value` aus den Dependencies entfernen (verursacht Endlosschleifen-Risiko)
+- Stattdessen nur `value?.voiceoverUrl` als Trigger verwenden
+- `onChange` stabil machen: nur aufrufen wenn `actualVoiceoverDuration` sich tatsaechlich aendert
 
-#### 4. `src/components/background/ProductInsightBanner.tsx`
-- Keine Aenderung noetig — "Uebernehmen" bezieht sich auf KI-Empfehlung (Kategorie/Licht), nicht auf ein Bild
+#### 3. `supabase/functions/render-with-remotion/index.ts` — Duration korrekt berechnen
+- Zeile 296-304: `totalDurationSeconds` muss das **Maximum** aus Szenen-Dauer und `voiceoverDuration` sein
+- Aenderung:
+```
+const sceneDuration = Array.isArray(sanitizedCustomizations.scenes) 
+  ? sanitizedCustomizations.scenes.reduce((sum, s) => sum + Number(s.duration || 0), 0)
+  : 0;
+const totalDurationSeconds = Math.max(sceneDuration, voiceoverDuration, 5);
+```
+- So bekommt Lambda immer die korrekte `durationInFrames` die zur tatsaechlichen Video-Laenge passt
 
-#### 5. Neuer "Uebernehmen"-Button pro Variante
-- In SceneGallery oder Lightbox: Button "Uebernehmen" der `onAcceptScene(index)` aufruft
-- In BackgroundReplacer: `handleAcceptScene` setzt `acceptedScene = generatedScenes[index]`
-- Vorschau-Panel zeigt dann nur dieses Bild gross an mit Export-Optionen
+#### 4. `src/components/universal-creator/steps/PreviewExportStep.tsx` — Gleiche Logik im Export
+- Zeile 289-290: `calculatedDuration` ebenfalls als `Math.max()` aus Voiceover und Szenen berechnen (ist teilweise schon so, aber Fallback auf 30 entfernen und durch echte Berechnung ersetzen)
 
 ### Dateien
-1. `src/components/background/SceneGallery.tsx` — Klick-Logik + Album-Button
-2. `src/components/background/ImageLightbox.tsx` — Download + Album + Uebernehmen Buttons
-3. `src/pages/BackgroundReplacer.tsx` — acceptedScene State + SaveToAlbumDialog Integration
+1. `src/pages/UniversalCreator/UniversalCreator.tsx` — Preview durationInFrames + voiceoverDuration Prop
+2. `src/components/universal-creator/steps/ContentVoiceStep.tsx` — useEffect Dependency-Fix
+3. `supabase/functions/render-with-remotion/index.ts` — totalDurationSeconds = max(scenes, voiceover)
+4. `src/components/universal-creator/steps/PreviewExportStep.tsx` — calculatedDuration konsistent
 
