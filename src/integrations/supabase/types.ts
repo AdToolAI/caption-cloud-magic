@@ -7863,6 +7863,89 @@ export type Database = {
           },
         ]
       }
+      studio_albums: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      studio_images: {
+        Row: {
+          album_id: string | null
+          aspect_ratio: string | null
+          created_at: string
+          id: string
+          image_url: string
+          metadata_json: Json | null
+          model_used: string | null
+          prompt: string | null
+          source: string
+          style: string | null
+          thumbnail_url: string | null
+          user_id: string
+        }
+        Insert: {
+          album_id?: string | null
+          aspect_ratio?: string | null
+          created_at?: string
+          id?: string
+          image_url: string
+          metadata_json?: Json | null
+          model_used?: string | null
+          prompt?: string | null
+          source?: string
+          style?: string | null
+          thumbnail_url?: string | null
+          user_id: string
+        }
+        Update: {
+          album_id?: string | null
+          aspect_ratio?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string
+          metadata_json?: Json | null
+          model_used?: string | null
+          prompt?: string | null
+          source?: string
+          style?: string | null
+          thumbnail_url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_images_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "studio_albums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_tickets: {
         Row: {
           category: string
