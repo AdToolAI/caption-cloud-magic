@@ -159,8 +159,8 @@ serve(async (req) => {
     }
 
     // Calculate credits based on video duration and quality
-    credits_required = calculateCredits(voiceoverDuration, quality);
-    console.log(`💰 Credits für ${voiceoverDuration}s ${quality.toUpperCase()} Video: ${credits_required}`);
+    credits_required = calculateCredits(requestedVoiceoverDuration, quality);
+    console.log(`💰 Credits für ${requestedVoiceoverDuration}s ${quality.toUpperCase()} Video: ${credits_required}`);
 
     // Check credits
     const { data: wallet } = await supabaseAdmin
