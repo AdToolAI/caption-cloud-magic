@@ -146,7 +146,7 @@ serve(async (req) => {
     // Upload to storage
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
     const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-    const fileName = `studio/${user.id}/${Date.now()}_${style}.png`;
+    const fileName = `${user.id}/studio/${Date.now()}_${style}.png`;
 
     const { error: uploadError } = await supabase.storage
       .from('background-projects')
