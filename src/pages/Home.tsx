@@ -24,6 +24,7 @@ import { RecoCard } from "@/features/recommendations/RecoCard";
 import { PRICING_V21 } from "@/config/pricing";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
+import { NicheTutorialModal } from "@/components/onboarding/NicheTutorialModal";
 
 interface Post {
   id: string;
