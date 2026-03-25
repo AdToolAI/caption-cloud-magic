@@ -196,7 +196,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
   const filteredVoices = voices.filter((v) => v.language === selectedLanguage);
 
   // Extract actual duration from audio metadata when voiceover URL is available
-  const voiceoverUrlRef = React.useRef<string | undefined>();
+  const voiceoverUrlRef = useRef<string | undefined>();
   useEffect(() => {
     const currentUrl = value?.voiceoverUrl;
     if (!currentUrl || currentUrl === voiceoverUrlRef.current) return;
