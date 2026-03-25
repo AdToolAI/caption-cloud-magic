@@ -1,19 +1,66 @@
 
-
-## Fix: Edge Function CORS/Deploy-Fehler im KI Picture Studio
+## Fix: Edge Function failed beim Bild-Generieren
 
 ### Ursache
-Die Console zeigt: "Response to preflight request doesn't pass access control check: It does not have HTTP ok status." und "net::ERR_FAILED". Das bedeutet, die Edge Function `generate-studio-image` antwortet nicht korrekt auf OPTIONS-Requests — wahrscheinlich weil sie nicht korrekt deployed ist oder einen Runtime-Fehler beim Start hat.
+Ich habe die Runtime-Logs der Backend-Funktion geprüft. Der Fehler ist **nicht mehr CORS** und auch **nicht Deploy**.
 
-### Aenderungen
+Der echte Fehler ist:
 
-#### 1. Edge Function redeployen
-Die Funktion `generate-studio-image` muss neu deployed werden. Der Code selbst hat korrekte CORS-Headers, aber die Funktion scheint nicht erreichbar zu sein.
+```text
+Upload error: StorageApiError: new row violates row-level security policy
+Failed to upload image
+```
 
-#### 2. Sicherheitshalber: `supabase/config.toml` pruefen
-Falls die Funktion `verify_jwt = true` hat (Standard), wird der OPTIONS-Request ohne JWT abgelehnt. In dem Fall muss `verify_jwt = false` gesetzt werden, da die JWT-Validierung im Code selbst stattfindet.
+### Exaktes Problem
+In `supabase/functions/generate-studio-image/index.ts` wird aktuell in diesen Pfad hochgeladen:
+
+```ts
+studio/${user.id}/${Date.now()}_${style}.png
+```
+
+Die Storage-Policy fuer den Bucket `background-projects` verlangt aber, dass **der erste Ordnername die User-ID ist**:
+
+```sql
+auth.uid()::text = (storage.foldername(name))[1]
+```
+
+Das heisst:
+- aktuell: erster Ordner = `studio` -> **RLS blockiert**
+- korrekt: erster Ordner = `user.id` -> **Upload erlaubt**
+
+Zum Vergleich: Der bestehende Smart-Background-Code in `src/pages/BackgroundReplacer.tsx` nutzt bereits korrekt:
+
+```ts
+${user.id}/${Date.now()}...
+```
+
+### Aenderung
+#### `supabase/functions/generate-studio-image/index.ts`
+Den Upload-Pfad an die bestehende Bucket-Policy anpassen, z. B.:
+
+```ts
+const fileName = `${user.id}/studio/${Date.now()}_${style}.png`;
+```
+
+oder einfacher:
+
+```ts
+const fileName = `${user.id}/${Date.now()}_${style}.png`;
+```
+
+Wichtig ist nur: **`user.id` muss der erste Pfadteil sein**.
+
+### Zusaetzliche Haertung
+In derselben Funktion verbessere ich noch die Fehlerbehandlung:
+- Storage-Fehler klar loggen
+- bei Upload-Fehlern eine praezisere Fehlermeldung zurueckgeben statt nur generischem 500
 
 ### Dateien
-1. `supabase/config.toml` — ggf. Function-Config Block hinzufuegen
-2. Edge Function redeployen
+1. `supabase/functions/generate-studio-image/index.ts` — Upload-Pfad korrigieren
+2. optional derselbe File — klarere Storage-Error-Responses
 
+### Ergebnis nach dem Fix
+- Bildgenerierung laeuft durch
+- Datei wird korrekt im Bucket gespeichert
+- `studio_images` kann anschliessend normal beschrieben werden
+- der 500-Fehler beim Funktionsaufruf verschwindet
