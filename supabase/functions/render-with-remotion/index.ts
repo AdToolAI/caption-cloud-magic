@@ -5,7 +5,7 @@ import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-p
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 // AWS Lambda configuration
@@ -33,7 +33,7 @@ function toAsciiSafeJson(jsonString: string): string {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
@@ -106,14 +106,14 @@ serve(async (req) => {
     console.log(`🎬 Video quality: ${quality}, dimensions: ${dimensions.width}x${dimensions.height}`);
 
     // Calculate duration based on voiceover duration
-    const voiceoverDuration = customizations?.voiceoverDuration || 30;
+    const requestedVoiceoverDuration = Number(customizations?.voiceoverDuration) || 30;
 
     // Maximum video duration: 10 minutes
     const MAX_VIDEO_DURATION = 600;
-    if (voiceoverDuration > MAX_VIDEO_DURATION) {
+    if (requestedVoiceoverDuration > MAX_VIDEO_DURATION) {
       return new Response(JSON.stringify({ 
         error: `Video zu lang. Maximum ist ${MAX_VIDEO_DURATION} Sekunden (10 Minuten).`,
-        requested: voiceoverDuration,
+        requested: requestedVoiceoverDuration,
         maximum: MAX_VIDEO_DURATION
       }), {
         status: 400,
@@ -159,8 +159,8 @@ serve(async (req) => {
     }
 
     // Calculate credits based on video duration and quality
-    credits_required = calculateCredits(voiceoverDuration, quality);
-    console.log(`💰 Credits für ${voiceoverDuration}s ${quality.toUpperCase()} Video: ${credits_required}`);
+    credits_required = calculateCredits(requestedVoiceoverDuration, quality);
+    console.log(`💰 Credits für ${requestedVoiceoverDuration}s ${quality.toUpperCase()} Video: ${credits_required}`);
 
     // Check credits
     const { data: wallet } = await supabaseAdmin
@@ -298,8 +298,8 @@ serve(async (req) => {
     const sceneDurationSum = Array.isArray(sanitizedCustomizations.scenes) 
       ? sanitizedCustomizations.scenes.reduce((sum: number, s: any) => sum + Number(s.duration || 0), 0)
       : 0;
-    const voiceoverDuration = Number(sanitizedCustomizations.voiceoverDuration) || 0;
-    const totalDurationSeconds = Math.max(sceneDurationSum, voiceoverDuration, 5);
+    const sanitizedVoiceoverDuration = Number(sanitizedCustomizations.voiceoverDuration) || 0;
+    const totalDurationSeconds = Math.max(sceneDurationSum, sanitizedVoiceoverDuration, 5);
     
     // Ensure durationInFrames is a safe, finite positive integer
     const rawFrames = Math.ceil(totalDurationSeconds * fps);
