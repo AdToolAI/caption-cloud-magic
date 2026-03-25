@@ -1,49 +1,35 @@
 
 
-## Probleme & Loesung: Medien-Tab Upgrade
+## Medien-Tab "Next Level" Redesign
 
-### Problem 1: YouTube-Videos sind "unavailable"
-Die KI (Gemini) **erfindet** YouTube Video-IDs - diese Videos existieren nicht. Daher zeigt jedes Embed "Video unavailable". Das ist ein fundamentales Problem: KI kann keine echten Video-IDs liefern.
+### Problem
+Der Medien-Tab zeigt nur textbasierte Suchlinks mit kleinen Play-Buttons - das wirkt wie eine einfache Linkliste statt einer modernen Medien-Erfahrung. Es fehlen echte visuelle Elemente (Thumbnails, Previews).
 
-**Loesung:** Statt fake Embeds → YouTube-Suche per Thumbnail-Link. Wir nutzen die oeffentliche YouTube oEmbed API oder verlinken direkt auf `youtube.com/results?search_query=...`. Alternativ: YouTube Data API v3 fuer echte Suchergebnisse (braucht API Key). Pragmatischste Loesung: Thumbnails mit YouTube-Suchlinks generieren, die den Trend-Namen als Query nutzen.
+### Loesung: Visuelles Medien-Erlebnis
 
-### Problem 2: Design sieht "2009" aus
-Das aktuelle Design nutzt einfache Cards und iframes ohne den futuristischen James Bond / Sci-Fi Stil der restlichen App.
+**1. YouTube-Karten als grosse visuelle Thumbnail-Cards**
+- Statt kleine Text-Links: Grossflaechige Cards im 16:9 Format mit Gradient-Overlay
+- Zentrierter Play-Button mit Neon-Glow und Pulse-Animation
+- Suchbegriff als Overlay-Text unten im Card
+- Hover-Effekt: Card hebt sich, Play-Button skaliert, Glow intensiviert sich
 
-**Loesung:** Komplettes Redesign beider Tabs mit:
-- Glassmorphismus-Cards mit Neon-Glow-Borders
-- Animierte Hover-Effekte mit Shimmer
-- Gradient-Overlays auf Video-Thumbnails
-- Quellen-Chips mit Glow-Effekten
-- Skeleton-Loader im futuristischen Stil statt einfacher Spinner
+**2. Grid-Layout statt Liste**
+- 2-Spalten Grid fuer Video-Cards (statt vertikale Liste)
+- Erste Card kann als "Featured" groeszer dargestellt werden (full-width)
+- Glassmorphism-Rahmen mit animiertem Gradient-Border
+
+**3. Artikel-Tab ebenfalls aufwerten**
+- Artikel als Cards mit grossem Thumbnail-Platzhalter (Gradient basierend auf Source-Domain)
+- Source-Favicon prominenter mit Glow-Ring
+- Hover: Neon-Border-Shimmer-Animation
+
+**4. Futuristischer Loading-State**
+- Skeleton-Cards im gleichen Grid-Layout
+- Shimmer mit Neon-Gradient statt grauem Pulse
 
 ### Technische Aenderungen
 
-**1. Edge Function (`search-trend-articles/index.ts`)**
-- YouTube-Video-Suche entfernen (liefert nur fake IDs)
-- Stattdessen: YouTube-Suchlinks generieren basierend auf Trend-Keywords
-- Optional: Video-Thumbnails via YouTube-Suche-URL einbetten
-
-**2. TrendDetailModal.tsx - Artikel-Tab Redesign**
-- Glassmorphism-Cards mit `backdrop-blur` und `border-glow`
-- Favicon groesser + in kreisfoermigem Container mit Glow
-- Source-Badge mit Plattform-Farb-Gradient
-- Animierter Hover mit Scale + Shadow-Glow
-- Lese-Zeit Schaetzung als visuelles Element
-
-**3. TrendDetailModal.tsx - Medien-Tab Redesign**
-- Statt broken iframes: YouTube-Thumbnail-Cards mit Play-Overlay
-- Click oeffnet YouTube-Suche in neuem Tab
-- Futuristisches Grid-Layout mit Neon-Borders
-- Animated gradient background auf Cards
-- "Powered by Web-Suche" Badge im Sci-Fi Stil
-
-**4. Loading State**
-- Skeleton-Loader mit Shimmer-Animation statt Spinner
-- Pulsierender Neon-Ring beim Laden
-
 | Datei | Aenderung |
 |---|---|
-| `supabase/functions/search-trend-articles/index.ts` | YouTube-Fake-IDs entfernen, Suchlinks generieren |
-| `src/components/trends/TrendDetailModal.tsx` | Beide Tabs komplett im Sci-Fi/Glassmorphism Stil redesignen |
+| `src/components/trends/TrendDetailModal.tsx` | Medien-Tab: Grid-Layout mit grossen visuellen Thumbnail-Cards, animierte Glow-Effekte. Artikel-Tab: Visuellere Cards mit Gradient-Thumbnails |
 
