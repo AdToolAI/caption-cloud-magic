@@ -16,7 +16,7 @@ import { useAICall } from "@/hooks/useAICall";
 import { useAIRateLimit } from "@/hooks/useAIRateLimit";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, Sparkles, Loader2, Info } from "lucide-react";
+import { Upload, Sparkles, Loader2, Info, ArrowLeft } from "lucide-react";
 import { removeBackground, loadImage } from "@/lib/backgroundRemoval";
 import { SceneGallery } from "@/components/background/SceneGallery";
 import { ExportControls } from "@/components/background/ExportControls";
@@ -25,6 +25,7 @@ import { AICallStatus } from "@/components/ai/AICallStatus";
 import { BackgroundReplacerHeroHeader } from "@/components/background/BackgroundReplacerHeroHeader";
 import { ProductInsightBanner } from "@/components/background/ProductInsightBanner";
 import { ImageLightbox } from "@/components/background/ImageLightbox";
+import { SaveToAlbumDialog } from "@/components/picture-studio/SaveToAlbumDialog";
 import { ESTIMATED_COSTS } from "@/lib/featureCosts";
 
 const CATEGORIES = [
@@ -75,6 +76,9 @@ export default function BackgroundReplacer() {
   const [aiSuggestion, setAiSuggestion] = useState<AISuggestion | null>(null);
   const [suggestionApplied, setSuggestionApplied] = useState(false);
   const [lightboxScene, setLightboxScene] = useState<number | null>(null);
+  const [acceptedScene, setAcceptedScene] = useState<any | null>(null);
+  const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
+  const [albumImageId, setAlbumImageId] = useState<string>("");
 
   useEffect(() => {
     if (user) {
@@ -153,7 +157,6 @@ export default function BackgroundReplacer() {
       };
       reader.readAsDataURL(file);
       
-      // Reset AI suggestion on new image
       setAiSuggestion(null);
       setSuggestionApplied(false);
       
@@ -213,6 +216,7 @@ export default function BackgroundReplacer() {
     }
 
     setIsGenerating(true);
+    setAcceptedScene(null);
 
     try {
       const fileExt = imageFile!.name.split('.').pop();
@@ -244,7 +248,7 @@ export default function BackgroundReplacer() {
               originalImageUrl: publicUrl,
               variantCount,
               diversify,
-              analyzeProduct: !aiSuggestion // Only analyze if no suggestion yet
+              analyzeProduct: !aiSuggestion
             }
           });
 
@@ -258,7 +262,6 @@ export default function BackgroundReplacer() {
       console.log('Generated scenes response:', data);
       setGeneratedScenes(data.results_json || []);
       
-      // Set AI suggestion if returned
       if (data.aiSuggestion && !aiSuggestion) {
         setAiSuggestion(data.aiSuggestion);
       }
@@ -293,6 +296,48 @@ export default function BackgroundReplacer() {
       newSelected.add(index);
     }
     setSelectedImages(newSelected);
+  };
+
+  const handleAcceptScene = (index: number) => {
+    setAcceptedScene(generatedScenes[index]);
+    setLightboxScene(null);
+    toast.success("Variante übernommen! 🎉");
+  };
+
+  const handleSaveToAlbum = async (imageUrl: string) => {
+    if (!user) return;
+    
+    // First save to studio_images, then open album dialog
+    const { data, error } = await supabase
+      .from('studio_images')
+      .insert({
+        user_id: user.id,
+        image_url: imageUrl,
+        prompt: `Smart Background: ${category} / ${lighting}`,
+        style: category,
+        aspect_ratio: '1:1',
+        source: 'smart_background',
+      })
+      .select('id')
+      .single();
+    
+    if (error) {
+      toast.error("Fehler beim Speichern");
+      return;
+    }
+    
+    setAlbumImageId(data.id);
+    setAlbumDialogOpen(true);
+  };
+
+  const handleLightboxSaveToAlbum = () => {
+    if (lightboxScene !== null && generatedScenes[lightboxScene]) {
+      handleSaveToAlbum(generatedScenes[lightboxScene].imageUrl);
+    }
+  };
+
+  const handleGallerySaveToAlbum = (index: number) => {
+    handleSaveToAlbum(generatedScenes[index].imageUrl);
   };
 
   return (
@@ -574,14 +619,70 @@ export default function BackgroundReplacer() {
           >
             <Card className="backdrop-blur-xl bg-card/60 border-white/10 overflow-hidden shadow-[0_0_30px_hsla(43,90%,68%,0.08)]">
               <CardContent className="p-0">
-                {generatedScenes.length > 0 ? (
+                {acceptedScene ? (
+                  /* Accepted single scene view */
+                  <div className="flex flex-col">
+                    <div className="p-6 border-b border-white/10">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">Übernommene Variante</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {acceptedScene.sceneName || `Variant ${acceptedScene.variant}`}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAcceptedScene(null)}
+                          className="gap-1.5"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                          Alle Varianten
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      <img
+                        src={acceptedScene.imageUrl}
+                        alt={acceptedScene.sceneName || 'Accepted scene'}
+                        className="w-full rounded-xl shadow-lg"
+                      />
+                      <div className="mt-4 flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSaveToAlbum(acceptedScene.imageUrl)}
+                        >
+                          In Album speichern
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const a = document.createElement('a');
+                            a.href = acceptedScene.imageUrl;
+                            a.download = `scene-${acceptedScene.sceneName || acceptedScene.variant}.png`;
+                            a.click();
+                          }}
+                        >
+                          Download
+                        </Button>
+                      </div>
+                    </div>
+                    <ExportControls
+                      selectedImages={selectedImages}
+                      scenes={[acceptedScene]}
+                      onClearSelection={() => setSelectedImages(new Set())}
+                    />
+                  </div>
+                ) : generatedScenes.length > 0 ? (
                   <div className="flex flex-col">
                     <div className="p-6 border-b border-white/10">
                       <div className="flex items-center justify-between mb-4">
                         <div>
                           <h3 className="text-lg font-semibold">Vorschau-Galerie</h3>
                           <p className="text-sm text-muted-foreground">
-                            {generatedScenes.length} Varianten · KI-bewertet
+                            {generatedScenes.length} Varianten · KI-bewertet · Klick für Vollbild
                           </p>
                         </div>
                         <Badge variant="default" className="gap-2 bg-gradient-to-r from-primary/80 to-cyan-500/80 border-0">
@@ -609,6 +710,8 @@ export default function BackgroundReplacer() {
                         selectedImages={selectedImages}
                         onToggleSelection={toggleImageSelection}
                         onOpenLightbox={(index) => setLightboxScene(index)}
+                        onSaveToAlbum={handleGallerySaveToAlbum}
+                        onAcceptScene={handleAcceptScene}
                       />
                     </div>
 
@@ -659,8 +762,18 @@ export default function BackgroundReplacer() {
           cutoutPreview={cutoutPreview}
           open={true}
           onClose={() => setLightboxScene(null)}
+          onSaveToAlbum={handleLightboxSaveToAlbum}
+          onAcceptScene={() => handleAcceptScene(lightboxScene)}
         />
       )}
+
+      {/* Save to Album Dialog */}
+      <SaveToAlbumDialog
+        open={albumDialogOpen}
+        onOpenChange={setAlbumDialogOpen}
+        imageId={albumImageId}
+        onSaved={() => toast.success("Im Album gespeichert! 📁")}
+      />
     </div>
   );
 }
