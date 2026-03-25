@@ -285,9 +285,10 @@ export function PreviewExportStep({
             throw new Error('Keine gültigen Szenen zum Rendern. Bitte überprüfe die Szenen-Dauer.');
           }
           
-          // Calculate duration from voiceover or validated scenes
-          const calculatedDuration = contentConfig.voiceoverDuration || 
-            (validatedScenes.length > 0 ? validatedScenes.reduce((sum, s) => sum + s.duration, 0) : 30);
+          // Calculate duration: use the LONGER of voiceover or scenes
+          const sceneDuration = validatedScenes.length > 0 ? validatedScenes.reduce((sum, s) => sum + s.duration, 0) : 0;
+          const voiceoverDur = contentConfig.actualVoiceoverDuration || contentConfig.voiceoverDuration || 0;
+          const calculatedDuration = Math.max(sceneDuration, voiceoverDur, 5);
 
           // Validate calculatedDuration
           if (!Number.isFinite(calculatedDuration) || calculatedDuration <= 0) {

@@ -295,9 +295,11 @@ serve(async (req) => {
 
     // ✅ CRITICAL FIX: Calculate durationInFrames EXPLICITLY to prevent Lambda array allocation errors
     const fps = 30;
-    const totalDurationSeconds = Array.isArray(sanitizedCustomizations.scenes) 
+    const sceneDurationSum = Array.isArray(sanitizedCustomizations.scenes) 
       ? sanitizedCustomizations.scenes.reduce((sum: number, s: any) => sum + Number(s.duration || 0), 0)
-      : 30;
+      : 0;
+    const voiceoverDuration = Number(sanitizedCustomizations.voiceoverDuration) || 0;
+    const totalDurationSeconds = Math.max(sceneDurationSum, voiceoverDuration, 5);
     
     // Ensure durationInFrames is a safe, finite positive integer
     const rawFrames = Math.ceil(totalDurationSeconds * fps);

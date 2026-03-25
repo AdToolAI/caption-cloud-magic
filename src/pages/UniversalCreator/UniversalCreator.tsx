@@ -534,9 +534,12 @@ export function UniversalCreator() {
                 width={formatConfig.width}
                 height={formatConfig.height}
                 durationInFrames={Math.ceil(
-                  (contentConfig?.voiceoverDuration || 
-                   scenes.reduce((sum, s) => sum + s.duration, 0)) * 30
-                )}
+                  Math.max(
+                    contentConfig?.actualVoiceoverDuration || contentConfig?.voiceoverDuration || 0,
+                    scenes.reduce((sum, s) => sum + s.duration, 0),
+                    5
+                  ) * 30
+                ) || 150}
               />
             )}
 
