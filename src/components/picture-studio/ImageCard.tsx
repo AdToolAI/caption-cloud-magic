@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Download, FolderPlus, Maximize2 } from "lucide-react";
+import { Download, FolderPlus, Maximize2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -15,9 +15,10 @@ interface ImageCardProps {
   onDownload?: (url: string) => void;
   onSaveToAlbum?: (image: any) => void;
   onOpenLightbox?: (image: any) => void;
+  onDelete?: (image: any) => void;
 }
 
-export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLightbox }: ImageCardProps) {
+export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLightbox, onDelete }: ImageCardProps) {
   const handleDownload = async () => {
     if (onDownload) {
       onDownload(image.url);
@@ -85,6 +86,11 @@ export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLight
           <Button size="icon" variant="ghost" className="h-7 w-7 bg-muted/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); onOpenLightbox?.(image); }}>
             <Maximize2 className="h-3.5 w-3.5" />
           </Button>
+          {onDelete && (
+            <Button size="icon" variant="ghost" className="h-7 w-7 bg-destructive/20 backdrop-blur-sm hover:bg-destructive/40 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(image); }}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       </div>
       </div>

@@ -143,6 +143,28 @@ export function ImageGenerator() {
     }
   };
 
+  const handleDeleteImage = async (image: any) => {
+    if (!image.id) {
+      setGeneratedImages(prev => prev.filter(img => img.url !== image.url));
+      return;
+    }
+    try {
+      // Delete from storage
+      const url = new URL(image.url);
+      const pathMatch = url.pathname.match(/\/object\/public\/background-projects\/(.+)/);
+      if (pathMatch) {
+        await supabase.storage.from('background-projects').remove([pathMatch[1]]);
+      }
+      // Delete from DB
+      await supabase.from('studio_images').delete().eq('id', image.id);
+      setGeneratedImages(prev => prev.filter(img => img.id !== image.id));
+      toast.success("Bild gelöscht 🗑️");
+    } catch (err) {
+      console.error(err);
+      toast.error("Fehler beim Löschen");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Generator Controls */}
@@ -259,6 +281,7 @@ export function ImageGenerator() {
                     image={img}
                     index={i}
                     onSaveToAlbum={handleSaveToAlbum}
+                    onDelete={handleDeleteImage}
                   />
                 ))}
               </AnimatePresence>
