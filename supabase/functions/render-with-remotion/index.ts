@@ -113,7 +113,7 @@ serve(async (req) => {
     if (requestedVoiceoverDuration > MAX_VIDEO_DURATION) {
       return new Response(JSON.stringify({ 
         error: `Video zu lang. Maximum ist ${MAX_VIDEO_DURATION} Sekunden (10 Minuten).`,
-        requested: voiceoverDuration,
+        requested: requestedVoiceoverDuration,
         maximum: MAX_VIDEO_DURATION
       }), {
         status: 400,
