@@ -1,6 +1,6 @@
 import { PlatformBadge } from "@/components/ui/PlatformBadge";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, Edit2, Upload, Plus, Sparkles, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Check, Clock, Edit2, Upload, Plus, Sparkles, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface WeekPost {
@@ -26,6 +26,7 @@ interface WeekDayCardProps {
   onEdit: (post: WeekPost) => void;
   onUpload: (post: WeekPost) => void;
   onAddPost: (date: string) => void;
+  onDelete: (post: WeekPost) => void;
 }
 
 const statusConfig = {
@@ -35,7 +36,7 @@ const statusConfig = {
   missed: { icon: AlertCircle, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', border: 'border-orange-300 dark:border-orange-700', label: 'Verpasst' },
 };
 
-export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, onUpload, onAddPost }: WeekDayCardProps) {
+export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, onUpload, onAddPost, onDelete }: WeekDayCardProps) {
   return (
     <div className={cn(
       "rounded-xl border p-4 transition-all",
@@ -161,6 +162,14 @@ export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, 
                       Hochladen
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10 hover:border-destructive/50"
+                    onClick={() => onDelete(post)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
               </div>
             );
