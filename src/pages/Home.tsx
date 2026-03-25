@@ -300,31 +300,63 @@ const Home = () => {
         }
       }
 
-      // Auto-reschedule missed posts: +6h minimum after original time
+      // Auto-reschedule missed posts: +6h minimum, move to correct future day
       const now = new Date();
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-      for (const day of days) {
-        if (!day.isToday) continue;
-        for (const post of day.posts) {
+      for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+        const day = days[dayIdx];
+        const postsToMove: { post: typeof day.posts[0]; targetDate: string; newTime: string }[] = [];
+
+        for (let postIdx = day.posts.length - 1; postIdx >= 0; postIdx--) {
+          const post = day.posts[postIdx];
           if (post.status === 'published') continue;
+
           const [h, m] = post.suggestedTime.split(":").map(Number);
-          const postMinutes = h * 60 + m;
-          if (currentMinutes > postMinutes) {
+          const postDateTime = new Date(`${day.date}T${post.suggestedTime}:00`);
+
+          if (now > postDateTime) {
             post.originalTime = post.suggestedTime;
-            // At least +6 hours from original post time
-            let newMinutes = Math.max(postMinutes + 360, Math.ceil((currentMinutes + 60) / 30) * 30);
-            if (newMinutes >= 22 * 60) {
-              // Too late today — suggest 09:00 next morning (keep on card as missed)
-              post.suggestedTime = "09:00";
-              post.status = 'missed';
+            post.status = 'missed';
+
+            // New time = max(originalPost + 6h, now + 6h), rounded to next 30min
+            const sixHoursLater = new Date(Math.max(postDateTime.getTime(), now.getTime()) + 6 * 60 * 60 * 1000);
+            // Round up to next 30 min
+            const mins = sixHoursLater.getMinutes();
+            if (mins % 30 !== 0) {
+              sixHoursLater.setMinutes(Math.ceil(mins / 30) * 30, 0, 0);
             } else {
-              const newH = Math.floor(newMinutes / 60);
-              const newM = newMinutes % 60;
-              post.suggestedTime = `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
-              post.status = 'missed';
+              sixHoursLater.setSeconds(0, 0);
             }
+
+            // If past 22:00, push to next day 09:00
+            if (sixHoursLater.getHours() >= 22 || (sixHoursLater.getHours() === 0 && sixHoursLater.getDate() !== postDateTime.getDate())) {
+              const nextDay = new Date(sixHoursLater);
+              if (nextDay.getHours() < 22) {
+                nextDay.setDate(nextDay.getDate() + 1);
+              }
+              nextDay.setHours(9, 0, 0, 0);
+              const targetDate = nextDay.toISOString().split('T')[0];
+              postsToMove.push({ post, targetDate, newTime: '09:00' });
+            } else {
+              const targetDate = sixHoursLater.toISOString().split('T')[0];
+              const newH = String(sixHoursLater.getHours()).padStart(2, '0');
+              const newM = String(sixHoursLater.getMinutes()).padStart(2, '0');
+              postsToMove.push({ post, targetDate, newTime: `${newH}:${newM}` });
+            }
+
+            // Remove from current day
+            day.posts.splice(postIdx, 1);
           }
+        }
+
+        // Move posts to their target days
+        for (const { post, targetDate, newTime } of postsToMove) {
+          post.suggestedTime = newTime;
+          const targetDay = days.find(d => d.date === targetDate);
+          if (targetDay) {
+            targetDay.posts.push(post);
+          }
+          // If target day is outside the week range, keep post info but it won't show
         }
       }
 
