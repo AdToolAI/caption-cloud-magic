@@ -147,7 +147,7 @@ export const RecoCard = () => {
               <Sparkles className="h-5 w-5 text-primary" />
             </motion.div>
             <h3 className="text-lg font-semibold text-foreground">
-              KI-Empfehlungen für dich
+              {isBeginnerMode ? 'Starter-Tipps für dich' : 'KI-Empfehlungen für dich'}
             </h3>
             <motion.div
               animate={{ scale: [1, 1.2, 1] }}
