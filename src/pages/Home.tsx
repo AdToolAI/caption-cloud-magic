@@ -405,6 +405,36 @@ const Home = () => {
     return editingDate;
   };
 
+  // Find the next upcoming post across all weekDays
+  const getNextPost = (): { post: WeekPost; date: string } | null => {
+    const now = new Date();
+    let best: { post: WeekPost; date: string; dt: number } | null = null;
+
+    for (const day of weekDays) {
+      for (const post of day.posts) {
+        if (post.status === 'published') continue;
+        const [h, m] = (post.suggestedTime || '12:00').split(':').map(Number);
+        const postDate = new Date(day.date);
+        postDate.setHours(h, m, 0, 0);
+        const dt = postDate.getTime();
+        if (dt >= now.getTime() && (!best || dt < best.dt)) {
+          best = { post, date: day.date, dt };
+        }
+      }
+    }
+    // If no future post, pick the first non-published post
+    if (!best) {
+      for (const day of weekDays) {
+        for (const post of day.posts) {
+          if (post.status !== 'published') {
+            return { post, date: day.date };
+          }
+        }
+      }
+    }
+    return best ? { post: best.post, date: best.date } : null;
+  };
+
   const getPlatformColor = (platform: string) => {
     const colors: Record<string, string> = {
       instagram: 'bg-pink-500',
