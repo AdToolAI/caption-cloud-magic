@@ -45,8 +45,8 @@ export function AppHeader() {
         </div>
 
         {/* Center-Right: Command Bar + Social Icons */}
-        <div className="hidden md:flex items-center gap-3 ml-auto">
-          <div className="flex-1 max-w-md">
+        <div className="hidden md:flex items-center gap-3">
+          <div className="flex-1 max-w-2xl">
             <CommandBar inline />
           </div>
           {user && (
