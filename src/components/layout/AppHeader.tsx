@@ -51,6 +51,13 @@ export function AppHeader() {
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
           <ThemeToggle />
+          {user && (
+            <Button asChild variant="ghost" size="icon" className="rounded-xl" aria-label="Community">
+              <Link to="/community">
+                <MessageSquare className="h-5 w-5" />
+              </Link>
+            </Button>
+          )}
           {user && <NotificationBell />}
           <UserMenu />
         </div>
