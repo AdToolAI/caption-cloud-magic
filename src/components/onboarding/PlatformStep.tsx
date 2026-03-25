@@ -1,10 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Instagram, Music, Linkedin, Facebook, Twitter } from "lucide-react";
+import { Check, Instagram, Music, Linkedin, Facebook, Twitter, Youtube } from "lucide-react";
 
 const platformOptions = [
   { id: "instagram", label: "Instagram", icon: Instagram, color: "text-pink-500" },
   { id: "tiktok", label: "TikTok", icon: Music, color: "text-foreground" },
+  { id: "youtube", label: "YouTube", icon: Youtube, color: "text-red-600" },
   { id: "linkedin", label: "LinkedIn", icon: Linkedin, color: "text-blue-700 dark:text-blue-500" },
   { id: "facebook", label: "Facebook", icon: Facebook, color: "text-blue-600" },
   { id: "x", label: "X (Twitter)", icon: Twitter, color: "text-foreground" },
