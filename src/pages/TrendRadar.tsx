@@ -619,26 +619,32 @@ export default function TrendRadar() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <Card className="mb-8 backdrop-blur-xl bg-card/60 border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
-              <CardContent className="p-6 space-y-4">
+            <Card className="mb-8 backdrop-blur-xl bg-card/30 border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.15)] relative overflow-hidden">
+              {/* Subtle animated border */}
+              <div className="absolute inset-0 rounded-2xl opacity-30 pointer-events-none" style={{
+                background: 'linear-gradient(135deg, hsla(43,90%,68%,0.1), transparent 40%, transparent 60%, hsla(187,80%,50%,0.1))',
+              }} />
+              <CardContent className="p-6 space-y-4 relative z-10">
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-2">
                     <label className="text-sm font-medium flex items-center gap-2">
                       <Search className="w-4 h-4 text-primary" />
                       {t('trends.search')}
                     </label>
-                    <Input
-                      placeholder={t('trends.searchPlaceholder')}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
+                    <div className="relative group/input">
+                      <Input
+                        placeholder={t('trends.searchPlaceholder')}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="bg-muted/10 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 focus:shadow-[0_0_20px_hsla(43,90%,68%,0.15)] transition-all duration-300"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">{t('trends.platform')}</label>
                     <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                      <SelectTrigger className="bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
+                      <SelectTrigger className="bg-muted/10 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="backdrop-blur-xl bg-card/95 border-white/10">
@@ -656,7 +662,7 @@ export default function TrendRadar() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">{t('trends.category')}</label>
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                      <SelectTrigger className="bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
+                      <SelectTrigger className="bg-muted/10 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="backdrop-blur-xl bg-card/95 border-white/10">
