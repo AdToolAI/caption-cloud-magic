@@ -87,6 +87,7 @@ export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLight
           </Button>
         </div>
       </div>
+      </div>
     </motion.div>
   );
 }
