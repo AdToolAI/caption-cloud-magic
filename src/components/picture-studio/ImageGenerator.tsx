@@ -281,6 +281,7 @@ export function ImageGenerator() {
                     image={img}
                     index={i}
                     onSaveToAlbum={handleSaveToAlbum}
+                    onDelete={handleDeleteImage}
                   />
                 ))}
               </AnimatePresence>

@@ -299,6 +299,7 @@ export function AlbumManager() {
                   image={{ id: img.id, url: img.image_url, prompt: img.prompt || undefined, style: img.style || undefined }}
                   index={i}
                   onSaveToAlbum={handleSaveToAlbum}
+                  onDelete={handleDeleteImage}
                 />
               ))}
             </AnimatePresence>
