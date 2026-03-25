@@ -53,6 +53,11 @@ export function AppHeader() {
         <div className="flex items-center gap-2">
           <ThemeToggle />
           {user && (
+            <div className="hidden md:flex">
+              <SocialConnectionIcons />
+            </div>
+          )}
+          {user && (
             <Button asChild variant="ghost" size="icon" className="rounded-xl" aria-label="Community">
               <Link to="/community">
                 <MessageSquare className="h-5 w-5" />
