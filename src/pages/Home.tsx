@@ -405,6 +405,36 @@ const Home = () => {
     return editingDate;
   };
 
+  // Find the next upcoming post across all weekDays
+  const getNextPost = (): { post: WeekPost; date: string } | null => {
+    const now = new Date();
+    let best: { post: WeekPost; date: string; dt: number } | null = null;
+
+    for (const day of weekDays) {
+      for (const post of day.posts) {
+        if (post.status === 'published') continue;
+        const [h, m] = (post.suggestedTime || '12:00').split(':').map(Number);
+        const postDate = new Date(day.date);
+        postDate.setHours(h, m, 0, 0);
+        const dt = postDate.getTime();
+        if (dt >= now.getTime() && (!best || dt < best.dt)) {
+          best = { post, date: day.date, dt };
+        }
+      }
+    }
+    // If no future post, pick the first non-published post
+    if (!best) {
+      for (const day of weekDays) {
+        for (const post of day.posts) {
+          if (post.status !== 'published') {
+            return { post, date: day.date };
+          }
+        }
+      }
+    }
+    return best ? { post: best.post, date: best.date } : null;
+  };
+
   const getPlatformColor = (platform: string) => {
     const colors: Record<string, string> = {
       instagram: 'bg-pink-500',
@@ -452,7 +482,14 @@ const Home = () => {
               <SocialConnectionIcons />
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-warning" />
-                <span>{t("dashboard.statusBar.nextPost")}: {language === "de" ? "Heute 18:00" : "Today 6:00 PM"}</span>
+                <span>{t("dashboard.statusBar.nextPost")}: {(() => {
+                  const next = getNextPost();
+                  if (!next) return language === "de" ? "Kein Post geplant" : "No post scheduled";
+                  const d = new Date(next.date);
+                  const dd = String(d.getDate()).padStart(2, '0');
+                  const mm = String(d.getMonth() + 1).padStart(2, '0');
+                  return `${dd}.${mm}. ${next.post.suggestedTime || "12:00"}`;
+                })()}</span>
               </div>
             </div>
           </div>
@@ -497,72 +534,62 @@ const Home = () => {
           </div>
         )}
 
-        {/* Today Section */}
-        {user && (
-          <Section title={t("dashboard.sections.today")} description={t("dashboard.sections.todayDescription")} bg="muted">
-            <Card className="rounded-2xl shadow-soft">
-              <CardContent className="p-6">
-                {todayPosts.length === 0 ? (
-                  <div className="text-center py-12">
-                    <CalendarIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">{t("dashboard.emptyState.noPosts")}</h3>
-                    <p className="text-sm text-muted-foreground mb-4">{t("dashboard.emptyState.createNow")}</p>
-                    <Button asChild>
-                      <Link to="/calendar">
-                        <Plus className="h-4 w-4 mr-2" />
-                        {language === "de" ? "Neuen Post planen" : "Schedule New Post"}
-                      </Link>
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {todayPosts.map(post => (
-                      <div key={post.id} className="flex items-center justify-between p-4 bg-background rounded-xl border border-border hover:border-primary/50 transition-smooth">
-                        <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted">
-                            {post.mediaUrl ? (
-                              <img src={post.mediaUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                              </div>
-                            )}
+        {/* Nächster Post Section */}
+        {user && (() => {
+          const next = getNextPost();
+          return (
+            <Section title={language === "de" ? "Nächster Post" : "Next Post"} description={language === "de" ? "Dein nächster geplanter Beitrag" : "Your next scheduled post"} bg="muted">
+              <Card className="rounded-2xl shadow-soft">
+                <CardContent className="p-6">
+                  {!next ? (
+                    <div className="text-center py-12">
+                      <CalendarIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">{t("dashboard.emptyState.noPosts")}</h3>
+                      <p className="text-sm text-muted-foreground mb-4">{t("dashboard.emptyState.createNow")}</p>
+                      <Button asChild>
+                        <Link to="/calendar">
+                          <Plus className="h-4 w-4 mr-2" />
+                          {language === "de" ? "Neuen Post planen" : "Schedule New Post"}
+                        </Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-4 p-4 bg-background rounded-xl border border-border">
+                      <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                        {next.post.mediaUrl ? (
+                          <img src={next.post.mediaUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <ImageIcon className="h-6 w-6 text-muted-foreground" />
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <StatusPill status={post.status} />
-                              <PlatformBadge platform={post.platform} />
-                            </div>
-                            <p className="text-sm font-medium line-clamp-1">{post.caption}</p>
-                            <p className="text-xs text-muted-foreground">{post.scheduledTime}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline">
-                            <Eye className="h-4 w-4 mr-2" />
-                            {t("dashboard.postActions.open")}
-                          </Button>
-                          {post.status === 'scheduled' && (
-                            <Button size="sm" onClick={() => publishNow(post.id)}>
-                              <Send className="h-4 w-4 mr-2" />
-                              {t("dashboard.postActions.publishNow")}
-                            </Button>
-                          )}
-                          {post.status === 'failed' && (
-                            <Button size="sm" variant="destructive" onClick={() => retry(post.id)}>
-                              <RefreshCw className="h-4 w-4 mr-2" />
-                              {t("dashboard.postActions.retry")}
-                            </Button>
-                          )}
-                        </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </Section>
-        )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <StatusPill status={(next.post.status as any) || "draft"} />
+                          {next.post.platform && (
+                            <PlatformBadge platform={next.post.platform as any} />
+                          )}
+                        </div>
+                        <p className="text-sm font-medium line-clamp-3">{next.post.contentIdea || next.post.caption || (language === "de" ? "Keine Beschreibung" : "No description")}</p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          <Clock className="h-3 w-3 inline mr-1" />
+                          {(() => {
+                            const d = new Date(next.date);
+                            const dd = String(d.getDate()).padStart(2, '0');
+                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                            const yyyy = d.getFullYear();
+                            return `${dd}.${mm}.${yyyy} ${next.post.suggestedTime || "12:00"}`;
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </Section>
+          );
+        })()}
 
         {/* Week Calendar */}
         {user && (
