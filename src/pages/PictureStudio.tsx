@@ -32,10 +32,7 @@ export default function PictureStudio() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 max-w-7xl">
-        <Breadcrumbs items={[
-          { label: "Home", href: "/home" },
-          { label: "KI Picture Studio" }
-        ]} />
+        <Breadcrumbs feature="KI Picture Studio" category="Erstellen" />
 
         <PictureStudioHeader />
 
