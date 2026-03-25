@@ -300,9 +300,8 @@ const Home = () => {
         }
       }
 
-      // Auto-reschedule missed posts for today
+      // Auto-reschedule missed posts: +6h minimum after original time
       const now = new Date();
-      const todayStr = now.toISOString().split("T")[0];
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
       for (const day of days) {
@@ -312,11 +311,12 @@ const Home = () => {
           const [h, m] = post.suggestedTime.split(":").map(Number);
           const postMinutes = h * 60 + m;
           if (currentMinutes > postMinutes) {
-            // Calculate new time: next full/half hour + 1h
-            let newMinutes = Math.ceil((currentMinutes + 60) / 30) * 30;
             post.originalTime = post.suggestedTime;
+            // At least +6 hours from original post time
+            let newMinutes = Math.max(postMinutes + 360, Math.ceil((currentMinutes + 60) / 30) * 30);
             if (newMinutes >= 22 * 60) {
-              // Too late, mark as missed but keep original time
+              // Too late today — suggest 09:00 next morning (keep on card as missed)
+              post.suggestedTime = "09:00";
               post.status = 'missed';
             } else {
               const newH = Math.floor(newMinutes / 60);
