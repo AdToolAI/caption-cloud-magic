@@ -56,6 +56,8 @@ export const ESTIMATED_COSTS: Record<string, number> = {
   // Explainer Video Animation (Hailuo 2.3 ~$0.30/scene = 30 credits)
   explainer_scene_animate: 30,
   explainer_character_animate: 35,
+  // KI Picture Studio
+  studio_image_generate: 5,
 };
 
 // Calculate Sora 2 Long-Form cost based on total duration
