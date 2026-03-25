@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Check, Zap } from 'lucide-react';
+import { Sparkles, Check, Zap, Target, Clock, Hash } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
