@@ -479,7 +479,7 @@ const Home = () => {
             </div>
             <div className="flex items-center gap-6">
               <div className="text-xs"><CreditBalance /></div>
-              <SocialConnectionIcons />
+              
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-warning" />
                 <span>{t("dashboard.statusBar.nextPost")}: {(() => {
