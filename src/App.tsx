@@ -45,6 +45,7 @@ const Campaigns = lazy(() => import("./pages/Campaigns"));
 const AIPostGenerator = lazy(() => import("./pages/AIPostGenerator"));
 const Planner = lazy(() => import("./pages/Planner"));
 const BackgroundReplacer = lazy(() => import("./pages/BackgroundReplacer"));
+const PictureStudio = lazy(() => import("./pages/PictureStudio"));
 const TrendRadar = lazy(() => import("./pages/TrendRadar"));
 
 const CommentManager = lazy(() => import("./pages/CommentManager"));
