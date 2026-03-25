@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Check, Plus, Calendar as CalendarIcon, FileText, TrendingUp, Lightbulb, Clock, Eye, Send, RefreshCw, ImageIcon } from "lucide-react";
-import { SocialConnectionIcons } from "@/components/dashboard/SocialConnectionIcons";
+
 import { SEO } from "@/components/SEO";
 import { supabase } from "@/integrations/supabase/client";
 import { QuickActions } from "@/components/dashboard/QuickActions";
@@ -479,7 +479,7 @@ const Home = () => {
             </div>
             <div className="flex items-center gap-6">
               <div className="text-xs"><CreditBalance /></div>
-              <SocialConnectionIcons />
+              
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-warning" />
                 <span>{t("dashboard.statusBar.nextPost")}: {(() => {

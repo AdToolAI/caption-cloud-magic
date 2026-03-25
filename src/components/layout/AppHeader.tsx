@@ -49,13 +49,15 @@ export function AppHeader() {
           <CommandBar inline />
         </div>
 
+        {/* Social Icons - separated left */}
+        {user && (
+          <div className="hidden md:flex items-center mr-auto">
+            <SocialConnectionIcons />
+          </div>
+        )}
+
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          {user && (
-            <div className="hidden md:flex">
-              <SocialConnectionIcons />
-            </div>
-          )}
           <ThemeToggle />
           {user && (
             <Button asChild variant="ghost" size="icon" className="rounded-xl" aria-label="Community">
