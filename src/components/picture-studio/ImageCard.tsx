@@ -46,9 +46,12 @@ export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLight
       exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
       transition={{ delay: index * 0.08, duration: 0.4 }}
       className="group relative rounded-xl overflow-hidden border border-border/50 bg-card/50 backdrop-blur-sm hover:border-primary/40 hover:shadow-[0_0_20px_rgba(var(--primary),0.15)] transition-all duration-300"
-      draggable={!!image.id}
-      onDragStart={handleDragStart}
     >
+      <div
+        draggable={!!image.id}
+        onDragStart={handleDragStart as any}
+        className="contents"
+      >
       <div className="aspect-square overflow-hidden cursor-pointer" onClick={() => onOpenLightbox?.(image)}>
         <img
           src={image.url}
