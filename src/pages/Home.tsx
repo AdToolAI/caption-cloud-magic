@@ -42,10 +42,14 @@ const Home = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
-  const [weekDays, setWeekDays] = useState<any[]>([]);
+  const [weekDays, setWeekDays] = useState<{ date: string; name: string; day: number; isToday: boolean; posts: WeekPost[] }[]>([]);
   const [loading, setLoading] = useState(false);
   const [showNicheTutorial, setShowNicheTutorial] = useState(false);
   const [nicheCheckDone, setNicheCheckDone] = useState(false);
+  const [editingPost, setEditingPost] = useState<WeekPost | null>(null);
+  const [editingDate, setEditingDate] = useState<string>("");
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState<string>("");
 
   // Performance KPI state
   const [performanceKPIs, setPerformanceKPIs] = useState({
