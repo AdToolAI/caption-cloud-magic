@@ -67,6 +67,7 @@ export const RecoCard = () => {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [isBeginnerMode, setIsBeginnerMode] = useState(false);
 
   useEffect(() => {
     fetchRecommendations();
