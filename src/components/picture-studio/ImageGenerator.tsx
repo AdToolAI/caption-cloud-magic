@@ -13,7 +13,7 @@ import { useAICall } from "@/hooks/useAICall";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageCard } from "./ImageCard";
-import { ESTIMATED_COSTS } from "@/lib/featureCosts";
+import { FEATURE_COSTS, ESTIMATED_COSTS } from "@/lib/featureCosts";
 
 const STYLES = [
   { value: 'realistic', label: 'Realistisch' },
@@ -89,8 +89,8 @@ export function ImageGenerator() {
 
     try {
       const result = await executeAICall({
-        featureCode: 'background_scene_generation' as any,
-        estimatedCost: ESTIMATED_COSTS.background_scene_generation,
+        featureCode: FEATURE_COSTS.STUDIO_IMAGE_GENERATE,
+        estimatedCost: ESTIMATED_COSTS.studio_image_generate,
         apiCall: async () => {
           const { data, error } = await supabase.functions.invoke('generate-studio-image', {
             body: {
