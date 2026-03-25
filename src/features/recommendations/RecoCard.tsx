@@ -26,6 +26,30 @@ interface Recommendation {
   href: string;
 }
 
+const BEGINNER_RECOMMENDATIONS: Recommendation[] = [
+  {
+    id: 'beginner_1',
+    icon: Target,
+    text: 'Poste mindestens 3x pro Woche für stetiges Wachstum',
+    impact: 'Grundlage',
+    href: '/calendar',
+  },
+  {
+    id: 'beginner_2',
+    icon: Clock,
+    text: 'Probiere verschiedene Uhrzeiten und beobachte dein Engagement',
+    impact: 'Strategie',
+    href: '/performance',
+  },
+  {
+    id: 'beginner_3',
+    icon: Hash,
+    text: 'Verwende 5–10 relevante Hashtags pro Post',
+    impact: 'Reichweite',
+    href: '/composer',
+  },
+];
+
 function mapInsightsToRecommendations(insights: InsightCardData[]): Recommendation[] {
   return insights.slice(0, 3).map((insight, i) => ({
     id: `insight_${i}`,
