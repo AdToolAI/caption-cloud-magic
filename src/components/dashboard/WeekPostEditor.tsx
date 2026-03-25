@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PostMediaUploader } from "@/components/calendar/PostMediaUploader";
 import { PlatformBadge } from "@/components/ui/PlatformBadge";
-import { Loader2, Sparkles, Save, Clock } from "lucide-react";
+import { Loader2, Sparkles, Save, Clock, Wand2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -24,23 +24,29 @@ interface WeekPostEditorProps {
 
 export function WeekPostEditor({ open, onOpenChange, post, date, workspaceId, onSaved }: WeekPostEditorProps) {
   const { user } = useAuth();
-  const [caption, setCaption] = useState(post?.caption || post?.contentIdea || "");
-  const [hashtags, setHashtags] = useState(post?.hashtags?.join(", ") || "");
-  const [time, setTime] = useState(post?.suggestedTime || "12:00");
-  const [mediaUrl, setMediaUrl] = useState<string | undefined>(post?.mediaUrl);
+  const [caption, setCaption] = useState("");
+  const [hashtags, setHashtags] = useState("");
+  const [time, setTime] = useState("12:00");
+  const [mediaUrl, setMediaUrl] = useState<string | undefined>(undefined);
   const [mediaType, setMediaType] = useState<"image" | "video" | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
+  const [autoFilling, setAutoFilling] = useState(false);
 
-  // Reset form when post changes
-  useState(() => {
+  // Sync form state when post changes
+  useEffect(() => {
     if (post) {
       setCaption(post.caption || post.contentIdea || "");
       setHashtags(post.hashtags?.join(", ") || "");
       setTime(post.suggestedTime || "12:00");
       setMediaUrl(post.mediaUrl);
+    } else {
+      setCaption("");
+      setHashtags("");
+      setTime("12:00");
+      setMediaUrl(undefined);
     }
-  });
+  }, [post]);
 
   const handleMediaChange = useCallback((url: string | undefined, type: "image" | "video" | undefined) => {
     setMediaUrl(url);
@@ -75,6 +81,34 @@ export function WeekPostEditor({ open, onOpenChange, post, date, workspaceId, on
     }
   };
 
+  const handleAutoFill = async () => {
+    setAutoFilling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-post-caption", {
+        body: {
+          description: post?.contentIdea || caption || "Social Media Post",
+          platform: post?.platform || "instagram",
+          language: "de",
+          tone: "professional",
+          ...(mediaUrl ? { media_url: mediaUrl } : {}),
+        },
+      });
+      if (error) throw error;
+      if (data?.caption) {
+        setCaption(data.caption);
+      }
+      if (data?.hashtags && Array.isArray(data.hashtags)) {
+        setHashtags(data.hashtags.join(", "));
+      }
+      toast.success("Caption & Hashtags per KI generiert!");
+    } catch (err) {
+      console.error("Auto-fill error:", err);
+      toast.error("KI-Generierung fehlgeschlagen");
+    } finally {
+      setAutoFilling(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!user || !workspaceId) return;
     setSaving(true);
@@ -90,7 +124,6 @@ export function WeekPostEditor({ open, onOpenChange, post, date, workspaceId, on
       const mediaAssets = mediaUrl ? [{ url: mediaUrl, type: mediaType || "image" }] : [];
 
       if (post?.sourceType === "calendar_event") {
-        // Update existing calendar event
         await updateEvent(post.sourceId, {
           caption,
           hashtags: hashtagArray,
@@ -100,7 +133,6 @@ export function WeekPostEditor({ open, onOpenChange, post, date, workspaceId, on
         });
         toast.success("Post aktualisiert!");
       } else {
-        // Create new calendar event from starter plan suggestion
         await createEvent({
           workspaceId,
           caption,
@@ -110,7 +142,6 @@ export function WeekPostEditor({ open, onOpenChange, post, date, workspaceId, on
           media: mediaAssets,
         });
 
-        // Mark starter plan as used if applicable
         if (post?.sourceType === "starter_plan" && post?.sourceId) {
           await supabase
             .from("starter_week_plans")
@@ -158,6 +189,31 @@ export function WeekPostEditor({ open, onOpenChange, post, date, workspaceId, on
             </div>
           </div>
 
+          {/* Media Upload */}
+          <div>
+            <Label className="text-xs font-medium mb-1 block">Bild / Video</Label>
+            <PostMediaUploader
+              mediaUrl={mediaUrl}
+              mediaType={mediaType}
+              onMediaChange={handleMediaChange}
+            />
+          </div>
+
+          {/* AI Auto-Fill Button */}
+          <Button
+            variant="outline"
+            className="w-full gap-2 border-dashed"
+            onClick={handleAutoFill}
+            disabled={autoFilling}
+          >
+            {autoFilling ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Wand2 className="h-4 w-4" />
+            )}
+            KI Auto-Ausfüllen (Caption & Hashtags)
+          </Button>
+
           {/* Caption */}
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -194,16 +250,6 @@ export function WeekPostEditor({ open, onOpenChange, post, date, workspaceId, on
               onChange={(e) => setHashtags(e.target.value)}
               placeholder="marketing, socialmedia, tipps"
               className="mt-1"
-            />
-          </div>
-
-          {/* Media Upload */}
-          <div>
-            <Label className="text-xs font-medium mb-1 block">Bild / Video</Label>
-            <PostMediaUploader
-              mediaUrl={mediaUrl}
-              mediaType={mediaType}
-              onMediaChange={handleMediaChange}
             />
           </div>
         </div>
