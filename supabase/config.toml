@@ -659,3 +659,6 @@ verify_jwt = true
 [functions.mux-audio-to-video]
 verify_jwt = false
 timeout_sec = 120
+
+[functions.generate-studio-image]
+verify_jwt = false
