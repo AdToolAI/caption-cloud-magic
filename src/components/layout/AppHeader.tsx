@@ -10,6 +10,7 @@ import { CommandBar } from "@/components/ui/CommandBar";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/NotificationBell";
+import { SocialConnectionIcons } from "@/components/dashboard/SocialConnectionIcons";
 
 export function AppHeader() {
   const { toggleSidebar } = useSidebar();
