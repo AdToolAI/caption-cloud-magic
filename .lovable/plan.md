@@ -1,37 +1,75 @@
 
 
-## Naechster Post: immer den echten naechsten zeigen + Reschedule fuer alle Tage
+## Smart Background v3 — Intelligenter, Hochwertiger, Visuell Beeindruckender
 
-### Problem
-1. Die Reschedule-Logik (Zeile 307-308) prueft nur `isToday` — Posts von vergangenen Tagen werden nie als "missed" markiert oder neu geplant
-2. Wenn ein Post auf "09:00" am naechsten Tag verschoben wird, bleibt er trotzdem auf der alten Tageskarte — er wird nicht wirklich auf den naechsten Tag verschoben
-3. `getNextPost()` zeigt dadurch manchmal veraltete Posts
+### Uebersicht
+Drei Saeulen: (1) KI-Produkterkennung fuer automatische Kategorie/Lighting-Empfehlung, (2) besseres Bildmodell + verfeinerte Prompts fuer hoehere Qualitaet, (3) komplett neues UI-Design mit Glassmorphismus, Before/After-Slider und immersiver Galerie.
 
-### Aenderungen in `src/pages/Home.tsx`
+---
 
-#### 1. Reschedule-Logik erweitern (Zeile 303-329)
+### Aenderungen
 
-Statt nur `isToday` zu pruefen, alle Tage durchgehen deren Datum+Uhrzeit in der Vergangenheit liegt:
+#### 1. Edge Function `generate-background-scenes/index.ts` — Intelligenz + Qualitaet
 
-```text
-Fuer jeden Tag in days:
-  Fuer jeden Post (nicht published):
-    postDateTime = day.date + suggestedTime
-    if (now > postDateTime):
-      originalTime = suggestedTime
-      newDateTime = postDateTime + 6 Stunden
-      if newDateTime < now: newDateTime = now + 6h (aufgerundet auf halbe Stunde)
-      if newDateTime.hours >= 22: naechster Tag 09:00
-      → Post auf neuen Tag verschieben (aus altem Tag entfernen, in neuen Tag einfuegen)
-      status = 'missed'
-```
+- **Produktanalyse-Schritt**: Vor der Szenen-Generierung das hochgeladene Produktbild per Lovable AI (gemini-3-flash-preview, Text-only) analysieren lassen: Produkttyp erkennen, beste Kategorie + Lighting + Style Intensity automatisch vorschlagen
+- **Modell-Upgrade**: Von `google/gemini-2.5-flash-image-preview` auf `google/gemini-3.1-flash-image-preview` (Nano Banana 2) — schneller + hoehere Qualitaet
+- **Verbesserte Prompts**: Detailliertere Compositing-Anweisungen mit Reflexions-Mapping, Schatten-Konsistenz und Farbtemperatur-Matching
+- **Echte Qualitaetsbewertung**: Nach Generierung das Ergebnis per Text-AI bewerten lassen (Compositing-Score, Schatten, Farb-Harmonie) statt Zufallswerte
 
-Kernpunkt: Posts werden tatsaechlich auf den richtigen zukuenftigen Tag verschoben, nicht nur die Uhrzeit geaendert.
+#### 2. `src/pages/BackgroundReplacer.tsx` — Intelligente Auto-Konfiguration
 
-#### 2. getNextPost() bleibt wie es ist
+- Neuer State `aiSuggestion` mit Produkttyp, empfohlener Kategorie, Lighting, Intensity
+- Nach Background-Removal automatisch `analyze-product` Logik ausfuehren (im gleichen Edge Function oder separater Call)
+- "KI-Empfehlung uebernehmen" Button der alle Einstellungen auf einmal setzt
+- Animierter Insight-Banner der die Empfehlung anzeigt (z.B. "Erkannt: Kopfhoerer → Empfohlen: Tech + Dramatic Lighting")
 
-Wenn die Reschedule-Logik korrekt Posts in die Zukunft verschiebt, findet `getNextPost()` automatisch den richtigen naechsten Post.
+#### 3. `src/components/background/BackgroundReplacerHeroHeader.tsx` — Next Level Design
+
+- Animierte Partikel im Hintergrund (schwebende Lichtpunkte wie auf den Hub-Seiten)
+- Shimmer-Border um den Hero-Bereich
+- Badge-Upgrade auf "v3" mit pulsierendem Glow
+- Untertitel: "KI-Produkterkennung · Pro Compositing · Nano Banana 2"
+
+#### 4. `src/components/background/SceneGallery.tsx` — Immersive Galerie
+
+- Glassmorphismus-Cards mit Neon-Glow bei Hover (passend zum James Bond 2028 Theme)
+- Klick auf Bild oeffnet Fullscreen-Lightbox mit Before/After Vergleich (Original vs. generiert)
+- Qualitaets-Badge mit farbigem Glow (Gruen/Gold/Rot)
+- Staggered Framer Motion Eingangs-Animation
+- Masonry-aehnliches Layout statt starrem Grid
+
+#### 5. `src/components/background/ExportControls.tsx` — Premium Export-Bar
+
+- Glassmorphismus-Leiste mit Gradient-Buttons
+- Hover-Shimmer-Effekte auf den Buttons
+
+#### 6. Neue Komponente `src/components/background/ProductInsightBanner.tsx`
+
+- Zeigt KI-Produkterkennung an: Produkttyp-Icon, empfohlene Einstellungen
+- Animierter Eintritt mit Framer Motion
+- "Uebernehmen" Button der Kategorie, Lighting und Intensity auf einmal setzt
+- Glassmorphismus-Card mit Cyan-Glow
+
+#### 7. Neue Komponente `src/components/background/ImageLightbox.tsx`
+
+- Fullscreen Overlay mit Backdrop-Blur
+- Before/After Slider (Drag-Handle in der Mitte)
+- Zeigt Original-Cutout vs. generiertes Ergebnis
+- Metadaten-Panel (Scene, Camera, Quality Scores)
+- ESC zum Schliessen
+
+### Technische Details
+
+- Produktanalyse nutzt Tool-Calling fuer strukturierte Ausgabe: `{ productType, suggestedCategory, suggestedLighting, suggestedIntensity, reasoning }`
+- Qualitaetsbewertung per separatem AI-Call nach jeder Generierung (Text-Modell bewertet das generierte Bild)
+- Before/After Slider per CSS clip-path + Drag-Event
 
 ### Dateien
-- `src/pages/Home.tsx` — Reschedule-Block (Zeile 303-329) neu schreiben
+1. `supabase/functions/generate-background-scenes/index.ts` — Modell-Upgrade + Produktanalyse + echte Qualitaetsbewertung
+2. `src/pages/BackgroundReplacer.tsx` — Auto-Konfiguration + Insight-Integration
+3. `src/components/background/BackgroundReplacerHeroHeader.tsx` — Partikel + v3 Badge
+4. `src/components/background/SceneGallery.tsx` — Glassmorphismus + Lightbox-Trigger + Animationen
+5. `src/components/background/ExportControls.tsx` — Premium Design
+6. `src/components/background/ProductInsightBanner.tsx` — NEU: KI-Empfehlungs-Banner
+7. `src/components/background/ImageLightbox.tsx` — NEU: Fullscreen Before/After
 
