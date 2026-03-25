@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Menu } from "lucide-react";
+import { Menu, MessageSquare } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Brand } from "./Brand";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
