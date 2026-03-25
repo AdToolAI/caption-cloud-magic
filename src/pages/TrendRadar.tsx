@@ -304,6 +304,18 @@ export default function TrendRadar() {
     { id: 'produktivität', name: 'Produktivität & Arbeitsalltag', icon: '💼' },
   ];
 
+  const getPlatformGradient = (platform: string) => {
+    switch (platform) {
+      case 'tiktok': return 'from-pink-600 via-purple-600 to-cyan-500';
+      case 'instagram': return 'from-purple-600 via-pink-500 to-orange-400';
+      case 'youtube': return 'from-red-700 via-red-600 to-red-500';
+      case 'linkedin': return 'from-blue-700 via-blue-600 to-blue-500';
+      case 'twitter': return 'from-sky-600 via-sky-500 to-blue-400';
+      case 'pinterest': return 'from-red-600 via-pink-500 to-rose-400';
+      default: return 'from-primary via-purple-500 to-pink-500';
+    }
+  };
+
   const getPlatformColor = (platform: string) => {
     switch (platform) {
       case 'tiktok': return 'bg-gradient-to-r from-pink-500/80 to-cyan-500/80 text-white shadow-[0_0_15px_hsla(340,80%,60%,0.3)]';
