@@ -196,27 +196,37 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
   const filteredVoices = voices.filter((v) => v.language === selectedLanguage);
 
   // Extract actual duration from audio metadata when voiceover URL is available
+  const voiceoverUrlRef = React.useRef<string | undefined>();
   useEffect(() => {
-    if (value?.voiceoverUrl && !value?.actualVoiceoverDuration) {
-      const tempAudio = new Audio(value.voiceoverUrl);
-      
-      tempAudio.addEventListener('loadedmetadata', () => {
-        const actualDuration = Math.ceil(tempAudio.duration);
-        
+    const currentUrl = value?.voiceoverUrl;
+    if (!currentUrl || currentUrl === voiceoverUrlRef.current) return;
+    voiceoverUrlRef.current = currentUrl;
+    
+    const tempAudio = new Audio(currentUrl);
+    
+    const handleMetadata = () => {
+      const actualDuration = Math.ceil(tempAudio.duration);
+      if (actualDuration > 0 && actualDuration !== value?.actualVoiceoverDuration) {
         onChange({
           ...value,
           voiceoverDuration: actualDuration,
           actualVoiceoverDuration: actualDuration,
         });
-        
         console.log(`Audio duration updated: ${actualDuration}s`);
-      });
-      
-      tempAudio.addEventListener('error', (e) => {
-        console.error('Error loading audio metadata:', e);
-      });
-    }
-  }, [value?.voiceoverUrl, value?.actualVoiceoverDuration, onChange, value]);
+      }
+    };
+    
+    tempAudio.addEventListener('loadedmetadata', handleMetadata);
+    tempAudio.addEventListener('error', (e) => {
+      console.error('Error loading audio metadata:', e);
+    });
+    
+    return () => {
+      tempAudio.removeEventListener('loadedmetadata', handleMetadata);
+      tempAudio.src = '';
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value?.voiceoverUrl]);
 
   return (
     <div className="space-y-6">
