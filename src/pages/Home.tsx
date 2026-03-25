@@ -566,10 +566,10 @@ const Home = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
-                          <StatusPill status={next.post.status || "draft"} />
-                          {next.post.platforms?.map(p => (
-                            <PlatformBadge key={p} platform={p as any} />
-                          ))}
+                          <StatusPill status={(next.post.status as any) || "draft"} />
+                          {next.post.platform && (
+                            <PlatformBadge platform={next.post.platform as any} />
+                          )}
                         </div>
                         <p className="text-sm font-medium line-clamp-3">{next.post.contentIdea || next.post.caption || (language === "de" ? "Keine Beschreibung" : "No description")}</p>
                         <p className="text-xs text-muted-foreground mt-2">
