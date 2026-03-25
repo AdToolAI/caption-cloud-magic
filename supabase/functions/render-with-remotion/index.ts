@@ -106,7 +106,7 @@ serve(async (req) => {
     console.log(`🎬 Video quality: ${quality}, dimensions: ${dimensions.width}x${dimensions.height}`);
 
     // Calculate duration based on voiceover duration
-    const voiceoverDuration = customizations?.voiceoverDuration || 30;
+    const requestedVoiceoverDuration = Number(customizations?.voiceoverDuration) || 30;
 
     // Maximum video duration: 10 minutes
     const MAX_VIDEO_DURATION = 600;
