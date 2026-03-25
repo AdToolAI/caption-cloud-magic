@@ -126,7 +126,7 @@ export const RecoCard = () => {
 
   const ffEnabled = FEATURE_FLAGS.ff_reco_card;
 
-  if (!ffEnabled || (!loading && recommendations.length === 0)) return null;
+  if (!ffEnabled) return null;
 
   return (
     <motion.div
