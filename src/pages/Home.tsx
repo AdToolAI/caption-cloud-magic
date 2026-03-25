@@ -42,6 +42,8 @@ const Home = () => {
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
   const [weekDays, setWeekDays] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showNicheTutorial, setShowNicheTutorial] = useState(false);
+  const [nicheCheckDone, setNicheCheckDone] = useState(false);
 
   // Performance KPI state
   const [performanceKPIs, setPerformanceKPIs] = useState({
