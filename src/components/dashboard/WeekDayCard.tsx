@@ -1,7 +1,6 @@
-import { useState } from "react";
 import { PlatformBadge } from "@/components/ui/PlatformBadge";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, Edit2, Upload, Plus, Sparkles } from "lucide-react";
+import { Check, Clock, Edit2, Upload, Plus, Sparkles, AlertCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface WeekPost {
@@ -10,7 +9,8 @@ export interface WeekPost {
   contentIdea: string;
   caption?: string;
   suggestedTime: string;
-  status: 'suggested' | 'scheduled' | 'published';
+  originalTime?: string;
+  status: 'suggested' | 'scheduled' | 'published' | 'missed';
   mediaUrl?: string;
   hashtags?: string[];
   sourceType: 'starter_plan' | 'calendar_event';
