@@ -579,6 +579,7 @@ const Home = () => {
                   onEdit={handleEditPost}
                   onUpload={handleUploadPost}
                   onAddPost={handleAddPost}
+                  onDelete={handleDeletePost}
                 />
               ))}
             </div>

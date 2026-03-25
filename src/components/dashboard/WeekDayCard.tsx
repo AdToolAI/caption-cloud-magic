@@ -162,6 +162,14 @@ export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, 
                       Hochladen
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10 hover:border-destructive/50"
+                    onClick={() => onDelete(post)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
               </div>
             );
