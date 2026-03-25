@@ -14,7 +14,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 const fallbackConfig = { label: 'Unbekannt', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' };
 
 export function StatusPill({ status }: StatusPillProps) {
-  const config = statusConfig[status];
+  const config = statusConfig[status] ?? fallbackConfig;
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full ${config.color}`}>
       {config.label}
