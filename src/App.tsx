@@ -100,6 +100,7 @@ const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const HubPage = lazy(() => import("./pages/HubPage"));
+const Community = lazy(() => import("./pages/Community"));
 
 const queryClient = new QueryClient();
 
@@ -209,6 +210,7 @@ function AppLayout() {
           <Route path="/ai-video-studio" element={<AIVideoStudio />} />
           <Route path="/audio-studio" element={<AudioStudio />} />
           <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
+          <Route path="/community" element={<Community />} />
           <Route path="/explainer-studio" element={<Navigate to="/home" replace />} />
           <Route path="/templates" element={<ComingSoon />} />
           <Route path="/brand-visualizer" element={<ComingSoon />} />

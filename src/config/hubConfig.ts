@@ -90,6 +90,7 @@ export const hubDefinitions: HubDefinition[] = [
     items: [
       { route: "/team-workspace", titleKey: "nav.teamWorkspace", descKey: "hubItemDesc.teamWorkspace", icon: Users, plan: "pro" },
       { route: "/white-label", titleKey: "nav.whiteLabel", descKey: "hubItemDesc.whiteLabel", icon: Palette, plan: "enterprise" },
+      { route: "/community", titleKey: "nav.community", descKey: "hubItemDesc.community", icon: MessageCircle },
     ],
   },
   {
