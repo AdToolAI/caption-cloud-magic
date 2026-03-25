@@ -88,11 +88,20 @@ export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, 
               <div
                 key={post.id}
                 className={cn(
-                  "rounded-lg border p-3 transition-all hover:shadow-sm",
+                  "rounded-lg border p-3 transition-all hover:shadow-sm relative",
                   config.border,
-                  post.status === 'published' ? 'bg-green-50/50 dark:bg-green-950/20' : 'bg-background'
+                  post.status === 'published' && 'bg-green-50/50 dark:bg-green-950/20 border-green-400 dark:border-green-500 shadow-[0_0_8px_rgba(34,197,94,0.3)]',
+                  post.status === 'missed' && 'bg-orange-50/50 dark:bg-orange-950/20',
+                  post.status !== 'published' && post.status !== 'missed' && 'bg-background'
                 )}
               >
+                {/* Published glow checkmark */}
+                {post.status === 'published' && (
+                  <div className="absolute -top-2 -right-2 bg-green-500 rounded-full p-0.5 shadow-[0_0_10px_rgba(34,197,94,0.6)]">
+                    <CheckCircle2 className="h-5 w-5 text-white" />
+                  </div>
+                )}
+
                 {/* Status + Time + Platform */}
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
@@ -100,7 +109,12 @@ export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, 
                       <StatusIcon className="h-3 w-3" />
                       {config.label}
                     </div>
-                    <span className="text-xs font-mono text-muted-foreground">{post.suggestedTime}</span>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {post.suggestedTime}
+                      {post.status === 'missed' && post.originalTime && (
+                        <span className="line-through ml-1 text-orange-400">{post.originalTime}</span>
+                      )}
+                    </span>
                   </div>
                   <PlatformBadge platform={post.platform} />
                 </div>
