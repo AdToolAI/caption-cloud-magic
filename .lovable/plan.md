@@ -1,46 +1,35 @@
 
 
-## TrendRadar "Lebendig machen" - Media & Teaser Upgrade
+## Hub-Reorganisation: Erstellen + Optimieren zusammenlegen, Medien -> Erstellen
 
-### Was fehlt
-Die Seite ist trotz Glassmorphism und Gradients immer noch sehr **textlastig**. Es fehlen bewegte, lebendige Elemente die sofort Aufmerksamkeit erzeugen.
+### Aenderungen
 
-### Neue Elemente
+**1. hubConfig.ts - Hub-Struktur umbauen**
+- "Erstellen" Hub entfernen
+- Die 3 Items (Text-Studio, Post-Generator, Bild-Text-Pairing) in "Optimieren" verschieben
+- "Medien" Hub umbenennen zu key: "erstellen", mit neuem Titel/Beschreibung die auf Content-Erstellung fokussiert
+- Icon von "Optimieren" anpassen (bleibt MessageSquare oder wird zu Sparkles da es jetzt auch KI-Erstellung umfasst)
 
-**1. Animated Trend-Ticker (Laufband)**
-- Horizontaler Marquee unter dem Hero-Header mit live scrollenden Trend-Namen
-- Neon-glowing Text, animierte Plattform-Icons
-- Erzeugt sofort das Gefuhl "hier passiert etwas"
+**Neues "Optimieren"** (6 Items):
+- KI Text-Studio, KI Post-Generator, Bild-Text-Pairing (von Erstellen)
+- KI-Content-Coach, Kommentar-Manager, Vorlagen-Manager (bestehend)
 
-**2. Top-Trends als Hero-Carousel mit Teaser-Cards**
-- Statt statisches 3er-Grid: Auto-rotierendes Carousel (alle 5s)
-- Jede Slide ist eine grosse, immersive Card mit:
-  - Animiertem Hintergrund-Gradient der sich langsam bewegt
-  - Grosser Trend-Name mit TypeWriter-Effekt
-  - 3 Key-Facts als animierte Chips die nacheinander einblenden
-  - "Jetzt analysieren" CTA mit Pulse-Glow
-- Dots-Navigation unten
+**Neues "Erstellen"** (ehemals Medien, 8 Items):
+- Media Library, VoicePro, Universal Content Creator, Universal Video Creator, Director's Cut, Sora Long-Form, AI Video Studio, Background Replacer
 
-**3. Trend-Cards mit Live-Teaser-Elementen**
-- Animiertes "TRENDING NOW" Badge mit Pulse auf heissen Trends (popularity > 85)
-- Mini animated chart-sparkline (SVG) die Popularitaet visuell zeigt statt nur Bar
-- Hover: Card flippt und zeigt Rueckseite mit Quick-Facts (Plattform, Zielgruppe, Top-Hashtag)
+**2. translations.ts - Texte anpassen (DE, EN, ES)**
+- `hubs.erstellen` / `hubDesc.erstellen` -> neue Beschreibung fuer den Medien/Content-Hub
+- `hubs.optimieren` / `hubDesc.optimieren` -> erweiterte Beschreibung die auch KI-Text-Erstellung umfasst
+- `hubs.medien` -> entfernen oder als Alias behalten
 
-**4. Floating Stats-Counter Section**
-- Zwischen Top-Trends und Grid: animierte Zaehler
-- "127 Trends analysiert" / "23 neue heute" / "5 Plattformen"
-- Count-up Animation beim Scrollen ins Viewport
-
-**5. Category Cards mit animierten Preview-Icons**
-- Statt statische Emojis: Lottie-aehnliche CSS-Animationen (bounce, rotate, pulse je nach Kategorie)
-- Mini-Preview der Top-3 Trends als Hover-Tooltip
+**3. CommandBar.tsx - Kategorien aktualisieren**
+- Text-Studio Kategorie von `hubs.erstellen` auf `hubs.optimieren` aendern
 
 ### Technische Aenderungen
 
 | Datei | Aenderung |
 |---|---|
-| `src/pages/TrendRadar.tsx` | Trend-Ticker Marquee, Hero-Carousel statt Grid, Floating Stats, Card-Flip auf Hover, Sparkline-Charts, "TRENDING NOW" Badges |
-| `src/components/trends/TrendRadarHeroHeader.tsx` | Platz fuer Ticker darunter |
-
-Keine neuen Dependencies - alles mit framer-motion, CSS-Animationen und inline SVG fuer Sparklines.
+| `src/config/hubConfig.ts` | Erstellen-Hub entfernen, Items nach Optimieren, Medien zu Erstellen umbenennen |
+| `src/lib/translations.ts` | Hub-Titel und Beschreibungen in allen 3 Sprachen anpassen |
+| `src/components/ui/CommandBar.tsx` | Kategorie-Zuordnung aktualisieren |
 
