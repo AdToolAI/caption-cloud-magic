@@ -24,6 +24,7 @@ import { RecoCard } from "@/features/recommendations/RecoCard";
 import { PRICING_V21 } from "@/config/pricing";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
+import { NicheTutorialModal } from "@/components/onboarding/NicheTutorialModal";
 
 interface Post {
   id: string;
@@ -41,6 +42,8 @@ const Home = () => {
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
   const [weekDays, setWeekDays] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showNicheTutorial, setShowNicheTutorial] = useState(false);
+  const [nicheCheckDone, setNicheCheckDone] = useState(false);
 
   // Performance KPI state
   const [performanceKPIs, setPerformanceKPIs] = useState({
@@ -156,11 +159,33 @@ const Home = () => {
   // Transform API data to heatmap format
   const heatmapData = transformPostingSlotsToHeatmap(postingTimesData, 7);
 
+  // Check if user has onboarding profile
   useEffect(() => {
-    if (user) {
+    if (!user) return;
+    const checkOnboardingProfile = async () => {
+      const { data } = await supabase
+        .from("onboarding_profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!data) {
+        setShowNicheTutorial(true);
+      }
+      setNicheCheckDone(true);
+    };
+    checkOnboardingProfile();
+  }, [user]);
+
+  useEffect(() => {
+    if (user && nicheCheckDone && !showNicheTutorial) {
       loadDashboardData();
     }
-  }, [user]);
+  }, [user, nicheCheckDone, showNicheTutorial]);
+
+  const handleTutorialComplete = () => {
+    setShowNicheTutorial(false);
+    loadDashboardData();
+  };
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -279,6 +304,7 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {showNicheTutorial && <NicheTutorialModal onComplete={handleTutorialComplete} />}
       <SEO
         title={language === "de" ? "KI Social Media Manager" : language === "es" ? "Gestor de Redes Sociales con IA" : "AI Social Media Manager"}
         description={language === "de" 
