@@ -1,17 +1,59 @@
 
 
-## Post-Loeschen in der Wochenuebersicht
+## Wochenansicht neu gestalten: Horizontale Linie mit Plattform-Ringen
+
+### Problem
+1. Verpasste Posts bekommen nur +1h neue Zeit statt mindestens +6h
+2. Layout ist ein Grid statt der gewuenschten horizontalen Linie (Mo-So)
+3. Fehlende visuelle Plattform-Ringe mit Glow-Effekt
+4. Klick auf Ring soll Composer/Editor oeffnen und Post in Kalender speichern
 
 ### Aenderungen
 
-| Datei | Aenderung |
-|---|---|
-| `src/components/dashboard/WeekDayCard.tsx` | Neuen `onDelete` Callback in Props + roter Muelleimer-Button (Trash2 Icon) neben "Bearbeiten" und "Hochladen". Bestaetigung per Klick (kein extra Dialog noetig). |
-| `src/pages/Home.tsx` | `handleDeletePost` Funktion: Bei `sourceType === 'starter_plan'` den Starter-Plan-Eintrag in der DB loeschen. Bei `sourceType === 'calendar_event'` das Calendar-Event loeschen. Danach Post aus dem lokalen `weekDays` State entfernen — kein Ersatz-Post wird erstellt. |
+#### 1. `src/components/dashboard/WeekDayCard.tsx` — Komplett neu als horizontale Timeline-Karte
+
+Neues Design pro Tag:
+- Kompakte horizontale Darstellung in einer Reihe (Mo–So), scrollbar auf Mobile
+- Jeder Tag zeigt: Tagesname + Nummer oben, darunter **leuchtende Plattform-Ringe**
+- Ring-Farben:
+  - YouTube: `ring-red-500 shadow-red-500/60`
+  - Instagram: `ring-purple-500 shadow-purple-500/60`
+  - Facebook: `ring-blue-500 shadow-blue-500/60`
+  - LinkedIn: `ring-green-500 shadow-green-500/60`
+  - X: `ring-violet-300 shadow-violet-300/60` (Schwarzlicht-Effekt)
+  - TikTok: `ring-white shadow-white/60`
+- Ring leuchtet (Glow via `shadow-[0_0_12px_...]`) **nur wenn Post published ist**
+- Nicht-published Posts: Ring mit gedaempfter Farbe, kein Glow
+- Klick auf Ring → oeffnet `WeekPostEditor` Dialog fuer diesen Post
+- Plus-Button bleibt fuer neue Posts
+
+#### 2. `src/pages/Home.tsx` — Layout + Reschedule-Logik
+
+**Layout**: Grid ersetzen durch horizontale Flex-Reihe mit 7 Tagen (Mo–So statt ab heute), `overflow-x-auto` auf Mobile.
+
+**Woche berechnen**: Start am Montag der aktuellen Woche, nicht ab heute.
+
+**Reschedule-Logik anpassen**: Statt `currentMinutes + 60` → mindestens **+6 Stunden** nach der urspruenglichen Post-Zeit:
+```text
+newTime = originalPostTime + 6h
+Falls newTime > 22:00 → naechster Tag 09:00
+Falls newTime < jetzt → jetzt + 1h aufgerundet
+```
+
+**Ring-Click Handler**: `onRingClick(post)` → oeffnet `WeekPostEditor` mit dem Post, der beim Speichern ein `calendar_event` erstellt (schon implementiert im Editor).
+
+#### 3. `src/components/dashboard/WeekTimelineDay.tsx` — Neue Komponente
+
+Kompakte Tagesdarstellung:
+- Tagesname (MO, DI, ...) + Nummer
+- Darunter: Plattform-Ringe als klickbare Kreise
+- Heute-Markierung mit Primary-Farbe
+- Leerer Tag: kleiner "+" Button
+- Ringe zeigen Plattform-Icon in der Mitte
 
 ### Verhalten
-- Klick auf Loeschen-Button → Post wird aus DB entfernt (starter_week_plans oder calendar_events)
-- Post verschwindet sofort aus der Wochenuebersicht
-- Kein neuer Post wird generiert — der Slot bleibt leer
-- Wenn alle Posts eines Tages geloescht sind, zeigt die Tageskarte "Kein Post geplant"
+- Posts werden weiterhin in den Kalender gespeichert (createEvent/updateEvent via WeekPostEditor)
+- Glow-Animation nur bei `status === 'published'`
+- Verpasste Posts: mindestens 6h spaeter neu geplant
+- Woche geht immer Mo–So
 
