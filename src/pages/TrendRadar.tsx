@@ -131,7 +131,7 @@ export default function TrendRadar() {
     }
   };
 
-  const openTrendDetail = (trend: Trend, tab: 'overview' | 'analysis' | 'articles' = 'overview') => {
+  const openTrendDetail = (trend: Trend, tab: 'overview' | 'analysis' | 'articles' | 'media' = 'overview') => {
     setSelectedTrend(trend);
     setModalDefaultTab(tab);
     setDetailModalOpen(true);
