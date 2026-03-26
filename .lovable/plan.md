@@ -1,61 +1,40 @@
 
-Ziel: Das Zurückspringen der Übergänge und den Voice-Aussetzer gezielt beheben, ohne die flüssige Single-Video-Preview wieder zu verlieren.
 
-1. Bestätigte Ursachen
-- In `src/remotion/templates/DirectorsCutVideo.tsx` werden die Preview-Übergänge aktuell auf demselben `<Video>`-Element per `opacity`, `transform` und `clipPath` animiert.
-- Gleichzeitig ist auf dem Video noch ein CSS-`transition` gesetzt. In einer framebasierten Remotion-Preview führt das zu Nachziehen und anschließendem Rücksprung, weil der Browser zwischen laufend wechselnden Werten zusätzlich tweened.
-- Für `wipe` / `slide` / `push` gibt es in der Preview kein echtes „incoming layer“. Es wird nur das aktuelle Bild verformt. Dadurch wirkt der Übergang halb fertig und springt am Szenenwechsel zurück.
-- In `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` ist die Voiceover-Drift-Korrektur zwar entfernt, aber die Voiceover-Spur hängt noch an mehreren Transport-Pfaden:
-  - `onPause`
-  - `handleSeek`
-  - Reset/Restart-Pfade
-- Außerdem gibt es keine robuste Behandlung für `waiting` / `stalled` / `canplay` auf dem Voiceover-Audio. Ein kurzer Ladehänger kann deshalb als 1-2 Sekunden Aussetzer hörbar werden.
+## Fix: Stotterer + doppelte Übergänge beseitigen
 
-2. Umsetzung
-- `src/remotion/templates/DirectorsCutVideo.tsx`
-  - CSS-`transition` auf dem Preview-Video entfernen.
-  - Preview-Übergänge nicht mehr durch Verformen des einzigen Video-Layers lösen, sondern als echte Overlay-Logik:
-    - Basisvideo bleibt stabil und läuft durch.
-    - Ein separater Preview-Overlay-Layer zeigt den nächsten Shot visuell an.
-  - Für `crossfade` / `dissolve` / `fade`:
-    - Overlay mit nächstem Frame/Thumbnail einblenden.
-  - Für `wipe-*`, `slide-*`, `push-*`:
-    - Richtung korrekt übernehmen.
-    - Bewegung auf dem Overlay-Layer statt auf dem Basisvideo.
-  - Für `zoom` / `blur`:
-    - als zusätzlicher Effekt über dem stabilen Basisvideo, ohne Reset-Sprung am Boundary.
-  - Übergangsfenster sauber bis zum Szenenende clampen, damit nichts am Umschaltpunkt zurückspringt.
+### Ursache
 
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-  - Voiceover von transienten Player-Pausen entkoppeln:
-    - nicht bei jedem internen `pause` sofort die Voiceover-Spur stoppen
-    - nur bei echter User-Pause, Reset oder explizitem Seek eingreifen
-  - Voiceover-Position nur noch bei echten Seek-/Reset-Aktionen setzen, nicht bei allgemeinen Transport-Syncs.
-  - Audio-Status-Handling ergänzen:
-    - `waiting`
-    - `stalled`
-    - `canplay`
-    - `playing`
-  - eine kleine Resume-/Recovery-Logik einbauen, damit die Voiceover-Spur nach kurzem Buffering nicht stumm hängen bleibt.
+Das Overlay für eingehende Szenen (Zeile 880-903) erzeugt ein **zweites `<Video>`-Element** mit eigenem Decoder (`startFrom={nextSceneStartFrame}`). Genau das war das ursprüngliche Problem — jeder neue Video-Decoder verursacht einen Stotterer. Zusätzlich sieht man "beide Übergänge", weil das Basisvideo weiterläuft während gleichzeitig das Overlay-Video einblendet.
 
-- Optional zur Konsistenz:
-  - die Preview-Overlay-Logik an `NativeTransitionOverlay` anlehnen bzw. angleichen, damit Schritt 2 und Schritt 3 gleich reagieren.
+### Lösung: Nur EIN Video, Übergänge rein visuell
 
-3. Was ich bewusst nicht ändere
-- keine Rückkehr zu `TransitionSeries` in der Preview
-- keine neue per-Szene-Decoder-Architektur
-- keine erneute Voiceover-Drift-Korrektur gegen die Videozeit
-- finaler Render bleibt unverändert framegenau
+Das zweite `<Video>` komplett entfernen. Alle Übergänge werden ausschließlich als CSS-Effekte auf dem einzigen Video-Element umgesetzt:
 
-4. Erwartetes Ergebnis
-- Übergänge springen nicht mehr zurück
-- `wipe` / `slide` / `push` wirken als echte eingehende Übergänge
-- Single-Video-Preview bleibt flüssig
-- Voiceover läuft linear weiter und fängt sich bei kurzen Ladehänger robuster ab
+- **Crossfade/Dissolve**: Kurzer Opacity-Dip (1 → 0.2 → 1) — simuliert Überblendung
+- **Fade**: Stärkerer Dip zu Schwarz (1 → 0 → 1) via schwarzem Overlay
+- **Wipe**: `clip-path` Animation auf dem Video selbst — Bild wird von einer Seite "aufgedeckt"
+- **Slide/Push**: `transform: translate` auf dem Video — Bild gleitet raus
+- **Zoom**: `scale()` Vergrößerung als visueller Akzent
+- **Blur**: `filter: blur()` Weichzeichner
 
-5. Technischer Kernpunkt
-```text
-Basisvideo bleibt stabil
-+ separater incoming Overlay-Layer für Übergänge
-+ Voiceover nur bei echten User-Transportaktionen seeken/pause'n
-```
+Das ist keine perfekte 1:1-Darstellung des finalen Renders, aber es ist **flüssig und ohne Stotterer** — was in der Preview wichtiger ist.
+
+### Änderungen
+
+**`src/remotion/templates/DirectorsCutVideo.tsx`**
+- Zeilen 762-838: `incomingOverlay*`-Variablen und zugehörige Logik entfernen
+- Zeilen 879-903: Das zweite `<Video>`-Element im Overlay komplett entfernen
+- Transition-Effekte nur noch auf dem Basisvideo via `opacity`, `filter`, `transform`, `clipPath`
+- Crossfade/Dissolve: stärkerer Opacity-Dip + schwarzer Overlay-Blitz
+- Wipe: `clipPath` direkt auf dem Video (zeigt "Aufdecken" der nächsten Szene)
+
+### Was sich nicht ändert
+- Finaler Render mit TransitionSeries + per-Scene Video bleibt unverändert
+- Audio-Architektur bleibt unverändert
+- Szenenkonzept, Editing, Filter bleiben erhalten
+
+### Erwartetes Ergebnis
+- 0 Stotterer (nur 1 Video-Decoder aktiv)
+- Übergänge als klare visuelle Effekte sichtbar (kein "doppelter" Übergang mehr)
+- Preview ist eine Approximation des finalen Looks, nicht 1:1 identisch
+
