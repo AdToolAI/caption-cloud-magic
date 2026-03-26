@@ -98,7 +98,7 @@ export function SceneAnalysisStep({
   
   const [transitions, setTransitionsInternal] = useState<TransitionAssignment[]>(externalTransitions);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const lastTimeUpdateRef = useRef(0);
   
   // Scene-specific transitions state
   const [sceneTransitions, setSceneTransitions] = useState<Record<string, {
