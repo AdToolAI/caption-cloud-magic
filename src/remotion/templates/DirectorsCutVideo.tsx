@@ -675,7 +675,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     const activeIdx = currentSceneIndex >= 0 ? currentSceneIndex : 0;
     const activeScene = sortedScenes[activeIdx];
     const nextScene = sortedScenes[activeIdx + 1];
-    const nextSceneStartFrame = nextScene ? Math.max(0, Math.floor(nextScene.startTime * fps)) : 0;
+    // nextSceneStartFrame no longer needed — single video architecture
 
     // Get scene-specific effects
     const currentSceneEffect = sceneEffects?.[activeScene.id] || activeScene.effects || null;
