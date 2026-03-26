@@ -504,7 +504,7 @@ export function UniversalCreator() {
             {/* Full Remotion Player Preview - Only from Step 4 onwards when audio is available */}
             {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 4 && (
               <RemotionPreviewPlayer
-                componentName="UniversalVideo"
+                componentName="UniversalCreatorVideo"
                 customizations={{
                   ...(contentConfig?.voiceoverUrl && {
                     voiceoverUrl: contentConfig.voiceoverUrl,

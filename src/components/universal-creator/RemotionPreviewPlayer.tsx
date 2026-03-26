@@ -41,7 +41,7 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
   return (
     <Player
       ref={playerRef}
-      component={UniversalVideo}
+      component={inputProps?._componentName ? (COMPONENT_REGISTRY[inputProps._componentName] || UniversalCreatorVideo) : UniversalCreatorVideo}
       inputProps={inputProps}
       compositionWidth={compositionWidth}
       compositionHeight={compositionHeight}
