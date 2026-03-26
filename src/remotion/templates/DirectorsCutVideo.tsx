@@ -686,33 +686,55 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* SCENES - Each scene is a Sequence with its own Video */}
-      {/* Next-scene overlap: during transition frames, render the NEXT scene underneath */}
-      {sortedScenes.map((scene, idx) => {
-        const sceneStartFrame = Math.floor(scene.startTime * fps);
-        const sceneEndFrame = Math.floor(scene.endTime * fps);
-        const sceneDurationFrames = Math.max(1, sceneEndFrame - sceneStartFrame);
+      {/* SCENES — rendered via TransitionSeries for automatic overlap, z-order, and premounting */}
+      <TransitionSeries>
+        {sortedScenes.map((scene, idx) => {
+          const sceneStartFrame = Math.floor(scene.startTime * fps);
+          const sceneEndFrame = Math.floor(scene.endTime * fps);
+          const sceneDurationFrames = Math.max(1, sceneEndFrame - sceneStartFrame);
 
-        // Check if this scene has a transition to the next scene
-        const currentTransition = transitions?.find(t => t.sceneIndex === idx);
-        const hasTransitionToNext = idx < sortedScenes.length - 1 && currentTransition && currentTransition.type && currentTransition.type !== 'none';
-        const transitionDurationFrames = hasTransitionToNext ? Math.floor((currentTransition!.duration || 0.5) * fps) : 0;
-        const nextScene = hasTransitionToNext ? sortedScenes[idx + 1] : null;
+          // Find transition AFTER this scene (to the next scene)
+          const currentTransition = transitions?.find(t => t.sceneIndex === idx);
+          const hasTransitionToNext = idx < sortedScenes.length - 1 && currentTransition && currentTransition.type && currentTransition.type !== 'none';
+          const transitionDurationFrames = hasTransitionToNext ? Math.max(1, Math.floor((currentTransition!.duration || 0.5) * fps)) : 0;
 
-        return (
-          <React.Fragment key={scene.id}>
-            {/* Pre-render next scene UNDERNEATH during transition overlap — premounted for smooth decoder start */}
-            {hasTransitionToNext && nextScene && transitionDurationFrames > 0 && (
-              <Sequence
-                from={Math.max(0, sceneEndFrame - transitionDurationFrames)}
-                durationInFrames={transitionDurationFrames}
-                premountFor={30}
-              >
+          // Build the presentation based on transition type
+          const getPresentation = () => {
+            if (!currentTransition || !currentTransition.type) return fade();
+            const [baseType, direction = 'left'] = currentTransition.type.toLowerCase().split('-');
+            
+            const directionMap: Record<string, 'from-left' | 'from-right' | 'from-top' | 'from-bottom'> = {
+              left: 'from-left',
+              right: 'from-right',
+              up: 'from-top',
+              down: 'from-bottom',
+            };
+
+            switch (baseType) {
+              case 'crossfade':
+              case 'dissolve':
+              case 'fade':
+              case 'blur':
+              case 'zoom':
+                return fade();
+              case 'wipe':
+                return wipe({ direction: directionMap[direction] || 'from-left' });
+              case 'slide':
+              case 'push':
+                return slide({ direction: directionMap[direction] || 'from-left' });
+              default:
+                return fade();
+            }
+          };
+
+          return (
+            <React.Fragment key={scene.id}>
+              <TransitionSeries.Sequence durationInFrames={sceneDurationFrames}>
                 <AbsoluteFill>
                   <SceneVideo
                     sourceVideoUrl={sourceVideoUrl}
-                    scene={nextScene}
-                    sceneIndex={idx + 1}
+                    scene={scene}
+                    sceneIndex={idx}
                     totalScenes={sortedScenes.length}
                     brightness={brightness}
                     contrast={contrast}
@@ -728,47 +750,21 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                     transitions={[]}
                     chromaKey={chromaKey}
                     kenBurns={kenBurns}
-                    sceneDurationFrames={Math.max(1, Math.floor(nextScene.endTime * fps) - Math.floor(nextScene.startTime * fps))}
+                    sceneDurationFrames={sceneDurationFrames}
                     previewMode={previewMode}
                   />
                 </AbsoluteFill>
-              </Sequence>
-            )}
-            {/* Current scene ON TOP (its exit transition reveals the next scene below) */}
-            <Sequence
-              from={sceneStartFrame}
-              durationInFrames={sceneDurationFrames}
-              premountFor={30}
-            >
-              <AbsoluteFill>
-                <SceneVideo
-                  sourceVideoUrl={sourceVideoUrl}
-                  scene={scene}
-                  sceneIndex={idx}
-                  totalScenes={sortedScenes.length}
-                  brightness={brightness}
-                  contrast={contrast}
-                  saturation={saturation}
-                  sharpness={sharpness}
-                  temperature={temperature}
-                  vignette={vignette}
-                  globalFilter={filter}
-                  styleTransfer={styleTransfer}
-                  colorGrading={colorGrading}
-                  sceneColorGrading={sceneColorGrading}
-                  sceneEffects={sceneEffects}
-                  transitions={transitions}
-                  chromaKey={chromaKey}
-                  kenBurns={kenBurns}
-                  sceneDurationFrames={sceneDurationFrames}
-                  previewMode={previewMode}
+              </TransitionSeries.Sequence>
+              {hasTransitionToNext && transitionDurationFrames > 0 && (
+                <TransitionSeries.Transition
+                  presentation={getPresentation()}
+                  timing={linearTiming({ durationInFrames: transitionDurationFrames })}
                 />
-              </AbsoluteFill>
-            </Sequence>
-          </React.Fragment>
-        );
-      })}
-
+              )}
+            </React.Fragment>
+          );
+        })}
+      </TransitionSeries>
       {/* AUDIO - Skip all Remotion audio in preview mode (native audio handles it) */}
       {!previewMode && !voiceoverUrl && !backgroundMusicUrl && (
         <Audio
