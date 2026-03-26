@@ -315,7 +315,6 @@ export function SceneAnalysisStep({
     }
     
     // NO fallback - let caller decide
-    console.log(`[parseEffectName] NO MATCH for "${name}"`);
     return {};
   };
 
