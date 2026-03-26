@@ -383,7 +383,7 @@ export function SceneAnalysisStep({
       }
       
       newSceneEffects[scene.id] = sceneEffect as SceneEffects;
-      console.log(`[applyAllSuggestions] Scene ${scene.id} final effects:`, sceneEffect);
+      // Applied
     }
     
     console.log(`[applyAllSuggestions] Applied ${appliedCount} effects, skipped ${skippedTransitions} transitions`);
