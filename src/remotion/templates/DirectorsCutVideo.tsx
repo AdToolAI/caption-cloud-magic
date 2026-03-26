@@ -759,10 +759,6 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     let transitionTransform = '';
     let transitionClipPath = '';
     let transitionVideoOpacity = 1;
-    // Incoming overlay variables — separate layer for wipe/slide/push/crossfade
-    let incomingOverlayOpacity = 0;
-    let incomingOverlayTransform = '';
-    let incomingOverlayClipPath = '';
     if (nextScene) {
       const currentTransition = transitions?.find(t => t.sceneIndex === activeIdx);
       if (currentTransition && currentTransition.type && currentTransition.type !== 'none') {
@@ -781,8 +777,9 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
               break;
             case 'crossfade':
             case 'dissolve':
-              transitionVideoOpacity = 1 - eased * 0.6;
-              incomingOverlayOpacity = eased;
+              // Simulate crossfade with opacity dip + black flash
+              transitionVideoOpacity = 1 - eased * 0.7;
+              transitionOverlayOpacity = eased * 0.4;
               break;
             case 'blur':
               transitionBlur = eased * 15;
@@ -793,39 +790,30 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
               transitionVideoOpacity = 1 - eased * 0.4;
               break;
             case 'wipe': {
-              // Base video stays stable; incoming overlay wipes in
-              incomingOverlayOpacity = 1;
-              if (transitionDir === 'left') incomingOverlayClipPath = `inset(0 ${(1 - eased) * 100}% 0 0)`;
-              else if (transitionDir === 'right') incomingOverlayClipPath = `inset(0 0 0 ${(1 - eased) * 100}%)`;
-              else if (transitionDir === 'up') incomingOverlayClipPath = `inset(0 0 ${(1 - eased) * 100}% 0)`;
-              else incomingOverlayClipPath = `inset(${(1 - eased) * 100}% 0 0 0)`;
+              // Clip-path on base video to simulate wipe reveal
+              if (transitionDir === 'left') transitionClipPath = `inset(0 0 0 ${eased * 100}%)`;
+              else if (transitionDir === 'right') transitionClipPath = `inset(0 ${eased * 100}% 0 0)`;
+              else if (transitionDir === 'up') transitionClipPath = `inset(0 0 0 0)`;
+              else transitionClipPath = `inset(0 0 0 0)`;
+              transitionVideoOpacity = 1;
+              transitionOverlayOpacity = eased * 0.15;
               break;
             }
             case 'slide': {
-              // Incoming overlay slides in from outside
-              incomingOverlayOpacity = 1;
-              if (transitionDir === 'left') incomingOverlayTransform = `translateX(${(1 - eased) * 100}%)`;
-              else if (transitionDir === 'right') incomingOverlayTransform = `translateX(${-(1 - eased) * 100}%)`;
-              else if (transitionDir === 'up') incomingOverlayTransform = `translateY(${(1 - eased) * 100}%)`;
-              else incomingOverlayTransform = `translateY(${-(1 - eased) * 100}%)`;
+              // Slide the base video out
+              if (transitionDir === 'left') transitionTransform = `translateX(${-eased * 30}%)`;
+              else if (transitionDir === 'right') transitionTransform = `translateX(${eased * 30}%)`;
+              else if (transitionDir === 'up') transitionTransform = `translateY(${-eased * 30}%)`;
+              else transitionTransform = `translateY(${eased * 30}%)`;
+              transitionVideoOpacity = 1 - eased * 0.5;
               break;
             }
             case 'push': {
-              // Base video pushes out, incoming pushes in
-              if (transitionDir === 'left') {
-                transitionTransform = `translateX(${-eased * 100}%)`;
-                incomingOverlayTransform = `translateX(${(1 - eased) * 100}%)`;
-              } else if (transitionDir === 'right') {
-                transitionTransform = `translateX(${eased * 100}%)`;
-                incomingOverlayTransform = `translateX(${-(1 - eased) * 100}%)`;
-              } else if (transitionDir === 'up') {
-                transitionTransform = `translateY(${-eased * 100}%)`;
-                incomingOverlayTransform = `translateY(${(1 - eased) * 100}%)`;
-              } else {
-                transitionTransform = `translateY(${eased * 100}%)`;
-                incomingOverlayTransform = `translateY(${-(1 - eased) * 100}%)`;
-              }
-              incomingOverlayOpacity = 1;
+              // Push base video fully out of frame
+              if (transitionDir === 'left') transitionTransform = `translateX(${-eased * 100}%)`;
+              else if (transitionDir === 'right') transitionTransform = `translateX(${eased * 100}%)`;
+              else if (transitionDir === 'up') transitionTransform = `translateY(${-eased * 100}%)`;
+              else transitionTransform = `translateY(${eased * 100}%)`;
               break;
             }
             default:
