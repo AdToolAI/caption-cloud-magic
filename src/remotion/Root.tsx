@@ -230,7 +230,8 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{
           scenes: [],
           fps: 30,
-        }}
+          aspectRatio: '16:9',
+        } as any}
       />
       <Composition
         id="ExplainerVideo"
