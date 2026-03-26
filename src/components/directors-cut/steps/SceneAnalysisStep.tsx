@@ -311,7 +311,6 @@ export function SceneAnalysisStep({
       effects.saturation = 75;
       effects.brightness = 96;
       effects.contrast = 120;
-      console.log(`[parseEffectName] COOL filter applied`, effects);
       return effects;
     }
     
