@@ -299,6 +299,7 @@ const SceneVideo: React.FC<{
   chromaKey?: { enabled?: boolean; color?: string; tolerance?: number; edgeSoftness?: number; spillSuppression?: number; backgroundUrl?: string };
   kenBurns?: Array<{ id?: string; sceneId?: string; startZoom?: number; endZoom?: number; startX?: number; startY?: number; endX?: number; endY?: number; easing?: string }>;
   sceneDurationFrames: number;
+  previewMode?: boolean;
 }> = ({
   sourceVideoUrl,
   scene,
