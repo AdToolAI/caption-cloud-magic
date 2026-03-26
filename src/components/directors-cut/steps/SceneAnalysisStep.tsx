@@ -285,7 +285,6 @@ export function SceneAnalysisStep({
     // Parse brightness - STRONGER default
     if (lowerName.includes('bright') || lowerName.includes('hell')) {
       effects.brightness = extractNumber(lowerName, 140);
-      console.log(`[parseEffectName] BRIGHTNESS: ${effects.brightness}`);
       return effects;
     }
     
