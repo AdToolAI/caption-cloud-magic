@@ -715,6 +715,7 @@ export function SceneAnalysisStep({
           duration={videoDuration}
           currentTime={currentVideoTime}
           onTimeUpdate={(time) => setCurrentVideoTime(time)}
+          initialMuted={false}
         >
           {/* Current Scene Indicator */}
           {scenes.length > 0 && (
