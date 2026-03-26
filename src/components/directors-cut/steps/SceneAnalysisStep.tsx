@@ -423,7 +423,7 @@ export function SceneAnalysisStep({
     if (Object.keys(sceneEffect).length === 0) {
       sceneEffect.contrast = 110;
       sceneEffect.saturation = 112;
-      console.log(`[applySingleSceneSuggestion] Scene ${scene.id}: using fallback effects`);
+      // Fallback
     }
     
     console.log(`[applySingleSceneSuggestion] Scene ${scene.id} (${scene.start_time}s - ${scene.end_time}s) final effects:`, sceneEffect);
