@@ -308,7 +308,7 @@ const SubtitleLayer: React.FC<{
       <div
         style={{
           fontFamily: fontFamily,
-          fontSize: subtitleStyle.fontSize,
+          fontSize: (subtitleStyle.fontSize || 48) * scaleFactor,
           color: subtitleStyle.color,
           textAlign: 'center',
           maxWidth: '80%',
