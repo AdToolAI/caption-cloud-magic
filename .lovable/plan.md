@@ -1,54 +1,91 @@
 
 Do I know what the issue is? Ja.
 
-Die Ursache ist jetzt klar und im Code sichtbar:
+Die Ursache ist jetzt eindeutig und ich sehe sie direkt im Projekt:
 
-- `package.json` pinnt Remotion noch auf `^4.0.424`
-  - `@remotion/cli`
-  - `@remotion/lottie`
-  - `@remotion/player`
-  - `@remotion/transitions`
-  - `remotion`
-- Gleichzeitig enthalten die Lockfiles bereits `4.0.441`
-  - besonders in `bun.lock` sind `@remotion/bundler`, `@remotion/cli` usw. schon auf `4.0.441`
-- Laut Remotion-Doku zu `version-mismatch` ist genau das problematisch: Die `^`-Versionen garantieren nicht, dass alle Remotion-Pakete wirklich dieselbe Version installiert haben.
+1. `package.json` ist nur halb korrigiert
+- Remotion ist bereits auf exakt `4.0.441` gepinnt
+- `zod` steht aber immer noch auf `^3.22.3`
+- `@remotion/lambda` fehlt komplett als Dependency
 
-Deshalb würde ich den Fix so umsetzen:
+2. Die Lockfiles widersprechen sich weiter
+- `package-lock.json` enthält noch alte Bereiche / alte Auflösung
+- `bun.lock` ist ebenfalls noch vorhanden
+- Für npm ist das problematisch, weil Remotion ausdrücklich vor mehreren Lockfiles und gemischten Versionen warnt
 
-1. `package.json` bereinigen
-- Alle Remotion-Pakete auf exakt dieselbe Version setzen, ohne `^`
-- Konsistent auf `4.0.441` gehen, weil diese Version bereits in den neueren Lockfile-Einträgen steckt und die neue Transition-Implementierung damit ausgerichtet ist
+3. Dein CMD-Screenshot bestätigt genau diese zwei Fehler gleichzeitig
+- `zod: installed 3.x, required 4.3.6`
+- `Cannot find module '@remotion/lambda'`
 
-2. Lockfile-/Package-Manager-Chaos auflösen
-- Da du npm nutzt, die Bun-Lockfiles nicht mehr als Quelle behalten
-- Ziel: nur noch npm als eine Wahrheit, damit nicht wieder 4.0.424 und 4.0.441 parallel auftauchen
+Die Remotion-Doku bestätigt dafür zwei Regeln:
+- alle `@remotion/*`-Pakete + `remotion` müssen exakt dieselbe Version haben, ohne `^`
+- für diese Version muss `zod` auf `4.3.6` liegen
+- `@remotion/lambda` muss installiert sein, wenn du `npx remotion lambda ...` nutzt
 
-3. Installation sauber neu auflösen
-- Nach der Manifest-Bereinigung Dependencies einmal frisch auflösen, damit `package-lock.json` nur noch eine Remotion-Version enthält
+## Umsetzungsplan
 
-4. Danach Preview erneut prüfen
-- Die aktuelle App-Fehlermeldung sollte verschwinden, weil `@remotion/player`, `@remotion/transitions` und `remotion` dann wieder dieselbe Runtime-Version haben
+### 1. Abhängigkeiten im Projekt sauber korrigieren
+Ich würde `package.json` auf einen konsistenten Satz bringen:
 
-Betroffene Dateien:
+```text
+"@remotion/cli": "4.0.441"
+"@remotion/lambda": "4.0.441"
+"@remotion/lottie": "4.0.441"
+"@remotion/player": "4.0.441"
+"@remotion/transitions": "4.0.441"
+"remotion": "4.0.441"
+"zod": "4.3.6"
+```
+
+Wichtig:
+- ohne `^`
+- `@remotion/lambda` kommt neu dazu
+- `zod` wird auf exakt `4.3.6` angehoben
+
+### 2. Lockfile-Chaos beenden
+Da du npm nutzt, würde ich die npm-Welt als einzige Quelle behalten:
+- `bun.lock`
+- `bun.lockb`
+
+raus aus dem Projekt bzw. nicht mehr als aktive Quelle benutzen.
+
+Danach muss `package-lock.json` neu erzeugt werden, damit dort nicht weiter alte `zod`-/Remotion-Stände stehen.
+
+### 3. Lokale Installation einmal komplett sauber neu auflösen
+Nach der Manifest-Bereinigung würde ich lokal einen sauberen Re-Install einplanen:
+- `node_modules` entfernen
+- altes `package-lock.json` verwerfen
+- `npm install` neu laufen lassen
+
+Ziel:
+- nur noch eine konsistente npm-Auflösung
+- `zod@4.3.6`
+- `@remotion/lambda@4.0.441`
+- alle Remotion-Pakete exakt `4.0.441`
+
+### 4. Verifikation vor erneutem Deploy
+Bevor wieder deployed wird, würde ich gezielt prüfen:
+- `npx remotion versions`
+- dort müssen alle Remotion-Pakete auf `4.0.441` stehen
+- `zod` muss `4.3.6` zeigen
+- kein Hinweis auf multiple lockfiles mehr
+
+### 5. Erst dann Bundle erneut deployen
+Wenn die Versionen sauber sind, erst danach wieder:
+```text
+npx remotion lambda sites create src/remotion/index.ts --site-name=adtool-remotion-bundle --region=eu-central-1
+```
+
+## Betroffene Dateien
 - `package.json`
 - `package-lock.json`
 - `bun.lock`
 - `bun.lockb`
 
-Konkret würde ich in `package.json` diese Pakete angleichen:
-```text
-"@remotion/cli": "4.0.441"
-"@remotion/lottie": "4.0.441"
-"@remotion/player": "4.0.441"
-"@remotion/transitions": "4.0.441"
-"remotion": "4.0.441"
-```
+## Ergebnis nach dem Fix
+Danach sollten diese beiden Fehler gleichzeitig verschwinden:
+- der `zod` version mismatch
+- `Cannot find module '@remotion/lambda'`
 
-Wichtig:
-- Ich würde in diesem Fix nicht gleichzeitig noch an der Directors-Cut-Logik schrauben
-- Erst den Versionskonflikt vollständig beseitigen
-- Danach erst wieder Übergänge / Preview prüfen, weil die aktuelle Fehlermeldung die Remotion-Player-Laufzeit bereits vorab kaputt macht
-
-Technischer Hinweis:
-- Das ist sehr wahrscheinlich kein inhaltlicher Fehler in `DirectorsCutVideo.tsx`, sondern ein Paketauflösungsfehler
-- Der Import von `TransitionSeries` in `src/remotion/templates/DirectorsCutVideo.tsx` ist okay, aber nur wenn alle Remotion-Pakete dieselbe Version haben
+## Technischer Hinweis
+Das ist aktuell sehr wahrscheinlich kein Fehler in deiner Director’s-Cut-Logik, sondern ein reines Dependency-/Lockfile-Problem. Solange `zod` und `@remotion/lambda` lokal nicht sauber aufgelöst sind, bleibt der Deploy-Befehl instabil, selbst wenn die eigentliche Video-Logik korrekt ist.
