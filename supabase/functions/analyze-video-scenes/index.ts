@@ -332,7 +332,10 @@ Antworte NUR mit dem JSON-Array!`
           };
         });
         
-        console.log(`[analyze-video-scenes] Final scenes: ${scenes.map(s => `${s.id}:${s.start_time}-${s.end_time}s "${s.description.substring(0, 40)}..."`).join(', ')}`);
+      // Stabilize scenes: merge micro-scenes and cap max count
+      scenes = stabilizeScenes(scenes, videoDuration);
+      
+      console.log(`[analyze-video-scenes] Final stabilized scenes: ${scenes.map(s => `${s.id}:${s.start_time}-${s.end_time}s "${s.description?.substring(0, 40)}..."`).join(', ')}`);
         
       } catch (parseError) {
         console.error("[analyze-video-scenes] Parse error:", parseError);
