@@ -688,6 +688,36 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     const effectiveFilter = currentSceneEffect?.filter ?? filter;
     // Next scene filter no longer needed — single video, no overlay
 
+    // Build filter string for active scene
+    let previewFilter = `brightness(${effectiveBrightness / 100}) `;
+    previewFilter += `contrast(${effectiveContrast / 100}) `;
+    previewFilter += `saturate(${effectiveSaturation / 100}) `;
+    if (effectiveTemperature !== 0) {
+      if (effectiveTemperature > 0) {
+        const warmth = effectiveTemperature / 50;
+        previewFilter += `sepia(${Math.min(0.5, warmth * 0.3)}) saturate(${1 + warmth * 0.3}) `;
+      } else {
+        const coldness = Math.abs(effectiveTemperature) / 50;
+        previewFilter += `hue-rotate(${effectiveTemperature * 1.5}deg) saturate(${1 + coldness * 0.2}) `;
+      }
+    }
+    if (effectiveSharpness > 0) previewFilter += `url(#sharpen-filter) `;
+    if (effectiveFilter && isSVGFilter(effectiveFilter)) {
+      previewFilter += SVG_FILTER_IDS[effectiveFilter] + ' ';
+    } else if (effectiveFilter && FILTER_CSS[effectiveFilter]) {
+      previewFilter += FILTER_CSS[effectiveFilter] + ' ';
+    }
+    if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
+      previewFilter += STYLE_CSS[styleTransfer.style] + ' ';
+    }
+    const sceneGrading = sceneColorGrading?.[activeScene.id];
+    const effectiveGrading = sceneGrading?.grade
+      ? { enabled: true, grade: sceneGrading.grade, intensity: sceneGrading.intensity }
+      : colorGrading;
+    if (effectiveGrading?.enabled && effectiveGrading.grade && GRADE_CSS[effectiveGrading.grade]) {
+      previewFilter += GRADE_CSS[effectiveGrading.grade] + ' ';
+    }
+
     // Calculate CSS-based transition effects per type
     let transitionOverlayOpacity = 0;
     let transitionBlur = 0;
