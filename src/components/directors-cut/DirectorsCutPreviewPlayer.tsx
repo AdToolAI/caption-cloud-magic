@@ -99,18 +99,33 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const sourceAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceoverAudioRef = useRef<HTMLAudioElement | null>(null);
   const backgroundMusicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const isMutedRef = useRef(initialMuted);
+  const isPlayingRef = useRef(false);
+  const originalAudioMutedRef = useRef(originalAudioMuted);
+  const voiceoverShouldRecoverRef = useRef(false);
+  const voiceoverRecoveryTimerRef = useRef<number | null>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(initialMuted);
   const internalTimeRef = useRef(currentTime);
   const [displayTime, setDisplayTime] = useState(currentTime);
-  const [playerReady, setPlayerReady] = useState(false);
-  const hasAutoStartedAudio = useRef(false);
 
   // Sync isMuted when initialMuted prop changes
   useEffect(() => {
     setIsMuted(initialMuted);
   }, [initialMuted]);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  useEffect(() => {
+    originalAudioMutedRef.current = originalAudioMuted;
+  }, [originalAudioMuted]);
 
   const fps = 30;
   
@@ -130,6 +145,30 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [scenes, transitions]);
 
   const durationInFrames = Math.max(1, Math.ceil(duration * fps) - transitionOverlapFrames);
+
+  const playVoiceover = useCallback(() => {
+    const voiceover = voiceoverAudioRef.current;
+    if (!voiceover || isMutedRef.current) return;
+
+    voiceover.play().then(() => {
+      voiceoverShouldRecoverRef.current = false;
+    }).catch(() => {
+      if (isPlayingRef.current && !isMutedRef.current) {
+        voiceoverShouldRecoverRef.current = true;
+      }
+    });
+  }, []);
+
+  const scheduleVoiceoverRecovery = useCallback(() => {
+    if (voiceoverRecoveryTimerRef.current) {
+      window.clearTimeout(voiceoverRecoveryTimerRef.current);
+    }
+
+    voiceoverRecoveryTimerRef.current = window.setTimeout(() => {
+      if (!voiceoverShouldRecoverRef.current || !isPlayingRef.current || isMutedRef.current) return;
+      playVoiceover();
+    }, 150);
+  }, [playVoiceover]);
 
   // Convert scenes to Remotion format with effects and Time Remapping data
   const remotionScenes = useMemo(() => {
@@ -280,17 +319,19 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         if (!originalAudioMuted) {
           sourceAudioRef.current?.play().catch(() => {});
         }
-        voiceoverAudioRef.current?.play().catch(() => {});
+        voiceoverShouldRecoverRef.current = false;
+        playVoiceover();
         backgroundMusicAudioRef.current?.play().catch(() => {});
       }
     } else if (!externalIsPlaying && isPlaying) {
       player.pause();
       setIsPlaying(false);
       sourceAudioRef.current?.pause();
+      voiceoverShouldRecoverRef.current = false;
       voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
     }
-  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted]);
+  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted, playVoiceover]);
 
   // ==================== NATIVE AUDIO SETUP ====================
   useEffect(() => {
@@ -331,6 +372,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     }
 
     return () => {
+      if (voiceoverRecoveryTimerRef.current) {
+        window.clearTimeout(voiceoverRecoveryTimerRef.current);
+        voiceoverRecoveryTimerRef.current = null;
+      }
       sourceAudioRef.current?.pause();
       voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
@@ -339,6 +384,51 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       backgroundMusicAudioRef.current = null;
     };
   }, [videoUrl, voiceoverUrl, backgroundMusicUrl]);
+
+  useEffect(() => {
+    const voiceover = voiceoverAudioRef.current;
+    if (!voiceover) return;
+
+    const markForRecovery = () => {
+      if (isPlayingRef.current && !isMutedRef.current) {
+        voiceoverShouldRecoverRef.current = true;
+      }
+    };
+
+    const handleCanPlay = () => {
+      if (!voiceoverShouldRecoverRef.current) return;
+      scheduleVoiceoverRecovery();
+    };
+
+    const handlePlaying = () => {
+      voiceoverShouldRecoverRef.current = false;
+      if (voiceoverRecoveryTimerRef.current) {
+        window.clearTimeout(voiceoverRecoveryTimerRef.current);
+        voiceoverRecoveryTimerRef.current = null;
+      }
+    };
+
+    const handlePause = () => {
+      if (isPlayingRef.current && !isMutedRef.current && !voiceover.ended) {
+        voiceoverShouldRecoverRef.current = true;
+        scheduleVoiceoverRecovery();
+      }
+    };
+
+    voiceover.addEventListener('waiting', markForRecovery);
+    voiceover.addEventListener('stalled', markForRecovery);
+    voiceover.addEventListener('canplay', handleCanPlay);
+    voiceover.addEventListener('playing', handlePlaying);
+    voiceover.addEventListener('pause', handlePause);
+
+    return () => {
+      voiceover.removeEventListener('waiting', markForRecovery);
+      voiceover.removeEventListener('stalled', markForRecovery);
+      voiceover.removeEventListener('canplay', handleCanPlay);
+      voiceover.removeEventListener('playing', handlePlaying);
+      voiceover.removeEventListener('pause', handlePause);
+    };
+  }, [voiceoverUrl, scheduleVoiceoverRecovery]);
 
   // Update source audio volume when master_volume changes
   useEffect(() => {
@@ -360,18 +450,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     const onPlay = () => {
       setIsPlaying(true);
       // Auto-start native audio when player plays
-      if (!isMuted) {
-        if (!originalAudioMuted && sourceAudioRef.current) {
+      if (!isMutedRef.current) {
+        if (!originalAudioMutedRef.current && sourceAudioRef.current) {
           sourceAudioRef.current.play().catch(() => {});
         }
-        voiceoverAudioRef.current?.play().catch(() => {});
+        voiceoverShouldRecoverRef.current = false;
+        playVoiceover();
         backgroundMusicAudioRef.current?.play().catch(() => {});
       }
     };
     const onPause = () => {
       setIsPlaying(false);
       sourceAudioRef.current?.pause();
-      voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
     };
     let lastDisplayUpdateTime = 0;
@@ -411,6 +501,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         sourceAudioRef.current.currentTime = 0;
       }
       if (voiceoverAudioRef.current) {
+        voiceoverShouldRecoverRef.current = false;
         voiceoverAudioRef.current.pause();
         voiceoverAudioRef.current.currentTime = 0;
       }
@@ -425,15 +516,13 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     player.addEventListener('timeupdate', onTimeUpdateEvent);
     player.addEventListener('ended', onEnded);
 
-    setPlayerReady(true);
-
     return () => {
       player.removeEventListener('play', onPlay);
       player.removeEventListener('pause', onPause);
       player.removeEventListener('timeupdate', onTimeUpdateEvent);
       player.removeEventListener('ended', onEnded);
     };
-  }, [playerKey]);
+  }, [playerKey, playVoiceover]);
 
   // Sync external time changes — only when NOT playing to avoid seek interrupts
   useEffect(() => {
@@ -446,6 +535,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       player.seekTo(Math.floor(currentTime * fps));
       internalTimeRef.current = currentTime;
       setDisplayTime(currentTime);
+      if (sourceAudioRef.current) {
+        sourceAudioRef.current.currentTime = currentTime;
+      }
+      if (voiceoverAudioRef.current) {
+        voiceoverAudioRef.current.currentTime = currentTime;
+      }
+      if (backgroundMusicAudioRef.current) {
+        backgroundMusicAudioRef.current.currentTime = currentTime;
+      }
     }
   }, [currentTime, isPlaying]);
 
@@ -458,6 +556,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (isPlaying) {
       player.pause();
       sourceAudioRef.current?.pause();
+      voiceoverShouldRecoverRef.current = false;
       voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
     } else {
@@ -479,14 +578,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         if (!originalAudioMuted) {
           sourceAudioRef.current?.play().catch(() => {});
         }
-        voiceoverAudioRef.current?.play().catch(() => {});
+        voiceoverShouldRecoverRef.current = false;
+        playVoiceover();
         backgroundMusicAudioRef.current?.play().catch(() => {});
       }
     }
 
     setIsPlaying(newPlayingState);
     onPlayingChange?.(newPlayingState);
-  }, [isPlaying, durationInFrames, isMuted, onPlayingChange, originalAudioMuted]);
+  }, [isPlaying, durationInFrames, isMuted, onPlayingChange, originalAudioMuted, playVoiceover]);
 
   const handleMuteToggle = useCallback(async (e: React.MouseEvent) => {
     const player = playerRef.current;
@@ -512,17 +612,19 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       if (!originalAudioMuted) {
         sourceAudioRef.current?.play().catch(() => {});
       }
-      voiceoverAudioRef.current?.play().catch(() => {});
+      voiceoverShouldRecoverRef.current = false;
+      playVoiceover();
       backgroundMusicAudioRef.current?.play().catch(() => {});
     } else {
       player.mute();
       setIsMuted(true);
       
       sourceAudioRef.current?.pause();
+      voiceoverShouldRecoverRef.current = false;
       voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
     }
-  }, [isMuted, originalAudioMuted]);
+  }, [isMuted, originalAudioMuted, playVoiceover]);
 
   const handleSeek = useCallback((value: number[]) => {
     const player = playerRef.current;
@@ -540,6 +642,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     }
     if (voiceoverAudioRef.current) {
       voiceoverAudioRef.current.currentTime = newTime;
+      if (isPlayingRef.current && !isMutedRef.current) {
+        voiceoverShouldRecoverRef.current = false;
+        playVoiceover();
+      }
     }
     if (backgroundMusicAudioRef.current) {
       backgroundMusicAudioRef.current.currentTime = newTime;
@@ -561,6 +667,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       sourceAudioRef.current.currentTime = 0;
     }
     if (voiceoverAudioRef.current) {
+      voiceoverShouldRecoverRef.current = false;
       voiceoverAudioRef.current.pause();
       voiceoverAudioRef.current.currentTime = 0;
     }
