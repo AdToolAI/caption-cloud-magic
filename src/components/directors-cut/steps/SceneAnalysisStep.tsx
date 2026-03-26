@@ -269,7 +269,6 @@ export function SceneAnalysisStep({
           effects.contrast = mapping.contrast;
           effects.saturation = mapping.saturation;
         }
-        console.log(`[parseEffectName] FILTER matched: "${filter.id}"`, effects);
         return effects;
       }
     }
