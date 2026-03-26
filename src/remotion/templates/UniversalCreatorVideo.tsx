@@ -1945,6 +1945,42 @@ const SceneBackground: React.FC<{
   );
 };
 
+// SafeVideo with delayRender + 20s timeout for Lambda stability (analog to SafeImg)
+const SafeVideo: React.FC<{ src: string; sceneType?: string; primaryColor?: string; secondaryColor?: string; style?: React.CSSProperties }> = ({ src, sceneType, primaryColor, secondaryColor, style }) => {
+  const [failed, setFailed] = React.useState(false);
+  const [loaded, setLoaded] = React.useState(false);
+  const [handle] = React.useState(() => delayRender('SafeVideo: ' + (src?.slice(0, 40) || 'unknown')));
+
+  React.useEffect(() => {
+    if (loaded || failed) return;
+    const timer = setTimeout(() => {
+      if (!loaded && !failed) {
+        console.warn(`[SafeVideo] Timeout: video not loaded after 20s, forcing fallback for ${src?.slice(0, 60)}`);
+        setFailed(true);
+        try { continueRender(handle); } catch (_) {}
+      }
+    }, 20000);
+    return () => clearTimeout(timer);
+  }, [src, loaded, failed, handle]);
+
+  if (failed || !src) {
+    return <GradientFallback sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />;
+  }
+  return (
+    <Video
+      src={src}
+      style={style || { width: '100%', height: '100%', objectFit: 'cover' }}
+      loop
+      muted
+      pauseWhenBuffering
+      onError={() => {
+        setFailed(true);
+        try { continueRender(handle); } catch (_) {}
+      }}
+    />
+  );
+};
+
 // r46: SafeImg with delayRender + 15s timeout for Lambda stability
 const SafeImg: React.FC<{ src: string; sceneType?: string; primaryColor?: string; secondaryColor?: string; style?: React.CSSProperties }> = ({ src, sceneType, primaryColor, secondaryColor, style }) => {
   const [failed, setFailed] = React.useState(false);
