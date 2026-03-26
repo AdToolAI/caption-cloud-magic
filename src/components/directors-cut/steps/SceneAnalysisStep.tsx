@@ -670,6 +670,13 @@ export function SceneAnalysisStep({
             preload="auto"
           />
           
+          {/* Transition visual overlay */}
+          <NativeTransitionOverlay
+            currentTime={currentVideoTime}
+            scenes={scenes}
+            transitions={transitions}
+          />
+          
           {/* Current Scene Indicator */}
           {scenes.length > 0 && (
             <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-sm rounded px-2 py-1 z-10 pointer-events-none">
