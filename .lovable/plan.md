@@ -1,52 +1,42 @@
 
 
-## Demo-Video fuer alle Accounts ohne eigene Videos
+## Fix: Video-Stottern im Universal Director's Cut
 
-### Ziel
-Das zuletzt erstellte Universal Creator Video (`ad8f4ad3`) soll als Demo-Video im Dashboard-Karussell und in der Mediathek erscheinen — fuer alle bestehenden und kuenftigen Accounts, die noch keine eigenen Videos haben. Sobald ein User ein eigenes Video erstellt, verschwindet das Demo-Video.
+### Ursache
 
-### Video-Daten
-- **ID**: `ad8f4ad3-cef0-41b8-b624-ae225c7075b5`
-- **URL**: `https://s3.eu-central-1.amazonaws.com/remotionlambda-eucentral1-13gm4o6s90/renders/iqab67nz53/out.mp4`
-- **Erstellt**: 26. Maerz 2026
+Zwei Hauptprobleme verursachen das Stottern:
+
+1. **Massives Debug-Logging**: `DirectorsCutPreviewPlayer.tsx` enthält ~30+ `console.log` Aufrufe in `useMemo`, `useEffect` und Event-Handlern. Diese feuern bei jeder Szenen-/Effekt-Aenderung und waehrend der Wiedergabe (z.B. bei jedem `timeupdate`-Event). Das blockiert den Main-Thread.
+
+2. **Player-Remount bei Effekt-Aenderungen**: Zeile 379-381 erzeugt einen neuen `playerKey` bei jeder Aenderung von brightness/contrast/saturation/etc. Das zerstoert den gesamten Remotion `<Player>` und baut ihn neu auf — das Video muss jedes Mal neu buffern. Stattdessen sollten die `inputProps` reaktiv aktualisiert werden, ohne den Player zu remounten.
 
 ### Aenderungen
 
-#### 1. `src/constants/demo-video.ts` (NEU)
-Neue Datei mit den Demo-Video-Daten als Konstante:
+#### 1. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+
+- **Alle `console.log`-Aufrufe entfernen** (Zeilen 106-117, 143-148, 155-156, 179, 293-301, 307-310, 333, 343, 354, 373, 415, 457, 478, 498, 510, 525, 549, 574) — ca. 30 Stellen
+- **`playerKey` stabilisieren**: Statt den Key bei jedem Effekt-Slider neu zu setzen, einen festen Key verwenden. Die Effekte fliessen bereits ueber `inputProps` ein — der Player muss dafuer nicht remountet werden. Der Key sollte sich nur bei strukturellen Aenderungen aendern (z.B. `videoUrl`)
+- **`onTimeUpdate` in `useEffect` Dependency stabilisieren**: Zeile 431 hat `[onTimeUpdate]` als Dependency, was den Event-Listener bei jedem Parent-Rerender neu registriert. Stattdessen `useRef` fuer den Callback verwenden
+
+#### Vorher (playerKey):
 ```typescript
-export const DEMO_VIDEO = {
-  id: 'demo-video-001',
-  output_url: 'https://s3.eu-central-1.amazonaws.com/remotionlambda-eucentral1-13gm4o6s90/renders/iqab67nz53/out.mp4',
-  status: 'completed',
-  created_at: '2026-03-26T17:07:34.954Z',
-  metadata: { source: 'universal-creator', is_demo: true },
-  // ... weitere Felder mit Defaults
-};
+const playerKey = useMemo(() => {
+  return `player-${effects.brightness}-${effects.contrast}-...`;
+}, [effects.brightness, effects.contrast, ...]);
 ```
 
-#### 2. `src/hooks/useVideoHistory.ts`
-- Nach dem Laden der echten Videos pruefen: Wenn `data.length === 0`, das `DEMO_VIDEO` Objekt als einziges Element zurueckgeben
-- Dem Demo-Video ein Flag `is_demo: true` in metadata mitgeben
-- Delete-Mutation fuer Demo-Videos blockieren (kein DB-Call)
+#### Nachher:
+```typescript
+const playerKey = useMemo(() => {
+  return `player-${videoUrl}-${durationInFrames}`;
+}, [videoUrl, durationInFrames]);
+```
 
-#### 3. `src/components/dashboard/DashboardVideoCarousel.tsx`
-- Demo-Videos mit einem kleinen "Demo" Badge kennzeichnen
-- Titel fuer Demo-Videos: "Demo Video — Universal Creator" statt der generierten ID
+### Ergebnis
+- Kein Player-Remount mehr beim Anpassen von Effekten
+- Main-Thread wird nicht mehr durch Debug-Logs blockiert
+- Fluessige Wiedergabe ohne Stottern
 
-#### 4. `src/pages/MediaLibrary.tsx`
-- Gleiche Logik: Wenn `videoCreations` leer ist, das Demo-Video in die `normalizedVideoCreations` Liste einfuegen
-- Demo-Videos als nicht loeschbar markieren
-
-### Verhalten
-- User hat **keine** eigenen Videos → Demo-Video erscheint im Karussell und Mediathek
-- User erstellt **ein eigenes** Video → Demo-Video verschwindet automatisch (da die DB-Query dann Ergebnisse hat)
-- Demo-Video kann nicht geloescht werden
-- Kein DB-Insert noetig — rein clientseitig
-
-### Dateien
-1. `src/constants/demo-video.ts` (NEU)
-2. `src/hooks/useVideoHistory.ts`
-3. `src/components/dashboard/DashboardVideoCarousel.tsx`
-4. `src/pages/MediaLibrary.tsx`
+### Datei
+1. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
 
