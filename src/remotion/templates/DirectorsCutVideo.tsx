@@ -533,10 +533,6 @@ const SceneVideo: React.FC<{
 
   const chromaKeyStyle = chromaKey?.enabled ? { mixBlendMode: 'multiply' as const } : {};
 
-  // Debug log on mount
-  useEffect(() => {
-    console.log(`[SceneVideo] Scene ${scene.id} mounted: startFrom=${sourceStartFrame} frames (${originalStart.toFixed(2)}s), rate=${playbackRate}, duration=${sceneDurationFrames} frames`);
-  }, []);
 
   // Determine if this scene uses additional media (video or image)
   const hasAdditionalMedia = scene.additionalMedia && scene.isFromOriginalVideo === false;
