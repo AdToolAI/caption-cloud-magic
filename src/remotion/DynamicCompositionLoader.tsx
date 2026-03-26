@@ -60,7 +60,7 @@ export const DynamicCompositionLoader: React.FC<DynamicCompositionLoaderProps> =
     );
   }
 
-  return <Component {...inputProps} />;
+  return <Component {...(inputProps as any)} />;
 };
 
 /**

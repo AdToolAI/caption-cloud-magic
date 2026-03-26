@@ -387,7 +387,14 @@ export const RemotionRoot: React.FC = () => {
           fontFamily: 'Inter',
           showProgressBar: false,
           showWatermark: false,
-        }}
+          fps: 30,
+          style: 'cinematic',
+          preferredFont: 'Inter',
+          showSceneTitles: false,
+          showSubtitles: true,
+          transitionStyle: 'fade',
+          aspectRatio: '9:16',
+        } as any}
       />
       <Composition
         id="SmokeTest"

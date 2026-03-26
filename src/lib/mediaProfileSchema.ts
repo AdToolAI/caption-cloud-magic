@@ -20,8 +20,8 @@ export const mediaProfileConfigSchema = z.object({
     .int('Größenlimit muss eine Ganzzahl sein')
     .min(1, 'Größenlimit muss mindestens 1 MB sein')
     .max(4000, 'Größenlimit darf maximal 4000 MB sein'),
-  type: z.enum(['image', 'video'], {
-    errorMap: () => ({ message: 'Typ muss image oder video sein' })
+  type: z.enum({image: 'image', video: 'video'}, {
+    error: 'Typ muss image oder video sein'
   }),
 
   // Optional fields

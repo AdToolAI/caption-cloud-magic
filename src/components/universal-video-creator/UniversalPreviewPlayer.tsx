@@ -200,7 +200,7 @@ export function UniversalPreviewPlayer({
             <div style={{ aspectRatio: `${dimensions.width}/${dimensions.height}` }}>
               <Player
                 ref={playerRef}
-                component={UniversalCreatorVideo}
+                component={UniversalCreatorVideo as any}
                 inputProps={inputProps}
                 durationInFrames={durationInFrames}
                 fps={fps}

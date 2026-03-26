@@ -42,7 +42,7 @@ export function MonacoJsonEditor({
         onValidationChange(true, []);
         return true;
       } else {
-        const errorMessages = (result as { success: false; error: { errors: { path: (string | number)[]; message: string }[] } }).error.errors.map(
+        const errorMessages = (result as unknown as { success: false; error: { issues: { path: (string | number)[]; message: string }[] } }).error.issues.map(
           (err) => `${err.path.join('.')}: ${err.message}`
         );
         setErrors(errorMessages);
