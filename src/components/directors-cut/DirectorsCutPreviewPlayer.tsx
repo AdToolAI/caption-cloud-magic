@@ -81,6 +81,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   externalIsPlaying,
   onPlayingChange,
   originalAudioMuted = false,
+  initialMuted = true,
   className = '',
   fillContainer = false,
   children,
