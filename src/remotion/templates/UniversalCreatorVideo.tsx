@@ -1786,8 +1786,10 @@ const SceneBackground: React.FC<{
     const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
       <AbsoluteFill style={{ opacity, filter: moodFilter }}>
-        <Video
+        <SafeVideo
           src={animatedVideoUrl}
+          sceneType={type}
+          primaryColor={primaryColor}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
         <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
