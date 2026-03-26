@@ -614,6 +614,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   soundDesign,
   textOverlays = [],
   subtitleTrack,
+  previewMode = false,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
