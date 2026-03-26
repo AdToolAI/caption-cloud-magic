@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { DEMO_VIDEO, isDemoVideo } from '@/constants/demo-video';
 
 /** Resolve a possibly-relative storage path to a full public URL */
 const resolveVideoUrl = (rawUrl: string): string => {
