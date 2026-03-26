@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { VideoCreation } from '@/types/video';
+import { DEMO_VIDEO, isDemoVideo } from '@/constants/demo-video';
 
 export const useVideoHistory = () => {
   const { toast } = useToast();
