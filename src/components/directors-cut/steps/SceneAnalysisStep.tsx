@@ -291,7 +291,6 @@ export function SceneAnalysisStep({
     // Parse saturation - STRONGER default
     if (lowerName.includes('saturat') || lowerName.includes('sättig')) {
       effects.saturation = extractNumber(lowerName, 160);
-      console.log(`[parseEffectName] SATURATION: ${effects.saturation}`);
       return effects;
     }
     
