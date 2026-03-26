@@ -52,6 +52,7 @@ interface DirectorsCutPreviewPlayerProps {
   externalIsPlaying?: boolean;
   onPlayingChange?: (isPlaying: boolean) => void;
   originalAudioMuted?: boolean;
+  initialMuted?: boolean;
   className?: string;
   fillContainer?: boolean;
   children?: React.ReactNode;
