@@ -796,9 +796,12 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             width: '100%',
             height: '100%',
             objectFit: 'contain',
+            opacity: transitionVideoOpacity,
             filter: `${previewFilter.trim()}${transitionBlur > 0 ? ` blur(${transitionBlur}px)` : ''}`,
-            transform: kenBurnsStyle || undefined,
+            transform: [kenBurnsStyle, transitionTransform].filter(Boolean).join(' ') || undefined,
+            clipPath: transitionClipPath || undefined,
             transformOrigin: 'center center',
+            transition: 'opacity 0.15s ease, filter 0.15s ease, transform 0.1s ease',
           }}
           volume={0}
         />
