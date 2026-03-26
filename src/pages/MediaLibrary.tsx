@@ -246,7 +246,7 @@ export default function MediaLibrary() {
         .eq('status', 'completed')
         .order('created_at', { ascending: false });
 
-      const normalizedVideoCreations: NormalizedMediaItem[] = (videoCreations || []).map(video => {
+      let normalizedVideoCreations: NormalizedMediaItem[] = (videoCreations || []).map(video => {
         // Check if it's a Sora-2-AI, Director's Cut Enhancement, Director's Cut, or Universal Creator video
         const metadata = video.metadata as any;
         const isSoraAI = metadata?.source === 'sora-2-ai';
@@ -283,6 +283,20 @@ export default function MediaLibrary() {
           createdAt: video.created_at,
         };
       });
+
+      // Inject demo video if user has no video creations
+      if (normalizedVideoCreations.length === 0) {
+        normalizedVideoCreations = [{
+          id: DEMO_VIDEO.id,
+          source: 'video-creator' as const,
+          type: 'video' as const,
+          title: 'Demo Video — Universal Creator',
+          caption: 'Dein erstes Video könnte so aussehen',
+          url: DEMO_VIDEO.output_url,
+          thumbUrl: DEMO_VIDEO.output_url,
+          createdAt: DEMO_VIDEO.created_at,
+        }];
+      }
 
       // Calculate storage quota including estimated sizes for content_items
       let totalUsedMB = 0;
