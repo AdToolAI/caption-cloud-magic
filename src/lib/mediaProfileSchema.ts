@@ -13,8 +13,8 @@ export const mediaProfileConfigSchema = z.object({
     .int('Höhe muss eine Ganzzahl sein')
     .min(100, 'Höhe muss mindestens 100px sein')
     .max(8192, 'Höhe darf maximal 8192px sein'),
-  fitMode: z.enum(['cover', 'contain', 'pad', 'smart'], {
-    errorMap: () => ({ message: 'FitMode muss cover, contain, pad oder smart sein' })
+  fitMode: z.enum({cover: 'cover', contain: 'contain', pad: 'pad', smart: 'smart'}, {
+    error: 'FitMode muss cover, contain, pad oder smart sein'
   }),
   sizeLimitMb: z.number()
     .int('Größenlimit muss eine Ganzzahl sein')
