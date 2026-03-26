@@ -1975,6 +1975,12 @@ const SafeVideo: React.FC<{ src: string; sceneType?: string; primaryColor?: stri
       loop
       muted
       pauseWhenBuffering
+      onLoadedData={() => {
+        if (!loaded) {
+          setLoaded(true);
+          try { continueRender(handle); } catch (_) {}
+        }
+      }}
       onError={() => {
         setFailed(true);
         try { continueRender(handle); } catch (_) {}
