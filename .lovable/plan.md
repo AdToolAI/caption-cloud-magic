@@ -1,90 +1,59 @@
 
 
-## Fix: Director's Cut stockt weiterhin an Übergängen
+## Fix: KI-Analyse erkennt Videoinhalte nicht + Audio standardmässig stumm
 
-### Wahrscheinliche Hauptursachen
+### Problem 1: Szenen-Beschreibungen sind generisch/falsch
 
-Ich habe den aktuellen Stand geprüft. Das Problem sitzt jetzt sehr wahrscheinlich an **drei konkreten Stellen**:
+**Bestätigte Ursache** (Edge Function Logs):
+```
+frames: 0
+No frames provided, using fallback text analysis
+```
 
-1. **Zwei Preview-Player laufen parallel**
-   - In `src/pages/DirectorsCut/DirectorsCut.tsx` wird rechts weiterhin die globale `Live-Preview` angezeigt.
-   - Gleichzeitig rendern viele Steps **bereits ihren eigenen** `DirectorsCutPreviewPlayer`:
-     - `SceneAnalysisStep`
-     - `SceneEditingStep`
-     - alle `StepLayoutWrapper`-basierten Steps (4–9)
-   - Ergebnis: **zwei Remotion-Player dekodieren dasselbe Video gleichzeitig**, genau dort fällt Buffering an Übergängen besonders auf.
+Die Frame-Extraktion schlägt fehl, weil das Video von einer externen S3-Domain (`remotionlambda-eucentral1`) kommt. Der Browser blockiert `canvas.toDataURL()` wegen CORS/Canvas-Taint bei `crossOrigin = 'anonymous'`. Der `onerror`-Handler gibt leise ein leeres Array zurück. Die Edge Function fällt dann auf eine **generische Text-Analyse** zurück, die "hypothetische" Szenenbeschreibungen erfindet — ohne das Video je gesehen zu haben.
 
-2. **Die nächste Szene wird nicht wirklich vorgepuffert**
-   - In `src/remotion/templates/DirectorsCutVideo.tsx` gibt es zwar schon eine Überlappung, aber die nächste Szene wird erst **am sichtbaren Transition-Fenster** gemountet.
-   - Das ist noch kein echtes Preloading.
-   - Zusätzlich existiert **kein `previewMode`**, obwohl das im letzten Plan vorgesehen war.
+**Lösung**: Die Frame-Extraktion robuster machen und bei CORS-Blockade die Frames serverseitig extrahieren.
 
-3. **Preview lädt Audio doppelt**
-   - `DirectorsCutPreviewPlayer.tsx` baut eigene native `Audio(...)`-Elemente auf.
-   - `DirectorsCutVideo.tsx` rendert im Preview aber zusätzlich weiterhin Remotion-`<Audio>`-Spuren.
-   - Das erhöht Netz-/Decode-Last unnötig.
+#### Änderung 1a: `src/pages/DirectorsCut/DirectorsCut.tsx`
+- Frame-Extraktion mit `try/catch` um `canvas.toDataURL()` wrappen
+- Bei Canvas-Taint-Error: leeres Array zurückgeben, aber **explizit loggen** dass CORS das Problem ist
+- Die `video_url` wird bereits an die Edge Function gesendet — diese soll die Frames selbst extrahieren können
 
-### Änderungen
+#### Änderung 1b: `supabase/functions/analyze-video-scenes/index.ts`
+- Wenn `frames` leer oder nicht vorhanden: **Frames serverseitig extrahieren** statt auf generische Textanalyse zurückzufallen
+- Video-URL per `fetch()` herunterladen (funktioniert serverseitig ohne CORS)
+- Mit `ffmpeg`/Frame-Extraction einen alternativen Ansatz verwenden: Video-URL direkt an das Vision-Modell senden
+- Gemini 2.5 Flash unterstützt Video-URLs direkt als Input — statt einzelner Frames das **Video selbst** an die API senden
+- Dazu den `userContent` um einen `video_url`-Part erweitern (Gemini Vision API akzeptiert `file_data` bzw. `video`-Input)
+- Fallback-Text-Analyse ("hypothetische Szenenstruktur") als letztes Mittel behalten, aber klar als "Fallback" kennzeichnen
 
-#### 1. `src/pages/DirectorsCut/DirectorsCut.tsx`
-Die rechte globale `Live-Preview` nur dann anzeigen, wenn der aktuelle Step **keine eigene große Preview** hat.
+**Konkreter Ansatz**: Da Gemini Vision das Video auch als URL akzeptieren kann, wird die Edge Function das Video direkt als URL-Referenz an die AI senden, anstatt auf clientseitige Frames angewiesen zu sein. Das ist zuverlässiger und liefert bessere Ergebnisse als einzelne JPEG-Frames.
 
-Geplant:
-- Step-Mapping wie `stepHasOwnPreview`
-- rechte Sidebar-Preview für Steps mit eingebautem Player ausblenden
-- Layout stabil halten, z. B. dort nur Projekt-Info anzeigen
+---
 
-Das reduziert die Last sofort von **2 Playern auf 1 Player**.
+### Problem 2: Audio ist standardmässig stumm
 
-#### 2. `src/remotion/templates/DirectorsCutVideo.tsx`
-Die Preview-Logik gezielt auf flüssige Wiedergabe umbauen, ohne die bestehende Szenen-Architektur aufzugeben.
+**Ursache**: In `DirectorsCutPreviewPlayer.tsx` Zeile 102 wird `isMuted` mit `true` initialisiert. Der User muss erst manuell auf das Lautsprecher-Icon klicken.
 
-Geplant:
-- `previewMode?: boolean` ergänzen
-- bei Szenen-Sequences `premountFor` verwenden, damit die nächste Szene **vor dem sichtbaren Übergang** gemountet wird
-- `pauseWhenBuffering` im **Preview-Modus** für Szenen-Videos nicht aggressiv verwenden
-- Remotion-`<Audio>` im `previewMode` **gar nicht rendern**, weil die Preview bereits eigene Audio-Sync nutzt
-- die aktuelle Übergangslogik von „nur Exit-Effekt“ auf **echte Zwei-Layer-Transition** bringen:
-  - aktuelle Szene = Exit
-  - nächste Szene = Entry
-- besonders `crossfade` / `fade` korrigieren, da sie aktuell nicht als echte Ein-/Ausblendung arbeiten
+**Lösung**: 
 
-Wichtig:
-- Die bestehende **Sequence-per-scene** Architektur bleibt erhalten.
-- Ich stelle **nicht** wieder auf ein einziges globales Video um.
+#### Änderung 2: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- Neue optionale Prop `initialMuted?: boolean` (Default: `true` für Rückwärtskompatibilität)
 
-#### 3. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-Den Preview-Player an die neue Preview-Strategie anbinden.
+#### Änderung 3: `src/components/directors-cut/steps/SceneAnalysisStep.tsx`
+- `DirectorsCutPreviewPlayer` mit `initialMuted={false}` aufrufen, damit Audio im Analyse-Step hörbar ist
+- Der User kann weiterhin selbst auf Mute klicken
 
-Geplant:
-- `previewMode: true` an `DirectorsCutVideo` weitergeben
-- native Audio-Elemente nicht mehr unnötig früh voll preloaden
-  - zuerst `metadata` oder lazy setup
-  - volles Audio erst bei Play/Unmute
-- bestehende Verbesserungen (`stable playerKey`, gedrosselte `timeupdate`) beibehalten
+---
 
-### Warum das den Fehler sehr wahrscheinlich behebt
-
-Der aktuelle Engpass ist vermutlich nicht mehr nur die Transition-Animation selbst, sondern die Kombination aus:
-
-- **doppelten Playern**
-- **doppeltem Audio**
-- **zu spätem Mount der nächsten Szene**
-
-Gerade an Übergängen steigt die Last sprunghaft an, weil dort neue Medieninstanzen aktiv werden. Wenn nur noch **ein** Preview-Player läuft, Audio nicht doppelt lädt und die nächste Szene schon **vorher** gemountet ist, sollte das sichtbare Stocken deutlich zurückgehen.
-
-### Erwartetes Ergebnis
-- deutlich flüssigere Vorschau im Director's Cut
-- weniger Hänger speziell bei Szenenübergängen
-- Übergänge wirken wieder wie echte Übergänge statt wie kurze Pausen
-
-### Dateien
-1. `src/pages/DirectorsCut/DirectorsCut.tsx`
-2. `src/remotion/templates/DirectorsCutVideo.tsx`
-3. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+### Zusammenfassung der Dateien
+1. `supabase/functions/analyze-video-scenes/index.ts` — Video-URL direkt an Gemini Vision senden statt auf leere Frames zu warten
+2. `src/pages/DirectorsCut/DirectorsCut.tsx` — Frame-Extraktion-Fehler besser loggen
+3. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `initialMuted` Prop ergänzen
+4. `src/components/directors-cut/steps/SceneAnalysisStep.tsx` — Audio standardmässig an
 
 ### Technische Hinweise
-- Kein Backend- oder Datenbank-Fix nötig
-- Die bereits umgesetzte Dauer-Synchronisierung mit `actualTotalDuration` ist korrekt und nicht der Hauptfehler
-- Der wichtigste zusätzliche Hebel ist jetzt: **nur ein Preview-Player gleichzeitig + echtes Premounting im Preview**
+- Kein Datenbank-Fix nötig
+- Gemini 2.5 Flash/Pro unterstützen multimodale Inputs inkl. Bild-URLs — die Frames müssen nicht als base64 inline gesendet werden
+- Die bestehende Vision-Analyse-Logik (Frame-Nummern, Zeitstempel-Berechnung) bleibt als Backup erhalten für den Fall, dass clientseitige Frames doch funktionieren
 
