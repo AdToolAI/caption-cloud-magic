@@ -22,6 +22,7 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
   loop,
   numberOfSharedAudioTags,
   initiallyMuted,
+  component,
 }: {
   playerRef: React.RefObject<PlayerRef>;
   inputProps: any;
@@ -32,6 +33,7 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
   loop: boolean;
   numberOfSharedAudioTags: number;
   initiallyMuted: boolean;
+  component: React.ComponentType<any>;
 }) {
   console.log('[MemoizedPlayer] Rendering with audio:', {
     backgroundMusicUrl: !!inputProps?.backgroundMusicUrl,
@@ -41,7 +43,7 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
   return (
     <Player
       ref={playerRef}
-      component={inputProps?._componentName ? (COMPONENT_REGISTRY[inputProps._componentName] || UniversalCreatorVideo) : UniversalCreatorVideo}
+      component={component}
       inputProps={inputProps}
       compositionWidth={compositionWidth}
       compositionHeight={compositionHeight}
