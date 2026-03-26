@@ -1,6 +1,12 @@
 import React, { useMemo, useRef, useState, useCallback, useEffect, memo } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { UniversalVideo } from '@/remotion/templates/UniversalVideo';
+import { UniversalCreatorVideo } from '@/remotion/templates/UniversalCreatorVideo';
+
+const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
+  UniversalVideo,
+  UniversalCreatorVideo,
+};
 import { Volume2, VolumeX, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
