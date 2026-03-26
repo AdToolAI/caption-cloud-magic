@@ -864,32 +864,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           }}
           volume={0}
         />
-        {/* Incoming scene overlay — for wipe/slide/push/crossfade transitions */}
-        {incomingOverlayOpacity > 0 && (
-          <AbsoluteFill style={{
-            opacity: incomingOverlayOpacity,
-            transform: incomingOverlayTransform || undefined,
-            clipPath: incomingOverlayClipPath || undefined,
-            backgroundColor: '#000',
-            pointerEvents: 'none',
-            zIndex: 4,
-            overflow: 'hidden',
-          }}>
-            {/* Re-use the same video source to show "next scene" frame */}
-            <Video
-              src={sourceVideoUrl}
-              startFrom={nextSceneStartFrame}
-              pauseWhenBuffering={false}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                filter: nextPreviewFilter.trim(),
-              }}
-              volume={0}
-            />
-          </AbsoluteFill>
-        )}
+        {/* No second Video element — all transitions are CSS-only on the base video */}
         {/* Darkening overlay for fade transitions */}
         {transitionOverlayOpacity > 0 && (
           <AbsoluteFill style={{
