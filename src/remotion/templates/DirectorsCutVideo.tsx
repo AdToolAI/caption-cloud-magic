@@ -1,5 +1,9 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, Img, delayRender, continueRender, staticFile } from 'remotion';
+import { TransitionSeries, linearTiming } from '@remotion/transitions';
+import { fade } from '@remotion/transitions/fade';
+import { slide } from '@remotion/transitions/slide';
+import { wipe } from '@remotion/transitions/wipe';
 import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
 import { z } from 'zod';
 import { SVGFilters, SVG_FILTER_IDS, isSVGFilter, VHSScanlines, VignetteOverlay } from '../components/SVGFilters';
