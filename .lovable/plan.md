@@ -1,40 +1,41 @@
 
 
-## Fix: Stotterer + doppelte Übergänge beseitigen
+## Fix: Übergänge richtig positionieren + länger machen
 
-### Ursache
+### Problem 1 — Übergänge leicht nach rechts verschoben
+Die `sceneIndex`-Werte in den Transition-Daten werden aus der **unsortierten** `scenes`-Liste berechnet (in `DirectorsCutPreviewPlayer.tsx`, Zeile 196), aber in der Preview werden sie gegen `activeIdx` aus der **sortierten** `sortedScenes`-Liste abgeglichen (Zeile 728). Wenn die Szenen-Reihenfolge auch nur leicht abweicht, zeigt der Übergang an der falschen Szenengrenze.
 
-Das Overlay für eingehende Szenen (Zeile 880-903) erzeugt ein **zweites `<Video>`-Element** mit eigenem Decoder (`startFrom={nextSceneStartFrame}`). Genau das war das ursprüngliche Problem — jeder neue Video-Decoder verursacht einen Stotterer. Zusätzlich sieht man "beide Übergänge", weil das Basisvideo weiterläuft während gleichzeitig das Overlay-Video einblendet.
+**Fix**: In `DirectorsCutVideo.tsx` (Zeile 728) statt `sceneIndex === activeIdx` eine Suche nutzen, die die `sceneIndex` gegen die sortierte Reihenfolge auflöst. Oder besser: die Transition direkt über die **Szenen-ID** des aktiven Scenes matchen statt über einen numerischen Index.
 
-### Lösung: Nur EIN Video, Übergänge rein visuell
+### Problem 2 — Übergänge zu kurz
+Die Standard-Dauer ist 0.5 Sekunden, was durch die Easing-Kurve (cosine ease-in-out) noch kürzer wirkt, weil der sichtbare Effekt erst ab ~20% Progress wirklich auffällt.
 
-Das zweite `<Video>` komplett entfernen. Alle Übergänge werden ausschließlich als CSS-Effekte auf dem einzigen Video-Element umgesetzt:
+**Fix**: Default-Dauer von `0.5` auf `0.8` erhöhen und die Easing-Kurve anpassen (stärkerer Effekt am Anfang).
 
-- **Crossfade/Dissolve**: Kurzer Opacity-Dip (1 → 0.2 → 1) — simuliert Überblendung
-- **Fade**: Stärkerer Dip zu Schwarz (1 → 0 → 1) via schwarzem Overlay
-- **Wipe**: `clip-path` Animation auf dem Video selbst — Bild wird von einer Seite "aufgedeckt"
-- **Slide/Push**: `transform: translate` auf dem Video — Bild gleitet raus
-- **Zoom**: `scale()` Vergrößerung als visueller Akzent
-- **Blur**: `filter: blur()` Weichzeichner
-
-Das ist keine perfekte 1:1-Darstellung des finalen Renders, aber es ist **flüssig und ohne Stotterer** — was in der Preview wichtiger ist.
-
-### Änderungen
+### Konkrete Änderungen
 
 **`src/remotion/templates/DirectorsCutVideo.tsx`**
-- Zeilen 762-838: `incomingOverlay*`-Variablen und zugehörige Logik entfernen
-- Zeilen 879-903: Das zweite `<Video>`-Element im Overlay komplett entfernen
-- Transition-Effekte nur noch auf dem Basisvideo via `opacity`, `filter`, `transform`, `clipPath`
-- Crossfade/Dissolve: stärkerer Opacity-Dip + schwarzer Overlay-Blitz
-- Wipe: `clipPath` direkt auf dem Video (zeigt "Aufdecken" der nächsten Szene)
+1. **Transition-Lookup per Szenen-ID statt numerischem Index** (Zeile 728):
+   - Statt `transitions?.find(t => t.sceneIndex === activeIdx)` 
+   - → die `sortedScenes[activeIdx].id` (oder den Index in der sortierten Liste) verwenden
+   - Konkreter Fix: `sortedScenes` hat eine klare Reihenfolge. Die `transitions`-Array enthält `sceneIndex` basierend auf der Originalreihenfolge. Wir müssen den originalen Index der aktiven Szene ermitteln und damit matchen
+   - **Einfachste Lösung**: Beim Aufbau der sortierten Szenen den Originalindex mitführen, oder den Lookup auf die Szenen-ID umstellen (da jede Szene eine eindeutige ID hat)
+
+2. **Transition-Dauer erhöhen** (Zeile 730):
+   - Default von `0.5` auf `0.8` Sekunden
+   - Minimum-Dauer von 0.6s erzwingen: `Math.max(0.6, currentTransition.duration || 0.8)`
+
+3. **Easing anpassen** (Zeile 737):
+   - Aktuell: `0.5 - 0.5 * Math.cos(progress * Math.PI)` — sehr sanft
+   - Neu: Stärkerer Einstieg, damit der Effekt früher sichtbar wird:
+   - `Math.pow(0.5 - 0.5 * Math.cos(progress * Math.PI), 0.7)` — hebt die Kurve an
 
 ### Was sich nicht ändert
-- Finaler Render mit TransitionSeries + per-Scene Video bleibt unverändert
-- Audio-Architektur bleibt unverändert
-- Szenenkonzept, Editing, Filter bleiben erhalten
+- Single-Video-Architektur bleibt
+- Finaler Render bleibt unverändert
+- Audio-Handling bleibt unverändert
 
 ### Erwartetes Ergebnis
-- 0 Stotterer (nur 1 Video-Decoder aktiv)
-- Übergänge als klare visuelle Effekte sichtbar (kein "doppelter" Übergang mehr)
-- Preview ist eine Approximation des finalen Looks, nicht 1:1 identisch
+- Übergänge exakt an den Szenegrenzen (nicht mehr nach rechts versetzt)
+- Übergänge dauern ~0.8s statt 0.5s und sind deutlich sichtbarer
 
