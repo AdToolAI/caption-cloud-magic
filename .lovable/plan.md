@@ -1,45 +1,52 @@
 
-## Fix: Universal Content Creator — Szenen werden nicht gezeigt
 
-### Ursache
-Die Szenen kommen grundsätzlich korrekt bis zum Render an. Die Logs zeigen:
-- `sceneCount: 5`
-- alle 5 Szenen sind gültig
-- jede Szene hat `background.type = video` und eine `videoUrl`
+## Demo-Video fuer alle Accounts ohne eigene Videos
 
-Das Problem sitzt sehr wahrscheinlich im Template `src/remotion/templates/UniversalCreatorVideo.tsx`:
+### Ziel
+Das zuletzt erstellte Universal Creator Video (`ad8f4ad3`) soll als Demo-Video im Dashboard-Karussell und in der Mediathek erscheinen — fuer alle bestehenden und kuenftigen Accounts, die noch keine eigenen Videos haben. Sobald ein User ein eigenes Video erstellt, verschwindet das Demo-Video.
 
-Die neue Komponente `SafeVideo` startet `delayRender()`, aber sie **löst den Handle bei erfolgreichem Laden nie auf**:
-- `loaded` wird zwar als State angelegt
-- es gibt aber **kein** `onLoadedData` / `onCanPlay` / ähnliches, das `setLoaded(true)` und `continueRender(handle)` ausführt
-- nach 20 Sekunden greift deshalb immer der Timeout
-- `SafeVideo` schaltet dann auf `GradientFallback` um
+### Video-Daten
+- **ID**: `ad8f4ad3-cef0-41b8-b624-ae225c7075b5`
+- **URL**: `https://s3.eu-central-1.amazonaws.com/remotionlambda-eucentral1-13gm4o6s90/renders/iqab67nz53/out.mp4`
+- **Erstellt**: 26. Maerz 2026
 
-Ergebnis: Die Video-Szenen werden nicht sichtbar, obwohl sie im Payload enthalten sind. Stattdessen sieht man nur Verlauf + Text.
+### Aenderungen
 
-### Änderungen
+#### 1. `src/constants/demo-video.ts` (NEU)
+Neue Datei mit den Demo-Video-Daten als Konstante:
+```typescript
+export const DEMO_VIDEO = {
+  id: 'demo-video-001',
+  output_url: 'https://s3.eu-central-1.amazonaws.com/remotionlambda-eucentral1-13gm4o6s90/renders/iqab67nz53/out.mp4',
+  status: 'completed',
+  created_at: '2026-03-26T17:07:34.954Z',
+  metadata: { source: 'universal-creator', is_demo: true },
+  // ... weitere Felder mit Defaults
+};
+```
 
-#### 1. `src/remotion/templates/UniversalCreatorVideo.tsx`
-`SafeVideo` sauber fertigstellen:
+#### 2. `src/hooks/useVideoHistory.ts`
+- Nach dem Laden der echten Videos pruefen: Wenn `data.length === 0`, das `DEMO_VIDEO` Objekt als einziges Element zurueckgeben
+- Dem Demo-Video ein Flag `is_demo: true` in metadata mitgeben
+- Delete-Mutation fuer Demo-Videos blockieren (kein DB-Call)
 
-- Erfolgs-Handler ergänzen, z. B. über `onLoadedData` oder `onCanPlay`
-- bei erfolgreichem Laden:
-  - `setLoaded(true)`
-  - `continueRender(handle)`
-- mit Guard absichern, damit `continueRender()` nur einmal aufgerufen wird
-- bei Error/Timeout weiterhin auf `GradientFallback` wechseln
-- optional: ungültige URLs früh abfangen und direkt Fallback rendern
+#### 3. `src/components/dashboard/DashboardVideoCarousel.tsx`
+- Demo-Videos mit einem kleinen "Demo" Badge kennzeichnen
+- Titel fuer Demo-Videos: "Demo Video — Universal Creator" statt der generierten ID
 
-### Warum das den Fehler behebt
-Dann blockiert `SafeVideo` den Render nicht mehr künstlich:
-- erfolgreiche Pixabay-/Remote-Videos bleiben sichtbar
-- nur echte Ladefehler fallen auf den Gradient-Fallback zurück
-- Preview und finaler Render verhalten sich wieder konsistent
+#### 4. `src/pages/MediaLibrary.tsx`
+- Gleiche Logik: Wenn `videoCreations` leer ist, das Demo-Video in die `normalizedVideoCreations` Liste einfuegen
+- Demo-Videos als nicht loeschbar markieren
 
-### Technische Hinweise
-- Kein Datenbank- oder Backend-Schema-Fix nötig
-- `render-with-remotion` liefert die Szenen bereits korrekt an
-- Der Fehler wurde durch die Schutz-Komponente selbst eingeführt, nicht durch die Szenen-Pipeline
+### Verhalten
+- User hat **keine** eigenen Videos → Demo-Video erscheint im Karussell und Mediathek
+- User erstellt **ein eigenes** Video → Demo-Video verschwindet automatisch (da die DB-Query dann Ergebnisse hat)
+- Demo-Video kann nicht geloescht werden
+- Kein DB-Insert noetig — rein clientseitig
 
-### Datei
-1. `src/remotion/templates/UniversalCreatorVideo.tsx` — `SafeVideo` Success-Handling ergänzen und `delayRender` korrekt freigeben
+### Dateien
+1. `src/constants/demo-video.ts` (NEU)
+2. `src/hooks/useVideoHistory.ts`
+3. `src/components/dashboard/DashboardVideoCarousel.tsx`
+4. `src/pages/MediaLibrary.tsx`
+
