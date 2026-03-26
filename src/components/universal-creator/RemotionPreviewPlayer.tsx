@@ -113,6 +113,10 @@ export function RemotionPreviewPlayer({
     customizations?.voiceoverUrl
   ]);
 
+  const resolvedComponent = useMemo(() => {
+    return COMPONENT_REGISTRY[componentName] || UniversalCreatorVideo;
+  }, [componentName]);
+
   const inputProps = useMemo(() => ({
     ...customizations,
     // Override with stable audio refs to prevent unnecessary remounts
