@@ -43,8 +43,6 @@ const extractVideoFrames = async (videoUrl: string, duration: number): Promise<s
       const frames: string[] = [];
       const frameCount = Math.min(10, Math.max(4, Math.ceil(duration / 3))); // 1 Frame alle ~3 Sekunden
       
-      console.log(`[extractVideoFrames] Extracting ${frameCount} frames from ${duration}s video`);
-      
       const canvas = document.createElement('canvas');
       canvas.width = 512; // Reduced for API efficiency
       canvas.height = 288;

@@ -278,25 +278,22 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     if (videoUrl) {
       const sourceAudio = new Audio(videoUrl);
-      sourceAudio.preload = 'metadata';
-      sourceAudio.crossOrigin = 'anonymous';
-      sourceAudio.volume = (audio.master_volume || 100) / 100;
+      sourceAudio.preload = 'auto';
+      sourceAudio.volume = isMuted ? 0 : (audio.master_volume || 100) / 100;
       sourceAudioRef.current = sourceAudio;
     }
 
     if (voiceoverUrl) {
       const vo = new Audio(voiceoverUrl);
-      vo.preload = 'metadata';
-      vo.crossOrigin = 'anonymous';
-      vo.volume = 1.0;
+      vo.preload = 'auto';
+      vo.volume = isMuted ? 0 : 1.0;
       voiceoverAudioRef.current = vo;
     }
 
     if (backgroundMusicUrl) {
       const bg = new Audio(backgroundMusicUrl);
-      bg.preload = 'metadata';
-      bg.crossOrigin = 'anonymous';
-      bg.volume = 0.3;
+      bg.preload = 'auto';
+      bg.volume = isMuted ? 0 : 0.3;
       bg.loop = true;
       backgroundMusicAudioRef.current = bg;
     }

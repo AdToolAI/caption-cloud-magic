@@ -755,8 +755,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
         return (
           <React.Fragment key={scene.id}>
-            {/* Pre-render next scene UNDERNEATH during transition overlap — no premount to avoid double decode */}
-            {hasTransitionToNext && nextScene && transitionDurationFrames > 0 && (
+            {/* Pre-render next scene UNDERNEATH during transition overlap — skip in preview mode to avoid double decode stutter */}
+            {!previewMode && hasTransitionToNext && nextScene && transitionDurationFrames > 0 && (
               <Sequence
                 from={Math.max(0, sceneEndFrame - transitionDurationFrames)}
                 durationInFrames={transitionDurationFrames}
