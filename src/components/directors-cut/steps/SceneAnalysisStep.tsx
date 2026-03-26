@@ -379,7 +379,7 @@ export function SceneAnalysisStep({
       if (Object.keys(sceneEffect).length === 0) {
         sceneEffect.contrast = 108;
         sceneEffect.saturation = 108;
-        console.log(`[applyAllSuggestions] Scene ${scene.id}: using fallback effects`);
+        // Fallback effects
       }
       
       newSceneEffects[scene.id] = sceneEffect as SceneEffects;
