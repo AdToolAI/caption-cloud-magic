@@ -1,59 +1,47 @@
 
+Ziel: Im Director's Cut soll im Schritt „KI-Analyse“ der Originalton standardmässig hörbar sein, und die Preview soll an Szenenübergängen nicht mehr stocken.
 
-## Fix: KI-Analyse erkennt Videoinhalte nicht + Audio standardmässig stumm
+Ursachen, die ich im Code gefunden habe:
+1. `SceneAnalysisStep.tsx` übergibt bereits `initialMuted={false}`, aber `DirectorsCutPreviewPlayer.tsx` übernimmt das nur einmal in `useState(initialMuted)` und synchronisiert den Zustand danach nicht mehr sauber mit Player/Nativ-Audio.
+2. `SceneAnalysisStep.tsx` rendert bei jedem Playback-Tick neu (`setCurrentVideoTime`) und enthält noch sehr viel Debug-/Altlogik. Das belastet genau den Schritt, in dem du das Stocken siehst.
+3. `DirectorsCutVideo.tsx` rendert an Übergängen die nächste Szene doppelt: einmal als Overlap-Sequenz und zusätzlich noch einmal als normale Szene mit `premountFor`. Das erhöht die Decode-Last genau an den Cuts.
 
-### Problem 1: Szenen-Beschreibungen sind generisch/falsch
+Umsetzung:
 
-**Bestätigte Ursache** (Edge Function Logs):
-```
-frames: 0
-No frames provided, using fallback text analysis
-```
+1. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- `initialMuted` robust machen:
+  - `isMuted` bei Prop-Änderungen mitsynchronisieren
+  - beim Mount/Player-Ready den tatsächlichen Mute-State aktiv auf Player + native Audio anwenden
+- Audio-Start vereinheitlichen:
+  - eine zentrale Helper-Logik für `play/pause/seek/sync`
+  - bei `initialMuted={false}` soll nach dem ersten Play-Klick direkt der Originalton starten, ohne extra „Audio aktivieren“
+- den Overlay-Button nur zeigen, wenn der Player wirklich absichtlich stumm ist
 
-Die Frame-Extraktion schlägt fehl, weil das Video von einer externen S3-Domain (`remotionlambda-eucentral1`) kommt. Der Browser blockiert `canvas.toDataURL()` wegen CORS/Canvas-Taint bei `crossOrigin = 'anonymous'`. Der `onerror`-Handler gibt leise ein leeres Array zurück. Die Edge Function fällt dann auf eine **generische Text-Analyse** zurück, die "hypothetische" Szenenbeschreibungen erfindet — ohne das Video je gesehen zu haben.
+2. `src/components/directors-cut/steps/SceneAnalysisStep.tsx`
+- Playback-induzierte Re-Renders stark reduzieren:
+  - `currentVideoTime` nicht mehr ungefiltert bei jedem Tick in den ganzen Step schreiben
+  - stattdessen nur grob/throttled für Timeline/aktive Szene aktualisieren oder auf Szenenwechsel begrenzen
+- die vielen `console.log`-Aufrufe entfernen
+- tote Altlogik entfernen, die noch aus dem früheren HTML-Video-Preview stammt (`videoRef`, `videoFilter`, `videoKey`, ungenutzte Time-Update-Pfade)
 
-**Lösung**: Die Frame-Extraktion robuster machen und bei CORS-Blockade die Frames serverseitig extrahieren.
+3. `src/remotion/templates/DirectorsCutVideo.tsx`
+- Übergangs-Rendering entschärfen:
+  - keine doppelte Vorab-Montage derselben nächsten Szene mehr
+  - `premountFor` nur dort nutzen, wo es wirklich hilft, nicht gleichzeitig auf Overlap- und Haupt-Sequenz
+- bestehende Zwei-Layer-Transitions beibehalten, aber die Preview so umbauen, dass an einem Cut nicht unnötig 3 Video-Instanzen parallel aktiv sind
 
-#### Änderung 1a: `src/pages/DirectorsCut/DirectorsCut.tsx`
-- Frame-Extraktion mit `try/catch` um `canvas.toDataURL()` wrappen
-- Bei Canvas-Taint-Error: leeres Array zurückgeben, aber **explizit loggen** dass CORS das Problem ist
-- Die `video_url` wird bereits an die Edge Function gesendet — diese soll die Frames selbst extrahieren können
+Erwartetes Ergebnis:
+- In Schritt 2 ist der Originalsound standardmässig an
+- der „Audio aktivieren“-Hinweis erscheint dort nicht mehr fälschlich
+- die Preview im KI-Analyse-Schritt wird deutlich ruhiger
+- Szenenübergänge ruckeln wesentlich weniger, weil sowohl React-Overhead als auch Video-Dekodierung an den Cuts reduziert werden
 
-#### Änderung 1b: `supabase/functions/analyze-video-scenes/index.ts`
-- Wenn `frames` leer oder nicht vorhanden: **Frames serverseitig extrahieren** statt auf generische Textanalyse zurückzufallen
-- Video-URL per `fetch()` herunterladen (funktioniert serverseitig ohne CORS)
-- Mit `ffmpeg`/Frame-Extraction einen alternativen Ansatz verwenden: Video-URL direkt an das Vision-Modell senden
-- Gemini 2.5 Flash unterstützt Video-URLs direkt als Input — statt einzelner Frames das **Video selbst** an die API senden
-- Dazu den `userContent` um einen `video_url`-Part erweitern (Gemini Vision API akzeptiert `file_data` bzw. `video`-Input)
-- Fallback-Text-Analyse ("hypothetische Szenenstruktur") als letztes Mittel behalten, aber klar als "Fallback" kennzeichnen
+Dateien:
+1. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+2. `src/components/directors-cut/steps/SceneAnalysisStep.tsx`
+3. `src/remotion/templates/DirectorsCutVideo.tsx`
 
-**Konkreter Ansatz**: Da Gemini Vision das Video auch als URL akzeptieren kann, wird die Edge Function das Video direkt als URL-Referenz an die AI senden, anstatt auf clientseitige Frames angewiesen zu sein. Das ist zuverlässiger und liefert bessere Ergebnisse als einzelne JPEG-Frames.
-
----
-
-### Problem 2: Audio ist standardmässig stumm
-
-**Ursache**: In `DirectorsCutPreviewPlayer.tsx` Zeile 102 wird `isMuted` mit `true` initialisiert. Der User muss erst manuell auf das Lautsprecher-Icon klicken.
-
-**Lösung**: 
-
-#### Änderung 2: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-- Neue optionale Prop `initialMuted?: boolean` (Default: `true` für Rückwärtskompatibilität)
-
-#### Änderung 3: `src/components/directors-cut/steps/SceneAnalysisStep.tsx`
-- `DirectorsCutPreviewPlayer` mit `initialMuted={false}` aufrufen, damit Audio im Analyse-Step hörbar ist
-- Der User kann weiterhin selbst auf Mute klicken
-
----
-
-### Zusammenfassung der Dateien
-1. `supabase/functions/analyze-video-scenes/index.ts` — Video-URL direkt an Gemini Vision senden statt auf leere Frames zu warten
-2. `src/pages/DirectorsCut/DirectorsCut.tsx` — Frame-Extraktion-Fehler besser loggen
-3. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `initialMuted` Prop ergänzen
-4. `src/components/directors-cut/steps/SceneAnalysisStep.tsx` — Audio standardmässig an
-
-### Technische Hinweise
-- Kein Datenbank-Fix nötig
-- Gemini 2.5 Flash/Pro unterstützen multimodale Inputs inkl. Bild-URLs — die Frames müssen nicht als base64 inline gesendet werden
-- Die bestehende Vision-Analyse-Logik (Frame-Nummern, Zeitstempel-Berechnung) bleibt als Backup erhalten für den Fall, dass clientseitige Frames doch funktionieren
-
+Technische Hinweise:
+- Kein Backend-/Datenbank-Fix nötig
+- Das ist jetzt vor allem ein Preview-State- und Performance-Fix
+- Der wichtigste Unterschied zum letzten Versuch: Ich würde nicht nochmals nur am Transition-Effekt schrauben, sondern gezielt die zwei echten Engpässe beheben: falscher Audio-State + doppelte Last an Übergängen
