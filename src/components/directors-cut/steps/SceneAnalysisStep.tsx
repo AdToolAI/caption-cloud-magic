@@ -305,7 +305,6 @@ export function SceneAnalysisStep({
       effects.saturation = 145;
       effects.brightness = 108;
       effects.contrast = 115;
-      console.log(`[parseEffectName] WARM filter applied`, effects);
       return effects;
     }
     if (lowerName.includes('cool') || lowerName.includes('kalt')) {
