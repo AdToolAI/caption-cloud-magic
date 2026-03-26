@@ -28,7 +28,7 @@ import { AIAutoCut } from '../features/AIAutoCut';
 import { toast } from 'sonner';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
-import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
+// DirectorsCutPreviewPlayer removed — using native <video> for lightweight analysis preview
 
 // Extract video frames for Vision AI analysis
 const extractVideoFrames = async (videoUrl: string, duration: number): Promise<string[]> => {
