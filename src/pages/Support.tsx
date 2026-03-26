@@ -57,7 +57,7 @@ const Support = () => {
       if (error instanceof z.ZodError) {
         toast({
           title: text[language as keyof typeof text].errorTitle,
-          description: error.errors[0].message,
+          description: error.issues[0].message,
           variant: "destructive",
         });
       } else {

@@ -13,15 +13,15 @@ export const mediaProfileConfigSchema = z.object({
     .int('Höhe muss eine Ganzzahl sein')
     .min(100, 'Höhe muss mindestens 100px sein')
     .max(8192, 'Höhe darf maximal 8192px sein'),
-  fitMode: z.enum(['cover', 'contain', 'pad', 'smart'], {
-    errorMap: () => ({ message: 'FitMode muss cover, contain, pad oder smart sein' })
+  fitMode: z.enum({cover: 'cover', contain: 'contain', pad: 'pad', smart: 'smart'}, {
+    error: 'FitMode muss cover, contain, pad oder smart sein'
   }),
   sizeLimitMb: z.number()
     .int('Größenlimit muss eine Ganzzahl sein')
     .min(1, 'Größenlimit muss mindestens 1 MB sein')
     .max(4000, 'Größenlimit darf maximal 4000 MB sein'),
-  type: z.enum(['image', 'video'], {
-    errorMap: () => ({ message: 'Typ muss image oder video sein' })
+  type: z.enum({image: 'image', video: 'video'}, {
+    error: 'Typ muss image oder video sein'
   }),
 
   // Optional fields

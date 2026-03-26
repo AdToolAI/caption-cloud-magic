@@ -136,6 +136,7 @@ export const RemotionRoot: React.FC = () => {
             backgroundColor: '#000000',
             backgroundOpacity: 0.7,
             animation: 'none',
+            animationSpeed: 1,
             outlineStyle: 'none',
             outlineColor: '#000000',
             outlineWidth: 2,
@@ -229,7 +230,8 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{
           scenes: [],
           fps: 30,
-        }}
+          aspectRatio: '16:9',
+        } as any}
       />
       <Composition
         id="ExplainerVideo"
@@ -304,7 +306,8 @@ export const RemotionRoot: React.FC = () => {
           secondaryColor: '#8B5CF6',
           showSceneTitles: true,
           showProgressBar: true,
-        }}
+          preferredFont: 'Inter',
+        } as any}
       />
       <Composition
         id="UniversalCreatorVideo"
@@ -384,7 +387,14 @@ export const RemotionRoot: React.FC = () => {
           fontFamily: 'Inter',
           showProgressBar: false,
           showWatermark: false,
-        }}
+          fps: 30,
+          style: 'cinematic',
+          preferredFont: 'Inter',
+          showSceneTitles: false,
+          showSubtitles: true,
+          transitionStyle: 'fade',
+          aspectRatio: '9:16',
+        } as any}
       />
       <Composition
         id="SmokeTest"
