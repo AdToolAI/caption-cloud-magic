@@ -1,40 +1,61 @@
 
+Ziel: Das Zurückspringen der Übergänge und den Voice-Aussetzer gezielt beheben, ohne die flüssige Single-Video-Preview wieder zu verlieren.
 
-## Fix: Voiceover-Wiederholung + sichtbare Übergänge in der Preview
+1. Bestätigte Ursachen
+- In `src/remotion/templates/DirectorsCutVideo.tsx` werden die Preview-Übergänge aktuell auf demselben `<Video>`-Element per `opacity`, `transform` und `clipPath` animiert.
+- Gleichzeitig ist auf dem Video noch ein CSS-`transition` gesetzt. In einer framebasierten Remotion-Preview führt das zu Nachziehen und anschließendem Rücksprung, weil der Browser zwischen laufend wechselnden Werten zusätzlich tweened.
+- Für `wipe` / `slide` / `push` gibt es in der Preview kein echtes „incoming layer“. Es wird nur das aktuelle Bild verformt. Dadurch wirkt der Übergang halb fertig und springt am Szenenwechsel zurück.
+- In `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` ist die Voiceover-Drift-Korrektur zwar entfernt, aber die Voiceover-Spur hängt noch an mehreren Transport-Pfaden:
+  - `onPause`
+  - `handleSeek`
+  - Reset/Restart-Pfade
+- Außerdem gibt es keine robuste Behandlung für `waiting` / `stalled` / `canplay` auf dem Voiceover-Audio. Ein kurzer Ladehänger kann deshalb als 1-2 Sekunden Aussetzer hörbar werden.
 
-### Ursache 1 — Voiceover wiederholt sich
-In `DirectorsCutPreviewPlayer.tsx` (Zeile 401-404) wird die Voiceover-Position an die **Video-Zeit** gebunden. Die Drift-Korrektur setzt `voiceoverAudioRef.current.currentTime = time` (= aktuelle Videozeit). Problem:
-- Wenn das Video an einer Szenengrenze kurz springt oder sich die Zeit leicht verschiebt, wird das Voiceover zu einer bereits gehörten Stelle zurückgesetzt
-- Bei 6-7 Szenen passiert das an mehreren Stellen → "wiederholt sich an 3 Stellen"
-- Das Voiceover soll linear durchlaufen, unabhängig von der Videozeit
+2. Umsetzung
+- `src/remotion/templates/DirectorsCutVideo.tsx`
+  - CSS-`transition` auf dem Preview-Video entfernen.
+  - Preview-Übergänge nicht mehr durch Verformen des einzigen Video-Layers lösen, sondern als echte Overlay-Logik:
+    - Basisvideo bleibt stabil und läuft durch.
+    - Ein separater Preview-Overlay-Layer zeigt den nächsten Shot visuell an.
+  - Für `crossfade` / `dissolve` / `fade`:
+    - Overlay mit nächstem Frame/Thumbnail einblenden.
+  - Für `wipe-*`, `slide-*`, `push-*`:
+    - Richtung korrekt übernehmen.
+    - Bewegung auf dem Overlay-Layer statt auf dem Basisvideo.
+  - Für `zoom` / `blur`:
+    - als zusätzlicher Effekt über dem stabilen Basisvideo, ohne Reset-Sprung am Boundary.
+  - Übergangsfenster sauber bis zum Szenenende clampen, damit nichts am Umschaltpunkt zurückspringt.
 
-**Fix**: Drift-Korrektur für Voiceover komplett entfernen. Das Voiceover startet bei Play und läuft linear bis zum Ende. Nur die Source-Audio (Originalton) bleibt an die Videozeit gekoppelt.
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+  - Voiceover von transienten Player-Pausen entkoppeln:
+    - nicht bei jedem internen `pause` sofort die Voiceover-Spur stoppen
+    - nur bei echter User-Pause, Reset oder explizitem Seek eingreifen
+  - Voiceover-Position nur noch bei echten Seek-/Reset-Aktionen setzen, nicht bei allgemeinen Transport-Syncs.
+  - Audio-Status-Handling ergänzen:
+    - `waiting`
+    - `stalled`
+    - `canplay`
+    - `playing`
+  - eine kleine Resume-/Recovery-Logik einbauen, damit die Voiceover-Spur nach kurzem Buffering nicht stumm hängen bleibt.
 
-### Ursache 2 — Keine sichtbaren Übergänge
-Die Preview-Mode-Logik (Zeile 720-742) erzeugt nur einen subtilen schwarzen Overlay (`rgba(0,0,0,0.3-0.5)`). Das ist auf den meisten Videos unsichtbar. Es gibt keine visuellen Bewegungen (Wipe, Slide, Zoom).
+- Optional zur Konsistenz:
+  - die Preview-Overlay-Logik an `NativeTransitionOverlay` anlehnen bzw. angleichen, damit Schritt 2 und Schritt 3 gleich reagieren.
 
-**Fix**: Übergänge als CSS-Transformationen auf dem einzelnen Video-Element umsetzen:
-- **fade/crossfade/dissolve**: Opacity-Dip auf 0.3 und zurück (stärker als aktuell)
-- **wipe**: `clip-path: inset()` Animation, die das Bild von einer Seite aufdeckt
-- **slide/push**: `translateX/Y` Verschiebung des Videos
-- **zoom**: `scale()` Vergrößerung als visueller Akzent
-- **blur**: `filter: blur()` wie bisher, aber stärker
+3. Was ich bewusst nicht ändere
+- keine Rückkehr zu `TransitionSeries` in der Preview
+- keine neue per-Szene-Decoder-Architektur
+- keine erneute Voiceover-Drift-Korrektur gegen die Videozeit
+- finaler Render bleibt unverändert framegenau
 
-### Änderungen
+4. Erwartetes Ergebnis
+- Übergänge springen nicht mehr zurück
+- `wipe` / `slide` / `push` wirken als echte eingehende Übergänge
+- Single-Video-Preview bleibt flüssig
+- Voiceover läuft linear weiter und fängt sich bei kurzen Ladehänger robuster ab
 
-**`src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`**
-- Zeile 401-404: Voiceover-Drift-Korrektur entfernen (nur 3 Zeilen löschen)
-
-**`src/remotion/templates/DirectorsCutVideo.tsx`**
-- Preview-Mode-Block (Zeile 719-742): Transition-Berechnung erweitern
-  - Statt nur `transitionOverlayOpacity` auch `transitionTransform` und `transitionClipPath` berechnen
-  - Diese Werte direkt auf das `<Video>`-Element anwenden (style-Attribute)
-  - Jeder Transition-Typ bekommt eine eigene, sichtbare CSS-Animation
-  - Overlay bleibt als zusätzliche Ebene für Blend-Effekte
-
-### Was sich nicht ändert
-- Single-Video-Architektur in der Preview bleibt
-- TransitionSeries für finalen Render bleibt unverändert
-- Source-Audio-Drift-Korrektur bleibt (nur für Originalton)
-- Native Audio-Architektur bleibt
-
+5. Technischer Kernpunkt
+```text
+Basisvideo bleibt stabil
++ separater incoming Overlay-Layer für Übergänge
++ Voiceover nur bei echten User-Transportaktionen seeken/pause'n
+```
