@@ -882,12 +882,23 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             } : {}),
           }}>
             {(() => {
-              const words = currentSubtitleSegment.words;
               const segmentText = currentSubtitleSegment.text;
-              
-              // If words array is missing/empty, show text directly as fallback
-              if (!words || words.length === 0) {
-                return segmentText ? <span>{segmentText}</span> : null;
+              let words = currentSubtitleSegment.words;
+
+              // Normalize: if words are missing/empty OR don't match text, rebuild from text
+              const wordsJoined = words && words.length > 0 ? words.map(w => w.text).join(' ') : '';
+              if (!words || words.length === 0 || wordsJoined !== segmentText) {
+                if (segmentText) {
+                  const tokens = segmentText.split(/\s+/).filter(Boolean);
+                  const dur = (currentSubtitleSegment.endTime - currentSubtitleSegment.startTime) / (tokens.length || 1);
+                  words = tokens.map((t, i) => ({
+                    text: t,
+                    startTime: currentSubtitleSegment.startTime + i * dur,
+                    endTime: currentSubtitleSegment.startTime + (i + 1) * dur,
+                  }));
+                } else {
+                  return null;
+                }
               }
               
               const wordsPerLine = Math.ceil(words.length / 3);
