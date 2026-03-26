@@ -186,7 +186,8 @@ const SubtitleLayer: React.FC<{
   subtitleStyle?: UniversalVideoProps['subtitleStyle'];
 }> = ({ subtitles, subtitleStyle }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width } = useVideoConfig();
+  const scaleFactor = (width / 1080) * 1.6;
   const currentTime = frame / fps;
 
 
@@ -307,7 +308,7 @@ const SubtitleLayer: React.FC<{
       <div
         style={{
           fontFamily: fontFamily,
-          fontSize: subtitleStyle.fontSize,
+          fontSize: (subtitleStyle.fontSize || 48) * scaleFactor,
           color: subtitleStyle.color,
           textAlign: 'center',
           maxWidth: '80%',
@@ -772,7 +773,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           }}>
           <div style={{
             fontFamily: fontFamily,
-            fontSize: subtitleStyle.fontSize || 48,
+            fontSize: (subtitleStyle.fontSize || 48) * ((width / 1080) * 1.6),
             color: subtitleStyle.color || '#FFFFFF',
             textAlign: 'center',
               maxWidth: '80%',
@@ -864,7 +865,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         }}>
           <div style={{
             fontFamily: fontFamily,
-            fontSize: subtitleStyle.fontSize || 48,
+            fontSize: (subtitleStyle.fontSize || 48) * ((width / 1080) * 1.6),
             color: subtitleStyle.color || '#FFFFFF',
             textAlign: 'center',
             maxWidth: '80%',
