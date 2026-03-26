@@ -692,7 +692,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         <SharpnessFilter intensity={sharpness} />
         <Video
           src={sourceVideoUrl}
-          pauseWhenBuffering
+          pauseWhenBuffering={!previewMode}
           style={{
             width: '100%',
             height: '100%',
@@ -703,15 +703,15 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         />
         {/* VHS Scanlines for retro_vhs filter */}
         {filter === 'retro_vhs' && <VHSScanlines intensity={0.25} />}
-        {/* Original Audio - mute if voiceover or background music present */}
-        {!voiceoverUrl && !backgroundMusicUrl && (
+        {/* Original Audio - skip in preview mode (native audio handles it) */}
+        {!previewMode && !voiceoverUrl && !backgroundMusicUrl && (
           <Audio src={sourceVideoUrl} volume={masterVolume / 100} startFrom={0} pauseWhenBuffering />
         )}
         {vignette > 0 && <AbsoluteFill style={{ ...vignetteStyle, pointerEvents: 'none', zIndex: 10 }} />}
-        {/* Voiceover - delayed loading to reduce concurrent network load */}
-        {voiceoverUrl && frame >= 15 && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} pauseWhenBuffering />}
-        {/* Background Music - further delayed to allow voiceover to load first */}
-        {backgroundMusicUrl && frame >= 30 && <Audio src={backgroundMusicUrl} volume={(backgroundMusicVolume || 30) / 100} loop pauseWhenBuffering />}
+        {/* Voiceover - skip in preview mode */}
+        {!previewMode && voiceoverUrl && frame >= 15 && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} pauseWhenBuffering />}
+        {/* Background Music - skip in preview mode */}
+        {!previewMode && backgroundMusicUrl && frame >= 30 && <Audio src={backgroundMusicUrl} volume={(backgroundMusicVolume || 30) / 100} loop pauseWhenBuffering />}
       </AbsoluteFill>
     );
   }
