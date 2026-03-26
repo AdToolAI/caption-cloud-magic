@@ -254,7 +254,7 @@ export function SceneAnalysisStep({
         lowerName.includes('slide') || 
         lowerName.includes('wipe') ||
         lowerName.includes('crossfade')) {
-      console.log(`[parseEffectName] SKIPPED (transition)`);
+      // Skipped transition
       return {};
     }
     
