@@ -664,6 +664,180 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     );
   }
 
+  // ========== PREVIEW MODE: Single continuous video + CSS overlays ==========
+  if (previewMode && sortedScenes.length > 0) {
+    // Find current scene based on time
+    const currentSceneIndex = sortedScenes.findIndex((scene, idx) => {
+      const nextScene = sortedScenes[idx + 1];
+      if (!nextScene) return currentTimeSeconds >= scene.startTime;
+      return currentTimeSeconds >= scene.startTime && currentTimeSeconds < nextScene.startTime;
+    });
+    const activeIdx = currentSceneIndex >= 0 ? currentSceneIndex : 0;
+    const activeScene = sortedScenes[activeIdx];
+    const nextScene = sortedScenes[activeIdx + 1];
+
+    // Get scene-specific effects
+    const currentSceneEffect = sceneEffects?.[activeScene.id] || activeScene.effects || null;
+    const effectiveBrightness = currentSceneEffect?.brightness ?? brightness;
+    const effectiveContrast = currentSceneEffect?.contrast ?? contrast;
+    const effectiveSaturation = currentSceneEffect?.saturation ?? saturation;
+    const effectiveSharpness = currentSceneEffect?.sharpness ?? sharpness;
+    const effectiveTemperature = currentSceneEffect?.temperature ?? temperature;
+    const effectiveVignette = currentSceneEffect?.vignette ?? vignette;
+    const effectiveFilter = currentSceneEffect?.filter ?? filter;
+
+    // Build filter string for active scene
+    let previewFilter = `brightness(${effectiveBrightness / 100}) `;
+    previewFilter += `contrast(${effectiveContrast / 100}) `;
+    previewFilter += `saturate(${effectiveSaturation / 100}) `;
+    if (effectiveTemperature !== 0) {
+      if (effectiveTemperature > 0) {
+        const warmth = effectiveTemperature / 50;
+        previewFilter += `sepia(${Math.min(0.5, warmth * 0.3)}) saturate(${1 + warmth * 0.3}) `;
+      } else {
+        const coldness = Math.abs(effectiveTemperature) / 50;
+        previewFilter += `hue-rotate(${effectiveTemperature * 1.5}deg) saturate(${1 + coldness * 0.2}) `;
+      }
+    }
+    if (effectiveSharpness > 0) previewFilter += `url(#sharpen-filter) `;
+    if (effectiveFilter && isSVGFilter(effectiveFilter)) {
+      previewFilter += SVG_FILTER_IDS[effectiveFilter] + ' ';
+    } else if (effectiveFilter && FILTER_CSS[effectiveFilter]) {
+      previewFilter += FILTER_CSS[effectiveFilter] + ' ';
+    }
+    if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
+      previewFilter += STYLE_CSS[styleTransfer.style] + ' ';
+    }
+    const sceneGrading = sceneColorGrading?.[activeScene.id];
+    const effectiveGrading = sceneGrading?.grade
+      ? { enabled: true, grade: sceneGrading.grade, intensity: sceneGrading.intensity }
+      : colorGrading;
+    if (effectiveGrading?.enabled && effectiveGrading.grade && GRADE_CSS[effectiveGrading.grade]) {
+      previewFilter += GRADE_CSS[effectiveGrading.grade] + ' ';
+    }
+
+    // Calculate transition overlay opacity for CSS-based transitions
+    let transitionOverlayOpacity = 0;
+    let transitionBlur = 0;
+    let transitionType = 'fade';
+    if (nextScene) {
+      const currentTransition = transitions?.find(t => t.sceneIndex === activeIdx);
+      if (currentTransition && currentTransition.type && currentTransition.type !== 'none') {
+        const tDuration = currentTransition.duration || 0.5;
+        const tStart = nextScene.startTime - tDuration;
+        transitionType = currentTransition.type.toLowerCase().split('-')[0];
+        if (currentTimeSeconds >= tStart && currentTimeSeconds < nextScene.startTime) {
+          const progress = (currentTimeSeconds - tStart) / tDuration;
+          if (transitionType === 'blur') {
+            transitionBlur = progress * 15;
+            transitionOverlayOpacity = progress * 0.3;
+          } else if (transitionType === 'zoom') {
+            transitionOverlayOpacity = progress * 0.5;
+          } else {
+            // fade, crossfade, dissolve, wipe, slide, push — all approximate as opacity dip
+            transitionOverlayOpacity = Math.sin(progress * Math.PI) * 0.4;
+          }
+        }
+      }
+    }
+
+    // Ken Burns for active scene
+    let kenBurnsStyle = '';
+    const kbKeyframe = kenBurns?.find(k => k.sceneId === activeScene.id || !k.sceneId);
+    if (kbKeyframe && kbKeyframe.startZoom !== undefined) {
+      const sceneDur = activeScene.endTime - activeScene.startTime;
+      const sceneProgress = sceneDur > 0 ? Math.min(1, Math.max(0, (currentTimeSeconds - activeScene.startTime) / sceneDur)) : 0;
+      const easedP = applyEasing(sceneProgress, kbKeyframe.easing || 'linear');
+      const zoom = (kbKeyframe.startZoom ?? 1) + easedP * ((kbKeyframe.endZoom ?? 1) - (kbKeyframe.startZoom ?? 1));
+      const x = (kbKeyframe.startX ?? 0) + easedP * ((kbKeyframe.endX ?? 0) - (kbKeyframe.startX ?? 0));
+      const y = (kbKeyframe.startY ?? 0) + easedP * ((kbKeyframe.endY ?? 0) - (kbKeyframe.startY ?? 0));
+      kenBurnsStyle = `scale(${zoom}) translate(${x}%, ${y}%)`;
+    }
+
+    return (
+      <AbsoluteFill style={{ backgroundColor: '#000' }}>
+        <SVGFilters />
+        <SharpnessFilter intensity={effectiveSharpness} />
+        {chromaKey?.enabled && chromaKey.backgroundUrl && (
+          <AbsoluteFill>
+            <img src={chromaKey.backgroundUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </AbsoluteFill>
+        )}
+        {/* Single continuous video — no decoder switches */}
+        <Video
+          src={sourceVideoUrl}
+          startFrom={0}
+          pauseWhenBuffering={false}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: `${previewFilter.trim()}${transitionBlur > 0 ? ` blur(${transitionBlur}px)` : ''}`,
+            transform: kenBurnsStyle || undefined,
+            transformOrigin: 'center center',
+          }}
+          volume={0}
+        />
+        {/* Transition overlay — darkens/blurs between scenes */}
+        {transitionOverlayOpacity > 0 && (
+          <AbsoluteFill style={{
+            backgroundColor: `rgba(0,0,0,${transitionOverlayOpacity})`,
+            pointerEvents: 'none',
+            zIndex: 5,
+          }} />
+        )}
+        {/* VHS Scanlines */}
+        {effectiveFilter === 'retro_vhs' && <VHSScanlines intensity={0.25} />}
+        {/* Vignette */}
+        {effectiveVignette > 0 && (
+          <AbsoluteFill style={{
+            background: `radial-gradient(ellipse at center, transparent 0%, transparent ${Math.max(0, 50 - effectiveVignette * 0.5)}%, rgba(0,0,0,${Math.min(1, effectiveVignette / 50)}) 100%)`,
+            pointerEvents: 'none',
+            zIndex: 10,
+          }} />
+        )}
+        {/* Text Overlays */}
+        {textOverlays.map((overlay) => {
+          const startFrame = Math.floor(overlay.startTime * fps);
+          const endFrame = overlay.endTime ? Math.floor(overlay.endTime * fps) : durationInFrames;
+          const overlayDuration = endFrame - startFrame;
+          return (
+            <Sequence key={overlay.id} from={startFrame} durationInFrames={overlayDuration}>
+              <TextOverlayRenderer overlay={overlay as TextOverlayProps} />
+            </Sequence>
+          );
+        })}
+        {/* Subtitles */}
+        {subtitleTrack?.clips?.map((clip) => {
+          const startFrame = Math.floor(clip.startTime * fps);
+          const endFrame = Math.floor(clip.endTime * fps);
+          const clipDuration = Math.max(1, endFrame - startFrame);
+          const fontSizeMap: Record<string, string> = { small: '24px', medium: '36px', large: '48px', xl: '64px' };
+          return (
+            <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
+              <AbsoluteFill style={{
+                display: 'flex', justifyContent: 'center',
+                alignItems: clip.position === 'top' ? 'flex-start' : clip.position === 'center' ? 'center' : 'flex-end',
+                padding: '5%', pointerEvents: 'none', zIndex: 100,
+              }}>
+                <div style={{
+                  backgroundColor: clip.backgroundColor || 'rgba(0,0,0,0.7)',
+                  color: clip.color || '#FFFFFF', padding: '12px 24px', borderRadius: '8px',
+                  fontSize: fontSizeMap[clip.fontSize || 'medium'] || '36px',
+                  fontFamily: clip.fontFamily || fontFamily, fontWeight: 'bold',
+                  textAlign: 'center', maxWidth: '90%', lineHeight: 1.4,
+                }}>
+                  {clip.text}
+                </div>
+              </AbsoluteFill>
+            </Sequence>
+          );
+        })}
+      </AbsoluteFill>
+    );
+  }
+
+  // ========== RENDER MODE: TransitionSeries with per-scene Video for frame-perfect output ==========
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
       {/* SVG Filter Definitions for all creative filters */}
@@ -717,10 +891,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
               case 'fade':
                 return fade();
               case 'blur':
-                // Blur approximated as a slower fade for visible effect
                 return fade();
               case 'zoom':
-                // Zoom approximated as slide-in for visible motion
                 return slide({ direction: 'from-bottom' });
               case 'wipe':
                 return wipe({ direction: directionMap[direction] || 'from-left' });
@@ -757,7 +929,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                     chromaKey={chromaKey}
                     kenBurns={kenBurns}
                     sceneDurationFrames={sceneDurationFrames}
-                    previewMode={previewMode}
+                    previewMode={false}
                   />
                 </AbsoluteFill>
               </TransitionSeries.Sequence>
