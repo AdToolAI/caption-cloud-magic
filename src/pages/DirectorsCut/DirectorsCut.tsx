@@ -81,9 +81,6 @@ export function DirectorsCut() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [transitions, setTransitions] = useState<TransitionAssignment[]>([]);
 
-  useEffect(() => {
-    console.log('[DirectorsCut] transitions state changed:', transitions);
-  }, [transitions]);
 
   useEffect(() => {
     if (scenes.length > 1 && transitions.length === 0) {
