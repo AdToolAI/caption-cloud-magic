@@ -363,8 +363,14 @@ export function DirectorsCut() {
             });
             
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const frameData = canvas.toDataURL('image/jpeg', 0.6);
-            frames.push(frameData);
+            try {
+              const frameData = canvas.toDataURL('image/jpeg', 0.6);
+              frames.push(frameData);
+            } catch (taintError) {
+              console.warn('[extractVideoFrames] Canvas tainted by CORS — cannot extract frames client-side. Video URL will be sent directly to Vision AI.', taintError);
+              resolve([]);
+              return;
+            }
           }
         } catch (frameError) {
           console.error('[extractVideoFrames] Frame extraction error:', frameError);

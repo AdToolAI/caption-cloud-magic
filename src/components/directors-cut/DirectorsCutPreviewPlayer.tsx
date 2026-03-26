@@ -52,6 +52,7 @@ interface DirectorsCutPreviewPlayerProps {
   externalIsPlaying?: boolean;
   onPlayingChange?: (isPlaying: boolean) => void;
   originalAudioMuted?: boolean;
+  initialMuted?: boolean;
   className?: string;
   fillContainer?: boolean;
   children?: React.ReactNode;
@@ -80,6 +81,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   externalIsPlaying,
   onPlayingChange,
   originalAudioMuted = false,
+  initialMuted = true,
   className = '',
   fillContainer = false,
   children,
@@ -99,7 +101,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const backgroundMusicAudioRef = useRef<HTMLAudioElement | null>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(initialMuted);
   const [internalTime, setInternalTime] = useState(currentTime);
   const [playerReady, setPlayerReady] = useState(false);
 

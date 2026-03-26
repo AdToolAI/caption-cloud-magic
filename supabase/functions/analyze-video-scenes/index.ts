@@ -347,29 +347,50 @@ Antworte NUR mit dem JSON-Array!`
       );
     }
 
-    // Fallback: No frames provided - use text-only analysis (less accurate)
-    console.log("[analyze-video-scenes] No frames provided, using fallback text analysis");
-    
-    const systemPrompt = `Du bist ein professioneller Video-Editor. Erstelle eine hypothetische Szenenstruktur für ein Video.
+    // No client-side frames — send video URL directly to Gemini Vision for analysis
+    console.log("[analyze-video-scenes] No client-side frames, sending video_url directly to Vision AI");
 
-Antworte NUR mit einem validen JSON-Array von Szenen. Keine zusätzlichen Erklärungen.`;
+    const videoAnalysisPrompt = `Du bist ein präziser Video-Schnitt-Analyst. Analysiere dieses Video und identifiziere die exakten Schnittpunkte.
 
-    const userPrompt = `Erstelle eine Szenenstruktur für ein ${videoDuration}-sekündiges Video.
+KRITISCHE ANWEISUNG:
+- Beschreibe was du TATSÄCHLICH im Video siehst
+- Szenen in CHRONOLOGISCHER REIHENFOLGE
+- Beschreibungen MAXIMAL 50 Zeichen
+- Erwarte 2-5 Szenen für ein ${videoDuration}s Video
 
-Teile das Video in 3-5 logische Szenen auf.
-
-Für jede Szene erstelle ein Objekt mit:
+JSON FORMAT für jede Szene:
 {
-  "id": "scene-X",
-  "start_time": number,
-  "end_time": number,
-  "description": "Generische Beschreibung",
+  "id": "scene-1",
+  "start_time": number (Sekunden),
+  "end_time": number (Sekunden),
+  "description": "string (MAXIMAL 50 Zeichen! Beschreibe was du siehst)",
   "mood": "dynamic|calm|energetic|emotional|neutral",
   "suggested_effects": [
-    { "type": "filter", "name": "cinematic", "reason": "Begründung", "confidence": 0.8 }
+    { "type": "filter", "name": "cinematic|vintage|warm|cool|vibrant|noir|muted|highkey", "reason": "Kurze Begründung", "confidence": 0.8 },
+    { "type": "color", "name": "brightness-110|contrast-115|saturation-120|vignette-40", "reason": "Kurze Begründung", "confidence": 0.8 }
   ],
-  "ai_suggestions": ["Vorschlag"]
-}`;
+  "ai_suggestions": ["Vorschlag 1", "Vorschlag 2"]
+}
+
+REGELN:
+- Erste Szene startet IMMER bei 0.0s
+- Letzte Szene endet IMMER bei ${videoDuration}s
+- JEDE Szene braucht genau 2 suggested_effects (1 filter + 1 color)
+- Antworte NUR mit einem validen JSON-Array!`;
+
+    // Build user content with video URL for Gemini Vision
+    const userContent: any[] = [
+      {
+        type: "text",
+        text: `Analysiere dieses ${videoDuration}-sekündige Video und finde die Schnittpunkte. Beschreibe was du in jeder Szene TATSÄCHLICH siehst. Antworte NUR mit dem JSON-Array!`
+      },
+      {
+        type: "image_url",
+        image_url: {
+          url: video_url,
+        }
+      }
+    ];
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -380,10 +401,11 @@ Für jede Szene erstelle ein Objekt mit:
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          { role: "system", content: videoAnalysisPrompt },
+          { role: "user", content: userContent }
         ],
-        temperature: 0.7,
+        temperature: 0.4,
+        max_tokens: 4096,
       }),
     });
 
