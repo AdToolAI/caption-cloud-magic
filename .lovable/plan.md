@@ -1,59 +1,56 @@
 
-
-## Fix: Content Creator Render schlaegt fehl — delayRender Timeout bei Video
+## Fix: Content Creator nutzt noch das falsche Remotion-Template
 
 ### Ursache
+Der letzte Fix fuer `SafeVideo` wurde in `UniversalCreatorVideo.tsx` eingebaut, aber der Universal Content Creator verwendet an den entscheidenden Stellen weiterhin **`UniversalVideo`**:
 
-Der Fehler ist ein `delayRender()` Timeout: Die Remotion `<Video>` Komponente versucht ein externes Video von `cdn.pixabay.com` zu laden. In der Lambda-Umgebung dauert das zu lange (298s Timeout). 
+- `src/components/universal-creator/steps/PreviewExportStep.tsx` sendet beim Rendern `component_name: 'UniversalVideo'`
+- `src/pages/UniversalCreator/UniversalCreator.tsx` uebergibt an den Preview-Player `componentName="UniversalVideo"`
+- `src/components/universal-creator/RemotionPreviewPlayer.tsx` ignoriert `componentName` aktuell komplett und rendert hart `component={UniversalVideo}`
 
-Im Code gibt es zwei Stellen in `UniversalCreatorVideo.tsx` wo `<Video>` ohne Timeout-Schutz verwendet wird:
-- **Zeile 1789**: `<Video src={animatedVideoUrl}>` (Hailuo animated video)
-- **Zeile 2005**: `<Video src={background.videoUrl}>` (Video-Hintergrund)
+Die Runtime-Logs bestaetigen das ebenfalls: Der Render lief mit `composition: "UniversalVideo"`. Deshalb greift der neue `SafeVideo`-Schutz aus `UniversalCreatorVideo` ueberhaupt nicht, und der alte Pixabay-Timeout tritt weiter auf.
 
-Fuer Bilder existiert bereits `SafeImg` mit 15s Timeout + Gradient-Fallback. Fuer Videos fehlt das Equivalent.
+### Aenderungen
 
-### Aenderung
+#### 1. `src/components/universal-creator/RemotionPreviewPlayer.tsx`
+- `componentName` wirklich verwenden statt immer `UniversalVideo`
+- kleine Composition-Registry/Switch einbauen:
+  - `UniversalCreatorVideo` → `UniversalCreatorVideo`
+  - `UniversalVideo` → `UniversalVideo`
+- bei unbekanntem Namen defensiv auf `UniversalCreatorVideo` oder klaren Fallback gehen
 
-#### `src/remotion/templates/UniversalCreatorVideo.tsx`
+#### 2. `src/pages/UniversalCreator/UniversalCreator.tsx`
+- Live-Preview des Universal Content Creators von
+  - `componentName="UniversalVideo"`
+  auf
+  - `componentName="UniversalCreatorVideo"`
+  umstellen
 
-1. **Neue `SafeVideo` Komponente** (analog zu `SafeImg`):
-   - Wraps `<Video>` mit eigenem `delayRender`/`continueRender`
-   - 20s Timeout (Videos brauchen etwas laenger als Bilder)
-   - Bei Timeout oder Error: Fallback auf `GradientFallback`
-   - `onError` Handler fuer sofortigen Fallback bei kaputten URLs
+#### 3. `src/components/universal-creator/steps/PreviewExportStep.tsx`
+- Export-Call zu `render-with-remotion` von
+  - `component_name: 'UniversalVideo'`
+  auf
+  - `component_name: 'UniversalCreatorVideo'`
+  umstellen
 
-2. **Zeile 1789 ersetzen**: `<Video src={animatedVideoUrl}>` → `<SafeVideo src={animatedVideoUrl}>`
+### Warum das den Fehler behebt
+Dann nutzen sowohl:
+- der Preview Player
+- als auch der echte Render auf Lovable Cloud
 
-3. **Zeile 2005 ersetzen**: `<Video src={background.videoUrl}>` → `<SafeVideo src={background.videoUrl}>`
+dieselbe Composition: **`UniversalCreatorVideo`**.
 
-```typescript
-const SafeVideo: React.FC<{
-  src: string;
-  sceneType?: string;
-  primaryColor?: string;
-  style?: React.CSSProperties;
-}> = ({ src, sceneType, primaryColor, style }) => {
-  const [failed, setFailed] = React.useState(false);
+Damit greifen endlich die bereits eingebauten Schutzmechanismen:
+- `SafeVideo` fuer Pixabay/Hailuo-Videos
+- Gradient-Fallback statt haengendem `delayRender()`
+- konsistentes Verhalten zwischen Preview und finalem Render
 
-  if (failed || !src) {
-    return <GradientFallback sceneType={sceneType} primaryColor={primaryColor} />;
-  }
-
-  return (
-    <Video
-      src={src}
-      style={style || { width: '100%', height: '100%', objectFit: 'cover' }}
-      loop
-      muted
-      onError={() => setFailed(true)}
-      pauseWhenBuffering
-    />
-  );
-};
-```
-
-Zusaetzlich: Die globale `delayRender` default-Timeout von Remotion ist 30s. Das reicht fuer Videos. Das eigentliche Problem ist dass die `<Video>` Komponente bei einem Netzwerkfehler nie `continueRender` aufruft. Mit `onError` + Fallback wird der Render nicht blockiert.
+### Technische Hinweise
+- Die vorhandenen Input-Props (`scenes`, `subtitles`, `voiceoverUrl`, `backgroundMusicUrl`, `targetWidth`, `targetHeight`, `fps`) passen bereits zum Creator-Template
+- Es ist kein Backend-Schema-Change noetig
+- Optional sinnvoll: Logging im Preview/Export klar auf `UniversalCreatorVideo` benennen, damit kuenftige Debugging-Faelle eindeutiger sind
 
 ### Dateien
-1. `src/remotion/templates/UniversalCreatorVideo.tsx` — SafeVideo Komponente + beide Video-Stellen ersetzen
-
+1. `src/components/universal-creator/RemotionPreviewPlayer.tsx`
+2. `src/pages/UniversalCreator/UniversalCreator.tsx`
+3. `src/components/universal-creator/steps/PreviewExportStep.tsx`
