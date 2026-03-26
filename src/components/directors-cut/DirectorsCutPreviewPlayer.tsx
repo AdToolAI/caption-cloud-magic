@@ -398,11 +398,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           sourceAudioRef.current.currentTime = time;
         }
       }
-      if (voiceoverAudioRef.current && !voiceoverAudioRef.current.paused) {
-        if (Math.abs(voiceoverAudioRef.current.currentTime - time) > 0.5) {
-          voiceoverAudioRef.current.currentTime = time;
-        }
-      }
+      // Voiceover runs linearly — no drift correction (prevents repeats at scene boundaries)
     };
     const onEnded = () => {
       setIsPlaying(false);

@@ -716,26 +716,50 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       previewFilter += GRADE_CSS[effectiveGrading.grade] + ' ';
     }
 
-    // Calculate transition overlay opacity for CSS-based transitions
+    // Calculate CSS-based transition effects per type
     let transitionOverlayOpacity = 0;
     let transitionBlur = 0;
-    let transitionType = 'fade';
+    let transitionTransform = '';
+    let transitionClipPath = '';
+    let transitionVideoOpacity = 1;
     if (nextScene) {
       const currentTransition = transitions?.find(t => t.sceneIndex === activeIdx);
       if (currentTransition && currentTransition.type && currentTransition.type !== 'none') {
         const tDuration = currentTransition.duration || 0.5;
         const tStart = nextScene.startTime - tDuration;
-        transitionType = currentTransition.type.toLowerCase().split('-')[0];
+        const transitionType = currentTransition.type.toLowerCase().split('-')[0];
         if (currentTimeSeconds >= tStart && currentTimeSeconds < nextScene.startTime) {
           const progress = (currentTimeSeconds - tStart) / tDuration;
-          if (transitionType === 'blur') {
-            transitionBlur = progress * 15;
-            transitionOverlayOpacity = progress * 0.3;
-          } else if (transitionType === 'zoom') {
-            transitionOverlayOpacity = progress * 0.5;
-          } else {
-            // fade, crossfade, dissolve, wipe, slide, push — all approximate as opacity dip
-            transitionOverlayOpacity = Math.sin(progress * Math.PI) * 0.4;
+          const eased = 0.5 - 0.5 * Math.cos(progress * Math.PI); // smooth ease in-out
+          switch (transitionType) {
+            case 'fade':
+            case 'crossfade':
+            case 'dissolve':
+              transitionVideoOpacity = 1 - eased * 0.7;
+              transitionOverlayOpacity = eased * 0.4;
+              break;
+            case 'blur':
+              transitionBlur = eased * 20;
+              transitionVideoOpacity = 1 - eased * 0.3;
+              break;
+            case 'zoom':
+              transitionTransform = `scale(${1 + eased * 0.3})`;
+              transitionVideoOpacity = 1 - eased * 0.4;
+              break;
+            case 'wipe':
+              transitionClipPath = `inset(0 ${eased * 100}% 0 0)`;
+              break;
+            case 'slide':
+              transitionTransform = `translateX(${-eased * 30}%)`;
+              transitionVideoOpacity = 1 - eased * 0.3;
+              break;
+            case 'push':
+              transitionTransform = `translateX(${-eased * 100}%)`;
+              break;
+            default:
+              transitionVideoOpacity = 1 - eased * 0.5;
+              transitionOverlayOpacity = eased * 0.3;
+              break;
           }
         }
       }
@@ -772,9 +796,12 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             width: '100%',
             height: '100%',
             objectFit: 'contain',
+            opacity: transitionVideoOpacity,
             filter: `${previewFilter.trim()}${transitionBlur > 0 ? ` blur(${transitionBlur}px)` : ''}`,
-            transform: kenBurnsStyle || undefined,
+            transform: [kenBurnsStyle, transitionTransform].filter(Boolean).join(' ') || undefined,
+            clipPath: transitionClipPath || undefined,
             transformOrigin: 'center center',
+            transition: 'opacity 0.15s ease, filter 0.15s ease, transform 0.1s ease',
           }}
           volume={0}
         />
