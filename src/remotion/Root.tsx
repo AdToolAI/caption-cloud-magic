@@ -306,7 +306,8 @@ export const RemotionRoot: React.FC = () => {
           secondaryColor: '#8B5CF6',
           showSceneTitles: true,
           showProgressBar: true,
-        }}
+          preferredFont: 'Inter',
+        } as any}
       />
       <Composition
         id="UniversalCreatorVideo"
