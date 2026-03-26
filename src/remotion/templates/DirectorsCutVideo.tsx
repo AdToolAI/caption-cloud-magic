@@ -725,16 +725,20 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     let transitionClipPath = '';
     let transitionVideoOpacity = 1;
     if (nextScene) {
-      const currentTransition = transitions?.find(t => t.sceneIndex === activeIdx);
+      // Match transition by scene ID (robust) or by finding the original index
+      const currentTransition = transitions?.find(t => 
+        (t as any).sceneId ? activeScene.id === (t as any).sceneId || activeScene.id === (t as any).sceneId.replace('scene-', '') || (t as any).sceneId === activeScene.id.replace('scene-', '')
+        : t.sceneIndex === activeIdx
+      );
       if (currentTransition && currentTransition.type && currentTransition.type !== 'none') {
-        const tDuration = currentTransition.duration || 0.5;
+        const tDuration = Math.max(0.6, currentTransition.duration || 0.8);
         const tStart = nextScene.startTime - tDuration;
         const fullType = currentTransition.type.toLowerCase();
         const transitionType = fullType.split('-')[0];
         const transitionDir = fullType.split('-')[1] || 'left';
         if (currentTimeSeconds >= tStart && currentTimeSeconds < nextScene.startTime) {
           const progress = (currentTimeSeconds - tStart) / tDuration;
-          const eased = 0.5 - 0.5 * Math.cos(progress * Math.PI); // smooth ease in-out
+          const eased = Math.pow(0.5 - 0.5 * Math.cos(progress * Math.PI), 0.7); // stronger start for visibility
           switch (transitionType) {
             case 'fade':
               transitionVideoOpacity = 1 - eased * 0.8;

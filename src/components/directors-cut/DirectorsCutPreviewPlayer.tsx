@@ -211,6 +211,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       
       return {
         sceneIndex,
+        sceneId: t.sceneId,
         type: t.transitionType,
         duration: t.duration,
       };
