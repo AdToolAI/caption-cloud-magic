@@ -868,7 +868,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         />
       )}
 
-      {soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, idx) => (
+      {!previewMode && soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, idx) => (
         <Sequence key={`sfx-${idx}`} from={Math.floor(sfx.startTime * fps)}>
           <Audio
             src={sfx.url}
