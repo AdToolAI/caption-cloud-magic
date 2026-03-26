@@ -112,7 +112,23 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [initialMuted]);
 
   const fps = 30;
-  const durationInFrames = Math.ceil(duration * fps);
+  
+  // Calculate total transition overlap for TransitionSeries duration adjustment
+  const transitionOverlapFrames = useMemo(() => {
+    if (!scenes.length || !transitions.length) return 0;
+    let totalOverlap = 0;
+    transitions.forEach((t, index) => {
+      // Only count transitions that are between scenes (not after the last scene)
+      let sceneIndex = scenes.findIndex(s => s.id === t.sceneId);
+      if (sceneIndex < 0) sceneIndex = index;
+      if (sceneIndex < scenes.length - 1 && t.transitionType !== 'none') {
+        totalOverlap += Math.max(1, Math.floor((t.duration || 0.5) * fps));
+      }
+    });
+    return totalOverlap;
+  }, [scenes, transitions]);
+
+  const durationInFrames = Math.max(1, Math.ceil(duration * fps) - transitionOverlapFrames);
 
   // Convert scenes to Remotion format with effects and Time Remapping data
   const remotionScenes = useMemo(() => {
