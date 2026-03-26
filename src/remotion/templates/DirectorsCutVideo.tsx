@@ -199,6 +199,8 @@ export const DirectorsCutVideoSchema = z.object({
   textOverlays: z.array(TextOverlaySchema).optional(),
   // Subtitle Track
   subtitleTrack: SubtitleTrackSchema.optional(),
+  // Preview mode: skip audio, less aggressive buffering
+  previewMode: z.boolean().optional(),
 });
 
 type DirectorsCutVideoProps = z.infer<typeof DirectorsCutVideoSchema>;
