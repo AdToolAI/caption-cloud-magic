@@ -49,16 +49,17 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
     />
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison: ONLY re-render if audio URLs change
   const audioEqual = 
     prevProps.inputProps?.backgroundMusicUrl === nextProps.inputProps?.backgroundMusicUrl &&
     prevProps.inputProps?.voiceoverUrl === nextProps.inputProps?.voiceoverUrl;
   
-  console.log('[MemoizedPlayer] areEqual check:', { audioEqual });
+  const subtitlesEqual = 
+    JSON.stringify(prevProps.inputProps?.subtitles) === JSON.stringify(nextProps.inputProps?.subtitles) &&
+    JSON.stringify(prevProps.inputProps?.subtitleStyle) === JSON.stringify(nextProps.inputProps?.subtitleStyle);
   
-  // Return TRUE = skip update (don't re-render)
-  // Return FALSE = do update (re-render)
-  return audioEqual;
+  const durationEqual = prevProps.durationInFrames === nextProps.durationInFrames;
+  
+  return audioEqual && subtitlesEqual && durationEqual;
 });
 
 interface RemotionPreviewPlayerProps {
