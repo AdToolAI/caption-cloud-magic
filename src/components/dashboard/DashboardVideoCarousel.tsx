@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { DEMO_VIDEO, isDemoVideo } from '@/constants/demo-video';
 
 /** Resolve a possibly-relative storage path to a full public URL */
 const resolveVideoUrl = (rawUrl: string): string => {
@@ -125,8 +126,10 @@ export const DashboardVideoCarousel = () => {
   const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
   const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
 
-  const getVideoTitle = (video: any) =>
-    (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
+  const getVideoTitle = (video: any) => {
+    if (isDemoVideo(video)) return 'Demo Video — Universal Creator';
+    return (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
+  };
 
   const handleVideoError = (videoId: string, index: number, videoUrl: string) => {
     if (!retriedVideos.has(videoId)) {
@@ -189,7 +192,7 @@ export const DashboardVideoCarousel = () => {
   }
 
   if (sortedVideos.length === 0) {
-    const demoVideoUrl = 'https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/public/ai-videos/8948d3d9-2c5e-4405-9e9c-1624448e7189/a028c06a-764d-44a3-8856-e3b1fa1855d4.mp4';
+    const demoVideoUrl = DEMO_VIDEO.output_url;
 
     return (
       <div className="space-y-4">

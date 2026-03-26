@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { VideoCreation } from '@/types/video';
+import { DEMO_VIDEO, isDemoVideo } from '@/constants/demo-video';
 
 export const useVideoHistory = () => {
   const { toast } = useToast();
@@ -30,12 +31,20 @@ export const useVideoHistory = () => {
       }
 
       console.log('[useVideoHistory] Loaded videos count:', data?.length ?? 0);
+      // If user has no videos, inject the demo video
+      if (!data || data.length === 0) {
+        return [DEMO_VIDEO] as any[];
+      }
       return data as any[];
     }
   });
 
   const deleteVideoMutation = useMutation({
     mutationFn: async (videoId: string) => {
+      // Block deletion of demo videos
+      if (videoId === DEMO_VIDEO.id) {
+        throw new Error('Demo-Videos können nicht gelöscht werden');
+      }
       const { error } = await supabase
         .from('video_creations')
         .delete()
