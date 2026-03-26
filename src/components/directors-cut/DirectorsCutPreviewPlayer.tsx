@@ -541,7 +541,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     player.seekTo(0);
     player.pause();
-    setInternalTime(0);
+    internalTimeRef.current = 0;
+    setDisplayTime(0);
     setIsPlaying(false);
     
     if (sourceAudioRef.current) {
