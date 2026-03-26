@@ -738,7 +738,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         const transitionDir = fullType.split('-')[1] || 'left';
         if (currentTimeSeconds >= tStart && currentTimeSeconds < nextScene.startTime) {
           const progress = (currentTimeSeconds - tStart) / tDuration;
-          const eased = 0.5 - 0.5 * Math.cos(progress * Math.PI); // smooth ease in-out
+          const eased = Math.pow(0.5 - 0.5 * Math.cos(progress * Math.PI), 0.7); // stronger start for visibility
           switch (transitionType) {
             case 'fade':
               transitionVideoOpacity = 1 - eased * 0.8;
