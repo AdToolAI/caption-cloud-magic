@@ -789,10 +789,10 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
               </Sequence>
             )}
             {/* Current scene ON TOP (its exit transition reveals the next scene below) */}
-            {/* In preview mode: skip transitions entirely to avoid stutter — just hard cut */}
             <Sequence
               from={sceneStartFrame}
               durationInFrames={sceneDurationFrames}
+              premountFor={30}
             >
               <AbsoluteFill>
                 <SceneVideo
