@@ -80,11 +80,21 @@ export function SubtitleTimingStep({
   const handleSaveEdit = (segmentId: string) => {
     if (!subtitleConfig) return;
 
-    const updatedSegments = subtitleConfig.segments.map(seg =>
-      seg.id === segmentId 
-        ? { ...seg, text: editText, startTime: editStartTime, endTime: editEndTime } 
-        : seg
-    );
+    const updatedSegments = subtitleConfig.segments.map(seg => {
+      if (seg.id !== segmentId) return seg;
+
+      // Rebuild words array from edited text so the Remotion template stays in sync
+      const newWords = editText.split(/\s+/).filter(Boolean).map((word, i, arr) => {
+        const duration = (editEndTime - editStartTime) / arr.length;
+        return {
+          text: word,
+          startTime: editStartTime + i * duration,
+          endTime: editStartTime + (i + 1) * duration,
+        };
+      });
+
+      return { ...seg, text: editText, words: newWords, startTime: editStartTime, endTime: editEndTime };
+    });
 
     onSubtitleConfigChange({
       ...subtitleConfig,
