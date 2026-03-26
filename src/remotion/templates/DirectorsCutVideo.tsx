@@ -675,6 +675,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     const activeIdx = currentSceneIndex >= 0 ? currentSceneIndex : 0;
     const activeScene = sortedScenes[activeIdx];
     const nextScene = sortedScenes[activeIdx + 1];
+    const nextSceneStartFrame = nextScene ? Math.max(0, Math.floor(nextScene.startTime * fps)) : 0;
 
     // Get scene-specific effects
     const currentSceneEffect = sceneEffects?.[activeScene.id] || activeScene.effects || null;
@@ -685,6 +686,13 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     const effectiveTemperature = currentSceneEffect?.temperature ?? temperature;
     const effectiveVignette = currentSceneEffect?.vignette ?? vignette;
     const effectiveFilter = currentSceneEffect?.filter ?? filter;
+    const nextSceneEffect = nextScene ? (sceneEffects?.[nextScene.id] || nextScene.effects || null) : null;
+    const nextEffectiveBrightness = nextSceneEffect?.brightness ?? brightness;
+    const nextEffectiveContrast = nextSceneEffect?.contrast ?? contrast;
+    const nextEffectiveSaturation = nextSceneEffect?.saturation ?? saturation;
+    const nextEffectiveSharpness = nextSceneEffect?.sharpness ?? sharpness;
+    const nextEffectiveTemperature = nextSceneEffect?.temperature ?? temperature;
+    const nextEffectiveFilter = nextSceneEffect?.filter ?? filter;
 
     // Build filter string for active scene
     let previewFilter = `brightness(${effectiveBrightness / 100}) `;
@@ -714,6 +722,35 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       : colorGrading;
     if (effectiveGrading?.enabled && effectiveGrading.grade && GRADE_CSS[effectiveGrading.grade]) {
       previewFilter += GRADE_CSS[effectiveGrading.grade] + ' ';
+    }
+
+    let nextPreviewFilter = `brightness(${nextEffectiveBrightness / 100}) `;
+    nextPreviewFilter += `contrast(${nextEffectiveContrast / 100}) `;
+    nextPreviewFilter += `saturate(${nextEffectiveSaturation / 100}) `;
+    if (nextEffectiveTemperature !== 0) {
+      if (nextEffectiveTemperature > 0) {
+        const warmth = nextEffectiveTemperature / 50;
+        nextPreviewFilter += `sepia(${Math.min(0.5, warmth * 0.3)}) saturate(${1 + warmth * 0.3}) `;
+      } else {
+        const coldness = Math.abs(nextEffectiveTemperature) / 50;
+        nextPreviewFilter += `hue-rotate(${nextEffectiveTemperature * 1.5}deg) saturate(${1 + coldness * 0.2}) `;
+      }
+    }
+    if (nextEffectiveSharpness > 0) nextPreviewFilter += `url(#sharpen-filter) `;
+    if (nextEffectiveFilter && isSVGFilter(nextEffectiveFilter)) {
+      nextPreviewFilter += SVG_FILTER_IDS[nextEffectiveFilter] + ' ';
+    } else if (nextEffectiveFilter && FILTER_CSS[nextEffectiveFilter]) {
+      nextPreviewFilter += FILTER_CSS[nextEffectiveFilter] + ' ';
+    }
+    if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
+      nextPreviewFilter += STYLE_CSS[styleTransfer.style] + ' ';
+    }
+    const nextSceneGrading = nextScene ? sceneColorGrading?.[nextScene.id] : undefined;
+    const nextEffectiveGrading = nextSceneGrading?.grade
+      ? { enabled: true, grade: nextSceneGrading.grade, intensity: nextSceneGrading.intensity }
+      : colorGrading;
+    if (nextEffectiveGrading?.enabled && nextEffectiveGrading.grade && GRADE_CSS[nextEffectiveGrading.grade]) {
+      nextPreviewFilter += GRADE_CSS[nextEffectiveGrading.grade] + ' ';
     }
 
     // Calculate CSS-based transition effects per type
@@ -853,13 +890,13 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             {/* Re-use the same video source to show "next scene" frame */}
             <Video
               src={sourceVideoUrl}
-              startFrom={0}
+              startFrom={nextSceneStartFrame}
               pauseWhenBuffering={false}
               style={{
                 width: '100%',
                 height: '100%',
                 objectFit: 'contain',
-                filter: previewFilter.trim(),
+                filter: nextPreviewFilter.trim(),
               }}
               volume={0}
             />
