@@ -520,7 +520,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     const newTime = value[0];
     const frame = Math.floor(newTime * fps);
     player.seekTo(frame);
-    setInternalTime(newTime);
+    internalTimeRef.current = newTime;
+    setDisplayTime(newTime);
     onTimeUpdateRef.current?.(newTime);
     
     if (sourceAudioRef.current) {
