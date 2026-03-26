@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DEMO_VIDEO, isDemoVideo } from "@/constants/demo-video";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
