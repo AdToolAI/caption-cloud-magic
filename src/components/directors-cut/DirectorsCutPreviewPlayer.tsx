@@ -243,6 +243,21 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     remotionScenes, sceneEffects, remotionTransitions, textOverlays
   ]);
 
+  // Fast visual time ref updated via rAF for smooth overlays/subtitles
+  const visualTimeRef = useRef(currentTime);
+  const rafIdRef = useRef<number>();
+  
+  useEffect(() => {
+    const updateVisualTime = () => {
+      visualTimeRef.current = internalTimeRef.current;
+      rafIdRef.current = requestAnimationFrame(updateVisualTime);
+    };
+    rafIdRef.current = requestAnimationFrame(updateVisualTime);
+    return () => {
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+    };
+  }, []);
+
   // Find current subtitles based on displayTime (throttled)
   const currentSubtitles = useMemo(() => {
     if (!subtitleTrack?.visible) return [];

@@ -658,7 +658,15 @@ export function SceneAnalysisStep({
             ref={(el) => {
               if (el && !el.dataset.initialized) {
                 el.dataset.initialized = 'true';
-                el.addEventListener('timeupdate', () => {
+                let rafId: number;
+                const updateTime = () => {
+                  if (el && !el.paused) {
+                    handleThrottledTimeUpdate(el.currentTime);
+                  }
+                  rafId = requestAnimationFrame(updateTime);
+                };
+                rafId = requestAnimationFrame(updateTime);
+                el.addEventListener('seeked', () => {
                   handleThrottledTimeUpdate(el.currentTime);
                 });
               }
