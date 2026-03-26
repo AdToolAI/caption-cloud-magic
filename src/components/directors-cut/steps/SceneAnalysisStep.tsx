@@ -187,13 +187,8 @@ export function SceneAnalysisStep({
   const getCurrentEffects = useCallback((time: number): Partial<GlobalEffects> => {
     const currentScene = getCurrentScene(time);
     
-    console.log(`[getCurrentEffects] time=${time.toFixed(2)}, scene=${currentScene?.id || 'none'}, sceneEffects keys:`, Object.keys(sceneEffects));
-    
     if (currentScene && sceneEffects[currentScene.id]) {
       const sceneEffect = sceneEffects[currentScene.id];
-      console.log(`[getCurrentEffects] Found effects for ${currentScene.id}:`, sceneEffect);
-      
-      // Merge scene-specific effects with global as fallback
       return {
         brightness: sceneEffect.brightness ?? appliedEffects?.brightness ?? 100,
         contrast: sceneEffect.contrast ?? appliedEffects?.contrast ?? 100,
@@ -204,7 +199,6 @@ export function SceneAnalysisStep({
       };
     }
     
-    console.log(`[getCurrentEffects] No scene effects found, using global:`, appliedEffects);
     return appliedEffects || {};
   }, [getCurrentScene, sceneEffects, appliedEffects]);
 
