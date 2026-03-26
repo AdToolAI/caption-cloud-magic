@@ -463,6 +463,9 @@ REGELN:
           ai_suggestions: scene.ai_suggestions || [],
         }));
       
+      // Stabilize scenes: merge micro-scenes and cap max count
+      scenes = stabilizeScenes(scenes, videoDuration);
+      
     } catch (parseError) {
       console.error("[analyze-video-scenes] Parse error:", parseError);
       scenes = generateFallbackScenes(videoDuration);
