@@ -243,13 +243,13 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     remotionScenes, sceneEffects, remotionTransitions, textOverlays
   ]);
 
-  // Find current subtitles based on internalTime
+  // Find current subtitles based on displayTime (throttled)
   const currentSubtitles = useMemo(() => {
     if (!subtitleTrack?.visible) return [];
     return subtitleTrack.clips.filter(
-      sub => internalTime >= sub.startTime && internalTime < sub.endTime
+      sub => displayTime >= sub.startTime && displayTime < sub.endTime
     );
-  }, [subtitleTrack, internalTime]);
+  }, [subtitleTrack, displayTime]);
 
   // Sync with external isPlaying state (from CapCutEditor)
   useEffect(() => {
