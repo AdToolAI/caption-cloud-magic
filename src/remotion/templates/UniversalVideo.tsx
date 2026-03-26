@@ -186,7 +186,8 @@ const SubtitleLayer: React.FC<{
   subtitleStyle?: UniversalVideoProps['subtitleStyle'];
 }> = ({ subtitles, subtitleStyle }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width } = useVideoConfig();
+  const scaleFactor = (width / 1080) * 1.6;
   const currentTime = frame / fps;
 
 
