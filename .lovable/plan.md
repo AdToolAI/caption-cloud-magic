@@ -1,31 +1,62 @@
 
 
-## Fix: Übergänge in Preview wiederherstellen ohne Doppel-Decode
+## Fix: Ruckeln an Szenenübergängen + unsichtbare Transitions (Step 3+)
 
-### Problem
-Du hast recht — die Per-Scene-Architektur ist bewusst so gebaut, damit Szenen einzeln verlängert, verlangsamt und angepasst werden können. Das darf nicht entfernt werden.
+### Bestätigte Ursachen
 
-Das aktuelle Problem hat zwei klare Ursachen:
-1. **Transitions in Preview komplett deaktiviert**: Zeile 813 übergibt `transitions={previewMode ? [] : transitions}` — dadurch sieht man im Editor nur harte Cuts, keine Übergänge
-2. **Ruckeln in Steps 3–11**: Das Underlay (zweite Video-Szene parallel) ist im Preview abgeschaltet (Zeile 759: `!previewMode && ...`), aber pro Szene wird trotzdem ein eigenes `<Video>` gemountet/unmountet, was an Szenengrenzen kurz ruckelt
+Ich habe den gesamten Code-Pfad und die offizielle Remotion-Dokumentation geprüft.
+
+**1. Ruckeln an Szenenübergängen — fehlende `premountFor`**
+
+Die Remotion-Docs sagen explizit: "For seamless transitions, use the `premountFor` prop for `<Sequence>`'s." Das Projekt nutzt Remotion v4.0.424, wo `premountFor` **nicht** automatisch aktiv ist (erst ab v5.0). Aktuell wird jede Szene erst gemountet wenn sie sichtbar wird — der Video-Decoder startet also erst im Moment des Schnitts, was schwarze Frames / Ruckler erzeugt.
+
+**2. Transitions unsichtbar — Underlay im Preview deaktiviert**
+
+Die CSS-Transition-Effekte in `SceneVideo` (Zeile 425-484) berechnen nur die **Exit-Animation** der aktuellen Szene (Fade-Out, Wipe-Out etc.). Damit diese sichtbar wird, muss die nächste Szene **darunter** als Underlay gerendert werden. Genau das ist aber seit dem letzten Fix in Zeile 758 mit `!previewMode && ...` deaktiviert. Ergebnis: Die aktuelle Szene fadet zu Schwarz statt zur nächsten Szene — das sieht aus wie ein harter Cut.
 
 ### Lösung
-Die Per-Scene-Architektur bleibt komplett erhalten. Stattdessen:
 
-**1. Transitions im Preview wieder aktivieren (nur CSS-basiert)**
-- `transitions={previewMode ? [] : transitions}` ändern zu `transitions={transitions}` — die SceneVideo-Komponente berechnet bereits CSS-Opacity/Transform/ClipPath-Effekte für Übergänge (Zeile 425–484), das sind reine CSS-Operationen ohne zweiten Decoder
-- Das Underlay (`!previewMode && hasTransitionToNext`) bleibt im Preview aus — die Transitions wirken dann als Fade-to-Black / Wipe / Slide ohne dass die nächste Szene drunter sichtbar ist, was aber visuell trotzdem den Übergang zeigt
+**Datei: `src/remotion/templates/DirectorsCutVideo.tsx`**
 
-**2. Ruckeln an Szenengrenzen reduzieren**
-- `pauseWhenBuffering` auf dem `<Video>` in SceneVideo aktivieren, damit Remotion bei Szenen-Mount kurz wartet statt Frames zu droppen
-- Prüfen ob `pauseWhenBuffering` bereits gesetzt ist, und ggf. ergänzen
+1. **`premountFor` auf alle Szenen-Sequences setzen** (30 Frames = 1 Sekunde bei 30fps)
+   - Dadurch beginnt der Video-Decoder der nächsten Szene 1 Sekunde vor dem sichtbaren Schnitt zu laden
+   - Remotion rendert das premounted Element mit `opacity: 0` und eingefrorenem Frame, also kein visueller Einfluss
+   - Das ist die von Remotion empfohlene Lösung für genau dieses Problem
 
-### Dateien
-1. `src/remotion/templates/DirectorsCutVideo.tsx` — Transitions im Preview re-aktivieren (CSS-only, kein Underlay), pauseWhenBuffering sicherstellen
+2. **Underlay auch im Preview-Modus aktivieren, aber leichtgewichtig**
+   - Den `!previewMode &&` Guard aus Zeile 758-759 entfernen
+   - Die Underlay-Szene wird **ohnehin bereits premounted** (durch Punkt 1), also ist der zusätzliche Decoder-Aufwand minimal
+   - Transitions (Crossfade, Wipe, Dissolve) werden dadurch im Editor wieder sichtbar: Die aktuelle Szene fadet/wipet weg und gibt den Blick auf die nächste Szene darunter frei
+   - Der Underlay bekommt ebenfalls `premountFor`, sodass er vor dem Transition-Zeitpunkt geladen ist
+
+### Konkreter Code-Change
+
+```text
+Zeile 758-759 (Underlay Guard):
+  VORHER:  {!previewMode && hasTransitionToNext && nextScene && ...}
+  NACHHER: {hasTransitionToNext && nextScene && ...}
+
+Zeile 792-794 (Haupt-Sequence):
+  VORHER:  <Sequence from={sceneStartFrame} durationInFrames={sceneDurationFrames}>
+  NACHHER: <Sequence from={sceneStartFrame} durationInFrames={sceneDurationFrames} premountFor={30}>
+
+Zeile 760-762 (Underlay-Sequence):
+  VORHER:  <Sequence from={...} durationInFrames={transitionDurationFrames}>
+  NACHHER: <Sequence from={...} durationInFrames={transitionDurationFrames} premountFor={30}>
+```
+
+### Was sich dadurch ändert
+- Szenenübergänge werden 1 Sekunde vorgeladen — kein Ruckeln mehr
+- Crossfade/Dissolve/Wipe/Fade-Transitions sind im Editor wieder sichtbar
+- Per-Scene-Architektur bleibt vollständig erhalten
+- Finaler Render bleibt unverändert
 
 ### Was sich nicht ändert
-- Per-Scene `<Sequence>` + `<Video>` Architektur bleibt bestehen
-- Szenen-Verlängerung, Slow-Motion, individuelle Effekte funktionieren weiterhin
-- Finaler Render bleibt unverändert (mit Underlay für echte Crossfades)
-- Audio-Handling bleibt wie es ist
+- Szenen können weiterhin verlängert/verkürzt werden
+- Slow-Motion und Speed-Ramping funktionieren weiterhin
+- Audio-Handling bleibt identisch
+- Export-Qualität bleibt identisch
+
+### Dateien
+1. `src/remotion/templates/DirectorsCutVideo.tsx`
 
