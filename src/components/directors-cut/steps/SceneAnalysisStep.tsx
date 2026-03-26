@@ -347,7 +347,6 @@ export function SceneAnalysisStep({
     if (add.transition_in) result.transition_in = add.transition_in;
     if (add.transition_out) result.transition_out = add.transition_out;
     
-    console.log(`[mergeEffects] Base:`, base, `+ Add:`, add, `= Result:`, result);
     return result;
   };
 
