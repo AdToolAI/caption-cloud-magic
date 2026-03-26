@@ -43,8 +43,6 @@ const extractVideoFrames = async (videoUrl: string, duration: number): Promise<s
       const frames: string[] = [];
       const frameCount = Math.min(10, Math.max(4, Math.ceil(duration / 3))); // 1 Frame alle ~3 Sekunden
       
-      console.log(`[extractVideoFrames] Extracting ${frameCount} frames from ${duration}s video`);
-      
       const canvas = document.createElement('canvas');
       canvas.width = 512; // Reduced for API efficiency
       canvas.height = 288;
@@ -66,7 +64,7 @@ const extractVideoFrames = async (videoUrl: string, duration: number): Promise<s
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const frameData = canvas.toDataURL('image/jpeg', 0.6);
         frames.push(frameData);
-        console.log(`[extractVideoFrames] Frame ${i + 1}/${frameCount} at ${time.toFixed(1)}s`);
+        
       }
       
       resolve(frames);

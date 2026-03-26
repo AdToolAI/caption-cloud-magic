@@ -278,25 +278,22 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     if (videoUrl) {
       const sourceAudio = new Audio(videoUrl);
-      sourceAudio.preload = 'metadata';
-      sourceAudio.crossOrigin = 'anonymous';
-      sourceAudio.volume = (audio.master_volume || 100) / 100;
+      sourceAudio.preload = 'auto';
+      sourceAudio.volume = isMuted ? 0 : (audio.master_volume || 100) / 100;
       sourceAudioRef.current = sourceAudio;
     }
 
     if (voiceoverUrl) {
       const vo = new Audio(voiceoverUrl);
-      vo.preload = 'metadata';
-      vo.crossOrigin = 'anonymous';
-      vo.volume = 1.0;
+      vo.preload = 'auto';
+      vo.volume = isMuted ? 0 : 1.0;
       voiceoverAudioRef.current = vo;
     }
 
     if (backgroundMusicUrl) {
       const bg = new Audio(backgroundMusicUrl);
-      bg.preload = 'metadata';
-      bg.crossOrigin = 'anonymous';
-      bg.volume = 0.3;
+      bg.preload = 'auto';
+      bg.volume = isMuted ? 0 : 0.3;
       bg.loop = true;
       backgroundMusicAudioRef.current = bg;
     }
@@ -328,8 +325,23 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     const player = playerRef.current;
     if (!player) return;
 
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const onPlay = () => {
+      setIsPlaying(true);
+      // Auto-start native audio when player plays
+      if (!isMuted) {
+        if (!originalAudioMuted && sourceAudioRef.current) {
+          sourceAudioRef.current.play().catch(() => {});
+        }
+        voiceoverAudioRef.current?.play().catch(() => {});
+        backgroundMusicAudioRef.current?.play().catch(() => {});
+      }
+    };
+    const onPause = () => {
+      setIsPlaying(false);
+      sourceAudioRef.current?.pause();
+      voiceoverAudioRef.current?.pause();
+      backgroundMusicAudioRef.current?.pause();
+    };
     let lastUpdateTime = 0;
     const onTimeUpdateEvent = () => {
       const now = performance.now();
@@ -339,6 +351,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const time = frame / fps;
       setInternalTime(time);
       onTimeUpdateRef.current?.(time);
+      
+      // Keep native audio in sync (correct drift > 0.3s)
+      if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
+        if (Math.abs(sourceAudioRef.current.currentTime - time) > 0.3) {
+          sourceAudioRef.current.currentTime = time;
+        }
+      }
+      if (voiceoverAudioRef.current && !voiceoverAudioRef.current.paused) {
+        if (Math.abs(voiceoverAudioRef.current.currentTime - time) > 0.3) {
+          voiceoverAudioRef.current.currentTime = time;
+        }
+      }
     };
     const onEnded = () => {
       setIsPlaying(false);
