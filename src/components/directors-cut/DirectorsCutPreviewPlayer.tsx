@@ -104,6 +104,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const [isMuted, setIsMuted] = useState(initialMuted);
   const [internalTime, setInternalTime] = useState(currentTime);
   const [playerReady, setPlayerReady] = useState(false);
+  const hasAutoStartedAudio = useRef(false);
+
+  // Sync isMuted when initialMuted prop changes
+  useEffect(() => {
+    setIsMuted(initialMuted);
+  }, [initialMuted]);
 
   const fps = 30;
   const durationInFrames = Math.ceil(duration * fps);
@@ -400,7 +406,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
       }
       player.play();
+      // Auto-unmute player if initialMuted is false and user hasn't interacted with mute yet
       if (!isMuted) {
+        try {
+          player.unmute();
+        } catch {}
         if (!originalAudioMuted) {
           sourceAudioRef.current?.play().catch(() => {});
         }

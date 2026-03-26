@@ -98,7 +98,7 @@ export function SceneAnalysisStep({
   
   const [transitions, setTransitionsInternal] = useState<TransitionAssignment[]>(externalTransitions);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const lastTimeUpdateRef = useRef(0);
   
   // Scene-specific transitions state
   const [sceneTransitions, setSceneTransitions] = useState<Record<string, {
@@ -147,7 +147,7 @@ export function SceneAnalysisStep({
         ...syncedTransitions
       }));
       
-      console.log('[Sync] AI-Transitions synchronized to sceneTransitions:', syncedTransitions);
+      // Synced
     }
   }, [transitions]);
 
@@ -187,13 +187,8 @@ export function SceneAnalysisStep({
   const getCurrentEffects = useCallback((time: number): Partial<GlobalEffects> => {
     const currentScene = getCurrentScene(time);
     
-    console.log(`[getCurrentEffects] time=${time.toFixed(2)}, scene=${currentScene?.id || 'none'}, sceneEffects keys:`, Object.keys(sceneEffects));
-    
     if (currentScene && sceneEffects[currentScene.id]) {
       const sceneEffect = sceneEffects[currentScene.id];
-      console.log(`[getCurrentEffects] Found effects for ${currentScene.id}:`, sceneEffect);
-      
-      // Merge scene-specific effects with global as fallback
       return {
         brightness: sceneEffect.brightness ?? appliedEffects?.brightness ?? 100,
         contrast: sceneEffect.contrast ?? appliedEffects?.contrast ?? 100,
@@ -204,7 +199,6 @@ export function SceneAnalysisStep({
       };
     }
     
-    console.log(`[getCurrentEffects] No scene effects found, using global:`, appliedEffects);
     return appliedEffects || {};
   }, [getCurrentScene, sceneEffects, appliedEffects]);
 
@@ -232,21 +226,16 @@ export function SceneAnalysisStep({
       }
     }
     
-    console.log(`[videoFilter] Final: ${filterString}`);
     return filterString;
   }, [getCurrentEffects, currentVideoTime]);
 
-  // FIXED: Create a stable key to force video re-render when effects change
-  const videoKey = useMemo(() => {
-    return JSON.stringify(sceneEffects);
-  }, [sceneEffects]);
-
-  // Handle video time update
-  const handleVideoTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentVideoTime(videoRef.current.currentTime);
-    }
-  };
+  // Throttled time update handler to reduce re-renders
+  const handleThrottledTimeUpdate = useCallback((time: number) => {
+    const now = performance.now();
+    if (now - lastTimeUpdateRef.current < 250) return; // Max ~4 updates/sec for scene indicator
+    lastTimeUpdateRef.current = now;
+    setCurrentVideoTime(time);
+  }, []);
 
   // Helper to extract number from string
   const extractNumber = (text: string, defaultValue: number): number => {
@@ -259,15 +248,13 @@ export function SceneAnalysisStep({
     const lowerName = name.toLowerCase();
     const effects: Partial<SceneEffects> = {};
     
-    console.log(`[parseEffectName] Input: "${name}", Type: "${effectType}"`);
-    
     // SKIP transitions - they don't apply visual filters
     if (effectType === 'transition' || 
         lowerName.includes('fade') || 
         lowerName.includes('slide') || 
         lowerName.includes('wipe') ||
         lowerName.includes('crossfade')) {
-      console.log(`[parseEffectName] SKIPPED (transition)`);
+      // Skipped transition
       return {};
     }
     
@@ -282,7 +269,6 @@ export function SceneAnalysisStep({
           effects.contrast = mapping.contrast;
           effects.saturation = mapping.saturation;
         }
-        console.log(`[parseEffectName] FILTER matched: "${filter.id}"`, effects);
         return effects;
       }
     }
@@ -293,28 +279,24 @@ export function SceneAnalysisStep({
       // Simulate vignette with stronger contrast/saturation boost
       effects.contrast = 100 + Math.round(strength);
       effects.saturation = 100 + Math.round(strength / 2);
-      console.log(`[parseEffectName] VIGNETTE: strength=${strength} → contrast=${effects.contrast}, saturation=${effects.saturation}`);
       return effects;
     }
     
     // Parse brightness - STRONGER default
     if (lowerName.includes('bright') || lowerName.includes('hell')) {
       effects.brightness = extractNumber(lowerName, 140);
-      console.log(`[parseEffectName] BRIGHTNESS: ${effects.brightness}`);
       return effects;
     }
     
     // Parse saturation - STRONGER default
     if (lowerName.includes('saturat') || lowerName.includes('sättig')) {
       effects.saturation = extractNumber(lowerName, 160);
-      console.log(`[parseEffectName] SATURATION: ${effects.saturation}`);
       return effects;
     }
     
     // Parse contrast - STRONGER default
     if (lowerName.includes('contrast') || lowerName.includes('kontrast')) {
       effects.contrast = extractNumber(lowerName, 140);
-      console.log(`[parseEffectName] CONTRAST: ${effects.contrast}`);
       return effects;
     }
     
@@ -323,19 +305,16 @@ export function SceneAnalysisStep({
       effects.saturation = 145;
       effects.brightness = 108;
       effects.contrast = 115;
-      console.log(`[parseEffectName] WARM filter applied`, effects);
       return effects;
     }
     if (lowerName.includes('cool') || lowerName.includes('kalt')) {
       effects.saturation = 75;
       effects.brightness = 96;
       effects.contrast = 120;
-      console.log(`[parseEffectName] COOL filter applied`, effects);
       return effects;
     }
     
     // NO fallback - let caller decide
-    console.log(`[parseEffectName] NO MATCH for "${name}"`);
     return {};
   };
 
@@ -368,7 +347,6 @@ export function SceneAnalysisStep({
     if (add.transition_in) result.transition_in = add.transition_in;
     if (add.transition_out) result.transition_out = add.transition_out;
     
-    console.log(`[mergeEffects] Base:`, base, `+ Add:`, add, `= Result:`, result);
     return result;
   };
 
@@ -401,14 +379,14 @@ export function SceneAnalysisStep({
       if (Object.keys(sceneEffect).length === 0) {
         sceneEffect.contrast = 108;
         sceneEffect.saturation = 108;
-        console.log(`[applyAllSuggestions] Scene ${scene.id}: using fallback effects`);
+        // Fallback effects
       }
       
       newSceneEffects[scene.id] = sceneEffect as SceneEffects;
-      console.log(`[applyAllSuggestions] Scene ${scene.id} final effects:`, sceneEffect);
+      // Applied
     }
     
-    console.log(`[applyAllSuggestions] Applied ${appliedCount} effects, skipped ${skippedTransitions} transitions`);
+    // Done
     
     // Pass empty global effects, but scene-specific effects
     onApplySuggestions({}, newSceneEffects);
@@ -445,21 +423,11 @@ export function SceneAnalysisStep({
     if (Object.keys(sceneEffect).length === 0) {
       sceneEffect.contrast = 110;
       sceneEffect.saturation = 112;
-      console.log(`[applySingleSceneSuggestion] Scene ${scene.id}: using fallback effects`);
+      // Fallback
     }
-    
-    console.log(`[applySingleSceneSuggestion] Scene ${scene.id} (${scene.start_time}s - ${scene.end_time}s) final effects:`, sceneEffect);
     
     // Pass only this scene's effects
     onApplySuggestions({}, { [scene.id]: sceneEffect as SceneEffects });
-    
-    // FIXED: Jump to the scene so user sees the effects immediately
-    if (videoRef.current) {
-      const targetTime = scene.start_time + 0.5;
-      videoRef.current.currentTime = targetTime;
-      setCurrentVideoTime(targetTime);
-      console.log(`[applySingleSceneSuggestion] Jumped to scene ${scene.id} at ${targetTime}s`);
-    }
     
     const transitionInfo = skippedTransitions > 0 ? ` (${skippedTransitions} Transition übersprungen)` : '';
     toast.success(`${appliedCount} Effekte für Szene angewendet${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`);
@@ -639,18 +607,7 @@ export function SceneAnalysisStep({
         end_time: videoDuration
       };
     }
-    
-    // ==================== DEBUG LOGS ====================
-    console.log('[SceneAnalysisStep] ========== CASCADE DURATION CHANGE ==========');
-    console.log(`[SceneAnalysisStep] Scene index: ${sceneIndex}, Shift amount: ${shiftAmount.toFixed(2)}s`);
-    console.log('[SceneAnalysisStep] Updated scenes:', updatedScenes.map(s => ({
-      id: s.id,
-      timeline: `${s.start_time?.toFixed(2)}-${s.end_time?.toFixed(2)}s`,
-      original: `${s.original_start_time?.toFixed(2)}-${s.original_end_time?.toFixed(2)}s`,
-      playbackRate: s.playbackRate?.toFixed(3)
-    })));
-    console.log('[SceneAnalysisStep] =============================================');
-    // ==================== END DEBUG LOGS ====================
+    // Cascade complete
     
     onScenesUpdate(updatedScenes);
   }, [scenes, onScenesUpdate, videoDuration]);
@@ -714,7 +671,7 @@ export function SceneAnalysisStep({
           }}
           duration={videoDuration}
           currentTime={currentVideoTime}
-          onTimeUpdate={(time) => setCurrentVideoTime(time)}
+          onTimeUpdate={handleThrottledTimeUpdate}
           initialMuted={false}
         >
           {/* Current Scene Indicator */}
