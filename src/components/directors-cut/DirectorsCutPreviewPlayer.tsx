@@ -321,7 +321,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
+    let lastUpdateTime = 0;
     const onTimeUpdateEvent = () => {
+      const now = performance.now();
+      if (now - lastUpdateTime < 100) return; // Throttle to ~10 updates/sec
+      lastUpdateTime = now;
       const frame = player.getCurrentFrame();
       const time = frame / fps;
       setInternalTime(time);

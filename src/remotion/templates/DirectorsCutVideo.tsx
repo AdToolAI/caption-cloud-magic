@@ -736,41 +736,81 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       )}
 
       {/* SCENES - Each scene is a Sequence with its own Video */}
+      {/* Next-scene overlap: during transition frames, render the NEXT scene underneath */}
       {sortedScenes.map((scene, idx) => {
         const sceneStartFrame = Math.floor(scene.startTime * fps);
         const sceneEndFrame = Math.floor(scene.endTime * fps);
         const sceneDurationFrames = Math.max(1, sceneEndFrame - sceneStartFrame);
 
+        // Check if this scene has a transition to the next scene
+        const currentTransition = transitions?.find(t => t.sceneIndex === idx);
+        const hasTransitionToNext = idx < sortedScenes.length - 1 && currentTransition && currentTransition.type && currentTransition.type !== 'none';
+        const transitionDurationFrames = hasTransitionToNext ? Math.floor((currentTransition!.duration || 0.5) * fps) : 0;
+        const nextScene = hasTransitionToNext ? sortedScenes[idx + 1] : null;
+
         return (
-          <Sequence
-            key={scene.id}
-            from={sceneStartFrame}
-            durationInFrames={sceneDurationFrames}
-          >
-            <AbsoluteFill>
-              <SceneVideo
-                sourceVideoUrl={sourceVideoUrl}
-                scene={scene}
-                sceneIndex={idx}
-                totalScenes={sortedScenes.length}
-                brightness={brightness}
-                contrast={contrast}
-                saturation={saturation}
-                sharpness={sharpness}
-                temperature={temperature}
-                vignette={vignette}
-                globalFilter={filter}
-                styleTransfer={styleTransfer}
-                colorGrading={colorGrading}
-                sceneColorGrading={sceneColorGrading}
-                sceneEffects={sceneEffects}
-                transitions={transitions}
-                chromaKey={chromaKey}
-                kenBurns={kenBurns}
-                sceneDurationFrames={sceneDurationFrames}
-              />
-            </AbsoluteFill>
-          </Sequence>
+          <React.Fragment key={scene.id}>
+            {/* Pre-render next scene UNDERNEATH during transition overlap */}
+            {hasTransitionToNext && nextScene && transitionDurationFrames > 0 && (
+              <Sequence
+                from={Math.max(0, sceneEndFrame - transitionDurationFrames)}
+                durationInFrames={transitionDurationFrames}
+              >
+                <AbsoluteFill>
+                  <SceneVideo
+                    sourceVideoUrl={sourceVideoUrl}
+                    scene={nextScene}
+                    sceneIndex={idx + 1}
+                    totalScenes={sortedScenes.length}
+                    brightness={brightness}
+                    contrast={contrast}
+                    saturation={saturation}
+                    sharpness={sharpness}
+                    temperature={temperature}
+                    vignette={vignette}
+                    globalFilter={filter}
+                    styleTransfer={styleTransfer}
+                    colorGrading={colorGrading}
+                    sceneColorGrading={sceneColorGrading}
+                    sceneEffects={sceneEffects}
+                    transitions={[]}
+                    chromaKey={chromaKey}
+                    kenBurns={kenBurns}
+                    sceneDurationFrames={Math.max(1, Math.floor(nextScene.endTime * fps) - Math.floor(nextScene.startTime * fps))}
+                  />
+                </AbsoluteFill>
+              </Sequence>
+            )}
+            {/* Current scene ON TOP (its exit transition reveals the next scene below) */}
+            <Sequence
+              from={sceneStartFrame}
+              durationInFrames={sceneDurationFrames}
+            >
+              <AbsoluteFill>
+                <SceneVideo
+                  sourceVideoUrl={sourceVideoUrl}
+                  scene={scene}
+                  sceneIndex={idx}
+                  totalScenes={sortedScenes.length}
+                  brightness={brightness}
+                  contrast={contrast}
+                  saturation={saturation}
+                  sharpness={sharpness}
+                  temperature={temperature}
+                  vignette={vignette}
+                  globalFilter={filter}
+                  styleTransfer={styleTransfer}
+                  colorGrading={colorGrading}
+                  sceneColorGrading={sceneColorGrading}
+                  sceneEffects={sceneEffects}
+                  transitions={transitions}
+                  chromaKey={chromaKey}
+                  kenBurns={kenBurns}
+                  sceneDurationFrames={sceneDurationFrames}
+                />
+              </AbsoluteFill>
+            </Sequence>
+          </React.Fragment>
         );
       })}
 

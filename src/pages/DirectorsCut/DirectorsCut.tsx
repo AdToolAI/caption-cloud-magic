@@ -984,7 +984,7 @@ export function DirectorsCut() {
                   scenes={scenes}
                   transitions={transitions}
                   audio={audioEnhancements}
-                  duration={selectedVideo.duration || 30}
+                  duration={actualTotalDuration}
                   currentTime={currentTime}
                   onTimeUpdate={setCurrentTime}
                   styleTransfer={styleTransfer}
