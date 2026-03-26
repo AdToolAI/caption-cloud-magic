@@ -1,65 +1,38 @@
 
 
-## Fix: Video nicht abspielbar — "NoSuchKey" S3 Fehler
+## Fix: Untertitel zu klein im gerenderten Video
 
 ### Ursache
 
-In `render-with-remotion/index.ts` (Zeilen 497-576) wird nach dem Lambda-Aufruf die Antwort `{ type: "success", renderId, bucketName }` als **fertiges Rendering** interpretiert. Tatsaechlich bedeutet diese Antwort nur, dass `renderMediaOnLambda()` den Render-Job **gestartet** hat — die Datei `renders/{renderId}/out.mp4` existiert noch nicht.
+Die `fontSize: 48` wird 1:1 als CSS-Pixel im Remotion-Template verwendet — sowohl im Preview als auch im Render. Im Preview-Player wird die 1080x1920 Composition auf eine kleine UI-Fläche herunterskaliert (z.B. ~200px breit), wodurch die 48px-Schrift *relativ* gross aussieht. Im gerenderten Video bei echten 1080x1920 Pixeln sind 48px aber nur ~4.4% der Breite — das ist sehr klein auf einem Handybildschirm.
 
-Die Funktion:
-1. Konstruiert sofort eine Output-URL (`renders/u5mx64mcjs/out.mp4`)
-2. Markiert `video_renders` als `completed` mit dieser URL
-3. Speichert in `video_creations` mit dieser nicht-existierenden URL
-4. Gibt `status: 'completed'` ans Frontend zurueck
+### Lösung
 
-Das Frontend erwartet eigentlich den Webhook-Flow (Zeile 348-368 in PreviewExportStep.tsx: es setzt `status: 'rendering'` und wartet auf Realtime-Updates). Aber weil die Edge Function `completed` zurueckgibt, wird die UI verwirrt.
+Die `fontSize` im Remotion-Template (`UniversalVideo.tsx`) proportional zur Composition-Breite skalieren. Referenz: 48px bei 1080px Breite sollte als ~80px gerendert werden. Die user-konfigurierte fontSize wird als Basiswert behandelt und mit einem Skalierungsfaktor multipliziert.
 
-**Zusaetzlich**: Der `media_assets` Insert schlaegt fehl wegen Check-Constraint (`source` muss `'upload'` oder `'url'` sein, nicht `'remotion-render'`).
+### Änderung
 
-### Aenderungen
+#### `src/remotion/templates/UniversalVideo.tsx`
 
-#### `supabase/functions/render-with-remotion/index.ts` (Zeilen 497-576)
+An allen 3 Stellen wo `subtitleStyle.fontSize` verwendet wird (Zeilen 310, 775, 867):
 
-Nach dem erfolgreichen Lambda-Response:
+- Aus `useVideoConfig()` die `width` lesen
+- Skalierungsfaktor berechnen: `scaleFactor = width / 1080 * 1.6` (1.6x Vergrösserung für Lesbarkeit)
+- `fontSize` ersetzen durch: `(subtitleStyle.fontSize || 48) * scaleFactor`
 
-1. **Nicht als completed markieren** — stattdessen nur den echten `renderId` in `video_renders.content_config` speichern (Status bleibt `rendering`)
-2. **Keine Output-URL konstruieren** — die URL kommt spaeter vom Webhook mit dem echten `outputFile`
-3. **Kein `video_creations` Insert** — das macht bereits der Webhook (Zeile 200-208 in `remotion-webhook/index.ts`)
-4. **Kein `media_assets` Insert** — entfernen (schlaegt sowieso fehl wegen Check-Constraint)
-5. **Response aendern**: `status: 'rendering'` statt `'completed'`, keine `video_url`
-
-Konkret werden Zeilen 512-565 ersetzt durch:
-
-```typescript
-// Update render record with real renderId (webhook will mark as completed)
-await supabaseAdmin.from('video_renders').update({
-  content_config: {
-    ...customizations,
-    credits_used: credits_required,
-    real_remotion_render_id: realRenderId,
-  },
-}).eq('render_id', pendingRenderId);
-
-console.log('✅ Updated render record with real renderId, waiting for webhook...');
+Beispiel:
+```text
+1080px Breite: 48 * 1.6 = ~77px (gut lesbar)
+1920px Breite: 48 * (1920/1080) * 1.6 = ~137px (proportional)
 ```
 
-Response (Zeilen 567-578):
-```typescript
-return new Response(JSON.stringify({
-  ok: true,
-  render_id: pendingRenderId,
-  real_render_id: realRenderId,
-  status: 'rendering',
-  message: 'Video-Rendering laeuft. Webhook benachrichtigt bei Fertigstellung.'
-}), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-```
+Dies betrifft alle 3 Render-Pfade:
+1. `SubtitleOverlay`-Komponente (Zeile 310)
+2. Multi-Scene inline Subtitle (Zeile 775)
+3. Fallback Single-Background inline Subtitle (Zeile 867)
 
-### Ergebnis
-- Edge Function startet den Render und gibt `status: 'rendering'` zurueck
-- Frontend setzt korrekt auf "rendering" und wartet auf Realtime-Updates
-- Webhook feuert wenn Render fertig ist, setzt echte `outputFile` URL, speichert in `video_creations`
-- Video ist dann tatsaechlich abspielbar und downloadbar
+Der Preview-Player verwendet dieselbe Composition-Breite und denselben Skalierungsfaktor — da Remotion's Player die Composition CSS-skaliert, bleibt die Proportionalität erhalten und Preview und Render sehen identisch aus.
 
-### Datei
-1. `supabase/functions/render-with-remotion/index.ts` — Premature-Completion entfernen, auf Webhook vertrauen
+### Dateien
+1. `src/remotion/templates/UniversalVideo.tsx` — fontSize-Skalierung an allen 3 Subtitle-Render-Stellen
 
