@@ -706,7 +706,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         </Button>
 
         <span className="text-xs text-muted-foreground min-w-[80px]">
-          {formatTime(internalTime)} / {formatTime(duration)}
+          {formatTime(displayTime)} / {formatTime(duration)}
         </span>
 
         <Slider
