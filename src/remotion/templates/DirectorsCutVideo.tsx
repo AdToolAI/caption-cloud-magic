@@ -567,7 +567,7 @@ const SceneVideo: React.FC<{
           src={mediaUrl}
           startFrom={hasAdditionalMedia ? 0 : sourceStartFrame}
           playbackRate={playbackRate}
-          pauseWhenBuffering={!previewMode}
+          pauseWhenBuffering
           style={{
             width: '100%',
             height: '100%',
@@ -694,7 +694,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         <SharpnessFilter intensity={sharpness} />
         <Video
           src={sourceVideoUrl}
-          pauseWhenBuffering={!previewMode}
+          pauseWhenBuffering
           style={{
             width: '100%',
             height: '100%',
@@ -810,7 +810,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                   colorGrading={colorGrading}
                   sceneColorGrading={sceneColorGrading}
                   sceneEffects={sceneEffects}
-                  transitions={previewMode ? [] : transitions}
+                  transitions={transitions}
                   chromaKey={chromaKey}
                   kenBurns={kenBurns}
                   sceneDurationFrames={sceneDurationFrames}
