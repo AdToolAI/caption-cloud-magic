@@ -2040,7 +2040,7 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
   if (background.type === 'video' && background.videoUrl) {
     return (
       <AbsoluteFill>
-        <Video src={background.videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loop muted />
+        <SafeVideo src={background.videoUrl} sceneType={sceneType} primaryColor={primaryColor} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </AbsoluteFill>
     );
   }
