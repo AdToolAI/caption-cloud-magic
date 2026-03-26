@@ -199,6 +199,8 @@ export const DirectorsCutVideoSchema = z.object({
   textOverlays: z.array(TextOverlaySchema).optional(),
   // Subtitle Track
   subtitleTrack: SubtitleTrackSchema.optional(),
+  // Preview mode: skip audio, less aggressive buffering
+  previewMode: z.boolean().optional(),
 });
 
 type DirectorsCutVideoProps = z.infer<typeof DirectorsCutVideoSchema>;
@@ -297,6 +299,7 @@ const SceneVideo: React.FC<{
   chromaKey?: { enabled?: boolean; color?: string; tolerance?: number; edgeSoftness?: number; spillSuppression?: number; backgroundUrl?: string };
   kenBurns?: Array<{ id?: string; sceneId?: string; startZoom?: number; endZoom?: number; startX?: number; startY?: number; endX?: number; endY?: number; easing?: string }>;
   sceneDurationFrames: number;
+  previewMode?: boolean;
 }> = ({
   sourceVideoUrl,
   scene,
@@ -317,6 +320,7 @@ const SceneVideo: React.FC<{
   chromaKey,
   kenBurns,
   sceneDurationFrames,
+  previewMode = false,
 }) => {
   const localFrame = useCurrentFrame(); // Local frame within this Sequence (0 to sceneDurationFrames)
   const { fps } = useVideoConfig();
@@ -563,7 +567,7 @@ const SceneVideo: React.FC<{
           src={mediaUrl}
           startFrom={hasAdditionalMedia ? 0 : sourceStartFrame}
           playbackRate={playbackRate}
-          pauseWhenBuffering
+          pauseWhenBuffering={!previewMode}
           style={{
             width: '100%',
             height: '100%',
@@ -612,6 +616,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   soundDesign,
   textOverlays = [],
   subtitleTrack,
+  previewMode = false,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -689,7 +694,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         <SharpnessFilter intensity={sharpness} />
         <Video
           src={sourceVideoUrl}
-          pauseWhenBuffering
+          pauseWhenBuffering={!previewMode}
           style={{
             width: '100%',
             height: '100%',
@@ -700,15 +705,15 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         />
         {/* VHS Scanlines for retro_vhs filter */}
         {filter === 'retro_vhs' && <VHSScanlines intensity={0.25} />}
-        {/* Original Audio - mute if voiceover or background music present */}
-        {!voiceoverUrl && !backgroundMusicUrl && (
+        {/* Original Audio - skip in preview mode (native audio handles it) */}
+        {!previewMode && !voiceoverUrl && !backgroundMusicUrl && (
           <Audio src={sourceVideoUrl} volume={masterVolume / 100} startFrom={0} pauseWhenBuffering />
         )}
         {vignette > 0 && <AbsoluteFill style={{ ...vignetteStyle, pointerEvents: 'none', zIndex: 10 }} />}
-        {/* Voiceover - delayed loading to reduce concurrent network load */}
-        {voiceoverUrl && frame >= 15 && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} pauseWhenBuffering />}
-        {/* Background Music - further delayed to allow voiceover to load first */}
-        {backgroundMusicUrl && frame >= 30 && <Audio src={backgroundMusicUrl} volume={(backgroundMusicVolume || 30) / 100} loop pauseWhenBuffering />}
+        {/* Voiceover - skip in preview mode */}
+        {!previewMode && voiceoverUrl && frame >= 15 && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} pauseWhenBuffering />}
+        {/* Background Music - skip in preview mode */}
+        {!previewMode && backgroundMusicUrl && frame >= 30 && <Audio src={backgroundMusicUrl} volume={(backgroundMusicVolume || 30) / 100} loop pauseWhenBuffering />}
       </AbsoluteFill>
     );
   }
@@ -755,6 +760,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
               <Sequence
                 from={Math.max(0, sceneEndFrame - transitionDurationFrames)}
                 durationInFrames={transitionDurationFrames}
+                premountFor={previewMode ? 30 : 0}
               >
                 <AbsoluteFill>
                   <SceneVideo
@@ -777,6 +783,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                     chromaKey={chromaKey}
                     kenBurns={kenBurns}
                     sceneDurationFrames={Math.max(1, Math.floor(nextScene.endTime * fps) - Math.floor(nextScene.startTime * fps))}
+                    previewMode={previewMode}
                   />
                 </AbsoluteFill>
               </Sequence>
@@ -785,6 +792,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             <Sequence
               from={sceneStartFrame}
               durationInFrames={sceneDurationFrames}
+              premountFor={previewMode ? 30 : 0}
             >
               <AbsoluteFill>
                 <SceneVideo
@@ -807,6 +815,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                   chromaKey={chromaKey}
                   kenBurns={kenBurns}
                   sceneDurationFrames={sceneDurationFrames}
+                  previewMode={previewMode}
                 />
               </AbsoluteFill>
             </Sequence>
@@ -814,8 +823,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         );
       })}
 
-      {/* AUDIO - Linear playback (only if no voiceover or background music) */}
-      {!voiceoverUrl && !backgroundMusicUrl && (
+      {/* AUDIO - Skip all Remotion audio in preview mode (native audio handles it) */}
+      {!previewMode && !voiceoverUrl && !backgroundMusicUrl && (
         <Audio
           src={sourceVideoUrl}
           volume={masterVolume / 100}
@@ -829,8 +838,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         <AbsoluteFill style={{ ...vignetteStyle, pointerEvents: 'none', zIndex: 10 }} />
       )}
 
-      {/* Voiceover Audio - Delayed loading to reduce concurrent network load */}
-      {voiceoverUrl && frame >= 15 && (
+      {/* Voiceover Audio */}
+      {!previewMode && voiceoverUrl && frame >= 15 && (
         <Audio
           src={voiceoverUrl}
           volume={(voiceoverVolume || 100) / 100}
@@ -839,8 +848,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         />
       )}
 
-      {/* Background Music - Delayed loading to reduce concurrent network load */}
-      {backgroundMusicUrl && frame >= 30 && (
+      {/* Background Music */}
+      {!previewMode && backgroundMusicUrl && frame >= 30 && (
         <Audio
           src={backgroundMusicUrl}
           volume={(backgroundMusicVolume || 30) / 100}
@@ -850,7 +859,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       )}
 
       {/* Sound Design Audio */}
-      {soundDesign?.enabled && soundDesign.ambientUrl && (
+      {!previewMode && soundDesign?.enabled && soundDesign.ambientUrl && (
         <Audio
           src={soundDesign.ambientUrl}
           volume={(soundDesign.ambientVolume || 50) / 100}
@@ -859,7 +868,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         />
       )}
 
-      {soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, idx) => (
+      {!previewMode && soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, idx) => (
         <Sequence key={`sfx-${idx}`} from={Math.floor(sfx.startTime * fps)}>
           <Audio
             src={sfx.url}

@@ -966,8 +966,10 @@ export function DirectorsCut() {
             </Card>
           </div>
 
-          {/* Right: Preview Panel - HIDE for step 11 (Export has its own full preview) */}
+          {/* Right: Preview Panel - HIDE for steps that have their own preview (2-9, 11) */}
           {currentStep !== 11 && <div className="xl:col-span-1 space-y-4">
+            {/* Only show global Live-Preview for Step 1 — Steps 2-9 have their own embedded preview */}
+            {currentStep === 1 && (
             <Card className="p-4">
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 <Film className="w-4 h-4" />
@@ -997,6 +999,7 @@ export function DirectorsCut() {
                 </div>
               )}
             </Card>
+            )}
 
             <Card className="p-4">
               <h3 className="font-semibold mb-3">Projekt-Info</h3>

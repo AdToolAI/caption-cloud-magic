@@ -153,7 +153,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     });
   }, [transitions, scenes]);
 
-  // Build input props for Remotion
+  // Build input props for Remotion — previewMode skips Remotion audio
   const inputProps = useMemo(() => ({
     sourceVideoUrl: videoUrl,
     brightness: effects.brightness,
@@ -211,6 +211,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       endTime: o.endTime,
       style: o.style,
     })),
+    previewMode: true,
   }), [
     videoUrl, effects, audio, duration, styleTransfer, 
     colorGrading, sceneColorGrading, speedKeyframes, chromaKey, kenBurns, voiceoverUrl, backgroundMusicUrl,
@@ -269,7 +270,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     if (videoUrl) {
       const sourceAudio = new Audio(videoUrl);
-      sourceAudio.preload = 'auto';
+      sourceAudio.preload = 'metadata';
       sourceAudio.crossOrigin = 'anonymous';
       sourceAudio.volume = (audio.master_volume || 100) / 100;
       sourceAudioRef.current = sourceAudio;
@@ -277,7 +278,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     if (voiceoverUrl) {
       const vo = new Audio(voiceoverUrl);
-      vo.preload = 'auto';
+      vo.preload = 'metadata';
       vo.crossOrigin = 'anonymous';
       vo.volume = 1.0;
       voiceoverAudioRef.current = vo;
@@ -285,7 +286,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     if (backgroundMusicUrl) {
       const bg = new Audio(backgroundMusicUrl);
-      bg.preload = 'auto';
+      bg.preload = 'metadata';
       bg.crossOrigin = 'anonymous';
       bg.volume = 0.3;
       bg.loop = true;
