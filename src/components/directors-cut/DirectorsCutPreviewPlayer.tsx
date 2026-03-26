@@ -453,7 +453,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const currentFrame = player.getCurrentFrame();
       if (currentFrame >= durationInFrames - 1) {
         player.seekTo(0);
-        setInternalTime(0);
+        internalTimeRef.current = 0;
+        setDisplayTime(0);
         if (sourceAudioRef.current) sourceAudioRef.current.currentTime = 0;
         if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = 0;
         if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
