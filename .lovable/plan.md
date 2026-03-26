@@ -1,60 +1,55 @@
 
-## Fix: Content Creator Render-Fehler ist aktuell ein Edge-Function Boot-Error
 
-### Ursache
-Ich habe die Runtime-Logs geprüft. Der Fehler ist derzeit **nicht** die Video-Dauer-Logik im Frontend, sondern ein **Syntax-/Compile-Fehler** in der Backend-Funktion `render-with-remotion`:
+## Fix: Video nicht in Mediathek + AWS Rate Limit
 
-```text
-worker boot error: Uncaught SyntaxError:
-Identifier 'voiceoverDuration' has already been declared
-```
+### Problem 1 — Video wird nicht in der Mediathek gespeichert
 
-Dadurch startet die Funktion gar nicht. Im Browser erscheint das dann als:
-- CORS / preflight failed
-- `Failed to send a request to the Edge Function`
+Die Edge Function `render-with-remotion` (Zeile 530-537) schreibt in `video_creations` mit falschen Spaltennamen:
+- `video_url` → Spalte existiert nicht, korrekt ist `output_url`
+- `template_name` → existiert nicht, muesste in `metadata` gespeichert werden
+- `render_engine` → existiert nicht, gehoert ebenfalls in `metadata`
+- `title` → existiert nicht als Spalte
 
-Der CORS-Fehler ist hier also nur das Symptom, weil die Funktion wegen des Syntaxfehlers nicht sauber antworten kann.
+Deshalb schlaegt das Insert still fehl (Supabase ignoriert unbekannte Spalten oder wirft einen Fehler, der im `catch` verschluckt wird). Die Log-Meldung "Saved to Media Library" ist truegerisch — der Insert-Fehler wird nicht korrekt geloggt.
+
+### Problem 2 — AWS Concurrency Limit beim zweiten Render
+
+Ein 4K-Video mit 810 Frames wird auf 8 parallel Lambda-Worker verteilt. Wenn sofort ein zweiter Render gestartet wird, sind die Lambdas noch belegt → "Rate Exceeded". 
+
+**Loesung**: `framesPerLambda` erhoehen, damit weniger Lambdas genutzt werden (z.B. max 3 statt 8). Zusaetzlich im Frontend einen Cooldown nach erfolgreichem Render einbauen.
 
 ### Aenderungen
 
-#### 1. `supabase/functions/render-with-remotion/index.ts`
-- Die doppelte Deklaration von `voiceoverDuration` entfernen
-- Die fruehe Variable fuer Limit-/Credit-Logik und die spaetere Variable fuer finale Frame-Berechnung klar trennen, z. B.:
-  - `requestedVoiceoverDuration`
-  - `sanitizedVoiceoverDuration`
-- Die bestehende Dauer-Logik beibehalten: finale Render-Dauer bleibt das Maximum aus Szenen und Voice-over
+#### 1. `supabase/functions/render-with-remotion/index.ts` — Media Library Insert fixen
 
-#### 2. CORS in derselben Funktion absichern
-- Die CORS-Header auf die vollstaendige Header-Liste erweitern, damit der Browser-Call auch nach dem Syntaxfix robust bleibt:
-  - `authorization`
-  - `x-client-info`
-  - `apikey`
-  - `content-type`
-  - `x-supabase-client-platform`
-  - `x-supabase-client-platform-version`
-  - `x-supabase-client-runtime`
-  - `x-supabase-client-runtime-version`
-- OPTIONS-Response explizit mit erfolgreichem Response-Body/Status zurueckgeben
+Zeile 530-550: Insert korrigieren mit den richtigen Spalten:
 
-### Technische Umsetzung
-```text
-Aktuell:
-const voiceoverDuration = customizations?.voiceoverDuration || 30;
-...
-const voiceoverDuration = Number(sanitizedCustomizations.voiceoverDuration) || 0;
-
-Fix:
-const requestedVoiceoverDuration = Number(customizations?.voiceoverDuration) || 30;
-...
-const sanitizedVoiceoverDuration = Number(sanitizedCustomizations.voiceoverDuration) || 0;
-const totalDurationSeconds = Math.max(sceneDurationSum, sanitizedVoiceoverDuration, 5);
+```typescript
+await supabaseAdmin.from('video_creations').insert({
+  user_id: userId,
+  output_url: outputUrl,
+  status: 'completed',
+  credits_used: credits_required,
+  quality: quality,
+  aspect_ratio: aspect_ratio,
+  format: format,
+  metadata: {
+    title: customizations?.projectTitle || 'Video',
+    template_name: componentName,
+    render_engine: 'remotion',
+    render_id: realRenderId,
+    source: 'universal-creator',
+  },
+});
 ```
 
-### Ergebnis nach dem Fix
-- `render-with-remotion` bootet wieder korrekt
-- Preflight/CORS-Fehler verschwindet
-- Der Content Creator kann wieder Render-Jobs starten
-- Die zuletzt eingebaute Dauer-Logik fuer lange Voice-overs bleibt erhalten
+Zusaetzlich: den `catch`-Block verbessern, damit Insert-Fehler sauber geloggt werden (`.insert().select()` verwenden und den Error pruefen).
 
-### Datei
-- `supabase/functions/render-with-remotion/index.ts`
+#### 2. `supabase/functions/_shared/remotion-payload.ts` — Lambda-Concurrency reduzieren
+
+`framesPerLambda` erhoehen (z.B. auf 270), damit maximal 3 Lambdas gestartet werden statt 8. Das reduziert Concurrency-Konflikte massiv.
+
+### Dateien
+1. `supabase/functions/render-with-remotion/index.ts` — Insert-Spalten korrigieren + Error-Logging
+2. `supabase/functions/_shared/remotion-payload.ts` — framesPerLambda anpassen
+
