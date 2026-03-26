@@ -1,30 +1,52 @@
 
+Ziel: Die Regression rückgängig machen, damit die Vorschau wieder sichtbare Übergänge zeigt und gleichzeitig flüssiger läuft.
 
-## Fix: Letzte 2 Stotterer beseitigen
+1. Bestätigte Ursachen
+- In `DirectorsCutPreviewPlayer.tsx` wird `displayTime` nur alle 250ms aktualisiert. Das entlastet React, macht aber sichtbare Übergänge, Subtitle-Wechsel und Overlays stufig statt flüssig.
+- In `DirectorsCutVideo.tsx` werden mehrere Transition-Typen (`blur`, `zoom`, `crossfade`, `dissolve`) aktuell alle auf `fade()` gemappt. Dadurch wirken Übergänge wieder „falsch“ oder kaum sichtbar.
+- Die Preview nutzt weiter pro Szene ein eigenes `<Video>`. Das bleibt okay, aber sie braucht eine bessere Trennung zwischen:
+  - flüssiger Playback-Zeit
+  - langsamer UI-Zeit
+- In Schritt 2 ist die native Overlay-Logik grundsätzlich richtig, aber auch dort wird die Zeit nur grob aktualisiert, wodurch Übergänge ruckelig wirken.
 
-### Verbleibende Ursachen
+2. Umsetzung
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+  - zweite Zeitspur einführen:
+    - `playbackTimeRef` für kontinuierliche, frame-nahe Zeit
+    - `displayTime` weiter nur throttled für Slider/Labels
+  - Subtitle-/Overlay-Berechnung nicht mehr auf dem grob gethrottelten Wert aufbauen, sondern auf einer sanft aktualisierten Preview-Zeit
+  - Parent-Updates weiter throttlen, aber lokale visuelle Updates deutlich feiner machen
+  - Audio-Sync nur korrigieren, wenn echter Drift vorliegt, ohne unnötige kleine Korrekturen
 
-1. **`premountFor={30}` reicht nicht ganz** — 30 Frames = 1 Sekunde Vorlauf. Bei langsamem Netzwerk oder großen Videos kann der Browser den Decoder in 1s nicht fertig vorbereiten. Erhöhung auf **60 Frames (2 Sekunden)** gibt dem Decoder deutlich mehr Zeit.
+- `src/remotion/templates/DirectorsCutVideo.tsx`
+  - Transition-Mapping verfeinern:
+    - `crossfade` / `dissolve` → echter Fade-ähnlicher Overlap
+    - `wipe-*` → wipe
+    - `slide-*` / `push-*` → slide
+    - `zoom` und `blur` nicht mehr stillschweigend wie `fade` behandeln, sondern mit eigener sichtbarer Preview-Näherung
+  - prüfen, dass die Übergangsrichtung (`left/right/up/down`) sauber bis in die Presentation übernommen wird
 
-2. **`setInternalTime` bei jedem Tick** — auch mit 100ms-Throttle löst `setInternalTime(time)` (Zeile 369) bei jedem Update einen React-State-Change aus, der Subtitle-Berechnung und andere UI-Elemente neu rendert. Lösung: `internalTime` als **`useRef`** führen und nur den sichtbaren Slider/Zeitanzeige per `requestAnimationFrame` updaten — kein React-State-Tick während Playback.
+- `src/components/directors-cut/steps/SceneAnalysisStep.tsx`
+  - die Native-Preview mit feinerer Zeitaktualisierung versorgen
+  - `NativeTransitionOverlay` auf eine glattere Zeitbasis stellen, damit Übergänge in Schritt 2 nicht springen
 
-3. **Externer Zeit-Sync während Playback** — der `useEffect` auf Zeile 422-431 vergleicht `currentTime` (von Parent) mit `internalTime` und triggert `seekTo` wenn die Differenz > 0.5s ist. Während normalem Playback kann das ungewollte Seeks auslösen. Lösung: Sync nur ausführen wenn **nicht** playing.
+3. Was ich bewusst nicht ändere
+- keine Rückkehr zu Remotion-Audio in der Preview
+- keine Auflösung des Szene-Konzepts
+- kein Entfernen von `premountFor={60}`
+- keine aggressive UI-Updates bei jedem Tick im gesamten Parent-State
 
-### Änderungen
+4. Erwartetes Ergebnis
+- Übergänge werden wieder klar sichtbar
+- weniger „stufige“ oder verspätete Blend-/Wipe-Effekte
+- weniger Hänger durch bessere Trennung von Playback und UI
+- Audio bleibt unabhängig und läuft linear weiter
 
-**`src/remotion/templates/DirectorsCutVideo.tsx`**
-- `premountFor={30}` → `premountFor={60}` auf allen `TransitionSeries.Sequence`
-
-**`src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`**
-- `internalTime` von `useState` zu `useRef` umbauen
-- Neuen `displayTime` State einführen, der nur alle ~250ms aktualisiert wird (für Slider/Zeitanzeige)
-- Subtitle-Berechnung auf `displayTime` statt `internalTime` basieren
-- Externer Zeit-Sync (`seekTo`) nur wenn `!isPlaying`
-- Audio-Drift-Korrektur Schwelle von 0.3s auf 0.5s erhöhen (weniger aggressive Korrekturen)
-
-### Erwartetes Ergebnis
-- Kein React-Re-Render mehr bei jedem Playback-Tick
-- 2 Sekunden Decoder-Vorlauf statt 1
-- Keine Seek-Interrupts während laufender Wiedergabe
-- Audio läuft weiterhin unabhängig und linear
-
+5. Technische Hinweise
+- Der aktuelle Fehler ist wahrscheinlich eine Performance-/Timing-Regression, kein neues Paket- oder Buildproblem.
+- Die wichtigste Korrektur ist: nicht alles auf denselben gethrottelten Zeitwert legen.
+- Für eine gute Vorschau braucht es zwei Geschwindigkeiten:
+```text
+Playback-Zeit   -> schnell / visuell flüssig
+UI-Zeit         -> langsam / React-schonend
+```
