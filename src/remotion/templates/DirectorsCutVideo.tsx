@@ -699,7 +699,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           const transitionDurationFrames = hasTransitionToNext ? Math.max(1, Math.floor((currentTransition!.duration || 0.5) * fps)) : 0;
 
           // Build the presentation based on transition type
-          const getPresentation = () => {
+          const getPresentation = (): any => {
             if (!currentTransition || !currentTransition.type) return fade();
             const [baseType, direction = 'left'] = currentTransition.type.toLowerCase().split('-');
             
