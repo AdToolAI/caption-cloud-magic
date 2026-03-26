@@ -1,37 +1,40 @@
 
 
-## Fix: Stotterer endgültig beseitigen — Single-Video Preview
+## Fix: Voiceover-Wiederholung + sichtbare Übergänge in der Preview
 
-### Ursache
-Das Kernproblem bleibt: `TransitionSeries` erzeugt pro Szene ein eigenes `<Video>`-Element. Beim Szenenwechsel muss der Browser einen neuen Video-Decoder starten. Selbst mit `premountFor={60}` und `pauseWhenBuffering={false}` reicht das bei 6-7 Szenen nicht — jeder Wechsel erzeugt einen kurzen Decoder-Hänger.
+### Ursache 1 — Voiceover wiederholt sich
+In `DirectorsCutPreviewPlayer.tsx` (Zeile 401-404) wird die Voiceover-Position an die **Video-Zeit** gebunden. Die Drift-Korrektur setzt `voiceoverAudioRef.current.currentTime = time` (= aktuelle Videozeit). Problem:
+- Wenn das Video an einer Szenengrenze kurz springt oder sich die Zeit leicht verschiebt, wird das Voiceover zu einer bereits gehörten Stelle zurückgesetzt
+- Bei 6-7 Szenen passiert das an mehreren Stellen → "wiederholt sich an 3 Stellen"
+- Das Voiceover soll linear durchlaufen, unabhängig von der Videozeit
 
-### Lösung: Ein einziges Video in der Preview
-In `previewMode` die `TransitionSeries` komplett überspringen und stattdessen **ein einzelnes durchlaufendes `<Video>`** rendern. Die Szenen-Effekte (Filter, Farbkorrektur, Übergänge) werden als CSS-Overlays basierend auf `currentTimeSeconds` berechnet und darüber gelegt.
+**Fix**: Drift-Korrektur für Voiceover komplett entfernen. Das Voiceover startet bei Play und läuft linear bis zum Ende. Nur die Source-Audio (Originalton) bleibt an die Videozeit gekoppelt.
 
-```text
-Aktuell (stottert):
-Scene1-Video → [Decoder-Pause] → Scene2-Video → [Decoder-Pause] → ...
+### Ursache 2 — Keine sichtbaren Übergänge
+Die Preview-Mode-Logik (Zeile 720-742) erzeugt nur einen subtilen schwarzen Overlay (`rgba(0,0,0,0.3-0.5)`). Das ist auf den meisten Videos unsichtbar. Es gibt keine visuellen Bewegungen (Wipe, Slide, Zoom).
 
-Neu (flüssig):
-Ein Video durchgehend → CSS-Effekte wechseln pro Szene
-```
+**Fix**: Übergänge als CSS-Transformationen auf dem einzelnen Video-Element umsetzen:
+- **fade/crossfade/dissolve**: Opacity-Dip auf 0.3 und zurück (stärker als aktuell)
+- **wipe**: `clip-path: inset()` Animation, die das Bild von einer Seite aufdeckt
+- **slide/push**: `translateX/Y` Verschiebung des Videos
+- **zoom**: `scale()` Vergrößerung als visueller Akzent
+- **blur**: `filter: blur()` wie bisher, aber stärker
 
 ### Änderungen
 
+**`src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`**
+- Zeile 401-404: Voiceover-Drift-Korrektur entfernen (nur 3 Zeilen löschen)
+
 **`src/remotion/templates/DirectorsCutVideo.tsx`**
-- Neuen Block einfügen: wenn `previewMode && sortedScenes.length > 0`, wird ein einzelnes `<Video src={sourceVideoUrl} startFrom={0} pauseWhenBuffering={false}>` gerendert
-- Darüber ein `<PreviewEffectOverlay>` das basierend auf `currentTimeSeconds` die aktuelle Szene findet und deren Filter/Effekte als CSS anwendet
-- Übergänge zwischen Szenen als einfache CSS-Opacity/Blur-Animationen (kein zweites Video nötig)
-- Die `TransitionSeries`-Logik bleibt für den finalen Render (`!previewMode`) komplett erhalten
+- Preview-Mode-Block (Zeile 719-742): Transition-Berechnung erweitern
+  - Statt nur `transitionOverlayOpacity` auch `transitionTransform` und `transitionClipPath` berechnen
+  - Diese Werte direkt auf das `<Video>`-Element anwenden (style-Attribute)
+  - Jeder Transition-Typ bekommt eine eigene, sichtbare CSS-Animation
+  - Overlay bleibt als zusätzliche Ebene für Blend-Effekte
 
-**Was sich nicht ändert:**
-- Finaler Render nutzt weiter `TransitionSeries` mit per-Scene `<Video>` für frame-perfekte Ausgabe
-- Audio bleibt native HTML5 über `DirectorsCutPreviewPlayer`
-- Szenenkonzept, Editing, Time-Remapping bleiben erhalten
-- `premountFor={60}` bleibt für den finalen Render
-
-### Erwartetes Ergebnis
-- 0 Stotterer in der Preview (ein Decoder, keine Wechsel)
-- Übergänge als weiche CSS-Effekte sichtbar
-- Finaler Render bleibt unverändert und frame-perfekt
+### Was sich nicht ändert
+- Single-Video-Architektur in der Preview bleibt
+- TransitionSeries für finalen Render bleibt unverändert
+- Source-Audio-Drift-Korrektur bleibt (nur für Originalton)
+- Native Audio-Architektur bleibt
 
