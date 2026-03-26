@@ -823,8 +823,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         );
       })}
 
-      {/* AUDIO - Linear playback (only if no voiceover or background music) */}
-      {!voiceoverUrl && !backgroundMusicUrl && (
+      {/* AUDIO - Skip all Remotion audio in preview mode (native audio handles it) */}
+      {!previewMode && !voiceoverUrl && !backgroundMusicUrl && (
         <Audio
           src={sourceVideoUrl}
           volume={masterVolume / 100}
@@ -838,8 +838,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         <AbsoluteFill style={{ ...vignetteStyle, pointerEvents: 'none', zIndex: 10 }} />
       )}
 
-      {/* Voiceover Audio - Delayed loading to reduce concurrent network load */}
-      {voiceoverUrl && frame >= 15 && (
+      {/* Voiceover Audio */}
+      {!previewMode && voiceoverUrl && frame >= 15 && (
         <Audio
           src={voiceoverUrl}
           volume={(voiceoverVolume || 100) / 100}
@@ -848,8 +848,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         />
       )}
 
-      {/* Background Music - Delayed loading to reduce concurrent network load */}
-      {backgroundMusicUrl && frame >= 30 && (
+      {/* Background Music */}
+      {!previewMode && backgroundMusicUrl && frame >= 30 && (
         <Audio
           src={backgroundMusicUrl}
           volume={(backgroundMusicVolume || 30) / 100}
@@ -859,7 +859,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       )}
 
       {/* Sound Design Audio */}
-      {soundDesign?.enabled && soundDesign.ambientUrl && (
+      {!previewMode && soundDesign?.enabled && soundDesign.ambientUrl && (
         <Audio
           src={soundDesign.ambientUrl}
           volume={(soundDesign.ambientVolume || 50) / 100}

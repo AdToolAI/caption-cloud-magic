@@ -153,7 +153,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     });
   }, [transitions, scenes]);
 
-  // Build input props for Remotion
+  // Build input props for Remotion — previewMode skips Remotion audio
   const inputProps = useMemo(() => ({
     sourceVideoUrl: videoUrl,
     brightness: effects.brightness,
@@ -211,6 +211,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       endTime: o.endTime,
       style: o.style,
     })),
+    previewMode: true,
   }), [
     videoUrl, effects, audio, duration, styleTransfer, 
     colorGrading, sceneColorGrading, speedKeyframes, chromaKey, kenBurns, voiceoverUrl, backgroundMusicUrl,
