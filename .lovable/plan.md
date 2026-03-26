@@ -1,47 +1,54 @@
 
-Ziel: Im Director's Cut soll im Schritt „KI-Analyse“ der Originalton standardmässig hörbar sein, und die Preview soll an Szenenübergängen nicht mehr stocken.
+Ziel: Den Director’s-Cut-Editor so umbauen, dass im KI-Analyse-Schritt der Originalton wirklich hörbar ist und die Vorschau an Szenenübergängen nicht mehr stockt. Da du das Bundle bereits korrekt deployed hast, liegt das Problem sehr wahrscheinlich nicht mehr im Render-Bundle, sondern in der lokalen Editor-Preview.
 
-Ursachen, die ich im Code gefunden habe:
-1. `SceneAnalysisStep.tsx` übergibt bereits `initialMuted={false}`, aber `DirectorsCutPreviewPlayer.tsx` übernimmt das nur einmal in `useState(initialMuted)` und synchronisiert den Zustand danach nicht mehr sauber mit Player/Nativ-Audio.
-2. `SceneAnalysisStep.tsx` rendert bei jedem Playback-Tick neu (`setCurrentVideoTime`) und enthält noch sehr viel Debug-/Altlogik. Das belastet genau den Schritt, in dem du das Stocken siehst.
-3. `DirectorsCutVideo.tsx` rendert an Übergängen die nächste Szene doppelt: einmal als Overlap-Sequenz und zusätzlich noch einmal als normale Szene mit `premountFor`. Das erhöht die Decode-Last genau an den Cuts.
+1. Hauptursachen, die ich im aktuellen Code sehe
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+  - Der Preview-Ton läuft noch über separate `new Audio(...)`-Elemente.
+  - Diese Audio-Elemente setzen weiter `crossOrigin = 'anonymous'` und schlucken `play()`-Fehler still weg.
+  - Ergebnis: Die UI kann „unmuted“ anzeigen, aber der Ton startet real nie.
+- `src/remotion/templates/DirectorsCutVideo.tsx`
+  - An Übergängen werden weiterhin zwei Video-Decodes parallel erzeugt:
+    - aktuelle Szene
+    - nächste Szene als Underlay im Overlap
+  - Genau dort entsteht das sichtbare Stocken.
+  - Gleichzeitig gibt es aktuell kein echtes Vorladen mehr (`premountFor` ist gar nicht mehr vorhanden), also kommt der zweite Decoder auch noch spät dazu.
+- `src/components/directors-cut/steps/SceneAnalysisStep.tsx`
+  - Der Step ist zwar schon entschärft, trägt aber noch eigene Preview-/Hilfslogik mit, die für die KI-Analyse nicht nötig schwer ist.
 
-Umsetzung:
+2. Geplanter Fix
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+  - Preview-Audio robust neu aufsetzen:
+    - `crossOrigin` bei den nativen Preview-Audioquellen entfernen
+    - Audio-Fehler nicht mehr still wegschlucken, sondern sauber behandeln
+    - Audio-Ready/Error-State einführen
+    - Originalaudio beim ersten Play explizit an `internalTime` koppeln und bei Seek/Play/Pause sauber mitsynchronisieren
+  - `initialMuted={false}` nicht nur in State übernehmen, sondern wirklich auf die aktive Preview-Audioquelle anwenden
+  - Den „Audio aktivieren“-Hinweis nur zeigen, wenn Audio absichtlich stumm ist — nicht wenn das Laden/Starten fehlgeschlagen ist
 
-1. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-- `initialMuted` robust machen:
-  - `isMuted` bei Prop-Änderungen mitsynchronisieren
-  - beim Mount/Player-Ready den tatsächlichen Mute-State aktiv auf Player + native Audio anwenden
-- Audio-Start vereinheitlichen:
-  - eine zentrale Helper-Logik für `play/pause/seek/sync`
-  - bei `initialMuted={false}` soll nach dem ersten Play-Klick direkt der Originalton starten, ohne extra „Audio aktivieren“
-- den Overlay-Button nur zeigen, wenn der Player wirklich absichtlich stumm ist
+- `src/remotion/templates/DirectorsCutVideo.tsx`
+  - Die schwere Übergangslogik von der Editor-Preview trennen:
+    - Finaler Render bleibt bei der bestehenden Sequence-per-scene-Architektur
+    - Preview-Modus bekommt eine leichtere Strategie ohne echten Doppel-Decode desselben Videos
+  - Konkret:
+    - im `previewMode` keine gleichzeitige Live-Video-Überlappung von aktueller + nächster Szene mehr
+    - stattdessen vereinfachte, flüssige Preview-Transitions (z. B. Cut/Fade/Overlay-basiert), die nur einen aktiven Video-Decoder brauchen
+  - Dadurch bleibt der Export korrekt, aber der Editor wird endlich flüssig
 
-2. `src/components/directors-cut/steps/SceneAnalysisStep.tsx`
-- Playback-induzierte Re-Renders stark reduzieren:
-  - `currentVideoTime` nicht mehr ungefiltert bei jedem Tick in den ganzen Step schreiben
-  - stattdessen nur grob/throttled für Timeline/aktive Szene aktualisieren oder auf Szenenwechsel begrenzen
-- die vielen `console.log`-Aufrufe entfernen
-- tote Altlogik entfernen, die noch aus dem früheren HTML-Video-Preview stammt (`videoRef`, `videoFilter`, `videoKey`, ungenutzte Time-Update-Pfade)
+- `src/components/directors-cut/steps/SceneAnalysisStep.tsx`
+  - Preview im Analyse-Schritt auf die robuste Audio-/Lightweight-Preview anbinden
+  - übrige step-lokale Preview-Hilfslogik weiter entschlacken, damit Step 2 nicht zusätzlich Last erzeugt
 
-3. `src/remotion/templates/DirectorsCutVideo.tsx`
-- Übergangs-Rendering entschärfen:
-  - keine doppelte Vorab-Montage derselben nächsten Szene mehr
-  - `premountFor` nur dort nutzen, wo es wirklich hilft, nicht gleichzeitig auf Overlap- und Haupt-Sequenz
-- bestehende Zwei-Layer-Transitions beibehalten, aber die Preview so umbauen, dass an einem Cut nicht unnötig 3 Video-Instanzen parallel aktiv sind
+3. Erwartetes Ergebnis
+- Im KI-Analyse-Schritt ist der Originalton direkt hörbar
+- Der Nutzer kann den Ton weiterhin manuell muten
+- Die Vorschau stockt an Szenenübergängen deutlich weniger oder gar nicht mehr
+- Der finale Export bleibt unverändert korrekt, weil nur die Editor-Preview leichter gemacht wird
 
-Erwartetes Ergebnis:
-- In Schritt 2 ist der Originalsound standardmässig an
-- der „Audio aktivieren“-Hinweis erscheint dort nicht mehr fälschlich
-- die Preview im KI-Analyse-Schritt wird deutlich ruhiger
-- Szenenübergänge ruckeln wesentlich weniger, weil sowohl React-Overhead als auch Video-Dekodierung an den Cuts reduziert werden
+4. Dateien
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- `src/remotion/templates/DirectorsCutVideo.tsx`
+- `src/components/directors-cut/steps/SceneAnalysisStep.tsx`
 
-Dateien:
-1. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-2. `src/components/directors-cut/steps/SceneAnalysisStep.tsx`
-3. `src/remotion/templates/DirectorsCutVideo.tsx`
-
-Technische Hinweise:
-- Kein Backend-/Datenbank-Fix nötig
-- Das ist jetzt vor allem ein Preview-State- und Performance-Fix
-- Der wichtigste Unterschied zum letzten Versuch: Ich würde nicht nochmals nur am Transition-Effekt schrauben, sondern gezielt die zwei echten Engpässe beheben: falscher Audio-State + doppelte Last an Übergängen
+5. Technischer Hinweis
+- Ich würde diesmal bewusst nicht noch einmal nur an kleinen Mute-/Transition-Details schrauben.
+- Der saubere Fix ist: Audio-Start im Editor korrekt machen und die Editor-Preview von der finalen Render-Architektur entkoppeln, damit nicht dieselbe Szene-Overlap-Logik den Browser ausbremst.
