@@ -424,16 +424,19 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     };
   }, [playerKey]);
 
-  // Sync external time changes
+  // Sync external time changes — only when NOT playing to avoid seek interrupts
   useEffect(() => {
+    if (isPlaying) return; // Don't interrupt playback with external syncs
     const player = playerRef.current;
-    if (currentTime === 0 && internalTime > 0.5) return;
+    if (!player) return;
+    if (currentTime === 0 && internalTimeRef.current > 0.5) return;
     
-    if (player && Math.abs(currentTime - internalTime) > 0.5) {
+    if (Math.abs(currentTime - internalTimeRef.current) > 0.5) {
       player.seekTo(Math.floor(currentTime * fps));
-      setInternalTime(currentTime);
+      internalTimeRef.current = currentTime;
+      setDisplayTime(currentTime);
     }
-  }, [currentTime, internalTime]);
+  }, [currentTime, isPlaying]);
 
   const handlePlayPause = useCallback(() => {
     const player = playerRef.current;
