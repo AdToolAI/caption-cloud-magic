@@ -1,56 +1,45 @@
 
-## Fix: Content Creator nutzt noch das falsche Remotion-Template
+## Fix: Universal Content Creator — Szenen werden nicht gezeigt
 
 ### Ursache
-Der letzte Fix fuer `SafeVideo` wurde in `UniversalCreatorVideo.tsx` eingebaut, aber der Universal Content Creator verwendet an den entscheidenden Stellen weiterhin **`UniversalVideo`**:
+Die Szenen kommen grundsätzlich korrekt bis zum Render an. Die Logs zeigen:
+- `sceneCount: 5`
+- alle 5 Szenen sind gültig
+- jede Szene hat `background.type = video` und eine `videoUrl`
 
-- `src/components/universal-creator/steps/PreviewExportStep.tsx` sendet beim Rendern `component_name: 'UniversalVideo'`
-- `src/pages/UniversalCreator/UniversalCreator.tsx` uebergibt an den Preview-Player `componentName="UniversalVideo"`
-- `src/components/universal-creator/RemotionPreviewPlayer.tsx` ignoriert `componentName` aktuell komplett und rendert hart `component={UniversalVideo}`
+Das Problem sitzt sehr wahrscheinlich im Template `src/remotion/templates/UniversalCreatorVideo.tsx`:
 
-Die Runtime-Logs bestaetigen das ebenfalls: Der Render lief mit `composition: "UniversalVideo"`. Deshalb greift der neue `SafeVideo`-Schutz aus `UniversalCreatorVideo` ueberhaupt nicht, und der alte Pixabay-Timeout tritt weiter auf.
+Die neue Komponente `SafeVideo` startet `delayRender()`, aber sie **löst den Handle bei erfolgreichem Laden nie auf**:
+- `loaded` wird zwar als State angelegt
+- es gibt aber **kein** `onLoadedData` / `onCanPlay` / ähnliches, das `setLoaded(true)` und `continueRender(handle)` ausführt
+- nach 20 Sekunden greift deshalb immer der Timeout
+- `SafeVideo` schaltet dann auf `GradientFallback` um
 
-### Aenderungen
+Ergebnis: Die Video-Szenen werden nicht sichtbar, obwohl sie im Payload enthalten sind. Stattdessen sieht man nur Verlauf + Text.
 
-#### 1. `src/components/universal-creator/RemotionPreviewPlayer.tsx`
-- `componentName` wirklich verwenden statt immer `UniversalVideo`
-- kleine Composition-Registry/Switch einbauen:
-  - `UniversalCreatorVideo` → `UniversalCreatorVideo`
-  - `UniversalVideo` → `UniversalVideo`
-- bei unbekanntem Namen defensiv auf `UniversalCreatorVideo` oder klaren Fallback gehen
+### Änderungen
 
-#### 2. `src/pages/UniversalCreator/UniversalCreator.tsx`
-- Live-Preview des Universal Content Creators von
-  - `componentName="UniversalVideo"`
-  auf
-  - `componentName="UniversalCreatorVideo"`
-  umstellen
+#### 1. `src/remotion/templates/UniversalCreatorVideo.tsx`
+`SafeVideo` sauber fertigstellen:
 
-#### 3. `src/components/universal-creator/steps/PreviewExportStep.tsx`
-- Export-Call zu `render-with-remotion` von
-  - `component_name: 'UniversalVideo'`
-  auf
-  - `component_name: 'UniversalCreatorVideo'`
-  umstellen
+- Erfolgs-Handler ergänzen, z. B. über `onLoadedData` oder `onCanPlay`
+- bei erfolgreichem Laden:
+  - `setLoaded(true)`
+  - `continueRender(handle)`
+- mit Guard absichern, damit `continueRender()` nur einmal aufgerufen wird
+- bei Error/Timeout weiterhin auf `GradientFallback` wechseln
+- optional: ungültige URLs früh abfangen und direkt Fallback rendern
 
 ### Warum das den Fehler behebt
-Dann nutzen sowohl:
-- der Preview Player
-- als auch der echte Render auf Lovable Cloud
-
-dieselbe Composition: **`UniversalCreatorVideo`**.
-
-Damit greifen endlich die bereits eingebauten Schutzmechanismen:
-- `SafeVideo` fuer Pixabay/Hailuo-Videos
-- Gradient-Fallback statt haengendem `delayRender()`
-- konsistentes Verhalten zwischen Preview und finalem Render
+Dann blockiert `SafeVideo` den Render nicht mehr künstlich:
+- erfolgreiche Pixabay-/Remote-Videos bleiben sichtbar
+- nur echte Ladefehler fallen auf den Gradient-Fallback zurück
+- Preview und finaler Render verhalten sich wieder konsistent
 
 ### Technische Hinweise
-- Die vorhandenen Input-Props (`scenes`, `subtitles`, `voiceoverUrl`, `backgroundMusicUrl`, `targetWidth`, `targetHeight`, `fps`) passen bereits zum Creator-Template
-- Es ist kein Backend-Schema-Change noetig
-- Optional sinnvoll: Logging im Preview/Export klar auf `UniversalCreatorVideo` benennen, damit kuenftige Debugging-Faelle eindeutiger sind
+- Kein Datenbank- oder Backend-Schema-Fix nötig
+- `render-with-remotion` liefert die Szenen bereits korrekt an
+- Der Fehler wurde durch die Schutz-Komponente selbst eingeführt, nicht durch die Szenen-Pipeline
 
-### Dateien
-1. `src/components/universal-creator/RemotionPreviewPlayer.tsx`
-2. `src/pages/UniversalCreator/UniversalCreator.tsx`
-3. `src/components/universal-creator/steps/PreviewExportStep.tsx`
+### Datei
+1. `src/remotion/templates/UniversalCreatorVideo.tsx` — `SafeVideo` Success-Handling ergänzen und `delayRender` korrekt freigeben
