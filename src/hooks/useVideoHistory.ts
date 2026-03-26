@@ -41,6 +41,10 @@ export const useVideoHistory = () => {
 
   const deleteVideoMutation = useMutation({
     mutationFn: async (videoId: string) => {
+      // Block deletion of demo videos
+      if (videoId === DEMO_VIDEO.id) {
+        throw new Error('Demo-Videos können nicht gelöscht werden');
+      }
       const { error } = await supabase
         .from('video_creations')
         .delete()
