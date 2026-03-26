@@ -1,46 +1,40 @@
 
 
-## Fix: Bearbeitete Untertitel werden nicht in Preview und Render uebernommen
+## Fix: Bearbeitete Untertitel erscheinen nicht im Preview
 
 ### Ursache
 
-Die `MemoizedPlayer`-Komponente in `RemotionPreviewPlayer.tsx` (Zeile 51-61) hat einen **custom `React.memo` Vergleich**, der NUR auf Aenderungen der Audio-URLs reagiert:
-
+In `SubtitleTimingStep.tsx` Zeile 85 wird beim Speichern nur `text` aktualisiert:
 ```typescript
-(prevProps, nextProps) => {
-  // ONLY re-render if audio URLs change
-  const audioEqual = 
-    prevProps.inputProps?.backgroundMusicUrl === nextProps.inputProps?.backgroundMusicUrl &&
-    prevProps.inputProps?.voiceoverUrl === nextProps.inputProps?.voiceoverUrl;
-  return audioEqual; // true = skip update
-}
+{ ...seg, text: editText, startTime: editStartTime, endTime: editEndTime }
 ```
 
-Wenn Untertitel bearbeitet werden, aendern sich `subtitles` und `subtitleStyle` in den `inputProps` — aber der Vergleich ignoriert diese komplett. Der Player rendert weiter mit den alten Untertiteln.
+Das `words`-Array bleibt unverändert mit dem alten Text. Das Remotion-Template (`UniversalVideo.tsx`) rendert aber bevorzugt aus `words` (Zeile 793-818) — `text` ist nur Fallback wenn `words` leer ist.
 
-### Aenderung
+### Änderungen
 
-#### `src/components/universal-creator/RemotionPreviewPlayer.tsx`
+#### 1. `src/components/universal-creator/steps/SubtitleTimingStep.tsx`
 
-Den `React.memo`-Vergleich erweitern, sodass er auch Untertitel-Aenderungen erkennt:
+In `handleSaveEdit`: Nach dem Text-Update das `words`-Array neu aufbauen. Neuen Text in Wörter splitten, Timings gleichmässig zwischen `startTime` und `endTime` verteilen:
 
 ```typescript
-(prevProps, nextProps) => {
-  const audioEqual = 
-    prevProps.inputProps?.backgroundMusicUrl === nextProps.inputProps?.backgroundMusicUrl &&
-    prevProps.inputProps?.voiceoverUrl === nextProps.inputProps?.voiceoverUrl;
-  
-  // Also re-render when subtitles change
-  const subtitlesEqual = 
-    JSON.stringify(prevProps.inputProps?.subtitles) === JSON.stringify(nextProps.inputProps?.subtitles) &&
-    JSON.stringify(prevProps.inputProps?.subtitleStyle) === JSON.stringify(nextProps.inputProps?.subtitleStyle);
-  
-  return audioEqual && subtitlesEqual;
-}
+const newWords = editText.split(/\s+/).filter(Boolean).map((word, i, arr) => {
+  const duration = (editEndTime - editStartTime) / arr.length;
+  return {
+    text: word,
+    startTime: editStartTime + i * duration,
+    endTime: editStartTime + (i + 1) * duration,
+  };
+});
+
+return { ...seg, text: editText, words: newWords, startTime: editStartTime, endTime: editEndTime };
 ```
 
-Zusaetzlich `durationInFrames` in den Vergleich aufnehmen, da sich die Dauer ebenfalls aendern kann.
+#### 2. `src/remotion/templates/UniversalVideo.tsx`
+
+Defensive Normalisierung: Vor dem Rendern prüfen ob `words` zum `text` passt. Wenn nicht (z.B. alte Daten), `words` aus `text` ableiten. Dies sichert auch bestehende Projekte ab.
 
 ### Dateien
-1. `src/components/universal-creator/RemotionPreviewPlayer.tsx` — Memo-Vergleich um Untertitel + Duration erweitern
+1. `src/components/universal-creator/steps/SubtitleTimingStep.tsx` — `words` beim Speichern mitsynchronisieren
+2. `src/remotion/templates/UniversalVideo.tsx` — Fallback-Normalisierung wenn `words` und `text` divergieren
 
