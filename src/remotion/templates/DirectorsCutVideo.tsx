@@ -722,40 +722,75 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     let transitionTransform = '';
     let transitionClipPath = '';
     let transitionVideoOpacity = 1;
+    // Incoming overlay variables — separate layer for wipe/slide/push/crossfade
+    let incomingOverlayOpacity = 0;
+    let incomingOverlayTransform = '';
+    let incomingOverlayClipPath = '';
     if (nextScene) {
       const currentTransition = transitions?.find(t => t.sceneIndex === activeIdx);
       if (currentTransition && currentTransition.type && currentTransition.type !== 'none') {
         const tDuration = currentTransition.duration || 0.5;
         const tStart = nextScene.startTime - tDuration;
-        const transitionType = currentTransition.type.toLowerCase().split('-')[0];
+        const fullType = currentTransition.type.toLowerCase();
+        const transitionType = fullType.split('-')[0];
+        const transitionDir = fullType.split('-')[1] || 'left';
         if (currentTimeSeconds >= tStart && currentTimeSeconds < nextScene.startTime) {
           const progress = (currentTimeSeconds - tStart) / tDuration;
           const eased = 0.5 - 0.5 * Math.cos(progress * Math.PI); // smooth ease in-out
           switch (transitionType) {
             case 'fade':
+              transitionVideoOpacity = 1 - eased * 0.8;
+              transitionOverlayOpacity = eased * 0.6;
+              break;
             case 'crossfade':
             case 'dissolve':
-              transitionVideoOpacity = 1 - eased * 0.7;
-              transitionOverlayOpacity = eased * 0.4;
+              transitionVideoOpacity = 1 - eased * 0.6;
+              incomingOverlayOpacity = eased;
               break;
             case 'blur':
-              transitionBlur = eased * 20;
+              transitionBlur = eased * 15;
               transitionVideoOpacity = 1 - eased * 0.3;
               break;
             case 'zoom':
               transitionTransform = `scale(${1 + eased * 0.3})`;
               transitionVideoOpacity = 1 - eased * 0.4;
               break;
-            case 'wipe':
-              transitionClipPath = `inset(0 ${eased * 100}% 0 0)`;
+            case 'wipe': {
+              // Base video stays stable; incoming overlay wipes in
+              incomingOverlayOpacity = 1;
+              if (transitionDir === 'left') incomingOverlayClipPath = `inset(0 ${(1 - eased) * 100}% 0 0)`;
+              else if (transitionDir === 'right') incomingOverlayClipPath = `inset(0 0 0 ${(1 - eased) * 100}%)`;
+              else if (transitionDir === 'up') incomingOverlayClipPath = `inset(0 0 ${(1 - eased) * 100}% 0)`;
+              else incomingOverlayClipPath = `inset(${(1 - eased) * 100}% 0 0 0)`;
               break;
-            case 'slide':
-              transitionTransform = `translateX(${-eased * 30}%)`;
-              transitionVideoOpacity = 1 - eased * 0.3;
+            }
+            case 'slide': {
+              // Incoming overlay slides in from outside
+              incomingOverlayOpacity = 1;
+              if (transitionDir === 'left') incomingOverlayTransform = `translateX(${(1 - eased) * 100}%)`;
+              else if (transitionDir === 'right') incomingOverlayTransform = `translateX(${-(1 - eased) * 100}%)`;
+              else if (transitionDir === 'up') incomingOverlayTransform = `translateY(${(1 - eased) * 100}%)`;
+              else incomingOverlayTransform = `translateY(${-(1 - eased) * 100}%)`;
               break;
-            case 'push':
-              transitionTransform = `translateX(${-eased * 100}%)`;
+            }
+            case 'push': {
+              // Base video pushes out, incoming pushes in
+              if (transitionDir === 'left') {
+                transitionTransform = `translateX(${-eased * 100}%)`;
+                incomingOverlayTransform = `translateX(${(1 - eased) * 100}%)`;
+              } else if (transitionDir === 'right') {
+                transitionTransform = `translateX(${eased * 100}%)`;
+                incomingOverlayTransform = `translateX(${-(1 - eased) * 100}%)`;
+              } else if (transitionDir === 'up') {
+                transitionTransform = `translateY(${-eased * 100}%)`;
+                incomingOverlayTransform = `translateY(${(1 - eased) * 100}%)`;
+              } else {
+                transitionTransform = `translateY(${eased * 100}%)`;
+                incomingOverlayTransform = `translateY(${-(1 - eased) * 100}%)`;
+              }
+              incomingOverlayOpacity = 1;
               break;
+            }
             default:
               transitionVideoOpacity = 1 - eased * 0.5;
               transitionOverlayOpacity = eased * 0.3;
@@ -801,11 +836,36 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             transform: [kenBurnsStyle, transitionTransform].filter(Boolean).join(' ') || undefined,
             clipPath: transitionClipPath || undefined,
             transformOrigin: 'center center',
-            transition: 'opacity 0.15s ease, filter 0.15s ease, transform 0.1s ease',
           }}
           volume={0}
         />
-        {/* Transition overlay — darkens/blurs between scenes */}
+        {/* Incoming scene overlay — for wipe/slide/push/crossfade transitions */}
+        {incomingOverlayOpacity > 0 && (
+          <AbsoluteFill style={{
+            opacity: incomingOverlayOpacity,
+            transform: incomingOverlayTransform || undefined,
+            clipPath: incomingOverlayClipPath || undefined,
+            backgroundColor: '#000',
+            pointerEvents: 'none',
+            zIndex: 4,
+            overflow: 'hidden',
+          }}>
+            {/* Re-use the same video source to show "next scene" frame */}
+            <Video
+              src={sourceVideoUrl}
+              startFrom={0}
+              pauseWhenBuffering={false}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                filter: previewFilter.trim(),
+              }}
+              volume={0}
+            />
+          </AbsoluteFill>
+        )}
+        {/* Darkening overlay for fade transitions */}
         {transitionOverlayOpacity > 0 && (
           <AbsoluteFill style={{
             backgroundColor: `rgba(0,0,0,${transitionOverlayOpacity})`,
