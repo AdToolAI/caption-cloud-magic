@@ -84,11 +84,13 @@ export function DirectorsCut() {
 
   useEffect(() => {
     if (scenes.length > 1 && transitions.length === 0) {
+      // Default to 'none' (hard cuts) — user can add transitions manually
+      // This avoids decoder-heavy crossfades that cause stuttering in preview
       const defaultTransitions: TransitionAssignment[] = scenes
         .slice(0, -1)
         .map((scene) => ({
           sceneId: scene.id,
-          transitionType: 'crossfade',
+          transitionType: 'none',
           duration: 0.5,
           aiSuggested: false,
         }));
@@ -405,12 +407,26 @@ export function DirectorsCut() {
       const rawScenes = data.scenes || [];
       const sortedScenes = [...rawScenes].sort((a: any, b: any) => a.start_time - b.start_time);
       
+      const videoDuration = selectedVideo.duration || 30;
+      
+      // Client-side stabilization: merge micro-scenes (<1.5s)
+      const MIN_SCENE_DURATION = 1.5;
+      const stableScenes: any[] = [];
+      for (const scene of sortedScenes) {
+        const dur = (scene.end_time || 0) - (scene.start_time || 0);
+        if (dur < MIN_SCENE_DURATION && stableScenes.length > 0) {
+          stableScenes[stableScenes.length - 1].end_time = scene.end_time;
+          stableScenes[stableScenes.length - 1].original_end_time = scene.original_end_time ?? scene.end_time;
+        } else {
+          stableScenes.push({ ...scene });
+        }
+      }
+      
       const normalizedScenes: SceneAnalysis[] = [];
       let currentTimelinePosition = 0;
-      const videoDuration = selectedVideo.duration || 30;
 
-      for (let i = 0; i < sortedScenes.length; i++) {
-        const scene = sortedScenes[i];
+      for (let i = 0; i < stableScenes.length; i++) {
+        const scene = stableScenes[i];
         const originalDuration = scene.end_time - scene.start_time;
         const safeDuration = Math.max(0.5, originalDuration);
         const timelineStart = currentTimelinePosition;

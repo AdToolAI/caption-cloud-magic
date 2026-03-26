@@ -332,7 +332,10 @@ Antworte NUR mit dem JSON-Array!`
           };
         });
         
-        console.log(`[analyze-video-scenes] Final scenes: ${scenes.map(s => `${s.id}:${s.start_time}-${s.end_time}s "${s.description.substring(0, 40)}..."`).join(', ')}`);
+      // Stabilize scenes: merge micro-scenes and cap max count
+      scenes = stabilizeScenes(scenes, videoDuration);
+      
+      console.log(`[analyze-video-scenes] Final stabilized scenes: ${scenes.map(s => `${s.id}:${s.start_time}-${s.end_time}s "${s.description?.substring(0, 40)}..."`).join(', ')}`);
         
       } catch (parseError) {
         console.error("[analyze-video-scenes] Parse error:", parseError);
@@ -460,6 +463,9 @@ REGELN:
           ai_suggestions: scene.ai_suggestions || [],
         }));
       
+      // Stabilize scenes: merge micro-scenes and cap max count
+      scenes = stabilizeScenes(scenes, videoDuration);
+      
     } catch (parseError) {
       console.error("[analyze-video-scenes] Parse error:", parseError);
       scenes = generateFallbackScenes(videoDuration);
@@ -508,6 +514,64 @@ function generateDefaultEffectsForMood(mood: string): { type: string; name: stri
   };
   
   return moodEffects[mood] || moodEffects.neutral;
+}
+
+// Stabilize scenes: merge micro-scenes (<1.5s) and cap max count based on video length
+function stabilizeScenes(scenes: any[], videoDuration: number): any[] {
+  if (scenes.length <= 1) return scenes;
+  
+  const MIN_SCENE_DURATION = 1.5; // seconds
+  const MAX_SCENES_PER_10S = 2; // max 2 scenes per 10 seconds of video
+  const maxScenes = Math.max(2, Math.ceil(videoDuration / 10 * MAX_SCENES_PER_10S));
+  
+  // Step 1: Merge micro-scenes into their neighbors
+  let stabilized: any[] = [];
+  for (const scene of scenes) {
+    const duration = (scene.end_time || 0) - (scene.start_time || 0);
+    if (duration < MIN_SCENE_DURATION && stabilized.length > 0) {
+      // Merge into previous scene
+      const prev = stabilized[stabilized.length - 1];
+      prev.end_time = scene.end_time;
+      prev.original_end_time = scene.original_end_time ?? scene.end_time;
+      // Keep the longer description
+      if ((scene.description || '').length > (prev.description || '').length) {
+        prev.description = scene.description;
+      }
+      console.log(`[stabilizeScenes] Merged micro-scene (${duration.toFixed(1)}s) into previous`);
+    } else {
+      stabilized.push({ ...scene });
+    }
+  }
+  
+  // Step 2: If still too many scenes, merge shortest ones
+  while (stabilized.length > maxScenes) {
+    // Find the shortest scene (not first or last)
+    let shortestIdx = -1;
+    let shortestDur = Infinity;
+    for (let i = 1; i < stabilized.length - 1; i++) {
+      const dur = stabilized[i].end_time - stabilized[i].start_time;
+      if (dur < shortestDur) {
+        shortestDur = dur;
+        shortestIdx = i;
+      }
+    }
+    if (shortestIdx < 0) break;
+    
+    // Merge into previous
+    stabilized[shortestIdx - 1].end_time = stabilized[shortestIdx].end_time;
+    stabilized[shortestIdx - 1].original_end_time = stabilized[shortestIdx].original_end_time;
+    stabilized.splice(shortestIdx, 1);
+    console.log(`[stabilizeScenes] Reduced scene count to ${stabilized.length} (merged shortest)`);
+  }
+  
+  // Re-index
+  stabilized = stabilized.map((s, i) => ({
+    ...s,
+    id: `scene-${i + 1}`,
+  }));
+  
+  console.log(`[stabilizeScenes] Final: ${stabilized.length} scenes (max allowed: ${maxScenes})`);
+  return stabilized;
 }
 
 function generateFallbackScenes(duration: number): SceneAnalysis[] {

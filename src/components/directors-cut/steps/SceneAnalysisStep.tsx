@@ -28,7 +28,7 @@ import { AIAutoCut } from '../features/AIAutoCut';
 import { toast } from 'sonner';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
-import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
+// DirectorsCutPreviewPlayer removed — using native <video> for lightweight analysis preview
 
 // Extract video frames for Vision AI analysis
 const extractVideoFrames = async (videoUrl: string, duration: number): Promise<string[]> => {
@@ -650,31 +650,28 @@ export function SceneAnalysisStep({
 
   return (
     <div className="space-y-6">
-      {/* Video Preview with Timeline - Remotion Player für Transitions */}
-      <div className="relative rounded-lg">
-        <DirectorsCutPreviewPlayer
-          videoUrl={videoUrl}
-          effects={appliedEffects || { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 }}
-          sceneEffects={sceneEffects}
-          scenes={scenes}
-          transitions={transitions}
-          audio={{ 
-            master_volume: 100, 
-            noise_reduction: false, 
-            noise_reduction_level: 0, 
-            auto_ducking: false, 
-            ducking_level: 0, 
-            voice_enhancement: false, 
-            added_sounds: [] 
-          }}
-          duration={videoDuration}
-          currentTime={currentVideoTime}
-          onTimeUpdate={handleThrottledTimeUpdate}
-          initialMuted={false}
-        >
+      {/* Lightweight Native Video Preview — no Remotion overhead in analysis step */}
+      <div className="relative rounded-lg bg-black overflow-hidden">
+        <div className="aspect-video relative">
+          <video
+            ref={(el) => {
+              if (el && !el.dataset.initialized) {
+                el.dataset.initialized = 'true';
+                el.addEventListener('timeupdate', () => {
+                  handleThrottledTimeUpdate(el.currentTime);
+                });
+              }
+            }}
+            src={videoUrl}
+            className="w-full h-full object-contain"
+            controls
+            playsInline
+            preload="auto"
+          />
+          
           {/* Current Scene Indicator */}
           {scenes.length > 0 && (
-            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-sm rounded px-2 py-1 z-10">
+            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-sm rounded px-2 py-1 z-10 pointer-events-none">
               <span className="text-xs text-white">
                 {(() => {
                   const currentScene = getCurrentScene(currentVideoTime);
@@ -700,12 +697,11 @@ export function SceneAnalysisStep({
             </div>
           )}
           
-          {/* Scene Timeline Overlay with Draggable Dividers and Cut Markers */}
+          {/* Scene Timeline Overlay with Draggable Dividers */}
           {scenes.length > 0 && (
-            <div className="absolute bottom-4 left-0 right-0 px-4 z-10">
+            <div className="absolute bottom-12 left-0 right-0 px-4 z-10">
               <div className="bg-black/60 backdrop-blur-sm rounded-lg p-2">
                 <div ref={timelineRef} className={`flex h-8 relative ${isDragging ? 'select-none' : ''}`}>
-                  {/* Scene Bars */}
                   {scenes.map((scene, index) => {
                     const width = ((scene.end_time - scene.start_time) / videoDuration) * 100;
                     const isActive = currentVideoTime >= scene.start_time && currentVideoTime < scene.end_time;
@@ -720,17 +716,14 @@ export function SceneAnalysisStep({
                     ];
                     return (
                       <div key={scene.id} className="flex" style={{ width: `${width}%` }}>
-                        {/* Scene Bar */}
                         <div
                           className={`${colors[index % colors.length]} rounded-l ${index === scenes.length - 1 ? 'rounded-r' : ''} cursor-pointer 
                             transition-all relative group flex-1 ${isActive ? 'ring-2 ring-white scale-y-110' : 'hover:opacity-80'}`}
                           title={`Szene ${index + 1}: ${scene.description}`}
                         >
-                          {/* Effects indicator */}
                           {hasEffects && (
                             <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white z-10" />
                           )}
-                          {/* Playback Rate Badge (Time Remapping indicator) */}
                           {scene.playbackRate && scene.playbackRate !== 1.0 && (
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
                               bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-medium z-10 pointer-events-none">
@@ -746,7 +739,6 @@ export function SceneAnalysisStep({
                           </div>
                         </div>
                         
-                        {/* Draggable Divider (between scenes, not after last) */}
                         {index < scenes.length - 1 && (
                           <div
                             className={`w-2 cursor-col-resize flex items-center justify-center group/divider z-30
@@ -765,7 +757,7 @@ export function SceneAnalysisStep({
               </div>
             </div>
           )}
-        </DirectorsCutPreviewPlayer>
+        </div>
       </div>
 
       {/* Analysis Section */}
