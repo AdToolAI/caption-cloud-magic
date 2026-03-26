@@ -279,7 +279,6 @@ export function SceneAnalysisStep({
       // Simulate vignette with stronger contrast/saturation boost
       effects.contrast = 100 + Math.round(strength);
       effects.saturation = 100 + Math.round(strength / 2);
-      console.log(`[parseEffectName] VIGNETTE: strength=${strength} → contrast=${effects.contrast}, saturation=${effects.saturation}`);
       return effects;
     }
     
