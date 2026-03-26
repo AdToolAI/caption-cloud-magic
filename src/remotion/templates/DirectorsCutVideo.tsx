@@ -760,6 +760,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
               <Sequence
                 from={Math.max(0, sceneEndFrame - transitionDurationFrames)}
                 durationInFrames={transitionDurationFrames}
+                premountFor={previewMode ? 30 : 0}
               >
                 <AbsoluteFill>
                   <SceneVideo
@@ -782,6 +783,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                     chromaKey={chromaKey}
                     kenBurns={kenBurns}
                     sceneDurationFrames={Math.max(1, Math.floor(nextScene.endTime * fps) - Math.floor(nextScene.startTime * fps))}
+                    previewMode={previewMode}
                   />
                 </AbsoluteFill>
               </Sequence>
@@ -790,6 +792,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             <Sequence
               from={sceneStartFrame}
               durationInFrames={sceneDurationFrames}
+              premountFor={previewMode ? 30 : 0}
             >
               <AbsoluteFill>
                 <SceneVideo
@@ -812,6 +815,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                   chromaKey={chromaKey}
                   kenBurns={kenBurns}
                   sceneDurationFrames={sceneDurationFrames}
+                  previewMode={previewMode}
                 />
               </AbsoluteFill>
             </Sequence>
