@@ -1,6 +1,12 @@
 import React, { useMemo, useRef, useState, useCallback, useEffect, memo } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { UniversalVideo } from '@/remotion/templates/UniversalVideo';
+import { UniversalCreatorVideo } from '@/remotion/templates/UniversalCreatorVideo';
+
+const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
+  UniversalVideo,
+  UniversalCreatorVideo,
+};
 import { Volume2, VolumeX, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
@@ -16,6 +22,7 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
   loop,
   numberOfSharedAudioTags,
   initiallyMuted,
+  component,
 }: {
   playerRef: React.RefObject<PlayerRef>;
   inputProps: any;
@@ -26,6 +33,7 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
   loop: boolean;
   numberOfSharedAudioTags: number;
   initiallyMuted: boolean;
+  component: React.ComponentType<any>;
 }) {
   console.log('[MemoizedPlayer] Rendering with audio:', {
     backgroundMusicUrl: !!inputProps?.backgroundMusicUrl,
@@ -35,7 +43,7 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
   return (
     <Player
       ref={playerRef}
-      component={UniversalVideo}
+      component={component}
       inputProps={inputProps}
       compositionWidth={compositionWidth}
       compositionHeight={compositionHeight}
@@ -106,6 +114,10 @@ export function RemotionPreviewPlayer({
     customizations?.backgroundMusicVolume,
     customizations?.voiceoverUrl
   ]);
+
+  const resolvedComponent = useMemo(() => {
+    return COMPONENT_REGISTRY[componentName] || UniversalCreatorVideo;
+  }, [componentName]);
 
   const inputProps = useMemo(() => ({
     ...customizations,
@@ -264,6 +276,7 @@ export function RemotionPreviewPlayer({
           loop={loop}
           numberOfSharedAudioTags={5}
           initiallyMuted={!hasEverInteractedRef.current}
+          component={resolvedComponent}
         />
       </div>
       

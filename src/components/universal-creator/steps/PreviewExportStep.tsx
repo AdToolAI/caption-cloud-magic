@@ -305,7 +305,7 @@ export function PreviewExportStep({
           const { data, error } = await supabase.functions.invoke('render-with-remotion', {
             body: {
               project_id: projectId,
-              component_name: 'UniversalVideo',
+              component_name: 'UniversalCreatorVideo',
               quality: videoQuality,
               customizations: {
                 voiceoverUrl: contentConfig.voiceoverUrl || '',
