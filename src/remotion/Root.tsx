@@ -136,6 +136,7 @@ export const RemotionRoot: React.FC = () => {
             backgroundColor: '#000000',
             backgroundOpacity: 0.7,
             animation: 'none',
+            animationSpeed: 1,
             outlineStyle: 'none',
             outlineColor: '#000000',
             outlineWidth: 2,
