@@ -607,18 +607,7 @@ export function SceneAnalysisStep({
         end_time: videoDuration
       };
     }
-    
-    // ==================== DEBUG LOGS ====================
-    console.log('[SceneAnalysisStep] ========== CASCADE DURATION CHANGE ==========');
-    console.log(`[SceneAnalysisStep] Scene index: ${sceneIndex}, Shift amount: ${shiftAmount.toFixed(2)}s`);
-    console.log('[SceneAnalysisStep] Updated scenes:', updatedScenes.map(s => ({
-      id: s.id,
-      timeline: `${s.start_time?.toFixed(2)}-${s.end_time?.toFixed(2)}s`,
-      original: `${s.original_start_time?.toFixed(2)}-${s.original_end_time?.toFixed(2)}s`,
-      playbackRate: s.playbackRate?.toFixed(3)
-    })));
-    console.log('[SceneAnalysisStep] =============================================');
-    // ==================== END DEBUG LOGS ====================
+    // Cascade complete
     
     onScenesUpdate(updatedScenes);
   }, [scenes, onScenesUpdate, videoDuration]);
