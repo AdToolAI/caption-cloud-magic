@@ -229,17 +229,13 @@ export function SceneAnalysisStep({
     return filterString;
   }, [getCurrentEffects, currentVideoTime]);
 
-  // FIXED: Create a stable key to force video re-render when effects change
-  const videoKey = useMemo(() => {
-    return JSON.stringify(sceneEffects);
-  }, [sceneEffects]);
-
-  // Handle video time update
-  const handleVideoTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentVideoTime(videoRef.current.currentTime);
-    }
-  };
+  // Throttled time update handler to reduce re-renders
+  const handleThrottledTimeUpdate = useCallback((time: number) => {
+    const now = performance.now();
+    if (now - lastTimeUpdateRef.current < 250) return; // Max ~4 updates/sec for scene indicator
+    lastTimeUpdateRef.current = now;
+    setCurrentVideoTime(time);
+  }, []);
 
   // Helper to extract number from string
   const extractNumber = (text: string, defaultValue: number): number => {
