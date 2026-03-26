@@ -865,7 +865,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         }}>
           <div style={{
             fontFamily: fontFamily,
-            fontSize: (subtitleStyle.fontSize || 48) * ((1080 / 1080) * 1.6),
+            fontSize: (subtitleStyle.fontSize || 48) * ((width / 1080) * 1.6),
             color: subtitleStyle.color || '#FFFFFF',
             textAlign: 'center',
             maxWidth: '80%',
