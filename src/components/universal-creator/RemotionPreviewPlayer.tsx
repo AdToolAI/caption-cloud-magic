@@ -276,6 +276,7 @@ export function RemotionPreviewPlayer({
           loop={loop}
           numberOfSharedAudioTags={5}
           initiallyMuted={!hasEverInteractedRef.current}
+          component={resolvedComponent}
         />
       </div>
       
