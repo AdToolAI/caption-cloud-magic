@@ -325,8 +325,23 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     const player = playerRef.current;
     if (!player) return;
 
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const onPlay = () => {
+      setIsPlaying(true);
+      // Auto-start native audio when player plays
+      if (!isMuted) {
+        if (!originalAudioMuted && sourceAudioRef.current) {
+          sourceAudioRef.current.play().catch(() => {});
+        }
+        voiceoverAudioRef.current?.play().catch(() => {});
+        backgroundMusicAudioRef.current?.play().catch(() => {});
+      }
+    };
+    const onPause = () => {
+      setIsPlaying(false);
+      sourceAudioRef.current?.pause();
+      voiceoverAudioRef.current?.pause();
+      backgroundMusicAudioRef.current?.pause();
+    };
     let lastUpdateTime = 0;
     const onTimeUpdateEvent = () => {
       const now = performance.now();
@@ -336,6 +351,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const time = frame / fps;
       setInternalTime(time);
       onTimeUpdateRef.current?.(time);
+      
+      // Keep native audio in sync (correct drift > 0.3s)
+      if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
+        if (Math.abs(sourceAudioRef.current.currentTime - time) > 0.3) {
+          sourceAudioRef.current.currentTime = time;
+        }
+      }
+      if (voiceoverAudioRef.current && !voiceoverAudioRef.current.paused) {
+        if (Math.abs(voiceoverAudioRef.current.currentTime - time) > 0.3) {
+          voiceoverAudioRef.current.currentTime = time;
+        }
+      }
     };
     const onEnded = () => {
       setIsPlaying(false);
