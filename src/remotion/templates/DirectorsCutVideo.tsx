@@ -320,6 +320,7 @@ const SceneVideo: React.FC<{
   chromaKey,
   kenBurns,
   sceneDurationFrames,
+  previewMode = false,
 }) => {
   const localFrame = useCurrentFrame(); // Local frame within this Sequence (0 to sceneDurationFrames)
   const { fps } = useVideoConfig();
