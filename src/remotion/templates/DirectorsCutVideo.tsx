@@ -729,7 +729,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
           return (
             <React.Fragment key={scene.id}>
-              <TransitionSeries.Sequence durationInFrames={sceneDurationFrames} premountFor={30}>
+              <TransitionSeries.Sequence durationInFrames={sceneDurationFrames} premountFor={60}>
                 <AbsoluteFill>
                   <SceneVideo
                     sourceVideoUrl={sourceVideoUrl}

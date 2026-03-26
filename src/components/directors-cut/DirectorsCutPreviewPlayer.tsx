@@ -102,7 +102,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(initialMuted);
-  const [internalTime, setInternalTime] = useState(currentTime);
+  const internalTimeRef = useRef(currentTime);
+  const [displayTime, setDisplayTime] = useState(currentTime);
   const [playerReady, setPlayerReady] = useState(false);
   const hasAutoStartedAudio = useRef(false);
 
@@ -242,13 +243,13 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     remotionScenes, sceneEffects, remotionTransitions, textOverlays
   ]);
 
-  // Find current subtitles based on internalTime
+  // Find current subtitles based on displayTime (throttled)
   const currentSubtitles = useMemo(() => {
     if (!subtitleTrack?.visible) return [];
     return subtitleTrack.clips.filter(
-      sub => internalTime >= sub.startTime && internalTime < sub.endTime
+      sub => displayTime >= sub.startTime && displayTime < sub.endTime
     );
-  }, [subtitleTrack, internalTime]);
+  }, [subtitleTrack, displayTime]);
 
   // Sync with external isPlaying state (from CapCutEditor)
   useEffect(() => {
@@ -358,36 +359,40 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
     };
-    let lastUpdateTime = 0;
+    let lastDisplayUpdateTime = 0;
     let lastParentUpdateTime = 0;
     const onTimeUpdateEvent = () => {
       const now = performance.now();
-      if (now - lastUpdateTime < 100) return; // Throttle internal to ~10/sec
-      lastUpdateTime = now;
       const frame = player.getCurrentFrame();
       const time = frame / fps;
-      setInternalTime(time);
+      internalTimeRef.current = time;
+      // Throttle display updates to ~4/sec to reduce React re-renders
+      if (now - lastDisplayUpdateTime > 250) {
+        lastDisplayUpdateTime = now;
+        setDisplayTime(time);
+      }
       // Throttle parent updates to ~4/sec to reduce upstream re-renders
       if (now - lastParentUpdateTime > 250) {
         lastParentUpdateTime = now;
         onTimeUpdateRef.current?.(time);
       }
       
-      // Keep native audio in sync (correct drift > 0.3s)
+      // Keep native audio in sync (correct drift > 0.5s)
       if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
-        if (Math.abs(sourceAudioRef.current.currentTime - time) > 0.3) {
+        if (Math.abs(sourceAudioRef.current.currentTime - time) > 0.5) {
           sourceAudioRef.current.currentTime = time;
         }
       }
       if (voiceoverAudioRef.current && !voiceoverAudioRef.current.paused) {
-        if (Math.abs(voiceoverAudioRef.current.currentTime - time) > 0.3) {
+        if (Math.abs(voiceoverAudioRef.current.currentTime - time) > 0.5) {
           voiceoverAudioRef.current.currentTime = time;
         }
       }
     };
     const onEnded = () => {
       setIsPlaying(false);
-      setInternalTime(0);
+      internalTimeRef.current = 0;
+      setDisplayTime(0);
       player.seekTo(0);
       
       if (sourceAudioRef.current) {
@@ -419,16 +424,19 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     };
   }, [playerKey]);
 
-  // Sync external time changes
+  // Sync external time changes — only when NOT playing to avoid seek interrupts
   useEffect(() => {
+    if (isPlaying) return; // Don't interrupt playback with external syncs
     const player = playerRef.current;
-    if (currentTime === 0 && internalTime > 0.5) return;
+    if (!player) return;
+    if (currentTime === 0 && internalTimeRef.current > 0.5) return;
     
-    if (player && Math.abs(currentTime - internalTime) > 0.5) {
+    if (Math.abs(currentTime - internalTimeRef.current) > 0.5) {
       player.seekTo(Math.floor(currentTime * fps));
-      setInternalTime(currentTime);
+      internalTimeRef.current = currentTime;
+      setDisplayTime(currentTime);
     }
-  }, [currentTime, internalTime]);
+  }, [currentTime, isPlaying]);
 
   const handlePlayPause = useCallback(() => {
     const player = playerRef.current;
@@ -445,7 +453,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const currentFrame = player.getCurrentFrame();
       if (currentFrame >= durationInFrames - 1) {
         player.seekTo(0);
-        setInternalTime(0);
+        internalTimeRef.current = 0;
+        setDisplayTime(0);
         if (sourceAudioRef.current) sourceAudioRef.current.currentTime = 0;
         if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = 0;
         if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
@@ -511,7 +520,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     const newTime = value[0];
     const frame = Math.floor(newTime * fps);
     player.seekTo(frame);
-    setInternalTime(newTime);
+    internalTimeRef.current = newTime;
+    setDisplayTime(newTime);
     onTimeUpdateRef.current?.(newTime);
     
     if (sourceAudioRef.current) {
@@ -531,7 +541,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     player.seekTo(0);
     player.pause();
-    setInternalTime(0);
+    internalTimeRef.current = 0;
+    setDisplayTime(0);
     setIsPlaying(false);
     
     if (sourceAudioRef.current) {
@@ -695,11 +706,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         </Button>
 
         <span className="text-xs text-muted-foreground min-w-[80px]">
-          {formatTime(internalTime)} / {formatTime(duration)}
+          {formatTime(displayTime)} / {formatTime(duration)}
         </span>
 
         <Slider
-          value={[internalTime]}
+          value={[displayTime]}
           min={0}
           max={duration}
           step={0.1}
