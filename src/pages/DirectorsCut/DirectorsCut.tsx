@@ -84,11 +84,13 @@ export function DirectorsCut() {
 
   useEffect(() => {
     if (scenes.length > 1 && transitions.length === 0) {
+      // Default to 'none' (hard cuts) — user can add transitions manually
+      // This avoids decoder-heavy crossfades that cause stuttering in preview
       const defaultTransitions: TransitionAssignment[] = scenes
         .slice(0, -1)
         .map((scene) => ({
           sceneId: scene.id,
-          transitionType: 'crossfade',
+          transitionType: 'none',
           duration: 0.5,
           aiSuggested: false,
         }));
