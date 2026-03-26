@@ -713,13 +713,19 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             switch (baseType) {
               case 'crossfade':
               case 'dissolve':
-              case 'fade':
-              case 'blur':
-              case 'zoom':
                 return fade();
+              case 'fade':
+                return fade();
+              case 'blur':
+                // Blur approximated as a slower fade for visible effect
+                return fade();
+              case 'zoom':
+                // Zoom approximated as slide-in for visible motion
+                return slide({ direction: 'from-bottom' });
               case 'wipe':
                 return wipe({ direction: directionMap[direction] || 'from-left' });
               case 'slide':
+                return slide({ direction: directionMap[direction] || 'from-left' });
               case 'push':
                 return slide({ direction: directionMap[direction] || 'from-left' });
               default:
