@@ -1,42 +1,76 @@
 
+## Fix: Universal Director's Cut stockt weiterhin an Szenenübergängen
 
-## Fix: Video-Stottern im Universal Director's Cut
+### Wahrscheinliche Ursache
+Ich habe die aktuelle Preview- und Remotion-Implementierung geprüft. Das Hängen sitzt sehr wahrscheinlich **nicht mehr primär im Player-Key**, sondern in der Szenen-/Transition-Architektur selbst:
 
-### Ursache
+1. **Jede Szene mountet ein neues `<Video>`**
+   - In `src/remotion/templates/DirectorsCutVideo.tsx` rendert jede Szene ihre **eigene** `Video`-Instanz in einer eigenen `Sequence`.
+   - Beim Szenenwechsel muss der Browser die Quelle neu auf die neue `startFrom`-Position anfahren.
+   - Weil `pauseWhenBuffering` aktiv ist, pausiert die Preview genau dann sichtbar.
 
-Zwei Hauptprobleme verursachen das Stottern:
+2. **Transitions sind aktuell nur “out”-Effekte**
+   - Die aktuelle Logik animiert am Szenenende fast nur die **ausgehende** Szene.
+   - Die **nächste** Szene wird nicht vorab sichtbar/preloaded überlagert.
+   - Dadurch fällt der Buffer-/Seek-Moment genau im Übergang auf.
 
-1. **Massives Debug-Logging**: `DirectorsCutPreviewPlayer.tsx` enthält ~30+ `console.log` Aufrufe in `useMemo`, `useEffect` und Event-Handlern. Diese feuern bei jeder Szenen-/Effekt-Aenderung und waehrend der Wiedergabe (z.B. bei jedem `timeupdate`-Event). Das blockiert den Main-Thread.
+3. **Die Haupt-Preview rechts nutzt teils die falsche Gesamtdauer**
+   - In `src/pages/DirectorsCut/DirectorsCut.tsx` wird der Preview-Player rechts noch mit `selectedVideo.duration` gefüttert statt mit der bearbeiteten Gesamtdauer.
+   - Nach Trims/Speed-Änderungen kann Preview-Timeline vs. Szenen-Timeline auseinanderlaufen, was Übergänge zusätzlich unsauber macht.
 
-2. **Player-Remount bei Effekt-Aenderungen**: Zeile 379-381 erzeugt einen neuen `playerKey` bei jeder Aenderung von brightness/contrast/saturation/etc. Das zerstoert den gesamten Remotion `<Player>` und baut ihn neu auf — das Video muss jedes Mal neu buffern. Stattdessen sollten die `inputProps` reaktiv aktualisiert werden, ohne den Player zu remounten.
+4. **Es gibt noch Rest-Overhead**
+   - In `DirectorsCutVideo.tsx` steckt noch ein `console.log` pro Szenen-Mount.
+   - `DirectorsCutPreviewPlayer.tsx` aktualisiert UI/State weiterhin sehr häufig während Playback.
 
-### Aenderungen
+### Änderungen
 
-#### 1. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+#### 1. `src/remotion/templates/DirectorsCutVideo.tsx`
+Die Transition-Logik auf **echte Überlappung** umbauen:
 
-- **Alle `console.log`-Aufrufe entfernen** (Zeilen 106-117, 143-148, 155-156, 179, 293-301, 307-310, 333, 343, 354, 373, 415, 457, 478, 498, 510, 525, 549, 574) — ca. 30 Stellen
-- **`playerKey` stabilisieren**: Statt den Key bei jedem Effekt-Slider neu zu setzen, einen festen Key verwenden. Die Effekte fliessen bereits ueber `inputProps` ein — der Player muss dafuer nicht remountet werden. Der Key sollte sich nur bei strukturellen Aenderungen aendern (z.B. `videoUrl`)
-- **`onTimeUpdate` in `useEffect` Dependency stabilisieren**: Zeile 431 hat `[onTimeUpdate]` als Dependency, was den Event-Listener bei jedem Parent-Rerender neu registriert. Stattdessen `useRef` fuer den Callback verwenden
+- `SceneVideo` so refaktorieren, dass **aktuelle und nächste Szene gleichzeitig** gerendert werden können
+- in den letzten Transition-Frames einer Szene:
+  - **Current Scene** = Exit-Animation
+  - **Next Scene** = Entry-Animation
+- dadurch ist die nächste Szene schon da, **bevor** der harte Cut kommt
+- `crossfade`, `dissolve`, `fade`, `slide`, `wipe`, `push`, `zoom`, `blur` als echte Zwei-Layer-Transitions behandeln statt nur Out-Effekt
+- verbleibendes Debug-Logging entfernen
 
-#### Vorher (playerKey):
-```typescript
-const playerKey = useMemo(() => {
-  return `player-${effects.brightness}-${effects.contrast}-...`;
-}, [effects.brightness, effects.contrast, ...]);
-```
+Zusätzlich:
+- optionales `previewMode` Prop ergänzen
+- im Preview-Modus die Szenen-Videos weniger aggressiv auf Buffering reagieren lassen als im finalen Render
 
-#### Nachher:
-```typescript
-const playerKey = useMemo(() => {
-  return `player-${videoUrl}-${durationInFrames}`;
-}, [videoUrl, durationInFrames]);
-```
+#### 2. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+Den Preview-Player auf flüssigere Wiedergabe trimmen:
 
-### Ergebnis
-- Kein Player-Remount mehr beim Anpassen von Effekten
-- Main-Thread wird nicht mehr durch Debug-Logs blockiert
-- Fluessige Wiedergabe ohne Stottern
+- `previewMode: true` an `DirectorsCutVideo` weitergeben
+- `timeupdate`/`setInternalTime` nicht unnötig oft durch den ganzen React-Tree treiben
+- Parent-Updates (`onTimeUpdate`) leicht drosseln, damit die UI nicht jeden Tick mitrendert
+- den bereits stabilisierten `playerKey` beibehalten
 
-### Datei
-1. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+#### 3. `src/pages/DirectorsCut/DirectorsCut.tsx`
+Die rechte Live-Preview mit der **bearbeiteten Gesamtdauer** synchronisieren:
 
+- statt `selectedVideo.duration || 30`
+- `actualTotalDuration` verwenden
+
+Das sorgt dafür, dass:
+- Transition-Frames an der richtigen Stelle liegen
+- Seek/Playhead/Preview nicht gegen die Szenenlogik laufen
+
+### Warum das den Fehler behebt
+Der aktuelle Ruckler entsteht sehr wahrscheinlich genau dann, wenn am Szenenende das nächste `Video` erstmals gebraucht wird. Mit echter Überlappung wird der Übergang nicht mehr zu einem harten “Szene endet / neue Szene muss erst anlaufen”, sondern zu einem kontrollierten Blend/Slide zwischen zwei bereits vorhandenen Layern.
+
+### Erwartetes Ergebnis
+- deutlich weniger Hänger an Szenenwechseln
+- Übergänge wirken wirklich wie Übergänge, nicht wie kurze Pausen
+- Preview bleibt auch nach Trim-/Speed-Anpassungen zeitlich sauber synchron
+
+### Dateien
+1. `src/remotion/templates/DirectorsCutVideo.tsx`
+2. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+3. `src/pages/DirectorsCut/DirectorsCut.tsx`
+
+### Technische Hinweise
+- Kein Backend- oder Datenbank-Fix nötig
+- Der finale Render kann die robuste Render-Logik behalten; die wichtigste Optimierung ist die **Preview-Wiedergabe**
+- Falls nötig, würde ich die Lösung so aufbauen, dass Render und Preview dasselbe Template teilen, aber über `previewMode` unterschiedlich auf Buffering reagieren
