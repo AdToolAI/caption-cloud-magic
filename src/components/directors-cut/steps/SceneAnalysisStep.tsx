@@ -147,7 +147,7 @@ export function SceneAnalysisStep({
         ...syncedTransitions
       }));
       
-      console.log('[Sync] AI-Transitions synchronized to sceneTransitions:', syncedTransitions);
+      // Synced
     }
   }, [transitions]);
 
