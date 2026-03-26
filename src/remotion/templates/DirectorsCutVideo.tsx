@@ -675,7 +675,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     const activeIdx = currentSceneIndex >= 0 ? currentSceneIndex : 0;
     const activeScene = sortedScenes[activeIdx];
     const nextScene = sortedScenes[activeIdx + 1];
-    const nextSceneStartFrame = nextScene ? Math.max(0, Math.floor(nextScene.startTime * fps)) : 0;
+    // nextSceneStartFrame no longer needed — single video architecture
 
     // Get scene-specific effects
     const currentSceneEffect = sceneEffects?.[activeScene.id] || activeScene.effects || null;
@@ -686,13 +686,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     const effectiveTemperature = currentSceneEffect?.temperature ?? temperature;
     const effectiveVignette = currentSceneEffect?.vignette ?? vignette;
     const effectiveFilter = currentSceneEffect?.filter ?? filter;
-    const nextSceneEffect = nextScene ? (sceneEffects?.[nextScene.id] || nextScene.effects || null) : null;
-    const nextEffectiveBrightness = nextSceneEffect?.brightness ?? brightness;
-    const nextEffectiveContrast = nextSceneEffect?.contrast ?? contrast;
-    const nextEffectiveSaturation = nextSceneEffect?.saturation ?? saturation;
-    const nextEffectiveSharpness = nextSceneEffect?.sharpness ?? sharpness;
-    const nextEffectiveTemperature = nextSceneEffect?.temperature ?? temperature;
-    const nextEffectiveFilter = nextSceneEffect?.filter ?? filter;
+    // Next scene filter no longer needed — single video, no overlay
 
     // Build filter string for active scene
     let previewFilter = `brightness(${effectiveBrightness / 100}) `;
@@ -724,45 +718,12 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       previewFilter += GRADE_CSS[effectiveGrading.grade] + ' ';
     }
 
-    let nextPreviewFilter = `brightness(${nextEffectiveBrightness / 100}) `;
-    nextPreviewFilter += `contrast(${nextEffectiveContrast / 100}) `;
-    nextPreviewFilter += `saturate(${nextEffectiveSaturation / 100}) `;
-    if (nextEffectiveTemperature !== 0) {
-      if (nextEffectiveTemperature > 0) {
-        const warmth = nextEffectiveTemperature / 50;
-        nextPreviewFilter += `sepia(${Math.min(0.5, warmth * 0.3)}) saturate(${1 + warmth * 0.3}) `;
-      } else {
-        const coldness = Math.abs(nextEffectiveTemperature) / 50;
-        nextPreviewFilter += `hue-rotate(${nextEffectiveTemperature * 1.5}deg) saturate(${1 + coldness * 0.2}) `;
-      }
-    }
-    if (nextEffectiveSharpness > 0) nextPreviewFilter += `url(#sharpen-filter) `;
-    if (nextEffectiveFilter && isSVGFilter(nextEffectiveFilter)) {
-      nextPreviewFilter += SVG_FILTER_IDS[nextEffectiveFilter] + ' ';
-    } else if (nextEffectiveFilter && FILTER_CSS[nextEffectiveFilter]) {
-      nextPreviewFilter += FILTER_CSS[nextEffectiveFilter] + ' ';
-    }
-    if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
-      nextPreviewFilter += STYLE_CSS[styleTransfer.style] + ' ';
-    }
-    const nextSceneGrading = nextScene ? sceneColorGrading?.[nextScene.id] : undefined;
-    const nextEffectiveGrading = nextSceneGrading?.grade
-      ? { enabled: true, grade: nextSceneGrading.grade, intensity: nextSceneGrading.intensity }
-      : colorGrading;
-    if (nextEffectiveGrading?.enabled && nextEffectiveGrading.grade && GRADE_CSS[nextEffectiveGrading.grade]) {
-      nextPreviewFilter += GRADE_CSS[nextEffectiveGrading.grade] + ' ';
-    }
-
     // Calculate CSS-based transition effects per type
     let transitionOverlayOpacity = 0;
     let transitionBlur = 0;
     let transitionTransform = '';
     let transitionClipPath = '';
     let transitionVideoOpacity = 1;
-    // Incoming overlay variables — separate layer for wipe/slide/push/crossfade
-    let incomingOverlayOpacity = 0;
-    let incomingOverlayTransform = '';
-    let incomingOverlayClipPath = '';
     if (nextScene) {
       const currentTransition = transitions?.find(t => t.sceneIndex === activeIdx);
       if (currentTransition && currentTransition.type && currentTransition.type !== 'none') {
@@ -781,8 +742,9 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
               break;
             case 'crossfade':
             case 'dissolve':
-              transitionVideoOpacity = 1 - eased * 0.6;
-              incomingOverlayOpacity = eased;
+              // Simulate crossfade with opacity dip + black flash
+              transitionVideoOpacity = 1 - eased * 0.7;
+              transitionOverlayOpacity = eased * 0.4;
               break;
             case 'blur':
               transitionBlur = eased * 15;
@@ -793,39 +755,30 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
               transitionVideoOpacity = 1 - eased * 0.4;
               break;
             case 'wipe': {
-              // Base video stays stable; incoming overlay wipes in
-              incomingOverlayOpacity = 1;
-              if (transitionDir === 'left') incomingOverlayClipPath = `inset(0 ${(1 - eased) * 100}% 0 0)`;
-              else if (transitionDir === 'right') incomingOverlayClipPath = `inset(0 0 0 ${(1 - eased) * 100}%)`;
-              else if (transitionDir === 'up') incomingOverlayClipPath = `inset(0 0 ${(1 - eased) * 100}% 0)`;
-              else incomingOverlayClipPath = `inset(${(1 - eased) * 100}% 0 0 0)`;
+              // Clip-path on base video to simulate wipe reveal
+              if (transitionDir === 'left') transitionClipPath = `inset(0 0 0 ${eased * 100}%)`;
+              else if (transitionDir === 'right') transitionClipPath = `inset(0 ${eased * 100}% 0 0)`;
+              else if (transitionDir === 'up') transitionClipPath = `inset(0 0 0 0)`;
+              else transitionClipPath = `inset(0 0 0 0)`;
+              transitionVideoOpacity = 1;
+              transitionOverlayOpacity = eased * 0.15;
               break;
             }
             case 'slide': {
-              // Incoming overlay slides in from outside
-              incomingOverlayOpacity = 1;
-              if (transitionDir === 'left') incomingOverlayTransform = `translateX(${(1 - eased) * 100}%)`;
-              else if (transitionDir === 'right') incomingOverlayTransform = `translateX(${-(1 - eased) * 100}%)`;
-              else if (transitionDir === 'up') incomingOverlayTransform = `translateY(${(1 - eased) * 100}%)`;
-              else incomingOverlayTransform = `translateY(${-(1 - eased) * 100}%)`;
+              // Slide the base video out
+              if (transitionDir === 'left') transitionTransform = `translateX(${-eased * 30}%)`;
+              else if (transitionDir === 'right') transitionTransform = `translateX(${eased * 30}%)`;
+              else if (transitionDir === 'up') transitionTransform = `translateY(${-eased * 30}%)`;
+              else transitionTransform = `translateY(${eased * 30}%)`;
+              transitionVideoOpacity = 1 - eased * 0.5;
               break;
             }
             case 'push': {
-              // Base video pushes out, incoming pushes in
-              if (transitionDir === 'left') {
-                transitionTransform = `translateX(${-eased * 100}%)`;
-                incomingOverlayTransform = `translateX(${(1 - eased) * 100}%)`;
-              } else if (transitionDir === 'right') {
-                transitionTransform = `translateX(${eased * 100}%)`;
-                incomingOverlayTransform = `translateX(${-(1 - eased) * 100}%)`;
-              } else if (transitionDir === 'up') {
-                transitionTransform = `translateY(${-eased * 100}%)`;
-                incomingOverlayTransform = `translateY(${(1 - eased) * 100}%)`;
-              } else {
-                transitionTransform = `translateY(${eased * 100}%)`;
-                incomingOverlayTransform = `translateY(${-(1 - eased) * 100}%)`;
-              }
-              incomingOverlayOpacity = 1;
+              // Push base video fully out of frame
+              if (transitionDir === 'left') transitionTransform = `translateX(${-eased * 100}%)`;
+              else if (transitionDir === 'right') transitionTransform = `translateX(${eased * 100}%)`;
+              else if (transitionDir === 'up') transitionTransform = `translateY(${-eased * 100}%)`;
+              else transitionTransform = `translateY(${eased * 100}%)`;
               break;
             }
             default:
@@ -876,32 +829,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           }}
           volume={0}
         />
-        {/* Incoming scene overlay — for wipe/slide/push/crossfade transitions */}
-        {incomingOverlayOpacity > 0 && (
-          <AbsoluteFill style={{
-            opacity: incomingOverlayOpacity,
-            transform: incomingOverlayTransform || undefined,
-            clipPath: incomingOverlayClipPath || undefined,
-            backgroundColor: '#000',
-            pointerEvents: 'none',
-            zIndex: 4,
-            overflow: 'hidden',
-          }}>
-            {/* Re-use the same video source to show "next scene" frame */}
-            <Video
-              src={sourceVideoUrl}
-              startFrom={nextSceneStartFrame}
-              pauseWhenBuffering={false}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                filter: nextPreviewFilter.trim(),
-              }}
-              volume={0}
-            />
-          </AbsoluteFill>
-        )}
+        {/* No second Video element — all transitions are CSS-only on the base video */}
         {/* Darkening overlay for fade transitions */}
         {transitionOverlayOpacity > 0 && (
           <AbsoluteFill style={{
