@@ -107,14 +107,16 @@ export function calculateScheduling(
   // r55-phase5: STABILITY MODE — graduated Lambda count for Loft-Film 30fps support
   // ≤500 frames → 1λ, ≤1000 → 2λ, >1000 → 3λ (allows 30fps/60s = 1800 frames safely)
   if (schedulingMode === 'stability') {
-    const stabilityLambdas = frameCount <= 500 ? 1 : frameCount <= 1000 ? 2 : 3;
-    const fpl = Math.ceil(frameCount / stabilityLambdas);
+    // r56: Max 3 Lambdas with higher framesPerLambda to avoid AWS concurrency limits
+    // ≤300 frames → 1λ, ≤600 → 2λ, >600 → 3λ (min 270 fpl to keep concurrency low)
+    const stabilityLambdas = frameCount <= 300 ? 1 : frameCount <= 600 ? 2 : 3;
+    const fpl = Math.max(Math.ceil(frameCount / stabilityLambdas), 270);
     const estRuntimeSec = fpl * ESTIMATED_SECONDS_PER_FRAME;
     const needsFpsReduction = estRuntimeSec > LAMBDA_TIMEOUT_SECONDS;
     const timeoutBudgetOk = !needsFpsReduction;
     
-    console.log(`[remotion-payload] r55-phase5 STABILITY scheduling: frames=${frameCount}, fpl=${fpl}, lambdas=${stabilityLambdas}, needsFpsReduction=${needsFpsReduction}, estTime=${estRuntimeSec.toFixed(1)}s, timeout=${LAMBDA_TIMEOUT_SECONDS}s, timeoutBudgetOk=${timeoutBudgetOk}`);
-    return { framesPerLambda: fpl, estimatedLambdas: stabilityLambdas, needsFpsReduction, schedulingMode, estRuntimeSec, timeoutBudgetOk };
+    console.log(`[remotion-payload] r56 STABILITY scheduling: frames=${frameCount}, fpl=${fpl}, lambdas=${Math.ceil(frameCount / fpl)}, needsFpsReduction=${needsFpsReduction}, estTime=${estRuntimeSec.toFixed(1)}s, timeout=${LAMBDA_TIMEOUT_SECONDS}s, timeoutBudgetOk=${timeoutBudgetOk}`);
+    return { framesPerLambda: fpl, estimatedLambdas: Math.ceil(frameCount / fpl), needsFpsReduction, schedulingMode, estRuntimeSec, timeoutBudgetOk };
   }
   
   // DISTRIBUTED MODE (legacy behavior)

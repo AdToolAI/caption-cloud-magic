@@ -527,16 +527,27 @@ serve(async (req) => {
 
     // ✅ Auto-save to Media Library (video_creations + media_assets)
     try {
-      await supabaseAdmin.from('video_creations').insert({
+      const { data: vcData, error: vcError } = await supabaseAdmin.from('video_creations').insert({
         user_id: userId,
-        title: customizations?.projectTitle || 'Video',
-        video_url: outputUrl,
-        template_name: componentName,
-        render_engine: 'remotion',
+        output_url: outputUrl,
         status: 'completed',
-      });
+        credits_used: credits_required,
+        render_id: realRenderId,
+        metadata: {
+          title: customizations?.projectTitle || 'Video',
+          template_name: componentName,
+          render_engine: 'remotion',
+          source: 'universal-creator',
+        },
+      }).select('id').single();
       
-      await supabaseAdmin.from('media_assets').insert({
+      if (vcError) {
+        console.error('⚠️ video_creations insert error:', JSON.stringify(vcError));
+      } else {
+        console.log('✅ Saved to video_creations, id:', vcData?.id);
+      }
+
+      const { error: maError } = await supabaseAdmin.from('media_assets').insert({
         user_id: userId,
         type: 'video',
         original_url: outputUrl,
@@ -544,9 +555,13 @@ serve(async (req) => {
         source: 'remotion-render',
       });
       
-      console.log('✅ Saved to Media Library');
+      if (maError) {
+        console.error('⚠️ media_assets insert error:', JSON.stringify(maError));
+      } else {
+        console.log('✅ Saved to media_assets');
+      }
     } catch (mediaError) {
-      console.warn('⚠️ Media Library save failed (non-critical):', mediaError);
+      console.error('⚠️ Media Library save failed:', mediaError);
     }
 
     return new Response(
