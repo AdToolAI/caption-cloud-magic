@@ -126,8 +126,10 @@ export const DashboardVideoCarousel = () => {
   const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
   const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
 
-  const getVideoTitle = (video: any) =>
-    (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
+  const getVideoTitle = (video: any) => {
+    if (isDemoVideo(video)) return 'Demo Video — Universal Creator';
+    return (video.metadata as any)?.title || 'Video ' + video.id.slice(0, 8);
+  };
 
   const handleVideoError = (videoId: string, index: number, videoUrl: string) => {
     if (!retriedVideos.has(videoId)) {
