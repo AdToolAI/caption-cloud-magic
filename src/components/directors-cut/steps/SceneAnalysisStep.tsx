@@ -682,7 +682,7 @@ export function SceneAnalysisStep({
           }}
           duration={videoDuration}
           currentTime={currentVideoTime}
-          onTimeUpdate={(time) => setCurrentVideoTime(time)}
+          onTimeUpdate={handleThrottledTimeUpdate}
           initialMuted={false}
         >
           {/* Current Scene Indicator */}

@@ -406,7 +406,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
       }
       player.play();
+      // Auto-unmute player if initialMuted is false and user hasn't interacted with mute yet
       if (!isMuted) {
+        try {
+          player.unmute();
+        } catch {}
         if (!originalAudioMuted) {
           sourceAudioRef.current?.play().catch(() => {});
         }

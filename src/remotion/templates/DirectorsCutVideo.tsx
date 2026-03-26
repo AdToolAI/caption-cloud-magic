@@ -791,7 +791,6 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             <Sequence
               from={sceneStartFrame}
               durationInFrames={sceneDurationFrames}
-              premountFor={previewMode ? 30 : 0}
             >
               <AbsoluteFill>
                 <SceneVideo
