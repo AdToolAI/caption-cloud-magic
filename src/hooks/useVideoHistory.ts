@@ -31,6 +31,10 @@ export const useVideoHistory = () => {
       }
 
       console.log('[useVideoHistory] Loaded videos count:', data?.length ?? 0);
+      // If user has no videos, inject the demo video
+      if (!data || data.length === 0) {
+        return [DEMO_VIDEO] as any[];
+      }
       return data as any[];
     }
   });
