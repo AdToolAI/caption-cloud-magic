@@ -359,14 +359,19 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       backgroundMusicAudioRef.current?.pause();
     };
     let lastUpdateTime = 0;
+    let lastParentUpdateTime = 0;
     const onTimeUpdateEvent = () => {
       const now = performance.now();
-      if (now - lastUpdateTime < 100) return; // Throttle to ~10 updates/sec
+      if (now - lastUpdateTime < 100) return; // Throttle internal to ~10/sec
       lastUpdateTime = now;
       const frame = player.getCurrentFrame();
       const time = frame / fps;
       setInternalTime(time);
-      onTimeUpdateRef.current?.(time);
+      // Throttle parent updates to ~4/sec to reduce upstream re-renders
+      if (now - lastParentUpdateTime > 250) {
+        lastParentUpdateTime = now;
+        onTimeUpdateRef.current?.(time);
+      }
       
       // Keep native audio in sync (correct drift > 0.3s)
       if (sourceAudioRef.current && !sourceAudioRef.current.paused) {

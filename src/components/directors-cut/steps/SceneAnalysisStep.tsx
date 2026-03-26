@@ -670,11 +670,12 @@ export function SceneAnalysisStep({
             preload="auto"
           />
           
-          {/* Transition visual overlay */}
+          {/* Transition visual overlay with real cross-fade */}
           <NativeTransitionOverlay
             currentTime={currentVideoTime}
             scenes={scenes}
             transitions={transitions}
+            videoUrl={videoUrl}
           />
           
           {/* Current Scene Indicator */}
