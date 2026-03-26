@@ -460,6 +460,10 @@ export default function MediaLibrary() {
   };
 
   const handleDelete = async (id: string, mediaItem: NormalizedMediaItem) => {
+    if (id === DEMO_VIDEO.id) {
+      toast({ title: 'Demo-Videos können nicht gelöscht werden' });
+      return;
+    }
     try {
       // Handle deletion based on source
       if (mediaItem.source === 'upload' && mediaItem.storagePath) {
