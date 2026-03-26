@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -89,6 +89,16 @@ export function SceneEditingStep({
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const lastTimeUpdateRef = useRef(0);
+  
+  // Throttled time update to reduce UI re-renders during playback
+  const handleThrottledTimeUpdate = useCallback((time: number) => {
+    const now = performance.now();
+    if (now - lastTimeUpdateRef.current > 150) { // ~6.6 updates/sec
+      lastTimeUpdateRef.current = now;
+      setCurrentVideoTime(time);
+    }
+  }, []);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
   
   // Multi-Layer Preview Overlay toggles
@@ -796,7 +806,7 @@ export function SceneEditingStep({
           audio={audio}
           duration={actualTotalDuration}
           currentTime={currentVideoTime}
-          onTimeUpdate={setCurrentVideoTime}
+          onTimeUpdate={handleThrottledTimeUpdate}
         >
           {/* Current Scene Indicator Overlay */}
           {currentScene && (

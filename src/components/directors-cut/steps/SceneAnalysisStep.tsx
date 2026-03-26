@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
 // DirectorsCutPreviewPlayer removed — using native <video> for lightweight analysis preview
+import { NativeTransitionOverlay } from '../preview/NativeTransitionOverlay';
 
 // Extract video frames for Vision AI analysis
 const extractVideoFrames = async (videoUrl: string, duration: number): Promise<string[]> => {
@@ -667,6 +668,13 @@ export function SceneAnalysisStep({
             controls
             playsInline
             preload="auto"
+          />
+          
+          {/* Transition visual overlay */}
+          <NativeTransitionOverlay
+            currentTime={currentVideoTime}
+            scenes={scenes}
+            transitions={transitions}
           />
           
           {/* Current Scene Indicator */}

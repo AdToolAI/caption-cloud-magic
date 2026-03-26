@@ -444,12 +444,24 @@ const SceneVideo: React.FC<{
 
           switch (baseType) {
             case 'crossfade':
+              // Real crossfade: current scene fades out, next scene (underlay) shows through
+              opacity = interpolate(progress, [0, 1], [1, 0], {
+                extrapolateLeft: 'clamp',
+                extrapolateRight: 'clamp',
+              });
+              break;
             case 'dissolve':
-              const pulseOut = Math.sin(progress * Math.PI);
-              additionalFilter = `brightness(${1 + pulseOut * 0.25})`;
+              // Dissolve: opacity fade + slight brightness pulse for organic feel
+              opacity = interpolate(progress, [0, 1], [1, 0], {
+                extrapolateLeft: 'clamp',
+                extrapolateRight: 'clamp',
+              });
+              const dissolvePulse = Math.sin(progress * Math.PI);
+              additionalFilter = `brightness(${1 + dissolvePulse * 0.15})`;
               break;
             case 'fade':
-              opacity = interpolate(progress, [0, 0.5, 1], [1, 0.2, 1], {
+              // Fade to black: clean exit
+              opacity = interpolate(progress, [0, 1], [1, 0], {
                 extrapolateLeft: 'clamp',
                 extrapolateRight: 'clamp',
               });
