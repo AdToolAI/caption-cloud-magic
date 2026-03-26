@@ -64,7 +64,7 @@ const extractVideoFrames = async (videoUrl: string, duration: number): Promise<s
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const frameData = canvas.toDataURL('image/jpeg', 0.6);
         frames.push(frameData);
-        console.log(`[extractVideoFrames] Frame ${i + 1}/${frameCount} at ${time.toFixed(1)}s`);
+        
       }
       
       resolve(frames);
