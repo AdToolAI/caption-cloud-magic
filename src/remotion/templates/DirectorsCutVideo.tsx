@@ -426,78 +426,8 @@ const SceneVideo: React.FC<{
     };
   }, [effectiveVignette]);
 
-  // Calculate transition effects (OUT transition only at end of scene)
-  const transitionEffects = useMemo(() => {
-    let opacity = 1;
-    let transform = '';
-    let clipPath = '';
-    let additionalFilter = '';
-
-    // Only apply OUT transition if not the last scene
-    if (sceneIndex < totalScenes - 1) {
-      const currentTransition = transitions?.find(t => t.sceneIndex === sceneIndex);
-      if (currentTransition && currentTransition.type && currentTransition.type !== 'none') {
-        const transitionDurationFrames = Math.floor((currentTransition.duration || 0.5) * fps);
-        // ✅ Ensure transitionStartFrame is never negative to prevent "Invalid array length" error
-        const safeTransitionDuration = Math.min(transitionDurationFrames, Math.max(1, sceneDurationFrames - 1));
-        const transitionStartFrame = Math.max(0, sceneDurationFrames - safeTransitionDuration);
-
-        if (localFrame >= transitionStartFrame && safeTransitionDuration > 0) {
-          const progress = (localFrame - transitionStartFrame) / safeTransitionDuration;
-          const [baseType, direction = 'left'] = currentTransition.type.toLowerCase().split('-');
-
-          switch (baseType) {
-            case 'crossfade':
-              // Real crossfade: current scene fades out, next scene (underlay) shows through
-              opacity = interpolate(progress, [0, 1], [1, 0], {
-                extrapolateLeft: 'clamp',
-                extrapolateRight: 'clamp',
-              });
-              break;
-            case 'dissolve':
-              // Dissolve: opacity fade + slight brightness pulse for organic feel
-              opacity = interpolate(progress, [0, 1], [1, 0], {
-                extrapolateLeft: 'clamp',
-                extrapolateRight: 'clamp',
-              });
-              const dissolvePulse = Math.sin(progress * Math.PI);
-              additionalFilter = `brightness(${1 + dissolvePulse * 0.15})`;
-              break;
-            case 'fade':
-              // Fade to black: clean exit
-              opacity = interpolate(progress, [0, 1], [1, 0], {
-                extrapolateLeft: 'clamp',
-                extrapolateRight: 'clamp',
-              });
-              break;
-            case 'zoom':
-              opacity = 1 - progress;
-              transform = `scale(${1 + progress * 0.3})`;
-              break;
-            case 'blur':
-              opacity = 1 - progress;
-              additionalFilter = `blur(${progress * 15}px)`;
-              break;
-            case 'wipe':
-              if (direction === 'left') clipPath = `inset(0 ${progress * 100}% 0 0)`;
-              else if (direction === 'right') clipPath = `inset(0 0 0 ${progress * 100}%)`;
-              else if (direction === 'up') clipPath = `inset(0 0 ${progress * 100}% 0)`;
-              else clipPath = `inset(${progress * 100}% 0 0 0)`;
-              break;
-            case 'push':
-            case 'slide':
-              if (direction === 'left') transform = `translateX(-${progress * 100}%)`;
-              else if (direction === 'right') transform = `translateX(${progress * 100}%)`;
-              else if (direction === 'up') transform = `translateY(-${progress * 100}%)`;
-              else transform = `translateY(${progress * 100}%)`;
-              break;
-          }
-        }
-      }
-    }
-
-    return { opacity, transform, clipPath, additionalFilter };
-  }, [transitions, sceneIndex, totalScenes, localFrame, sceneDurationFrames, fps]);
+  // TransitionSeries handles all transition effects — no manual calculation needed
+  const transitionEffects = { opacity: 1, transform: '', clipPath: '', additionalFilter: '' };
 
   // Calculate Ken Burns transform
   const kenBurnsTransform = useMemo(() => {
