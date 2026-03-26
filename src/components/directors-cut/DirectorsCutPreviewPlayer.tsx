@@ -710,7 +710,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         </span>
 
         <Slider
-          value={[internalTime]}
+          value={[displayTime]}
           min={0}
           max={duration}
           step={0.1}
