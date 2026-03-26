@@ -248,8 +248,6 @@ export function SceneAnalysisStep({
     const lowerName = name.toLowerCase();
     const effects: Partial<SceneEffects> = {};
     
-    console.log(`[parseEffectName] Input: "${name}", Type: "${effectType}"`);
-    
     // SKIP transitions - they don't apply visual filters
     if (effectType === 'transition' || 
         lowerName.includes('fade') || 
