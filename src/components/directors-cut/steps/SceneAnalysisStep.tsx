@@ -231,7 +231,7 @@ export function SceneAnalysisStep({
   // Throttled time update handler to reduce re-renders
   const handleThrottledTimeUpdate = useCallback((time: number) => {
     const now = performance.now();
-    if (now - lastTimeUpdateRef.current < 250) return; // Max ~4 updates/sec for scene indicator
+    if (now - lastTimeUpdateRef.current < 80) return; // ~12 updates/sec for smooth transitions
     lastTimeUpdateRef.current = now;
     setCurrentVideoTime(time);
   }, []);
