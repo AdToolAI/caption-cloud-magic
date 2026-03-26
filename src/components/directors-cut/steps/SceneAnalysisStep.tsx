@@ -426,18 +426,8 @@ export function SceneAnalysisStep({
       // Fallback
     }
     
-    console.log(`[applySingleSceneSuggestion] Scene ${scene.id} (${scene.start_time}s - ${scene.end_time}s) final effects:`, sceneEffect);
-    
     // Pass only this scene's effects
     onApplySuggestions({}, { [scene.id]: sceneEffect as SceneEffects });
-    
-    // FIXED: Jump to the scene so user sees the effects immediately
-    if (videoRef.current) {
-      const targetTime = scene.start_time + 0.5;
-      videoRef.current.currentTime = targetTime;
-      setCurrentVideoTime(targetTime);
-      console.log(`[applySingleSceneSuggestion] Jumped to scene ${scene.id} at ${targetTime}s`);
-    }
     
     const transitionInfo = skippedTransitions > 0 ? ` (${skippedTransitions} Transition übersprungen)` : '';
     toast.success(`${appliedCount} Effekte für Szene angewendet${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`);
