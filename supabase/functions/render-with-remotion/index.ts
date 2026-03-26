@@ -509,59 +509,22 @@ serve(async (req) => {
     console.log('🎬 Real Render ID:', realRenderId);
     console.log('📁 Output URL:', outputUrl);
 
-    // ✅ Update DB with real render data - mark as completed immediately
+    // ✅ Update render record with real renderId — webhook will mark as completed
     const { error: updateError } = await supabaseAdmin
       .from('video_renders')
       .update({
-        status: 'completed',
-        video_url: outputUrl,
-        completed_at: new Date().toISOString(),
+        content_config: {
+          ...customizations,
+          credits_used: credits_required,
+          real_remotion_render_id: realRenderId,
+        },
       })
       .eq('render_id', pendingRenderId);
     
     if (updateError) {
-      console.error('⚠️ Failed to update render record:', updateError);
+      console.error('⚠️ Failed to update render record with real renderId:', updateError);
     } else {
-      console.log('✅ Updated render record to completed');
-    }
-
-    // ✅ Auto-save to Media Library (video_creations + media_assets)
-    try {
-      const { data: vcData, error: vcError } = await supabaseAdmin.from('video_creations').insert({
-        user_id: userId,
-        output_url: outputUrl,
-        status: 'completed',
-        credits_used: credits_required,
-        render_id: realRenderId,
-        metadata: {
-          title: customizations?.projectTitle || 'Video',
-          template_name: componentName,
-          render_engine: 'remotion',
-          source: 'universal-creator',
-        },
-      }).select('id').single();
-      
-      if (vcError) {
-        console.error('⚠️ video_creations insert error:', JSON.stringify(vcError));
-      } else {
-        console.log('✅ Saved to video_creations, id:', vcData?.id);
-      }
-
-      const { error: maError } = await supabaseAdmin.from('media_assets').insert({
-        user_id: userId,
-        type: 'video',
-        original_url: outputUrl,
-        storage_path: outputUrl,
-        source: 'remotion-render',
-      });
-      
-      if (maError) {
-        console.error('⚠️ media_assets insert error:', JSON.stringify(maError));
-      } else {
-        console.log('✅ Saved to media_assets');
-      }
-    } catch (mediaError) {
-      console.error('⚠️ Media Library save failed:', mediaError);
+      console.log('✅ Updated render record with real renderId, waiting for webhook...');
     }
 
     return new Response(
@@ -569,10 +532,8 @@ serve(async (req) => {
         ok: true,
         render_id: pendingRenderId,
         real_render_id: realRenderId,
-        video_url: outputUrl,
-        bucket_name: bucketName,
-        status: 'completed',
-        message: 'Video-Rendering abgeschlossen!'
+        status: 'rendering',
+        message: 'Video-Rendering läuft. Webhook benachrichtigt bei Fertigstellung.'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
