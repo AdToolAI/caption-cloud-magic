@@ -359,36 +359,40 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
     };
-    let lastUpdateTime = 0;
+    let lastDisplayUpdateTime = 0;
     let lastParentUpdateTime = 0;
     const onTimeUpdateEvent = () => {
       const now = performance.now();
-      if (now - lastUpdateTime < 100) return; // Throttle internal to ~10/sec
-      lastUpdateTime = now;
       const frame = player.getCurrentFrame();
       const time = frame / fps;
-      setInternalTime(time);
+      internalTimeRef.current = time;
+      // Throttle display updates to ~4/sec to reduce React re-renders
+      if (now - lastDisplayUpdateTime > 250) {
+        lastDisplayUpdateTime = now;
+        setDisplayTime(time);
+      }
       // Throttle parent updates to ~4/sec to reduce upstream re-renders
       if (now - lastParentUpdateTime > 250) {
         lastParentUpdateTime = now;
         onTimeUpdateRef.current?.(time);
       }
       
-      // Keep native audio in sync (correct drift > 0.3s)
+      // Keep native audio in sync (correct drift > 0.5s)
       if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
-        if (Math.abs(sourceAudioRef.current.currentTime - time) > 0.3) {
+        if (Math.abs(sourceAudioRef.current.currentTime - time) > 0.5) {
           sourceAudioRef.current.currentTime = time;
         }
       }
       if (voiceoverAudioRef.current && !voiceoverAudioRef.current.paused) {
-        if (Math.abs(voiceoverAudioRef.current.currentTime - time) > 0.3) {
+        if (Math.abs(voiceoverAudioRef.current.currentTime - time) > 0.5) {
           voiceoverAudioRef.current.currentTime = time;
         }
       }
     };
     const onEnded = () => {
       setIsPlaying(false);
-      setInternalTime(0);
+      internalTimeRef.current = 0;
+      setDisplayTime(0);
       player.seekTo(0);
       
       if (sourceAudioRef.current) {
