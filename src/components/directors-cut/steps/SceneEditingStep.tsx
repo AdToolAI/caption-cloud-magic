@@ -806,7 +806,7 @@ export function SceneEditingStep({
           audio={audio}
           duration={actualTotalDuration}
           currentTime={currentVideoTime}
-          onTimeUpdate={setCurrentVideoTime}
+          onTimeUpdate={handleThrottledTimeUpdate}
         >
           {/* Current Scene Indicator Overlay */}
           {currentScene && (
