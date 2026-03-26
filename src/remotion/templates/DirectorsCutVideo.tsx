@@ -694,7 +694,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         <SharpnessFilter intensity={sharpness} />
         <Video
           src={sourceVideoUrl}
-          pauseWhenBuffering={!previewMode}
+          pauseWhenBuffering
           style={{
             width: '100%',
             height: '100%',
