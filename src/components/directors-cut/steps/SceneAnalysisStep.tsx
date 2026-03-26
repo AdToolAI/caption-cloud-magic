@@ -297,7 +297,6 @@ export function SceneAnalysisStep({
     // Parse contrast - STRONGER default
     if (lowerName.includes('contrast') || lowerName.includes('kontrast')) {
       effects.contrast = extractNumber(lowerName, 140);
-      console.log(`[parseEffectName] CONTRAST: ${effects.contrast}`);
       return effects;
     }
     
