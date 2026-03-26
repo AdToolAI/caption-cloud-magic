@@ -386,7 +386,7 @@ export function SceneAnalysisStep({
       // Applied
     }
     
-    console.log(`[applyAllSuggestions] Applied ${appliedCount} effects, skipped ${skippedTransitions} transitions`);
+    // Done
     
     // Pass empty global effects, but scene-specific effects
     onApplySuggestions({}, newSceneEffects);
