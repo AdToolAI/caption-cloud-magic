@@ -226,7 +226,6 @@ export function SceneAnalysisStep({
       }
     }
     
-    console.log(`[videoFilter] Final: ${filterString}`);
     return filterString;
   }, [getCurrentEffects, currentVideoTime]);
 
