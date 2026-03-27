@@ -367,7 +367,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [isPlaying, duration, sortedScenes, sourceTimeForScene, transitionInfo, handleVideoEnded]);
 
   // ==================== VIDEO EVENT HANDLERS ====================
-  // (handleVideoEnded moved above rAF loop)
 
   // ==================== EXTERNAL isPlaying SYNC ====================
   useEffect(() => {
