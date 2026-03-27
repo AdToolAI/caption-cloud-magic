@@ -615,6 +615,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     return filters.length > 0 ? filters.join(' ') : undefined;
   }, [effects.brightness, effects.contrast, effects.saturation, effects.filter, sceneEffects, sortedScenes, displayTime]);
 
+  // Keep videoFilterRef in sync for the transition renderer
+  useEffect(() => { videoFilterRef.current = videoFilter ?? ''; }, [videoFilter]);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
