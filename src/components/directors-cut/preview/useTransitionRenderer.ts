@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import type { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 
-const TRANSITION_DURATION = 0.8;
-const MIN_TRANSITION_DURATION = 0.6;
+const TRANSITION_DURATION = 1.2;
+const MIN_TRANSITION_DURATION = 0.8;
 
 /**
  * Zero-rerender transition renderer.
