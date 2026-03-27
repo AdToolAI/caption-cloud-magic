@@ -15,13 +15,13 @@ export function useTransitionRenderer(
   visualTimeRef: React.RefObject<number>,
   scenes: SceneAnalysis[],
   transitions: TransitionAssignment[],
+  videoFilterRef: React.RefObject<string>,
 ) {
   const rafRef = useRef<number>();
   const wasActiveRef = useRef(false);
 
   useEffect(() => {
     if (scenes.length < 2 || transitions.length === 0) {
-      // No transitions possible — hide incoming, clear base styles
       const incoming = incomingVideoRef.current;
       if (incoming) incoming.style.display = 'none';
       return;
@@ -63,7 +63,6 @@ export function useTransitionRenderer(
       }
 
       if (!found && wasActiveRef.current) {
-        // Transition just ended — reset styles
         clearStyles(base);
         incoming.style.display = 'none';
         incoming.style.opacity = '';
@@ -96,8 +95,8 @@ function applyStyles(
   progress: number,
   baseType: string,
   direction: string,
+  baseFilter: string,
 ) {
-  // Always show incoming during transition
   incoming.style.display = '';
 
   switch (baseType) {
