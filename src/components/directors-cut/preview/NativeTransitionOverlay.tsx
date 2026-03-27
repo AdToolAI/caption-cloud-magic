@@ -75,7 +75,7 @@ export function NativeTransitionOverlay({
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           frames[sceneId] = canvas.toDataURL('image/jpeg', 0.6);
           capturedRef.current.add(sceneId);
-        } catch { /* skip */ }
+        } catch (e) { console.warn('Frame capture failed for scene', sceneId, e); }
       }
       if (Object.keys(frames).length > 0) {
         setNextFrameCache((prev) => ({ ...prev, ...frames }));
