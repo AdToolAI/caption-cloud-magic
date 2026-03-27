@@ -323,15 +323,10 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
                         <Download className="w-4 h-4 mr-2" />
                         Download
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleSaveToLibrary(gen.id)}
-                        disabled={savingVideo === gen.id}
-                      >
-                        <Save className="w-4 h-4 mr-2" />
-                        {savingVideo === gen.id ? 'Speichert...' : 'In Mediathek'}
-                      </Button>
+                      <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400">
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                        In Mediathek gespeichert
+                      </span>
                     </>
                   )}
                   {gen.status === 'processing' && (
