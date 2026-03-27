@@ -69,7 +69,7 @@ export function useTransitionRenderer(
         incoming.style.opacity = '';
         incoming.style.transform = '';
         incoming.style.clipPath = '';
-        incoming.style.filter = '';
+        // Do NOT clear filter — managed by React
         wasActiveRef.current = false;
       }
 
