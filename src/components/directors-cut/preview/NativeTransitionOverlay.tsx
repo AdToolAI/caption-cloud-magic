@@ -67,11 +67,19 @@ export function NativeTransitionOverlay({
 
       const frames: Record<string, string> = {};
       for (let i = 1; i < scenes.length; i++) {
-        const sceneId = scenes[i].id;
+        const incomingScene = scenes[i];
+        const sceneId = incomingScene.id;
         if (capturedRef.current.has(sceneId)) continue;
+
+        // Use original source time (not timeline time) for correct frame capture
+        const sourceStart = incomingScene.original_start_time ?? incomingScene.start_time;
+        const captureTime = Math.max(0, sourceStart + 0.02);
+
         try {
-          video.currentTime = scenes[i].start_time + 0.05;
-          await new Promise<void>((r) => { video.onseeked = () => r(); });
+          video.currentTime = captureTime;
+          await new Promise<void>((resolve) => {
+            video.addEventListener('seeked', () => resolve(), { once: true });
+          });
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           frames[sceneId] = canvas.toDataURL('image/jpeg', 0.6);
           capturedRef.current.add(sceneId);
