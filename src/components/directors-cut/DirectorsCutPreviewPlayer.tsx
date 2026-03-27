@@ -548,24 +548,31 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     >
       {/* Video Player */}
       <div className={`relative bg-black rounded-lg overflow-hidden ${fillContainer ? 'flex-1 min-h-0' : 'aspect-video'}`}>
+        {/* Base (outgoing) video */}
         <video
           ref={videoRef}
           src={videoUrl}
-          className="w-full h-full object-contain"
-          style={{ filter: videoFilter }}
+          className="absolute inset-0 w-full h-full object-contain"
+          style={{ filter: videoFilter, ...transitionStyles.baseStyle, zIndex: 1 }}
           muted
           playsInline
           preload="auto"
           onEnded={handleVideoEnded}
         />
 
-        {/* Lightweight transition overlay */}
-        <NativeTransitionOverlay
-          currentTime={displayTime}
-          visualTimeRef={visualTimeRef}
-          scenes={sortedScenes}
-          transitions={transitions}
-          videoUrl={videoUrl}
+        {/* Incoming (next scene) video — only visible during transitions */}
+        <video
+          ref={incomingVideoRef}
+          src={videoUrl}
+          className="absolute inset-0 w-full h-full object-contain"
+          style={{
+            filter: videoFilter,
+            ...transitionStyles.incomingStyle,
+            zIndex: 2,
+          }}
+          muted
+          playsInline
+          preload="auto"
         />
 
         {/* Lightweight effect overlays (color grading, vignette, etc.) */}
