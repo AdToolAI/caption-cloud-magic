@@ -35,8 +35,6 @@ interface VideoGenerationHistoryProps {
 
 export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHistoryProps = {}) {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
   
   const { toast } = useToast();
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
