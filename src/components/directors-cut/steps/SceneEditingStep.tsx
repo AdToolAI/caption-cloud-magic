@@ -213,7 +213,7 @@ export function SceneEditingStep({
       return {
         sceneId: scene.id,
         transitionType,
-        duration: 0.5,
+        duration: 1.2,
         aiSuggested: true,
         confidence,
         reasoning,
