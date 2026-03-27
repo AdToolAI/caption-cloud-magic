@@ -195,6 +195,7 @@ export default function AIVideoStudio() {
       const modeLabel = referenceImageUrl ? 'Image-to-Video' : 'Text-to-Video';
       toast.success(`${modeLabel} wird generiert! Kosten: ${data.cost.toFixed(2)}€`);
       setPrompt('');
+      sessionStorage.removeItem('ai-video-prompt');
       handleRemoveImage(); // Clear image after generation
       refetchWallet();
       setActiveTab('history');
