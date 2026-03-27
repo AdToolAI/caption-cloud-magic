@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Download, RefreshCw, Loader2, Save, RotateCcw, Info } from 'lucide-react';
+import { Play, Download, RefreshCw, Loader2, RotateCcw, Info, CheckCircle2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
