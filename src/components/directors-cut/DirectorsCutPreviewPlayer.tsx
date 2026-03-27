@@ -344,10 +344,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const incoming = incomingVideoRef.current;
 
       if (activeTrans) {
-        // DURING TRANSITION: base video stays on OUTGOING scene, incoming shows NEXT scene
-        const { outgoingScene, incomingScene, boundary, progress, tDuration } = activeTrans;
+        // DURING TRANSITION: base video stays on OUTGOING scene
+        const { outgoingScene } = activeTrans;
 
-        // Base video: keep on outgoing scene (clamp time to not exceed boundary)
         const outgoingTime = sourceTimeForScene(outgoingScene, Math.min(timelineTime, outgoingScene.end_time));
         if (Math.abs(video.currentTime - outgoingTime) > 0.15) {
           video.currentTime = outgoingTime;
@@ -356,42 +355,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         if (Math.abs(video.playbackRate - outRate) > 0.01) {
           video.playbackRate = outRate;
         }
-
-        // Incoming video: use sourceTimeForScene for seamless handoff to base video
-        if (incoming) {
-          const incomingSourceStart = incomingScene.original_start_time ?? incomingScene.start_time;
-          const inRate = (incomingScene as any).playbackRate ?? 1;
-          // Use sourceTimeForScene when timeline is past incoming scene start,
-          // otherwise clamp to source start to avoid negative offsets
-          const expectedIncoming = timelineTime >= incomingScene.start_time
-            ? sourceTimeForScene(incomingScene, timelineTime)
-            : incomingSourceStart;
-          if (Math.abs(incoming.currentTime - expectedIncoming) > 0.15) {
-            incoming.currentTime = expectedIncoming;
-          }
-          if (incoming.paused) {
-            incoming.play().catch(() => {});
-          }
-          if (Math.abs(incoming.playbackRate - inRate) > 0.01) {
-            incoming.playbackRate = inRate;
-          }
-        }
+        // Canvas-based incoming frame is handled by useTransitionRenderer — no sync needed
       } else {
-        // PRE-SYNC: 500ms before next transition, pre-seek incoming video
-        // Increased from 200ms to give the decoder more time to find and decode the target keyframe
-        if (incoming) {
-          const nextTrans = findActiveTransition(timelineTime + 0.5);
-          if (nextTrans && incoming.paused) {
-            const incomingSourceStart = nextTrans.incomingScene.original_start_time ?? nextTrans.incomingScene.start_time;
-            const expectedIncoming = timelineTime + 0.5 >= nextTrans.incomingScene.start_time
-              ? sourceTimeForScene(nextTrans.incomingScene, timelineTime + 0.5)
-              : incomingSourceStart;
-            if (Math.abs(incoming.currentTime - expectedIncoming) > 0.3) {
-              incoming.currentTime = expectedIncoming;
-            }
-          }
-        }
-
         // NOT in transition: normal scene sync
         const activeScene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
         if (activeScene) {
@@ -403,11 +368,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           if (Math.abs(video.playbackRate - sceneRate) > 0.01) {
             video.playbackRate = sceneRate;
           }
-        }
-
-        // Pause incoming video when not in transition
-        if (incoming && !incoming.paused) {
-          incoming.pause();
         }
       }
 
