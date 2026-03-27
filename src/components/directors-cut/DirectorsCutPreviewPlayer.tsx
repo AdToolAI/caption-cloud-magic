@@ -1,13 +1,13 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
-import { Player, PlayerRef } from '@remotion/player';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Play, Pause, VolumeX, Volume2, Maximize2, RotateCcw } from 'lucide-react';
-import { DirectorsCutVideo } from '@/remotion/templates/DirectorsCutVideo';
 import { GlobalEffects, AudioEnhancements, SceneEffects, SceneAnalysis, TransitionAssignment, TextOverlay } from '@/types/directors-cut';
 import type { KenBurnsKeyframe } from './features/KenBurnsEffect';
 import { SubtitleTrack, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { cn } from '@/lib/utils';
+import { NativeTransitionOverlay } from './preview/NativeTransitionOverlay';
+import { NativePreviewEffects } from './preview/NativePreviewEffects';
 
 const SUBTITLE_FONT_SIZES = {
   small: '16px',
@@ -86,16 +86,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   fillContainer = false,
   children,
 }) => {
-  const playerRef = useRef<PlayerRef>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const onTimeUpdateRef = useRef(onTimeUpdate);
-  
-  // Keep ref in sync
+
   useEffect(() => {
     onTimeUpdateRef.current = onTimeUpdate;
   }, [onTimeUpdate]);
-  
-  // Native HTML5 Audio refs for reliable audio playback
+
+  // Native audio refs
   const sourceAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceoverAudioRef = useRef<HTMLAudioElement | null>(null);
   const backgroundMusicAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -104,52 +103,27 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const originalAudioMutedRef = useRef(originalAudioMuted);
   const voiceoverShouldRecoverRef = useRef(false);
   const voiceoverRecoveryTimerRef = useRef<number | null>(null);
-  
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(initialMuted);
-  const internalTimeRef = useRef(currentTime);
   const [displayTime, setDisplayTime] = useState(currentTime);
+  const visualTimeRef = useRef(currentTime);
+  const rafIdRef = useRef<number>();
 
-  // Sync isMuted when initialMuted prop changes
-  useEffect(() => {
-    setIsMuted(initialMuted);
-  }, [initialMuted]);
+  useEffect(() => { setIsMuted(initialMuted); }, [initialMuted]);
+  useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+  useEffect(() => { originalAudioMutedRef.current = originalAudioMuted; }, [originalAudioMuted]);
 
-  useEffect(() => {
-    isMutedRef.current = isMuted;
-  }, [isMuted]);
+  // Sort scenes by start_time for consistent matching
+  const sortedScenes = useMemo(() => {
+    return [...scenes].sort((a, b) => a.start_time - b.start_time);
+  }, [scenes]);
 
-  useEffect(() => {
-    isPlayingRef.current = isPlaying;
-  }, [isPlaying]);
-
-  useEffect(() => {
-    originalAudioMutedRef.current = originalAudioMuted;
-  }, [originalAudioMuted]);
-
-  const fps = 30;
-  
-  // Calculate total transition overlap for TransitionSeries duration adjustment
-  const transitionOverlapFrames = useMemo(() => {
-    if (!scenes.length || !transitions.length) return 0;
-    let totalOverlap = 0;
-    transitions.forEach((t, index) => {
-      // Only count transitions that are between scenes (not after the last scene)
-      let sceneIndex = scenes.findIndex(s => s.id === t.sceneId);
-      if (sceneIndex < 0) sceneIndex = index;
-      if (sceneIndex < scenes.length - 1 && t.transitionType !== 'none') {
-        totalOverlap += Math.max(1, Math.floor((t.duration || 0.5) * fps));
-      }
-    });
-    return totalOverlap;
-  }, [scenes, transitions]);
-
-  const durationInFrames = Math.max(1, Math.ceil(duration * fps) - transitionOverlapFrames);
-
+  // ==================== VOICEOVER HELPERS ====================
   const playVoiceover = useCallback(() => {
     const voiceover = voiceoverAudioRef.current;
     if (!voiceover || isMutedRef.current) return;
-
     voiceover.play().then(() => {
       voiceoverShouldRecoverRef.current = false;
     }).catch(() => {
@@ -163,207 +137,33 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (voiceoverRecoveryTimerRef.current) {
       window.clearTimeout(voiceoverRecoveryTimerRef.current);
     }
-
     voiceoverRecoveryTimerRef.current = window.setTimeout(() => {
       if (!voiceoverShouldRecoverRef.current || !isPlayingRef.current || isMutedRef.current) return;
       playVoiceover();
     }, 150);
   }, [playVoiceover]);
 
-  // Convert scenes to Remotion format with effects and Time Remapping data
-  const remotionScenes = useMemo(() => {
-    return scenes.map(scene => {
-      const originalStart = scene.original_start_time ?? scene.start_time;
-      const originalEnd = scene.original_end_time ?? scene.end_time;
-      
-      return {
-        id: scene.id,
-        startTime: scene.start_time,
-        endTime: scene.end_time,
-        originalStartTime: originalStart,
-        originalEndTime: originalEnd,
-        playbackRate: scene.playbackRate ?? 1.0,
-        effects: sceneEffects[scene.id] || undefined,
-        additionalMedia: scene.additionalMedia,
-        isFromOriginalVideo: scene.isFromOriginalVideo ?? true,
-      };
-    });
-  }, [scenes, sceneEffects]);
-
-  // Convert transitions to Remotion format with robust ID mapping
-  const remotionTransitions = useMemo(() => {
-    return transitions.map((t, index) => {
-      let sceneIndex = scenes.findIndex(s => s.id === t.sceneId);
-      
-      if (sceneIndex < 0 && t.sceneId.includes('scene-')) {
-        const numericPart = t.sceneId.replace('scene-', '');
-        sceneIndex = scenes.findIndex(s => s.id === numericPart);
-      }
-      
-      if (sceneIndex < 0) {
-        const numericPart = t.sceneId.replace(/\D/g, '');
-        sceneIndex = scenes.findIndex(s => s.id === numericPart);
-      }
-      
-      if (sceneIndex < 0) {
-        sceneIndex = index;
-      }
-      
-      return {
-        sceneIndex,
-        sceneId: t.sceneId,
-        type: t.transitionType,
-        duration: t.duration,
-      };
-    });
-  }, [transitions, scenes]);
-
-  // Build input props for Remotion — previewMode skips Remotion audio
-  const inputProps = useMemo(() => ({
-    sourceVideoUrl: videoUrl,
-    brightness: effects.brightness,
-    contrast: effects.contrast,
-    saturation: effects.saturation,
-    sharpness: effects.sharpness,
-    temperature: effects.temperature,
-    vignette: effects.vignette,
-    filter: effects.filter,
-    scenes: remotionScenes,
-    sceneEffects,
-    transitions: remotionTransitions,
-    styleTransfer: styleTransfer ? {
-      enabled: styleTransfer.enabled,
-      style: styleTransfer.style || undefined,
-      intensity: styleTransfer.intensity,
-    } : undefined,
-    colorGrading: colorGrading ? {
-      enabled: colorGrading.enabled,
-      grade: colorGrading.grade || undefined,
-      intensity: colorGrading.intensity,
-    } : undefined,
-    sceneColorGrading,
-    speedKeyframes,
-    chromaKey: chromaKey ? {
-      enabled: chromaKey.enabled,
-      color: chromaKey.color,
-      tolerance: chromaKey.tolerance,
-      backgroundUrl: chromaKey.backgroundUrl,
-    } : undefined,
-    kenBurns: kenBurns?.map(k => ({
-      id: k.id,
-      sceneId: k.sceneId,
-      startZoom: k.startZoom,
-      endZoom: k.endZoom,
-      startX: k.startX,
-      startY: k.startY,
-      endX: k.endX,
-      endY: k.endY,
-      easing: k.easing,
-    })),
-    masterVolume: audio.master_volume,
-    voiceoverUrl,
-    voiceoverVolume: 100,
-    backgroundMusicUrl,
-    backgroundMusicVolume: 30,
-    durationInSeconds: duration,
-    textOverlays: textOverlays.map(o => ({
-      id: o.id,
-      text: o.text,
-      animation: o.animation,
-      position: o.position,
-      customPosition: o.customPosition,
-      startTime: o.startTime,
-      endTime: o.endTime,
-      style: o.style,
-    })),
-    previewMode: true,
-  }), [
-    videoUrl, effects, audio, duration, styleTransfer, 
-    colorGrading, sceneColorGrading, speedKeyframes, chromaKey, kenBurns, voiceoverUrl, backgroundMusicUrl,
-    remotionScenes, sceneEffects, remotionTransitions, textOverlays
-  ]);
-
-  // Fast visual time ref updated via rAF for smooth overlays/subtitles
-  const visualTimeRef = useRef(currentTime);
-  const rafIdRef = useRef<number>();
-  
-  useEffect(() => {
-    const updateVisualTime = () => {
-      visualTimeRef.current = internalTimeRef.current;
-      rafIdRef.current = requestAnimationFrame(updateVisualTime);
-    };
-    rafIdRef.current = requestAnimationFrame(updateVisualTime);
-    return () => {
-      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-    };
-  }, []);
-
-  // Find current subtitles based on displayTime (throttled)
-  const currentSubtitles = useMemo(() => {
-    if (!subtitleTrack?.visible) return [];
-    return subtitleTrack.clips.filter(
-      sub => displayTime >= sub.startTime && displayTime < sub.endTime
-    );
-  }, [subtitleTrack, displayTime]);
-
-  // Sync with external isPlaying state (from CapCutEditor)
-  useEffect(() => {
-    if (externalIsPlaying === undefined) return;
-    
-    const player = playerRef.current;
-    if (!player) return;
-    
-    if (externalIsPlaying && !isPlaying) {
-      player.play();
-      setIsPlaying(true);
-      if (!isMuted) {
-        if (!originalAudioMuted) {
-          sourceAudioRef.current?.play().catch(() => {});
-        }
-        voiceoverShouldRecoverRef.current = false;
-        playVoiceover();
-        backgroundMusicAudioRef.current?.play().catch(() => {});
-      }
-    } else if (!externalIsPlaying && isPlaying) {
-      player.pause();
-      setIsPlaying(false);
-      sourceAudioRef.current?.pause();
-      voiceoverShouldRecoverRef.current = false;
-      voiceoverAudioRef.current?.pause();
-      backgroundMusicAudioRef.current?.pause();
-    }
-  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted, playVoiceover]);
-
   // ==================== NATIVE AUDIO SETUP ====================
   useEffect(() => {
-    // Cleanup existing audio elements
-    if (sourceAudioRef.current) {
-      sourceAudioRef.current.pause();
-      sourceAudioRef.current = null;
-    }
-    if (voiceoverAudioRef.current) {
-      voiceoverAudioRef.current.pause();
-      voiceoverAudioRef.current = null;
-    }
-    if (backgroundMusicAudioRef.current) {
-      backgroundMusicAudioRef.current.pause();
-      backgroundMusicAudioRef.current = null;
-    }
+    sourceAudioRef.current?.pause();
+    voiceoverAudioRef.current?.pause();
+    backgroundMusicAudioRef.current?.pause();
+    sourceAudioRef.current = null;
+    voiceoverAudioRef.current = null;
+    backgroundMusicAudioRef.current = null;
 
     if (videoUrl) {
-      const sourceAudio = new Audio(videoUrl);
-      sourceAudio.preload = 'auto';
-      sourceAudio.volume = isMuted ? 0 : (audio.master_volume || 100) / 100;
-      sourceAudioRef.current = sourceAudio;
+      const src = new Audio(videoUrl);
+      src.preload = 'auto';
+      src.volume = isMuted ? 0 : (audio.master_volume || 100) / 100;
+      sourceAudioRef.current = src;
     }
-
     if (voiceoverUrl) {
       const vo = new Audio(voiceoverUrl);
       vo.preload = 'auto';
       vo.volume = isMuted ? 0 : 1.0;
       voiceoverAudioRef.current = vo;
     }
-
     if (backgroundMusicUrl) {
       const bg = new Audio(backgroundMusicUrl);
       bg.preload = 'auto';
@@ -386,6 +186,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     };
   }, [videoUrl, voiceoverUrl, backgroundMusicUrl]);
 
+  // Voiceover recovery listeners
   useEffect(() => {
     const voiceover = voiceoverAudioRef.current;
     if (!voiceover) return;
@@ -395,12 +196,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         voiceoverShouldRecoverRef.current = true;
       }
     };
-
     const handleCanPlay = () => {
       if (!voiceoverShouldRecoverRef.current) return;
       scheduleVoiceoverRecovery();
     };
-
     const handlePlaying = () => {
       voiceoverShouldRecoverRef.current = false;
       if (voiceoverRecoveryTimerRef.current) {
@@ -408,7 +207,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         voiceoverRecoveryTimerRef.current = null;
       }
     };
-
     const handlePause = () => {
       if (isPlayingRef.current && !isMutedRef.current && !voiceover.ended) {
         voiceoverShouldRecoverRef.current = true;
@@ -431,216 +229,187 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     };
   }, [voiceoverUrl, scheduleVoiceoverRecovery]);
 
-  // Update source audio volume when master_volume changes
+  // Update source audio volume
   useEffect(() => {
     if (sourceAudioRef.current) {
       sourceAudioRef.current.volume = (audio.master_volume || 100) / 100;
     }
   }, [audio.master_volume]);
 
-  // Stable player key — only remount on structural changes, not effect sliders
-  const playerKey = useMemo(() => {
-    return `player-${videoUrl}-${durationInFrames}`;
-  }, [videoUrl, durationInFrames]);
-
-  // Handle player events — use ref for onTimeUpdate to avoid re-registering listeners
+  // ==================== rAF PLAYBACK LOOP ====================
   useEffect(() => {
-    const player = playerRef.current;
-    if (!player) return;
+    if (!isPlaying) {
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      return;
+    }
 
-    const onPlay = () => {
-      setIsPlaying(true);
-      // Auto-start native audio when player plays
-      if (!isMutedRef.current) {
-        if (!originalAudioMutedRef.current && sourceAudioRef.current) {
-          sourceAudioRef.current.play().catch(() => {});
-        }
-        voiceoverShouldRecoverRef.current = false;
-        playVoiceover();
-        backgroundMusicAudioRef.current?.play().catch(() => {});
-      }
-    };
-    const onPause = () => {
-      setIsPlaying(false);
-      sourceAudioRef.current?.pause();
-      backgroundMusicAudioRef.current?.pause();
-    };
-    let lastDisplayUpdateTime = 0;
-    let lastParentUpdateTime = 0;
-    const onTimeUpdateEvent = () => {
+    let lastDisplayUpdate = 0;
+    let lastParentUpdate = 0;
+
+    const tick = () => {
+      const video = videoRef.current;
+      if (!video) { rafIdRef.current = requestAnimationFrame(tick); return; }
+
+      const time = video.currentTime;
+      visualTimeRef.current = time;
+
       const now = performance.now();
-      const frame = player.getCurrentFrame();
-      const time = frame / fps;
-      internalTimeRef.current = time;
-      // Throttle display updates to ~4/sec to reduce React re-renders
-      if (now - lastDisplayUpdateTime > 250) {
-        lastDisplayUpdateTime = now;
+      if (now - lastDisplayUpdate > 250) {
+        lastDisplayUpdate = now;
         setDisplayTime(time);
       }
-      // Throttle parent updates to ~4/sec to reduce upstream re-renders
-      if (now - lastParentUpdateTime > 250) {
-        lastParentUpdateTime = now;
+      if (now - lastParentUpdate > 250) {
+        lastParentUpdate = now;
         onTimeUpdateRef.current?.(time);
       }
-      
-      // Keep native audio in sync (correct drift > 0.5s)
+
+      // Drift correction for source audio (not voiceover)
       if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
         if (Math.abs(sourceAudioRef.current.currentTime - time) > 0.5) {
           sourceAudioRef.current.currentTime = time;
         }
       }
-      // Voiceover runs linearly — no drift correction (prevents repeats at scene boundaries)
-    };
-    const onEnded = () => {
-      setIsPlaying(false);
-      internalTimeRef.current = 0;
-      setDisplayTime(0);
-      player.seekTo(0);
-      
-      if (sourceAudioRef.current) {
-        sourceAudioRef.current.pause();
-        sourceAudioRef.current.currentTime = 0;
-      }
-      if (voiceoverAudioRef.current) {
-        voiceoverShouldRecoverRef.current = false;
-        voiceoverAudioRef.current.pause();
-        voiceoverAudioRef.current.currentTime = 0;
-      }
-      if (backgroundMusicAudioRef.current) {
-        backgroundMusicAudioRef.current.pause();
-        backgroundMusicAudioRef.current.currentTime = 0;
-      }
+
+      rafIdRef.current = requestAnimationFrame(tick);
     };
 
-    player.addEventListener('play', onPlay);
-    player.addEventListener('pause', onPause);
-    player.addEventListener('timeupdate', onTimeUpdateEvent);
-    player.addEventListener('ended', onEnded);
+    rafIdRef.current = requestAnimationFrame(tick);
+    return () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current); };
+  }, [isPlaying]);
 
-    return () => {
-      player.removeEventListener('play', onPlay);
-      player.removeEventListener('pause', onPause);
-      player.removeEventListener('timeupdate', onTimeUpdateEvent);
-      player.removeEventListener('ended', onEnded);
-    };
-  }, [playerKey, playVoiceover]);
+  // ==================== VIDEO EVENT HANDLERS ====================
+  const handleVideoEnded = useCallback(() => {
+    setIsPlaying(false);
+    isPlayingRef.current = false;
+    visualTimeRef.current = 0;
+    setDisplayTime(0);
+    onTimeUpdateRef.current?.(0);
 
-  // Sync external time changes — only when NOT playing to avoid seek interrupts
+    sourceAudioRef.current?.pause();
+    if (sourceAudioRef.current) sourceAudioRef.current.currentTime = 0;
+    voiceoverShouldRecoverRef.current = false;
+    voiceoverAudioRef.current?.pause();
+    if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = 0;
+    backgroundMusicAudioRef.current?.pause();
+    if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
+    onPlayingChange?.(false);
+  }, [onPlayingChange]);
+
+  // ==================== EXTERNAL isPlaying SYNC ====================
   useEffect(() => {
-    if (isPlaying) return; // Don't interrupt playback with external syncs
-    const player = playerRef.current;
-    if (!player) return;
-    if (currentTime === 0 && internalTimeRef.current > 0.5) return;
-    
-    if (Math.abs(currentTime - internalTimeRef.current) > 0.5) {
-      player.seekTo(Math.floor(currentTime * fps));
-      internalTimeRef.current = currentTime;
-      setDisplayTime(currentTime);
-      if (sourceAudioRef.current) {
-        sourceAudioRef.current.currentTime = currentTime;
-      }
-      if (voiceoverAudioRef.current) {
-        voiceoverAudioRef.current.currentTime = currentTime;
-      }
-      if (backgroundMusicAudioRef.current) {
-        backgroundMusicAudioRef.current.currentTime = currentTime;
-      }
-    }
-  }, [currentTime, isPlaying]);
+    if (externalIsPlaying === undefined) return;
+    const video = videoRef.current;
+    if (!video) return;
 
-  const handlePlayPause = useCallback(() => {
-    const player = playerRef.current;
-    if (!player) return;
-
-    const newPlayingState = !isPlaying;
-
-    if (isPlaying) {
-      player.pause();
+    if (externalIsPlaying && !isPlaying) {
+      video.play().catch(() => {});
+      setIsPlaying(true);
+      if (!isMuted) {
+        if (!originalAudioMuted) sourceAudioRef.current?.play().catch(() => {});
+        voiceoverShouldRecoverRef.current = false;
+        playVoiceover();
+        backgroundMusicAudioRef.current?.play().catch(() => {});
+      }
+    } else if (!externalIsPlaying && isPlaying) {
+      video.pause();
+      setIsPlaying(false);
       sourceAudioRef.current?.pause();
       voiceoverShouldRecoverRef.current = false;
       voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
+    }
+  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted, playVoiceover]);
+
+  // ==================== EXTERNAL TIME SYNC ====================
+  useEffect(() => {
+    if (isPlaying) return;
+    const video = videoRef.current;
+    if (!video) return;
+    if (currentTime === 0 && visualTimeRef.current > 0.5) return;
+
+    if (Math.abs(currentTime - visualTimeRef.current) > 0.5) {
+      video.currentTime = currentTime;
+      visualTimeRef.current = currentTime;
+      setDisplayTime(currentTime);
+      if (sourceAudioRef.current) sourceAudioRef.current.currentTime = currentTime;
+      if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = currentTime;
+      if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = currentTime;
+    }
+  }, [currentTime, isPlaying]);
+
+  // ==================== USER CONTROLS ====================
+  const startAllAudio = useCallback(() => {
+    if (!originalAudioMuted) sourceAudioRef.current?.play().catch(() => {});
+    voiceoverShouldRecoverRef.current = false;
+    playVoiceover();
+    backgroundMusicAudioRef.current?.play().catch(() => {});
+  }, [originalAudioMuted, playVoiceover]);
+
+  const stopAllAudio = useCallback(() => {
+    sourceAudioRef.current?.pause();
+    voiceoverShouldRecoverRef.current = false;
+    voiceoverAudioRef.current?.pause();
+    backgroundMusicAudioRef.current?.pause();
+  }, []);
+
+  const handlePlayPause = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (isPlaying) {
+      video.pause();
+      setIsPlaying(false);
+      stopAllAudio();
+      onPlayingChange?.(false);
     } else {
-      const currentFrame = player.getCurrentFrame();
-      if (currentFrame >= durationInFrames - 1) {
-        player.seekTo(0);
-        internalTimeRef.current = 0;
+      if (video.ended || video.currentTime >= duration - 0.1) {
+        video.currentTime = 0;
+        visualTimeRef.current = 0;
         setDisplayTime(0);
         if (sourceAudioRef.current) sourceAudioRef.current.currentTime = 0;
         if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = 0;
         if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
       }
-      player.play();
-      // Auto-unmute player if initialMuted is false and user hasn't interacted with mute yet
-      if (!isMuted) {
-        try {
-          player.unmute();
-        } catch {}
-        if (!originalAudioMuted) {
-          sourceAudioRef.current?.play().catch(() => {});
-        }
-        voiceoverShouldRecoverRef.current = false;
-        playVoiceover();
-        backgroundMusicAudioRef.current?.play().catch(() => {});
-      }
+      video.play().catch(() => {});
+      setIsPlaying(true);
+      if (!isMuted) startAllAudio();
+      onPlayingChange?.(true);
     }
-
-    setIsPlaying(newPlayingState);
-    onPlayingChange?.(newPlayingState);
-  }, [isPlaying, durationInFrames, isMuted, onPlayingChange, originalAudioMuted, playVoiceover]);
+  }, [isPlaying, isMuted, duration, onPlayingChange, startAllAudio, stopAllAudio]);
 
   const handleMuteToggle = useCallback(async (e: React.MouseEvent) => {
-    const player = playerRef.current;
-    if (!player) return;
-
     if (isMuted) {
       try {
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioContextClass) {
           const ctx = new AudioContextClass();
-          if (ctx.state === 'suspended') {
-            await ctx.resume();
-          }
+          if (ctx.state === 'suspended') await ctx.resume();
         }
-      } catch (err) {
-        // AudioContext resume failed silently
-      }
-      
-      player.unmute();
-      player.play(e);
+      } catch {}
+
       setIsMuted(false);
-      
-      if (!originalAudioMuted) {
-        sourceAudioRef.current?.play().catch(() => {});
-      }
-      voiceoverShouldRecoverRef.current = false;
-      playVoiceover();
-      backgroundMusicAudioRef.current?.play().catch(() => {});
+      if (sourceAudioRef.current) sourceAudioRef.current.volume = (audio.master_volume || 100) / 100;
+      if (voiceoverAudioRef.current) voiceoverAudioRef.current.volume = 1.0;
+      if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.volume = 0.3;
+
+      if (isPlaying) startAllAudio();
     } else {
-      player.mute();
       setIsMuted(true);
-      
-      sourceAudioRef.current?.pause();
-      voiceoverShouldRecoverRef.current = false;
-      voiceoverAudioRef.current?.pause();
-      backgroundMusicAudioRef.current?.pause();
+      stopAllAudio();
     }
-  }, [isMuted, originalAudioMuted, playVoiceover]);
+  }, [isMuted, isPlaying, audio.master_volume, startAllAudio, stopAllAudio]);
 
   const handleSeek = useCallback((value: number[]) => {
-    const player = playerRef.current;
-    if (!player) return;
+    const video = videoRef.current;
+    if (!video) return;
 
     const newTime = value[0];
-    const frame = Math.floor(newTime * fps);
-    player.seekTo(frame);
-    internalTimeRef.current = newTime;
+    video.currentTime = newTime;
+    visualTimeRef.current = newTime;
     setDisplayTime(newTime);
     onTimeUpdateRef.current?.(newTime);
-    
-    if (sourceAudioRef.current) {
-      sourceAudioRef.current.currentTime = newTime;
-    }
+
+    if (sourceAudioRef.current) sourceAudioRef.current.currentTime = newTime;
     if (voiceoverAudioRef.current) {
       voiceoverAudioRef.current.currentTime = newTime;
       if (isPlayingRef.current && !isMutedRef.current) {
@@ -648,52 +417,55 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         playVoiceover();
       }
     }
-    if (backgroundMusicAudioRef.current) {
-      backgroundMusicAudioRef.current.currentTime = newTime;
-    }
-  }, []);
+    if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = newTime;
+  }, [playVoiceover]);
 
   const handleReset = useCallback(() => {
-    const player = playerRef.current;
-    if (!player) return;
+    const video = videoRef.current;
+    if (!video) return;
 
-    player.seekTo(0);
-    player.pause();
-    internalTimeRef.current = 0;
+    video.pause();
+    video.currentTime = 0;
+    visualTimeRef.current = 0;
     setDisplayTime(0);
     setIsPlaying(false);
-    
-    if (sourceAudioRef.current) {
-      sourceAudioRef.current.pause();
-      sourceAudioRef.current.currentTime = 0;
-    }
-    if (voiceoverAudioRef.current) {
-      voiceoverShouldRecoverRef.current = false;
-      voiceoverAudioRef.current.pause();
-      voiceoverAudioRef.current.currentTime = 0;
-    }
-    if (backgroundMusicAudioRef.current) {
-      backgroundMusicAudioRef.current.pause();
-      backgroundMusicAudioRef.current.currentTime = 0;
-    }
-  }, []);
+    stopAllAudio();
+    if (sourceAudioRef.current) sourceAudioRef.current.currentTime = 0;
+    if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = 0;
+    if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
+  }, [stopAllAudio]);
 
   const handleFullscreen = useCallback(async () => {
     if (containerRef.current) {
       try {
         await containerRef.current.requestFullscreen();
-        if (isMuted) {
-          const player = playerRef.current;
-          if (player) {
-            player.unmute();
-            setIsMuted(false);
-          }
-        }
-      } catch (e) {
-        // Fullscreen not supported
-      }
+        if (isMuted) setIsMuted(false);
+      } catch {}
     }
   }, [isMuted]);
+
+  // ==================== SUBTITLES ====================
+  const currentSubtitles = useMemo(() => {
+    if (!subtitleTrack?.visible) return [];
+    return subtitleTrack.clips.filter(
+      sub => displayTime >= sub.startTime && displayTime < sub.endTime
+    );
+  }, [subtitleTrack, displayTime]);
+
+  // ==================== CSS FILTERS FROM EFFECTS ====================
+  const videoFilter = useMemo(() => {
+    const filters: string[] = [];
+    if (effects.brightness !== undefined && effects.brightness !== 100) {
+      filters.push(`brightness(${effects.brightness / 100})`);
+    }
+    if (effects.contrast !== undefined && effects.contrast !== 100) {
+      filters.push(`contrast(${effects.contrast / 100})`);
+    }
+    if (effects.saturation !== undefined && effects.saturation !== 100) {
+      filters.push(`saturate(${effects.saturation / 100})`);
+    }
+    return filters.length > 0 ? filters.join(' ') : undefined;
+  }, [effects.brightness, effects.contrast, effects.saturation]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -702,30 +474,61 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   };
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className={`flex flex-col ${fillContainer ? 'h-full overflow-hidden' : 'gap-3'} ${className}`}
     >
       {/* Video Player */}
       <div className={`relative bg-black rounded-lg overflow-hidden ${fillContainer ? 'flex-1 min-h-0' : 'aspect-video'}`}>
-        <Player
-          key={playerKey}
-          ref={playerRef}
-          component={DirectorsCutVideo}
-          inputProps={inputProps}
-          durationInFrames={durationInFrames}
-          fps={fps}
-          compositionWidth={1920}
-          compositionHeight={1080}
-          style={{
-            width: '100%',
-            height: '100%',
-          }}
-          controls={false}
-          autoPlay={false}
-          loop={false}
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          className="w-full h-full object-contain"
+          style={{ filter: videoFilter }}
+          muted
+          playsInline
+          preload="auto"
+          onEnded={handleVideoEnded}
         />
-        
+
+        {/* Lightweight transition overlay */}
+        <NativeTransitionOverlay
+          currentTime={displayTime}
+          visualTimeRef={visualTimeRef}
+          scenes={sortedScenes}
+          transitions={transitions}
+          videoUrl={videoUrl}
+        />
+
+        {/* Lightweight effect overlays (color grading, vignette, etc.) */}
+        <NativePreviewEffects
+          effects={effects}
+          colorGrading={colorGrading}
+          sceneColorGrading={sceneColorGrading}
+          scenes={sortedScenes}
+          currentTime={displayTime}
+        />
+
+        {/* Text Overlays */}
+        {textOverlays.filter(o => displayTime >= o.startTime && displayTime < o.endTime).map(overlay => (
+          <div
+            key={overlay.id}
+            className="absolute pointer-events-none z-[15]"
+            style={{
+              top: overlay.customPosition?.y != null ? `${overlay.customPosition.y}%` : overlay.position === 'top' ? '10%' : overlay.position === 'center' ? '50%' : '80%',
+              left: overlay.customPosition?.x != null ? `${overlay.customPosition.x}%` : '50%',
+              transform: 'translate(-50%, -50%)',
+              fontSize: overlay.style?.fontSize || '32px',
+              fontWeight: (overlay.style as any)?.fontWeight || 'bold',
+              color: overlay.style?.color || '#ffffff',
+              textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
+              fontFamily: overlay.style?.fontFamily || 'sans-serif',
+            }}
+          >
+            {overlay.text}
+          </div>
+        ))}
+
         {/* Fullscreen Button */}
         <Button
           variant="ghost"
@@ -736,12 +539,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           <Maximize2 className="h-4 w-4" />
         </Button>
 
-        {/* Custom overlays passed as children */}
         {children}
-        
+
         {/* Subtitle Overlay */}
         {currentSubtitles.map(subtitle => (
-          <div 
+          <div
             key={subtitle.id}
             className={cn(
               "absolute left-0 right-0 flex justify-center px-4 z-30 pointer-events-none",
@@ -764,8 +566,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
                 WebkitLineClamp: subtitle.maxLines || DEFAULT_SUBTITLE_STYLE.maxLines,
                 WebkitBoxOrient: 'vertical' as const,
                 overflow: 'hidden',
-                WebkitTextStroke: subtitle.textStroke 
-                  ? `${subtitle.textStrokeWidth || DEFAULT_SUBTITLE_STYLE.textStrokeWidth}px ${subtitle.textStrokeColor || DEFAULT_SUBTITLE_STYLE.textStrokeColor}` 
+                WebkitTextStroke: subtitle.textStroke
+                  ? `${subtitle.textStrokeWidth || DEFAULT_SUBTITLE_STYLE.textStrokeWidth}px ${subtitle.textStrokeColor || DEFAULT_SUBTITLE_STYLE.textStrokeColor}`
                   : undefined,
                 paintOrder: subtitle.textStroke ? 'stroke fill' : undefined,
               }}
@@ -774,17 +576,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             </div>
           </div>
         ))}
-        
-        {/* Audio Activation Button - Clickable when muted */}
+
+        {/* Audio Activation Button */}
         {isMuted && (
-          <button 
-            onClick={handleMuteToggle}
-            className="absolute top-2 left-2 z-10 group"
-          >
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-black/70 backdrop-blur-sm 
-                            text-white text-xs font-medium cursor-pointer
-                            hover:bg-primary/80 hover:scale-105 transition-all duration-200
-                            border border-white/20 hover:border-primary/50">
+          <button onClick={handleMuteToggle} className="absolute top-2 left-2 z-10 group">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-black/70 text-white text-xs font-medium cursor-pointer hover:bg-primary/80 hover:scale-105 transition-all duration-200 border border-white/20 hover:border-primary/50">
               <Volume2 className="w-4 h-4 group-hover:animate-pulse" />
               <span>🔊 Audio aktivieren</span>
             </div>
@@ -806,28 +602,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
       {/* Controls */}
       <div className={`flex items-center ${fillContainer ? 'gap-2 py-2 shrink-0' : 'gap-3'}`}>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handlePlayPause}
-          className="h-8 w-8"
-        >
+        <Button variant="ghost" size="icon" onClick={handlePlayPause} className="h-8 w-8">
           {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </Button>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleReset}
-          className="h-8 w-8"
-        >
+        <Button variant="ghost" size="icon" onClick={handleReset} className="h-8 w-8">
           <RotateCcw className="h-4 w-4" />
         </Button>
-
         <span className="text-xs text-muted-foreground min-w-[80px]">
           {formatTime(displayTime)} / {formatTime(duration)}
         </span>
-
         <Slider
           value={[displayTime]}
           min={0}
@@ -836,13 +619,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           onValueChange={handleSeek}
           className="flex-1"
         />
-
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleMuteToggle}
-          className="h-8 w-8"
-        >
+        <Button variant="ghost" size="icon" onClick={handleMuteToggle} className="h-8 w-8">
           {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
         </Button>
       </div>
