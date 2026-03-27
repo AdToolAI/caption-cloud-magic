@@ -632,7 +632,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           ref={videoRef}
           src={videoUrl}
           className="absolute inset-0 w-full h-full object-contain"
-          style={{ filter: videoFilter, ...transitionStyles.baseStyle, zIndex: 1 }}
+          style={{ filter: videoFilter, zIndex: 1 }}
           muted
           playsInline
           preload="auto"
