@@ -168,8 +168,7 @@ export function VisualTimeline({
     }
   }, [draggingDivider, handleMouseMove, handleMouseUp, draggingTransition, handleTransitionDotMouseMove, handleTransitionDotMouseUp]);
 
-  // Calculate total duration dynamically from scenes (not prop) for accurate widths
-  const actualTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+  // (actualTotalDuration moved up before handlers)
   
   const getSceneWidth = (scene: SceneAnalysis) => {
     return ((scene.end_time - scene.start_time) / actualTotalDuration) * 100;
