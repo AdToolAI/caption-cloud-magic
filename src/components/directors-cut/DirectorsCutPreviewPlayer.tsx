@@ -372,13 +372,14 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           }
         }
       } else {
-        // PRE-SYNC: 200ms before next transition, pre-seek incoming video
+        // PRE-SYNC: 500ms before next transition, pre-seek incoming video
+        // Increased from 200ms to give the decoder more time to find and decode the target keyframe
         if (incoming) {
-          const nextTrans = findActiveTransition(timelineTime + 0.2);
+          const nextTrans = findActiveTransition(timelineTime + 0.5);
           if (nextTrans && incoming.paused) {
             const incomingSourceStart = nextTrans.incomingScene.original_start_time ?? nextTrans.incomingScene.start_time;
-            const expectedIncoming = timelineTime + 0.2 >= nextTrans.incomingScene.start_time
-              ? sourceTimeForScene(nextTrans.incomingScene, timelineTime + 0.2)
+            const expectedIncoming = timelineTime + 0.5 >= nextTrans.incomingScene.start_time
+              ? sourceTimeForScene(nextTrans.incomingScene, timelineTime + 0.5)
               : incomingSourceStart;
             if (Math.abs(incoming.currentTime - expectedIncoming) > 0.3) {
               incoming.currentTime = expectedIncoming;

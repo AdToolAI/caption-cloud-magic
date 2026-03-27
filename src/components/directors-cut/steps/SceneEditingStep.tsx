@@ -190,25 +190,12 @@ export function SceneEditingStep({
       const existing = transitions.find(t => t.sceneId === scene.id);
       if (existing?.aiSuggested) return existing;
       
-      // Smart AI logic based on scene mood
-      const mood = scene.mood?.toLowerCase() || 'neutral';
-      let transitionType = 'crossfade';
-      let confidence = 0.85;
-      let reasoning = 'Standard-Überblendung für neutrale Szenen';
-      
-      if (mood === 'energetic' || mood === 'action') {
-        transitionType = 'wipe';
-        confidence = 0.9;
-        reasoning = 'Dynamischer Wipe-Effekt passt zur energetischen Stimmung';
-      } else if (mood === 'calm' || mood === 'peaceful') {
-        transitionType = 'dissolve';
-        confidence = 0.92;
-        reasoning = 'Sanfter Dissolve-Effekt für ruhige, friedliche Szenen';
-      } else if (mood === 'dramatic') {
-        transitionType = 'fade';
-        confidence = 0.88;
-        reasoning = 'Fade to Black verstärkt dramatische Momente';
-      }
+      // AI default: always crossfade — motion transitions (slide/push/wipe) 
+      // show framing mismatches between scenes in the preview due to browser decoder limitations.
+      // Users can still manually select any transition type.
+      const transitionType = 'crossfade';
+      const confidence = 0.92;
+      const reasoning = 'Crossfade sorgt für die sauberste Überblendung zwischen Szenen';
       
       return {
         sceneId: scene.id,
