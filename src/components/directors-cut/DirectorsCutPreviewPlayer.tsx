@@ -538,9 +538,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     const activeTrans = findActiveTransition(newTime);
     if (incoming && activeTrans) {
       const incomingSourceStart = activeTrans.incomingScene.original_start_time ?? activeTrans.incomingScene.start_time;
-      const inRate = (activeTrans.incomingScene as any).playbackRate ?? 1;
-      const incomingOffset = activeTrans.progress * activeTrans.tDuration * inRate;
-      incoming.currentTime = incomingSourceStart + incomingOffset;
+      // Use sourceTimeForScene for consistent position with base video handoff
+      incoming.currentTime = newTime >= activeTrans.incomingScene.start_time
+        ? sourceTimeForScene(activeTrans.incomingScene, newTime)
+        : incomingSourceStart;
     }
 
     if (sourceAudioRef.current) sourceAudioRef.current.currentTime = newTime;
