@@ -1,44 +1,39 @@
 
 
-## Fix: Übergänge stocken — `useTransitionInfo` verursacht 60 Re-Renders/Sekunde
+## Fix: Filter im Preview Player nicht sichtbar
 
-### Kernproblem
+### Problem
+Der `useTransitionRenderer` Hook schreibt direkt auf `element.style.filter = ''` — sowohl beim Zurücksetzen nach Transitions (`clearStyles`) als auch bei allen nicht-Blur-Transitions (`base.style.filter = ''`). Das **überschreibt** den von React gesetzten `filter`-Wert (der die visuellen Filter wie cinematic, vintage etc. enthält).
 
-`useTransitionInfo` (Zeile 302) läuft in einem eigenen rAF-Loop und ruft `setState` bei **jeder Fortschrittsänderung** auf — selbst mit dem 0.005-Throttle sind das ~30-60 State-Updates pro Sekunde während einer Transition. **Jedes State-Update rendert die gesamte Komponente neu**, inklusive beider `<video>`-Elemente mit ihren `style`-Props. Das verursacht das Stocken.
+Da der rAF-Loop permanent läuft, wird `style.filter` ständig auf `''` gesetzt, selbst wenn keine Transition aktiv ist.
 
-Das Problem: Die Transition-Styles (`transitionStyles.baseStyle`, `transitionStyles.incomingStyle`) werden als React `style`-Props auf die Videos gesetzt (Zeilen 636, 648-651). Jeder Re-Render erzwingt ein DOM-Update beider Video-Elemente.
+### Lösung
+Den `useTransitionRenderer` so ändern, dass er **niemals** `style.filter` direkt setzt, außer beim Blur-Transition-Typ. Stattdessen einen separaten CSS-Ansatz für Blur verwenden oder den React-Filter als Basis beibehalten.
 
-### Lösung: Ref-basierte DOM-Manipulation statt React-State
+**Konkret in `useTransitionRenderer.ts`:**
 
-Statt `useTransitionInfo` → `getTransitionStyles` → React Re-Render → DOM-Update den Umweg über React komplett eliminieren:
+1. **`clearStyles`**: `el.style.filter = ''` entfernen — Filter wird von React verwaltet
+2. **`applyStyles`**: Alle `base.style.filter = ''` und `incoming.style.filter = ''` Zeilen entfernen
+3. **Blur-Transition**: Statt `style.filter` direkt zu setzen, den Blur-Effekt über ein separates Wrapper-Element oder über eine CSS-Variable steuern, die den bestehenden Filter nicht überschreibt. Einfachste Lösung: Blur als zusätzlichen Filter **anhängen** statt zu ersetzen — dafür den aktuellen `filter`-Wert des Elements auslesen oder den Blur über ein eigenes Overlay-Div anwenden.
 
-1. **Neuer Hook `useTransitionRenderer`** der direkt auf die Video-DOM-Elemente schreibt:
-   - Nimmt `videoRef`, `incomingVideoRef`, `visualTimeRef`, `scenes`, `transitions`
-   - Eigener rAF-Loop berechnet Transition-Progress
-   - Schreibt `style.opacity`, `style.transform`, `style.clipPath` etc. **direkt auf die DOM-Elemente** — kein setState, kein Re-Render
-   - Wenn keine Transition aktiv: setzt incoming auf `display: none`
+**Einfachster Ansatz**: Den `baseFilter` als Parameter an den Hook übergeben und bei Blur diesen als Prefix verwenden:
 
-2. **`useTransitionInfo` und `getTransitionStyles` entfernen** aus dem Player
-   - Zeile 302-303: entfernen
-   - Zeile 636: `style={{ filter: videoFilter }}` — kein `transitionStyles.baseStyle` mehr
-   - Zeile 648-651: `style={{ filter: videoFilter }}` — kein `transitionStyles.incomingStyle` mehr
-   - Der neue Hook übernimmt die Style-Steuerung direkt
+```typescript
+// clearStyles: filter nicht anfassen
+function clearStyles(el: HTMLElement) {
+  el.style.opacity = '';
+  el.style.transform = '';
+  el.style.clipPath = '';
+  // NICHT: el.style.filter = '';
+}
 
-3. **Ergebnis**: Während Transitions passieren **null React Re-Renders** für die Animation. Nur der rAF-Loop schreibt direkt ins DOM — genau wie eine CSS-Animation, aber mit voller Kontrolle.
-
-### Betroffene Dateien
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — useTransitionInfo/getTransitionStyles durch useTransitionRenderer ersetzen
-- `src/components/directors-cut/preview/NativeTransitionLayer.tsx` — neuen `useTransitionRenderer` Hook hinzufügen (oder als separate Datei)
-
-### Technische Kurzfassung
-```text
-Vorher:
-  useTransitionInfo rAF → setState(progress) → React Re-Render
-  → getTransitionStyles → style prop → DOM update
-  = 60 React renders/sec während Transition
-
-Nachher:
-  useTransitionRenderer rAF → element.style.opacity = ... (direkt)
-  = 0 React renders, 60 DOM writes/sec (wie CSS Animation)
+// Blur-Transition: baseFilter beibehalten
+case 'blur':
+  base.style.filter = `${baseFilter || ''} blur(${progress * 8}px)`.trim();
+  incoming.style.filter = `${baseFilter || ''} blur(${(1 - progress) * 8}px)`.trim();
 ```
+
+### Dateien
+- `src/components/directors-cut/preview/useTransitionRenderer.ts` — filter-Handling korrigieren
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `videoFilter` als Ref an den Hook übergeben
 
