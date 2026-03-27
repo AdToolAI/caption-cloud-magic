@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Download, RefreshCw, Loader2, RotateCcw, Info, CheckCircle2 } from 'lucide-react';
+import { Play, Download, RefreshCw, Loader2, RotateCcw, Info, CheckCircle2, Library } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { toast as sonnerToast } from 'sonner';
 
 
 interface VideoGeneration {
@@ -37,7 +38,9 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
   const { user } = useAuth();
   
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
+  const [savingVideo, setSavingVideo] = useState<string | null>(null);
 
   const { data: generations, isLoading, refetch } = useQuery({
     queryKey: ['ai-video-generations', user?.id],
@@ -53,6 +56,32 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
 
       if (error) throw error;
       return data as VideoGeneration[];
+    },
+    enabled: !!user
+  });
+
+  // Query which generation IDs are already saved in video_creations
+  const { data: savedGenerationIds } = useQuery({
+    queryKey: ['saved-generation-ids', user?.id],
+    queryFn: async () => {
+      if (!user) return new Set<string>();
+
+      const { data, error } = await supabase
+        .from('video_creations')
+        .select('metadata')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error fetching saved generation IDs:', error);
+        return new Set<string>();
+      }
+
+      const ids = new Set<string>();
+      data?.forEach((vc: any) => {
+        const genId = vc.metadata?.ai_generation_id;
+        if (genId) ids.add(genId);
+      });
+      return ids;
     },
     enabled: !!user
   });
@@ -74,6 +103,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
         () => {
           console.log('[VideoHistory] Realtime update received, refetching...');
           refetch();
+          queryClient.invalidateQueries({ queryKey: ['saved-generation-ids', user?.id] });
         }
       )
       .subscribe();
@@ -81,7 +111,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, refetch]);
+  }, [user, refetch, queryClient]);
 
   const getStatusBadge = (status: VideoGeneration['status']) => {
     const variants = {
@@ -109,7 +139,6 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
   const getFriendlyErrorMessage = (errorMessage: string | null): string => {
     if (!errorMessage) return 'Ein unbekannter Fehler ist aufgetreten.';
 
-    // Check for Replicate service unavailable errors (E004)
     if (
       errorMessage.includes('Service is temporarily unavailable') ||
       errorMessage.includes('(E004)') ||
@@ -118,7 +147,6 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
       return 'Der Videoanbieter war vorübergehend nicht verfügbar. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es später erneut.';
     }
 
-    // Check for other common Replicate errors
     if (errorMessage.includes('Rate limit exceeded')) {
       return 'Zu viele Anfragen. Bitte warte einen Moment und versuche es erneut.';
     }
@@ -127,7 +155,6 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
       return 'Ungültige Eingabe. Bitte überprüfe deine Eingaben und versuche es erneut.';
     }
 
-    // For other errors, show a shortened version (max 150 chars)
     if (errorMessage.length > 150) {
       return errorMessage.substring(0, 147) + '...';
     }
@@ -176,6 +203,55 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     }
   };
 
+  const handleSaveToLibrary = async (generationId: string) => {
+    if (!user) return;
+    setSavingVideo(generationId);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      if (!token) {
+        throw new Error('Nicht authentifiziert');
+      }
+
+      const response = await supabase.functions.invoke('save-ai-video-to-library', {
+        body: { generation_id: generationId },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Fehler beim Speichern');
+      }
+
+      const result = response.data;
+
+      if (!result.ok) {
+        throw new Error(result.error || 'Unbekannter Fehler');
+      }
+
+      sonnerToast.success('Video in Mediathek gespeichert!');
+      queryClient.invalidateQueries({ queryKey: ['saved-generation-ids', user?.id] });
+    } catch (error: any) {
+      console.error('Save to library error:', error);
+      const errorMsg = error?.message || '';
+      
+      if (errorMsg.includes('not reachable') || errorMsg.includes('expired')) {
+        sonnerToast.error('Video nicht mehr verfügbar', {
+          description: 'Die temporäre URL ist abgelaufen. Bitte generiere das Video erneut.'
+        });
+      } else {
+        sonnerToast.error('Speichern fehlgeschlagen', {
+          description: errorMsg || 'Bitte versuche es erneut.'
+        });
+      }
+    } finally {
+      setSavingVideo(null);
+    }
+  };
+
+  const isVideoSaved = (generationId: string): boolean => {
+    return savedGenerationIds?.has(generationId) ?? false;
+  };
 
   if (isLoading) {
     return (
@@ -320,10 +396,26 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
                         <Download className="w-4 h-4 mr-2" />
                         Download
                       </Button>
-                      <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400">
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                        In Mediathek gespeichert
-                      </span>
+                      {isVideoSaved(gen.id) ? (
+                        <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400">
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                          In Mediathek gespeichert
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSaveToLibrary(gen.id)}
+                          disabled={savingVideo === gen.id}
+                        >
+                          {savingVideo === gen.id ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Library className="w-4 h-4 mr-2" />
+                          )}
+                          In Mediathek speichern
+                        </Button>
+                      )}
                     </>
                   )}
                   {gen.status === 'processing' && (

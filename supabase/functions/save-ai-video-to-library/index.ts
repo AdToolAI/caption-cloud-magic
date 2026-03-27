@@ -86,11 +86,22 @@ serve(async (req) => {
       );
     }
 
-    // Download video from Replicate
+    // Download video from source URL
     console.log("Downloading video from:", generation.video_url);
-    const videoResponse = await fetch(generation.video_url);
+    let videoResponse: Response;
+    try {
+      videoResponse = await fetch(generation.video_url);
+    } catch (fetchErr) {
+      return new Response(
+        JSON.stringify({ ok: false, error: "Video nicht mehr verfügbar — die temporäre URL ist abgelaufen. Bitte generiere das Video erneut." }),
+        { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     if (!videoResponse.ok) {
-      throw new Error("Failed to download video from Replicate");
+      return new Response(
+        JSON.stringify({ ok: false, error: "Video nicht mehr verfügbar — die temporäre URL ist abgelaufen. Bitte generiere das Video erneut." }),
+        { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const videoBlob = await videoResponse.blob();
