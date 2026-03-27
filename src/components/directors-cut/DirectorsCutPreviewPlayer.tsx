@@ -343,7 +343,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         const { outgoingScene, incomingScene, boundary, progress, tDuration } = activeTrans;
 
         // Base video: keep on outgoing scene (clamp time to not exceed boundary)
-        const outgoingTime = sourceTimeForScene(outgoingScene, Math.min(timelineTime, boundary));
+        const outgoingTime = sourceTimeForScene(outgoingScene, Math.min(timelineTime, outgoingScene.end_time));
         if (Math.abs(video.currentTime - outgoingTime) > 0.15) {
           video.currentTime = outgoingTime;
         }
