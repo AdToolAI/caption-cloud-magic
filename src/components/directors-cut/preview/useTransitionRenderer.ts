@@ -87,7 +87,7 @@ function clearStyles(el: HTMLElement) {
   el.style.opacity = '';
   el.style.transform = '';
   el.style.clipPath = '';
-  el.style.filter = '';
+  // Do NOT clear filter — it's managed by React (videoFilter prop)
 }
 
 function applyStyles(
