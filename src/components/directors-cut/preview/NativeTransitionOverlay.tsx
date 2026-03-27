@@ -50,6 +50,7 @@ export function NativeTransitionOverlay({
     const video = document.createElement('video');
     video.preload = 'auto';
     video.muted = true;
+    video.crossOrigin = 'anonymous';
     video.src = videoUrl;
 
     const capture = async () => {
@@ -74,7 +75,7 @@ export function NativeTransitionOverlay({
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           frames[sceneId] = canvas.toDataURL('image/jpeg', 0.6);
           capturedRef.current.add(sceneId);
-        } catch { /* skip */ }
+        } catch (e) { console.warn('Frame capture failed for scene', sceneId, e); }
       }
       if (Object.keys(frames).length > 0) {
         setNextFrameCache((prev) => ({ ...prev, ...frames }));
@@ -132,15 +133,15 @@ export function NativeTransitionOverlay({
 
   // Next-frame overlay style
   const getNextFrameStyle = (): React.CSSProperties => {
-    if (!nextFrame) return { display: 'none' };
-
-    const bgBase: React.CSSProperties = {
-      backgroundImage: `url(${nextFrame})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat',
-      backgroundColor: '#000',
-    };
+    const bgBase: React.CSSProperties = nextFrame
+      ? {
+          backgroundImage: `url(${nextFrame})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundColor: '#000',
+        }
+      : { backgroundColor: '#000' };
 
     switch (baseType) {
       case 'crossfade':
@@ -185,12 +186,10 @@ export function NativeTransitionOverlay({
         style={getEffectStyle()}
       />
       {/* Incoming scene frame */}
-      {nextFrame && (
-        <div
-          className="absolute inset-0 pointer-events-none z-[6]"
-          style={getNextFrameStyle()}
-        />
-      )}
+      <div
+        className="absolute inset-0 pointer-events-none z-[6]"
+        style={getNextFrameStyle()}
+      />
     </>
   );
 }
