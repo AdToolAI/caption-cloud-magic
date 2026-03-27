@@ -28,9 +28,21 @@ export function NativeTransitionOverlay({
 }: NativeTransitionOverlayProps) {
   const [nextFrameCache, setNextFrameCache] = useState<Record<string, string>>({});
   const capturedRef = useRef<Set<string>>(new Set());
+  const [smoothTime, setSmoothTime] = useState(currentTime);
+  const smoothRafRef = useRef<number>();
 
-  // Use visualTimeRef for smoother animation when available
-  const time = visualTimeRef?.current ?? currentTime;
+  // Own rAF loop reading visualTimeRef at 60fps for fluid transitions
+  useEffect(() => {
+    const tick = () => {
+      const t = visualTimeRef?.current ?? currentTime;
+      setSmoothTime(t);
+      smoothRafRef.current = requestAnimationFrame(tick);
+    };
+    smoothRafRef.current = requestAnimationFrame(tick);
+    return () => { if (smoothRafRef.current) cancelAnimationFrame(smoothRafRef.current); };
+  }, [currentTime, visualTimeRef]);
+
+  const time = smoothTime;
 
   // Pre-capture the first frame of each scene (except the first)
   useEffect(() => {
