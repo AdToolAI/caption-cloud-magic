@@ -126,9 +126,9 @@ function applyStyles(
       break;
 
     case 'blur':
-      base.style.filter = `blur(${progress * 8}px)`;
+      base.style.filter = `${baseFilter} blur(${progress * 8}px)`.trim();
       base.style.opacity = String(1 - progress);
-      incoming.style.filter = `blur(${(1 - progress) * 8}px)`;
+      incoming.style.filter = `${baseFilter} blur(${(1 - progress) * 8}px)`.trim();
       incoming.style.opacity = String(progress);
       base.style.transform = '';
       base.style.clipPath = '';
