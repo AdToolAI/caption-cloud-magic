@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Download, RefreshCw, Loader2, Save, RotateCcw, Info } from 'lucide-react';
+import { Play, Download, RefreshCw, Loader2, RotateCcw, Info, CheckCircle2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { toast as sonnerToast } from 'sonner';
+
 
 interface VideoGeneration {
   id: string;
@@ -36,9 +35,7 @@ interface VideoGenerationHistoryProps {
 
 export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHistoryProps = {}) {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [savingVideo, setSavingVideo] = useState<string | null>(null);
+  
   const { toast } = useToast();
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
 
@@ -179,37 +176,6 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     }
   };
 
-  const handleSaveToLibrary = async (generationId: string) => {
-    setSavingVideo(generationId);
-    try {
-      const { data, error } = await supabase.functions.invoke('save-ai-video-to-library', {
-        body: { generation_id: generationId }
-      });
-
-      if (error) throw error;
-
-      if (!data.ok) {
-        throw new Error(data.error || 'Fehler beim Speichern');
-      }
-
-      sonnerToast.success('Video in Mediathek gespeichert!', {
-        description: 'Du wirst zur Mediathek weitergeleitet...',
-        duration: 2000
-      });
-      
-      queryClient.invalidateQueries({ queryKey: ['video-history'] });
-      
-      // Navigate to Media Library with AI tab selected after 1 second
-      setTimeout(() => {
-        navigate('/media-library?tab=ai');
-      }, 1000);
-    } catch (error) {
-      console.error('Save to library error:', error);
-      sonnerToast.error(error instanceof Error ? error.message : 'Fehler beim Speichern in Mediathek');
-    } finally {
-      setSavingVideo(null);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -354,15 +320,10 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
                         <Download className="w-4 h-4 mr-2" />
                         Download
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleSaveToLibrary(gen.id)}
-                        disabled={savingVideo === gen.id}
-                      >
-                        <Save className="w-4 h-4 mr-2" />
-                        {savingVideo === gen.id ? 'Speichert...' : 'In Mediathek'}
-                      </Button>
+                      <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400">
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                        In Mediathek gespeichert
+                      </span>
                     </>
                   )}
                   {gen.status === 'processing' && (

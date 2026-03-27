@@ -49,16 +49,53 @@ serve(async (req) => {
     // Handle different Replicate statuses
     if (status === 'succeeded' && output) {
       // Replicate output is typically an array of URLs or a single URL
-      const videoUrl = Array.isArray(output) ? output[0] : output;
+      const replicateVideoUrl = Array.isArray(output) ? output[0] : output;
+      console.log('[Replicate Webhook] Video completed, downloading from:', replicateVideoUrl);
 
-      console.log('[Replicate Webhook] Video completed:', videoUrl);
+      let permanentUrl = replicateVideoUrl;
 
-      // Update generation as completed
+      try {
+        // 1. Download video from Replicate (temporary URL)
+        const videoResponse = await fetch(replicateVideoUrl);
+        if (!videoResponse.ok) {
+          throw new Error(`Failed to download video: ${videoResponse.status}`);
+        }
+        const videoBuffer = await videoResponse.arrayBuffer();
+        console.log(`[Replicate Webhook] Downloaded video: ${videoBuffer.byteLength} bytes`);
+
+        // 2. Upload to permanent storage
+        const fileName = `${generation.user_id}/${generation.id}.mp4`;
+        const { error: uploadError } = await supabase.storage
+          .from('ai-videos')
+          .upload(fileName, videoBuffer, {
+            contentType: 'video/mp4',
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error('[Replicate Webhook] Storage upload error:', uploadError);
+          throw uploadError;
+        }
+        console.log('[Replicate Webhook] Video uploaded to storage:', fileName);
+
+        // 3. Get permanent public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('ai-videos')
+          .getPublicUrl(fileName);
+        permanentUrl = publicUrl;
+        console.log('[Replicate Webhook] Permanent URL:', permanentUrl);
+
+      } catch (storageError) {
+        console.error('[Replicate Webhook] Storage error, using Replicate URL as fallback:', storageError);
+        // permanentUrl stays as replicateVideoUrl
+      }
+
+      // 4. Update generation as completed with permanent URL
       const { error: updateError } = await supabase
         .from('ai_video_generations')
         .update({
           status: 'completed',
-          video_url: videoUrl,
+          video_url: permanentUrl,
           completed_at: new Date().toISOString(),
           error_message: null
         })
@@ -69,7 +106,33 @@ serve(async (req) => {
         throw updateError;
       }
 
-      console.log('[Replicate Webhook] Generation marked as completed:', generation.id);
+      // 5. Auto-save to video_creations (Mediathek)
+      const { error: creationError } = await supabase
+        .from('video_creations')
+        .insert({
+          user_id: generation.user_id,
+          template_id: null,
+          output_url: permanentUrl,
+          status: 'completed',
+          metadata: {
+            ai_generation_id: generation.id,
+            model: generation.model,
+            prompt: generation.prompt,
+            aspect_ratio: generation.aspect_ratio,
+            resolution: generation.resolution,
+            duration_seconds: generation.duration_seconds,
+            source: 'sora-2-ai'
+          },
+          credits_used: 0
+        });
+
+      if (creationError) {
+        console.error('[Replicate Webhook] video_creations insert error:', creationError);
+      } else {
+        console.log('[Replicate Webhook] Video auto-saved to Mediathek');
+      }
+
+      console.log('[Replicate Webhook] Generation completed and saved:', generation.id);
 
       return new Response(JSON.stringify({ success: true, status: 'completed' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
