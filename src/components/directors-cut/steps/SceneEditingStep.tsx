@@ -170,7 +170,7 @@ export function SceneEditingStep({
       onTransitionsChange([...transitions, {
         sceneId: editingTransitionId,
         transitionType: type,
-        duration: 0.5,
+        duration: 1.2,
         aiSuggested: false,
       }]);
     }
