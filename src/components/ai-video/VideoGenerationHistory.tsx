@@ -219,14 +219,12 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
         body: { generation_id: generationId },
       });
 
-      if (response.error) {
-        throw new Error(response.error.message || 'Fehler beim Speichern');
-      }
-
+      // Supabase SDK: bei non-2xx ist response.data trotzdem gesetzt mit dem Body
       const result = response.data;
-
-      if (!result.ok) {
-        throw new Error(result.error || 'Unbekannter Fehler');
+      
+      if (response.error || (result && !result.ok)) {
+        const errorMsg = result?.error || response.error?.message || 'Fehler beim Speichern';
+        throw new Error(errorMsg);
       }
 
       sonnerToast.success('Video in Mediathek gespeichert!');
