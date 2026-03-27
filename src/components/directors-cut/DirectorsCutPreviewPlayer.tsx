@@ -519,16 +519,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     setDisplayTime(newTime);
     onTimeUpdateRef.current?.(newTime);
 
-    // Sync incoming video if seeking into a transition window
-    const incoming = incomingVideoRef.current;
-    const activeTrans = findActiveTransition(newTime);
-    if (incoming && activeTrans) {
-      const incomingSourceStart = activeTrans.incomingScene.original_start_time ?? activeTrans.incomingScene.start_time;
-      // Use sourceTimeForScene for consistent position with base video handoff
-      incoming.currentTime = newTime >= activeTrans.incomingScene.start_time
-        ? sourceTimeForScene(activeTrans.incomingScene, newTime)
-        : incomingSourceStart;
-    }
+    // No incoming video sync needed — canvas snapshots handle transitions
 
     if (sourceAudioRef.current) sourceAudioRef.current.currentTime = newTime;
     if (voiceoverAudioRef.current) {
