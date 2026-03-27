@@ -120,6 +120,8 @@ export interface TransitionAssignment {
   aiSuggested: boolean;
   confidence?: number;
   reasoning?: string;
+  /** Manual anchor time — overrides scene.end_time as the transition center */
+  anchorTime?: number;
 }
 
 // Wizard Step Props

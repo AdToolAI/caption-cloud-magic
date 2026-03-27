@@ -14,6 +14,7 @@ interface VisualTimelineProps {
   onTransitionClick: (sceneId: string) => void;
   // Updated: only needs sceneId and new end time - parent handles shifting
   onSceneDurationChange?: (sceneId: string, newEndTime: number) => void;
+  onTransitionAnchorChange?: (sceneId: string, anchorTime: number) => void;
   thumbnails?: Record<string, string>;
   currentTime?: number;
 }
@@ -44,6 +45,7 @@ export function VisualTimeline({
   onSceneSelect,
   onTransitionClick,
   onSceneDurationChange,
+  onTransitionAnchorChange,
   thumbnails = {},
   currentTime = 0,
 }: VisualTimelineProps) {
@@ -53,6 +55,15 @@ export function VisualTimeline({
   const [draggingDivider, setDraggingDivider] = useState<number | null>(null);
   const [dragStartX, setDragStartX] = useState<number>(0);
   const [dragStartScenes, setDragStartScenes] = useState<{ leftEnd: number; rightStart: number } | null>(null);
+  
+  // Transition dot drag state
+  const [draggingTransition, setDraggingTransition] = useState<{ sceneId: string; sceneIndex: number } | null>(null);
+  const [dragTransitionAnchor, setDragTransitionAnchor] = useState<number | null>(null);
+  const dragTransitionStartXRef = useRef<number>(0);
+  const dragTransitionStartAnchorRef = useRef<number>(0);
+
+  // Calculate total duration dynamically from scenes (not prop) for accurate widths
+  const actualTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
 
   // Handle divider drag
   const handleDividerMouseDown = useCallback((e: React.MouseEvent, index: number) => {
@@ -100,6 +111,43 @@ export function VisualTimeline({
     setDragStartScenes(null);
   }, []);
 
+  // Transition dot drag handlers
+  const handleTransitionDotMouseDown = useCallback((e: React.MouseEvent, sceneId: string, sceneIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const transition = transitions.find(t => t.sceneId === sceneId);
+    const currentAnchor = transition?.anchorTime ?? scenes[sceneIndex].end_time;
+    dragTransitionStartXRef.current = e.clientX;
+    dragTransitionStartAnchorRef.current = currentAnchor;
+    setDraggingTransition({ sceneId, sceneIndex });
+    setDragTransitionAnchor(currentAnchor);
+  }, [scenes, transitions]);
+
+  const handleTransitionDotMouseMove = useCallback((e: MouseEvent) => {
+    if (!draggingTransition || !timelineRef.current || !onTransitionAnchorChange) return;
+    const rect = timelineRef.current.getBoundingClientRect();
+    const deltaX = e.clientX - dragTransitionStartXRef.current;
+    const deltaPercent = deltaX / rect.width;
+    const deltaTime = deltaPercent * actualTotalDuration;
+    
+    const leftScene = scenes[draggingTransition.sceneIndex];
+    const rightScene = scenes[draggingTransition.sceneIndex + 1];
+    // Clamp: at least 0.3s inside each scene
+    const minAnchor = leftScene.start_time + 0.3;
+    const maxAnchor = rightScene.end_time - 0.3;
+    const newAnchor = Math.max(minAnchor, Math.min(maxAnchor, dragTransitionStartAnchorRef.current + deltaTime));
+    
+    setDragTransitionAnchor(newAnchor);
+  }, [draggingTransition, scenes, onTransitionAnchorChange]);
+
+  const handleTransitionDotMouseUp = useCallback(() => {
+    if (draggingTransition && dragTransitionAnchor !== null && onTransitionAnchorChange) {
+      onTransitionAnchorChange(draggingTransition.sceneId, dragTransitionAnchor);
+    }
+    setDraggingTransition(null);
+    setDragTransitionAnchor(null);
+  }, [draggingTransition, dragTransitionAnchor, onTransitionAnchorChange]);
+
   // Add/remove event listeners for drag
   useEffect(() => {
     if (draggingDivider !== null) {
@@ -110,10 +158,17 @@ export function VisualTimeline({
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [draggingDivider, handleMouseMove, handleMouseUp]);
+    if (draggingTransition !== null) {
+      window.addEventListener('mousemove', handleTransitionDotMouseMove);
+      window.addEventListener('mouseup', handleTransitionDotMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleTransitionDotMouseMove);
+        window.removeEventListener('mouseup', handleTransitionDotMouseUp);
+      };
+    }
+  }, [draggingDivider, handleMouseMove, handleMouseUp, draggingTransition, handleTransitionDotMouseMove, handleTransitionDotMouseUp]);
 
-  // Calculate total duration dynamically from scenes (not prop) for accurate widths
-  const actualTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+  // (actualTotalDuration moved up before handlers)
   
   const getSceneWidth = (scene: SceneAnalysis) => {
     return ((scene.end_time - scene.start_time) / actualTotalDuration) * 100;
@@ -271,33 +326,57 @@ export function VisualTimeline({
                       </div>
                     </motion.div>
 
-                    {/* Transition Button */}
-                    <motion.button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onTransitionClick(scene.id);
-                      }}
-                      onHoverStart={() => setHoveredTransition(scene.id)}
-                      onHoverEnd={() => setHoveredTransition(null)}
-                      whileHover={{ scale: 1.2 }}
-                      whileTap={{ scale: 0.9 }}
-                      className={cn(
-                        "w-4 h-4 rounded-full flex items-center justify-center",
-                        "border-2 border-background shadow-lg",
-                        "transition-all duration-200",
-                        transition ? TRANSITION_COLORS[transition.transitionType] : 'bg-muted',
-                        hoveredTransition === scene.id && "ring-2 ring-primary/50"
-                      )}
-                    >
-                      <span className="text-[8px] text-white">
-                        {transition ? TRANSITION_ICONS[transition.transitionType] : '+'}
-                      </span>
-                    </motion.button>
+                    {/* Transition Button — draggable */}
+                    {(() => {
+                      const isDraggingThis = draggingTransition?.sceneId === scene.id;
+                      const anchorTime = isDraggingThis && dragTransitionAnchor !== null
+                        ? dragTransitionAnchor
+                        : (transition?.anchorTime ?? scene.end_time);
+                      // Compute offset from scene boundary as % of timeline width
+                      const offsetTime = anchorTime - scene.end_time;
+                      const offsetPercent = (offsetTime / actualTotalDuration) * 100;
+                      
+                      return (
+                        <motion.button
+                          onMouseDown={(e) => {
+                            if (onTransitionAnchorChange) {
+                              handleTransitionDotMouseDown(e, scene.id, index);
+                            }
+                          }}
+                          onClick={(e) => {
+                            if (!isDraggingThis) {
+                              e.stopPropagation();
+                              onTransitionClick(scene.id);
+                            }
+                          }}
+                          onHoverStart={() => !isDraggingThis && setHoveredTransition(scene.id)}
+                          onHoverEnd={() => setHoveredTransition(null)}
+                          whileHover={!isDraggingThis ? { scale: 1.2 } : undefined}
+                          whileTap={!isDraggingThis ? { scale: 0.9 } : undefined}
+                          className={cn(
+                            "w-5 h-5 rounded-full flex items-center justify-center",
+                            "border-2 border-background shadow-lg",
+                            "transition-colors duration-200",
+                            onTransitionAnchorChange ? "cursor-ew-resize" : "cursor-pointer",
+                            transition ? TRANSITION_COLORS[transition.transitionType] : 'bg-muted',
+                            hoveredTransition === scene.id && "ring-2 ring-primary/50",
+                            isDraggingThis && "ring-2 ring-primary scale-125"
+                          )}
+                          style={{
+                            transform: `translateX(${offsetPercent * (timelineRef.current?.getBoundingClientRect().width ?? 800) / 100}px)`,
+                          }}
+                        >
+                          <span className="text-[8px] text-white">
+                            {transition ? TRANSITION_ICONS[transition.transitionType] : '+'}
+                          </span>
+                        </motion.button>
+                      );
+                    })()}
                   </div>
                 )}
 
                 {/* Transition Info Tooltip */}
-                {hoveredTransition === scene.id && transition && (
+                {(hoveredTransition === scene.id || draggingTransition?.sceneId === scene.id) && transition && (
                   <motion.div
                     initial={{ opacity: 0, y: 5, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -311,6 +390,16 @@ export function VisualTimeline({
                       <div className="text-[9px] text-muted-foreground">
                         Dauer: {transition.duration.toFixed(1)}s
                       </div>
+                      {draggingTransition?.sceneId === scene.id && dragTransitionAnchor !== null && (
+                        <div className="text-[9px] text-primary font-mono mt-0.5">
+                          Position: {dragTransitionAnchor.toFixed(1)}s
+                        </div>
+                      )}
+                      {transition.anchorTime && !draggingTransition && (
+                        <div className="text-[9px] text-muted-foreground font-mono mt-0.5">
+                          Anker: {transition.anchorTime.toFixed(1)}s
+                        </div>
+                      )}
                       {transition.aiSuggested && (
                         <Badge className="mt-1 h-4 text-[8px] px-1" variant="secondary">
                           <Sparkles className="h-2 w-2 mr-0.5" />
