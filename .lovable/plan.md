@@ -1,45 +1,100 @@
 
+Ziel: Den verbleibenden Function-Fehler nicht mehr zu raten, sondern die Save-to-Library-Strecke so umbauen, dass der echte Fehler sauber sichtbar wird und der Client ihn korrekt anzeigt.
 
-## Fix: "In Mediathek speichern" Fehler bei abgelaufenen URLs
+Befund aus dem aktuellen Code
+- Der Button ruft wirklich `save-ai-video-to-library` auf.
+- Die Function startet auch wirklich: In den Logs sieht man `Downloading video from: ...`.
+- Trotzdem landet der User weiter bei `Edge Function returned a non-2xx status code`.
+- Für den betroffenen Testuser existieren weiterhin keine `video_creations`-Einträge. Der Fehler passiert also serverseitig nach dem Start der Function.
+- Der aktuelle Client-Code in `VideoGenerationHistory.tsx` liest bei Fehlern nur `response.error?.message` bzw. `response.data`. Bei Supabase-Functions steckt der echte Fehlertext bei non-2xx aber typischerweise in `error.context`.
 
-### Problem
-Die zwei Videos wurden **vor** dem Auto-Save-Webhook generiert. Ihre `video_url` zeigt auf temporäre `replicate.delivery`-URLs, die nach ~1 Stunde ablaufen. Das Edge Function gibt korrekt 410 zurück, aber:
+Wahrscheinlichste Ursache
+- Die Function schlägt nach dem Download in einem späteren Schritt fehl:
+  - Insert in `video_creations`
+  - Duplicate-Check mit JSON-Filter
+  - Upload/Storage-Folgeschritt
+- Der Client zeigt den konkreten Fehler nicht, weil `FunctionsHttpError.context.json()` nicht ausgewertet wird.
 
-1. Der Client-Code erkennt den Fehler nicht richtig — `supabase.functions.invoke()` wrappet non-2xx als generischen Error, die eigentliche Fehlermeldung ("temporäre URL abgelaufen") geht verloren
-2. Für diese alten Videos gibt es **keine Möglichkeit mehr**, sie zu speichern — die Quelle ist weg
+Umsetzung
+1. Client-Fehlerbehandlung in `src/components/ai-video/VideoGenerationHistory.tsx` korrigieren
+- `FunctionsHttpError` sauber behandeln
+- Bei `response.error` zusätzlich `await response.error.context.json()` lesen
+- Daraus `error`, `message` und optional `code` extrahieren
+- Nur wenn das fehlt, auf `response.error.message` zurückfallen
+- Die Toasts danach anhand der echten Backend-Meldung unterscheiden:
+  - abgelaufene URL
+  - bereits gespeichert
+  - Insert-/Storage-Fehler
+  - generischer Fallback
 
-### Lösung
+2. Edge Function `supabase/functions/save-ai-video-to-library/index.ts` diagnostisch härten
+- Vor jedem kritischen Schritt klare Logs ergänzen:
+  - generation gefunden
+  - Existing-Check Ergebnis
+  - Download erfolgreich / Content-Type / Größe
+  - Upload erfolgreich
+  - Public URL erzeugt
+  - Insert startet
+  - Insert fehlgeschlagen mit voller Fehlermeldung
+- Fehler nicht nur generisch werfen, sondern strukturiert zurückgeben:
+  - `code`
+  - `error`
+  - `step`
+- Beispielhafte Steps:
+  - `auth`
+  - `fetch_generation`
+  - `existing_check`
+  - `download_source`
+  - `upload_storage`
+  - `create_library_entry`
 
-**1. `VideoGenerationHistory.tsx` — bessere Fehlerbehandlung + klare UI**
+3. Fragile Existing-Check robuster machen
+- Der aktuelle Check nutzt:
+  - `.eq("metadata->ai_generation_id", generation_id)`
+- Das ist verdächtig/fragil. Ich würde den Duplikat-Schutz auf eine robustere Strategie umstellen:
+  - entweder über `contains` auf `metadata`
+  - oder über nachgelagerte Filterung der User-Videos im Code
+- So vermeiden wir, dass schon der “already saved”-Check intern schiefgeht.
 
-- Bei `handleSaveToLibrary`: Die Edge-Function-Antwort kommt bei non-2xx über `response.error`, aber die eigentliche JSON-Body-Nachricht muss aus `response.data` gelesen werden (Supabase SDK Verhalten)
-- Für abgelaufene Videos: Statt den generischen "Edge Function returned a non-2xx status code" einen klaren Hinweis anzeigen: "Video nicht mehr verfügbar — bitte neu generieren"
-- Optional: Button deaktivieren oder ausblenden für Videos, bei denen das Speichern fehlgeschlagen ist (URL abgelaufen)
+4. Insert in `video_creations` an bestehendes Schema angleichen
+- Den Insert gegen vorhandene Projektmuster prüfen und angleichen, damit keine Pflichtfelder oder impliziten Erwartungen verletzt werden
+- Besonders prüfen:
+  - `template_id: null`
+  - `status: "completed"`
+  - `output_url`
+  - `metadata`
+  - optionale Defaults statt unnötiger manueller Werte
 
-**2. Fehler-Parsing im Client verbessern**
+5. Erwartetes Ergebnis
+- Der User sieht nicht mehr nur den generischen Function-Fehler
+- Wir bekommen den echten Grund im UI und in den Logs
+- Das Speichern funktioniert entweder direkt oder liefert eine klare fachliche Meldung wie:
+  - Video-URL abgelaufen
+  - bereits gespeichert
+  - Bibliothekseintrag konnte nicht erzeugt werden
 
-```tsx
-// Aktuell: error.message = "Edge Function returned a non-2xx status code"
-// Besser: Den Body parsen, der die echte Fehlermeldung enthält
-const response = await supabase.functions.invoke('save-ai-video-to-library', {
-  body: { generation_id: generationId },
-});
+Betroffene Dateien
+- `src/components/ai-video/VideoGenerationHistory.tsx`
+- `supabase/functions/save-ai-video-to-library/index.ts`
 
-// supabase SDK setzt response.data auch bei Fehlern
-if (response.error || (response.data && !response.data.ok)) {
-  const errorMsg = response.data?.error || response.error?.message || 'Unbekannter Fehler';
-  throw new Error(errorMsg);
+Technische Details
+```text
+Aktuelles Problem:
+Client liest den echten Edge-Function-Fehler nicht aus.
+
+Neu:
+if (error instanceof FunctionsHttpError) {
+  const payload = await error.context.json()
+  const message = payload?.error || payload?.message || error.message
 }
+
+Zusätzlich:
+Die Function soll jeden Schritt explizit loggen und Fehler mit
+{ ok: false, code, step, error } zurückgeben.
+
+So lässt sich endlich unterscheiden:
+- Download kaputt
+- Upload kaputt
+- video_creations insert kaputt
+- Duplicate-Check kaputt
 ```
-
-### Änderungen
-
-**Datei: `src/components/ai-video/VideoGenerationHistory.tsx`**
-- `handleSaveToLibrary`: Error-Parsing fixen — `response.data?.error` auslesen statt nur `response.error.message`
-- Bei 410/abgelaufener URL: Sonner-Toast mit "Bitte Video neu generieren" + Retry-Button
-
-### Erwartetes Ergebnis
-- Klare Fehlermeldung "Video nicht mehr verfügbar" statt "non-2xx status code"
-- User versteht, dass das Video neu generiert werden muss
-- Zukünftige Videos werden via Webhook automatisch gespeichert (bereits implementiert)
-
