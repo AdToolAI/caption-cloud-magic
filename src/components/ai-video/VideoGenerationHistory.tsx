@@ -233,7 +233,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
       console.error('Save to library error:', error);
       const errorMsg = error?.message || '';
       
-      if (errorMsg.includes('not reachable') || errorMsg.includes('expired')) {
+      if (errorMsg.includes('nicht mehr verfügbar') || errorMsg.includes('abgelaufen') || errorMsg.includes('not reachable') || errorMsg.includes('expired')) {
         sonnerToast.error('Video nicht mehr verfügbar', {
           description: 'Die temporäre URL ist abgelaufen. Bitte generiere das Video erneut.'
         });
