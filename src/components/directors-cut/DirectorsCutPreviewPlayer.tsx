@@ -620,15 +620,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           onEnded={handleVideoEnded}
         />
 
-        {/* Incoming (next scene) video — only visible during transitions */}
-        <video
-          ref={incomingVideoRef}
-          src={videoUrl}
+        {/* Transition canvas — shows pre-captured incoming scene frame */}
+        <canvas
+          ref={transitionCanvasRef}
           className="absolute inset-0 w-full h-full object-contain"
-          style={{ filter: videoFilter, zIndex: 2, display: 'none' }}
-          muted
-          playsInline
-          preload="auto"
+          style={{ zIndex: 2, display: 'none' }}
         />
 
         {/* Lightweight effect overlays (color grading, vignette, etc.) */}
