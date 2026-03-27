@@ -314,24 +314,40 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         }
       }
 
-      // Sync incoming video during active transition
+      // Sync incoming video during active transition — computed inline, no React state dependency
       const incoming = incomingVideoRef.current;
-      if (incoming && transitionInfo) {
-        const nextScene = sortedScenes[transitionInfo.sceneIndex + 1];
-        if (nextScene) {
-          const expectedIncoming = sourceTimeForScene(nextScene, timelineTime);
-          if (Math.abs(incoming.currentTime - expectedIncoming) > 0.15) {
-            incoming.currentTime = expectedIncoming;
-          }
-          if (incoming.paused) {
-            incoming.play().catch(() => {});
-          }
-          const nextRate = (nextScene as any).playbackRate ?? 1;
-          if (Math.abs(incoming.playbackRate - nextRate) > 0.01) {
-            incoming.playbackRate = nextRate;
+      let inTransition = false;
+
+      if (incoming && sortedScenes.length >= 2) {
+        for (let i = 0; i < sortedScenes.length - 1; i++) {
+          const scene = sortedScenes[i];
+          const t = transitions.find(tr => tr.sceneId === scene.id);
+          if (!t || t.transitionType === 'none') continue;
+
+          const tDuration = Math.max(0.6, t.duration || 0.8);
+          const half = tDuration / 2;
+          const boundary = scene.end_time;
+
+          if (timelineTime >= boundary - half && timelineTime < boundary + half) {
+            const nextScene = sortedScenes[i + 1];
+            const expectedIncoming = sourceTimeForScene(nextScene, timelineTime);
+            if (Math.abs(incoming.currentTime - expectedIncoming) > 0.15) {
+              incoming.currentTime = expectedIncoming;
+            }
+            if (incoming.paused) {
+              incoming.play().catch(() => {});
+            }
+            const nextRate = (nextScene as any).playbackRate ?? 1;
+            if (Math.abs(incoming.playbackRate - nextRate) > 0.01) {
+              incoming.playbackRate = nextRate;
+            }
+            inTransition = true;
+            break;
           }
         }
-      } else if (incoming && !incoming.paused) {
+      }
+
+      if (incoming && !inTransition && !incoming.paused) {
         incoming.pause();
       }
 
@@ -364,7 +380,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     rafIdRef.current = requestAnimationFrame(tick);
     return () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current); };
-  }, [isPlaying, duration, sortedScenes, sourceTimeForScene, transitionInfo, handleVideoEnded]);
+  }, [isPlaying, duration, sortedScenes, sourceTimeForScene, transitions, handleVideoEnded]);
 
   // ==================== VIDEO EVENT HANDLERS ====================
 
