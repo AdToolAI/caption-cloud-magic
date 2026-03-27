@@ -1,102 +1,100 @@
 
-Ziel: Den Preview-Übergang so korrigieren, dass bei Szene 2 wirklich der Anfang der neuen Szene gezeigt wird statt noch Bildmaterial der alten Szene.
+Ziel: Das Problem nicht weiter im Overlay “wegzuoptimieren”, sondern die eigentliche Ursache in Schritt 3 zu korrigieren: Das Basisvideo läuft offenbar noch auf der falschen Quellzeit. Dadurch ist der Overlay-Snapshot zwar richtig, aber das darunterliegende Video zeigt an den späteren Schnitten noch Bild der alten Szene.
 
-1. Wahrscheinliche Hauptursache im aktuellen Code
-- `NativeTransitionOverlay` capturt den Overlay-Frame mit:
+1. Kernbefund aus dem aktuellen Code
+- `NativeTransitionOverlay` ist inzwischen weitgehend korrekt:
+  - 60fps via eigenem rAF-Loop
+  - Snapshot per `original_start_time`
+  - Transition-Matching per `sceneId`
+  - Timing zentriert um die Szenengrenze
+- Aber in `DirectorsCutPreviewPlayer.tsx` läuft das Haupt-`<video>` weiterhin direkt mit:
 ```ts
-video.currentTime = scenes[i].start_time + 0.05;
+const time = video.currentTime;
+visualTimeRef.current = time;
 ```
-- Das ist zu naiv für bearbeitete Szenen:
-  - `start_time` / `end_time` sind Timeline-Zeiten
-  - Szenen können aber per `original_start_time`, `original_end_time` und `playbackRate` vom Originalmaterial entkoppelt sein
-- Ergebnis: Der Overlay kann an einer falschen Stelle im Quellvideo capturen und dadurch bei Szene 2 noch Bild der alten Szene bzw. des eingebauten Originalschnitts zeigen.
+- Es gibt dort keine Remap-Logik von Timeline-Zeit auf Quellvideo-Zeit pro Szene, obwohl `SceneAnalysis` genau dafür `original_start_time`, `original_end_time` und `playbackRate` hat.
+- Das erklärt dein Symptom sehr gut:
+  - Overlay blendet Szene 3 ein
+  - Basisvideo liegt noch auf “alter” Quellposition
+  - dadurch wirkt es so, als würde der Übergang Teile der alten Szene mitziehen
+  - je später der Schnitt, desto stärker summiert sich der Drift → deshalb ist Übergang 2/3 schlechter als Übergang 1
 
 2. Saubere Lösung
+`src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+
+Ich würde die Preview auf dieselbe Grundlogik umstellen, die im `CapCutPreviewPlayer` bereits verwendet wird:
+- aktuelle Szene aus `displayTime` / `visualTimeRef` bestimmen
+- daraus die korrekte Quellzeit berechnen:
+```ts
+sourceTime =
+  (scene.original_start_time ?? scene.start_time) +
+  (timelineTime - scene.start_time) * (scene.playbackRate ?? 1)
+```
+- das native `<video>` aktiv auf diese Quellzeit synchronisieren statt ungefiltert die Timeline-Zeit zu verwenden
+
+3. Konkret betroffene Stellen
+A. Playback-/rAF-Loop in `DirectorsCutPreviewPlayer.tsx`
+- aktuell wird `video.currentTime` implizit als globale Timeline-Zeit behandelt
+- neu:
+  - Timeline-Zeit bleibt für UI/Slider/Overlays
+  - Video-Zeit wird davon getrennt und aus der aktiven Szene remapped
+
+B. Seek-Handling
+- bei Slider-Seeks darf nicht mehr einfach
+```ts
+video.currentTime = newTime
+```
+gesetzt werden
+- stattdessen muss `newTime` erst auf die korrekte Quellzeit der Zielszene übersetzt werden
+
+C. Externe Zeit-Sync-Logik
+- auch der Block mit
+```ts
+if (Math.abs(currentTime - visualTimeRef.current) > 0.5) { ... }
+```
+muss auf remappte Zielzeit umgebaut werden
+- sonst springt das Video beim nächsten Sync wieder auf die falsche Position
+
+4. Kleine, aber wichtige Overlay-Nachbesserung
 `src/components/directors-cut/preview/NativeTransitionOverlay.tsx`
-
-Ich würde den Capture-Zeitpunkt von „Timeline-Zeit“ auf „echte Quellzeit der nächsten Szene“ umstellen:
-
-- für jede kommende Szene die effektive Quell-Startzeit bestimmen:
+- Das Overlay nutzt aktuell:
 ```ts
-const sourceStart = scene.original_start_time ?? scene.start_time;
+backgroundSize: 'cover'
 ```
-- den Snapshot knapp nach diesem Quellstart capturen, z. B.:
-```ts
-video.currentTime = sourceStart + 0.02;
-```
-- dabei sauber clampen, damit nicht außerhalb der Videolänge gecaptured wird
+- Das Hauptvideo nutzt aber `object-contain`
+- dadurch kann das eingeblendete Bild leicht anders aussehen/liegen als das Basisvideo
+- ich würde das Overlay auf contain-artige Darstellung umbauen:
+  - kein `cover`
+  - zentrierte vollständige Darstellung
+  - schwarzer Letterbox-Hintergrund beibehalten
+- Das behebt die optische Fehllage, ist aber nicht die Hauptursache des falschen Inhalts
 
-3. Zweite wichtige Korrektur
-Die Overlay-Frames sollten robuster gecaptured werden, damit kein Frame aus einem noch nicht fertig gesprungenen Seek verwendet wird:
+5. Erwartetes Ergebnis
+- Übergang 2 und 3 zeigen nicht mehr “alte Szene unter neuer Szene”
+- Overlay und Basisvideo liegen an derselben echten Szenengrenze
+- spätere Übergänge driften nicht weiter auseinander
+- Schritt 3 bleibt flüssig, weil weiterhin nur ein nativer Decoder aktiv ist
 
-- `seeked` Promise absichern
-- danach erst `drawImage`
-- optional zusätzlich `await video.play().catch(() => {})` ist nicht nötig; besser rein bei seek-basiertem Capture bleiben
-- Fehlerlogging beim globalen `capture().catch(...)` ebenfalls sichtbar machen statt zu schlucken
-
-4. Warum das das eigentliche Problem trifft
-Der aktuelle Bug wirkt nicht wie ein reines Timing-Problem mehr, sondern wie ein falscher Snapshot:
-- der Übergang wird zwar zur richtigen Zeit gestartet
-- aber das eingeblendete Bild ist offenbar noch die vorherige Szene / der Originalschnitt
-- genau das passt dazu, dass der Overlay aus der falschen Zeitposition capturt wird
-
-5. Konkrete Änderung
-In `NativeTransitionOverlay.tsx` den Capture-Block sinngemäß so umbauen:
-
-```ts
-for (let i = 1; i < scenes.length; i++) {
-  const incomingScene = scenes[i];
-  const sceneId = incomingScene.id;
-  if (capturedRef.current.has(sceneId)) continue;
-
-  const sourceStart = incomingScene.original_start_time ?? incomingScene.start_time;
-  const captureTime = Math.max(0, sourceStart + 0.02);
-
-  try {
-    video.currentTime = captureTime;
-    await new Promise<void>((resolve, reject) => {
-      const onSeeked = () => {
-        video.removeEventListener('seeked', onSeeked);
-        resolve();
-      };
-      video.addEventListener('seeked', onSeeked, { once: true });
-    });
-
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    frames[sceneId] = canvas.toDataURL('image/jpeg', 0.6);
-    capturedRef.current.add(sceneId);
-  } catch (e) {
-    console.warn('Frame capture failed for scene', sceneId, e);
-  }
-}
-```
-
-6. Optionaler Zusatz-Fix, falls nötig
-Wenn Szene 2 danach immer noch falsch aussieht, würde ich im zweiten Schritt noch die Overlay-Positionierung leicht ändern:
-- bei `slide` / `wipe` den Overlay auf `object-contain`-ähnliche Darstellung bringen
-- aktuell nutzt das Overlay `backgroundSize: 'cover'`, während das Hauptvideo `object-contain` hat
-- dadurch kann die optische Lage leicht anders wirken als das Basisvideo
-
-Das ist aber eher ein Folge-Fix. Der erste, wichtigere Fix ist die richtige Capture-Zeit.
-
-7. Erwartetes Ergebnis
-- Szene 2 zeigt im Übergang endlich den tatsächlichen Anfang der neuen Szene
-- kein sichtbares „alte Szene wird nochmal eingeblendet“
-- Timing-Logik aus dem letzten Fix bleibt erhalten
-- Single-Video-Preview bleibt performant
-
-8. Betroffene Datei
-- `src/components/directors-cut/preview/NativeTransitionOverlay.tsx`
+6. Dateien
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — Hauptfix
+- `src/components/directors-cut/preview/NativeTransitionOverlay.tsx` — visuelle Angleichung an `object-contain`
 
 Technische Details
 ```text
-Problem heute:
-Overlay-Snapshot = nextScene.start_time + 0.05   (Timeline-Zeit)
+Aktueller Fehler:
+Timeline-Zeit wird wie Quellvideo-Zeit behandelt.
 
-Soll:
-Overlay-Snapshot = nextScene.original_start_time + kleiner Offset
-                   fallback auf start_time nur wenn original_* fehlt
+Korrekt wäre:
+Timeline-Zeit -> aktive Szene bestimmen
+aktive Szene -> originale Quellzeit berechnen
+nur diese Quellzeit ins <video> schreiben
 
-Denn:
-Timeline-Zeit != Quellvideo-Zeit, sobald Szenen editiert / verschoben / remapped wurden.
+Formel:
+sourceTime =
+(scene.original_start_time ?? scene.start_time)
++ (timelineTime - scene.start_time) * (scene.playbackRate ?? 1)
+
+Folge:
+Das Basisvideo zeigt endlich denselben inhaltlichen Frame,
+auf den auch der Transition-Overlay referenziert.
 ```
