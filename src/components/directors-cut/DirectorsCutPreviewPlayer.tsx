@@ -306,9 +306,13 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     onPlayingChange?.(false);
   }, [onPlayingChange]);
 
-  // ==================== TRANSITION RENDERER (zero re-renders) ====================
+  // ==================== FRAME CAPTURE & TRANSITION RENDERER ====================
+  const frameCache = useFrameCapture(videoUrl, sortedScenes);
+  const frameCacheRef = useRef(frameCache);
+  useEffect(() => { frameCacheRef.current = frameCache; }, [frameCache]);
+
   const videoFilterRef = useRef('');
-  useTransitionRenderer(videoRef, incomingVideoRef, visualTimeRef, sortedScenes, transitions, videoFilterRef);
+  useTransitionRenderer(videoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef);
 
 
   // ==================== rAF PLAYBACK LOOP (TIMELINE-LED) ====================
