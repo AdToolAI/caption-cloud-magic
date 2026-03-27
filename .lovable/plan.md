@@ -1,41 +1,45 @@
 
 
-## Fix: Videos werden nicht in Mediathek gespeichert + "In Mediathek gespeichert" lügt
+## Fix: "In Mediathek speichern" Fehler bei abgelaufenen URLs
 
-### Befund
+### Problem
+Die zwei Videos wurden **vor** dem Auto-Save-Webhook generiert. Ihre `video_url` zeigt auf temporäre `replicate.delivery`-URLs, die nach ~1 Stunde ablaufen. Das Edge Function gibt korrekt 410 zurück, aber:
 
-1. **Webhook wurde nie aufgerufen** — die zwei Videos für den Testuser (`3faf219a`) haben `video_url` mit temporären `replicate.delivery`-URLs. Der Auto-Save-Code im Webhook wurde erst danach deployed. Keine Webhook-Logs vorhanden → der Webhook wurde für diese Videos nie getriggert.
-
-2. **`video_creations` ist leer** für diesen User — null Einträge. Die Mediathek zeigt nur das Demo-Video.
-
-3. **UI lügt** — Zeile 323-326 zeigt "✓ In Mediathek gespeichert" für JEDES completed Video, ohne zu prüfen ob es wirklich in `video_creations` existiert.
+1. Der Client-Code erkennt den Fehler nicht richtig — `supabase.functions.invoke()` wrappet non-2xx als generischen Error, die eigentliche Fehlermeldung ("temporäre URL abgelaufen") geht verloren
+2. Für diese alten Videos gibt es **keine Möglichkeit mehr**, sie zu speichern — die Quelle ist weg
 
 ### Lösung
 
-**1. Retroaktives Speichern (Edge Function oder Client-Logik)**
+**1. `VideoGenerationHistory.tsx` — bessere Fehlerbehandlung + klare UI**
 
-Die UI muss beim Laden prüfen, ob ein completed Video schon in `video_creations` existiert. Falls nicht, einen "In Mediathek speichern"-Button anzeigen, der `save-ai-video-to-library` aufruft (die bestehende Fallback-Funktion).
+- Bei `handleSaveToLibrary`: Die Edge-Function-Antwort kommt bei non-2xx über `response.error`, aber die eigentliche JSON-Body-Nachricht muss aus `response.data` gelesen werden (Supabase SDK Verhalten)
+- Für abgelaufene Videos: Statt den generischen "Edge Function returned a non-2xx status code" einen klaren Hinweis anzeigen: "Video nicht mehr verfügbar — bitte neu generieren"
+- Optional: Button deaktivieren oder ausblenden für Videos, bei denen das Speichern fehlgeschlagen ist (URL abgelaufen)
 
-**2. `VideoGenerationHistory.tsx` — ehrliche Statusanzeige**
+**2. Fehler-Parsing im Client verbessern**
 
-- Beim Laden der Generierungen auch `video_creations` abfragen (mit `metadata->>'ai_generation_id'`)
-- Für jedes completed Video prüfen ob es in der Mediathek ist
-- Falls ja: "✓ In Mediathek gespeichert" anzeigen
-- Falls nein: "In Mediathek speichern"-Button anzeigen, der die Funktion `save-ai-video-to-library` aufruft
+```tsx
+// Aktuell: error.message = "Edge Function returned a non-2xx status code"
+// Besser: Den Body parsen, der die echte Fehlermeldung enthält
+const response = await supabase.functions.invoke('save-ai-video-to-library', {
+  body: { generation_id: generationId },
+});
 
-**3. `save-ai-video-to-library` anpassen**
+// supabase SDK setzt response.data auch bei Fehlern
+if (response.error || (response.data && !response.data.ok)) {
+  const errorMsg = response.data?.error || response.error?.message || 'Unbekannter Fehler';
+  throw new Error(errorMsg);
+}
+```
 
-Die bestehende Funktion versucht von `generation.video_url` herunterzuladen. Da die URLs abgelaufen sein können, muss sie:
-- Prüfen ob die URL noch erreichbar ist
-- Falls nicht: einen Fehler anzeigen wie "Video nicht mehr verfügbar — bitte neu generieren"
+### Änderungen
 
-### Dateien
-
-- `src/components/ai-video/VideoGenerationHistory.tsx` — Query erweitern, Button statt statischem Text
-- `supabase/functions/save-ai-video-to-library/index.ts` — bessere Fehlerbehandlung bei abgelaufenen URLs
+**Datei: `src/components/ai-video/VideoGenerationHistory.tsx`**
+- `handleSaveToLibrary`: Error-Parsing fixen — `response.data?.error` auslesen statt nur `response.error.message`
+- Bei 410/abgelaufener URL: Sonner-Toast mit "Bitte Video neu generieren" + Retry-Button
 
 ### Erwartetes Ergebnis
-- "In Mediathek gespeichert" wird nur angezeigt wenn wirklich gespeichert
-- Für nicht-gespeicherte Videos erscheint ein Button zum Nachholen
-- Zukünftige Videos werden via Webhook automatisch gespeichert (wie schon implementiert)
+- Klare Fehlermeldung "Video nicht mehr verfügbar" statt "non-2xx status code"
+- User versteht, dass das Video neu generiert werden muss
+- Zukünftige Videos werden via Webhook automatisch gespeichert (bereits implementiert)
 
