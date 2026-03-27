@@ -1,29 +1,34 @@
 
 
-## Problem: useadtool.ai zeigt "Your app will live here"
+## Auto-Save: Videos automatisch in Mediathek speichern
 
-### Diagnose
+### Idee
+Statt dass der User manuell "In Mediathek" klicken muss, wird das Video direkt im Webhook beim Fertigwerden heruntergeladen, in den Storage hochgeladen und als `video_creations`-Eintrag gespeichert — genau wie es der `director-cut-sora-webhook` bereits macht.
 
-Die App funktioniert in der Lovable-Preview einwandfrei (Session Replay zeigt die Landing Page mit Animationen). Das Problem betrifft nur die deployed Version auf `https://www.useadtool.ai`.
+### Änderungen
 
-Die Meldung "Your app will live here / Ask Lovable to build it" ist der Standard-Platzhalter von Lovable, der erscheint, wenn kein aktueller Build deployed ist.
+**1. `supabase/functions/replicate-webhook/index.ts`**
+- Bei `status === 'succeeded'`: Video sofort von Replicate herunterladen
+- In `ai-videos` Storage-Bucket hochladen
+- Permanente Storage-URL in `ai_video_generations.video_url` speichern
+- Automatisch `video_creations`-Eintrag erstellen (wie beim Director's Cut Webhook)
+- Metadata: model, prompt, aspect_ratio, duration, source: `"sora-2-ai"`
 
-### Ursache
+**2. `src/components/ai-video/VideoGenerationHistory.tsx`**
+- "In Mediathek"-Button entfernen
+- Stattdessen bei completed-Videos einen kleinen Hinweis "✓ In Mediathek gespeichert" anzeigen
+- `handleSaveToLibrary`-Funktion und zugehörigen State (`savingVideo`) entfernen
 
-Nach den vielen Code-Änderungen (DirectorsCutPreviewPlayer, NativeTransitionLayer etc.) wurde die Frontend-Version nicht neu published. Backend-Änderungen (Edge Functions, DB) deployen automatisch, aber **Frontend-Änderungen erfordern einen manuellen Klick auf "Update"** im Publish-Dialog.
+**3. `supabase/functions/save-ai-video-to-library/index.ts`**
+- Kann perspektivisch entfernt werden, wird aber vorerst als Fallback belassen (falls alte Videos noch die temporäre URL haben)
 
-### Lösung — kein Code-Change nötig
+### Erwartetes Ergebnis
+- Video wird beim Fertigwerden automatisch permanent gespeichert + in Mediathek eingetragen
+- Kein manueller Klick mehr nötig
+- Keine abgelaufenen Replicate-URLs mehr
+- Verhalten identisch zum Universal Content Creator und Director's Cut
 
-1. In Lovable oben rechts auf **"Publish"** klicken
-2. Im Dialog auf **"Update"** klicken
-3. Warten bis der Build durchgelaufen ist
-4. `https://www.useadtool.ai` neu laden
-
-Falls die Seite danach immer noch nicht geht:
-- Prüfen ob die Custom Domain (`useadtool.ai`) noch korrekt in den Project Settings unter "Domains" verknüpft ist
-- Den `www`-Subdomain-Redirect prüfen (dein Screenshot zeigt `www.useadtool.ai` — möglicherweise ist nur `useadtool.ai` ohne `www` konfiguriert)
-
-### Hinweis zum www-Redirect
-
-Dein Screenshot zeigt `https://www.useadtool.ai`. Falls die Domain nur als `useadtool.ai` (ohne www) konfiguriert ist, musst du bei deinem DNS-Provider einen CNAME-Eintrag für `www` anlegen, der auf dieselbe Lovable-App zeigt — oder einen Redirect von `www` auf die nackte Domain einrichten.
+### Dateien
+- `supabase/functions/replicate-webhook/index.ts` — Download + Storage + video_creations
+- `src/components/ai-video/VideoGenerationHistory.tsx` — Button entfernen, Hinweis anzeigen
 
