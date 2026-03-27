@@ -55,7 +55,7 @@ export function useTransitionRenderer(
 
         if (time >= tStart && time < tEnd) {
           const rawProgress = (time - tStart) / effectiveDuration;
-          const progress = Math.pow(0.5 - 0.5 * Math.cos(rawProgress * Math.PI), 0.7);
+          const progress = 0.5 - 0.5 * Math.cos(rawProgress * Math.PI);
           const parts = transition.transitionType.split('-');
           const baseType = parts[0].toLowerCase();
           const direction = parts[1] || 'left';

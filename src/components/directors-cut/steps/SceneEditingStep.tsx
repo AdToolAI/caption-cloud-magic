@@ -641,7 +641,7 @@ export function SceneEditingStep({
     const newTransitions: TransitionAssignment[] = scenes.slice(0, -1).map((scene) => ({
       sceneId: scene.id,
       transitionType: template.preview.transitionType,
-      duration: 0.5,
+      duration: 1.2,
       aiSuggested: false,
     }));
     

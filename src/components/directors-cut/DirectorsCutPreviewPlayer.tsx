@@ -371,6 +371,20 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           }
         }
       } else {
+        // PRE-SYNC: 200ms before next transition, pre-seek incoming video
+        if (incoming) {
+          const nextTrans = findActiveTransition(timelineTime + 0.2);
+          if (nextTrans && incoming.paused) {
+            const incomingSourceStart = nextTrans.incomingScene.original_start_time ?? nextTrans.incomingScene.start_time;
+            const expectedIncoming = timelineTime + 0.2 >= nextTrans.incomingScene.start_time
+              ? sourceTimeForScene(nextTrans.incomingScene, timelineTime + 0.2)
+              : incomingSourceStart;
+            if (Math.abs(incoming.currentTime - expectedIncoming) > 0.3) {
+              incoming.currentTime = expectedIncoming;
+            }
+          }
+        }
+
         // NOT in transition: normal scene sync
         const activeScene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
         if (activeScene) {
