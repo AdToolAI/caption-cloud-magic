@@ -29,12 +29,19 @@ export default function AIVideoStudio() {
   const [activeTab, setActiveTab] = useState('generate');
   const [showPromptOptimizer, setShowPromptOptimizer] = useState(false);
   
-  // Generation parameters
-  const [prompt, setPrompt] = useState('');
-  const [model, setModel] = useState<AIVideoModel>('sora-2-standard');
-  const [duration, setDuration] = useState<4 | 8 | 12>(4);
-  const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
-  const [resolution, setResolution] = useState<'1080p' | '720p'>('1080p');
+  // Generation parameters — persisted via sessionStorage
+  const [prompt, setPrompt] = useState(() => sessionStorage.getItem('ai-video-prompt') || '');
+  const [model, setModel] = useState<AIVideoModel>(() => (sessionStorage.getItem('ai-video-model') as AIVideoModel) || 'sora-2-standard');
+  const [duration, setDuration] = useState<4 | 8 | 12>(() => (Number(sessionStorage.getItem('ai-video-duration')) || 4) as 4 | 8 | 12);
+  const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>(() => (sessionStorage.getItem('ai-video-aspect') as '16:9' | '9:16' | '1:1') || '16:9');
+  const [resolution, setResolution] = useState<'1080p' | '720p'>(() => (sessionStorage.getItem('ai-video-resolution') as '1080p' | '720p') || '1080p');
+
+  // Sync to sessionStorage
+  useEffect(() => { sessionStorage.setItem('ai-video-prompt', prompt); }, [prompt]);
+  useEffect(() => { sessionStorage.setItem('ai-video-model', model); }, [model]);
+  useEffect(() => { sessionStorage.setItem('ai-video-duration', String(duration)); }, [duration]);
+  useEffect(() => { sessionStorage.setItem('ai-video-aspect', aspectRatio); }, [aspectRatio]);
+  useEffect(() => { sessionStorage.setItem('ai-video-resolution', resolution); }, [resolution]);
 
   // Image-to-Video state
   const [referenceImage, setReferenceImage] = useState<File | null>(null);
