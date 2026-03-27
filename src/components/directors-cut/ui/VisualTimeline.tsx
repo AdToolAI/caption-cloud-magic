@@ -45,6 +45,7 @@ export function VisualTimeline({
   onSceneSelect,
   onTransitionClick,
   onSceneDurationChange,
+  onTransitionAnchorChange,
   thumbnails = {},
   currentTime = 0,
 }: VisualTimelineProps) {
@@ -54,6 +55,12 @@ export function VisualTimeline({
   const [draggingDivider, setDraggingDivider] = useState<number | null>(null);
   const [dragStartX, setDragStartX] = useState<number>(0);
   const [dragStartScenes, setDragStartScenes] = useState<{ leftEnd: number; rightStart: number } | null>(null);
+  
+  // Transition dot drag state
+  const [draggingTransition, setDraggingTransition] = useState<{ sceneId: string; sceneIndex: number } | null>(null);
+  const [dragTransitionAnchor, setDragTransitionAnchor] = useState<number | null>(null);
+  const dragTransitionStartXRef = useRef<number>(0);
+  const dragTransitionStartAnchorRef = useRef<number>(0);
 
   // Handle divider drag
   const handleDividerMouseDown = useCallback((e: React.MouseEvent, index: number) => {
