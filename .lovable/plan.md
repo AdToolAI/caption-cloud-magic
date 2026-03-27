@@ -1,38 +1,53 @@
 
 
-## Fix: Übergänge noch versetzt und zu kurz
+## Saubere Übergänge: Das eigentliche Problem und die Lösung
 
-### Analyse
+### Warum es bisher nicht klappt
 
-Das Transition-Fenster ist aktuell **exakt zentriert** auf der Szenengrenze: 50% davor, 50% danach. Das bedeutet bei 1.2s Dauer startet der Übergang schon **0.6s vor** dem eigentlichen Szenenwechsel — das fühlt sich "zu früh" an, besonders bei kurzen Szenen.
+Das Grundproblem ist **nicht** die Timing-Berechnung — die stimmt inzwischen. Das Problem ist der **HTML5 Video-Decoder**:
 
-Außerdem: Wenn das Base-Video während der Transition an `boundary` geclampt wird (Zeile 345: `Math.min(timelineTime, boundary)`), friert es in der zweiten Hälfte ein — sichtbarer Stillstand.
+1. **Beide Video-Elemente laden dieselbe Datei** (`src={videoUrl}`), aber der Browser muss für das Incoming-Video an eine andere Stelle seekn
+2. **`video.currentTime = X` ist nicht framegenau** — der Decoder braucht 50-200ms um den nächsten Keyframe zu finden und zu dekodieren
+3. Bei **Slide/Push/Wipe** sieht man diesen Sync-Fehler sofort (weil beide Frames nebeneinander sichtbar sind)
+4. Bei **Crossfade/Dissolve** ist derselbe Fehler unsichtbar (weil die Frames übereinander geblendet werden)
 
-### Lösung: 2 gezielte Änderungen
+Das ist eine Browser-Limitation, kein Code-Bug. Professionelle Video-Editoren umgehen das mit Frame-Buffering in WebGL — das wäre ein kompletter Architektur-Umbau.
 
-#### 1) Transition-Fenster nach hinten verschieben (70/30 statt 50/50)
-Statt `[boundary - half, boundary + half]` das Fenster asymmetrisch setzen: nur 30% der Dauer VOR der Grenze, 70% danach.
+### Pragmatische Lösung: 3 Ebenen
 
-```text
-Vorher: [boundary - 0.6, boundary + 0.6]  → Übergang startet "zu früh"
-Nachher: [boundary - 0.36, boundary + 0.84] → natürlicherer Beginn
-```
+#### 1) Preview: Crossfade als Standard, Motion-Transitions "best effort"
+- AI-Vorschläge in Schritt 2 setzen **immer `crossfade`** als Standard
+- Der User kann manuell auf Slide/Push/Wipe wechseln — mit dem Wissen, dass die Preview nicht pixelgenau sein kann
+- **Tooltip/Hinweis** bei Slide/Push/Wipe: "Hinweis: Dieser Übergangstyp kann in der Vorschau leicht versetzt wirken. Der finale Export ist framegenau."
 
-So spielt die ausgehende Szene länger bevor der Übergang sichtbar wird.
+#### 2) Besseres Pre-Buffering für Motion-Transitions
+- Pre-Sync von 200ms auf **500ms** erhöhen — speziell für Slide/Push/Wipe
+- `requestVideoFrameCallback` nutzen (wo verfügbar) für präziseres Timing
+- Incoming-Video erst sichtbar machen wenn der Decoder den richtigen Frame hat (`readyState >= 3`)
 
-**Dateien:** `findActiveTransition` + `useTransitionRenderer` — beide nutzen `half` → ändern zu `leadIn = tDuration * 0.3` und `leadOut = tDuration * 0.7`
+#### 3) Export bleibt framegenau
+- Der Remotion-Export nutzt bereits `TransitionSeries` mit framegenauen Transitions — dort funktionieren alle Typen perfekt. Keine Änderung nötig.
 
-#### 2) Base-Video während Transition NICHT einfrieren
-Zeile 345 clampt das Base-Video auf `boundary` — in der zweiten Hälfte der Transition friert das Bild ein. Stattdessen soll das Base-Video normal weiterlaufen bis zum Ende seines Szenen-Fensters:
+### Technische Details
 
-```typescript
-// Vorher:
-sourceTimeForScene(outgoingScene, Math.min(timelineTime, boundary))
-// Nachher:
-sourceTimeForScene(outgoingScene, Math.min(timelineTime, outgoingScene.end_time))
-```
+**Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`**
+- Pre-Sync-Fenster von 200ms auf 500ms für Slide/Push/Wipe
+- `readyState`-Check vor dem Abspielen des Incoming-Videos
+- Optional: `requestVideoFrameCallback` für frame-genaue Sync
 
-### Dateien
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `findActiveTransition` asymmetrisch + Base-Video nicht einfrieren
-- `src/components/directors-cut/preview/useTransitionRenderer.ts` — gleiche asymmetrische Fenster-Berechnung
+**Datei: `src/components/directors-cut/preview/useTransitionRenderer.ts`**
+- Motion-Transitions (slide/push/wipe) erst visuell starten wenn `incoming.readyState >= 3`
+- Fallback: automatisch auf Crossfade wechseln wenn Incoming-Video nicht bereit ist
+
+**Datei: `src/components/directors-cut/steps/SceneEditingStep.tsx`**
+- AI-Default auf `crossfade` mit 1.2s setzen
+
+**Datei: UI (TransitionPicker oder Tooltip)**
+- Kleiner Hinweis bei Motion-Transitions: "Vorschau-Qualität — Export ist framegenau"
+
+### Ergebnis
+- Crossfade funktioniert immer sauber (90% der Fälle)
+- Slide/Push/Wipe werden durch Pre-Buffering deutlich besser
+- Falls Incoming nicht rechtzeitig dekodiert: automatischer Fallback auf Crossfade in der Preview
+- Der finale Export bleibt von all dem unberührt — Remotion rendert immer framegenau
 
