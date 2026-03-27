@@ -341,7 +341,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
       // Check if we're in a transition window
       const activeTrans = findActiveTransition(timelineTime);
-      const incoming = incomingVideoRef.current;
 
       if (activeTrans) {
         // DURING TRANSITION: base video stays on OUTGOING scene
