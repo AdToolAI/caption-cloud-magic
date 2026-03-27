@@ -121,6 +121,13 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     return [...scenes].sort((a, b) => a.start_time - b.start_time);
   }, [scenes]);
 
+  // Helper: compute source time for a specific scene at a given timeline time
+  const sourceTimeForScene = useCallback((scene: SceneAnalysis, timelineTime: number): number => {
+    const sourceStart = scene.original_start_time ?? scene.start_time;
+    const playbackRate = (scene as any).playbackRate ?? 1;
+    return sourceStart + (timelineTime - scene.start_time) * playbackRate;
+  }, []);
+
   // Helper: find active transition at a given timeline time
   const findActiveTransition = useCallback((timelineTime: number) => {
     for (let i = 0; i < sortedScenes.length - 1; i++) {
@@ -147,7 +154,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // Helper: map timeline time → source video time (transition-aware: stays on outgoing scene)
   const timelineToSourceTime = useCallback((timelineTime: number): number => {
     if (sortedScenes.length === 0) return timelineTime;
-    // During a transition, the base video must stay on the outgoing scene
     const activeTrans = findActiveTransition(timelineTime);
     if (activeTrans) {
       return sourceTimeForScene(activeTrans.outgoingScene, Math.min(timelineTime, activeTrans.boundary));
