@@ -298,9 +298,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     onPlayingChange?.(false);
   }, [onPlayingChange]);
 
-  // ==================== TRANSITION HOOK ====================
-  const transitionInfo = useTransitionInfo(visualTimeRef, sortedScenes, transitions);
-  const transitionStyles = getTransitionStyles(transitionInfo);
+  // ==================== TRANSITION RENDERER (zero re-renders) ====================
+  useTransitionRenderer(videoRef, incomingVideoRef, visualTimeRef, sortedScenes, transitions);
 
 
   // ==================== rAF PLAYBACK LOOP (TIMELINE-LED) ====================
