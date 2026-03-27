@@ -302,12 +302,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const transitionInfo = useTransitionInfo(visualTimeRef, sortedScenes, transitions);
   const transitionStyles = getTransitionStyles(transitionInfo);
 
-  // Helper: compute source time for a specific scene at a given timeline time
-  const sourceTimeForScene = useCallback((scene: SceneAnalysis, timelineTime: number): number => {
-    const sourceStart = scene.original_start_time ?? scene.start_time;
-    const playbackRate = (scene as any).playbackRate ?? 1;
-    return sourceStart + (timelineTime - scene.start_time) * playbackRate;
-  }, []);
 
   // ==================== rAF PLAYBACK LOOP (TIMELINE-LED) ====================
   useEffect(() => {
