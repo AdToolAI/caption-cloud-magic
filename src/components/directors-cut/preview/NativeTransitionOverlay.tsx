@@ -95,9 +95,12 @@ export function NativeTransitionOverlay({
       if (!transition || transition.transitionType === 'none') continue;
 
       const transitionDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
-      const transitionStart = scene.end_time - transitionDuration;
+      // Center transition on scene boundary: starts before end_time, ends after end_time
+      const halfDuration = transitionDuration / 2;
+      const transitionStart = scene.end_time - halfDuration;
+      const transitionEnd = scene.end_time + halfDuration;
 
-      if (time >= transitionStart && time < scene.end_time) {
+      if (time >= transitionStart && time < transitionEnd) {
         const rawProgress = (time - transitionStart) / transitionDuration;
         // Power-based easing for more visible effect
         const progress = Math.pow(0.5 - 0.5 * Math.cos(rawProgress * Math.PI), 0.7);
