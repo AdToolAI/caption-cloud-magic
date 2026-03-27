@@ -6,7 +6,7 @@ import { GlobalEffects, AudioEnhancements, SceneEffects, SceneAnalysis, Transiti
 import type { KenBurnsKeyframe } from './features/KenBurnsEffect';
 import { SubtitleTrack, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { cn } from '@/lib/utils';
-import { useTransitionInfo, getTransitionStyles } from './preview/NativeTransitionLayer';
+import { useTransitionRenderer } from './preview/useTransitionRenderer';
 import { NativePreviewEffects } from './preview/NativePreviewEffects';
 
 const SUBTITLE_FONT_SIZES = {
