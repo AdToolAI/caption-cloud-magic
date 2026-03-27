@@ -15,13 +15,13 @@ export function useTransitionRenderer(
   visualTimeRef: React.RefObject<number>,
   scenes: SceneAnalysis[],
   transitions: TransitionAssignment[],
+  videoFilterRef: React.RefObject<string>,
 ) {
   const rafRef = useRef<number>();
   const wasActiveRef = useRef(false);
 
   useEffect(() => {
     if (scenes.length < 2 || transitions.length === 0) {
-      // No transitions possible — hide incoming, clear base styles
       const incoming = incomingVideoRef.current;
       if (incoming) incoming.style.display = 'none';
       return;
@@ -55,7 +55,7 @@ export function useTransitionRenderer(
           const baseType = parts[0].toLowerCase();
           const direction = parts[1] || 'left';
 
-          applyStyles(base, incoming, progress, baseType, direction);
+          applyStyles(base, incoming, progress, baseType, direction, videoFilterRef.current ?? '');
           found = true;
           wasActiveRef.current = true;
           break;
@@ -63,13 +63,12 @@ export function useTransitionRenderer(
       }
 
       if (!found && wasActiveRef.current) {
-        // Transition just ended — reset styles
         clearStyles(base);
         incoming.style.display = 'none';
         incoming.style.opacity = '';
         incoming.style.transform = '';
         incoming.style.clipPath = '';
-        incoming.style.filter = '';
+        // Do NOT clear filter — managed by React
         wasActiveRef.current = false;
       }
 
@@ -80,14 +79,14 @@ export function useTransitionRenderer(
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [scenes, transitions, visualTimeRef, baseVideoRef, incomingVideoRef]);
+  }, [scenes, transitions, visualTimeRef, baseVideoRef, incomingVideoRef, videoFilterRef]);
 }
 
 function clearStyles(el: HTMLElement) {
   el.style.opacity = '';
   el.style.transform = '';
   el.style.clipPath = '';
-  el.style.filter = '';
+  // Do NOT clear filter — it's managed by React (videoFilter prop)
 }
 
 function applyStyles(
@@ -96,8 +95,8 @@ function applyStyles(
   progress: number,
   baseType: string,
   direction: string,
+  baseFilter: string,
 ) {
-  // Always show incoming during transition
   incoming.style.display = '';
 
   switch (baseType) {
@@ -126,9 +125,9 @@ function applyStyles(
       break;
 
     case 'blur':
-      base.style.filter = `blur(${progress * 8}px)`;
+      base.style.filter = `${baseFilter} blur(${progress * 8}px)`.trim();
       base.style.opacity = String(1 - progress);
-      incoming.style.filter = `blur(${(1 - progress) * 8}px)`;
+      incoming.style.filter = `${baseFilter} blur(${(1 - progress) * 8}px)`.trim();
       incoming.style.opacity = String(progress);
       base.style.transform = '';
       base.style.clipPath = '';
