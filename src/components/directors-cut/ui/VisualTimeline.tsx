@@ -62,6 +62,9 @@ export function VisualTimeline({
   const dragTransitionStartXRef = useRef<number>(0);
   const dragTransitionStartAnchorRef = useRef<number>(0);
 
+  // Calculate total duration dynamically from scenes (not prop) for accurate widths
+  const actualTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+
   // Handle divider drag
   const handleDividerMouseDown = useCallback((e: React.MouseEvent, index: number) => {
     e.preventDefault();
