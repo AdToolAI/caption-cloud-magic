@@ -50,6 +50,7 @@ export function NativeTransitionOverlay({
     const video = document.createElement('video');
     video.preload = 'auto';
     video.muted = true;
+    video.crossOrigin = 'anonymous';
     video.src = videoUrl;
 
     const capture = async () => {
