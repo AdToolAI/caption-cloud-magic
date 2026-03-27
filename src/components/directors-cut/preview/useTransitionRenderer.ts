@@ -38,6 +38,7 @@ export function useTransitionRenderer(
 
       let found = false;
 
+      let prevEnd = -Infinity;
       for (let i = 0; i < scenes.length - 1; i++) {
         const scene = scenes[i];
         const transition = transitions.find(t => t.sceneId === scene.id);
@@ -45,11 +46,15 @@ export function useTransitionRenderer(
 
         const tDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
         const half = tDuration / 2;
-        const tStart = scene.end_time - half;
-        const tEnd = scene.end_time + half;
+        const boundary = scene.end_time;
+        // Clamp start so transitions never overlap
+        const tStart = Math.max(boundary - half, prevEnd);
+        const tEnd = boundary + half;
+        const effectiveDuration = tEnd - tStart;
+        prevEnd = tEnd;
 
         if (time >= tStart && time < tEnd) {
-          const rawProgress = (time - tStart) / tDuration;
+          const rawProgress = (time - tStart) / effectiveDuration;
           const progress = Math.pow(0.5 - 0.5 * Math.cos(rawProgress * Math.PI), 0.7);
           const parts = transition.transitionType.split('-');
           const baseType = parts[0].toLowerCase();

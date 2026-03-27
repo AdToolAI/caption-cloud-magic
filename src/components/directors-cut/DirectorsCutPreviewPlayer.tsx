@@ -128,8 +128,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     return sourceStart + (timelineTime - scene.start_time) * playbackRate;
   }, []);
 
-  // Helper: find active transition at a given timeline time
+  // Helper: find active transition at a given timeline time (with overlap clamping)
   const findActiveTransition = useCallback((timelineTime: number) => {
+    let prevEnd = -Infinity;
     for (let i = 0; i < sortedScenes.length - 1; i++) {
       const scene = sortedScenes[i];
       const t = transitions.find(tr => tr.sceneId === scene.id);
@@ -137,14 +138,19 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const tDuration = Math.max(0.6, t.duration || 0.8);
       const half = tDuration / 2;
       const boundary = scene.end_time;
-      if (timelineTime >= boundary - half && timelineTime < boundary + half) {
+      // Clamp start so transitions never overlap
+      const tStart = Math.max(boundary - half, prevEnd);
+      const tEnd = boundary + half;
+      const effectiveDuration = tEnd - tStart;
+      prevEnd = tEnd;
+      if (timelineTime >= tStart && timelineTime < tEnd) {
         return {
           outgoingScene: scene,
           incomingScene: sortedScenes[i + 1],
           boundary,
           half,
-          tDuration,
-          progress: (timelineTime - (boundary - half)) / tDuration,
+          tDuration: effectiveDuration,
+          progress: (timelineTime - tStart) / effectiveDuration,
         };
       }
     }
