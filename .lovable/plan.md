@@ -1,121 +1,40 @@
 
 
-## Draggable Transition-Dot für manuelle Übergangs-Position
+## Besserer Ansatz: Saubere Übergänge in Schritt 2
 
-### Ziel
-Statt nur Typ und Dauer zu ändern, soll man den **Transition-Dot direkt auf der Timeline nach links/rechts ziehen** können. Der Dot steuert dann, **wann innerhalb der beiden angrenzenden Szenen der Übergang stattfindet**. So kann man problematische Übergänge manuell sauber setzen, ohne auf die KI zu warten.
+### Analyse des eigentlichen Problems
 
-### Gefundener Ist-Zustand
-- `VisualTimeline.tsx` rendert den Dot aktuell nur als Klick-Button.
-- `SceneEditingStep.tsx` kann bisher nur `transitionType` und `duration` je `sceneId` ändern.
-- Die Preview-Logik (`DirectorsCutPreviewPlayer.tsx` + `useTransitionRenderer.ts`) verankert Übergänge fest an `scene.end_time` und kennt **keinen manuellen Offset**.
+Das Kernproblem war nie die Dot-Position, sondern:
+1. **Zu kurze Standard-Transition-Dauer** (0.8s) — bei schnellen Schnitten reicht das nicht für flüssige Übergänge
+2. **Incoming-Video-Sync braucht Zeit** — der zweite Video-Decoder muss erst zur richtigen Stelle seekn, was ~100-200ms dauert
+3. **Zu abrupte Easing-Kurve** — die Power-Cosine-Kurve (⁰·⁷) springt zu schnell in die Mitte
 
-### Vorschlag
-Die Transition bekommt zusätzlich eine **manuelle Anchor-Position** pro Szenenübergang, z. B. `anchorTime` oder `boundaryOffset`.
+### Lösung: 3 gezielte Änderungen (ohne neue UI)
 
-Empfehlung:
-- `anchorTime: number` direkt in `TransitionAssignment`
-- Fallback bleibt wie heute: wenn nichts gesetzt ist, nutze `scene.end_time`
+#### 1) Längere Standard-Transition + sanftere Kurve
+**`useTransitionRenderer.ts`** und **`DirectorsCutPreviewPlayer.tsx`**:
+- `TRANSITION_DURATION` von 0.8s auf **1.2s** erhöhen
+- `MIN_TRANSITION_DURATION` von 0.6s auf **0.8s** erhöhen
+- Easing von `Math.pow(cosine, 0.7)` auf `Math.pow(cosine, 1.0)` (reine Cosine-Ease) — sanfterer Übergang, weniger "Sprung" in der Mitte
 
-So kann der Benutzer den Dot frei verschieben und die Render-/Playback-Logik arbeitet mit diesem echten Anker statt immer mit dem automatischen Schnittpunkt.
+#### 2) Incoming-Video Pre-Sync — früher seekn
+**`DirectorsCutPreviewPlayer.tsx`** (Playback-rAF):
+- **200ms vor** dem Transition-Fenster das Incoming-Video bereits zur richtigen Stelle seekn und auf Pause lassen
+- Erst wenn die Transition tatsächlich startet, `.play()` aufrufen
+- So hat der Decoder Zeit, den Frame zu laden bevor er sichtbar wird
 
-### Umsetzung
+#### 3) AI-Vorschläge in Schritt 2 verbessern
+**`SceneEditingStep.tsx`** oder wo "Alle Vorschläge anwenden" die Transitions setzt:
+- Standard-Transition auf `crossfade` mit **1.2s** setzen (statt 0.8s)
+- Crossfade ist am fehlerverzeihendsten — kein harter Cut, kein Sync-Problem sichtbar
 
-#### 1) Datenmodell erweitern
-**Datei:** `src/types/directors-cut.ts`
-- `TransitionAssignment` um optionales Feld erweitern:
-  - `anchorTime?: number`
-- Bedeutet: exakter Timeline-Zeitpunkt des Übergangs zwischen Szene A und B
-
-Vorteil:
-- klarer als nur ein relativer Offset
-- Preview, Timeline und später Export können denselben Wert verwenden
-
-#### 2) Timeline-Dot draggable machen
-**Datei:** `src/components/directors-cut/ui/VisualTimeline.tsx`
-- Neue Props ergänzen:
-  - `onTransitionAnchorChange?: (sceneId: string, anchorTime: number) => void`
-- Für jeden Dot:
-  - Drag per `onMouseDown` + globale `mousemove`/`mouseup` Listener
-  - Während Drag die Mausposition in Timeline-Zeit umrechnen
-  - Den Wert auf einen sinnvollen Bereich clampen:
-    - nicht vor Start der linken Szene + Sicherheitsabstand
-    - nicht nach Ende der rechten Szene - Sicherheitsabstand
-- Der Dot soll **visuell an seiner echten Anchor-Zeit** stehen, nicht mehr nur mittig auf der Szenengrenze
-- Optional kleine Vorschau/Label während Drag:
-  - z. B. `Übergang bei 12.4s`
-
-#### 3) Parent-State sauber aktualisieren
-**Datei:** `src/components/directors-cut/steps/SceneEditingStep.tsx`
-- Neue Handler ergänzen:
-  - `handleTransitionAnchorChange(sceneId, anchorTime)`
-- Verhalten:
-  - wenn Transition existiert: `anchorTime` updaten
-  - wenn noch keine Transition existiert: optional direkt Standard-Transition anlegen (`crossfade`, `0.5s`) und `anchorTime` setzen
-- `VisualTimeline` diese neue Prop übergeben
-
-Zusätzlich sinnvoll:
-- Wenn per Sidebar/Picker ein Übergang neu angelegt wird und noch kein `anchorTime` existiert:
-  - Standard auf `scene.end_time` setzen
-
-#### 4) Preview-Playback auf echten Anchor umstellen
-**Dateien:**
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-- `src/components/directors-cut/preview/useTransitionRenderer.ts`
-
-Aktuell:
-- `boundary = scene.end_time`
-
-Neu:
-- gemeinsame Boundary-Auflösung:
-  - `boundary = transition.anchorTime ?? scene.end_time`
-
-Diese Boundary muss an **allen relevanten Stellen identisch** verwendet werden:
-- `findActiveTransition`
-- Base/Incoming-Sync im Playback-rAF
-- `handleSeek`
-- Transition-Renderer-rAF
-
-So bleibt alles synchron:
-- Timeline-Dot
-- sichtbarer Übergang
-- Videopositionierung
-
-#### 5) Schutzlogik gegen kaputte Übergänge
-Beim Draggen Anchor clampen, damit der Übergang technisch stabil bleibt:
-- Übergangsfenster darf nicht unendlich in Nachbar-Transitions laufen
-- Mindestabstand zu Szenenrändern beibehalten
-- bestehendes Overlap-Clamping bleibt zusätzlich aktiv
-
-### UX-Verhalten
-- Klick auf Dot: weiterhin Übergang auswählen / Detailpanel öffnen
-- Drag auf Dot: verschiebt den echten Übergangspunkt
-- Dadurch kann der Nutzer problematische Übergänge 2 und 3 direkt selbst sauber nachjustieren
-
-### Technische Kurzfassung
-```text
-Heute:
-  boundary = scene.end_time
-
-Neu:
-  boundary = transition.anchorTime ?? scene.end_time
-
-Dot-Position:
-  left = anchorTime auf Timeline
-
-Drag:
-  Maus-X -> Timeline-Zeit -> clamp -> anchorTime speichern
-```
-
-### Betroffene Dateien
-- `src/types/directors-cut.ts`
-- `src/components/directors-cut/ui/VisualTimeline.tsx`
-- `src/components/directors-cut/steps/SceneEditingStep.tsx`
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-- `src/components/directors-cut/preview/useTransitionRenderer.ts`
+### Dateien
+- `src/components/directors-cut/preview/useTransitionRenderer.ts` — Dauer + Easing
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — Dauer + Pre-Sync
+- `src/components/directors-cut/steps/SceneEditingStep.tsx` oder AI-Analyse-Step — Default-Werte
 
 ### Ergebnis
-- Du kannst problematische Übergänge direkt unten in der Timeline selbst verschieben
-- Die Preview folgt genau dieser Position
-- KI bleibt optional, aber du bist nicht mehr blockiert, wenn sie den Schnittpunkt nicht perfekt trifft
+- Übergänge sind länger und sanfter → weniger sichtbare Sync-Probleme
+- Incoming-Video wird vorgeladen → kein schwarzer Blitz
+- Keine neue UI-Komplexität, rein technische Verbesserung
 
