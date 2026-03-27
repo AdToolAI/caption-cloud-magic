@@ -299,7 +299,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [onPlayingChange]);
 
   // ==================== TRANSITION RENDERER (zero re-renders) ====================
-  useTransitionRenderer(videoRef, incomingVideoRef, visualTimeRef, sortedScenes, transitions);
+  const videoFilterRef = useRef('');
+  // Keep ref in sync with videoFilter memo (defined below)
+  useEffect(() => { videoFilterRef.current = videoFilter; }, [videoFilter]);
+  useTransitionRenderer(videoRef, incomingVideoRef, visualTimeRef, sortedScenes, transitions, videoFilterRef);
 
 
   // ==================== rAF PLAYBACK LOOP (TIMELINE-LED) ====================
