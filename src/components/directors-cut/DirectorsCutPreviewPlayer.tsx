@@ -352,14 +352,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (currentTime === 0 && visualTimeRef.current > 0.5) return;
 
     if (Math.abs(currentTime - visualTimeRef.current) > 0.5) {
-      video.currentTime = currentTime;
+      const sourceTime = timelineToSourceTime(currentTime);
+      video.currentTime = sourceTime;
       visualTimeRef.current = currentTime;
       setDisplayTime(currentTime);
       if (sourceAudioRef.current) sourceAudioRef.current.currentTime = currentTime;
       if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = currentTime;
       if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = currentTime;
     }
-  }, [currentTime, isPlaying]);
+  }, [currentTime, isPlaying, timelineToSourceTime]);
 
   // ==================== USER CONTROLS ====================
   const startAllAudio = useCallback(() => {
