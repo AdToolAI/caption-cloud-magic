@@ -6,7 +6,7 @@ import { GlobalEffects, AudioEnhancements, SceneEffects, SceneAnalysis, Transiti
 import type { KenBurnsKeyframe } from './features/KenBurnsEffect';
 import { SubtitleTrack, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { cn } from '@/lib/utils';
-import { useTransitionInfo, getTransitionStyles } from './preview/NativeTransitionLayer';
+import { useTransitionRenderer } from './preview/useTransitionRenderer';
 import { NativePreviewEffects } from './preview/NativePreviewEffects';
 
 const SUBTITLE_FONT_SIZES = {
@@ -298,9 +298,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     onPlayingChange?.(false);
   }, [onPlayingChange]);
 
-  // ==================== TRANSITION HOOK ====================
-  const transitionInfo = useTransitionInfo(visualTimeRef, sortedScenes, transitions);
-  const transitionStyles = getTransitionStyles(transitionInfo);
+  // ==================== TRANSITION RENDERER (zero re-renders) ====================
+  useTransitionRenderer(videoRef, incomingVideoRef, visualTimeRef, sortedScenes, transitions);
 
 
   // ==================== rAF PLAYBACK LOOP (TIMELINE-LED) ====================
@@ -633,7 +632,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           ref={videoRef}
           src={videoUrl}
           className="absolute inset-0 w-full h-full object-contain"
-          style={{ filter: videoFilter, ...transitionStyles.baseStyle, zIndex: 1 }}
+          style={{ filter: videoFilter, zIndex: 1 }}
           muted
           playsInline
           preload="auto"
@@ -645,11 +644,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           ref={incomingVideoRef}
           src={videoUrl}
           className="absolute inset-0 w-full h-full object-contain"
-          style={{
-            filter: videoFilter,
-            ...transitionStyles.incomingStyle,
-            zIndex: 2,
-          }}
+          style={{ filter: videoFilter, zIndex: 2, display: 'none' }}
           muted
           playsInline
           preload="auto"
