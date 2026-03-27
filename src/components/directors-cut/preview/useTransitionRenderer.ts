@@ -55,7 +55,7 @@ export function useTransitionRenderer(
           const baseType = parts[0].toLowerCase();
           const direction = parts[1] || 'left';
 
-          applyStyles(base, incoming, progress, baseType, direction);
+          applyStyles(base, incoming, progress, baseType, direction, videoFilterRef.current ?? '');
           found = true;
           wasActiveRef.current = true;
           break;
