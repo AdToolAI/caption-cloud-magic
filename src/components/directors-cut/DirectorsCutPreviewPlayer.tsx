@@ -519,7 +519,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
               left: overlay.customPosition?.x != null ? `${overlay.customPosition.x}%` : '50%',
               transform: 'translate(-50%, -50%)',
               fontSize: overlay.style?.fontSize || '32px',
-              fontWeight: overlay.style?.fontWeight || 'bold',
+              fontWeight: (overlay.style as any)?.fontWeight || 'bold',
               color: overlay.style?.color || '#ffffff',
               textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
               fontFamily: overlay.style?.fontFamily || 'sans-serif',
