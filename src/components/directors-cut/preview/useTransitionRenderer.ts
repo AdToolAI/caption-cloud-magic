@@ -46,7 +46,7 @@ export function useTransitionRenderer(
 
         const tDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
         const half = tDuration / 2;
-        const boundary = scene.end_time;
+        const boundary = transition.anchorTime ?? scene.end_time;
         // Clamp start so transitions never overlap
         const tStart = Math.max(boundary - half, prevEnd);
         const tEnd = boundary + half;

@@ -137,7 +137,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       if (!t || t.transitionType === 'none') continue;
       const tDuration = Math.max(0.6, t.duration || 0.8);
       const half = tDuration / 2;
-      const boundary = scene.end_time;
+      const boundary = t.anchorTime ?? scene.end_time;
       // Clamp start so transitions never overlap
       const tStart = Math.max(boundary - half, prevEnd);
       const tEnd = boundary + half;
