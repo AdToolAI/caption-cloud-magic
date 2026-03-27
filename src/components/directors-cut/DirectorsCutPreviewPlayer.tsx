@@ -266,6 +266,24 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     }
   }, [audio.master_volume]);
 
+  // ==================== VIDEO EVENT HANDLERS ====================
+  const handleVideoEnded = useCallback(() => {
+    setIsPlaying(false);
+    isPlayingRef.current = false;
+    visualTimeRef.current = 0;
+    setDisplayTime(0);
+    onTimeUpdateRef.current?.(0);
+
+    sourceAudioRef.current?.pause();
+    if (sourceAudioRef.current) sourceAudioRef.current.currentTime = 0;
+    voiceoverShouldRecoverRef.current = false;
+    voiceoverAudioRef.current?.pause();
+    if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = 0;
+    backgroundMusicAudioRef.current?.pause();
+    if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
+    onPlayingChange?.(false);
+  }, [onPlayingChange]);
+
   // ==================== TRANSITION HOOK ====================
   const transitionInfo = useTransitionInfo(visualTimeRef, sortedScenes, transitions);
   const transitionStyles = getTransitionStyles(transitionInfo);
