@@ -130,6 +130,25 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     return sourceStart + (timelineTime - scene.start_time) * playbackRate;
   }, [sortedScenes]);
 
+  // Helper: map source video time → timeline time (decoder-led)
+  const sourceToTimelineTime = useCallback((sourceTime: number): number => {
+    if (sortedScenes.length === 0) return sourceTime;
+    // Find scene whose original source range contains sourceTime
+    for (const scene of sortedScenes) {
+      const sourceStart = scene.original_start_time ?? scene.start_time;
+      const playbackRate = (scene as any).playbackRate ?? 1;
+      const sourceEnd = (scene.original_end_time ?? scene.end_time);
+      if (sourceTime >= sourceStart - 0.05 && sourceTime < sourceEnd + 0.05) {
+        return scene.start_time + (sourceTime - sourceStart) / playbackRate;
+      }
+    }
+    // Fallback: return sourceTime as-is
+    return sourceTime;
+  }, [sortedScenes]);
+
+  // Track which scene is currently active for playbackRate sync
+  const lastActiveSceneRef = useRef<string | null>(null);
+
   // ==================== VOICEOVER HELPERS ====================
   const playVoiceover = useCallback(() => {
     const voiceover = voiceoverAudioRef.current;
