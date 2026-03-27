@@ -108,6 +108,43 @@ export function VisualTimeline({
     setDragStartScenes(null);
   }, []);
 
+  // Transition dot drag handlers
+  const handleTransitionDotMouseDown = useCallback((e: React.MouseEvent, sceneId: string, sceneIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const transition = transitions.find(t => t.sceneId === sceneId);
+    const currentAnchor = transition?.anchorTime ?? scenes[sceneIndex].end_time;
+    dragTransitionStartXRef.current = e.clientX;
+    dragTransitionStartAnchorRef.current = currentAnchor;
+    setDraggingTransition({ sceneId, sceneIndex });
+    setDragTransitionAnchor(currentAnchor);
+  }, [scenes, transitions]);
+
+  const handleTransitionDotMouseMove = useCallback((e: MouseEvent) => {
+    if (!draggingTransition || !timelineRef.current || !onTransitionAnchorChange) return;
+    const rect = timelineRef.current.getBoundingClientRect();
+    const deltaX = e.clientX - dragTransitionStartXRef.current;
+    const deltaPercent = deltaX / rect.width;
+    const deltaTime = deltaPercent * actualTotalDuration;
+    
+    const leftScene = scenes[draggingTransition.sceneIndex];
+    const rightScene = scenes[draggingTransition.sceneIndex + 1];
+    // Clamp: at least 0.3s inside each scene
+    const minAnchor = leftScene.start_time + 0.3;
+    const maxAnchor = rightScene.end_time - 0.3;
+    const newAnchor = Math.max(minAnchor, Math.min(maxAnchor, dragTransitionStartAnchorRef.current + deltaTime));
+    
+    setDragTransitionAnchor(newAnchor);
+  }, [draggingTransition, scenes, onTransitionAnchorChange]);
+
+  const handleTransitionDotMouseUp = useCallback(() => {
+    if (draggingTransition && dragTransitionAnchor !== null && onTransitionAnchorChange) {
+      onTransitionAnchorChange(draggingTransition.sceneId, dragTransitionAnchor);
+    }
+    setDraggingTransition(null);
+    setDragTransitionAnchor(null);
+  }, [draggingTransition, dragTransitionAnchor, onTransitionAnchorChange]);
+
   // Add/remove event listeners for drag
   useEffect(() => {
     if (draggingDivider !== null) {
@@ -118,7 +155,15 @@ export function VisualTimeline({
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [draggingDivider, handleMouseMove, handleMouseUp]);
+    if (draggingTransition !== null) {
+      window.addEventListener('mousemove', handleTransitionDotMouseMove);
+      window.addEventListener('mouseup', handleTransitionDotMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleTransitionDotMouseMove);
+        window.removeEventListener('mouseup', handleTransitionDotMouseUp);
+      };
+    }
+  }, [draggingDivider, handleMouseMove, handleMouseUp, draggingTransition, handleTransitionDotMouseMove, handleTransitionDotMouseUp]);
 
   // Calculate total duration dynamically from scenes (not prop) for accurate widths
   const actualTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
