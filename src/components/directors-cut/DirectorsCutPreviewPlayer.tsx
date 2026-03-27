@@ -163,7 +163,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (sortedScenes.length === 0) return timelineTime;
     const activeTrans = findActiveTransition(timelineTime);
     if (activeTrans) {
-      return sourceTimeForScene(activeTrans.outgoingScene, Math.min(timelineTime, activeTrans.boundary));
+      return sourceTimeForScene(activeTrans.outgoingScene, Math.min(timelineTime, activeTrans.outgoingScene.end_time));
     }
     const scene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
     if (!scene) return timelineTime;

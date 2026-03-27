@@ -45,11 +45,12 @@ export function useTransitionRenderer(
         if (!transition || transition.transitionType === 'none') continue;
 
         const tDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
-        const half = tDuration / 2;
+        const leadIn = tDuration * 0.3;
+        const leadOut = tDuration * 0.7;
         const boundary = transition.anchorTime ?? scene.end_time;
         // Clamp start so transitions never overlap
-        const tStart = Math.max(boundary - half, prevEnd);
-        const tEnd = boundary + half;
+        const tStart = Math.max(boundary - leadIn, prevEnd);
+        const tEnd = boundary + leadOut;
         const effectiveDuration = tEnd - tStart;
         prevEnd = tEnd;
 
