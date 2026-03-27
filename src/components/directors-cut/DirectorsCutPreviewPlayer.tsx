@@ -428,8 +428,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     const video = videoRef.current;
     if (!video) return;
 
-    const newTime = value[0];
-    video.currentTime = newTime;
+    const newTime = value[0]; // timeline time
+    const sourceTime = timelineToSourceTime(newTime);
+    video.currentTime = sourceTime;
     visualTimeRef.current = newTime;
     setDisplayTime(newTime);
     onTimeUpdateRef.current?.(newTime);
@@ -443,7 +444,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       }
     }
     if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = newTime;
-  }, [playVoiceover]);
+  }, [playVoiceover, timelineToSourceTime]);
 
   const handleReset = useCallback(() => {
     const video = videoRef.current;

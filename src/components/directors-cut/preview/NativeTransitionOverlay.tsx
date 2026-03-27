@@ -147,7 +147,7 @@ export function NativeTransitionOverlay({
     const bgBase: React.CSSProperties = nextFrame
       ? {
           backgroundImage: `url(${nextFrame})`,
-          backgroundSize: 'cover',
+          backgroundSize: 'contain',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           backgroundColor: '#000',
