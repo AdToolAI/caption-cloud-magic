@@ -1,53 +1,67 @@
 
 
-## Saubere Übergänge: Das eigentliche Problem und die Lösung
+## Lösung: Canvas-basierte Übergänge statt zweitem Video-Decoder
 
-### Warum es bisher nicht klappt
+### Das eigentliche Problem
+Aktuell nutzt der Preview Player **zwei `<video>`-Elemente** für Übergänge. Das Incoming-Video muss per `video.currentTime = X` an die richtige Stelle seekn — aber das ist im Browser **nicht framegenau**. Der Decoder braucht 50-200ms, um den nächsten Keyframe zu finden. Bei Slide/Push/Wipe sieht man das sofort als "Versatz".
 
-Das Grundproblem ist **nicht** die Timing-Berechnung — die stimmt inzwischen. Das Problem ist der **HTML5 Video-Decoder**:
+### Die Lösung: Vorgerenderte Frames statt zweitem Decoder
+Statt eines zweiten Video-Decoders verwenden wir **voraufgenommene Canvas-Frames** für die eingehende Szene:
 
-1. **Beide Video-Elemente laden dieselbe Datei** (`src={videoUrl}`), aber der Browser muss für das Incoming-Video an eine andere Stelle seekn
-2. **`video.currentTime = X` ist nicht framegenau** — der Decoder braucht 50-200ms um den nächsten Keyframe zu finden und zu dekodieren
-3. Bei **Slide/Push/Wipe** sieht man diesen Sync-Fehler sofort (weil beide Frames nebeneinander sichtbar sind)
-4. Bei **Crossfade/Dissolve** ist derselbe Fehler unsichtbar (weil die Frames übereinander geblendet werden)
+1. Beim Laden des Videos wird für jede Szene (ab Szene 2) der **erste Frame als Canvas-Snapshot** in hoher Auflösung (1280×720) erfasst
+2. Während einer Transition wird dieser Snapshot als `<canvas>`-Element angezeigt — kein Seeking, kein Decoder-Delay
+3. Das Base-Video läuft einfach normal weiter
+4. **Ergebnis: Alle Übergangstypen funktionieren perfekt**, weil der Incoming-Frame immer sofort verfügbar ist
 
-Das ist eine Browser-Limitation, kein Code-Bug. Professionelle Video-Editoren umgehen das mit Frame-Buffering in WebGL — das wäre ein kompletter Architektur-Umbau.
+```text
+Vorher:
+  Base <video> ──────────────► [playing scene 1]
+  Incoming <video> ──seek──► [trying to decode scene 2 start] ← UNRELIABLE
+  
+Nachher:
+  Base <video> ──────────────► [playing scene 1]
+  Canvas snapshot ─────────► [pre-captured frame of scene 2] ← INSTANT
+```
 
-### Pragmatische Lösung: 3 Ebenen
+### Warum das funktioniert
+- Canvas-Snapshots sind **statische Bilder** — kein Decoder, kein Seeking, kein Timing-Problem
+- Für kurze Übergänge (0.8-1.5s) ist ein statisches Bild visuell nicht von einem laufenden Video zu unterscheiden
+- `NativeTransitionOverlay.tsx` hat diese Logik **bereits implementiert** (wird in Schritt 2 genutzt), aber nur mit 640×360 und als Hintergrund-Bild statt Canvas
+- Wir portieren das in den Hauptplayer mit höherer Auflösung und direkter DOM-Manipulation (zero re-renders)
 
-#### 1) Preview: Crossfade als Standard, Motion-Transitions "best effort"
-- AI-Vorschläge in Schritt 2 setzen **immer `crossfade`** als Standard
-- Der User kann manuell auf Slide/Push/Wipe wechseln — mit dem Wissen, dass die Preview nicht pixelgenau sein kann
-- **Tooltip/Hinweis** bei Slide/Push/Wipe: "Hinweis: Dieser Übergangstyp kann in der Vorschau leicht versetzt wirken. Der finale Export ist framegenau."
+### Änderungen
 
-#### 2) Besseres Pre-Buffering für Motion-Transitions
-- Pre-Sync von 200ms auf **500ms** erhöhen — speziell für Slide/Push/Wipe
-- `requestVideoFrameCallback` nutzen (wo verfügbar) für präziseres Timing
-- Incoming-Video erst sichtbar machen wenn der Decoder den richtigen Frame hat (`readyState >= 3`)
+#### 1) Neuer Hook: `useFrameCapture`
+Erfasst beim Laden den ersten Frame jeder Szene als `ImageBitmap` (1280×720). Verwendet ein verstecktes `<video>`-Element mit sequentiellem Seeking. Gibt ein `Map<sceneId, ImageBitmap>` zurück.
 
-#### 3) Export bleibt framegenau
-- Der Remotion-Export nutzt bereits `TransitionSeries` mit framegenauen Transitions — dort funktionieren alle Typen perfekt. Keine Änderung nötig.
+#### 2) `useTransitionRenderer` umbauen
+Statt das `incomingVideoRef` (ein zweites `<video>`) zu animieren, rendert der Hook den voraufgenommenen Frame auf ein `<canvas>`-Element:
+- Canvas ersetzt das zweite `<video>`-Element
+- `ctx.drawImage(imageBitmap, ...)` ist eine einzige GPU-Operation — kein Decoder nötig
+- Alle CSS-Animationen (opacity, transform, clipPath) funktionieren identisch auf dem Canvas
+- Der `readyState`-Fallback wird überflüssig — der Frame ist immer bereit
 
-### Technische Details
+#### 3) `DirectorsCutPreviewPlayer` vereinfachen
+- Zweites `<video>`-Element durch `<canvas>` ersetzen
+- Komplette Incoming-Video-Sync-Logik entfernen (Zeilen 356-373, 377-387)
+- Pre-Sync-Logik entfällt komplett
+- rAF-Loop wird deutlich einfacher — nur noch Base-Video sync
 
-**Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`**
-- Pre-Sync-Fenster von 200ms auf 500ms für Slide/Push/Wipe
-- `readyState`-Check vor dem Abspielen des Incoming-Videos
-- Optional: `requestVideoFrameCallback` für frame-genaue Sync
+#### 4) Kein zweites `<video>` mehr
+Das eliminiert:
+- Decoder-Sync-Probleme
+- readyState-Checks
+- Pre-Buffering-Logik
+- Fallback auf Crossfade
 
-**Datei: `src/components/directors-cut/preview/useTransitionRenderer.ts`**
-- Motion-Transitions (slide/push/wipe) erst visuell starten wenn `incoming.readyState >= 3`
-- Fallback: automatisch auf Crossfade wechseln wenn Incoming-Video nicht bereit ist
-
-**Datei: `src/components/directors-cut/steps/SceneEditingStep.tsx`**
-- AI-Default auf `crossfade` mit 1.2s setzen
-
-**Datei: UI (TransitionPicker oder Tooltip)**
-- Kleiner Hinweis bei Motion-Transitions: "Vorschau-Qualität — Export ist framegenau"
+### Dateien
+- **Neu:** `src/components/directors-cut/preview/useFrameCapture.ts`
+- **Umbau:** `src/components/directors-cut/preview/useTransitionRenderer.ts`
+- **Vereinfachung:** `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
 
 ### Ergebnis
-- Crossfade funktioniert immer sauber (90% der Fälle)
-- Slide/Push/Wipe werden durch Pre-Buffering deutlich besser
-- Falls Incoming nicht rechtzeitig dekodiert: automatischer Fallback auf Crossfade in der Preview
-- Der finale Export bleibt von all dem unberührt — Remotion rendert immer framegenau
+- **Alle Übergangstypen** (Slide, Push, Wipe, Crossfade, etc.) funktionieren sauber
+- Kein Versatz, kein Stottern, kein "zu früh"
+- Einfacherer Code (weniger Logik = weniger Bugs)
+- Einziger Trade-off: Incoming-Frame ist ein Standbild statt laufendes Video — bei 0.8-1.5s Übergangsdauer visuell nicht wahrnehmbar
 
