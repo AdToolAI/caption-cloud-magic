@@ -1,72 +1,57 @@
 
 
-## Fix: Übergänge werden nicht angezeigt — CORS-Problem bei Frame-Capture
+## Fix: Filter und Übergänge in Schritt 4 (Style & Look) sichtbar machen
 
-### Ursache
-In `NativeTransitionOverlay.tsx` (Zeile 50-86) wird ein verstecktes `<video>`-Element erstellt, um den ersten Frame jeder Szene zu capturen. Aber:
+### Problem 1 — Filter werden nicht angewendet
+Der `videoFilter` in `DirectorsCutPreviewPlayer.tsx` (Zeile 456-468) berechnet nur `brightness`, `contrast` und `saturation`. Die `effects.filter`-Eigenschaft (z.B. `"cinematic"`, `"vintage"`) und szenenspezifische Filter aus `sceneEffects[sceneId].filter` werden **komplett ignoriert**.
 
-1. **`crossOrigin` fehlt** — das Video kommt von Supabase Storage (andere Origin). Ohne `video.crossOrigin = 'anonymous'` wird der Canvas "tainted" und `canvas.toDataURL()` wirft einen SecurityError
-2. **Leerer `catch`-Block** (Zeile 77) schluckt den Fehler komplett — kein Frame wird gecached
-3. Ohne gecachte Frames gibt `getNextFrameStyle()` `display: none` zurück → kein sichtbarer Übergang
+Die CSS-Strings dafür existieren bereits in `AVAILABLE_FILTERS[].preview` (z.B. `'saturate(1.35) contrast(1.3) brightness(0.95)'` für Cinematic).
+
+### Problem 2 — Übergänge nicht sichtbar in Schritt 4
+`StepLayoutWrapper` übergibt `transitions` korrekt an `DirectorsCutPreviewPlayer`. Das Problem ist wahrscheinlich dasselbe wie in Schritt 3 zuvor — der rAF-Loop und die Frame-Capture-Fixes greifen bereits. Falls die Übergänge in Schritt 3 funktionieren, sollten sie auch in Schritt 4 funktionieren, sobald der Player dieselben Props bekommt.
 
 ### Lösung
 
-**`src/components/directors-cut/preview/NativeTransitionOverlay.tsx`**
+**`src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`**
 
-1. `crossOrigin = 'anonymous'` auf dem versteckten Capture-Video setzen (Zeile 52)
-2. Fallback für den Fall, dass Frame-Capture trotzdem fehlschlägt (z.B. CORS-Header fehlen):
-   - Statt `display: none` bei fehlendem Frame → einfarbigen schwarzen/dunklen Overlay als Fallback verwenden
-   - So sind Übergänge (Wipe, Slide, Fade) auch ohne Snapshot sichtbar
-3. `catch`-Block mit `console.warn` versehen, damit Fehler nicht mehr lautlos verschluckt werden
+Den `videoFilter`-useMemo erweitern:
 
-### Konkreter Code-Plan
+1. **Globalen Filter einbeziehen**: Wenn `effects.filter` gesetzt ist, den passenden CSS-String aus `AVAILABLE_FILTERS` nachschlagen und anhängen
+2. **Szenenspezifischen Filter einbeziehen**: Per `currentTime` die aktuelle Szene ermitteln, dann `sceneEffects[currentScene.id]?.filter` prüfen — dieser hat Vorrang vor dem globalen Filter
+3. Import von `AVAILABLE_FILTERS` aus `@/types/directors-cut` hinzufügen
 
 ```tsx
-// Zeile 50-53: crossOrigin setzen
-const video = document.createElement('video');
-video.preload = 'auto';
-video.muted = true;
-video.crossOrigin = 'anonymous';  // NEU
-video.src = videoUrl;
-
-// Zeile 77: catch nicht mehr leer
-} catch (e) { 
-  console.warn('Frame capture failed for scene', sceneId, e); 
-}
-```
-
-```tsx
-// getNextFrameStyle: Fallback wenn kein Frame vorhanden
-const getNextFrameStyle = (): React.CSSProperties => {
-  const bgBase: React.CSSProperties = nextFrame 
-    ? {
-        backgroundImage: `url(${nextFrame})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundColor: '#000',
-      }
-    : { backgroundColor: '#000' };  // Fallback: schwarzer Overlay
+// Pseudo-Code der Erweiterung
+const videoFilter = useMemo(() => {
+  const filters: string[] = [];
   
-  // ... rest der switch/case Logik bleibt gleich
-};
-
-// Render: auch ohne nextFrame den Overlay anzeigen
-{(nextFrame || overlayInfo) && (
-  <div ... style={getNextFrameStyle()} />
-)}
+  // Bestehende brightness/contrast/saturation...
+  
+  // Aktiven Filter ermitteln (szenen-spezifisch > global)
+  const currentScene = sortedScenes.find(s => displayTime >= s.start_time && displayTime < s.end_time);
+  const activeFilterId = (currentScene && sceneEffects[currentScene.id]?.filter) || effects.filter;
+  
+  if (activeFilterId && activeFilterId !== 'none') {
+    const filterDef = AVAILABLE_FILTERS.find(f => f.id === activeFilterId);
+    if (filterDef?.preview) {
+      filters.push(filterDef.preview);
+    }
+  }
+  
+  return filters.length > 0 ? filters.join(' ') : undefined;
+}, [effects, sceneEffects, sortedScenes, displayTime]);
 ```
 
 ### Was sich ändert
-- Frame-Capture funktioniert bei CORS-fähigem Storage
-- Falls CORS trotzdem blockt: Übergänge zeigen einen schwarzen Overlay statt gar nichts
-- Slide/Wipe/Fade werden in jedem Fall sichtbar
+- Filter wie "Cinematic", "Vintage", "Noir" etc. werden live auf dem Video sichtbar
+- Szenenspezifische Filter überschreiben den globalen Filter korrekt
+- Gilt für alle Steps, die `StepLayoutWrapper` verwenden
 
 ### Was sich nicht ändert
-- Single-Video-Architektur
-- rAF-Loop für flüssige Animation
-- Finaler Export unberührt
+- Transition-Logik bleibt unberührt
+- Single-Video-Architektur bleibt
+- Finaler Export bleibt unverändert
 
 ### Dateien
-- `src/components/directors-cut/preview/NativeTransitionOverlay.tsx` — einzige Änderung
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — einzige Änderung
 
