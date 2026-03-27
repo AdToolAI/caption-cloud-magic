@@ -219,14 +219,12 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
         body: { generation_id: generationId },
       });
 
-      if (response.error) {
-        throw new Error(response.error.message || 'Fehler beim Speichern');
-      }
-
+      // Supabase SDK: bei non-2xx ist response.data trotzdem gesetzt mit dem Body
       const result = response.data;
-
-      if (!result.ok) {
-        throw new Error(result.error || 'Unbekannter Fehler');
+      
+      if (response.error || (result && !result.ok)) {
+        const errorMsg = result?.error || response.error?.message || 'Fehler beim Speichern';
+        throw new Error(errorMsg);
       }
 
       sonnerToast.success('Video in Mediathek gespeichert!');
@@ -235,7 +233,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
       console.error('Save to library error:', error);
       const errorMsg = error?.message || '';
       
-      if (errorMsg.includes('not reachable') || errorMsg.includes('expired')) {
+      if (errorMsg.includes('nicht mehr verfügbar') || errorMsg.includes('abgelaufen') || errorMsg.includes('not reachable') || errorMsg.includes('expired')) {
         sonnerToast.error('Video nicht mehr verfügbar', {
           description: 'Die temporäre URL ist abgelaufen. Bitte generiere das Video erneut.'
         });
