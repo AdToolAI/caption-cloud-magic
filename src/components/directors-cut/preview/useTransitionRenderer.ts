@@ -58,8 +58,15 @@ export function useTransitionRenderer(
           const rawProgress = (time - tStart) / effectiveDuration;
           const progress = 0.5 - 0.5 * Math.cos(rawProgress * Math.PI);
           const parts = transition.transitionType.split('-');
-          const baseType = parts[0].toLowerCase();
+          let baseType = parts[0].toLowerCase();
           const direction = parts[1] || 'left';
+
+          // For motion transitions (slide/push/wipe), check if incoming video is ready.
+          // If not decoded yet, fall back to crossfade to avoid visible glitches.
+          const isMotionTransition = baseType === 'slide' || baseType === 'push' || baseType === 'wipe';
+          if (isMotionTransition && incoming.readyState < 3) {
+            baseType = 'crossfade'; // fallback until decoder is ready
+          }
 
           applyStyles(base, incoming, progress, baseType, direction, videoFilterRef.current ?? '');
           found = true;

@@ -219,6 +219,12 @@ export function TransitionPicker({
                 <p className="text-[10px] text-muted-foreground line-clamp-1">
                   {type.description}
                 </p>
+                {/* Motion transition hint */}
+                {isSelected && (type.id === 'wipe' || type.id === 'slide') && (
+                  <p className="text-[9px] text-amber-500 mt-0.5 line-clamp-2">
+                    ⚡ Vorschau kann leicht versetzt wirken — Export ist framegenau
+                  </p>
+                )}
               </div>
 
               {/* AI Badge */}
