@@ -464,8 +464,21 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (effects.saturation !== undefined && effects.saturation !== 100) {
       filters.push(`saturate(${effects.saturation / 100})`);
     }
+
+    // Apply scene-specific or global filter (cinematic, vintage, etc.)
+    const currentScene = sortedScenes.find(s => displayTime >= s.start_time && displayTime < s.end_time);
+    const sceneFilter = currentScene && sceneEffects?.[currentScene.id]?.filter;
+    const activeFilterId = sceneFilter || effects.filter;
+
+    if (activeFilterId && activeFilterId !== 'none') {
+      const filterDef = AVAILABLE_FILTERS.find(f => f.id === activeFilterId);
+      if (filterDef?.preview) {
+        filters.push(filterDef.preview);
+      }
+    }
+
     return filters.length > 0 ? filters.join(' ') : undefined;
-  }, [effects.brightness, effects.contrast, effects.saturation]);
+  }, [effects.brightness, effects.contrast, effects.saturation, effects.filter, sceneEffects, sortedScenes, displayTime]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
