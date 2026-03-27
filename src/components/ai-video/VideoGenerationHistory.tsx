@@ -179,37 +179,6 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     }
   };
 
-  const handleSaveToLibrary = async (generationId: string) => {
-    setSavingVideo(generationId);
-    try {
-      const { data, error } = await supabase.functions.invoke('save-ai-video-to-library', {
-        body: { generation_id: generationId }
-      });
-
-      if (error) throw error;
-
-      if (!data.ok) {
-        throw new Error(data.error || 'Fehler beim Speichern');
-      }
-
-      sonnerToast.success('Video in Mediathek gespeichert!', {
-        description: 'Du wirst zur Mediathek weitergeleitet...',
-        duration: 2000
-      });
-      
-      queryClient.invalidateQueries({ queryKey: ['video-history'] });
-      
-      // Navigate to Media Library with AI tab selected after 1 second
-      setTimeout(() => {
-        navigate('/media-library?tab=ai');
-      }, 1000);
-    } catch (error) {
-      console.error('Save to library error:', error);
-      sonnerToast.error(error instanceof Error ? error.message : 'Fehler beim Speichern in Mediathek');
-    } finally {
-      setSavingVideo(null);
-    }
-  };
 
   if (isLoading) {
     return (
