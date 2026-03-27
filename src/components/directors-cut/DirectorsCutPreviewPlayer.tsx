@@ -120,6 +120,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     return [...scenes].sort((a, b) => a.start_time - b.start_time);
   }, [scenes]);
 
+  // Helper: map timeline time → source video time (handles reordering/trimming/speed)
+  const timelineToSourceTime = useCallback((timelineTime: number): number => {
+    if (sortedScenes.length === 0) return timelineTime;
+    const scene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
+    if (!scene) return timelineTime;
+    const sourceStart = scene.original_start_time ?? scene.start_time;
+    const playbackRate = (scene as any).playbackRate ?? 1;
+    return sourceStart + (timelineTime - scene.start_time) * playbackRate;
+  }, [sortedScenes]);
+
   // ==================== VOICEOVER HELPERS ====================
   const playVoiceover = useCallback(() => {
     const voiceover = voiceoverAudioRef.current;
