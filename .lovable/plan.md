@@ -1,100 +1,110 @@
 
-Ziel: Das Problem nicht weiter im Overlay “wegzuoptimieren”, sondern die eigentliche Ursache in Schritt 3 zu korrigieren: Das Basisvideo läuft offenbar noch auf der falschen Quellzeit. Dadurch ist der Overlay-Snapshot zwar richtig, aber das darunterliegende Video zeigt an den späteren Schnitten noch Bild der alten Szene.
+Ziel: Nicht noch mehr am Overlay schrauben, sondern die Preview-Zeitquelle sauber vereinheitlichen. Der aktuelle Fehler sitzt sehr wahrscheinlich in `DirectorsCutPreviewPlayer.tsx`, nicht mehr in der Capture-Logik.
 
-1. Kernbefund aus dem aktuellen Code
-- `NativeTransitionOverlay` ist inzwischen weitgehend korrekt:
-  - 60fps via eigenem rAF-Loop
-  - Snapshot per `original_start_time`
-  - Transition-Matching per `sceneId`
-  - Timing zentriert um die Szenengrenze
-- Aber in `DirectorsCutPreviewPlayer.tsx` läuft das Haupt-`<video>` weiterhin direkt mit:
-```ts
-const time = video.currentTime;
-visualTimeRef.current = time;
-```
-- Es gibt dort keine Remap-Logik von Timeline-Zeit auf Quellvideo-Zeit pro Szene, obwohl `SceneAnalysis` genau dafür `original_start_time`, `original_end_time` und `playbackRate` hat.
-- Das erklärt dein Symptom sehr gut:
-  - Overlay blendet Szene 3 ein
-  - Basisvideo liegt noch auf “alter” Quellposition
-  - dadurch wirkt es so, als würde der Übergang Teile der alten Szene mitziehen
-  - je später der Schnitt, desto stärker summiert sich der Drift → deshalb ist Übergang 2/3 schlechter als Übergang 1
+1. Kernbefund aus dem Code
+- `NativeTransitionOverlay` ist aktuell im Wesentlichen korrekt:
+  - eigener rAF-Loop
+  - Snapshot über `original_start_time`
+  - Matching per `sceneId`
+  - Timing um die Szenengrenze zentriert
+- Aber `DirectorsCutPreviewPlayer` fährt gerade zweigleisig:
+  - `visualTimeRef` wird im rAF rein per Wall-Clock hochgezählt
+  - das `<video>` wird nur bei Abweichung `> 0.1s` auf `timelineToSourceTime(...)` zurückgesetzt
+- Dadurch gibt es zwei unterschiedliche Wahrheiten:
+  - Overlay orientiert sich an `visualTimeRef`
+  - tatsächlich sichtbares Bild kommt vom nativen Decoder und kann hinterherhängen
+- Genau das passt zu deinem Symptom: späterer Übergang zeigt noch Teile der alten Szene, obwohl der Overlay formal schon in Szene 3 ist.
 
 2. Saubere Lösung
 `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
 
-Ich würde die Preview auf dieselbe Grundlogik umstellen, die im `CapCutPreviewPlayer` bereits verwendet wird:
-- aktuelle Szene aus `displayTime` / `visualTimeRef` bestimmen
-- daraus die korrekte Quellzeit berechnen:
-```ts
-sourceTime =
-  (scene.original_start_time ?? scene.start_time) +
-  (timelineTime - scene.start_time) * (scene.playbackRate ?? 1)
+Ich würde die Preview auf eine einzige führende Zeitquelle umbauen:
+
+- Während Playback darf nicht mehr `visualTimeRef += delta` die Wahrheit sein.
+- Stattdessen:
+  - das `<video>` bleibt der führende Decoder
+  - pro Frame wird aus `video.currentTime` wieder die passende Timeline-Zeit berechnet
+  - Overlay, UI und `onTimeUpdate` hängen an dieser rückgerechneten Timeline-Zeit
+
+Kurz:
+```text
+source video time -> current scene bestimmen -> timeline time ableiten
 ```
-- das native `<video>` aktiv auf diese Quellzeit synchronisieren statt ungefiltert die Timeline-Zeit zu verwenden
 
-3. Konkret betroffene Stellen
-A. Playback-/rAF-Loop in `DirectorsCutPreviewPlayer.tsx`
-- aktuell wird `video.currentTime` implizit als globale Timeline-Zeit behandelt
-- neu:
-  - Timeline-Zeit bleibt für UI/Slider/Overlays
-  - Video-Zeit wird davon getrennt und aus der aktiven Szene remapped
-
-B. Seek-Handling
-- bei Slider-Seeks darf nicht mehr einfach
+3. Konkrete Umsetzung
+A. Bidirektionales Mapping ergänzen
+- Neben `timelineToSourceTime()` auch `sourceToTimelineTime()` einführen
+- Formel pro aktiver Szene:
 ```ts
-video.currentTime = newTime
+timelineTime =
+scene.start_time +
+(sourceTime - sourceStart) / playbackRate
 ```
-gesetzt werden
-- stattdessen muss `newTime` erst auf die korrekte Quellzeit der Zielszene übersetzt werden
-
-C. Externe Zeit-Sync-Logik
-- auch der Block mit
+- mit:
 ```ts
-if (Math.abs(currentTime - visualTimeRef.current) > 0.5) { ... }
+sourceStart = scene.original_start_time ?? scene.start_time
+playbackRate = scene.playbackRate ?? 1
 ```
-muss auf remappte Zielzeit umgebaut werden
-- sonst springt das Video beim nächsten Sync wieder auf die falsche Position
 
-4. Kleine, aber wichtige Overlay-Nachbesserung
+B. Playback-Loop korrigieren
+- kein freies Hochzählen von `visualTimeRef` mehr
+- stattdessen im rAF:
+  - `sourceTime = video.currentTime`
+  - passende Szene anhand `original_start_time/original_end_time` bzw. remapptem Bereich bestimmen
+  - daraus `timelineTime` berechnen
+  - `visualTimeRef.current = timelineTime`
+- `setDisplayTime` und `onTimeUpdate` bleiben throttled, aber basieren auf echter Decoder-Zeit
+
+C. Nur noch bei echten Seeks aktiv setzen
+- `video.currentTime = timelineToSourceTime(...)` nur bei:
+  - Slider-Seek
+  - Reset
+  - externer Zeit-Synchronisation
+  - Szenensprung / manuellem Jump
+- nicht mehr als dauernde Drift-Korrektur im Playback-Loop
+
+D. PlaybackRate am nativen Video korrekt setzen
+- wenn eine Szene beschleunigt/verlangsamt ist:
+  - `video.playbackRate = currentScene.playbackRate ?? 1`
+- sonst läuft das Video linear weiter und das Mapping stimmt nur auf dem Papier
+
+4. Wichtiger Nebenaspekt
+Der aktuelle `timelineToSourceTime()`-Ansatz sucht nur nach Timeline-Szene und springt dann hart am Decoder herum. Das kann zwar “formal” korrekt wirken, ist aber genau die Art von Entkopplung, die zu alten Frames an den Cuts führt. Mit decodergeführter Zeit fällt diese Drift weg.
+
+5. Overlay nur leicht nachziehen
 `src/components/directors-cut/preview/NativeTransitionOverlay.tsx`
-- Das Overlay nutzt aktuell:
-```ts
-backgroundSize: 'cover'
-```
-- Das Hauptvideo nutzt aber `object-contain`
-- dadurch kann das eingeblendete Bild leicht anders aussehen/liegen als das Basisvideo
-- ich würde das Overlay auf contain-artige Darstellung umbauen:
-  - kein `cover`
-  - zentrierte vollständige Darstellung
-  - schwarzer Letterbox-Hintergrund beibehalten
-- Das behebt die optische Fehllage, ist aber nicht die Hauptursache des falschen Inhalts
+- vermutlich nur kleine Nacharbeit:
+  - weiter `visualTimeRef` verwenden
+  - aber jetzt bekommt es eine Timeline-Zeit, die wirklich aus dem sichtbaren Videoframe kommt
+- Falls nötig:
+  - die aktive Transition robust gegen Grenzfälle am Szenenende clampen
+  - sonst keine neue Logik nötig
 
-5. Erwartetes Ergebnis
-- Übergang 2 und 3 zeigen nicht mehr “alte Szene unter neuer Szene”
-- Overlay und Basisvideo liegen an derselben echten Szenengrenze
-- spätere Übergänge driften nicht weiter auseinander
-- Schritt 3 bleibt flüssig, weil weiterhin nur ein nativer Decoder aktiv ist
+6. Erwartetes Ergebnis
+- Übergang 2 und 3 ziehen keine alte Szene mehr mit
+- Overlay und Basisvideo referenzieren endlich denselben sichtbaren Moment
+- keine kumulative Drift über mehrere Schnitte
+- Performance bleibt gut, weil weiterhin nur ein nativer Decoder läuft
 
-6. Dateien
+7. Dateien
 - `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — Hauptfix
-- `src/components/directors-cut/preview/NativeTransitionOverlay.tsx` — visuelle Angleichung an `object-contain`
+- `src/components/directors-cut/preview/NativeTransitionOverlay.tsx` — höchstens kleiner Folge-Fix
 
 Technische Details
 ```text
 Aktueller Fehler:
-Timeline-Zeit wird wie Quellvideo-Zeit behandelt.
+timeline clock und decoder clock laufen getrennt.
 
-Korrekt wäre:
-Timeline-Zeit -> aktive Szene bestimmen
-aktive Szene -> originale Quellzeit berechnen
-nur diese Quellzeit ins <video> schreiben
+Besser:
+Beim Abspielen ist der Decoder führend.
+Die Timeline-Zeit wird aus video.currentTime zurückgerechnet.
 
-Formel:
-sourceTime =
-(scene.original_start_time ?? scene.start_time)
-+ (timelineTime - scene.start_time) * (scene.playbackRate ?? 1)
+Alt:
+visualTimeRef += delta
+video.currentTime wird nur gelegentlich korrigiert
 
-Folge:
-Das Basisvideo zeigt endlich denselben inhaltlichen Frame,
-auf den auch der Transition-Overlay referenziert.
+Neu:
+visualTimeRef = sourceToTimelineTime(video.currentTime)
+video.currentTime wird nur bei echten Seeks gesetzt
+video.playbackRate folgt der aktiven Szene
 ```
