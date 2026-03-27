@@ -1,34 +1,41 @@
 
 
-## Auto-Save: Videos automatisch in Mediathek speichern
+## Fix: Videos werden nicht in Mediathek gespeichert + "In Mediathek gespeichert" lügt
 
-### Idee
-Statt dass der User manuell "In Mediathek" klicken muss, wird das Video direkt im Webhook beim Fertigwerden heruntergeladen, in den Storage hochgeladen und als `video_creations`-Eintrag gespeichert — genau wie es der `director-cut-sora-webhook` bereits macht.
+### Befund
 
-### Änderungen
+1. **Webhook wurde nie aufgerufen** — die zwei Videos für den Testuser (`3faf219a`) haben `video_url` mit temporären `replicate.delivery`-URLs. Der Auto-Save-Code im Webhook wurde erst danach deployed. Keine Webhook-Logs vorhanden → der Webhook wurde für diese Videos nie getriggert.
 
-**1. `supabase/functions/replicate-webhook/index.ts`**
-- Bei `status === 'succeeded'`: Video sofort von Replicate herunterladen
-- In `ai-videos` Storage-Bucket hochladen
-- Permanente Storage-URL in `ai_video_generations.video_url` speichern
-- Automatisch `video_creations`-Eintrag erstellen (wie beim Director's Cut Webhook)
-- Metadata: model, prompt, aspect_ratio, duration, source: `"sora-2-ai"`
+2. **`video_creations` ist leer** für diesen User — null Einträge. Die Mediathek zeigt nur das Demo-Video.
 
-**2. `src/components/ai-video/VideoGenerationHistory.tsx`**
-- "In Mediathek"-Button entfernen
-- Stattdessen bei completed-Videos einen kleinen Hinweis "✓ In Mediathek gespeichert" anzeigen
-- `handleSaveToLibrary`-Funktion und zugehörigen State (`savingVideo`) entfernen
+3. **UI lügt** — Zeile 323-326 zeigt "✓ In Mediathek gespeichert" für JEDES completed Video, ohne zu prüfen ob es wirklich in `video_creations` existiert.
 
-**3. `supabase/functions/save-ai-video-to-library/index.ts`**
-- Kann perspektivisch entfernt werden, wird aber vorerst als Fallback belassen (falls alte Videos noch die temporäre URL haben)
+### Lösung
 
-### Erwartetes Ergebnis
-- Video wird beim Fertigwerden automatisch permanent gespeichert + in Mediathek eingetragen
-- Kein manueller Klick mehr nötig
-- Keine abgelaufenen Replicate-URLs mehr
-- Verhalten identisch zum Universal Content Creator und Director's Cut
+**1. Retroaktives Speichern (Edge Function oder Client-Logik)**
+
+Die UI muss beim Laden prüfen, ob ein completed Video schon in `video_creations` existiert. Falls nicht, einen "In Mediathek speichern"-Button anzeigen, der `save-ai-video-to-library` aufruft (die bestehende Fallback-Funktion).
+
+**2. `VideoGenerationHistory.tsx` — ehrliche Statusanzeige**
+
+- Beim Laden der Generierungen auch `video_creations` abfragen (mit `metadata->>'ai_generation_id'`)
+- Für jedes completed Video prüfen ob es in der Mediathek ist
+- Falls ja: "✓ In Mediathek gespeichert" anzeigen
+- Falls nein: "In Mediathek speichern"-Button anzeigen, der die Funktion `save-ai-video-to-library` aufruft
+
+**3. `save-ai-video-to-library` anpassen**
+
+Die bestehende Funktion versucht von `generation.video_url` herunterzuladen. Da die URLs abgelaufen sein können, muss sie:
+- Prüfen ob die URL noch erreichbar ist
+- Falls nicht: einen Fehler anzeigen wie "Video nicht mehr verfügbar — bitte neu generieren"
 
 ### Dateien
-- `supabase/functions/replicate-webhook/index.ts` — Download + Storage + video_creations
-- `src/components/ai-video/VideoGenerationHistory.tsx` — Button entfernen, Hinweis anzeigen
+
+- `src/components/ai-video/VideoGenerationHistory.tsx` — Query erweitern, Button statt statischem Text
+- `supabase/functions/save-ai-video-to-library/index.ts` — bessere Fehlerbehandlung bei abgelaufenen URLs
+
+### Erwartetes Ergebnis
+- "In Mediathek gespeichert" wird nur angezeigt wenn wirklich gespeichert
+- Für nicht-gespeicherte Videos erscheint ein Button zum Nachholen
+- Zukünftige Videos werden via Webhook automatisch gespeichert (wie schon implementiert)
 
