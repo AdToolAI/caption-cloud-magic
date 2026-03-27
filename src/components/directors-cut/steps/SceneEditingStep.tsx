@@ -848,6 +848,12 @@ export function SceneEditingStep({
         onSceneSelect={setSelectedSceneId}
         onTransitionClick={setEditingTransitionId}
         onSceneDurationChange={handleTimelineDurationChange}
+        onTransitionAnchorChange={(sceneId, anchorTime) => {
+          const updated = transitions.map(t =>
+            t.sceneId === sceneId ? { ...t, anchorTime } : t
+          );
+          onTransitionsChange(updated);
+        }}
         thumbnails={thumbnails}
         currentTime={currentVideoTime}
       />
