@@ -121,15 +121,47 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     return [...scenes].sort((a, b) => a.start_time - b.start_time);
   }, [scenes]);
 
-  // Helper: map timeline time → source video time (handles reordering/trimming/speed)
-  const timelineToSourceTime = useCallback((timelineTime: number): number => {
-    if (sortedScenes.length === 0) return timelineTime;
-    const scene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
-    if (!scene) return timelineTime;
+  // Helper: compute source time for a specific scene at a given timeline time
+  const sourceTimeForScene = useCallback((scene: SceneAnalysis, timelineTime: number): number => {
     const sourceStart = scene.original_start_time ?? scene.start_time;
     const playbackRate = (scene as any).playbackRate ?? 1;
     return sourceStart + (timelineTime - scene.start_time) * playbackRate;
-  }, [sortedScenes]);
+  }, []);
+
+  // Helper: find active transition at a given timeline time
+  const findActiveTransition = useCallback((timelineTime: number) => {
+    for (let i = 0; i < sortedScenes.length - 1; i++) {
+      const scene = sortedScenes[i];
+      const t = transitions.find(tr => tr.sceneId === scene.id);
+      if (!t || t.transitionType === 'none') continue;
+      const tDuration = Math.max(0.6, t.duration || 0.8);
+      const half = tDuration / 2;
+      const boundary = scene.end_time;
+      if (timelineTime >= boundary - half && timelineTime < boundary + half) {
+        return {
+          outgoingScene: scene,
+          incomingScene: sortedScenes[i + 1],
+          boundary,
+          half,
+          tDuration,
+          progress: (timelineTime - (boundary - half)) / tDuration,
+        };
+      }
+    }
+    return null;
+  }, [sortedScenes, transitions]);
+
+  // Helper: map timeline time → source video time (transition-aware: stays on outgoing scene)
+  const timelineToSourceTime = useCallback((timelineTime: number): number => {
+    if (sortedScenes.length === 0) return timelineTime;
+    const activeTrans = findActiveTransition(timelineTime);
+    if (activeTrans) {
+      return sourceTimeForScene(activeTrans.outgoingScene, Math.min(timelineTime, activeTrans.boundary));
+    }
+    const scene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
+    if (!scene) return timelineTime;
+    return sourceTimeForScene(scene, timelineTime);
+  }, [sortedScenes, findActiveTransition, sourceTimeForScene]);
 
 
   // ==================== VOICEOVER HELPERS ====================
@@ -270,12 +302,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const transitionInfo = useTransitionInfo(visualTimeRef, sortedScenes, transitions);
   const transitionStyles = getTransitionStyles(transitionInfo);
 
-  // Helper: compute source time for a specific scene at a given timeline time
-  const sourceTimeForScene = useCallback((scene: SceneAnalysis, timelineTime: number): number => {
-    const sourceStart = scene.original_start_time ?? scene.start_time;
-    const playbackRate = (scene as any).playbackRate ?? 1;
-    return sourceStart + (timelineTime - scene.start_time) * playbackRate;
-  }, []);
 
   // ==================== rAF PLAYBACK LOOP (TIMELINE-LED) ====================
   useEffect(() => {
@@ -301,54 +327,59 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
       const timelineTime = visualTimeRef.current;
 
-      // Find active scene and sync base video
-      const activeScene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
-      if (activeScene) {
-        const expectedSource = sourceTimeForScene(activeScene, timelineTime);
-        if (Math.abs(video.currentTime - expectedSource) > 0.15) {
-          video.currentTime = expectedSource;
-        }
-        const sceneRate = (activeScene as any).playbackRate ?? 1;
-        if (Math.abs(video.playbackRate - sceneRate) > 0.01) {
-          video.playbackRate = sceneRate;
-        }
-      }
-
-      // Sync incoming video during active transition — computed inline, no React state dependency
+      // Check if we're in a transition window
+      const activeTrans = findActiveTransition(timelineTime);
       const incoming = incomingVideoRef.current;
-      let inTransition = false;
 
-      if (incoming && sortedScenes.length >= 2) {
-        for (let i = 0; i < sortedScenes.length - 1; i++) {
-          const scene = sortedScenes[i];
-          const t = transitions.find(tr => tr.sceneId === scene.id);
-          if (!t || t.transitionType === 'none') continue;
+      if (activeTrans) {
+        // DURING TRANSITION: base video stays on OUTGOING scene, incoming shows NEXT scene
+        const { outgoingScene, incomingScene, boundary, progress, tDuration } = activeTrans;
 
-          const tDuration = Math.max(0.6, t.duration || 0.8);
-          const half = tDuration / 2;
-          const boundary = scene.end_time;
+        // Base video: keep on outgoing scene (clamp time to not exceed boundary)
+        const outgoingTime = sourceTimeForScene(outgoingScene, Math.min(timelineTime, boundary));
+        if (Math.abs(video.currentTime - outgoingTime) > 0.15) {
+          video.currentTime = outgoingTime;
+        }
+        const outRate = (outgoingScene as any).playbackRate ?? 1;
+        if (Math.abs(video.playbackRate - outRate) > 0.01) {
+          video.playbackRate = outRate;
+        }
 
-          if (timelineTime >= boundary - half && timelineTime < boundary + half) {
-            const nextScene = sortedScenes[i + 1];
-            const expectedIncoming = sourceTimeForScene(nextScene, timelineTime);
-            if (Math.abs(incoming.currentTime - expectedIncoming) > 0.15) {
-              incoming.currentTime = expectedIncoming;
-            }
-            if (incoming.paused) {
-              incoming.play().catch(() => {});
-            }
-            const nextRate = (nextScene as any).playbackRate ?? 1;
-            if (Math.abs(incoming.playbackRate - nextRate) > 0.01) {
-              incoming.playbackRate = nextRate;
-            }
-            inTransition = true;
-            break;
+        // Incoming video: show start of next scene + progress-based offset
+        if (incoming) {
+          const incomingSourceStart = incomingScene.original_start_time ?? incomingScene.start_time;
+          const inRate = (incomingScene as any).playbackRate ?? 1;
+          // Map progress to a small offset into the incoming scene
+          const incomingOffset = progress * tDuration * inRate;
+          const expectedIncoming = incomingSourceStart + incomingOffset;
+          if (Math.abs(incoming.currentTime - expectedIncoming) > 0.15) {
+            incoming.currentTime = expectedIncoming;
+          }
+          if (incoming.paused) {
+            incoming.play().catch(() => {});
+          }
+          if (Math.abs(incoming.playbackRate - inRate) > 0.01) {
+            incoming.playbackRate = inRate;
           }
         }
-      }
+      } else {
+        // NOT in transition: normal scene sync
+        const activeScene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
+        if (activeScene) {
+          const expectedSource = sourceTimeForScene(activeScene, timelineTime);
+          if (Math.abs(video.currentTime - expectedSource) > 0.15) {
+            video.currentTime = expectedSource;
+          }
+          const sceneRate = (activeScene as any).playbackRate ?? 1;
+          if (Math.abs(video.playbackRate - sceneRate) > 0.01) {
+            video.playbackRate = sceneRate;
+          }
+        }
 
-      if (incoming && !inTransition && !incoming.paused) {
-        incoming.pause();
+        // Pause incoming video when not in transition
+        if (incoming && !incoming.paused) {
+          incoming.pause();
+        }
       }
 
       // Throttled UI updates
@@ -380,7 +411,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     rafIdRef.current = requestAnimationFrame(tick);
     return () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current); };
-  }, [isPlaying, duration, sortedScenes, sourceTimeForScene, transitions, handleVideoEnded]);
+  }, [isPlaying, duration, sortedScenes, sourceTimeForScene, transitions, findActiveTransition, handleVideoEnded]);
 
   // ==================== VIDEO EVENT HANDLERS ====================
 
@@ -500,6 +531,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     setDisplayTime(newTime);
     onTimeUpdateRef.current?.(newTime);
 
+    // Sync incoming video if seeking into a transition window
+    const incoming = incomingVideoRef.current;
+    const activeTrans = findActiveTransition(newTime);
+    if (incoming && activeTrans) {
+      const incomingSourceStart = activeTrans.incomingScene.original_start_time ?? activeTrans.incomingScene.start_time;
+      const inRate = (activeTrans.incomingScene as any).playbackRate ?? 1;
+      const incomingOffset = activeTrans.progress * activeTrans.tDuration * inRate;
+      incoming.currentTime = incomingSourceStart + incomingOffset;
+    }
+
     if (sourceAudioRef.current) sourceAudioRef.current.currentTime = newTime;
     if (voiceoverAudioRef.current) {
       voiceoverAudioRef.current.currentTime = newTime;
@@ -509,7 +550,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       }
     }
     if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = newTime;
-  }, [playVoiceover, timelineToSourceTime]);
+  }, [playVoiceover, timelineToSourceTime, findActiveTransition]);
 
   const handleReset = useCallback(() => {
     const video = videoRef.current;
