@@ -121,15 +121,41 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     return [...scenes].sort((a, b) => a.start_time - b.start_time);
   }, [scenes]);
 
-  // Helper: map timeline time → source video time (handles reordering/trimming/speed)
+  // Helper: find active transition at a given timeline time
+  const findActiveTransition = useCallback((timelineTime: number) => {
+    for (let i = 0; i < sortedScenes.length - 1; i++) {
+      const scene = sortedScenes[i];
+      const t = transitions.find(tr => tr.sceneId === scene.id);
+      if (!t || t.transitionType === 'none') continue;
+      const tDuration = Math.max(0.6, t.duration || 0.8);
+      const half = tDuration / 2;
+      const boundary = scene.end_time;
+      if (timelineTime >= boundary - half && timelineTime < boundary + half) {
+        return {
+          outgoingScene: scene,
+          incomingScene: sortedScenes[i + 1],
+          boundary,
+          half,
+          tDuration,
+          progress: (timelineTime - (boundary - half)) / tDuration,
+        };
+      }
+    }
+    return null;
+  }, [sortedScenes, transitions]);
+
+  // Helper: map timeline time → source video time (transition-aware: stays on outgoing scene)
   const timelineToSourceTime = useCallback((timelineTime: number): number => {
     if (sortedScenes.length === 0) return timelineTime;
+    // During a transition, the base video must stay on the outgoing scene
+    const activeTrans = findActiveTransition(timelineTime);
+    if (activeTrans) {
+      return sourceTimeForScene(activeTrans.outgoingScene, Math.min(timelineTime, activeTrans.boundary));
+    }
     const scene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
     if (!scene) return timelineTime;
-    const sourceStart = scene.original_start_time ?? scene.start_time;
-    const playbackRate = (scene as any).playbackRate ?? 1;
-    return sourceStart + (timelineTime - scene.start_time) * playbackRate;
-  }, [sortedScenes]);
+    return sourceTimeForScene(scene, timelineTime);
+  }, [sortedScenes, findActiveTransition, sourceTimeForScene]);
 
 
   // ==================== VOICEOVER HELPERS ====================
