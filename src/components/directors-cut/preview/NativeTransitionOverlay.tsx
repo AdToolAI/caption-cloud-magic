@@ -133,15 +133,15 @@ export function NativeTransitionOverlay({
 
   // Next-frame overlay style
   const getNextFrameStyle = (): React.CSSProperties => {
-    if (!nextFrame) return { display: 'none' };
-
-    const bgBase: React.CSSProperties = {
-      backgroundImage: `url(${nextFrame})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat',
-      backgroundColor: '#000',
-    };
+    const bgBase: React.CSSProperties = nextFrame
+      ? {
+          backgroundImage: `url(${nextFrame})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundColor: '#000',
+        }
+      : { backgroundColor: '#000' };
 
     switch (baseType) {
       case 'crossfade':
