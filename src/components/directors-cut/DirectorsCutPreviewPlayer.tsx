@@ -7,6 +7,7 @@ import type { KenBurnsKeyframe } from './features/KenBurnsEffect';
 import { SubtitleTrack, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { cn } from '@/lib/utils';
 import { useTransitionRenderer } from './preview/useTransitionRenderer';
+import { useFrameCapture } from './preview/useFrameCapture';
 import { NativePreviewEffects } from './preview/NativePreviewEffects';
 
 const SUBTITLE_FONT_SIZES = {
