@@ -1,40 +1,38 @@
 
 
-## Besserer Ansatz: Saubere Übergänge in Schritt 2
+## Fix: Übergänge noch versetzt und zu kurz
 
-### Analyse des eigentlichen Problems
+### Analyse
 
-Das Kernproblem war nie die Dot-Position, sondern:
-1. **Zu kurze Standard-Transition-Dauer** (0.8s) — bei schnellen Schnitten reicht das nicht für flüssige Übergänge
-2. **Incoming-Video-Sync braucht Zeit** — der zweite Video-Decoder muss erst zur richtigen Stelle seekn, was ~100-200ms dauert
-3. **Zu abrupte Easing-Kurve** — die Power-Cosine-Kurve (⁰·⁷) springt zu schnell in die Mitte
+Das Transition-Fenster ist aktuell **exakt zentriert** auf der Szenengrenze: 50% davor, 50% danach. Das bedeutet bei 1.2s Dauer startet der Übergang schon **0.6s vor** dem eigentlichen Szenenwechsel — das fühlt sich "zu früh" an, besonders bei kurzen Szenen.
 
-### Lösung: 3 gezielte Änderungen (ohne neue UI)
+Außerdem: Wenn das Base-Video während der Transition an `boundary` geclampt wird (Zeile 345: `Math.min(timelineTime, boundary)`), friert es in der zweiten Hälfte ein — sichtbarer Stillstand.
 
-#### 1) Längere Standard-Transition + sanftere Kurve
-**`useTransitionRenderer.ts`** und **`DirectorsCutPreviewPlayer.tsx`**:
-- `TRANSITION_DURATION` von 0.8s auf **1.2s** erhöhen
-- `MIN_TRANSITION_DURATION` von 0.6s auf **0.8s** erhöhen
-- Easing von `Math.pow(cosine, 0.7)` auf `Math.pow(cosine, 1.0)` (reine Cosine-Ease) — sanfterer Übergang, weniger "Sprung" in der Mitte
+### Lösung: 2 gezielte Änderungen
 
-#### 2) Incoming-Video Pre-Sync — früher seekn
-**`DirectorsCutPreviewPlayer.tsx`** (Playback-rAF):
-- **200ms vor** dem Transition-Fenster das Incoming-Video bereits zur richtigen Stelle seekn und auf Pause lassen
-- Erst wenn die Transition tatsächlich startet, `.play()` aufrufen
-- So hat der Decoder Zeit, den Frame zu laden bevor er sichtbar wird
+#### 1) Transition-Fenster nach hinten verschieben (70/30 statt 50/50)
+Statt `[boundary - half, boundary + half]` das Fenster asymmetrisch setzen: nur 30% der Dauer VOR der Grenze, 70% danach.
 
-#### 3) AI-Vorschläge in Schritt 2 verbessern
-**`SceneEditingStep.tsx`** oder wo "Alle Vorschläge anwenden" die Transitions setzt:
-- Standard-Transition auf `crossfade` mit **1.2s** setzen (statt 0.8s)
-- Crossfade ist am fehlerverzeihendsten — kein harter Cut, kein Sync-Problem sichtbar
+```text
+Vorher: [boundary - 0.6, boundary + 0.6]  → Übergang startet "zu früh"
+Nachher: [boundary - 0.36, boundary + 0.84] → natürlicherer Beginn
+```
+
+So spielt die ausgehende Szene länger bevor der Übergang sichtbar wird.
+
+**Dateien:** `findActiveTransition` + `useTransitionRenderer` — beide nutzen `half` → ändern zu `leadIn = tDuration * 0.3` und `leadOut = tDuration * 0.7`
+
+#### 2) Base-Video während Transition NICHT einfrieren
+Zeile 345 clampt das Base-Video auf `boundary` — in der zweiten Hälfte der Transition friert das Bild ein. Stattdessen soll das Base-Video normal weiterlaufen bis zum Ende seines Szenen-Fensters:
+
+```typescript
+// Vorher:
+sourceTimeForScene(outgoingScene, Math.min(timelineTime, boundary))
+// Nachher:
+sourceTimeForScene(outgoingScene, Math.min(timelineTime, outgoingScene.end_time))
+```
 
 ### Dateien
-- `src/components/directors-cut/preview/useTransitionRenderer.ts` — Dauer + Easing
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — Dauer + Pre-Sync
-- `src/components/directors-cut/steps/SceneEditingStep.tsx` oder AI-Analyse-Step — Default-Werte
-
-### Ergebnis
-- Übergänge sind länger und sanfter → weniger sichtbare Sync-Probleme
-- Incoming-Video wird vorgeladen → kein schwarzer Blitz
-- Keine neue UI-Komplexität, rein technische Verbesserung
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `findActiveTransition` asymmetrisch + Base-Video nicht einfrieren
+- `src/components/directors-cut/preview/useTransitionRenderer.ts` — gleiche asymmetrische Fenster-Berechnung
 
