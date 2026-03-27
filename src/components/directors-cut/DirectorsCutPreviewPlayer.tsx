@@ -135,7 +135,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const scene = sortedScenes[i];
       const t = transitions.find(tr => tr.sceneId === scene.id);
       if (!t || t.transitionType === 'none') continue;
-      const tDuration = Math.max(0.6, t.duration || 0.8);
+      const tDuration = Math.max(0.8, t.duration || 1.2);
       const half = tDuration / 2;
       const boundary = t.anchorTime ?? scene.end_time;
       // Clamp start so transitions never overlap
@@ -371,6 +371,20 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           }
         }
       } else {
+        // PRE-SYNC: 200ms before next transition, pre-seek incoming video
+        if (incoming) {
+          const nextTrans = findActiveTransition(timelineTime + 0.2);
+          if (nextTrans && incoming.paused) {
+            const incomingSourceStart = nextTrans.incomingScene.original_start_time ?? nextTrans.incomingScene.start_time;
+            const expectedIncoming = timelineTime + 0.2 >= nextTrans.incomingScene.start_time
+              ? sourceTimeForScene(nextTrans.incomingScene, timelineTime + 0.2)
+              : incomingSourceStart;
+            if (Math.abs(incoming.currentTime - expectedIncoming) > 0.3) {
+              incoming.currentTime = expectedIncoming;
+            }
+          }
+        }
+
         // NOT in transition: normal scene sync
         const activeScene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
         if (activeScene) {

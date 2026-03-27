@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import type { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 
-const TRANSITION_DURATION = 0.8;
-const MIN_TRANSITION_DURATION = 0.6;
+const TRANSITION_DURATION = 1.2;
+const MIN_TRANSITION_DURATION = 0.8;
 
 /**
  * Zero-rerender transition renderer.
@@ -55,7 +55,7 @@ export function useTransitionRenderer(
 
         if (time >= tStart && time < tEnd) {
           const rawProgress = (time - tStart) / effectiveDuration;
-          const progress = Math.pow(0.5 - 0.5 * Math.cos(rawProgress * Math.PI), 0.7);
+          const progress = 0.5 - 0.5 * Math.cos(rawProgress * Math.PI);
           const parts = transition.transitionType.split('-');
           const baseType = parts[0].toLowerCase();
           const direction = parts[1] || 'left';
