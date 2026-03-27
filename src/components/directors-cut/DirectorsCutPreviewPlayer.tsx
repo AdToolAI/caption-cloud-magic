@@ -265,7 +265,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     }
   }, [audio.master_volume]);
 
-  // ==================== rAF PLAYBACK LOOP ====================
+  // ==================== rAF PLAYBACK LOOP (DECODER-LED) ====================
   useEffect(() => {
     if (!isPlaying) {
       if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
@@ -274,7 +274,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     let lastDisplayUpdate = 0;
     let lastParentUpdate = 0;
-    let lastRafTime = -1;
 
     const tick = () => {
       const video = videoRef.current;
@@ -282,21 +281,31 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
       const now = performance.now();
 
-      // Advance timeline time independently based on wall-clock delta
-      if (lastRafTime > 0) {
-        const delta = (now - lastRafTime) / 1000;
-        visualTimeRef.current = Math.min(visualTimeRef.current + delta, duration);
+      // DECODER-LED: derive timeline time from the actual video position
+      const sourceTime = video.currentTime;
+      const timelineTime = Math.min(sourceToTimelineTime(sourceTime), duration);
+      visualTimeRef.current = timelineTime;
+
+      // Sync native playbackRate to the active scene's rate
+      const activeScene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
+      if (activeScene) {
+        const sceneRate = (activeScene as any).playbackRate ?? 1;
+        if (Math.abs(video.playbackRate - sceneRate) > 0.01) {
+          video.playbackRate = sceneRate;
+        }
+
+        // When crossing into a new scene, jump decoder to correct source position
+        if (lastActiveSceneRef.current !== activeScene.id) {
+          const expectedSource = (activeScene.original_start_time ?? activeScene.start_time)
+            + (timelineTime - activeScene.start_time) * sceneRate;
+          if (Math.abs(sourceTime - expectedSource) > 0.15) {
+            video.currentTime = expectedSource;
+          }
+          lastActiveSceneRef.current = activeScene.id;
+        }
       }
-      lastRafTime = now;
 
-      const timelineTime = visualTimeRef.current;
-
-      // Map timeline → source and keep video synced
-      const expectedSourceTime = timelineToSourceTime(timelineTime);
-      if (Math.abs(video.currentTime - expectedSourceTime) > 0.1) {
-        video.currentTime = expectedSourceTime;
-      }
-
+      // Throttled UI updates
       if (now - lastDisplayUpdate > 250) {
         lastDisplayUpdate = now;
         setDisplayTime(timelineTime);
@@ -318,7 +327,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     rafIdRef.current = requestAnimationFrame(tick);
     return () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current); };
-  }, [isPlaying, duration, timelineToSourceTime]);
+  }, [isPlaying, duration, sourceToTimelineTime, sortedScenes]);
 
   // ==================== VIDEO EVENT HANDLERS ====================
   const handleVideoEnded = useCallback(() => {
