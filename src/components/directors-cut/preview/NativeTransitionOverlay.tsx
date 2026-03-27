@@ -186,12 +186,10 @@ export function NativeTransitionOverlay({
         style={getEffectStyle()}
       />
       {/* Incoming scene frame */}
-      {nextFrame && (
-        <div
-          className="absolute inset-0 pointer-events-none z-[6]"
-          style={getNextFrameStyle()}
-        />
-      )}
+      <div
+        className="absolute inset-0 pointer-events-none z-[6]"
+        style={getNextFrameStyle()}
+      />
     </>
   );
 }
