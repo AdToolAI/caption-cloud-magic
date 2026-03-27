@@ -6,7 +6,7 @@ import { GlobalEffects, AudioEnhancements, SceneEffects, SceneAnalysis, Transiti
 import type { KenBurnsKeyframe } from './features/KenBurnsEffect';
 import { SubtitleTrack, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { cn } from '@/lib/utils';
-import { NativeTransitionOverlay } from './preview/NativeTransitionOverlay';
+import { useTransitionInfo, getTransitionStyles } from './preview/NativeTransitionLayer';
 import { NativePreviewEffects } from './preview/NativePreviewEffects';
 
 const SUBTITLE_FONT_SIZES = {
@@ -87,6 +87,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   children,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const incomingVideoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const onTimeUpdateRef = useRef(onTimeUpdate);
 
@@ -130,24 +131,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     return sourceStart + (timelineTime - scene.start_time) * playbackRate;
   }, [sortedScenes]);
 
-  // Helper: map source video time → timeline time (decoder-led)
-  const sourceToTimelineTime = useCallback((sourceTime: number): number => {
-    if (sortedScenes.length === 0) return sourceTime;
-    // Find scene whose original source range contains sourceTime
-    for (const scene of sortedScenes) {
-      const sourceStart = scene.original_start_time ?? scene.start_time;
-      const playbackRate = (scene as any).playbackRate ?? 1;
-      const sourceEnd = (scene.original_end_time ?? scene.end_time);
-      if (sourceTime >= sourceStart - 0.05 && sourceTime < sourceEnd + 0.05) {
-        return scene.start_time + (sourceTime - sourceStart) / playbackRate;
-      }
-    }
-    // Fallback: return sourceTime as-is
-    return sourceTime;
-  }, [sortedScenes]);
-
-  // Track which scene is currently active for playbackRate sync
-  const lastActiveSceneRef = useRef<string | null>(null);
 
   // ==================== VOICEOVER HELPERS ====================
   const playVoiceover = useCallback(() => {
@@ -265,70 +248,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     }
   }, [audio.master_volume]);
 
-  // ==================== rAF PLAYBACK LOOP (DECODER-LED) ====================
-  useEffect(() => {
-    if (!isPlaying) {
-      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-      return;
-    }
-
-    let lastDisplayUpdate = 0;
-    let lastParentUpdate = 0;
-
-    const tick = () => {
-      const video = videoRef.current;
-      if (!video) { rafIdRef.current = requestAnimationFrame(tick); return; }
-
-      const now = performance.now();
-
-      // DECODER-LED: derive timeline time from the actual video position
-      const sourceTime = video.currentTime;
-      const timelineTime = Math.min(sourceToTimelineTime(sourceTime), duration);
-      visualTimeRef.current = timelineTime;
-
-      // Sync native playbackRate to the active scene's rate
-      const activeScene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
-      if (activeScene) {
-        const sceneRate = (activeScene as any).playbackRate ?? 1;
-        if (Math.abs(video.playbackRate - sceneRate) > 0.01) {
-          video.playbackRate = sceneRate;
-        }
-
-        // When crossing into a new scene, jump decoder to correct source position
-        if (lastActiveSceneRef.current !== activeScene.id) {
-          const expectedSource = (activeScene.original_start_time ?? activeScene.start_time)
-            + (timelineTime - activeScene.start_time) * sceneRate;
-          if (Math.abs(sourceTime - expectedSource) > 0.15) {
-            video.currentTime = expectedSource;
-          }
-          lastActiveSceneRef.current = activeScene.id;
-        }
-      }
-
-      // Throttled UI updates
-      if (now - lastDisplayUpdate > 250) {
-        lastDisplayUpdate = now;
-        setDisplayTime(timelineTime);
-      }
-      if (now - lastParentUpdate > 250) {
-        lastParentUpdate = now;
-        onTimeUpdateRef.current?.(timelineTime);
-      }
-
-      // Drift correction for source audio
-      if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
-        if (Math.abs(sourceAudioRef.current.currentTime - timelineTime) > 0.5) {
-          sourceAudioRef.current.currentTime = timelineTime;
-        }
-      }
-
-      rafIdRef.current = requestAnimationFrame(tick);
-    };
-
-    rafIdRef.current = requestAnimationFrame(tick);
-    return () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current); };
-  }, [isPlaying, duration, sourceToTimelineTime, sortedScenes]);
-
   // ==================== VIDEO EVENT HANDLERS ====================
   const handleVideoEnded = useCallback(() => {
     setIsPlaying(false);
@@ -346,6 +265,108 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
     onPlayingChange?.(false);
   }, [onPlayingChange]);
+
+  // ==================== TRANSITION HOOK ====================
+  const transitionInfo = useTransitionInfo(visualTimeRef, sortedScenes, transitions);
+  const transitionStyles = getTransitionStyles(transitionInfo);
+
+  // Helper: compute source time for a specific scene at a given timeline time
+  const sourceTimeForScene = useCallback((scene: SceneAnalysis, timelineTime: number): number => {
+    const sourceStart = scene.original_start_time ?? scene.start_time;
+    const playbackRate = (scene as any).playbackRate ?? 1;
+    return sourceStart + (timelineTime - scene.start_time) * playbackRate;
+  }, []);
+
+  // ==================== rAF PLAYBACK LOOP (TIMELINE-LED) ====================
+  useEffect(() => {
+    if (!isPlaying) {
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      return;
+    }
+
+    let lastTimestamp: number | null = null;
+    let lastDisplayUpdate = 0;
+    let lastParentUpdate = 0;
+
+    const tick = (timestamp: number) => {
+      const video = videoRef.current;
+      if (!video) { rafIdRef.current = requestAnimationFrame(tick); return; }
+
+      // Timeline-led: advance timeline time by wall-clock delta
+      if (lastTimestamp !== null) {
+        const delta = (timestamp - lastTimestamp) / 1000;
+        visualTimeRef.current = Math.min(visualTimeRef.current + delta, duration);
+      }
+      lastTimestamp = timestamp;
+
+      const timelineTime = visualTimeRef.current;
+
+      // Find active scene and sync base video
+      const activeScene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
+      if (activeScene) {
+        const expectedSource = sourceTimeForScene(activeScene, timelineTime);
+        if (Math.abs(video.currentTime - expectedSource) > 0.15) {
+          video.currentTime = expectedSource;
+        }
+        const sceneRate = (activeScene as any).playbackRate ?? 1;
+        if (Math.abs(video.playbackRate - sceneRate) > 0.01) {
+          video.playbackRate = sceneRate;
+        }
+      }
+
+      // Sync incoming video during active transition
+      const incoming = incomingVideoRef.current;
+      if (incoming && transitionInfo) {
+        const nextScene = sortedScenes[transitionInfo.sceneIndex + 1];
+        if (nextScene) {
+          const expectedIncoming = sourceTimeForScene(nextScene, timelineTime);
+          if (Math.abs(incoming.currentTime - expectedIncoming) > 0.15) {
+            incoming.currentTime = expectedIncoming;
+          }
+          if (incoming.paused) {
+            incoming.play().catch(() => {});
+          }
+          const nextRate = (nextScene as any).playbackRate ?? 1;
+          if (Math.abs(incoming.playbackRate - nextRate) > 0.01) {
+            incoming.playbackRate = nextRate;
+          }
+        }
+      } else if (incoming && !incoming.paused) {
+        incoming.pause();
+      }
+
+      // Throttled UI updates
+      const now = performance.now();
+      if (now - lastDisplayUpdate > 250) {
+        lastDisplayUpdate = now;
+        setDisplayTime(timelineTime);
+      }
+      if (now - lastParentUpdate > 250) {
+        lastParentUpdate = now;
+        onTimeUpdateRef.current?.(timelineTime);
+      }
+
+      // Drift correction for source audio
+      if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
+        if (Math.abs(sourceAudioRef.current.currentTime - timelineTime) > 0.5) {
+          sourceAudioRef.current.currentTime = timelineTime;
+        }
+      }
+
+      // Check end of timeline
+      if (timelineTime >= duration - 0.05) {
+        handleVideoEnded();
+        return;
+      }
+
+      rafIdRef.current = requestAnimationFrame(tick);
+    };
+
+    rafIdRef.current = requestAnimationFrame(tick);
+    return () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current); };
+  }, [isPlaying, duration, sortedScenes, sourceTimeForScene, transitionInfo, handleVideoEnded]);
+
+  // ==================== VIDEO EVENT HANDLERS ====================
 
   // ==================== EXTERNAL isPlaying SYNC ====================
   useEffect(() => {
@@ -547,24 +568,31 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     >
       {/* Video Player */}
       <div className={`relative bg-black rounded-lg overflow-hidden ${fillContainer ? 'flex-1 min-h-0' : 'aspect-video'}`}>
+        {/* Base (outgoing) video */}
         <video
           ref={videoRef}
           src={videoUrl}
-          className="w-full h-full object-contain"
-          style={{ filter: videoFilter }}
+          className="absolute inset-0 w-full h-full object-contain"
+          style={{ filter: videoFilter, ...transitionStyles.baseStyle, zIndex: 1 }}
           muted
           playsInline
           preload="auto"
           onEnded={handleVideoEnded}
         />
 
-        {/* Lightweight transition overlay */}
-        <NativeTransitionOverlay
-          currentTime={displayTime}
-          visualTimeRef={visualTimeRef}
-          scenes={sortedScenes}
-          transitions={transitions}
-          videoUrl={videoUrl}
+        {/* Incoming (next scene) video — only visible during transitions */}
+        <video
+          ref={incomingVideoRef}
+          src={videoUrl}
+          className="absolute inset-0 w-full h-full object-contain"
+          style={{
+            filter: videoFilter,
+            ...transitionStyles.incomingStyle,
+            zIndex: 2,
+          }}
+          muted
+          playsInline
+          preload="auto"
         />
 
         {/* Lightweight effect overlays (color grading, vignette, etc.) */}
