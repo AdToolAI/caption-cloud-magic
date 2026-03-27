@@ -1,13 +1,30 @@
 
 
-## Sidebar sticky machen beim Scrollen
+## Prompt-Text beim Seitenwechsel beibehalten
 
 ### Problem
-Die Sidebar nutzt `collapsible="none"`, was in der Shadcn-Sidebar-Komponente einen einfachen `div` ohne `fixed`/`sticky` Positionierung rendert. Daher scrollt die Sidebar mit dem Content weg, statt wie der Header fixiert zu bleiben.
+`prompt` wird mit `useState('')` initialisiert. Bei Navigation zu einer anderen Seite wird die Komponente unmounted und der State geht verloren.
 
 ### Lösung
-Eine Zeile in `AppSidebar.tsx` ändern: Der `<Sidebar>`-Komponente die Klasse `sticky top-0 h-screen` hinzufügen. Damit bleibt die Sidebar beim Scrollen fixiert, genau wie der Header.
+Den `prompt`-State über `sessionStorage` persistieren — analog zum Draft-System des Universal Creators, aber einfacher:
 
-### Datei
-- `src/components/AppSidebar.tsx` — Zeile 39: `className` um `sticky top-0 h-screen` erweitern
+**Datei: `src/pages/AIVideoStudio.tsx`**
+
+1. Initial-State aus `sessionStorage` laden:
+```tsx
+const [prompt, setPrompt] = useState(() => 
+  sessionStorage.getItem('ai-video-prompt') || ''
+);
+```
+
+2. Bei Änderung in `sessionStorage` schreiben (via `useEffect`):
+```tsx
+useEffect(() => {
+  sessionStorage.setItem('ai-video-prompt', prompt);
+}, [prompt]);
+```
+
+3. Nach erfolgreicher Generierung den gespeicherten Prompt löschen.
+
+Dasselbe auch für `model`, `duration`, `aspectRatio` und `resolution` anwenden, damit alle Einstellungen erhalten bleiben.
 
