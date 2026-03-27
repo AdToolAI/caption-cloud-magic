@@ -149,7 +149,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           outgoingScene: scene,
           incomingScene: sortedScenes[i + 1],
           boundary,
-          half,
+          leadIn,
           tDuration: effectiveDuration,
           progress: (timelineTime - tStart) / effectiveDuration,
         };
