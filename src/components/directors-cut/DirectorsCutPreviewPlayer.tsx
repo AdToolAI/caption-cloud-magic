@@ -136,11 +136,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const t = transitions.find(tr => tr.sceneId === scene.id);
       if (!t || t.transitionType === 'none') continue;
       const tDuration = Math.max(0.8, t.duration || 1.2);
-      const half = tDuration / 2;
+      const leadIn = tDuration * 0.3;
+      const leadOut = tDuration * 0.7;
       const boundary = t.anchorTime ?? scene.end_time;
       // Clamp start so transitions never overlap
-      const tStart = Math.max(boundary - half, prevEnd);
-      const tEnd = boundary + half;
+      const tStart = Math.max(boundary - leadIn, prevEnd);
+      const tEnd = boundary + leadOut;
       const effectiveDuration = tEnd - tStart;
       prevEnd = tEnd;
       if (timelineTime >= tStart && timelineTime < tEnd) {
@@ -148,7 +149,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           outgoingScene: scene,
           incomingScene: sortedScenes[i + 1],
           boundary,
-          half,
+          leadIn,
           tDuration: effectiveDuration,
           progress: (timelineTime - tStart) / effectiveDuration,
         };
@@ -162,7 +163,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (sortedScenes.length === 0) return timelineTime;
     const activeTrans = findActiveTransition(timelineTime);
     if (activeTrans) {
-      return sourceTimeForScene(activeTrans.outgoingScene, Math.min(timelineTime, activeTrans.boundary));
+      return sourceTimeForScene(activeTrans.outgoingScene, Math.min(timelineTime, activeTrans.outgoingScene.end_time));
     }
     const scene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
     if (!scene) return timelineTime;
@@ -342,7 +343,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         const { outgoingScene, incomingScene, boundary, progress, tDuration } = activeTrans;
 
         // Base video: keep on outgoing scene (clamp time to not exceed boundary)
-        const outgoingTime = sourceTimeForScene(outgoingScene, Math.min(timelineTime, boundary));
+        const outgoingTime = sourceTimeForScene(outgoingScene, Math.min(timelineTime, outgoingScene.end_time));
         if (Math.abs(video.currentTime - outgoingTime) > 0.15) {
           video.currentTime = outgoingTime;
         }
