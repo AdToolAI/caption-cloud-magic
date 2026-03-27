@@ -255,28 +255,42 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     let lastDisplayUpdate = 0;
     let lastParentUpdate = 0;
+    let lastRafTime = -1;
 
     const tick = () => {
       const video = videoRef.current;
       if (!video) { rafIdRef.current = requestAnimationFrame(tick); return; }
 
-      const time = video.currentTime;
-      visualTimeRef.current = time;
-
       const now = performance.now();
+
+      // Advance timeline time independently based on wall-clock delta
+      if (lastRafTime > 0) {
+        const delta = (now - lastRafTime) / 1000;
+        visualTimeRef.current = Math.min(visualTimeRef.current + delta, duration);
+      }
+      lastRafTime = now;
+
+      const timelineTime = visualTimeRef.current;
+
+      // Map timeline → source and keep video synced
+      const expectedSourceTime = timelineToSourceTime(timelineTime);
+      if (Math.abs(video.currentTime - expectedSourceTime) > 0.1) {
+        video.currentTime = expectedSourceTime;
+      }
+
       if (now - lastDisplayUpdate > 250) {
         lastDisplayUpdate = now;
-        setDisplayTime(time);
+        setDisplayTime(timelineTime);
       }
       if (now - lastParentUpdate > 250) {
         lastParentUpdate = now;
-        onTimeUpdateRef.current?.(time);
+        onTimeUpdateRef.current?.(timelineTime);
       }
 
-      // Drift correction for source audio (not voiceover)
+      // Drift correction for source audio
       if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
-        if (Math.abs(sourceAudioRef.current.currentTime - time) > 0.5) {
-          sourceAudioRef.current.currentTime = time;
+        if (Math.abs(sourceAudioRef.current.currentTime - timelineTime) > 0.5) {
+          sourceAudioRef.current.currentTime = timelineTime;
         }
       }
 
@@ -285,7 +299,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     rafIdRef.current = requestAnimationFrame(tick);
     return () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current); };
-  }, [isPlaying]);
+  }, [isPlaying, duration, timelineToSourceTime]);
 
   // ==================== VIDEO EVENT HANDLERS ====================
   const handleVideoEnded = useCallback(() => {
