@@ -80,7 +80,7 @@ export function useTransitionRenderer(
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [scenes, transitions, visualTimeRef, baseVideoRef, incomingVideoRef]);
+  }, [scenes, transitions, visualTimeRef, baseVideoRef, incomingVideoRef, videoFilterRef]);
 }
 
 function clearStyles(el: HTMLElement) {
