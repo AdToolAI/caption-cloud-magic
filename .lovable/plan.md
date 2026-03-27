@@ -1,39 +1,31 @@
 
 
-## Fix: Filter im Preview Player nicht sichtbar
+## Fix: Letzte 2 Übergänge ~0.2s zu früh / "verschmelzen"
 
-### Problem
-Der `useTransitionRenderer` Hook schreibt direkt auf `element.style.filter = ''` — sowohl beim Zurücksetzen nach Transitions (`clearStyles`) als auch bei allen nicht-Blur-Transitions (`base.style.filter = ''`). Das **überschreibt** den von React gesetzten `filter`-Wert (der die visuellen Filter wie cinematic, vintage etc. enthält).
+### Ursache
 
-Da der rAF-Loop permanent läuft, wird `style.filter` ständig auf `''` gesetzt, selbst wenn keine Transition aktiv ist.
+Die Transition-Fenster sind **zentriert** um die Szenengrenze: `[boundary - half, boundary + half]`. Wenn zwei aufeinanderfolgende Szenen kurz sind, **überlappen** sich die Fenster:
 
-### Lösung
-Den `useTransitionRenderer` so ändern, dass er **niemals** `style.filter` direkt setzt, außer beim Blur-Transition-Typ. Stattdessen einen separaten CSS-Ansatz für Blur verwenden oder den React-Filter als Basis beibehalten.
+```text
+Szene 1 endet bei 5.0s → Transition 1: [4.6, 5.4]
+Szene 2 endet bei 6.0s → Transition 2: [5.6, 6.4]
+                                          ↑ Gap nur 0.2s
 
-**Konkret in `useTransitionRenderer.ts`:**
-
-1. **`clearStyles`**: `el.style.filter = ''` entfernen — Filter wird von React verwaltet
-2. **`applyStyles`**: Alle `base.style.filter = ''` und `incoming.style.filter = ''` Zeilen entfernen
-3. **Blur-Transition**: Statt `style.filter` direkt zu setzen, den Blur-Effekt über ein separates Wrapper-Element oder über eine CSS-Variable steuern, die den bestehenden Filter nicht überschreibt. Einfachste Lösung: Blur als zusätzlichen Filter **anhängen** statt zu ersetzen — dafür den aktuellen `filter`-Wert des Elements auslesen oder den Blur über ein eigenes Overlay-Div anwenden.
-
-**Einfachster Ansatz**: Den `baseFilter` als Parameter an den Hook übergeben und bei Blur diesen als Prefix verwenden:
-
-```typescript
-// clearStyles: filter nicht anfassen
-function clearStyles(el: HTMLElement) {
-  el.style.opacity = '';
-  el.style.transform = '';
-  el.style.clipPath = '';
-  // NICHT: el.style.filter = '';
-}
-
-// Blur-Transition: baseFilter beibehalten
-case 'blur':
-  base.style.filter = `${baseFilter || ''} blur(${progress * 8}px)`.trim();
-  incoming.style.filter = `${baseFilter || ''} blur(${(1 - progress) * 8}px)`.trim();
+Bei noch kürzeren Szenen oder längerer Duration → Überlappung!
 ```
 
+Da beide Loops (`findActiveTransition` und `useTransitionRenderer`) mit `break` beim ersten Treffer aufhören, "gewinnt" immer die erste Transition — aber die zweite startet zu früh nach Ende der ersten, weil das Base-Video kaum Zeit hat, sich auf die neue Szene zu synchronisieren.
+
+### Lösung: Transition-Fenster clampen, damit sie sich nie überlappen
+
+**Beide Stellen** (Player + Renderer) müssen die gleiche Clamp-Logik verwenden:
+
+1. **`findActiveTransition`** (Zeile 132-152): Vor dem Window-Check prüfen, ob das vorherige Transition-Fenster noch aktiv wäre — wenn ja, das aktuelle `tStart` auf `prevEnd` verschieben
+2. **`useTransitionRenderer`** (Zeile 41-62): Gleiche Clamp-Logik anwenden
+
+Konkret: Für jede Transition das effektive `tStart` als `max(boundary - half, prevBoundary + prevHalf)` berechnen. So wird die Transition verkürzt statt überlappt.
+
 ### Dateien
-- `src/components/directors-cut/preview/useTransitionRenderer.ts` — filter-Handling korrigieren
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `videoFilter` als Ref an den Hook übergeben
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `findActiveTransition` mit Overlap-Clamping
+- `src/components/directors-cut/preview/useTransitionRenderer.ts` — gleiche Clamp-Logik im rAF-Loop
 
