@@ -6,32 +6,35 @@ const MIN_TRANSITION_DURATION = 0.8;
 
 /**
  * Zero-rerender transition renderer.
- * Writes opacity/transform/clipPath directly to video DOM elements via rAF.
- * No setState, no React re-renders during transitions.
+ * Uses a <canvas> element with pre-captured ImageBitmaps for the incoming scene.
+ * Writes opacity/transform/clipPath directly to DOM elements via rAF.
+ * No setState, no React re-renders, no second video decoder.
  */
 export function useTransitionRenderer(
   baseVideoRef: React.RefObject<HTMLVideoElement | null>,
-  incomingVideoRef: React.RefObject<HTMLVideoElement | null>,
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
   visualTimeRef: React.RefObject<number>,
   scenes: SceneAnalysis[],
   transitions: TransitionAssignment[],
   videoFilterRef: React.RefObject<string>,
+  frameCacheRef: React.RefObject<Map<string, ImageBitmap>>,
 ) {
   const rafRef = useRef<number>();
   const wasActiveRef = useRef(false);
+  const lastDrawnSceneRef = useRef<string>('');
 
   useEffect(() => {
     if (scenes.length < 2 || transitions.length === 0) {
-      const incoming = incomingVideoRef.current;
-      if (incoming) incoming.style.display = 'none';
+      const canvas = canvasRef.current;
+      if (canvas) canvas.style.display = 'none';
       return;
     }
 
     const tick = () => {
       const time = visualTimeRef.current ?? 0;
       const base = baseVideoRef.current;
-      const incoming = incomingVideoRef.current;
-      if (!base || !incoming) {
+      const canvas = canvasRef.current;
+      if (!base || !canvas) {
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
@@ -48,7 +51,6 @@ export function useTransitionRenderer(
         const leadIn = tDuration * 0.3;
         const leadOut = tDuration * 0.7;
         const boundary = transition.anchorTime ?? scene.end_time;
-        // Clamp start so transitions never overlap
         const tStart = Math.max(boundary - leadIn, prevEnd);
         const tEnd = boundary + leadOut;
         const effectiveDuration = tEnd - tStart;
@@ -58,17 +60,29 @@ export function useTransitionRenderer(
           const rawProgress = (time - tStart) / effectiveDuration;
           const progress = 0.5 - 0.5 * Math.cos(rawProgress * Math.PI);
           const parts = transition.transitionType.split('-');
-          let baseType = parts[0].toLowerCase();
+          const baseType = parts[0].toLowerCase();
           const direction = parts[1] || 'left';
 
-          // For motion transitions (slide/push/wipe), check if incoming video is ready.
-          // If not decoded yet, fall back to crossfade to avoid visible glitches.
-          const isMotionTransition = baseType === 'slide' || baseType === 'push' || baseType === 'wipe';
-          if (isMotionTransition && incoming.readyState < 3) {
-            baseType = 'crossfade'; // fallback until decoder is ready
+          // Draw incoming scene frame onto canvas (if not already drawn)
+          const nextScene = scenes[i + 1];
+          const frameCache = frameCacheRef.current;
+          if (nextScene && frameCache) {
+            const bitmap = frameCache.get(nextScene.id);
+            if (bitmap && lastDrawnSceneRef.current !== nextScene.id) {
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                // Match canvas size to its display size for crisp rendering
+                if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+                  canvas.width = canvas.clientWidth || 1280;
+                  canvas.height = canvas.clientHeight || 720;
+                }
+                ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                lastDrawnSceneRef.current = nextScene.id;
+              }
+            }
           }
 
-          applyStyles(base, incoming, progress, baseType, direction, videoFilterRef.current ?? '');
+          applyStyles(base, canvas, progress, baseType, direction, videoFilterRef.current ?? '');
           found = true;
           wasActiveRef.current = true;
           break;
@@ -77,11 +91,11 @@ export function useTransitionRenderer(
 
       if (!found && wasActiveRef.current) {
         clearStyles(base);
-        incoming.style.display = 'none';
-        incoming.style.opacity = '';
-        incoming.style.transform = '';
-        incoming.style.clipPath = '';
-        // Do NOT clear filter — managed by React
+        canvas.style.display = 'none';
+        canvas.style.opacity = '';
+        canvas.style.transform = '';
+        canvas.style.clipPath = '';
+        lastDrawnSceneRef.current = '';
         wasActiveRef.current = false;
       }
 
@@ -92,7 +106,7 @@ export function useTransitionRenderer(
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [scenes, transitions, visualTimeRef, baseVideoRef, incomingVideoRef, videoFilterRef]);
+  }, [scenes, transitions, visualTimeRef, baseVideoRef, canvasRef, videoFilterRef, frameCacheRef]);
 }
 
 function clearStyles(el: HTMLElement) {
@@ -140,7 +154,7 @@ function applyStyles(
     case 'blur':
       base.style.filter = `${baseFilter} blur(${progress * 8}px)`.trim();
       base.style.opacity = String(1 - progress);
-      incoming.style.filter = `${baseFilter} blur(${(1 - progress) * 8}px)`.trim();
+      incoming.style.filter = `blur(${(1 - progress) * 8}px)`;
       incoming.style.opacity = String(progress);
       base.style.transform = '';
       base.style.clipPath = '';

@@ -7,6 +7,7 @@ import type { KenBurnsKeyframe } from './features/KenBurnsEffect';
 import { SubtitleTrack, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { cn } from '@/lib/utils';
 import { useTransitionRenderer } from './preview/useTransitionRenderer';
+import { useFrameCapture } from './preview/useFrameCapture';
 import { NativePreviewEffects } from './preview/NativePreviewEffects';
 
 const SUBTITLE_FONT_SIZES = {
@@ -87,7 +88,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   children,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const incomingVideoRef = useRef<HTMLVideoElement>(null);
+  const transitionCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const onTimeUpdateRef = useRef(onTimeUpdate);
 
@@ -305,9 +306,13 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     onPlayingChange?.(false);
   }, [onPlayingChange]);
 
-  // ==================== TRANSITION RENDERER (zero re-renders) ====================
+  // ==================== FRAME CAPTURE & TRANSITION RENDERER ====================
+  const frameCache = useFrameCapture(videoUrl, sortedScenes);
+  const frameCacheRef = useRef(frameCache);
+  useEffect(() => { frameCacheRef.current = frameCache; }, [frameCache]);
+
   const videoFilterRef = useRef('');
-  useTransitionRenderer(videoRef, incomingVideoRef, visualTimeRef, sortedScenes, transitions, videoFilterRef);
+  useTransitionRenderer(videoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef);
 
 
   // ==================== rAF PLAYBACK LOOP (TIMELINE-LED) ====================
@@ -336,13 +341,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
       // Check if we're in a transition window
       const activeTrans = findActiveTransition(timelineTime);
-      const incoming = incomingVideoRef.current;
 
       if (activeTrans) {
-        // DURING TRANSITION: base video stays on OUTGOING scene, incoming shows NEXT scene
-        const { outgoingScene, incomingScene, boundary, progress, tDuration } = activeTrans;
+        // DURING TRANSITION: base video stays on OUTGOING scene
+        const { outgoingScene } = activeTrans;
 
-        // Base video: keep on outgoing scene (clamp time to not exceed boundary)
         const outgoingTime = sourceTimeForScene(outgoingScene, Math.min(timelineTime, outgoingScene.end_time));
         if (Math.abs(video.currentTime - outgoingTime) > 0.15) {
           video.currentTime = outgoingTime;
@@ -351,42 +354,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         if (Math.abs(video.playbackRate - outRate) > 0.01) {
           video.playbackRate = outRate;
         }
-
-        // Incoming video: use sourceTimeForScene for seamless handoff to base video
-        if (incoming) {
-          const incomingSourceStart = incomingScene.original_start_time ?? incomingScene.start_time;
-          const inRate = (incomingScene as any).playbackRate ?? 1;
-          // Use sourceTimeForScene when timeline is past incoming scene start,
-          // otherwise clamp to source start to avoid negative offsets
-          const expectedIncoming = timelineTime >= incomingScene.start_time
-            ? sourceTimeForScene(incomingScene, timelineTime)
-            : incomingSourceStart;
-          if (Math.abs(incoming.currentTime - expectedIncoming) > 0.15) {
-            incoming.currentTime = expectedIncoming;
-          }
-          if (incoming.paused) {
-            incoming.play().catch(() => {});
-          }
-          if (Math.abs(incoming.playbackRate - inRate) > 0.01) {
-            incoming.playbackRate = inRate;
-          }
-        }
+        // Canvas-based incoming frame is handled by useTransitionRenderer — no sync needed
       } else {
-        // PRE-SYNC: 500ms before next transition, pre-seek incoming video
-        // Increased from 200ms to give the decoder more time to find and decode the target keyframe
-        if (incoming) {
-          const nextTrans = findActiveTransition(timelineTime + 0.5);
-          if (nextTrans && incoming.paused) {
-            const incomingSourceStart = nextTrans.incomingScene.original_start_time ?? nextTrans.incomingScene.start_time;
-            const expectedIncoming = timelineTime + 0.5 >= nextTrans.incomingScene.start_time
-              ? sourceTimeForScene(nextTrans.incomingScene, timelineTime + 0.5)
-              : incomingSourceStart;
-            if (Math.abs(incoming.currentTime - expectedIncoming) > 0.3) {
-              incoming.currentTime = expectedIncoming;
-            }
-          }
-        }
-
         // NOT in transition: normal scene sync
         const activeScene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
         if (activeScene) {
@@ -398,11 +367,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           if (Math.abs(video.playbackRate - sceneRate) > 0.01) {
             video.playbackRate = sceneRate;
           }
-        }
-
-        // Pause incoming video when not in transition
-        if (incoming && !incoming.paused) {
-          incoming.pause();
         }
       }
 
@@ -555,16 +519,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     setDisplayTime(newTime);
     onTimeUpdateRef.current?.(newTime);
 
-    // Sync incoming video if seeking into a transition window
-    const incoming = incomingVideoRef.current;
-    const activeTrans = findActiveTransition(newTime);
-    if (incoming && activeTrans) {
-      const incomingSourceStart = activeTrans.incomingScene.original_start_time ?? activeTrans.incomingScene.start_time;
-      // Use sourceTimeForScene for consistent position with base video handoff
-      incoming.currentTime = newTime >= activeTrans.incomingScene.start_time
-        ? sourceTimeForScene(activeTrans.incomingScene, newTime)
-        : incomingSourceStart;
-    }
+    // No incoming video sync needed — canvas snapshots handle transitions
 
     if (sourceAudioRef.current) sourceAudioRef.current.currentTime = newTime;
     if (voiceoverAudioRef.current) {
@@ -665,15 +620,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           onEnded={handleVideoEnded}
         />
 
-        {/* Incoming (next scene) video — only visible during transitions */}
-        <video
-          ref={incomingVideoRef}
-          src={videoUrl}
+        {/* Transition canvas — shows pre-captured incoming scene frame */}
+        <canvas
+          ref={transitionCanvasRef}
           className="absolute inset-0 w-full h-full object-contain"
-          style={{ filter: videoFilter, zIndex: 2, display: 'none' }}
-          muted
-          playsInline
-          preload="auto"
+          style={{ zIndex: 2, display: 'none' }}
         />
 
         {/* Lightweight effect overlays (color grading, vignette, etc.) */}
