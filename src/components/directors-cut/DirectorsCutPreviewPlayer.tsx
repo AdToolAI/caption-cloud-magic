@@ -345,13 +345,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           video.playbackRate = outRate;
         }
 
-        // Incoming video: show start of next scene + progress-based offset
+        // Incoming video: use sourceTimeForScene for seamless handoff to base video
         if (incoming) {
           const incomingSourceStart = incomingScene.original_start_time ?? incomingScene.start_time;
           const inRate = (incomingScene as any).playbackRate ?? 1;
-          // Map progress to a small offset into the incoming scene
-          const incomingOffset = progress * tDuration * inRate;
-          const expectedIncoming = incomingSourceStart + incomingOffset;
+          // Use sourceTimeForScene when timeline is past incoming scene start,
+          // otherwise clamp to source start to avoid negative offsets
+          const expectedIncoming = timelineTime >= incomingScene.start_time
+            ? sourceTimeForScene(incomingScene, timelineTime)
+            : incomingSourceStart;
           if (Math.abs(incoming.currentTime - expectedIncoming) > 0.15) {
             incoming.currentTime = expectedIncoming;
           }
