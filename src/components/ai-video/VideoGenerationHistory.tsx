@@ -38,7 +38,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [savingVideo, setSavingVideo] = useState<string | null>(null);
+  
   const { toast } = useToast();
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
 
