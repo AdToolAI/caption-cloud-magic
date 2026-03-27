@@ -3,31 +3,39 @@ import type { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut'
 
 interface NativeTransitionOverlayProps {
   currentTime: number;
+  visualTimeRef?: React.RefObject<number>;
   scenes: SceneAnalysis[];
   transitions: TransitionAssignment[];
   videoUrl?: string;
 }
 
+const TRANSITION_DURATION = 0.8;
+const MIN_TRANSITION_DURATION = 0.6;
+
 /**
- * Enhanced CSS transition overlay for native <video> preview.
- * Captures the next scene's first frame and cross-fades / wipes it
+ * Lightweight CSS transition overlay for native <video> preview.
+ * Pre-captures the first frame of each scene and cross-fades / wipes it
  * over the current video during transition boundaries.
+ * 
+ * NO backdropFilter — only filter/opacity/clipPath/transform.
  */
 export function NativeTransitionOverlay({
   currentTime,
+  visualTimeRef,
   scenes,
   transitions,
   videoUrl,
 }: NativeTransitionOverlayProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [nextFrameCache, setNextFrameCache] = useState<Record<number, string>>({});
-  const capturedRef = useRef<Set<number>>(new Set());
+  const [nextFrameCache, setNextFrameCache] = useState<Record<string, string>>({});
+  const capturedRef = useRef<Set<string>>(new Set());
+
+  // Use visualTimeRef for smoother animation when available
+  const time = visualTimeRef?.current ?? currentTime;
 
   // Pre-capture the first frame of each scene (except the first)
   useEffect(() => {
     if (!videoUrl || scenes.length < 2) return;
     const video = document.createElement('video');
-    video.crossOrigin = 'anonymous';
     video.preload = 'auto';
     video.muted = true;
     video.src = videoUrl;
@@ -39,20 +47,21 @@ export function NativeTransitionOverlay({
       });
 
       const canvas = document.createElement('canvas');
-      canvas.width = 320;
-      canvas.height = 180;
+      canvas.width = 640;
+      canvas.height = 360;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const frames: Record<number, string> = {};
+      const frames: Record<string, string> = {};
       for (let i = 1; i < scenes.length; i++) {
-        if (capturedRef.current.has(i)) continue;
+        const sceneId = scenes[i].id;
+        if (capturedRef.current.has(sceneId)) continue;
         try {
           video.currentTime = scenes[i].start_time + 0.05;
           await new Promise<void>((r) => { video.onseeked = () => r(); });
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          frames[i] = canvas.toDataURL('image/jpeg', 0.5);
-          capturedRef.current.add(i);
+          frames[sceneId] = canvas.toDataURL('image/jpeg', 0.6);
+          capturedRef.current.add(sceneId);
         } catch { /* skip */ }
       }
       if (Object.keys(frames).length > 0) {
@@ -72,81 +81,72 @@ export function NativeTransitionOverlay({
       const transition = transitions.find(t => t.sceneId === scene.id);
       if (!transition || transition.transitionType === 'none') continue;
 
-      const transitionDuration = transition.duration || 0.5;
+      const transitionDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
       const transitionStart = scene.end_time - transitionDuration;
 
-      if (currentTime >= transitionStart && currentTime < scene.end_time) {
-        const progress = (currentTime - transitionStart) / transitionDuration;
+      if (time >= transitionStart && time < scene.end_time) {
+        const rawProgress = (time - transitionStart) / transitionDuration;
+        // Power-based easing for more visible effect
+        const progress = Math.pow(0.5 - 0.5 * Math.cos(rawProgress * Math.PI), 0.7);
         const baseType = transition.transitionType.split('-')[0].toLowerCase();
-        const nextSceneIdx = i + 1;
-        return { progress, baseType, nextSceneIdx, transition };
+        const nextScene = scenes[i + 1];
+        return { progress, rawProgress, baseType, nextSceneId: nextScene.id, transition };
       }
     }
     return null;
-  }, [currentTime, scenes, transitions]);
+  }, [time, scenes, transitions]);
 
   if (!overlayInfo) return null;
 
-  const { progress, baseType, nextSceneIdx } = overlayInfo;
-  const nextFrame = nextFrameCache[nextSceneIdx];
+  const { progress, baseType, nextSceneId } = overlayInfo;
+  const nextFrame = nextFrameCache[nextSceneId];
 
-  // Overlay style for the darkening/blur effect
+  // Effect overlay (darken during transition — no blur)
   const getEffectStyle = (): React.CSSProperties => {
     switch (baseType) {
       case 'crossfade':
       case 'dissolve':
-        return { backgroundColor: `rgba(0,0,0,${progress * 0.15})` };
+        return { backgroundColor: `rgba(0,0,0,${progress * 0.1})` };
       case 'fade':
-        return { backgroundColor: `rgba(0,0,0,${progress * 0.6})` };
+        return { backgroundColor: `rgba(0,0,0,${progress * 0.5})` };
       case 'blur':
-        return { backdropFilter: `blur(${progress * 6}px)` };
+        return {}; // blur applied via filter on overlay, not backdrop
       case 'zoom':
-        return { backgroundColor: `rgba(0,0,0,${progress * 0.2})` };
+        return { backgroundColor: `rgba(0,0,0,${progress * 0.15})` };
       default:
         return {};
     }
   };
 
-  // Next-frame overlay for real cross-fade
+  // Next-frame overlay style
   const getNextFrameStyle = (): React.CSSProperties => {
     if (!nextFrame) return { display: 'none' };
+
+    const bgBase: React.CSSProperties = {
+      backgroundImage: `url(${nextFrame})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      backgroundColor: '#000',
+    };
 
     switch (baseType) {
       case 'crossfade':
       case 'dissolve':
-        return {
-          opacity: progress,
-          backgroundImage: `url(${nextFrame})`,
-          backgroundSize: 'contain',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundColor: '#000',
-        };
+        return { ...bgBase, opacity: progress };
       case 'fade':
-        return {
-          opacity: progress > 0.5 ? (progress - 0.5) * 2 : 0,
-          backgroundImage: `url(${nextFrame})`,
-          backgroundSize: 'contain',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundColor: '#000',
-        };
+        return { ...bgBase, opacity: progress > 0.5 ? (progress - 0.5) * 2 : 0 };
+      case 'blur':
+        return { ...bgBase, opacity: progress, filter: `blur(${(1 - progress) * 8}px)` };
       case 'wipe': {
         const dir = overlayInfo.transition.transitionType.split('-')[1] || 'left';
         let clipPath = '';
-        if (dir === 'left') clipPath = `inset(0 ${(1 - progress) * 100}% 0 0)`;
-        else if (dir === 'right') clipPath = `inset(0 0 0 ${(1 - progress) * 100}%)`;
-        else if (dir === 'up') clipPath = `inset(0 0 ${(1 - progress) * 100}% 0)`;
-        else clipPath = `inset(${(1 - progress) * 100}% 0 0 0)`;
-        return {
-          opacity: 1,
-          clipPath,
-          backgroundImage: `url(${nextFrame})`,
-          backgroundSize: 'contain',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundColor: '#000',
-        };
+        const p = progress * 100;
+        if (dir === 'left') clipPath = `inset(0 ${100 - p}% 0 0)`;
+        else if (dir === 'right') clipPath = `inset(0 0 0 ${100 - p}%)`;
+        else if (dir === 'up') clipPath = `inset(0 0 ${100 - p}% 0)`;
+        else clipPath = `inset(${100 - p}% 0 0 0)`;
+        return { ...bgBase, opacity: 1, clipPath };
       }
       case 'slide':
       case 'push': {
@@ -156,46 +156,23 @@ export function NativeTransitionOverlay({
         else if (dir === 'right') transform = `translateX(${-(1 - progress) * 100}%)`;
         else if (dir === 'up') transform = `translateY(${(1 - progress) * 100}%)`;
         else transform = `translateY(${-(1 - progress) * 100}%)`;
-        return {
-          opacity: 1,
-          transform,
-          backgroundImage: `url(${nextFrame})`,
-          backgroundSize: 'contain',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundColor: '#000',
-        };
+        return { ...bgBase, opacity: 1, transform };
       }
       case 'zoom':
-        return {
-          opacity: progress,
-          transform: `scale(${1 + (1 - progress) * 0.3})`,
-          backgroundImage: `url(${nextFrame})`,
-          backgroundSize: 'contain',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundColor: '#000',
-        };
+        return { ...bgBase, opacity: progress, transform: `scale(${1 + (1 - progress) * 0.3})` };
       default:
-        return {
-          opacity: progress,
-          backgroundImage: `url(${nextFrame})`,
-          backgroundSize: 'contain',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundColor: '#000',
-        };
+        return { ...bgBase, opacity: progress };
     }
   };
 
   return (
     <>
-      {/* Effect overlay (darken / blur) */}
+      {/* Dark overlay during transition */}
       <div
         className="absolute inset-0 pointer-events-none z-[5]"
         style={getEffectStyle()}
       />
-      {/* Next scene frame overlay */}
+      {/* Incoming scene frame */}
       {nextFrame && (
         <div
           className="absolute inset-0 pointer-events-none z-[6]"
