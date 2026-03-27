@@ -10,7 +10,7 @@ import { Play, Download, RefreshCw, Loader2, RotateCcw, Info, CheckCircle2 } fro
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { toast as sonnerToast } from 'sonner';
+
 
 interface VideoGeneration {
   id: string;
