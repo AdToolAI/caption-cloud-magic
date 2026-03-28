@@ -1,68 +1,55 @@
 
-Ziel: Die Übergänge im Preview nicht weiter “raten”, sondern an präziseren Original-Schnittdaten ausrichten. Der aktuelle Preview-Code ist bereits source-basiert; das verbleibende Problem sitzt sehr wahrscheinlich in den Eingangsdaten.
 
-Warum ich das so einschätze:
-- Der Preview-Player vergleicht Übergänge jetzt direkt mit `video.currentTime` und `original_end_time`.
-- Aber die Szenenanalyse liefert Schnittzeiten aktuell nur in 0.5s-Schritten:
-  - `extractVideoFrames()` nimmt Frames alle `0.5s`
-  - `analyze-video-scenes` fordert und normalisiert Zeiten auf `0.5s`
-  - `frame_start/frame_end -> time = (frame - 1) * 0.5`
-- Dadurch kann der Preview gar nicht exakter auf den Originalschnitt legen als diese grobe Quantisierung. Wenn der echte Cut z. B. bei 12.84s liegt, landet er heute bei 12.5s oder 13.0s.
+## Fix: Transition-Timing-Offset für Übergänge 2 und 3
 
-Geplanter Fix:
-1. Analyse-Auflösung deutlich erhöhen
-- Frame-Sampling von `0.5s` auf feinere Intervalle umstellen, z. B. `0.1s`
-- Prompt und Parsing in `supabase/functions/analyze-video-scenes/index.ts` entsprechend anpassen
-- Zeitnormalisierung nicht mehr auf 0.5s runden
+### Ursache
 
-2. Sauberes Zeitmodell für Original-Cuts einführen
-- Szenen weiter mit:
-  - `start_time` / `end_time` = Timeline
-  - `original_start_time` / `original_end_time` = Source
-- Optional zusätzlich ein explizites Feld für “detected cut confidence / source cut precision”, falls wir Grenzfälle markieren wollen
-- `anchorTime` nicht wieder einführen
+Die KI-Schnitterkennung erkennt die exakten Cut-Punkte nicht präzise genug. Egal wie fein das Frame-Sampling ist (0.1s), die KI identifiziert den visuellen Schnitt manchmal 2-4 Frames zu früh. Bei Übergang 1 trifft sie zufällig, bei 2 und 3 liegt sie ~0.4s daneben. Das ist ein **Daten-Problem**, kein Renderer-Problem.
 
-3. Preview an präzise Source-Cuts koppeln, ohne neue Drift
-- Bestehende source-domain Architektur beibehalten
-- `findActiveTransition` / `useTransitionRenderer` / Overlay-Komponenten weiter auf `original_end_time` lassen
-- Nur sicherstellen, dass alle Hilfsfunktionen konsistent echte Source-Zeiten verwenden
+### Lösung: Timing-Offset pro Transition
 
-4. Export-Logik auf dieselben präzisen Cut-Daten ausrichten
-- Prüfen, dass Remotion dieselben verfeinerten Scene-Daten verwendet
-- So stimmen Preview und Export besser überein
+Statt weiter am Renderer oder an der Analyse-Präzision zu drehen, geben wir dem Nutzer eine einfache Kontrolle:
 
-5. Optionaler Feinschliff für wahrgenommene Exaktheit
-- Für den Editor eine kleine “Preview-Ausrichtung an Originalschnitt”-Option ergänzen:
-  - Hard cuts exakt auf erkanntem Cut
-  - Übergang visuell symmetrisch oder fast-symmetrisch um diesen Cut herum
-- Das ist nur Feintuning; Hauptproblem ist zuerst die Datenauflösung
+1. **`offsetSeconds` Feld zum TransitionAssignment hinzufügen** (default: 0)
+   - Positiver Wert = Übergang später starten
+   - Negativer Wert = Übergang früher starten
+   - Bereich: -2.0 bis +2.0 Sekunden, Schrittweite 0.1s
 
-Betroffene Dateien:
-- `src/pages/DirectorsCut/DirectorsCut.tsx`
-- `supabase/functions/analyze-video-scenes/index.ts`
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-- `src/components/directors-cut/preview/useTransitionRenderer.ts`
-- `src/components/directors-cut/preview/NativeTransitionOverlay.tsx`
-- `src/components/directors-cut/preview/NativeTransitionLayer.tsx`
-- ggf. `src/remotion/templates/DirectorsCutVideo.tsx`
+2. **Offset-Slider im Transition-Editor** (TransitionPicker)
+   - Kleiner Slider unter dem Typ-Selector
+   - Label: "Timing anpassen" mit Anzeige des Werts in Sekunden
 
-Erwartetes Ergebnis:
-- Übergänge 2 und 3 liegen nicht nur “besser”, sondern deutlich näher auf dem echten Originalschnitt
-- Kein Rückfall in Stottern, Looping oder Gummiband-Audio
-- Preview und Export basieren endlich auf denselben präziseren Cut-Grenzen
+3. **Offset in allen Transition-Berechnungen anwenden**
+   - `boundary = (scene.original_end_time ?? scene.end_time) + (transition.offsetSeconds ?? 0)`
+   - In: `findActiveTransition`, `useTransitionRenderer`, `NativeTransitionOverlay`, `NativeTransitionLayer`
 
-Technische Details:
-```text
-Heute:
-Originalcut ≈ 12.84s
-Analyse speichert 12.5s oder 13.0s
-Preview triggert exakt auf den falschen Wert
+### Betroffene Dateien
 
-Nach Fix:
-Originalcut ≈ 12.84s
-Analyse speichert z. B. 12.8s / 12.9s oder noch feiner
-Preview triggert exakt auf diesem präziseren Wert
+| Datei | Änderung |
+|-------|----------|
+| `src/types/directors-cut.ts` | `offsetSeconds?: number` zu `TransitionAssignment` |
+| `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` | Offset in `findActiveTransition` boundary |
+| `src/components/directors-cut/preview/useTransitionRenderer.ts` | Offset in boundary-Berechnung |
+| `src/components/directors-cut/preview/NativeTransitionOverlay.tsx` | Offset in boundary-Berechnung |
+| `src/components/directors-cut/preview/NativeTransitionLayer.tsx` | Offset in boundary-Berechnung |
+| `src/components/directors-cut/ui/TransitionPicker.tsx` | Offset-Slider UI |
+
+### Technische Details
+
+```typescript
+// TransitionAssignment erweitern
+offsetSeconds?: number; // -2.0 bis +2.0, default 0
+
+// Boundary-Berechnung überall:
+const offset = transition.offsetSeconds ?? 0;
+const boundary = (scene.original_end_time ?? scene.end_time) + offset;
 ```
 
-Wichtigster Punkt:
-Der nächste sinnvolle Schritt ist nicht noch mehr am Renderer zu drehen, sondern die Erkennung der Originalschnittstellen präziser zu machen. Der Preview-Code scheint inzwischen nah genug an der richtigen Architektur zu sein; die Datenbasis ist noch zu grob.
+### Warum das der richtige Ansatz ist
+
+- KI-Schnitterkennung wird nie 100% framegenau sein
+- Der Nutzer sieht sofort im Preview ob der Übergang passt
+- Einfacher +/- Slider ist intuitiver als Anchor-Dragging
+- Kein Risiko für neue Bugs im Playback-Loop
+- Alle bisherigen Fixes (kein Loop, kein Stottern, Video-led) bleiben unangetastet
+
