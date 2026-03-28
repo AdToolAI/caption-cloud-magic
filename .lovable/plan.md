@@ -1,56 +1,49 @@
 
 
-## Fix: Schritt 5 Farbkorrektur-Effekte im Preview sichtbar machen
+## Fix: Video-Stottern im Preview Player beseitigen
 
-### Probleme gefunden
+### Ursache des Stotterns
 
-Der Preview Player ignoriert mehrere Effekte komplett:
+Der rAF-Loop setzt **jeden Frame** `video.currentTime = X`, sobald die Drift > 0.15s ist. Das Problem:
 
-1. **Sharpness, Temperature, Vignette** — werden in der UI als Slider angeboten, aber im `videoFilter`-Memo des Preview Players **nie in CSS umgesetzt**
-2. **Scene-spezifische Brightness/Contrast/Saturation** — Die `sceneEffects` werden zwar an den Player übergeben, aber im `videoFilter`-Memo werden nur die **globalen** `effects.brightness` etc. gelesen. Scene-spezifische Werte (`sceneEffects[sceneId].brightness`) werden komplett ignoriert
-3. **Color Grading** — wird als Prop übergeben, aber ich muss prüfen ob es tatsächlich visuell angewendet wird
+1. **Timeline-led statt Video-led**: Der Player zählt die Zeit selbst per `performance.now()` hoch und korrigiert dann das Video ständig darauf. Aber `video.currentTime = X` löst jedes Mal einen **Seek** im Browser-Decoder aus — das ist teuer und verursacht Frame-Drops.
+2. **Während Transitions**: `video.currentTime` wird jeden Frame auf die Outgoing-Scene-Position gesetzt — also ~60 Seeks/Sekunde. Das ist der Hauptgrund für das Ruckeln.
+3. **Drift-Schwelle 0.15s ist zu aggressiv**: Natürliche Video-Playback-Schwankungen von 100-200ms lösen ständig Korrekturen aus.
 
-### Lösung
+### Lösung: Video-led Playback mit seltenen Korrekturen
 
-**Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`** — `videoFilter` Memo erweitern:
+**Prinzip**: Das `<video>`-Element spielt von selbst smooth ab. Wir lesen `video.currentTime` als Quelle der Wahrheit und korrigieren nur bei echten Problemen (Szenenwechsel, Seek).
 
-1. **Scene-spezifische Werte priorisieren**: Für brightness/contrast/saturation zuerst `sceneEffects[currentScene.id]` prüfen, dann auf globale `effects` fallbacken
-2. **Sharpness** → CSS `contrast()` leicht verstärken (kein natives CSS-Sharpness, aber Kombination aus `contrast` + SVG-Filter simuliert es)
-3. **Temperature** → `sepia()` + `hue-rotate()` Kombination (warm = sepia+leichter hue-rotate, kalt = hue-rotate ins Blaue)
-4. **Vignette** → Kein CSS-Filter, sondern ein **Overlay-Div** mit `radial-gradient` über dem Video
-5. **Color Grading** → Prüfen ob das CSS overlay korrekt gerendert wird
+#### Änderungen im rAF-Loop (Zeilen 329-401):
 
-### Technische Details
+1. **Video-led statt Timeline-led**: `visualTimeRef.current` folgt dem Video, nicht umgekehrt
+2. **Drift-Schwelle auf 0.5s erhöhen**: Nur bei echtem Versatz korrigieren
+3. **Während Transitions**: Video einfach weiterlaufen lassen (es spielt ja die Outgoing-Szene), kein `currentTime`-Setzen nötig
+4. **Szenen-Grenze**: Nur bei Szenenwechsel einmal `currentTime` setzen, nicht jeden Frame
 
 ```typescript
-// Scene-spezifische Werte priorisieren
-const currentScene = sortedScenes.find(s => displayTime >= s.start_time && displayTime < s.end_time);
-const sceneFx = currentScene ? sceneEffects?.[currentScene.id] : undefined;
-const bright = sceneFx?.brightness ?? effects.brightness ?? 100;
-const contr = sceneFx?.contrast ?? effects.contrast ?? 100;
-const sat = sceneFx?.saturation ?? effects.saturation ?? 100;
-const sharp = sceneFx?.sharpness ?? effects.sharpness ?? 0;
-const temp = sceneFx?.temperature ?? effects.temperature ?? 0;
+// VORHER (schlecht - 60 seeks/s):
+if (Math.abs(video.currentTime - outgoingTime) > 0.15) {
+  video.currentTime = outgoingTime;
+}
 
-// Temperature → sepia + hue-rotate
-if (temp > 0) filters.push(`sepia(${temp/100})`, `saturate(${1 + temp/100})`);
-if (temp < 0) filters.push(`hue-rotate(${temp * 1.5}deg)`);
-
-// Sharpness → leichter contrast-boost
-if (sharp > 0) { /* extra contrast micro-boost */ }
+// NACHHER (gut - Video spielt natürlich):
+// Während Transition: Video läuft weiter, kein Seek nötig
+// Nur bei Szenenwechsel einmal korrigieren
 ```
 
-Vignette als separates Overlay-Div:
-```tsx
-{effects.vignette > 0 && (
-  <div style={{
-    position: 'absolute', inset: 0, zIndex: 5,
-    background: `radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,${effects.vignette/100}) 100%)`,
-    pointerEvents: 'none'
-  }} />
-)}
-```
+#### Konkrete Optimierungen:
+
+1. **`visualTimeRef` aus `video.currentTime` ableiten** statt aus wall-clock-delta — dann ist es immer synchron ohne Seeks
+2. **Source-Time-Mapping invertieren**: Statt Timeline→Source→Seek machen wir Source→Timeline (lesen was das Video gerade zeigt und berechnen die Timeline-Position daraus)
+3. **Seek nur bei Szenen-Sprüngen**: Wenn die aktuelle Szene sich ändert (neuer Szenen-Index), einmal `video.currentTime` setzen
+4. **`lastSceneIndex` tracken**: Nur wenn sich der Index ändert, wird geseekt
 
 ### Dateien
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — videoFilter Memo + Vignette Overlay
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — rAF-Loop umbauen auf Video-led
+
+### Ergebnis
+- Video spielt nativ smooth ab ohne ständige Seeks
+- Kein Stottern mehr bei Transitions (Canvas-Overlay braucht kein Seeking)
+- Szenenwechsel: einmaliger Seek statt Dauer-Korrektur
 
