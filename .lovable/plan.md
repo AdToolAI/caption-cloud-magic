@@ -1,49 +1,53 @@
 
 
-## Fix: Video-Stottern im Preview Player beseitigen
+## Fix: Übergänge 0.5s zu früh — Timeline-Mapping während Transitions
 
-### Ursache des Stotterns
+### Problem
 
-Der rAF-Loop setzt **jeden Frame** `video.currentTime = X`, sobald die Drift > 0.15s ist. Das Problem:
+Das Video-led Playback hat ein Mapping-Problem an Szenengrenzen:
 
-1. **Timeline-led statt Video-led**: Der Player zählt die Zeit selbst per `performance.now()` hoch und korrigiert dann das Video ständig darauf. Aber `video.currentTime = X` löst jedes Mal einen **Seek** im Browser-Decoder aus — das ist teuer und verursacht Frame-Drops.
-2. **Während Transitions**: `video.currentTime` wird jeden Frame auf die Outgoing-Scene-Position gesetzt — also ~60 Seeks/Sekunde. Das ist der Hauptgrund für das Ruckeln.
-3. **Drift-Schwelle 0.15s ist zu aggressiv**: Natürliche Video-Playback-Schwankungen von 100-200ms lösen ständig Korrekturen aus.
+1. **Zeile 366**: `timelineTime` wird auf `scene.end_time` geclampt — aber während einer Transition muss die Zeit **darüber hinaus** weiterlaufen (70% des Übergangs passiert NACH der Grenze)
+2. **Zeile 345**: `findSceneBySourceTime` hat nur 0.05s Toleranz — sobald das Video 50ms über das Source-Ende der Outgoing-Szene hinaus spielt, findet es keine Szene mehr und fällt auf `timelineTime = videoSourceTime` (Zeile 418), was bei nicht-linearem Scene-Mapping falsch ist
+3. **Ergebnis**: Der `visualTimeRef`-Wert springt oder stagniert an Szenengrenzen, was die Transition im Canvas-Renderer ~0.5s zu früh erscheinen lässt
 
-### Lösung: Video-led Playback mit seltenen Korrekturen
+### Lösung
 
-**Prinzip**: Das `<video>`-Element spielt von selbst smooth ab. Wir lesen `video.currentTime` als Quelle der Wahrheit und korrigieren nur bei echten Problemen (Szenenwechsel, Seek).
+Den rAF-Loop so anpassen, dass er während einer Transition die Timeline-Zeit korrekt weiterberechnet:
 
-#### Änderungen im rAF-Loop (Zeilen 329-401):
+**In `findSceneBySourceTime` (Zeile 339-350):**
+- Toleranz am Ende auf **1.5s** erweitern (= maximale Transition-Dauer), damit die Outgoing-Szene während der Transition weiterhin gefunden wird
 
-1. **Video-led statt Timeline-led**: `visualTimeRef.current` folgt dem Video, nicht umgekehrt
-2. **Drift-Schwelle auf 0.5s erhöhen**: Nur bei echtem Versatz korrigieren
-3. **Während Transitions**: Video einfach weiterlaufen lassen (es spielt ja die Outgoing-Szene), kein `currentTime`-Setzen nötig
-4. **Szenen-Grenze**: Nur bei Szenenwechsel einmal `currentTime` setzen, nicht jeden Frame
+**In der Timeline-Berechnung (Zeile 363-366):**
+- Clamping auf `scene.end_time` entfernen wenn eine aktive Transition läuft
+- Stattdessen: Wenn `timelineTime > scene.end_time`, prüfen ob eine Transition aktiv ist → wenn ja, Timeline weiter hochzählen lassen (das Video spielt natürlich weiter, die Source-Time mapped korrekt auf die Zeit nach der Grenze)
 
+**Konkreter Ansatz:**
 ```typescript
-// VORHER (schlecht - 60 seeks/s):
-if (Math.abs(video.currentTime - outgoingTime) > 0.15) {
-  video.currentTime = outgoingTime;
+// Zeile 363-366 — Clamping nur ohne aktive Transition
+if (sceneInfo) {
+  timelineTime = sourceToTimelineTime(sceneInfo.scene, videoSourceTime);
+  
+  // Nur clampen wenn KEINE Transition aktiv ist
+  const activeTrans = findActiveTransition(timelineTime);
+  if (!activeTrans) {
+    timelineTime = Math.max(sceneInfo.scene.start_time, Math.min(timelineTime, sceneInfo.scene.end_time));
+  }
 }
-
-// NACHHER (gut - Video spielt natürlich):
-// Während Transition: Video läuft weiter, kein Seek nötig
-// Nur bei Szenenwechsel einmal korrigieren
 ```
 
-#### Konkrete Optimierungen:
-
-1. **`visualTimeRef` aus `video.currentTime` ableiten** statt aus wall-clock-delta — dann ist es immer synchron ohne Seeks
-2. **Source-Time-Mapping invertieren**: Statt Timeline→Source→Seek machen wir Source→Timeline (lesen was das Video gerade zeigt und berechnen die Timeline-Position daraus)
-3. **Seek nur bei Szenen-Sprüngen**: Wenn die aktuelle Szene sich ändert (neuer Szenen-Index), einmal `video.currentTime` setzen
-4. **`lastSceneIndex` tracken**: Nur wenn sich der Index ändert, wird geseekt
+```typescript
+// Zeile 344-345 — Großzügigere Toleranz am Source-Ende für Transitions
+const srcEnd = srcStart + (s.end_time - s.start_time) * rate;
+if (sourceTime >= srcStart - 0.05 && sourceTime < srcEnd + 1.5) {
+  return { scene: s, index: i };
+}
+```
 
 ### Dateien
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — rAF-Loop umbauen auf Video-led
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `findSceneBySourceTime` Toleranz + Clamping-Fix
 
 ### Ergebnis
-- Video spielt nativ smooth ab ohne ständige Seeks
-- Kein Stottern mehr bei Transitions (Canvas-Overlay braucht kein Seeking)
-- Szenenwechsel: einmaliger Seek statt Dauer-Korrektur
+- Transitions starten und enden zeitlich korrekt
+- Kein Stottern (Video-led bleibt erhalten)
+- Alle 3 Übergänge synchron zur erwarteten Position
 
