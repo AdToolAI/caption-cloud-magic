@@ -67,8 +67,10 @@ const TRANSITION_TYPES: TransitionType[] = [
 interface TransitionPickerProps {
   selectedType: string;
   duration: number;
+  offsetSeconds?: number;
   onTypeChange: (type: string) => void;
   onDurationChange: (duration: number) => void;
+  onOffsetChange?: (offset: number) => void;
   aiRecommendation?: string;
   aiConfidence?: number;
   aiReasoning?: string;
