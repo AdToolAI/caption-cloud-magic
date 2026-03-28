@@ -61,9 +61,9 @@ serve(async (req) => {
       const systemPrompt = `Du bist ein präziser Video-Schnitt-Analyst. Deine Aufgabe ist es, EXAKTE Schnittpunkte zu identifizieren.
 
 FRAME-ZEITSTEMPEL:
-${frames.length} Frames wurden alle 0.5 Sekunden extrahiert:
-Frame 1 = 0.0s, Frame 2 = 0.5s, Frame 3 = 1.0s, Frame 4 = 1.5s, Frame 5 = 2.0s, usw.
-Formel: Frame N entspricht Sekunde (N-1) × 0.5
+${frames.length} Frames wurden alle 0.1 Sekunden extrahiert:
+Frame 1 = 0.0s, Frame 2 = 0.1s, Frame 3 = 0.2s, Frame 4 = 0.3s, usw.
+Formel: Frame N entspricht Sekunde (N-1) × 0.1
 
 KRITISCHE ANWEISUNG - CHRONOLOGISCHE REIHENFOLGE:
 ⚠️ Du MUSST die Szenen STRIKT IN CHRONOLOGISCHER REIHENFOLGE beschreiben!
