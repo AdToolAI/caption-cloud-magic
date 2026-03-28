@@ -14,6 +14,7 @@ interface VisualTimelineProps {
   onTransitionClick: (sceneId: string) => void;
   // Updated: only needs sceneId and new end time - parent handles shifting
   onSceneDurationChange?: (sceneId: string, newEndTime: number) => void;
+  /** @deprecated anchorTime removed — transitions anchor to original_end_time */
   onTransitionAnchorChange?: (sceneId: string, anchorTime: number) => void;
   thumbnails?: Record<string, string>;
   currentTime?: number;
