@@ -113,18 +113,13 @@ export function VisualTimeline({
     setDragStartScenes(null);
   }, []);
 
-  // Transition dot drag handlers
+  // Transition dot click handler — no more dragging, just click to open dialog
   const handleTransitionDotMouseDown = useCallback((e: React.MouseEvent, sceneId: string, sceneIndex: number) => {
     e.preventDefault();
     e.stopPropagation();
-    const transition = transitions.find(t => t.sceneId === sceneId);
-    const currentAnchor = transition?.anchorTime ?? scenes[sceneIndex].end_time;
-    dragTransitionStartXRef.current = e.clientX;
-    dragTransitionStartAnchorRef.current = currentAnchor;
-    hasExceededDragThresholdRef.current = false;
-    setDraggingTransition({ sceneId, sceneIndex });
-    setDragTransitionAnchor(currentAnchor);
-  }, [scenes, transitions]);
+    // No drag — just open the transition dialog
+    onTransitionClick(sceneId);
+  }, [onTransitionClick]);
 
   const handleTransitionDotMouseMove = useCallback((e: MouseEvent) => {
     if (!draggingTransition || !timelineRef.current || !onTransitionAnchorChange) return;
