@@ -314,24 +314,7 @@ export function SceneEditingStep({
 
     onScenesUpdate(updatedScenes);
     
-    // Shift transition anchors for affected and subsequent scenes
-    if (Math.abs(durationDelta) > 0.001) {
-      const updatedTransitions = transitions.map(t => {
-        const tIdx = scenes.findIndex(s => s.id === t.sceneId);
-        if (tIdx === -1 || !t.anchorTime) return t;
-        
-        // Same scene: reset anchor (boundary moved)
-        if (tIdx === sceneIndex) {
-          return { ...t, anchorTime: undefined };
-        }
-        // Later scenes: shift anchor by delta
-        if (tIdx > sceneIndex) {
-          return { ...t, anchorTime: t.anchorTime + durationDelta };
-        }
-        return t;
-      });
-      onTransitionsChange(updatedTransitions);
-    }
+    // anchorTime removed — transitions auto-anchor to original_end_time
   }, [scenes, onScenesUpdate, transitions, onTransitionsChange]);
 
   // Find current scene based on video time
