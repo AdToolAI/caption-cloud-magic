@@ -147,12 +147,17 @@ export function VisualTimeline({
   }, [draggingTransition, scenes, onTransitionAnchorChange, actualTotalDuration]);
 
   const handleTransitionDotMouseUp = useCallback(() => {
-    if (draggingTransition && dragTransitionAnchor !== null && onTransitionAnchorChange) {
+    // Only persist anchor if user actually dragged (exceeded threshold)
+    if (draggingTransition && dragTransitionAnchor !== null && onTransitionAnchorChange && hasExceededDragThresholdRef.current) {
       onTransitionAnchorChange(draggingTransition.sceneId, dragTransitionAnchor);
+    }
+    // If no drag happened (just a click), open the transition dialog instead
+    if (draggingTransition && !hasExceededDragThresholdRef.current) {
+      onTransitionClick(draggingTransition.sceneId);
     }
     setDraggingTransition(null);
     setDragTransitionAnchor(null);
-  }, [draggingTransition, dragTransitionAnchor, onTransitionAnchorChange]);
+  }, [draggingTransition, dragTransitionAnchor, onTransitionAnchorChange, onTransitionClick]);
 
   // Add/remove event listeners for drag
   useEffect(() => {
