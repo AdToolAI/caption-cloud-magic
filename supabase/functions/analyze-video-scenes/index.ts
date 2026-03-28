@@ -51,18 +51,19 @@ serve(async (req) => {
     if (frames && frames.length > 0) {
       console.log(`[analyze-video-scenes] Using Vision AI with ${frames.length} frames`);
       
-      // Frames sind alle 0.5 Sekunden extrahiert
+      // Frames sind alle 0.1 Sekunden extrahiert (hochpräzise Schnitterkennung)
+      const FRAME_INTERVAL = 0.1;
       const frameTimings = frames.map((_: string, i: number) => {
-        const time = (i * 0.5).toFixed(1);
+        const time = (i * FRAME_INTERVAL).toFixed(1);
         return `Frame ${i + 1}: Sekunde ${time}`;
       }).join('\n');
 
       const systemPrompt = `Du bist ein präziser Video-Schnitt-Analyst. Deine Aufgabe ist es, EXAKTE Schnittpunkte zu identifizieren.
 
 FRAME-ZEITSTEMPEL:
-${frames.length} Frames wurden alle 0.5 Sekunden extrahiert:
-Frame 1 = 0.0s, Frame 2 = 0.5s, Frame 3 = 1.0s, Frame 4 = 1.5s, Frame 5 = 2.0s, usw.
-Formel: Frame N entspricht Sekunde (N-1) × 0.5
+${frames.length} Frames wurden alle 0.1 Sekunden extrahiert:
+Frame 1 = 0.0s, Frame 2 = 0.1s, Frame 3 = 0.2s, Frame 4 = 0.3s, usw.
+Formel: Frame N entspricht Sekunde (N-1) × 0.1
 
 KRITISCHE ANWEISUNG - CHRONOLOGISCHE REIHENFOLGE:
 ⚠️ Du MUSST die Szenen STRIKT IN CHRONOLOGISCHER REIHENFOLGE beschreiben!
@@ -90,13 +91,13 @@ WAS IST KEIN SCHNITT (gleiche Szene)?
 
 SZENENGRENZE BERECHNUNG:
 Wenn Frame N und Frame N+1 UNTERSCHIEDLICH sind:
-→ Schnitt passiert bei (N - 1) × 0.5 Sekunden
+→ Schnitt passiert bei (N - 1) × 0.1 Sekunden
 → Diese Szene endet dort, nächste Szene beginnt dort
 
 REGELN:
 - Erste Szene startet IMMER bei 0.0s (frame_start: 1)
 - Letzte Szene endet IMMER bei ${videoDuration}s
-- Szenenzeiten müssen auf 0.5s genau sein!
+- Szenenzeiten auf 0.1s genau angeben!
 - Erwarte 2-5 Szenen für ein ${videoDuration}s Video
 
 JSON FORMAT für jede Szene (MIT FRAME-NUMMERN!):
@@ -104,8 +105,8 @@ JSON FORMAT für jede Szene (MIT FRAME-NUMMERN!):
   "id": "scene-1",
   "frame_start": number (Frame-Nummer wo Szene beginnt, z.B. 1),
   "frame_end": number (Frame-Nummer wo Szene endet, z.B. 7),
-  "start_time": number (= (frame_start - 1) × 0.5),
-  "end_time": number (= (frame_end - 1) × 0.5),
+   "start_time": number (= (frame_start - 1) × 0.1),
+   "end_time": number (= (frame_end - 1) × 0.1),
   "description": "string (MAXIMAL 50 Zeichen! z.B. 'Parfümflaschen nebeneinander')",
   "mood": "dynamic|calm|energetic|emotional|neutral",
   "suggested_effects": [
@@ -133,9 +134,9 @@ Für JEDE Szene MUSST du genau 2 suggested_effects generieren:
 Antworte NUR mit einem validen JSON-Array!`;
 
       const userContent: any[] = [
-        { 
+         { 
           type: "text", 
-          text: `FRAME-ZEITSTEMPEL (alle 0.5 Sekunden):
+          text: `FRAME-ZEITSTEMPEL (alle 0.1 Sekunden):
 ${frameTimings}
 
 ⚠️ WICHTIG: Beschreibe die Szenen IN CHRONOLOGISCHER REIHENFOLGE!
@@ -157,14 +158,14 @@ SCHRITT-FÜR-SCHRITT ANALYSE:
 Für jeden gefundenen SCHNITT:
 - Notiere die Frame-Nummer VOR dem Schnitt (frame_end der aktuellen Szene)
 - Notiere die Frame-Nummer NACH dem Schnitt (frame_start der nächsten Szene)
-- Berechne start_time = (frame_start - 1) × 0.5
-- Berechne end_time = (frame_end - 1) × 0.5
+- Berechne start_time = (frame_start - 1) × 0.1
+- Berechne end_time = (frame_end - 1) × 0.1
 
-BEISPIEL für 40 Frames (20s Video):
-- Frames 1-7: Produkt von vorne → Szene 1: frame_start=1, frame_end=7, start=0.0s, end=3.0s, description="Produkt Frontansicht"
-- Frame 8 ist ANDERS → SCHNITT!
-- Frames 8-14: Produkt von der Seite → Szene 2: frame_start=8, frame_end=14, start=3.5s, end=6.5s, description="Produkt Seitenansicht"
-- Frame 15 ist ANDERS → SCHNITT!
+BEISPIEL für 200 Frames (20s Video bei 0.1s Intervall):
+- Frames 1-70: Produkt von vorne → Szene 1: frame_start=1, frame_end=70, start=0.0s, end=6.9s, description="Produkt Frontansicht"
+- Frame 71 ist ANDERS → SCHNITT!
+- Frames 71-140: Produkt von der Seite → Szene 2: frame_start=71, frame_end=140, start=7.0s, end=13.9s, description="Produkt Seitenansicht"
+- Frame 141 ist ANDERS → SCHNITT!
 - usw.
 
 GIB FRAME-NUMMERN AN! Das ist wichtig für die Validierung.
@@ -249,8 +250,8 @@ Antworte NUR mit dem JSON-Array!`
         
         // CRITICAL: Sort scenes by frame_start (most reliable) or start_time
         scenes = scenes.sort((a, b) => {
-          const aStart = a.frame_start || (a.start_time * 2 + 1) || 1;
-          const bStart = b.frame_start || (b.start_time * 2 + 1) || 1;
+          const aStart = a.frame_start || (a.start_time * 10 + 1) || 1;
+          const bStart = b.frame_start || (b.start_time * 10 + 1) || 1;
           return aStart - bStart;
         });
         
@@ -263,31 +264,33 @@ Antworte NUR mit dem JSON-Array!`
           let fixedEndTime: number;
           
           if (scene.frame_start !== undefined && scene.frame_start !== null) {
-            // Calculate time from frame number: time = (frame - 1) * 0.5
-            const calculatedStartTime = (scene.frame_start - 1) * 0.5;
+            // Calculate time from frame number: time = (frame - 1) * 0.1
+            const FRAME_INTERVAL = 0.1;
+            const calculatedStartTime = Math.round((scene.frame_start - 1) * FRAME_INTERVAL * 10) / 10;
             
             // Check if AI's start_time matches the calculated value
-            if (scene.start_time !== undefined && Math.abs(scene.start_time - calculatedStartTime) > 0.5) {
+            if (scene.start_time !== undefined && Math.abs(scene.start_time - calculatedStartTime) > 0.2) {
               console.warn(`[analyze-video-scenes] Scene ${scene.id}: start_time mismatch! AI said ${scene.start_time}s but frame_start=${scene.frame_start} suggests ${calculatedStartTime}s. Using frame-based time.`);
             }
             
             fixedStartTime = calculatedStartTime;
           } else {
-            // Fallback to AI's start_time
-            fixedStartTime = Math.round((scene.start_time || 0) * 2) / 2;
+            // Fallback to AI's start_time (no rounding to 0.5s anymore)
+            fixedStartTime = Math.round((scene.start_time || 0) * 10) / 10;
           }
           
           if (scene.frame_end !== undefined && scene.frame_end !== null) {
             // Calculate time from frame number
-            const calculatedEndTime = (scene.frame_end - 1) * 0.5;
+            const FRAME_INTERVAL = 0.1;
+            const calculatedEndTime = Math.round((scene.frame_end - 1) * FRAME_INTERVAL * 10) / 10;
             
-            if (scene.end_time !== undefined && Math.abs(scene.end_time - calculatedEndTime) > 0.5) {
+            if (scene.end_time !== undefined && Math.abs(scene.end_time - calculatedEndTime) > 0.2) {
               console.warn(`[analyze-video-scenes] Scene ${scene.id}: end_time mismatch! AI said ${scene.end_time}s but frame_end=${scene.frame_end} suggests ${calculatedEndTime}s. Using frame-based time.`);
             }
             
             fixedEndTime = calculatedEndTime;
           } else {
-            fixedEndTime = Math.round((scene.end_time || videoDuration) * 2) / 2;
+            fixedEndTime = Math.round((scene.end_time || videoDuration) * 10) / 10;
           }
           
           // Boundary corrections: First scene at 0, last scene at videoDuration

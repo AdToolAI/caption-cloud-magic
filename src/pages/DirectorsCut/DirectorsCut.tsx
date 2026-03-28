@@ -343,7 +343,9 @@ export function DirectorsCut() {
       
       video.onloadedmetadata = async () => {
         const frames: string[] = [];
-        const frameCount = Math.min(40, Math.ceil(duration * 2));
+        // Sample every 0.1s for high-precision cut detection (max 200 frames for 20s video)
+        const FRAME_INTERVAL = 0.1;
+        const frameCount = Math.min(200, Math.ceil(duration / FRAME_INTERVAL));
         
         const canvas = document.createElement('canvas');
         canvas.width = 512;
@@ -357,7 +359,7 @@ export function DirectorsCut() {
         
         try {
           for (let i = 0; i < frameCount; i++) {
-            const time = i * 0.5;
+            const time = i * FRAME_INTERVAL;
             video.currentTime = time;
             
             await new Promise<void>((seekResolve) => {
