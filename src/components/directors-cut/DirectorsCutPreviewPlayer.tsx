@@ -565,20 +565,42 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [subtitleTrack, displayTime]);
 
   // ==================== CSS FILTERS FROM EFFECTS ====================
+  const currentScene = useMemo(() => {
+    return sortedScenes.find(s => displayTime >= s.start_time && displayTime < s.end_time);
+  }, [sortedScenes, displayTime]);
+
   const videoFilter = useMemo(() => {
     const filters: string[] = [];
-    if (effects.brightness !== undefined && effects.brightness !== 100) {
-      filters.push(`brightness(${effects.brightness / 100})`);
+
+    // Scene-specific values take priority over global
+    const sceneFx = currentScene ? sceneEffects?.[currentScene.id] : undefined;
+
+    const bright = sceneFx?.brightness ?? effects.brightness ?? 100;
+    const contr = sceneFx?.contrast ?? effects.contrast ?? 100;
+    const sat = sceneFx?.saturation ?? effects.saturation ?? 100;
+    const sharp = sceneFx?.sharpness ?? effects.sharpness ?? 0;
+    const temp = sceneFx?.temperature ?? effects.temperature ?? 0;
+
+    if (bright !== 100) filters.push(`brightness(${bright / 100})`);
+    if (contr !== 100) filters.push(`contrast(${contr / 100})`);
+    if (sat !== 100) filters.push(`saturate(${sat / 100})`);
+
+    // Temperature: warm → sepia + extra saturation, cold → hue-rotate into blue
+    if (temp > 0) {
+      filters.push(`sepia(${Math.min(temp / 100, 0.4)})`);
+      filters.push(`saturate(${1 + temp / 200})`);
+    } else if (temp < 0) {
+      filters.push(`hue-rotate(${Math.max(temp * 1.2, -60)}deg)`);
+      filters.push(`saturate(${1 + Math.abs(temp) / 200})`);
     }
-    if (effects.contrast !== undefined && effects.contrast !== 100) {
-      filters.push(`contrast(${effects.contrast / 100})`);
-    }
-    if (effects.saturation !== undefined && effects.saturation !== 100) {
-      filters.push(`saturate(${effects.saturation / 100})`);
+
+    // Sharpness: simulate via micro contrast boost
+    if (sharp > 0) {
+      const sharpBoost = 1 + (sharp / 100) * 0.15;
+      filters.push(`contrast(${sharpBoost})`);
     }
 
     // Apply scene-specific or global filter (cinematic, vintage, etc.)
-    const currentScene = sortedScenes.find(s => displayTime >= s.start_time && displayTime < s.end_time);
     const sceneFilter = currentScene && sceneEffects?.[currentScene.id]?.filter;
     const activeFilterId = sceneFilter || effects.filter;
 
@@ -590,7 +612,13 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     }
 
     return filters.length > 0 ? filters.join(' ') : undefined;
-  }, [effects.brightness, effects.contrast, effects.saturation, effects.filter, sceneEffects, sortedScenes, displayTime]);
+  }, [effects, sceneEffects, currentScene, sortedScenes, displayTime]);
+
+  // Vignette value (scene-specific or global)
+  const vignetteValue = useMemo(() => {
+    const sceneFx = currentScene ? sceneEffects?.[currentScene.id] : undefined;
+    return sceneFx?.vignette ?? effects.vignette ?? 0;
+  }, [currentScene, sceneEffects, effects.vignette]);
 
   // Keep videoFilterRef in sync for the transition renderer
   useEffect(() => { videoFilterRef.current = videoFilter ?? ''; }, [videoFilter]);
@@ -635,6 +663,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           scenes={sortedScenes}
           currentTime={displayTime}
         />
+
+        {/* Vignette overlay from Step 5 color correction */}
+        {vignetteValue > 0 && (
+          <div
+            className="absolute inset-0 pointer-events-none z-[5]"
+            style={{
+              background: `radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,${vignetteValue / 100 * 0.7}) 100%)`,
+            }}
+          />
+        )}
 
         {/* Text Overlays */}
         {textOverlays.filter(o => displayTime >= o.startTime && displayTime < o.endTime).map(overlay => (
