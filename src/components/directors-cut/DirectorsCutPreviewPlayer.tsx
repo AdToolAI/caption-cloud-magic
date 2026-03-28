@@ -342,7 +342,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         const srcStart = s.original_start_time ?? s.start_time;
         const rate = (s as any).playbackRate ?? 1;
         const srcEnd = srcStart + (s.end_time - s.start_time) * rate;
-        if (sourceTime >= srcStart - 0.05 && sourceTime < srcEnd + 0.05) {
+        if (sourceTime >= srcStart - 0.05 && sourceTime < srcEnd + 1.5) {
           return { scene: s, index: i };
         }
       }
@@ -362,8 +362,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
       if (sceneInfo) {
         timelineTime = sourceToTimelineTime(sceneInfo.scene, videoSourceTime);
-        // Clamp to scene boundaries
-        timelineTime = Math.max(sceneInfo.scene.start_time, Math.min(timelineTime, sceneInfo.scene.end_time));
+        // Only clamp to scene boundaries if NO transition is active
+        // During transitions, timeline time must flow past scene.end_time
+        const activeTrans = findActiveTransition(timelineTime);
+        if (!activeTrans) {
+          timelineTime = Math.max(sceneInfo.scene.start_time, Math.min(timelineTime, sceneInfo.scene.end_time));
+        }
 
         // Detect scene change → only seek when entering a NEW scene
         if (sceneInfo.index !== lastSceneIndexRef.current) {
