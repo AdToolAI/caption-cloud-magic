@@ -91,13 +91,13 @@ WAS IST KEIN SCHNITT (gleiche Szene)?
 
 SZENENGRENZE BERECHNUNG:
 Wenn Frame N und Frame N+1 UNTERSCHIEDLICH sind:
-→ Schnitt passiert bei (N - 1) × 0.5 Sekunden
+→ Schnitt passiert bei (N - 1) × 0.1 Sekunden
 → Diese Szene endet dort, nächste Szene beginnt dort
 
 REGELN:
 - Erste Szene startet IMMER bei 0.0s (frame_start: 1)
 - Letzte Szene endet IMMER bei ${videoDuration}s
-- Szenenzeiten müssen auf 0.5s genau sein!
+- Szenenzeiten auf 0.1s genau angeben!
 - Erwarte 2-5 Szenen für ein ${videoDuration}s Video
 
 JSON FORMAT für jede Szene (MIT FRAME-NUMMERN!):
