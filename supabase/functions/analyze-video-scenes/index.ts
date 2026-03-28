@@ -264,18 +264,19 @@ Antworte NUR mit dem JSON-Array!`
           let fixedEndTime: number;
           
           if (scene.frame_start !== undefined && scene.frame_start !== null) {
-            // Calculate time from frame number: time = (frame - 1) * 0.5
-            const calculatedStartTime = (scene.frame_start - 1) * 0.5;
+            // Calculate time from frame number: time = (frame - 1) * 0.1
+            const FRAME_INTERVAL = 0.1;
+            const calculatedStartTime = Math.round((scene.frame_start - 1) * FRAME_INTERVAL * 10) / 10;
             
             // Check if AI's start_time matches the calculated value
-            if (scene.start_time !== undefined && Math.abs(scene.start_time - calculatedStartTime) > 0.5) {
+            if (scene.start_time !== undefined && Math.abs(scene.start_time - calculatedStartTime) > 0.2) {
               console.warn(`[analyze-video-scenes] Scene ${scene.id}: start_time mismatch! AI said ${scene.start_time}s but frame_start=${scene.frame_start} suggests ${calculatedStartTime}s. Using frame-based time.`);
             }
             
             fixedStartTime = calculatedStartTime;
           } else {
-            // Fallback to AI's start_time
-            fixedStartTime = Math.round((scene.start_time || 0) * 2) / 2;
+            // Fallback to AI's start_time (no rounding to 0.5s anymore)
+            fixedStartTime = Math.round((scene.start_time || 0) * 10) / 10;
           }
           
           if (scene.frame_end !== undefined && scene.frame_end !== null) {
