@@ -318,6 +318,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
   // Track last scene index to detect scene changes (only seek on scene entry)
   const lastSceneIndexRef = useRef<number>(-1);
+  // Guard: when boundary-advance triggers a seek, suppress false "non-sequential jump" detection
+  // for a few frames until the decoder settles into the new scene
+  const pendingSceneAdvanceRef = useRef<{ targetIndex: number; framesLeft: number } | null>(null);
 
   useEffect(() => {
     if (!isPlaying) {
@@ -336,7 +339,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     };
 
     // Helper: find which scene the video's current source time belongs to
-    const findSceneBySourceTime = (sourceTime: number): { scene: SceneAnalysis; index: number } | null => {
+    // Returns matchType to distinguish exact vs extended-tolerance matches
+    // preferredIndex: bias toward current or next scene in fallback to prevent backward snapping
+    const findSceneBySourceTime = (sourceTime: number, preferredIndex: number): { scene: SceneAnalysis; index: number; matchType: 'exact' | 'extended' } | null => {
       // Pass 1: Exact match (tight tolerance)
       for (let i = 0; i < sortedScenes.length; i++) {
         const s = sortedScenes[i];
@@ -344,20 +349,32 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         const rate = (s as any).playbackRate ?? 1;
         const srcEnd = srcStart + (s.end_time - s.start_time) * rate;
         if (sourceTime >= srcStart - 0.05 && sourceTime < srcEnd + 0.05) {
-          return { scene: s, index: i };
+          return { scene: s, index: i, matchType: 'exact' };
         }
       }
       // Pass 2: Extended tolerance fallback (for transitions flowing past boundary)
+      // Collect ALL candidates and pick the best one based on proximity to preferredIndex
+      let bestCandidate: { scene: SceneAnalysis; index: number; matchType: 'extended' } | null = null;
+      let bestScore = Infinity;
       for (let i = 0; i < sortedScenes.length; i++) {
         const s = sortedScenes[i];
         const srcStart = s.original_start_time ?? s.start_time;
         const rate = (s as any).playbackRate ?? 1;
         const srcEnd = srcStart + (s.end_time - s.start_time) * rate;
         if (sourceTime >= srcStart - 0.05 && sourceTime < srcEnd + 1.5) {
-          return { scene: s, index: i };
+          // Score: prefer preferredIndex, then preferredIndex+1, then closest forward
+          let score: number;
+          if (i === preferredIndex) score = 0;
+          else if (i === preferredIndex + 1) score = 1;
+          else if (i > preferredIndex) score = 2 + (i - preferredIndex);
+          else score = 100 + (preferredIndex - i); // Strongly penalize backward matches
+          if (score < bestScore) {
+            bestScore = score;
+            bestCandidate = { scene: s, index: i, matchType: 'extended' };
+          }
         }
       }
-      return null;
+      return bestCandidate;
     };
 
     const tick = () => {
@@ -368,7 +385,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const videoSourceTime = video.currentTime;
 
       // Reverse-map to timeline time
-      const sceneInfo = findSceneBySourceTime(videoSourceTime);
+      const sceneInfo = findSceneBySourceTime(videoSourceTime, lastSceneIndexRef.current);
       let timelineTime: number;
 
       // Cache findActiveTransition ONCE per frame
@@ -386,22 +403,46 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         // Detect scene change → only seek when entering a NEW scene
         if (sceneInfo.index !== lastSceneIndexRef.current) {
           const prevIndex = lastSceneIndexRef.current;
-          lastSceneIndexRef.current = sceneInfo.index;
-
-          // If we jumped to a non-consecutive scene, we need a seek
-          // But if it's the next scene in sequence, the video is naturally playing through
-          if (prevIndex >= 0 && sceneInfo.index !== prevIndex + 1) {
-            // Non-sequential scene jump — seek to correct source position
-            const expectedSource = sourceTimeForScene(sceneInfo.scene, sceneInfo.scene.start_time);
-            if (Math.abs(video.currentTime - expectedSource) > 0.3) {
-              video.currentTime = expectedSource;
+          
+          // Check if there's a pending advance that matches this scene change
+          const isPendingAdvance = pendingSceneAdvanceRef.current && 
+            pendingSceneAdvanceRef.current.targetIndex === sceneInfo.index;
+          
+          if (isPendingAdvance) {
+            // Expected scene change from boundary advance — accept it cleanly
+            pendingSceneAdvanceRef.current = null;
+            lastSceneIndexRef.current = sceneInfo.index;
+          } else if (sceneInfo.matchType === 'exact') {
+            // Real scene change confirmed by exact match — accept it
+            lastSceneIndexRef.current = sceneInfo.index;
+            
+            // Only seek on true non-sequential jumps (not next scene in order)
+            if (prevIndex >= 0 && sceneInfo.index !== prevIndex + 1) {
+              const expectedSource = sourceTimeForScene(sceneInfo.scene, sceneInfo.scene.start_time);
+              if (Math.abs(video.currentTime - expectedSource) > 0.3) {
+                video.currentTime = expectedSource;
+              }
             }
+          } else {
+            // Extended-tolerance match during transition — DON'T update lastSceneIndexRef
+            // The scene hasn't truly changed yet, the decoder is still in the tolerance zone
+            // Keep the current scene index to prevent false jumps
+            // (timelineTime will still be computed correctly from sceneInfo)
           }
 
-          // Apply playback rate for new scene
+          // Apply playback rate for the matched scene
           const sceneRate = (sceneInfo.scene as any).playbackRate ?? 1;
           if (Math.abs(video.playbackRate - sceneRate) > 0.01) {
             video.playbackRate = sceneRate;
+          }
+        }
+        
+        // Decrement pending advance frame counter if active but not yet matched
+        if (pendingSceneAdvanceRef.current) {
+          pendingSceneAdvanceRef.current.framesLeft--;
+          if (pendingSceneAdvanceRef.current.framesLeft <= 0) {
+            // Pending advance expired — clear it
+            pendingSceneAdvanceRef.current = null;
           }
         }
 
@@ -421,7 +462,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
               if (Math.abs(video.currentTime - nextSourceStart) > 0.3) {
                 video.currentTime = nextSourceStart;
               }
-              lastSceneIndexRef.current = sceneInfo.index + 1;
+              // DON'T set lastSceneIndexRef here — set a pending advance instead
+              // The ref will be updated once findSceneBySourceTime confirms the new scene
+              pendingSceneAdvanceRef.current = { targetIndex: sceneInfo.index + 1, framesLeft: 15 };
               const nextRate = (nextScene as any).playbackRate ?? 1;
               if (Math.abs(video.playbackRate - nextRate) > 0.01) {
                 video.playbackRate = nextRate;
