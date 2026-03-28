@@ -332,7 +332,7 @@ export function SceneEditingStep({
       });
       onTransitionsChange(updatedTransitions);
     }
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, transitions, onTransitionsChange]);
 
   // Find current scene based on video time
   const getCurrentScene = useCallback(() => {
