@@ -31,7 +31,8 @@ export function useTransitionRenderer(
     }
 
     const tick = () => {
-      const time = visualTimeRef.current ?? 0;
+      // Read source time directly from video element for drift-free transitions
+      const time = baseVideoRef.current?.currentTime ?? visualTimeRef.current ?? 0;
       const base = baseVideoRef.current;
       const canvas = canvasRef.current;
       if (!base || !canvas) {

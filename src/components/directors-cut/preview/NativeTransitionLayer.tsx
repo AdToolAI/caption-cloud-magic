@@ -49,8 +49,10 @@ export function useTransitionInfo(
         const transitionDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
         const leadIn = transitionDuration * 0.05;
         const leadOut = transitionDuration * 0.95;
-        const transitionStart = scene.end_time - leadIn;
-        const transitionEnd = scene.end_time + leadOut;
+        // Use original_end_time (source domain) for drift-free matching
+        const boundary = scene.original_end_time ?? scene.end_time;
+        const transitionStart = boundary - leadIn;
+        const transitionEnd = boundary + leadOut;
 
         if (time >= transitionStart && time < transitionEnd) {
           const rawProgress = (time - transitionStart) / transitionDuration;

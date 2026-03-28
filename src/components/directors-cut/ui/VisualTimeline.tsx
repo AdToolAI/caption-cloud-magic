@@ -370,16 +370,7 @@ export function VisualTimeline({
                       <div className="text-[9px] text-muted-foreground">
                         Dauer: {transition.duration.toFixed(1)}s
                       </div>
-                      {draggingTransition?.sceneId === scene.id && dragTransitionAnchor !== null && (
-                        <div className="text-[9px] text-primary font-mono mt-0.5">
-                          Position: {dragTransitionAnchor.toFixed(1)}s
-                        </div>
-                      )}
-                      {transition.anchorTime && !draggingTransition && (
-                        <div className="text-[9px] text-muted-foreground font-mono mt-0.5">
-                          Anker: {transition.anchorTime.toFixed(1)}s
-                        </div>
-                      )}
+                      
                       {transition.aiSuggested && (
                         <Badge className="mt-1 h-4 text-[8px] px-1" variant="secondary">
                           <Sparkles className="h-2 w-2 mr-0.5" />

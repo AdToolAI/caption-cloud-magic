@@ -389,14 +389,14 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const sceneInfo = findSceneBySourceTime(videoSourceTime, lastSceneIndexRef.current);
       let timelineTime: number;
 
-      // Cache findActiveTransition ONCE per frame
+      // Cache findActiveTransition ONCE per frame — using SOURCE time directly
       let cachedActiveTrans: ReturnType<typeof findActiveTransition> = null;
+      cachedActiveTrans = findActiveTransition(videoSourceTime);
 
       if (sceneInfo) {
         timelineTime = sourceToTimelineTime(sceneInfo.scene, videoSourceTime);
         // Only clamp to scene boundaries if NO transition is active
         // During transitions, timeline time must flow past scene.end_time
-        cachedActiveTrans = findActiveTransition(timelineTime);
         if (!cachedActiveTrans) {
           timelineTime = Math.max(sceneInfo.scene.start_time, Math.min(timelineTime, sceneInfo.scene.end_time));
         }
