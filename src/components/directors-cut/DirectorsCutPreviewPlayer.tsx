@@ -439,8 +439,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         onTimeUpdateRef.current?.(timelineTime);
       }
 
-      // Drift correction for source audio (generous threshold)
-      if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
+      // Drift correction for source audio — SKIP during transitions to prevent rubber-banding
+      if (sourceAudioRef.current && !sourceAudioRef.current.paused && !cachedActiveTrans) {
         if (Math.abs(sourceAudioRef.current.currentTime - timelineTime) > 0.5) {
           sourceAudioRef.current.currentTime = timelineTime;
         }
