@@ -161,11 +161,11 @@ Für jeden gefundenen SCHNITT:
 - Berechne start_time = (frame_start - 1) × 0.1
 - Berechne end_time = (frame_end - 1) × 0.1
 
-BEISPIEL für 40 Frames (20s Video):
-- Frames 1-7: Produkt von vorne → Szene 1: frame_start=1, frame_end=7, start=0.0s, end=3.0s, description="Produkt Frontansicht"
-- Frame 8 ist ANDERS → SCHNITT!
-- Frames 8-14: Produkt von der Seite → Szene 2: frame_start=8, frame_end=14, start=3.5s, end=6.5s, description="Produkt Seitenansicht"
-- Frame 15 ist ANDERS → SCHNITT!
+BEISPIEL für 200 Frames (20s Video bei 0.1s Intervall):
+- Frames 1-70: Produkt von vorne → Szene 1: frame_start=1, frame_end=70, start=0.0s, end=6.9s, description="Produkt Frontansicht"
+- Frame 71 ist ANDERS → SCHNITT!
+- Frames 71-140: Produkt von der Seite → Szene 2: frame_start=71, frame_end=140, start=7.0s, end=13.9s, description="Produkt Seitenansicht"
+- Frame 141 ist ANDERS → SCHNITT!
 - usw.
 
 GIB FRAME-NUMMERN AN! Das ist wichtig für die Validierung.
