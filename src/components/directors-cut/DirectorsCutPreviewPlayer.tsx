@@ -664,6 +664,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           currentTime={displayTime}
         />
 
+        {/* Vignette overlay from Step 5 color correction */}
+        {vignetteValue > 0 && (
+          <div
+            className="absolute inset-0 pointer-events-none z-[5]"
+            style={{
+              background: `radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,${vignetteValue / 100 * 0.7}) 100%)`,
+            }}
+          />
+        )}
+
         {/* Text Overlays */}
         {textOverlays.filter(o => displayTime >= o.startTime && displayTime < o.endTime).map(overlay => (
           <div
