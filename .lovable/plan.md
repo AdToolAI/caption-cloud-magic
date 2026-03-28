@@ -1,53 +1,49 @@
 
 
-## Fix: Übergänge 0.5s zu früh — Timeline-Mapping während Transitions
+## Fix: Stottern & Gummibandeffekt bei Übergängen 2 und 3
 
-### Problem
+### Ursache
 
-Das Video-led Playback hat ein Mapping-Problem an Szenengrenzen:
+Zwei Probleme im rAF-Loop:
 
-1. **Zeile 366**: `timelineTime` wird auf `scene.end_time` geclampt — aber während einer Transition muss die Zeit **darüber hinaus** weiterlaufen (70% des Übergangs passiert NACH der Grenze)
-2. **Zeile 345**: `findSceneBySourceTime` hat nur 0.05s Toleranz — sobald das Video 50ms über das Source-Ende der Outgoing-Szene hinaus spielt, findet es keine Szene mehr und fällt auf `timelineTime = videoSourceTime` (Zeile 418), was bei nicht-linearem Scene-Mapping falsch ist
-3. **Ergebnis**: Der `visualTimeRef`-Wert springt oder stagniert an Szenengrenzen, was die Transition im Canvas-Renderer ~0.5s zu früh erscheinen lässt
+1. **Scene-Boundary-Logik feuert während Transitions**: Zeile 399 (`videoSourceTime >= srcEnd - 0.02`) ist während der gesamten Transition nach der Szenengrenze **jeden Frame true**. Obwohl kein Seek passiert (weil `findActiveTransition` die Transition erkennt), wird die Logik trotzdem jedes Mal durchlaufen und erzeugt unnötige Berechnungen/Checks.
+
+2. **Audio-Korrektur während Transitions = Gummibandeffekt**: Zeile 442 korrigiert `sourceAudio.currentTime = timelineTime` wenn drift > 0.5s. Während einer Transition fließt `timelineTime` über `scene.end_time` hinaus (gewollt), aber das Audio spielt linear. Die Timeline-Zeit kann leicht schwanken (durch die Toleranz in `findSceneBySourceTime`), was zu wiederholten Audio-Seeks führt → Gummiband-Sound.
 
 ### Lösung
 
-Den rAF-Loop so anpassen, dass er während einer Transition die Timeline-Zeit korrekt weiterberechnet:
+**Datei: `DirectorsCutPreviewPlayer.tsx`** — rAF-Loop anpassen:
 
-**In `findSceneBySourceTime` (Zeile 339-350):**
-- Toleranz am Ende auf **1.5s** erweitern (= maximale Transition-Dauer), damit die Outgoing-Szene während der Transition weiterhin gefunden wird
+1. **Transition-Guard für Scene-Boundary-Logik**: Wenn `findActiveTransition(timelineTime)` aktiv ist → den gesamten Block (Zeilen 399-418) überspringen. Das Video läuft natürlich weiter, der Canvas-Renderer zeigt den Übergang, kein Seeking nötig.
 
-**In der Timeline-Berechnung (Zeile 363-366):**
-- Clamping auf `scene.end_time` entfernen wenn eine aktive Transition läuft
-- Stattdessen: Wenn `timelineTime > scene.end_time`, prüfen ob eine Transition aktiv ist → wenn ja, Timeline weiter hochzählen lassen (das Video spielt natürlich weiter, die Source-Time mapped korrekt auf die Zeit nach der Grenze)
-
-**Konkreter Ansatz:**
 ```typescript
-// Zeile 363-366 — Clamping nur ohne aktive Transition
-if (sceneInfo) {
-  timelineTime = sourceToTimelineTime(sceneInfo.scene, videoSourceTime);
-  
-  // Nur clampen wenn KEINE Transition aktiv ist
-  const activeTrans = findActiveTransition(timelineTime);
-  if (!activeTrans) {
-    timelineTime = Math.max(sceneInfo.scene.start_time, Math.min(timelineTime, sceneInfo.scene.end_time));
+// Zeile 394-418 — NUR ausführen wenn KEINE Transition aktiv
+const activeTransForBoundary = findActiveTransition(timelineTime);
+if (!activeTransForBoundary) {
+  // Existing scene-boundary-crossing logic...
+  if (videoSourceTime >= srcEnd - 0.02) { ... }
+}
+```
+
+2. **Audio-Korrektur während Transitions pausieren**: Kein `sourceAudio.currentTime` setzen solange eine Transition läuft → eliminiert den Gummiband-Sound komplett.
+
+```typescript
+// Zeile 440-445 — Audio nur korrigieren wenn KEINE Transition
+const activeTransForAudio = findActiveTransition(timelineTime);
+if (sourceAudioRef.current && !sourceAudioRef.current.paused && !activeTransForAudio) {
+  if (Math.abs(sourceAudioRef.current.currentTime - timelineTime) > 0.5) {
+    sourceAudioRef.current.currentTime = timelineTime;
   }
 }
 ```
 
-```typescript
-// Zeile 344-345 — Großzügigere Toleranz am Source-Ende für Transitions
-const srcEnd = srcStart + (s.end_time - s.start_time) * rate;
-if (sourceTime >= srcStart - 0.05 && sourceTime < srcEnd + 1.5) {
-  return { scene: s, index: i };
-}
-```
+3. **`findActiveTransition` einmal pro Frame cachen** statt 3x aufrufen: Am Anfang des tick einmal berechnen und wiederverwenden.
 
 ### Dateien
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `findSceneBySourceTime` Toleranz + Clamping-Fix
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — rAF-Loop: Transition-Guard + Audio-Fix
 
 ### Ergebnis
-- Transitions starten und enden zeitlich korrekt
-- Kein Stottern (Video-led bleibt erhalten)
-- Alle 3 Übergänge synchron zur erwarteten Position
+- Kein Stottern mehr bei Übergängen (keine Seeks während Transitions)
+- Kein Gummiband-Sound (Audio läuft ungestört durch Transitions)
+- Performance besser (findActiveTransition nur 1x pro Frame)
 
