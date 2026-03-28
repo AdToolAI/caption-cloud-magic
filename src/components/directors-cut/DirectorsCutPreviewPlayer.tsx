@@ -630,6 +630,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     visualTimeRef.current = newTime;
     setDisplayTime(newTime);
     onTimeUpdateRef.current?.(newTime);
+    // Reset scene tracking on manual seek
+    lastSceneIndexRef.current = -1;
+    pendingSceneAdvanceRef.current = null;
 
     // No incoming video sync needed — canvas snapshots handle transitions
 
