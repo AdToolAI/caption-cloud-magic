@@ -129,7 +129,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     return sourceStart + (timelineTime - scene.start_time) * playbackRate;
   }, []);
 
-  // Helper: find active transition using SOURCE time (video.currentTime domain)
+  // Helper: find active transition OR freeze-phase using SOURCE time (video.currentTime domain)
   // This avoids timeline-mapping drift by comparing directly against original_end_time
   const findActiveTransition = useCallback((sourceTime: number) => {
     let prevEnd = -Infinity;
@@ -140,13 +140,28 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const tDuration = Math.max(0.8, t.duration || 1.2);
       const leadIn = tDuration * 0.05;
       const leadOut = tDuration * 0.95;
-      // Use original_end_time (source domain) — same domain as video.currentTime
       const offset = t.offsetSeconds ?? 0;
-      const boundary = (scene.original_end_time ?? scene.end_time) + offset;
+      const originalBoundary = scene.original_end_time ?? scene.end_time;
+      const boundary = originalBoundary + offset;
       const tStart = Math.max(boundary - leadIn, prevEnd);
       const tEnd = boundary + leadOut;
       const effectiveDuration = tEnd - tStart;
       prevEnd = tEnd;
+
+      // Freeze phase: offset > 0, past original cut but before transition window
+      // Return a synthetic "active" result so boundary-crossing logic is suppressed
+      if (offset > 0 && sourceTime >= originalBoundary && sourceTime < tStart) {
+        return {
+          outgoingScene: scene,
+          incomingScene: sortedScenes[i + 1],
+          boundary,
+          leadIn,
+          tDuration: effectiveDuration,
+          progress: 0, // freeze = 0% progress
+          isFreeze: true,
+        };
+      }
+
       if (sourceTime >= tStart && sourceTime < tEnd) {
         return {
           outgoingScene: scene,
@@ -155,6 +170,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           leadIn,
           tDuration: effectiveDuration,
           progress: (sourceTime - tStart) / effectiveDuration,
+          isFreeze: false,
         };
       }
     }
