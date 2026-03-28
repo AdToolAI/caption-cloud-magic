@@ -1157,6 +1157,7 @@ export function SceneEditingStep({
                         <TransitionPicker
                           selectedType={getTransitionForScene(selectedScene.id)?.transitionType || 'none'}
                           duration={getTransitionForScene(selectedScene.id)?.duration || 0.5}
+                          offsetSeconds={getTransitionForScene(selectedScene.id)?.offsetSeconds ?? 0}
                           onTypeChange={(type) => {
                             setEditingTransitionId(selectedScene.id);
                             handleTransitionTypeChange(type);
@@ -1164,6 +1165,13 @@ export function SceneEditingStep({
                           onDurationChange={(duration) => {
                             setEditingTransitionId(selectedScene.id);
                             handleTransitionDurationChange(duration);
+                          }}
+                          onOffsetChange={(offset) => {
+                            const sceneId = selectedScene.id;
+                            const updated = transitions.map(t =>
+                              t.sceneId === sceneId ? { ...t, offsetSeconds: offset } : t
+                            );
+                            onTransitionsChange(updated);
                           }}
                           aiRecommendation={getTransitionForScene(selectedScene.id)?.aiSuggested 
                             ? getTransitionForScene(selectedScene.id)?.transitionType 

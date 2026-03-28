@@ -67,8 +67,10 @@ const TRANSITION_TYPES: TransitionType[] = [
 interface TransitionPickerProps {
   selectedType: string;
   duration: number;
+  offsetSeconds?: number;
   onTypeChange: (type: string) => void;
   onDurationChange: (duration: number) => void;
+  onOffsetChange?: (offset: number) => void;
   aiRecommendation?: string;
   aiConfidence?: number;
   aiReasoning?: string;
@@ -77,8 +79,10 @@ interface TransitionPickerProps {
 export function TransitionPicker({
   selectedType,
   duration,
+  offsetSeconds = 0,
   onTypeChange,
   onDurationChange,
+  onOffsetChange,
   aiRecommendation,
   aiConfidence,
   aiReasoning,
@@ -288,6 +292,40 @@ export function TransitionPicker({
             <span>Schnell</span>
             <span>Langsam</span>
             <span>2.0s</span>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Timing Offset Slider */}
+      {selectedType !== 'none' && onOffsetChange && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="space-y-3 p-3 rounded-xl bg-muted/50 backdrop-blur-sm"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Timing anpassen</span>
+            </div>
+            <Badge variant="outline" className="font-mono">
+              {offsetSeconds >= 0 ? '+' : ''}{offsetSeconds.toFixed(1)}s
+            </Badge>
+          </div>
+          <Slider
+            value={[(offsetSeconds + 2) * 10]}
+            onValueChange={([v]) => onOffsetChange(Math.round((v / 10 - 2) * 10) / 10)}
+            min={0}
+            max={40}
+            step={1}
+            className="py-2"
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground">
+            <span>-2.0s</span>
+            <span>Früher</span>
+            <span>Später</span>
+            <span>+2.0s</span>
           </div>
         </motion.div>
       )}

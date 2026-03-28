@@ -52,7 +52,8 @@ export function useTransitionRenderer(
         const leadIn = tDuration * 0.05;
         const leadOut = tDuration * 0.95;
         // Use original_end_time (source domain) for drift-free matching
-        const boundary = scene.original_end_time ?? scene.end_time;
+        const offset = transition.offsetSeconds ?? 0;
+        const boundary = (scene.original_end_time ?? scene.end_time) + offset;
         const tStart = Math.max(boundary - leadIn, prevEnd);
         const tEnd = boundary + leadOut;
         const effectiveDuration = tEnd - tStart;
