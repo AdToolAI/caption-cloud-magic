@@ -127,20 +127,24 @@ export function VisualTimeline({
 
   const handleTransitionDotMouseMove = useCallback((e: MouseEvent) => {
     if (!draggingTransition || !timelineRef.current || !onTransitionAnchorChange) return;
-    const rect = timelineRef.current.getBoundingClientRect();
+    
     const deltaX = e.clientX - dragTransitionStartXRef.current;
+    // Only start actual dragging after 5px threshold
+    if (!hasExceededDragThresholdRef.current && Math.abs(deltaX) < 5) return;
+    hasExceededDragThresholdRef.current = true;
+    
+    const rect = timelineRef.current.getBoundingClientRect();
     const deltaPercent = deltaX / rect.width;
     const deltaTime = deltaPercent * actualTotalDuration;
     
     const leftScene = scenes[draggingTransition.sceneIndex];
     const rightScene = scenes[draggingTransition.sceneIndex + 1];
-    // Clamp: at least 0.3s inside each scene
     const minAnchor = leftScene.start_time + 0.3;
     const maxAnchor = rightScene.end_time - 0.3;
     const newAnchor = Math.max(minAnchor, Math.min(maxAnchor, dragTransitionStartAnchorRef.current + deltaTime));
     
     setDragTransitionAnchor(newAnchor);
-  }, [draggingTransition, scenes, onTransitionAnchorChange]);
+  }, [draggingTransition, scenes, onTransitionAnchorChange, actualTotalDuration]);
 
   const handleTransitionDotMouseUp = useCallback(() => {
     if (draggingTransition && dragTransitionAnchor !== null && onTransitionAnchorChange) {
