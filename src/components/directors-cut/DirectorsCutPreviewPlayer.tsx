@@ -337,6 +337,17 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     // Helper: find which scene the video's current source time belongs to
     const findSceneBySourceTime = (sourceTime: number): { scene: SceneAnalysis; index: number } | null => {
+      // Pass 1: Exact match (tight tolerance)
+      for (let i = 0; i < sortedScenes.length; i++) {
+        const s = sortedScenes[i];
+        const srcStart = s.original_start_time ?? s.start_time;
+        const rate = (s as any).playbackRate ?? 1;
+        const srcEnd = srcStart + (s.end_time - s.start_time) * rate;
+        if (sourceTime >= srcStart - 0.05 && sourceTime < srcEnd + 0.05) {
+          return { scene: s, index: i };
+        }
+      }
+      // Pass 2: Extended tolerance fallback (for transitions flowing past boundary)
       for (let i = 0; i < sortedScenes.length; i++) {
         const s = sortedScenes[i];
         const srcStart = s.original_start_time ?? s.start_time;
