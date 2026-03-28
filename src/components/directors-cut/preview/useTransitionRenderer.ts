@@ -48,8 +48,8 @@ export function useTransitionRenderer(
         if (!transition || transition.transitionType === 'none') continue;
 
         const tDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
-        const leadIn = tDuration * 0.3;
-        const leadOut = tDuration * 0.7;
+        const leadIn = tDuration * 0.05;
+        const leadOut = tDuration * 0.95;
         const boundary = transition.anchorTime ?? scene.end_time;
         const tStart = Math.max(boundary - leadIn, prevEnd);
         const tEnd = boundary + leadOut;
