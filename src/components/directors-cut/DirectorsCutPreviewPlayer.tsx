@@ -342,7 +342,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         const srcStart = s.original_start_time ?? s.start_time;
         const rate = (s as any).playbackRate ?? 1;
         const srcEnd = srcStart + (s.end_time - s.start_time) * rate;
-        if (sourceTime >= srcStart - 0.05 && sourceTime < srcEnd + 0.05) {
+        if (sourceTime >= srcStart - 0.05 && sourceTime < srcEnd + 1.5) {
           return { scene: s, index: i };
         }
       }
