@@ -333,52 +333,25 @@ export function VisualTimeline({
                       </div>
                     </motion.div>
 
-                    {/* Transition Button — draggable */}
-                    {(() => {
-                      const isDraggingThis = draggingTransition?.sceneId === scene.id;
-                      const anchorTime = isDraggingThis && dragTransitionAnchor !== null
-                        ? dragTransitionAnchor
-                        : (transition?.anchorTime ?? scene.end_time);
-                      // Compute offset from scene boundary as % of timeline width
-                      const offsetTime = anchorTime - scene.end_time;
-                      const offsetPercent = (offsetTime / actualTotalDuration) * 100;
-                      
-                      return (
-                        <motion.button
-                          onMouseDown={(e) => {
-                            if (onTransitionAnchorChange) {
-                              handleTransitionDotMouseDown(e, scene.id, index);
-                            }
-                          }}
-                          onClick={(e) => {
-                            if (!isDraggingThis) {
-                              e.stopPropagation();
-                              onTransitionClick(scene.id);
-                            }
-                          }}
-                          onHoverStart={() => !isDraggingThis && setHoveredTransition(scene.id)}
-                          onHoverEnd={() => setHoveredTransition(null)}
-                          whileHover={!isDraggingThis ? { scale: 1.2 } : undefined}
-                          whileTap={!isDraggingThis ? { scale: 0.9 } : undefined}
-                          className={cn(
-                            "w-5 h-5 rounded-full flex items-center justify-center",
-                            "border-2 border-background shadow-lg",
-                            "transition-colors duration-200",
-                            onTransitionAnchorChange ? "cursor-ew-resize" : "cursor-pointer",
-                            transition ? TRANSITION_COLORS[transition.transitionType] : 'bg-muted',
-                            hoveredTransition === scene.id && "ring-2 ring-primary/50",
-                            isDraggingThis && "ring-2 ring-primary scale-125"
-                          )}
-                          style={{
-                            transform: `translateX(${offsetPercent * (timelineRef.current?.getBoundingClientRect().width ?? 800) / 100}px)`,
-                          }}
-                        >
-                          <span className="text-[8px] text-white">
-                            {transition ? TRANSITION_ICONS[transition.transitionType] : '+'}
-                          </span>
-                        </motion.button>
-                      );
-                    })()}
+                    {/* Transition Button — click only, no drag */}
+                    <motion.button
+                      onMouseDown={(e) => handleTransitionDotMouseDown(e, scene.id, index)}
+                      onHoverStart={() => setHoveredTransition(scene.id)}
+                      onHoverEnd={() => setHoveredTransition(null)}
+                      whileHover={{ scale: 1.2 }}
+                      whileTap={{ scale: 0.9 }}
+                      className={cn(
+                        "w-5 h-5 rounded-full flex items-center justify-center",
+                        "border-2 border-background shadow-lg",
+                        "transition-colors duration-200 cursor-pointer",
+                        transition ? TRANSITION_COLORS[transition.transitionType] : 'bg-muted',
+                        hoveredTransition === scene.id && "ring-2 ring-primary/50",
+                      )}
+                    >
+                      <span className="text-[8px] text-white">
+                        {transition ? TRANSITION_ICONS[transition.transitionType] : '+'}
+                      </span>
+                    </motion.button>
                   </div>
                 )}
 
