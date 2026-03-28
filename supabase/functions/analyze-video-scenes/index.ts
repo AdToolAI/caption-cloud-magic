@@ -51,9 +51,10 @@ serve(async (req) => {
     if (frames && frames.length > 0) {
       console.log(`[analyze-video-scenes] Using Vision AI with ${frames.length} frames`);
       
-      // Frames sind alle 0.5 Sekunden extrahiert
+      // Frames sind alle 0.1 Sekunden extrahiert (hochpräzise Schnitterkennung)
+      const FRAME_INTERVAL = 0.1;
       const frameTimings = frames.map((_: string, i: number) => {
-        const time = (i * 0.5).toFixed(1);
+        const time = (i * FRAME_INTERVAL).toFixed(1);
         return `Frame ${i + 1}: Sekunde ${time}`;
       }).join('\n');
 
