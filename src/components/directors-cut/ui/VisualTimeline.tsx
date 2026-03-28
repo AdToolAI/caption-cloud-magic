@@ -61,6 +61,7 @@ export function VisualTimeline({
   const [dragTransitionAnchor, setDragTransitionAnchor] = useState<number | null>(null);
   const dragTransitionStartXRef = useRef<number>(0);
   const dragTransitionStartAnchorRef = useRef<number>(0);
+  const hasExceededDragThresholdRef = useRef<boolean>(false);
 
   // Calculate total duration dynamically from scenes (not prop) for accurate widths
   const actualTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
