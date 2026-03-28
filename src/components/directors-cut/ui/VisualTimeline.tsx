@@ -120,6 +120,7 @@ export function VisualTimeline({
     const currentAnchor = transition?.anchorTime ?? scenes[sceneIndex].end_time;
     dragTransitionStartXRef.current = e.clientX;
     dragTransitionStartAnchorRef.current = currentAnchor;
+    hasExceededDragThresholdRef.current = false;
     setDraggingTransition({ sceneId, sceneIndex });
     setDragTransitionAnchor(currentAnchor);
   }, [scenes, transitions]);
