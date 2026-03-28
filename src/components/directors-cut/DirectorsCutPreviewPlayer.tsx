@@ -141,7 +141,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const leadIn = tDuration * 0.05;
       const leadOut = tDuration * 0.95;
       // Use original_end_time (source domain) — same domain as video.currentTime
-      const boundary = scene.original_end_time ?? scene.end_time;
+      const offset = t.offsetSeconds ?? 0;
+      const boundary = (scene.original_end_time ?? scene.end_time) + offset;
       const tStart = Math.max(boundary - leadIn, prevEnd);
       const tEnd = boundary + leadOut;
       const effectiveDuration = tEnd - tStart;

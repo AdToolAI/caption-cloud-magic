@@ -122,6 +122,8 @@ export interface TransitionAssignment {
   reasoning?: string;
   /** Manual anchor time — overrides scene.end_time as the transition center */
   anchorTime?: number;
+  /** Manual timing offset in seconds (-2.0 to +2.0). Positive = later, negative = earlier */
+  offsetSeconds?: number;
 }
 
 // Wizard Step Props

@@ -79,8 +79,10 @@ interface TransitionPickerProps {
 export function TransitionPicker({
   selectedType,
   duration,
+  offsetSeconds = 0,
   onTypeChange,
   onDurationChange,
+  onOffsetChange,
   aiRecommendation,
   aiConfidence,
   aiReasoning,

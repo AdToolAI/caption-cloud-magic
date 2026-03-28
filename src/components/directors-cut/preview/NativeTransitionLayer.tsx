@@ -50,7 +50,8 @@ export function useTransitionInfo(
         const leadIn = transitionDuration * 0.05;
         const leadOut = transitionDuration * 0.95;
         // Use original_end_time (source domain) for drift-free matching
-        const boundary = scene.original_end_time ?? scene.end_time;
+        const offset = transition.offsetSeconds ?? 0;
+        const boundary = (scene.original_end_time ?? scene.end_time) + offset;
         const transitionStart = boundary - leadIn;
         const transitionEnd = boundary + leadOut;
 
