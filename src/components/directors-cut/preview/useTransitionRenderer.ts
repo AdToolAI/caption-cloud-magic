@@ -31,7 +31,8 @@ export function useTransitionRenderer(
     }
 
     const tick = () => {
-      const time = visualTimeRef.current ?? 0;
+      // Read source time directly from video element for drift-free transitions
+      const time = baseVideoRef.current?.currentTime ?? visualTimeRef.current ?? 0;
       const base = baseVideoRef.current;
       const canvas = canvasRef.current;
       if (!base || !canvas) {
@@ -50,7 +51,8 @@ export function useTransitionRenderer(
         const tDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
         const leadIn = tDuration * 0.05;
         const leadOut = tDuration * 0.95;
-        const boundary = transition.anchorTime ?? scene.end_time;
+        // Use original_end_time (source domain) for drift-free matching
+        const boundary = scene.original_end_time ?? scene.end_time;
         const tStart = Math.max(boundary - leadIn, prevEnd);
         const tEnd = boundary + leadOut;
         const effectiveDuration = tEnd - tStart;

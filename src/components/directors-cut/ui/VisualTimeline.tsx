@@ -14,6 +14,7 @@ interface VisualTimelineProps {
   onTransitionClick: (sceneId: string) => void;
   // Updated: only needs sceneId and new end time - parent handles shifting
   onSceneDurationChange?: (sceneId: string, newEndTime: number) => void;
+  /** @deprecated anchorTime removed — transitions anchor to original_end_time */
   onTransitionAnchorChange?: (sceneId: string, anchorTime: number) => void;
   thumbnails?: Record<string, string>;
   currentTime?: number;
@@ -112,18 +113,13 @@ export function VisualTimeline({
     setDragStartScenes(null);
   }, []);
 
-  // Transition dot drag handlers
+  // Transition dot click handler — no more dragging, just click to open dialog
   const handleTransitionDotMouseDown = useCallback((e: React.MouseEvent, sceneId: string, sceneIndex: number) => {
     e.preventDefault();
     e.stopPropagation();
-    const transition = transitions.find(t => t.sceneId === sceneId);
-    const currentAnchor = transition?.anchorTime ?? scenes[sceneIndex].end_time;
-    dragTransitionStartXRef.current = e.clientX;
-    dragTransitionStartAnchorRef.current = currentAnchor;
-    hasExceededDragThresholdRef.current = false;
-    setDraggingTransition({ sceneId, sceneIndex });
-    setDragTransitionAnchor(currentAnchor);
-  }, [scenes, transitions]);
+    // No drag — just open the transition dialog
+    onTransitionClick(sceneId);
+  }, [onTransitionClick]);
 
   const handleTransitionDotMouseMove = useCallback((e: MouseEvent) => {
     if (!draggingTransition || !timelineRef.current || !onTransitionAnchorChange) return;
@@ -337,52 +333,25 @@ export function VisualTimeline({
                       </div>
                     </motion.div>
 
-                    {/* Transition Button — draggable */}
-                    {(() => {
-                      const isDraggingThis = draggingTransition?.sceneId === scene.id;
-                      const anchorTime = isDraggingThis && dragTransitionAnchor !== null
-                        ? dragTransitionAnchor
-                        : (transition?.anchorTime ?? scene.end_time);
-                      // Compute offset from scene boundary as % of timeline width
-                      const offsetTime = anchorTime - scene.end_time;
-                      const offsetPercent = (offsetTime / actualTotalDuration) * 100;
-                      
-                      return (
-                        <motion.button
-                          onMouseDown={(e) => {
-                            if (onTransitionAnchorChange) {
-                              handleTransitionDotMouseDown(e, scene.id, index);
-                            }
-                          }}
-                          onClick={(e) => {
-                            if (!isDraggingThis) {
-                              e.stopPropagation();
-                              onTransitionClick(scene.id);
-                            }
-                          }}
-                          onHoverStart={() => !isDraggingThis && setHoveredTransition(scene.id)}
-                          onHoverEnd={() => setHoveredTransition(null)}
-                          whileHover={!isDraggingThis ? { scale: 1.2 } : undefined}
-                          whileTap={!isDraggingThis ? { scale: 0.9 } : undefined}
-                          className={cn(
-                            "w-5 h-5 rounded-full flex items-center justify-center",
-                            "border-2 border-background shadow-lg",
-                            "transition-colors duration-200",
-                            onTransitionAnchorChange ? "cursor-ew-resize" : "cursor-pointer",
-                            transition ? TRANSITION_COLORS[transition.transitionType] : 'bg-muted',
-                            hoveredTransition === scene.id && "ring-2 ring-primary/50",
-                            isDraggingThis && "ring-2 ring-primary scale-125"
-                          )}
-                          style={{
-                            transform: `translateX(${offsetPercent * (timelineRef.current?.getBoundingClientRect().width ?? 800) / 100}px)`,
-                          }}
-                        >
-                          <span className="text-[8px] text-white">
-                            {transition ? TRANSITION_ICONS[transition.transitionType] : '+'}
-                          </span>
-                        </motion.button>
-                      );
-                    })()}
+                    {/* Transition Button — click only, no drag */}
+                    <motion.button
+                      onMouseDown={(e) => handleTransitionDotMouseDown(e, scene.id, index)}
+                      onHoverStart={() => setHoveredTransition(scene.id)}
+                      onHoverEnd={() => setHoveredTransition(null)}
+                      whileHover={{ scale: 1.2 }}
+                      whileTap={{ scale: 0.9 }}
+                      className={cn(
+                        "w-5 h-5 rounded-full flex items-center justify-center",
+                        "border-2 border-background shadow-lg",
+                        "transition-colors duration-200 cursor-pointer",
+                        transition ? TRANSITION_COLORS[transition.transitionType] : 'bg-muted',
+                        hoveredTransition === scene.id && "ring-2 ring-primary/50",
+                      )}
+                    >
+                      <span className="text-[8px] text-white">
+                        {transition ? TRANSITION_ICONS[transition.transitionType] : '+'}
+                      </span>
+                    </motion.button>
                   </div>
                 )}
 
@@ -401,16 +370,7 @@ export function VisualTimeline({
                       <div className="text-[9px] text-muted-foreground">
                         Dauer: {transition.duration.toFixed(1)}s
                       </div>
-                      {draggingTransition?.sceneId === scene.id && dragTransitionAnchor !== null && (
-                        <div className="text-[9px] text-primary font-mono mt-0.5">
-                          Position: {dragTransitionAnchor.toFixed(1)}s
-                        </div>
-                      )}
-                      {transition.anchorTime && !draggingTransition && (
-                        <div className="text-[9px] text-muted-foreground font-mono mt-0.5">
-                          Anker: {transition.anchorTime.toFixed(1)}s
-                        </div>
-                      )}
+                      
                       {transition.aiSuggested && (
                         <Badge className="mt-1 h-4 text-[8px] px-1" variant="secondary">
                           <Sparkles className="h-2 w-2 mr-0.5" />
