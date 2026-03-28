@@ -315,60 +315,112 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   useTransitionRenderer(videoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef);
 
 
-  // ==================== rAF PLAYBACK LOOP (TIMELINE-LED) ====================
+  // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
+  // Track last scene index to detect scene changes (only seek on scene entry)
+  const lastSceneIndexRef = useRef<number>(-1);
+
   useEffect(() => {
     if (!isPlaying) {
       if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
       return;
     }
 
-    let lastTimestamp: number | null = null;
     let lastDisplayUpdate = 0;
     let lastParentUpdate = 0;
 
-    const tick = (timestamp: number) => {
+    // Helper: reverse-map source time → timeline time for a given scene
+    const sourceToTimelineTime = (scene: SceneAnalysis, sourceTime: number): number => {
+      const sourceStart = scene.original_start_time ?? scene.start_time;
+      const playbackRate = (scene as any).playbackRate ?? 1;
+      return scene.start_time + (sourceTime - sourceStart) / playbackRate;
+    };
+
+    // Helper: find which scene the video's current source time belongs to
+    const findSceneBySourceTime = (sourceTime: number): { scene: SceneAnalysis; index: number } | null => {
+      for (let i = 0; i < sortedScenes.length; i++) {
+        const s = sortedScenes[i];
+        const srcStart = s.original_start_time ?? s.start_time;
+        const rate = (s as any).playbackRate ?? 1;
+        const srcEnd = srcStart + (s.end_time - s.start_time) * rate;
+        if (sourceTime >= srcStart - 0.05 && sourceTime < srcEnd + 0.05) {
+          return { scene: s, index: i };
+        }
+      }
+      return null;
+    };
+
+    const tick = () => {
       const video = videoRef.current;
       if (!video) { rafIdRef.current = requestAnimationFrame(tick); return; }
 
-      // Timeline-led: advance timeline time by wall-clock delta
-      if (lastTimestamp !== null) {
-        const delta = (timestamp - lastTimestamp) / 1000;
-        visualTimeRef.current = Math.min(visualTimeRef.current + delta, duration);
-      }
-      lastTimestamp = timestamp;
+      // VIDEO-LED: read video.currentTime as source of truth
+      const videoSourceTime = video.currentTime;
 
-      const timelineTime = visualTimeRef.current;
+      // Reverse-map to timeline time
+      const sceneInfo = findSceneBySourceTime(videoSourceTime);
+      let timelineTime: number;
 
-      // Check if we're in a transition window
-      const activeTrans = findActiveTransition(timelineTime);
+      if (sceneInfo) {
+        timelineTime = sourceToTimelineTime(sceneInfo.scene, videoSourceTime);
+        // Clamp to scene boundaries
+        timelineTime = Math.max(sceneInfo.scene.start_time, Math.min(timelineTime, sceneInfo.scene.end_time));
 
-      if (activeTrans) {
-        // DURING TRANSITION: base video stays on OUTGOING scene
-        const { outgoingScene } = activeTrans;
+        // Detect scene change → only seek when entering a NEW scene
+        if (sceneInfo.index !== lastSceneIndexRef.current) {
+          const prevIndex = lastSceneIndexRef.current;
+          lastSceneIndexRef.current = sceneInfo.index;
 
-        const outgoingTime = sourceTimeForScene(outgoingScene, Math.min(timelineTime, outgoingScene.end_time));
-        if (Math.abs(video.currentTime - outgoingTime) > 0.15) {
-          video.currentTime = outgoingTime;
-        }
-        const outRate = (outgoingScene as any).playbackRate ?? 1;
-        if (Math.abs(video.playbackRate - outRate) > 0.01) {
-          video.playbackRate = outRate;
-        }
-        // Canvas-based incoming frame is handled by useTransitionRenderer — no sync needed
-      } else {
-        // NOT in transition: normal scene sync
-        const activeScene = sortedScenes.find(s => timelineTime >= s.start_time && timelineTime < s.end_time);
-        if (activeScene) {
-          const expectedSource = sourceTimeForScene(activeScene, timelineTime);
-          if (Math.abs(video.currentTime - expectedSource) > 0.15) {
-            video.currentTime = expectedSource;
+          // If we jumped to a non-consecutive scene, we need a seek
+          // But if it's the next scene in sequence, the video is naturally playing through
+          if (prevIndex >= 0 && sceneInfo.index !== prevIndex + 1) {
+            // Non-sequential scene jump — seek to correct source position
+            const expectedSource = sourceTimeForScene(sceneInfo.scene, sceneInfo.scene.start_time);
+            if (Math.abs(video.currentTime - expectedSource) > 0.3) {
+              video.currentTime = expectedSource;
+            }
           }
-          const sceneRate = (activeScene as any).playbackRate ?? 1;
+
+          // Apply playback rate for new scene
+          const sceneRate = (sceneInfo.scene as any).playbackRate ?? 1;
           if (Math.abs(video.playbackRate - sceneRate) > 0.01) {
             video.playbackRate = sceneRate;
           }
         }
+
+        // Check if video has drifted past current scene's source-end (scene boundary crossing)
+        const srcStart = sceneInfo.scene.original_start_time ?? sceneInfo.scene.start_time;
+        const rate = (sceneInfo.scene as any).playbackRate ?? 1;
+        const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
+
+        if (videoSourceTime >= srcEnd - 0.02) {
+          // Video naturally reached scene boundary — advance to next scene
+          const nextScene = sortedScenes[sceneInfo.index + 1];
+          if (nextScene) {
+            // Check if there's a transition — if so, let video keep playing (outgoing scene)
+            const activeTrans = findActiveTransition(sceneInfo.scene.end_time);
+            if (!activeTrans) {
+              // No transition: seek to next scene's source start
+              const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
+              if (Math.abs(video.currentTime - nextSourceStart) > 0.3) {
+                video.currentTime = nextSourceStart;
+              }
+              lastSceneIndexRef.current = sceneInfo.index + 1;
+              const nextRate = (nextScene as any).playbackRate ?? 1;
+              if (Math.abs(video.playbackRate - nextRate) > 0.01) {
+                video.playbackRate = nextRate;
+              }
+              timelineTime = nextScene.start_time;
+            }
+          }
+        }
+      } else {
+        // Fallback: no scene found, estimate timeline time
+        timelineTime = videoSourceTime;
       }
+
+      // Clamp timeline time
+      timelineTime = Math.max(0, Math.min(timelineTime, duration));
+      visualTimeRef.current = timelineTime;
 
       // Throttled UI updates
       const now = performance.now();
@@ -381,7 +433,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         onTimeUpdateRef.current?.(timelineTime);
       }
 
-      // Drift correction for source audio
+      // Drift correction for source audio (generous threshold)
       if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
         if (Math.abs(sourceAudioRef.current.currentTime - timelineTime) > 0.5) {
           sourceAudioRef.current.currentTime = timelineTime;
