@@ -1,84 +1,82 @@
 
-## Fix: Übergänge 2 und 3 bleiben zu früh, obwohl das Bundle korrekt deployed ist
 
-### Was ich im Code gefunden habe
-Der 5/95-Timing-Fix ist bereits an allen relevanten Stellen drin:
-- `DirectorsCutPreviewPlayer.tsx`
-- `useTransitionRenderer.ts`
-- `NativeTransitionOverlay.tsx`
-- `NativeTransitionLayer.tsx`
+## Fix: Transitions auf Original-Schnittstellen verankern (Source-Time-Domain)
 
-Wenn das Problem trotzdem bleibt, liegt es sehr wahrscheinlich **nicht mehr am Bundle** und auch **nicht mehr am Lead-in/Lead-out-Split**.
+### Kernproblem
 
-### Wahrscheinliche eigentliche Ursache
-Im Editor gibt es `anchorTime` pro Transition. Diese Zeit ist **absolut auf der Timeline gespeichert**.
+Alle Transition-Berechnungen laufen aktuell im **Timeline-Zeit-Raum**:
 
-Problem dabei:
-- Wenn frühere Szenen in der Länge verändert oder verschoben werden, verschieben sich spätere Szenengrenzen.
-- Die gespeicherten `anchorTime`-Werte der späteren Transitions werden aber **nicht mitverschoben**.
-- Dadurch liegen Transition 2 und 3 später oft noch auf alten Timeline-Positionen und wirken dann im Preview um ~0.5s zu früh oder generell versetzt.
-
-Dazu kommt noch ein zweites Problem:
-- In `VisualTimeline.tsx` startet `onMouseDown` auf dem Transition-Dot sofort den Anchor-Drag.
-- Beim Loslassen wird `anchorTime` zurückgeschrieben, selbst wenn man den Punkt nur angeklickt hat.
-- So kann unbemerkt ein fixer Anchor entstehen, obwohl eigentlich nur der Transition-Dialog geöffnet werden sollte.
-
-### Geplanter Fix
-1. **Anchor nur als echte manuelle Override-Position behandeln**
-   - `anchorTime` soll nur gesetzt werden, wenn der Nutzer den Punkt wirklich gezogen hat.
-   - Ein normaler Klick öffnet nur den Dialog und speichert keinen Anchor.
-
-2. **Transitions bei Szenen-Verschiebung mitsynchronisieren**
-   - In `SceneEditingStep.tsx` beim `handleTimelineDurationChange`:
-     - alle nachfolgenden `anchorTime`-Werte um denselben `durationDelta` verschieben
-     - nur wenn ein Transition-Objekt tatsächlich einen manuellen `anchorTime` hat
-
-3. **Optional: Anchor auf Boundary zurücksetzen**
-   - Wenn ein Anchor praktisch wieder auf `scene.end_time` liegt, den Override entfernen (`anchorTime: undefined`)
-   - Dann nutzt der Player wieder automatisch die aktuelle Szenengrenze
-
-4. **Preview-Logik unverändert lassen**
-   - `DirectorsCutPreviewPlayer` und Canvas-Renderer müssen vermutlich nicht erneut geändert werden
-   - sie lesen bereits korrekt `transition.anchorTime ?? scene.end_time`
-
-### Betroffene Dateien
-- `src/components/directors-cut/ui/VisualTimeline.tsx`
-- `src/components/directors-cut/steps/SceneEditingStep.tsx`
-
-### Konkrete Umsetzung
 ```text
-VisualTimeline
-├─ click ohne echten Drag => nur Transition-Editor öffnen
-├─ drag über kleine Schwelle => anchorTime aktualisieren
-└─ kein versehentliches Persistieren mehr
-
-SceneEditingStep
-├─ scene duration ändern
-├─ durationDelta berechnen
-├─ nachfolgende Szenen verschieben
-└─ alle manuellen transition.anchorTime Werte ab betroffenem Punkt mitverschieben
+video.currentTime (Source) → reverse-map → timelineTime → findActiveTransition(timelineTime)
 ```
 
-### Warum das die beste nächste Maßnahme ist
-- erklärt, warum speziell **Transition 2 und 3** falsch liegen, obwohl Transition 1 passt
-- erklärt, warum ein korrekt deploytes Bundle nichts ändert
-- behebt die Ursache im Editordatenmodell statt weiter am Renderer herumzudrehen
-- bewahrt die bereits funktionierenden Fixes:
-  - kein Endlos-Loop
-  - kein Stottern
-  - smoothes Video-led Playback
+Das Reverse-Mapping hat bei jedem Szenenwechsel eine Ungenauigkeit von ~0.1-0.2s (Browser-Decoder-Drift). Bei 3 Szenen summiert sich das auf ~0.5s. Transition 2 und 3 kommen deshalb zu früh.
 
-### Technische Details
-Ich würde konkret:
-- in `VisualTimeline.tsx` eine kleine Drag-Schwelle einführen (`hasMovedRef`, z. B. 4–6px)
-- `onTransitionAnchorChange` nur feuern, wenn diese Schwelle überschritten wurde
-- in `SceneEditingStep.tsx` innerhalb von `handleTimelineDurationChange` zusätzlich die `transitions` mitupdaten:
-  - Transition derselben Szene: Anchor relativ zur neuen Boundary optional beibehalten oder resetten
-  - alle späteren Transition-Anker: `anchorTime += durationDelta`
-- Anchors, die fast exakt auf der Boundary liegen, bereinigen statt dauerhaft mitzuschleppen
+### Lösung: Source-Time-Domain statt Timeline-Domain
 
-### Ergebnis
-Nach diesem Fix sollten:
-- Transition 2 und 3 wieder an der **richtigen Timeline-Position** liegen
-- spätere Szenenänderungen keine versteckten Timing-Fehler mehr erzeugen
-- der Preview Player weiterhin smooth und ohne Loop laufen
+Statt den Umweg über Timeline-Zeit zu nehmen, vergleichen wir `video.currentTime` **direkt** mit den originalen Schnittstellen im Quellvideo:
+
+```text
+video.currentTime (Source) → findActiveTransition(sourceTime, original_end_times)
+                            ↓
+                     Transition an Original-Schnitt verankert → kein Drift
+```
+
+### Konkrete Änderungen
+
+**1. `findActiveTransition` auf Source-Domain umstellen**
+
+Aktuell:
+```typescript
+const boundary = t.anchorTime ?? scene.end_time;  // Timeline-Domain
+```
+
+Neu:
+```typescript
+const boundary = scene.original_end_time ?? scene.end_time;  // Source-Domain
+```
+
+Die Funktion bekommt `sourceTime` statt `timelineTime` als Parameter. Da `original_end_time` im Source-Domain liegt und `video.currentTime` ebenfalls, gibt es keine Mapping-Drift.
+
+**2. `anchorTime` komplett entfernen**
+
+Per Nutzerwunsch: keine manuellen Anker mehr.
+
+- Aus `findActiveTransition`: `anchorTime`-Referenz entfernen
+- Aus `useTransitionRenderer`: `anchorTime`-Referenz entfernen
+- Aus `NativeTransitionOverlay`/`NativeTransitionLayer`: ebenfalls
+- Aus `VisualTimeline.tsx`: Anchor-Drag-UI entfernen (Dot bleibt als Klick-Button für Transition-Typ)
+- Aus `SceneEditingStep.tsx`: `onTransitionAnchorChange` und Anchor-Shift-Logik entfernen
+
+**3. `useTransitionRenderer` auf Source-Time umstellen**
+
+Aktuell liest er `visualTimeRef.current` (Timeline). Stattdessen:
+- Liest `baseVideoRef.current.currentTime` direkt (Source-Domain)
+- Boundary = `scene.original_end_time ?? scene.end_time`
+- Kein Mapping-Schritt mehr nötig
+
+**4. rAF-Loop im PreviewPlayer anpassen**
+
+`cachedActiveTrans` wird jetzt mit `videoSourceTime` statt `timelineTime` aufgerufen:
+```typescript
+cachedActiveTrans = findActiveTransition(videoSourceTime);
+```
+
+### Betroffene Dateien
+
+| Datei | Änderung |
+|-------|----------|
+| `DirectorsCutPreviewPlayer.tsx` | `findActiveTransition` auf sourceTime, anchorTime entfernen |
+| `useTransitionRenderer.ts` | `video.currentTime` statt `visualTimeRef`, Boundary auf `original_end_time` |
+| `NativeTransitionOverlay.tsx` | Boundary auf `original_end_time`, anchorTime entfernen |
+| `NativeTransitionLayer.tsx` | Boundary auf `original_end_time` |
+| `VisualTimeline.tsx` | Anchor-Drag-UI entfernen, Dot nur noch als Klick-Button |
+| `SceneEditingStep.tsx` | `onTransitionAnchorChange` und Anchor-Shift-Logik entfernen |
+
+### Warum das funktioniert
+
+- **Kein Drift**: `video.currentTime` wird direkt mit `original_end_time` verglichen — beide im selben Domain
+- **Kein Mapping-Fehler**: Der fehleranfällige `sourceToTimelineTime`-Schritt wird für Transitions komplett übersprungen
+- **Einfacher Code**: `anchorTime` und dessen Synchronisations-Logik fällt komplett weg
+- **Alle bisherigen Fixes bleiben**: Video-led Playback, kein Loop, kein Stottern, Audio-Stabilität
+
