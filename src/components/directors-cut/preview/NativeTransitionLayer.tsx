@@ -47,9 +47,10 @@ export function useTransitionInfo(
         if (!transition || transition.transitionType === 'none') continue;
 
         const transitionDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
-        const halfDuration = transitionDuration / 2;
-        const transitionStart = scene.end_time - halfDuration;
-        const transitionEnd = scene.end_time + halfDuration;
+        const leadIn = transitionDuration * 0.05;
+        const leadOut = transitionDuration * 0.95;
+        const transitionStart = scene.end_time - leadIn;
+        const transitionEnd = scene.end_time + leadOut;
 
         if (time >= transitionStart && time < transitionEnd) {
           const rawProgress = (time - transitionStart) / transitionDuration;
