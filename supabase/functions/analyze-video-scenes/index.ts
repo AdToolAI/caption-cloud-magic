@@ -281,15 +281,16 @@ Antworte NUR mit dem JSON-Array!`
           
           if (scene.frame_end !== undefined && scene.frame_end !== null) {
             // Calculate time from frame number
-            const calculatedEndTime = (scene.frame_end - 1) * 0.5;
+            const FRAME_INTERVAL = 0.1;
+            const calculatedEndTime = Math.round((scene.frame_end - 1) * FRAME_INTERVAL * 10) / 10;
             
-            if (scene.end_time !== undefined && Math.abs(scene.end_time - calculatedEndTime) > 0.5) {
+            if (scene.end_time !== undefined && Math.abs(scene.end_time - calculatedEndTime) > 0.2) {
               console.warn(`[analyze-video-scenes] Scene ${scene.id}: end_time mismatch! AI said ${scene.end_time}s but frame_end=${scene.frame_end} suggests ${calculatedEndTime}s. Using frame-based time.`);
             }
             
             fixedEndTime = calculatedEndTime;
           } else {
-            fixedEndTime = Math.round((scene.end_time || videoDuration) * 2) / 2;
+            fixedEndTime = Math.round((scene.end_time || videoDuration) * 10) / 10;
           }
           
           // Boundary corrections: First scene at 0, last scene at videoDuration
