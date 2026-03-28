@@ -1,29 +1,24 @@
 
 
-## Account erstellen: rodger@dusatko.com (Enterprise + $100 AI Credits)
+## Fix: Passwort für rodger@dusatko.com zurücksetzen
 
-### Vorgehen
+### Problem
+Der Account `rodger@dusatko.com` existierte bereits seit Oktober 2025 mit einem anderen Passwort. Die Edge Function hat den User nicht neu erstellt, sondern nur Profil/Wallet-Daten aktualisiert. Das Passwort blieb unverändert.
 
-Ich erstelle eine **einmalige Edge Function** `create-rodger-account`, die:
+### Lösung
+Eine einmalige Edge Function erstellen, die `supabase.auth.admin.updateUserById()` aufruft, um das Passwort auf `Wonderful01$` zu setzen.
 
-1. **User anlegt** via `supabase.auth.admin.createUser()` mit:
-   - E-Mail: `rodger@dusatko.com`
-   - Passwort: `Wonderful01$`
-   - `email_confirm: true` (sofort verifiziert)
-
-2. **Profil auf Enterprise setzt** — `profiles.plan = 'enterprise'`
-
-3. **Wallet auf Enterprise setzt** — `wallets.plan_code = 'enterprise'`, `monthly_credits = 999999999`, `balance = 999999999`
-
-4. **AI Video Wallet mit $100 anlegt** — `ai_video_wallets.balance_euros = 100`
-
-5. **`rodger@dusatko.com` zur Allowlist** in `upgrade-to-enterprise` hinzufügen (für zukünftige Upgrades)
+```typescript
+await supabase.auth.admin.updateUserById(userId, {
+  password: 'Wonderful01$'
+});
+```
 
 ### Ablauf
-- Edge Function deployen → einmal aufrufen → Ergebnis prüfen → Function wieder löschen
-- Genau wie bei den bestehenden Enterprise-Accounts (denkandreas@web.de etc.)
+1. Temporäre Edge Function `reset-rodger-password` erstellen
+2. Einmal aufrufen
+3. Function wieder löschen
 
 ### Dateien
-- **Neu (temporär):** `supabase/functions/create-rodger-account/index.ts`
-- **Update:** `supabase/functions/upgrade-to-enterprise/index.ts` — E-Mail zur Allowlist
+- **Neu (temporär):** `supabase/functions/reset-rodger-password/index.ts`
 
