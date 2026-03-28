@@ -134,9 +134,9 @@ Für JEDE Szene MUSST du genau 2 suggested_effects generieren:
 Antworte NUR mit einem validen JSON-Array!`;
 
       const userContent: any[] = [
-        { 
+         { 
           type: "text", 
-          text: `FRAME-ZEITSTEMPEL (alle 0.5 Sekunden):
+          text: `FRAME-ZEITSTEMPEL (alle 0.1 Sekunden):
 ${frameTimings}
 
 ⚠️ WICHTIG: Beschreibe die Szenen IN CHRONOLOGISCHER REIHENFOLGE!
