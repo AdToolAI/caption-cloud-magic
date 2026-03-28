@@ -105,8 +105,8 @@ JSON FORMAT für jede Szene (MIT FRAME-NUMMERN!):
   "id": "scene-1",
   "frame_start": number (Frame-Nummer wo Szene beginnt, z.B. 1),
   "frame_end": number (Frame-Nummer wo Szene endet, z.B. 7),
-  "start_time": number (= (frame_start - 1) × 0.5),
-  "end_time": number (= (frame_end - 1) × 0.5),
+   "start_time": number (= (frame_start - 1) × 0.1),
+   "end_time": number (= (frame_end - 1) × 0.1),
   "description": "string (MAXIMAL 50 Zeichen! z.B. 'Parfümflaschen nebeneinander')",
   "mood": "dynamic|calm|energetic|emotional|neutral",
   "suggested_effects": [
