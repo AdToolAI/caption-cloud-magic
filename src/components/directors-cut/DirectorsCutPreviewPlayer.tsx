@@ -362,8 +362,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
       if (sceneInfo) {
         timelineTime = sourceToTimelineTime(sceneInfo.scene, videoSourceTime);
-        // Clamp to scene boundaries
-        timelineTime = Math.max(sceneInfo.scene.start_time, Math.min(timelineTime, sceneInfo.scene.end_time));
+        // Only clamp to scene boundaries if NO transition is active
+        // During transitions, timeline time must flow past scene.end_time
+        const activeTrans = findActiveTransition(timelineTime);
+        if (!activeTrans) {
+          timelineTime = Math.max(sceneInfo.scene.start_time, Math.min(timelineTime, sceneInfo.scene.end_time));
+        }
 
         // Detect scene change → only seek when entering a NEW scene
         if (sceneInfo.index !== lastSceneIndexRef.current) {
