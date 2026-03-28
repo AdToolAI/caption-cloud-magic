@@ -155,20 +155,27 @@ export function SceneEditingStep({
   }, true);
   // Keyboard shortcuts placeholder - actual handler added after function declarations
 
-  const handleTransitionTypeChange = useCallback((type: string) => {
-    if (!editingTransitionId) return;
+  const handleTransitionTypeChange = useCallback((type: string, sceneId?: string) => {
+    const targetSceneId = sceneId || editingTransitionId;
+    if (!targetSceneId) return;
     
-    const existing = transitions.find(t => t.sceneId === editingTransitionId);
+    const existing = transitions.find(t => t.sceneId === targetSceneId);
     
     if (type === 'none') {
-      onTransitionsChange(transitions.filter(t => t.sceneId !== editingTransitionId));
+      // Keep in array with type 'none' so offset can still be adjusted
+      if (existing) {
+        onTransitionsChange(transitions.map(t => 
+          t.sceneId === targetSceneId ? { ...t, transitionType: 'none' } : t
+        ));
+      }
+      // If no existing entry, nothing to do for 'none'
     } else if (existing) {
       onTransitionsChange(transitions.map(t => 
-        t.sceneId === editingTransitionId ? { ...t, transitionType: type } : t
+        t.sceneId === targetSceneId ? { ...t, transitionType: type } : t
       ));
     } else {
       onTransitionsChange([...transitions, {
-        sceneId: editingTransitionId,
+        sceneId: targetSceneId,
         transitionType: type,
         duration: 1.2,
         aiSuggested: false,
