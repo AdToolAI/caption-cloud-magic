@@ -158,8 +158,8 @@ SCHRITT-FÜR-SCHRITT ANALYSE:
 Für jeden gefundenen SCHNITT:
 - Notiere die Frame-Nummer VOR dem Schnitt (frame_end der aktuellen Szene)
 - Notiere die Frame-Nummer NACH dem Schnitt (frame_start der nächsten Szene)
-- Berechne start_time = (frame_start - 1) × 0.5
-- Berechne end_time = (frame_end - 1) × 0.5
+- Berechne start_time = (frame_start - 1) × 0.1
+- Berechne end_time = (frame_end - 1) × 0.1
 
 BEISPIEL für 40 Frames (20s Video):
 - Frames 1-7: Produkt von vorne → Szene 1: frame_start=1, frame_end=7, start=0.0s, end=3.0s, description="Produkt Frontansicht"
