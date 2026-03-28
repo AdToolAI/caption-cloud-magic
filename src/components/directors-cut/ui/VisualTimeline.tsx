@@ -61,6 +61,7 @@ export function VisualTimeline({
   const [dragTransitionAnchor, setDragTransitionAnchor] = useState<number | null>(null);
   const dragTransitionStartXRef = useRef<number>(0);
   const dragTransitionStartAnchorRef = useRef<number>(0);
+  const hasExceededDragThresholdRef = useRef<boolean>(false);
 
   // Calculate total duration dynamically from scenes (not prop) for accurate widths
   const actualTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
@@ -119,34 +120,44 @@ export function VisualTimeline({
     const currentAnchor = transition?.anchorTime ?? scenes[sceneIndex].end_time;
     dragTransitionStartXRef.current = e.clientX;
     dragTransitionStartAnchorRef.current = currentAnchor;
+    hasExceededDragThresholdRef.current = false;
     setDraggingTransition({ sceneId, sceneIndex });
     setDragTransitionAnchor(currentAnchor);
   }, [scenes, transitions]);
 
   const handleTransitionDotMouseMove = useCallback((e: MouseEvent) => {
     if (!draggingTransition || !timelineRef.current || !onTransitionAnchorChange) return;
-    const rect = timelineRef.current.getBoundingClientRect();
+    
     const deltaX = e.clientX - dragTransitionStartXRef.current;
+    // Only start actual dragging after 5px threshold
+    if (!hasExceededDragThresholdRef.current && Math.abs(deltaX) < 5) return;
+    hasExceededDragThresholdRef.current = true;
+    
+    const rect = timelineRef.current.getBoundingClientRect();
     const deltaPercent = deltaX / rect.width;
     const deltaTime = deltaPercent * actualTotalDuration;
     
     const leftScene = scenes[draggingTransition.sceneIndex];
     const rightScene = scenes[draggingTransition.sceneIndex + 1];
-    // Clamp: at least 0.3s inside each scene
     const minAnchor = leftScene.start_time + 0.3;
     const maxAnchor = rightScene.end_time - 0.3;
     const newAnchor = Math.max(minAnchor, Math.min(maxAnchor, dragTransitionStartAnchorRef.current + deltaTime));
     
     setDragTransitionAnchor(newAnchor);
-  }, [draggingTransition, scenes, onTransitionAnchorChange]);
+  }, [draggingTransition, scenes, onTransitionAnchorChange, actualTotalDuration]);
 
   const handleTransitionDotMouseUp = useCallback(() => {
-    if (draggingTransition && dragTransitionAnchor !== null && onTransitionAnchorChange) {
+    // Only persist anchor if user actually dragged (exceeded threshold)
+    if (draggingTransition && dragTransitionAnchor !== null && onTransitionAnchorChange && hasExceededDragThresholdRef.current) {
       onTransitionAnchorChange(draggingTransition.sceneId, dragTransitionAnchor);
+    }
+    // If no drag happened (just a click), open the transition dialog instead
+    if (draggingTransition && !hasExceededDragThresholdRef.current) {
+      onTransitionClick(draggingTransition.sceneId);
     }
     setDraggingTransition(null);
     setDragTransitionAnchor(null);
-  }, [draggingTransition, dragTransitionAnchor, onTransitionAnchorChange]);
+  }, [draggingTransition, dragTransitionAnchor, onTransitionAnchorChange, onTransitionClick]);
 
   // Add/remove event listeners for drag
   useEffect(() => {
