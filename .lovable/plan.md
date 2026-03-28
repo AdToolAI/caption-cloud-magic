@@ -1,73 +1,65 @@
 
 
-## Fix: Timing-Offset hat keinen sichtbaren Effekt im Preview
+## Fix: Szenenanalyse verpasst Szenen + Übergänge funktionieren nicht nach Einstellen
 
-### Ursache (diesmal wirklich gefunden)
+### Problem 1: Szenenanalyse erkennt nicht alle Szenen
 
-Das Problem ist **architektonisch**, nicht logisch. Der Code-Flow ist korrekt — das Transition-Fenster verschiebt sich mathematisch mit dem Offset. Aber:
+**Ursache**: Die `stabilizeScenes()` Funktion ist zu aggressiv:
+- Szenen unter 1.5s werden mit der vorherigen zusammengelegt
+- Maximum: `2 Szenen pro 10 Sekunden` → bei einem 20s-Video maximal 4 Szenen erlaubt
+- Ein 20s-Video mit 5 echten Schnitten wird auf 4 Szenen reduziert
 
-1. Das Quellvideo ist **ein durchgehender Stream**. Szene 3 endet bei z.B. 15.0s im Source, Szene 4 startet bei 15.0s.
-2. Bei +2.0s Offset: Transition-Fenster öffnet sich erst bei 16.94s (= 15.0 + 2.0 - 0.06).
-3. **Aber**: Der Video-Decoder spielt bei 15.0s bereits Szene 4's Inhalt ab — der visuelle Schnitt im Quellvideo ist sofort sichtbar.
-4. Die Boundary-Logik verhindert zwar einen Seek (wartet auf `effectiveBoundary`), aber das Video zeigt trotzdem schon den nächsten Szeneninhalt.
-5. Wenn das Transition-Fenster bei 16.94s endlich öffnet, ist der visuelle Schnitt längst passiert → der Offset hat keinen sichtbaren Effekt.
+**Fix**: 
+- `MIN_SCENE_DURATION` von 1.5s auf 0.8s reduzieren (kurze Schnitte erlauben)
+- `MAX_SCENES_PER_10S` von 2 auf 3 erhöhen → 20s-Video erlaubt bis zu 6 Szenen
+- Micro-Scene-Merging nur bei Szenen < 0.8s (echte Fehler, keine echten Schnitte)
 
-```text
-Quellvideo:    [===Szene 3===|===Szene 4===]
-                             ^ 15.0s: Decoder zeigt schon Szene 4
+**Datei**: `supabase/functions/analyze-video-scenes/index.ts` — `stabilizeScenes()`
 
-Transition-Fenster (+2s):    |----[Fenster]-------|
-                                  ^ 16.94s        ^ 17.9s
-                                  Zu spät — Szene 4 läuft schon seit 2s!
+---
+
+### Problem 2: Übergänge werden nicht angewendet (auch wenn eingestellt)
+
+**Ursache**: Stale-Closure-Bug in `SceneEditingStep.tsx`:
+
+```typescript
+onTypeChange={(type) => {
+  setEditingTransitionId(selectedScene.id);  // React state → NÄCHSTER Render
+  handleTransitionTypeChange(type);          // Liest editingTransitionId → AKTUELLER Render (noch alter Wert!)
+}}
 ```
 
-### Lösung: "Frame-Freeze" des Outgoing-Frames bei positivem Offset
+`handleTransitionTypeChange` prüft `if (!editingTransitionId) return;` — beim ersten Klick ist `editingTransitionId` noch `undefined` oder der vorherige Wert → der Übergang wird nie gesetzt.
 
-Wenn ein positiver Offset existiert, muss der letzte Frame der ausgehenden Szene **eingefroren** und als Overlay angezeigt werden, bis das Transition-Fenster beginnt:
+Zusätzlich: Wenn `type === 'none'` gewählt wird, wird die Transition komplett aus dem Array **entfernt** (`filter`). Danach kann `onOffsetChange` per `map` nichts mehr finden → Offset-Slider hat keinen Effekt. Und die Default-Init-Logik (Zeile 86) greift nicht, weil `transitions.length > 0`.
 
-```text
-Quellvideo:    [===Szene 3===|===Szene 4===]
-Frame-Freeze:                |FREEZE FRAME|
-Transition:                               [crossfade → Szene 4]
-                             ^ 15.0s      ^ 16.94s             ^ 17.9s
-```
+**Fix**: 
+1. `handleTransitionTypeChange` direkt mit `sceneId` aufrufen statt über den Umweg `editingTransitionId`
+2. Bei `type === 'none'`: Transition nicht löschen, sondern `transitionType: 'none'` setzen (im Array behalten)
+3. `onOffsetChange`: Fallback hinzufügen falls keine Transition im Array existiert
 
-### Implementation
+**Datei**: `src/components/directors-cut/steps/SceneEditingStep.tsx`
 
-**1. `useFrameCapture.ts` erweitern: Auch den letzten Frame jeder Szene capturen**
+---
 
-Zusätzlich zum ersten Frame der Incoming-Szene wird der letzte Frame jeder Outgoing-Szene (bei `original_end_time - 0.05`) als ImageBitmap gespeichert. Key: `"outgoing-" + scene.id`.
+### Problem 3: Transition-Timing weiterhin ungenau
 
-**2. `useTransitionRenderer.ts`: Frame-Freeze-Phase vor dem Transition-Fenster**
+Mit den Fixes oben werden Transitions überhaupt erst korrekt gesetzt. Das bereits implementierte Offset-System (Frame-Freeze + Source-basiertes Timing) kann dann greifen. 
 
-Neue Logik im rAF-Loop:
-- Wenn `offset > 0` und `time >= original_end_time` und `time < tStart` (vor dem Transition-Fenster):
-  - Canvas zeigt den Outgoing-Frame (freeze frame)
-  - Canvas opacity = 1, Video darunter verdeckt
-  - `found = true`, damit keine Styles zurückgesetzt werden
-- Wenn `time >= tStart`: Normaler Transition-Ablauf wie bisher
+Falls das Timing nach diesen Fixes immer noch nicht stimmt, liegt es an den `original_end_time`-Werten aus der Szenenanalyse — aber das kann erst getestet werden, wenn die Transitions überhaupt funktionieren.
 
-**3. `DirectorsCutPreviewPlayer.tsx`: Boundary-Logik anpassen**
+---
 
-- Bei positivem Offset: Video **nicht** am Szenenende halten, sondern weiterlaufen lassen (ist bereits so)
-- `findSceneBySourceTime` akzeptiert bereits die nächste Szene per exact match → kein Seek nötig
-- Sicherstellen, dass `lastSceneIndexRef` während der Freeze-Phase nicht auf die nächste Szene springt
-
-**4. Export: Remotion-Template prüfen**
-
-Remotion nutzt `<TransitionSeries>` mit expliziten Frames — dort ist der Offset einfacher: Die Transition-Position wird um `offset * fps` Frames verschoben.
-
-### Betroffene Dateien
+### Zusammenfassung der Änderungen
 
 | Datei | Änderung |
 |-------|----------|
-| `src/components/directors-cut/preview/useFrameCapture.ts` | Outgoing-Frame-Capture hinzufügen |
-| `src/components/directors-cut/preview/useTransitionRenderer.ts` | Frame-Freeze-Phase vor Transition-Fenster |
-| `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` | Scene-change während Freeze unterdrücken |
+| `supabase/functions/analyze-video-scenes/index.ts` | `stabilizeScenes`: MIN_SCENE_DURATION 0.8s, MAX_SCENES_PER_10S 3 |
+| `src/components/directors-cut/steps/SceneEditingStep.tsx` | Stale-Closure-Fix: `handleTransitionTypeChange` mit direktem `sceneId`-Parameter; 'none' behält Transition im Array |
 
 ### Ergebnis
-- Positiver Offset: Outgoing-Szene wird visuell "eingefroren" bis der Übergang startet
-- Negativer Offset: Übergang startet früher (funktioniert bereits)
-- Kein Stottern, kein Loop — nur ein zusätzliches Canvas-Overlay in der Freeze-Phase
-- Export und Preview zeigen denselben zeitlichen Übergang
+- Videos mit 5+ Szenen werden korrekt erkannt (nicht mehr auf 4 reduziert)
+- Übergänge werden sofort beim Einstellen im Preview angezeigt
+- Offset-Slider funktioniert zuverlässig
+- Kein Loop, kein Stottern — bestehende Fixes bleiben unangetastet
 
