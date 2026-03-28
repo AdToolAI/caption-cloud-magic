@@ -250,8 +250,8 @@ Antworte NUR mit dem JSON-Array!`
         
         // CRITICAL: Sort scenes by frame_start (most reliable) or start_time
         scenes = scenes.sort((a, b) => {
-          const aStart = a.frame_start || (a.start_time * 2 + 1) || 1;
-          const bStart = b.frame_start || (b.start_time * 2 + 1) || 1;
+          const aStart = a.frame_start || (a.start_time * 10 + 1) || 1;
+          const bStart = b.frame_start || (b.start_time * 10 + 1) || 1;
           return aStart - bStart;
         });
         
