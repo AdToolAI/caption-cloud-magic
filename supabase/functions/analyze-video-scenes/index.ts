@@ -519,12 +519,12 @@ function generateDefaultEffectsForMood(mood: string): { type: string; name: stri
   return moodEffects[mood] || moodEffects.neutral;
 }
 
-// Stabilize scenes: merge micro-scenes (<1.5s) and cap max count based on video length
+// Stabilize scenes: merge micro-scenes (<0.8s) and cap max count based on video length
 function stabilizeScenes(scenes: any[], videoDuration: number): any[] {
   if (scenes.length <= 1) return scenes;
   
-  const MIN_SCENE_DURATION = 1.5; // seconds
-  const MAX_SCENES_PER_10S = 2; // max 2 scenes per 10 seconds of video
+  const MIN_SCENE_DURATION = 0.8; // seconds — only merge truly micro-scenes
+  const MAX_SCENES_PER_10S = 3; // max 3 scenes per 10 seconds of video
   const maxScenes = Math.max(2, Math.ceil(videoDuration / 10 * MAX_SCENES_PER_10S));
   
   // Step 1: Merge micro-scenes into their neighbors
