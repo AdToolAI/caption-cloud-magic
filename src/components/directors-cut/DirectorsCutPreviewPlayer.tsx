@@ -455,7 +455,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           const rate = (sceneInfo.scene as any).playbackRate ?? 1;
           const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
 
-          if (videoSourceTime >= srcEnd - 0.02) {
+          // Account for transition offset — if a positive offset exists,
+          // the video must keep playing past srcEnd until the offset transition window completes
+          const sceneTransition = transitions.find(tr => tr.sceneId === sceneInfo.scene.id);
+          const transOffset = (sceneTransition && sceneTransition.transitionType !== 'none') 
+            ? (sceneTransition.offsetSeconds ?? 0) 
+            : 0;
+          const effectiveBoundary = srcEnd + transOffset;
+
+          if (videoSourceTime >= effectiveBoundary - 0.02) {
             // Video naturally reached scene boundary — advance to next scene
             const nextScene = sortedScenes[sceneInfo.index + 1];
             if (nextScene) {
@@ -464,8 +472,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
               if (Math.abs(video.currentTime - nextSourceStart) > 0.3) {
                 video.currentTime = nextSourceStart;
               }
-              // DON'T set lastSceneIndexRef here — set a pending advance instead
-              // The ref will be updated once findSceneBySourceTime confirms the new scene
               pendingSceneAdvanceRef.current = { targetIndex: sceneInfo.index + 1, framesLeft: 15 };
               const nextRate = (nextScene as any).playbackRate ?? 1;
               if (Math.abs(video.playbackRate - nextRate) > 0.01) {
