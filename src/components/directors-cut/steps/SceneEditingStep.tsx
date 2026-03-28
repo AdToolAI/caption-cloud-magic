@@ -1167,7 +1167,8 @@ export function SceneEditingStep({
                           offsetSeconds={getTransitionForScene(selectedScene.id)?.offsetSeconds ?? 0}
                           onTypeChange={(type) => {
                             setEditingTransitionId(selectedScene.id);
-                            handleTransitionTypeChange(type);
+                            // Pass sceneId directly to avoid stale closure
+                            handleTransitionTypeChange(type, selectedScene.id);
                           }}
                           onDurationChange={(duration) => {
                             setEditingTransitionId(selectedScene.id);
@@ -1175,10 +1176,22 @@ export function SceneEditingStep({
                           }}
                           onOffsetChange={(offset) => {
                             const sceneId = selectedScene.id;
-                            const updated = transitions.map(t =>
-                              t.sceneId === sceneId ? { ...t, offsetSeconds: offset } : t
-                            );
-                            onTransitionsChange(updated);
+                            const existing = transitions.find(t => t.sceneId === sceneId);
+                            if (existing) {
+                              const updated = transitions.map(t =>
+                                t.sceneId === sceneId ? { ...t, offsetSeconds: offset } : t
+                              );
+                              onTransitionsChange(updated);
+                            } else {
+                              // Create transition entry if none exists yet
+                              onTransitionsChange([...transitions, {
+                                sceneId,
+                                transitionType: 'none',
+                                duration: 1.2,
+                                aiSuggested: false,
+                                offsetSeconds: offset,
+                              }]);
+                            }
                           }}
                           aiRecommendation={getTransitionForScene(selectedScene.id)?.aiSuggested 
                             ? getTransitionForScene(selectedScene.id)?.transitionType 
