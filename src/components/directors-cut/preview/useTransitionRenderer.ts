@@ -9,6 +9,10 @@ const MIN_TRANSITION_DURATION = 0.8;
  * Uses a <canvas> element with pre-captured ImageBitmaps for the incoming scene.
  * Writes opacity/transform/clipPath directly to DOM elements via rAF.
  * No setState, no React re-renders, no second video decoder.
+ *
+ * NEW: Frame-freeze phase — when a transition has a positive offsetSeconds,
+ * the outgoing scene's last frame is drawn at full opacity to hide the
+ * underlying video cut until the transition window actually opens.
  */
 export function useTransitionRenderer(
   baseVideoRef: React.RefObject<HTMLVideoElement | null>,
@@ -51,14 +55,48 @@ export function useTransitionRenderer(
         const tDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
         const leadIn = tDuration * 0.05;
         const leadOut = tDuration * 0.95;
-        // Use original_end_time (source domain) for drift-free matching
         const offset = transition.offsetSeconds ?? 0;
-        const boundary = (scene.original_end_time ?? scene.end_time) + offset;
+        const originalBoundary = scene.original_end_time ?? scene.end_time;
+        const boundary = originalBoundary + offset;
         const tStart = Math.max(boundary - leadIn, prevEnd);
         const tEnd = boundary + leadOut;
         const effectiveDuration = tEnd - tStart;
         prevEnd = tEnd;
 
+        // === FRAME-FREEZE PHASE ===
+        // When offset > 0, the video has already crossed the original cut point
+        // but the transition window hasn't opened yet. Show the outgoing scene's
+        // last frame as a full-opacity overlay to hide the underlying video cut.
+        if (offset > 0 && time >= originalBoundary && time < tStart) {
+          const frameCache = frameCacheRef.current;
+          if (frameCache) {
+            const outgoingKey = `outgoing-${scene.id}`;
+            const outgoingBitmap = frameCache.get(outgoingKey);
+            if (outgoingBitmap) {
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+                  canvas.width = canvas.clientWidth || 1280;
+                  canvas.height = canvas.clientHeight || 720;
+                }
+                ctx.drawImage(outgoingBitmap, 0, 0, canvas.width, canvas.height);
+                lastDrawnSceneRef.current = outgoingKey;
+              }
+            }
+          }
+          // Show canvas as full freeze-frame overlay
+          canvas.style.display = '';
+          canvas.style.opacity = '1';
+          canvas.style.transform = '';
+          canvas.style.clipPath = '';
+          // Keep base video visible underneath but hidden by the opaque canvas
+          clearStyles(base);
+          found = true;
+          wasActiveRef.current = true;
+          break;
+        }
+
+        // === NORMAL TRANSITION PHASE ===
         if (time >= tStart && time < tEnd) {
           const rawProgress = (time - tStart) / effectiveDuration;
           const progress = 0.5 - 0.5 * Math.cos(rawProgress * Math.PI);
@@ -74,7 +112,6 @@ export function useTransitionRenderer(
             if (bitmap && lastDrawnSceneRef.current !== nextScene.id) {
               const ctx = canvas.getContext('2d');
               if (ctx) {
-                // Match canvas size to its display size for crisp rendering
                 if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
                   canvas.width = canvas.clientWidth || 1280;
                   canvas.height = canvas.clientHeight || 720;
