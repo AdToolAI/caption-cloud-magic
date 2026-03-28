@@ -360,12 +360,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const sceneInfo = findSceneBySourceTime(videoSourceTime);
       let timelineTime: number;
 
+      // Cache findActiveTransition ONCE per frame
+      let cachedActiveTrans: ReturnType<typeof findActiveTransition> = null;
+
       if (sceneInfo) {
         timelineTime = sourceToTimelineTime(sceneInfo.scene, videoSourceTime);
         // Only clamp to scene boundaries if NO transition is active
         // During transitions, timeline time must flow past scene.end_time
-        const activeTrans = findActiveTransition(timelineTime);
-        if (!activeTrans) {
+        cachedActiveTrans = findActiveTransition(timelineTime);
+        if (!cachedActiveTrans) {
           timelineTime = Math.max(sceneInfo.scene.start_time, Math.min(timelineTime, sceneInfo.scene.end_time));
         }
 
@@ -391,18 +394,17 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           }
         }
 
-        // Check if video has drifted past current scene's source-end (scene boundary crossing)
-        const srcStart = sceneInfo.scene.original_start_time ?? sceneInfo.scene.start_time;
-        const rate = (sceneInfo.scene as any).playbackRate ?? 1;
-        const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
+        // Scene-boundary-crossing logic: SKIP entirely during active transitions
+        // This prevents unnecessary seeks and checks while the video plays through a transition
+        if (!cachedActiveTrans) {
+          const srcStart = sceneInfo.scene.original_start_time ?? sceneInfo.scene.start_time;
+          const rate = (sceneInfo.scene as any).playbackRate ?? 1;
+          const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
 
-        if (videoSourceTime >= srcEnd - 0.02) {
-          // Video naturally reached scene boundary — advance to next scene
-          const nextScene = sortedScenes[sceneInfo.index + 1];
-          if (nextScene) {
-            // Check if there's a transition — if so, let video keep playing (outgoing scene)
-            const activeTrans = findActiveTransition(sceneInfo.scene.end_time);
-            if (!activeTrans) {
+          if (videoSourceTime >= srcEnd - 0.02) {
+            // Video naturally reached scene boundary — advance to next scene
+            const nextScene = sortedScenes[sceneInfo.index + 1];
+            if (nextScene) {
               // No transition: seek to next scene's source start
               const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
               if (Math.abs(video.currentTime - nextSourceStart) > 0.3) {
@@ -437,8 +439,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         onTimeUpdateRef.current?.(timelineTime);
       }
 
-      // Drift correction for source audio (generous threshold)
-      if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
+      // Drift correction for source audio — SKIP during transitions to prevent rubber-banding
+      if (sourceAudioRef.current && !sourceAudioRef.current.paused && !cachedActiveTrans) {
         if (Math.abs(sourceAudioRef.current.currentTime - timelineTime) > 0.5) {
           sourceAudioRef.current.currentTime = timelineTime;
         }
