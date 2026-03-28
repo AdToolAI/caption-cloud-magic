@@ -1,55 +1,57 @@
 
 
-## Fix: Transition-Timing-Offset für Übergänge 2 und 3
+## Fix: Timing-Offset-Slider hat keinen Effekt im Preview
 
-### Ursache
+### Ursache (gefunden)
 
-Die KI-Schnitterkennung erkennt die exakten Cut-Punkte nicht präzise genug. Egal wie fein das Frame-Sampling ist (0.1s), die KI identifiziert den visuellen Schnitt manchmal 2-4 Frames zu früh. Bei Übergang 1 trifft sie zufällig, bei 2 und 3 liegt sie ~0.4s daneben. Das ist ein **Daten-Problem**, kein Renderer-Problem.
+Im rAF-Loop gibt es zwei unabhängige Zeitberechnungen:
 
-### Lösung: Timing-Offset pro Transition
+1. **`findActiveTransition`** (Zeile 134-162): Berechnet die Transition-Fenster mit `offsetSeconds`:
+   ```
+   boundary = original_end_time + offset   // z.B. 12.5 + 0.5 = 13.0
+   tStart = boundary - leadIn              // 13.0 - 0.06 = 12.94
+   ```
 
-Statt weiter am Renderer oder an der Analyse-Präzision zu drehen, geben wir dem Nutzer eine einfache Kontrolle:
+2. **Boundary-Crossing-Logik** (Zeile 453-475): Erkennt das Szenenende **ohne** Offset:
+   ```
+   srcEnd = srcStart + duration * rate      // z.B. 12.5
+   if (videoSourceTime >= srcEnd - 0.02)    // Feuert bei 12.48!
+   ```
 
-1. **`offsetSeconds` Feld zum TransitionAssignment hinzufügen** (default: 0)
-   - Positiver Wert = Übergang später starten
-   - Negativer Wert = Übergang früher starten
-   - Bereich: -2.0 bis +2.0 Sekunden, Schrittweite 0.1s
+**Das Problem**: Bei positivem Offset (+0.5s) erreicht das Video `srcEnd` (12.48s) **bevor** die Transition startet (12.94s). Da `cachedActiveTrans` zu dem Zeitpunkt noch `null` ist, feuert die Boundary-Logik und seekt direkt zur nächsten Szene. Die Transition hat keine Chance, am verschobenen Zeitpunkt zu erscheinen.
 
-2. **Offset-Slider im Transition-Editor** (TransitionPicker)
-   - Kleiner Slider unter dem Typ-Selector
-   - Label: "Timing anpassen" mit Anzeige des Werts in Sekunden
+### Fix
 
-3. **Offset in allen Transition-Berechnungen anwenden**
-   - `boundary = (scene.original_end_time ?? scene.end_time) + (transition.offsetSeconds ?? 0)`
-   - In: `findActiveTransition`, `useTransitionRenderer`, `NativeTransitionOverlay`, `NativeTransitionLayer`
-
-### Betroffene Dateien
-
-| Datei | Änderung |
-|-------|----------|
-| `src/types/directors-cut.ts` | `offsetSeconds?: number` zu `TransitionAssignment` |
-| `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` | Offset in `findActiveTransition` boundary |
-| `src/components/directors-cut/preview/useTransitionRenderer.ts` | Offset in boundary-Berechnung |
-| `src/components/directors-cut/preview/NativeTransitionOverlay.tsx` | Offset in boundary-Berechnung |
-| `src/components/directors-cut/preview/NativeTransitionLayer.tsx` | Offset in boundary-Berechnung |
-| `src/components/directors-cut/ui/TransitionPicker.tsx` | Offset-Slider UI |
-
-### Technische Details
+Die Boundary-Crossing-Logik muss den Transition-Offset berücksichtigen. Wenn eine Transition mit positivem Offset existiert, darf die Boundary-Logik erst **nach** dem verschobenen Transition-Fenster feuern:
 
 ```typescript
-// TransitionAssignment erweitern
-offsetSeconds?: number; // -2.0 bis +2.0, default 0
+// Zeile 453-458: Vor der Boundary-Prüfung den Offset checken
+if (!cachedActiveTrans) {
+  const sceneTransition = transitions.find(tr => tr.sceneId === sceneInfo.scene.id);
+  const transOffset = sceneTransition?.offsetSeconds ?? 0;
+  
+  // Wenn ein positiver Offset existiert und wir noch VOR dem 
+  // verschobenen Transition-Fenster sind → NICHT seeken, 
+  // das Video weiterlaufen lassen bis die Transition beginnt
+  const srcStart = sceneInfo.scene.original_start_time ?? sceneInfo.scene.start_time;
+  const rate = (sceneInfo.scene as any).playbackRate ?? 1;
+  const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
+  const effectiveBoundary = srcEnd + transOffset;
 
-// Boundary-Berechnung überall:
-const offset = transition.offsetSeconds ?? 0;
-const boundary = (scene.original_end_time ?? scene.end_time) + offset;
+  if (videoSourceTime >= effectiveBoundary - 0.02) {
+    // Erst jetzt zur nächsten Szene springen
+    // (bei offset=0 identisch zum bisherigen Verhalten)
+    ...
+  }
+}
 ```
 
-### Warum das der richtige Ansatz ist
+### Betroffene Datei
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — Boundary-Crossing-Logik (Zeile 453-475): `srcEnd` durch `srcEnd + transOffset` ersetzen
 
-- KI-Schnitterkennung wird nie 100% framegenau sein
-- Der Nutzer sieht sofort im Preview ob der Übergang passt
-- Einfacher +/- Slider ist intuitiver als Anchor-Dragging
-- Kein Risiko für neue Bugs im Playback-Loop
-- Alle bisherigen Fixes (kein Loop, kein Stottern, Video-led) bleiben unangetastet
+### Ergebnis
+- Der Timing-Slider verschiebt den Übergang tatsächlich im Preview
+- Positiver Offset = Video läuft länger in der aktuellen Szene bevor der Übergang startet
+- Negativer Offset = Übergang startet etwas vor dem Szenenende
+- Kein Stottern, kein Loop — nur eine Zeile Logik angepasst
 
