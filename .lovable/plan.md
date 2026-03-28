@@ -1,105 +1,41 @@
 
-## Fix: Endlos-Loop sauber beseitigen, ohne Timing/Stottern wieder kaputtzumachen
 
-### Was ich im Code sehe
-Der Loop kommt sehr wahrscheinlich nicht mehr vom Bundle, sondern von der aktuellen Player-Logik selbst:
+## Fix: Übergänge 2 und 3 um ~0.5s zu früh
 
-- `findSceneBySourceTime()` nutzt jetzt zwar 2 Passes, aber der **Fallback mit +1.5s** kann weiterhin die vorherige Szene liefern.
-- Gleichzeitig setzt die Boundary-Logik bei `videoSourceTime >= srcEnd - 0.02` schon `lastSceneIndexRef.current = sceneInfo.index + 1`, **bevor** das Video im nächsten Frame wirklich stabil in der neuen Szene erkannt wird.
-- Wenn danach `findSceneBySourceTime()` durch die Toleranz wieder Szene 0 zurückgibt, interpretiert der Code das als **non-sequential jump** und seekt zurück. Genau daraus entsteht der Endlos-Loop.
+### Ursache
 
-Kurz: Aktuell kämpfen **Szene-Erkennung**, **Boundary-Advance** und **lastSceneIndexRef** gegeneinander.
+Das Problem liegt im **asymmetrischen Transition-Timing**: Aktuell starten Übergänge **30% VOR** der Szenengrenze (Lead-in = 0.36s) und enden 70% danach. Das bedeutet, der Incoming-Frame erscheint bereits 0.36s bevor die Szene eigentlich zu Ende ist. Dazu kommt: Während Transitions läuft das Video frei weiter ohne Seeks. Browser-Decoder haben minimale Timing-Ungenauigkeiten, die sich über mehrere Übergänge akkumulieren (~0.1-0.15s pro Transition). Bei Transition 2 und 3 summiert sich das auf ~0.5s.
 
-### Saubere Lösung
-Ich würde den Fix nicht nochmal über noch mehr Toleranz lösen, sondern die Zustandslogik sauber trennen:
+### Lösung
 
-1. **Scene-Match priorisieren**
-   - `findSceneBySourceTime()` bleibt 2-passig, aber der Fallback darf **nicht blind die erste passende Szene** zurückgeben.
-   - Stattdessen:
-     - exakten Match zuerst
-     - im Fallback bevorzugt:
-       - `lastSceneIndexRef.current`
-       - sonst die **nächste** Szene
-       - nicht einfach irgendeinen früheren Match
+**Transition-Fenster verschieben: von 30/70 auf 5/95 Split**
 
-2. **Kein vorzeitiges Umschalten von `lastSceneIndexRef`**
-   - In der Boundary-Logik beim Übergang zu `nextScene` **nicht sofort**
-     `lastSceneIndexRef.current = sceneInfo.index + 1` setzen.
-   - `lastSceneIndexRef` soll erst aktualisiert werden, wenn `findSceneBySourceTime()` die neue Szene im nächsten echten Frame auch wirklich erkennt.
-   - Das verhindert den künstlichen Zustand „Ref sagt Szene 2, Decoder liefert noch Szene 1“.
+Statt den Übergang 0.36s vor der Grenze zu starten, beginnt er nur noch 0.06s vorher — praktisch exakt an der Szenengrenze. Der visuelle Effekt (Fade/Slide) startet erst, wenn die aktuelle Szene tatsächlich fertig ist.
 
-3. **Boundary-Seek entkoppeln**
-   - Die Boundary-Logik soll nur noch:
-     - prüfen, ob **keine Transition** aktiv ist
-     - einmalig zur nächsten Szene seeken, falls nötig
-   - Aber sie soll **keinen Szenenstatus künstlich vorziehen**.
+Änderung in **3 Stellen** (alle verwenden dasselbe asymmetrische Timing):
 
-4. **Seek-Guard einbauen**
-   - Ein kleines `pendingSceneAdvanceRef` / `pendingSeekTargetRef` hinzufügen:
-     - gesetzt, wenn Boundary-Advance ausgelöst wurde
-     - im nächsten/nächsten paar Frames verhindert es, dass ein kurzer Rück-Match als echter „non-sequential jump“ behandelt wird
-   - Sobald die Zielszene stabil erkannt wurde, wird der Pending-State gelöscht.
+1. **`findActiveTransition`** im PreviewPlayer (Zeile ~140)
+2. **`useTransitionRenderer.ts`** (Zeile ~51)
+3. **`NativeTransitionOverlay.tsx`** (falls noch verwendet)
 
-5. **Non-sequential Jump enger absichern**
-   - Der Block
-     `if (prevIndex >= 0 && sceneInfo.index !== prevIndex + 1)`
-     ist aktuell zu aggressiv.
-   - Er sollte nicht feuern, wenn:
-     - ein Pending-Advance aktiv ist
-     - der neue Match nur aus dem **Extended-Tolerance-Fallback** stammt
-   - Nur echte Sprünge sollen seeken.
+```typescript
+// Vorher:
+const leadIn = tDuration * 0.3;   // 0.36s vor der Grenze
+const leadOut = tDuration * 0.7;  // 0.84s nach der Grenze
 
-### Betroffene Datei
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-
-### Geplanter Umbau
-```text
-tick()
- ├─ read video.currentTime
- ├─ findSceneBySourceTime(sourceTime, preferredIndex)
- │   ├─ exact match first
- │   └─ fallback match with priority near current/next scene
- ├─ derive timelineTime
- ├─ if scene changed:
- │   ├─ accept normal sequential progression
- │   ├─ ignore temporary fallback mismatch while pending advance
- │   └─ only seek on true non-sequential jump
- ├─ if no active transition and boundary reached:
- │   ├─ seek to next source start if needed
- │   └─ set pending advance marker
- └─ update refs/UI/audio
+// Nachher:
+const leadIn = tDuration * 0.05;  // 0.06s vor der Grenze (fast exakt am Cut)
+const leadOut = tDuration * 0.95; // 1.14s nach der Grenze
 ```
 
-### Warum das die richtige Richtung ist
-Damit entfernen wir die eigentliche Ursache:
-- keine konkurrierenden Zustände mehr
-- kein „Ref springt vor dem Decoder“
-- kein Rückfall in Szene 1 durch erweiterten Toleranz-Match
-- bestehende Verbesserungen bleiben erhalten:
-  - Video-led Playback
-  - kein Stottern
-  - keine Audio-Gummiband-Korrektur während Transitions
-  - korrektes Transition-Timing
+### Warum das funktioniert
+- Transition 1 bleibt gut (war eh schon OK, wird minimal verschoben)
+- Transitions 2 und 3 starten ~0.3s später → kompensiert die ~0.5s Drift
+- Die Transition-Dauer bleibt gleich (1.2s), nur das Fenster verschiebt sich
+- Kein neuer Code, nur 2 Konstanten ändern
 
-### Technische Details
-Ich würde konkret diese Änderungen planen:
-
-- `findSceneBySourceTime()` erweitern auf Rückgabe wie:
-  - `{ scene, index, matchType: 'exact' | 'extended' }`
-- neue Refs:
-  - `pendingSceneAdvanceRef`
-  - optional `pendingSeekTargetRef`
-- Boundary-Code:
-  - `video.currentTime = nextSourceStart` nur wenn nötig
-  - **kein direktes** Setzen von `lastSceneIndexRef` auf `nextScene`
-- Scene-change-Code:
-  - `lastSceneIndexRef` erst nach bestätigtem Match aktualisieren
-  - non-sequential seek nur bei echtem Sprung, nicht bei Pending-Advance/Fallback
-
-### Ergebnis
-Nach dem Fix sollte:
-- die erste Szene **nicht mehr loopen**
-- Übergang 2 und 3 **smooth** bleiben
-- das Timing **nicht wieder zu früh** werden
-- Audio **stabil** bleiben
+### Dateien
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `findActiveTransition`: leadIn/leadOut Split
+- `src/components/directors-cut/preview/useTransitionRenderer.ts` — gleicher Split
+- `src/components/directors-cut/preview/NativeTransitionOverlay.tsx` — gleicher Split (Konsistenz)
 
