@@ -1,55 +1,34 @@
 
 
-## Fix: CORS-bedingte Transition-Ausfälle beheben
+## Fix: Transition-Timing zentrieren
 
-### Ursache (jetzt bestätigt durch Logs)
+### Problem
 
-Die Console-Logs zeigen:
-- Transition-Daten kommen korrekt an (3 Transitions, richtige Typen)
-- Resolver gibt korrekte Ausgabe (3 resolved transitions)
-- Renderer startet mit korrekten resolvedTransitions
+In `transitionResolver.ts` (Zeile 91-92) ist die Aufteilung des Übergangsfensters stark asymmetrisch:
 
-**ABER**: Die CORS-Fehler blockieren die Frame-Capture-Videos komplett. `useFrameCapture.ts` und `NativeTransitionOverlay.tsx` erstellen Video-Elemente mit `crossOrigin = 'anonymous'`, aber der S3-Bucket gibt keine `Access-Control-Allow-Origin`-Header zurück. Dadurch werden **keine Frames gecaptured** → der Canvas hat keine Bitmaps → alle Transitions sind unsichtbar, egal welcher Typ gesetzt ist.
+```text
+leadIn  = duration * 0.05   (nur 5% VOR der Szenengrenze)
+leadOut = duration * 0.95   (95% NACH der Szenengrenze)
+```
 
-### Lösung: Dual-Video CSS-Transitions statt Canvas-Compositing
+Bei einer 1.2s-Transition bedeutet das: Der Übergang beginnt 0.06s vor dem Schnitt und läuft 1.14s danach. Das heißt, die eingehende Szene wird fast sofort sichtbar — der visuelle Eindruck ist "zu früh", weil der Effekt praktisch am Schnittpunkt beginnt statt sich um ihn herum aufzubauen.
 
-Statt das CORS-Problem auf S3-Seite zu lösen (was wir hier nicht können), wechseln wir auf einen Ansatz, der **kein Canvas-Frame-Capture braucht**:
+### Lösung
 
-**1. Zweites `<video>`-Element im Preview-Player hinzufügen** (`DirectorsCutPreviewPlayer.tsx`)
-- Ein zweites `<video>` (ohne `crossOrigin`) für die eingehende Szene
-- Beide Videos ohne `crossOrigin` → kein CORS nötig
-- Das zweite Video wird vor Transition-Beginn auf den Start der nächsten Szene geseekt
+Die Aufteilung auf **50/50** ändern, sodass der Übergang gleichmäßig um die Szenengrenze zentriert ist:
 
-**2. CSS-basierte Transitions statt Canvas** (`useTransitionRenderer.ts`)
-- Statt `drawTransitionComposite()` auf Canvas: direkte DOM-Manipulation der zwei Video-Elemente
-- Nutzt die bereits existierende Logik aus `NativeTransitionLayer.tsx` (`getTransitionStyles()`)
-- Crossfade → opacity auf beiden Videos
-- Slide/Push → transform auf dem incoming Video
-- Wipe → clipPath auf dem incoming Video
-- Fade → opacity-Sequenz (out → black → in)
-- Blur → CSS filter blur + opacity
+```text
+leadIn  = duration * 0.5    (50% VOR der Grenze)
+leadOut = duration * 0.5    (50% NACH der Grenze)
+```
 
-**3. Canvas nur als Fallback behalten**
-- Wenn aus irgendeinem Grund das zweite Video nicht bereit ist, wird der aktuelle Canvas-Ansatz als Fallback versucht
-- Canvas-Display bleibt `none` im Normalfall
+Bei 1.2s: 0.6s vor dem Schnitt → 0.6s nach dem Schnitt. Der Effekt baut sich natürlich auf und klingt symmetrisch ab.
 
-**4. `useFrameCapture.ts` als optional markieren**
-- Nicht mehr kritisch für die Transition-Darstellung
-- Kann weiterhin für Thumbnails oder andere Zwecke existieren
+### Betroffene Datei
 
-### Betroffene Dateien
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — zweites Video-Element + ref
-- `src/components/directors-cut/preview/useTransitionRenderer.ts` — CSS-basierte Dual-Video-Logik statt Canvas
-- Diagnose-Logs werden nach dem Fix entfernt
-
-### Warum das funktioniert
-- Zwei `<video>`-Elemente ohne `crossOrigin` brauchen kein CORS
-- CSS-Transitions (opacity, transform, clipPath) sind GPU-beschleunigt und performant
-- `NativeTransitionLayer.tsx` beweist bereits, dass die CSS-Logik für alle Typen korrekt implementiert ist
-- Der Browser compositet die zwei Video-Layer direkt — kein Canvas-Taint-Problem
+- `src/utils/transitionResolver.ts` — Zeile 91-92: `leadIn`/`leadOut` Berechnung ändern
 
 ### Ergebnis
-- Alle Transition-Typen (Crossfade, Slide, Push, Wipe, Fade, Blur, Zoom) funktionieren
-- Kein CORS-Problem mehr
-- Vorschau zeigt sofort den gewählten Übergangstyp
+
+Übergänge sind visuell um den eigentlichen Schnittpunkt zentriert statt fast komplett danach zu liegen.
 
