@@ -89,6 +89,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   children,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const incomingVideoRef = useRef<HTMLVideoElement>(null);
   const transitionCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const onTimeUpdateRef = useRef(onTimeUpdate);
@@ -333,12 +334,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
   const videoFilterRef = useRef('');
 
-  // Diagnostic: log when transitions prop changes
-  useEffect(() => {
-    console.log('[PreviewPlayer] transitions prop updated:', transitions.map(t => ({ sceneId: t.sceneId, type: t.transitionType, dur: t.duration })));
-  }, [transitions]);
-
-  useTransitionRenderer(videoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef);
+  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
@@ -794,11 +790,22 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           onEnded={handleVideoEnded}
         />
 
-        {/* Transition canvas — shows pre-captured incoming scene frame */}
+        {/* Incoming (transition) video — no crossOrigin to avoid CORS */}
+        <video
+          ref={incomingVideoRef}
+          src={videoUrl}
+          className="absolute inset-0 w-full h-full object-contain"
+          style={{ zIndex: 2, display: 'none' }}
+          muted
+          playsInline
+          preload="auto"
+        />
+
+        {/* Transition canvas — legacy fallback, hidden by default */}
         <canvas
           ref={transitionCanvasRef}
           className="absolute inset-0 w-full h-full object-contain"
-          style={{ zIndex: 2, display: 'none' }}
+          style={{ zIndex: 3, display: 'none' }}
         />
 
         {/* Lightweight effect overlays (color grading, vignette, etc.) */}

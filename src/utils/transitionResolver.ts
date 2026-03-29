@@ -68,9 +68,6 @@ export function resolveTransitions(
   const resolved: ResolvedTransition[] = [];
   let prevEnd = -Infinity;
 
-  console.log('[resolveTransitions] INPUT transitions:', transitions.map(t => ({
-    sceneId: t.sceneId, type: t.transitionType ?? t.type, duration: t.duration, sceneIndex: t.sceneIndex
-  })));
 
   for (let i = 0; i < scenes.length - 1; i++) {
     const scene = scenes[i];
@@ -119,9 +116,6 @@ export function resolveTransitions(
     });
   }
 
-  console.log('[resolveTransitions] OUTPUT:', resolved.map(r => ({
-    sceneIndex: r.sceneIndex, baseType: r.baseType, direction: r.direction, tStart: r.tStart.toFixed(2), tEnd: r.tEnd.toFixed(2)
-  })));
   return resolved;
 }
 
