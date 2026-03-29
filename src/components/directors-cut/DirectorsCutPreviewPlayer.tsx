@@ -332,6 +332,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   useEffect(() => { frameCacheRef.current = frameCache; }, [frameCache]);
 
   const videoFilterRef = useRef('');
+
+  // Diagnostic: log when transitions prop changes
+  useEffect(() => {
+    console.log('[PreviewPlayer] transitions prop updated:', transitions.map(t => ({ sceneId: t.sceneId, type: t.transitionType, dur: t.duration })));
+  }, [transitions]);
+
   useTransitionRenderer(videoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef);
 
 
