@@ -721,79 +721,88 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       previewFilter += GRADE_CSS[effectiveGrading.grade] + ' ';
     }
 
-    // Calculate CSS-based transition effects per type
+    // Use shared resolver for transition timing (same as preview player)
+    const resolvedTrans = resolveTransitions(
+      sortedScenes.map(s => ({
+        id: s.id,
+        originalStartTime: s.originalStartTime,
+        originalEndTime: s.originalEndTime,
+        startTime: s.startTime,
+        endTime: s.endTime,
+      })),
+      (transitions || []).map(t => ({
+        sceneId: (t as any).sceneId || '',
+        sceneIndex: t.sceneIndex,
+        transitionType: t.type || 'none',
+        type: t.type,
+        duration: t.duration || 0.8,
+        offsetSeconds: t.offsetSeconds,
+      })),
+    );
+    
     let transitionOverlayOpacity = 0;
     let transitionBlur = 0;
     let transitionTransform = '';
     let transitionClipPath = '';
     let transitionVideoOpacity = 1;
-    if (nextScene) {
-      // Match transition by scene ID (robust) or by finding the original index
-      const currentTransition = transitions?.find(t => 
-        (t as any).sceneId ? activeScene.id === (t as any).sceneId || activeScene.id === (t as any).sceneId.replace('scene-', '') || (t as any).sceneId === activeScene.id.replace('scene-', '')
-        : t.sceneIndex === activeIdx
-      );
-      if (currentTransition && currentTransition.type && currentTransition.type !== 'none') {
-        const tDuration = Math.max(0.6, currentTransition.duration || 0.8);
-        const tStart = nextScene.startTime - tDuration;
-        const fullType = currentTransition.type.toLowerCase();
-        const transitionType = fullType.split('-')[0];
-        const transitionDir = fullType.split('-')[1] || 'left';
-        if (currentTimeSeconds >= tStart && currentTimeSeconds < nextScene.startTime) {
-          const progress = (currentTimeSeconds - tStart) / tDuration;
-          const eased = Math.pow(0.5 - 0.5 * Math.cos(progress * Math.PI), 0.7); // stronger start for visibility
-          switch (transitionType) {
-            case 'fade':
-              transitionVideoOpacity = 1 - eased * 0.8;
-              transitionOverlayOpacity = eased * 0.6;
-              break;
-            case 'crossfade':
-            case 'dissolve':
-              // Simulate crossfade with opacity dip + black flash
-              transitionVideoOpacity = 1 - eased * 0.7;
-              transitionOverlayOpacity = eased * 0.4;
-              break;
-            case 'blur':
-              transitionBlur = eased * 15;
-              transitionVideoOpacity = 1 - eased * 0.3;
-              break;
-            case 'zoom':
-              transitionTransform = `scale(${1 + eased * 0.3})`;
-              transitionVideoOpacity = 1 - eased * 0.4;
-              break;
-            case 'wipe': {
-              // Clip-path on base video to simulate wipe reveal
-              if (transitionDir === 'left') transitionClipPath = `inset(0 0 0 ${eased * 100}%)`;
-              else if (transitionDir === 'right') transitionClipPath = `inset(0 ${eased * 100}% 0 0)`;
-              else if (transitionDir === 'up') transitionClipPath = `inset(0 0 0 0)`;
-              else transitionClipPath = `inset(0 0 0 0)`;
-              transitionVideoOpacity = 1;
-              transitionOverlayOpacity = eased * 0.15;
-              break;
-            }
-            case 'slide': {
-              // Slide the base video out
-              if (transitionDir === 'left') transitionTransform = `translateX(${-eased * 30}%)`;
-              else if (transitionDir === 'right') transitionTransform = `translateX(${eased * 30}%)`;
-              else if (transitionDir === 'up') transitionTransform = `translateY(${-eased * 30}%)`;
-              else transitionTransform = `translateY(${eased * 30}%)`;
-              transitionVideoOpacity = 1 - eased * 0.5;
-              break;
-            }
-            case 'push': {
-              // Push base video fully out of frame
-              if (transitionDir === 'left') transitionTransform = `translateX(${-eased * 100}%)`;
-              else if (transitionDir === 'right') transitionTransform = `translateX(${eased * 100}%)`;
-              else if (transitionDir === 'up') transitionTransform = `translateY(${-eased * 100}%)`;
-              else transitionTransform = `translateY(${eased * 100}%)`;
-              break;
-            }
-            default:
-              transitionVideoOpacity = 1 - eased * 0.5;
-              transitionOverlayOpacity = eased * 0.3;
-              break;
-          }
+
+    // Use the original_end_time domain (source time) for matching
+    const sourceTime = activeScene.originalStartTime != null
+      ? (activeScene.originalStartTime + (currentTimeSeconds - activeScene.startTime) * (activeScene.playbackRate ?? 1))
+      : currentTimeSeconds;
+
+    const activeRT = findActiveTransition(sourceTime, resolvedTrans);
+    if (activeRT) {
+      const { transition: rt, progress } = activeRT;
+      const eased = progress; // already eased by resolver
+      switch (rt.baseType) {
+        case 'fade':
+          transitionVideoOpacity = 1 - eased * 0.8;
+          transitionOverlayOpacity = eased * 0.6;
+          break;
+        case 'crossfade':
+        case 'dissolve':
+          transitionVideoOpacity = 1 - eased * 0.7;
+          transitionOverlayOpacity = eased * 0.4;
+          break;
+        case 'blur':
+          transitionBlur = eased * 15;
+          transitionVideoOpacity = 1 - eased * 0.3;
+          break;
+        case 'zoom':
+          transitionTransform = `scale(${1 + eased * 0.3})`;
+          transitionVideoOpacity = 1 - eased * 0.4;
+          break;
+        case 'wipe': {
+          const dir = rt.direction;
+          if (dir === 'left') transitionClipPath = `inset(0 0 0 ${eased * 100}%)`;
+          else if (dir === 'right') transitionClipPath = `inset(0 ${eased * 100}% 0 0)`;
+          else transitionClipPath = `inset(0 0 0 0)`;
+          transitionVideoOpacity = 1;
+          transitionOverlayOpacity = eased * 0.15;
+          break;
         }
+        case 'slide': {
+          const dir = rt.direction;
+          if (dir === 'left') transitionTransform = `translateX(${-eased * 30}%)`;
+          else if (dir === 'right') transitionTransform = `translateX(${eased * 30}%)`;
+          else if (dir === 'up') transitionTransform = `translateY(${-eased * 30}%)`;
+          else transitionTransform = `translateY(${eased * 30}%)`;
+          transitionVideoOpacity = 1 - eased * 0.5;
+          break;
+        }
+        case 'push': {
+          const dir = rt.direction;
+          if (dir === 'left') transitionTransform = `translateX(${-eased * 100}%)`;
+          else if (dir === 'right') transitionTransform = `translateX(${eased * 100}%)`;
+          else if (dir === 'up') transitionTransform = `translateY(${-eased * 100}%)`;
+          else transitionTransform = `translateY(${eased * 100}%)`;
+          break;
+        }
+        default:
+          transitionVideoOpacity = 1 - eased * 0.5;
+          transitionOverlayOpacity = eased * 0.3;
+          break;
       }
     }
 
