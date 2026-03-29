@@ -22,8 +22,10 @@ export interface ResolvedTransition {
   tStart: number;
   /** Timeline end of transition window */
   tEnd: number;
-  /** Original boundary (original_end_time of outgoing scene) */
+  /** Original boundary (original_end_time of outgoing scene — source time) */
   originalBoundary: number;
+  /** Timeline boundary (end_time of outgoing scene — timeline time) */
+  timelineBoundary: number;
   /** Offset in seconds */
   offsetSeconds: number;
 }
@@ -95,7 +97,11 @@ export function resolveTransitions(
     // Get original boundary in source time domain
     const originalBoundary =
       scene.original_end_time ?? scene.originalEndTime ?? scene.end_time ?? scene.endTime ?? 0;
-    const boundary = originalBoundary + offset;
+    
+    // Use TIMELINE boundary (end_time) for transition window calculation
+    // This ensures the transition is centered around what the user sees on the timeline
+    const timelineBoundary = scene.end_time ?? scene.endTime ?? originalBoundary;
+    const boundary = timelineBoundary + offset;
 
     const tStart = Math.max(boundary - leadIn, prevEnd);
     const tEnd = boundary + leadOut;
@@ -112,6 +118,7 @@ export function resolveTransitions(
       tStart,
       tEnd,
       originalBoundary,
+      timelineBoundary,
       offsetSeconds: offset,
     });
   }

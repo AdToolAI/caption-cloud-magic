@@ -413,12 +413,27 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       // Cache findActiveTransition ONCE per frame — using SOURCE time directly
       let cachedActiveTrans: ReturnType<typeof findActiveTransition> = null;
       cachedActiveTrans = findActiveTransition(videoSourceTime);
+      
+      // Also check using timeline time (for timeline-boundary-based transitions)
+      if (!cachedActiveTrans && sceneInfo) {
+        const approxTimelineTime = sourceToTimelineTime(sceneInfo.scene, videoSourceTime);
+        cachedActiveTrans = findActiveTransition(approxTimelineTime);
+      }
 
       if (sceneInfo) {
         timelineTime = sourceToTimelineTime(sceneInfo.scene, videoSourceTime);
-        // Only clamp to scene boundaries if NO transition is active
-        // During transitions, timeline time must flow past scene.end_time
-        if (!cachedActiveTrans) {
+        
+        // During active transitions, fix timeline time to flow linearly
+        // from outgoing scene's end_time through the transition window
+        if (cachedActiveTrans && !cachedActiveTrans.isFreeze) {
+          // Let timeline time flow past scene boundary — don't clamp to scene.end_time
+          // But keep sceneInfo locked to the outgoing scene
+          const outgoing = cachedActiveTrans.outgoingScene;
+          if (sceneInfo.scene.id !== outgoing.id) {
+            // Force sceneInfo to stay on outgoing scene during transition
+            timelineTime = sourceToTimelineTime(outgoing, videoSourceTime);
+          }
+        } else if (!cachedActiveTrans) {
           timelineTime = Math.max(sceneInfo.scene.start_time, Math.min(timelineTime, sceneInfo.scene.end_time));
         }
 
@@ -479,10 +494,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           const rate = (sceneInfo.scene as any).playbackRate ?? 1;
           const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
 
-          // Use the resolver to find the effective boundary including offset
+          // Use the resolver's timeline boundary for scene advancement
           const matchedRT = resolvedTransitions.find(rt => rt.outgoingSceneId === sceneInfo.scene.id);
           const effectiveBoundary = matchedRT 
-            ? matchedRT.originalBoundary + matchedRT.offsetSeconds 
+            ? matchedRT.timelineBoundary + matchedRT.offsetSeconds 
             : srcEnd;
 
           if (videoSourceTime >= effectiveBoundary - 0.02) {
