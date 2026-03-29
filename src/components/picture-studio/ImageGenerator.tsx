@@ -15,6 +15,7 @@ import { ImageCard } from "./ImageCard";
 import { StudioLightbox } from "./StudioLightbox";
 import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 import { FEATURE_COSTS, ESTIMATED_COSTS } from "@/lib/featureCosts";
+import { getCachedState, setCachedState } from "./imageGeneratorCache";
 
 const STYLES = [
   { value: 'realistic', label: 'Realistisch' },
