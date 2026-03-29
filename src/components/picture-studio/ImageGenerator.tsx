@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,7 @@ import { ImageCard } from "./ImageCard";
 import { StudioLightbox } from "./StudioLightbox";
 import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 import { FEATURE_COSTS, ESTIMATED_COSTS } from "@/lib/featureCosts";
+import { getCachedState, setCachedState } from "./imageGeneratorCache";
 
 const STYLES = [
   { value: 'realistic', label: 'Realistisch' },
@@ -63,13 +64,15 @@ export function ImageGenerator() {
   const { executeAICall, loading, status } = useAICall();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [prompt, setPrompt] = useState("");
-  const [style, setStyle] = useState("realistic");
-  const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [quality, setQuality] = useState<'fast' | 'pro'>('fast');
-  const [editMode, setEditMode] = useState(false);
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
-  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+  const cached = getCachedState();
+
+  const [prompt, setPrompt] = useState(cached?.prompt ?? "");
+  const [style, setStyle] = useState(cached?.style ?? "realistic");
+  const [aspectRatio, setAspectRatio] = useState(cached?.aspectRatio ?? "1:1");
+  const [quality, setQuality] = useState<'fast' | 'pro'>(cached?.quality ?? 'fast');
+  const [editMode, setEditMode] = useState(cached?.editMode ?? false);
+  const [referenceImage, setReferenceImage] = useState<string | null>(cached?.referenceImage ?? null);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
   
   // Album save state
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
@@ -77,6 +80,11 @@ export function ImageGenerator() {
 
   // Lightbox state
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
+
+  // Sync state to in-memory cache on every change
+  useEffect(() => {
+    setCachedState({ prompt, style, aspectRatio, quality, editMode, referenceImage, generatedImages });
+  }, [prompt, style, aspectRatio, quality, editMode, referenceImage, generatedImages]);
 
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
