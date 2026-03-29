@@ -167,7 +167,7 @@ Accent colors: ${primaryColor || '#F5C76A'} gold highlights, ${secondaryColor ||
     // Get public URL
     const { data: { publicUrl } } = supabase.storage
       .from('brand-logos')
-      .getPublicUrl(storagePath);
+      .getPublicUrl(fileName);
 
     console.log('=== GENERATE-BRAND-ASSET END (SUCCESS) ===');
 
