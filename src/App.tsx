@@ -144,6 +144,7 @@ function AppLayout() {
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/verify-email" element={<VerifyEmail />} />
                     <Route path="/account" element={<Account />} />
+                    <Route path="/account/delete" element={<ProtectedRoute><DeleteAccount /></ProtectedRoute>} />
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/faq" element={<FAQ />} />
                     <Route path="/billing" element={<Billing />} />
