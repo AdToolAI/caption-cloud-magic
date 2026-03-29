@@ -53,7 +53,7 @@ export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLight
         onDragStart={handleDragStart as any}
         className="contents"
       >
-      <div className="aspect-square overflow-hidden cursor-pointer" onClick={() => onOpenLightbox?.(image)}>
+      <div className="aspect-square overflow-hidden cursor-pointer bg-checkerboard" onClick={() => onOpenLightbox?.(image)}>
         <img
           src={image.url}
           alt={image.prompt || 'Generated image'}

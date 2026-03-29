@@ -71,7 +71,7 @@ serve(async (req) => {
       surreal: 'surrealist art, dreamlike imagery, impossible geometry, Salvador Dalí inspired',
       architectural: 'architectural visualization, clean lines, modern design, dramatic perspective',
       editorial: 'editorial fashion photography, high-end magazine style, bold composition',
-      'brand-logo': 'professional brand logo design, clean vector style, scalable, minimalist, iconic symbol, negative space, no photographic elements, no text unless specified, solid or transparent background, corporate identity quality, Adobe Illustrator style',
+      'brand-logo': 'professional brand logo design, clean vector style, scalable, minimalist, iconic symbol, negative space, no photographic elements, no text unless specified, transparent background only, no background elements, isolated logo on clean white canvas, corporate identity quality, Adobe Illustrator style',
     };
 
     const stylePrompt = styleModifiers[style] || styleModifiers.realistic;
