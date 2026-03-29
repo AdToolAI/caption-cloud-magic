@@ -1173,7 +1173,8 @@ export function SceneEditingStep({
                           }}
                           onDurationChange={(duration) => {
                             setEditingTransitionId(selectedScene.id);
-                            handleTransitionDurationChange(duration);
+                            // Pass sceneId directly to avoid stale closure
+                            handleTransitionDurationChange(duration, selectedScene.id);
                           }}
                           onOffsetChange={(offset) => {
                             const sceneId = selectedScene.id;
