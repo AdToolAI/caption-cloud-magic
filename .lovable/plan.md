@@ -1,76 +1,61 @@
 
-Ziel: Die Übergänge 2 und 3 im Universal Director’s Cut zuverlässig sauber machen, statt weiter an Symptomen herumzudoktern. Ich würde das als ein Architektur-Fix umsetzen, nicht als weiteren kleinen Patch.
+Ziel: Das Problem an der Wurzel beheben. Der aktuelle Fix hat zwar einen gemeinsamen Resolver eingeführt, aber die zwei entscheidenden Laufzeitpfade benutzen ihn noch nicht wirklich korrekt. Deshalb fühlt es sich für dich weiterhin 1:1 gleich an.
 
-1. Befund aus dem aktuellen Code
-- Die Vorschau und der Export benutzen derzeit nicht dieselbe Übergangslogik.
-- Die Vorschau arbeitet schon mit `sceneId`, `original_end_time` und `offsetSeconds`:
-  - `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-  - `src/components/directors-cut/preview/useTransitionRenderer.ts`
-- Der Export verliert diese Präzision wieder:
-  - `supabase/functions/render-directors-cut/index.ts` wandelt Transitions auf `sceneIndex` um und wirft `offsetSeconds` weg.
-  - `src/remotion/templates/DirectorsCutVideo.tsx` sucht Übergänge dann nur noch per `sceneIndex`.
-- Zusätzlich gibt es einen echten Cache-Bug in der Vorschau:
-  - `useFrameCapture.ts` merkt sich bereits gecapturete Frames nur per `scene.id`.
-  - Wenn Szenenzeiten verändert oder neu analysiert werden, bleiben alte Snapshots erhalten und spätere Übergänge zeigen falsche/stale Frames.
-- Und es gibt einen Editor-Bug:
-  - In `SceneEditingStep.tsx` benutzt `handleTransitionDurationChange()` ein potenziell stale `editingTransitionId`, während der Typ-Handler korrekt `sceneId` direkt bekommt.
+1. Wahrscheinliche Hauptursache
+- Die Vorschau rendert die Canvas-Transition korrekt über `useTransitionRenderer`, aber die eigentliche Playback-/Seek-Logik in `DirectorsCutPreviewPlayer.tsx` rechnet weiterhin mit eigener Boundary-Logik.
+- Gleichzeitig friert die Vorschau aktuell nur die Phase `originalBoundary -> tStart` ein.
+- Bei positiven Offsets oder längeren Overlaps springt der echte Base-Decoder aber schon auf die nächste Szene, während die Transition noch läuft.
+- Ergebnis: Übergang 2 und 3 sehen weiterhin wie ein Dirty Cut mit darüberliegender Transition aus.
 
-2. Was ich bauen würde
-Ich würde eine einzige gemeinsame Transition-Engine als Source of Truth einführen, die sowohl Vorschau als auch Export verwendet.
+2. Zweite Hauptursache im Export
+- `DirectorsCutVideo.tsx` nutzt im Render-Pfad zwar `sceneId`, aber die tatsächliche Übergangsplatzierung läuft noch über simples `TransitionSeries` zwischen Sequenzen.
+- Das respektiert nicht die vom Resolver berechneten `tStart/tEnd`-Fenster in der Source-Time-Domain.
+- Dadurch ist Export-Parität weiterhin nicht wirklich hergestellt, selbst wenn `offsetSeconds` im Payload ankommt.
 
 3. Konkreter Umsetzungsplan
-- Gemeinsame Transition-Resolver-Utility erstellen
-  - zentrale Berechnung pro Übergang:
-    - ausgehende Szene
-    - eingehende Szene
-    - `original_end_time`
-    - `offsetSeconds`
-    - `leadIn/leadOut`
-    - `tStart/tEnd`
-    - effektive Dauer
-    - Basis-Typ + Richtung
-  - dieselbe Clamp-/Overlap-Logik für alle Übergänge, damit 2 und 3 nicht anders behandelt werden als 1.
+- Preview-Playback vollständig auf den Resolver umstellen
+  - In `DirectorsCutPreviewPlayer.tsx` die lokale `findActiveTransition()`-Berechnung entfernen bzw. durch `resolveTransitions + findActiveTransition + findFreezePhase` ersetzen.
+  - Eine gemeinsame Helper-Logik einführen:
+    - wann die Base-Video-Zeit auf der ausgehenden Szene “gehalten” werden muss
+    - wann zur nächsten Szene gesprungen werden darf
+    - wann Timeline-Clamping ausgesetzt wird
+  - Wichtig: Nicht nur die Freeze-Phase vor `tStart` abdecken, sondern die gesamte Zone behandeln, in der der Base-Decoder sonst zu früh in die nächste Szene kippt.
 
-- Preview stabilisieren
-  - `useFrameCapture.ts` so umbauen, dass der Cache bei geänderten Szenenschnitten invalidiert wird.
-  - Cache-Key nicht nur `scene.id`, sondern z. B. `scene.id + original_start_time + original_end_time`.
-  - alte `ImageBitmap`s sauber freigeben/ersetzen.
-  - `useTransitionRenderer.ts` so anpassen, dass bei jedem neuen Transition-Fenster garantiert der richtige Snapshot gezeichnet wird.
-  - Wenn ein Snapshot fehlt oder nicht rechtzeitig bereit ist, sauber auf Crossfade/Fade fallbacken statt einen schmutzigen Jump zu zeigen.
+- Vorschau-Renderer robust gegen Base-Decoder-Sprung machen
+  - `useTransitionRenderer.ts` so erweitern, dass während der gesamten aktiven Transition bei Bedarf der outgoing frame bzw. incoming frame kontrolliert gezeichnet wird.
+  - Für `crossfade/fade/blur/zoom` klar definieren, wann Canvas dominiert und wann das Base-Video sichtbar bleiben darf.
+  - Fallback: Wenn ein Bitmap fehlt, sauberer Crossfade statt harter Umschaltkante.
 
-- Editor-Fehler beheben
-  - `handleTransitionDurationChange()` ebenfalls auf direkte `sceneId`-Übergabe umstellen.
-  - Sicherstellen, dass Typ, Dauer und Offset immer auf genau die aktuell bearbeitete Szene geschrieben werden.
+- Export wirklich auf Resolver-Fenster umstellen
+  - `DirectorsCutVideo.tsx` nicht mehr nur “eine Sequence pro Szene + Transition dazwischen” rechnen lassen.
+  - Stattdessen die Szene-Dauern und Overlaps aus den aufgelösten Transition-Fenstern ableiten.
+  - Die Render-Komposition muss dieselben effektiven Fenster verwenden wie die Vorschau:
+    - resolver-basierte Übergangsstarts
+    - resolver-basierte Übergangsdauer
+    - konsistente Richtung/Typ-Mappings
 
-- Export auf dieselbe Logik umstellen
-  - `render-directors-cut/index.ts` darf `offsetSeconds` und `sceneId` nicht mehr verlieren.
-  - `DirectorsCutVideo.tsx` muss Übergänge per `sceneId` an die sortierten Szenen binden, nicht per Array-Position.
-  - Die Export-Komposition soll dieselben Transition-Fenster respektieren wie die Vorschau, damit Übergänge 2 und 3 nicht anders gerendert werden.
+- Editor-Bug vollständig abschließen
+  - `SceneEditingStep.tsx`: `onDurationChange` ebenfalls direkte `sceneId` übergeben.
+  - Sonst kann Timing noch immer auf dem falschen Übergang landen, obwohl der Handler schon optional `sceneId` unterstützt.
 
-- Parität Preview vs Export herstellen
-  - gleiche Richtungsmappings und gleiche Defaults
-  - gleiche Behandlung von `crossfade`, `fade`, `wipe`, `slide`, `push`
-  - gleiche Boundary-Logik bei positiven/negativen Offsets
+4. Betroffene Dateien
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- `src/components/directors-cut/preview/useTransitionRenderer.ts`
+- `src/components/directors-cut/steps/SceneEditingStep.tsx`
+- `src/remotion/templates/DirectorsCutVideo.tsx`
+- optional zusätzlich:
+  - `src/components/directors-cut/preview/NativeTransitionOverlay.tsx`
+  - `src/components/directors-cut/preview/NativeTransitionLayer.tsx`
+  damit keine alten Nebenpfade wieder abweichende Übergangslogik nutzen
 
-4. Technische Details
-- Betroffene Dateien:
-  - `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-  - `src/components/directors-cut/preview/useTransitionRenderer.ts`
-  - `src/components/directors-cut/preview/useFrameCapture.ts`
-  - `src/components/directors-cut/steps/SceneEditingStep.tsx`
-  - `supabase/functions/render-directors-cut/index.ts`
-  - `src/remotion/templates/DirectorsCutVideo.tsx`
-- Ich erwarte keine Datenbankänderung.
-- Der wichtigste strukturelle Fix ist: keine doppelte, voneinander abweichende Übergangslogik mehr.
+5. Warum ich glaube, dass das der echte Fehler ist
+- Der Resolver existiert bereits.
+- Aber der wichtigste Vorschau-Pfad (`DirectorsCutPreviewPlayer`) nutzt weiterhin eigene Übergangs-/Boundary-Logik.
+- Und der Export-Pfad nutzt weiterhin `TransitionSeries` auf Basis der Szenensequenzen statt auf Basis der aufgelösten Übergangsfenster.
+- Das erklärt exakt, warum dein Bundle korrekt deployed sein kann und das Verhalten trotzdem “identisch” wirkt: Die Architektur wurde nur teilweise, nicht vollständig umgestellt.
 
-5. Ergebnis nach Umsetzung
-- Übergänge 2 und 3 verwenden dieselbe saubere Logik wie Übergang 1.
-- Nach Szenen-Neuschnitt oder Re-Analyse werden keine alten Frames mehr weiterverwendet.
-- Vorschau und finaler Export verhalten sich gleich.
-- Wenn ein Übergang technisch nicht perfekt vorbereitet ist, gibt es einen kontrollierten sauberen Fallback statt harter/glitchiger Sprünge.
-
-6. Erfolgskriterien
-- Crossfade/Fade zwischen Szene 2→3 und 3→4 laufen ohne sichtbaren Dirty Cut.
-- Änderungen an Timing/Dauer wirken sofort auf den korrekten Übergang.
-- Re-Analyse der Szenen erzeugt aktualisierte Übergänge ohne stale Snapshots.
-- Export stimmt visuell mit der Vorschau überein.
+6. Erfolgskriterien nach diesem Fix
+- Übergänge 2 und 3 bleiben auch dann sauber, wenn der Base-Decoder die echte Source-Boundary überschreitet.
+- Positive und negative `offsetSeconds` verhalten sich in Vorschau und Export gleich.
+- Kein sichtbarer Dirty Cut mehr unter Crossfade/Fade.
+- Dauer-/Offset-Änderungen greifen sicher auf den richtigen Übergang.
