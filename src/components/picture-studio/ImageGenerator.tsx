@@ -81,6 +81,11 @@ export function ImageGenerator() {
   // Lightbox state
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
 
+  // Sync state to in-memory cache on every change
+  useEffect(() => {
+    setCachedState({ prompt, style, aspectRatio, quality, editMode, referenceImage, generatedImages });
+  }, [prompt, style, aspectRatio, quality, editMode, referenceImage, generatedImages]);
+
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
