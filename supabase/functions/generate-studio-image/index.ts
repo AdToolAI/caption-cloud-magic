@@ -71,11 +71,34 @@ serve(async (req) => {
       surreal: 'surrealist art, dreamlike imagery, impossible geometry, Salvador Dalí inspired',
       architectural: 'architectural visualization, clean lines, modern design, dramatic perspective',
       editorial: 'editorial fashion photography, high-end magazine style, bold composition',
-      'brand-logo': 'professional brand logo design, clean vector style, scalable, minimalist, iconic symbol, negative space, no photographic elements, no text unless specified, transparent background only, no background elements, isolated logo on clean white canvas, corporate identity quality, Adobe Illustrator style',
     };
 
-    const stylePrompt = styleModifiers[style] || styleModifiers.realistic;
-    const enhancedPrompt = `${prompt}. Style: ${stylePrompt}. Aspect ratio: ${aspectRatio}.`;
+    // Special handling for brand-logo
+    const isBrandLogo = style === 'brand-logo';
+    let enhancedPrompt: string;
+
+    if (isBrandLogo) {
+      enhancedPrompt = `Create ONLY a flat, 2D logo design. The logo must fill 70-90% of the image area and be perfectly centered.
+
+SUBJECT: ${prompt}
+
+MANDATORY RULES:
+- Output ONLY the logo/logomark/wordmark itself
+- The logo must be a clean, flat, vector-style graphic
+- Use bold, simple, iconic shapes with clear negative space
+- NO background elements, NO gradients behind the logo
+- NO mockups, NO products, NO cameras, NO tables, NO scenes
+- NO 3D rendering, NO photographic elements, NO realistic textures
+- NO business cards, NO letterheads, NO branding collateral
+- NO decorative frames or borders around the logo
+- Place the logo on a plain solid white background (#FFFFFF)
+- The logo should look like it was designed in Adobe Illustrator
+- Professional corporate identity quality, scalable design
+- Aspect ratio: ${aspectRatio}`;
+    } else {
+      const stylePrompt = styleModifiers[style] || styleModifiers.realistic;
+      enhancedPrompt = `${prompt}. Style: ${stylePrompt}. Aspect ratio: ${aspectRatio}.`;
+    }
 
     // Select model based on quality
     const model = quality === 'pro' 
