@@ -532,7 +532,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     rafIdRef.current = requestAnimationFrame(tick);
     return () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current); };
-  }, [isPlaying, duration, sortedScenes, sourceTimeForScene, transitions, findActiveTransition, handleVideoEnded]);
+  }, [isPlaying, duration, sortedScenes, sourceTimeForScene, transitions, resolvedTransitions, findActiveTransition, handleVideoEnded]);
 
   // ==================== VIDEO EVENT HANDLERS ====================
 
