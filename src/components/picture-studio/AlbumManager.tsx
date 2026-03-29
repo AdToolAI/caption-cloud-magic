@@ -227,8 +227,9 @@ export function AlbumManager() {
             {albumImages.map((img, i) => (
               <ImageCard
                 key={img.id}
-                image={{ id: img.id, url: img.image_url, prompt: img.prompt || undefined, style: img.style || undefined }}
+                image={{ id: img.id, url: img.image_url, prompt: img.prompt || undefined, style: img.style || undefined, aspectRatio: img.aspect_ratio || undefined }}
                 index={i}
+                onOpenLightbox={setLightboxImage}
                 onDelete={handleDeleteImage}
               />
             ))}
