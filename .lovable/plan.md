@@ -1,65 +1,31 @@
 
 
-## Fix: Szenenanalyse verpasst Szenen + Übergänge funktionieren nicht nach Einstellen
+## Feature: "Brand Logo" Style im KI Picture Studio
 
-### Problem 1: Szenenanalyse erkennt nicht alle Szenen
+### Was wird gemacht
 
-**Ursache**: Die `stabilizeScenes()` Funktion ist zu aggressiv:
-- Szenen unter 1.5s werden mit der vorherigen zusammengelegt
-- Maximum: `2 Szenen pro 10 Sekunden` → bei einem 20s-Video maximal 4 Szenen erlaubt
-- Ein 20s-Video mit 5 echten Schnitten wird auf 4 Szenen reduziert
+Ein neuer Style **"Brand Logo"** wird hinzugefügt, der auf Logo-Generierung optimierte Prompt-Modifier nutzt (clean vectors, scalable design, negative space, keine fotografischen Elemente). Zusätzlich werden logo-relevante Seitenverhältnisse ergänzt.
 
-**Fix**: 
-- `MIN_SCENE_DURATION` von 1.5s auf 0.8s reduzieren (kurze Schnitte erlauben)
-- `MAX_SCENES_PER_10S` von 2 auf 3 erhöhen → 20s-Video erlaubt bis zu 6 Szenen
-- Micro-Scene-Merging nur bei Szenen < 0.8s (echte Fehler, keine echten Schnitte)
+### Änderungen
 
-**Datei**: `supabase/functions/analyze-video-scenes/index.ts` — `stabilizeScenes()`
+**1. `src/components/picture-studio/ImageGenerator.tsx`**
+- Neuen Style `{ value: 'brand-logo', label: 'Brand Logo' }` zum STYLES-Array hinzufügen
+- Neue Seitenverhältnisse für Logos ergänzen:
+  - `1:1 Quadrat` (App Icon, Favicon) — existiert bereits
+  - `4:3 Landscape` (Website-Header-Logo)
+  - `3:4 Portrait` (Vertikales Logo)
+  - `2:1 Wide` (Banner-Logo, Social Media Cover)
 
----
-
-### Problem 2: Übergänge werden nicht angewendet (auch wenn eingestellt)
-
-**Ursache**: Stale-Closure-Bug in `SceneEditingStep.tsx`:
-
-```typescript
-onTypeChange={(type) => {
-  setEditingTransitionId(selectedScene.id);  // React state → NÄCHSTER Render
-  handleTransitionTypeChange(type);          // Liest editingTransitionId → AKTUELLER Render (noch alter Wert!)
-}}
-```
-
-`handleTransitionTypeChange` prüft `if (!editingTransitionId) return;` — beim ersten Klick ist `editingTransitionId` noch `undefined` oder der vorherige Wert → der Übergang wird nie gesetzt.
-
-Zusätzlich: Wenn `type === 'none'` gewählt wird, wird die Transition komplett aus dem Array **entfernt** (`filter`). Danach kann `onOffsetChange` per `map` nichts mehr finden → Offset-Slider hat keinen Effekt. Und die Default-Init-Logik (Zeile 86) greift nicht, weil `transitions.length > 0`.
-
-**Fix**: 
-1. `handleTransitionTypeChange` direkt mit `sceneId` aufrufen statt über den Umweg `editingTransitionId`
-2. Bei `type === 'none'`: Transition nicht löschen, sondern `transitionType: 'none'` setzen (im Array behalten)
-3. `onOffsetChange`: Fallback hinzufügen falls keine Transition im Array existiert
-
-**Datei**: `src/components/directors-cut/steps/SceneEditingStep.tsx`
-
----
-
-### Problem 3: Transition-Timing weiterhin ungenau
-
-Mit den Fixes oben werden Transitions überhaupt erst korrekt gesetzt. Das bereits implementierte Offset-System (Frame-Freeze + Source-basiertes Timing) kann dann greifen. 
-
-Falls das Timing nach diesen Fixes immer noch nicht stimmt, liegt es an den `original_end_time`-Werten aus der Szenenanalyse — aber das kann erst getestet werden, wenn die Transitions überhaupt funktionieren.
-
----
-
-### Zusammenfassung der Änderungen
-
-| Datei | Änderung |
-|-------|----------|
-| `supabase/functions/analyze-video-scenes/index.ts` | `stabilizeScenes`: MIN_SCENE_DURATION 0.8s, MAX_SCENES_PER_10S 3 |
-| `src/components/directors-cut/steps/SceneEditingStep.tsx` | Stale-Closure-Fix: `handleTransitionTypeChange` mit direktem `sceneId`-Parameter; 'none' behält Transition im Array |
+**2. `supabase/functions/generate-studio-image/index.ts`**
+- Neuen `styleModifiers`-Eintrag für `brand-logo`:
+  ```
+  'brand-logo': 'professional brand logo design, clean vector style, 
+  scalable, minimalist, iconic symbol, negative space, no photographic 
+  elements, no text unless specified, solid or transparent background, 
+  corporate identity quality, Adobe Illustrator style'
+  ```
 
 ### Ergebnis
-- Videos mit 5+ Szenen werden korrekt erkannt (nicht mehr auf 4 reduziert)
-- Übergänge werden sofort beim Einstellen im Preview angezeigt
-- Offset-Slider funktioniert zuverlässig
-- Kein Loop, kein Stottern — bestehende Fixes bleiben unangetastet
+- Der User wählt "Brand Logo" als Style und kann verschiedene Seitenverhältnisse für unterschiedliche Logo-Einsatzzwecke generieren
+- Die Prompt-Modifier sorgen dafür, dass das KI-Modell Logo-typische Ergebnisse liefert (clean, skalierbar, ikonisch)
 
