@@ -448,8 +448,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             // if we're in an active transition and the matched scene is the incoming scene.
             // This prevents a false "new scene" detection when the transition ends.
             if (cachedActiveTrans) {
-              const rt = cachedActiveTrans.transition;
-              if (sceneInfo.scene.id === rt.incomingSceneId) {
+              if (sceneInfo.scene.id === cachedActiveTrans.incomingScene.id) {
                 lastSceneIndexRef.current = sceneInfo.index;
               }
             }
