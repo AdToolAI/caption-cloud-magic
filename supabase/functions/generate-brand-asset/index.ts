@@ -138,9 +138,12 @@ Accent colors: ${primaryColor || '#F5C76A'} gold highlights, ${secondaryColor ||
     // Upload to Supabase Storage
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Convert base64 to blob
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
-    const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    // Robust Base64 decoding
+    const commaIdx = imageData.indexOf(',');
+    const rawBase64 = commaIdx !== -1 ? imageData.substring(commaIdx + 1) : imageData;
+    const cleanBase64 = rawBase64.replace(/\s/g, '');
+    const { decodeBase64 } = await import("https://deno.land/std@0.224.0/encoding/base64.ts");
+    const imageBytes = decodeBase64(cleanBase64);
     
     const fileName = `${assetType}_${Date.now()}.png`;
     const storagePath = `brand-assets/${fileName}`;
