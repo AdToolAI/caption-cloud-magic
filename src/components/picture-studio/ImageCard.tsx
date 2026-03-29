@@ -61,7 +61,7 @@ export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLight
         <img
           src={image.url}
           alt={image.prompt || 'Generated image'}
-          className="max-w-full max-h-full object-contain"
+          className="w-full h-full object-contain"
           loading="lazy"
         />
       </div>
