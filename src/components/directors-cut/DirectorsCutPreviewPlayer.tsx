@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useTransitionRenderer } from './preview/useTransitionRenderer';
 import { useFrameCapture } from './preview/useFrameCapture';
 import { NativePreviewEffects } from './preview/NativePreviewEffects';
+import { resolveTransitions, findActiveTransition as resolverFindActiveTransition, findFreezePhase } from '@/utils/transitionResolver';
 
 const SUBTITLE_FONT_SIZES = {
   small: '16px',
@@ -129,53 +130,54 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     return sourceStart + (timelineTime - scene.start_time) * playbackRate;
   }, []);
 
-  // Helper: find active transition OR freeze-phase using SOURCE time (video.currentTime domain)
-  // This avoids timeline-mapping drift by comparing directly against original_end_time
-  const findActiveTransition = useCallback((sourceTime: number) => {
-    let prevEnd = -Infinity;
-    for (let i = 0; i < sortedScenes.length - 1; i++) {
-      const scene = sortedScenes[i];
-      const t = transitions.find(tr => tr.sceneId === scene.id);
-      if (!t || t.transitionType === 'none') continue;
-      const tDuration = Math.max(0.8, t.duration || 1.2);
-      const leadIn = tDuration * 0.05;
-      const leadOut = tDuration * 0.95;
-      const offset = t.offsetSeconds ?? 0;
-      const originalBoundary = scene.original_end_time ?? scene.end_time;
-      const boundary = originalBoundary + offset;
-      const tStart = Math.max(boundary - leadIn, prevEnd);
-      const tEnd = boundary + leadOut;
-      const effectiveDuration = tEnd - tStart;
-      prevEnd = tEnd;
+  // Pre-resolve transitions using the shared resolver (single source of truth)
+  const resolvedTransitions = useMemo(
+    () => resolveTransitions(sortedScenes, transitions),
+    [sortedScenes, transitions],
+  );
 
-      // Freeze phase: offset > 0, past original cut but before transition window
-      // Return a synthetic "active" result so boundary-crossing logic is suppressed
-      if (offset > 0 && sourceTime >= originalBoundary && sourceTime < tStart) {
+  // Helper: find active transition OR freeze-phase using SOURCE time
+  const findActiveTransition = useCallback((sourceTime: number) => {
+    // Check freeze phase first
+    const freezeRT = findFreezePhase(sourceTime, resolvedTransitions);
+    if (freezeRT) {
+      const outgoingScene = sortedScenes.find(s => s.id === freezeRT.outgoingSceneId);
+      const incomingScene = sortedScenes.find(s => s.id === freezeRT.incomingSceneId);
+      if (outgoingScene && incomingScene) {
         return {
-          outgoingScene: scene,
-          incomingScene: sortedScenes[i + 1],
-          boundary,
-          leadIn,
-          tDuration: effectiveDuration,
-          progress: 0, // freeze = 0% progress
+          outgoingScene,
+          incomingScene,
+          boundary: freezeRT.originalBoundary + freezeRT.offsetSeconds,
+          leadIn: freezeRT.duration * 0.05,
+          tDuration: freezeRT.duration,
+          progress: 0,
           isFreeze: true,
+          tEnd: freezeRT.tEnd,
         };
       }
+    }
 
-      if (sourceTime >= tStart && sourceTime < tEnd) {
+    // Check active transition
+    const active = resolverFindActiveTransition(sourceTime, resolvedTransitions);
+    if (active) {
+      const { transition: rt, progress } = active;
+      const outgoingScene = sortedScenes.find(s => s.id === rt.outgoingSceneId);
+      const incomingScene = sortedScenes.find(s => s.id === rt.incomingSceneId);
+      if (outgoingScene && incomingScene) {
         return {
-          outgoingScene: scene,
-          incomingScene: sortedScenes[i + 1],
-          boundary,
-          leadIn,
-          tDuration: effectiveDuration,
-          progress: (sourceTime - tStart) / effectiveDuration,
+          outgoingScene,
+          incomingScene,
+          boundary: rt.originalBoundary + rt.offsetSeconds,
+          leadIn: rt.duration * 0.05,
+          tDuration: rt.duration,
+          progress,
           isFreeze: false,
+          tEnd: rt.tEnd,
         };
       }
     }
     return null;
-  }, [sortedScenes, transitions]);
+  }, [sortedScenes, resolvedTransitions]);
 
   // Helper: map timeline time → source video time (transition-aware: stays on outgoing scene)
   const timelineToSourceTime = useCallback((timelineTime: number): number => {
@@ -465,25 +467,20 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         }
 
         // Scene-boundary-crossing logic: SKIP entirely during active transitions
-        // This prevents unnecessary seeks and checks while the video plays through a transition
+        // Canvas handles visuals; video just keeps playing through the boundary
         if (!cachedActiveTrans) {
           const srcStart = sceneInfo.scene.original_start_time ?? sceneInfo.scene.start_time;
           const rate = (sceneInfo.scene as any).playbackRate ?? 1;
           const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
 
-          // Account for transition offset — if a positive offset exists,
-          // the video must keep playing past srcEnd until the offset transition window completes
-          const sceneTransition = transitions.find(tr => tr.sceneId === sceneInfo.scene.id);
-          const transOffset = (sceneTransition && sceneTransition.transitionType !== 'none') 
-            ? (sceneTransition.offsetSeconds ?? 0) 
-            : 0;
-          const effectiveBoundary = srcEnd + transOffset;
+          // Use the resolver to find the effective boundary including offset
+          const matchedRT = resolvedTransitions.find(rt => rt.outgoingSceneId === sceneInfo.scene.id);
+          const effectiveBoundary = matchedRT ? matchedRT.tEnd : srcEnd;
 
           if (videoSourceTime >= effectiveBoundary - 0.02) {
-            // Video naturally reached scene boundary — advance to next scene
+            // Video reached end of scene (or end of transition window) — advance to next scene
             const nextScene = sortedScenes[sceneInfo.index + 1];
             if (nextScene) {
-              // No transition: seek to next scene's source start
               const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
               if (Math.abs(video.currentTime - nextSourceStart) > 0.3) {
                 video.currentTime = nextSourceStart;
@@ -535,7 +532,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     rafIdRef.current = requestAnimationFrame(tick);
     return () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current); };
-  }, [isPlaying, duration, sortedScenes, sourceTimeForScene, transitions, findActiveTransition, handleVideoEnded]);
+  }, [isPlaying, duration, sortedScenes, sourceTimeForScene, transitions, resolvedTransitions, findActiveTransition, handleVideoEnded]);
 
   // ==================== VIDEO EVENT HANDLERS ====================
 

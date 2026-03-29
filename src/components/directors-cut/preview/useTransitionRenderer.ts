@@ -2,18 +2,11 @@ import { useEffect, useRef, useMemo } from 'react';
 import type { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 import { resolveTransitions, findActiveTransition, findFreezePhase } from '@/utils/transitionResolver';
 
-const TRANSITION_DURATION = 1.2;
-const MIN_TRANSITION_DURATION = 0.8;
-
 /**
  * Zero-rerender transition renderer.
- * Uses a <canvas> element with pre-captured ImageBitmaps for the incoming scene.
- * Writes opacity/transform/clipPath directly to DOM elements via rAF.
- * No setState, no React re-renders, no second video decoder.
- *
- * NEW: Frame-freeze phase — when a transition has a positive offsetSeconds,
- * the outgoing scene's last frame is drawn at full opacity to hide the
- * underlying video cut until the transition window actually opens.
+ * Uses a <canvas> element with pre-captured ImageBitmaps for BOTH outgoing and incoming scenes.
+ * During transitions the base video is hidden (opacity 0) and the canvas draws the full composite.
+ * This prevents "dirty cuts" caused by the base decoder advancing past the scene boundary.
  */
 export function useTransitionRenderer(
   baseVideoRef: React.RefObject<HTMLVideoElement | null>,
@@ -26,9 +19,7 @@ export function useTransitionRenderer(
 ) {
   const rafRef = useRef<number>();
   const wasActiveRef = useRef(false);
-  const lastDrawnSceneRef = useRef<string>('');
 
-  // Pre-resolve all transition windows once when scenes/transitions change
   const resolvedTransitions = useMemo(
     () => resolveTransitions(scenes, transitions),
     [scenes, transitions],
@@ -42,7 +33,6 @@ export function useTransitionRenderer(
     }
 
     const tick = () => {
-      // Read source time directly from video element for drift-free transitions
       const time = baseVideoRef.current?.currentTime ?? visualTimeRef.current ?? 0;
       const base = baseVideoRef.current;
       const canvas = canvasRef.current;
@@ -51,32 +41,36 @@ export function useTransitionRenderer(
         return;
       }
 
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      // Ensure canvas dimensions match
+      if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+        canvas.width = canvas.clientWidth || 1280;
+        canvas.height = canvas.clientHeight || 720;
+      }
+
+      const w = canvas.width;
+      const h = canvas.height;
+      const frameCache = frameCacheRef.current;
       let found = false;
 
       // === FRAME-FREEZE PHASE ===
       const freezeRT = findFreezePhase(time, resolvedTransitions);
-      if (freezeRT) {
-        const frameCache = frameCacheRef.current;
-        if (frameCache) {
-          const outgoingKey = `outgoing-${freezeRT.outgoingSceneId}`;
-          const outgoingBitmap = frameCache.get(outgoingKey);
-          if (outgoingBitmap) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-                canvas.width = canvas.clientWidth || 1280;
-                canvas.height = canvas.clientHeight || 720;
-              }
-              ctx.drawImage(outgoingBitmap, 0, 0, canvas.width, canvas.height);
-              lastDrawnSceneRef.current = outgoingKey;
-            }
-          }
+      if (freezeRT && frameCache) {
+        const outgoingBitmap = frameCache.get(`outgoing-${freezeRT.outgoingSceneId}`);
+        if (outgoingBitmap) {
+          ctx.globalAlpha = 1;
+          ctx.drawImage(outgoingBitmap, 0, 0, w, h);
         }
         canvas.style.display = '';
         canvas.style.opacity = '1';
         canvas.style.transform = '';
         canvas.style.clipPath = '';
-        clearStyles(base);
+        base.style.opacity = '0'; // Hide base — it already jumped
         found = true;
         wasActiveRef.current = true;
       }
@@ -87,36 +81,31 @@ export function useTransitionRenderer(
         if (active) {
           const { transition: rt, progress } = active;
 
-          // Draw incoming scene frame onto canvas
-          const frameCache = frameCacheRef.current;
-          if (frameCache) {
-            const bitmap = frameCache.get(rt.incomingSceneId);
-            if (bitmap && lastDrawnSceneRef.current !== rt.incomingSceneId) {
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-                  canvas.width = canvas.clientWidth || 1280;
-                  canvas.height = canvas.clientHeight || 720;
-                }
-                ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-                lastDrawnSceneRef.current = rt.incomingSceneId;
-              }
-            }
-          }
+          const outgoingBitmap = frameCache?.get(`outgoing-${rt.outgoingSceneId}`) ?? null;
+          const incomingBitmap = frameCache?.get(rt.incomingSceneId) ?? null;
 
-          applyStyles(base, canvas, progress, rt.baseType, rt.direction, videoFilterRef.current ?? '');
+          // Draw composite: both outgoing + incoming on canvas
+          drawTransitionComposite(ctx, w, h, outgoingBitmap, incomingBitmap, progress, rt.baseType, rt.direction);
+
+          canvas.style.display = '';
+          canvas.style.opacity = '1';
+          canvas.style.transform = '';
+          canvas.style.clipPath = '';
+          base.style.opacity = '0'; // Hide base — canvas handles everything
+
           found = true;
           wasActiveRef.current = true;
         }
       }
 
       if (!found && wasActiveRef.current) {
-        clearStyles(base);
+        base.style.opacity = '';
+        base.style.transform = '';
+        base.style.clipPath = '';
         canvas.style.display = 'none';
         canvas.style.opacity = '';
         canvas.style.transform = '';
         canvas.style.clipPath = '';
-        lastDrawnSceneRef.current = '';
         wasActiveRef.current = false;
       }
 
@@ -130,117 +119,132 @@ export function useTransitionRenderer(
   }, [scenes, transitions, resolvedTransitions, visualTimeRef, baseVideoRef, canvasRef, videoFilterRef, frameCacheRef]);
 }
 
-function clearStyles(el: HTMLElement) {
-  el.style.opacity = '';
-  el.style.transform = '';
-  el.style.clipPath = '';
-  // Do NOT clear filter — it's managed by React (videoFilter prop)
-}
-
-function applyStyles(
-  base: HTMLElement,
-  incoming: HTMLElement,
+/**
+ * Draw a full transition composite onto a canvas context.
+ * Both outgoing and incoming frames are drawn, so the base video can be hidden.
+ */
+function drawTransitionComposite(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  outgoing: ImageBitmap | null,
+  incoming: ImageBitmap | null,
   progress: number,
   baseType: string,
   direction: string,
-  baseFilter: string,
 ) {
-  incoming.style.display = '';
+  ctx.clearRect(0, 0, w, h);
+  ctx.globalAlpha = 1;
 
   switch (baseType) {
     case 'crossfade':
-    case 'dissolve':
-      base.style.opacity = String(1 - progress * 0.3);
-      base.style.transform = '';
-      base.style.clipPath = '';
-      incoming.style.opacity = String(progress);
-      incoming.style.transform = '';
-      incoming.style.clipPath = '';
+    case 'dissolve': {
+      if (outgoing) { ctx.globalAlpha = 1; ctx.drawImage(outgoing, 0, 0, w, h); }
+      if (incoming) { ctx.globalAlpha = progress; ctx.drawImage(incoming, 0, 0, w, h); }
+      ctx.globalAlpha = 1;
       break;
+    }
 
-    case 'fade':
+    case 'fade': {
+      // Fade through black
       if (progress < 0.5) {
-        base.style.opacity = String(1 - progress * 2);
-        incoming.style.opacity = '0';
+        if (outgoing) { ctx.globalAlpha = 1 - progress * 2; ctx.drawImage(outgoing, 0, 0, w, h); }
       } else {
-        base.style.opacity = '0';
-        incoming.style.opacity = String((progress - 0.5) * 2);
+        if (incoming) { ctx.globalAlpha = (progress - 0.5) * 2; ctx.drawImage(incoming, 0, 0, w, h); }
       }
-      base.style.transform = '';
-      base.style.clipPath = '';
-      incoming.style.transform = '';
-      incoming.style.clipPath = '';
+      ctx.globalAlpha = 1;
       break;
+    }
 
-    case 'blur':
-      base.style.filter = `${baseFilter} blur(${progress * 8}px)`.trim();
-      base.style.opacity = String(1 - progress);
-      incoming.style.filter = `blur(${(1 - progress) * 8}px)`;
-      incoming.style.opacity = String(progress);
-      base.style.transform = '';
-      base.style.clipPath = '';
-      incoming.style.transform = '';
-      incoming.style.clipPath = '';
+    case 'blur': {
+      // Canvas filter API for blur
+      if (outgoing) {
+        ctx.save();
+        ctx.filter = `blur(${progress * 8}px)`;
+        ctx.globalAlpha = 1 - progress;
+        ctx.drawImage(outgoing, 0, 0, w, h);
+        ctx.restore();
+      }
+      if (incoming) {
+        ctx.save();
+        ctx.filter = `blur(${(1 - progress) * 8}px)`;
+        ctx.globalAlpha = progress;
+        ctx.drawImage(incoming, 0, 0, w, h);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+      ctx.filter = 'none';
       break;
+    }
 
     case 'wipe': {
-      const p = progress * 100;
-      let clipPath = '';
-      if (direction === 'left') clipPath = `inset(0 ${100 - p}% 0 0)`;
-      else if (direction === 'right') clipPath = `inset(0 0 0 ${100 - p}%)`;
-      else if (direction === 'up') clipPath = `inset(0 0 ${100 - p}% 0)`;
-      else clipPath = `inset(${100 - p}% 0 0 0)`;
-      base.style.opacity = '';
-      base.style.transform = '';
-      base.style.clipPath = '';
-      incoming.style.opacity = '';
-      incoming.style.transform = '';
-      incoming.style.clipPath = clipPath;
-      break;
-    }
-
-    case 'slide':
-    case 'push': {
-      let inTransform = '';
-      let outTransform = '';
-      if (direction === 'left') {
-        inTransform = `translateX(${(1 - progress) * 100}%)`;
-        if (baseType === 'push') outTransform = `translateX(${-progress * 100}%)`;
-      } else if (direction === 'right') {
-        inTransform = `translateX(${-(1 - progress) * 100}%)`;
-        if (baseType === 'push') outTransform = `translateX(${progress * 100}%)`;
-      } else if (direction === 'up') {
-        inTransform = `translateY(${(1 - progress) * 100}%)`;
-        if (baseType === 'push') outTransform = `translateY(${-progress * 100}%)`;
-      } else {
-        inTransform = `translateY(${-(1 - progress) * 100}%)`;
-        if (baseType === 'push') outTransform = `translateY(${progress * 100}%)`;
+      if (outgoing) { ctx.drawImage(outgoing, 0, 0, w, h); }
+      if (incoming) {
+        ctx.save();
+        ctx.beginPath();
+        const p = progress;
+        if (direction === 'left') ctx.rect(0, 0, w * p, h);
+        else if (direction === 'right') ctx.rect(w * (1 - p), 0, w * p, h);
+        else if (direction === 'up') ctx.rect(0, 0, w, h * p);
+        else ctx.rect(0, h * (1 - p), w, h * p);
+        ctx.clip();
+        ctx.drawImage(incoming, 0, 0, w, h);
+        ctx.restore();
       }
-      base.style.opacity = '';
-      base.style.clipPath = '';
-      base.style.transform = outTransform;
-      incoming.style.opacity = '';
-      incoming.style.clipPath = '';
-      incoming.style.transform = inTransform;
       break;
     }
 
-    case 'zoom':
-      base.style.opacity = String(1 - progress * 0.3);
-      base.style.transform = '';
-      base.style.clipPath = '';
-      incoming.style.opacity = String(progress);
-      incoming.style.transform = `scale(${1 + (1 - progress) * 0.3})`;
-      incoming.style.clipPath = '';
+    case 'slide': {
+      if (outgoing) { ctx.drawImage(outgoing, 0, 0, w, h); }
+      if (incoming) {
+        let dx = 0, dy = 0;
+        if (direction === 'left') dx = (1 - progress) * w;
+        else if (direction === 'right') dx = -(1 - progress) * w;
+        else if (direction === 'up') dy = (1 - progress) * h;
+        else dy = -(1 - progress) * h;
+        ctx.drawImage(incoming, dx, dy, w, h);
+      }
       break;
+    }
 
-    default:
-      base.style.opacity = String(1 - progress * 0.3);
-      base.style.transform = '';
-      base.style.clipPath = '';
-      incoming.style.opacity = String(progress);
-      incoming.style.transform = '';
-      incoming.style.clipPath = '';
+    case 'push': {
+      if (outgoing) {
+        let dx = 0, dy = 0;
+        if (direction === 'left') dx = -progress * w;
+        else if (direction === 'right') dx = progress * w;
+        else if (direction === 'up') dy = -progress * h;
+        else dy = progress * h;
+        ctx.drawImage(outgoing, dx, dy, w, h);
+      }
+      if (incoming) {
+        let dx = 0, dy = 0;
+        if (direction === 'left') dx = (1 - progress) * w;
+        else if (direction === 'right') dx = -(1 - progress) * w;
+        else if (direction === 'up') dy = (1 - progress) * h;
+        else dy = -(1 - progress) * h;
+        ctx.drawImage(incoming, dx, dy, w, h);
+      }
       break;
+    }
+
+    case 'zoom': {
+      if (outgoing) { ctx.drawImage(outgoing, 0, 0, w, h); }
+      if (incoming) {
+        ctx.globalAlpha = progress;
+        const scale = 1 + (1 - progress) * 0.3;
+        const sw = w * scale;
+        const sh = h * scale;
+        ctx.drawImage(incoming, (w - sw) / 2, (h - sh) / 2, sw, sh);
+        ctx.globalAlpha = 1;
+      }
+      break;
+    }
+
+    default: {
+      if (outgoing) { ctx.globalAlpha = 1; ctx.drawImage(outgoing, 0, 0, w, h); }
+      if (incoming) { ctx.globalAlpha = progress; ctx.drawImage(incoming, 0, 0, w, h); }
+      ctx.globalAlpha = 1;
+      break;
+    }
   }
 }
