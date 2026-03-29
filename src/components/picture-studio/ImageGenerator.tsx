@@ -308,6 +308,15 @@ export function ImageGenerator() {
           onSaved={handleImageSaved}
         />
       )}
+
+      {/* Lightbox */}
+      <StudioLightbox
+        image={lightboxImage}
+        open={!!lightboxImage}
+        onOpenChange={(open) => !open && setLightboxImage(null)}
+        onSaveToAlbum={handleSaveToAlbum}
+        onDelete={handleDeleteImage}
+      />
     </div>
   );
 }
