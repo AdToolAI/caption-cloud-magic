@@ -1,38 +1,39 @@
 
 
-## Fix: Director's Cut Transitions — Scene-3-Dopplung und Slide-Effekte
+## Diagnose: Warum Übergänge nicht aktualisiert werden
 
-### Problem-Analyse
+### Bisherige Analyse
 
-Zwei konkrete Bugs identifiziert:
+Ich habe den gesamten Datenfluss von der UI (SceneEditingStep) bis zum Renderer (useTransitionRenderer) nachvollzogen. Der Code sieht architektonisch korrekt aus:
 
-**Bug 1: Szene 3 wird kurz doppelt gezeigt**
-In `DirectorsCutPreviewPlayer.tsx` Zeile 446-451: Während einer aktiven Transition wird `lastSceneIndexRef` NICHT aktualisiert (extended-tolerance match). Wenn die Transition endet und der Video-Decoder bereits in der nächsten Szene ist, erkennt die Szene-Wechsel-Logik einen "neuen" Szenenwechsel und versucht, zur nächsten Szene zu seeken — obwohl das Video dort schon ist. Das erzeugt einen kurzen Flash/Rücksprung.
+1. User wählt "Slide" → `handleTransitionTypeChange` → `onTransitionsChange(transitions.map(...))` → neues Array
+2. Parent-State (`DirectorsCut.tsx`) wird aktualisiert
+3. Neues `transitions`-Array fließt in `DirectorsCutPreviewPlayer` → `useTransitionRenderer`
+4. `resolvedTransitions` wird via `useMemo` neu berechnet
+5. `useEffect` mit rAF-Loop startet neu mit neuen `resolvedTransitions`
 
-**Bug 2: Slide-Effekte kaputt**
-Das `<canvas>` Element hat `object-contain` als CSS-Klasse (Zeile 790), aber Canvas-Elemente unterstützen `object-fit` NICHT. Das `<video>` Element verwendet `object-contain` korrekt (Zeile 779), aber der Canvas zeichnet das Bild über die volle Canvas-Breite/-Höhe — ohne das Seitenverhältnis des Videos zu berücksichtigen. Bei Videos mit anderem Seitenverhältnis als dem Container (z.B. Portrait-Video in Landscape-Container) stimmt die Canvas-Zeichnung nicht mit dem Video überein. Slide/Push/Wipe-Effekte erscheinen dann verschoben oder gar nicht sichtbar, weil sie außerhalb des sichtbaren Bereichs gezeichnet werden.
+**Trotzdem zeigt die Vorschau die alten Übergänge.** Da der Code logisch korrekt aussieht, muss ich mit Diagnose-Logging herausfinden, was zur Laufzeit tatsächlich passiert.
 
-### Umsetzungsplan
+### Plan
 
-**1. Scene-Tracking während Transitions fixen** (`DirectorsCutPreviewPlayer.tsx`)
-- Wenn eine Transition aktiv ist UND `sceneInfo.index` dem `incomingSceneId` der aktiven Transition entspricht → `lastSceneIndexRef` sofort auf den neuen Index setzen
-- So weiß die Boundary-Logik nach Ende der Transition, dass wir bereits in der richtigen Szene sind, und der Doppel-Seek entfällt
+**1. Diagnose-Logging in `useTransitionRenderer.ts` einfügen**
+- Bei jedem Neustart des rAF-Loops: `resolvedTransitions` loggen (Anzahl, baseType jedes Eintrags)
+- Im `tick`: wenn `findActiveTransition` matcht, den `baseType` und `direction` loggen
+- Damit sehe ich, ob der Renderer überhaupt "slide" als Typ bekommt
 
-**2. Canvas-Rendering an Video-Seitenverhältnis anpassen** (`useTransitionRenderer.ts`)
-- Vor dem Zeichnen das tatsächliche Video-Seitenverhältnis berechnen (`video.videoWidth / video.videoHeight`)
-- Die Zeichenfläche (drawImage-Koordinaten) so berechnen, dass sie dem `object-contain`-Verhalten des Video-Elements entspricht (Letterbox/Pillarbox)
-- Alle `drawImage`-Aufrufe in `drawTransitionComposite` mit den korrekten Offset-/Größenwerten versehen
-- Alternativ: Canvas-Größe auf die tatsächliche Video-Darstellungsfläche beschränken und CSS-Positionierung anpassen
+**2. Diagnose-Logging in `resolveTransitions`**
+- Jeden Input-Transition loggen: `transitionType`, `sceneId`
+- Jeden aufgelösten Output loggen: `baseType`, `direction`, `tStart`, `tEnd`
+- Damit prüfe ich, ob "slide" korrekt aufgelöst wird oder ob irgendwo "crossfade" / "none" zurückfällt
 
-**3. Transition-Ende sauber handhaben** (`DirectorsCutPreviewPlayer.tsx`)
-- Nach Ende einer Transition (Frame N wo `cachedActiveTrans` erstmals null ist, nachdem es zuvor truthy war): Den `lastSceneIndexRef` auf den Index der aktuellen Szene setzen, bevor die Boundary-Crossing-Logik läuft
-- Das verhindert den falschen "Sprung" zur selben Szene
+**3. Diagnose-Logging in `DirectorsCutPreviewPlayer.tsx`**
+- Wenn `transitions` prop sich ändert, die neuen Transition-Typen loggen
+- Damit prüfe ich, ob der Player überhaupt die aktualisierten Transitions erhält
 
-### Betroffene Dateien
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — Scene-tracking + Transition-Ende-Handling
-- `src/components/directors-cut/preview/useTransitionRenderer.ts` — Canvas Aspect-Ratio-korrektes Zeichnen
+**4. Basierend auf den Logs das eigentliche Problem fixen**
+- Sobald die Console-Logs den Fehler zeigen, behebe ich die Ursache
 
-### Ergebnis
-- Szene 3 wird nicht mehr doppelt angezeigt
-- Slide/Push/Wipe-Effekte funktionieren wieder korrekt, auch bei Videos mit anderem Seitenverhältnis
+### Warum Logging statt weiterem Raten
+
+Wir sind jetzt an einem Punkt, wo der Code strukturell korrekt aussieht. Weiteres Raten führt zu noch mehr Patches ohne Ergebnis. Die Console-Logs werden beim nächsten Abspielen sofort zeigen, wo die Kette bricht — ob der Renderer die falschen Transition-Typen bekommt, ob die Bitmaps fehlen, oder ob der Resolver nicht getriggert wird.
 
