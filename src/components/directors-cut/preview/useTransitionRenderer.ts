@@ -32,6 +32,8 @@ export function useTransitionRenderer(
       return;
     }
 
+    console.log('[useTransitionRenderer] rAF loop START — resolvedTransitions:', resolvedTransitions.map(r => `${r.sceneIndex}:${r.baseType}-${r.direction}`));
+
     const tick = () => {
       const time = baseVideoRef.current?.currentTime ?? visualTimeRef.current ?? 0;
       const base = baseVideoRef.current;
@@ -80,6 +82,7 @@ export function useTransitionRenderer(
         const active = findActiveTransition(time, resolvedTransitions);
         if (active) {
           const { transition: rt, progress } = active;
+          if (Math.random() < 0.02) console.log('[useTransitionRenderer] ACTIVE transition:', rt.baseType, rt.direction, 'progress:', progress.toFixed(2), 'time:', time.toFixed(2));
 
           const outgoingBitmap = frameCache?.get(`outgoing-${rt.outgoingSceneId}`) ?? null;
           const incomingBitmap = frameCache?.get(rt.incomingSceneId) ?? null;
