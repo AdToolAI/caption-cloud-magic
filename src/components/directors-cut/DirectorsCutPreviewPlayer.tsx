@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useTransitionRenderer } from './preview/useTransitionRenderer';
 import { useFrameCapture } from './preview/useFrameCapture';
 import { NativePreviewEffects } from './preview/NativePreviewEffects';
+import { resolveTransitions, findActiveTransition as resolverFindActiveTransition, findFreezePhase } from '@/utils/transitionResolver';
 
 const SUBTITLE_FONT_SIZES = {
   small: '16px',
