@@ -350,6 +350,15 @@ export function AlbumManager() {
           onSaved={handleUnsortedImageSaved}
         />
       )}
+
+      {/* Lightbox */}
+      <StudioLightbox
+        image={lightboxImage}
+        open={!!lightboxImage}
+        onOpenChange={(open) => !open && setLightboxImage(null)}
+        onSaveToAlbum={handleSaveToAlbum}
+        onDelete={handleDeleteImage}
+      />
     </div>
   );
 }
