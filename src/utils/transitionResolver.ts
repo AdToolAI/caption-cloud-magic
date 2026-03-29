@@ -22,8 +22,10 @@ export interface ResolvedTransition {
   tStart: number;
   /** Timeline end of transition window */
   tEnd: number;
-  /** Original boundary (original_end_time of outgoing scene) */
+  /** Original boundary (original_end_time of outgoing scene — source time) */
   originalBoundary: number;
+  /** Timeline boundary (end_time of outgoing scene — timeline time) */
+  timelineBoundary: number;
   /** Offset in seconds */
   offsetSeconds: number;
 }
