@@ -152,21 +152,32 @@ export function useTransitionRenderer(
       // === NO TRANSITION — reset styles and resume base video ===
       if (!found && wasActiveRef.current) {
         const baseFilter = videoFilterRef.current || '';
-        base.style.opacity = '';
-        base.style.transform = '';
-        base.style.clipPath = '';
+        base.style.opacity = '1';
+        base.style.transform = 'none';
+        base.style.clipPath = 'none';
         base.style.filter = baseFilter || '';
+
+        // Seek base video to incoming scene's position so it continues correctly
+        if (incoming.currentTime > 0 && Math.abs(base.currentTime - incoming.currentTime) > 0.2) {
+          base.currentTime = incoming.currentTime;
+        }
 
         // Resume base video playback after transition ends
         if (base.paused) base.play().catch(() => {});
         
-        // Pause and hide incoming
+        // Pause and hide incoming, reset ALL styles
         if (!incoming.paused) incoming.pause();
         incoming.style.display = 'none';
         incoming.style.opacity = '';
-        incoming.style.transform = '';
-        incoming.style.clipPath = '';
+        incoming.style.transform = 'none';
+        incoming.style.clipPath = 'none';
         incoming.style.filter = '';
+        incoming.style.position = '';
+        incoming.style.inset = '';
+        incoming.style.width = '';
+        incoming.style.height = '';
+        incoming.style.objectFit = '';
+        incoming.style.zIndex = '';
 
         wasActiveRef.current = false;
         lastIncomingSeekRef.current = '';

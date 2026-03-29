@@ -492,10 +492,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           const rate = (sceneInfo.scene as any).playbackRate ?? 1;
           const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
 
-          // Use the resolver's timeline boundary for scene advancement
+          // Use source-time boundary for scene advancement (compare source vs source)
           const matchedRT = resolvedTransitions.find(rt => rt.outgoingSceneId === sceneInfo.scene.id);
           const effectiveBoundary = matchedRT 
-            ? matchedRT.timelineBoundary + matchedRT.offsetSeconds 
+            ? matchedRT.originalBoundary + matchedRT.offsetSeconds 
             : srcEnd;
 
           if (videoSourceTime >= effectiveBoundary - 0.02) {
