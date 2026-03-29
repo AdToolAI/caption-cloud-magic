@@ -167,14 +167,19 @@ MANDATORY RULES:
       throw new Error('No image generated');
     }
 
+    // Detect MIME type and extension from base64 data URL
+    const mimeMatch = imageData.match(/^data:(image\/\w+);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+    const ext = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
+
     // Upload to storage
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
     const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-    const fileName = `${user.id}/studio/${Date.now()}_${style}.png`;
+    const fileName = `${user.id}/studio/${Date.now()}_${style}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from('background-projects')
-      .upload(fileName, binaryData, { contentType: 'image/png', upsert: true });
+      .upload(fileName, binaryData, { contentType: mimeType, upsert: true });
 
     if (uploadError) {
       console.error('[Studio] Upload error:', uploadError);
