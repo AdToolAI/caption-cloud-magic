@@ -467,25 +467,20 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         }
 
         // Scene-boundary-crossing logic: SKIP entirely during active transitions
-        // This prevents unnecessary seeks and checks while the video plays through a transition
+        // Canvas handles visuals; video just keeps playing through the boundary
         if (!cachedActiveTrans) {
           const srcStart = sceneInfo.scene.original_start_time ?? sceneInfo.scene.start_time;
           const rate = (sceneInfo.scene as any).playbackRate ?? 1;
           const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
 
-          // Account for transition offset — if a positive offset exists,
-          // the video must keep playing past srcEnd until the offset transition window completes
-          const sceneTransition = transitions.find(tr => tr.sceneId === sceneInfo.scene.id);
-          const transOffset = (sceneTransition && sceneTransition.transitionType !== 'none') 
-            ? (sceneTransition.offsetSeconds ?? 0) 
-            : 0;
-          const effectiveBoundary = srcEnd + transOffset;
+          // Use the resolver to find the effective boundary including offset
+          const matchedRT = resolvedTransitions.find(rt => rt.outgoingSceneId === sceneInfo.scene.id);
+          const effectiveBoundary = matchedRT ? matchedRT.tEnd : srcEnd;
 
           if (videoSourceTime >= effectiveBoundary - 0.02) {
-            // Video naturally reached scene boundary — advance to next scene
+            // Video reached end of scene (or end of transition window) — advance to next scene
             const nextScene = sortedScenes[sceneInfo.index + 1];
             if (nextScene) {
-              // No transition: seek to next scene's source start
               const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
               if (Math.abs(video.currentTime - nextSourceStart) > 0.3) {
                 video.currentTime = nextSourceStart;
