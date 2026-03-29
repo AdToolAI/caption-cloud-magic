@@ -88,8 +88,8 @@ export function resolveTransitions(
     const direction = parts[1] || 'left';
 
     const tDuration = Math.max(MIN_DURATION, transition.duration || DEFAULT_DURATION);
-    const leadIn = tDuration * 0.05;
-    const leadOut = tDuration * 0.95;
+    const leadIn = tDuration * 0.5;
+    const leadOut = tDuration * 0.5;
     const offset = transition.offsetSeconds ?? 0;
 
     // Get original boundary in source time domain
