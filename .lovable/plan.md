@@ -1,34 +1,76 @@
 
+Ziel: Die Übergänge 2 und 3 im Universal Director’s Cut zuverlässig sauber machen, statt weiter an Symptomen herumzudoktern. Ich würde das als ein Architektur-Fix umsetzen, nicht als weiteren kleinen Patch.
 
-## Meta Reviewer Test-Account erstellen
+1. Befund aus dem aktuellen Code
+- Die Vorschau und der Export benutzen derzeit nicht dieselbe Übergangslogik.
+- Die Vorschau arbeitet schon mit `sceneId`, `original_end_time` und `offsetSeconds`:
+  - `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+  - `src/components/directors-cut/preview/useTransitionRenderer.ts`
+- Der Export verliert diese Präzision wieder:
+  - `supabase/functions/render-directors-cut/index.ts` wandelt Transitions auf `sceneIndex` um und wirft `offsetSeconds` weg.
+  - `src/remotion/templates/DirectorsCutVideo.tsx` sucht Übergänge dann nur noch per `sceneIndex`.
+- Zusätzlich gibt es einen echten Cache-Bug in der Vorschau:
+  - `useFrameCapture.ts` merkt sich bereits gecapturete Frames nur per `scene.id`.
+  - Wenn Szenenzeiten verändert oder neu analysiert werden, bleiben alte Snapshots erhalten und spätere Übergänge zeigen falsche/stale Frames.
+- Und es gibt einen Editor-Bug:
+  - In `SceneEditingStep.tsx` benutzt `handleTransitionDurationChange()` ein potenziell stale `editingTransitionId`, während der Typ-Handler korrekt `sceneId` direkt bekommt.
 
-### Was wird gebaut
-Eine temporäre Edge Function `create-reviewer-account`, die einen Testaccount für den Meta App Reviewer erstellt und mit Enterprise-Plan ausstattet.
+2. Was ich bauen würde
+Ich würde eine einzige gemeinsame Transition-Engine als Source of Truth einführen, die sowohl Vorschau als auch Export verwendet.
 
-### Schritte
+3. Konkreter Umsetzungsplan
+- Gemeinsame Transition-Resolver-Utility erstellen
+  - zentrale Berechnung pro Übergang:
+    - ausgehende Szene
+    - eingehende Szene
+    - `original_end_time`
+    - `offsetSeconds`
+    - `leadIn/leadOut`
+    - `tStart/tEnd`
+    - effektive Dauer
+    - Basis-Typ + Richtung
+  - dieselbe Clamp-/Overlap-Logik für alle Übergänge, damit 2 und 3 nicht anders behandelt werden als 1.
 
-1. **Edge Function `create-reviewer-account` erstellen**
-   - Erstellt einen User via `supabase.auth.admin.createUser()` mit festen Credentials:
-     - E-Mail: `meta-reviewer@useadtool.ai`
-     - Passwort: `MetaReview2026!Secure`
-     - `email_confirm: true` (damit sofort eingeloggt werden kann)
-   - Setzt Profil auf `plan: 'enterprise'`
-   - Setzt Wallet auf `plan_code: 'enterprise'`, `monthly_credits: 999999999`, `balance: 999999999`
-   - Erstellt `ai_video_wallets`-Eintrag mit 100€ Balance
+- Preview stabilisieren
+  - `useFrameCapture.ts` so umbauen, dass der Cache bei geänderten Szenenschnitten invalidiert wird.
+  - Cache-Key nicht nur `scene.id`, sondern z. B. `scene.id + original_start_time + original_end_time`.
+  - alte `ImageBitmap`s sauber freigeben/ersetzen.
+  - `useTransitionRenderer.ts` so anpassen, dass bei jedem neuen Transition-Fenster garantiert der richtige Snapshot gezeichnet wird.
+  - Wenn ein Snapshot fehlt oder nicht rechtzeitig bereit ist, sauber auf Crossfade/Fade fallbacken statt einen schmutzigen Jump zu zeigen.
 
-2. **`upgrade-to-enterprise` allowedEmails erweitern**
-   - `meta-reviewer@useadtool.ai` zur Liste hinzufügen (falls manueller Re-Upgrade nötig)
+- Editor-Fehler beheben
+  - `handleTransitionDurationChange()` ebenfalls auf direkte `sceneId`-Übergabe umstellen.
+  - Sicherstellen, dass Typ, Dauer und Offset immer auf genau die aktuell bearbeitete Szene geschrieben werden.
 
-3. **Edge Function aufrufen** um den Account anzulegen
+- Export auf dieselbe Logik umstellen
+  - `render-directors-cut/index.ts` darf `offsetSeconds` und `sceneId` nicht mehr verlieren.
+  - `DirectorsCutVideo.tsx` muss Übergänge per `sceneId` an die sortierten Szenen binden, nicht per Array-Position.
+  - Die Export-Komposition soll dieselben Transition-Fenster respektieren wie die Vorschau, damit Übergänge 2 und 3 nicht anders gerendert werden.
 
-4. **Edge Function nach Erstellung wieder löschen** (temporär)
+- Parität Preview vs Export herstellen
+  - gleiche Richtungsmappings und gleiche Defaults
+  - gleiche Behandlung von `crossfade`, `fade`, `wipe`, `slide`, `push`
+  - gleiche Boundary-Logik bei positiven/negativen Offsets
 
-### Ergebnis
-Der Reviewer kann sich mit den Credentials einloggen und hat vollen Zugriff auf alle Features (Enterprise-Plan, unbegrenzte Credits).
+4. Technische Details
+- Betroffene Dateien:
+  - `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+  - `src/components/directors-cut/preview/useTransitionRenderer.ts`
+  - `src/components/directors-cut/preview/useFrameCapture.ts`
+  - `src/components/directors-cut/steps/SceneEditingStep.tsx`
+  - `supabase/functions/render-directors-cut/index.ts`
+  - `src/remotion/templates/DirectorsCutVideo.tsx`
+- Ich erwarte keine Datenbankänderung.
+- Der wichtigste strukturelle Fix ist: keine doppelte, voneinander abweichende Übergangslogik mehr.
 
-### Credentials für Meta App Review
-```
-Email: meta-reviewer@useadtool.ai
-Password: MetaReview2026!Secure
-```
+5. Ergebnis nach Umsetzung
+- Übergänge 2 und 3 verwenden dieselbe saubere Logik wie Übergang 1.
+- Nach Szenen-Neuschnitt oder Re-Analyse werden keine alten Frames mehr weiterverwendet.
+- Vorschau und finaler Export verhalten sich gleich.
+- Wenn ein Übergang technisch nicht perfekt vorbereitet ist, gibt es einen kontrollierten sauberen Fallback statt harter/glitchiger Sprünge.
 
+6. Erfolgskriterien
+- Crossfade/Fade zwischen Szene 2→3 und 3→4 laufen ohne sichtbaren Dirty Cut.
+- Änderungen an Timing/Dauer wirken sofort auf den korrekten Übergang.
+- Re-Analyse der Szenen erzeugt aktualisierte Übergänge ohne stale Snapshots.
+- Export stimmt visuell mit der Vorschau überein.
