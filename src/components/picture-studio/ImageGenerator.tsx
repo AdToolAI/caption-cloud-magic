@@ -12,6 +12,7 @@ import { useAICall } from "@/hooks/useAICall";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageCard } from "./ImageCard";
+import { StudioLightbox } from "./StudioLightbox";
 import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 import { FEATURE_COSTS, ESTIMATED_COSTS } from "@/lib/featureCosts";
 
@@ -74,6 +75,9 @@ export function ImageGenerator() {
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [selectedImageForAlbum, setSelectedImageForAlbum] = useState<GeneratedImage | null>(null);
 
+  // Lightbox state
+  const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
+
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -118,8 +122,9 @@ export function ImageGenerator() {
       });
 
       if (result?.image) {
+        const imgUrl = result.image.previewUrl || result.image.url;
         setGeneratedImages(prev => [
-          { ...result.image, prompt: prompt.trim(), style, aspectRatio: aspectRatio },
+          { ...result.image, url: imgUrl, prompt: prompt.trim(), style, aspectRatio: aspectRatio },
           ...prev,
         ]);
         toast.success("Bild erfolgreich generiert! 🎨");
@@ -285,6 +290,7 @@ export function ImageGenerator() {
                     image={img}
                     index={i}
                     onSaveToAlbum={handleSaveToAlbum}
+                    onOpenLightbox={setLightboxImage}
                     onDelete={handleDeleteImage}
                   />
                 ))}
@@ -303,6 +309,15 @@ export function ImageGenerator() {
           onSaved={handleImageSaved}
         />
       )}
+
+      {/* Lightbox */}
+      <StudioLightbox
+        image={lightboxImage}
+        open={!!lightboxImage}
+        onOpenChange={(open) => !open && setLightboxImage(null)}
+        onSaveToAlbum={handleSaveToAlbum}
+        onDelete={handleDeleteImage}
+      />
     </div>
   );
 }

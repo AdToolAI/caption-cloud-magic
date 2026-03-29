@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageCard } from "./ImageCard";
+import { StudioLightbox } from "./StudioLightbox";
 import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 
 interface Album {
@@ -45,6 +46,7 @@ export function AlbumManager() {
   // Album dialog for unsorted images
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<any>(null);
 
   useEffect(() => {
     if (user) loadAlbums();
@@ -225,8 +227,9 @@ export function AlbumManager() {
             {albumImages.map((img, i) => (
               <ImageCard
                 key={img.id}
-                image={{ id: img.id, url: img.image_url, prompt: img.prompt || undefined, style: img.style || undefined }}
+                image={{ id: img.id, url: img.image_url, prompt: img.prompt || undefined, style: img.style || undefined, aspectRatio: img.aspect_ratio || undefined }}
                 index={i}
+                onOpenLightbox={setLightboxImage}
                 onDelete={handleDeleteImage}
               />
             ))}
@@ -296,9 +299,10 @@ export function AlbumManager() {
               {unsortedImages.map((img, i) => (
                 <ImageCard
                   key={img.id}
-                  image={{ id: img.id, url: img.image_url, prompt: img.prompt || undefined, style: img.style || undefined }}
+                  image={{ id: img.id, url: img.image_url, prompt: img.prompt || undefined, style: img.style || undefined, aspectRatio: img.aspect_ratio || undefined }}
                   index={i}
                   onSaveToAlbum={handleSaveToAlbum}
+                  onOpenLightbox={setLightboxImage}
                   onDelete={handleDeleteImage}
                 />
               ))}
@@ -346,6 +350,15 @@ export function AlbumManager() {
           onSaved={handleUnsortedImageSaved}
         />
       )}
+
+      {/* Lightbox */}
+      <StudioLightbox
+        image={lightboxImage}
+        open={!!lightboxImage}
+        onOpenChange={(open) => !open && setLightboxImage(null)}
+        onSaveToAlbum={handleSaveToAlbum}
+        onDelete={handleDeleteImage}
+      />
     </div>
   );
 }

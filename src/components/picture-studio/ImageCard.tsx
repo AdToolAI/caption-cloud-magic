@@ -53,11 +53,15 @@ export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLight
         onDragStart={handleDragStart as any}
         className="contents"
       >
-      <div className="aspect-square overflow-hidden cursor-pointer bg-white" onClick={() => onOpenLightbox?.(image)}>
+      <div
+        className="overflow-hidden cursor-pointer bg-white p-2 flex items-center justify-center"
+        style={{ aspectRatio: image.aspectRatio?.replace(':', ' / ') || '1 / 1' }}
+        onClick={() => onOpenLightbox?.(image)}
+      >
         <img
           src={image.url}
           alt={image.prompt || 'Generated image'}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          className="max-w-full max-h-full object-contain"
           loading="lazy"
         />
       </div>
