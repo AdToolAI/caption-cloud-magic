@@ -149,7 +149,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           outgoingScene,
           incomingScene,
           boundary: freezeRT.originalBoundary + freezeRT.offsetSeconds,
-          leadIn: freezeRT.duration * 0.05,
+          leadIn: freezeRT.duration * 0.5,
           tDuration: freezeRT.duration,
           progress: 0,
           isFreeze: true,
