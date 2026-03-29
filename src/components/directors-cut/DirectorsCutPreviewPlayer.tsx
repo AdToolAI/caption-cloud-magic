@@ -410,12 +410,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const sceneInfo = findSceneBySourceTime(videoSourceTime, lastSceneIndexRef.current);
       let timelineTime: number;
 
-      // Cache findActiveTransition ONCE per frame — using SOURCE time directly
+      // Cache findActiveTransition ONCE per frame — using TIMELINE time
+      // The resolver works in timeline-time, so we must query it with timeline-time
       let cachedActiveTrans: ReturnType<typeof findActiveTransition> = null;
-      cachedActiveTrans = findActiveTransition(videoSourceTime);
-      
-      // Also check using timeline time (for timeline-boundary-based transitions)
-      if (!cachedActiveTrans && sceneInfo) {
+      if (sceneInfo) {
         const approxTimelineTime = sourceToTimelineTime(sceneInfo.scene, videoSourceTime);
         cachedActiveTrans = findActiveTransition(approxTimelineTime);
       }
@@ -494,10 +492,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           const rate = (sceneInfo.scene as any).playbackRate ?? 1;
           const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
 
-          // Use the resolver's timeline boundary for scene advancement
+          // Use source-time boundary for scene advancement (compare source vs source)
           const matchedRT = resolvedTransitions.find(rt => rt.outgoingSceneId === sceneInfo.scene.id);
           const effectiveBoundary = matchedRT 
-            ? matchedRT.timelineBoundary + matchedRT.offsetSeconds 
+            ? matchedRT.originalBoundary + matchedRT.offsetSeconds 
             : srcEnd;
 
           if (videoSourceTime >= effectiveBoundary - 0.02) {
