@@ -169,7 +169,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           outgoingScene,
           incomingScene,
           boundary: rt.originalBoundary + rt.offsetSeconds,
-          leadIn: rt.duration * 0.05,
+          leadIn: rt.duration * 0.5,
           tDuration: rt.duration,
           progress,
           isFreeze: false,
