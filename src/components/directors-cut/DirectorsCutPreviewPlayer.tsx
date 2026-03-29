@@ -790,11 +790,22 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           onEnded={handleVideoEnded}
         />
 
-        {/* Transition canvas — shows pre-captured incoming scene frame */}
+        {/* Incoming (transition) video — no crossOrigin to avoid CORS */}
+        <video
+          ref={incomingVideoRef}
+          src={videoUrl}
+          className="absolute inset-0 w-full h-full object-contain"
+          style={{ zIndex: 2, display: 'none' }}
+          muted
+          playsInline
+          preload="auto"
+        />
+
+        {/* Transition canvas — legacy fallback, hidden by default */}
         <canvas
           ref={transitionCanvasRef}
           className="absolute inset-0 w-full h-full object-contain"
-          style={{ zIndex: 2, display: 'none' }}
+          style={{ zIndex: 3, display: 'none' }}
         />
 
         {/* Lightweight effect overlays (color grading, vignette, etc.) */}
