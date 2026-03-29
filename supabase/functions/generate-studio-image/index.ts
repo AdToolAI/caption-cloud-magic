@@ -217,6 +217,7 @@ MANDATORY RULES:
       image: {
         id: savedImage?.id,
         url: imageUrl,
+        previewUrl: imageData,
         prompt,
         style,
         aspectRatio,
