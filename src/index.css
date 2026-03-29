@@ -188,13 +188,13 @@
     @apply font-semibold tracking-tight;
   }
 
-  /* Lazy loading image optimization */
-  img[loading="lazy"] {
+  /* Lazy loading image optimization - opt-in only */
+  .lazy-fade {
     opacity: 0;
     transition: opacity 0.3s;
   }
 
-  img[loading="lazy"].loaded {
+  .lazy-fade.loaded {
     opacity: 1;
   }
 }
