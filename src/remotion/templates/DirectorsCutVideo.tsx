@@ -940,7 +940,10 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             t.sceneId ? t.sceneId === scene.id : t.sceneIndex === idx
           );
           const hasTransitionToNext = idx < sortedScenes.length - 1 && currentTransition && currentTransition.type && currentTransition.type !== 'none';
-          const transitionDurationFrames = hasTransitionToNext ? Math.max(1, Math.floor((currentTransition!.duration || 0.5) * fps)) : 0;
+          // Account for offsetSeconds: positive offset extends the scene before transition starts
+          const offsetFrames = hasTransitionToNext ? Math.round((currentTransition!.offsetSeconds || 0) * fps) : 0;
+          const baseDuration = Math.max(0.6, currentTransition?.duration || 0.5);
+          const transitionDurationFrames = hasTransitionToNext ? Math.max(1, Math.floor(baseDuration * fps)) : 0;
 
           // Build the presentation based on transition type
           const getPresentation = (): any => {
