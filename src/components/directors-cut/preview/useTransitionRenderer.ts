@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import type { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
+import { resolveTransitions, findActiveTransition, findFreezePhase } from '@/utils/transitionResolver';
 
 const TRANSITION_DURATION = 1.2;
 const MIN_TRANSITION_DURATION = 0.8;
