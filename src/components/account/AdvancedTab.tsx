@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Trash2, Download, FileDown, LogOut } from "lucide-react";
 
 export const AdvancedTab = () => {
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -17,7 +17,6 @@ export const AdvancedTab = () => {
   const handleExportData = async () => {
     setLoading(true);
     try {
-      // Fetch user data
       const { data: profile } = await supabase
         .from("profiles")
         .select("*")
@@ -26,11 +25,10 @@ export const AdvancedTab = () => {
 
       const exportData = {
         email: user?.email,
-        profile: profile,
+        profile,
         exportedAt: new Date().toISOString()
       };
 
-      // Create download
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -41,47 +39,9 @@ export const AdvancedTab = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast({
-        title: "Export erfolgreich",
-        description: "Ihre Daten wurden heruntergeladen"
-      });
-    } catch (error) {
-      toast({
-        title: "Fehler",
-        description: "Export fehlgeschlagen",
-        variant: "destructive"
-      });
-    }
-    setLoading(false);
-  };
-
-  const handleDeleteAccount = async () => {
-    if (confirmEmail !== user?.email) {
-      toast({
-        title: "Fehler",
-        description: "E-Mail-Adresse stimmt nicht überein",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Note: Full account deletion requires admin API or Edge Function
-      // For now, we'll just sign out and show a message
-      toast({
-        title: "Löschanfrage gesendet",
-        description: "Ihr Konto wird innerhalb von 30 Tagen gelöscht. Sie erhalten eine Bestätigungs-E-Mail."
-      });
-      
-      await signOut();
-      navigate("/");
-    } catch (error) {
-      toast({
-        title: "Fehler",
-        description: "Löschung fehlgeschlagen",
-        variant: "destructive"
-      });
+      toast({ title: "Export erfolgreich", description: "Ihre Daten wurden heruntergeladen" });
+    } catch {
+      toast({ title: "Fehler", description: "Export fehlgeschlagen", variant: "destructive" });
     }
     setLoading(false);
   };
