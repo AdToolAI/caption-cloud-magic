@@ -36,6 +36,7 @@ const STYLES = [
   { value: 'surreal', label: 'Surreal' },
   { value: 'architectural', label: 'Architektur' },
   { value: 'editorial', label: 'Editorial' },
+  { value: 'brand-logo', label: 'Brand Logo' },
 ];
 
 const ASPECT_RATIOS = [
@@ -43,6 +44,9 @@ const ASPECT_RATIOS = [
   { value: '16:9', label: '16:9 Landscape' },
   { value: '9:16', label: '9:16 Portrait' },
   { value: '4:5', label: '4:5 Instagram' },
+  { value: '4:3', label: '4:3 Header' },
+  { value: '3:4', label: '3:4 Vertikal' },
+  { value: '2:1', label: '2:1 Banner' },
 ];
 
 interface GeneratedImage {
