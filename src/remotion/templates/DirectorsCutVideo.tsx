@@ -925,8 +925,10 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           const sceneEndFrame = Math.floor(scene.endTime * fps);
           const sceneDurationFrames = Math.max(1, sceneEndFrame - sceneStartFrame);
 
-          // Find transition AFTER this scene (to the next scene)
-          const currentTransition = transitions?.find(t => t.sceneIndex === idx);
+          // Find transition by sceneId (robust) with fallback to sceneIndex
+          const currentTransition = transitions?.find(t =>
+            t.sceneId ? t.sceneId === scene.id : t.sceneIndex === idx
+          );
           const hasTransitionToNext = idx < sortedScenes.length - 1 && currentTransition && currentTransition.type && currentTransition.type !== 'none';
           const transitionDurationFrames = hasTransitionToNext ? Math.max(1, Math.floor((currentTransition!.duration || 0.5) * fps)) : 0;
 
