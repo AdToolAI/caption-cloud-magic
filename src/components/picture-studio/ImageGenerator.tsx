@@ -64,13 +64,15 @@ export function ImageGenerator() {
   const { executeAICall, loading, status } = useAICall();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [prompt, setPrompt] = useState("");
-  const [style, setStyle] = useState("realistic");
-  const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [quality, setQuality] = useState<'fast' | 'pro'>('fast');
-  const [editMode, setEditMode] = useState(false);
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
-  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+  const cached = getCachedState();
+
+  const [prompt, setPrompt] = useState(cached?.prompt ?? "");
+  const [style, setStyle] = useState(cached?.style ?? "realistic");
+  const [aspectRatio, setAspectRatio] = useState(cached?.aspectRatio ?? "1:1");
+  const [quality, setQuality] = useState<'fast' | 'pro'>(cached?.quality ?? 'fast');
+  const [editMode, setEditMode] = useState(cached?.editMode ?? false);
+  const [referenceImage, setReferenceImage] = useState<string | null>(cached?.referenceImage ?? null);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
   
   // Album save state
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
