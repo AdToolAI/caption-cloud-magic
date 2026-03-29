@@ -75,6 +75,9 @@ export function ImageGenerator() {
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [selectedImageForAlbum, setSelectedImageForAlbum] = useState<GeneratedImage | null>(null);
 
+  // Lightbox state
+  const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
+
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
