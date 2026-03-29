@@ -56,7 +56,8 @@ export function useTransitionRenderer(
     }
 
     const tick = () => {
-      const time = baseVideoRef.current?.currentTime ?? visualTimeRef.current ?? 0;
+      // Use TIMELINE time (visualTimeRef) — NOT video.currentTime (source time)
+      const time = visualTimeRef.current ?? 0;
       const base = baseVideoRef.current;
       const incoming = incomingVideoRef.current;
       if (!base || !incoming) {
@@ -67,7 +68,7 @@ export function useTransitionRenderer(
       let found = false;
 
       // === PRE-SEEK: prepare incoming video before transition starts ===
-      const PRE_SEEK_WINDOW = 0.5; // seconds before tStart to begin seeking
+      const PRE_SEEK_WINDOW = 0.5;
       for (const rt of resolvedTransitions) {
         if (time >= rt.tStart - PRE_SEEK_WINDOW && time < rt.tStart) {
           seekIncoming(rt.incomingSceneId, scenes);
@@ -78,7 +79,6 @@ export function useTransitionRenderer(
       // === FREEZE PHASE (offset > 0) ===
       const freezeRT = findFreezePhase(time, resolvedTransitions);
       if (freezeRT) {
-        // During freeze, keep showing base video at its last frame (it's paused at boundary)
         base.style.opacity = '1';
         base.style.transform = '';
         base.style.clipPath = '';
@@ -93,8 +93,24 @@ export function useTransitionRenderer(
         if (active) {
           const { transition: rt, progress } = active;
 
-          // Ensure incoming video is seeked to the right scene
           seekIncoming(rt.incomingSceneId, scenes);
+
+          // FREEZE base video at the last frame of the outgoing scene
+          // This prevents the base from playing into the next scene's content
+          const outgoingScene = scenes.find(s => s.id === rt.outgoingSceneId);
+          if (outgoingScene && base.currentTime > (outgoingScene.original_end_time ?? outgoingScene.end_time) - 0.02) {
+            const freezeTime = (outgoingScene.original_end_time ?? outgoingScene.end_time) - 0.05;
+            if (Math.abs(base.currentTime - freezeTime) > 0.1) {
+              base.currentTime = freezeTime;
+            }
+            // Pause base during transition to prevent it from advancing
+            if (!base.paused) base.pause();
+          }
+
+          // Start incoming video playing from the right position
+          if (incoming.paused && incoming.readyState >= 2) {
+            incoming.play().catch(() => {});
+          }
 
           const styles = getTransitionStyles({
             progress,
@@ -133,7 +149,7 @@ export function useTransitionRenderer(
         }
       }
 
-      // === NO TRANSITION — reset styles ===
+      // === NO TRANSITION — reset styles and resume base video ===
       if (!found && wasActiveRef.current) {
         const baseFilter = videoFilterRef.current || '';
         base.style.opacity = '';
@@ -141,6 +157,11 @@ export function useTransitionRenderer(
         base.style.clipPath = '';
         base.style.filter = baseFilter || '';
 
+        // Resume base video playback after transition ends
+        if (base.paused) base.play().catch(() => {});
+        
+        // Pause and hide incoming
+        if (!incoming.paused) incoming.pause();
         incoming.style.display = 'none';
         incoming.style.opacity = '';
         incoming.style.transform = '';
