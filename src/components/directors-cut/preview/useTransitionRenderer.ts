@@ -66,6 +66,15 @@ export function useTransitionRenderer(
 
       let found = false;
 
+      // === PRE-SEEK: prepare incoming video before transition starts ===
+      const PRE_SEEK_WINDOW = 0.5; // seconds before tStart to begin seeking
+      for (const rt of resolvedTransitions) {
+        if (time >= rt.tStart - PRE_SEEK_WINDOW && time < rt.tStart) {
+          seekIncoming(rt.incomingSceneId, scenes);
+          break;
+        }
+      }
+
       // === FREEZE PHASE (offset > 0) ===
       const freezeRT = findFreezePhase(time, resolvedTransitions);
       if (freezeRT) {

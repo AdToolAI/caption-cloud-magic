@@ -149,7 +149,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           outgoingScene,
           incomingScene,
           boundary: freezeRT.originalBoundary + freezeRT.offsetSeconds,
-          leadIn: freezeRT.duration * 0.05,
+          leadIn: freezeRT.duration * 0.5,
           tDuration: freezeRT.duration,
           progress: 0,
           isFreeze: true,
@@ -169,7 +169,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           outgoingScene,
           incomingScene,
           boundary: rt.originalBoundary + rt.offsetSeconds,
-          leadIn: rt.duration * 0.05,
+          leadIn: rt.duration * 0.5,
           tDuration: rt.duration,
           progress,
           isFreeze: false,
@@ -481,7 +481,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
           // Use the resolver to find the effective boundary including offset
           const matchedRT = resolvedTransitions.find(rt => rt.outgoingSceneId === sceneInfo.scene.id);
-          const effectiveBoundary = matchedRT ? matchedRT.tEnd : srcEnd;
+          const effectiveBoundary = matchedRT 
+            ? matchedRT.originalBoundary + matchedRT.offsetSeconds 
+            : srcEnd;
 
           if (videoSourceTime >= effectiveBoundary - 0.02) {
             // Video reached end of scene (or end of transition window) — advance to next scene
