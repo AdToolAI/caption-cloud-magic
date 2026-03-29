@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageCard } from "./ImageCard";
+import { StudioLightbox } from "./StudioLightbox";
 import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 
 interface Album {
