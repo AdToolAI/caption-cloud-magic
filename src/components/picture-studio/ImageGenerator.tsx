@@ -122,8 +122,9 @@ export function ImageGenerator() {
       });
 
       if (result?.image) {
+        const imgUrl = result.image.previewUrl || result.image.url;
         setGeneratedImages(prev => [
-          { ...result.image, prompt: prompt.trim(), style, aspectRatio: aspectRatio },
+          { ...result.image, url: imgUrl, prompt: prompt.trim(), style, aspectRatio: aspectRatio },
           ...prev,
         ]);
         toast.success("Bild erfolgreich generiert! 🎨");
