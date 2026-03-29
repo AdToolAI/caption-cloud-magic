@@ -1,37 +1,59 @@
 
 
-## Feature: Picture Studio State bei Navigation beibehalten
+## Dedizierte "Account löschen" Seite
 
-### Problem
-Wenn man auf eine andere Seite navigiert und zurückkommt, sind Prompt, Einstellungen und generierte Bilder weg — weil `useState` beim Unmount gelöscht wird. Der User möchte den Zustand bei Navigation behalten, aber bei F5/Refresh soll alles zurückgesetzt werden.
+### Was wird gebaut
+Eine eigenständige Seite unter `/account/delete` mit einem rechtlich korrekten Lösch-Flow, inklusive Bestätigungs-Checkboxen und klarer Kommunikation der 30-Tage-Widerrufsfrist.
 
-### Lösung
-Ein **modulbasierter In-Memory-Cache** (kein localStorage/sessionStorage, da diese auch bei F5 bestehen bleiben). Eine einfache Variable auf Modulebene, die den Zustand zwischen Mounts speichert, aber bei Page Reload automatisch leer ist.
+### Seitenaufbau
+
+```text
+┌─────────────────────────────────────────┐
+│  ⚠️  Account unwiderruflich löschen     │
+│                                          │
+│  ┌────────────────────────────────────┐  │
+│  │ Was wird gelöscht:                 │  │
+│  │ • Alle Projekte und Medien         │  │
+│  │ • Alle Credits und Transaktionen   │  │
+│  │ • Persönliche Einstellungen        │  │
+│  │ • Aktives Abo wird gekündigt       │  │
+│  └────────────────────────────────────┘  │
+│                                          │
+│  📥 Daten vorher exportieren (Button)    │
+│                                          │
+│  ☐ Ich verstehe, dass alle Daten        │
+│    nach 30 Tagen unwiderruflich          │
+│    gelöscht werden.                      │
+│                                          │
+│  ☐ Ich habe die AGB und Datenschutz-    │
+│    bestimmungen zur Kenntnis genommen.   │
+│                                          │
+│  ☐ Ich bestätige, dass mein Abo         │
+│    gekündigt und Credits verfallen.      │
+│                                          │
+│  E-Mail eingeben: [____________]         │
+│                                          │
+│  [Abbrechen]  [Account endgültig löschen]│
+│  (Button nur aktiv wenn alle ☐ ✓        │
+│   und E-Mail korrekt)                    │
+└─────────────────────────────────────────┘
+```
 
 ### Änderungen
 
-**1. Neuer Cache-Helper: `src/components/picture-studio/imageGeneratorCache.ts`**
-- Exportiert `get/set/clear` Funktionen für einen modulweiten Cache
-- Speichert: `prompt`, `style`, `aspectRatio`, `quality`, `editMode`, `referenceImage`, `generatedImages`
-- Lebt nur im JS-Speicher → bei F5 automatisch weg
-
-**2. `src/components/picture-studio/ImageGenerator.tsx`**
-- Bei Mount: Initialwerte aus Cache lesen statt Defaults
-- Bei jeder Änderung (Prompt, Style, generierte Bilder etc.): Cache aktualisieren
-- Kein Cleanup bei Unmount → Daten bleiben für nächsten Mount erhalten
-
-### Technisches Detail
-```text
-Navigation weg → Component unmounts → useState weg
-                                     → Module-Cache bleibt ✓
-Navigation zurück → Component mounts → liest aus Cache ✓
-
-F5 Refresh → JS-Module neu geladen → Cache leer ✓
-```
-
-### Betroffene Dateien
 | Datei | Änderung |
 |---|---|
-| `src/components/picture-studio/imageGeneratorCache.ts` | Neu: In-Memory-Cache |
-| `src/components/picture-studio/ImageGenerator.tsx` | Cache lesen bei Mount, schreiben bei Änderung |
+| `src/pages/DeleteAccount.tsx` | Neue Seite: Warnhinweise, 3 Pflicht-Checkboxen, E-Mail-Bestätigung, Datenexport-Button, Lösch-Button, 30-Tage-Hinweis |
+| `src/App.tsx` | Route `/account/delete` hinzufügen (geschützt via ProtectedRoute) |
+| `src/components/account/AdvancedTab.tsx` | "Konto löschen"-Card: Dialog entfernen, stattdessen Link-Button zu `/account/delete` |
+
+### Rechtliche Absicherung
+- 3 Pflicht-Checkboxen müssen alle angehakt sein
+- E-Mail-Bestätigung als doppelte Sicherheit
+- Hinweis auf 30-Tage-Widerrufsfrist
+- Links zu AGB und Datenschutzbestimmungen in den Checkboxen
+- Datenexport-Option prominent angeboten vor dem Löschen
+
+### URL für Meta
+Die resultierende URL `https://useadtool.ai/account/delete` kann als "Anleitung zur Datenlöschung" in den Meta App Settings hinterlegt werden.
 
