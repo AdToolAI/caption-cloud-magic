@@ -172,19 +172,16 @@ MANDATORY RULES:
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
     const ext = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
 
-    // Robust Base64 decoding: strip header, clean whitespace, decode via Deno standard library
-    const commaIdx = imageData.indexOf(',');
-    const rawBase64 = commaIdx !== -1 ? imageData.substring(commaIdx + 1) : imageData;
-    const cleanBase64 = rawBase64.replace(/\s/g, '');
+    // Convert data URL to Blob via fetch for robust binary handling
+    const blobResponse = await fetch(imageData);
+    const blob = await blobResponse.blob();
     
-    // Use Deno's built-in base64 decoding for reliable binary conversion
-    const { decodeBase64 } = await import("https://deno.land/std@0.224.0/encoding/base64.ts");
-    const binaryData = decodeBase64(cleanBase64);
     const fileName = `${user.id}/studio/${Date.now()}_${style}.${ext}`;
 
+    // Upload blob with correct content type
     const { error: uploadError } = await supabase.storage
       .from('background-projects')
-      .upload(fileName, binaryData, { contentType: mimeType, upsert: true });
+      .upload(fileName, blob, { contentType: mimeType, upsert: true });
 
     if (uploadError) {
       console.error('[Studio] Upload error:', uploadError);

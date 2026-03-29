@@ -138,19 +138,15 @@ Accent colors: ${primaryColor || '#F5C76A'} gold highlights, ${secondaryColor ||
     // Upload to Supabase Storage
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Robust Base64 decoding
-    const commaIdx = imageData.indexOf(',');
-    const rawBase64 = commaIdx !== -1 ? imageData.substring(commaIdx + 1) : imageData;
-    const cleanBase64 = rawBase64.replace(/\s/g, '');
-    const { decodeBase64 } = await import("https://deno.land/std@0.224.0/encoding/base64.ts");
-    const imageBytes = decodeBase64(cleanBase64);
+    // Convert data URL to Blob via fetch for robust binary handling
+    const blobResponse = await fetch(imageData);
+    const blob = await blobResponse.blob();
     
-    const fileName = `${assetType}_${Date.now()}.png`;
-    const storagePath = `brand-assets/${fileName}`;
+    const fileName = `brand-assets/${assetType}_${Date.now()}.png`;
     
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('brand-logos')
-      .upload(storagePath, imageBytes, {
+      .upload(fileName, blob, {
         contentType: 'image/png',
         upsert: true,
       });
@@ -171,7 +167,7 @@ Accent colors: ${primaryColor || '#F5C76A'} gold highlights, ${secondaryColor ||
     // Get public URL
     const { data: { publicUrl } } = supabase.storage
       .from('brand-logos')
-      .getPublicUrl(storagePath);
+      .getPublicUrl(fileName);
 
     console.log('=== GENERATE-BRAND-ASSET END (SUCCESS) ===');
 
