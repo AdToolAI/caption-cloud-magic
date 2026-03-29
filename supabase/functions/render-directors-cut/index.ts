@@ -376,11 +376,13 @@ serve(async (req) => {
       isFromOriginalVideo: scene.is_from_original_video ?? scene.isFromOriginalVideo ?? true,
     }));
 
-    // Transform transitions to use sceneIndex
+    // Transform transitions — preserve sceneId and offsetSeconds for parity with preview
     const transformedTransitions = transitions?.map((t: any, index: number) => ({
       sceneIndex: t.sceneIndex ?? index,
+      sceneId: t.sceneId ?? null,
       type: t.transitionType ?? t.type ?? 'crossfade',
       duration: t.duration ?? 0.5,
+      offsetSeconds: t.offsetSeconds ?? 0,
     }));
 
     // Build inputProps for DirectorsCutVideo composition

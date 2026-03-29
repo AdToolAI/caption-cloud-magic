@@ -1,4 +1,5 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
+import { resolveTransitions, findActiveTransition } from '@/utils/transitionResolver';
 import type { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 
 interface NativeTransitionOverlayProps {
@@ -94,34 +95,27 @@ export function NativeTransitionOverlay({
     return () => { video.src = ''; };
   }, [videoUrl, scenes]);
 
+  const resolvedTransitions = useMemo(
+    () => resolveTransitions(scenes, transitions as any),
+    [scenes, transitions],
+  );
+
   const overlayInfo = useMemo(() => {
-    if (scenes.length < 2 || transitions.length === 0) return null;
+    if (resolvedTransitions.length === 0) return null;
 
-    for (let i = 0; i < scenes.length - 1; i++) {
-      const scene = scenes[i];
-      const transition = transitions.find(t => t.sceneId === scene.id);
-      if (!transition || transition.transitionType === 'none') continue;
+    const active = findActiveTransition(time, resolvedTransitions);
+    if (!active) return null;
 
-      const transitionDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
-      const leadIn = transitionDuration * 0.05;
-      const leadOut = transitionDuration * 0.95;
-      // Use original_end_time (source domain) for drift-free matching
-      const offset = transition.offsetSeconds ?? 0;
-      const boundary = (scene.original_end_time ?? scene.end_time) + offset;
-      const transitionStart = boundary - leadIn;
-      const transitionEnd = boundary + leadOut;
-
-      if (time >= transitionStart && time < transitionEnd) {
-        const rawProgress = (time - transitionStart) / transitionDuration;
-        // Power-based easing for more visible effect
-        const progress = Math.pow(0.5 - 0.5 * Math.cos(rawProgress * Math.PI), 0.7);
-        const baseType = transition.transitionType.split('-')[0].toLowerCase();
-        const nextScene = scenes[i + 1];
-        return { progress, rawProgress, baseType, nextSceneId: nextScene.id, transition };
-      }
-    }
-    return null;
-  }, [time, scenes, transitions]);
+    const { transition: rt, progress } = active;
+    const matchingTransition = transitions.find(t => t.sceneId === rt.outgoingSceneId);
+    return {
+      progress,
+      rawProgress: active.rawProgress,
+      baseType: rt.baseType,
+      nextSceneId: rt.incomingSceneId,
+      transition: matchingTransition || { transitionType: rt.fullType, duration: rt.duration },
+    };
+  }, [time, resolvedTransitions, transitions]);
 
   if (!overlayInfo) return null;
 

@@ -16,8 +16,27 @@ export function useFrameCapture(
   const capturedRef = useRef<Set<string>>(new Set());
   const abortRef = useRef(false);
 
+  // Build a fingerprint of scene boundaries so we invalidate when times change
+  const sceneFingerprintRef = useRef<string>('');
+
   useEffect(() => {
     if (!videoUrl || scenes.length < 2) return;
+
+    // Composite fingerprint: id + original times for every scene
+    const fingerprint = scenes.map(s => {
+      const oStart = s.original_start_time ?? s.start_time;
+      const oEnd = s.original_end_time ?? s.end_time;
+      return `${s.id}:${oStart.toFixed(3)}:${oEnd.toFixed(3)}`;
+    }).join('|');
+
+    // If scenes changed, invalidate all cached frames
+    if (fingerprint !== sceneFingerprintRef.current) {
+      sceneFingerprintRef.current = fingerprint;
+      // Close old bitmaps to free memory
+      frames.forEach(bmp => bmp.close());
+      setFrames(new Map());
+      capturedRef.current = new Set();
+    }
 
     abortRef.current = false;
     const video = document.createElement('video');

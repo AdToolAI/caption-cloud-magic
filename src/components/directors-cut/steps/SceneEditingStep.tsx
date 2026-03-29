@@ -183,11 +183,12 @@ export function SceneEditingStep({
     }
   }, [editingTransitionId, transitions, onTransitionsChange]);
 
-  const handleTransitionDurationChange = useCallback((duration: number) => {
-    if (!editingTransitionId) return;
+  const handleTransitionDurationChange = useCallback((duration: number, sceneId?: string) => {
+    const targetSceneId = sceneId || editingTransitionId;
+    if (!targetSceneId) return;
     
     onTransitionsChange(transitions.map(t =>
-      t.sceneId === editingTransitionId ? { ...t, duration } : t
+      t.sceneId === targetSceneId ? { ...t, duration } : t
     ));
   }, [editingTransitionId, transitions, onTransitionsChange]);
 

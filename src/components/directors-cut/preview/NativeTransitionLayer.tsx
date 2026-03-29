@@ -1,4 +1,5 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
+import { resolveTransitions, findActiveTransition } from '@/utils/transitionResolver';
 import type { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 
 interface TransitionInfo {
@@ -31,44 +32,35 @@ export function useTransitionInfo(
   const [info, setInfo] = useState<TransitionInfo | null>(null);
   const rafRef = useRef<number>();
 
+  const resolvedTransitions = useMemo(
+    () => resolveTransitions(scenes, transitions as any),
+    [scenes, transitions],
+  );
+
   useEffect(() => {
-    if (scenes.length < 2 || transitions.length === 0) {
+    if (resolvedTransitions.length === 0) {
       setInfo(null);
       return;
     }
 
     const tick = () => {
       const time = visualTimeRef.current ?? 0;
+
+      const active = findActiveTransition(time, resolvedTransitions);
       let found: TransitionInfo | null = null;
 
-      for (let i = 0; i < scenes.length - 1; i++) {
-        const scene = scenes[i];
-        const transition = transitions.find(t => t.sceneId === scene.id);
-        if (!transition || transition.transitionType === 'none') continue;
-
-        const transitionDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
-        const leadIn = transitionDuration * 0.05;
-        const leadOut = transitionDuration * 0.95;
-        // Use original_end_time (source domain) for drift-free matching
-        const offset = transition.offsetSeconds ?? 0;
-        const boundary = (scene.original_end_time ?? scene.end_time) + offset;
-        const transitionStart = boundary - leadIn;
-        const transitionEnd = boundary + leadOut;
-
-        if (time >= transitionStart && time < transitionEnd) {
-          const rawProgress = (time - transitionStart) / transitionDuration;
-          const progress = Math.pow(0.5 - 0.5 * Math.cos(rawProgress * Math.PI), 0.7);
-          const parts = transition.transitionType.split('-');
-          const baseType = parts[0].toLowerCase();
-          const direction = parts[1] || 'left';
-
-          found = { progress, baseType, direction, sceneIndex: i, transitionDuration };
-          break;
-        }
+      if (active) {
+        const { transition: rt, progress } = active;
+        found = {
+          progress,
+          baseType: rt.baseType,
+          direction: rt.direction,
+          sceneIndex: rt.sceneIndex,
+          transitionDuration: rt.duration,
+        };
       }
 
       setInfo(prev => {
-        // Only update if actually changed to avoid unnecessary renders
         if (!found && !prev) return prev;
         if (!found && prev) return null;
         if (found && prev && Math.abs(found.progress - prev.progress) < 0.005 && found.sceneIndex === prev.sceneIndex) return prev;
@@ -80,7 +72,7 @@ export function useTransitionInfo(
 
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [scenes, transitions, visualTimeRef]);
+  }, [resolvedTransitions, visualTimeRef]);
 
   return info;
 }
