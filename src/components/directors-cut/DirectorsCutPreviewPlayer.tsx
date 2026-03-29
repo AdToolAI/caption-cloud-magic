@@ -481,7 +481,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
           // Use the resolver to find the effective boundary including offset
           const matchedRT = resolvedTransitions.find(rt => rt.outgoingSceneId === sceneInfo.scene.id);
-          const effectiveBoundary = matchedRT ? matchedRT.tEnd : srcEnd;
+          const effectiveBoundary = matchedRT 
+            ? matchedRT.originalBoundary + matchedRT.offsetSeconds 
+            : srcEnd;
 
           if (videoSourceTime >= effectiveBoundary - 0.02) {
             // Video reached end of scene (or end of transition window) — advance to next scene
