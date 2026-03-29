@@ -12,6 +12,7 @@ import { useAICall } from "@/hooks/useAICall";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageCard } from "./ImageCard";
+import { StudioLightbox } from "./StudioLightbox";
 import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 import { FEATURE_COSTS, ESTIMATED_COSTS } from "@/lib/featureCosts";
 
