@@ -28,6 +28,12 @@ export function useTransitionRenderer(
   const wasActiveRef = useRef(false);
   const lastDrawnSceneRef = useRef<string>('');
 
+  // Pre-resolve all transition windows once when scenes/transitions change
+  const resolvedTransitions = useMemo(
+    () => resolveTransitions(scenes, transitions),
+    [scenes, transitions],
+  );
+
   useEffect(() => {
     if (scenes.length < 2 || transitions.length === 0) {
       const canvas = canvasRef.current;
@@ -47,70 +53,45 @@ export function useTransitionRenderer(
 
       let found = false;
 
-      let prevEnd = -Infinity;
-      for (let i = 0; i < scenes.length - 1; i++) {
-        const scene = scenes[i];
-        const transition = transitions.find(t => t.sceneId === scene.id);
-        if (!transition || transition.transitionType === 'none') continue;
-
-        const tDuration = Math.max(MIN_TRANSITION_DURATION, transition.duration || TRANSITION_DURATION);
-        const leadIn = tDuration * 0.05;
-        const leadOut = tDuration * 0.95;
-        const offset = transition.offsetSeconds ?? 0;
-        const originalBoundary = scene.original_end_time ?? scene.end_time;
-        const boundary = originalBoundary + offset;
-        const tStart = Math.max(boundary - leadIn, prevEnd);
-        const tEnd = boundary + leadOut;
-        const effectiveDuration = tEnd - tStart;
-        prevEnd = tEnd;
-
-        // === FRAME-FREEZE PHASE ===
-        // When offset > 0, the video has already crossed the original cut point
-        // but the transition window hasn't opened yet. Show the outgoing scene's
-        // last frame as a full-opacity overlay to hide the underlying video cut.
-        if (offset > 0 && time >= originalBoundary && time < tStart) {
-          const frameCache = frameCacheRef.current;
-          if (frameCache) {
-            const outgoingKey = `outgoing-${scene.id}`;
-            const outgoingBitmap = frameCache.get(outgoingKey);
-            if (outgoingBitmap) {
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-                  canvas.width = canvas.clientWidth || 1280;
-                  canvas.height = canvas.clientHeight || 720;
-                }
-                ctx.drawImage(outgoingBitmap, 0, 0, canvas.width, canvas.height);
-                lastDrawnSceneRef.current = outgoingKey;
+      // === FRAME-FREEZE PHASE ===
+      const freezeRT = findFreezePhase(time, resolvedTransitions);
+      if (freezeRT) {
+        const frameCache = frameCacheRef.current;
+        if (frameCache) {
+          const outgoingKey = `outgoing-${freezeRT.outgoingSceneId}`;
+          const outgoingBitmap = frameCache.get(outgoingKey);
+          if (outgoingBitmap) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+                canvas.width = canvas.clientWidth || 1280;
+                canvas.height = canvas.clientHeight || 720;
               }
+              ctx.drawImage(outgoingBitmap, 0, 0, canvas.width, canvas.height);
+              lastDrawnSceneRef.current = outgoingKey;
             }
           }
-          // Show canvas as full freeze-frame overlay
-          canvas.style.display = '';
-          canvas.style.opacity = '1';
-          canvas.style.transform = '';
-          canvas.style.clipPath = '';
-          // Keep base video visible underneath but hidden by the opaque canvas
-          clearStyles(base);
-          found = true;
-          wasActiveRef.current = true;
-          break;
         }
+        canvas.style.display = '';
+        canvas.style.opacity = '1';
+        canvas.style.transform = '';
+        canvas.style.clipPath = '';
+        clearStyles(base);
+        found = true;
+        wasActiveRef.current = true;
+      }
 
-        // === NORMAL TRANSITION PHASE ===
-        if (time >= tStart && time < tEnd) {
-          const rawProgress = (time - tStart) / effectiveDuration;
-          const progress = 0.5 - 0.5 * Math.cos(rawProgress * Math.PI);
-          const parts = transition.transitionType.split('-');
-          const baseType = parts[0].toLowerCase();
-          const direction = parts[1] || 'left';
+      // === NORMAL TRANSITION PHASE ===
+      if (!found) {
+        const active = findActiveTransition(time, resolvedTransitions);
+        if (active) {
+          const { transition: rt, progress } = active;
 
-          // Draw incoming scene frame onto canvas (if not already drawn)
-          const nextScene = scenes[i + 1];
+          // Draw incoming scene frame onto canvas
           const frameCache = frameCacheRef.current;
-          if (nextScene && frameCache) {
-            const bitmap = frameCache.get(nextScene.id);
-            if (bitmap && lastDrawnSceneRef.current !== nextScene.id) {
+          if (frameCache) {
+            const bitmap = frameCache.get(rt.incomingSceneId);
+            if (bitmap && lastDrawnSceneRef.current !== rt.incomingSceneId) {
               const ctx = canvas.getContext('2d');
               if (ctx) {
                 if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
@@ -118,15 +99,14 @@ export function useTransitionRenderer(
                   canvas.height = canvas.clientHeight || 720;
                 }
                 ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-                lastDrawnSceneRef.current = nextScene.id;
+                lastDrawnSceneRef.current = rt.incomingSceneId;
               }
             }
           }
 
-          applyStyles(base, canvas, progress, baseType, direction, videoFilterRef.current ?? '');
+          applyStyles(base, canvas, progress, rt.baseType, rt.direction, videoFilterRef.current ?? '');
           found = true;
           wasActiveRef.current = true;
-          break;
         }
       }
 
@@ -147,7 +127,7 @@ export function useTransitionRenderer(
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [scenes, transitions, visualTimeRef, baseVideoRef, canvasRef, videoFilterRef, frameCacheRef]);
+  }, [scenes, transitions, resolvedTransitions, visualTimeRef, baseVideoRef, canvasRef, videoFilterRef, frameCacheRef]);
 }
 
 function clearStyles(el: HTMLElement) {
