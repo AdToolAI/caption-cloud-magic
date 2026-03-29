@@ -168,13 +168,18 @@ MANDATORY RULES:
     }
 
     // Detect MIME type and extension from base64 data URL
-    const mimeMatch = imageData.match(/^data:(image\/\w+);base64,/);
+    const mimeMatch = imageData.match(/^data:(image\/[a-zA-Z+]+);base64,/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
     const ext = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
 
-    // Upload to storage
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
-    const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    // Robust Base64 decoding: strip header, clean whitespace, decode via Deno standard library
+    const commaIdx = imageData.indexOf(',');
+    const rawBase64 = commaIdx !== -1 ? imageData.substring(commaIdx + 1) : imageData;
+    const cleanBase64 = rawBase64.replace(/\s/g, '');
+    
+    // Use Deno's built-in base64 decoding for reliable binary conversion
+    const { decodeBase64 } = await import("https://deno.land/std@0.224.0/encoding/base64.ts");
+    const binaryData = decodeBase64(cleanBase64);
     const fileName = `${user.id}/studio/${Date.now()}_${style}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
