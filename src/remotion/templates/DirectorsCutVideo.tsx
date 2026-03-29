@@ -148,8 +148,10 @@ export const DirectorsCutVideoSchema = z.object({
   // Transitions
   transitions: z.array(z.object({
     sceneIndex: z.number(),
+    sceneId: z.string().optional().nullable(),
     type: z.string(),
     duration: z.number(),
+    offsetSeconds: z.number().optional(),
   })).optional(),
   // Ken Burns Effect
   kenBurns: z.array(z.object({
