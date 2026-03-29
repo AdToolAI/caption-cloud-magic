@@ -1,49 +1,47 @@
 
 
-## Fix: Transition-Timing — Ursache gefunden
+## Fix: Video ins Eck verschoben + Dauer-Diskrepanz
 
-### Das eigentliche Problem
+### Problem 1: Bildschirm wird nach Slide/Push ins Eck verschoben
 
-Nach gründlicher Code-Analyse habe ich die **echte Ursache** identifiziert, die alle bisherigen Patches nicht adressiert haben:
+**Ursache**: `useTransitionRenderer` pausiert das Base-Video während der Transition (Zeile 107) und setzt es am Ende per `base.play()` fort. Aber das Base-Video steht noch bei der Freeze-Position der alten Szene. Der Player-Tick erkennt dann eine falsche Szene, und das Incoming-Video behält residuale Styles.
 
-**Während einer Transition spielt das Base-Video über die Szenengrenze hinaus.** Da beide `<video>`-Elemente dasselbe Quellvideo laden, zeigt das Base-Video in der zweiten Hälfte der Transition denselben Inhalt wie das Incoming-Video. Der Nutzer sieht die nächste Szene auf BEIDEN Layern → visuell wirkt es, als käme die Transition "zu früh."
+**Zusätzlich**: Nach Ende der Transition wird `base.style.transform = ''` gesetzt (leerer String statt `'none'`), was bei manchen Browsern nicht zuverlässig den Transform zurücksetzt.
 
-Zusätzlich: Der Resolver arbeitet in **Source-Time** (`original_end_time`), aber der Renderer sollte in **Timeline-Time** (`visualTimeRef`) arbeiten. Wenn Source-Time und Timeline-Time voneinander abweichen (z.B. durch Trimming oder Neuanordnung), stimmen die Übergangsfenster nicht mit dem überein, was der Nutzer auf der Timeline sieht.
+**Fix in `useTransitionRenderer.ts`**:
+- Nach Transition-Ende: Base-Video auf die **Start-Position der eingehenden Szene** seeken, nicht einfach weiterspielen lassen
+- Alle Style-Resets explizit auf `'none'` statt leeren String setzen
+- Incoming-Video-Styles komplett zurücksetzen inkl. `position`, `inset`, `zIndex`
 
-### Konkreter Fix (3 Dateien)
+### Problem 2: Dauer 32s vs 30s
 
-**1. `transitionResolver.ts` — Boundary auf Timeline-Time umstellen**
-- Statt `scene.original_end_time` (Source-Time) wird `scene.end_time` (Timeline-Time) als Boundary verwendet
-- `originalBoundary` bleibt als Metadaten-Feld für den Player erhalten
-- Neues Feld `timelineBoundary` für die tatsächliche Fenster-Berechnung
+**Ursache**: Zeile 503 vergleicht `videoSourceTime` (Source-Time) mit `effectiveBoundary` (Timeline-Time). Wenn `original_end_time !== end_time` (z.B. durch Szenen-Erweiterung oder wenn die Analyse andere Timestamps liefert), löst der Boundary-Check zu früh oder zu spät aus. Das verschiebt die gesamte Abspiellogik.
 
-**2. `useTransitionRenderer.ts` — Drei Fixes**
-- **Time-Source**: `visualTimeRef.current` statt `baseVideoRef.current?.currentTime` verwenden
-- **Base-Video einfrieren**: Während einer aktiven Transition das Base-Video auf die letzte Frame der ausgehenden Szene clampen (`originalBoundary - 0.05`), damit es nicht über die Grenze hinausspielt
-- **Incoming-Video abspielen**: `incoming.play()` starten, wenn die Transition beginnt; `incoming.pause()` wenn sie endet
+**Fix in `DirectorsCutPreviewPlayer.tsx`**:
+- `effectiveBoundary` in Source-Time-Domain berechnen statt in Timeline-Time
+- `matchedRT.originalBoundary` verwenden (das ist bereits Source-Time) statt `matchedRT.timelineBoundary`
+- Alternativ: den Vergleich auf Timeline-Time umstellen, d.h. `timelineTime >= effectiveBoundary` statt `videoSourceTime >= effectiveBoundary`
 
-**3. `DirectorsCutPreviewPlayer.tsx` — Scene-Tracking stabilisieren**
-- Wenn `cachedActiveTrans` aktiv ist, `sceneInfo` auf die ausgehende Szene fixieren (nicht zur nächsten Szene wechseln)
-- `timelineTime` während Transitions an `outgoingScene.end_time` clampen statt frei laufen zu lassen
-- Nach Transition-Ende: Base-Video korrekt auf die nächste Szene seeken
+### Problem 3: Transition-Timing immer noch verschoben
 
-### Warum das funktioniert
+**Gleiche Ursache**: In `findActiveTransition` (Zeile 415) wird zuerst `videoSourceTime` getestet, dann `approxTimelineTime`. Aber der Resolver arbeitet in Timeline-Time. Wenn Source ≠ Timeline, matcht die erste Prüfung (Zeile 415) falsch oder gar nicht.
 
-```text
-VORHER:
-  Base-Video spielt über Boundary → zeigt nächste Szene
-  Incoming-Video zeigt nächste Szene (statisch)
-  → Beide Layer = gleicher Inhalt → "zu früh"
+**Fix**: `findActiveTransition` immer mit **Timeline-Time** aufrufen, nie mit Source-Time.
 
-NACHHER:
-  Base-Video eingefroren bei letztem Frame
-  Incoming-Video spielt ab Start der nächsten Szene
-  → Sauberer Crossfade zwischen zwei verschiedenen Inhalten
-  → Timing exakt an Timeline-Boundary
-```
+### Konkrete Änderungen
 
-### Erwartetes Ergebnis
-- Übergang 1 wird sichtbar (Renderer nutzt jetzt korrekte Timeline-Time)
-- Übergänge 2 und 3 starten an der richtigen Stelle (nicht mehr "zu früh")
-- Alle Transition-Typen (Crossfade, Slide, Wipe, Push) funktionieren korrekt
+**Datei 1: `useTransitionRenderer.ts`**
+- Transition-Ende-Block (Zeile 152-173):
+  - Base-Video auf `incoming.currentTime` seeken (= Start der neuen Szene)
+  - `transform: 'none'`, `clipPath: 'none'` statt leere Strings
+  - Incoming-Video: auch `position`, `inset`, `width`, `height`, `objectFit`, `zIndex` zurücksetzen
+
+**Datei 2: `DirectorsCutPreviewPlayer.tsx`**
+- Zeile 414-421: `findActiveTransition` NUR mit Timeline-Time aufrufen (nicht zuerst mit Source-Time)
+- Zeile 499-503: `effectiveBoundary` in Source-Time-Domain berechnen: `originalBoundary + offsetSeconds` statt `timelineBoundary + offsetSeconds`, ODER den Vergleich auf `timelineTime` umstellen
+
+### Ergebnis
+- Slide/Push-Übergänge hinterlassen keine verschobenen Video-Elemente
+- Dauer ist in allen Schritten konsistent
+- Boundary-Crossing und Transition-Detection arbeiten in derselben Zeit-Domain
 
