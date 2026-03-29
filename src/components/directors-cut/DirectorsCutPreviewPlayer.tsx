@@ -444,10 +444,14 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
               }
             }
           } else {
-            // Extended-tolerance match during transition — DON'T update lastSceneIndexRef
-            // The scene hasn't truly changed yet, the decoder is still in the tolerance zone
-            // Keep the current scene index to prevent false jumps
-            // (timelineTime will still be computed correctly from sceneInfo)
+            // Extended-tolerance match during transition — update lastSceneIndexRef
+            // if we're in an active transition and the matched scene is the incoming scene.
+            // This prevents a false "new scene" detection when the transition ends.
+            if (cachedActiveTrans) {
+              if (sceneInfo.scene.id === cachedActiveTrans.incomingScene.id) {
+                lastSceneIndexRef.current = sceneInfo.index;
+              }
+            }
           }
 
           // Apply playback rate for the matched scene
