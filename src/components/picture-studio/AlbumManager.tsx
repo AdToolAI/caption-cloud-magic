@@ -46,6 +46,7 @@ export function AlbumManager() {
   // Album dialog for unsorted images
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<any>(null);
 
   useEffect(() => {
     if (user) loadAlbums();
