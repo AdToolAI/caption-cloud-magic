@@ -70,6 +70,7 @@ const Support = lazy(() => import("./pages/Support"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Legal = lazy(() => import("./pages/Legal"));
 const DeleteData = lazy(() => import("./pages/DeleteData"));
+const DeleteAccount = lazy(() => import("./pages/DeleteAccount"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
 const Credits = lazy(() => import("./pages/Credits"));
 const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));

@@ -185,72 +185,14 @@ export const AdvancedTab = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                variant="outline" 
-                className="h-12 border-destructive/20 text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Konto löschen
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="backdrop-blur-xl bg-card/95 border border-white/10">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-destructive">
-                  <AlertTriangle className="h-5 w-5" />
-                  Konto wirklich löschen?
-                </DialogTitle>
-                <DialogDescription>
-                  Diese Aktion kann nicht rückgängig gemacht werden. Alle Ihre Daten, 
-                  Projekte und Credits werden permanent gelöscht.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4">
-                <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20">
-                  <p className="text-sm text-destructive font-medium mb-2">
-                    Folgende Daten werden gelöscht:
-                  </p>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Alle Projekte und Medien</li>
-                    <li>• Alle Credits und Transaktionen</li>
-                    <li>• Alle persönlichen Einstellungen</li>
-                    <li>• Aktives Abonnement wird gekündigt</li>
-                  </ul>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>
-                    Geben Sie <strong>{user?.email}</strong> ein, um zu bestätigen:
-                  </Label>
-                  <Input
-                    value={confirmEmail}
-                    onChange={(e) => setConfirmEmail(e.target.value)}
-                    placeholder="E-Mail-Adresse eingeben"
-                    className="bg-muted/20 border-white/10"
-                  />
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setDeleteDialogOpen(false)}
-                >
-                  Abbrechen
-                </Button>
-                <Button 
-                  variant="destructive"
-                  onClick={handleDeleteAccount}
-                  disabled={loading || confirmEmail !== user?.email}
-                >
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Konto endgültig löschen
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button 
+            variant="outline" 
+            className="h-12 border-destructive/20 text-destructive hover:bg-destructive/10"
+            onClick={() => navigate("/account/delete")}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Konto löschen
+          </Button>
         </CardContent>
       </Card>
     </motion.div>
