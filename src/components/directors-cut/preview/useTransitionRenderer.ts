@@ -32,6 +32,8 @@ export function useTransitionRenderer(
       return;
     }
 
+    console.log('[useTransitionRenderer] rAF loop START — resolvedTransitions:', resolvedTransitions.map(r => `${r.sceneIndex}:${r.baseType}-${r.direction}`));
+
     const tick = () => {
       const time = baseVideoRef.current?.currentTime ?? visualTimeRef.current ?? 0;
       const base = baseVideoRef.current;
