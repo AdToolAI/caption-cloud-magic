@@ -18,7 +18,7 @@ serve(async (req) => {
 
     const { userEmail } = await req.json();
 
-    const allowedEmails = ['bestofproducts4u@gmail.com', 'dusatkojr@web.de', 'denkandreas@web.de', 'rodger@dusatko.com'];
+    const allowedEmails = ['bestofproducts4u@gmail.com', 'dusatkojr@web.de', 'denkandreas@web.de', 'rodger@dusatko.com', 'meta-reviewer@useadtool.ai'];
     if (!allowedEmails.includes(userEmail)) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }), 
