@@ -289,6 +289,7 @@ export function ImageGenerator() {
                     image={img}
                     index={i}
                     onSaveToAlbum={handleSaveToAlbum}
+                    onOpenLightbox={setLightboxImage}
                     onDelete={handleDeleteImage}
                   />
                 ))}
