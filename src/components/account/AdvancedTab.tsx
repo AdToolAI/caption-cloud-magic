@@ -9,11 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Trash2, Download, FileDown, LogOut } from "lucide-react";
 
 export const AdvancedTab = () => {
-  const { user, signOut } = useAuth();
+  const { signOut } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [confirmEmail, setConfirmEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleExportData = async () => {
