@@ -6,8 +6,13 @@ import { Toggle } from '@/components/ui/toggle';
 import { 
   ArrowLeft, ArrowRight, Film, Sparkles, Scissors, Wand2, 
   Palette, Zap, ArrowUpCircle, Volume2, Mic, Download, Check, Play,
-  LayoutGrid, Timer
+  LayoutGrid, Timer, RotateCcw
 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { TimelineStudioPro } from '@/components/directors-cut/timeline';
 import { CapCutEditor } from '@/components/directors-cut/studio';
 import { motion } from 'framer-motion';
@@ -808,7 +813,35 @@ export function DirectorsCut() {
     }
   };
 
-  // Smart back navigation - step by step
+  // Reset entire project
+  const handleResetProject = useCallback(() => {
+    clearDraft();
+    setSelectedVideo(null);
+    setCurrentStep(1);
+    setScenes([]);
+    setTransitions([]);
+    setAppliedEffects({ global: { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 }, scenes: {} });
+    setAudioEnhancements({ master_volume: 100, noise_reduction: false, noise_reduction_level: 50, auto_ducking: false, ducking_level: 30, voice_enhancement: false, added_sounds: [] });
+    setExportSettings({ quality: 'hd', format: 'mp4', fps: 30, aspect_ratio: '16:9' });
+    setStyleTransfer({ enabled: false, style: null, intensity: 0.8 });
+    setColorGrading({ enabled: false, grade: null, intensity: 0.7 });
+    setSceneColorGrading({});
+    setSpeedKeyframes([]);
+    setKenBurnsKeyframes([]);
+    setChromaKey({ enabled: false, color: '#00ff00', tolerance: 30, backgroundUrl: undefined });
+    setUpscaling({ enabled: false, targetResolution: '4k' });
+    setInterpolation({ enabled: false, targetFps: 60 });
+    setRestoration({ enabled: false, level: 'standard' });
+    setObjectRemoval({ enabled: false, objectsCount: 0 });
+    setTextOverlays([]);
+    setVoiceOverUrl(undefined);
+    setBackgroundMusicUrl(undefined);
+    setCapCutAudioTracks([]);
+    setCapCutSubtitleTrack(undefined);
+    setEditorMode('steps');
+    toast.success('Projekt zurückgesetzt');
+  }, []);
+
   const handleBackNavigation = useCallback(() => {
     if (editorMode === 'timeline') {
       setEditorMode('steps');
@@ -872,6 +905,28 @@ export function DirectorsCut() {
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Neues Projekt
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Projekt zurücksetzen?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Alle aktuellen Einstellungen, Szenen und Effekte werden gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleResetProject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Zurücksetzen
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               <Button variant="outline" onClick={handleBackNavigation}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 {getBackButtonText()}
