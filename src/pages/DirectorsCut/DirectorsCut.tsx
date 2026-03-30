@@ -452,13 +452,8 @@ export function DirectorsCut() {
         currentTimelinePosition = timelineEnd;
       }
 
-      if (normalizedScenes.length > 0) {
-        const lastIdx = normalizedScenes.length - 1;
-        if (normalizedScenes[lastIdx].end_time > videoDuration) {
-          normalizedScenes[lastIdx].end_time = videoDuration;
-          normalizedScenes[lastIdx].original_end_time = videoDuration;
-        }
-      }
+      // Don't clamp scenes to videoDuration — the scenes define the actual duration
+      // The videoDuration from selectedVideo may be inaccurate (e.g. duration_in_frames / 30)
       
       setScenes(normalizedScenes);
       toast.success(`${normalizedScenes.length || 0} Szenen erkannt (Vision AI)`);
