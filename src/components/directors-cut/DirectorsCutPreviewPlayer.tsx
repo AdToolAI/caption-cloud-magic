@@ -675,8 +675,19 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     // Reset scene tracking on manual seek
     lastSceneIndexRef.current = -1;
     pendingSceneAdvanceRef.current = null;
-
-    // No incoming video sync needed — canvas snapshots handle transitions
+    // Reset incoming video to prevent stale transition state
+    const incoming = incomingVideoRef.current;
+    if (incoming) {
+      incoming.pause();
+      incoming.style.display = 'none';
+      incoming.style.opacity = '0';
+      incoming.style.transform = 'none';
+      incoming.style.clipPath = 'none';
+      incoming.style.filter = 'none';
+      incoming.style.position = '';
+      incoming.style.inset = '';
+      incoming.style.zIndex = '';
+    }
 
     if (sourceAudioRef.current) sourceAudioRef.current.currentTime = newTime;
     if (voiceoverAudioRef.current) {
