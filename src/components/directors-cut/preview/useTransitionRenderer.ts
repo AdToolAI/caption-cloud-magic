@@ -73,6 +73,11 @@ export function useTransitionRenderer(
       for (const rt of resolvedTransitions) {
         if (time >= rt.tStart - PRE_SEEK_WINDOW && time < rt.tStart) {
           seekIncoming(rt.incomingSceneId, scenes);
+          // Start playing early so frames are decoded when transition begins
+          if (incoming.paused && incoming.readyState >= 2) {
+            incoming.style.display = 'none';
+            incoming.play().catch(() => {});
+          }
           break;
         }
       }
