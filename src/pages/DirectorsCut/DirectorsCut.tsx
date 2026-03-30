@@ -877,6 +877,28 @@ export function DirectorsCut() {
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Neues Projekt
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Projekt zurücksetzen?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Alle aktuellen Einstellungen, Szenen und Effekte werden gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleResetProject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Zurücksetzen
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               <Button variant="outline" onClick={handleBackNavigation}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 {getBackButtonText()}
