@@ -151,12 +151,13 @@ export function useTransitionRenderer(
 
       // === NO TRANSITION — deterministic baseline reset EVERY inactive frame ===
       if (!found) {
-        const baseFilter = videoFilterRef.current || '';
+        // Synchronous filter for exact time
+        const syncFilter = computeFilterForTimeRef?.current ? computeFilterForTimeRef.current(time) : (videoFilterRef.current || '');
         // Deterministic hard reset EVERY inactive frame
         base.style.opacity = '1';
         base.style.transform = 'none';
         base.style.clipPath = 'none';
-        base.style.filter = baseFilter || '';
+        base.style.filter = syncFilter || '';
         base.style.position = '';
         base.style.inset = '';
         base.style.zIndex = '';
