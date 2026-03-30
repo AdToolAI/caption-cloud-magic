@@ -3,7 +3,7 @@ import type { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut'
 import { resolveTransitions, findActiveTransition, findFreezePhase } from '@/utils/transitionResolver';
 import { getTransitionStyles } from './NativeTransitionLayer';
 
-const OPACITY_BASED_TYPES = new Set(['crossfade', 'dissolve', 'fade', 'blur']);
+// All transition types now use the same dual-video CSS path
 
 /**
  * Dual-video CSS transition renderer with canvas freeze for opacity transitions.
