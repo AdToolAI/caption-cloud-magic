@@ -98,6 +98,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     onTimeUpdateRef.current = onTimeUpdate;
   }, [onTimeUpdate]);
 
+  // Set initial incoming video styles imperatively to avoid React re-render conflicts
+  useEffect(() => {
+    const incoming = incomingVideoRef.current;
+    if (incoming) {
+      incoming.style.opacity = '0';
+      incoming.style.pointerEvents = 'none';
+    }
+  }, []);
+
   // Native audio refs
   const sourceAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceoverAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -952,7 +961,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             ref={videoRef}
             src={videoUrl}
             className="absolute inset-0 w-full h-full object-contain"
-            style={{ filter: videoFilter, zIndex: 1 }}
+            style={{ zIndex: 1 }}
             muted
             playsInline
             preload="auto"
@@ -964,7 +973,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             ref={incomingVideoRef}
             src={videoUrl}
             className="absolute inset-0 w-full h-full object-contain"
-            style={{ zIndex: 2, opacity: 0, pointerEvents: 'none' }}
+            style={{ zIndex: 2 }}
             muted
             playsInline
             preload="auto"
