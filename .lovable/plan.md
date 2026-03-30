@@ -1,42 +1,56 @@
 
 
-## Fix: Effekte (Helligkeit, Kontrast etc.) werden nicht angewendet
+## Fix: Ruckler nach Übergängen glätten
 
-### Root Cause
+### Ursache
 
-Beim letzten Fix wurde `filter: videoFilter` aus dem Base-Video JSX entfernt (Zeile 972: `style={{ zIndex: 1 }}`), damit React die Transitions nicht überschreibt. **Aber:** Der einzige Ort, der jetzt den Filter anwendet, ist der RAF-Loop in `useTransitionRenderer.ts` — und dieser startet nur, wenn `scenes.length >= 2 && transitions.length > 0` (Zeile 58). 
+Wenn eine Transition endet (active → idle), passieren zwei Dinge, die den Ruckler verursachen:
 
-Wenn keine Transitions gesetzt sind, wird der RAF-Loop sofort beendet, und **kein Filter wird jemals auf das Base-Video angewendet**. Selbst mit Transitions läuft der Filter nur über den Transition-Renderer, was fragil ist.
+1. **Kein Video-Handoff**: Der Renderer pausiert das Incoming-Video und blendet es aus, aber das Base-Video steht noch an der Position der alten Szene. Erst danach erkennt der Boundary-Check (Zeile 581) die Szenengrenze und macht `video.currentTime = nextSourceStart` — das ist ein harter Seek, der einen sichtbaren Frame-Sprung erzeugt.
+
+2. **Cooldown zu kurz**: Der Cooldown ist 10 Frames (~160ms bei 60fps). Bei langsamen Seeks oder wenn das Video noch buffert, kann der Boundary-Check trotzdem feuern, bevor das Video smooth weiterspielt.
 
 ### Lösung
 
-Einen separaten `useEffect` in `DirectorsCutPreviewPlayer.tsx` hinzufügen, der `videoFilter` imperativ auf das Base-Video anwendet, wann immer sich der berechnete Filter ändert. Der Transition-Renderer überschreibt diesen Wert ohnehin während aktiver Transitions.
+**Im Transition-Renderer** (`useTransitionRenderer.ts`): Beim Übergang `active → idle` das Base-Video auf die aktuelle Position des Incoming-Videos synchronisieren, **bevor** das Incoming pausiert und ausgeblendet wird. So sieht der Nutzer keinen Sprung.
 
-### Konkrete Änderung
+**Cooldown erhöhen**: Von 10 auf 30 Frames (~500ms), damit der Boundary-Check nach dem Handoff sicher unterdrückt bleibt.
 
-**`src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`** — nach Zeile 946 (dem bestehenden `videoFilterRef` sync):
+### Konkrete Änderungen
 
-```tsx
-// Apply filter imperatively to base video so effects work even without transitions
-useEffect(() => {
-  const base = videoRef.current;
-  if (base) {
-    base.style.filter = videoFilter || '';
+**`src/components/directors-cut/preview/useTransitionRenderer.ts`** — Zeile 187-211 (idle-Reset):
+
+```typescript
+if (phaseRef.current !== 'idle') {
+  // Sync base video to incoming position BEFORE hiding incoming
+  // This prevents the visible jump when switching layers
+  const base = baseVideoRef.current;
+  if (base && incoming.currentTime > 0 && !incoming.paused) {
+    const diff = Math.abs(base.currentTime - incoming.currentTime);
+    if (diff > 0.05) {
+      base.currentTime = incoming.currentTime;
+    }
   }
-}, [videoFilter]);
+
+  // Now clean up incoming
+  if (!incoming.paused) incoming.pause();
+  incoming.style.pointerEvents = 'none';
+  incoming.style.opacity = '0';
+  // ... rest of cleanup ...
+
+  if (transitionCooldownRef) {
+    transitionCooldownRef.current = 30; // increased from 10
+  }
+  
+  phaseRef.current = 'idle';
+}
 ```
 
-Das ist alles. Eine Zeile `useEffect`.
-
-### Warum das sicher ist
-- Der Transition-Renderer setzt `base.style.filter` im RAF-Loop und überschreibt diesen Wert während aktiver Transitions
-- Ohne Transitions (oder zwischen Transitions) liefert dieser `useEffect` den korrekten Filter
-- Kein Konflikt mit dem bisherigen Fix, da wir `filter` weiterhin NICHT im JSX-Style haben (kein Re-Render-Flicker)
-
 ### Betroffene Datei
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — 1 kleiner `useEffect` hinzufügen
+- `src/components/directors-cut/preview/useTransitionRenderer.ts` — Base-Sync + Cooldown-Erhöhung
 
 ### Ergebnis
-- Helligkeit, Kontrast, Sättigung, Filter-Presets wirken sofort im Preview
-- Funktioniert unabhängig davon, ob Transitions konfiguriert sind
+- Base-Video springt nicht mehr sichtbar nach Transitions-Ende
+- Boundary-Check wird lang genug unterdrückt, um doppelte Seeks zu vermeiden
+- Übergänge enden smooth ohne Ruckler
 
