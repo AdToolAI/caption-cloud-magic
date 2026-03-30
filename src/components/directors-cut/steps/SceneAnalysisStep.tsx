@@ -481,7 +481,7 @@ export function SceneAnalysisStep({
       ...prev,
       [sceneId]: {
         type: transitionType,
-        duration: prev[sceneId]?.duration || 0.5
+        duration: prev[sceneId]?.duration || 1.2
       }
     }));
     
@@ -491,7 +491,7 @@ export function SceneAnalysisStep({
       const newTransition: TransitionAssignment = {
         sceneId,
         transitionType,
-        duration: sceneTransitions[sceneId]?.duration || 0.5,
+        duration: sceneTransitions[sceneId]?.duration || 1.2,
         aiSuggested: false
       };
       
@@ -1117,15 +1117,15 @@ export function SceneAnalysisStep({
                               <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/50">
                                 <span className="text-xs font-medium">Dauer:</span>
                                 <Slider
-                                  value={[sceneTransitions[scene.id]?.duration || 0.5]}
+                                  value={[sceneTransitions[scene.id]?.duration || 1.2]}
                                   onValueChange={(v) => handleSetSceneTransitionDuration(scene.id, v[0])}
-                                  min={0.2}
+                                  min={0.5}
                                   max={2}
                                   step={0.1}
                                   className="flex-1"
                                 />
                                 <span className="text-xs text-muted-foreground w-10 text-right">
-                                  {(sceneTransitions[scene.id]?.duration || 0.5).toFixed(1)}s
+                                  {(sceneTransitions[scene.id]?.duration || 1.2).toFixed(1)}s
                                 </span>
                               </div>
                             )}

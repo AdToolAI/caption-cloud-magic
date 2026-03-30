@@ -19,6 +19,7 @@ export function useTransitionRenderer(
   videoFilterRef: React.RefObject<string>,
   frameCacheRef: React.RefObject<Map<string, ImageBitmap>>,
   computeFilterForTimeRef?: React.RefObject<(time: number) => string>,
+  transitionCooldownRef?: React.MutableRefObject<number>,
 ) {
   const rafRef = useRef<number>();
   const phaseRef = useRef<'idle' | 'preparing' | 'active'>('idle');
@@ -201,6 +202,12 @@ export function useTransitionRenderer(
         incoming.style.zIndex = '';
 
         lastIncomingSeekRef.current = '';
+        
+        // Signal cooldown to player to suppress boundary seek for a few frames
+        if (transitionCooldownRef) {
+          transitionCooldownRef.current = 10; // suppress for 10 frames
+        }
+        
         phaseRef.current = 'idle';
       }
 

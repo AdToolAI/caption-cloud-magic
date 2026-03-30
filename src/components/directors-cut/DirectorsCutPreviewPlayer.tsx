@@ -406,7 +406,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const speedKeyframesRef = useRef(speedKeyframes);
   useEffect(() => { speedKeyframesRef.current = speedKeyframes; }, [speedKeyframes]);
 
-  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef);
+  // Cooldown ref: when a transition just ended, suppress boundary seek for N frames
+  const transitionCooldownRef = useRef<number>(0);
+
+  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
@@ -477,6 +480,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
       // VIDEO-LED: read video.currentTime as source of truth
       const videoSourceTime = video.currentTime;
+
+      // Decrement transition cooldown counter each frame
+      if (transitionCooldownRef.current > 0) {
+        transitionCooldownRef.current--;
+      }
 
       // Reverse-map to timeline time
       const sceneInfo = findSceneBySourceTime(videoSourceTime, lastSceneIndexRef.current);
@@ -559,7 +567,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
         // Scene-boundary-crossing logic: SKIP entirely during active transitions
         // Canvas handles visuals; video just keeps playing through the boundary
-        if (!cachedActiveTrans) {
+        if (!cachedActiveTrans && transitionCooldownRef.current <= 0) {
           const srcStart = sceneInfo.scene.original_start_time ?? sceneInfo.scene.start_time;
           const rate = (sceneInfo.scene as any).playbackRate ?? 1;
           const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
