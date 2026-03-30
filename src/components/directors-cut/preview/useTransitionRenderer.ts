@@ -104,25 +104,42 @@ export function useTransitionRenderer(
         }
       }
 
-      // === HANDOFF PHASE: wait for base to be ready before swapping ===
+      // === HANDOFF PHASE: wait for base to TRULY finish seeking before swapping ===
       if (phaseRef.current === 'handoff') {
-        // Check if base is ready at the synced position
-        const baseReady = base.readyState >= 2;
-        const timeDiff = Math.abs(base.currentTime - incoming.currentTime);
+        if (!handoffRequestedRef.current) {
+          // First frame of handoff: request base seek + attach seeked listener
+          handoffRequestedRef.current = true;
+          handoffReadyRef.current = false;
+          cleanupHandoffListener();
 
-        if (!handoffSeekedRef.current) {
-          // First frame of handoff: sync base position
           if (incoming.currentTime > 0) {
             const diff = Math.abs(base.currentTime - incoming.currentTime);
             if (diff > 0.05) {
+              // Attach one-shot seeked listener BEFORE setting currentTime
+              const onSeeked = () => {
+                handoffReadyRef.current = true;
+                cleanupHandoffListener();
+              };
+              handoffListenerRef.current = onSeeked;
+              base.addEventListener('seeked', onSeeked, { once: true });
               base.currentTime = incoming.currentTime;
+            } else {
+              // Already close enough — mark ready immediately
+              handoffReadyRef.current = true;
             }
+          } else {
+            handoffReadyRef.current = true;
           }
-          handoffSeekedRef.current = true;
         }
 
-        if (baseReady && (timeDiff < 0.1 || handoffSeekedRef.current)) {
+        // Only complete handoff when base has TRULY finished the seek
+        const baseReady = base.readyState >= 2;
+        const timeDiff = Math.abs(base.currentTime - incoming.currentTime);
+        const seekComplete = handoffReadyRef.current && baseReady && timeDiff < 0.05;
+
+        if (seekComplete) {
           // Base is ready — complete the handoff
+          cleanupHandoffListener();
           if (!incoming.paused) incoming.pause();
           incoming.style.pointerEvents = 'none';
           incoming.style.opacity = '0';
@@ -137,7 +154,8 @@ export function useTransitionRenderer(
           incoming.style.zIndex = '';
 
           lastIncomingSeekRef.current = '';
-          handoffSeekedRef.current = false;
+          handoffRequestedRef.current = false;
+          handoffReadyRef.current = false;
 
           if (transitionCooldownRef) {
             transitionCooldownRef.current = 30;
