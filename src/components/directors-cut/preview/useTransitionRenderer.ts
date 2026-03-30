@@ -52,7 +52,10 @@ export function useTransitionRenderer(
 
     if (scenes.length < 2 || transitions.length === 0) {
       const incoming = incomingVideoRef.current;
-      if (incoming) incoming.style.display = 'none';
+      if (incoming) {
+        incoming.style.opacity = '0';
+        incoming.style.pointerEvents = 'none';
+      }
       return;
     }
 
@@ -75,7 +78,7 @@ export function useTransitionRenderer(
           seekIncoming(rt.incomingSceneId, scenes);
           // Start playing early so frames are decoded when transition begins
           if (incoming.paused) {
-            incoming.style.display = 'none';
+            incoming.style.opacity = '0';
             incoming.play().catch(() => {});
           }
           break;
@@ -88,7 +91,8 @@ export function useTransitionRenderer(
         base.style.opacity = '1';
         base.style.transform = '';
         base.style.clipPath = '';
-        incoming.style.display = 'none';
+        incoming.style.opacity = '0';
+        incoming.style.pointerEvents = 'none';
         found = true;
         wasActiveRef.current = true;
       }
@@ -134,7 +138,7 @@ export function useTransitionRenderer(
           base.style.filter = [syncBaseFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
 
           // Apply incoming styles
-          incoming.style.display = '';
+          incoming.style.pointerEvents = 'auto';
           incoming.style.position = 'absolute';
           incoming.style.inset = '0';
           incoming.style.width = '100%';
@@ -175,7 +179,7 @@ export function useTransitionRenderer(
 
         // Always ensure incoming is hidden and fully reset
         if (!incoming.paused) incoming.pause();
-        incoming.style.display = 'none';
+        incoming.style.pointerEvents = 'none';
         incoming.style.opacity = '0';
         incoming.style.transform = 'none';
         incoming.style.clipPath = 'none';
