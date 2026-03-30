@@ -179,7 +179,7 @@ export function useTransitionRenderer(
 
         // Always ensure incoming is hidden and fully reset
         if (!incoming.paused) incoming.pause();
-        incoming.style.display = 'none';
+        incoming.style.pointerEvents = 'none';
         incoming.style.opacity = '0';
         incoming.style.transform = 'none';
         incoming.style.clipPath = 'none';
