@@ -91,7 +91,8 @@ export function useTransitionRenderer(
         base.style.opacity = '1';
         base.style.transform = '';
         base.style.clipPath = '';
-        incoming.style.display = 'none';
+        incoming.style.opacity = '0';
+        incoming.style.pointerEvents = 'none';
         found = true;
         wasActiveRef.current = true;
       }
