@@ -179,9 +179,11 @@ export function DirectorsCut() {
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | undefined>(undefined);
 
   // Dynamic video duration based on scene adjustments
+  // Uses max(end_time) from scenes as canonical duration — never falls back to selectedVideo.duration
+  // which may be inaccurate (e.g. duration_in_frames / 30 assumption)
   const actualTotalDuration = useMemo(() => {
     if (scenes.length === 0) return selectedVideo?.duration || 30;
-    return scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+    return Math.max(...scenes.map(s => s.end_time));
   }, [scenes, selectedVideo?.duration]);
 
   // AI Co-Pilot command handler
@@ -409,7 +411,10 @@ export function DirectorsCut() {
       const rawScenes = data.scenes || [];
       const sortedScenes = [...rawScenes].sort((a: any, b: any) => a.start_time - b.start_time);
       
-      const videoDuration = selectedVideo.duration || 30;
+      // Use the actual video duration from scenes, not selectedVideo.duration which may be inaccurate
+      const videoDuration = rawScenes.length > 0 
+        ? Math.max(...rawScenes.map((s: any) => s.end_time || s.original_end_time || 0))
+        : (selectedVideo.duration || 30);
       
       // Client-side stabilization: merge micro-scenes (<1.5s)
       const MIN_SCENE_DURATION = 1.5;
@@ -447,13 +452,8 @@ export function DirectorsCut() {
         currentTimelinePosition = timelineEnd;
       }
 
-      if (normalizedScenes.length > 0) {
-        const lastIdx = normalizedScenes.length - 1;
-        if (normalizedScenes[lastIdx].end_time > videoDuration) {
-          normalizedScenes[lastIdx].end_time = videoDuration;
-          normalizedScenes[lastIdx].original_end_time = videoDuration;
-        }
-      }
+      // Don't clamp scenes to videoDuration — the scenes define the actual duration
+      // The videoDuration from selectedVideo may be inaccurate (e.g. duration_in_frames / 30)
       
       setScenes(normalizedScenes);
       toast.success(`${normalizedScenes.length || 0} Szenen erkannt (Vision AI)`);
@@ -544,7 +544,7 @@ export function DirectorsCut() {
         return (
           <SceneAnalysisStep
             videoUrl={selectedVideo?.url || ''}
-            videoDuration={selectedVideo?.duration || 30}
+            videoDuration={actualTotalDuration}
             scenes={scenes}
             onScenesUpdate={setScenes}
             isAnalyzing={isAnalyzing}
@@ -560,7 +560,7 @@ export function DirectorsCut() {
         return (
           <SceneEditingStep
             videoUrl={selectedVideo?.url || ''}
-            videoDuration={selectedVideo?.duration || 30}
+            videoDuration={actualTotalDuration}
             scenes={scenes}
             onScenesUpdate={setScenes}
             transitions={transitions}
