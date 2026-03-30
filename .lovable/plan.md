@@ -1,57 +1,63 @@
 
 
-## Fix: Crossfade/Dissolve frieren ein + Ruckler danach
+## Fix: Crossfade/Dissolve-Übergänge nicht sichtbar
 
-### Problem
+### Root Cause
 
-Zwei zusammenhängende Ursachen:
+Die Incoming-Video hat in der JSX-Definition `style={{ zIndex: 2, display: 'none' }}` (Zeile 965 in `DirectorsCutPreviewPlayer.tsx`). Alle 250ms ruft der Player `setDisplayTime()` auf → React re-rendert → setzt `display: 'none'` zurück auf das Incoming-Video, egal was der Transition-Renderer vorher imperativ gesetzt hat.
 
-**1. Incoming-Video startet nicht rechtzeitig**
-Im Pre-Seek-Window und beim Transition-Start wird `incoming.play()` nur aufgerufen wenn `readyState >= 2`. Nach einem Seek fällt `readyState` auf 0/1 zurück — das Video bleibt stumm/schwarz während das Base bereits ausblendet. Bei Crossfade/Dissolve ist das fatal, weil beide Opacity-gesteuert sind (Base geht auf 0, Incoming bleibt auf 0 = schwarzer Frame).
+```text
+RAF-Frame 1: Renderer setzt incoming.style.display = ''  (sichtbar)
+RAF-Frame 2: Crossfade läuft korrekt
+...
+250ms später: React re-render → style={{ display: 'none' }} überschreibt
+RAF-Frame N: Renderer setzt display = '' zurück (16ms Verzögerung)
+```
 
-**2. Post-Transition-Seek verursacht Ruckler**
-Nach jeder Transition wird `base.currentTime = incoming.currentTime` gesetzt (Zeile 174-180). Dieser Seek löst einen Browser-Decode-Stall aus → sichtbares Hängen für ~100ms. Zusätzlich kollidiert dieser Seek mit der Boundary-Crossing-Logik im Haupt-RAF-Loop (Zeile 564), die ebenfalls einen Seek auslöst.
+Bei Slide/Push fällt das kaum auf, weil das Incoming-Element über `transform` positioniert wird und die kurze Unsichtbarkeit durch Bewegung maskiert wird. Bei Crossfade/Dissolve ist das fatal — das Incoming-Video flackert alle 250ms unsichtbar, und der Überblendeffekt ist praktisch nicht erkennbar.
 
 ### Lösung
 
-**Datei: `src/components/directors-cut/preview/useTransitionRenderer.ts`**
+**1. `DirectorsCutPreviewPlayer.tsx` — Zeile 965:** React-Style von `display: 'none'` auf `opacity: 0` ändern. Damit kämpft React nicht mehr gegen den Renderer:
 
-**A) Incoming-Video robuster starten**
-- `readyState >= 2` Check entfernen — stattdessen immer `play()` aufrufen (Browser puffert automatisch)
-- Im Pre-Seek-Window: `incoming.play()` ohne readyState-Guard
-- Im Active-Transition-Block: ebenfalls ohne readyState-Guard
-- Zusätzlich: `canplay`-Event-Listener als Fallback registrieren, der `play()` beim ersten verfügbaren Frame aufruft
+```tsx
+// Vorher:
+style={{ zIndex: 2, display: 'none' }}
 
-**B) Post-Transition-Seek eliminieren**
-- Den `base.currentTime = incoming.currentTime` Sync komplett entfernen
-- Stattdessen: Die Boundary-Crossing-Logik im Haupt-Player (DirectorsCutPreviewPlayer) übernimmt den Szenenwechsel bereits korrekt
-- Der Transition-Renderer muss am Ende nur die Styles zurücksetzen, nicht die Video-Position ändern
-
-Konkret:
-```typescript
-// PRE-SEEK block — remove readyState guard
-if (incoming.paused) {
-  incoming.play().catch(() => {});
-}
-
-// ACTIVE TRANSITION block — remove readyState guard  
-if (incoming.paused) {
-  incoming.play().catch(() => {});
-}
-
-// POST-TRANSITION — remove the sync seek entirely
-if (wasActiveRef.current) {
-  wasActiveRef.current = false;
-  lastIncomingSeekRef.current = '';
-  // NO base.currentTime sync — let the main player handle scene advance
-}
+// Nachher:
+style={{ zIndex: 2, opacity: 0, pointerEvents: 'none' }}
 ```
 
-### Betroffene Datei
-- `src/components/directors-cut/preview/useTransitionRenderer.ts`
+**2. `useTransitionRenderer.ts` — Inaktive Phase (Zeilen 176-188):** Statt `display: 'none'` durchgängig `opacity: 0` und `pointerEvents: 'none'` nutzen, um React-Style-Konflikte zu vermeiden:
+
+```typescript
+// Statt:
+incoming.style.display = 'none';
+incoming.style.opacity = '0';
+
+// Nachher:
+incoming.style.opacity = '0';
+incoming.style.pointerEvents = 'none';
+// display bleibt unverändert (kein Kampf mit React)
+```
+
+**3. `useTransitionRenderer.ts` — Aktive Phase (Zeile 137):** Statt `display: ''` die Sichtbarkeit über `opacity` und `pointerEvents` steuern:
+
+```typescript
+// Statt:
+incoming.style.display = '';
+
+// Nachher:
+incoming.style.pointerEvents = '';
+// opacity wird bereits durch getTransitionStyles gesetzt
+```
+
+### Betroffene Dateien
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — JSX-Style des Incoming-Video
+- `src/components/directors-cut/preview/useTransitionRenderer.ts` — display→opacity Wechsel
 
 ### Ergebnis
-- Crossfade/Dissolve zeigen sofort das Incoming-Video (kein schwarzer Frame)
-- Kein doppelter Seek am Transitions-Ende = kein Ruckler
-- Slide-Übergänge bleiben unverändert (funktionieren bereits)
+- React-Re-Renders können die Incoming-Video-Sichtbarkeit nicht mehr überschreiben
+- Crossfade/Dissolve sind durchgehend sichtbar ohne 250ms-Flackern
+- Slide/Push-Übergänge bleiben unverändert funktional
 
