@@ -21,13 +21,16 @@ export function useTransitionRenderer(
   frameCacheRef: React.RefObject<Map<string, ImageBitmap>>,
   computeFilterForTimeRef?: React.RefObject<(time: number) => string>,
   transitionCooldownRef?: React.MutableRefObject<number>,
+  lastHandoffBoundaryRef?: React.MutableRefObject<number | null>,
 ) {
   const rafRef = useRef<number>();
   const phaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
   const lastIncomingSeekRef = useRef<string>('');
-  const handoffRequestedRef = useRef(false);
-  const handoffReadyRef = useRef(false);
-  const handoffListenerRef = useRef<(() => void) | null>(null);
+  
+  // Handoff: snapshot-based approach
+  const handoffTargetTimeRef = useRef<number | null>(null);
+  const handoffFrameCountRef = useRef(0);
+  const HANDOFF_MAX_FRAMES = 45; // ~750ms safety fallback
 
   const resolvedTransitions = useMemo(
     () => resolveTransitions(scenes, transitions),
@@ -50,21 +53,12 @@ export function useTransitionRenderer(
   }, [incomingVideoRef]);
 
   // When scenes or transitions change, reset phase
-  // Cleanup helper for seeked listener
-  const cleanupHandoffListener = useCallback(() => {
-    if (handoffListenerRef.current && baseVideoRef.current) {
-      baseVideoRef.current.removeEventListener('seeked', handoffListenerRef.current);
-    }
-    handoffListenerRef.current = null;
-  }, [baseVideoRef]);
-
   useEffect(() => {
     phaseRef.current = 'idle';
     lastIncomingSeekRef.current = '';
-    handoffRequestedRef.current = false;
-    handoffReadyRef.current = false;
-    cleanupHandoffListener();
-  }, [scenes, transitions, cleanupHandoffListener]);
+    handoffTargetTimeRef.current = null;
+    handoffFrameCountRef.current = 0;
+  }, [scenes, transitions]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -104,110 +98,18 @@ export function useTransitionRenderer(
         }
       }
 
-      // === HANDOFF PHASE: wait for base to TRULY finish seeking before swapping ===
-      if (phaseRef.current === 'handoff') {
-        if (!handoffRequestedRef.current) {
-          // First frame of handoff: request base seek + attach seeked listener
-          handoffRequestedRef.current = true;
-          handoffReadyRef.current = false;
-          cleanupHandoffListener();
-
-          if (incoming.currentTime > 0) {
-            const diff = Math.abs(base.currentTime - incoming.currentTime);
-            if (diff > 0.05) {
-              // Attach one-shot seeked listener BEFORE setting currentTime
-              const onSeeked = () => {
-                handoffReadyRef.current = true;
-                cleanupHandoffListener();
-              };
-              handoffListenerRef.current = onSeeked;
-              base.addEventListener('seeked', onSeeked, { once: true });
-              base.currentTime = incoming.currentTime;
-            } else {
-              // Already close enough — mark ready immediately
-              handoffReadyRef.current = true;
-            }
-          } else {
-            handoffReadyRef.current = true;
-          }
-        }
-
-        // Only complete handoff when base has TRULY finished the seek
-        const baseReady = base.readyState >= 2;
-        const timeDiff = Math.abs(base.currentTime - incoming.currentTime);
-        const seekComplete = handoffReadyRef.current && baseReady && timeDiff < 0.05;
-
-        if (seekComplete) {
-          // Base is ready — complete the handoff
-          cleanupHandoffListener();
-          if (!incoming.paused) incoming.pause();
-          incoming.style.pointerEvents = 'none';
-          incoming.style.opacity = '0';
-          incoming.style.transform = 'none';
-          incoming.style.clipPath = 'none';
-          incoming.style.filter = 'none';
-          incoming.style.position = '';
-          incoming.style.inset = '';
-          incoming.style.width = '';
-          incoming.style.height = '';
-          incoming.style.objectFit = '';
-          incoming.style.zIndex = '';
-
-          lastIncomingSeekRef.current = '';
-          handoffRequestedRef.current = false;
-          handoffReadyRef.current = false;
-
-          if (transitionCooldownRef) {
-            transitionCooldownRef.current = 30;
-          }
-
-          phaseRef.current = 'idle';
-        } else {
-          // Keep incoming visible at full opacity while base catches up
-          incoming.style.opacity = '1';
-          incoming.style.pointerEvents = 'none';
-          incoming.style.transform = '';
-          incoming.style.clipPath = '';
-          incoming.style.filter = syncFilter || '';
-        }
-
-        // Base normal styles during handoff
-        base.style.opacity = '1';
-        base.style.transform = 'none';
-        base.style.clipPath = 'none';
-        base.style.filter = syncFilter || '';
-        base.style.position = '';
-        base.style.inset = '';
-        base.style.zIndex = '';
-
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      // === Check phases in priority order ===
-
-      // Phase 1: FREEZE (offset > 0)
-      const freezeRT = findFreezePhase(time, resolvedTransitions);
-      if (freezeRT) {
-        phaseRef.current = 'preparing';
-        base.style.opacity = '1';
-        base.style.transform = '';
-        base.style.clipPath = '';
-        base.style.filter = syncFilter || '';
-        incoming.style.opacity = '0';
-        incoming.style.pointerEvents = 'none';
-        seekIncoming(freezeRT.incomingSceneId, scenes);
-        if (incoming.paused) {
-          incoming.play().catch(() => {});
-        }
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      // Phase 2: ACTIVE TRANSITION
+      // === PRIORITY 1: Check for ACTIVE TRANSITION first ===
+      // This ensures a new transition always preempts a stuck handoff
       const active = findActiveTransition(time, resolvedTransitions);
       if (active) {
         const { transition: rt, progress } = active;
+        
+        // If we were in handoff, abort it cleanly
+        if (phaseRef.current === 'handoff') {
+          handoffTargetTimeRef.current = null;
+          handoffFrameCountRef.current = 0;
+        }
+        
         phaseRef.current = 'active';
 
         seekIncoming(rt.incomingSceneId, scenes);
@@ -257,7 +159,101 @@ export function useTransitionRenderer(
         return;
       }
 
-      // Phase 3: PRE-SEEK (preparing)
+      // === PRIORITY 2: FREEZE phase (offset > 0) ===
+      const freezeRT = findFreezePhase(time, resolvedTransitions);
+      if (freezeRT) {
+        // If we were in handoff, abort it
+        if (phaseRef.current === 'handoff') {
+          handoffTargetTimeRef.current = null;
+          handoffFrameCountRef.current = 0;
+        }
+        
+        phaseRef.current = 'preparing';
+        base.style.opacity = '1';
+        base.style.transform = '';
+        base.style.clipPath = '';
+        base.style.filter = syncFilter || '';
+        incoming.style.opacity = '0';
+        incoming.style.pointerEvents = 'none';
+        seekIncoming(freezeRT.incomingSceneId, scenes);
+        if (incoming.paused) {
+          incoming.play().catch(() => {});
+        }
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      // === PRIORITY 3: HANDOFF phase ===
+      if (phaseRef.current === 'handoff') {
+        handoffFrameCountRef.current++;
+        
+        // First frame: snapshot the target time
+        if (handoffTargetTimeRef.current === null) {
+          handoffTargetTimeRef.current = incoming.currentTime;
+          const diff = Math.abs(base.currentTime - handoffTargetTimeRef.current);
+          if (diff > 0.05) {
+            base.currentTime = handoffTargetTimeRef.current;
+          }
+        }
+
+        const targetTime = handoffTargetTimeRef.current;
+        const timeDiff = Math.abs(base.currentTime - targetTime);
+        const baseReady = base.readyState >= 2;
+        const isReady = (baseReady && timeDiff < 0.1) || handoffFrameCountRef.current >= HANDOFF_MAX_FRAMES;
+
+        if (isReady) {
+          // Complete handoff
+          if (!incoming.paused) incoming.pause();
+          incoming.style.pointerEvents = 'none';
+          incoming.style.opacity = '0';
+          incoming.style.transform = 'none';
+          incoming.style.clipPath = 'none';
+          incoming.style.filter = 'none';
+          incoming.style.position = '';
+          incoming.style.inset = '';
+          incoming.style.width = '';
+          incoming.style.height = '';
+          incoming.style.objectFit = '';
+          incoming.style.zIndex = '';
+
+          lastIncomingSeekRef.current = '';
+          
+          // Mark this boundary as consumed so player skips boundary-advance
+          if (lastHandoffBoundaryRef && handoffTargetTimeRef.current !== null) {
+            lastHandoffBoundaryRef.current = handoffTargetTimeRef.current;
+          }
+          
+          handoffTargetTimeRef.current = null;
+          handoffFrameCountRef.current = 0;
+
+          if (transitionCooldownRef) {
+            transitionCooldownRef.current = 30;
+          }
+
+          phaseRef.current = 'idle';
+        } else {
+          // Keep incoming visible while base catches up
+          incoming.style.opacity = '1';
+          incoming.style.pointerEvents = 'none';
+          incoming.style.transform = '';
+          incoming.style.clipPath = '';
+          incoming.style.filter = syncFilter || '';
+        }
+
+        // Base normal styles during handoff
+        base.style.opacity = '1';
+        base.style.transform = 'none';
+        base.style.clipPath = 'none';
+        base.style.filter = syncFilter || '';
+        base.style.position = '';
+        base.style.inset = '';
+        base.style.zIndex = '';
+
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      // === PRIORITY 4: PRE-SEEK (preparing) ===
       for (const rt of resolvedTransitions) {
         if (time >= rt.tStart - PRE_SEEK_WINDOW && time < rt.tStart) {
           phaseRef.current = 'preparing';
@@ -280,13 +276,12 @@ export function useTransitionRenderer(
         }
       }
 
-      // Phase 4: IDLE — truly far from any transition
+      // === PRIORITY 5: IDLE ===
       // If we were active, enter handoff instead of going directly to idle
       if (phaseRef.current === 'active') {
         phaseRef.current = 'handoff';
-        handoffRequestedRef.current = false;
-        handoffReadyRef.current = false;
-        cleanupHandoffListener();
+        handoffTargetTimeRef.current = null;
+        handoffFrameCountRef.current = 0;
         // Don't clean up incoming yet — handoff handler will do it
         rafRef.current = requestAnimationFrame(tick);
         return;
@@ -325,7 +320,6 @@ export function useTransitionRenderer(
     rafRef.current = requestAnimationFrame(tick);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      cleanupHandoffListener();
     };
-  }, [scenes, transitions, resolvedTransitions, visualTimeRef, baseVideoRef, incomingVideoRef, canvasRef, videoFilterRef, frameCacheRef, seekIncoming, computeFilterForTimeRef, cleanupHandoffListener]);
+  }, [scenes, transitions, resolvedTransitions, visualTimeRef, baseVideoRef, incomingVideoRef, canvasRef, videoFilterRef, frameCacheRef, seekIncoming, computeFilterForTimeRef, lastHandoffBoundaryRef]);
 }
