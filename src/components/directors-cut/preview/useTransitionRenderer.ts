@@ -52,7 +52,10 @@ export function useTransitionRenderer(
 
     if (scenes.length < 2 || transitions.length === 0) {
       const incoming = incomingVideoRef.current;
-      if (incoming) incoming.style.display = 'none';
+      if (incoming) {
+        incoming.style.opacity = '0';
+        incoming.style.pointerEvents = 'none';
+      }
       return;
     }
 
