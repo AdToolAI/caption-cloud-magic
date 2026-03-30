@@ -78,7 +78,7 @@ export function useTransitionRenderer(
           seekIncoming(rt.incomingSceneId, scenes);
           // Start playing early so frames are decoded when transition begins
           if (incoming.paused) {
-            incoming.style.display = 'none';
+            incoming.style.opacity = '0';
             incoming.play().catch(() => {});
           }
           break;
