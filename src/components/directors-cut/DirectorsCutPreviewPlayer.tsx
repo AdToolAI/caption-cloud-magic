@@ -709,6 +709,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     visualTimeRef.current = 0;
     setDisplayTime(0);
     setIsPlaying(false);
+    lastSceneIndexRef.current = -1;
+    pendingSceneAdvanceRef.current = null;
+    // Reset incoming video
+    const incoming = incomingVideoRef.current;
+    if (incoming) {
+      incoming.pause();
+      incoming.style.display = 'none';
+      incoming.style.opacity = '0';
+      incoming.style.transform = 'none';
+    }
     stopAllAudio();
     if (sourceAudioRef.current) sourceAudioRef.current.currentTime = 0;
     if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = 0;
