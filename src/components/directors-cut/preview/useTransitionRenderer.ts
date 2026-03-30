@@ -137,12 +137,12 @@ export function useTransitionRenderer(
           incoming.style.objectFit = 'contain';
           incoming.style.zIndex = '2';
 
-          const incomingFilter = videoFilterRef.current || '';
+          const syncIncomingFilter = computeFilterForTimeRef?.current ? computeFilterForTimeRef.current(time) : (videoFilterRef.current || '');
           const incomingTransitionFilter = (styles.incomingStyle as any).filter || '';
           incoming.style.opacity = styles.incomingStyle.opacity != null ? String(styles.incomingStyle.opacity) : '1';
           incoming.style.transform = styles.incomingStyle.transform || '';
           incoming.style.clipPath = styles.incomingStyle.clipPath || '';
-          incoming.style.filter = [incomingFilter, incomingTransitionFilter].filter(Boolean).join(' ') || '';
+          incoming.style.filter = [syncIncomingFilter, incomingTransitionFilter].filter(Boolean).join(' ') || '';
 
           found = true;
           wasActiveRef.current = true;
