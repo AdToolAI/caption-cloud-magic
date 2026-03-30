@@ -1,61 +1,43 @@
 
-Ziel: Die Übergänge im Preview wirklich sichtbar machen. Nach dem aktuellen Code sind noch zwei echte Blocker übrig, deshalb reicht der letzte Fix allein nicht.
 
-1. Root Cause, den ich jetzt beheben würde
-- In `DirectorsCutPreviewPlayer.tsx` werden beim `handleSeek` und `handleReset` immer noch imperative Resets mit `incoming.style.display = 'none'` gesetzt.
-- Im aktuellen `useTransitionRenderer.ts` wird `display` aber gar nicht mehr zurückgesetzt, sondern nur noch `opacity/pointerEvents` gesteuert.
-- Ergebnis: Nach dem ersten Seek/Reset bleibt das Incoming-Video hart unsichtbar, selbst wenn der Transition-Renderer später Opacity setzt.
+## Fix: Alle Übergänge (Crossfade, Dissolve, Fade, Blur etc.) sichtbar machen
 
-Zusätzlich:
-- `useTransitionRenderer.ts` nutzt `frameCacheRef` aktuell gar nicht, obwohl `useFrameCapture` bereits den letzten Frame der ausgehenden Szene cached.
-- Dadurch bleibt bei Crossfade/Dissolve das Base-Video ein live laufendes Video statt visuell auf dem letzten Outgoing-Frame “eingefroren”.
-- Genau diese Opacity-Übergänge wirken dann fast unsichtbar, weil nicht sauber zwischen “altem Bild” und “neuem Bild” überblendet wird.
+### Problem
 
-2. Konkrete Umsetzung
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-  - Alle verbliebenen `incoming.style.display = 'none'` Resets in `handleSeek` und `handleReset` entfernen.
-  - Stattdessen nur noch `opacity`, `pointerEvents`, `transform`, `clipPath`, `filter`, `position`, `inset`, `zIndex` sauber zurücksetzen.
-  - Optional einen kleinen gemeinsamen `resetIncomingLayer()` Helper daraus machen, damit kein inkonsistenter Reset mehr an zwei Stellen lebt.
+Der Renderer hat zwei Code-Pfade (Zeile 122-180 in `useTransitionRenderer.ts`):
 
-- `src/components/directors-cut/preview/useTransitionRenderer.ts`
-  - Für `crossfade`, `dissolve`, `fade` und ggf. `blur` die cached Outgoing-Frames aus `frameCacheRef` wirklich verwenden.
-  - Die vorhandene `canvasRef` gezielt dafür aktivieren:
-    - Outgoing-Freeze-Frame auf Canvas zeichnen
-    - Canvas nur während diesen opacity-basierten Übergängen sichtbar machen
-    - Base-Video darunter visuell neutral halten
-    - Incoming-Video wie bisher darüber mit Opacity einblenden
-  - Für `slide`, `push`, `wipe`, `zoom` beim aktuellen Dual-Video-CSS-Ansatz bleiben.
+1. **Opacity-basierte Übergänge** (crossfade, dissolve, fade, blur) → Canvas-Pfad mit `frameCacheRef`
+2. **Räumliche Übergänge** (slide, push, wipe, zoom) → Dual-Video-CSS-Pfad
 
-3. Warum genau dieser Fix
-```text
-Aktuell:
-Seek/Reset -> incoming.display='none'
-Renderer -> setzt nur opacity
-=> incoming bleibt unsichtbar
+**Der Canvas-Pfad scheitert immer**, weil `useFrameCapture.ts` das Capture-Video mit `crossOrigin = 'anonymous'` erstellt (Zeile 45). S3-Videos liefern keine CORS-Header → `createImageBitmap()` schlägt fehl → `frameCacheRef` bleibt leer → der Fallback-Code (Zeilen 155-163) setzt zwar `base.style.opacity`, aber ohne eingefrorenes Bild wirkt der Übergang kaum sichtbar.
 
-Und bei Crossfade/Dissolve:
-base bleibt live-video
-statt gefrorenem outgoing-frame
-=> Überblendung wirkt nicht sauber / kaum sichtbar
-```
+Slide funktioniert, weil es den `else`-Pfad (Zeile 164+) nutzt — reines CSS mit zwei Videos.
 
-4. Betroffene Dateien
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-- `src/components/directors-cut/preview/useTransitionRenderer.ts`
+### Lösung: Ein einziger Dual-Video-CSS-Pfad für ALLE Übergänge
 
-5. Erwartetes Ergebnis
-- Übergänge bleiben auch nach Scrubbing/Seek sichtbar.
-- Crossfade und Dissolve sehen endlich wie echte Überblendungen aus.
-- Slide/Push/Wipe bleiben stabil.
-- Kein “Übergang aktiv in der Timeline, aber im Preview unsichtbar” mehr.
+Die `if (isOpacityBased && canvas)` Verzweigung (Zeilen 122-163) wird komplett entfernt. Alle Transition-Typen nutzen denselben Pfad wie Slide/Push — beide Videos laufen, CSS-Styles werden von `getTransitionStyles()` geliefert.
 
-6. Technische Kurznotiz
-```text
-Visibility ownership muss an genau einer Stelle liegen:
-- React/JSX: nur Default-Styles
-- Renderer: komplette Laufzeit-Steuerung
+`getTransitionStyles()` in `NativeTransitionLayer.tsx` liefert bereits korrekte Werte für alle Typen:
+- Crossfade/Dissolve: `base.opacity: 1→0`, `incoming.opacity: 0→1`  
+- Fade: base aus → incoming ein (über Schwarz)
+- Blur: opacity + filter
+- Wipe: clipPath
+- Slide/Push: transform
+- Zoom: scale + opacity
 
-Und:
-Opacity-Transitions brauchen ein stabiles outgoing visual.
-Ein live weiterlaufendes Base-Video ist dafür die falsche Grundlage.
-```
+**Datei: `useTransitionRenderer.ts`**
+- `OPACITY_BASED_TYPES` Konstante entfernen
+- Canvas-Verzweigung (Zeilen 122-163) entfernen
+- Nur den bestehenden Dual-Video-CSS-Block (Zeilen 164-180) behalten, für ALLE Typen
+- Canvas wird nie gezeigt (`canvas.style.display = 'none'` bleibt)
+
+**Datei: `useFrameCapture.ts`** — bleibt unverändert (wird nicht mehr aktiv genutzt, kann später aufgeräumt werden)
+
+### Betroffene Datei
+- `src/components/directors-cut/preview/useTransitionRenderer.ts` — Canvas-Branching entfernen, einheitlicher CSS-Pfad
+
+### Ergebnis
+- Crossfade, Dissolve, Fade, Blur funktionieren genauso zuverlässig wie Slide
+- Keine CORS-Abhängigkeit mehr
+- Alle angebotenen Übergänge (none, crossfade, fade, dissolve, wipe, slide) sind im Preview sichtbar
+
