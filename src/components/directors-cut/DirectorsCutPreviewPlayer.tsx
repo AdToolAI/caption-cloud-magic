@@ -481,6 +481,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       // VIDEO-LED: read video.currentTime as source of truth
       const videoSourceTime = video.currentTime;
 
+      // Decrement transition cooldown counter each frame
+      if (transitionCooldownRef.current > 0) {
+        transitionCooldownRef.current--;
+      }
+
       // Reverse-map to timeline time
       const sceneInfo = findSceneBySourceTime(videoSourceTime, lastSceneIndexRef.current);
       let timelineTime: number;
