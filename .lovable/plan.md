@@ -1,73 +1,65 @@
 
-Ziel: Das echte Laufzeitproblem beheben, nicht nochmal am Timing raten. Der neue Fehler ist jetzt klarer: Beim Übergang 1→2 bleibt der Regler stehen, obwohl rechts das Video weiterläuft. Das bedeutet: Transport und Darstellung laufen auf zwei verschiedenen Video-Elementen auseinander.
+Ziel: Den Fehler diesmal an den tatsächlich noch falschen Stellen beheben. Die aktuelle 30s-Anzeige in Schritt 3 kommt nicht aus dem Preview-Player, sondern aus widersprüchlichen Dauerberechnungen in mehreren UI-Komponenten. Zusätzlich ist der Rechts-Shift beim ersten Slide sehr wahrscheinlich ein Renderer-Reset-/Layout-Problem, das im aktuellen Hook noch nicht hart genug neutralisiert wird.
 
-1. Genaues Problem
-- In `DirectorsCutPreviewPlayer.tsx` ist das Base-Video weiterhin die Zeitquelle des gesamten Players (`video.currentTime`).
-- In `useTransitionRenderer.ts` wird genau dieses Base-Video während der aktiven Transition absichtlich `pause()`d und auf dem letzten Frame eingefroren.
-- Gleichzeitig läuft das `incoming`-Video weiter und zeigt den Übergang visuell an.
-- Folge:
-  - Slider/`displayTime`/`visualTimeRef` hängen an der eingefrorenen Base-Time fest
-  - das sichtbare Overlay-Video bewegt sich weiter
-  - dadurch wirkt der Player “aufgehangen”, obwohl rechts das Bild weiterläuft
+1. Echte Ursache für die 30 Sekunden
+- In `DirectorsCut.tsx` ist die globale Dauer schon auf `Math.max(...end_time)` umgestellt.
+- Aber in Schritt 3 wird diese Logik lokal wieder überschrieben:
+  - `SceneEditingStep.tsx` berechnet `actualTotalDuration` noch als Summe aller Szenenlängen.
+  - `VisualTimeline.tsx` berechnet dieselbe Dauer ebenfalls noch als Summe.
+- Genau diese beiden Stellen erklären, warum Schritt 3 weiterhin 30.0s zeigt, obwohl die Parent-Komponente schon korrekt arbeitet.
+- Zusätzlich nutzt `handleStartAnalysis()` in `DirectorsCut.tsx` für Frame-Extraktion und Analyse-Request weiterhin `selectedVideo.duration || 30`. Wenn die importierte Library-Dauer fehlt oder falsch ist, wird die Analyse weiterhin mit 30 Sekunden gestartet.
 
-2. Zweites bestätigtes Problem
-- Die 30s vs. 32s sind noch nicht vollständig sauber gelöst:
-  - `VideoImportStep.tsx` verwendet beim Library-Select teils noch `duration_in_frames / 30`
-  - `VisualTimeline.tsx` und `SceneEditingStep.tsx` berechnen die Gesamtdauer per Summe der Szenenlängen statt per echter Timeline-Grenze (`max(end_time)`)
-- Wenn Szenen lückenlos, aber verschoben/gestretcht sind, kann Summe und echte Timeline-Gesamtdauer auseinanderlaufen.
+2. Echte Ursache für den ersten Slide-Fehler
+- `useTransitionRenderer.ts` setzt zwar viele Styles zurück, aber im aktiven Slide/Push-Zweig bleibt das Base-Video ein normaler Layout-Teilnehmer.
+- Bei Slide wird das Incoming-Video absolut positioniert, das Base-Video aber nicht explizit auf einen stabilen absoluten Layer gezwungen.
+- Gleichzeitig werden Reset-Werte teils mit `''`/leeren Defaults statt stabilen expliziten Layoutwerten verwendet.
+- Dadurch ist der erste Übergang besonders anfällig für einen Layer-Offset nach rechts, obwohl spätere Frames teilweise korrekt aussehen.
 
-3. Dateien mit der eigentlichen Ursache
-- `src/components/directors-cut/preview/useTransitionRenderer.ts`
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-- `src/components/directors-cut/steps/VideoImportStep.tsx`
-- `src/components/directors-cut/ui/VisualTimeline.tsx`
+3. Konkrete Umsetzung
 - `src/components/directors-cut/steps/SceneEditingStep.tsx`
+  - Alle lokalen Dauerberechnungen von `sum(end-start)` auf `Math.max(...end_time)` umstellen.
+  - Footer-Statistik ebenfalls auf dieselbe kanonische Dauer umstellen.
+  - Sicherstellen, dass Preview, Timeline und Stats exakt dieselbe Dauerquelle verwenden.
+- `src/components/directors-cut/ui/VisualTimeline.tsx`
+  - `actualTotalDuration` ebenfalls auf `Math.max(...end_time)` umstellen.
+  - Divider-Drag/Marker-Berechnungen auf diese kanonische Dauer synchronisieren.
+- `src/pages/DirectorsCut/DirectorsCut.tsx`
+  - In `handleStartAnalysis()` nicht mehr `selectedVideo.duration || 30` direkt verwenden.
+  - Vor Analyse eine kanonische Quelldauer bestimmen:
+    - primär `selectedVideo.duration`
+    - sonst Metadaten/geladene Videodauer
+    - nur als letzter Notfall 30
+  - Diese Dauer für Frame-Extraktion und den Analyze-Request verwenden.
+- `src/components/directors-cut/steps/VideoImportStep.tsx`
+  - Die Mediathek-Karte zeigt aktuell unten rechts weiterhin `duration_in_frames / 30`.
+  - Auch die Anzeige dort auf `metadata.duration_seconds` priorisieren, damit UI und tatsächliche Projekt-Dauer nicht auseinanderlaufen.
+- `src/components/directors-cut/preview/useTransitionRenderer.ts`
+  - Base-Video im aktiven Transition-Zweig explizit auf denselben stabilen Layer-Frame setzen wie Incoming:
+    - `position: absolute`
+    - `inset: 0`
+    - `width/height: 100%`
+    - `objectFit: contain`
+  - Inaktive Resets nicht nur “leeren”, sondern deterministisch neutralisieren.
+  - Damit Slide/Push den ersten Layer nicht mehr seitlich aus dem Layout schieben.
 
-4. Umsetzung
-- `useTransitionRenderer.ts`
-  - Base-Video nicht mehr als transportkritische Zeitquelle “hart pausieren”, ohne dass der Player das weiß
-  - stattdessen Freeze rein visuell entkoppeln:
-    - entweder Base nicht pausieren und nur Darstellung/Fallback kontrollieren
-    - oder expliziten Transition-Transport-State nach außen geben, damit der Player während aktiver Transitions nicht mehr `video.currentTime` als Wahrheit benutzt
-  - Freeze/Reset-Pfade vereinheitlichen, damit Slide nicht mehr Layout-Reste hinterlässt
+4. Warum dieser Plan diesmal gezielt ist
+- Das 30s-Problem ist jetzt direkt im Code nachweisbar: Schritt 3 rechnet lokal falsch, obwohl der Parent bereits richtig rechnet.
+- Das ist kein Deployment-Thema, sondern ein verbliebener Widerspruch zwischen Parent- und Child-Komponenten.
+- Der Slide-Bug sitzt sehr wahrscheinlich im Layering selbst, nicht mehr in der reinen Transition-Zeit.
 
-- `DirectorsCutPreviewPlayer.tsx`
-  - Während aktiver Transition darf die Timeline nicht mehr blind aus `videoRef.current.currentTime` gelesen werden
-  - aktiven Übergang einmal pro Frame auf Timeline-Basis bestimmen und `timelineTime` daraus kontinuierlich fortschreiben
-  - wenn Base eingefroren ist, den Regler trotzdem mit der Transition-Zeit weiterlaufen lassen
-  - Scene-Detection und Boundary-Advance strikt auf dieselbe Zeitdomäne bringen
-  - Seek/Reset/Restart so anpassen, dass kein alter Transition-Zustand wiederverwendet wird
+5. Erfolgskriterien
+- Schritt 2 und Schritt 3 zeigen dieselbe Gesamtdauer.
+- Die Timeline in Schritt 3 zeigt nicht mehr fest 30.0s, wenn die Szenen tatsächlich bis 32s reichen.
+- Der erste Slide verschiebt das Bild nicht mehr nach rechts.
+- Preview, Slider und Timeline basieren überall auf derselben Dauerlogik.
 
-- Dauer-Fix ergänzen
-  - `VideoImportStep.tsx`: für Mediathek primär `metadata.duration_seconds`
-  - `SceneEditingStep.tsx` + `VisualTimeline.tsx`: Gesamtdauer nicht als Summe, sondern als `max(end_time)` berechnen
-  - damit Schritt 2, Schritt 3, Regler und Timeline dieselbe Dauer anzeigen
-
-5. Warum dieser Fix der richtige ist
-- Das aktuelle Verhalten ist kein kosmetischer Fehler, sondern ein Transport-Bug:
+6. Technische Kurznotiz
 ```text
-Base-Video = Zeitquelle
-Base-Video wird in Transition eingefroren
-Incoming-Video läuft weiter
-=> sichtbares Bild und Slider laufen auseinander
-```
-- Solange genau das nicht korrigiert wird, bleiben alle weiteren Timing-Patches instabil.
+Kanonische Dauer überall:
+duration = max(scene.end_time)
 
-6. Erfolgskriterien
-- Beim Übergang 1→2 läuft der Regler sauber weiter und bleibt nicht an der Grenze stehen
-- Kein “rechts weiterlaufendes” Video mehr bei gleichzeitig eingefrorenem Slider
-- Der erste Slide verschiebt das Bild nicht mehr
-- Schritt 2 und Schritt 3 zeigen dieselbe Gesamtdauer
-- Übergänge bleiben sichtbar, ohne dass Transport und UI auseinanderdriften
-
-7. Technische Kurznotiz
-- Ich würde das als Transport-Fix umsetzen, nicht als weiteren Transition-Tweak.
-- Wichtigste Änderung:
-```text
-Transition-Layer darf nicht unabhängig von der Playback-Zeit laufen.
-Entweder:
-A) Base bleibt Zeitquelle und wird nicht hart pausiert
-oder
-B) Player bekommt während aktiver Transition eine eigene fortlaufende Timeline-Zeit
+Nicht mehr zulässig:
+duration = sum(scene lengths)
+duration = duration_in_frames / 30
+duration = selectedVideo.duration || 30 als versteckter Default in Unterkomponenten
 ```
-- In diesem Code ist B wahrscheinlich sauberer, weil die Freeze-Logik schon existiert und nur korrekt in die Playback-Steuerung integriert werden muss.
