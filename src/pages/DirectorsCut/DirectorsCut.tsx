@@ -411,7 +411,10 @@ export function DirectorsCut() {
       const rawScenes = data.scenes || [];
       const sortedScenes = [...rawScenes].sort((a: any, b: any) => a.start_time - b.start_time);
       
-      const videoDuration = selectedVideo.duration || 30;
+      // Use the actual video duration from scenes, not selectedVideo.duration which may be inaccurate
+      const videoDuration = rawScenes.length > 0 
+        ? Math.max(...rawScenes.map((s: any) => s.end_time || s.original_end_time || 0))
+        : (selectedVideo.duration || 30);
       
       // Client-side stabilization: merge micro-scenes (<1.5s)
       const MIN_SCENE_DURATION = 1.5;
