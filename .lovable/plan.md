@@ -1,48 +1,41 @@
 
 
-## Fix: Helligkeit/Kontrast/Sättigung werden nicht im Preview angezeigt
+## Fix: Filter-Flackern beim Szenenwechsel
 
-### Ursache
+### Problem
 
-Im `DirectorsCutPreviewPlayer` wird `currentScene` anhand von `displayTime` bestimmt (Zeile 746-748):
-```typescript
-const currentScene = sortedScenes.find(s => displayTime >= s.start_time && displayTime < s.end_time);
+Der `useTransitionRenderer` RAF-Loop setzt `base.style.filter = videoFilterRef.current` auf **jedem Frame** (Zeile 152-157). Aber `videoFilterRef` wird über eine React-Kette aktualisiert:
+
+```text
+visualTimeRef → displayTime (setState) → currentScene (useMemo) → videoFilter (useMemo) → videoFilterRef (useEffect)
 ```
 
-**Problem 1**: Wenn das Video bei `displayTime = 0` steht und die erste Szene bei z.B. `0.167s` beginnt (typisch bei KI-Analyse), ist `currentScene = undefined`. Damit werden szenen-spezifische Effekte (`sceneEffects[sceneId].brightness` etc.) komplett ignoriert und es fällt auf die globalen Werte (unverändert = 100) zurück.
-
-**Problem 2**: Der RAF-Loop in `useTransitionRenderer` überschreibt `base.style.filter` auf **jedem Frame** mit `videoFilterRef.current`. Wenn der `useEffect` für den Ref-Sync noch nicht gelaufen ist (z.B. beim ersten Render), kann kurzzeitig der alte Wert angewendet werden.
+Das ist 2-3 Frames Verzögerung. Beim Szenenwechsel zeigt der RAF-Loop noch den **alten** Filter für ~2ms, bevor React den neuen Wert durchpropagiert hat. Das erklärt:
+- **Szene 3**: Nach dem Übergang kurz das ungefilterte Bild (alter Filter noch im Ref)
+- **Szene 4**: Am Anfang kurz den Filter der vorherigen Szene (Ref noch nicht aktualisiert)
 
 ### Lösung
 
-**1. `DirectorsCutPreviewPlayer.tsx` — `currentScene` Lookup toleranter machen**
-- Wenn kein exakter Match gefunden wird, die nächstliegende Szene wählen (besonders für `displayTime < scenes[0].start_time`)
-- Damit werden szenen-spezifische Slider-Änderungen sofort sichtbar, auch wenn der Playhead am Anfang steht
+Den Filter **synchron im RAF-Loop** berechnen statt über den React-State-Umweg. Der Renderer kennt bereits `visualTimeRef.current` und die `scenes` — er braucht nur zusätzlich `sceneEffects` und `effects`, um den korrekten Filter direkt für die aktuelle Zeit zu bestimmen.
 
-```typescript
-const currentScene = useMemo(() => {
-  const exact = sortedScenes.find(s => displayTime >= s.start_time && displayTime < s.end_time);
-  if (exact) return exact;
-  // Fallback: if before first scene, use first scene
-  if (sortedScenes.length > 0 && displayTime < sortedScenes[0].start_time) {
-    return sortedScenes[0];
-  }
-  // Fallback: if after last scene, use last scene
-  if (sortedScenes.length > 0) {
-    return sortedScenes[sortedScenes.length - 1];
-  }
-  return undefined;
-}, [sortedScenes, displayTime]);
-```
+### Umsetzung
 
-**2. `useTransitionRenderer.ts` — videoFilterRef sofort synchron lesen**
-- Der Ref-Sync (`useEffect`) ist bereits korrekt, aber zur Sicherheit: Im "No Transition"-Pfad den `videoFilterRef.current` Wert verwenden (bereits der Fall). Dies ist kein Code-Change, nur Bestätigung dass der Pfad korrekt ist.
+**1. `useTransitionRenderer.ts` — Neue Parameter + synchrone Filter-Berechnung**
+- Zusätzliche Parameter: `scenes`, `effects`, `sceneEffects`, `AVAILABLE_FILTERS` (oder ein bereits vorberechneter Filter-Resolver-Callback)
+- Sauberer Ansatz: Ein `computeFilterForTime(time)` Callback, der von `DirectorsCutPreviewPlayer` übergeben wird
+- Im RAF-Loop: `const currentFilter = computeFilterForTime(visualTimeRef.current)` statt `videoFilterRef.current`
 
-### Betroffene Datei
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `currentScene` useMemo erweitern (ca. 5 Zeilen Änderung)
+**2. `DirectorsCutPreviewPlayer.tsx` — Callback bereitstellen**
+- `computeFilterForTime` als `useCallback` erstellen, der dieselbe Logik wie das `videoFilter`-Memo nutzt, aber für eine beliebige Zeit
+- Szene-Lookup + Filter-Berechnung in einer Funktion zusammenfassen
+- Diesen Callback als Ref an `useTransitionRenderer` übergeben (damit der RAF-Loop immer die aktuellste Version hat)
+
+### Betroffene Dateien
+- `src/components/directors-cut/preview/useTransitionRenderer.ts` — `videoFilterRef` durch `computeFilterRef` ersetzen
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `computeFilterForTime` Callback + Ref erstellen und übergeben
 
 ### Ergebnis
-- Helligkeit, Kontrast, Sättigung etc. werden sofort im Preview sichtbar wenn per Slider geändert
-- Funktioniert sowohl für globale als auch szenen-spezifische Änderungen
-- Kein Layout- oder Timing-Problem, da nur die Scene-Lookup-Logik angepasst wird
+- Filter wird synchron im selben RAF-Frame berechnet wie die Zeitposition
+- Kein 2-3 Frame Delay mehr beim Szenenwechsel
+- Keine sichtbaren Filter-Blitzer mehr
 
