@@ -179,6 +179,71 @@ export function DirectorsCut() {
   const [capCutSubtitleTrack, setCapCutSubtitleTrack] = useState<any | undefined>(undefined);
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | undefined>(undefined);
 
+  // --- Draft restoration on mount ---
+  const draftLoadedRef = useRef(false);
+  useEffect(() => {
+    if (draftLoadedRef.current) return;
+    draftLoadedRef.current = true;
+    const draft = loadDraft();
+    if (!draft || !draft.selectedVideo) return;
+    setSelectedVideo(draft.selectedVideo);
+    setCurrentStep(draft.currentStep || 1);
+    if (draft.scenes?.length) setScenes(draft.scenes);
+    if (draft.transitions?.length) setTransitions(draft.transitions);
+    if (draft.appliedEffects) setAppliedEffects(draft.appliedEffects);
+    if (draft.audioEnhancements) setAudioEnhancements(draft.audioEnhancements);
+    if (draft.exportSettings) setExportSettings(draft.exportSettings);
+    if (draft.styleTransfer) setStyleTransfer(draft.styleTransfer);
+    if (draft.colorGrading) setColorGrading(draft.colorGrading);
+    if (draft.sceneColorGrading) setSceneColorGrading(draft.sceneColorGrading);
+    if (draft.speedKeyframes) setSpeedKeyframes(draft.speedKeyframes);
+    if (draft.kenBurnsKeyframes) setKenBurnsKeyframes(draft.kenBurnsKeyframes);
+    if (draft.chromaKey) setChromaKey(draft.chromaKey);
+    if (draft.upscaling) setUpscaling(draft.upscaling);
+    if (draft.interpolation) setInterpolation(draft.interpolation);
+    if (draft.restoration) setRestoration(draft.restoration);
+    if (draft.objectRemoval) setObjectRemoval(draft.objectRemoval);
+    if (draft.textOverlays) setTextOverlays(draft.textOverlays);
+    if (draft.voiceOverUrl) setVoiceOverUrl(draft.voiceOverUrl);
+    if (draft.backgroundMusicUrl) setBackgroundMusicUrl(draft.backgroundMusicUrl);
+    if (draft.capCutAudioTracks) setCapCutAudioTracks(draft.capCutAudioTracks);
+    if (draft.capCutSubtitleTrack) setCapCutSubtitleTrack(draft.capCutSubtitleTrack);
+  }, []);
+
+  // --- Auto-save draft on state changes (debounced) ---
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!draftLoadedRef.current) return; // don't save before load
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveDraft({
+        currentStep,
+        selectedVideo,
+        scenes,
+        transitions,
+        appliedEffects,
+        audioEnhancements,
+        exportSettings,
+        styleTransfer,
+        colorGrading,
+        sceneColorGrading,
+        speedKeyframes,
+        kenBurnsKeyframes: kenBurnsKeyframes,
+        chromaKey,
+        upscaling,
+        interpolation,
+        restoration,
+        objectRemoval,
+        textOverlays,
+        voiceOverUrl,
+        backgroundMusicUrl,
+        capCutAudioTracks,
+        capCutSubtitleTrack,
+      });
+    }, 500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [currentStep, selectedVideo, scenes, transitions, appliedEffects, audioEnhancements, exportSettings, styleTransfer, colorGrading, sceneColorGrading, speedKeyframes, kenBurnsKeyframes, chromaKey, upscaling, interpolation, restoration, objectRemoval, textOverlays, voiceOverUrl, backgroundMusicUrl, capCutAudioTracks, capCutSubtitleTrack]);
+
   // Dynamic video duration based on scene adjustments
   // Uses max(end_time) from scenes as canonical duration — never falls back to selectedVideo.duration
   // which may be inaccurate (e.g. duration_in_frames / 30 assumption)
