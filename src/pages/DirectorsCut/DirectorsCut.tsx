@@ -396,7 +396,7 @@ export function DirectorsCut() {
     
     try {
       toast.info('Extrahiere Video-Frames für KI-Analyse...');
-      const canonicalDuration = selectedVideo.duration || selectedVideo.metadata?.duration_seconds || 30;
+      const canonicalDuration = selectedVideo.duration || 30;
       const frames = await extractVideoFrames(selectedVideo.url, canonicalDuration);
       
       const { data, error } = await supabase.functions.invoke('analyze-video-scenes', {
