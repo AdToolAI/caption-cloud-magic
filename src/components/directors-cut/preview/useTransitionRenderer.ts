@@ -112,13 +112,19 @@ export function useTransitionRenderer(
             transitionDuration: rt.duration,
           });
 
-          // Apply base (outgoing) styles
+          // Apply base (outgoing) styles — force stable absolute layer to prevent layout shift
+          base.style.position = 'absolute';
+          base.style.inset = '0';
+          base.style.width = '100%';
+          base.style.height = '100%';
+          base.style.objectFit = 'contain';
+          base.style.zIndex = '1';
           const baseFilter = videoFilterRef.current || '';
           const baseTransitionFilter = (styles.baseStyle as any).filter || '';
           base.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
-          base.style.transform = styles.baseStyle.transform || '';
-          base.style.clipPath = styles.baseStyle.clipPath || '';
-          base.style.filter = [baseFilter, baseTransitionFilter].filter(Boolean).join(' ') || '';
+          base.style.transform = styles.baseStyle.transform || 'none';
+          base.style.clipPath = styles.baseStyle.clipPath || 'none';
+          base.style.filter = [baseFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
 
           // Apply incoming styles
           incoming.style.display = '';

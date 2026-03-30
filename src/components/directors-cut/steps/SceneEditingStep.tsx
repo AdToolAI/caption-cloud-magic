@@ -1232,7 +1232,7 @@ export function SceneEditingStep({
 
       {/* Stats Footer */}
       {(() => {
-        const actualTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+        const actualTotalDuration = scenes.length > 0 ? Math.max(...scenes.map(s => s.end_time)) : videoDuration;
         const durationChange = actualTotalDuration - videoDuration;
         
         return (

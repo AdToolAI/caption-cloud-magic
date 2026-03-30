@@ -157,7 +157,7 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
                 {libraryVideos.map((video: any) => {
                   const isSelected = selectedVideo?.id === video.id;
                   const metadata = video.metadata as Record<string, any> || {};
-                  const durationSec = video.duration_in_frames ? Math.round(video.duration_in_frames / 30) : null;
+                  const durationSec = metadata?.duration_seconds ? Math.round(metadata.duration_seconds) : (video.duration_in_frames ? Math.round(video.duration_in_frames / 30) : null);
                   const videoTitle = metadata?.title || 'Unbenanntes Video';
                   return (
                     <Card
