@@ -170,9 +170,14 @@ export function useTransitionRenderer(
         if (wasActiveRef.current) {
           wasActiveRef.current = false;
           lastIncomingSeekRef.current = '';
-          // Sync base video to incoming position to prevent visible jerk
-          if (incoming.currentTime > 0) {
-            base.currentTime = incoming.currentTime;
+          // Soft-sync base video to incoming position to prevent visible jerk
+          const diff = Math.abs(base.currentTime - incoming.currentTime);
+          if (incoming.currentTime > 0 && diff > 0.1) {
+            if ((base as any).fastSeek) {
+              (base as any).fastSeek(incoming.currentTime);
+            } else {
+              base.currentTime = incoming.currentTime;
+            }
           }
         }
 
