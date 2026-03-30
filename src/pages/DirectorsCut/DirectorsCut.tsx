@@ -153,7 +153,7 @@ export function DirectorsCut() {
   });
   // Scene-specific color grading state
   const [sceneColorGrading, setSceneColorGrading] = useState<Record<string, { grade?: string | null; intensity?: number }>>({});
-  const [speedKeyframes, setSpeedKeyframes] = useState<Array<{ time: number; speed: number }>>([]);
+  const [speedKeyframes, setSpeedKeyframes] = useState<Array<{ id: string; time: number; speed: number; sceneId?: string; easing?: string }>>([]);
   const [kenBurnsKeyframes, setKenBurnsKeyframes] = useState<KenBurnsKeyframe[]>([]);
   const [chromaKey, setChromaKey] = useState({
     enabled: false,
@@ -734,8 +734,10 @@ export function DirectorsCut() {
             sceneEffects={appliedEffects.scenes}
             transitions={transitions}
             audio={audioEnhancements}
-            onSpeedKeyframesChange={(keyframes) => setSpeedKeyframes(keyframes.map(k => ({ time: k.time, speed: k.speed })))}
+            onSpeedKeyframesChange={(keyframes) => setSpeedKeyframes(keyframes.map(k => ({ id: k.id, time: k.time, speed: k.speed, sceneId: k.sceneId, easing: k.easing })))}
             onKenBurnsChange={(keyframes) => setKenBurnsKeyframes(keyframes)}
+            initialSpeedKeyframes={speedKeyframes as any}
+            initialKenBurnsKeyframes={kenBurnsKeyframes}
             colorGrading={colorGrading}
             sceneColorGrading={sceneColorGrading}
             textOverlays={textOverlays}

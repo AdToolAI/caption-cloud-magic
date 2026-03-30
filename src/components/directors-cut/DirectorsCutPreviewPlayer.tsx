@@ -388,6 +388,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
   useEffect(() => { computeFilterForTimeRef.current = computeFilterForTime; }, [computeFilterForTime]);
 
+  // Ken Burns refs for RAF-loop application
+  const kenBurnsRef = useRef(kenBurns);
+  useEffect(() => { kenBurnsRef.current = kenBurns; }, [kenBurns]);
+  const kenBurnsWrapperRef = useRef<HTMLDivElement>(null);
+
+  // Speed keyframes ref for RAF-loop application
+  const speedKeyframesRef = useRef(speedKeyframes);
+  useEffect(() => { speedKeyframesRef.current = speedKeyframes; }, [speedKeyframes]);
+
   useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef);
 
 
@@ -577,6 +586,60 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       // Clamp timeline time
       timelineTime = Math.max(0, Math.min(timelineTime, duration));
       visualTimeRef.current = timelineTime;
+
+      // === KEN BURNS MOTION ===
+      const kbWrapper = kenBurnsWrapperRef.current;
+      if (kbWrapper) {
+        const kbKeyframes = kenBurnsRef.current;
+        let kbApplied = false;
+        if (kbKeyframes && kbKeyframes.length > 0 && sceneInfo) {
+          // Find matching Ken Burns keyframe for current scene
+          const kbForScene = kbKeyframes.find(kb => kb.sceneId === sceneInfo.scene.id) 
+            || kbKeyframes.find(kb => !kb.sceneId); // fallback to global
+          if (kbForScene) {
+            const sceneStart = sceneInfo.scene.start_time;
+            const sceneDur = sceneInfo.scene.end_time - sceneStart;
+            const progress = sceneDur > 0 ? Math.max(0, Math.min(1, (timelineTime - sceneStart) / sceneDur)) : 0;
+            const zoom = kbForScene.startZoom + (kbForScene.endZoom - kbForScene.startZoom) * progress;
+            const panX = kbForScene.startX + (kbForScene.endX - kbForScene.startX) * progress;
+            const panY = kbForScene.startY + (kbForScene.endY - kbForScene.startY) * progress;
+            kbWrapper.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
+            kbApplied = true;
+          }
+        }
+        if (!kbApplied) {
+          kbWrapper.style.transform = 'none';
+        }
+      }
+
+      // === SPEED RAMPING ===
+      const sKeyframes = speedKeyframesRef.current;
+      if (sKeyframes && sKeyframes.length > 0 && video) {
+        // Find the applicable speed keyframe for current time
+        let activeSpeed = 1;
+        if (sceneInfo) {
+          // Scene-specific keyframes first, then global
+          const sceneKFs = sKeyframes.filter(k => k.sceneId === sceneInfo.scene.id);
+          const globalKFs = sKeyframes.filter(k => !k.sceneId);
+          const relevantKFs = sceneKFs.length > 0 ? sceneKFs : globalKFs;
+          
+          if (relevantKFs.length > 0) {
+            // Sort by time and find the last keyframe before current time
+            const sorted = [...relevantKFs].sort((a, b) => a.time - b.time);
+            for (const kf of sorted) {
+              if (timelineTime >= kf.time) {
+                activeSpeed = kf.speed;
+              }
+            }
+          }
+        }
+        
+        const sceneRate = (sceneInfo?.scene as any)?.playbackRate ?? 1;
+        const targetRate = sceneRate * activeSpeed;
+        if (Math.abs(video.playbackRate - targetRate) > 0.01) {
+          video.playbackRate = targetRate;
+        }
+      }
 
       // Throttled UI updates
       const now = performance.now();
@@ -876,28 +939,35 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     >
       {/* Video Player */}
       <div className={`relative bg-black rounded-lg overflow-hidden ${fillContainer ? 'flex-1 min-h-0' : 'aspect-video'}`}>
-        {/* Base (outgoing) video */}
-        <video
-          ref={videoRef}
-          src={videoUrl}
-          className="absolute inset-0 w-full h-full object-contain"
-          style={{ filter: videoFilter, zIndex: 1 }}
-          muted
-          playsInline
-          preload="auto"
-          onEnded={handleVideoEnded}
-        />
+        {/* Ken Burns motion wrapper — separate from transition transforms */}
+        <div
+          ref={kenBurnsWrapperRef}
+          className="absolute inset-0 w-full h-full"
+          style={{ zIndex: 0, willChange: 'transform' }}
+        >
+          {/* Base (outgoing) video */}
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            className="absolute inset-0 w-full h-full object-contain"
+            style={{ filter: videoFilter, zIndex: 1 }}
+            muted
+            playsInline
+            preload="auto"
+            onEnded={handleVideoEnded}
+          />
 
-        {/* Incoming (transition) video — no crossOrigin to avoid CORS */}
-        <video
-          ref={incomingVideoRef}
-          src={videoUrl}
-          className="absolute inset-0 w-full h-full object-contain"
-          style={{ zIndex: 2, display: 'none' }}
-          muted
-          playsInline
-          preload="auto"
-        />
+          {/* Incoming (transition) video — no crossOrigin to avoid CORS */}
+          <video
+            ref={incomingVideoRef}
+            src={videoUrl}
+            className="absolute inset-0 w-full h-full object-contain"
+            style={{ zIndex: 2, display: 'none' }}
+            muted
+            playsInline
+            preload="auto"
+          />
+        </div>
 
         {/* Transition canvas — legacy fallback, hidden by default */}
         <canvas

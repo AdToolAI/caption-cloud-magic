@@ -23,6 +23,9 @@ interface MotionEffectsStepProps {
   audio: AudioEnhancements;
   onSpeedKeyframesChange?: (keyframes: SpeedKeyframe[]) => void;
   onKenBurnsChange?: (keyframes: KenBurnsKeyframe[]) => void;
+  // Controlled state from parent
+  initialSpeedKeyframes?: SpeedKeyframe[];
+  initialKenBurnsKeyframes?: KenBurnsKeyframe[];
   // Color Grading Props
   colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
   sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
@@ -41,13 +44,15 @@ export function MotionEffectsStep({
   audio,
   onSpeedKeyframesChange,
   onKenBurnsChange,
+  initialSpeedKeyframes,
+  initialKenBurnsKeyframes,
   colorGrading,
   sceneColorGrading,
   textOverlays = [],
 }: MotionEffectsStepProps) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
-  const [kenBurnsKeyframes, setKenBurnsKeyframes] = useState<KenBurnsKeyframe[]>([]);
-  const [speedKeyframes, setSpeedKeyframes] = useState<SpeedKeyframe[]>([]);
+  const [kenBurnsKeyframes, setKenBurnsKeyframes] = useState<KenBurnsKeyframe[]>(initialKenBurnsKeyframes ?? []);
+  const [speedKeyframes, setSpeedKeyframes] = useState<SpeedKeyframe[]>(initialSpeedKeyframes ?? []);
 
   const handleKenBurnsChange = (keyframes: KenBurnsKeyframe[]) => {
     setKenBurnsKeyframes(keyframes);
