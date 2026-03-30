@@ -179,9 +179,11 @@ export function DirectorsCut() {
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | undefined>(undefined);
 
   // Dynamic video duration based on scene adjustments
+  // Uses max(end_time) from scenes as canonical duration — never falls back to selectedVideo.duration
+  // which may be inaccurate (e.g. duration_in_frames / 30 assumption)
   const actualTotalDuration = useMemo(() => {
     if (scenes.length === 0) return selectedVideo?.duration || 30;
-    return scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+    return Math.max(...scenes.map(s => s.end_time));
   }, [scenes, selectedVideo?.duration]);
 
   // AI Co-Pilot command handler
