@@ -481,7 +481,7 @@ export function SceneAnalysisStep({
       ...prev,
       [sceneId]: {
         type: transitionType,
-        duration: prev[sceneId]?.duration || 0.5
+        duration: prev[sceneId]?.duration || 1.2
       }
     }));
     
