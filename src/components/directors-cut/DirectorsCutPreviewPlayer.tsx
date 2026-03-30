@@ -602,6 +602,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
                 timelineTime = nextScene.start_time;
               }
             }
+          }
         }
       } else {
         // Fallback: no scene found, estimate timeline time
