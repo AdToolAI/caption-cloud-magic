@@ -95,17 +95,9 @@ export function useTransitionRenderer(
 
           seekIncoming(rt.incomingSceneId, scenes);
 
-          // FREEZE base video at the last frame of the outgoing scene
-          // This prevents the base from playing into the next scene's content
-          const outgoingScene = scenes.find(s => s.id === rt.outgoingSceneId);
-          if (outgoingScene && base.currentTime > (outgoingScene.original_end_time ?? outgoingScene.end_time) - 0.02) {
-            const freezeTime = (outgoingScene.original_end_time ?? outgoingScene.end_time) - 0.05;
-            if (Math.abs(base.currentTime - freezeTime) > 0.1) {
-              base.currentTime = freezeTime;
-            }
-            // Pause base during transition to prevent it from advancing
-            if (!base.paused) base.pause();
-          }
+          // DO NOT pause or seek the base video — it is the transport clock.
+          // The base content is hidden/faded by CSS during the transition.
+          // Pausing it would freeze the timeline slider.
 
           // Start incoming video playing from the right position
           if (incoming.paused && incoming.readyState >= 2) {
@@ -152,18 +144,16 @@ export function useTransitionRenderer(
       // === NO TRANSITION — deterministic baseline reset EVERY inactive frame ===
       if (!found) {
         const baseFilter = videoFilterRef.current || '';
-        // Always reset base styles to neutral (not just on wasActiveRef change)
+        // Deterministic hard reset EVERY inactive frame
         base.style.opacity = '1';
         base.style.transform = 'none';
         base.style.clipPath = 'none';
         base.style.filter = baseFilter || '';
+        base.style.position = '';
+        base.style.inset = '';
+        base.style.zIndex = '';
 
         if (wasActiveRef.current) {
-          // Transition just ended — seek base to incoming position and resume
-          if (incoming.currentTime > 0 && Math.abs(base.currentTime - incoming.currentTime) > 0.2) {
-            base.currentTime = incoming.currentTime;
-          }
-          if (base.paused) base.play().catch(() => {});
           wasActiveRef.current = false;
           lastIncomingSeekRef.current = '';
         }
