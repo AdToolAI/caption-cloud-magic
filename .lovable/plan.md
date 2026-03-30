@@ -1,63 +1,61 @@
 
+Ziel: Die Übergänge im Preview wirklich sichtbar machen. Nach dem aktuellen Code sind noch zwei echte Blocker übrig, deshalb reicht der letzte Fix allein nicht.
 
-## Fix: Crossfade/Dissolve-Übergänge nicht sichtbar
+1. Root Cause, den ich jetzt beheben würde
+- In `DirectorsCutPreviewPlayer.tsx` werden beim `handleSeek` und `handleReset` immer noch imperative Resets mit `incoming.style.display = 'none'` gesetzt.
+- Im aktuellen `useTransitionRenderer.ts` wird `display` aber gar nicht mehr zurückgesetzt, sondern nur noch `opacity/pointerEvents` gesteuert.
+- Ergebnis: Nach dem ersten Seek/Reset bleibt das Incoming-Video hart unsichtbar, selbst wenn der Transition-Renderer später Opacity setzt.
 
-### Root Cause
+Zusätzlich:
+- `useTransitionRenderer.ts` nutzt `frameCacheRef` aktuell gar nicht, obwohl `useFrameCapture` bereits den letzten Frame der ausgehenden Szene cached.
+- Dadurch bleibt bei Crossfade/Dissolve das Base-Video ein live laufendes Video statt visuell auf dem letzten Outgoing-Frame “eingefroren”.
+- Genau diese Opacity-Übergänge wirken dann fast unsichtbar, weil nicht sauber zwischen “altem Bild” und “neuem Bild” überblendet wird.
 
-Die Incoming-Video hat in der JSX-Definition `style={{ zIndex: 2, display: 'none' }}` (Zeile 965 in `DirectorsCutPreviewPlayer.tsx`). Alle 250ms ruft der Player `setDisplayTime()` auf → React re-rendert → setzt `display: 'none'` zurück auf das Incoming-Video, egal was der Transition-Renderer vorher imperativ gesetzt hat.
+2. Konkrete Umsetzung
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+  - Alle verbliebenen `incoming.style.display = 'none'` Resets in `handleSeek` und `handleReset` entfernen.
+  - Stattdessen nur noch `opacity`, `pointerEvents`, `transform`, `clipPath`, `filter`, `position`, `inset`, `zIndex` sauber zurücksetzen.
+  - Optional einen kleinen gemeinsamen `resetIncomingLayer()` Helper daraus machen, damit kein inkonsistenter Reset mehr an zwei Stellen lebt.
 
+- `src/components/directors-cut/preview/useTransitionRenderer.ts`
+  - Für `crossfade`, `dissolve`, `fade` und ggf. `blur` die cached Outgoing-Frames aus `frameCacheRef` wirklich verwenden.
+  - Die vorhandene `canvasRef` gezielt dafür aktivieren:
+    - Outgoing-Freeze-Frame auf Canvas zeichnen
+    - Canvas nur während diesen opacity-basierten Übergängen sichtbar machen
+    - Base-Video darunter visuell neutral halten
+    - Incoming-Video wie bisher darüber mit Opacity einblenden
+  - Für `slide`, `push`, `wipe`, `zoom` beim aktuellen Dual-Video-CSS-Ansatz bleiben.
+
+3. Warum genau dieser Fix
 ```text
-RAF-Frame 1: Renderer setzt incoming.style.display = ''  (sichtbar)
-RAF-Frame 2: Crossfade läuft korrekt
-...
-250ms später: React re-render → style={{ display: 'none' }} überschreibt
-RAF-Frame N: Renderer setzt display = '' zurück (16ms Verzögerung)
+Aktuell:
+Seek/Reset -> incoming.display='none'
+Renderer -> setzt nur opacity
+=> incoming bleibt unsichtbar
+
+Und bei Crossfade/Dissolve:
+base bleibt live-video
+statt gefrorenem outgoing-frame
+=> Überblendung wirkt nicht sauber / kaum sichtbar
 ```
 
-Bei Slide/Push fällt das kaum auf, weil das Incoming-Element über `transform` positioniert wird und die kurze Unsichtbarkeit durch Bewegung maskiert wird. Bei Crossfade/Dissolve ist das fatal — das Incoming-Video flackert alle 250ms unsichtbar, und der Überblendeffekt ist praktisch nicht erkennbar.
+4. Betroffene Dateien
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- `src/components/directors-cut/preview/useTransitionRenderer.ts`
 
-### Lösung
+5. Erwartetes Ergebnis
+- Übergänge bleiben auch nach Scrubbing/Seek sichtbar.
+- Crossfade und Dissolve sehen endlich wie echte Überblendungen aus.
+- Slide/Push/Wipe bleiben stabil.
+- Kein “Übergang aktiv in der Timeline, aber im Preview unsichtbar” mehr.
 
-**1. `DirectorsCutPreviewPlayer.tsx` — Zeile 965:** React-Style von `display: 'none'` auf `opacity: 0` ändern. Damit kämpft React nicht mehr gegen den Renderer:
+6. Technische Kurznotiz
+```text
+Visibility ownership muss an genau einer Stelle liegen:
+- React/JSX: nur Default-Styles
+- Renderer: komplette Laufzeit-Steuerung
 
-```tsx
-// Vorher:
-style={{ zIndex: 2, display: 'none' }}
-
-// Nachher:
-style={{ zIndex: 2, opacity: 0, pointerEvents: 'none' }}
+Und:
+Opacity-Transitions brauchen ein stabiles outgoing visual.
+Ein live weiterlaufendes Base-Video ist dafür die falsche Grundlage.
 ```
-
-**2. `useTransitionRenderer.ts` — Inaktive Phase (Zeilen 176-188):** Statt `display: 'none'` durchgängig `opacity: 0` und `pointerEvents: 'none'` nutzen, um React-Style-Konflikte zu vermeiden:
-
-```typescript
-// Statt:
-incoming.style.display = 'none';
-incoming.style.opacity = '0';
-
-// Nachher:
-incoming.style.opacity = '0';
-incoming.style.pointerEvents = 'none';
-// display bleibt unverändert (kein Kampf mit React)
-```
-
-**3. `useTransitionRenderer.ts` — Aktive Phase (Zeile 137):** Statt `display: ''` die Sichtbarkeit über `opacity` und `pointerEvents` steuern:
-
-```typescript
-// Statt:
-incoming.style.display = '';
-
-// Nachher:
-incoming.style.pointerEvents = '';
-// opacity wird bereits durch getTransitionStyles gesetzt
-```
-
-### Betroffene Dateien
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — JSX-Style des Incoming-Video
-- `src/components/directors-cut/preview/useTransitionRenderer.ts` — display→opacity Wechsel
-
-### Ergebnis
-- React-Re-Renders können die Incoming-Video-Sichtbarkeit nicht mehr überschreiben
-- Crossfade/Dissolve sind durchgehend sichtbar ohne 250ms-Flackern
-- Slide/Push-Übergänge bleiben unverändert funktional
-
