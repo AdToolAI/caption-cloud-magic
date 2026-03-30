@@ -284,7 +284,9 @@ export function useTransitionRenderer(
       // If we were active, enter handoff instead of going directly to idle
       if (phaseRef.current === 'active') {
         phaseRef.current = 'handoff';
-        handoffSeekedRef.current = false;
+        handoffRequestedRef.current = false;
+        handoffReadyRef.current = false;
+        cleanupHandoffListener();
         // Don't clean up incoming yet — handoff handler will do it
         rafRef.current = requestAnimationFrame(tick);
         return;
