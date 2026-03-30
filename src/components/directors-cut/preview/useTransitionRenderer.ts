@@ -165,6 +165,10 @@ export function useTransitionRenderer(
         if (wasActiveRef.current) {
           wasActiveRef.current = false;
           lastIncomingSeekRef.current = '';
+          // Sync base video to incoming position to prevent visible jerk
+          if (incoming.currentTime > 0) {
+            base.currentTime = incoming.currentTime;
+          }
         }
 
         // Always ensure incoming is hidden and fully reset
