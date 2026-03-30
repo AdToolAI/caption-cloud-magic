@@ -408,8 +408,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
   // Cooldown ref: when a transition just ended, suppress boundary seek for N frames
   const transitionCooldownRef = useRef<number>(0);
+  // Tracks the last boundary time that was handled by the handoff, so boundary-advance skips it
+  const lastHandoffBoundaryRef = useRef<number | null>(null);
 
-  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef);
+  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
@@ -579,19 +581,26 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             : srcEnd;
 
           if (videoSourceTime >= effectiveBoundary - 0.02) {
-            // Video reached end of scene (or end of transition window) — advance to next scene
-            const nextScene = sortedScenes[sceneInfo.index + 1];
-            if (nextScene) {
-              const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
-              if (Math.abs(video.currentTime - nextSourceStart) > 0.3) {
-                video.currentTime = nextSourceStart;
+            // Check if this boundary was already consumed by a handoff
+            const handoffTime = lastHandoffBoundaryRef.current;
+            if (handoffTime !== null && Math.abs(videoSourceTime - handoffTime) < 0.5) {
+              // Boundary already handled by transition handoff — skip the seek
+              lastHandoffBoundaryRef.current = null;
+            } else {
+              // Video reached end of scene (or end of transition window) — advance to next scene
+              const nextScene = sortedScenes[sceneInfo.index + 1];
+              if (nextScene) {
+                const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
+                if (Math.abs(video.currentTime - nextSourceStart) > 0.3) {
+                  video.currentTime = nextSourceStart;
+                }
+                pendingSceneAdvanceRef.current = { targetIndex: sceneInfo.index + 1, framesLeft: 15 };
+                const nextRate = (nextScene as any).playbackRate ?? 1;
+                if (Math.abs(video.playbackRate - nextRate) > 0.01) {
+                  video.playbackRate = nextRate;
+                }
+                timelineTime = nextScene.start_time;
               }
-              pendingSceneAdvanceRef.current = { targetIndex: sceneInfo.index + 1, framesLeft: 15 };
-              const nextRate = (nextScene as any).playbackRate ?? 1;
-              if (Math.abs(video.playbackRate - nextRate) > 0.01) {
-                video.playbackRate = nextRate;
-              }
-              timelineTime = nextScene.start_time;
             }
           }
         }
@@ -810,7 +819,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     lastSceneIndexRef.current = -1;
     pendingSceneAdvanceRef.current = null;
     transitionCooldownRef.current = 0;
-    // Reset incoming video to prevent stale transition state
+    lastHandoffBoundaryRef.current = null;
     const incoming = incomingVideoRef.current;
     if (incoming) {
       incoming.pause();
@@ -847,6 +856,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     lastSceneIndexRef.current = -1;
     pendingSceneAdvanceRef.current = null;
     transitionCooldownRef.current = 0;
+    lastHandoffBoundaryRef.current = null;
     // Reset incoming video
     const incoming = incomingVideoRef.current;
     if (incoming) {
