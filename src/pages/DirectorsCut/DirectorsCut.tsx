@@ -761,7 +761,7 @@ export function DirectorsCut() {
             videoDuration={actualTotalDuration}
             premiumFeatures={{ styleTransfer, colorGrading, upscaling, interpolation, restoration, objectRemoval }}
             sceneColorGrading={sceneColorGrading}
-            onRender={() => console.log('Render started')}
+            onRender={() => { clearDraft(); console.log('Render started'); }}
             // Complete effect propagation from all steps
             textOverlays={textOverlays}
             transitions={transitions}
