@@ -138,7 +138,7 @@ export function useTransitionRenderer(
           base.style.filter = [syncBaseFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
 
           // Apply incoming styles
-          incoming.style.display = '';
+          incoming.style.pointerEvents = 'auto';
           incoming.style.position = 'absolute';
           incoming.style.inset = '0';
           incoming.style.width = '100%';
