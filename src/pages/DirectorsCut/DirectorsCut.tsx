@@ -549,7 +549,7 @@ export function DirectorsCut() {
         return (
           <SceneAnalysisStep
             videoUrl={selectedVideo?.url || ''}
-            videoDuration={selectedVideo?.duration || 30}
+            videoDuration={actualTotalDuration}
             scenes={scenes}
             onScenesUpdate={setScenes}
             isAnalyzing={isAnalyzing}
