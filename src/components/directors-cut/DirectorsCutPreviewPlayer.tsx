@@ -796,8 +796,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     const incoming = incomingVideoRef.current;
     if (incoming) {
       incoming.pause();
-      incoming.style.display = 'none';
       incoming.style.opacity = '0';
+      incoming.style.pointerEvents = 'none';
       incoming.style.transform = 'none';
       incoming.style.clipPath = 'none';
       incoming.style.filter = 'none';
