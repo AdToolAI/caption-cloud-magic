@@ -1,41 +1,42 @@
 
 
-## Fix: Übergänge zu kurz + Ruckler nach Szene 3
+## Fix: Effekte (Helligkeit, Kontrast etc.) werden nicht angewendet
 
-### Problem 1: Übergänge nur sehr kurz sichtbar
+### Root Cause
 
-Die UI (`SceneAnalysisStep.tsx`) setzt die Standard-Dauer auf **0.5s** (Zeile 484/494/1120). Der Resolver hat `MIN_DURATION = 0.6s`, also werden alle Übergänge auf 0.6s hochgeklemmt — aber das ist immer noch extrem kurz für einen sichtbaren Crossfade.
+Beim letzten Fix wurde `filter: videoFilter` aus dem Base-Video JSX entfernt (Zeile 972: `style={{ zIndex: 1 }}`), damit React die Transitions nicht überschreibt. **Aber:** Der einzige Ort, der jetzt den Filter anwendet, ist der RAF-Loop in `useTransitionRenderer.ts` — und dieser startet nur, wenn `scenes.length >= 2 && transitions.length > 0` (Zeile 58). 
 
-**Fix**: Default-Dauer in `SceneAnalysisStep.tsx` von 0.5s auf **1.2s** erhöhen (passend zum `DEFAULT_DURATION` im Resolver). Slider-Min von 0.2 auf 0.5 erhöhen.
+Wenn keine Transitions gesetzt sind, wird der RAF-Loop sofort beendet, und **kein Filter wird jemals auf das Base-Video angewendet**. Selbst mit Transitions läuft der Filter nur über den Transition-Renderer, was fragil ist.
 
-### Problem 2: Ruckler nach Szene 3
+### Lösung
 
-Wenn die Transition endet (`active → idle`), führt der Renderer zwei Dinge aus:
-1. `incoming.pause()` — OK
-2. Der Player erkennt die Szenengrenze und macht `base.currentTime = nextSourceStart` (Zeile 578-579) — das verursacht einen Seek-Ruckler
+Einen separaten `useEffect` in `DirectorsCutPreviewPlayer.tsx` hinzufügen, der `videoFilter` imperativ auf das Base-Video anwendet, wann immer sich der berechnete Filter ändert. Der Transition-Renderer überschreibt diesen Wert ohnehin während aktiver Transitions.
 
-Das Problem: Der Boundary-Check (Zeile 573) nutzt `effectiveBoundary = originalBoundary + offsetSeconds`, aber **nicht** das Transitions-Fenster. Wenn eine Transition aktiv ist, wird der Boundary-Check per `if (!cachedActiveTrans)` übersprungen (Zeile 562). Sobald die Transition endet, feuert der Boundary-Check sofort — aber der Base-Video ist jetzt an einer Position, die eventuell einen unnötigen Seek triggert.
+### Konkrete Änderung
 
-**Fix**: Nach dem Ende einer Transition (`phaseRef: active → idle`) den `lastIncomingSeekRef` resetten, aber **keinen** harten Seek auf das Base-Video machen. Stattdessen im Player den Boundary-Check für **2 Frames** nach Transitions-Ende unterdrücken, ähnlich wie `pendingSceneAdvanceRef`.
+**`src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`** — nach Zeile 946 (dem bestehenden `videoFilterRef` sync):
 
-### Konkrete Änderungen
+```tsx
+// Apply filter imperatively to base video so effects work even without transitions
+useEffect(() => {
+  const base = videoRef.current;
+  if (base) {
+    base.style.filter = videoFilter || '';
+  }
+}, [videoFilter]);
+```
 
-**1. `src/components/directors-cut/steps/SceneAnalysisStep.tsx`**
-- Zeile 484: `duration: prev[sceneId]?.duration || 0.5` → `|| 1.2`
-- Zeile 494: `duration: sceneTransitions[sceneId]?.duration || 0.5` → `|| 1.2`
-- Zeile 1120: `value={[sceneTransitions[scene.id]?.duration || 0.5]}` → `|| 1.2`
-- Zeile 1122: `min={0.2}` → `min={0.5}`
-- Zeile 1128: `(sceneTransitions[scene.id]?.duration || 0.5)` → `|| 1.2`
+Das ist alles. Eine Zeile `useEffect`.
 
-**2. `src/components/directors-cut/preview/useTransitionRenderer.ts`**
-- Beim Übergang `active → idle` (Zeile 188): einen `transitionJustEndedRef` setzen
-- Diesen Ref nach außen exponieren oder über einen Callback den Player informieren
+### Warum das sicher ist
+- Der Transition-Renderer setzt `base.style.filter` im RAF-Loop und überschreibt diesen Wert während aktiver Transitions
+- Ohne Transitions (oder zwischen Transitions) liefert dieser `useEffect` den korrekten Filter
+- Kein Konflikt mit dem bisherigen Fix, da wir `filter` weiterhin NICHT im JSX-Style haben (kein Re-Render-Flicker)
 
-**3. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`**
-- Nach `!cachedActiveTrans` Check (Zeile 562): zusätzlich prüfen ob eine Transition gerade erst geendet hat (innerhalb der letzten 0.1s). Falls ja, den Boundary-Seek überspringen, um den Ruckler zu vermeiden.
-- Einfachste Variante: `wasInTransitionRef` das für 5 Frames nach Transitions-Ende den Boundary-Seek suppresst.
+### Betroffene Datei
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — 1 kleiner `useEffect` hinzufügen
 
 ### Ergebnis
-- Übergänge standardmäßig 1.2s lang → deutlich sichtbar
-- Kein Ruckler nach Szene 3, weil der doppelte Seek am Transitions-Ende unterdrückt wird
+- Helligkeit, Kontrast, Sättigung, Filter-Presets wirken sofort im Preview
+- Funktioniert unabhängig davon, ob Transitions konfiguriert sind
 
