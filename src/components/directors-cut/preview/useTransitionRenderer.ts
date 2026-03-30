@@ -144,18 +144,16 @@ export function useTransitionRenderer(
       // === NO TRANSITION — deterministic baseline reset EVERY inactive frame ===
       if (!found) {
         const baseFilter = videoFilterRef.current || '';
-        // Always reset base styles to neutral (not just on wasActiveRef change)
+        // Deterministic hard reset EVERY inactive frame
         base.style.opacity = '1';
         base.style.transform = 'none';
         base.style.clipPath = 'none';
         base.style.filter = baseFilter || '';
+        base.style.position = '';
+        base.style.inset = '';
+        base.style.zIndex = '';
 
         if (wasActiveRef.current) {
-          // Transition just ended — seek base to incoming position and resume
-          if (incoming.currentTime > 0 && Math.abs(base.currentTime - incoming.currentTime) > 0.2) {
-            base.currentTime = incoming.currentTime;
-          }
-          if (base.paused) base.play().catch(() => {});
           wasActiveRef.current = false;
           lastIncomingSeekRef.current = '';
         }
