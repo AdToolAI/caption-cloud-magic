@@ -562,7 +562,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
         // Scene-boundary-crossing logic: SKIP entirely during active transitions
         // Canvas handles visuals; video just keeps playing through the boundary
-        if (!cachedActiveTrans) {
+        if (!cachedActiveTrans && transitionCooldownRef.current <= 0) {
           const srcStart = sceneInfo.scene.original_start_time ?? sceneInfo.scene.start_time;
           const rate = (sceneInfo.scene as any).playbackRate ?? 1;
           const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
