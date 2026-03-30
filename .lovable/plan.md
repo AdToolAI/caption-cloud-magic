@@ -1,41 +1,42 @@
 
 
-## Plan: Director's Cut — Zustand bei Navigation beibehalten
+## Fix: 30s-Dauer und verlorene Übergänge in Schritt 4
 
-### Problem
-Alle Einstellungen im Director's Cut (ausgewähltes Video, Szenen, Übergänge, Effekte, Schritt-Position etc.) liegen in ~20 `useState`-Hooks in `DirectorsCut.tsx`. Beim Seitenwechsel wird die Komponente unmounted und alles geht verloren.
+### Problem 1: Immer noch 30 Sekunden
 
-### Lösung: SessionStorage-basierte Persistenz
+**Ursache gefunden in `DirectorsCut.tsx` Zeile 465:**
+```typescript
+const canonicalDuration = selectedVideo.duration || 30;
+```
 
-Ähnlich wie das Picture Studio einen In-Memory-Cache nutzt und der Universal Video Creator `localStorage`-Drafts hat, bekommt der Director's Cut eine **SessionStorage-Persistenz** (überlebt Navigation, wird bei Tab-Schließen automatisch aufgeräumt).
+Wenn ein Mediathek-Video keine `duration_seconds` in den Metadaten hat, ist `selectedVideo.duration` = `undefined`. Die Analyse wird dann mit `30` als Dauer gestartet, und die KI erstellt Szenen die bei 30s enden — obwohl das Video 32s lang ist.
+
+**Alle nachfolgenden Berechnungen** (`actualTotalDuration = Math.max(...end_time)`) ergeben dann korrekt 30s, weil die Szenen selbst falsch sind.
+
+**Lösung:** Vor der Analyse die echte Videodauer direkt vom URL messen (wie `getVideoDuration` in VideoImportStep). Dann mit der gemessenen Dauer analysieren UND `selectedVideo.duration` aktualisieren.
+
+### Problem 2: Übergänge in Schritt 4 fehlen
+
+Schritt 4 (StyleLookStep) leitet `transitions` korrekt an `StepLayoutWrapper` → `DirectorsCutPreviewPlayer` weiter. Aber durch die falsche 30s-Dauer liegen die Transition-Fenster an falschen Positionen. Wenn die Szenen korrekte Zeiten haben, funktionieren die Übergänge automatisch auch in Schritt 4.
 
 ### Umsetzung
 
-**1. Neuer Helper: `src/lib/directors-cut-draft.ts`**
-- Speichert/lädt den gesamten Projekt-Zustand als JSON in `sessionStorage` unter einem festen Key
-- Enthält: `selectedVideo`, `currentStep`, `scenes`, `transitions`, `appliedEffects`, `audioEnhancements`, `exportSettings`, `styleTransfer`, `colorGrading`, `sceneColorGrading`, `speedKeyframes`, `kenBurnsKeyframes`, `chromaKey`, `upscaling`, `interpolation`, `restoration`, `textOverlays`, `voiceOverUrl`, `backgroundMusicUrl`
-- Funktionen: `saveDraft()`, `loadDraft()`, `clearDraft()`, `hasDraft()`
-- Version-Feld für Kompatibilität bei zukünftigen Änderungen
+**1. `DirectorsCut.tsx` — Echte Dauer messen vor Analyse**
+- Neue Helper-Funktion `measureVideoDuration(url)` die per `<video>` Element die echte Dauer misst
+- In `handleStartAnalysis()`: Vor Frame-Extraktion die echte Dauer messen
+- `selectedVideo.duration` mit gemessener Dauer aktualisieren (`setSelectedVideo(prev => ({...prev, duration: measured}))`)
+- `canonicalDuration` = gemessene Dauer statt `selectedVideo.duration || 30`
 
-**2. Integration in `DirectorsCut.tsx`**
-- Beim Mount: `loadDraft()` aufrufen und alle States initialisieren (statt Default-Werte)
-- Per `useEffect` mit Debounce (~500ms): bei jeder relevanten State-Änderung `saveDraft()` aufrufen
-- Bei erfolgreichem Export oder explizitem "Neues Projekt": `clearDraft()` aufrufen
-- Kein Wiederaufnahme-Dialog nötig — der Zustand wird einfach still wiederhergestellt
-
-**3. Was NICHT persistiert wird**
-- `isAnalyzing` (laufende Prozesse)
-- `currentTime` (Playback-Position)
-- `user` (wird separat geladen)
-- `projectId` (wird aus URL/Supabase geladen)
-- Temporäre UI-States wie `editorMode`
+**2. `VideoImportStep.tsx` — Mediathek-Import mit Dauer-Messung**
+- In `handleLibrarySelect`: Wenn `metadata.duration_seconds` fehlt, die Dauer direkt vom Video-URL messen (gleiche `getVideoDuration`-Logik, aber mit URL statt File)
+- Damit hat `selectedVideo.duration` IMMER einen echten Wert bevor die Analyse startet
 
 ### Betroffene Dateien
-- **Neu:** `src/lib/directors-cut-draft.ts`
-- **Geändert:** `src/pages/DirectorsCut/DirectorsCut.tsx` — Draft-Load beim Mount, Auto-Save per useEffect, Clear bei Export/Reset
+- `src/pages/DirectorsCut/DirectorsCut.tsx` — Dauer-Messung in `handleStartAnalysis`
+- `src/components/directors-cut/steps/VideoImportStep.tsx` — Dauer-Messung bei Mediathek-Select
 
 ### Ergebnis
-- Seitenwechsel → zurück zum Director's Cut = alles ist noch da (Video, Schritt, Szenen, Effekte)
-- Tab schließen = automatisch aufgeräumt (sessionStorage)
-- Export abgeschlossen = Draft wird gelöscht, sauberer Neustart
+- Video zeigt echte Dauer (32s) in allen Schritten
+- Szenen decken die volle Videolänge ab
+- Übergänge liegen an den richtigen Positionen (auch in Schritt 4+)
 
