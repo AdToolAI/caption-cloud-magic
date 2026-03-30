@@ -1,49 +1,56 @@
 
 
-## Fix: Crossfade + Ruckler nach Übergängen 2 und 3
+## Fix: Crossfade/Dissolve-Stocken bei Übergängen 1 und 2
 
-### Problem 1: Crossfade funktioniert nicht sichtbar
-In `NativeTransitionLayer.tsx` (Zeile 103-106) ist die Crossfade-Formel zu schwach:
-```
-baseStyle = { opacity: 1 - progress * 0.3 }  // Base geht nur von 1.0 → 0.7
-incomingStyle = { opacity: progress }          // Incoming geht von 0 → 1
-```
-Das sieht aus, als würde das neue Bild einfach über das alte gelegt werden — kein echter Crossfade. Für einen sichtbaren Crossfade muss das Base-Video auf 0 runtergehen.
+### Ursache
 
-### Problem 2: Ruckler nach Übergang 2 und 3
-Wenn eine Transition endet (`time >= tEnd`):
-1. `useTransitionRenderer` versteckt das Incoming-Video und zeigt nur das Base-Video
-2. Aber das Base-Video steht noch bei der Source-Time der **alten** Szene (es hat während der Transition weiter über die Grenze hinaus gespielt)
-3. Die Boundary-Crossing-Logik im Haupt-RAF-Loop (Zeile 564) erkennt, dass es seeken muss → **sichtbarer Ruck**
+Das Stocken hat zwei Quellen:
+
+1. **Incoming-Video nicht spielbereit**: Der Pre-Seek (0.5s vorher) setzt nur `incoming.currentTime`, startet aber das Video nicht. Beim Crossfade-Start ist `incoming.paused && readyState >= 2` oft noch nicht erfüllt → die ersten Frames zeigen ein schwarzes/eingefrorenes Incoming-Bild während das Base bereits ausblendet.
+
+2. **Base-Seek am Transitions-Ende**: `base.currentTime = incoming.currentTime` löst einen Browser-Seek aus → sichtbarer Stutter-Frame.
 
 ### Lösung
 
-**1. `NativeTransitionLayer.tsx` — Crossfade-Formel korrigieren**
-```typescript
-case 'crossfade':
-case 'dissolve':
-  baseStyle = { opacity: 1 - progress };   // Voll ausfaden
-  incomingStyle = { opacity: progress };     // Voll einfaden
-```
+**1. `useTransitionRenderer.ts` — Incoming im Pre-Seek-Window bereits abspielen**
 
-**2. `useTransitionRenderer.ts` — Base-Video am Transitions-Ende synchronisieren**
-Wenn `wasActiveRef` von `true` auf `false` wechselt (Transition gerade beendet), das Base-Video auf die aktuelle Position des Incoming-Videos seeken. So gibt es keinen sichtbaren Sprung:
+Im Pre-Seek-Block (Zeile 72-78): Nach dem Seek das Incoming-Video sofort starten (muted, da es noch unsichtbar ist). So ist es beim Crossfade-Start bereits am Laufen und hat Frames decodiert.
+
 ```typescript
-if (wasActiveRef.current) {
-  wasActiveRef.current = false;
-  lastIncomingSeekRef.current = '';
-  // Sync base video to incoming video position to prevent jerk
-  if (incoming.currentTime > 0) {
-    base.currentTime = incoming.currentTime;
+// PRE-SEEK: prepare incoming video before transition starts
+if (time >= rt.tStart - PRE_SEEK_WINDOW && time < rt.tStart) {
+  seekIncoming(rt.incomingSceneId, scenes);
+  // Start playing early so frames are decoded when transition begins
+  if (incoming.paused && incoming.readyState >= 2) {
+    incoming.style.display = 'none';  // still hidden
+    incoming.play().catch(() => {});
   }
 }
 ```
 
-### Betroffene Dateien
-- `src/components/directors-cut/preview/NativeTransitionLayer.tsx` — Crossfade-Opacity
-- `src/components/directors-cut/preview/useTransitionRenderer.ts` — Base-Sync nach Transition
+**2. `useTransitionRenderer.ts` — Base-Seek am Ende weicher machen**
+
+Statt harten Seek (`base.currentTime = incoming.currentTime`) einen `fastSeek()` verwenden (wenn verfügbar), und den Seek nur ausführen wenn die Differenz signifikant ist (> 0.1s). Bei kleinen Differenzen springt das Video ohnehin nicht sichtbar.
+
+```typescript
+if (wasActiveRef.current) {
+  wasActiveRef.current = false;
+  lastIncomingSeekRef.current = '';
+  const diff = Math.abs(base.currentTime - incoming.currentTime);
+  if (incoming.currentTime > 0 && diff > 0.1) {
+    if (base.fastSeek) {
+      base.fastSeek(incoming.currentTime);
+    } else {
+      base.currentTime = incoming.currentTime;
+    }
+  }
+}
+```
+
+### Betroffene Datei
+- `src/components/directors-cut/preview/useTransitionRenderer.ts`
 
 ### Ergebnis
-- Crossfade zeigt einen echten, sichtbaren Überblendeffekt
-- Kein Ruckler mehr nach Übergängen 2 und 3
+- Incoming-Video ist beim Crossfade-Start bereits am Laufen → kein schwarzer Frame
+- Base-Seek am Ende ist sanfter → kein Stutter-Frame nach dem Übergang
 
