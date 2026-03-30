@@ -170,15 +170,7 @@ export function useTransitionRenderer(
         if (wasActiveRef.current) {
           wasActiveRef.current = false;
           lastIncomingSeekRef.current = '';
-          // Soft-sync base video to incoming position to prevent visible jerk
-          const diff = Math.abs(base.currentTime - incoming.currentTime);
-          if (incoming.currentTime > 0 && diff > 0.1) {
-            if ((base as any).fastSeek) {
-              (base as any).fastSeek(incoming.currentTime);
-            } else {
-              base.currentTime = incoming.currentTime;
-            }
-          }
+          // NO base.currentTime sync — let the main player handle scene advance
         }
 
         // Always ensure incoming is hidden and fully reset
