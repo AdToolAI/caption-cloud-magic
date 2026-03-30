@@ -1,24 +1,48 @@
 
 
-## Plan: Reset-Button für Director's Cut
+## Fix: Helligkeit/Kontrast/Sättigung werden nicht im Preview angezeigt
 
-### Änderung
+### Ursache
 
-Ein "Neues Projekt"-Button wird im Header des Director's Cut (Steps-Modus) neben dem bestehenden Back-Button eingefügt. Er setzt alle States auf ihre Defaults zurück und löscht den SessionStorage-Draft.
+Im `DirectorsCutPreviewPlayer` wird `currentScene` anhand von `displayTime` bestimmt (Zeile 746-748):
+```typescript
+const currentScene = sortedScenes.find(s => displayTime >= s.start_time && displayTime < s.end_time);
+```
 
-### Umsetzung in `src/pages/DirectorsCut/DirectorsCut.tsx`
+**Problem 1**: Wenn das Video bei `displayTime = 0` steht und die erste Szene bei z.B. `0.167s` beginnt (typisch bei KI-Analyse), ist `currentScene = undefined`. Damit werden szenen-spezifische Effekte (`sceneEffects[sceneId].brightness` etc.) komplett ignoriert und es fällt auf die globalen Werte (unverändert = 100) zurück.
 
-**1. Reset-Handler hinzufügen** (nach `handleBackNavigation`):
-- Ruft `clearDraft()` auf
-- Setzt alle ~20 States auf ihre Initialwerte (Video=null, Step=1, Szenen=[], etc.)
-- Zeigt Toast-Bestätigung
+**Problem 2**: Der RAF-Loop in `useTransitionRenderer` überschreibt `base.style.filter` auf **jedem Frame** mit `videoFilterRef.current`. Wenn der `useEffect` für den Ref-Sync noch nicht gelaufen ist (z.B. beim ersten Render), kann kurzzeitig der alte Wert angewendet werden.
 
-**2. Button im Header** (Zeile 874, neben dem Back-Button):
-- Icon: `RotateCcw` (oder `Trash2`) aus lucide-react
-- Label: "Neues Projekt"
-- Variant: `outline` mit destructive Styling
-- Bestätigungsdialog (AlertDialog) vor dem Zurücksetzen, damit man nicht versehentlich alles löscht
+### Lösung
+
+**1. `DirectorsCutPreviewPlayer.tsx` — `currentScene` Lookup toleranter machen**
+- Wenn kein exakter Match gefunden wird, die nächstliegende Szene wählen (besonders für `displayTime < scenes[0].start_time`)
+- Damit werden szenen-spezifische Slider-Änderungen sofort sichtbar, auch wenn der Playhead am Anfang steht
+
+```typescript
+const currentScene = useMemo(() => {
+  const exact = sortedScenes.find(s => displayTime >= s.start_time && displayTime < s.end_time);
+  if (exact) return exact;
+  // Fallback: if before first scene, use first scene
+  if (sortedScenes.length > 0 && displayTime < sortedScenes[0].start_time) {
+    return sortedScenes[0];
+  }
+  // Fallback: if after last scene, use last scene
+  if (sortedScenes.length > 0) {
+    return sortedScenes[sortedScenes.length - 1];
+  }
+  return undefined;
+}, [sortedScenes, displayTime]);
+```
+
+**2. `useTransitionRenderer.ts` — videoFilterRef sofort synchron lesen**
+- Der Ref-Sync (`useEffect`) ist bereits korrekt, aber zur Sicherheit: Im "No Transition"-Pfad den `videoFilterRef.current` Wert verwenden (bereits der Fall). Dies ist kein Code-Change, nur Bestätigung dass der Pfad korrekt ist.
 
 ### Betroffene Datei
-- `src/pages/DirectorsCut/DirectorsCut.tsx` — Reset-Handler + Button mit Bestätigungsdialog
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `currentScene` useMemo erweitern (ca. 5 Zeilen Änderung)
+
+### Ergebnis
+- Helligkeit, Kontrast, Sättigung etc. werden sofort im Preview sichtbar wenn per Slider geändert
+- Funktioniert sowohl für globale als auch szenen-spezifische Änderungen
+- Kein Layout- oder Timing-Problem, da nur die Scene-Lookup-Logik angepasst wird
 
