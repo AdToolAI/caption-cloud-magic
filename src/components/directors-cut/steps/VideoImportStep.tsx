@@ -124,7 +124,7 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
       id: video.id,
       url: video.output_url,
       name: metadata?.title || video.project_name || 'Video aus Mediathek',
-      duration: video.duration_in_frames ? video.duration_in_frames / 30 : undefined,
+      duration: (video.metadata as any)?.duration_seconds || (video.duration_in_frames ? video.duration_in_frames / 30 : undefined),
       thumbnail_url: video.thumbnail_url,
       source: 'media_library',
     };

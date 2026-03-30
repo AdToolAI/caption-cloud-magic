@@ -565,7 +565,7 @@ export function DirectorsCut() {
         return (
           <SceneEditingStep
             videoUrl={selectedVideo?.url || ''}
-            videoDuration={selectedVideo?.duration || 30}
+            videoDuration={actualTotalDuration}
             scenes={scenes}
             onScenesUpdate={setScenes}
             transitions={transitions}

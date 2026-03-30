@@ -149,38 +149,38 @@ export function useTransitionRenderer(
         }
       }
 
-      // === NO TRANSITION — reset styles and resume base video ===
-      if (!found && wasActiveRef.current) {
+      // === NO TRANSITION — deterministic baseline reset EVERY inactive frame ===
+      if (!found) {
         const baseFilter = videoFilterRef.current || '';
+        // Always reset base styles to neutral (not just on wasActiveRef change)
         base.style.opacity = '1';
         base.style.transform = 'none';
         base.style.clipPath = 'none';
         base.style.filter = baseFilter || '';
 
-        // Seek base video to incoming scene's position so it continues correctly
-        if (incoming.currentTime > 0 && Math.abs(base.currentTime - incoming.currentTime) > 0.2) {
-          base.currentTime = incoming.currentTime;
+        if (wasActiveRef.current) {
+          // Transition just ended — seek base to incoming position and resume
+          if (incoming.currentTime > 0 && Math.abs(base.currentTime - incoming.currentTime) > 0.2) {
+            base.currentTime = incoming.currentTime;
+          }
+          if (base.paused) base.play().catch(() => {});
+          wasActiveRef.current = false;
+          lastIncomingSeekRef.current = '';
         }
 
-        // Resume base video playback after transition ends
-        if (base.paused) base.play().catch(() => {});
-        
-        // Pause and hide incoming, reset ALL styles
+        // Always ensure incoming is hidden and fully reset
         if (!incoming.paused) incoming.pause();
         incoming.style.display = 'none';
-        incoming.style.opacity = '';
+        incoming.style.opacity = '0';
         incoming.style.transform = 'none';
         incoming.style.clipPath = 'none';
-        incoming.style.filter = '';
+        incoming.style.filter = 'none';
         incoming.style.position = '';
         incoming.style.inset = '';
         incoming.style.width = '';
         incoming.style.height = '';
         incoming.style.objectFit = '';
         incoming.style.zIndex = '';
-
-        wasActiveRef.current = false;
-        lastIncomingSeekRef.current = '';
       }
 
       rafRef.current = requestAnimationFrame(tick);
