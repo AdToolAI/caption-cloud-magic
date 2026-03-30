@@ -26,6 +26,10 @@ const TRANSITION_COLORS: Record<string, string> = {
   'dissolve': 'bg-purple-500',
   'wipe': 'bg-green-500',
   'slide': 'bg-orange-500',
+  'blur': 'bg-indigo-500',
+  'zoom': 'bg-teal-500',
+  'push': 'bg-amber-500',
+  'morph': 'bg-violet-500',
   'none': 'bg-muted',
 };
 
@@ -35,6 +39,10 @@ const TRANSITION_ICONS: Record<string, string> = {
   'dissolve': '✧',
   'wipe': '▶',
   'slide': '→',
+  'blur': '◎',
+  'zoom': '⊕',
+  'push': '⇒',
+  'morph': '∞',
   'none': '—',
 };
 

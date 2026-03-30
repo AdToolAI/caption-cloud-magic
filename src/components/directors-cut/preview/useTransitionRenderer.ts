@@ -3,10 +3,11 @@ import type { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut'
 import { resolveTransitions, findActiveTransition, findFreezePhase } from '@/utils/transitionResolver';
 import { getTransitionStyles } from './NativeTransitionLayer';
 
-// All transition types now use the same dual-video CSS path
-
 /**
- * Dual-video CSS transition renderer with canvas freeze for opacity transitions.
+ * Dual-video CSS transition renderer with phase-based lifecycle:
+ *   idle       → far from any transition, incoming hidden
+ *   preparing  → within pre-seek window, incoming seeked & playing but invisible
+ *   active     → transition in progress, styles applied
  */
 export function useTransitionRenderer(
   baseVideoRef: React.RefObject<HTMLVideoElement | null>,
@@ -20,7 +21,7 @@ export function useTransitionRenderer(
   computeFilterForTimeRef?: React.RefObject<(time: number) => string>,
 ) {
   const rafRef = useRef<number>();
-  const wasActiveRef = useRef(false);
+  const phaseRef = useRef<'idle' | 'preparing' | 'active'>('idle');
   const lastIncomingSeekRef = useRef<string>('');
 
   const resolvedTransitions = useMemo(
@@ -35,13 +36,20 @@ export function useTransitionRenderer(
     const scene = scenes.find(s => s.id === incomingSceneId);
     if (!scene) return;
 
-    const seekKey = `${incomingSceneId}`;
+    const seekKey = incomingSceneId;
     if (lastIncomingSeekRef.current === seekKey) return;
     lastIncomingSeekRef.current = seekKey;
 
     const sourceStart = scene.original_start_time ?? scene.start_time;
     incoming.currentTime = sourceStart + 0.05;
   }, [incomingVideoRef]);
+
+  // Expose a way to reset transition state (called from handleSeek/handleReset)
+  useEffect(() => {
+    // When scenes or transitions change, reset phase
+    phaseRef.current = 'idle';
+    lastIncomingSeekRef.current = '';
+  }, [scenes, transitions]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -56,6 +64,9 @@ export function useTransitionRenderer(
       return;
     }
 
+    const PRE_SEEK_WINDOW = 0.8; // seconds before transition to start preparing
+    const IDLE_MARGIN = 1.5; // seconds away from any transition = truly idle
+
     const tick = () => {
       const time = visualTimeRef.current ?? 0;
       const base = baseVideoRef.current;
@@ -65,114 +76,117 @@ export function useTransitionRenderer(
         return;
       }
 
-      let found = false;
+      // Always hide canvas — we use pure CSS dual-video
+      if (canvas) canvas.style.display = 'none';
 
-      // === PRE-SEEK: prepare incoming video before transition starts ===
-      const PRE_SEEK_WINDOW = 0.5;
-      for (const rt of resolvedTransitions) {
-        if (time >= rt.tStart - PRE_SEEK_WINDOW && time < rt.tStart) {
-          seekIncoming(rt.incomingSceneId, scenes);
-          if (incoming.paused) {
-            incoming.style.opacity = '0';
-            incoming.play().catch(() => {});
-          }
-          break;
-        }
-      }
+      const syncFilter = computeFilterForTimeRef?.current
+        ? computeFilterForTimeRef.current(time)
+        : (videoFilterRef.current || '');
 
-      // === FREEZE PHASE (offset > 0) ===
+      // === Check phases in priority order ===
+
+      // Phase 1: FREEZE (offset > 0)
       const freezeRT = findFreezePhase(time, resolvedTransitions);
       if (freezeRT) {
+        phaseRef.current = 'preparing';
+        // Keep base visible, hide incoming
         base.style.opacity = '1';
         base.style.transform = '';
         base.style.clipPath = '';
+        base.style.filter = syncFilter || '';
         incoming.style.opacity = '0';
         incoming.style.pointerEvents = 'none';
-        if (canvas) canvas.style.display = 'none';
-        found = true;
-        wasActiveRef.current = true;
+        // Pre-seek incoming during freeze
+        seekIncoming(freezeRT.incomingSceneId, scenes);
+        if (incoming.paused) {
+          incoming.play().catch(() => {});
+        }
+        rafRef.current = requestAnimationFrame(tick);
+        return;
       }
 
-      // === ACTIVE TRANSITION ===
-      if (!found) {
-        const active = findActiveTransition(time, resolvedTransitions);
-        if (active) {
-          const { transition: rt, progress } = active;
+      // Phase 2: ACTIVE TRANSITION
+      const active = findActiveTransition(time, resolvedTransitions);
+      if (active) {
+        const { transition: rt, progress } = active;
+        phaseRef.current = 'active';
 
+        seekIncoming(rt.incomingSceneId, scenes);
+
+        if (incoming.paused) {
+          incoming.play().catch(() => {});
+        }
+
+        const styles = getTransitionStyles({
+          progress,
+          baseType: rt.baseType,
+          direction: rt.direction,
+          sceneIndex: rt.sceneIndex,
+          transitionDuration: rt.duration,
+        });
+
+        // Apply base styles
+        base.style.position = 'absolute';
+        base.style.inset = '0';
+        base.style.width = '100%';
+        base.style.height = '100%';
+        base.style.objectFit = 'contain';
+        base.style.zIndex = '1';
+
+        const baseTransitionFilter = (styles.baseStyle as any).filter || '';
+        base.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
+        base.style.transform = styles.baseStyle.transform || 'none';
+        base.style.clipPath = styles.baseStyle.clipPath || 'none';
+        base.style.filter = [syncFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
+
+        // Apply incoming styles
+        incoming.style.pointerEvents = 'auto';
+        incoming.style.position = 'absolute';
+        incoming.style.inset = '0';
+        incoming.style.width = '100%';
+        incoming.style.height = '100%';
+        incoming.style.objectFit = 'contain';
+        incoming.style.zIndex = '2';
+
+        const incomingTransitionFilter = (styles.incomingStyle as any).filter || '';
+        incoming.style.opacity = styles.incomingStyle.opacity != null ? String(styles.incomingStyle.opacity) : '1';
+        incoming.style.transform = styles.incomingStyle.transform || '';
+        incoming.style.clipPath = styles.incomingStyle.clipPath || '';
+        incoming.style.filter = [syncFilter, incomingTransitionFilter].filter(Boolean).join(' ') || '';
+
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      // Phase 3: PRE-SEEK (preparing)
+      for (const rt of resolvedTransitions) {
+        if (time >= rt.tStart - PRE_SEEK_WINDOW && time < rt.tStart) {
+          phaseRef.current = 'preparing';
           seekIncoming(rt.incomingSceneId, scenes);
-
+          // Start playing but keep invisible
+          incoming.style.opacity = '0';
+          incoming.style.pointerEvents = 'none';
           if (incoming.paused) {
             incoming.play().catch(() => {});
           }
+          // Base stays normal
+          base.style.opacity = '1';
+          base.style.transform = 'none';
+          base.style.clipPath = 'none';
+          base.style.filter = syncFilter || '';
+          base.style.position = '';
+          base.style.inset = '';
+          base.style.zIndex = '';
 
-          const styles = getTransitionStyles({
-            progress,
-            baseType: rt.baseType,
-            direction: rt.direction,
-            sceneIndex: rt.sceneIndex,
-            transitionDuration: rt.duration,
-          });
-
-          const syncFilter = computeFilterForTimeRef?.current
-            ? computeFilterForTimeRef.current(time)
-            : (videoFilterRef.current || '');
-
-          // --- ALL TRANSITIONS: unified dual-video CSS path ---
-          if (canvas) canvas.style.display = 'none';
-
-          base.style.position = 'absolute';
-          base.style.inset = '0';
-          base.style.width = '100%';
-          base.style.height = '100%';
-          base.style.objectFit = 'contain';
-          base.style.zIndex = '1';
-
-          const baseTransitionFilter = (styles.baseStyle as any).filter || '';
-          base.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
-          base.style.transform = styles.baseStyle.transform || 'none';
-          base.style.clipPath = styles.baseStyle.clipPath || 'none';
-          base.style.filter = [syncFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
-
-          // Apply incoming styles (same for all transition types)
-          incoming.style.pointerEvents = 'auto';
-          incoming.style.position = 'absolute';
-          incoming.style.inset = '0';
-          incoming.style.width = '100%';
-          incoming.style.height = '100%';
-          incoming.style.objectFit = 'contain';
-          incoming.style.zIndex = '2';
-
-          const incomingTransitionFilter = (styles.incomingStyle as any).filter || '';
-          incoming.style.opacity = styles.incomingStyle.opacity != null ? String(styles.incomingStyle.opacity) : '1';
-          incoming.style.transform = styles.incomingStyle.transform || '';
-          incoming.style.clipPath = styles.incomingStyle.clipPath || '';
-          incoming.style.filter = [syncFilter, incomingTransitionFilter].filter(Boolean).join(' ') || '';
-
-          found = true;
-          wasActiveRef.current = true;
+          rafRef.current = requestAnimationFrame(tick);
+          return;
         }
       }
 
-      // === NO TRANSITION — reset everything ===
-      if (!found) {
-        const syncFilter = computeFilterForTimeRef?.current
-          ? computeFilterForTimeRef.current(time)
-          : (videoFilterRef.current || '');
-
-        base.style.opacity = '1';
-        base.style.transform = 'none';
-        base.style.clipPath = 'none';
-        base.style.filter = syncFilter || '';
-        base.style.position = '';
-        base.style.inset = '';
-        base.style.zIndex = '';
-
-        if (wasActiveRef.current) {
-          wasActiveRef.current = false;
-          lastIncomingSeekRef.current = '';
-        }
-
-        // Hide incoming
+      // Phase 4: IDLE — truly far from any transition
+      // Only reset incoming if we were previously in a non-idle phase
+      if (phaseRef.current !== 'idle') {
+        // Transition just ended — clean up incoming
         if (!incoming.paused) incoming.pause();
         incoming.style.pointerEvents = 'none';
         incoming.style.opacity = '0';
@@ -186,9 +200,18 @@ export function useTransitionRenderer(
         incoming.style.objectFit = '';
         incoming.style.zIndex = '';
 
-        // Hide canvas
-        if (canvas) canvas.style.display = 'none';
+        lastIncomingSeekRef.current = '';
+        phaseRef.current = 'idle';
       }
+
+      // Base normal styles
+      base.style.opacity = '1';
+      base.style.transform = 'none';
+      base.style.clipPath = 'none';
+      base.style.filter = syncFilter || '';
+      base.style.position = '';
+      base.style.inset = '';
+      base.style.zIndex = '';
 
       rafRef.current = requestAnimationFrame(tick);
     };

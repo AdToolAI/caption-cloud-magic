@@ -157,12 +157,27 @@ export function getTransitionStyles(info: TransitionInfo | null): {
     }
 
     case 'zoom':
-      baseStyle = { opacity: 1 - progress * 0.3 };
-      incomingStyle = { opacity: progress, transform: `scale(${1 + (1 - progress) * 0.3})` };
+      baseStyle = { opacity: 1 - progress, transform: `scale(${1 - progress * 0.1})` };
+      incomingStyle = { opacity: progress, transform: `scale(${0.8 + progress * 0.2})` };
+      break;
+
+    case 'morph':
+      // AI Morph preview fallback: scale + blur + opacity
+      baseStyle = {
+        opacity: 1 - progress,
+        transform: `scale(${1 + progress * 0.15})`,
+        filter: `blur(${progress * 6}px)`,
+      };
+      incomingStyle = {
+        opacity: progress,
+        transform: `scale(${1.15 - progress * 0.15})`,
+        filter: `blur(${(1 - progress) * 6}px)`,
+      };
       break;
 
     default:
-      baseStyle = { opacity: 1 - progress * 0.3 };
+      // Strong visible fallback for any unknown type
+      baseStyle = { opacity: 1 - progress };
       incomingStyle = { opacity: progress };
       break;
   }

@@ -62,6 +62,38 @@ const TRANSITION_TYPES: TransitionType[] = [
     gradient: 'from-orange-500 to-amber-500',
     aiScore: 0.70
   },
+  { 
+    id: 'blur', 
+    name: 'Blur', 
+    description: 'Weichzeichner-Übergang',
+    icon: '◎',
+    gradient: 'from-indigo-500 to-blue-500',
+    aiScore: 0.78
+  },
+  { 
+    id: 'zoom', 
+    name: 'Zoom', 
+    description: 'Zoom-Übergang',
+    icon: '⊕',
+    gradient: 'from-teal-500 to-cyan-500',
+    aiScore: 0.72
+  },
+  { 
+    id: 'push', 
+    name: 'Push', 
+    description: 'Schub-Effekt',
+    icon: '⇒',
+    gradient: 'from-amber-500 to-yellow-500',
+    aiScore: 0.68
+  },
+  { 
+    id: 'morph', 
+    name: 'AI Morph', 
+    description: 'KI-generierter Übergang',
+    icon: '∞',
+    gradient: 'from-violet-500 to-fuchsia-500',
+    aiScore: 0.95
+  },
 ];
 
 interface TransitionPickerProps {
