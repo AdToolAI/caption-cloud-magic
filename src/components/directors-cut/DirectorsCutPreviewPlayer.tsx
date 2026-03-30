@@ -943,7 +943,14 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [currentScene, sceneEffects, effects.vignette]);
 
   // Keep videoFilterRef in sync for the transition renderer
-  useEffect(() => { videoFilterRef.current = videoFilter ?? ''; }, [videoFilter]);
+  useEffect(() => {
+    videoFilterRef.current = videoFilter ?? '';
+    // Apply filter imperatively to base video so effects work even without transitions
+    const base = videoRef.current;
+    if (base) {
+      base.style.filter = videoFilter || '';
+    }
+  }, [videoFilter]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
