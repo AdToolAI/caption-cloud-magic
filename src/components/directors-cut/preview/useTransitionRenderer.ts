@@ -3,12 +3,10 @@ import type { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut'
 import { resolveTransitions, findActiveTransition, findFreezePhase } from '@/utils/transitionResolver';
 import { getTransitionStyles } from './NativeTransitionLayer';
 
+const OPACITY_BASED_TYPES = new Set(['crossfade', 'dissolve', 'fade', 'blur']);
+
 /**
- * Dual-video CSS transition renderer.
- * Instead of canvas compositing (which requires CORS for frame capture),
- * this manipulates two <video> elements directly via CSS properties.
- * The base video shows the outgoing scene; the incoming video shows the next scene.
- * Transitions are rendered via opacity, transform, clipPath, and filter.
+ * Dual-video CSS transition renderer with canvas freeze for opacity transitions.
  */
 export function useTransitionRenderer(
   baseVideoRef: React.RefObject<HTMLVideoElement | null>,
@@ -30,7 +28,6 @@ export function useTransitionRenderer(
     [scenes, transitions],
   );
 
-  // Seek the incoming video to the start of the incoming scene
   const seekIncoming = useCallback((incomingSceneId: string, scenes: SceneAnalysis[]) => {
     const incoming = incomingVideoRef.current;
     if (!incoming) return;
@@ -48,7 +45,6 @@ export function useTransitionRenderer(
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (canvas) canvas.style.display = 'none';
 
     if (scenes.length < 2 || transitions.length === 0) {
       const incoming = incomingVideoRef.current;
@@ -56,11 +52,11 @@ export function useTransitionRenderer(
         incoming.style.opacity = '0';
         incoming.style.pointerEvents = 'none';
       }
+      if (canvas) canvas.style.display = 'none';
       return;
     }
 
     const tick = () => {
-      // Use TIMELINE time (visualTimeRef) — NOT video.currentTime (source time)
       const time = visualTimeRef.current ?? 0;
       const base = baseVideoRef.current;
       const incoming = incomingVideoRef.current;
@@ -76,7 +72,6 @@ export function useTransitionRenderer(
       for (const rt of resolvedTransitions) {
         if (time >= rt.tStart - PRE_SEEK_WINDOW && time < rt.tStart) {
           seekIncoming(rt.incomingSceneId, scenes);
-          // Start playing early so frames are decoded when transition begins
           if (incoming.paused) {
             incoming.style.opacity = '0';
             incoming.play().catch(() => {});
@@ -93,6 +88,7 @@ export function useTransitionRenderer(
         base.style.clipPath = '';
         incoming.style.opacity = '0';
         incoming.style.pointerEvents = 'none';
+        if (canvas) canvas.style.display = 'none';
         found = true;
         wasActiveRef.current = true;
       }
@@ -105,14 +101,11 @@ export function useTransitionRenderer(
 
           seekIncoming(rt.incomingSceneId, scenes);
 
-          // DO NOT pause or seek the base video — it is the transport clock.
-          // The base content is hidden/faded by CSS during the transition.
-          // Pausing it would freeze the timeline slider.
-
-          // Start incoming video playing from the right position
           if (incoming.paused) {
             incoming.play().catch(() => {});
           }
+
+          const isOpacityBased = OPACITY_BASED_TYPES.has(rt.baseType);
 
           const styles = getTransitionStyles({
             progress,
@@ -122,22 +115,71 @@ export function useTransitionRenderer(
             transitionDuration: rt.duration,
           });
 
-          // Apply base (outgoing) styles — force stable absolute layer to prevent layout shift
-          base.style.position = 'absolute';
-          base.style.inset = '0';
-          base.style.width = '100%';
-          base.style.height = '100%';
-          base.style.objectFit = 'contain';
-          base.style.zIndex = '1';
-          // Synchronous filter: compute for exact current time to avoid 2-3 frame lag
-          const syncBaseFilter = computeFilterForTimeRef?.current ? computeFilterForTimeRef.current(time) : (videoFilterRef.current || '');
-          const baseTransitionFilter = (styles.baseStyle as any).filter || '';
-          base.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
-          base.style.transform = styles.baseStyle.transform || 'none';
-          base.style.clipPath = styles.baseStyle.clipPath || 'none';
-          base.style.filter = [syncBaseFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
+          const syncFilter = computeFilterForTimeRef?.current
+            ? computeFilterForTimeRef.current(time)
+            : (videoFilterRef.current || '');
 
-          // Apply incoming styles
+          // --- OPACITY-BASED TRANSITIONS: use canvas for frozen outgoing frame ---
+          if (isOpacityBased && canvas) {
+            const outgoingKey = `outgoing-${rt.outgoingSceneId}`;
+            const cachedFrame = frameCacheRef.current?.get(outgoingKey);
+
+            if (cachedFrame) {
+              // Show canvas with frozen outgoing frame
+              canvas.style.display = 'block';
+              canvas.style.position = 'absolute';
+              canvas.style.inset = '0';
+              canvas.style.width = '100%';
+              canvas.style.height = '100%';
+              canvas.style.zIndex = '1';
+              canvas.style.pointerEvents = 'none';
+
+              const baseTransitionFilter = (styles.baseStyle as any).filter || '';
+              canvas.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
+              canvas.style.filter = [syncFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
+
+              // Draw the cached frame
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                if (canvas.width !== cachedFrame.width || canvas.height !== cachedFrame.height) {
+                  canvas.width = cachedFrame.width;
+                  canvas.height = cachedFrame.height;
+                }
+                ctx.drawImage(cachedFrame, 0, 0);
+              }
+
+              // Hide the base video during opacity transition so it doesn't show through
+              base.style.opacity = '0';
+              base.style.transform = 'none';
+              base.style.clipPath = 'none';
+            } else {
+              // No cached frame — fall back to base video
+              canvas.style.display = 'none';
+              const baseTransitionFilter = (styles.baseStyle as any).filter || '';
+              base.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
+              base.style.transform = styles.baseStyle.transform || 'none';
+              base.style.clipPath = styles.baseStyle.clipPath || 'none';
+              base.style.filter = [syncFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
+            }
+          } else {
+            // --- NON-OPACITY TRANSITIONS (slide, push, wipe, zoom): dual-video CSS ---
+            if (canvas) canvas.style.display = 'none';
+
+            base.style.position = 'absolute';
+            base.style.inset = '0';
+            base.style.width = '100%';
+            base.style.height = '100%';
+            base.style.objectFit = 'contain';
+            base.style.zIndex = '1';
+
+            const baseTransitionFilter = (styles.baseStyle as any).filter || '';
+            base.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
+            base.style.transform = styles.baseStyle.transform || 'none';
+            base.style.clipPath = styles.baseStyle.clipPath || 'none';
+            base.style.filter = [syncFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
+          }
+
+          // Apply incoming styles (same for all transition types)
           incoming.style.pointerEvents = 'auto';
           incoming.style.position = 'absolute';
           incoming.style.inset = '0';
@@ -146,23 +188,23 @@ export function useTransitionRenderer(
           incoming.style.objectFit = 'contain';
           incoming.style.zIndex = '2';
 
-          const syncIncomingFilter = computeFilterForTimeRef?.current ? computeFilterForTimeRef.current(time) : (videoFilterRef.current || '');
           const incomingTransitionFilter = (styles.incomingStyle as any).filter || '';
           incoming.style.opacity = styles.incomingStyle.opacity != null ? String(styles.incomingStyle.opacity) : '1';
           incoming.style.transform = styles.incomingStyle.transform || '';
           incoming.style.clipPath = styles.incomingStyle.clipPath || '';
-          incoming.style.filter = [syncIncomingFilter, incomingTransitionFilter].filter(Boolean).join(' ') || '';
+          incoming.style.filter = [syncFilter, incomingTransitionFilter].filter(Boolean).join(' ') || '';
 
           found = true;
           wasActiveRef.current = true;
         }
       }
 
-      // === NO TRANSITION — deterministic baseline reset EVERY inactive frame ===
+      // === NO TRANSITION — reset everything ===
       if (!found) {
-        // Synchronous filter for exact time
-        const syncFilter = computeFilterForTimeRef?.current ? computeFilterForTimeRef.current(time) : (videoFilterRef.current || '');
-        // Deterministic hard reset EVERY inactive frame
+        const syncFilter = computeFilterForTimeRef?.current
+          ? computeFilterForTimeRef.current(time)
+          : (videoFilterRef.current || '');
+
         base.style.opacity = '1';
         base.style.transform = 'none';
         base.style.clipPath = 'none';
@@ -174,10 +216,9 @@ export function useTransitionRenderer(
         if (wasActiveRef.current) {
           wasActiveRef.current = false;
           lastIncomingSeekRef.current = '';
-          // NO base.currentTime sync — let the main player handle scene advance
         }
 
-        // Always ensure incoming is hidden and fully reset
+        // Hide incoming
         if (!incoming.paused) incoming.pause();
         incoming.style.pointerEvents = 'none';
         incoming.style.opacity = '0';
@@ -190,6 +231,9 @@ export function useTransitionRenderer(
         incoming.style.height = '';
         incoming.style.objectFit = '';
         incoming.style.zIndex = '';
+
+        // Hide canvas
+        if (canvas) canvas.style.display = 'none';
       }
 
       rafRef.current = requestAnimationFrame(tick);
@@ -199,5 +243,5 @@ export function useTransitionRenderer(
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [scenes, transitions, resolvedTransitions, visualTimeRef, baseVideoRef, incomingVideoRef, canvasRef, videoFilterRef, frameCacheRef, seekIncoming]);
+  }, [scenes, transitions, resolvedTransitions, visualTimeRef, baseVideoRef, incomingVideoRef, canvasRef, videoFilterRef, frameCacheRef, seekIncoming, computeFilterForTimeRef]);
 }
