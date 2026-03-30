@@ -813,7 +813,35 @@ export function DirectorsCut() {
     }
   };
 
-  // Smart back navigation - step by step
+  // Reset entire project
+  const handleResetProject = useCallback(() => {
+    clearDraft();
+    setSelectedVideo(null);
+    setCurrentStep(1);
+    setScenes([]);
+    setTransitions([]);
+    setAppliedEffects({ global: { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 }, scenes: {} });
+    setAudioEnhancements({ master_volume: 100, noise_reduction: false, noise_reduction_level: 50, auto_ducking: false, ducking_level: 30, voice_enhancement: false, added_sounds: [] });
+    setExportSettings({ quality: 'hd', format: 'mp4', fps: 30, aspect_ratio: '16:9' });
+    setStyleTransfer({ enabled: false, style: null, intensity: 0.8 });
+    setColorGrading({ enabled: false, grade: null, intensity: 0.7 });
+    setSceneColorGrading({});
+    setSpeedKeyframes([]);
+    setKenBurnsKeyframes([]);
+    setChromaKey({ enabled: false, color: '#00ff00', tolerance: 30, backgroundUrl: undefined });
+    setUpscaling({ enabled: false, targetResolution: '4k' });
+    setInterpolation({ enabled: false, targetFps: 60 });
+    setRestoration({ enabled: false, level: 'standard' });
+    setObjectRemoval({ enabled: false, objectsCount: 0 });
+    setTextOverlays([]);
+    setVoiceOverUrl(undefined);
+    setBackgroundMusicUrl(undefined);
+    setCapCutAudioTracks([]);
+    setCapCutSubtitleTrack(undefined);
+    setEditorMode('steps');
+    toast.success('Projekt zurückgesetzt');
+  }, []);
+
   const handleBackNavigation = useCallback(() => {
     if (editorMode === 'timeline') {
       setEditorMode('steps');
