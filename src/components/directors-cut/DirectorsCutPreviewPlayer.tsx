@@ -744,7 +744,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
   // ==================== CSS FILTERS FROM EFFECTS ====================
   const currentScene = useMemo(() => {
-    return sortedScenes.find(s => displayTime >= s.start_time && displayTime < s.end_time);
+    const exact = sortedScenes.find(s => displayTime >= s.start_time && displayTime < s.end_time);
+    if (exact) return exact;
+    if (sortedScenes.length > 0 && displayTime < sortedScenes[0].start_time) {
+      return sortedScenes[0];
+    }
+    if (sortedScenes.length > 0) {
+      return sortedScenes[sortedScenes.length - 1];
+    }
+    return undefined;
   }, [sortedScenes, displayTime]);
 
   const videoFilter = useMemo(() => {
