@@ -8,6 +8,7 @@ import { getTransitionStyles } from './NativeTransitionLayer';
  *   idle       → far from any transition, incoming hidden
  *   preparing  → within pre-seek window, incoming seeked & playing but invisible
  *   active     → transition in progress, styles applied
+ *   handoff    → transition ended, incoming stays visible while base syncs
  */
 export function useTransitionRenderer(
   baseVideoRef: React.RefObject<HTMLVideoElement | null>,
@@ -22,8 +23,9 @@ export function useTransitionRenderer(
   transitionCooldownRef?: React.MutableRefObject<number>,
 ) {
   const rafRef = useRef<number>();
-  const phaseRef = useRef<'idle' | 'preparing' | 'active'>('idle');
+  const phaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
   const lastIncomingSeekRef = useRef<string>('');
+  const handoffSeekedRef = useRef(false);
 
   const resolvedTransitions = useMemo(
     () => resolveTransitions(scenes, transitions),
@@ -45,11 +47,11 @@ export function useTransitionRenderer(
     incoming.currentTime = sourceStart + 0.05;
   }, [incomingVideoRef]);
 
-  // Expose a way to reset transition state (called from handleSeek/handleReset)
+  // When scenes or transitions change, reset phase
   useEffect(() => {
-    // When scenes or transitions change, reset phase
     phaseRef.current = 'idle';
     lastIncomingSeekRef.current = '';
+    handoffSeekedRef.current = false;
   }, [scenes, transitions]);
 
   useEffect(() => {
@@ -65,8 +67,7 @@ export function useTransitionRenderer(
       return;
     }
 
-    const PRE_SEEK_WINDOW = 0.8; // seconds before transition to start preparing
-    const IDLE_MARGIN = 1.5; // seconds away from any transition = truly idle
+    const PRE_SEEK_WINDOW = 0.8;
 
     const tick = () => {
       const time = visualTimeRef.current ?? 0;
@@ -84,20 +85,87 @@ export function useTransitionRenderer(
         ? computeFilterForTimeRef.current(time)
         : (videoFilterRef.current || '');
 
+      // Mirror playbackRate from base to incoming during non-idle phases
+      if (phaseRef.current !== 'idle') {
+        if (Math.abs(incoming.playbackRate - base.playbackRate) > 0.01) {
+          incoming.playbackRate = base.playbackRate;
+        }
+      }
+
+      // === HANDOFF PHASE: wait for base to be ready before swapping ===
+      if (phaseRef.current === 'handoff') {
+        // Check if base is ready at the synced position
+        const baseReady = base.readyState >= 2;
+        const timeDiff = Math.abs(base.currentTime - incoming.currentTime);
+
+        if (!handoffSeekedRef.current) {
+          // First frame of handoff: sync base position
+          if (incoming.currentTime > 0) {
+            const diff = Math.abs(base.currentTime - incoming.currentTime);
+            if (diff > 0.05) {
+              base.currentTime = incoming.currentTime;
+            }
+          }
+          handoffSeekedRef.current = true;
+        }
+
+        if (baseReady && (timeDiff < 0.1 || handoffSeekedRef.current)) {
+          // Base is ready — complete the handoff
+          if (!incoming.paused) incoming.pause();
+          incoming.style.pointerEvents = 'none';
+          incoming.style.opacity = '0';
+          incoming.style.transform = 'none';
+          incoming.style.clipPath = 'none';
+          incoming.style.filter = 'none';
+          incoming.style.position = '';
+          incoming.style.inset = '';
+          incoming.style.width = '';
+          incoming.style.height = '';
+          incoming.style.objectFit = '';
+          incoming.style.zIndex = '';
+
+          lastIncomingSeekRef.current = '';
+          handoffSeekedRef.current = false;
+
+          if (transitionCooldownRef) {
+            transitionCooldownRef.current = 30;
+          }
+
+          phaseRef.current = 'idle';
+        } else {
+          // Keep incoming visible at full opacity while base catches up
+          incoming.style.opacity = '1';
+          incoming.style.pointerEvents = 'none';
+          incoming.style.transform = '';
+          incoming.style.clipPath = '';
+          incoming.style.filter = syncFilter || '';
+        }
+
+        // Base normal styles during handoff
+        base.style.opacity = '1';
+        base.style.transform = 'none';
+        base.style.clipPath = 'none';
+        base.style.filter = syncFilter || '';
+        base.style.position = '';
+        base.style.inset = '';
+        base.style.zIndex = '';
+
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
       // === Check phases in priority order ===
 
       // Phase 1: FREEZE (offset > 0)
       const freezeRT = findFreezePhase(time, resolvedTransitions);
       if (freezeRT) {
         phaseRef.current = 'preparing';
-        // Keep base visible, hide incoming
         base.style.opacity = '1';
         base.style.transform = '';
         base.style.clipPath = '';
         base.style.filter = syncFilter || '';
         incoming.style.opacity = '0';
         incoming.style.pointerEvents = 'none';
-        // Pre-seek incoming during freeze
         seekIncoming(freezeRT.incomingSceneId, scenes);
         if (incoming.paused) {
           incoming.play().catch(() => {});
@@ -164,13 +232,11 @@ export function useTransitionRenderer(
         if (time >= rt.tStart - PRE_SEEK_WINDOW && time < rt.tStart) {
           phaseRef.current = 'preparing';
           seekIncoming(rt.incomingSceneId, scenes);
-          // Start playing but keep invisible
           incoming.style.opacity = '0';
           incoming.style.pointerEvents = 'none';
           if (incoming.paused) {
             incoming.play().catch(() => {});
           }
-          // Base stays normal
           base.style.opacity = '1';
           base.style.transform = 'none';
           base.style.clipPath = 'none';
@@ -185,19 +251,17 @@ export function useTransitionRenderer(
       }
 
       // Phase 4: IDLE — truly far from any transition
-      // Only reset incoming if we were previously in a non-idle phase
-      if (phaseRef.current !== 'idle') {
-        // Sync base video to incoming position BEFORE hiding incoming
-        // This prevents the visible jump when switching layers
-        const base = baseVideoRef.current;
-        if (base && incoming.currentTime > 0 && !incoming.paused) {
-          const diff = Math.abs(base.currentTime - incoming.currentTime);
-          if (diff > 0.05) {
-            base.currentTime = incoming.currentTime;
-          }
-        }
+      // If we were active, enter handoff instead of going directly to idle
+      if (phaseRef.current === 'active') {
+        phaseRef.current = 'handoff';
+        handoffSeekedRef.current = false;
+        // Don't clean up incoming yet — handoff handler will do it
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
 
-        // Now clean up incoming
+      // If we were preparing (but never went active), just clean up
+      if (phaseRef.current === 'preparing') {
         if (!incoming.paused) incoming.pause();
         incoming.style.pointerEvents = 'none';
         incoming.style.opacity = '0';
@@ -210,14 +274,7 @@ export function useTransitionRenderer(
         incoming.style.height = '';
         incoming.style.objectFit = '';
         incoming.style.zIndex = '';
-
         lastIncomingSeekRef.current = '';
-        
-        // Signal cooldown to player to suppress boundary seek for a few frames
-        if (transitionCooldownRef) {
-          transitionCooldownRef.current = 30; // suppress for 30 frames (~500ms)
-        }
-        
         phaseRef.current = 'idle';
       }
 
