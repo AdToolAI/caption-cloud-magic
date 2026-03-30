@@ -939,28 +939,35 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     >
       {/* Video Player */}
       <div className={`relative bg-black rounded-lg overflow-hidden ${fillContainer ? 'flex-1 min-h-0' : 'aspect-video'}`}>
-        {/* Base (outgoing) video */}
-        <video
-          ref={videoRef}
-          src={videoUrl}
-          className="absolute inset-0 w-full h-full object-contain"
-          style={{ filter: videoFilter, zIndex: 1 }}
-          muted
-          playsInline
-          preload="auto"
-          onEnded={handleVideoEnded}
-        />
+        {/* Ken Burns motion wrapper — separate from transition transforms */}
+        <div
+          ref={kenBurnsWrapperRef}
+          className="absolute inset-0 w-full h-full"
+          style={{ zIndex: 0, willChange: 'transform' }}
+        >
+          {/* Base (outgoing) video */}
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            className="absolute inset-0 w-full h-full object-contain"
+            style={{ filter: videoFilter, zIndex: 1 }}
+            muted
+            playsInline
+            preload="auto"
+            onEnded={handleVideoEnded}
+          />
 
-        {/* Incoming (transition) video — no crossOrigin to avoid CORS */}
-        <video
-          ref={incomingVideoRef}
-          src={videoUrl}
-          className="absolute inset-0 w-full h-full object-contain"
-          style={{ zIndex: 2, display: 'none' }}
-          muted
-          playsInline
-          preload="auto"
-        />
+          {/* Incoming (transition) video — no crossOrigin to avoid CORS */}
+          <video
+            ref={incomingVideoRef}
+            src={videoUrl}
+            className="absolute inset-0 w-full h-full object-contain"
+            style={{ zIndex: 2, display: 'none' }}
+            muted
+            playsInline
+            preload="auto"
+          />
+        </div>
 
         {/* Transition canvas — legacy fallback, hidden by default */}
         <canvas
