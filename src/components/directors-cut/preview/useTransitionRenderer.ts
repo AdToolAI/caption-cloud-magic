@@ -120,12 +120,13 @@ export function useTransitionRenderer(
           base.style.height = '100%';
           base.style.objectFit = 'contain';
           base.style.zIndex = '1';
-          const baseFilter = videoFilterRef.current || '';
+          // Synchronous filter: compute for exact current time to avoid 2-3 frame lag
+          const syncBaseFilter = computeFilterForTimeRef?.current ? computeFilterForTimeRef.current(time) : (videoFilterRef.current || '');
           const baseTransitionFilter = (styles.baseStyle as any).filter || '';
           base.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
           base.style.transform = styles.baseStyle.transform || 'none';
           base.style.clipPath = styles.baseStyle.clipPath || 'none';
-          base.style.filter = [baseFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
+          base.style.filter = [syncBaseFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
 
           // Apply incoming styles
           incoming.style.display = '';
