@@ -491,7 +491,7 @@ export function SceneAnalysisStep({
       const newTransition: TransitionAssignment = {
         sceneId,
         transitionType,
-        duration: sceneTransitions[sceneId]?.duration || 0.5,
+        duration: sceneTransitions[sceneId]?.duration || 1.2,
         aiSuggested: false
       };
       
