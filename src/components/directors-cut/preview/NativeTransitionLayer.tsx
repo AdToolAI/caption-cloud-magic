@@ -89,7 +89,7 @@ export function getTransitionStyles(info: TransitionInfo | null): {
   if (!info) {
     return {
       baseStyle: {},
-      incomingStyle: { display: 'none' },
+      incomingStyle: { opacity: 0 },
       isActive: false,
     };
   }
