@@ -396,12 +396,13 @@ export function DirectorsCut() {
     
     try {
       toast.info('Extrahiere Video-Frames für KI-Analyse...');
-      const frames = await extractVideoFrames(selectedVideo.url, selectedVideo.duration || 30);
+      const canonicalDuration = selectedVideo.duration || 30;
+      const frames = await extractVideoFrames(selectedVideo.url, canonicalDuration);
       
       const { data, error } = await supabase.functions.invoke('analyze-video-scenes', {
         body: {
           video_url: selectedVideo.url,
-          duration: selectedVideo.duration || 30,
+          duration: canonicalDuration,
           frames: frames.length > 0 ? frames : undefined,
         },
       });

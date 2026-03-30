@@ -122,10 +122,11 @@ export function SceneEditingStep({
   const selectedScene = scenes.find(s => s.id === selectedSceneId);
   const selectedSceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
 
-  // Calculate actual total duration based on extended scenes
+  // Calculate actual total duration as max(end_time) — canonical duration source
   const actualTotalDuration = useMemo(() => {
-    return scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
-  }, [scenes]);
+    if (scenes.length === 0) return videoDuration;
+    return Math.max(...scenes.map(s => s.end_time));
+  }, [scenes, videoDuration]);
 
   // Get transition for editing scene
   const editingTransition = transitions.find(t => t.sceneId === editingTransitionId);
@@ -1231,7 +1232,7 @@ export function SceneEditingStep({
 
       {/* Stats Footer */}
       {(() => {
-        const actualTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+        const actualTotalDuration = scenes.length > 0 ? Math.max(...scenes.map(s => s.end_time)) : videoDuration;
         const durationChange = actualTotalDuration - videoDuration;
         
         return (

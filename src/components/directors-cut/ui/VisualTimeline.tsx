@@ -64,8 +64,8 @@ export function VisualTimeline({
   const dragTransitionStartAnchorRef = useRef<number>(0);
   const hasExceededDragThresholdRef = useRef<boolean>(false);
 
-  // Calculate total duration dynamically from scenes (not prop) for accurate widths
-  const actualTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+  // Calculate total duration as max(end_time) — canonical duration source
+  const actualTotalDuration = scenes.length > 0 ? Math.max(...scenes.map(s => s.end_time)) : videoDuration;
 
   // Handle divider drag
   const handleDividerMouseDown = useCallback((e: React.MouseEvent, index: number) => {
