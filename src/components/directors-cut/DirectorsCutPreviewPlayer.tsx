@@ -971,11 +971,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           />
         </div>
 
-        {/* Transition canvas — legacy fallback, hidden by default */}
+        {/* Transition canvas — used for frozen outgoing frame during opacity transitions */}
         <canvas
           ref={transitionCanvasRef}
-          className="absolute inset-0 w-full h-full object-contain"
-          style={{ zIndex: 3, display: 'none' }}
+          className="absolute inset-0 w-full h-full"
+          style={{ zIndex: 3, display: 'none', objectFit: 'contain' }}
         />
 
         {/* Lightweight effect overlays (color grading, vignette, etc.) */}
