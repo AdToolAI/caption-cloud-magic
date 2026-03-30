@@ -74,7 +74,7 @@ export function useTransitionRenderer(
         if (time >= rt.tStart - PRE_SEEK_WINDOW && time < rt.tStart) {
           seekIncoming(rt.incomingSceneId, scenes);
           // Start playing early so frames are decoded when transition begins
-          if (incoming.paused && incoming.readyState >= 2) {
+          if (incoming.paused) {
             incoming.style.display = 'none';
             incoming.play().catch(() => {});
           }
