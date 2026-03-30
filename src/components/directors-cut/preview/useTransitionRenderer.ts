@@ -19,6 +19,7 @@ export function useTransitionRenderer(
   transitions: TransitionAssignment[],
   videoFilterRef: React.RefObject<string>,
   frameCacheRef: React.RefObject<Map<string, ImageBitmap>>,
+  computeFilterForTimeRef?: React.RefObject<(time: number) => string>,
 ) {
   const rafRef = useRef<number>();
   const wasActiveRef = useRef(false);
@@ -119,12 +120,13 @@ export function useTransitionRenderer(
           base.style.height = '100%';
           base.style.objectFit = 'contain';
           base.style.zIndex = '1';
-          const baseFilter = videoFilterRef.current || '';
+          // Synchronous filter: compute for exact current time to avoid 2-3 frame lag
+          const syncBaseFilter = computeFilterForTimeRef?.current ? computeFilterForTimeRef.current(time) : (videoFilterRef.current || '');
           const baseTransitionFilter = (styles.baseStyle as any).filter || '';
           base.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
           base.style.transform = styles.baseStyle.transform || 'none';
           base.style.clipPath = styles.baseStyle.clipPath || 'none';
-          base.style.filter = [baseFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
+          base.style.filter = [syncBaseFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
 
           // Apply incoming styles
           incoming.style.display = '';
@@ -135,12 +137,12 @@ export function useTransitionRenderer(
           incoming.style.objectFit = 'contain';
           incoming.style.zIndex = '2';
 
-          const incomingFilter = videoFilterRef.current || '';
+          const syncIncomingFilter = computeFilterForTimeRef?.current ? computeFilterForTimeRef.current(time) : (videoFilterRef.current || '');
           const incomingTransitionFilter = (styles.incomingStyle as any).filter || '';
           incoming.style.opacity = styles.incomingStyle.opacity != null ? String(styles.incomingStyle.opacity) : '1';
           incoming.style.transform = styles.incomingStyle.transform || '';
           incoming.style.clipPath = styles.incomingStyle.clipPath || '';
-          incoming.style.filter = [incomingFilter, incomingTransitionFilter].filter(Boolean).join(' ') || '';
+          incoming.style.filter = [syncIncomingFilter, incomingTransitionFilter].filter(Boolean).join(' ') || '';
 
           found = true;
           wasActiveRef.current = true;
@@ -149,12 +151,13 @@ export function useTransitionRenderer(
 
       // === NO TRANSITION — deterministic baseline reset EVERY inactive frame ===
       if (!found) {
-        const baseFilter = videoFilterRef.current || '';
+        // Synchronous filter for exact time
+        const syncFilter = computeFilterForTimeRef?.current ? computeFilterForTimeRef.current(time) : (videoFilterRef.current || '');
         // Deterministic hard reset EVERY inactive frame
         base.style.opacity = '1';
         base.style.transform = 'none';
         base.style.clipPath = 'none';
-        base.style.filter = baseFilter || '';
+        base.style.filter = syncFilter || '';
         base.style.position = '';
         base.style.inset = '';
         base.style.zIndex = '';
