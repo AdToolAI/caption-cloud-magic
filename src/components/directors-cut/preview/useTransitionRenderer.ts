@@ -50,11 +50,21 @@ export function useTransitionRenderer(
   }, [incomingVideoRef]);
 
   // When scenes or transitions change, reset phase
+  // Cleanup helper for seeked listener
+  const cleanupHandoffListener = useCallback(() => {
+    if (handoffListenerRef.current && baseVideoRef.current) {
+      baseVideoRef.current.removeEventListener('seeked', handoffListenerRef.current);
+    }
+    handoffListenerRef.current = null;
+  }, [baseVideoRef]);
+
   useEffect(() => {
     phaseRef.current = 'idle';
     lastIncomingSeekRef.current = '';
-    handoffSeekedRef.current = false;
-  }, [scenes, transitions]);
+    handoffRequestedRef.current = false;
+    handoffReadyRef.current = false;
+    cleanupHandoffListener();
+  }, [scenes, transitions, cleanupHandoffListener]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
