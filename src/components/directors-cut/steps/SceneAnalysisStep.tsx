@@ -1117,9 +1117,9 @@ export function SceneAnalysisStep({
                               <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/50">
                                 <span className="text-xs font-medium">Dauer:</span>
                                 <Slider
-                                  value={[sceneTransitions[scene.id]?.duration || 0.5]}
+                                  value={[sceneTransitions[scene.id]?.duration || 1.2]}
                                   onValueChange={(v) => handleSetSceneTransitionDuration(scene.id, v[0])}
-                                  min={0.2}
+                                  min={0.5}
                                   max={2}
                                   step={0.1}
                                   className="flex-1"
