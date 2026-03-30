@@ -23,6 +23,9 @@ interface MotionEffectsStepProps {
   audio: AudioEnhancements;
   onSpeedKeyframesChange?: (keyframes: SpeedKeyframe[]) => void;
   onKenBurnsChange?: (keyframes: KenBurnsKeyframe[]) => void;
+  // Controlled state from parent
+  initialSpeedKeyframes?: SpeedKeyframe[];
+  initialKenBurnsKeyframes?: KenBurnsKeyframe[];
   // Color Grading Props
   colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
   sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
