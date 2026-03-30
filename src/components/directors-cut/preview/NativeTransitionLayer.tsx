@@ -102,7 +102,7 @@ export function getTransitionStyles(info: TransitionInfo | null): {
   switch (baseType) {
     case 'crossfade':
     case 'dissolve':
-      baseStyle = { opacity: 1 - progress * 0.3 };
+      baseStyle = { opacity: 1 - progress };
       incomingStyle = { opacity: progress };
       break;
 
