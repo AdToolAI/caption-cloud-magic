@@ -1,56 +1,107 @@
 
+## Fix: Stotterer direkt nach jedem Übergang entfernen
 
-## Fix: Ruckler nach Übergängen glätten
+### Wahrscheinliche Root Cause im aktuellen Code
 
-### Ursache
+Der Stotterer kommt sehr wahrscheinlich nicht mehr vom eigentlichen Übergang, sondern vom **Handoff direkt danach**:
 
-Wenn eine Transition endet (active → idle), passieren zwei Dinge, die den Ruckler verursachen:
+- In `useTransitionRenderer.ts` wird beim Wechsel `active/preparing → idle` aktuell sofort:
+  - `base.currentTime = incoming.currentTime` gesetzt
+  - danach das `incoming`-Video sofort pausiert und versteckt
+- Dieses `currentTime`-Setzen ist ein **echter Decoder-Seek** auf dem Hauptvideo und erzeugt genau den kurzen Hänger, den man nach jedem Übergang sieht.
+- Der aktuelle Cooldown unterdrückt nur den nachfolgenden Boundary-Seek im Player, **nicht** diesen sichtbaren Handoff-Seek.
+- Zusätzlich wird das `incoming`-Video aktuell nicht sauber auf dieselbe Playback-Geschwindigkeit wie das Base-Video gespiegelt, wodurch der Handoff unnötig große Zeitdifferenzen bekommen kann.
 
-1. **Kein Video-Handoff**: Der Renderer pausiert das Incoming-Video und blendet es aus, aber das Base-Video steht noch an der Position der alten Szene. Erst danach erkennt der Boundary-Check (Zeile 581) die Szenengrenze und macht `video.currentTime = nextSourceStart` — das ist ein harter Seek, der einen sichtbaren Frame-Sprung erzeugt.
+### Umsetzung
 
-2. **Cooldown zu kurz**: Der Cooldown ist 10 Frames (~160ms bei 60fps). Bei langsamen Seeks oder wenn das Video noch buffert, kann der Boundary-Check trotzdem feuern, bevor das Video smooth weiterspielt.
+#### 1. Harten Active→Idle-Handoff durch echten `handoff`-State ersetzen
+Datei: `src/components/directors-cut/preview/useTransitionRenderer.ts`
 
-### Lösung
+Statt nach dem Übergang sofort auf `idle` zu springen:
 
-**Im Transition-Renderer** (`useTransitionRenderer.ts`): Beim Übergang `active → idle` das Base-Video auf die aktuelle Position des Incoming-Videos synchronisieren, **bevor** das Incoming pausiert und ausgeblendet wird. So sieht der Nutzer keinen Sprung.
+- neuen Lifecycle verwenden:
+  - `idle`
+  - `preparing`
+  - `active`
+  - `handoff`
+- Wenn der Übergang endet:
+  - `incoming` bleibt **noch sichtbar**
+  - `base` wird im Hintergrund auf die Zielposition gebracht
+  - erst wenn `base` wieder renderbereit ist, wird sauber auf `base` zurückgeschaltet
 
-**Cooldown erhöhen**: Von 10 auf 30 Frames (~500ms), damit der Boundary-Check nach dem Handoff sicher unterdrückt bleibt.
+So wird der Decoder-Hänger nicht mehr sichtbar.
 
-### Konkrete Änderungen
+#### 2. Layer-Swap erst nach echter Readiness
+Datei: `src/components/directors-cut/preview/useTransitionRenderer.ts`
 
-**`src/components/directors-cut/preview/useTransitionRenderer.ts`** — Zeile 187-211 (idle-Reset):
+Im neuen `handoff`-State:
 
-```typescript
-if (phaseRef.current !== 'idle') {
-  // Sync base video to incoming position BEFORE hiding incoming
-  // This prevents the visible jump when switching layers
-  const base = baseVideoRef.current;
-  if (base && incoming.currentTime > 0 && !incoming.paused) {
-    const diff = Math.abs(base.currentTime - incoming.currentTime);
-    if (diff > 0.05) {
-      base.currentTime = incoming.currentTime;
-    }
-  }
+- `base.currentTime` nur einmal synchronisieren, wenn nötig
+- danach auf echte Bereitschaft warten:
+  - `base.readyState >= 2`
+  - optional zusätzlich `seeked` / sehr kleine Zeitdifferenz als Abschlussbedingung
+- erst dann:
+  - `incoming.pause()`
+  - `incoming.opacity = 0`
+  - Styles neutralisieren
+  - `phaseRef = 'idle'`
 
-  // Now clean up incoming
-  if (!incoming.paused) incoming.pause();
-  incoming.style.pointerEvents = 'none';
-  incoming.style.opacity = '0';
-  // ... rest of cleanup ...
+Damit verschwindet das `incoming`-Bild erst dann, wenn `base` wirklich übernehmen kann.
 
-  if (transitionCooldownRef) {
-    transitionCooldownRef.current = 30; // increased from 10
-  }
-  
-  phaseRef.current = 'idle';
-}
+#### 3. Incoming-PlaybackRate an Base/Timeline koppeln
+Datei: `src/components/directors-cut/preview/useTransitionRenderer.ts`
+Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+
+Aktuell wird die Wiedergabegeschwindigkeit im Player nur für `videoRef` gepflegt.  
+Ich würde eine kleine gemeinsame Rate-/Timing-Quelle bereitstellen und im Renderer während `preparing`, `active` und `handoff` auch auf `incoming.playbackRate` anwenden.
+
+Das reduziert Drift zwischen beiden Video-Layern und minimiert den Korrektur-Seek beim Handoff.
+
+#### 4. Boundary-Advance nach Handoff gezielt nur einmal überspringen
+Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+
+Statt nur mit einem langen pauschalen Cooldown zu arbeiten:
+
+- nach abgeschlossenem Handoff ein kleines, explizites Flag setzen
+- den Boundary-Advance genau für den direkt folgenden Zyklus / Szenenwechsel überspringen oder als bereits verarbeitet markieren
+
+So bleibt die Szenenlogik stabil, ohne unnötig lange „blind“ zu unterdrücken.
+
+#### 5. Seek/Reset auf neuen Handoff-State erweitern
+Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+Datei: `src/components/directors-cut/preview/useTransitionRenderer.ts`
+
+`handleSeek` und `handleReset` sollen zusätzlich:
+
+- laufenden `handoff` abbrechen
+- beide Layer wieder in neutralen Zustand bringen
+- Handoff-/Cooldown-/Pending-Refs zurücksetzen
+
+Damit Scrubbing und Wiederholen stabil bleiben.
+
+### Betroffene Dateien
+
+- `src/components/directors-cut/preview/useTransitionRenderer.ts`
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+
+### Technische Kurznotiz
+
+```text
+Aktuell:
+active -> base.currentTime = incoming.currentTime -> incoming sofort weg
+=> sichtbarer Seek / Decoder-Hänger
+
+Nach Fix:
+active -> handoff
+       -> incoming bleibt sichtbar
+       -> base wird im Hintergrund synchronisiert
+       -> erst bei base-ready wird sauber geswappt
+=> kein sichtbarer Stotterer nach dem Übergang
 ```
 
-### Betroffene Datei
-- `src/components/directors-cut/preview/useTransitionRenderer.ts` — Base-Sync + Cooldown-Erhöhung
-
 ### Ergebnis
-- Base-Video springt nicht mehr sichtbar nach Transitions-Ende
-- Boundary-Check wird lang genug unterdrückt, um doppelte Seeks zu vermeiden
-- Übergänge enden smooth ohne Ruckler
 
+- Kein kurzer Hänger direkt nach jedem Übergang
+- Übergänge bleiben sichtbar und enden deutlich smoother
+- Szene 1/2/3 usw. verhalten sich konsistent
+- Scrubbing/Reset bleiben stabil
