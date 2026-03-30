@@ -1,41 +1,53 @@
 
+Ziel: Die Effektkette im Director’s Cut wieder wirklich wirksam machen. Nach Code-Analyse ist das kein einzelner Slider-Bug, sondern eine unterbrochene Propagation zwischen Step-UI, Preview-Player und Render-Template.
 
-## Fix: Filter-Flackern beim Szenenwechsel
+1. Root Cause, die ich beheben würde
+- `MotionEffectsStep.tsx` verwaltet `kenBurnsKeyframes` und `speedKeyframes` lokal und startet immer mit leeren Arrays.
+- `DirectorsCutPreviewPlayer.tsx` akzeptiert `kenBurns`, `speedKeyframes`, `styleTransfer` und `chromaKey` zwar als Props, nutzt sie aber im Preview praktisch nicht.
+- In `DirectorsCut.tsx` wird bei `onSpeedKeyframesChange` sogar Information abgeschnitten (`sceneId`, `easing` gehen verloren).
+- Ergebnis: Die UI zeigt aktive Effekte an, aber der Preview-Player hat keine vollständige/aktive Effektlogik. Das erklärt genau, warum z. B. Pan/Zoom oder Speed-Ramping “nicht funktionieren”.
 
-### Problem
+2. Geplanter Fix
+- `MotionEffectsStep` auf kontrollierten State umstellen:
+  - vorhandene `speedKeyframes`/`kenBurnsKeyframes` aus dem Parent übernehmen
+  - keine internen leeren Shadow-States mehr
+- in `DirectorsCut.tsx` die Motion-Daten vollständig speichern:
+  - Speed-Keyframes nicht mehr auf `{time, speed}` kürzen
+  - `sceneId` und `easing` erhalten
+- `DirectorsCutPreviewPlayer` funktional erweitern:
+  - Ken-Burns/Pan im Preview sichtbar machen
+  - Speed-Ramping auf die tatsächliche Preview-Wiedergabe anwenden
+  - fehlende visuelle Effektteile konsistent zusammensetzen
+- Transform-Konflikt sauber lösen:
+  - Transition-Transform und Ken-Burns-Transform dürfen nicht auf demselben DOM-Level gegeneinander überschrieben werden
+  - dafür würde ich Transition-Layer und Scene-Motion-Layer trennen
+- `NativePreviewEffects` ergänzen/vereinheitlichen:
+  - szenenspezifische Werte robust anwenden
+  - keine zweite, abweichende Effektlogik neben dem Hauptplayer mehr
+- Remotion-Render angleichen:
+  - dieselbe Motion-/Speed-Logik auch im finalen Render verwenden, damit Preview und Export übereinstimmen
 
-Der `useTransitionRenderer` RAF-Loop setzt `base.style.filter = videoFilterRef.current` auf **jedem Frame** (Zeile 152-157). Aber `videoFilterRef` wird über eine React-Kette aktualisiert:
+3. Betroffene Dateien
+- `src/components/directors-cut/steps/MotionEffectsStep.tsx`
+- `src/pages/DirectorsCut/DirectorsCut.tsx`
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- `src/components/directors-cut/preview/useTransitionRenderer.ts`
+- `src/components/directors-cut/preview/NativePreviewEffects.tsx`
+- `src/remotion/templates/DirectorsCutVideo.tsx`
 
+4. Erwartetes Ergebnis
+- Ken Burns / Pan Rechts / Zoom sind im Motion-Step sofort im Preview sichtbar.
+- Speed Ramping verändert die Wiedergabe tatsächlich statt nur die UI.
+- Szene-spezifische Motion-Daten bleiben erhalten.
+- Step-Preview und finaler Export zeigen dieselben Effekte.
+- Keine “aktiv im UI, aber ohne Wirkung im Player”-Effekte mehr.
+
+5. Technische Kurznotiz
 ```text
-visualTimeRef → displayTime (setState) → currentScene (useMemo) → videoFilter (useMemo) → videoFilterRef (useEffect)
+Bisher:
+Step-State -> teilweise Parent -> Preview-Props -> keine echte Anwendung
+
+Nach Fix:
+Step-State -> Parent-State -> Preview-Resolver -> sichtbare Wirkung
+                           -> Render-Resolver  -> gleicher Export
 ```
-
-Das ist 2-3 Frames Verzögerung. Beim Szenenwechsel zeigt der RAF-Loop noch den **alten** Filter für ~2ms, bevor React den neuen Wert durchpropagiert hat. Das erklärt:
-- **Szene 3**: Nach dem Übergang kurz das ungefilterte Bild (alter Filter noch im Ref)
-- **Szene 4**: Am Anfang kurz den Filter der vorherigen Szene (Ref noch nicht aktualisiert)
-
-### Lösung
-
-Den Filter **synchron im RAF-Loop** berechnen statt über den React-State-Umweg. Der Renderer kennt bereits `visualTimeRef.current` und die `scenes` — er braucht nur zusätzlich `sceneEffects` und `effects`, um den korrekten Filter direkt für die aktuelle Zeit zu bestimmen.
-
-### Umsetzung
-
-**1. `useTransitionRenderer.ts` — Neue Parameter + synchrone Filter-Berechnung**
-- Zusätzliche Parameter: `scenes`, `effects`, `sceneEffects`, `AVAILABLE_FILTERS` (oder ein bereits vorberechneter Filter-Resolver-Callback)
-- Sauberer Ansatz: Ein `computeFilterForTime(time)` Callback, der von `DirectorsCutPreviewPlayer` übergeben wird
-- Im RAF-Loop: `const currentFilter = computeFilterForTime(visualTimeRef.current)` statt `videoFilterRef.current`
-
-**2. `DirectorsCutPreviewPlayer.tsx` — Callback bereitstellen**
-- `computeFilterForTime` als `useCallback` erstellen, der dieselbe Logik wie das `videoFilter`-Memo nutzt, aber für eine beliebige Zeit
-- Szene-Lookup + Filter-Berechnung in einer Funktion zusammenfassen
-- Diesen Callback als Ref an `useTransitionRenderer` übergeben (damit der RAF-Loop immer die aktuellste Version hat)
-
-### Betroffene Dateien
-- `src/components/directors-cut/preview/useTransitionRenderer.ts` — `videoFilterRef` durch `computeFilterRef` ersetzen
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — `computeFilterForTime` Callback + Ref erstellen und übergeben
-
-### Ergebnis
-- Filter wird synchron im selben RAF-Frame berechnet wie die Zeitposition
-- Kein 2-3 Frame Delay mehr beim Szenenwechsel
-- Keine sichtbaren Filter-Blitzer mehr
-
