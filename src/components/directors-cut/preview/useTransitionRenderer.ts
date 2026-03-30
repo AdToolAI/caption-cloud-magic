@@ -25,7 +25,9 @@ export function useTransitionRenderer(
   const rafRef = useRef<number>();
   const phaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
   const lastIncomingSeekRef = useRef<string>('');
-  const handoffSeekedRef = useRef(false);
+  const handoffRequestedRef = useRef(false);
+  const handoffReadyRef = useRef(false);
+  const handoffListenerRef = useRef<(() => void) | null>(null);
 
   const resolvedTransitions = useMemo(
     () => resolveTransitions(scenes, transitions),
@@ -48,11 +50,21 @@ export function useTransitionRenderer(
   }, [incomingVideoRef]);
 
   // When scenes or transitions change, reset phase
+  // Cleanup helper for seeked listener
+  const cleanupHandoffListener = useCallback(() => {
+    if (handoffListenerRef.current && baseVideoRef.current) {
+      baseVideoRef.current.removeEventListener('seeked', handoffListenerRef.current);
+    }
+    handoffListenerRef.current = null;
+  }, [baseVideoRef]);
+
   useEffect(() => {
     phaseRef.current = 'idle';
     lastIncomingSeekRef.current = '';
-    handoffSeekedRef.current = false;
-  }, [scenes, transitions]);
+    handoffRequestedRef.current = false;
+    handoffReadyRef.current = false;
+    cleanupHandoffListener();
+  }, [scenes, transitions, cleanupHandoffListener]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -92,25 +104,42 @@ export function useTransitionRenderer(
         }
       }
 
-      // === HANDOFF PHASE: wait for base to be ready before swapping ===
+      // === HANDOFF PHASE: wait for base to TRULY finish seeking before swapping ===
       if (phaseRef.current === 'handoff') {
-        // Check if base is ready at the synced position
-        const baseReady = base.readyState >= 2;
-        const timeDiff = Math.abs(base.currentTime - incoming.currentTime);
+        if (!handoffRequestedRef.current) {
+          // First frame of handoff: request base seek + attach seeked listener
+          handoffRequestedRef.current = true;
+          handoffReadyRef.current = false;
+          cleanupHandoffListener();
 
-        if (!handoffSeekedRef.current) {
-          // First frame of handoff: sync base position
           if (incoming.currentTime > 0) {
             const diff = Math.abs(base.currentTime - incoming.currentTime);
             if (diff > 0.05) {
+              // Attach one-shot seeked listener BEFORE setting currentTime
+              const onSeeked = () => {
+                handoffReadyRef.current = true;
+                cleanupHandoffListener();
+              };
+              handoffListenerRef.current = onSeeked;
+              base.addEventListener('seeked', onSeeked, { once: true });
               base.currentTime = incoming.currentTime;
+            } else {
+              // Already close enough — mark ready immediately
+              handoffReadyRef.current = true;
             }
+          } else {
+            handoffReadyRef.current = true;
           }
-          handoffSeekedRef.current = true;
         }
 
-        if (baseReady && (timeDiff < 0.1 || handoffSeekedRef.current)) {
+        // Only complete handoff when base has TRULY finished the seek
+        const baseReady = base.readyState >= 2;
+        const timeDiff = Math.abs(base.currentTime - incoming.currentTime);
+        const seekComplete = handoffReadyRef.current && baseReady && timeDiff < 0.05;
+
+        if (seekComplete) {
           // Base is ready — complete the handoff
+          cleanupHandoffListener();
           if (!incoming.paused) incoming.pause();
           incoming.style.pointerEvents = 'none';
           incoming.style.opacity = '0';
@@ -125,7 +154,8 @@ export function useTransitionRenderer(
           incoming.style.zIndex = '';
 
           lastIncomingSeekRef.current = '';
-          handoffSeekedRef.current = false;
+          handoffRequestedRef.current = false;
+          handoffReadyRef.current = false;
 
           if (transitionCooldownRef) {
             transitionCooldownRef.current = 30;
@@ -254,7 +284,9 @@ export function useTransitionRenderer(
       // If we were active, enter handoff instead of going directly to idle
       if (phaseRef.current === 'active') {
         phaseRef.current = 'handoff';
-        handoffSeekedRef.current = false;
+        handoffRequestedRef.current = false;
+        handoffReadyRef.current = false;
+        cleanupHandoffListener();
         // Don't clean up incoming yet — handoff handler will do it
         rafRef.current = requestAnimationFrame(tick);
         return;
@@ -293,6 +325,7 @@ export function useTransitionRenderer(
     rafRef.current = requestAnimationFrame(tick);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      cleanupHandoffListener();
     };
-  }, [scenes, transitions, resolvedTransitions, visualTimeRef, baseVideoRef, incomingVideoRef, canvasRef, videoFilterRef, frameCacheRef, seekIncoming, computeFilterForTimeRef]);
+  }, [scenes, transitions, resolvedTransitions, visualTimeRef, baseVideoRef, incomingVideoRef, canvasRef, videoFilterRef, frameCacheRef, seekIncoming, computeFilterForTimeRef, cleanupHandoffListener]);
 }
