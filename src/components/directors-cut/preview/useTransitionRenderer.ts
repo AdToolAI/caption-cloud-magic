@@ -25,7 +25,9 @@ export function useTransitionRenderer(
   const rafRef = useRef<number>();
   const phaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
   const lastIncomingSeekRef = useRef<string>('');
-  const handoffSeekedRef = useRef(false);
+  const handoffRequestedRef = useRef(false);
+  const handoffReadyRef = useRef(false);
+  const handoffListenerRef = useRef<(() => void) | null>(null);
 
   const resolvedTransitions = useMemo(
     () => resolveTransitions(scenes, transitions),
