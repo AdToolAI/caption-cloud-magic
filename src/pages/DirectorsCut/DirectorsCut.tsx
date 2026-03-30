@@ -6,8 +6,13 @@ import { Toggle } from '@/components/ui/toggle';
 import { 
   ArrowLeft, ArrowRight, Film, Sparkles, Scissors, Wand2, 
   Palette, Zap, ArrowUpCircle, Volume2, Mic, Download, Check, Play,
-  LayoutGrid, Timer
+  LayoutGrid, Timer, RotateCcw
 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { TimelineStudioPro } from '@/components/directors-cut/timeline';
 import { CapCutEditor } from '@/components/directors-cut/studio';
 import { motion } from 'framer-motion';
