@@ -388,6 +388,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
   useEffect(() => { computeFilterForTimeRef.current = computeFilterForTime; }, [computeFilterForTime]);
 
+  // Ken Burns refs for RAF-loop application
+  const kenBurnsRef = useRef(kenBurns);
+  useEffect(() => { kenBurnsRef.current = kenBurns; }, [kenBurns]);
+  const kenBurnsWrapperRef = useRef<HTMLDivElement>(null);
+
+  // Speed keyframes ref for RAF-loop application
+  const speedKeyframesRef = useRef(speedKeyframes);
+  useEffect(() => { speedKeyframesRef.current = speedKeyframes; }, [speedKeyframes]);
+
   useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef);
 
 
