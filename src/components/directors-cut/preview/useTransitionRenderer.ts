@@ -105,8 +105,6 @@ export function useTransitionRenderer(
             incoming.play().catch(() => {});
           }
 
-          const isOpacityBased = OPACITY_BASED_TYPES.has(rt.baseType);
-
           const styles = getTransitionStyles({
             progress,
             baseType: rt.baseType,
@@ -119,65 +117,21 @@ export function useTransitionRenderer(
             ? computeFilterForTimeRef.current(time)
             : (videoFilterRef.current || '');
 
-          // --- OPACITY-BASED TRANSITIONS: use canvas for frozen outgoing frame ---
-          if (isOpacityBased && canvas) {
-            const outgoingKey = `outgoing-${rt.outgoingSceneId}`;
-            const cachedFrame = frameCacheRef.current?.get(outgoingKey);
+          // --- ALL TRANSITIONS: unified dual-video CSS path ---
+          if (canvas) canvas.style.display = 'none';
 
-            if (cachedFrame) {
-              // Show canvas with frozen outgoing frame
-              canvas.style.display = 'block';
-              canvas.style.position = 'absolute';
-              canvas.style.inset = '0';
-              canvas.style.width = '100%';
-              canvas.style.height = '100%';
-              canvas.style.zIndex = '1';
-              canvas.style.pointerEvents = 'none';
+          base.style.position = 'absolute';
+          base.style.inset = '0';
+          base.style.width = '100%';
+          base.style.height = '100%';
+          base.style.objectFit = 'contain';
+          base.style.zIndex = '1';
 
-              const baseTransitionFilter = (styles.baseStyle as any).filter || '';
-              canvas.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
-              canvas.style.filter = [syncFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
-
-              // Draw the cached frame
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                if (canvas.width !== cachedFrame.width || canvas.height !== cachedFrame.height) {
-                  canvas.width = cachedFrame.width;
-                  canvas.height = cachedFrame.height;
-                }
-                ctx.drawImage(cachedFrame, 0, 0);
-              }
-
-              // Hide the base video during opacity transition so it doesn't show through
-              base.style.opacity = '0';
-              base.style.transform = 'none';
-              base.style.clipPath = 'none';
-            } else {
-              // No cached frame — fall back to base video
-              canvas.style.display = 'none';
-              const baseTransitionFilter = (styles.baseStyle as any).filter || '';
-              base.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
-              base.style.transform = styles.baseStyle.transform || 'none';
-              base.style.clipPath = styles.baseStyle.clipPath || 'none';
-              base.style.filter = [syncFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
-            }
-          } else {
-            // --- NON-OPACITY TRANSITIONS (slide, push, wipe, zoom): dual-video CSS ---
-            if (canvas) canvas.style.display = 'none';
-
-            base.style.position = 'absolute';
-            base.style.inset = '0';
-            base.style.width = '100%';
-            base.style.height = '100%';
-            base.style.objectFit = 'contain';
-            base.style.zIndex = '1';
-
-            const baseTransitionFilter = (styles.baseStyle as any).filter || '';
-            base.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
-            base.style.transform = styles.baseStyle.transform || 'none';
-            base.style.clipPath = styles.baseStyle.clipPath || 'none';
-            base.style.filter = [syncFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
-          }
+          const baseTransitionFilter = (styles.baseStyle as any).filter || '';
+          base.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
+          base.style.transform = styles.baseStyle.transform || 'none';
+          base.style.clipPath = styles.baseStyle.clipPath || 'none';
+          base.style.filter = [syncFilter, baseTransitionFilter].filter(Boolean).join(' ') || 'none';
 
           // Apply incoming styles (same for all transition types)
           incoming.style.pointerEvents = 'auto';
