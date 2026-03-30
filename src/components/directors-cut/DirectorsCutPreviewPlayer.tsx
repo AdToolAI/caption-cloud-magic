@@ -856,6 +856,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     lastSceneIndexRef.current = -1;
     pendingSceneAdvanceRef.current = null;
     transitionCooldownRef.current = 0;
+    lastHandoffBoundaryRef.current = null;
     // Reset incoming video
     const incoming = incomingVideoRef.current;
     if (incoming) {
