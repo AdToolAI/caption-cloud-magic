@@ -734,8 +734,10 @@ export function DirectorsCut() {
             sceneEffects={appliedEffects.scenes}
             transitions={transitions}
             audio={audioEnhancements}
-            onSpeedKeyframesChange={(keyframes) => setSpeedKeyframes(keyframes.map(k => ({ time: k.time, speed: k.speed })))}
+            onSpeedKeyframesChange={(keyframes) => setSpeedKeyframes(keyframes.map(k => ({ id: k.id, time: k.time, speed: k.speed, sceneId: k.sceneId, easing: k.easing })))}
             onKenBurnsChange={(keyframes) => setKenBurnsKeyframes(keyframes)}
+            initialSpeedKeyframes={speedKeyframes as any}
+            initialKenBurnsKeyframes={kenBurnsKeyframes}
             colorGrading={colorGrading}
             sceneColorGrading={sceneColorGrading}
             textOverlays={textOverlays}

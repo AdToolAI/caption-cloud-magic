@@ -44,13 +44,15 @@ export function MotionEffectsStep({
   audio,
   onSpeedKeyframesChange,
   onKenBurnsChange,
+  initialSpeedKeyframes,
+  initialKenBurnsKeyframes,
   colorGrading,
   sceneColorGrading,
   textOverlays = [],
 }: MotionEffectsStepProps) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
-  const [kenBurnsKeyframes, setKenBurnsKeyframes] = useState<KenBurnsKeyframe[]>([]);
-  const [speedKeyframes, setSpeedKeyframes] = useState<SpeedKeyframe[]>([]);
+  const [kenBurnsKeyframes, setKenBurnsKeyframes] = useState<KenBurnsKeyframe[]>(initialKenBurnsKeyframes ?? []);
+  const [speedKeyframes, setSpeedKeyframes] = useState<SpeedKeyframe[]>(initialSpeedKeyframes ?? []);
 
   const handleKenBurnsChange = (keyframes: KenBurnsKeyframe[]) => {
     setKenBurnsKeyframes(keyframes);
