@@ -406,7 +406,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const speedKeyframesRef = useRef(speedKeyframes);
   useEffect(() => { speedKeyframesRef.current = speedKeyframes; }, [speedKeyframes]);
 
-  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef);
+  // Cooldown ref: when a transition just ended, suppress boundary seek for N frames
+  const transitionCooldownRef = useRef<number>(0);
+
+  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
