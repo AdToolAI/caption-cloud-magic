@@ -118,13 +118,33 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
     });
   };
 
-  const handleLibrarySelect = (video: any) => {
+  const handleLibrarySelect = async (video: any) => {
     const metadata = video.metadata as Record<string, any> || {};
+    let duration = metadata?.duration_seconds || undefined;
+    
+    // If no duration in metadata, measure from video URL
+    if (!duration && video.output_url) {
+      try {
+        const measured = await new Promise<number>((resolve) => {
+          const v = document.createElement('video');
+          v.preload = 'metadata';
+          v.onloadedmetadata = () => {
+            const d = v.duration;
+            v.src = '';
+            resolve(isFinite(d) && d > 0 ? d : 0);
+          };
+          v.onerror = () => { v.src = ''; resolve(0); };
+          v.src = video.output_url;
+        });
+        if (measured > 0) duration = measured;
+      } catch { /* ignore */ }
+    }
+    
     const selected: SelectedVideo = {
       id: video.id,
       url: video.output_url,
       name: metadata?.title || video.project_name || 'Video aus Mediathek',
-      duration: metadata?.duration_seconds || undefined,
+      duration,
       thumbnail_url: video.thumbnail_url,
       source: 'media_library',
     };

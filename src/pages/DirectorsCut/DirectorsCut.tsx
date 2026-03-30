@@ -455,6 +455,24 @@ export function DirectorsCut() {
     });
   };
 
+  // Measure real video duration from URL
+  const measureVideoDuration = (url: string): Promise<number> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        const dur = video.duration;
+        video.src = '';
+        resolve(isFinite(dur) && dur > 0 ? dur : 0);
+      };
+      video.onerror = () => {
+        video.src = '';
+        resolve(0);
+      };
+      video.src = url;
+    });
+  };
+
   const handleStartAnalysis = async () => {
     if (!selectedVideo) return;
     
@@ -462,7 +480,19 @@ export function DirectorsCut() {
     
     try {
       toast.info('Extrahiere Video-Frames für KI-Analyse...');
-      const canonicalDuration = selectedVideo.duration || 30;
+      
+      // Measure real duration from video URL if not already known
+      let canonicalDuration = selectedVideo.duration || 0;
+      if (!canonicalDuration) {
+        const measured = await measureVideoDuration(selectedVideo.url);
+        if (measured > 0) {
+          canonicalDuration = measured;
+          setSelectedVideo(prev => prev ? { ...prev, duration: measured } : prev);
+        } else {
+          canonicalDuration = 30; // absolute last fallback
+        }
+      }
+      
       const frames = await extractVideoFrames(selectedVideo.url, canonicalDuration);
       
       const { data, error } = await supabase.functions.invoke('analyze-video-scenes', {
