@@ -187,7 +187,17 @@ export function useTransitionRenderer(
       // Phase 4: IDLE — truly far from any transition
       // Only reset incoming if we were previously in a non-idle phase
       if (phaseRef.current !== 'idle') {
-        // Transition just ended — clean up incoming
+        // Sync base video to incoming position BEFORE hiding incoming
+        // This prevents the visible jump when switching layers
+        const base = baseVideoRef.current;
+        if (base && incoming.currentTime > 0 && !incoming.paused) {
+          const diff = Math.abs(base.currentTime - incoming.currentTime);
+          if (diff > 0.05) {
+            base.currentTime = incoming.currentTime;
+          }
+        }
+
+        // Now clean up incoming
         if (!incoming.paused) incoming.pause();
         incoming.style.pointerEvents = 'none';
         incoming.style.opacity = '0';
@@ -205,7 +215,7 @@ export function useTransitionRenderer(
         
         // Signal cooldown to player to suppress boundary seek for a few frames
         if (transitionCooldownRef) {
-          transitionCooldownRef.current = 10; // suppress for 10 frames
+          transitionCooldownRef.current = 30; // suppress for 30 frames (~500ms)
         }
         
         phaseRef.current = 'idle';
