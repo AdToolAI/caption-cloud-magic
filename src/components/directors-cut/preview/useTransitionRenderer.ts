@@ -106,7 +106,7 @@ export function useTransitionRenderer(
           // Pausing it would freeze the timeline slider.
 
           // Start incoming video playing from the right position
-          if (incoming.paused && incoming.readyState >= 2) {
+          if (incoming.paused) {
             incoming.play().catch(() => {});
           }
 
