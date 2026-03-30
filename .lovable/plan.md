@@ -1,73 +1,72 @@
 
-Ziel: Den verbleibenden Stotterer 0,1–0,2s nach jedem Übergang entfernen. Der aktuelle Handoff ist fast richtig, schaltet aber noch zu früh zurück.
+Ziel: Die Übergänge wieder sichtbar machen und den verbleibenden Stotterer beseitigen, ohne den Renderer erneut in einen unsichtbaren Zustand zu bringen.
 
-1. Root Cause präzise beheben
-- In `useTransitionRenderer.ts` ist die Bedingung im `handoff` aktuell zu permissiv:
-  - `handoffSeekedRef.current` wird direkt nach `base.currentTime = incoming.currentTime` auf `true` gesetzt
-  - die Abschlussbedingung `baseReady && (timeDiff < 0.1 || handoffSeekedRef.current)` ist dadurch praktisch sofort wahr
-- Ergebnis:
-  - Das Incoming-Layer wird versteckt, bevor das Base-Video den Seek wirklich fertig dekodiert hat
-  - Der sichtbare Hänger erscheint dann leicht verzögert genau 0,1–0,2s nach dem Übergang
+Do I know what the issue is? Ja.
 
-2. Handoff auf echte Seek-Fertigstellung umstellen
-Datei: `src/components/directors-cut/preview/useTransitionRenderer.ts`
-- Den `handoff`-Ablauf in zwei echte Schritte teilen:
-  - `handoffRequestedRef`: Seek wurde ausgelöst
-  - `handoffReadyRef`: Base hat den Seek wirklich abgeschlossen
-- Die Handoff-Fertigstellung nur erlauben, wenn wirklich beide Bedingungen erfüllt sind:
-  - `base.readyState >= 2`
-  - `Math.abs(base.currentTime - incoming.currentTime) < sehr kleinem Threshold` (z. B. 0.03–0.05)
-- Wichtig:
-  - `handoffSeekedRef` darf nicht mehr selbst als Erfolgskriterium dienen
-  - optional `seeked`-Event auf dem Base-Video einmalig anhängen, damit Readiness nicht nur vermutet wird
+Problem:
+Der letzte Handoff-Fix ist jetzt zu streng. In `useTransitionRenderer.ts` bleibt der Renderer im `handoff`, bis `seeked + readyState >= 2 + timeDiff < 0.05` gleichzeitig erfüllt sind. Da das Incoming-Video währenddessen weiterläuft, driftet `incoming.currentTime` weiter. Dadurch kann `timeDiff < 0.05` leicht nie eintreten. Ergebnis:
+- der Renderer bleibt im `handoff` hängen
+- das Incoming-Layer bleibt logisch im Übergabezustand
+- neue Transitions werden nicht mehr sauber gestartet
+- für den Nutzer wirken die Übergänge “weg”, obwohl die Timeline sie zeigt
 
-3. Während des Handoffs das Incoming-Layer stabil stehen lassen
-Datei: `src/components/directors-cut/preview/useTransitionRenderer.ts`
-- Solange das Base-Video noch nicht wirklich fertig ist:
-  - Incoming sichtbar lassen
-  - keine weitere Cleanup-Logik ausführen
-  - Base bereits mit neutralen Styles im Hintergrund halten
-- Dadurch bleibt der Decoder-Seek vollständig unsichtbar
+Zusätzlich ist der Stotterer sehr wahrscheinlich jetzt nicht mehr der ursprüngliche Transition-Seek, sondern der nachgelagerte Boundary-Advance im Player, der nach dem Handoff trotzdem noch sichtbar wird.
 
-4. Boundary-Suppression gezielter nach echtem Handoff-Ende koppeln
-Datei: `src/components/directors-cut/preview/useTransitionRenderer.ts`
-Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-- `transitionCooldownRef.current = 30` erst dann setzen, wenn der Handoff wirklich abgeschlossen ist
-- So wird der Boundary-Advance nicht zu früh wieder aktiv, während das Base-Video noch mitten im Seek-Recovery ist
-
-5. Reset/Seek auf neue Handoff-Refs erweitern
-Datei: `src/components/directors-cut/preview/useTransitionRenderer.ts`
-Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-- Beim manuellen Seek/Reset:
-  - alle Handoff-Refs sauber zurücksetzen
-  - eventuelle `seeked`-Listener entfernen
-  - Incoming wieder in neutralen Zustand bringen
-- Damit Scrubbing und Wiederholen stabil bleiben
-
-Technische Kurznotiz
-```text
-Aktuell:
-handoff start
--> base.currentTime = incoming.currentTime
--> handoffSeekedRef = true
--> Abschlussbedingung wird fast sofort erfüllt
--> incoming verschwindet zu früh
--> 100–200ms später sichtbarer Decoder-Hänger
-
-Nach Fix:
-handoff start
--> base seek wird angefordert
--> incoming bleibt sichtbar
--> warten auf echte base-Seekkonsistenz + readiness
--> erst dann swap auf base
-=> kein verzögerter Stotterer nach dem Übergang
-```
-
-Betroffene Dateien
+Betroffene Dateien:
 - `src/components/directors-cut/preview/useTransitionRenderer.ts`
 - `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
 
-Ergebnis
-- Kein verzögerter Mini-Ruckler nach Übergängen
-- Übergänge enden sichtbar sauberer
-- Bestehende Crossfade/Slide/Wipe-Logik bleibt erhalten
+Umsetzung:
+1. Handoff in `useTransitionRenderer.ts` deterministisch machen
+- Beim Eintritt in `handoff` eine feste `handoffTargetTimeRef` speichern = Snapshot von `incoming.currentTime`
+- Base genau einmal auf diesen festen Zielwert seeken
+- Abschlussbedingung gegen den Snapshot prüfen, nicht gegen das weiterlaufende `incoming.currentTime`
+- Während `handoff` neue aktive Transition sofort höher priorisieren als das alte Handoff, damit der Renderer nie “festhängt”
+
+2. Stuck-Handoff absichern
+- kleinen Fallback einbauen, z. B. Timeout/Fame-Limit für `handoff`
+- wenn Base nach kurzer Zeit nicht sauber ready wird, Handoff kontrolliert beenden statt unendlich sichtbar/inkonsistent zu bleiben
+- alle Handoff-Refs bei Seek/Reset vollständig zurücksetzen
+
+3. Boundary-Advance gezielt unterdrücken
+- In `DirectorsCutPreviewPlayer.tsx` nicht nur globalen Cooldown verwenden
+- nach erfolgreichem Handoff die gerade verarbeitete Szenengrenze explizit als “schon übernommen” markieren
+- den Boundary-Seek für genau diese Grenze überspringen, damit nach dem Übergang kein zusätzlicher Sprung mehr feuert
+
+4. Prioritätsordnung im Renderer bereinigen
+- Reihenfolge im RAF-Loop so anpassen:
+  - neue aktive Transition
+  - freeze/preparing
+  - handoff
+  - idle
+- dadurch kann ein altes Handoff niemals eine neue Transition maskieren
+
+5. Reset-/Seek-Pfade angleichen
+- `handleSeek` und `handleReset` so erweitern, dass auch Handoff-spezifische Marker sicher gelöscht werden
+- Incoming/Base-Stile wieder auf neutral setzen, damit kein unsichtbarer Restzustand bleibt
+
+Warum ich diesen Plan wähle:
+- Er erklärt beide Symptome gleichzeitig:
+  - Übergänge weg = Renderer hängt im Handoff
+  - Stotterer bleibt = Boundary-Advance läuft nach dem Handoff noch sichtbar
+- Er ist kleiner und robuster als noch mehr `readyState`-/`seeked`-Komplexität
+
+Erwartetes Ergebnis:
+- Übergänge werden wieder zuverlässig sichtbar
+- kein dauerhaft festhängender `handoff` mehr
+- der Mini-Stotterer direkt nach dem Übergang wird beseitigt oder stark reduziert
+- Scrubbing/Reset bleiben stabil
+
+Technische Kurznotiz:
+```text
+Aktuell:
+handoff compares base.currentTime to live incoming.currentTime
+incoming keeps moving
+=> handoff may never resolve
+
+Nach Fix:
+handoff compares base.currentTime to frozen target snapshot
+boundary for that transition is marked as already consumed
+=> transition returns visibly
+=> no extra post-transition seek
+```
