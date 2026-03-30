@@ -98,6 +98,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     onTimeUpdateRef.current = onTimeUpdate;
   }, [onTimeUpdate]);
 
+  // Set initial incoming video styles imperatively to avoid React re-render conflicts
+  useEffect(() => {
+    const incoming = incomingVideoRef.current;
+    if (incoming) {
+      incoming.style.opacity = '0';
+      incoming.style.pointerEvents = 'none';
+    }
+  }, []);
+
   // Native audio refs
   const sourceAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceoverAudioRef = useRef<HTMLAudioElement | null>(null);
