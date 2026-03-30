@@ -1125,7 +1125,7 @@ export function SceneAnalysisStep({
                                   className="flex-1"
                                 />
                                 <span className="text-xs text-muted-foreground w-10 text-right">
-                                  {(sceneTransitions[scene.id]?.duration || 0.5).toFixed(1)}s
+                                  {(sceneTransitions[scene.id]?.duration || 1.2).toFixed(1)}s
                                 </span>
                               </div>
                             )}

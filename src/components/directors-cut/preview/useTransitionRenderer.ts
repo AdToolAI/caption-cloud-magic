@@ -202,6 +202,12 @@ export function useTransitionRenderer(
         incoming.style.zIndex = '';
 
         lastIncomingSeekRef.current = '';
+        
+        // Signal cooldown to player to suppress boundary seek for a few frames
+        if (transitionCooldownRef) {
+          transitionCooldownRef.current = 10; // suppress for 10 frames
+        }
+        
         phaseRef.current = 'idle';
       }
 
