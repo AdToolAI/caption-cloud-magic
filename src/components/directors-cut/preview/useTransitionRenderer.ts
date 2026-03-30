@@ -19,6 +19,7 @@ export function useTransitionRenderer(
   videoFilterRef: React.RefObject<string>,
   frameCacheRef: React.RefObject<Map<string, ImageBitmap>>,
   computeFilterForTimeRef?: React.RefObject<(time: number) => string>,
+  transitionCooldownRef?: React.RefObject<number>,
 ) {
   const rafRef = useRef<number>();
   const phaseRef = useRef<'idle' | 'preparing' | 'active'>('idle');
