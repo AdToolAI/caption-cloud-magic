@@ -19,6 +19,7 @@ export function useTransitionRenderer(
   transitions: TransitionAssignment[],
   videoFilterRef: React.RefObject<string>,
   frameCacheRef: React.RefObject<Map<string, ImageBitmap>>,
+  computeFilterForTimeRef?: React.RefObject<(time: number) => string>,
 ) {
   const rafRef = useRef<number>();
   const wasActiveRef = useRef(false);

@@ -334,7 +334,61 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
   const videoFilterRef = useRef('');
 
-  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef);
+  // Synchronous filter computation for the RAF loop — eliminates 2-3 frame delay
+  const computeFilterForTimeRef = useRef<(time: number) => string>(() => '');
+  const effectsRef = useRef(effects);
+  const sceneEffectsRef = useRef(sceneEffects);
+  useEffect(() => { effectsRef.current = effects; }, [effects]);
+  useEffect(() => { sceneEffectsRef.current = sceneEffects; }, [sceneEffects]);
+
+  const computeFilterForTime = useCallback((time: number): string => {
+    const eff = effectsRef.current;
+    const sEffects = sceneEffectsRef.current;
+    const filters: string[] = [];
+
+    // Find current scene for this time
+    let scene: SceneAnalysis | undefined = sortedScenes.find(s => time >= s.start_time && time < s.end_time);
+    if (!scene && sortedScenes.length > 0) {
+      scene = time < sortedScenes[0].start_time ? sortedScenes[0] : sortedScenes[sortedScenes.length - 1];
+    }
+
+    const sceneFx = scene ? sEffects?.[scene.id] : undefined;
+    const bright = sceneFx?.brightness ?? eff.brightness ?? 100;
+    const contr = sceneFx?.contrast ?? eff.contrast ?? 100;
+    const sat = sceneFx?.saturation ?? eff.saturation ?? 100;
+    const sharp = sceneFx?.sharpness ?? eff.sharpness ?? 0;
+    const temp = sceneFx?.temperature ?? eff.temperature ?? 0;
+
+    if (bright !== 100) filters.push(`brightness(${bright / 100})`);
+    if (contr !== 100) filters.push(`contrast(${contr / 100})`);
+    if (sat !== 100) filters.push(`saturate(${sat / 100})`);
+
+    if (temp > 0) {
+      filters.push(`sepia(${Math.min(temp / 100, 0.4)})`);
+      filters.push(`saturate(${1 + temp / 200})`);
+    } else if (temp < 0) {
+      filters.push(`hue-rotate(${Math.max(temp * 1.2, -60)}deg)`);
+      filters.push(`saturate(${1 + Math.abs(temp) / 200})`);
+    }
+
+    if (sharp > 0) {
+      const sharpBoost = 1 + (sharp / 100) * 0.15;
+      filters.push(`contrast(${sharpBoost})`);
+    }
+
+    const sceneFilter = scene && sEffects?.[scene.id]?.filter;
+    const activeFilterId = sceneFilter || eff.filter;
+    if (activeFilterId && activeFilterId !== 'none') {
+      const filterDef = AVAILABLE_FILTERS.find(f => f.id === activeFilterId);
+      if (filterDef?.preview) filters.push(filterDef.preview);
+    }
+
+    return filters.length > 0 ? filters.join(' ') : '';
+  }, [sortedScenes]);
+
+  useEffect(() => { computeFilterForTimeRef.current = computeFilterForTime; }, [computeFilterForTime]);
+
+  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
