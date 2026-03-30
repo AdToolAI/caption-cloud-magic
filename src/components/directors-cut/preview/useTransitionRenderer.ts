@@ -95,17 +95,9 @@ export function useTransitionRenderer(
 
           seekIncoming(rt.incomingSceneId, scenes);
 
-          // FREEZE base video at the last frame of the outgoing scene
-          // This prevents the base from playing into the next scene's content
-          const outgoingScene = scenes.find(s => s.id === rt.outgoingSceneId);
-          if (outgoingScene && base.currentTime > (outgoingScene.original_end_time ?? outgoingScene.end_time) - 0.02) {
-            const freezeTime = (outgoingScene.original_end_time ?? outgoingScene.end_time) - 0.05;
-            if (Math.abs(base.currentTime - freezeTime) > 0.1) {
-              base.currentTime = freezeTime;
-            }
-            // Pause base during transition to prevent it from advancing
-            if (!base.paused) base.pause();
-          }
+          // DO NOT pause or seek the base video — it is the transport clock.
+          // The base content is hidden/faded by CSS during the transition.
+          // Pausing it would freeze the timeline slider.
 
           // Start incoming video playing from the right position
           if (incoming.paused && incoming.readyState >= 2) {
