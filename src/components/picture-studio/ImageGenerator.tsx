@@ -123,7 +123,30 @@ export function ImageGenerator() {
             }
           });
 
-          if (error) throw error;
+          // Normalize edge function errors to expose status
+          if (error) {
+            const fnError: any = error;
+            // Try to extract structured response from FunctionsHttpError
+            if (fnError.context && typeof fnError.context.json === 'function') {
+              try {
+                const body = await fnError.context.json();
+                const normalized: any = new Error(body?.error || fnError.message);
+                normalized.status = body?.code || fnError.context?.status || 500;
+                normalized.step = body?.step;
+                normalized.attemptedModels = body?.attemptedModels;
+                throw normalized;
+              } catch (parseErr: any) {
+                if (parseErr.status) throw parseErr; // re-throw normalized
+              }
+            }
+            throw error;
+          }
+          if (data?.ok === false) {
+            const normalized: any = new Error(data.error || 'Generierung fehlgeschlagen');
+            normalized.status = data.code || 500;
+            normalized.step = data.step;
+            throw normalized;
+          }
           if (data?.error) throw new Error(data.error);
           return data;
         }

@@ -662,3 +662,4 @@ timeout_sec = 120
 
 [functions.generate-studio-image]
 verify_jwt = false
+timeout_sec = 120
