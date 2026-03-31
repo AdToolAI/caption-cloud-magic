@@ -127,37 +127,56 @@ MANDATORY RULES:
       });
     }
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        modalities: ['image', 'text'],
-      }),
-    });
+    let response: Response | null = null;
+    const MAX_RETRIES = 3;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Studio] AI Gateway error:', response.status, errorText);
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          modalities: ['image', 'text'],
+        }),
+      });
+
+      if (response.ok) break;
+
+      // Only retry on 429 or 5xx
+      if ((response.status === 429 || response.status >= 500) && attempt < MAX_RETRIES) {
+        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+        console.log(`[Studio] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms (status ${response.status})`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+
+      // Non-retryable error → break immediately
+      break;
+    }
+
+    if (!response || !response.ok) {
+      const errorText = response ? await response.text() : 'No response';
+      const status = response?.status || 500;
+      console.error('[Studio] AI Gateway error after retries:', status, errorText);
       
-      if (response.status === 429) {
+      if (status === 429) {
         return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
           status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      if (response.status === 402) {
+      if (status === 402) {
         return new Response(JSON.stringify({ error: 'Credits exhausted. Please add funds.' }), {
           status: 402,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
       
-      throw new Error(`AI Gateway error: ${response.status}`);
+      throw new Error(`AI Gateway error: ${status}`);
     }
 
     const aiData = await response.json();
