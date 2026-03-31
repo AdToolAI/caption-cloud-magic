@@ -1,10 +1,65 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+/** Try a single model with retries */
+async function tryGenerate(
+  model: string,
+  messages: any[],
+  apiKey: string,
+  maxRetries = 3
+): Promise<Response | null> {
+  let response: Response | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model, messages, modalities: ['image', 'text'] }),
+    });
+
+    if (response.ok) return response;
+
+    // Non-retryable client errors
+    if (response.status === 401 || response.status === 402 || response.status === 400) {
+      return response;
+    }
+
+    // Retry on 429 / 5xx
+    if ((response.status === 429 || response.status >= 500) && attempt < maxRetries) {
+      const delay = Math.pow(2, attempt) * 1000;
+      console.log(`[Studio] Retry ${attempt}/${maxRetries} for ${model} after ${delay}ms (status ${response.status})`);
+      await new Promise(r => setTimeout(r, delay));
+      continue;
+    }
+
+    break;
+  }
+  return response;
+}
+
+/** Get fallback chain based on quality */
+function getFallbackChain(quality: string): string[] {
+  if (quality === 'pro') {
+    return [
+      'google/gemini-3-pro-image-preview',
+      'google/gemini-2.5-flash-image',
+      'google/gemini-3.1-flash-image-preview',
+    ];
+  }
+  return [
+    'google/gemini-2.5-flash-image',
+    'google/gemini-3.1-flash-image-preview',
+    'google/gemini-3-pro-image-preview',
+  ];
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -14,7 +69,9 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
-      throw new Error('No authorization header');
+      return new Response(JSON.stringify({ ok: false, code: 401, step: 'auth', error: 'No authorization header' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -25,9 +82,8 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      return new Response(JSON.stringify({ ok: false, code: 401, step: 'auth', error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -41,15 +97,19 @@ serve(async (req) => {
     } = await req.json();
 
     if (!prompt) {
-      throw new Error('Prompt is required');
+      return new Response(JSON.stringify({ ok: false, code: 400, step: 'validation', error: 'Prompt is required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+      return new Response(JSON.stringify({ ok: false, code: 500, step: 'config', error: 'LOVABLE_API_KEY not configured' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    // Style modifiers for prompt enhancement
+    // Style modifiers
     const styleModifiers: Record<string, string> = {
       realistic: 'photorealistic, 8k, ultra-detailed, natural lighting, professional photography',
       cinematic: 'cinematic composition, dramatic lighting, anamorphic lens flare, movie still, color graded',
@@ -73,7 +133,6 @@ serve(async (req) => {
       editorial: 'editorial fashion photography, high-end magazine style, bold composition',
     };
 
-    // Special handling for brand-logo
     const isBrandLogo = style === 'brand-logo';
     let enhancedPrompt: string;
 
@@ -100,18 +159,9 @@ MANDATORY RULES:
       enhancedPrompt = `${prompt}. Style: ${stylePrompt}. Aspect ratio: ${aspectRatio}.`;
     }
 
-    // Select model based on quality
-    const model = quality === 'pro' 
-      ? 'google/gemini-3-pro-image-preview' 
-      : 'google/gemini-3.1-flash-image-preview';
-
-    console.log(`[Studio] Generating image: model=${model}, style=${style}, ratio=${aspectRatio}`);
-
     // Build messages
     const messages: any[] = [];
-    
     if (editMode && referenceImageUrl) {
-      // Image-to-Image editing
       messages.push({
         role: 'user',
         content: [
@@ -120,100 +170,110 @@ MANDATORY RULES:
         ]
       });
     } else {
-      // Text-to-Image
-      messages.push({
-        role: 'user',
-        content: enhancedPrompt
-      });
+      messages.push({ role: 'user', content: enhancedPrompt });
     }
 
+    // Model fallback chain
+    const fallbackChain = getFallbackChain(quality);
     let response: Response | null = null;
-    const MAX_RETRIES = 3;
+    let usedModel = '';
+    const attemptedModels: string[] = [];
 
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          modalities: ['image', 'text'],
-        }),
-      });
+    for (const candidateModel of fallbackChain) {
+      attemptedModels.push(candidateModel);
+      console.log(`[Studio] Trying model: ${candidateModel}`);
+      
+      response = await tryGenerate(candidateModel, messages, LOVABLE_API_KEY);
+      usedModel = candidateModel;
 
-      if (response.ok) break;
-
-      // Only retry on 429 or 5xx
-      if ((response.status === 429 || response.status >= 500) && attempt < MAX_RETRIES) {
-        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-        console.log(`[Studio] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms (status ${response.status})`);
-        await new Promise(r => setTimeout(r, delay));
-        continue;
+      if (response?.ok) {
+        console.log(`[Studio] Success with model: ${candidateModel}`);
+        break;
       }
 
-      // Non-retryable error → break immediately
-      break;
+      // Non-retryable errors: stop immediately
+      if (response?.status === 401 || response?.status === 402 || response?.status === 400) {
+        break;
+      }
+
+      console.log(`[Studio] Model ${candidateModel} failed (${response?.status}), trying next...`);
     }
 
     if (!response || !response.ok) {
-      const errorText = response ? await response.text() : 'No response';
       const status = response?.status || 500;
-      console.error('[Studio] AI Gateway error after retries:', status, errorText);
-      
+      let errorText = '';
+      try { errorText = await response!.text(); } catch {}
+      console.error('[Studio] All models failed:', status, errorText);
+
       if (status === 429) {
-        return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        return new Response(JSON.stringify({ 
+          ok: false, code: 429, step: 'ai_generate', 
+          error: 'Alle Modelle sind gerade überlastet. Bitte versuche es in 1-2 Minuten erneut.',
+          attemptedModels 
+        }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
       if (status === 402) {
-        return new Response(JSON.stringify({ error: 'Credits exhausted. Please add funds.' }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        return new Response(JSON.stringify({ 
+          ok: false, code: 402, step: 'ai_generate', 
+          error: 'Credits erschöpft. Bitte lade dein Guthaben auf.',
+          attemptedModels 
+        }), {
+          status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      
-      throw new Error(`AI Gateway error: ${status}`);
+
+      return new Response(JSON.stringify({ 
+        ok: false, code: status, step: 'ai_generate', 
+        error: `KI-Generierung fehlgeschlagen (${status})`,
+        attemptedModels 
+      }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     const aiData = await response.json();
     const imageData = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!imageData) {
-      throw new Error('No image generated');
+      return new Response(JSON.stringify({ 
+        ok: false, code: 500, step: 'parse_result', 
+        error: 'Kein Bild generiert. Bitte versuche einen anderen Prompt.',
+        attemptedModels 
+      }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    // Detect MIME type and extension from base64 data URL
+    // Detect MIME type
     const mimeMatch = imageData.match(/^data:(image\/[a-zA-Z+]+);base64,/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
     const ext = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
 
-    // Convert data URL to Blob via fetch for robust binary handling
     const blobResponse = await fetch(imageData);
     const blob = await blobResponse.blob();
-    
     const fileName = `${user.id}/studio/${Date.now()}_${style}.${ext}`;
 
-    // Upload blob with correct content type
     const { error: uploadError } = await supabase.storage
       .from('background-projects')
       .upload(fileName, blob, { contentType: mimeType, upsert: true });
 
     if (uploadError) {
       console.error('[Studio] Upload error:', uploadError);
-      throw new Error('Failed to upload image');
+      return new Response(JSON.stringify({ 
+        ok: false, code: 500, step: 'storage_upload', 
+        error: 'Bild konnte nicht gespeichert werden.' 
+      }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     const { data: publicUrlData } = supabase.storage
       .from('background-projects')
       .getPublicUrl(fileName);
-
     const imageUrl = publicUrlData.publicUrl;
 
-    // Save to studio_images table
     const { data: savedImage, error: saveError } = await supabase
       .from('studio_images')
       .insert({
@@ -221,10 +281,10 @@ MANDATORY RULES:
         image_url: imageUrl,
         prompt,
         style,
-        model_used: model,
+        model_used: usedModel,
         aspect_ratio: aspectRatio,
         source: editMode ? 'upload' : 'generated',
-        metadata_json: { quality, editMode, referenceImageUrl: editMode ? referenceImageUrl : null },
+        metadata_json: { quality, editMode, referenceImageUrl: editMode ? referenceImageUrl : null, attemptedModels },
       })
       .select()
       .single();
@@ -242,7 +302,7 @@ MANDATORY RULES:
         prompt,
         style,
         aspectRatio,
-        model,
+        model: usedModel,
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -250,9 +310,11 @@ MANDATORY RULES:
 
   } catch (error: any) {
     console.error('[Studio] Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    return new Response(JSON.stringify({ 
+      ok: false, code: 500, step: 'unknown', 
+      error: error.message || 'Interner Serverfehler' 
+    }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
