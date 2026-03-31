@@ -1,29 +1,53 @@
 
 
-## Video-Analyse für Raumplan-Erstellung
+## Retry-Mechanismus für 429 Rate-Limit in generate-studio-image
 
-### Was ich tun werde
+### Problem
+Die AI Gateway API gibt bei schnell aufeinanderfolgenden Bildgenerierungen einen 429 (Rate Limit) zurück. Aktuell wird dieser Fehler direkt an den Client weitergegeben.
 
-Das Video (24 Sekunden) enthält kaum Audio ("Thank you"). Um eine detaillierte räumliche Beschreibung zu erstellen, werde ich:
+### Lösung
+In `supabase/functions/generate-studio-image/index.ts` den API-Aufruf (Zeile 130-141) in eine Retry-Schleife mit exponentiellem Backoff wrappen:
 
-1. **Frames extrahieren** — Alle 1-2 Sekunden ein Bild aus dem Video ziehen (ca. 12-15 Frames), um den gesamten Rundgang abzudecken
-2. **KI-Bildanalyse** — Jeden Frame mit einem Vision-Modell analysieren lassen, um Räume, Möbel, Türen, Fenster, Durchgänge und räumliche Zusammenhänge zu erkennen
-3. **Zusammenfassung erstellen** — Eine strukturierte Raumbeschreibung als Text-Dokument generieren, die folgendes enthält:
-   - Auflistung aller sichtbaren Räume
-   - Raumgrößen-Schätzungen (relativ zueinander)
-   - Position von Türen, Fenstern, Durchgängen
-   - Möblierung und markante Merkmale
-   - Reihenfolge/Verbindung der Räume (wie sie im Video durchlaufen werden)
-   - Himmelsrichtungs-Hinweise (falls Lichteinfall erkennbar)
-4. **Dokument ausgeben** — Das Ergebnis als Textdatei, die du direkt an ChatGPT geben kannst
+- **Max 3 Versuche** bei 429 oder 5xx Fehlern
+- **Backoff**: 2s → 4s → 8s (exponentiell)
+- Sofortiger Abbruch bei 402, 401 oder anderen Client-Fehlern
+- Logging jedes Retry-Versuchs
 
-### Technischer Ablauf
+### Umsetzung
 
-- `ffmpeg` zum Frame-Extrahieren aus dem Video
-- Lovable AI (Gemini Vision) zur Bildanalyse der einzelnen Frames
-- Ergebnis wird als `/mnt/documents/raumanalyse.txt` gespeichert
+**Datei: `supabase/functions/generate-studio-image/index.ts`**
+
+Den Block ab Zeile 130 (`const response = await fetch(...)`) bis Zeile 161 ersetzen durch:
+
+```typescript
+let response: Response | null = null;
+const MAX_RETRIES = 3;
+
+for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: { ... },
+    body: JSON.stringify({ model, messages, modalities: ['image', 'text'] }),
+  });
+
+  if (response.ok) break;
+
+  // Nur bei 429/5xx retrien
+  if ((response.status === 429 || response.status >= 500) && attempt < MAX_RETRIES) {
+    const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+    console.log(`[Studio] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms (status ${response.status})`);
+    await new Promise(r => setTimeout(r, delay));
+    continue;
+  }
+
+  // Nicht-retriebarer Fehler → sofort raus
+  break;
+}
+
+// Danach bestehende Fehlerbehandlung (429, 402 etc.) für den Fall dass alle Retries fehlschlagen
+```
 
 ### Ergebnis
-
-Eine detaillierte, ChatGPT-optimierte Raumbeschreibung, mit der ein Grundriss/Raumplan erstellt werden kann.
+- 429-Fehler werden automatisch bis zu 3× wiederholt, bevor der Nutzer einen Fehler sieht
+- Kein Code-Änderung im Frontend nötig
 
