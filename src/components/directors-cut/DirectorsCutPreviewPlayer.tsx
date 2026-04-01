@@ -795,7 +795,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       if (!isMuted) startAllAudio();
       onPlayingChange?.(true);
     }
-  }, [isPlaying, isMuted, duration, onPlayingChange, startAllAudio, stopAllAudio]);
+  }, [isPlaying, isMuted, duration, onPlayingChange, startAllAudio, stopAllAudio, getActiveVideo]);
 
   const handleMuteToggle = useCallback(async (e: React.MouseEvent) => {
     if (isMuted) {
