@@ -63,6 +63,9 @@ export function useTransitionRenderer(
     lastIncomingSeekRef.current = '';
     handoffTargetTimeRef.current = null;
     handoffFrameCountRef.current = 0;
+    handoffBaseSeekedRef.current = false;
+    handoffIncomingPausedRef.current = false;
+    lastActiveTransitionRef.current = null;
   }, [scenes, transitions]);
 
   useEffect(() => {
