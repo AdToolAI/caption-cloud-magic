@@ -1,78 +1,120 @@
 
 Ziel
 
-- Den verbleibenden Stotterer nach jedem Director’s-Cut-Übergang entfernen, ohne das aktuell gute Transition-Timing wieder zu verschlechtern.
+- Den verbleibenden Stotterer nach jedem Übergang beseitigen, ohne das gute Timing der Transition selbst zu verlieren.
 
-Was ich jetzt im Code als wahrscheinlichste Restursachen sehe
+Warum es trotz der letzten Fixes noch hängt
 
-- `useTransitionRenderer.ts` lässt das Incoming-Video schon in `preparing` und `freeze` unsichtbar weiterlaufen (`incoming.play()`), obwohl der eigentliche Übergang noch nicht aktiv ist. Dadurch ist der nächste Clip beim Handoff bereits zu weit fortgeschritten.
-- Im Handoff wird nur `incoming` eingefroren. `base` wird zwar auf den Zielzeitpunkt seeked, läuft aber nicht wirklich frame-stabil mit demselben sichtbaren Frame mit.
-- Der Swap passiert noch zu früh: `seeked + readyState >= 2 + timeDiff < 0.1` heißt noch nicht, dass der richtige Base-Frame schon tatsächlich gerendert wurde.
-- Der Boundary-Marker ist noch nicht wirklich exakt: `boundarySourceTime` wird aktuell mit dem Handoff-Ziel gefüllt statt mit der echten Boundary, und der Player prüft beim Skip nur `outgoingSceneId`.
+- Der aktuelle Flow macht nach jeder Transition immer noch einen Decoder-Handoff auf demselben sichtbaren Playback-Element:
+  - `useTransitionRenderer.ts`: Am Ende der Transition wird der aktuelle Haupt-Stream pausiert, auf die Zeit des Incoming-Streams seeked und danach wieder resumed.
+  - `DirectorsCutPreviewPlayer.tsx`: Der gesamte Playback-Loop hängt fest an `videoRef.current` als dauerhaftem Source-of-Truth.
+- Das Timing ist dadurch zwar genauer geworden, aber die Architektur erzwingt weiterhin `pause -> seek -> resume` direkt nach jeder Transition. Genau dieser sichtbare Re-Sync ist sehr wahrscheinlich der Rest-Stotterer.
 
 Umsetzung
 
-1. Preseek auf „buffern, nicht abspielen“ umstellen
-- In `preparing` und `freeze` nur `seekIncoming(...)` ausführen.
-- Incoming dabei pausiert und unsichtbar halten.
-- `incoming.play()` erst beim Eintritt in `active` starten.
-- Falls nötig beim ersten aktiven Frame einmal hart auf den erwarteten Incoming-Start synchronisieren.
-
-2. Handoff wirklich frame-genau machen
-- Beim Wechsel `active -> handoff` nicht nur `incoming`, sondern auch `base` sofort stabilisieren.
-- `base` exakt auf denselben sichtbaren Frame bringen, den `incoming` gerade zeigt.
-- `base` erst nach erfolgreichem Swap wieder normal weiterlaufen lassen.
-
-3. Swap erst nach bestätigtem präsentem Frame
-- Nicht mehr nur auf `seeked` vertrauen.
-- Nach dem Seek zusätzlich auf einen wirklich präsentierten Base-Frame warten:
+1. Dual-Video auf echtes Ping-Pong umstellen
+- Die zwei `<video>`-Elemente bleiben, aber nicht mehr als festes `base` und `incoming`.
+- Stattdessen:
 ```text
-bevorzugt: requestVideoFrameCallback
-fallback: 1 RAF + strenger timeDiff
+slot A / slot B
+active slot  = aktuell sichtbarer, laufender Playback-Stream
+standby slot = vorseeked für die nächste Transition
 ```
-- Die Toleranz von `0.1` auf etwa `0.03–0.05` verschärfen.
+- Nach einer Transition wird nicht mehr der alte Haupt-Stream nachgezogen, sondern der bereits laufende Standby-Stream wird zum neuen aktiven Stream.
 
-4. Boundary-Skip wirklich exakt machen
-- Im Renderer den Marker mit echter Boundary speichern:
+2. Player von festem `videoRef` entkoppeln
+- In `DirectorsCutPreviewPlayer.tsx` alle Video-Zugriffe über Helfer führen:
 ```text
-{
-  outgoingSceneId,
-  incomingSceneId,
-  boundarySourceTime
-}
+getActiveVideo()
+getStandbyVideo()
+swapActiveSlot()
 ```
-- `boundarySourceTime` muss aus der echten Transition-Grenze kommen, nicht aus `handoffTargetTime`.
-- Im Player nur dann skippen, wenn outgoing, incoming und Boundary wirklich zur aktuellen Grenze passen.
+- Betroffen:
+  - RAF-Playback-Loop
+  - Play/Pause
+  - externe Time-Syncs
+  - `handleSeek`
+  - `handleReset`
+  - Boundary-Advance
+  - Non-Sequential-Jump-Korrektur
 
-5. Reset-/Seek-Pfade sauber mitziehen
-- Alle neuen Active-/Handoff-/Frame-Present-Refs bei manuellem Seek, Reset, Szenenänderungen und Transition-Änderungen zurücksetzen.
-- Den bestehenden Cooldown behalten, aber nur noch als Zusatzschutz.
+3. Handoff ohne sichtbaren Re-Seek umbauen
+- Den aktuellen Handoff in `useTransitionRenderer.ts` ersetzen:
+```text
+heute:
+Transition endet
+-> incoming einfrieren
+-> base pausieren
+-> base seeken
+-> warten
+-> zurück auf base zeigen
+
+neu:
+Transition endet
+-> standby läuft bereits korrekt
+-> active slot auf standby umschalten
+-> alter active slot pausieren/verstecken
+-> alter active slot wird neuer standby
+```
+- Dadurch entfällt der sichtbare `pause/seek/resume`-Moment nach jedem Übergang.
+
+4. Renderer an Slot-Logik anpassen
+- `useTransitionRenderer.ts` soll immer mit „active“ und „standby“ arbeiten, nicht mit hartem `base/incoming`-Denken.
+- Preseek bleibt erhalten.
+- Während aktiver Transition laufen beide Streams.
+- Nach Abschluss gibt es einen Slot-Swap statt eines Frame-Handoffs auf dasselbe Element.
+
+5. Boundary- und Cooldown-Logik auf Slot-Swap abstimmen
+- `lastHandoffBoundaryRef` und `transitionPhaseRef` beibehalten.
+- Player-seitige Boundary-Seeks an genau der bereits konsumierten Grenze weiter blockieren.
+- Cooldown nur noch als Zusatzschutz lassen, nicht mehr als Hauptmechanik gegen den Hitch.
+
+6. Reset-/Scrub-/Änderungs-Pfade sauber mitziehen
+- Bei manuellem Seek, Reset, Szenen-/Transition-Änderungen:
+  - aktiven Slot eindeutig setzen
+  - Standby pausieren und verstecken
+  - Preseek-Key, Boundary-Marker, Cooldown und Slot-State zurücksetzen
+- So bleibt das Verhalten auch bei Scrubbing und mehreren Übergängen stabil.
 
 Technische Details
 
 - Betroffene Dateien:
   - `src/components/directors-cut/preview/useTransitionRenderer.ts`
   - `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- Kernänderung:
+```text
+bisher:
+videoRef = dauerhaft Source-of-Truth
+incomingVideoRef = temporärer Overlay-Stream
 
-- Erwarteter Effekt:
+neu:
+zwei feste Video-Slots
+activeSlotRef bestimmt, welches Element gerade Source-of-Truth ist
+Renderer und Player greifen immer über active/standby-Helfer darauf zu
+```
+- Optionaler Schutz:
+  - Slot-Swap nur freigeben, wenn der Standby-Stream am Transition-Ende noch in enger Zeittoleranz zur erwarteten Szene liegt.
+  - Kein nachträglicher Re-Seek auf dem sichtbaren Stream mehr.
+
+Erwarteter Effekt
+
 ```text
 vorher:
-preparing -> incoming läuft unsichtbar schon vor dem Übergang
-active -> Übergang sieht gut aus
-handoff -> base ist nicht exakt auf demselben präsentierten Frame
-swap -> kleiner sichtbarer Hitch / leichter Vorsprung
+Transition sieht gut aus
+-> danach sichtbarer Mini-Hitch
+weil der sichtbare Hauptstream nachträglich resynchronisiert wird
 
 nachher:
-preparing -> incoming nur vorgeladen
-active -> incoming startet exakt mit dem Übergang
-handoff -> beide Videos werden auf denselben sichtbaren Frame synchronisiert
-swap -> erst nach bestätigtem präsentem base-Frame
+Transition sieht gut aus
+-> kein Re-Seek auf dem sichtbaren Stream
+-> laufender Transition-Stream wird direkt neuer Hauptstream
+-> Hitch nach dem Übergang verschwindet
 ```
 
 Verifikation
 
 - Crossfade, Wipe, Slide, Push und Zoom testen
-- Direkt auf die ersten 0.5–1.0s nach jedem Übergang achten
 - Mehrere Übergänge direkt hintereinander testen
-- Seek, Reset und Scrubbing testen
-- Sicherstellen, dass Übergänge sichtbar bleiben und der nächste Clip nach dem Übergang nicht mehr leicht vorspringt
+- Auf die ersten 0.5–1.0s nach jedem Übergang achten
+- Seek, Pause/Resume, Reset und Scrubbing testen
+- Prüfen, dass keine neuen Boundary-Sprünge entstehen und die Transitionen sichtbar bleiben
