@@ -408,10 +408,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
   // Cooldown ref: when a transition just ended, suppress boundary seek for N frames
   const transitionCooldownRef = useRef<number>(0);
-  // Tracks the last boundary time that was handled by the handoff, so boundary-advance skips it
-  const lastHandoffBoundaryRef = useRef<number | null>(null);
+  // Structured boundary marker: tracks which boundary was consumed by the handoff
+  const lastHandoffBoundaryRef = useRef<{ outgoingSceneId: string; incomingSceneId: string; boundarySourceTime: number } | null>(null);
+  // Shared transition phase ref — lets the player know when the renderer is in handoff
+  const transitionPhaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
 
-  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef);
+  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
