@@ -717,7 +717,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // ==================== EXTERNAL isPlaying SYNC ====================
   useEffect(() => {
     if (externalIsPlaying === undefined) return;
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
 
     if (externalIsPlaying && !isPlaying) {
