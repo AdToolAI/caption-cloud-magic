@@ -332,6 +332,8 @@ export function useTransitionRenderer(
         phaseRef.current = 'handoff';
         handoffTargetTimeRef.current = null;
         handoffFrameCountRef.current = 0;
+        handoffBaseSeekedRef.current = false;
+        handoffIncomingPausedRef.current = false;
         // Don't clean up incoming yet — handoff handler will do it
         rafRef.current = requestAnimationFrame(tick);
         return;
