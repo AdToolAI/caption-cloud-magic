@@ -865,7 +865,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [playVoiceover, timelineToSourceTime, findActiveTransition]);
 
   const handleReset = useCallback(() => {
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
 
     video.pause();
@@ -877,15 +877,23 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     pendingSceneAdvanceRef.current = null;
     transitionCooldownRef.current = 0;
     lastHandoffBoundaryRef.current = null;
-    // Reset incoming video
-    const incoming = incomingVideoRef.current;
-    if (incoming) {
-      incoming.pause();
-      incoming.style.opacity = '0';
-      incoming.style.pointerEvents = 'none';
-      incoming.style.transform = 'none';
-      incoming.style.clipPath = 'none';
-      incoming.style.filter = 'none';
+    // Reset to slot A
+    activeSlotRef.current = 'A';
+    const slotA = videoRefA.current;
+    const slotB = videoRefB.current;
+    if (slotA) {
+      slotA.pause();
+      slotA.currentTime = 0;
+      slotA.style.opacity = '1';
+    }
+    if (slotB) {
+      slotB.pause();
+      slotB.currentTime = 0;
+      slotB.style.opacity = '0';
+      slotB.style.pointerEvents = 'none';
+      slotB.style.transform = 'none';
+      slotB.style.clipPath = 'none';
+      slotB.style.filter = 'none';
     }
     stopAllAudio();
     if (sourceAudioRef.current) sourceAudioRef.current.currentTime = 0;
