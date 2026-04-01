@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 
 interface TextOverlayData {
   id: string;
@@ -29,8 +29,60 @@ const FONT_SIZE_MAP: Record<string, string> = {
   xl: '72px',
 };
 
-export const NativeTextOverlayRenderer: React.FC<NativeTextOverlayRendererProps> = ({ overlay, displayTime }) => {
-  const elapsed = Math.max(0, displayTime - overlay.startTime);
+// Inject keyframes once
+const STYLE_ID = 'native-text-overlay-keyframes';
+function ensureKeyframes() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = `
+    @keyframes nto-fadeIn {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes nto-scaleUp {
+      0% { opacity: 0; transform: scale(0.3); }
+      60% { opacity: 1; transform: scale(1.08); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    @keyframes nto-bounce {
+      0% { opacity: 0; transform: translateY(-50px); }
+      40% { opacity: 1; transform: translateY(0); }
+      55% { transform: translateY(-12px); }
+      70% { transform: translateY(0); }
+      85% { transform: translateY(-5px); }
+      100% { transform: translateY(0); }
+    }
+    @keyframes nto-highlight {
+      0% { background-size: 0% 100%; }
+      100% { background-size: 100% 100%; }
+    }
+    @keyframes nto-glitch {
+      0% { opacity: 0; transform: translateX(0); text-shadow: none; }
+      10% { opacity: 1; transform: translateX(-3px); text-shadow: -3px 0 #ff0000, 3px 0 #00ffff; }
+      20% { transform: translateX(3px); text-shadow: 3px 0 #ff0000, -3px 0 #00ffff; }
+      30% { transform: translateX(-2px); text-shadow: -2px 0 #ff0000, 2px 0 #00ffff; }
+      40% { transform: translateX(2px); text-shadow: 2px 0 #ff0000, -2px 0 #00ffff; }
+      50% { transform: translateX(-1px); text-shadow: -1px 0 #ff0000, 1px 0 #00ffff; }
+      60% { transform: translateX(1px); text-shadow: 1px 0 #ff0000, -1px 0 #00ffff; }
+      70% { transform: translateX(0); text-shadow: none; }
+      100% { transform: translateX(0); text-shadow: none; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+const ANIM_CSS: Record<string, string> = {
+  fadeIn: 'nto-fadeIn 0.6s ease-out forwards',
+  scaleUp: 'nto-scaleUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+  bounce: 'nto-bounce 0.7s ease-out forwards',
+  highlight: 'nto-highlight 0.6s ease-out forwards',
+  glitch: 'nto-glitch 0.8s ease-out forwards',
+};
+
+export const NativeTextOverlayRenderer: React.FC<NativeTextOverlayRendererProps> = ({ overlay }) => {
+  ensureKeyframes();
 
   // Position
   const positionStyle = useMemo((): React.CSSProperties => {
@@ -55,91 +107,60 @@ export const NativeTextOverlayRenderer: React.FC<NativeTextOverlayRendererProps>
     }
   }, [overlay.position, overlay.customPosition?.x, overlay.customPosition?.y]);
 
-  // Animation
-  const animDuration = 0.5; // seconds
-  const progress = Math.min(elapsed / animDuration, 1);
+  // Typewriter: local RAF-based timer
+  const [twText, setTwText] = useState('');
+  const rafRef = useRef<number>(0);
+  const isTypewriter = overlay.animation === 'typewriter';
 
-  let animStyle: React.CSSProperties = {};
-  let displayText = overlay.text;
-
-  switch (overlay.animation) {
-    case 'fadeIn': {
-      animStyle = {
-        opacity: progress,
-        transform: `translateY(${(1 - progress) * 20}px)`,
-      };
-      break;
-    }
-    case 'scaleUp': {
-      const scale = progress < 1
-        ? 0.3 + progress * 0.85 - Math.sin(progress * Math.PI) * 0.15
-        : 1;
-      animStyle = {
-        opacity: Math.min(progress * 2, 1),
-        transform: `scale(${scale})`,
-      };
-      break;
-    }
-    case 'bounce': {
-      let ty = 0;
-      if (progress < 0.4) {
-        ty = -50 * (1 - progress / 0.4);
-      } else if (progress < 0.6) {
-        ty = 10 * ((progress - 0.4) / 0.2);
-      } else if (progress < 0.8) {
-        ty = 10 - 15 * ((progress - 0.6) / 0.2);
-      } else {
-        ty = -5 * (1 - (progress - 0.8) / 0.2);
+  useEffect(() => {
+    if (!isTypewriter) return;
+    const startMs = performance.now();
+    const charsPerSecond = 15;
+    const fullText = overlay.text;
+    const tick = (now: number) => {
+      const elapsed = (now - startMs) / 1000;
+      const count = Math.min(Math.floor(elapsed * charsPerSecond), fullText.length);
+      setTwText(fullText.substring(0, count));
+      if (count < fullText.length) {
+        rafRef.current = requestAnimationFrame(tick);
       }
-      animStyle = {
-        opacity: Math.min(progress * 3, 1),
-        transform: `translateY(${ty}px)`,
-      };
-      break;
-    }
-    case 'typewriter': {
-      const charsPerSecond = 15;
-      const visibleChars = Math.floor(elapsed * charsPerSecond);
-      displayText = overlay.text.substring(0, Math.min(visibleChars, overlay.text.length));
-      animStyle = { opacity: 1 };
-      break;
-    }
-    case 'highlight': {
-      const highlightWidth = Math.min(elapsed / animDuration * 100, 100);
-      animStyle = {
-        opacity: 1,
-        backgroundImage: 'linear-gradient(transparent 60%, rgba(255, 215, 0, 0.5) 60%)',
-        backgroundSize: `${highlightWidth}% 100%`,
-        backgroundRepeat: 'no-repeat',
-      };
-      break;
-    }
-    case 'glitch': {
-      const glitchOffset = Math.sin(elapsed * 15) * 3;
-      animStyle = {
-        opacity: Math.min(elapsed * 4, 1),
-        transform: `translateX(${glitchOffset}px)`,
-        textShadow: `${-glitchOffset}px 0 #ff0000, ${glitchOffset}px 0 #00ffff`,
-      };
-      break;
-    }
-    default:
-      animStyle = { opacity: 1 };
-  }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [isTypewriter, overlay.text]);
 
-  // Merge transforms
-  const posTransform = positionStyle.transform || '';
-  const animTransform = animStyle.transform || '';
-  const mergedTransform = [posTransform, animTransform].filter(Boolean).join(' ') || undefined;
+  const displayText = isTypewriter ? twText : overlay.text;
 
   const fontSize = FONT_SIZE_MAP[overlay.style?.fontSize || ''] || overlay.style?.fontSize || '36px';
   const bgColor = overlay.style?.backgroundColor;
+
+  // Build animation style
+  let animStyle: React.CSSProperties = {};
+  if (isTypewriter) {
+    animStyle = { opacity: 1 };
+  } else {
+    const animCss = ANIM_CSS[overlay.animation];
+    if (animCss) {
+      animStyle = {
+        animation: animCss,
+        opacity: overlay.animation === 'highlight' ? 1 : 0, // start invisible for most, visible for highlight
+      };
+    } else {
+      animStyle = { opacity: 1 };
+    }
+  }
+
+  // Highlight needs background-image
+  if (overlay.animation === 'highlight') {
+    animStyle.backgroundImage = 'linear-gradient(transparent 60%, rgba(255, 215, 0, 0.5) 60%)';
+    animStyle.backgroundSize = '0% 100%';
+    animStyle.backgroundRepeat = 'no-repeat';
+  }
 
   const style: React.CSSProperties = {
     position: 'absolute',
     ...positionStyle,
     ...animStyle,
-    transform: mergedTransform,
     fontSize,
     fontWeight: (overlay.style as any)?.fontWeight || 'bold',
     color: overlay.style?.color || '#ffffff',
@@ -156,8 +177,8 @@ export const NativeTextOverlayRenderer: React.FC<NativeTextOverlayRendererProps>
   return (
     <div style={style}>
       {displayText}
-      {overlay.animation === 'typewriter' && displayText.length < overlay.text.length && (
-        <span style={{ opacity: Math.floor(elapsed * 10) % 2 === 0 ? 1 : 0 }}>|</span>
+      {isTypewriter && twText.length < overlay.text.length && (
+        <span style={{ animation: 'none', opacity: 1 }}>|</span>
       )}
     </div>
   );
