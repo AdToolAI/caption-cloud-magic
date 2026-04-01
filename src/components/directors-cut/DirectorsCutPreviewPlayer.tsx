@@ -1011,9 +1011,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           className="absolute inset-0 w-full h-full"
           style={{ zIndex: 0, willChange: 'transform' }}
         >
-          {/* Base (outgoing) video */}
+          {/* Video Slot A */}
           <video
-            ref={videoRef}
+            ref={videoRefA}
             src={videoUrl}
             className="absolute inset-0 w-full h-full object-contain"
             style={{ zIndex: 1 }}
@@ -1023,15 +1023,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             onEnded={handleVideoEnded}
           />
 
-          {/* Incoming (transition) video — no crossOrigin to avoid CORS */}
+          {/* Video Slot B */}
           <video
-            ref={incomingVideoRef}
+            ref={videoRefB}
             src={videoUrl}
             className="absolute inset-0 w-full h-full object-contain"
             style={{ zIndex: 2 }}
             muted
             playsInline
             preload="auto"
+            onEnded={handleVideoEnded}
           />
         </div>
 
