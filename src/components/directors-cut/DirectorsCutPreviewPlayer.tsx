@@ -983,14 +983,25 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [currentScene, sceneEffects, effects.vignette]);
 
   // Keep videoFilterRef in sync for the transition renderer
+  // Track active slot changes to reapply filter after ping-pong swap
+  const [activeSlotTracker, setActiveSlotTracker] = useState(activeSlotRef.current);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (activeSlotRef.current !== activeSlotTracker) {
+        setActiveSlotTracker(activeSlotRef.current);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [activeSlotTracker]);
+
   useEffect(() => {
     videoFilterRef.current = videoFilter ?? '';
-    // Apply filter imperatively to base video so effects work even without transitions
+    // Apply filter imperatively to active video so effects work even without transitions
     const active = getActiveVideo();
     if (active) {
       active.style.filter = videoFilter || '';
     }
-  }, [videoFilter]);
+  }, [videoFilter, activeSlotTracker]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -1063,7 +1074,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         )}
 
         {/* Text Overlays */}
-        {textOverlays.filter(o => displayTime >= o.startTime && displayTime < o.endTime).map(overlay => (
+        {textOverlays.filter(o => displayTime >= o.startTime && (o.endTime === null || o.endTime === undefined || displayTime < o.endTime)).map(overlay => (
           <div
             key={overlay.id}
             className="absolute pointer-events-none z-[15]"
