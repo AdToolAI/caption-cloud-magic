@@ -422,7 +422,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // Shared transition phase ref — lets the player know when the renderer is in handoff
   const transitionPhaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
 
-  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef);
+  useTransitionRenderer(videoRefA, videoRefB, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
