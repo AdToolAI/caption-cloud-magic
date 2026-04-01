@@ -1,75 +1,55 @@
 
-Ziel
+Kurze Antwort
 
-- Den verbleibenden Mini-Stotterer direkt nach jedem Übergang entfernen, ohne das jetzt gute Transition-Timing wieder kaputtzumachen.
+- Nein, im Dauerzustand ist das nicht normal.
+- Ja: In deinem Screenshot wurden die Änderungen trotzdem übernommen, weil dort klar steht: `Successfully rebased and updated refs/heads/main`.
 
-Wahrscheinliche Root Cause
+Was ich im Projekt sehe
 
-- In `useTransitionRenderer.ts` wird beim Handoff nur einmal ein Ziel-Zeitpunkt gesetzt (`handoffTargetTimeRef = incoming.currentTime`), aber das sichtbare incoming-Video läuft währenddessen weiter.
-- Beim Swap ist das sichtbare incoming-Bild dadurch schon ca. 0,1–0,2s weiter als das Base-Video, auf das zurückgeschaltet wird. Genau das erzeugt den kurzen Rücksprung.
-- Der Handoff wird aktuell außerdem zu früh freigegeben: Es wird nur `readyState + timeDiff` geprüft, aber nicht auf ein echtes `seeked` des Base-Videos gewartet.
-- Im Player wird nicht die exakt konsumierte Transition-Boundary markiert, sondern nur eine ungefähre Zeit. Dadurch bleibt die Boundary-Logik unnötig unscharf.
+- Im Root liegen aktuell gleichzeitig:
+  - `bun.lock`
+  - `bun.lockb`
+  - `package-lock.json`
+- `package.json` nutzt normale npm-Skripte
+- `README.md` und `CONTRIBUTING.md` sagen ebenfalls `npm install`
+- `.gitignore` ignoriert die Bun-Lockfiles nicht
 
-Umsetzung
+Das bedeutet:
+- Das Repo ist gerade in einem gemischten Zustand zwischen Bun und npm.
+- Genau so entstehen solche wiederkehrenden Pull/Rebase-Konflikte.
 
-1. Handoff auf einen echten Frame-Freeze umstellen
-- In `useTransitionRenderer.ts` die letzte aktive Transition in einer Ref behalten.
-- Beim Wechsel `active -> handoff`:
-  - incoming sofort pausieren, aber sichtbar lassen
-  - dessen aktuelle Zeit als fixes Handoff-Target einfrieren
-  - Base-Video genau auf dieses Target seeken
-- So bleibt das sichtbare Bild stabil stehen, während Base im Hintergrund exakt auf denselben Frame synchronisiert.
+Was dein Screenshot konkret bedeutet
 
-2. Handoff erst nach echtem Base-Seek abschließen
-- Für das Base-Video im Handoff echte Readiness-Flags ergänzen (`seeked`, ggf. `canplay`/`loadeddata`).
-- Den Handoff nur dann beenden, wenn:
-  - der Base-Seek wirklich angekommen ist
-  - `readyState >= 2`
-  - `timeDiff` klein genug ist
-  - plus Safety-Fallback nach einer Maximalzahl Frames
-- Erst danach incoming ausblenden und sauber auf Base zurückschalten.
+- Der Konflikt war nur beim Lockfile:
+  - Remote wollte `bun.lock` löschen
+  - dein lokaler Stand hatte `bun.lock` noch/modifiziert
+- Du hast ihn korrekt aufgelöst mit:
+  - `git rm bun.lock`
+  - `git rebase --continue`
+- Danach war der Pull erfolgreich abgeschlossen.
+- Das heißt: Die eigentlichen Änderungen wurden übernommen.
 
-3. Boundary-Skip exakt statt fuzzy machen
-- `lastHandoffBoundaryRef` in eine strukturierte Markierung ändern, z. B. mit:
-  - `outgoingSceneId`
-  - `boundarySourceTime`
-  - optional `sceneIndex`
-- In `DirectorsCutPreviewPlayer.tsx` die Boundary-Advance-Logik dann nur für genau diese bereits per Handoff verarbeitete Transition einmal skippen, statt mit `Math.abs(... ) < 0.5` zu raten.
+Wichtig
 
-4. Reset- und Seek-Pfade mitziehen
-- Alle neuen Handoff-/Seek-Refs bei manuellem Seek, Reset und Szenen-/Transition-Änderungen sauber zurücksetzen.
-- Den bestehenden Cooldown beibehalten, aber erst nach erfolgreich abgeschlossenem Handoff setzen.
+- Solange du den Konflikt auflöst und `rebase --continue` erfolgreich endet, kommen die Änderungen an.
+- Wenn der Konflikt aber immer wieder auftaucht, ist das ein Zeichen, dass die Lockfile-Strategie im Repo nicht sauber vereinheitlicht ist.
 
-Technische Details
+Sinnvolle dauerhafte Lösung
 
-```text
-Heute:
-active
- -> handoff
- -> targetTime wird 1x gesnapshottet
- -> incoming bleibt sichtbar und läuft weiter
- -> base synced nur auf alten Snapshot
- -> swap auf base
- => sichtbarer Mini-Rücksprung
+1. npm als einzigen Paketmanager im Repo festlegen.
+2. `bun.lock` und `bun.lockb` aus dem Repo entfernen.
+3. `package-lock.json` als einziges Lockfile behalten.
+4. Optional `bun.lock` und `bun.lockb` in `.gitignore` aufnehmen, damit sie lokal nicht ständig wieder Stress machen.
+5. Danach nur noch `npm install` bzw. `npm ci` verwenden.
 
-Nach Fix:
-active
- -> handoff
- -> incoming wird auf letztem sichtbaren Frame pausiert
- -> base seekt exakt auf denselben Frame
- -> warten auf echtes base.seeked + ready
- -> erst dann sauberer swap
- => kein Stotterer nach dem Übergang
-```
+Erwartetes Ergebnis
 
-Betroffene Dateien
+- `git pull` hängt nicht mehr ständig an `bun.lock`
+- Änderungen von GitHub/Lovable werden sauber übernommen
+- Nur noch ein Lockfile ist die Wahrheit im Projekt
 
-- `src/components/directors-cut/preview/useTransitionRenderer.ts`
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-
-Verifikation
-
-- Crossfade, Wipe, Slide/Push testen
-- Mehrere Übergänge direkt hintereinander testen
-- Seek/Reset testen
-- Prüfen, dass Übergänge sichtbar bleiben und der Post-Transition-Stotterer weg ist
+Wenn ich dafür eine konkrete Repo-Bereinigung planen soll, würde ich diese Stellen bereinigen:
+- `package.json`
+- `.gitignore`
+- `bun.lock`
+- `bun.lockb`
