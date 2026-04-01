@@ -12,9 +12,9 @@ export interface HandoffBoundaryMarker {
 /**
  * Dual-video CSS transition renderer with phase-based lifecycle:
  *   idle       → far from any transition, incoming hidden
- *   preparing  → within pre-seek window, incoming seeked & playing but invisible
- *   active     → transition in progress, styles applied
- *   handoff    → transition ended, incoming stays visible while base syncs
+ *   preparing  → within pre-seek window, incoming seeked but PAUSED and invisible
+ *   active     → transition in progress, incoming playing, styles applied
+ *   handoff    → transition ended, both videos frozen while base syncs to incoming's frame
  */
 export function useTransitionRenderer(
   baseVideoRef: React.RefObject<HTMLVideoElement | null>,
@@ -34,15 +34,15 @@ export function useTransitionRenderer(
   const phaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
   const lastIncomingSeekRef = useRef<string>('');
   
-  // Handoff: snapshot-based approach
+  // Handoff state
   const handoffTargetTimeRef = useRef<number | null>(null);
   const handoffFrameCountRef = useRef(0);
   const handoffBaseSeekedRef = useRef(false);
-  const handoffIncomingPausedRef = useRef(false);
-  const HANDOFF_MAX_FRAMES = 60; // ~1s safety fallback
+  const handoffFramePresentedRef = useRef(false);
+  const HANDOFF_MAX_FRAMES = 60;
   
   // Track last active transition for structured boundary marking
-  const lastActiveTransitionRef = useRef<{ outgoingSceneId: string; incomingSceneId: string; tEnd: number } | null>(null);
+  const lastActiveTransitionRef = useRef<{ outgoingSceneId: string; incomingSceneId: string; tEnd: number; originalBoundary: number; offsetSeconds: number } | null>(null);
 
   const resolvedTransitions = useMemo(
     () => resolveTransitions(scenes, transitions),
@@ -64,20 +64,19 @@ export function useTransitionRenderer(
     incoming.currentTime = sourceStart + 0.05;
   }, [incomingVideoRef]);
 
-  // Helper to set phase in both local and shared refs
   const setPhase = useCallback((phase: 'idle' | 'preparing' | 'active' | 'handoff') => {
     phaseRef.current = phase;
     if (transitionPhaseRef) transitionPhaseRef.current = phase;
   }, [transitionPhaseRef]);
 
-  // When scenes or transitions change, reset phase
+  // Reset on scenes/transitions change
   useEffect(() => {
     setPhase('idle');
     lastIncomingSeekRef.current = '';
     handoffTargetTimeRef.current = null;
     handoffFrameCountRef.current = 0;
     handoffBaseSeekedRef.current = false;
-    handoffIncomingPausedRef.current = false;
+    handoffFramePresentedRef.current = false;
     lastActiveTransitionRef.current = null;
   }, [scenes, transitions, setPhase]);
 
@@ -105,46 +104,59 @@ export function useTransitionRenderer(
         return;
       }
 
-      // Always hide canvas — we use pure CSS dual-video
       if (canvas) canvas.style.display = 'none';
 
       const syncFilter = computeFilterForTimeRef?.current
         ? computeFilterForTimeRef.current(time)
         : (videoFilterRef.current || '');
 
-      // Mirror playbackRate from base to incoming during non-idle phases
-      if (phaseRef.current !== 'idle') {
+      // Mirror playbackRate during active phase
+      if (phaseRef.current === 'active') {
         if (Math.abs(incoming.playbackRate - base.playbackRate) > 0.01) {
           incoming.playbackRate = base.playbackRate;
         }
       }
 
-      // === PRIORITY 1: Check for ACTIVE TRANSITION first ===
-      // This ensures a new transition always preempts a stuck handoff
+      // === PRIORITY 1: ACTIVE TRANSITION ===
       const active = findActiveTransition(time, resolvedTransitions);
       if (active) {
         const { transition: rt, progress } = active;
         
-        // If we were in handoff, abort it cleanly
+        // Abort any stuck handoff
         if (phaseRef.current === 'handoff') {
           handoffTargetTimeRef.current = null;
           handoffFrameCountRef.current = 0;
           handoffBaseSeekedRef.current = false;
-          handoffIncomingPausedRef.current = false;
+          handoffFramePresentedRef.current = false;
         }
         
-        // Track the currently active transition for structured boundary marking
+        // Track active transition with real boundary info
         lastActiveTransitionRef.current = {
           outgoingSceneId: rt.outgoingSceneId,
           incomingSceneId: rt.incomingSceneId,
           tEnd: rt.tEnd,
+          originalBoundary: rt.originalBoundary,
+          offsetSeconds: rt.offsetSeconds,
         };
         
+        const wasNotActive = phaseRef.current !== 'active';
         setPhase('active');
 
         seekIncoming(rt.incomingSceneId, scenes);
 
+        // Start playing incoming ONLY when entering active phase
         if (incoming.paused) {
+          if (wasNotActive) {
+            // Sync incoming to correct position before playing
+            const incomingScene = scenes.find(s => s.id === rt.incomingSceneId);
+            if (incomingScene) {
+              const sourceStart = incomingScene.original_start_time ?? incomingScene.start_time;
+              const expectedTime = sourceStart + 0.05;
+              if (Math.abs(incoming.currentTime - expectedTime) > 0.1) {
+                incoming.currentTime = expectedTime;
+              }
+            }
+          }
           incoming.play().catch(() => {});
         }
 
@@ -192,12 +204,11 @@ export function useTransitionRenderer(
       // === PRIORITY 2: FREEZE phase (offset > 0) ===
       const freezeRT = findFreezePhase(time, resolvedTransitions);
       if (freezeRT) {
-        // If we were in handoff, abort it
         if (phaseRef.current === 'handoff') {
           handoffTargetTimeRef.current = null;
           handoffFrameCountRef.current = 0;
           handoffBaseSeekedRef.current = false;
-          handoffIncomingPausedRef.current = false;
+          handoffFramePresentedRef.current = false;
         }
         
         setPhase('preparing');
@@ -207,10 +218,9 @@ export function useTransitionRenderer(
         base.style.filter = syncFilter || '';
         incoming.style.opacity = '0';
         incoming.style.pointerEvents = 'none';
+        // Pre-seek but keep paused — don't play during freeze
         seekIncoming(freezeRT.incomingSceneId, scenes);
-        if (incoming.paused) {
-          incoming.play().catch(() => {});
-        }
+        // Do NOT play incoming here — it stays paused until active
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
@@ -219,12 +229,15 @@ export function useTransitionRenderer(
       if (phaseRef.current === 'handoff') {
         handoffFrameCountRef.current++;
         
-        // Safety: if targetTime wasn't set (shouldn't happen after fix), initialize now
+        // Safety init if targetTime wasn't set
         if (handoffTargetTimeRef.current === null) {
           if (!incoming.paused) incoming.pause();
-          handoffIncomingPausedRef.current = true;
           handoffTargetTimeRef.current = incoming.currentTime;
           handoffBaseSeekedRef.current = false;
+          handoffFramePresentedRef.current = false;
+          
+          // Pause base during handoff to prevent it from drifting
+          if (!base.paused) base.pause();
           
           const diff = Math.abs(base.currentTime - handoffTargetTimeRef.current);
           if (diff > 0.02) {
@@ -240,18 +253,26 @@ export function useTransitionRenderer(
         const baseReady = base.readyState >= 2;
         const seekConfirmed = handoffBaseSeekedRef.current;
         
-        // Complete handoff only when:
-        // 1. Base has confirmed seeked event + readyState >= 2 + time is close
-        // 2. OR safety fallback after max frames
-        const isReady = (seekConfirmed && baseReady && timeDiff < 0.1) || 
+        // Wait for frame to be presented after seek
+        if (seekConfirmed && !handoffFramePresentedRef.current) {
+          if ('requestVideoFrameCallback' in base) {
+            (base as any).requestVideoFrameCallback(() => {
+              handoffFramePresentedRef.current = true;
+            });
+          } else {
+            // Fallback: trust seeked + 1 RAF
+            handoffFramePresentedRef.current = true;
+          }
+        }
+        
+        // Complete handoff when:
+        // 1. Seek confirmed + frame presented + ready + time close (0.05 tolerance)
+        // 2. OR safety fallback
+        const isReady = (seekConfirmed && handoffFramePresentedRef.current && baseReady && timeDiff < 0.05) || 
                         handoffFrameCountRef.current >= HANDOFF_MAX_FRAMES;
 
         if (isReady) {
-          // Base is already at the target (confirmed by seeked event + timeDiff < 0.1)
-          // Do NOT issue another seek here — that causes a visible stutter
-          // The initial seek from handoff start is sufficient
-          
-          // Now swap: hide incoming, show base
+          // Swap: hide incoming, show base
           incoming.style.pointerEvents = 'none';
           incoming.style.opacity = '0';
           incoming.style.transform = 'none';
@@ -266,23 +287,26 @@ export function useTransitionRenderer(
 
           lastIncomingSeekRef.current = '';
           
-          // Mark this boundary as consumed using structured data
+          // Mark boundary as consumed using REAL boundary time (not handoff target)
           if (lastHandoffBoundaryRef && lastActiveTransitionRef.current) {
             lastHandoffBoundaryRef.current = {
               outgoingSceneId: lastActiveTransitionRef.current.outgoingSceneId,
               incomingSceneId: lastActiveTransitionRef.current.incomingSceneId,
-              boundarySourceTime: targetTime,
+              boundarySourceTime: lastActiveTransitionRef.current.originalBoundary + lastActiveTransitionRef.current.offsetSeconds,
             };
           }
           
           handoffTargetTimeRef.current = null;
           handoffFrameCountRef.current = 0;
           handoffBaseSeekedRef.current = false;
-          handoffIncomingPausedRef.current = false;
+          handoffFramePresentedRef.current = false;
 
           if (transitionCooldownRef) {
             transitionCooldownRef.current = 30;
           }
+
+          // Resume base playback after swap
+          if (base.paused) base.play().catch(() => {});
 
           setPhase('idle');
         } else {
@@ -294,7 +318,7 @@ export function useTransitionRenderer(
           incoming.style.filter = syncFilter || '';
         }
 
-        // Base styles during handoff — hidden behind incoming
+        // Base hidden during handoff
         base.style.opacity = isReady ? '1' : '0';
         base.style.transform = 'none';
         base.style.clipPath = 'none';
@@ -314,9 +338,7 @@ export function useTransitionRenderer(
           seekIncoming(rt.incomingSceneId, scenes);
           incoming.style.opacity = '0';
           incoming.style.pointerEvents = 'none';
-          if (incoming.paused) {
-            incoming.play().catch(() => {});
-          }
+          // Do NOT play incoming — keep it paused, just pre-seeked
           base.style.opacity = '1';
           base.style.transform = 'none';
           base.style.clipPath = 'none';
@@ -336,10 +358,11 @@ export function useTransitionRenderer(
         setPhase('handoff');
         handoffFrameCountRef.current = 0;
         handoffBaseSeekedRef.current = false;
-        handoffIncomingPausedRef.current = true;
+        handoffFramePresentedRef.current = false;
         
-        // Freeze incoming IMMEDIATELY — no 1-frame delay
+        // Freeze BOTH videos immediately
         if (!incoming.paused) incoming.pause();
+        if (!base.paused) base.pause();
         
         // Snapshot the frozen incoming time as sync target
         handoffTargetTimeRef.current = incoming.currentTime;
