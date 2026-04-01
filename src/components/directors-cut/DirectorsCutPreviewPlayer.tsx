@@ -488,7 +488,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     };
 
     const tick = () => {
-      const video = videoRef.current;
+      const video = getActiveVideo();
       if (!video) { rafIdRef.current = requestAnimationFrame(tick); return; }
 
       // VIDEO-LED: read video.currentTime as source of truth
