@@ -742,7 +742,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // ==================== EXTERNAL TIME SYNC ====================
   useEffect(() => {
     if (isPlaying) return;
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
     if (currentTime === 0 && visualTimeRef.current > 0.5) return;
 
