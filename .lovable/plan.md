@@ -1,21 +1,27 @@
 
 
-## Fix: Transition-Dauer-Slider funktioniert nicht richtig
+## Fix: Text-Overlay-Animationen ruckeln / erscheinen sofort
 
-### Problem
+### Ursache
 
-Der Slider geht aktuell von 0.1s bis 2.0s — aber der Resolver in `transitionResolver.ts` clampt alles unter 0.6s auf 0.6s (`MIN_DURATION = 0.6`). Zusätzlich resettet `useTransitionRenderer.ts` bei jeder Änderung die Transition-Phase, sodass man den Effekt einer Dauer-Änderung kaum sieht.
+`displayTime` wird nur alle **250ms** aktualisiert (Zeile 687 in DirectorsCutPreviewPlayer). Die Animation in `NativeTextOverlayRenderer` berechnet `progress = elapsed / 0.5s` — bei 250ms-Updates springt progress von 0 → 0.5 → 1.0 in nur 2 Schritten. Das sieht aus wie "Text erscheint plötzlich".
 
-### Änderungen
+### Lösung
 
-**1. `src/utils/transitionResolver.ts`**
-- `MIN_DURATION` von 0.6 auf 0.1 senken, damit der gesamte Slider-Bereich tatsächlich wirkt
+CSS-Animationen statt JS-berechneter Progress-Werte nutzen. Die Komponente wird gemountet sobald `displayTime >= startTime` — der **Mount-Zeitpunkt** triggert dann eine flüssige 60fps CSS-Animation automatisch.
 
-**2. `src/components/directors-cut/ui/TransitionPicker.tsx`**
-- Slider-Range beibehalten (0.1s–2.0s), aber `step` auf 2 erhöhen (= 0.2s Schritte) für spürbarere Unterschiede
-- Labels anpassen: "0.1s" → "2.0s"
+### Änderung: `NativeTextOverlayRenderer.tsx`
 
-**3. `src/components/directors-cut/preview/useTransitionRenderer.ts`**
-- Den Reset-Effect so umbauen, dass reine Dauer-Änderungen die laufende Transition NICHT abbrechen
-- Nur bei Typ- oder Szenen-Änderungen zurücksetzen
+- **fadeIn/scaleUp/bounce**: CSS `@keyframes` + `animation`-Property statt manueller opacity/transform-Berechnung
+- **typewriter**: Bleibt JS-basiert (text.substring), aber nutzt `useEffect` + `requestAnimationFrame` für eigenen Timer statt des langsamen `displayTime`
+- **highlight**: CSS `@keyframes` für Background-Sweep
+- **glitch**: CSS `@keyframes` für Oszillation + text-shadow
+
+Konkret: Die gesamte `switch(overlay.animation)`-Logik (Zeilen 65-128) wird ersetzt durch CSS-Klassen, die beim Mount automatisch abspielen. Für typewriter wird ein interner `useState` + `useEffect` mit eigenem RAF-Timer genutzt.
+
+### Betroffene Datei
+
+- `src/components/directors-cut/preview/NativeTextOverlayRenderer.tsx`
+
+Keine Änderung an `DirectorsCutPreviewPlayer.tsx` nötig.
 
