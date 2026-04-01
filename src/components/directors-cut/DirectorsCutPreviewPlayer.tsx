@@ -536,7 +536,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             lastSceneIndexRef.current = sceneInfo.index;
             
             // Only seek on true non-sequential jumps (not next scene in order)
-            if (prevIndex >= 0 && sceneInfo.index !== prevIndex + 1) {
+            if (prevIndex >= 0 && sceneInfo.index !== prevIndex + 1 && transitionPhaseRef.current === 'idle') {
               const expectedSource = sourceTimeForScene(sceneInfo.scene, sceneInfo.scene.start_time);
               if (Math.abs(video.currentTime - expectedSource) > 0.3) {
                 video.currentTime = expectedSource;
