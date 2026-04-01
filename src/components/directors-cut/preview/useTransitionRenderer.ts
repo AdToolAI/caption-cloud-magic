@@ -116,7 +116,16 @@ export function useTransitionRenderer(
         if (phaseRef.current === 'handoff') {
           handoffTargetTimeRef.current = null;
           handoffFrameCountRef.current = 0;
+          handoffBaseSeekedRef.current = false;
+          handoffIncomingPausedRef.current = false;
         }
+        
+        // Track the currently active transition for structured boundary marking
+        lastActiveTransitionRef.current = {
+          outgoingSceneId: rt.outgoingSceneId,
+          incomingSceneId: rt.incomingSceneId,
+          tEnd: rt.tEnd,
+        };
         
         phaseRef.current = 'active';
 
