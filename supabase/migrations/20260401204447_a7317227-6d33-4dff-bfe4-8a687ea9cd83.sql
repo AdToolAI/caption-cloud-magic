@@ -1,0 +1,1 @@
+ALTER TABLE public.video_creations ADD COLUMN IF NOT EXISTS batch_job_id UUID REFERENCES public.batch_jobs(id) ON DELETE SET NULL;

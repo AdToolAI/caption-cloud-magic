@@ -9407,6 +9407,7 @@ export type Database = {
       video_creations: {
         Row: {
           aspect_ratio: string | null
+          batch_job_id: string | null
           brand_kit_id: string | null
           compressed_file_size_mb: number | null
           compression_ratio: number | null
@@ -9445,6 +9446,7 @@ export type Database = {
         }
         Insert: {
           aspect_ratio?: string | null
+          batch_job_id?: string | null
           brand_kit_id?: string | null
           compressed_file_size_mb?: number | null
           compression_ratio?: number | null
@@ -9483,6 +9485,7 @@ export type Database = {
         }
         Update: {
           aspect_ratio?: string | null
+          batch_job_id?: string | null
           brand_kit_id?: string | null
           compressed_file_size_mb?: number | null
           compression_ratio?: number | null
@@ -9520,6 +9523,13 @@ export type Database = {
           version_number?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "video_creations_batch_job_id_fkey"
+            columns: ["batch_job_id"]
+            isOneToOne: false
+            referencedRelation: "batch_jobs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "video_creations_brand_kit_id_fkey"
             columns: ["brand_kit_id"]
