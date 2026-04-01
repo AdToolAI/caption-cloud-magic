@@ -88,9 +88,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   fillContainer = false,
   children,
 }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const incomingVideoRef = useRef<HTMLVideoElement>(null);
+  const videoRefA = useRef<HTMLVideoElement>(null);
+  const videoRefB = useRef<HTMLVideoElement>(null);
   const transitionCanvasRef = useRef<HTMLCanvasElement>(null);
+  // Ping-pong: tracks which slot is currently the active (visible, playing) video
+  const activeSlotRef = useRef<'A' | 'B'>('A');
+  // Helper to get the currently active video element
+  const getActiveVideo = useCallback(() => {
+    return activeSlotRef.current === 'A' ? videoRefA.current : videoRefB.current;
+  }, []);
+  const getStandbyVideo = useCallback(() => {
+    return activeSlotRef.current === 'A' ? videoRefB.current : videoRefA.current;
+  }, []);
   const containerRef = useRef<HTMLDivElement>(null);
   const onTimeUpdateRef = useRef(onTimeUpdate);
 
