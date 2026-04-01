@@ -585,7 +585,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           if (videoSourceTime >= effectiveBoundary - 0.02) {
             // Check if this boundary was already consumed by a handoff (structured match)
             const handoffMarker = lastHandoffBoundaryRef.current;
-            if (handoffMarker !== null && handoffMarker.outgoingSceneId === sceneInfo.scene.id) {
+            const nextScene = sortedScenes[sceneInfo.index + 1];
+            if (handoffMarker !== null && 
+                handoffMarker.outgoingSceneId === sceneInfo.scene.id &&
+                nextScene && handoffMarker.incomingSceneId === nextScene.id) {
               // Boundary already handled by transition handoff — skip the seek
               lastHandoffBoundaryRef.current = null;
             } else {
