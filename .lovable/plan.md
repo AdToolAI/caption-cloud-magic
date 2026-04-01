@@ -1,32 +1,47 @@
 
 
-## Fix: Text Overlays unsichtbar + Effekte nach Slot-Swap
+## Fix: Text-Overlay-Animationen im Director's Cut Preview
 
-### Problem 1: Text Overlays erscheinen nie (Schritt 6)
+### Problem
 
-**Root Cause**: In `DirectorsCutPreviewPlayer.tsx` Zeile 1066:
-```typescript
-textOverlays.filter(o => displayTime >= o.startTime && displayTime < o.endTime)
-```
-`endTime` ist standardmäßig `null` (= "bis Ende"). Aber `displayTime < null` ergibt immer `false` → Overlays mit `endTime: null` werden nie angezeigt.
+In `DirectorsCutPreviewPlayer.tsx` (Zeile 1076-1094) werden Text-Overlays als statische `<div>`s gerendert. Die `animation`-Property des Overlays wird komplett ignoriert — kein fadeIn, kein scaleUp, kein Bounce, nichts.
 
-**Fix**: Null-Check einbauen:
-```typescript
-textOverlays.filter(o => displayTime >= o.startTime && (o.endTime === null || displayTime < o.endTime))
-```
+Die existierende `TextOverlayRenderer`-Komponente nutzt Remotion's `useCurrentFrame()` und funktioniert nur im Remotion-Renderpfad, nicht in der nativen Video-Preview.
 
-### Problem 2: Effekte (Helligkeit/Kontrast) nach Slot-Swap weg
+### Lösung
 
-**Root Cause**: Der `useEffect` auf Zeile 986 appliziert den CSS-Filter nur wenn `videoFilter` sich ändert. `getActiveVideo` ist nicht in der Dependency-Liste. Nach einem Ping-Pong-Swap zeigt `getActiveVideo()` auf ein anderes Element, aber der Effect läuft nicht erneut.
+Eine neue Komponente `NativeTextOverlayRenderer` erstellen, die CSS-Animationen statt Remotion-Hooks nutzt und im nativen Preview-Player funktioniert.
 
-**Fix**: `activeSlotRef.current` als Abhängigkeit ergänzen und den Filter auch bei Slot-Wechsel anwenden. Zusätzlich einen separaten kleinen Effect, der bei Slot-Änderungen den Filter nachzieht.
+### Umsetzung
 
-### Betroffene Datei
+**Neue Datei: `src/components/directors-cut/preview/NativeTextOverlayRenderer.tsx`**
 
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- Bekommt das Overlay-Objekt + `displayTime` als Props
+- Berechnet `elapsed = displayTime - overlay.startTime` für zeitbasierte Animationen
+- Implementiert alle 6 Animationstypen mit CSS transitions/keyframes:
+  - **fadeIn**: opacity 0→1 + translateY über ~0.5s
+  - **scaleUp**: scale 0→1 mit CSS spring-ähnlichem easing
+  - **bounce**: translateY mit cubic-bezier bounce
+  - **typewriter**: Zeichen progressiv einblenden basierend auf elapsed time
+  - **highlight**: Hintergrund-Sweep von 0% auf 100% Breite
+  - **glitch**: translateX oszillation + farbige text-shadows
+- Positionierung (top/center/bottom/custom) wie bisher
+- Styling (fontSize, color, backgroundColor, shadow, fontFamily) wie bisher
 
-### Änderungen
+**Änderung: `DirectorsCutPreviewPlayer.tsx`**
 
-1. **Zeile 1066**: Text-Overlay-Filter um `endTime === null` erweitern
-2. **Zeile 986-993**: Filter-Anwendung auch bei Slot-Swap triggern (activeSlotRef tracken)
+- Import der neuen `NativeTextOverlayRenderer`
+- Zeile 1076-1094: Statische `<div>`s durch `<NativeTextOverlayRenderer>` ersetzen
+
+### Technische Details
+
+- Animationen werden zeitbasiert berechnet: `elapsed = displayTime - startTime`
+- Kein Remotion-Dependency — rein CSS + JS Math
+- Typewriter nutzt `text.substring(0, Math.floor(elapsed * charsPerSecond))`
+- Glitch nutzt `Math.sin(elapsed * frequency)` für Oszillation
+
+### Betroffene Dateien
+
+1. **Neu**: `src/components/directors-cut/preview/NativeTextOverlayRenderer.tsx`
+2. **Edit**: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` (Overlay-Rendering ersetzen)
 
