@@ -107,14 +107,14 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     onTimeUpdateRef.current = onTimeUpdate;
   }, [onTimeUpdate]);
 
-  // Set initial incoming video styles imperatively to avoid React re-render conflicts
+  // Set initial standby video styles imperatively to avoid React re-render conflicts
   useEffect(() => {
-    const incoming = incomingVideoRef.current;
-    if (incoming) {
-      incoming.style.opacity = '0';
-      incoming.style.pointerEvents = 'none';
+    const standby = getStandbyVideo();
+    if (standby) {
+      standby.style.opacity = '0';
+      standby.style.pointerEvents = 'none';
     }
-  }, []);
+  }, [getStandbyVideo]);
 
   // Native audio refs
   const sourceAudioRef = useRef<HTMLAudioElement | null>(null);
