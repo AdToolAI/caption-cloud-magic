@@ -54,7 +54,7 @@ export interface SceneInput {
 }
 
 const DEFAULT_DURATION = 1.2;
-const MIN_DURATION = 0.6;
+const MIN_DURATION = 0.1;
 
 /**
  * Resolve all transition windows from scenes and transition assignments.

@@ -315,15 +315,15 @@ export function TransitionPicker({
             value={[duration * 10]}
             onValueChange={([v]) => onDurationChange(v / 10)}
             min={1}
-            max={20}
-            step={1}
+            max={30}
+            step={2}
             className="py-2"
           />
           <div className="flex justify-between text-[10px] text-muted-foreground">
             <span>0.1s</span>
             <span>Schnell</span>
             <span>Langsam</span>
-            <span>2.0s</span>
+            <span>3.0s</span>
           </div>
         </motion.div>
       )}
