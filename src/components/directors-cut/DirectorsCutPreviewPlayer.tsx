@@ -571,7 +571,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
         // Scene-boundary-crossing logic: SKIP entirely during active transitions
         // Canvas handles visuals; video just keeps playing through the boundary
-        if (!cachedActiveTrans && transitionCooldownRef.current <= 0) {
+        if (!cachedActiveTrans && transitionCooldownRef.current <= 0 && transitionPhaseRef.current === 'idle') {
           const srcStart = sceneInfo.scene.original_start_time ?? sceneInfo.scene.start_time;
           const rate = (sceneInfo.scene as any).playbackRate ?? 1;
           const srcEnd = srcStart + (sceneInfo.scene.end_time - sceneInfo.scene.start_time) * rate;
@@ -583,9 +583,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             : srcEnd;
 
           if (videoSourceTime >= effectiveBoundary - 0.02) {
-            // Check if this boundary was already consumed by a handoff
-            const handoffTime = lastHandoffBoundaryRef.current;
-            if (handoffTime !== null && Math.abs(videoSourceTime - handoffTime) < 0.5) {
+            // Check if this boundary was already consumed by a handoff (structured match)
+            const handoffMarker = lastHandoffBoundaryRef.current;
+            if (handoffMarker !== null && handoffMarker.outgoingSceneId === sceneInfo.scene.id) {
               // Boundary already handled by transition handoff — skip the seek
               lastHandoffBoundaryRef.current = null;
             } else {
