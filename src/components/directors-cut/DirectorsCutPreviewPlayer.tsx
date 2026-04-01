@@ -986,9 +986,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   useEffect(() => {
     videoFilterRef.current = videoFilter ?? '';
     // Apply filter imperatively to base video so effects work even without transitions
-    const base = videoRef.current;
-    if (base) {
-      base.style.filter = videoFilter || '';
+    const active = getActiveVideo();
+    if (active) {
+      active.style.filter = videoFilter || '';
     }
   }, [videoFilter]);
 
