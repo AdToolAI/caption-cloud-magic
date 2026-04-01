@@ -737,7 +737,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
     }
-  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted, playVoiceover]);
+  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted, playVoiceover, getActiveVideo]);
 
   // ==================== EXTERNAL TIME SYNC ====================
   useEffect(() => {
