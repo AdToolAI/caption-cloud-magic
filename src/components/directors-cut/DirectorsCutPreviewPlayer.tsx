@@ -820,7 +820,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [isMuted, isPlaying, audio.master_volume, startAllAudio, stopAllAudio]);
 
   const handleSeek = useCallback((value: number[]) => {
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
 
     const newTime = value[0]; // timeline time
@@ -834,17 +834,23 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     pendingSceneAdvanceRef.current = null;
     transitionCooldownRef.current = 0;
     lastHandoffBoundaryRef.current = null;
-    const incoming = incomingVideoRef.current;
-    if (incoming) {
-      incoming.pause();
-      incoming.style.opacity = '0';
-      incoming.style.pointerEvents = 'none';
-      incoming.style.transform = 'none';
-      incoming.style.clipPath = 'none';
-      incoming.style.filter = 'none';
-      incoming.style.position = '';
-      incoming.style.inset = '';
-      incoming.style.zIndex = '';
+    // Reset active slot to A and hide B
+    activeSlotRef.current = 'A';
+    const slotA = videoRefA.current;
+    const slotB = videoRefB.current;
+    if (slotA && slotB) {
+      slotB.pause();
+      slotB.style.opacity = '0';
+      slotB.style.pointerEvents = 'none';
+      slotB.style.transform = 'none';
+      slotB.style.clipPath = 'none';
+      slotB.style.filter = 'none';
+      slotB.style.position = '';
+      slotB.style.inset = '';
+      slotB.style.zIndex = '';
+      // Make sure the seek targets slot A
+      slotA.currentTime = sourceTime;
+      slotA.style.opacity = '1';
     }
 
     if (sourceAudioRef.current) sourceAudioRef.current.currentTime = newTime;
