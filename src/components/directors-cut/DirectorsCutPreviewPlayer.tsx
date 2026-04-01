@@ -1075,22 +1075,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
         {/* Text Overlays */}
         {textOverlays.filter(o => displayTime >= o.startTime && (o.endTime === null || o.endTime === undefined || displayTime < o.endTime)).map(overlay => (
-          <div
-            key={overlay.id}
-            className="absolute pointer-events-none z-[15]"
-            style={{
-              top: overlay.customPosition?.y != null ? `${overlay.customPosition.y}%` : overlay.position === 'top' ? '10%' : overlay.position === 'center' ? '50%' : '80%',
-              left: overlay.customPosition?.x != null ? `${overlay.customPosition.x}%` : '50%',
-              transform: 'translate(-50%, -50%)',
-              fontSize: overlay.style?.fontSize || '32px',
-              fontWeight: (overlay.style as any)?.fontWeight || 'bold',
-              color: overlay.style?.color || '#ffffff',
-              textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
-              fontFamily: overlay.style?.fontFamily || 'sans-serif',
-            }}
-          >
-            {overlay.text}
-          </div>
+          <NativeTextOverlayRenderer key={overlay.id} overlay={overlay} displayTime={displayTime} />
         ))}
 
         {/* Fullscreen Button */}
