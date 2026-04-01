@@ -30,7 +30,12 @@ export function useTransitionRenderer(
   // Handoff: snapshot-based approach
   const handoffTargetTimeRef = useRef<number | null>(null);
   const handoffFrameCountRef = useRef(0);
-  const HANDOFF_MAX_FRAMES = 45; // ~750ms safety fallback
+  const handoffBaseSeekedRef = useRef(false);
+  const handoffIncomingPausedRef = useRef(false);
+  const HANDOFF_MAX_FRAMES = 60; // ~1s safety fallback
+  
+  // Track last active transition for structured boundary marking
+  const lastActiveTransitionRef = useRef<{ outgoingSceneId: string; incomingSceneId: string; tEnd: number } | null>(null);
 
   const resolvedTransitions = useMemo(
     () => resolveTransitions(scenes, transitions),
