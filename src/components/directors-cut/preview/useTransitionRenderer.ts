@@ -80,12 +80,17 @@ export function useTransitionRenderer(
     if (transitionPhaseRef) transitionPhaseRef.current = phase;
   }, [transitionPhaseRef]);
 
-  // Reset on scenes/transitions change
+  // Build a structural key that ignores pure duration changes
+  const structuralKey = useMemo(() => {
+    return transitions.map(t => `${t.sceneId}:${t.transitionType}`).join('|');
+  }, [transitions]);
+
+  // Reset only on structural changes (type or scene), not duration
   useEffect(() => {
     setPhase('idle');
     lastStandbySeekRef.current = '';
     lastActiveTransitionRef.current = null;
-  }, [scenes, transitions, setPhase]);
+  }, [scenes, structuralKey, setPhase]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
