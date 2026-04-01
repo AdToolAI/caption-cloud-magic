@@ -1074,7 +1074,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         )}
 
         {/* Text Overlays */}
-        {textOverlays.filter(o => displayTime >= o.startTime && displayTime < o.endTime).map(overlay => (
+        {textOverlays.filter(o => displayTime >= o.startTime && (o.endTime === null || o.endTime === undefined || displayTime < o.endTime)).map(overlay => (
           <div
             key={overlay.id}
             className="absolute pointer-events-none z-[15]"
