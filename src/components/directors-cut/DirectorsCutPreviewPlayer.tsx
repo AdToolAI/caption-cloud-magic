@@ -88,9 +88,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   fillContainer = false,
   children,
 }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const incomingVideoRef = useRef<HTMLVideoElement>(null);
+  const videoRefA = useRef<HTMLVideoElement>(null);
+  const videoRefB = useRef<HTMLVideoElement>(null);
   const transitionCanvasRef = useRef<HTMLCanvasElement>(null);
+  // Ping-pong: tracks which slot is currently the active (visible, playing) video
+  const activeSlotRef = useRef<'A' | 'B'>('A');
+  // Helper to get the currently active video element
+  const getActiveVideo = useCallback(() => {
+    return activeSlotRef.current === 'A' ? videoRefA.current : videoRefB.current;
+  }, []);
+  const getStandbyVideo = useCallback(() => {
+    return activeSlotRef.current === 'A' ? videoRefB.current : videoRefA.current;
+  }, []);
   const containerRef = useRef<HTMLDivElement>(null);
   const onTimeUpdateRef = useRef(onTimeUpdate);
 
@@ -98,14 +107,14 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     onTimeUpdateRef.current = onTimeUpdate;
   }, [onTimeUpdate]);
 
-  // Set initial incoming video styles imperatively to avoid React re-render conflicts
+  // Set initial standby video styles imperatively to avoid React re-render conflicts
   useEffect(() => {
-    const incoming = incomingVideoRef.current;
-    if (incoming) {
-      incoming.style.opacity = '0';
-      incoming.style.pointerEvents = 'none';
+    const standby = getStandbyVideo();
+    if (standby) {
+      standby.style.opacity = '0';
+      standby.style.pointerEvents = 'none';
     }
-  }, []);
+  }, [getStandbyVideo]);
 
   // Native audio refs
   const sourceAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -413,7 +422,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // Shared transition phase ref — lets the player know when the renderer is in handoff
   const transitionPhaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
 
-  useTransitionRenderer(videoRef, incomingVideoRef, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef);
+  useTransitionRenderer(videoRefA, videoRefB, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
@@ -479,7 +488,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     };
 
     const tick = () => {
-      const video = videoRef.current;
+      const video = getActiveVideo();
       if (!video) { rafIdRef.current = requestAnimationFrame(tick); return; }
 
       // VIDEO-LED: read video.currentTime as source of truth
@@ -701,14 +710,14 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     rafIdRef.current = requestAnimationFrame(tick);
     return () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current); };
-  }, [isPlaying, duration, sortedScenes, sourceTimeForScene, transitions, resolvedTransitions, findActiveTransition, handleVideoEnded]);
+  }, [isPlaying, duration, sortedScenes, sourceTimeForScene, transitions, resolvedTransitions, findActiveTransition, handleVideoEnded, getActiveVideo]);
 
   // ==================== VIDEO EVENT HANDLERS ====================
 
   // ==================== EXTERNAL isPlaying SYNC ====================
   useEffect(() => {
     if (externalIsPlaying === undefined) return;
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
 
     if (externalIsPlaying && !isPlaying) {
@@ -728,12 +737,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
     }
-  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted, playVoiceover]);
+  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted, playVoiceover, getActiveVideo]);
 
   // ==================== EXTERNAL TIME SYNC ====================
   useEffect(() => {
     if (isPlaying) return;
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
     if (currentTime === 0 && visualTimeRef.current > 0.5) return;
 
@@ -764,7 +773,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, []);
 
   const handlePlayPause = useCallback(() => {
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
 
     if (isPlaying) {
@@ -786,7 +795,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       if (!isMuted) startAllAudio();
       onPlayingChange?.(true);
     }
-  }, [isPlaying, isMuted, duration, onPlayingChange, startAllAudio, stopAllAudio]);
+  }, [isPlaying, isMuted, duration, onPlayingChange, startAllAudio, stopAllAudio, getActiveVideo]);
 
   const handleMuteToggle = useCallback(async (e: React.MouseEvent) => {
     if (isMuted) {
@@ -811,7 +820,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [isMuted, isPlaying, audio.master_volume, startAllAudio, stopAllAudio]);
 
   const handleSeek = useCallback((value: number[]) => {
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
 
     const newTime = value[0]; // timeline time
@@ -825,17 +834,23 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     pendingSceneAdvanceRef.current = null;
     transitionCooldownRef.current = 0;
     lastHandoffBoundaryRef.current = null;
-    const incoming = incomingVideoRef.current;
-    if (incoming) {
-      incoming.pause();
-      incoming.style.opacity = '0';
-      incoming.style.pointerEvents = 'none';
-      incoming.style.transform = 'none';
-      incoming.style.clipPath = 'none';
-      incoming.style.filter = 'none';
-      incoming.style.position = '';
-      incoming.style.inset = '';
-      incoming.style.zIndex = '';
+    // Reset active slot to A and hide B
+    activeSlotRef.current = 'A';
+    const slotA = videoRefA.current;
+    const slotB = videoRefB.current;
+    if (slotA && slotB) {
+      slotB.pause();
+      slotB.style.opacity = '0';
+      slotB.style.pointerEvents = 'none';
+      slotB.style.transform = 'none';
+      slotB.style.clipPath = 'none';
+      slotB.style.filter = 'none';
+      slotB.style.position = '';
+      slotB.style.inset = '';
+      slotB.style.zIndex = '';
+      // Make sure the seek targets slot A
+      slotA.currentTime = sourceTime;
+      slotA.style.opacity = '1';
     }
 
     if (sourceAudioRef.current) sourceAudioRef.current.currentTime = newTime;
@@ -850,7 +865,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [playVoiceover, timelineToSourceTime, findActiveTransition]);
 
   const handleReset = useCallback(() => {
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
 
     video.pause();
@@ -862,15 +877,23 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     pendingSceneAdvanceRef.current = null;
     transitionCooldownRef.current = 0;
     lastHandoffBoundaryRef.current = null;
-    // Reset incoming video
-    const incoming = incomingVideoRef.current;
-    if (incoming) {
-      incoming.pause();
-      incoming.style.opacity = '0';
-      incoming.style.pointerEvents = 'none';
-      incoming.style.transform = 'none';
-      incoming.style.clipPath = 'none';
-      incoming.style.filter = 'none';
+    // Reset to slot A
+    activeSlotRef.current = 'A';
+    const slotA = videoRefA.current;
+    const slotB = videoRefB.current;
+    if (slotA) {
+      slotA.pause();
+      slotA.currentTime = 0;
+      slotA.style.opacity = '1';
+    }
+    if (slotB) {
+      slotB.pause();
+      slotB.currentTime = 0;
+      slotB.style.opacity = '0';
+      slotB.style.pointerEvents = 'none';
+      slotB.style.transform = 'none';
+      slotB.style.clipPath = 'none';
+      slotB.style.filter = 'none';
     }
     stopAllAudio();
     if (sourceAudioRef.current) sourceAudioRef.current.currentTime = 0;
@@ -963,9 +986,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   useEffect(() => {
     videoFilterRef.current = videoFilter ?? '';
     // Apply filter imperatively to base video so effects work even without transitions
-    const base = videoRef.current;
-    if (base) {
-      base.style.filter = videoFilter || '';
+    const active = getActiveVideo();
+    if (active) {
+      active.style.filter = videoFilter || '';
     }
   }, [videoFilter]);
 
@@ -988,9 +1011,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           className="absolute inset-0 w-full h-full"
           style={{ zIndex: 0, willChange: 'transform' }}
         >
-          {/* Base (outgoing) video */}
+          {/* Video Slot A */}
           <video
-            ref={videoRef}
+            ref={videoRefA}
             src={videoUrl}
             className="absolute inset-0 w-full h-full object-contain"
             style={{ zIndex: 1 }}
@@ -1000,15 +1023,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             onEnded={handleVideoEnded}
           />
 
-          {/* Incoming (transition) video — no crossOrigin to avoid CORS */}
+          {/* Video Slot B */}
           <video
-            ref={incomingVideoRef}
+            ref={videoRefB}
             src={videoUrl}
             className="absolute inset-0 w-full h-full object-contain"
             style={{ zIndex: 2 }}
             muted
             playsInline
             preload="auto"
+            onEnded={handleVideoEnded}
           />
         </div>
 
