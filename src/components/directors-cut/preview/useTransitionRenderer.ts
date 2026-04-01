@@ -183,6 +183,8 @@ export function useTransitionRenderer(
         if (phaseRef.current === 'handoff') {
           handoffTargetTimeRef.current = null;
           handoffFrameCountRef.current = 0;
+          handoffBaseSeekedRef.current = false;
+          handoffIncomingPausedRef.current = false;
         }
         
         phaseRef.current = 'preparing';
