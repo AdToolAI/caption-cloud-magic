@@ -169,13 +169,13 @@ Return ONLY valid JSON, no markdown.`
     }
 
     // Clamp values to safe ranges
-    result.bottomBandPercent = Math.max(4, Math.min(25, result.bottomBandPercent || 12));
+    result.bottomBandPercent = Math.max(10, Math.min(30, result.bottomBandPercent || 14));
     result.confidence = Math.max(0, Math.min(1, result.confidence || 0.5));
 
     // Calculate recommended safe zone settings based on detection
     const bottomPercent = result.bottomBandPercent;
-    // Add 2% safety margin
-    const safeBottomPercent = Math.min(25, bottomPercent + 2);
+    // Add 4% safety margin for shadows/glow effects
+    const safeBottomPercent = Math.min(30, bottomPercent + 4);
     // Zoom: need to scale up to fill the cropped area
     const zoom = 1 / (1 - safeBottomPercent / 100);
     // OffsetY: shift up by half the cropped amount 

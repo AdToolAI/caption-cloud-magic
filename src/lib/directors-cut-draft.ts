@@ -20,9 +20,9 @@ export const DEFAULT_SUBTITLE_SAFE_ZONE: SubtitleSafeZone = {
 };
 
 export const SAFE_ZONE_PRESETS: Record<string, Partial<SubtitleSafeZone>> = {
-  light: { zoom: 1.06, offsetY: -3, bottomBandPercent: 6 },
-  medium: { zoom: 1.12, offsetY: -6, bottomBandPercent: 12 },
-  strong: { zoom: 1.20, offsetY: -10, bottomBandPercent: 18 },
+  light: { zoom: 1.09, offsetY: -4, bottomBandPercent: 8 },
+  medium: { zoom: 1.16, offsetY: -7, bottomBandPercent: 14 },
+  strong: { zoom: 1.28, offsetY: -11, bottomBandPercent: 22 },
 };
 
 export interface DirectorsCutDraft {

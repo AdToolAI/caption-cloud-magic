@@ -783,39 +783,64 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                       ))}
                     </div>
 
-                    {/* Zoom Slider */}
+                    {/* Bottom Band / Crop Slider — primary control */}
                     <div className="space-y-1">
                       <div className="flex justify-between">
                         <label className="text-[10px] text-white/50 flex items-center gap-1">
-                          <ZoomIn className="h-2.5 w-2.5" /> Zoom
+                          <Crop className="h-2.5 w-2.5" /> Zuschnittbereich
                         </label>
-                        <span className="text-[10px] text-white/40">{Math.round((subtitleSafeZone.zoom - 1) * 100)}%</span>
+                        <span className="text-[10px] text-white/40">{subtitleSafeZone.bottomBandPercent}%</span>
                       </div>
                       <Slider
-                        value={[subtitleSafeZone.zoom * 100]}
-                        onValueChange={([v]) => onSubtitleSafeZoneChange?.({ ...subtitleSafeZone, preset: 'custom', zoom: v / 100 })}
-                        min={100}
-                        max={130}
+                        value={[subtitleSafeZone.bottomBandPercent]}
+                        onValueChange={([v]) => {
+                          const zoom = Math.round((1 / (1 - v / 100)) * 100) / 100;
+                          const offsetY = Math.round(-(v / 2) * 10) / 10;
+                          onSubtitleSafeZoneChange?.({ ...subtitleSafeZone, preset: 'custom', bottomBandPercent: v, zoom, offsetY });
+                        }}
+                        min={4}
+                        max={30}
                         step={1}
                         className="cursor-pointer"
                       />
                     </div>
 
-                    {/* Vertical Offset */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between">
-                        <label className="text-[10px] text-white/50">Verschiebung ↑</label>
-                        <span className="text-[10px] text-white/40">{Math.abs(subtitleSafeZone.offsetY)}%</span>
+                    {/* Advanced: Zoom & Offset */}
+                    <details className="group">
+                      <summary className="text-[10px] text-white/30 cursor-pointer hover:text-white/50">Erweitert</summary>
+                      <div className="space-y-2 pt-1.5">
+                        <div className="space-y-1">
+                          <div className="flex justify-between">
+                            <label className="text-[10px] text-white/50 flex items-center gap-1">
+                              <ZoomIn className="h-2.5 w-2.5" /> Zoom
+                            </label>
+                            <span className="text-[10px] text-white/40">{Math.round((subtitleSafeZone.zoom - 1) * 100)}%</span>
+                          </div>
+                          <Slider
+                            value={[subtitleSafeZone.zoom * 100]}
+                            onValueChange={([v]) => onSubtitleSafeZoneChange?.({ ...subtitleSafeZone, preset: 'custom', zoom: v / 100 })}
+                            min={100}
+                            max={145}
+                            step={1}
+                            className="cursor-pointer"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between">
+                            <label className="text-[10px] text-white/50">Verschiebung ↑</label>
+                            <span className="text-[10px] text-white/40">{Math.abs(subtitleSafeZone.offsetY)}%</span>
+                          </div>
+                          <Slider
+                            value={[Math.abs(subtitleSafeZone.offsetY)]}
+                            onValueChange={([v]) => onSubtitleSafeZoneChange?.({ ...subtitleSafeZone, preset: 'custom', offsetY: -v })}
+                            min={0}
+                            max={20}
+                            step={1}
+                            className="cursor-pointer"
+                          />
+                        </div>
                       </div>
-                      <Slider
-                        value={[Math.abs(subtitleSafeZone.offsetY)]}
-                        onValueChange={([v]) => onSubtitleSafeZoneChange?.({ ...subtitleSafeZone, preset: 'custom', offsetY: -v })}
-                        min={0}
-                        max={20}
-                        step={1}
-                        className="cursor-pointer"
-                      />
-                    </div>
+                    </details>
                   </div>
                 )}
               </div>
