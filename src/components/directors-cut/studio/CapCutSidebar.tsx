@@ -61,6 +61,8 @@ interface CapCutSidebarProps {
   burnedSubsStatus?: string;
   onRemoveBurnedSubtitles?: (settings?: { conf_threshold?: number; margin?: number; method?: string }) => void;
   onRestoreOriginalVideo?: () => void;
+  subtitleSafeZone?: SubtitleSafeZone;
+  onSubtitleSafeZoneChange?: (zone: SubtitleSafeZone) => void;
 }
 
 interface Caption {
