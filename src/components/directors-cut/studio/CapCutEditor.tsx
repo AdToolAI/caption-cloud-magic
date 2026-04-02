@@ -1135,6 +1135,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onShowTextOverlaysChange={setShowTextOverlays}
               isRemovingBurnedSubs={isRemovingBurnedSubs}
               hasCleanedVideo={!!cleanedVideoUrl}
+              burnedSubsStatus={burnedSubsStatus}
               onRemoveBurnedSubtitles={handleRemoveBurnedSubtitles}
               onRestoreOriginalVideo={handleRestoreOriginalVideo}
               onAddVideoAsScene={async (file) => {

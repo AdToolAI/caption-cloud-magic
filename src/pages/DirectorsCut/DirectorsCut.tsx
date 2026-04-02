@@ -1009,6 +1009,36 @@ export function DirectorsCut() {
               onSubtitleTrackChange={setCapCutSubtitleTrack}
               onBackgroundMusicUrlChange={setBackgroundMusicUrl}
               initialSubtitleTrack={capCutSubtitleTrack}
+              // Project ID for burned subtitle removal
+              projectId={projectId}
+              onCleanedVideoUrlChange={(url) => {
+                // Persist in draft via cleanedVideoUrl field
+                saveDraft({
+                  currentStep,
+                  selectedVideo,
+                  scenes,
+                  transitions,
+                  appliedEffects,
+                  audioEnhancements,
+                  exportSettings,
+                  styleTransfer,
+                  colorGrading,
+                  sceneColorGrading,
+                  speedKeyframes,
+                  kenBurnsKeyframes,
+                  chromaKey,
+                  upscaling,
+                  interpolation,
+                  restoration,
+                  objectRemoval,
+                  textOverlays,
+                  voiceOverUrl,
+                  backgroundMusicUrl,
+                  cleanedVideoUrl: url || undefined,
+                  capCutAudioTracks,
+                  capCutSubtitleTrack,
+                });
+              }}
             />
           );
         })()}
