@@ -1,50 +1,114 @@
 
+## Empfohlene Lösung
 
-## Plan: Dritter Durchlauf + minimale Schwelle für vollständige Entfernung
+Ja: Es gibt eine saubere und vor allem zuverlässige Lösung. Aber nicht über noch mehr KI-Durchläufe.
 
-### Analyse der Logs
+Die robuste Lösung ist ein **„Subtitle Safe Zone / Reframe“-Modus**:
+Der untere Bereich mit dem eingebrannten Untertitel wird durch **leichtes Zoom + Verschieben nach oben** komplett aus dem sichtbaren Bild geschoben. So ist der Untertitel wirklich weg — deterministisch, sauber und ohne halb sichtbare Reste.
 
-Die Zwei-Pass-Verarbeitung funktioniert, aber nicht vollständig:
-- **Pass 1**: 550 Frames mit Text erkannt, 600 Regionen entfernt ✓
-- **Pass 2**: 50 Frames mit Text erkannt, 56 Regionen entfernt ✓
-- **Problem**: Pass 2 findet noch 50 Frames mit Text — das sind die sichtbaren Reste
+## Warum der aktuelle Ansatz nicht sauber genug ist
 
-Da Pass 2 bei `conf_threshold: 0.03` immer noch 56 Regionen findet, lohnt sich ein **dritter Durchlauf** mit noch niedrigerer Schwelle. Außerdem wechseln wir in Pass 3 die Methode auf `"fast"`, die einen anderen Erkennungsalgorithmus nutzt und dadurch andere Textmuster findet.
+Ich habe mir den aktuellen Stand angesehen:
 
-### Änderungen
+- Die jetzige 3-Pass-KI arbeitet nur als **Erkennungs-/Rekonstruktionsversuch**.
+- Genau diese Art von Modell scheitert typischerweise an **stilisierter, transparenter oder kontrastarmer Schrift**.
+- Im Frontend wird aktuell nur ein `cleanedVideoUrl` im Editor verwendet. Für ein wirklich sauberes Produkt muss dieselbe Logik **auch im Export** gelten.
+- Für Preview und Export gibt es bereits gute Transform-Stellen im Code (`DirectorsCutPreviewPlayer` und `DirectorsCutVideo`), die wir für eine saubere Reframe-Lösung nutzen können.
 
-**1. Webhook: Drei-Pass-Logik**
+## Plan
 
-`supabase/functions/director-cut-burned-subtitles-webhook/index.ts`:
-- Pass 1 fertig → Pass 2 starten (wie bisher)
-- Pass 2 fertig → **Pass 3** starten mit `conf_threshold: 0.01`, `method: "fast"`, `iou_threshold: 0.2`
-- Pass 3 fertig → Ergebnis als final speichern
+### 1. Neuen Standardmodus für eingebrannte Untertitel einführen
+In der Sidebar ersetzen wir den bisherigen Haupt-CTA durch zwei klare Modi:
 
-**2. Edge Function: Statusmeldung anpassen**
+- **Sauber entfernen (empfohlen)** = Reframe / Zoom & Shift
+- **KI-Rekonstruktion (experimentell)** = bisherige Pipeline als Fallback
 
-`supabase/functions/director-cut-remove-burned-subtitles/index.ts`:
-- Meldung auf "3 Durchläufe" ändern
+Dazu kommen einfache Presets:
+- Leicht
+- Mittel
+- Stark
 
-**3. Frontend: Pass-Anzeige aktualisieren**
+und Feineinstellungen:
+- Zoom
+- vertikale Verschiebung
+- Höhe des unteren „Untertitel-Bands“
 
-`src/components/directors-cut/studio/CapCutSidebar.tsx`:
-- Status "Durchlauf 1/3...", "Durchlauf 2/3...", "Durchlauf 3/3..." anzeigen
+### 2. Neue Reframe-Einstellung als echten Editor-State anlegen
+Wir führen einen neuen State ein, z. B. `subtitleSafeZone`, und reichen ihn sauber durch:
 
-### Technischer Ablauf
+- `CapCutSidebar`
+- `CapCutEditor`
+- `DirectorsCut`
+- Draft-Persistenz
+
+So bleibt die Einstellung beim Reload erhalten und ist nicht nur ein temporärer Preview-Trick.
+
+### 3. Live-Vorschau wirklich sauber machen
+Im `DirectorsCutPreviewPlayer` bekommt das Video einen eigenen Wrapper für:
 
 ```text
-Pass 1: video → conf: 0.05, margin: 20, method: hybrid
-         ↓
-Pass 2: cleaned → conf: 0.03, margin: 20, method: hybrid
-         ↓
-Pass 3: cleaned → conf: 0.01, margin: 20, method: fast
-         ↓
-Final → Storage → User sieht Video
+scale(...) + translateY(...)
 ```
 
-### Betroffene Dateien
+Wichtig:
+- nicht die bestehenden Transitions kaputtmachen
+- nicht Ken-Burns überschreiben
+- optional einen dezenten Overlay-Hinweis anzeigen, welcher untere Bereich entfernt wird
 
-1. `supabase/functions/director-cut-burned-subtitles-webhook/index.ts` — Pass 3 hinzufügen
-2. `supabase/functions/director-cut-remove-burned-subtitles/index.ts` — Meldung anpassen
-3. `src/components/directors-cut/studio/CapCutSidebar.tsx` — 3-Pass-Status
+### 4. Export exakt an die Vorschau koppeln
+Die gleiche Einstellung wird in den Render-Flow übernommen:
 
+- `ExportRenderStep`
+- Backend-Render-Funktion
+- `DirectorsCutVideo` (Remotion)
+
+Damit gilt endlich:
+```text
+Was im Editor sauber aussieht, wird genauso exportiert.
+```
+
+### 5. Bestehende KI-Entfernung nur noch als Fallback behalten
+Die aktuelle 3-Pass-Logik kann bleiben, aber nur als **experimentelle Zusatzoption**.
+Für „muss komplett verschwinden“ wird der neue Reframe-Modus der Standard.
+
+## Technische Details
+
+Betroffene Dateien:
+- `src/components/directors-cut/studio/CapCutSidebar.tsx`
+- `src/components/directors-cut/studio/CapCutEditor.tsx`
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- `src/pages/DirectorsCut/DirectorsCut.tsx`
+- `src/lib/directors-cut-draft.ts`
+- `src/components/directors-cut/steps/ExportRenderStep.tsx`
+- `src/remotion/templates/DirectorsCutVideo.tsx`
+- `supabase/functions/render-directors-cut/index.ts`
+
+Vorgeschlagenes Datenmodell:
+```text
+subtitleSafeZone = {
+  enabled: boolean
+  mode: "reframe" | "ai"
+  preset: "light" | "medium" | "strong"
+  zoom: number
+  offsetY: number
+  bottomBandPercent: number
+}
+```
+
+Architektur:
+```text
+Preview:
+video -> safe-zone transform -> ken burns -> transitions -> overlays
+
+Export:
+video -> safe-zone transform -> ken burns -> transitions -> overlays
+```
+
+Wichtiger Nebeneffekt:
+- Keine Datenbank-Migration nötig für die erste Version
+- Persistenz kann über den bestehenden Draft + Render-Payload laufen
+- Die aktuelle `cleanedVideoUrl`-Logik muss nicht mehr die Hauptlösung sein
+
+Kurz gesagt:
+**Ja, es gibt eine saubere Art.**
+Aber die saubere, wirklich zuverlässige Art ist hier **kontrolliertes Reframing**, nicht noch mehr OCR-/Inpainting-Durchläufe.
