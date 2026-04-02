@@ -1,79 +1,50 @@
 
 
-## Fix: Untertitel tauchen nach Entfernung wieder auf
+## Google Search Console Indexierungs-Probleme beheben
 
-### Ursache
+Die Email zeigt 4 Probleme. Hier ist die Analyse und der Fix:
 
-In `CapCutEditor.tsx` (Zeile 496-552) gibt es einen `useEffect` für die automatische Erkennung von Original-Untertiteln. Dieser hat `subtitleTrack.clips.length` als Dependency:
+### Problem-Analyse
 
-```typescript
-useEffect(() => {
-  if (!videoUrl || originalSubsDetectedRef.current) return;
-  if (subtitleTrack.clips.length > 0) return;
-  // ... erkennt und fügt Untertitel hinzu
-}, [videoUrl, subtitleTrack.clips.length]);
-```
-
-**Problem**: Wenn der User „Alle Untertitel entfernen" klickt, geht `clips.length` auf `0`. Das triggert den `useEffect` erneut. Falls `originalSubsDetectedRef` durch Remount, Strict Mode, oder einen früheren Fehler (Zeile 545: `originalSubsDetectedRef.current = false`) zurückgesetzt wurde, läuft die Erkennung sofort wieder los und fügt die Untertitel direkt wieder ein.
+| GSC-Meldung | Ursache im Code |
+|---|---|
+| **Page with redirect** | `/` leitet eingeloggte User auf `/home` weiter. Mehrere Routen wie `/prompt-wizard`, `/videos`, `/voice-library` sind reine Redirects — diese sollten nicht in der Sitemap stehen. |
+| **Alternate page with proper canonical tag** | Die Sitemap und hreflang-Tags verweisen auf `/en/...` und `/es/...` URLs (z.B. `useadtool.ai/en/pricing`), aber diese Routen existieren gar nicht in `App.tsx`. Es gibt kein URL-basiertes i18n-Routing. |
+| **Blocked by robots.txt** | `/account`, `/billing`, `/auth` etc. sind absichtlich blockiert — das ist korrekt und kein Problem. |
+| **Duplicate without user-selected canonical** | Inkonsistente Canonical-URLs: manche Seiten setzen relative Pfade (`/faq`), andere absolute URLs (`https://useadtool.ai`). Manche App-Seiten (hinter Auth) haben gar keine Canonical-Tags. |
 
 ### Lösung
 
-1. **User-Löschung merken**: Einen `userClearedSubtitlesRef` einführen, der auf `true` gesetzt wird wenn der User aktiv Untertitel löscht.
+**1. Sitemap bereinigen (`public/sitemap.xml` + `scripts/generate-sitemap.js`)**
+- Alle hreflang-Verweise auf `/en/...` und `/es/...` entfernen — diese Routen gibt es nicht
+- App-Seiten entfernen, die hinter Auth liegen: `/hook-generator`, `/planner`, `/calendar`, `/analytics`
+- Nur wirklich öffentliche Seiten behalten: `/`, `/home`, `/pricing`, `/faq`, `/features`, `/support`, `/legal/*`, `/terms`, `/privacy`, `/delete-data`
+- `lastmod` aktualisieren auf aktuelles Datum
 
-2. **Auto-Erkennung blockieren**: Die Detection-Logik prüft zusätzlich diesen Ref — wenn `true`, wird nie automatisch erkannt.
+**2. Canonical-URLs konsistent machen**
+- In jeder Seite die `canonical`-Prop als vollständige absolute URL setzen (`https://useadtool.ai/...`)
+- FAQ: `canonical="https://useadtool.ai/faq"` statt `"/faq"`
+- Pricing: `canonical="https://useadtool.ai/pricing"` statt `"/pricing"`
+- Homepage (`/`): Canonical auf `https://useadtool.ai/` setzen (nicht `/home`)
 
-3. **Dependency bereinigen**: `subtitleTrack.clips.length` aus der Dependency-Array entfernen. Die Auto-Erkennung soll nur beim initialen Mount laufen, nicht bei jeder Clips-Änderung.
+**3. hreflang komplett entfernen (SEO.tsx)**
+- Da es kein URL-basiertes i18n gibt (Sprache wird per State/Query umgeschaltet), sind hreflang-Tags falsch und irreführend
+- Die hreflang-Generierung in `SEO.tsx` entfernen
+- `supportedLanguages` in `seo.ts` kann bleiben, wird aber nicht mehr für hreflang verwendet
 
-4. **Retry explizit**: Der "Erneut erkennen"-Button setzt `userClearedSubtitlesRef` zurück und triggert bewusst.
+**4. robots.txt leicht anpassen**
+- `Crawl-delay` entfernen (wird von Google ignoriert und kann bei anderen Crawlern Probleme machen)
+- Redirect-Pfade explizit blocken, damit Crawler sie nicht erst laden und dann dem Redirect folgen müssen
 
-### Betroffene Datei
+### Betroffene Dateien
 
-- `src/components/directors-cut/studio/CapCutEditor.tsx`
-
-### Technische Umsetzung
-
-```typescript
-// Neuer Ref
-const userClearedSubtitlesRef = useRef(false);
-
-// useEffect Guard erweitern (Zeile 496-552)
-useEffect(() => {
-  if (!videoUrl || originalSubsDetectedRef.current) return;
-  if (userClearedSubtitlesRef.current) return; // User hat bewusst gelöscht
-  if (subtitleTrack.clips.length > 0) return;
-  if (initialSubtitleTrack && initialSubtitleTrack.clips.length > 0) return;
-  // ...detection...
-}, [videoUrl]); // clips.length raus aus Dependencies
-
-// handleRemoveAllSubtitles (Zeile 564)
-const handleRemoveAllSubtitles = useCallback(() => {
-  userClearedSubtitlesRef.current = true;
-  setSubtitleTrack(prev => ({ ...prev, clips: [] }));
-  setSelectedSubtitleId(null);
-  toast.success('Alle Untertitel entfernt');
-}, []);
-
-// handleRemoveOriginalSubtitles (Zeile 555)
-const handleRemoveOriginalSubtitles = useCallback(() => {
-  userClearedSubtitlesRef.current = true;
-  setSubtitleTrack(prev => ({
-    ...prev,
-    clips: prev.clips.filter(c => c.source !== 'original'),
-  }));
-  toast.success('Original-Untertitel entfernt');
-}, []);
-
-// handleRetryDetection (Zeile 571) — bewusster Reset
-const handleRetryDetection = useCallback(() => {
-  userClearedSubtitlesRef.current = false;
-  originalSubsDetectedRef.current = false;
-  // ... trigger detection
-}, []);
-```
-
-### Ergebnis
-
-- Nach „Alle Untertitel entfernen" bleiben sie weg — die Auto-Erkennung wird blockiert.
-- Nur der explizite „Erneut erkennen"-Button kann die Erkennung wieder starten.
-- Die Preview zeigt sofort keine Untertitel mehr.
+- `public/sitemap.xml` — bereinigen, hreflang entfernen, App-Seiten raus
+- `scripts/generate-sitemap.js` — hreflang-Logik entfernen, Route-Liste bereinigen
+- `src/components/SEO.tsx` — hreflang-Block entfernen
+- `src/pages/Index.tsx` — canonical fix
+- `src/pages/Home.tsx` — canonical fix
+- `src/pages/FAQ.tsx` — canonical als absolute URL
+- `src/pages/Pricing.tsx` — canonical als absolute URL
+- `src/pages/IndexLegacy.tsx` — canonical fix
+- `public/robots.txt` — Crawl-delay entfernen
 
