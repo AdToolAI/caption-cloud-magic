@@ -560,6 +560,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     toast.success('Original-Untertitel entfernt');
   }, []);
 
+  // Handler to remove ALL subtitles (original + generated + manual)
+  const handleRemoveAllSubtitles = useCallback(() => {
+    setSubtitleTrack(prev => ({ ...prev, clips: [] }));
+    setSelectedSubtitleId(null);
+    toast.success('Alle Untertitel entfernt');
+  }, []);
+
   // Handler to retry original subtitle detection
   const handleRetryDetection = useCallback(() => {
     originalSubsDetectedRef.current = false;
