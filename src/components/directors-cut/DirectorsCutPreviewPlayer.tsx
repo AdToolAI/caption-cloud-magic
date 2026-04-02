@@ -457,8 +457,26 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const buildSafeZoneTransform = (): string => {
     const sz = subtitleSafeZoneRef.current;
     if (!sz?.enabled || sz.mode !== 'reframe') return '';
-    return `scale(${sz.zoom}) translateY(${sz.offsetY}%)`;
+    // Hard crop: zoom in and shift up so bottomBandPercent is pushed out of view
+    const cropPercent = sz.bottomBandPercent || 12;
+    const zoomFactor = 1 / (1 - cropPercent / 100);
+    const shiftY = -(cropPercent / 2);
+    return `scale(${zoomFactor.toFixed(4)}) translateY(${shiftY.toFixed(2)}%)`;
   };
+
+  // Apply clip-path on the outer wrapper to hard-crop the bottom band
+  const safeZoneOuterRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const outer = safeZoneOuterRef.current;
+    if (!outer) return;
+    const sz = subtitleSafeZone;
+    if (sz?.enabled && sz.mode === 'reframe' && sz.bottomBandPercent > 0) {
+      // Clip the bottom N% of the visible area
+      outer.style.clipPath = `inset(0 0 ${sz.bottomBandPercent}% 0)`;
+    } else {
+      outer.style.clipPath = 'none';
+    }
+  }, [subtitleSafeZone]);
 
   // Speed keyframes ref for RAF-loop application
   const speedKeyframesRef = useRef(speedKeyframes);
@@ -1105,8 +1123,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     >
       {/* Video Player */}
       <div className={`relative bg-black rounded-lg overflow-hidden ${fillContainer ? 'flex-1 min-h-0' : 'aspect-video'}`}>
-        {/* Safe Zone Reframe wrapper — applies zoom + vertical shift to crop out burned subtitles */}
+        {/* Safe Zone Reframe wrapper — hard-crops bottom band + zoom/shift */}
         <div
+          ref={safeZoneOuterRef}
           style={{
             position: 'absolute',
             inset: 0,

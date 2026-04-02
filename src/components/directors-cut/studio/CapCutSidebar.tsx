@@ -63,6 +63,8 @@ interface CapCutSidebarProps {
   onRestoreOriginalVideo?: () => void;
   subtitleSafeZone?: SubtitleSafeZone;
   onSubtitleSafeZoneChange?: (zone: SubtitleSafeZone) => void;
+  isDetectingBand?: boolean;
+  onDetectSubtitleBand?: () => void;
 }
 
 interface Caption {
@@ -203,6 +205,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onRestoreOriginalVideo,
   subtitleSafeZone = DEFAULT_SUBTITLE_SAFE_ZONE,
   onSubtitleSafeZoneChange,
+  isDetectingBand = false,
+  onDetectSubtitleBand,
 }) => {
   // Tab state
   const [activeTab, setActiveTab] = useState('subtitle');
@@ -696,9 +700,38 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
             {/* Burned-in Subtitle Removal */}
             <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
-              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Eingebrannte Untertitel</p>
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Eingebrannter Text im Video</p>
+              <p className="text-[9px] text-white/30">
+                Entfernt sichtbaren Text im Bild durch automatischen Zuschnitt.
+              </p>
 
-              {/* Reframe Mode (Recommended) */}
+              {/* Auto-Detect + Apply Button */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onDetectSubtitleBand}
+                disabled={isDetectingBand || (subtitleSafeZone.enabled && subtitleSafeZone.mode === 'reframe')}
+                className="w-full h-8 text-[11px] border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 font-medium"
+              >
+                {isDetectingBand ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                    Wird analysiert...
+                  </>
+                ) : subtitleSafeZone.enabled && subtitleSafeZone.mode === 'reframe' ? (
+                  <>
+                    <Crop className="h-3 w-3 mr-1.5" />
+                    ✅ Zuschnitt aktiv
+                  </>
+                ) : (
+                  <>
+                    <Crop className="h-3 w-3 mr-1.5" />
+                    Automatisch sauber entfernen
+                  </>
+                )}
+              </Button>
+
+              {/* Reframe Mode Controls (shown when active) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
