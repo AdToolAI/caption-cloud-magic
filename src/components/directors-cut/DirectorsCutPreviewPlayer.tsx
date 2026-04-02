@@ -606,10 +606,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
                   video.currentTime = nextSourceStart;
                 }
                 pendingSceneAdvanceRef.current = { targetIndex: sceneInfo.index + 1, framesLeft: 15 };
-                const nextRate = (nextScene as any).playbackRate ?? 1;
-                if (Math.abs(video.playbackRate - nextRate) > 0.01) {
-                  video.playbackRate = nextRate;
-                }
+                // playbackRate is set in the unified SPEED RAMPING block below
                 timelineTime = nextScene.start_time;
               }
             }
