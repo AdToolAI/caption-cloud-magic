@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, BarChart3, Zap, Keyboard, RotateCcw, Download, SlidersHorizontal } from 'lucide-react';
+import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, BarChart3, Zap, Keyboard, RotateCcw, Download, SlidersHorizontal, Crop, ZoomIn } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { supabase } from '@/integrations/supabase/client';
