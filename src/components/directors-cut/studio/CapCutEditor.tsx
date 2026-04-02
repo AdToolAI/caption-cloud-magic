@@ -733,7 +733,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       setBurnedSubsStatus('failed');
       toast.error(err instanceof Error ? err.message : 'Entfernung fehlgeschlagen');
     }
-  }, [videoUrl, projectId, startBurnedSubsPolling]);
+  }, [videoUrl, projectId, onSaveProject, startBurnedSubsPolling]);
 
   // Handler to restore original video (toggle, don't forget cleaned result)
   const handleRestoreOriginalVideo = useCallback(() => {
