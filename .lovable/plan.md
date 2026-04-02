@@ -1,30 +1,31 @@
 
 
-## Fix: Speed Ramping hat keinen Effekt
+## Fix: Speed Ramping funktioniert nicht für einzelne Szenen
 
 ### Ursache
 
-In `DirectorsCutPreviewPlayer.tsx` gibt es **3 Stellen** die `video.playbackRate` setzen, und sie kämpfen gegeneinander:
+Szenen-spezifische Keyframes speichern `time` relativ zur Szene (0 bis Szenendauer), weil der Slider in `SpeedRamping.tsx` `max={effectiveDuration}` nutzt (= Szenendauer wenn Szene ausgewählt).
 
-1. **Zeile 567-570**: Setzt `playbackRate = sceneRate` (= 1) **jeden Frame**, bedingungslos
-2. **Zeile 613-616**: Setzt `playbackRate = nextRate` bei Szenenwechsel
-3. **Zeile 678-682**: Setzt `playbackRate = sceneRate * activeSpeed` — der korrekte Wert mit Speed Ramping
-
-**Problem**: Zeile 568 prüft `if (Math.abs(video.playbackRate - sceneRate) > 0.01)` — wenn Speed Ramping die Rate auf z.B. 0.25 gesetzt hat, erkennt Zeile 568 eine Abweichung und **resettet sofort auf 1.0**. Dann setzt Zeile 680 sie wieder auf 0.25. Jeder Frame hat also: `0.25 → 1.0 → 0.25`. Der Browser-Decoder bekommt widersprüchliche Signale und die Wiedergabe ruckelt oder ändert sich nicht spürbar.
+Aber im Preview-Player (Zeile 663) wird `timelineTime >= kf.time` verglichen — `timelineTime` ist die **absolute** Position auf der Timeline (z.B. 15.3s), während `kf.time` relativ zur Szene ist (z.B. 0.5s). Dadurch matcht ein Szenen-Keyframe bei 0.5s sofort ab Sekunde 0.5 der Timeline, unabhängig davon wo die Szene tatsächlich liegt.
 
 ### Fix
 
-**Zeilen 567-570 und 613-616 entfernen**. Stattdessen die gesamte playbackRate-Logik im Speed-Ramping-Block (Zeile 656-683) konsolidieren. Dieser Block berechnet den finalen Wert aus `sceneRate * activeSpeed` und setzt ihn **einmal** pro Frame.
+In `DirectorsCutPreviewPlayer.tsx` Zeile 656-667: Für szenen-spezifische Keyframes die relative Zeit innerhalb der Szene berechnen und gegen diese vergleichen.
 
-Wenn keine Speed-Keyframes existieren, setzt der Block einfach `playbackRate = sceneRate` (wie bisher Zeile 568).
+```
+const sceneStart = sceneInfo.scene.start_time ?? 0;
+const relativeTime = timelineTime - sceneStart;
+
+for (const kf of sorted) {
+  if (relativeTime >= kf.time) {
+    activeSpeed = kf.speed;
+  }
+}
+```
+
+Für globale Keyframes bleibt der Vergleich gegen `timelineTime`.
 
 ### Betroffene Datei
 
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-
-### Änderungen
-
-1. **Zeilen 566-570 entfernen** (der erste playbackRate-Block)
-2. **Zeilen 613-616 entfernen** (der playbackRate-Block beim Szenenwechsel)
-3. **Zeilen 656-683 erweitern**: Immer laufen (nicht nur wenn Keyframes existieren), sceneRate + activeSpeed kombinieren, einmal setzen
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` (Zeilen 656-667)
 
