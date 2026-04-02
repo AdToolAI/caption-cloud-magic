@@ -179,6 +179,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   isDetectingOriginalSubs = false,
   hasOriginalSubtitles = false,
   onRemoveOriginalSubtitles,
+  onRemoveAllSubtitles,
   onRetryDetection,
   textOverlayCount = 0,
   textOverlays = [],
