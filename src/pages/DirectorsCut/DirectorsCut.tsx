@@ -1015,6 +1015,8 @@ export function DirectorsCut() {
               // Project ID for burned subtitle removal
               projectId={projectId}
               onSaveProject={saveProject}
+              subtitleSafeZone={subtitleSafeZone}
+              onSubtitleSafeZoneChange={setSubtitleSafeZone}
               onCleanedVideoUrlChange={(url) => {
                 // Persist in draft via cleanedVideoUrl field
                 saveDraft({
