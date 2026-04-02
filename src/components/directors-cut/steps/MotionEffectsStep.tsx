@@ -96,10 +96,15 @@ export function MotionEffectsStep({
           onKeyframesChange={handleSpeedKeyframesChange}
           currentTime={currentTime}
           selectedSceneId={selectedSceneId || undefined}
+          sceneStartTime={
+            selectedSceneId
+              ? (scenes.find(s => s.id === selectedSceneId)?.start_time ?? 0)
+              : 0
+          }
           sceneDuration={
             selectedSceneId 
-              ? scenes.find(s => s.id === selectedSceneId)?.end_time - 
-                (scenes.find(s => s.id === selectedSceneId)?.start_time || 0)
+              ? (scenes.find(s => s.id === selectedSceneId)?.end_time ?? 0) - 
+                (scenes.find(s => s.id === selectedSceneId)?.start_time ?? 0)
               : undefined
           }
         />

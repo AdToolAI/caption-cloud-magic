@@ -229,7 +229,7 @@ export function SpeedRamping({
             {/* Current Time Indicator */}
             <div 
               className="absolute top-0 bottom-0 w-0.5 bg-red-500"
-              style={{ left: `${(currentTime / effectiveDuration) * 100}%` }}
+              style={{ left: `${(relativeTime / effectiveDuration) * 100}%` }}
             />
           </div>
         </div>
