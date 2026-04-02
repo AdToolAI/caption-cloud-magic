@@ -42,10 +42,16 @@ serve(async (req) => {
           .download(storagePath);
 
         if (downloadError) {
-          throw new Error(`Failed to download audio from ${bucketName}: ${downloadError.message}`);
+          console.warn(`Storage download failed for ${bucketName}/${storagePath}: ${downloadError.message}, trying direct fetch...`);
+          // Fallback: try direct HTTP fetch of the public URL
+          const directResponse = await fetch(audioUrl);
+          if (!directResponse.ok) {
+            throw new Error(`Failed to download audio: storage error (${downloadError.message}) and direct fetch failed (${directResponse.statusText})`);
+          }
+          audioBuffer = await directResponse.arrayBuffer();
+        } else {
+          audioBuffer = await audioData.arrayBuffer();
         }
-        
-        audioBuffer = await audioData.arrayBuffer();
       } else {
         throw new Error('Could not parse Supabase storage URL');
       }
