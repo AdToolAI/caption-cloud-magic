@@ -450,6 +450,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   useEffect(() => { kenBurnsRef.current = kenBurns; }, [kenBurns]);
   const kenBurnsWrapperRef = useRef<HTMLDivElement>(null);
 
+  // Subtitle safe zone ref for RAF-loop (avoids React re-render conflicts)
+  const subtitleSafeZoneRef = useRef(subtitleSafeZone);
+  useEffect(() => { subtitleSafeZoneRef.current = subtitleSafeZone; }, [subtitleSafeZone]);
+
+  const buildSafeZoneTransform = (): string => {
+    const sz = subtitleSafeZoneRef.current;
+    if (!sz?.enabled || sz.mode !== 'reframe') return '';
+    return `scale(${sz.zoom}) translateY(${sz.offsetY}%)`;
+  };
+
   // Speed keyframes ref for RAF-loop application
   const speedKeyframesRef = useRef(speedKeyframes);
   useEffect(() => { speedKeyframesRef.current = speedKeyframes; }, [speedKeyframes]);
