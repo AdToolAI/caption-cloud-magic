@@ -646,19 +646,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         }
       }
 
-      // === SPEED RAMPING ===
-      const sKeyframes = speedKeyframesRef.current;
-      if (sKeyframes && sKeyframes.length > 0 && video) {
-        // Find the applicable speed keyframe for current time
+      // === UNIFIED PLAYBACK RATE (Scene Rate + Speed Ramping) ===
+      if (video) {
+        const sceneRate = (sceneInfo?.scene as any)?.playbackRate ?? 1;
         let activeSpeed = 1;
-        if (sceneInfo) {
-          // Scene-specific keyframes first, then global
+        
+        const sKeyframes = speedKeyframesRef.current;
+        if (sKeyframes && sKeyframes.length > 0 && sceneInfo) {
           const sceneKFs = sKeyframes.filter(k => k.sceneId === sceneInfo.scene.id);
           const globalKFs = sKeyframes.filter(k => !k.sceneId);
           const relevantKFs = sceneKFs.length > 0 ? sceneKFs : globalKFs;
           
           if (relevantKFs.length > 0) {
-            // Sort by time and find the last keyframe before current time
             const sorted = [...relevantKFs].sort((a, b) => a.time - b.time);
             for (const kf of sorted) {
               if (timelineTime >= kf.time) {
@@ -668,8 +667,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           }
         }
         
-        const sceneRate = (sceneInfo?.scene as any)?.playbackRate ?? 1;
-        const targetRate = sceneRate * activeSpeed;
+        const targetRate = Math.max(0.0625, sceneRate * activeSpeed);
         if (Math.abs(video.playbackRate - targetRate) > 0.01) {
           video.playbackRate = targetRate;
         }
