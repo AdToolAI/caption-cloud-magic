@@ -91,6 +91,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   initialSubtitleTrack,
   projectId,
   onCleanedVideoUrlChange,
+  onSaveProject,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
