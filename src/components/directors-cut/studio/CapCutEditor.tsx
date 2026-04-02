@@ -694,8 +694,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   // Handler to remove burned-in subtitles via AI inpainting (async)
   const handleRemoveBurnedSubtitles = useCallback(async () => {
-    if (!projectId) {
-      toast.error('Projekt muss zuerst gespeichert werden.');
+    let activeProjectId = projectId;
+    if (!activeProjectId && onSaveProject) {
+      toast.info('Projekt wird gespeichert...');
+      activeProjectId = await onSaveProject();
+    }
+    if (!activeProjectId) {
+      toast.error('Projekt konnte nicht gespeichert werden.');
       return;
     }
     setIsRemovingBurnedSubs(true);
