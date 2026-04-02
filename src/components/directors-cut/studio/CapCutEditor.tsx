@@ -844,7 +844,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           >
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
-          <span className="text-white font-semibold text-sm">Audio Studio</span>
+          <span className="text-white font-semibold text-sm">Schritt 10 von 11 — Audio Studio</span>
         </div>
         <div className="flex items-center gap-1.5">
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10">
@@ -1048,7 +1048,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 subtitleTrack={subtitleTrack}
                 externalIsPlaying={isPlaying}
                 onPlayingChange={setIsPlaying}
-                originalAudioMuted={audioTracks.find(t => t.name === 'Original')?.muted ?? false}
+                originalAudioMuted={(() => {
+                  const originalTrack = audioTracks.find(t => t.name === 'Original');
+                  if (!originalTrack) return true;
+                  if (originalTrack.muted) return true;
+                  if (originalTrack.clips.length === 0) return true;
+                  return false;
+                })()}
               />
             </div>
 

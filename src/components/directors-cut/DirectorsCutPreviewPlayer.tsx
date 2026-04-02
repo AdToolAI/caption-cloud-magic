@@ -152,7 +152,17 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   useEffect(() => { setIsMuted(initialMuted); }, [initialMuted]);
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
-  useEffect(() => { originalAudioMutedRef.current = originalAudioMuted; }, [originalAudioMuted]);
+  useEffect(() => {
+    originalAudioMutedRef.current = originalAudioMuted;
+    // Reactively pause/resume original audio when mute state changes
+    if (originalAudioMuted && sourceAudioRef.current) {
+      sourceAudioRef.current.pause();
+      sourceAudioRef.current.volume = 0;
+    } else if (!originalAudioMuted && sourceAudioRef.current && isPlayingRef.current && !isMutedRef.current) {
+      sourceAudioRef.current.volume = (audio.master_volume || 100) / 100;
+      sourceAudioRef.current.play().catch(() => {});
+    }
+  }, [originalAudioMuted, audio.master_volume]);
 
   // Sort scenes by start_time for consistent matching
   const sortedScenes = useMemo(() => {
