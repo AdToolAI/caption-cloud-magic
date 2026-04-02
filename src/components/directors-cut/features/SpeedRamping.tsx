@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +39,7 @@ interface SpeedRampingProps {
   currentTime: number;
   selectedSceneId?: string;
   sceneDuration?: number;
+  sceneStartTime?: number;
 }
 
 export function SpeedRamping({
@@ -48,23 +49,37 @@ export function SpeedRamping({
   currentTime,
   selectedSceneId,
   sceneDuration,
+  sceneStartTime = 0,
 }: SpeedRampingProps) {
   const [selectedKeyframe, setSelectedKeyframe] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const prevSceneIdRef = useRef(selectedSceneId);
+
+  // Reset selected keyframe when scene changes
+  useEffect(() => {
+    if (prevSceneIdRef.current !== selectedSceneId) {
+      setSelectedKeyframe(null);
+      prevSceneIdRef.current = selectedSceneId;
+    }
+  }, [selectedSceneId]);
 
   // Use scene duration if available, otherwise video duration
   const effectiveDuration = selectedSceneId && sceneDuration ? sceneDuration : videoDuration;
+
+  // Convert absolute currentTime to relative time for scene context
+  const relativeTime = selectedSceneId ? Math.max(0, currentTime - sceneStartTime) : currentTime;
 
   // Filter keyframes for current context (scene-specific or global)
   const currentKeyframes = keyframes.filter(k => 
     selectedSceneId ? k.sceneId === selectedSceneId : !k.sceneId
   );
 
-  const addKeyframe = (time: number = currentTime, speed: number = 1) => {
+  const addKeyframe = (time: number = relativeTime, speed: number = 1) => {
+    const clampedTime = Math.max(0, Math.min(time, effectiveDuration));
     const newKeyframe: SpeedKeyframe = {
       id: `kf-${Date.now()}`,
       sceneId: selectedSceneId, // Assign to current scene or global
-      time,
+      time: clampedTime,
       speed,
       easing: 'ease-in-out',
     };
@@ -85,11 +100,18 @@ export function SpeedRamping({
   };
 
   const applyPreset = (speed: number) => {
+    // Only apply to selected keyframe if it belongs to the current context
     if (selectedKeyframe) {
-      updateKeyframe(selectedKeyframe, { speed });
-    } else {
-      addKeyframe(currentTime, speed);
+      const kf = keyframes.find(k => k.id === selectedKeyframe);
+      const belongsToCurrentContext = kf && (
+        selectedSceneId ? kf.sceneId === selectedSceneId : !kf.sceneId
+      );
+      if (belongsToCurrentContext) {
+        updateKeyframe(selectedKeyframe, { speed });
+        return;
+      }
     }
+    addKeyframe(relativeTime, speed);
   };
 
   const formatTime = (seconds: number) => {
