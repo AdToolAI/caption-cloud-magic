@@ -216,6 +216,7 @@ export function DirectorsCut() {
     if (draft.capCutAudioTracks) setCapCutAudioTracks(draft.capCutAudioTracks);
     if (draft.capCutSubtitleTrack) setCapCutSubtitleTrack(draft.capCutSubtitleTrack);
     if (draft.subtitleSafeZone) setSubtitleSafeZone(draft.subtitleSafeZone);
+    if (draft.cleanedVideoUrl) setCleanedVideoUrl(draft.cleanedVideoUrl);
   }, []);
 
   // --- Auto-save draft on state changes (debounced) ---
