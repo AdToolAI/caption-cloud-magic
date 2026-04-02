@@ -1,34 +1,56 @@
 
 
-## Fix: Original-Untertitel werden in Schritt 9 nicht angezeigt
+## Fix: Original-Audio/Untertitel bleiben trotz Entfernung im Preview + Step-Navigation
 
-### Ursache
+### Problem 1: Original-Audio bleibt hörbar nach Entfernung
 
-Zwei Probleme gefunden:
+Im CapCutEditor (Step 10) prüft die Preview-Komponente `originalAudioMuted` nur den `muted`-Status des "Original"-Tracks:
+```
+originalAudioMuted={audioTracks.find(t => t.name === 'Original')?.muted ?? false}
+```
+Wenn der User die Original-Audio-Clips **löscht** (statt nur zu muten), bleibt der Track selbst unmuted → `false` → Originalton spielt weiter über `sourceAudioRef`.
 
-1. **Fehler wird verschluckt**: Wenn die `generate-subtitles` Edge Function fehlschlägt (z.B. Timeout bei grossen Videos, Download-Fehler), wird der Fehler nur als `console.warn` geloggt — kein Toast, kein UI-Feedback. Der User sieht nichts.
+Zusätzlich gibt es keinen reaktiven `useEffect`, der `sourceAudioRef` pausiert wenn `originalAudioMuted` sich während der Wiedergabe ändert.
 
-2. **Kein Timeout-Schutz**: Die Edge Function hat kein erhöhtes Timeout konfiguriert. Grosse Videos brauchen länger zum Downloaden und Transkribieren.
+### Problem 2: Original-Untertitel bleiben sichtbar nach Entfernung
 
-3. **Kein Retry/Feedback**: Wenn die Erkennung fehlschlägt, gibt es keinen Button zum manuellen Neu-Versuchen. Der `originalSubsDetectedRef` verhindert auch einen automatischen Retry.
+Die Subtitle-Clips werden korrekt aus `subtitleTrack.clips` gefiltert. Wenn die Untertitel aber im Video **eingebrannt** sind (hardcoded), können sie nicht entfernt werden. Falls es sich um die gerenderten Subtitle-Overlays handelt, liegt das Problem wahrscheinlich daran, dass die `subtitleTrack`-Änderung nicht korrekt zum Preview durchpropagiert wird.
+
+### Problem 3: Step 9 → Step 11 (Step 10 "fehlt")
+
+Die Step-Reihenfolge im Code ist korrekt (9=Voice, 10=Audio/CapCut, 11=Export). Der CapCut-Editor (Step 10) rendert sich aber als Full-Page-Editor ohne die Step-Nummern-Anzeige. Das verwirrt den User. Eine Schritt-Anzeige im CapCut-Header würde helfen.
 
 ### Umsetzung
 
-**1. `supabase/config.toml`**
-- Timeout für `generate-subtitles` auf 120 Sekunden erhöhen
+**1. `src/components/directors-cut/studio/CapCutEditor.tsx`**
+- `originalAudioMuted`-Berechnung verbessern: Auch prüfen ob der Original-Track keine Clips mehr hat
+  ```
+  const isOriginalMuted = (() => {
+    const originalTrack = audioTracks.find(t => t.name === 'Original');
+    if (!originalTrack) return true;
+    if (originalTrack.muted) return true;
+    if (originalTrack.clips.length === 0) return true;
+    return false;
+  })();
+  ```
+- Step-10-Header hinzufügen: "Schritt 10 von 11 — Audio Studio" oben im CapCut-Layout
 
-**2. `src/components/directors-cut/studio/CapCutEditor.tsx`**
-- Bei Fehler einen Toast mit Fehlermeldung anzeigen statt nur `console.warn`
-- `originalSubsDetectedRef` bei Fehler zurücksetzen, damit ein Retry möglich ist
-- Loading-State mit Info-Text anzeigen ("Originaluntertitel werden erkannt...")
-
-**3. `src/components/directors-cut/studio/CapCutSidebar.tsx`**
-- "Erneut erkennen"-Button anzeigen wenn keine Original-Untertitel vorhanden und nicht gerade am Laden
-- Lade-Indikator ("Erkennung läuft...") sichtbar im Untertitel-Tab
+**2. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`**
+- Neuen `useEffect` hinzufügen der bei Änderung von `originalAudioMuted` das `sourceAudioRef` sofort pausiert/startet:
+  ```typescript
+  useEffect(() => {
+    if (originalAudioMuted && sourceAudioRef.current) {
+      sourceAudioRef.current.pause();
+      sourceAudioRef.current.volume = 0;
+    } else if (!originalAudioMuted && sourceAudioRef.current && isPlaying && !isMuted) {
+      sourceAudioRef.current.volume = (audio.master_volume || 100) / 100;
+      sourceAudioRef.current.play().catch(() => {});
+    }
+  }, [originalAudioMuted]);
+  ```
 
 ### Betroffene Dateien
 
-1. `supabase/config.toml` — Timeout erhöhen
-2. `src/components/directors-cut/studio/CapCutEditor.tsx` — Fehlerbehandlung + Retry-Logik
-3. `src/components/directors-cut/studio/CapCutSidebar.tsx` — Retry-Button + besseres Feedback
+1. `src/components/directors-cut/studio/CapCutEditor.tsx` — originalAudioMuted-Logik + Step-Header
+2. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — Reaktiver Mute-Effect
 
