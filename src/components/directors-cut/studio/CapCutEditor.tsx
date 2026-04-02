@@ -708,7 +708,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     try {
       toast.info('Eingebrannte Untertitel werden per KI entfernt... (1–3 Min.)');
       const { data, error } = await supabase.functions.invoke('director-cut-remove-burned-subtitles', {
-        body: { video_url: videoUrl, project_id: projectId },
+        body: { video_url: videoUrl, project_id: activeProjectId },
       });
       
       if (error) {
