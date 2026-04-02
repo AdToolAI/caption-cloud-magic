@@ -103,14 +103,16 @@ export function SpeedRamping({
   };
 
   const removeKeyframe = (id: string) => {
-    onKeyframesChange(keyframes.filter(kf => kf.id !== id));
+    const updated = keyframes.filter(kf => kf.id !== id);
+    onKeyframesChange(updated);
     if (selectedKeyframe === id) setSelectedKeyframe(null);
+    notifyDurationChange(updated);
   };
 
   const updateKeyframe = (id: string, updates: Partial<SpeedKeyframe>) => {
-    onKeyframesChange(
-      keyframes.map(kf => kf.id === id ? { ...kf, ...updates } : kf)
-    );
+    const updated = keyframes.map(kf => kf.id === id ? { ...kf, ...updates } : kf);
+    onKeyframesChange(updated);
+    notifyDurationChange(updated);
   };
 
   const applyPreset = (speed: number) => {
