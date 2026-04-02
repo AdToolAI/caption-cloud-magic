@@ -1266,6 +1266,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                   if (originalTrack.clips.length === 0) return true;
                   return false;
                 })()}
+                subtitleSafeZone={subtitleSafeZone}
               />
             </div>
 
