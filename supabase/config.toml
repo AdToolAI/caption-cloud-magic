@@ -664,3 +664,7 @@ timeout_sec = 120
 [functions.generate-studio-image]
 verify_jwt = false
 timeout_sec = 120
+
+[functions.director-cut-remove-burned-subtitles]
+verify_jwt = false
+timeout_sec = 300
