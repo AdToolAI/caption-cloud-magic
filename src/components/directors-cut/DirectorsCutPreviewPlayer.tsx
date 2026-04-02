@@ -563,11 +563,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             }
           }
 
-          // Apply playback rate for the matched scene
-          const sceneRate = (sceneInfo.scene as any).playbackRate ?? 1;
-          if (Math.abs(video.playbackRate - sceneRate) > 0.01) {
-            video.playbackRate = sceneRate;
-          }
+          // playbackRate is set in the unified SPEED RAMPING block below
         }
         
         // Decrement pending advance frame counter if active but not yet matched
