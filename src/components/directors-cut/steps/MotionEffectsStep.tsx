@@ -47,6 +47,7 @@ export function MotionEffectsStep({
   colorGrading,
   sceneColorGrading,
   textOverlays = [],
+  onSceneDurationChange,
 }: MotionEffectsStepProps) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [kenBurnsKeyframes, setKenBurnsKeyframes] = useState<KenBurnsKeyframe[]>(initialKenBurnsKeyframes ?? []);
