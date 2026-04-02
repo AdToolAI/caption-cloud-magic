@@ -104,8 +104,7 @@ export function SpeedRamping({
     if (!selectedSceneId || !onSceneDurationChange || !originalSceneDuration) return;
     const sceneKfs = updatedKeyframes.filter(k => k.sceneId === selectedSceneId);
     if (sceneKfs.length === 0) return;
-    const avgSpeed = sceneKfs.reduce((sum, k) => sum + k.speed, 0) / sceneKfs.length;
-    const newDuration = originalSceneDuration / avgSpeed;
+    const { newDuration, avgSpeed } = calculateSceneDuration(sceneKfs, originalSceneDuration);
     onSceneDurationChange(selectedSceneId, newDuration, avgSpeed);
   };
 
