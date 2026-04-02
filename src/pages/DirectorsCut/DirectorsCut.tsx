@@ -875,6 +875,7 @@ export function DirectorsCut() {
     setBackgroundMusicUrl(undefined);
     setCapCutAudioTracks([]);
     setCapCutSubtitleTrack(undefined);
+    setSubtitleSafeZone(DEFAULT_SUBTITLE_SAFE_ZONE);
     setEditorMode('steps');
     toast.success('Projekt zurückgesetzt');
   }, []);
