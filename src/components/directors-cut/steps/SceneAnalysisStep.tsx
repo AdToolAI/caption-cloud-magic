@@ -19,8 +19,12 @@ import {
   Sun,
   Circle,
   Droplets,
-  Scissors
+  Scissors,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import type { SceneAnalysisStepProps, SceneAnalysis, GlobalEffects, SceneEffects, TransitionAssignment } from '@/types/directors-cut';
 import { FILTER_EFFECT_MAPPING, AVAILABLE_FILTERS } from '@/types/directors-cut';
 import { TRANSITION_TYPES, AITransitions } from '../features/AITransitions';
