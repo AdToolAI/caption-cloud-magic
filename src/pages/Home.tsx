@@ -495,7 +495,7 @@ const Home = () => {
           : language === "es"
           ? "Crea y analiza contenido de redes sociales con IA. Más de 10,000 creadores confían en AdTool AI."
           : "Create & analyze social media content with AI. Over 10,000 creators trust AdTool AI."}
-        canonical="https://useadtool.ai/home"
+        canonical="https://useadtool.ai/"
         ogImage="og-home.jpg"
         lang={language}
       />
