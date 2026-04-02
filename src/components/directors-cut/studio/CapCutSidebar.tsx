@@ -709,6 +709,14 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     <RotateCcw className="h-2.5 w-2.5 mr-1" />
                     Original wiederherstellen
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onRemoveBurnedSubtitles?.({ conf_threshold: 0.05, margin: 20, method: 'hybrid' })}
+                    className="w-full h-7 text-[10px] border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+                  >
+                    <Zap className="h-2.5 w-2.5 mr-1" /> Erneut (empfindlicher)
+                  </Button>
                 </div>
               ) : burnedSubsStatus === 'processing' || isRemovingBurnedSubs ? (
                 <div className="space-y-2">
