@@ -476,6 +476,73 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     };
   }, [voiceOverUrl]);
 
+  // Auto-detect original subtitles from video audio on init
+  const [isDetectingOriginalSubs, setIsDetectingOriginalSubs] = useState(false);
+  const originalSubsDetectedRef = useRef(false);
+
+  useEffect(() => {
+    if (!videoUrl || originalSubsDetectedRef.current) return;
+    if (subtitleTrack.clips.length > 0) return;
+
+    originalSubsDetectedRef.current = true;
+    setIsDetectingOriginalSubs(true);
+
+    const detectOriginalSubtitles = async () => {
+      try {
+        console.log('[CapCutEditor] Auto-detecting original subtitles from video...');
+        const { data, error } = await supabase.functions.invoke('generate-subtitles', {
+          body: {
+            audioUrl: videoUrl,
+            language: 'de',
+          },
+        });
+
+        if (error) throw error;
+
+        const originalSubs: SubtitleClip[] = (data?.subtitles || []).map((seg: any, i: number) => ({
+          id: `original-sub-${Date.now()}-${i}`,
+          startTime: seg.startTime || i * 3,
+          endTime: seg.endTime || (i + 1) * 3,
+          text: seg.text || '',
+          style: 'standard' as const,
+          source: 'original' as const,
+          position: 'bottom' as const,
+          fontSize: 'medium' as const,
+          color: '#FFFFFF',
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          fontFamily: 'Inter',
+          maxLines: 2 as const,
+          textStroke: false,
+          textStrokeColor: '#000000',
+          textStrokeWidth: 2,
+        }));
+
+        if (originalSubs.length > 0) {
+          setSubtitleTrack(prev => ({
+            ...prev,
+            clips: originalSubs,
+          }));
+          toast.success(`🎬 ${originalSubs.length} Original-Untertitel erkannt`);
+        }
+      } catch (err) {
+        console.warn('[CapCutEditor] Original subtitle detection failed:', err);
+      } finally {
+        setIsDetectingOriginalSubs(false);
+      }
+    };
+
+    detectOriginalSubtitles();
+  }, [videoUrl, subtitleTrack.clips.length]);
+
+  // Handler to remove all original subtitles
+  const handleRemoveOriginalSubtitles = useCallback(() => {
+    setSubtitleTrack(prev => ({
+      ...prev,
+      clips: prev.clips.filter(c => c.source !== 'original'),
+    }));
+    toast.success('Original-Untertitel entfernt');
+  }, []);
+
   // Delete clip handler
   const handleDeleteClip = useCallback((clipId: string) => {
     setAudioTracks(prev => prev.map(track => ({
