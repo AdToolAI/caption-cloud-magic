@@ -90,6 +90,16 @@ export function SpeedRamping({
     const updated = [...keyframes, newKeyframe].sort((a, b) => a.time - b.time);
     onKeyframesChange(updated);
     setSelectedKeyframe(newKeyframe.id);
+    notifyDurationChange(updated);
+  };
+
+  const notifyDurationChange = (updatedKeyframes: SpeedKeyframe[]) => {
+    if (!selectedSceneId || !onSceneDurationChange || !originalSceneDuration) return;
+    const sceneKfs = updatedKeyframes.filter(k => k.sceneId === selectedSceneId);
+    if (sceneKfs.length === 0) return;
+    const avgSpeed = sceneKfs.reduce((sum, k) => sum + k.speed, 0) / sceneKfs.length;
+    const newDuration = originalSceneDuration / avgSpeed;
+    onSceneDurationChange(selectedSceneId, newDuration, avgSpeed);
   };
 
   const removeKeyframe = (id: string) => {
