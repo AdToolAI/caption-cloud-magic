@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card } from '@/components/ui/card';
-import { saveDraft, loadDraft, clearDraft } from '@/lib/directors-cut-draft';
+import { saveDraft, loadDraft, clearDraft, SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE } from '@/lib/directors-cut-draft';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { 
