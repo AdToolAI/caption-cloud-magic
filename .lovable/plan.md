@@ -1,39 +1,55 @@
 
 
-## Fix: Aggressivere Parameter für Untertitel-Entfernung
+## Plan: Doppelter Durchlauf für vollständige Untertitel-Entfernung
 
-### Was die Logs zeigen
+### Analyse
 
-Das Modell hat funktioniert — es hat in 444 von 960 Frames Text erkannt und 450 Regionen entfernt. Aber:
-- **Confidence 0.25** ist zu hoch — stilisierte/halbtransparente Untertitel werden nicht erkannt
-- **Margin 5px** ist zu klein — der Text wird nicht vollständig abgedeckt
-- **720p Verarbeitung** bei einem 1080x1920 Video verliert Erkennungsgenauigkeit
+Die Logs zeigen: Das Modell hat mit `conf_threshold: 0.05` und `margin: 20` in 550 von 960 Frames Text erkannt und 600 Regionen entfernt. Das ist deutlich besser als vorher (444 Frames, 450 Regionen), aber einige Reste bleiben. Die Parameter sind bereits am Maximum:
+- `margin: 20` ist das dokumentierte Limit
+- `conf_threshold: 0.05` ist schon sehr niedrig
+
+### Lösung: Zwei-Pass-Verarbeitung
+
+Ein einzelner Durchlauf reicht nicht für 100% Entfernung. Professionelle Tools machen oft einen zweiten Durchlauf auf dem bereits bereinigten Video, um Reste zu finden. Zusätzlich nutzen wir `iou_threshold: 0.3` (statt 0.45), damit mehr überlappende Erkennungen beibehalten werden.
+
+### Technischer Ablauf
+
+```text
+Pass 1: video_url → Replicate (conf: 0.05, margin: 20)
+         ↓ Webhook
+Pass 2: cleaned_url → Replicate (conf: 0.03, margin: 20)
+         ↓ Webhook
+Ergebnis → Storage → User sieht bereinigtes Video
+```
 
 ### Änderungen
 
-**1. Edge Function: Bessere Default-Parameter**
+**1. Webhook erweitern: Automatischer zweiter Durchlauf**
+
+`supabase/functions/director-cut-burned-subtitles-webhook/index.ts`:
+- Neues Feld `burned_subtitles_pass` in der DB prüfen (default: 1)
+- Wenn Pass 1 fertig → automatisch Pass 2 starten mit dem bereinigten Video
+- Wenn Pass 2 fertig → Ergebnis als final speichern
+- Pass 2 nutzt noch aggressivere Einstellungen (`conf_threshold: 0.03`)
+
+**2. Edge Function: Pass-Nummer mitgeben**
 
 `supabase/functions/director-cut-remove-burned-subtitles/index.ts`:
-- `conf_threshold`: `0.25` → `0.10` (erkennt mehr Text)
-- `margin`: `5` → `15` (größerer Entfernungsbereich)
-- `resolution`: auf `"original"` setzen (keine Downscale-Artefakte)
-- Optional: Parameter aus dem Frontend entgegennehmen für Nachjustierung
+- `pass: 1` als Metadata im Webhook-Request mitgeben (über die DB)
 
-**2. Sidebar: Erneut-Versuchen mit Einstellungen**
+**3. Migration: Pass-Tracking-Spalte**
+
+- `burned_subtitles_pass` (integer, default 1) in `director_cut_projects`
+
+**4. Frontend: Statusmeldung anpassen**
 
 `src/components/directors-cut/studio/CapCutSidebar.tsx`:
-- Wenn das Ergebnis nicht passt, Button "Erneut versuchen (empfindlicher)" hinzufügen
-- Sendet `conf_threshold: 0.05` und `margin: 20` für hartnäckige Fälle
-
-**3. Editor: Parameter durchreichen**
-
-`src/components/directors-cut/studio/CapCutEditor.tsx`:
-- `handleRemoveBurnedSubtitles` akzeptiert optionale Settings
-- Leitet sie an die Edge Function weiter
+- Status "Durchlauf 1/2..." und "Durchlauf 2/2..." anzeigen
 
 ### Betroffene Dateien
 
-1. `supabase/functions/director-cut-remove-burned-subtitles/index.ts` — Parameter-Update
-2. `src/components/directors-cut/studio/CapCutSidebar.tsx` — Retry-Button
-3. `src/components/directors-cut/studio/CapCutEditor.tsx` — Parameter weiterleiten
+1. `supabase/functions/director-cut-burned-subtitles-webhook/index.ts` — zweiten Pass auslösen
+2. `supabase/functions/director-cut-remove-burned-subtitles/index.ts` — Pass-Info speichern
+3. Migration — `burned_subtitles_pass` Spalte
+4. `src/components/directors-cut/studio/CapCutSidebar.tsx` — Pass-Status anzeigen
 
