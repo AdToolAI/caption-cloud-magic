@@ -496,6 +496,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   useEffect(() => {
     if (!videoUrl || originalSubsDetectedRef.current) return;
     if (subtitleTrack.clips.length > 0) return;
+    // Don't auto-detect if parent already provided subtitles (from draft)
+    if (initialSubtitleTrack && initialSubtitleTrack.clips.length > 0) return;
 
     originalSubsDetectedRef.current = true;
     setIsDetectingOriginalSubs(true);
