@@ -106,6 +106,18 @@ export function MotionEffectsStep({
                 (scenes.find(s => s.id === selectedSceneId)?.start_time ?? 0)
               : undefined
           }
+          originalSceneDuration={
+            selectedSceneId
+              ? (() => {
+                  const scene = scenes.find(s => s.id === selectedSceneId);
+                  if (!scene) return undefined;
+                  const origStart = scene.original_start_time ?? scene.start_time;
+                  const origEnd = scene.original_end_time ?? scene.end_time;
+                  return origEnd - origStart;
+                })()
+              : undefined
+          }
+          onSceneDurationChange={onSceneDurationChange}
         />
       </div>
     </StepLayoutWrapper>

@@ -741,6 +741,38 @@ export function DirectorsCut() {
             colorGrading={colorGrading}
             sceneColorGrading={sceneColorGrading}
             textOverlays={textOverlays}
+            onSceneDurationChange={(sceneId, newDuration, avgSpeed) => {
+              setScenes(prev => {
+                const idx = prev.findIndex(s => s.id === sceneId);
+                if (idx === -1) return prev;
+                const scene = prev[idx];
+                const origStart = scene.original_start_time ?? scene.start_time;
+                const origEnd = scene.original_end_time ?? scene.end_time;
+                const clampedDuration = Math.max(0.5, newDuration);
+                const newEnd = scene.start_time + clampedDuration;
+                const delta = newEnd - scene.end_time;
+                
+                return prev.map((s, i) => {
+                  if (i === idx) {
+                    return {
+                      ...s,
+                      end_time: newEnd,
+                      original_start_time: s.original_start_time ?? s.start_time,
+                      original_end_time: s.original_end_time ?? s.end_time,
+                      playbackRate: avgSpeed,
+                    };
+                  }
+                  if (i > idx) {
+                    return {
+                      ...s,
+                      start_time: s.start_time + delta,
+                      end_time: s.end_time + delta,
+                    };
+                  }
+                  return s;
+                });
+              });
+            }}
           />
         );
       case 8:
