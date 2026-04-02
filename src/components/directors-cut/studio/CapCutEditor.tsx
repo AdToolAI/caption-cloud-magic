@@ -962,6 +962,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               isDetectingOriginalSubs={isDetectingOriginalSubs}
               hasOriginalSubtitles={subtitleTrack.clips.some(c => c.source === 'original')}
               onRemoveOriginalSubtitles={handleRemoveOriginalSubtitles}
+              onRemoveAllSubtitles={handleRemoveAllSubtitles}
               onRetryDetection={handleRetryDetection}
               textOverlayCount={(textOverlays || []).length}
               textOverlays={textOverlays || []}
