@@ -4049,6 +4049,7 @@ export type Database = {
           applied_effects: Json | null
           audio_enhancements: Json | null
           burned_subtitles_error: string | null
+          burned_subtitles_pass: number
           burned_subtitles_prediction_id: string | null
           burned_subtitles_status: string
           cleaned_video_url: string | null
@@ -4070,6 +4071,7 @@ export type Database = {
           applied_effects?: Json | null
           audio_enhancements?: Json | null
           burned_subtitles_error?: string | null
+          burned_subtitles_pass?: number
           burned_subtitles_prediction_id?: string | null
           burned_subtitles_status?: string
           cleaned_video_url?: string | null
@@ -4091,6 +4093,7 @@ export type Database = {
           applied_effects?: Json | null
           audio_enhancements?: Json | null
           burned_subtitles_error?: string | null
+          burned_subtitles_pass?: number
           burned_subtitles_prediction_id?: string | null
           burned_subtitles_status?: string
           cleaned_video_url?: string | null
