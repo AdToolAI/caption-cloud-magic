@@ -577,6 +577,19 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               </div>
             )}
 
+            {/* Retry button when no original subs and not detecting */}
+            {!hasOriginalSubtitles && !isDetectingOriginalSubs && existingCaptions.length === 0 && onRetryDetection && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onRetryDetection}
+                className="w-full h-7 text-[10px] border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10"
+              >
+                <RotateCcw className="h-2.5 w-2.5 mr-1" />
+                Original-Untertitel erneut erkennen
+              </Button>
+            )}
+
             {/* Language Selection */}
             <div className="space-y-2">
               <label className="text-xs text-white/70">Sprache</label>
