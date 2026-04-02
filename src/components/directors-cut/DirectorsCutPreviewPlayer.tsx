@@ -685,7 +685,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             const zoom = kbForScene.startZoom + (kbForScene.endZoom - kbForScene.startZoom) * progress;
             const panX = kbForScene.startX + (kbForScene.endX - kbForScene.startX) * progress;
             const panY = kbForScene.startY + (kbForScene.endY - kbForScene.startY) * progress;
-            kbWrapper.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
+            const szTransform = buildSafeZoneTransform();
+            kbWrapper.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)${szTransform ? ' ' + szTransform : ''}`;
             kbApplied = true;
           }
         }
