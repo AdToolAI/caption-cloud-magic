@@ -1140,6 +1140,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             onEnded={handleVideoEnded}
           />
         </div>
+        </div>
 
         {/* Transition canvas — used for frozen outgoing frame during opacity transitions */}
         <canvas
