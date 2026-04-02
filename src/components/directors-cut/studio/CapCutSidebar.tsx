@@ -57,6 +57,7 @@ interface CapCutSidebarProps {
   onShowTextOverlaysChange?: (show: boolean) => void;
   isRemovingBurnedSubs?: boolean;
   hasCleanedVideo?: boolean;
+  burnedSubsStatus?: string;
   onRemoveBurnedSubtitles?: () => void;
   onRestoreOriginalVideo?: () => void;
 }
