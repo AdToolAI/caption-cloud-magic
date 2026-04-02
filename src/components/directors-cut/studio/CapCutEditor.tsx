@@ -1150,6 +1150,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               burnedSubsStatus={burnedSubsStatus}
               onRemoveBurnedSubtitles={handleRemoveBurnedSubtitles}
               onRestoreOriginalVideo={handleRestoreOriginalVideo}
+              subtitleSafeZone={subtitleSafeZone}
+              onSubtitleSafeZoneChange={onSubtitleSafeZoneChange}
               onAddVideoAsScene={async (file) => {
                 // Upload to storage and get video metadata
                 try {

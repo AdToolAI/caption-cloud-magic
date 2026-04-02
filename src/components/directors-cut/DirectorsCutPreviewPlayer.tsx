@@ -106,6 +106,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   className = '',
   fillContainer = false,
   children,
+  subtitleSafeZone,
 }) => {
   const videoRefA = useRef<HTMLVideoElement>(null);
   const videoRefB = useRef<HTMLVideoElement>(null);
