@@ -201,6 +201,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   burnedSubsStatus = 'idle',
   onRemoveBurnedSubtitles,
   onRestoreOriginalVideo,
+  subtitleSafeZone = DEFAULT_SUBTITLE_SAFE_ZONE,
+  onSubtitleSafeZoneChange,
 }) => {
   // Tab state
   const [activeTab, setActiveTab] = useState('subtitle');
