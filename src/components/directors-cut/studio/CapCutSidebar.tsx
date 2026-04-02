@@ -63,6 +63,8 @@ interface CapCutSidebarProps {
   onRestoreOriginalVideo?: () => void;
   subtitleSafeZone?: SubtitleSafeZone;
   onSubtitleSafeZoneChange?: (zone: SubtitleSafeZone) => void;
+  isDetectingBand?: boolean;
+  onDetectSubtitleBand?: () => void;
 }
 
 interface Caption {
