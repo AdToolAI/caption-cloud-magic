@@ -48,6 +48,8 @@ interface CapCutSidebarProps {
   onRemoveOriginalSubtitles?: () => void;
   onRetryDetection?: () => void;
   textOverlayCount?: number;
+  textOverlays?: Array<{ id: string; text: string; startTime: number; endTime: number | null }>;
+  onTextOverlaysChange?: (overlays: any[]) => void;
   showSubtitles?: boolean;
   onShowSubtitlesChange?: (show: boolean) => void;
   showTextOverlays?: boolean;
