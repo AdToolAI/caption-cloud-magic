@@ -419,6 +419,7 @@ verify_jwt = true
 
 [functions.generate-subtitles]
 verify_jwt = false
+timeout_sec = 120
 
 
 [functions.check-render-status]

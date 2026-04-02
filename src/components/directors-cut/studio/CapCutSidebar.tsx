@@ -46,6 +46,7 @@ interface CapCutSidebarProps {
   isDetectingOriginalSubs?: boolean;
   hasOriginalSubtitles?: boolean;
   onRemoveOriginalSubtitles?: () => void;
+  onRetryDetection?: () => void;
 }
 
 interface Caption {
