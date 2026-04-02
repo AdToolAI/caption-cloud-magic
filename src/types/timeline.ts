@@ -76,6 +76,7 @@ export interface SubtitleClip {
   endTime: number;
   text: string;
   style: 'standard' | 'tiktok' | 'subtitle' | 'highlight';
+  source?: 'original' | 'ai-generated' | 'manual';
   // Extended styling options
   position?: 'top' | 'center' | 'bottom';
   fontSize?: 'small' | 'medium' | 'large' | 'xl';
