@@ -1023,32 +1023,7 @@ export function DirectorsCut() {
               subtitleSafeZone={subtitleSafeZone}
               onSubtitleSafeZoneChange={setSubtitleSafeZone}
               onCleanedVideoUrlChange={(url) => {
-                // Persist in draft via cleanedVideoUrl field
-                saveDraft({
-                  currentStep,
-                  selectedVideo,
-                  scenes,
-                  transitions,
-                  appliedEffects,
-                  audioEnhancements,
-                  exportSettings,
-                  styleTransfer,
-                  colorGrading,
-                  sceneColorGrading,
-                  speedKeyframes,
-                  kenBurnsKeyframes,
-                  chromaKey,
-                  upscaling,
-                  interpolation,
-                  restoration,
-                  objectRemoval,
-                  textOverlays,
-                  voiceOverUrl,
-                  backgroundMusicUrl,
-                  cleanedVideoUrl: url || undefined,
-                  capCutAudioTracks,
-                  capCutSubtitleTrack,
-                });
+                setCleanedVideoUrl(url || undefined);
               }}
             />
           );
