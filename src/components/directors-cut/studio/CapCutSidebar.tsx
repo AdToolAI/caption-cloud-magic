@@ -752,7 +752,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={onRemoveBurnedSubtitles}
+                  onClick={() => onRemoveBurnedSubtitles?.()}
                   disabled={isRemovingBurnedSubs}
                   className="w-full h-7 text-[10px] border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                 >
