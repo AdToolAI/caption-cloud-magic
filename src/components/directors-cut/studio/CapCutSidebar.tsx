@@ -195,6 +195,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onShowTextOverlaysChange,
   isRemovingBurnedSubs = false,
   hasCleanedVideo = false,
+  burnedSubsStatus = 'idle',
   onRemoveBurnedSubtitles,
   onRestoreOriginalVideo,
 }) => {
