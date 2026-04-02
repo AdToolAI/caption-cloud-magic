@@ -1,36 +1,34 @@
 
 
-## Feature: Original-Untertitel automatisch erkennen
+## Fix: Original-Untertitel werden in Schritt 9 nicht angezeigt
 
-### Idee
+### Ursache
 
-Beim Laden des Videos im Audio Studio (Schritt 9) soll die KI automatisch die Originalsprache aus dem Video transkribieren — genau wie der "Original Audio"-Clip automatisch erscheint. Diese Original-Untertitel sind löschbar und ersetzbar, analog zur Originalmusik.
+Zwei Probleme gefunden:
 
-### Wie es funktioniert
+1. **Fehler wird verschluckt**: Wenn die `generate-subtitles` Edge Function fehlschlägt (z.B. Timeout bei grossen Videos, Download-Fehler), wird der Fehler nur als `console.warn` geloggt — kein Toast, kein UI-Feedback. Der User sieht nichts.
 
-1. Wenn der CapCutEditor initialisiert wird und noch keine Untertitel existieren, wird automatisch die `generate-subtitles` Edge Function mit der **Video-URL** (= Originalaudio) aufgerufen
-2. Die erkannten Untertitel werden als `SubtitleClip[]` in den `subtitleTrack` geladen und mit `source: 'original'` markiert
-3. Ein Banner/Badge zeigt "Original-Untertitel erkannt" an
-4. Nutzer kann diese mit einem Klick löschen ("Original-Untertitel entfernen") oder durch KI-generierte ersetzen
+2. **Kein Timeout-Schutz**: Die Edge Function hat kein erhöhtes Timeout konfiguriert. Grosse Videos brauchen länger zum Downloaden und Transkribieren.
+
+3. **Kein Retry/Feedback**: Wenn die Erkennung fehlschlägt, gibt es keinen Button zum manuellen Neu-Versuchen. Der `originalSubsDetectedRef` verhindert auch einen automatischen Retry.
 
 ### Umsetzung
 
-**1. `src/components/directors-cut/studio/CapCutEditor.tsx`**
-- Neuer `useEffect`: Wenn `subtitleTrack.clips.length === 0` und `videoUrl` vorhanden, automatisch `generate-subtitles` mit `videoUrl` aufrufen
-- Erkannte Untertitel als Clips mit einem Flag (`source: 'original'` o.ä.) in den Track laden
-- Loading-State für "Originaluntertitel werden erkannt..."
+**1. `supabase/config.toml`**
+- Timeout für `generate-subtitles` auf 120 Sekunden erhöhen
 
-**2. `src/types/timeline.ts`**
-- `SubtitleClip` um optionales `source?: 'original' | 'ai-generated' | 'manual'` erweitern
+**2. `src/components/directors-cut/studio/CapCutEditor.tsx`**
+- Bei Fehler einen Toast mit Fehlermeldung anzeigen statt nur `console.warn`
+- `originalSubsDetectedRef` bei Fehler zurücksetzen, damit ein Retry möglich ist
+- Loading-State mit Info-Text anzeigen ("Originaluntertitel werden erkannt...")
 
 **3. `src/components/directors-cut/studio/CapCutSidebar.tsx`**
-- Im Untertitel-Tab: Info-Banner wenn Original-Untertitel vorhanden ("🎬 Original-Untertitel erkannt")
-- Button "Original-Untertitel entfernen" → löscht alle Clips mit `source: 'original'`
-- "Neu generieren" ersetzt die Original-Untertitel durch KI-Transkription vom Voiceover (bestehendes Verhalten)
+- "Erneut erkennen"-Button anzeigen wenn keine Original-Untertitel vorhanden und nicht gerade am Laden
+- Lade-Indikator ("Erkennung läuft...") sichtbar im Untertitel-Tab
 
 ### Betroffene Dateien
 
-1. `src/types/timeline.ts` — `source` Feld zu `SubtitleClip` hinzufügen
-2. `src/components/directors-cut/studio/CapCutEditor.tsx` — Auto-Erkennung beim Init
-3. `src/components/directors-cut/studio/CapCutSidebar.tsx` — UI für Original-Untertitel verwalten
+1. `supabase/config.toml` — Timeout erhöhen
+2. `src/components/directors-cut/studio/CapCutEditor.tsx` — Fehlerbehandlung + Retry-Logik
+3. `src/components/directors-cut/studio/CapCutSidebar.tsx` — Retry-Button + besseres Feedback
 
