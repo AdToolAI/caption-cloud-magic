@@ -127,6 +127,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [showSubtitles, setShowSubtitles] = useState(true);
   const [showTextOverlays, setShowTextOverlays] = useState(true);
   
+  // Burned-in subtitle removal state
+  const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | null>(null);
+  const [isRemovingBurnedSubs, setIsRemovingBurnedSubs] = useState(false);
+  
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   // DnD sensors with activation constraint to allow clicks
@@ -617,6 +621,35 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     detect();
   }, [videoUrl]);
 
+  // Handler to remove burned-in subtitles via AI inpainting
+  const handleRemoveBurnedSubtitles = useCallback(async () => {
+    setIsRemovingBurnedSubs(true);
+    try {
+      toast.info('Eingebrannte Untertitel werden analysiert...');
+      const { data, error } = await supabase.functions.invoke('director-cut-remove-burned-subtitles', {
+        body: { video_url: videoUrl },
+      });
+      if (error) throw error;
+      if (!data?.success) {
+        toast.info(data?.message || 'Keine eingebrannten Untertitel erkannt');
+        return;
+      }
+      setCleanedVideoUrl(data.cleaned_video_url);
+      toast.success('Eingebrannte Untertitel erfolgreich entfernt!');
+    } catch (err) {
+      console.error('[CapCutEditor] Burned subtitle removal failed:', err);
+      toast.error('Entfernung fehlgeschlagen. Bitte erneut versuchen.');
+    } finally {
+      setIsRemovingBurnedSubs(false);
+    }
+  }, [videoUrl]);
+
+  // Handler to restore original video
+  const handleRestoreOriginalVideo = useCallback(() => {
+    setCleanedVideoUrl(null);
+    toast.success('Originalvideo wiederhergestellt');
+  }, []);
+
   // Delete clip handler
   const handleDeleteClip = useCallback((clipId: string) => {
     setAudioTracks(prev => prev.map(track => ({
@@ -1015,6 +1048,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onShowSubtitlesChange={setShowSubtitles}
               showTextOverlays={showTextOverlays}
               onShowTextOverlaysChange={setShowTextOverlays}
+              isRemovingBurnedSubs={isRemovingBurnedSubs}
+              hasCleanedVideo={!!cleanedVideoUrl}
+              onRemoveBurnedSubtitles={handleRemoveBurnedSubtitles}
+              onRestoreOriginalVideo={handleRestoreOriginalVideo}
               onAddVideoAsScene={async (file) => {
                 // Upload to storage and get video metadata
                 try {
@@ -1104,7 +1141,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             <div className="h-[50%] min-h-[280px] p-2 bg-[#1a1a1a] overflow-hidden flex flex-col">
               <DirectorsCutPreviewPlayer
                 fillContainer={true}
-                videoUrl={videoUrl}
+                videoUrl={cleanedVideoUrl || videoUrl}
                 effects={appliedEffects?.global || { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 }}
                 sceneEffects={appliedEffects?.scenes || {}}
                 scenes={scenes}

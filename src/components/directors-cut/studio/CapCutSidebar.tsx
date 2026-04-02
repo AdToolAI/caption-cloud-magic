@@ -55,6 +55,10 @@ interface CapCutSidebarProps {
   onShowSubtitlesChange?: (show: boolean) => void;
   showTextOverlays?: boolean;
   onShowTextOverlaysChange?: (show: boolean) => void;
+  isRemovingBurnedSubs?: boolean;
+  hasCleanedVideo?: boolean;
+  onRemoveBurnedSubtitles?: () => void;
+  onRestoreOriginalVideo?: () => void;
 }
 
 interface Caption {
@@ -188,6 +192,10 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onShowSubtitlesChange,
   showTextOverlays = true,
   onShowTextOverlaysChange,
+  isRemovingBurnedSubs = false,
+  hasCleanedVideo = false,
+  onRemoveBurnedSubtitles,
+  onRestoreOriginalVideo,
 }) => {
   // Tab state
   const [activeTab, setActiveTab] = useState('subtitle');
@@ -672,10 +680,48 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   />
                 </div>
               )}
-              {existingCaptions.length === 0 && textOverlayCount === 0 && (
+              {existingCaptions.length === 0 && textOverlayCount === 0 && !hasCleanedVideo && (
                 <p className="text-[10px] text-amber-400/80 mt-1">
-                  ⚠️ Falls weiterhin Text sichtbar ist, ist er im Originalvideo eingebrannt und kann nicht entfernt werden.
+                  ⚠️ Falls weiterhin Text sichtbar ist, ist er im Originalvideo eingebrannt.
                 </p>
+              )}
+            </div>
+
+            {/* Burned-in Subtitle Removal */}
+            <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Eingebrannte Untertitel</p>
+              <p className="text-[10px] text-white/40">
+                Falls das Originalvideo fest eingebrannte Untertitel enthält, kann die KI versuchen, diese per Video-Inpainting zu entfernen.
+              </p>
+              {hasCleanedVideo ? (
+                <div className="space-y-2">
+                  <p className="text-[10px] text-emerald-400 flex items-center gap-1">
+                    ✅ Bereinigtes Video aktiv
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onRestoreOriginalVideo}
+                    className="w-full h-7 text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                  >
+                    <RotateCcw className="h-2.5 w-2.5 mr-1" />
+                    Original wiederherstellen
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onRemoveBurnedSubtitles}
+                  disabled={isRemovingBurnedSubs}
+                  className="w-full h-7 text-[10px] border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                >
+                  {isRemovingBurnedSubs ? (
+                    <><Loader2 className="h-2.5 w-2.5 mr-1 animate-spin" /> Wird entfernt...</>
+                  ) : (
+                    <><Sparkles className="h-2.5 w-2.5 mr-1" /> Eingebrannte Untertitel entfernen</>
+                  )}
+                </Button>
               )}
             </div>
 

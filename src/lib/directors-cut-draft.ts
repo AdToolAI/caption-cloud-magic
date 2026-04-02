@@ -24,6 +24,7 @@ export interface DirectorsCutDraft {
   textOverlays: any[];
   voiceOverUrl?: string;
   backgroundMusicUrl?: string;
+  cleanedVideoUrl?: string;
   capCutAudioTracks: any[];
   capCutSubtitleTrack: any;
 }
