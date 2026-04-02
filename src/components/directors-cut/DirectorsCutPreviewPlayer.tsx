@@ -705,22 +705,25 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           backgroundMusicAudioRef.current.playbackRate = 1;
         }
         
-        // Source audio: mute/duck when speed != 1x to avoid pitch distortion
-        // Instead of pitching the audio (which causes chipmunk effects),
-        // we duck it proportionally to how far from 1x we are
+        // Source audio: sync playbackRate to video, preserve pitch, duck only at extreme speeds
         if (sourceAudioRef.current) {
-          if (Math.abs(targetRate - 1) > 0.05) {
-            // Speed is not ~1x → duck the source audio to avoid distortion
-            const duckAmount = Math.min(1, Math.abs(targetRate - 1) * 2);
-            const duckedVolume = Math.max(0, 1 - duckAmount);
-            sourceAudioRef.current.volume = duckedVolume;
+          const masterVol = (audio.master_volume || 100) / 100;
+          
+          // Always sync playbackRate to match video
+          if (Math.abs(sourceAudioRef.current.playbackRate - targetRate) > 0.01) {
             sourceAudioRef.current.playbackRate = targetRate;
+          }
+          
+          // Only duck at extreme speeds (< 0.5x or > 2x) where pitch preservation fails
+          if (targetRate < 0.5 || targetRate > 2) {
+            const extremeness = targetRate < 0.5 
+              ? (0.5 - targetRate) * 4   // 0.5→0 = duck 0→1
+              : (targetRate - 2) * 0.5;  // 2→4 = duck 0→1
+            const duckFactor = Math.max(0, 1 - Math.min(1, extremeness));
+            sourceAudioRef.current.volume = masterVol * duckFactor;
           } else {
-            // Speed is ~1x → normal volume and rate
-            sourceAudioRef.current.volume = 1;
-            if (Math.abs(sourceAudioRef.current.playbackRate - 1) > 0.01) {
-              sourceAudioRef.current.playbackRate = 1;
-            }
+            // Normal range (0.5x - 2x): full volume, pitch preserved by browser
+            sourceAudioRef.current.volume = masterVol;
           }
         }
       }
