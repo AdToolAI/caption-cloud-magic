@@ -125,6 +125,7 @@ export function ExportRenderStep({
   backgroundMusicUrl,
   styleTransfer,
   sceneEffects,
+  subtitleSafeZone,
 }: ExportRenderStepProps) {
   const navigate = useNavigate();
   const [isRendering, setIsRendering] = useState(false);
