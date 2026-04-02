@@ -538,6 +538,7 @@ export function ExportRenderStep({
                 subtitleTrack={subtitleTrack}
                 voiceoverUrl={voiceOverUrl}
                 backgroundMusicUrl={backgroundMusicUrl}
+                subtitleSafeZone={subtitleSafeZone}
                 originalAudioMuted={audioTracks?.some(t => 
                   (t.type === 'voiceover' || t.type === 'background-music') && 
                   t.clips.length > 0 && 
