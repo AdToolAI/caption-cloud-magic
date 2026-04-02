@@ -477,7 +477,7 @@ export default function MediaLibrary() {
           .eq('id', id);
 
         if (error) throw error;
-      } else if (mediaItem.source === 'video-creator' || mediaItem.source === 'directors-cut' || mediaItem.source === 'sora') {
+      } else if (mediaItem.source === 'video-creator') {
         // Delete from video_creations
         const { error } = await supabase
           .from('video_creations')
@@ -485,7 +485,7 @@ export default function MediaLibrary() {
           .eq('id', id);
 
         if (error) throw error;
-      } else if ((mediaItem.source === 'ai' && mediaItem.type === 'video')) {
+      } else if (mediaItem.source === 'ai' && mediaItem.type === 'video') {
         // AI videos stored in video_creations
         const { error } = await supabase
           .from('video_creations')
