@@ -1,27 +1,58 @@
 
+Ziel
 
-## Fix: Text-Overlay-Animationen ruckeln / erscheinen sofort
+- Die Text-Overlay-Animationen in Schritt 6 so reparieren, dass sie sichtbar ablaufen statt sofort „fertig“ da zu sein.
 
-### Ursache
+Was ich im Code konkret gefunden habe
 
-`displayTime` wird nur alle **250ms** aktualisiert (Zeile 687 in DirectorsCutPreviewPlayer). Die Animation in `NativeTextOverlayRenderer` berechnet `progress = elapsed / 0.5s` — bei 250ms-Updates springt progress von 0 → 0.5 → 1.0 in nur 2 Schritten. Das sieht aus wie "Text erscheint plötzlich".
+- Der letzte CSS-Fix ist tatsächlich im Projekt: `src/components/directors-cut/preview/NativeTextOverlayRenderer.tsx` enthält bereits eigene `@keyframes`.
+- Das Problem liegt jetzt am Trigger und an der Struktur:
+  1. `displayTime` wird zwar an den Renderer übergeben, dort aber aktuell gar nicht genutzt. Der Renderer weiß also nicht, ob das Overlay gerade wirklich startet, ob hineingeseekt wurde oder ob es schon im pausierten Zustand sichtbar war.
+  2. Die CSS-Animation startet sofort beim Mount. Neue Overlays werden meistens an der aktuellen, oft pausierten Playhead-Position angelegt. Dadurch läuft die Animation schon im Standbild ab und beim eigentlichen Play ist der Text bereits im Endzustand.
+  3. Positionierung und Animation verwenden beide `transform` auf demselben Element. Bei der Standardposition `center` überschreibt die Animation das Zentrier-`transform`, wodurch Fade/Scale/Bounce nicht sauber wirken.
 
-### Lösung
+Umsetzung
 
-CSS-Animationen statt JS-berechneter Progress-Werte nutzen. Die Komponente wird gemountet sobald `displayTime >= startTime` — der **Mount-Zeitpunkt** triggert dann eine flüssige 60fps CSS-Animation automatisch.
+1. `DirectorsCutPreviewPlayer.tsx` anpassen
+- Dem Overlay-Renderer zusätzlich `isPlaying` übergeben.
+- Pro Overlay unterscheiden zwischen:
+  - echtem Start während laufender Wiedergabe
+  - bereits aktiv durch Pause/Seek
+- Einen kleinen Trigger wie `runId` oder `shouldAnimateOnEntry` ableiten, damit Animationen nur dann neu starten, wenn der Playhead das Overlay wirklich überschreitet.
 
-### Änderung: `NativeTextOverlayRenderer.tsx`
+2. `NativeTextOverlayRenderer.tsx` umbauen
+- Zwei Ebenen statt einer:
+  - äußerer Wrapper = absolute Position + Zentrierung
+  - innerer Wrapper = nur Animation
+- So kollidiert das Positions-`transform` nicht mehr mit `fadeIn`, `scaleUp` und `bounce`.
+- Interne Zustände ergänzen:
+  - `waiting` = sichtbar vorbereitet, aber Animation noch nicht starten
+  - `animating` = Start exakt beim echten Playback-Eintritt
+  - `settled` = Endzustand bei Seek mitten ins Overlay
 
-- **fadeIn/scaleUp/bounce**: CSS `@keyframes` + `animation`-Property statt manueller opacity/transform-Berechnung
-- **typewriter**: Bleibt JS-basiert (text.substring), aber nutzt `useEffect` + `requestAnimationFrame` für eigenen Timer statt des langsamen `displayTime`
-- **highlight**: CSS `@keyframes` für Background-Sweep
-- **glitch**: CSS `@keyframes` für Oszillation + text-shadow
+3. Typewriter korrekt koppeln
+- Den RAF-Loop nicht mehr beim Mount starten, sondern erst beim echten Animationsstart.
+- Wenn man in die Mitte des Overlays seekt, nicht wieder bei 0 Zeichen beginnen, sondern den passenden Zwischen-/Endzustand zeigen.
 
-Konkret: Die gesamte `switch(overlay.animation)`-Logik (Zeilen 65-128) wird ersetzt durch CSS-Klassen, die beim Mount automatisch abspielen. Für typewriter wird ein interner `useState` + `useEffect` mit eigenem RAF-Timer genutzt.
+4. Reset/Re-Trigger sauber machen
+- Bei Reset, Replay oder Seek vor den Startzeitpunkt den lokalen Animationszustand zurücksetzen.
+- Beim Wechsel des Animationstyps im Editor die Vorschau wieder sauber neu triggern.
 
-### Betroffene Datei
+Technische Details
 
+- Der Kernfehler ist aktuell: Die CSS-Keyframes sind vorhanden, aber sie werden am falschen Moment ausgelöst.
+- Der zweite Kernfehler ist der `transform`-Konflikt auf demselben DOM-Element.
+- Ich würde die Animationen weiterhin CSS-basiert lassen, weil das trotz des 250ms-`displayTime`-Throttlings die richtige Strategie ist. Es braucht nur einen playback-aware Start.
+
+Betroffene Dateien
+
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
 - `src/components/directors-cut/preview/NativeTextOverlayRenderer.tsx`
 
-Keine Änderung an `DirectorsCutPreviewPlayer.tsx` nötig.
+Verifikation
 
+- Neues Overlay im pausierten Zustand anlegen und danach auf Play drücken: Animation muss erst dann sichtbar starten.
+- `fadeIn`, `scaleUp`, `bounce`, `typewriter`, `highlight`, `glitch` testen.
+- Center-Position und Eckpositionen testen.
+- In die Mitte eines Overlays seeken: kein unerwartetes Neu-Abspielen.
+- Replay/Reset testen: dieselbe Animation muss erneut sauber ablaufen.
