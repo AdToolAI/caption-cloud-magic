@@ -839,7 +839,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     }
 
     return (
-      <AbsoluteFill style={{ backgroundColor: '#000' }}>
+      <AbsoluteFill style={{ backgroundColor: '#000', overflow: 'hidden' }}>
         <SVGFilters />
         <SharpnessFilter intensity={effectiveSharpness} />
         {chromaKey?.enabled && chromaKey.backgroundUrl && (
@@ -848,22 +848,24 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           </AbsoluteFill>
         )}
         {/* Single continuous video — no decoder switches */}
-        <Video
-          src={sourceVideoUrl}
-          startFrom={0}
-          pauseWhenBuffering={false}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            opacity: transitionVideoOpacity,
-            filter: `${previewFilter.trim()}${transitionBlur > 0 ? ` blur(${transitionBlur}px)` : ''}`,
-            transform: [kenBurnsStyle, transitionTransform].filter(Boolean).join(' ') || undefined,
-            clipPath: transitionClipPath || undefined,
-            transformOrigin: 'center center',
-          }}
-          volume={0}
-        />
+        <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
+          <Video
+            src={sourceVideoUrl}
+            startFrom={0}
+            pauseWhenBuffering={false}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              opacity: transitionVideoOpacity,
+              filter: `${previewFilter.trim()}${transitionBlur > 0 ? ` blur(${transitionBlur}px)` : ''}`,
+              transform: [kenBurnsStyle, transitionTransform].filter(Boolean).join(' ') || undefined,
+              clipPath: transitionClipPath || undefined,
+              transformOrigin: 'center center',
+            }}
+            volume={0}
+          />
+        </div>
         {/* No second Video element — all transitions are CSS-only on the base video */}
         {/* Darkening overlay for fade transitions */}
         {transitionOverlayOpacity > 0 && (
