@@ -539,6 +539,42 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               <span className="text-sm font-medium text-white">Untertitel</span>
             </div>
 
+            {/* Original Subtitles Detection Banner */}
+            {isDetectingOriginalSubs && (
+              <div className="p-2.5 rounded bg-indigo-500/10 border border-indigo-500/30 flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
+                <p className="text-[11px] text-indigo-300">Original-Untertitel werden erkannt...</p>
+              </div>
+            )}
+
+            {hasOriginalSubtitles && !isDetectingOriginalSubs && (
+              <div className="p-2.5 rounded bg-indigo-500/10 border border-indigo-500/30 space-y-2">
+                <p className="text-[11px] text-indigo-300 flex items-center gap-1.5">
+                  🎬 Original-Untertitel erkannt
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onRemoveOriginalSubtitles}
+                    className="h-6 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 px-2"
+                  >
+                    Entfernen
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleGenerateCaptions}
+                    disabled={isGeneratingCaptions}
+                    className="h-6 text-[10px] border-[#00d4ff]/30 text-[#00d4ff] hover:bg-[#00d4ff]/10 px-2"
+                  >
+                    <Sparkles className="h-2.5 w-2.5 mr-1" />
+                    Neu generieren
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Language Selection */}
             <div className="space-y-2">
               <label className="text-xs text-white/70">Sprache</label>
