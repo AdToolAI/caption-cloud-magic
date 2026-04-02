@@ -111,6 +111,9 @@ export function SceneAnalysisStep({
   
   // Dragging state for scene dividers
   const [isDragging, setIsDragging] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [originalVolume, setOriginalVolume] = useState(100);
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
