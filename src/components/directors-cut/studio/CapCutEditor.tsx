@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { SceneAnalysis, AudioEnhancements, TextOverlay, TransitionAssignment } from '@/types/directors-cut';
+import { SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE } from '@/lib/directors-cut-draft';
 import { CapCutSidebar } from './CapCutSidebar';
 import { CapCutTimeline } from './CapCutTimeline';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
