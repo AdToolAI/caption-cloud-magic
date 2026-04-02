@@ -996,6 +996,7 @@ export function DirectorsCut() {
               onNextStep={() => setCurrentStep(11)}
               // Visual effects from previous steps
               textOverlays={textOverlays}
+              onTextOverlaysChange={setTextOverlays}
               appliedEffects={appliedEffects}
               transitions={transitions}
               colorGrading={colorGrading}
