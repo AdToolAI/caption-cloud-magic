@@ -63,7 +63,7 @@ interface ExportRenderStepProps {
   // Scene-specific effects from Step 5
   sceneEffects?: Record<string, any>;
   // Subtitle Safe Zone
-  subtitleSafeZone?: { enabled: boolean; zoom: number; offsetY: number; bottomBandPercent: number; mode: string; preset: string };
+  subtitleSafeZone?: SubtitleSafeZone;
 }
 
 const QUALITY_OPTIONS = [
