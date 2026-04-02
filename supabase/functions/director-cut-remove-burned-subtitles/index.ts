@@ -33,7 +33,7 @@ serve(async (req) => {
       });
     }
 
-    const { video_url, project_id } = await req.json();
+    const { video_url, project_id, conf_threshold, margin, method } = await req.json();
     if (!video_url || !project_id) {
       return new Response(JSON.stringify({ ok: false, code: 'validation', step: 'input', error: 'video_url and project_id are required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
