@@ -525,7 +525,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           toast.success(`🎬 ${originalSubs.length} Original-Untertitel erkannt`);
         }
       } catch (err) {
-        console.warn('[CapCutEditor] Original subtitle detection failed:', err);
+        console.error('[CapCutEditor] Original subtitle detection failed:', err);
+        toast.error('Original-Untertitel konnten nicht erkannt werden. Bitte erneut versuchen.');
+        originalSubsDetectedRef.current = false; // Allow retry
       } finally {
         setIsDetectingOriginalSubs(false);
       }
@@ -541,6 +543,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       clips: prev.clips.filter(c => c.source !== 'original'),
     }));
     toast.success('Original-Untertitel entfernt');
+  }, []);
+
+  // Handler to retry original subtitle detection
+  const handleRetryDetection = useCallback(() => {
+    originalSubsDetectedRef.current = false;
+    setSubtitleTrack(prev => ({ ...prev })); // trigger re-render to run useEffect
   }, []);
 
   // Delete clip handler
@@ -932,6 +940,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               isDetectingOriginalSubs={isDetectingOriginalSubs}
               hasOriginalSubtitles={subtitleTrack.clips.some(c => c.source === 'original')}
               onRemoveOriginalSubtitles={handleRemoveOriginalSubtitles}
+              onRetryDetection={handleRetryDetection}
               onAddVideoAsScene={async (file) => {
                 // Upload to storage and get video metadata
                 try {
