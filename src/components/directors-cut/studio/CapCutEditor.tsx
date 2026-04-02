@@ -28,6 +28,7 @@ interface CapCutEditorProps {
   onNextStep?: () => void;
   // Visual effects from previous steps
   textOverlays?: TextOverlay[];
+  onTextOverlaysChange?: (overlays: TextOverlay[]) => void;
   appliedEffects?: {
     global: {
       brightness: number;
