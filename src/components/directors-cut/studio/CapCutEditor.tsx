@@ -114,6 +114,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   });
   const [selectedSubtitleId, setSelectedSubtitleId] = useState<string | null>(null);
   
+  // Preview layer visibility toggles
+  const [showSubtitles, setShowSubtitles] = useState(true);
+  const [showTextOverlays, setShowTextOverlays] = useState(true);
+  
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   // DnD sensors with activation constraint to allow clicks
@@ -941,6 +945,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               hasOriginalSubtitles={subtitleTrack.clips.some(c => c.source === 'original')}
               onRemoveOriginalSubtitles={handleRemoveOriginalSubtitles}
               onRetryDetection={handleRetryDetection}
+              textOverlayCount={(textOverlays || []).length}
+              showSubtitles={showSubtitles}
+              onShowSubtitlesChange={setShowSubtitles}
+              showTextOverlays={showTextOverlays}
+              onShowTextOverlaysChange={setShowTextOverlays}
               onAddVideoAsScene={async (file) => {
                 // Upload to storage and get video metadata
                 try {
@@ -1044,8 +1053,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 styleTransfer={styleTransfer}
                 speedKeyframes={speedKeyframes}
                 kenBurns={kenBurns}
-                textOverlays={textOverlays || []}
-                subtitleTrack={subtitleTrack}
+                textOverlays={showTextOverlays ? (textOverlays || []) : []}
+                subtitleTrack={showSubtitles ? subtitleTrack : { ...subtitleTrack, clips: [] }}
                 externalIsPlaying={isPlaying}
                 onPlayingChange={setIsPlaying}
                 originalAudioMuted={(() => {

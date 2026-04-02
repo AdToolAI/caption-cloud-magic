@@ -47,6 +47,11 @@ interface CapCutSidebarProps {
   hasOriginalSubtitles?: boolean;
   onRemoveOriginalSubtitles?: () => void;
   onRetryDetection?: () => void;
+  textOverlayCount?: number;
+  showSubtitles?: boolean;
+  onShowSubtitlesChange?: (show: boolean) => void;
+  showTextOverlays?: boolean;
+  onShowTextOverlaysChange?: (show: boolean) => void;
 }
 
 interface Caption {
@@ -172,6 +177,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   hasOriginalSubtitles = false,
   onRemoveOriginalSubtitles,
   onRetryDetection,
+  textOverlayCount = 0,
+  showSubtitles = true,
+  onShowSubtitlesChange,
+  showTextOverlays = true,
+  onShowTextOverlaysChange,
 }) => {
   // Tab state
   const [activeTab, setActiveTab] = useState('subtitle');
@@ -589,6 +599,37 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 Original-Untertitel erneut erkennen
               </Button>
             )}
+
+            {/* Preview Layer Toggles */}
+            <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Preview-Ebenen</p>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-white/70">💬 Untertitel</span>
+                <Switch
+                  checked={showSubtitles}
+                  onCheckedChange={(v) => onShowSubtitlesChange?.(v)}
+                  className="scale-75"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-white/70">📝 Text-Overlays {textOverlayCount > 0 && <span className="text-[#00d4ff]">({textOverlayCount})</span>}</span>
+                <Switch
+                  checked={showTextOverlays}
+                  onCheckedChange={(v) => onShowTextOverlaysChange?.(v)}
+                  className="scale-75"
+                />
+              </div>
+              {!showSubtitles && !showTextOverlays && existingCaptions.length === 0 && (
+                <p className="text-[10px] text-amber-400/80 mt-1">
+                  ⚠️ Falls weiterhin Text sichtbar ist, ist er im Originalvideo eingebrannt und kann nicht entfernt werden.
+                </p>
+              )}
+              {!showSubtitles && textOverlayCount > 0 && showTextOverlays && (
+                <p className="text-[10px] text-white/40 mt-1">
+                  Sichtbarer Text stammt möglicherweise aus Text-Overlays eines früheren Schritts.
+                </p>
+              )}
+            </div>
 
             {/* Language Selection */}
             <div className="space-y-2">
