@@ -135,7 +135,7 @@ const Pricing = () => {
       <SEO
         title={t("pricingDetails.header.title")}
         description={t("pricingDetails.header.subtitle")}
-        canonical="/pricing"
+        canonical="https://useadtool.ai/pricing"
         lang={language}
         ogImage="/og-pricing.jpg"
         structuredData={structuredData}

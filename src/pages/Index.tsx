@@ -76,7 +76,7 @@ const Index = () => {
         <SEO
           title="AdTool AI - KI Social Media Marketing Platform"
           description="Effektives Marketing. Smarte Kampagnen. Dein KI-gestütztes Marketing-Arsenal für Social Media Erfolg."
-          canonical="https://useadtool.ai"
+          canonical="https://useadtool.ai/"
           lang={language}
           structuredData={structuredData}
           ogImage="/og-home.jpg"

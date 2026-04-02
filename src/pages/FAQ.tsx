@@ -137,7 +137,7 @@ const FAQ = () => {
       <SEO
         title={title}
         description="Finde Antworten auf häufig gestellte Fragen zu AdTool AI - Preise, Abonnements, Zahlungsmethoden und mehr."
-        canonical="/faq"
+        canonical="https://useadtool.ai/faq"
         lang={language}
         ogImage="/og-faq.jpg"
         structuredData={structuredData}
