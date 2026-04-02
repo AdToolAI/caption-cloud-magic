@@ -29,6 +29,7 @@ interface MotionEffectsStepProps {
   sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
   textOverlays?: TextOverlay[];
   onSceneDurationChange?: (sceneId: string, newDuration: number, avgSpeed: number) => void;
+  liveCurrentTime?: number; // Injected by StepLayoutWrapper
 }
 
 export function MotionEffectsStep({ 
@@ -48,6 +49,7 @@ export function MotionEffectsStep({
   sceneColorGrading,
   textOverlays = [],
   onSceneDurationChange,
+  liveCurrentTime,
 }: MotionEffectsStepProps) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [kenBurnsKeyframes, setKenBurnsKeyframes] = useState<KenBurnsKeyframe[]>(initialKenBurnsKeyframes ?? []);
@@ -93,7 +95,7 @@ export function MotionEffectsStep({
           videoDuration={videoDuration}
           keyframes={speedKeyframes}
           onKeyframesChange={handleSpeedKeyframesChange}
-          currentTime={currentTime}
+          currentTime={liveCurrentTime ?? currentTime}
           selectedSceneId={selectedSceneId || undefined}
           sceneStartTime={
             selectedSceneId

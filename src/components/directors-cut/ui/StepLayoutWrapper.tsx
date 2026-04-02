@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, cloneElement, isValidElement, Children } from 'react';
 import { motion } from 'framer-motion';
 import { LucideIcon } from 'lucide-react';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
@@ -144,13 +144,18 @@ export function StepLayoutWrapper({
         </motion.div>
       )}
 
-      {/* Step-specific content */}
+      {/* Step-specific content — inject liveCurrentTime */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        {children}
+        {Children.map(children, child => {
+          if (isValidElement(child)) {
+            return cloneElement(child as React.ReactElement<any>, { liveCurrentTime: currentTime });
+          }
+          return child;
+        })}
       </motion.div>
     </div>
   );

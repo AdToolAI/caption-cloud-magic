@@ -7,6 +7,7 @@ import {
   Gauge, Plus, Trash2, Play, Pause, RotateCcw, 
   FastForward, Rewind, Zap, Clock
 } from 'lucide-react';
+import { calculateSceneDuration } from '@/utils/speedCurve';
 
 export interface SpeedKeyframe {
   id: string;
@@ -97,8 +98,7 @@ export function SpeedRamping({
     if (!selectedSceneId || !onSceneDurationChange || !originalSceneDuration) return;
     const sceneKfs = updatedKeyframes.filter(k => k.sceneId === selectedSceneId);
     if (sceneKfs.length === 0) return;
-    const avgSpeed = sceneKfs.reduce((sum, k) => sum + k.speed, 0) / sceneKfs.length;
-    const newDuration = originalSceneDuration / avgSpeed;
+    const { newDuration, avgSpeed } = calculateSceneDuration(sceneKfs, originalSceneDuration);
     onSceneDurationChange(selectedSceneId, newDuration, avgSpeed);
   };
 
@@ -151,8 +151,7 @@ export function SpeedRamping({
     if (!selectedSceneId || !originalSceneDuration) return null;
     const sceneKfs = keyframes.filter(k => k.sceneId === selectedSceneId);
     if (sceneKfs.length === 0) return null;
-    const avgSpeed = sceneKfs.reduce((sum, k) => sum + k.speed, 0) / sceneKfs.length;
-    const newDuration = originalSceneDuration / avgSpeed;
+    const { newDuration, avgSpeed } = calculateSceneDuration(sceneKfs, originalSceneDuration);
     return { original: originalSceneDuration, newDuration, avgSpeed };
   })();
 

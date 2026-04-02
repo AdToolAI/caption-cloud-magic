@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
+import { getSpeedAtTime } from '@/utils/speedCurve';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Play, Pause, VolumeX, Volume2, Maximize2, RotateCcw } from 'lucide-react';
@@ -670,9 +671,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         }
       }
 
-      // === UNIFIED PLAYBACK RATE (Scene Rate + Speed Ramping) ===
+      // === UNIFIED PLAYBACK RATE (Speed Ramping with easing interpolation) ===
       if (video) {
-        const sceneRate = (sceneInfo?.scene as any)?.playbackRate ?? 1;
+        // Don't multiply by sceneRate — scene duration is already stretched on the timeline.
+        // Only use the keyframe-derived speed for live playbackRate.
         let activeSpeed = 1;
         
         const sKeyframes = speedKeyframesRef.current;
@@ -682,24 +684,20 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           const relevantKFs = sceneKFs.length > 0 ? sceneKFs : globalKFs;
           
           if (relevantKFs.length > 0) {
-            const sorted = [...relevantKFs].sort((a, b) => a.time - b.time);
             // Scene-specific keyframes use relative time (0 to scene duration)
             const useRelativeTime = sceneKFs.length > 0;
             const sceneStart = sceneInfo.scene.start_time ?? 0;
             const compareTime = useRelativeTime ? (timelineTime - sceneStart) : timelineTime;
-            for (const kf of sorted) {
-              if (compareTime >= kf.time) {
-                activeSpeed = kf.speed;
-              }
-            }
+            activeSpeed = getSpeedAtTime(relevantKFs, compareTime);
           }
         }
         
-        const targetRate = Math.max(0.0625, sceneRate * activeSpeed);
+        const targetRate = Math.max(0.0625, Math.min(16, activeSpeed));
         if (Math.abs(video.playbackRate - targetRate) > 0.01) {
           video.playbackRate = targetRate;
         }
 
+        // Voiceover and background music always stay at 1.0x
         if (voiceoverAudioRef.current && Math.abs(voiceoverAudioRef.current.playbackRate - 1) > 0.001) {
           voiceoverAudioRef.current.playbackRate = 1;
         }
@@ -707,14 +705,22 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           backgroundMusicAudioRef.current.playbackRate = 1;
         }
         
-        // Sync only source audio with video speed (smooth interpolation)
-        // Voiceover and background music stay at 1.0x to avoid pitch distortion
+        // Source audio: mute/duck when speed != 1x to avoid pitch distortion
+        // Instead of pitching the audio (which causes chipmunk effects),
+        // we duck it proportionally to how far from 1x we are
         if (sourceAudioRef.current) {
-          const currentRate = sourceAudioRef.current.playbackRate;
-          const diff = targetRate - currentRate;
-          if (Math.abs(diff) > 0.01) {
-            const smoothedRate = currentRate + Math.sign(diff) * Math.min(Math.abs(diff), 0.05);
-            sourceAudioRef.current.playbackRate = Math.max(0.0625, smoothedRate);
+          if (Math.abs(targetRate - 1) > 0.05) {
+            // Speed is not ~1x → duck the source audio to avoid distortion
+            const duckAmount = Math.min(1, Math.abs(targetRate - 1) * 2);
+            const duckedVolume = Math.max(0, 1 - duckAmount);
+            sourceAudioRef.current.volume = duckedVolume;
+            sourceAudioRef.current.playbackRate = targetRate;
+          } else {
+            // Speed is ~1x → normal volume and rate
+            sourceAudioRef.current.volume = 1;
+            if (Math.abs(sourceAudioRef.current.playbackRate - 1) > 0.01) {
+              sourceAudioRef.current.playbackRate = 1;
+            }
           }
         }
       }
