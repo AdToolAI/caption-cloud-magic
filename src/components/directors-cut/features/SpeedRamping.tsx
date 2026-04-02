@@ -40,6 +40,8 @@ interface SpeedRampingProps {
   selectedSceneId?: string;
   sceneDuration?: number;
   sceneStartTime?: number;
+  onSceneDurationChange?: (sceneId: string, newDuration: number, avgSpeed: number) => void;
+  originalSceneDuration?: number;
 }
 
 export function SpeedRamping({
@@ -50,6 +52,8 @@ export function SpeedRamping({
   selectedSceneId,
   sceneDuration,
   sceneStartTime = 0,
+  onSceneDurationChange,
+  originalSceneDuration,
 }: SpeedRampingProps) {
   const [selectedKeyframe, setSelectedKeyframe] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -86,17 +90,29 @@ export function SpeedRamping({
     const updated = [...keyframes, newKeyframe].sort((a, b) => a.time - b.time);
     onKeyframesChange(updated);
     setSelectedKeyframe(newKeyframe.id);
+    notifyDurationChange(updated);
+  };
+
+  const notifyDurationChange = (updatedKeyframes: SpeedKeyframe[]) => {
+    if (!selectedSceneId || !onSceneDurationChange || !originalSceneDuration) return;
+    const sceneKfs = updatedKeyframes.filter(k => k.sceneId === selectedSceneId);
+    if (sceneKfs.length === 0) return;
+    const avgSpeed = sceneKfs.reduce((sum, k) => sum + k.speed, 0) / sceneKfs.length;
+    const newDuration = originalSceneDuration / avgSpeed;
+    onSceneDurationChange(selectedSceneId, newDuration, avgSpeed);
   };
 
   const removeKeyframe = (id: string) => {
-    onKeyframesChange(keyframes.filter(kf => kf.id !== id));
+    const updated = keyframes.filter(kf => kf.id !== id);
+    onKeyframesChange(updated);
     if (selectedKeyframe === id) setSelectedKeyframe(null);
+    notifyDurationChange(updated);
   };
 
   const updateKeyframe = (id: string, updates: Partial<SpeedKeyframe>) => {
-    onKeyframesChange(
-      keyframes.map(kf => kf.id === id ? { ...kf, ...updates } : kf)
-    );
+    const updated = keyframes.map(kf => kf.id === id ? { ...kf, ...updates } : kf);
+    onKeyframesChange(updated);
+    notifyDurationChange(updated);
   };
 
   const applyPreset = (speed: number) => {
@@ -130,6 +146,16 @@ export function SpeedRamping({
 
   const selectedKf = keyframes.find(kf => kf.id === selectedKeyframe);
 
+  // Calculate duration feedback for scene mode
+  const durationFeedback = (() => {
+    if (!selectedSceneId || !originalSceneDuration) return null;
+    const sceneKfs = keyframes.filter(k => k.sceneId === selectedSceneId);
+    if (sceneKfs.length === 0) return null;
+    const avgSpeed = sceneKfs.reduce((sum, k) => sum + k.speed, 0) / sceneKfs.length;
+    const newDuration = originalSceneDuration / avgSpeed;
+    return { original: originalSceneDuration, newDuration, avgSpeed };
+  })();
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -147,6 +173,15 @@ export function SpeedRamping({
           )}
           <Badge variant="secondary" className="ml-auto">Premium</Badge>
         </CardTitle>
+        {durationFeedback && (
+          <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+            <Clock className="h-3 w-3" />
+            Dauer: {durationFeedback.original.toFixed(1)}s → {durationFeedback.newDuration.toFixed(1)}s
+            <span className={durationFeedback.avgSpeed < 1 ? 'text-blue-400' : durationFeedback.avgSpeed > 1 ? 'text-orange-400' : 'text-green-400'}>
+              ({durationFeedback.avgSpeed.toFixed(2)}x)
+            </span>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Speed Presets */}
