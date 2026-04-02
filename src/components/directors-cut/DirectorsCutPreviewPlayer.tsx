@@ -1076,7 +1076,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
         {/* Text Overlays */}
         {textOverlays.filter(o => displayTime >= o.startTime && (o.endTime === null || o.endTime === undefined || displayTime < o.endTime)).map(overlay => (
-          <NativeTextOverlayRenderer key={overlay.id} overlay={overlay} displayTime={displayTime} />
+          <NativeTextOverlayRenderer key={overlay.id} overlay={overlay} displayTime={displayTime} isPlaying={isPlaying} />
         ))}
 
         {/* Fullscreen Button */}
