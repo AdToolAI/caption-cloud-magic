@@ -827,7 +827,7 @@ export function DirectorsCut() {
           <ExportRenderStep
             exportSettings={exportSettings}
             onExportSettingsChange={setExportSettings}
-            videoUrl={selectedVideo?.url || ''}
+            videoUrl={cleanedVideoUrl || selectedVideo?.url || ''}
             effects={appliedEffects.global}
             sceneEffects={appliedEffects.scenes}
             audio={audioEnhancements}
