@@ -675,6 +675,17 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         if (Math.abs(video.playbackRate - targetRate) > 0.01) {
           video.playbackRate = targetRate;
         }
+        
+        // Sync audio playback rates with video speed
+        if (sourceAudioRef.current && Math.abs(sourceAudioRef.current.playbackRate - targetRate) > 0.01) {
+          sourceAudioRef.current.playbackRate = targetRate;
+        }
+        if (voiceoverAudioRef.current && Math.abs(voiceoverAudioRef.current.playbackRate - targetRate) > 0.01) {
+          voiceoverAudioRef.current.playbackRate = targetRate;
+        }
+        if (backgroundMusicAudioRef.current && Math.abs(backgroundMusicAudioRef.current.playbackRate - targetRate) > 0.01) {
+          backgroundMusicAudioRef.current.playbackRate = targetRate;
+        }
       }
 
       // Throttled UI updates
