@@ -843,6 +843,7 @@ export function DirectorsCut() {
             audioTracks={capCutAudioTracks}
             backgroundMusicUrl={backgroundMusicUrl}
             styleTransfer={styleTransfer}
+            subtitleSafeZone={subtitleSafeZone}
           />
         );
       default:

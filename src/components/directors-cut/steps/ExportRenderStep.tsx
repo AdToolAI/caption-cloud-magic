@@ -409,7 +409,12 @@ export function ExportRenderStep({
             objects_count: premiumFeatures.objectRemoval.objectsCount,
           } : undefined,
           // Subtitle Safe Zone (hard crop for burned-in subtitles)
-          subtitle_safe_zone: undefined, // Will be passed from parent when available
+          subtitle_safe_zone: subtitleSafeZone?.enabled ? {
+            enabled: true,
+            zoom: subtitleSafeZone.zoom,
+            offsetY: subtitleSafeZone.offsetY,
+            bottomBandPercent: subtitleSafeZone.bottomBandPercent,
+          } : undefined,
         },
       });
 

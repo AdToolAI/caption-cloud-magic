@@ -206,6 +206,13 @@ export const DirectorsCutVideoSchema = z.object({
   textOverlays: z.array(TextOverlaySchema).optional(),
   // Subtitle Track
   subtitleTrack: SubtitleTrackSchema.optional(),
+  // Subtitle Safe Zone (hard crop for burned-in subtitles)
+  subtitleSafeZone: z.object({
+    enabled: z.boolean(),
+    zoom: z.number(),
+    offsetY: z.number(),
+    bottomBandPercent: z.number(),
+  }).optional(),
   // Preview mode: skip audio, less aggressive buffering
   previewMode: z.boolean().optional(),
 });
