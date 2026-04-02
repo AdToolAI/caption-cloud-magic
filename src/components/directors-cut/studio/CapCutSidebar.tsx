@@ -167,6 +167,9 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   captionCount = 0,
   onExportClick,
   onResetClick,
+  isDetectingOriginalSubs = false,
+  hasOriginalSubtitles = false,
+  onRemoveOriginalSubtitles,
 }) => {
   // Tab state
   const [activeTab, setActiveTab] = useState('subtitle');
