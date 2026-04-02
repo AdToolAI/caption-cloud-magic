@@ -851,7 +851,6 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 </div>
               </details>
             </div>
-            </div>
 
             {/* Language Selection */}
             <div className="space-y-2">
