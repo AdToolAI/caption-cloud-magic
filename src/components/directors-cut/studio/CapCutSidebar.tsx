@@ -604,9 +604,42 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               </Button>
             )}
 
+            {/* Text-Overlays Management */}
+            {textOverlayCount > 0 && (
+              <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Text-Overlays ({textOverlayCount})</p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[10px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                    onClick={() => onTextOverlaysChange?.([])}
+                  >
+                    Alle entfernen
+                  </Button>
+                </div>
+                <p className="text-[10px] text-white/40">Text aus früheren Schritten (z.B. VFX)</p>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {textOverlays.map((overlay) => (
+                    <div key={overlay.id} className="flex items-center justify-between gap-1 p-1.5 rounded bg-[#1e1e1e] border border-[#333]">
+                      <span className="text-[10px] text-white/70 truncate flex-1">{overlay.text}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-5 w-5 p-0 text-white/40 hover:text-red-400 hover:bg-red-500/10 shrink-0"
+                        onClick={() => onTextOverlaysChange?.(textOverlays.filter(o => o.id !== overlay.id))}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Preview Layer Toggles */}
             <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
-              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Preview-Ebenen</p>
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Vorschau-Sichtbarkeit</p>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-white/70">💬 Untertitel</span>
                 <Switch
@@ -615,22 +648,19 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   className="scale-75"
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-white/70">📝 Text-Overlays {textOverlayCount > 0 && <span className="text-[#00d4ff]">({textOverlayCount})</span>}</span>
-                <Switch
-                  checked={showTextOverlays}
-                  onCheckedChange={(v) => onShowTextOverlaysChange?.(v)}
-                  className="scale-75"
-                />
-              </div>
-              {!showSubtitles && !showTextOverlays && existingCaptions.length === 0 && (
+              {textOverlayCount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-white/70">📝 Text-Overlays</span>
+                  <Switch
+                    checked={showTextOverlays}
+                    onCheckedChange={(v) => onShowTextOverlaysChange?.(v)}
+                    className="scale-75"
+                  />
+                </div>
+              )}
+              {existingCaptions.length === 0 && textOverlayCount === 0 && (
                 <p className="text-[10px] text-amber-400/80 mt-1">
                   ⚠️ Falls weiterhin Text sichtbar ist, ist er im Originalvideo eingebrannt und kann nicht entfernt werden.
-                </p>
-              )}
-              {!showSubtitles && textOverlayCount > 0 && showTextOverlays && (
-                <p className="text-[10px] text-white/40 mt-1">
-                  Sichtbarer Text stammt möglicherweise aus Text-Overlays eines früheren Schritts.
                 </p>
               )}
             </div>
