@@ -95,6 +95,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   projectId,
   onCleanedVideoUrlChange,
   onSaveProject,
+  subtitleSafeZone = DEFAULT_SUBTITLE_SAFE_ZONE,
+  onSubtitleSafeZoneChange,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
