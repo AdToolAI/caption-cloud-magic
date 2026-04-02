@@ -38,6 +38,15 @@ serve(async (req) => {
       });
     }
 
+    // Validate that the input is an image (data URL or image URL), not a video
+    const isDataUrl = video_url.startsWith('data:image/');
+    const isVideoUrl = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i.test(video_url);
+    if (isVideoUrl && !isDataUrl) {
+      return new Response(JSON.stringify({ ok: false, error: 'Please provide an image frame, not a video URL. The client should capture a frame first.' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ ok: false, error: 'LOVABLE_API_KEY not configured' }), {
