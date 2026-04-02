@@ -52,6 +52,8 @@ export function SpeedRamping({
   selectedSceneId,
   sceneDuration,
   sceneStartTime = 0,
+  onSceneDurationChange,
+  originalSceneDuration,
 }: SpeedRampingProps) {
   const [selectedKeyframe, setSelectedKeyframe] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
