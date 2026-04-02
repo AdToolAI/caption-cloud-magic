@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import Replicate from "https://esm.sh/replicate@0.25.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +25,7 @@ serve(async (req) => {
     // Find project by prediction ID
     const { data: project, error: findError } = await supabase
       .from('director_cut_projects')
-      .select('id, user_id')
+      .select('id, user_id, burned_subtitles_pass')
       .eq('burned_subtitles_prediction_id', predictionId)
       .single();
 
@@ -35,7 +36,8 @@ serve(async (req) => {
       });
     }
 
-    console.log('[BurnedSubsWebhook] Found project:', project.id, 'status:', status);
+    const currentPass = project.burned_subtitles_pass || 1;
+    console.log('[BurnedSubsWebhook] Found project:', project.id, 'status:', status, 'pass:', currentPass);
 
     if (status === 'succeeded' && output) {
       // Normalize output URL
@@ -57,46 +59,62 @@ serve(async (req) => {
         });
       }
 
-      try {
-        // Download cleaned video
-        console.log('[BurnedSubsWebhook] Downloading cleaned video from:', cleanedVideoUrl);
-        const videoResponse = await fetch(cleanedVideoUrl);
-        if (!videoResponse.ok) throw new Error(`Download failed: ${videoResponse.status}`);
+      // If Pass 1 completed → automatically start Pass 2
+      if (currentPass === 1) {
+        console.log('[BurnedSubsWebhook] Pass 1 done. Starting Pass 2 with:', cleanedVideoUrl);
 
-        const videoBlob = await videoResponse.arrayBuffer();
-        const fileName = `burned-sub-removal/cleaned-${project.user_id}-${Date.now()}.mp4`;
+        const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
+        if (!REPLICATE_API_KEY) {
+          console.error('[BurnedSubsWebhook] No REPLICATE_API_KEY for pass 2');
+          // Fallback: save pass 1 result as final
+          await saveCleanedVideo(supabase, project, cleanedVideoUrl);
+          return new Response(JSON.stringify({ ok: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
 
-        // Upload to storage
-        const { error: uploadError } = await supabase.storage
-          .from('video-assets')
-          .upload(fileName, videoBlob, {
-            contentType: 'video/mp4',
-            upsert: true,
+        try {
+          const replicate = new Replicate({ auth: REPLICATE_API_KEY });
+
+          // Update pass to 2
+          await supabase.from('director_cut_projects').update({
+            burned_subtitles_pass: 2,
+          }).eq('id', project.id);
+
+          const webhookUrl = `${SUPABASE_URL}/functions/v1/director-cut-burned-subtitles-webhook`;
+
+          const prediction = await replicate.predictions.create({
+            version: "247c8385f3c6c322110a6787bd2d257acc3a3d60b9ed7da1726a628f72a42c4d",
+            input: {
+              video: cleanedVideoUrl,
+              method: "hybrid",
+              conf_threshold: 0.03,
+              margin: 20,
+              resolution: "original",
+              detection_interval: 1,
+              iou_threshold: 0.25,
+            },
+            webhook: webhookUrl,
+            webhook_events_filter: ["completed"],
           });
 
-        if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+          console.log('[BurnedSubsWebhook] Pass 2 prediction created:', prediction.id);
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('video-assets')
-          .getPublicUrl(fileName);
+          // Update prediction ID for pass 2
+          await supabase.from('director_cut_projects').update({
+            burned_subtitles_prediction_id: prediction.id,
+          }).eq('id', project.id);
 
-        console.log('[BurnedSubsWebhook] Success! Stored at:', publicUrl);
+        } catch (pass2Error) {
+          console.error('[BurnedSubsWebhook] Pass 2 failed to start:', pass2Error);
+          // Save pass 1 result as fallback
+          await saveCleanedVideo(supabase, project, cleanedVideoUrl);
+        }
 
-        // Update project
-        await supabase.from('director_cut_projects').update({
-          burned_subtitles_status: 'completed',
-          cleaned_video_url: publicUrl,
-          burned_subtitles_error: null,
-        }).eq('id', project.id);
-
-      } catch (storageError) {
-        console.error('[BurnedSubsWebhook] Storage error:', storageError);
-        // Fallback: use Replicate URL directly
-        await supabase.from('director_cut_projects').update({
-          burned_subtitles_status: 'completed',
-          cleaned_video_url: cleanedVideoUrl,
-          burned_subtitles_error: null,
-        }).eq('id', project.id);
+      } else {
+        // Pass 2 completed → save final result
+        console.log('[BurnedSubsWebhook] Pass 2 done. Saving final result.');
+        await saveCleanedVideo(supabase, project, cleanedVideoUrl);
       }
 
     } else if (status === 'failed') {
@@ -118,3 +136,44 @@ serve(async (req) => {
     });
   }
 });
+
+async function saveCleanedVideo(supabase: any, project: any, cleanedVideoUrl: string) {
+  try {
+    console.log('[BurnedSubsWebhook] Downloading cleaned video from:', cleanedVideoUrl);
+    const videoResponse = await fetch(cleanedVideoUrl);
+    if (!videoResponse.ok) throw new Error(`Download failed: ${videoResponse.status}`);
+
+    const videoBlob = await videoResponse.arrayBuffer();
+    const fileName = `burned-sub-removal/cleaned-${project.user_id}-${Date.now()}.mp4`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('video-assets')
+      .upload(fileName, videoBlob, {
+        contentType: 'video/mp4',
+        upsert: true,
+      });
+
+    if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('video-assets')
+      .getPublicUrl(fileName);
+
+    console.log('[BurnedSubsWebhook] Success! Stored at:', publicUrl);
+
+    await supabase.from('director_cut_projects').update({
+      burned_subtitles_status: 'completed',
+      cleaned_video_url: publicUrl,
+      burned_subtitles_error: null,
+    }).eq('id', project.id);
+
+  } catch (storageError) {
+    console.error('[BurnedSubsWebhook] Storage error:', storageError);
+    // Fallback: use Replicate URL directly
+    await supabase.from('director_cut_projects').update({
+      burned_subtitles_status: 'completed',
+      cleaned_video_url: cleanedVideoUrl,
+      burned_subtitles_error: null,
+    }).eq('id', project.id);
+  }
+}

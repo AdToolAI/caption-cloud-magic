@@ -18,7 +18,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Auth check
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ ok: false, code: 'auth', step: 'auth', error: 'No authorization header' }), {
@@ -51,18 +50,18 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 
-    // Update project status to processing
+    // Reset pass to 1 and update status
     await supabase
       .from('director_cut_projects')
       .update({
         burned_subtitles_status: 'processing',
         burned_subtitles_error: null,
         cleaned_video_url: null,
+        burned_subtitles_pass: 1,
       })
       .eq('id', project_id)
       .eq('user_id', user.id);
 
-    // Create async prediction with webhook
     const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
     const webhookUrl = `${SUPABASE_URL}/functions/v1/director-cut-burned-subtitles-webhook`;
@@ -73,10 +72,11 @@ serve(async (req) => {
       input: {
         video: video_url,
         method: method || "hybrid",
-        conf_threshold: conf_threshold ?? 0.10,
-        margin: margin ?? 15,
+        conf_threshold: conf_threshold ?? 0.05,
+        margin: margin ?? 20,
         resolution: "original",
         detection_interval: 1,
+        iou_threshold: 0.3,
       },
       webhook: webhookUrl,
       webhook_events_filter: ["completed"],
@@ -84,7 +84,6 @@ serve(async (req) => {
 
     console.log('[RemoveBurnedSubs] Prediction created:', prediction.id);
 
-    // Save prediction ID to project
     await supabase
       .from('director_cut_projects')
       .update({
@@ -97,7 +96,7 @@ serve(async (req) => {
       ok: true,
       status: 'processing',
       prediction_id: prediction.id,
-      message: 'Verarbeitung gestartet. Dies kann 1–3 Minuten dauern.',
+      message: 'Verarbeitung gestartet (2 Durchläufe). Dies kann 2–5 Minuten dauern.',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

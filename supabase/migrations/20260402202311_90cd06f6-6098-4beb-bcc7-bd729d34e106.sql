@@ -1,0 +1,1 @@
+ALTER TABLE public.director_cut_projects ADD COLUMN IF NOT EXISTS burned_subtitles_pass integer NOT NULL DEFAULT 1;
