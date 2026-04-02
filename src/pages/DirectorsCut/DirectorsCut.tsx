@@ -246,6 +246,7 @@ export function DirectorsCut() {
         backgroundMusicUrl,
         capCutAudioTracks,
         capCutSubtitleTrack,
+        subtitleSafeZone,
       });
     }, 500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
