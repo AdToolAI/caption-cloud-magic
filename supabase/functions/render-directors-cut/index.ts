@@ -195,6 +195,8 @@ serve(async (req) => {
       scene_color_grading,
       // Scene-specific effects (per-scene filters, brightness, etc.)
       scene_effects,
+      // Subtitle Safe Zone (hard crop)
+      subtitle_safe_zone,
     } = await req.json();
 
     if (!source_video_url) {
