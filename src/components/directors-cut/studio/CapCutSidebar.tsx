@@ -722,12 +722,12 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-3 w-3 animate-spin text-purple-400" />
-                    <p className="text-[10px] text-purple-400">Wird per KI entfernt (2 Durchläufe)... 2–5 Min.</p>
+                    <p className="text-[10px] text-purple-400">Wird per KI entfernt (3 Durchläufe)... 3–8 Min.</p>
                   </div>
                   <div className="w-full bg-[#3a3a3a] rounded-full h-1.5">
-                    <div className="bg-purple-500 h-1.5 rounded-full animate-pulse" style={{ width: '60%' }} />
+                    <div className="bg-purple-500 h-1.5 rounded-full animate-pulse" style={{ width: '45%' }} />
                   </div>
-                  <p className="text-[9px] text-white/30">Durchlauf 1: Erkennung & Entfernung → Durchlauf 2: Reste bereinigen</p>
+                  <p className="text-[9px] text-white/30">Durchlauf 1: Erkennung → 2: Reste → 3: Feinbereinigung</p>
                 </div>
               ) : burnedSubsStatus === 'failed' ? (
                 <div className="space-y-2">
