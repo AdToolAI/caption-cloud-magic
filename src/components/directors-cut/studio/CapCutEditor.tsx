@@ -135,6 +135,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Burned-in subtitle removal state
   const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | null>(null);
   const [isRemovingBurnedSubs, setIsRemovingBurnedSubs] = useState(false);
+  const [burnedSubsStatus, setBurnedSubsStatus] = useState<string>('idle');
+  const burnedSubsPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
