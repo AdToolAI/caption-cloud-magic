@@ -25,22 +25,6 @@
     <priority>0.8</priority>
   </url>
 
-  <!-- Features Page -->
-  <url>
-    <loc>https://useadtool.ai/features</loc>
-    <lastmod>2026-04-02</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-
-  <!-- Support Page -->
-  <url>
-    <loc>https://useadtool.ai/support</loc>
-    <lastmod>2026-04-02</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
   <!-- Legal - Privacy -->
   <url>
     <loc>https://useadtool.ai/legal/privacy</loc>

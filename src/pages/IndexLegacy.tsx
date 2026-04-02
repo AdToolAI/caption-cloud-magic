@@ -54,7 +54,7 @@ const Index = () => {
       <SEO
         title={t('hero_title')}
         description={t('hero_subtitle')}
-        canonical="https://useadtool.ai/home"
+        canonical="https://useadtool.ai/"
         lang={language}
         structuredData={structuredData}
       />
