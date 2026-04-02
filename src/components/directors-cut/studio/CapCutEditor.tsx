@@ -50,6 +50,8 @@ interface CapCutEditorProps {
   onAudioTracksChange?: (tracks: AudioTrack[]) => void;
   onSubtitleTrackChange?: (track: SubtitleTrack) => void;
   onBackgroundMusicUrlChange?: (url: string | undefined) => void;
+  // Initial subtitle track from parent (for draft persistence)
+  initialSubtitleTrack?: SubtitleTrack;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [

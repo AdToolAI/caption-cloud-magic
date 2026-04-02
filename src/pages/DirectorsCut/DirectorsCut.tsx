@@ -1008,6 +1008,7 @@ export function DirectorsCut() {
               onAudioTracksChange={setCapCutAudioTracks}
               onSubtitleTrackChange={setCapCutSubtitleTrack}
               onBackgroundMusicUrlChange={setBackgroundMusicUrl}
+              initialSubtitleTrack={capCutSubtitleTrack}
             />
           );
         })()}
