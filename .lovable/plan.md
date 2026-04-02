@@ -1,23 +1,30 @@
 
 
-## Completed: Speed Ramping Overhaul
+## Feature: Originalton-Regler in Schritt 2 (KI-Analyse)
 
-### Changes Made
+### Was
 
-1. **`src/utils/speedCurve.ts`** (NEW) — Shared utility with easing interpolation (`getSpeedAtTime`), weighted duration calculation (`calculateSceneDuration`), and easing functions (linear, ease-in, ease-out, ease-in-out).
+Ein einfacher Toggle/Schalter direkt über oder unter dem Video-Preview in Schritt 2, mit dem man den Originalton des Videos ein- und ausschalten kann.
 
-2. **`src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`**
-   - Removed double-speed bug: no longer multiplies `sceneRate × activeSpeed` — only uses keyframe-derived speed
-   - Uses `getSpeedAtTime()` for smooth easing interpolation between keyframes
-   - Source audio is ducked (volume reduced) when speed ≠ 1x instead of pitch-shifted — eliminates chipmunk effect
-   - Voiceover and background music remain at constant 1x speed
+### Umsetzung
 
-3. **`src/components/directors-cut/features/SpeedRamping.tsx`**
-   - Duration calculation uses weighted average via `calculateSceneDuration()` instead of simple arithmetic mean
-   - More accurate scene duration feedback
+**`src/components/directors-cut/steps/SceneAnalysisStep.tsx`**
 
-4. **`src/components/directors-cut/ui/StepLayoutWrapper.tsx`**
-   - Injects `liveCurrentTime` from the preview player into child components
+1. Einen `isMuted`-State hinzufügen (`useState(false)`)
+2. Das native `<video>`-Element (Zeile 657) mit dem `muted`-Attribut verbinden: `muted={isMuted}`
+3. Unter dem Video-Preview (nach Zeile 679) einen kleinen Kontrollbereich einfügen:
+   - Ein Volume-Icon (🔊/🔇) + Switch-Toggle mit Label "Originalton"
+   - Optional: einen Lautstärke-Slider (0–100%) für feinere Kontrolle
 
-5. **`src/components/directors-cut/steps/MotionEffectsStep.tsx`**
-   - Uses `liveCurrentTime` from the embedded preview player for accurate keyframe placement
+```text
+┌─────────────────────────────┐
+│        Video Preview        │
+│                             │
+└─────────────────────────────┘
+  🔊 Originalton  [━━━━━━●━━]  72%
+```
+
+### Betroffene Datei
+
+- `src/components/directors-cut/steps/SceneAnalysisStep.tsx` — State + UI-Elemente hinzufügen
+
