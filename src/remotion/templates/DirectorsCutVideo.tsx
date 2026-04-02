@@ -1026,6 +1026,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                     sceneDurationFrames={sceneDurationFrames}
                     previewMode={false}
                   />
+                  </div>
                 </AbsoluteFill>
               </TransitionSeries.Sequence>
               {hasTransitionToNext && transitionDurationFrames > 0 && (
