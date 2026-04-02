@@ -184,6 +184,7 @@ export function DirectorsCut() {
   const [capCutSubtitleTrack, setCapCutSubtitleTrack] = useState<any | undefined>(undefined);
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | undefined>(undefined);
   const [subtitleSafeZone, setSubtitleSafeZone] = useState<SubtitleSafeZone>(DEFAULT_SUBTITLE_SAFE_ZONE);
+  const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | undefined>(undefined);
 
   // --- Draft restoration on mount ---
   const draftLoadedRef = useRef(false);
