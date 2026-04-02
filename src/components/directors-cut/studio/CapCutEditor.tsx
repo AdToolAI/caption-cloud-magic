@@ -621,6 +621,35 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     detect();
   }, [videoUrl]);
 
+  // Handler to remove burned-in subtitles via AI inpainting
+  const handleRemoveBurnedSubtitles = useCallback(async () => {
+    setIsRemovingBurnedSubs(true);
+    try {
+      toast.info('Eingebrannte Untertitel werden analysiert...');
+      const { data, error } = await supabase.functions.invoke('director-cut-remove-burned-subtitles', {
+        body: { video_url: videoUrl },
+      });
+      if (error) throw error;
+      if (!data?.success) {
+        toast.info(data?.message || 'Keine eingebrannten Untertitel erkannt');
+        return;
+      }
+      setCleanedVideoUrl(data.cleaned_video_url);
+      toast.success('Eingebrannte Untertitel erfolgreich entfernt!');
+    } catch (err) {
+      console.error('[CapCutEditor] Burned subtitle removal failed:', err);
+      toast.error('Entfernung fehlgeschlagen. Bitte erneut versuchen.');
+    } finally {
+      setIsRemovingBurnedSubs(false);
+    }
+  }, [videoUrl]);
+
+  // Handler to restore original video
+  const handleRestoreOriginalVideo = useCallback(() => {
+    setCleanedVideoUrl(null);
+    toast.success('Originalvideo wiederhergestellt');
+  }, []);
+
   // Delete clip handler
   const handleDeleteClip = useCallback((clipId: string) => {
     setAudioTracks(prev => prev.map(track => ({
