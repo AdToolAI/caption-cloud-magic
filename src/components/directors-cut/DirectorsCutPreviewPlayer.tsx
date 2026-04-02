@@ -1093,11 +1093,28 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     >
       {/* Video Player */}
       <div className={`relative bg-black rounded-lg overflow-hidden ${fillContainer ? 'flex-1 min-h-0' : 'aspect-video'}`}>
-        {/* Ken Burns motion wrapper — separate from transition transforms */}
+        {/* Safe Zone Reframe wrapper — applies zoom + vertical shift to crop out burned subtitles */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden',
+            zIndex: 0,
+          }}
+        >
         <div
           ref={kenBurnsWrapperRef}
           className="absolute inset-0 w-full h-full"
-          style={{ zIndex: 0, willChange: 'transform' }}
+          style={{
+            zIndex: 0,
+            willChange: 'transform',
+            ...(subtitleSafeZone?.enabled && subtitleSafeZone.mode === 'reframe' ? {
+              transform: `scale(${subtitleSafeZone.zoom}) translateY(${subtitleSafeZone.offsetY}%)`,
+              transformOrigin: 'center center',
+            } : {}),
+          }}
         >
           {/* Video Slot A */}
           <video
