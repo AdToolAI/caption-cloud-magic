@@ -929,6 +929,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 }));
               }}
               onSubtitleSelect={handleSubtitleSelect}
+              isDetectingOriginalSubs={isDetectingOriginalSubs}
+              hasOriginalSubtitles={subtitleTrack.clips.some(c => c.source === 'original')}
+              onRemoveOriginalSubtitles={handleRemoveOriginalSubtitles}
               onAddVideoAsScene={async (file) => {
                 // Upload to storage and get video metadata
                 try {
