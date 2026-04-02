@@ -663,8 +663,10 @@ export function SceneAnalysisStep({
         <div className="aspect-video relative">
           <video
             ref={(el) => {
+              videoElRef.current = el;
               if (el && !el.dataset.initialized) {
                 el.dataset.initialized = 'true';
+                el.volume = originalVolume / 100;
                 let rafId: number;
                 const updateTime = () => {
                   if (el && !el.paused) {
