@@ -19,8 +19,12 @@ import {
   Sun,
   Circle,
   Droplets,
-  Scissors
+  Scissors,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import type { SceneAnalysisStepProps, SceneAnalysis, GlobalEffects, SceneEffects, TransitionAssignment } from '@/types/directors-cut';
 import { FILTER_EFFECT_MAPPING, AVAILABLE_FILTERS } from '@/types/directors-cut';
 import { TRANSITION_TYPES, AITransitions } from '../features/AITransitions';
@@ -107,6 +111,9 @@ export function SceneAnalysisStep({
   
   // Dragging state for scene dividers
   const [isDragging, setIsDragging] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [originalVolume, setOriginalVolume] = useState(100);
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
@@ -656,8 +663,10 @@ export function SceneAnalysisStep({
         <div className="aspect-video relative">
           <video
             ref={(el) => {
+              videoElRef.current = el;
               if (el && !el.dataset.initialized) {
                 el.dataset.initialized = 'true';
+                el.volume = originalVolume / 100;
                 let rafId: number;
                 const updateTime = () => {
                   if (el && !el.paused) {
@@ -676,6 +685,7 @@ export function SceneAnalysisStep({
             controls
             playsInline
             preload="auto"
+            muted={isMuted}
           />
           
           {/* Transition visual overlay with real cross-fade */}
@@ -777,7 +787,53 @@ export function SceneAnalysisStep({
         </div>
       </div>
 
-      {/* Analysis Section */}
+      {/* Originalton-Regler */}
+      <div className="flex items-center gap-4 px-2 py-2 rounded-lg bg-muted/50 border border-border">
+        <button
+          onClick={() => {
+            setIsMuted(!isMuted);
+            if (videoElRef.current) {
+              videoElRef.current.muted = !isMuted;
+            }
+          }}
+          className="p-1.5 rounded-md hover:bg-muted transition-colors"
+        >
+          {isMuted ? (
+            <VolumeX className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <Volume2 className="h-4 w-4 text-foreground" />
+          )}
+        </button>
+        <Label className="text-sm whitespace-nowrap">Originalton</Label>
+        <Switch
+          checked={!isMuted}
+          onCheckedChange={(checked) => {
+            setIsMuted(!checked);
+            if (videoElRef.current) {
+              videoElRef.current.muted = !checked;
+            }
+          }}
+        />
+        <Slider
+          value={[isMuted ? 0 : originalVolume]}
+          min={0}
+          max={100}
+          step={1}
+          onValueChange={([val]) => {
+            setOriginalVolume(val);
+            setIsMuted(val === 0);
+            if (videoElRef.current) {
+              videoElRef.current.volume = val / 100;
+              videoElRef.current.muted = val === 0;
+            }
+          }}
+          className="flex-1 max-w-[140px]"
+        />
+        <span className="text-xs text-muted-foreground w-8 text-right">
+          {isMuted ? 0 : originalVolume}%
+        </span>
+      </div>
+
       {scenes.length === 0 ? (
         <Card className="p-8 text-center">
           {isAnalyzing ? (
