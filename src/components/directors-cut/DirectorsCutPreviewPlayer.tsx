@@ -676,15 +676,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           video.playbackRate = targetRate;
         }
         
-        // Sync audio playback rates with video speed
-        if (sourceAudioRef.current && Math.abs(sourceAudioRef.current.playbackRate - targetRate) > 0.01) {
-          sourceAudioRef.current.playbackRate = targetRate;
-        }
-        if (voiceoverAudioRef.current && Math.abs(voiceoverAudioRef.current.playbackRate - targetRate) > 0.01) {
-          voiceoverAudioRef.current.playbackRate = targetRate;
-        }
-        if (backgroundMusicAudioRef.current && Math.abs(backgroundMusicAudioRef.current.playbackRate - targetRate) > 0.01) {
-          backgroundMusicAudioRef.current.playbackRate = targetRate;
+        // Sync only source audio with video speed (smooth interpolation)
+        // Voiceover and background music stay at 1.0x to avoid pitch distortion
+        if (sourceAudioRef.current) {
+          const currentRate = sourceAudioRef.current.playbackRate;
+          const diff = targetRate - currentRate;
+          if (Math.abs(diff) > 0.01) {
+            const smoothedRate = currentRate + Math.sign(diff) * Math.min(Math.abs(diff), 0.05);
+            sourceAudioRef.current.playbackRate = Math.max(0.0625, smoothedRate);
+          }
         }
       }
 
