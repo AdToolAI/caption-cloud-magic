@@ -76,6 +76,7 @@ interface DirectorsCutPreviewPlayerProps {
   className?: string;
   fillContainer?: boolean;
   children?: React.ReactNode;
+  subtitleSafeZone?: SubtitleSafeZone;
 }
 
 export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps> = ({
