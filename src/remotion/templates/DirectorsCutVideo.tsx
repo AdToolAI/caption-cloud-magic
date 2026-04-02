@@ -1002,7 +1002,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           return (
             <React.Fragment key={scene.id}>
               <TransitionSeries.Sequence durationInFrames={sceneDurationFrames} premountFor={60}>
-                <AbsoluteFill>
+                <AbsoluteFill style={{ overflow: 'hidden' }}>
+                  <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
                   <SceneVideo
                     sourceVideoUrl={sourceVideoUrl}
                     scene={scene}
