@@ -183,6 +183,7 @@ export function DirectorsCut() {
   const [capCutAudioTracks, setCapCutAudioTracks] = useState<any[]>([]);
   const [capCutSubtitleTrack, setCapCutSubtitleTrack] = useState<any | undefined>(undefined);
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | undefined>(undefined);
+  const [subtitleSafeZone, setSubtitleSafeZone] = useState<SubtitleSafeZone>(DEFAULT_SUBTITLE_SAFE_ZONE);
 
   // --- Draft restoration on mount ---
   const draftLoadedRef = useRef(false);
