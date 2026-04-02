@@ -52,6 +52,9 @@ interface CapCutEditorProps {
   onBackgroundMusicUrlChange?: (url: string | undefined) => void;
   // Initial subtitle track from parent (for draft persistence)
   initialSubtitleTrack?: SubtitleTrack;
+  // Project ID for burned subtitle removal
+  projectId?: string | null;
+  onCleanedVideoUrlChange?: (url: string | null) => void;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
