@@ -55,6 +55,7 @@ interface CapCutEditorProps {
   // Project ID for burned subtitle removal
   projectId?: string | null;
   onCleanedVideoUrlChange?: (url: string | null) => void;
+  onSaveProject?: () => Promise<string | null>;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [

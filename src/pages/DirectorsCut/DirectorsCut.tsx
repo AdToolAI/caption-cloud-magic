@@ -1011,6 +1011,7 @@ export function DirectorsCut() {
               initialSubtitleTrack={capCutSubtitleTrack}
               // Project ID for burned subtitle removal
               projectId={projectId}
+              onSaveProject={saveProject}
               onCleanedVideoUrlChange={(url) => {
                 // Persist in draft via cleanedVideoUrl field
                 saveDraft({
