@@ -46,6 +46,7 @@ interface CapCutSidebarProps {
   isDetectingOriginalSubs?: boolean;
   hasOriginalSubtitles?: boolean;
   onRemoveOriginalSubtitles?: () => void;
+  onRemoveAllSubtitles?: () => void;
   onRetryDetection?: () => void;
   textOverlayCount?: number;
   textOverlays?: Array<{ id: string; text: string; startTime: number; endTime: number | null }>;
@@ -178,6 +179,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   isDetectingOriginalSubs = false,
   hasOriginalSubtitles = false,
   onRemoveOriginalSubtitles,
+  onRemoveAllSubtitles,
   onRetryDetection,
   textOverlayCount = 0,
   textOverlays = [],
@@ -601,6 +603,18 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               >
                 <RotateCcw className="h-2.5 w-2.5 mr-1" />
                 Original-Untertitel erneut erkennen
+              </Button>
+            )}
+
+            {/* Remove ALL subtitles button */}
+            {existingCaptions.length > 0 && !isDetectingOriginalSubs && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onRemoveAllSubtitles}
+                className="w-full h-7 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+              >
+                Alle Untertitel entfernen ({existingCaptions.length})
               </Button>
             )}
 

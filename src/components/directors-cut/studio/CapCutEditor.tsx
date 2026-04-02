@@ -50,6 +50,8 @@ interface CapCutEditorProps {
   onAudioTracksChange?: (tracks: AudioTrack[]) => void;
   onSubtitleTrackChange?: (track: SubtitleTrack) => void;
   onBackgroundMusicUrlChange?: (url: string | undefined) => void;
+  // Initial subtitle track from parent (for draft persistence)
+  initialSubtitleTrack?: SubtitleTrack;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
@@ -82,6 +84,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onAudioTracksChange,
   onSubtitleTrackChange,
   onBackgroundMusicUrlChange,
+  initialSubtitleTrack,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -102,7 +105,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [audioEffects, setAudioEffects] = useState<AudioEffects>(DEFAULT_AUDIO_EFFECTS);
   
   // Subtitle Track State
-  const [subtitleTrack, setSubtitleTrack] = useState<SubtitleTrack>({ ...DEFAULT_SUBTITLE_TRACK });
+  const [subtitleTrack, setSubtitleTrack] = useState<SubtitleTrack>(
+    initialSubtitleTrack && initialSubtitleTrack.clips.length > 0 
+      ? initialSubtitleTrack 
+      : { ...DEFAULT_SUBTITLE_TRACK }
+  );
   const [defaultSubtitleStyle, setDefaultSubtitleStyle] = useState<Partial<SubtitleClip>>({
     position: 'bottom',
     fontSize: 'medium',
@@ -489,6 +496,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   useEffect(() => {
     if (!videoUrl || originalSubsDetectedRef.current) return;
     if (subtitleTrack.clips.length > 0) return;
+    // Don't auto-detect if parent already provided subtitles (from draft)
+    if (initialSubtitleTrack && initialSubtitleTrack.clips.length > 0) return;
 
     originalSubsDetectedRef.current = true;
     setIsDetectingOriginalSubs(true);
@@ -549,6 +558,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       clips: prev.clips.filter(c => c.source !== 'original'),
     }));
     toast.success('Original-Untertitel entfernt');
+  }, []);
+
+  // Handler to remove ALL subtitles (original + generated + manual)
+  const handleRemoveAllSubtitles = useCallback(() => {
+    setSubtitleTrack(prev => ({ ...prev, clips: [] }));
+    setSelectedSubtitleId(null);
+    toast.success('Alle Untertitel entfernt');
   }, []);
 
   // Handler to retry original subtitle detection
@@ -946,6 +962,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               isDetectingOriginalSubs={isDetectingOriginalSubs}
               hasOriginalSubtitles={subtitleTrack.clips.some(c => c.source === 'original')}
               onRemoveOriginalSubtitles={handleRemoveOriginalSubtitles}
+              onRemoveAllSubtitles={handleRemoveAllSubtitles}
               onRetryDetection={handleRetryDetection}
               textOverlayCount={(textOverlays || []).length}
               textOverlays={textOverlays || []}
