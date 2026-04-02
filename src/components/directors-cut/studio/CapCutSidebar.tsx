@@ -710,6 +710,28 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     Original wiederherstellen
                   </Button>
                 </div>
+              ) : burnedSubsStatus === 'processing' || isRemovingBurnedSubs ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-3 w-3 animate-spin text-purple-400" />
+                    <p className="text-[10px] text-purple-400">Wird per KI entfernt... (1–3 Min.)</p>
+                  </div>
+                  <div className="w-full bg-[#3a3a3a] rounded-full h-1.5">
+                    <div className="bg-purple-500 h-1.5 rounded-full animate-pulse" style={{ width: '60%' }} />
+                  </div>
+                </div>
+              ) : burnedSubsStatus === 'failed' ? (
+                <div className="space-y-2">
+                  <p className="text-[10px] text-red-400">❌ Entfernung fehlgeschlagen</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onRemoveBurnedSubtitles}
+                    className="w-full h-7 text-[10px] border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                  >
+                    <RotateCcw className="h-2.5 w-2.5 mr-1" /> Erneut versuchen
+                  </Button>
+                </div>
               ) : (
                 <Button
                   size="sm"
@@ -718,11 +740,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   disabled={isRemovingBurnedSubs}
                   className="w-full h-7 text-[10px] border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                 >
-                  {isRemovingBurnedSubs ? (
-                    <><Loader2 className="h-2.5 w-2.5 mr-1 animate-spin" /> Wird entfernt...</>
-                  ) : (
-                    <><Sparkles className="h-2.5 w-2.5 mr-1" /> Eingebrannte Untertitel entfernen</>
-                  )}
+                  <Sparkles className="h-2.5 w-2.5 mr-1" /> Eingebrannte Untertitel entfernen
                 </Button>
               )}
             </div>
