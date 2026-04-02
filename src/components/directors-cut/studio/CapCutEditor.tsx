@@ -55,6 +55,7 @@ interface CapCutEditorProps {
   // Project ID for burned subtitle removal
   projectId?: string | null;
   onCleanedVideoUrlChange?: (url: string | null) => void;
+  onSaveProject?: () => Promise<string | null>;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
@@ -90,6 +91,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   initialSubtitleTrack,
   projectId,
   onCleanedVideoUrlChange,
+  onSaveProject,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -692,8 +694,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   // Handler to remove burned-in subtitles via AI inpainting (async)
   const handleRemoveBurnedSubtitles = useCallback(async () => {
-    if (!projectId) {
-      toast.error('Projekt muss zuerst gespeichert werden.');
+    let activeProjectId = projectId;
+    if (!activeProjectId && onSaveProject) {
+      toast.info('Projekt wird gespeichert...');
+      activeProjectId = await onSaveProject();
+    }
+    if (!activeProjectId) {
+      toast.error('Projekt konnte nicht gespeichert werden.');
       return;
     }
     setIsRemovingBurnedSubs(true);
@@ -701,7 +708,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     try {
       toast.info('Eingebrannte Untertitel werden per KI entfernt... (1–3 Min.)');
       const { data, error } = await supabase.functions.invoke('director-cut-remove-burned-subtitles', {
-        body: { video_url: videoUrl, project_id: projectId },
+        body: { video_url: videoUrl, project_id: activeProjectId },
       });
       
       if (error) {
@@ -719,14 +726,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       }
       
       // Start polling for completion
-      startBurnedSubsPolling(projectId);
+      startBurnedSubsPolling(activeProjectId);
     } catch (err) {
       console.error('[CapCutEditor] Burned subtitle removal failed:', err);
       setIsRemovingBurnedSubs(false);
       setBurnedSubsStatus('failed');
       toast.error(err instanceof Error ? err.message : 'Entfernung fehlgeschlagen');
     }
-  }, [videoUrl, projectId, startBurnedSubsPolling]);
+  }, [videoUrl, projectId, onSaveProject, startBurnedSubsPolling]);
 
   // Handler to restore original video (toggle, don't forget cleaned result)
   const handleRestoreOriginalVideo = useCallback(() => {
