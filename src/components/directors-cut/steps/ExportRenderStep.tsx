@@ -28,6 +28,7 @@ import { useNavigate } from 'react-router-dom';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
 import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
 import type { AudioTrack, SubtitleTrack } from '@/types/timeline';
+import type { SubtitleSafeZone } from '@/lib/directors-cut-draft';
 
 interface PremiumFeatureState {
   styleTransfer?: { enabled: boolean; style: string | null };
