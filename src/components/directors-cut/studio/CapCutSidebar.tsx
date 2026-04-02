@@ -606,6 +606,18 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               </Button>
             )}
 
+            {/* Remove ALL subtitles button */}
+            {existingCaptions.length > 0 && !isDetectingOriginalSubs && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onRemoveAllSubtitles}
+                className="w-full h-7 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+              >
+                Alle Untertitel entfernen ({existingCaptions.length})
+              </Button>
+            )}
+
             {/* Text-Overlays Management */}
             {textOverlayCount > 0 && (
               <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
