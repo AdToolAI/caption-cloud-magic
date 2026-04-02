@@ -680,6 +680,7 @@ export function SceneAnalysisStep({
             controls
             playsInline
             preload="auto"
+            muted={isMuted}
           />
           
           {/* Transition visual overlay with real cross-fade */}
