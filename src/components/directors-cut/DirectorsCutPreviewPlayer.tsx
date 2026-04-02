@@ -691,7 +691,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           }
         }
         if (!kbApplied) {
-          kbWrapper.style.transform = 'none';
+          const szFallback = buildSafeZoneTransform();
+          kbWrapper.style.transform = szFallback || 'none';
         }
       }
 
