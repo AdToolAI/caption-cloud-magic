@@ -492,11 +492,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Auto-detect original subtitles from video audio on init
   const [isDetectingOriginalSubs, setIsDetectingOriginalSubs] = useState(false);
   const originalSubsDetectedRef = useRef(false);
+  const userClearedSubtitlesRef = useRef(false);
 
   useEffect(() => {
     if (!videoUrl || originalSubsDetectedRef.current) return;
+    if (userClearedSubtitlesRef.current) return;
     if (subtitleTrack.clips.length > 0) return;
-    // Don't auto-detect if parent already provided subtitles (from draft)
     if (initialSubtitleTrack && initialSubtitleTrack.clips.length > 0) return;
 
     originalSubsDetectedRef.current = true;
@@ -513,6 +514,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         });
 
         if (error) throw error;
+
+        if (userClearedSubtitlesRef.current) return;
 
         const originalSubs: SubtitleClip[] = (data?.subtitles || []).map((seg: any, i: number) => ({
           id: `original-sub-${Date.now()}-${i}`,
@@ -542,17 +545,18 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       } catch (err) {
         console.error('[CapCutEditor] Original subtitle detection failed:', err);
         toast.error('Original-Untertitel konnten nicht erkannt werden. Bitte erneut versuchen.');
-        originalSubsDetectedRef.current = false; // Allow retry
+        originalSubsDetectedRef.current = false;
       } finally {
         setIsDetectingOriginalSubs(false);
       }
     };
 
     detectOriginalSubtitles();
-  }, [videoUrl, subtitleTrack.clips.length]);
+  }, [videoUrl]);
 
   // Handler to remove all original subtitles
   const handleRemoveOriginalSubtitles = useCallback(() => {
+    userClearedSubtitlesRef.current = true;
     setSubtitleTrack(prev => ({
       ...prev,
       clips: prev.clips.filter(c => c.source !== 'original'),
@@ -562,6 +566,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   // Handler to remove ALL subtitles (original + generated + manual)
   const handleRemoveAllSubtitles = useCallback(() => {
+    userClearedSubtitlesRef.current = true;
     setSubtitleTrack(prev => ({ ...prev, clips: [] }));
     setSelectedSubtitleId(null);
     toast.success('Alle Untertitel entfernt');
@@ -569,9 +574,48 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   // Handler to retry original subtitle detection
   const handleRetryDetection = useCallback(() => {
+    userClearedSubtitlesRef.current = false;
     originalSubsDetectedRef.current = false;
-    setSubtitleTrack(prev => ({ ...prev })); // trigger re-render to run useEffect
-  }, []);
+    setIsDetectingOriginalSubs(true);
+    // Manually trigger detection
+    const detect = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-subtitles', {
+          body: { audioUrl: videoUrl, language: 'de' },
+        });
+        if (error) throw error;
+        if (userClearedSubtitlesRef.current) return;
+        const originalSubs: SubtitleClip[] = (data?.subtitles || []).map((seg: any, i: number) => ({
+          id: `original-sub-${Date.now()}-${i}`,
+          startTime: seg.startTime || i * 3,
+          endTime: seg.endTime || (i + 1) * 3,
+          text: seg.text || '',
+          style: 'standard' as const,
+          source: 'original' as const,
+          position: 'bottom' as const,
+          fontSize: 'medium' as const,
+          color: '#FFFFFF',
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          fontFamily: 'Inter',
+          maxLines: 2 as const,
+          textStroke: false,
+          textStrokeColor: '#000000',
+          textStrokeWidth: 2,
+        }));
+        if (originalSubs.length > 0) {
+          originalSubsDetectedRef.current = true;
+          setSubtitleTrack(prev => ({ ...prev, clips: originalSubs }));
+          toast.success(`🎬 ${originalSubs.length} Original-Untertitel erkannt`);
+        }
+      } catch (err) {
+        console.error('[CapCutEditor] Retry detection failed:', err);
+        toast.error('Erkennung fehlgeschlagen. Bitte erneut versuchen.');
+      } finally {
+        setIsDetectingOriginalSubs(false);
+      }
+    };
+    detect();
+  }, [videoUrl]);
 
   // Delete clip handler
   const handleDeleteClip = useCallback((clipId: string) => {
