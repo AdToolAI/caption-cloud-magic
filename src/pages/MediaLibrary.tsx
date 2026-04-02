@@ -477,6 +477,22 @@ export default function MediaLibrary() {
           .eq('id', id);
 
         if (error) throw error;
+      } else if (mediaItem.source === 'video-creator') {
+        // Delete from video_creations
+        const { error } = await supabase
+          .from('video_creations')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+      } else if (mediaItem.source === 'ai' && mediaItem.type === 'video') {
+        // AI videos stored in video_creations
+        const { error } = await supabase
+          .from('video_creations')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
       } else if (mediaItem.source === 'ai' || mediaItem.source === 'ai_generator' || mediaItem.source === 'campaign') {
         // Delete from content_items
         const { error } = await supabase
