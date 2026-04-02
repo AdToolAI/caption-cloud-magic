@@ -740,6 +740,44 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     }
   }, [videoUrl, projectId, onSaveProject, startBurnedSubsPolling]);
 
+  // Auto-detect subtitle band via AI vision
+  const [isDetectingBand, setIsDetectingBand] = useState(false);
+  const handleDetectSubtitleBand = useCallback(async () => {
+    setIsDetectingBand(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('director-cut-detect-subtitle-band', {
+        body: { video_url: videoUrl },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || 'Detection failed');
+
+      const sz = data.safeZone;
+      onSubtitleSafeZoneChange?.({
+        enabled: true,
+        mode: 'reframe',
+        preset: 'custom',
+        zoom: sz.zoom,
+        offsetY: sz.offsetY,
+        bottomBandPercent: sz.bottomBandPercent,
+      });
+      toast.success(`Untertitelbereich erkannt (${sz.bottomBandPercent}%) — Zuschnitt aktiv`);
+    } catch (err) {
+      console.error('[CapCutEditor] Band detection failed:', err);
+      // Fallback: apply medium preset
+      onSubtitleSafeZoneChange?.({
+        enabled: true,
+        mode: 'reframe',
+        preset: 'medium',
+        zoom: 1.12,
+        offsetY: -6,
+        bottomBandPercent: 12,
+      });
+      toast.info('Automatische Erkennung fehlgeschlagen — Standard-Zuschnitt angewendet');
+    } finally {
+      setIsDetectingBand(false);
+    }
+  }, [videoUrl, onSubtitleSafeZoneChange]);
+
   // Handler to restore original video (toggle, don't forget cleaned result)
   const handleRestoreOriginalVideo = useCallback(() => {
     setCleanedVideoUrl(null);
