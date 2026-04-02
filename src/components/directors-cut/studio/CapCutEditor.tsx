@@ -726,7 +726,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       }
       
       // Start polling for completion
-      startBurnedSubsPolling(projectId);
+      startBurnedSubsPolling(activeProjectId);
     } catch (err) {
       console.error('[CapCutEditor] Burned subtitle removal failed:', err);
       setIsRemovingBurnedSubs(false);
