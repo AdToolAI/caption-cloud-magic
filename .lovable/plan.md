@@ -1,55 +1,50 @@
 
 
-## Plan: Doppelter Durchlauf für vollständige Untertitel-Entfernung
+## Plan: Dritter Durchlauf + minimale Schwelle für vollständige Entfernung
 
-### Analyse
+### Analyse der Logs
 
-Die Logs zeigen: Das Modell hat mit `conf_threshold: 0.05` und `margin: 20` in 550 von 960 Frames Text erkannt und 600 Regionen entfernt. Das ist deutlich besser als vorher (444 Frames, 450 Regionen), aber einige Reste bleiben. Die Parameter sind bereits am Maximum:
-- `margin: 20` ist das dokumentierte Limit
-- `conf_threshold: 0.05` ist schon sehr niedrig
+Die Zwei-Pass-Verarbeitung funktioniert, aber nicht vollständig:
+- **Pass 1**: 550 Frames mit Text erkannt, 600 Regionen entfernt ✓
+- **Pass 2**: 50 Frames mit Text erkannt, 56 Regionen entfernt ✓
+- **Problem**: Pass 2 findet noch 50 Frames mit Text — das sind die sichtbaren Reste
 
-### Lösung: Zwei-Pass-Verarbeitung
+Da Pass 2 bei `conf_threshold: 0.03` immer noch 56 Regionen findet, lohnt sich ein **dritter Durchlauf** mit noch niedrigerer Schwelle. Außerdem wechseln wir in Pass 3 die Methode auf `"fast"`, die einen anderen Erkennungsalgorithmus nutzt und dadurch andere Textmuster findet.
 
-Ein einzelner Durchlauf reicht nicht für 100% Entfernung. Professionelle Tools machen oft einen zweiten Durchlauf auf dem bereits bereinigten Video, um Reste zu finden. Zusätzlich nutzen wir `iou_threshold: 0.3` (statt 0.45), damit mehr überlappende Erkennungen beibehalten werden.
+### Änderungen
+
+**1. Webhook: Drei-Pass-Logik**
+
+`supabase/functions/director-cut-burned-subtitles-webhook/index.ts`:
+- Pass 1 fertig → Pass 2 starten (wie bisher)
+- Pass 2 fertig → **Pass 3** starten mit `conf_threshold: 0.01`, `method: "fast"`, `iou_threshold: 0.2`
+- Pass 3 fertig → Ergebnis als final speichern
+
+**2. Edge Function: Statusmeldung anpassen**
+
+`supabase/functions/director-cut-remove-burned-subtitles/index.ts`:
+- Meldung auf "3 Durchläufe" ändern
+
+**3. Frontend: Pass-Anzeige aktualisieren**
+
+`src/components/directors-cut/studio/CapCutSidebar.tsx`:
+- Status "Durchlauf 1/3...", "Durchlauf 2/3...", "Durchlauf 3/3..." anzeigen
 
 ### Technischer Ablauf
 
 ```text
-Pass 1: video_url → Replicate (conf: 0.05, margin: 20)
-         ↓ Webhook
-Pass 2: cleaned_url → Replicate (conf: 0.03, margin: 20)
-         ↓ Webhook
-Ergebnis → Storage → User sieht bereinigtes Video
+Pass 1: video → conf: 0.05, margin: 20, method: hybrid
+         ↓
+Pass 2: cleaned → conf: 0.03, margin: 20, method: hybrid
+         ↓
+Pass 3: cleaned → conf: 0.01, margin: 20, method: fast
+         ↓
+Final → Storage → User sieht Video
 ```
-
-### Änderungen
-
-**1. Webhook erweitern: Automatischer zweiter Durchlauf**
-
-`supabase/functions/director-cut-burned-subtitles-webhook/index.ts`:
-- Neues Feld `burned_subtitles_pass` in der DB prüfen (default: 1)
-- Wenn Pass 1 fertig → automatisch Pass 2 starten mit dem bereinigten Video
-- Wenn Pass 2 fertig → Ergebnis als final speichern
-- Pass 2 nutzt noch aggressivere Einstellungen (`conf_threshold: 0.03`)
-
-**2. Edge Function: Pass-Nummer mitgeben**
-
-`supabase/functions/director-cut-remove-burned-subtitles/index.ts`:
-- `pass: 1` als Metadata im Webhook-Request mitgeben (über die DB)
-
-**3. Migration: Pass-Tracking-Spalte**
-
-- `burned_subtitles_pass` (integer, default 1) in `director_cut_projects`
-
-**4. Frontend: Statusmeldung anpassen**
-
-`src/components/directors-cut/studio/CapCutSidebar.tsx`:
-- Status "Durchlauf 1/2..." und "Durchlauf 2/2..." anzeigen
 
 ### Betroffene Dateien
 
-1. `supabase/functions/director-cut-burned-subtitles-webhook/index.ts` — zweiten Pass auslösen
-2. `supabase/functions/director-cut-remove-burned-subtitles/index.ts` — Pass-Info speichern
-3. Migration — `burned_subtitles_pass` Spalte
-4. `src/components/directors-cut/studio/CapCutSidebar.tsx` — Pass-Status anzeigen
+1. `supabase/functions/director-cut-burned-subtitles-webhook/index.ts` — Pass 3 hinzufügen
+2. `supabase/functions/director-cut-remove-burned-subtitles/index.ts` — Meldung anpassen
+3. `src/components/directors-cut/studio/CapCutSidebar.tsx` — 3-Pass-Status
 
