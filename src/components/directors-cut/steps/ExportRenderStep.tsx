@@ -61,6 +61,8 @@ interface ExportRenderStepProps {
   styleTransfer?: { enabled: boolean; style: string | null; intensity: number };
   // Scene-specific effects from Step 5
   sceneEffects?: Record<string, any>;
+  // Subtitle Safe Zone
+  subtitleSafeZone?: { enabled: boolean; zoom: number; offsetY: number; bottomBandPercent: number; mode: string; preset: string };
 }
 
 const QUALITY_OPTIONS = [
@@ -123,6 +125,7 @@ export function ExportRenderStep({
   backgroundMusicUrl,
   styleTransfer,
   sceneEffects,
+  subtitleSafeZone,
 }: ExportRenderStepProps) {
   const navigate = useNavigate();
   const [isRendering, setIsRendering] = useState(false);
@@ -407,7 +410,12 @@ export function ExportRenderStep({
             objects_count: premiumFeatures.objectRemoval.objectsCount,
           } : undefined,
           // Subtitle Safe Zone (hard crop for burned-in subtitles)
-          subtitle_safe_zone: undefined, // Will be passed from parent when available
+          subtitle_safe_zone: subtitleSafeZone?.enabled ? {
+            enabled: true,
+            zoom: subtitleSafeZone.zoom,
+            offsetY: subtitleSafeZone.offsetY,
+            bottomBandPercent: subtitleSafeZone.bottomBandPercent,
+          } : undefined,
         },
       });
 

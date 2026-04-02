@@ -195,6 +195,8 @@ serve(async (req) => {
       scene_color_grading,
       // Scene-specific effects (per-scene filters, brightness, etc.)
       scene_effects,
+      // Subtitle Safe Zone (hard crop)
+      subtitle_safe_zone,
     } = await req.json();
 
     if (!source_video_url) {
@@ -448,6 +450,13 @@ serve(async (req) => {
         ambientUrl: sound_design.ambient_url,
         ambientVolume: sound_design.ambient_volume || 20,
         sfxTracks: sound_design.sfx_tracks || [],
+      } : undefined,
+      // Subtitle Safe Zone (hard crop for burned-in subtitles)
+      subtitleSafeZone: subtitle_safe_zone?.enabled ? {
+        enabled: true,
+        zoom: subtitle_safe_zone.zoom,
+        offsetY: subtitle_safe_zone.offsetY,
+        bottomBandPercent: subtitle_safe_zone.bottomBandPercent,
       } : undefined,
       // Duration and dimensions
       durationInSeconds: duration,

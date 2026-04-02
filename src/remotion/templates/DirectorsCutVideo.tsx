@@ -206,6 +206,13 @@ export const DirectorsCutVideoSchema = z.object({
   textOverlays: z.array(TextOverlaySchema).optional(),
   // Subtitle Track
   subtitleTrack: SubtitleTrackSchema.optional(),
+  // Subtitle Safe Zone (hard crop for burned-in subtitles)
+  subtitleSafeZone: z.object({
+    enabled: z.boolean(),
+    zoom: z.number(),
+    offsetY: z.number(),
+    bottomBandPercent: z.number(),
+  }).optional(),
   // Preview mode: skip audio, less aggressive buffering
   previewMode: z.boolean().optional(),
 });
@@ -565,6 +572,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   soundDesign,
   textOverlays = [],
   subtitleTrack,
+  subtitleSafeZone,
   previewMode = false,
 }) => {
   const frame = useCurrentFrame();
@@ -597,6 +605,15 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     if (!scenes || scenes.length === 0) return [];
     return [...scenes].sort((a, b) => a.startTime - b.startTime);
   }, [scenes]);
+
+  // Subtitle Safe Zone crop style
+  const safeZoneCropStyle: React.CSSProperties = subtitleSafeZone?.enabled ? {
+    clipPath: `inset(0 0 ${subtitleSafeZone.bottomBandPercent}% 0)`,
+    transform: `scale(${subtitleSafeZone.zoom}) translateY(${subtitleSafeZone.offsetY}%)`,
+    transformOrigin: 'top center',
+    width: '100%',
+    height: '100%',
+  } : {};
 
   // Vignette style - korrigierte Formel für sichtbaren Effekt
   const vignetteStyle = vignette > 0 ? {
@@ -637,21 +654,23 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     }
 
     return (
-      <AbsoluteFill style={{ backgroundColor: '#000' }}>
+      <AbsoluteFill style={{ backgroundColor: '#000', overflow: 'hidden' }}>
         {/* SVG Filter Definitions */}
         <SVGFilters />
         <SharpnessFilter intensity={sharpness} />
-        <Video
-          src={sourceVideoUrl}
-          pauseWhenBuffering={!previewMode}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            filter: filterStr.trim(),
-          }}
-          volume={0}
-        />
+        <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
+          <Video
+            src={sourceVideoUrl}
+            pauseWhenBuffering={!previewMode}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              filter: filterStr.trim(),
+            }}
+            volume={0}
+          />
+        </div>
         {/* VHS Scanlines for retro_vhs filter */}
         {filter === 'retro_vhs' && <VHSScanlines intensity={0.25} />}
         {/* Original Audio - skip in preview mode (native audio handles it) */}
@@ -820,7 +839,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     }
 
     return (
-      <AbsoluteFill style={{ backgroundColor: '#000' }}>
+      <AbsoluteFill style={{ backgroundColor: '#000', overflow: 'hidden' }}>
         <SVGFilters />
         <SharpnessFilter intensity={effectiveSharpness} />
         {chromaKey?.enabled && chromaKey.backgroundUrl && (
@@ -829,22 +848,24 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           </AbsoluteFill>
         )}
         {/* Single continuous video — no decoder switches */}
-        <Video
-          src={sourceVideoUrl}
-          startFrom={0}
-          pauseWhenBuffering={false}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            opacity: transitionVideoOpacity,
-            filter: `${previewFilter.trim()}${transitionBlur > 0 ? ` blur(${transitionBlur}px)` : ''}`,
-            transform: [kenBurnsStyle, transitionTransform].filter(Boolean).join(' ') || undefined,
-            clipPath: transitionClipPath || undefined,
-            transformOrigin: 'center center',
-          }}
-          volume={0}
-        />
+        <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
+          <Video
+            src={sourceVideoUrl}
+            startFrom={0}
+            pauseWhenBuffering={false}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              opacity: transitionVideoOpacity,
+              filter: `${previewFilter.trim()}${transitionBlur > 0 ? ` blur(${transitionBlur}px)` : ''}`,
+              transform: [kenBurnsStyle, transitionTransform].filter(Boolean).join(' ') || undefined,
+              clipPath: transitionClipPath || undefined,
+              transformOrigin: 'center center',
+            }}
+            volume={0}
+          />
+        </div>
         {/* No second Video element — all transitions are CSS-only on the base video */}
         {/* Darkening overlay for fade transitions */}
         {transitionOverlayOpacity > 0 && (
@@ -981,7 +1002,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           return (
             <React.Fragment key={scene.id}>
               <TransitionSeries.Sequence durationInFrames={sceneDurationFrames} premountFor={60}>
-                <AbsoluteFill>
+                <AbsoluteFill style={{ overflow: 'hidden' }}>
+                  <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
                   <SceneVideo
                     sourceVideoUrl={sourceVideoUrl}
                     scene={scene}
@@ -1004,6 +1026,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                     sceneDurationFrames={sceneDurationFrames}
                     previewMode={false}
                   />
+                  </div>
                 </AbsoluteFill>
               </TransitionSeries.Sequence>
               {hasTransitionToNext && transitionDurationFrames > 0 && (
