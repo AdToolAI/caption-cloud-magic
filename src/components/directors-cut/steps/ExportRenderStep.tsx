@@ -28,6 +28,7 @@ import { useNavigate } from 'react-router-dom';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
 import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
 import type { AudioTrack, SubtitleTrack } from '@/types/timeline';
+import type { SubtitleSafeZone } from '@/lib/directors-cut-draft';
 
 interface PremiumFeatureState {
   styleTransfer?: { enabled: boolean; style: string | null };
@@ -62,7 +63,7 @@ interface ExportRenderStepProps {
   // Scene-specific effects from Step 5
   sceneEffects?: Record<string, any>;
   // Subtitle Safe Zone
-  subtitleSafeZone?: { enabled: boolean; zoom: number; offsetY: number; bottomBandPercent: number; mode: string; preset: string };
+  subtitleSafeZone?: SubtitleSafeZone;
 }
 
 const QUALITY_OPTIONS = [
@@ -538,6 +539,7 @@ export function ExportRenderStep({
                 subtitleTrack={subtitleTrack}
                 voiceoverUrl={voiceOverUrl}
                 backgroundMusicUrl={backgroundMusicUrl}
+                subtitleSafeZone={subtitleSafeZone}
                 originalAudioMuted={audioTracks?.some(t => 
                   (t.type === 'voiceover' || t.type === 'background-music') && 
                   t.clips.length > 0 && 

@@ -184,6 +184,7 @@ export function DirectorsCut() {
   const [capCutSubtitleTrack, setCapCutSubtitleTrack] = useState<any | undefined>(undefined);
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | undefined>(undefined);
   const [subtitleSafeZone, setSubtitleSafeZone] = useState<SubtitleSafeZone>(DEFAULT_SUBTITLE_SAFE_ZONE);
+  const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | undefined>(undefined);
 
   // --- Draft restoration on mount ---
   const draftLoadedRef = useRef(false);
@@ -215,6 +216,7 @@ export function DirectorsCut() {
     if (draft.capCutAudioTracks) setCapCutAudioTracks(draft.capCutAudioTracks);
     if (draft.capCutSubtitleTrack) setCapCutSubtitleTrack(draft.capCutSubtitleTrack);
     if (draft.subtitleSafeZone) setSubtitleSafeZone(draft.subtitleSafeZone);
+    if (draft.cleanedVideoUrl) setCleanedVideoUrl(draft.cleanedVideoUrl);
   }, []);
 
   // --- Auto-save draft on state changes (debounced) ---
@@ -247,10 +249,11 @@ export function DirectorsCut() {
         capCutAudioTracks,
         capCutSubtitleTrack,
         subtitleSafeZone,
+        cleanedVideoUrl,
       });
     }, 500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [currentStep, selectedVideo, scenes, transitions, appliedEffects, audioEnhancements, exportSettings, styleTransfer, colorGrading, sceneColorGrading, speedKeyframes, kenBurnsKeyframes, chromaKey, upscaling, interpolation, restoration, objectRemoval, textOverlays, voiceOverUrl, backgroundMusicUrl, capCutAudioTracks, capCutSubtitleTrack, subtitleSafeZone]);
+  }, [currentStep, selectedVideo, scenes, transitions, appliedEffects, audioEnhancements, exportSettings, styleTransfer, colorGrading, sceneColorGrading, speedKeyframes, kenBurnsKeyframes, chromaKey, upscaling, interpolation, restoration, objectRemoval, textOverlays, voiceOverUrl, backgroundMusicUrl, capCutAudioTracks, capCutSubtitleTrack, subtitleSafeZone, cleanedVideoUrl]);
 
   // Dynamic video duration based on scene adjustments
   // Uses max(end_time) from scenes as canonical duration — never falls back to selectedVideo.duration
@@ -824,7 +827,7 @@ export function DirectorsCut() {
           <ExportRenderStep
             exportSettings={exportSettings}
             onExportSettingsChange={setExportSettings}
-            videoUrl={selectedVideo?.url || ''}
+            videoUrl={cleanedVideoUrl || selectedVideo?.url || ''}
             effects={appliedEffects.global}
             sceneEffects={appliedEffects.scenes}
             audio={audioEnhancements}
@@ -1020,32 +1023,7 @@ export function DirectorsCut() {
               subtitleSafeZone={subtitleSafeZone}
               onSubtitleSafeZoneChange={setSubtitleSafeZone}
               onCleanedVideoUrlChange={(url) => {
-                // Persist in draft via cleanedVideoUrl field
-                saveDraft({
-                  currentStep,
-                  selectedVideo,
-                  scenes,
-                  transitions,
-                  appliedEffects,
-                  audioEnhancements,
-                  exportSettings,
-                  styleTransfer,
-                  colorGrading,
-                  sceneColorGrading,
-                  speedKeyframes,
-                  kenBurnsKeyframes,
-                  chromaKey,
-                  upscaling,
-                  interpolation,
-                  restoration,
-                  objectRemoval,
-                  textOverlays,
-                  voiceOverUrl,
-                  backgroundMusicUrl,
-                  cleanedVideoUrl: url || undefined,
-                  capCutAudioTracks,
-                  capCutSubtitleTrack,
-                });
+                setCleanedVideoUrl(url || undefined);
               }}
             />
           );
