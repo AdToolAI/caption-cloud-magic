@@ -127,6 +127,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [showSubtitles, setShowSubtitles] = useState(true);
   const [showTextOverlays, setShowTextOverlays] = useState(true);
   
+  // Burned-in subtitle removal state
+  const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | null>(null);
+  const [isRemovingBurnedSubs, setIsRemovingBurnedSubs] = useState(false);
+  
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   // DnD sensors with activation constraint to allow clicks
