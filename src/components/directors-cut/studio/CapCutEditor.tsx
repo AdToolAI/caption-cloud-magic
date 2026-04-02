@@ -545,6 +545,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     toast.success('Original-Untertitel entfernt');
   }, []);
 
+  // Handler to retry original subtitle detection
+  const handleRetryDetection = useCallback(() => {
+    originalSubsDetectedRef.current = false;
+    setSubtitleTrack(prev => ({ ...prev })); // trigger re-render to run useEffect
+  }, []);
+
   // Delete clip handler
   const handleDeleteClip = useCallback((clipId: string) => {
     setAudioTracks(prev => prev.map(track => ({
