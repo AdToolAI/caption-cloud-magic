@@ -1123,8 +1123,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     >
       {/* Video Player */}
       <div className={`relative bg-black rounded-lg overflow-hidden ${fillContainer ? 'flex-1 min-h-0' : 'aspect-video'}`}>
-        {/* Safe Zone Reframe wrapper — applies zoom + vertical shift to crop out burned subtitles */}
+        {/* Safe Zone Reframe wrapper — hard-crops bottom band + zoom/shift */}
         <div
+          ref={safeZoneOuterRef}
           style={{
             position: 'absolute',
             inset: 0,
