@@ -29,6 +29,7 @@ interface MotionEffectsStepProps {
   sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
   textOverlays?: TextOverlay[];
   onSceneDurationChange?: (sceneId: string, newDuration: number, avgSpeed: number) => void;
+  liveCurrentTime?: number; // Injected by StepLayoutWrapper
 }
 
 export function MotionEffectsStep({ 
