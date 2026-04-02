@@ -668,3 +668,6 @@ timeout_sec = 120
 [functions.director-cut-remove-burned-subtitles]
 verify_jwt = false
 timeout_sec = 300
+
+[functions.director-cut-burned-subtitles-webhook]
+verify_jwt = false

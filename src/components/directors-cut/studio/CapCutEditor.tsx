@@ -52,6 +52,9 @@ interface CapCutEditorProps {
   onBackgroundMusicUrlChange?: (url: string | undefined) => void;
   // Initial subtitle track from parent (for draft persistence)
   initialSubtitleTrack?: SubtitleTrack;
+  // Project ID for burned subtitle removal
+  projectId?: string | null;
+  onCleanedVideoUrlChange?: (url: string | null) => void;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
@@ -85,6 +88,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onSubtitleTrackChange,
   onBackgroundMusicUrlChange,
   initialSubtitleTrack,
+  projectId,
+  onCleanedVideoUrlChange,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -130,6 +135,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Burned-in subtitle removal state
   const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | null>(null);
   const [isRemovingBurnedSubs, setIsRemovingBurnedSubs] = useState(false);
+  const [burnedSubsStatus, setBurnedSubsStatus] = useState<string>('idle');
+  const burnedSubsPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
@@ -621,34 +628,112 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     detect();
   }, [videoUrl]);
 
-  // Handler to remove burned-in subtitles via AI inpainting
-  const handleRemoveBurnedSubtitles = useCallback(async () => {
-    setIsRemovingBurnedSubs(true);
-    try {
-      toast.info('Eingebrannte Untertitel werden analysiert...');
-      const { data, error } = await supabase.functions.invoke('director-cut-remove-burned-subtitles', {
-        body: { video_url: videoUrl },
-      });
-      if (error) throw error;
-      if (!data?.success) {
-        toast.info(data?.message || 'Keine eingebrannten Untertitel erkannt');
-        return;
+  // Poll project for burned subtitle status
+  const startBurnedSubsPolling = useCallback((pid: string) => {
+    if (burnedSubsPollingRef.current) clearInterval(burnedSubsPollingRef.current);
+    
+    burnedSubsPollingRef.current = setInterval(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('director_cut_projects')
+          .select('burned_subtitles_status, cleaned_video_url, burned_subtitles_error')
+          .eq('id', pid)
+          .single();
+        
+        if (error || !data) return;
+        
+        setBurnedSubsStatus(data.burned_subtitles_status);
+        
+        if (data.burned_subtitles_status === 'completed' && data.cleaned_video_url) {
+          setCleanedVideoUrl(data.cleaned_video_url);
+          onCleanedVideoUrlChange?.(data.cleaned_video_url);
+          setIsRemovingBurnedSubs(false);
+          toast.success('Eingebrannte Untertitel erfolgreich entfernt!');
+          if (burnedSubsPollingRef.current) clearInterval(burnedSubsPollingRef.current);
+        } else if (data.burned_subtitles_status === 'failed') {
+          setIsRemovingBurnedSubs(false);
+          toast.error(data.burned_subtitles_error || 'Entfernung fehlgeschlagen');
+          if (burnedSubsPollingRef.current) clearInterval(burnedSubsPollingRef.current);
+        }
+      } catch (e) {
+        console.error('[CapCutEditor] Polling error:', e);
       }
-      setCleanedVideoUrl(data.cleaned_video_url);
-      toast.success('Eingebrannte Untertitel erfolgreich entfernt!');
+    }, 5000); // Poll every 5s
+  }, [onCleanedVideoUrlChange]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (burnedSubsPollingRef.current) clearInterval(burnedSubsPollingRef.current);
+    };
+  }, []);
+
+  // Check initial burned subtitle status from project
+  useEffect(() => {
+    if (!projectId) return;
+    const checkStatus = async () => {
+      const { data } = await supabase
+        .from('director_cut_projects')
+        .select('burned_subtitles_status, cleaned_video_url, burned_subtitles_error')
+        .eq('id', projectId)
+        .single();
+      if (!data) return;
+      setBurnedSubsStatus(data.burned_subtitles_status);
+      if (data.cleaned_video_url) {
+        setCleanedVideoUrl(data.cleaned_video_url);
+      }
+      if (data.burned_subtitles_status === 'processing') {
+        setIsRemovingBurnedSubs(true);
+        startBurnedSubsPolling(projectId);
+      }
+    };
+    checkStatus();
+  }, [projectId, startBurnedSubsPolling]);
+
+  // Handler to remove burned-in subtitles via AI inpainting (async)
+  const handleRemoveBurnedSubtitles = useCallback(async () => {
+    if (!projectId) {
+      toast.error('Projekt muss zuerst gespeichert werden.');
+      return;
+    }
+    setIsRemovingBurnedSubs(true);
+    setBurnedSubsStatus('processing');
+    try {
+      toast.info('Eingebrannte Untertitel werden per KI entfernt... (1–3 Min.)');
+      const { data, error } = await supabase.functions.invoke('director-cut-remove-burned-subtitles', {
+        body: { video_url: videoUrl, project_id: projectId },
+      });
+      
+      if (error) {
+        // Try to extract structured error
+        let errorMsg = 'Entfernung fehlgeschlagen';
+        try {
+          const errBody = await (error as any)?.context?.json?.();
+          if (errBody?.error) errorMsg = errBody.error;
+        } catch {}
+        throw new Error(errorMsg);
+      }
+      
+      if (!data?.ok) {
+        throw new Error(data?.error || 'Unbekannter Fehler');
+      }
+      
+      // Start polling for completion
+      startBurnedSubsPolling(projectId);
     } catch (err) {
       console.error('[CapCutEditor] Burned subtitle removal failed:', err);
-      toast.error('Entfernung fehlgeschlagen. Bitte erneut versuchen.');
-    } finally {
       setIsRemovingBurnedSubs(false);
+      setBurnedSubsStatus('failed');
+      toast.error(err instanceof Error ? err.message : 'Entfernung fehlgeschlagen');
     }
-  }, [videoUrl]);
+  }, [videoUrl, projectId, startBurnedSubsPolling]);
 
-  // Handler to restore original video
+  // Handler to restore original video (toggle, don't forget cleaned result)
   const handleRestoreOriginalVideo = useCallback(() => {
     setCleanedVideoUrl(null);
+    onCleanedVideoUrlChange?.(null);
     toast.success('Originalvideo wiederhergestellt');
-  }, []);
+  }, [onCleanedVideoUrlChange]);
 
   // Delete clip handler
   const handleDeleteClip = useCallback((clipId: string) => {
@@ -1050,6 +1135,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onShowTextOverlaysChange={setShowTextOverlays}
               isRemovingBurnedSubs={isRemovingBurnedSubs}
               hasCleanedVideo={!!cleanedVideoUrl}
+              burnedSubsStatus={burnedSubsStatus}
               onRemoveBurnedSubtitles={handleRemoveBurnedSubtitles}
               onRestoreOriginalVideo={handleRestoreOriginalVideo}
               onAddVideoAsScene={async (file) => {

@@ -20,86 +20,82 @@ serve(async (req) => {
 
     // Auth check
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('No authorization header');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ ok: false, code: 'auth', step: 'auth', error: 'No authorization header' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) throw new Error('Unauthorized');
+    if (authError || !user) {
+      return new Response(JSON.stringify({ ok: false, code: 'auth', step: 'auth', error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    const { video_url } = await req.json();
-    if (!video_url) {
-      return new Response(JSON.stringify({ error: 'video_url is required' }), {
+    const { video_url, project_id } = await req.json();
+    if (!video_url || !project_id) {
+      return new Response(JSON.stringify({ ok: false, code: 'validation', step: 'input', error: 'video_url and project_id are required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log('[RemoveBurnedSubs] Starting for user:', user.id, 'video:', video_url);
+    console.log('[RemoveBurnedSubs] Starting async for user:', user.id, 'project:', project_id);
 
-    // Use Replicate video-text-remover model
     const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
-    if (!REPLICATE_API_KEY) throw new Error('REPLICATE_API_KEY not configured');
+    if (!REPLICATE_API_KEY) {
+      return new Response(JSON.stringify({ ok: false, code: 'config', step: 'replicate', error: 'REPLICATE_API_KEY not configured' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
+
+    // Update project status to processing
+    await supabase
+      .from('director_cut_projects')
+      .update({
+        burned_subtitles_status: 'processing',
+        burned_subtitles_error: null,
+        cleaned_video_url: null,
+      })
+      .eq('id', project_id)
+      .eq('user_id', user.id);
+
+    // Create async prediction with webhook
     const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
-    console.log('[RemoveBurnedSubs] Calling video-text-remover model...');
+    const webhookUrl = `${SUPABASE_URL}/functions/v1/director-cut-burned-subtitles-webhook`;
+    console.log('[RemoveBurnedSubs] Creating prediction with webhook:', webhookUrl);
 
-    const output = await replicate.run(
-      "hjunior29/video-text-remover",
-      {
-        input: {
-          video: video_url,
-          method: "hybrid",
-          conf_threshold: 0.25,
-          margin: 5,
-        },
-      }
-    );
+    const prediction = await replicate.predictions.create({
+      version: "247c8385f3c6c322110a6787bd2d257acc3a3d60b9ed7da1726a628f72a42c4d",
+      input: {
+        video: video_url,
+        method: "hybrid",
+        conf_threshold: 0.25,
+        margin: 5,
+      },
+      webhook: webhookUrl,
+      webhook_events_filter: ["completed"],
+    });
 
-    console.log('[RemoveBurnedSubs] Model output:', typeof output, output);
+    console.log('[RemoveBurnedSubs] Prediction created:', prediction.id);
 
-    // Get the output URL
-    let cleanedVideoUrl: string;
-    if (typeof output === 'string') {
-      cleanedVideoUrl = output;
-    } else if (Array.isArray(output) && output.length > 0) {
-      cleanedVideoUrl = output[0];
-    } else if (output && typeof output === 'object' && 'output' in output) {
-      cleanedVideoUrl = (output as any).output;
-    } else {
-      throw new Error('Unexpected model output format: ' + JSON.stringify(output));
-    }
-
-    // Upload cleaned video to Supabase Storage
-    console.log('[RemoveBurnedSubs] Downloading cleaned video from:', cleanedVideoUrl);
-
-    const videoResponse = await fetch(cleanedVideoUrl);
-    if (!videoResponse.ok) throw new Error('Failed to download cleaned video');
-
-    const videoBlob = await videoResponse.arrayBuffer();
-    const fileName = `cleaned-${user.id}-${Date.now()}.mp4`;
-    const storagePath = `burned-sub-removal/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('video-assets')
-      .upload(storagePath, videoBlob, {
-        contentType: 'video/mp4',
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error('[RemoveBurnedSubs] Upload error:', uploadError);
-      throw new Error(`Storage upload failed: ${uploadError.message}`);
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('video-assets')
-      .getPublicUrl(storagePath);
-
-    console.log('[RemoveBurnedSubs] Success! Cleaned video at:', publicUrl);
+    // Save prediction ID to project
+    await supabase
+      .from('director_cut_projects')
+      .update({
+        burned_subtitles_prediction_id: prediction.id,
+      })
+      .eq('id', project_id)
+      .eq('user_id', user.id);
 
     return new Response(JSON.stringify({
-      success: true,
-      cleaned_video_url: publicUrl,
-      message: 'Eingebrannte Untertitel erfolgreich entfernt',
+      ok: true,
+      status: 'processing',
+      prediction_id: prediction.id,
+      message: 'Verarbeitung gestartet. Dies kann 1–3 Minuten dauern.',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -107,8 +103,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('[RemoveBurnedSubs] Error:', error);
     return new Response(JSON.stringify({
+      ok: false,
+      code: 'internal',
+      step: 'unknown',
       error: error instanceof Error ? error.message : 'Unknown error',
-      success: false,
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
