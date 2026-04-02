@@ -84,6 +84,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onAudioTracksChange,
   onSubtitleTrackChange,
   onBackgroundMusicUrlChange,
+  initialSubtitleTrack,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
