@@ -70,6 +70,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onNextStep,
   // Visual effects from previous steps
   textOverlays,
+  onTextOverlaysChange,
   appliedEffects,
   transitions,
   colorGrading,
