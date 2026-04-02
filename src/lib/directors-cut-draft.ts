@@ -1,6 +1,30 @@
 const DRAFT_KEY = 'directors-cut-draft';
 const DRAFT_VERSION = 1;
 
+export interface SubtitleSafeZone {
+  enabled: boolean;
+  mode: 'reframe' | 'ai';
+  preset: 'light' | 'medium' | 'strong' | 'custom';
+  zoom: number;       // e.g. 1.08 = 8% zoom
+  offsetY: number;    // negative = shift up, e.g. -4 means 4% up
+  bottomBandPercent: number; // percentage of bottom area to crop, e.g. 10
+}
+
+export const DEFAULT_SUBTITLE_SAFE_ZONE: SubtitleSafeZone = {
+  enabled: false,
+  mode: 'reframe',
+  preset: 'medium',
+  zoom: 1.12,
+  offsetY: -6,
+  bottomBandPercent: 12,
+};
+
+export const SAFE_ZONE_PRESETS: Record<string, Partial<SubtitleSafeZone>> = {
+  light: { zoom: 1.06, offsetY: -3, bottomBandPercent: 6 },
+  medium: { zoom: 1.12, offsetY: -6, bottomBandPercent: 12 },
+  strong: { zoom: 1.20, offsetY: -10, bottomBandPercent: 18 },
+};
+
 export interface DirectorsCutDraft {
   version: number;
   updatedAt: string;
@@ -27,6 +51,7 @@ export interface DirectorsCutDraft {
   cleanedVideoUrl?: string;
   capCutAudioTracks: any[];
   capCutSubtitleTrack: any;
+  subtitleSafeZone?: SubtitleSafeZone;
 }
 
 export function saveDraft(data: Omit<DirectorsCutDraft, 'version' | 'updatedAt'>): void {

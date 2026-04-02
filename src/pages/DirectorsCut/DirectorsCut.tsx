@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card } from '@/components/ui/card';
-import { saveDraft, loadDraft, clearDraft } from '@/lib/directors-cut-draft';
+import { saveDraft, loadDraft, clearDraft, SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE } from '@/lib/directors-cut-draft';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { 
@@ -183,6 +183,7 @@ export function DirectorsCut() {
   const [capCutAudioTracks, setCapCutAudioTracks] = useState<any[]>([]);
   const [capCutSubtitleTrack, setCapCutSubtitleTrack] = useState<any | undefined>(undefined);
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | undefined>(undefined);
+  const [subtitleSafeZone, setSubtitleSafeZone] = useState<SubtitleSafeZone>(DEFAULT_SUBTITLE_SAFE_ZONE);
 
   // --- Draft restoration on mount ---
   const draftLoadedRef = useRef(false);
@@ -213,6 +214,7 @@ export function DirectorsCut() {
     if (draft.backgroundMusicUrl) setBackgroundMusicUrl(draft.backgroundMusicUrl);
     if (draft.capCutAudioTracks) setCapCutAudioTracks(draft.capCutAudioTracks);
     if (draft.capCutSubtitleTrack) setCapCutSubtitleTrack(draft.capCutSubtitleTrack);
+    if (draft.subtitleSafeZone) setSubtitleSafeZone(draft.subtitleSafeZone);
   }, []);
 
   // --- Auto-save draft on state changes (debounced) ---
@@ -244,10 +246,11 @@ export function DirectorsCut() {
         backgroundMusicUrl,
         capCutAudioTracks,
         capCutSubtitleTrack,
+        subtitleSafeZone,
       });
     }, 500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [currentStep, selectedVideo, scenes, transitions, appliedEffects, audioEnhancements, exportSettings, styleTransfer, colorGrading, sceneColorGrading, speedKeyframes, kenBurnsKeyframes, chromaKey, upscaling, interpolation, restoration, objectRemoval, textOverlays, voiceOverUrl, backgroundMusicUrl, capCutAudioTracks, capCutSubtitleTrack]);
+  }, [currentStep, selectedVideo, scenes, transitions, appliedEffects, audioEnhancements, exportSettings, styleTransfer, colorGrading, sceneColorGrading, speedKeyframes, kenBurnsKeyframes, chromaKey, upscaling, interpolation, restoration, objectRemoval, textOverlays, voiceOverUrl, backgroundMusicUrl, capCutAudioTracks, capCutSubtitleTrack, subtitleSafeZone]);
 
   // Dynamic video duration based on scene adjustments
   // Uses max(end_time) from scenes as canonical duration — never falls back to selectedVideo.duration
@@ -872,6 +875,7 @@ export function DirectorsCut() {
     setBackgroundMusicUrl(undefined);
     setCapCutAudioTracks([]);
     setCapCutSubtitleTrack(undefined);
+    setSubtitleSafeZone(DEFAULT_SUBTITLE_SAFE_ZONE);
     setEditorMode('steps');
     toast.success('Projekt zurückgesetzt');
   }, []);
@@ -1012,6 +1016,8 @@ export function DirectorsCut() {
               // Project ID for burned subtitle removal
               projectId={projectId}
               onSaveProject={saveProject}
+              subtitleSafeZone={subtitleSafeZone}
+              onSubtitleSafeZoneChange={setSubtitleSafeZone}
               onCleanedVideoUrlChange={(url) => {
                 // Persist in draft via cleanedVideoUrl field
                 saveDraft({

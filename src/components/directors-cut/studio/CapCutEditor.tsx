@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { SceneAnalysis, AudioEnhancements, TextOverlay, TransitionAssignment } from '@/types/directors-cut';
+import { SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE } from '@/lib/directors-cut-draft';
 import { CapCutSidebar } from './CapCutSidebar';
 import { CapCutTimeline } from './CapCutTimeline';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
@@ -56,6 +57,8 @@ interface CapCutEditorProps {
   projectId?: string | null;
   onCleanedVideoUrlChange?: (url: string | null) => void;
   onSaveProject?: () => Promise<string | null>;
+  subtitleSafeZone?: SubtitleSafeZone;
+  onSubtitleSafeZoneChange?: (zone: SubtitleSafeZone) => void;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
@@ -92,6 +95,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   projectId,
   onCleanedVideoUrlChange,
   onSaveProject,
+  subtitleSafeZone = DEFAULT_SUBTITLE_SAFE_ZONE,
+  onSubtitleSafeZoneChange,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -1145,6 +1150,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               burnedSubsStatus={burnedSubsStatus}
               onRemoveBurnedSubtitles={handleRemoveBurnedSubtitles}
               onRestoreOriginalVideo={handleRestoreOriginalVideo}
+              subtitleSafeZone={subtitleSafeZone}
+              onSubtitleSafeZoneChange={onSubtitleSafeZoneChange}
               onAddVideoAsScene={async (file) => {
                 // Upload to storage and get video metadata
                 try {
@@ -1259,6 +1266,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                   if (originalTrack.clips.length === 0) return true;
                   return false;
                 })()}
+                subtitleSafeZone={subtitleSafeZone}
               />
             </div>
 

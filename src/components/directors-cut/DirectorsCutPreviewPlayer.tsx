@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { getSpeedAtTime } from '@/utils/speedCurve';
+import { SubtitleSafeZone } from '@/lib/directors-cut-draft';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Play, Pause, VolumeX, Volume2, Maximize2, RotateCcw } from 'lucide-react';
@@ -75,6 +76,7 @@ interface DirectorsCutPreviewPlayerProps {
   className?: string;
   fillContainer?: boolean;
   children?: React.ReactNode;
+  subtitleSafeZone?: SubtitleSafeZone;
 }
 
 export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps> = ({
@@ -104,6 +106,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   className = '',
   fillContainer = false,
   children,
+  subtitleSafeZone,
 }) => {
   const videoRefA = useRef<HTMLVideoElement>(null);
   const videoRefB = useRef<HTMLVideoElement>(null);
@@ -1090,11 +1093,28 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     >
       {/* Video Player */}
       <div className={`relative bg-black rounded-lg overflow-hidden ${fillContainer ? 'flex-1 min-h-0' : 'aspect-video'}`}>
-        {/* Ken Burns motion wrapper — separate from transition transforms */}
+        {/* Safe Zone Reframe wrapper — applies zoom + vertical shift to crop out burned subtitles */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden',
+            zIndex: 0,
+          }}
+        >
         <div
           ref={kenBurnsWrapperRef}
           className="absolute inset-0 w-full h-full"
-          style={{ zIndex: 0, willChange: 'transform' }}
+          style={{
+            zIndex: 0,
+            willChange: 'transform',
+            ...(subtitleSafeZone?.enabled && subtitleSafeZone.mode === 'reframe' ? {
+              transform: `scale(${subtitleSafeZone.zoom}) translateY(${subtitleSafeZone.offsetY}%)`,
+              transformOrigin: 'center center',
+            } : {}),
+          }}
         >
           {/* Video Slot A */}
           <video
@@ -1119,6 +1139,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             preload="auto"
             onEnded={handleVideoEnded}
           />
+        </div>
         </div>
 
         {/* Transition canvas — used for frozen outgoing frame during opacity transitions */}
