@@ -8,12 +8,6 @@ import {
   FastForward, Rewind, Zap, Clock
 } from 'lucide-react';
 import { calculateSceneDuration } from '@/utils/speedCurve';
-import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
-import { 
-  Gauge, Plus, Trash2, Play, Pause, RotateCcw, 
-  FastForward, Rewind, Zap, Clock
-} from 'lucide-react';
 
 export interface SpeedKeyframe {
   id: string;
