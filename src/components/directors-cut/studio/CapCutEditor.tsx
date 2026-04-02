@@ -693,7 +693,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   }, [projectId, startBurnedSubsPolling]);
 
   // Handler to remove burned-in subtitles via AI inpainting (async)
-  const handleRemoveBurnedSubtitles = useCallback(async () => {
+  const handleRemoveBurnedSubtitles = useCallback(async (settings?: { conf_threshold?: number; margin?: number; method?: string }) => {
     let activeProjectId = projectId;
     if (!activeProjectId && onSaveProject) {
       toast.info('Projekt wird gespeichert...');
@@ -708,7 +708,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     try {
       toast.info('Eingebrannte Untertitel werden per KI entfernt... (1–3 Min.)');
       const { data, error } = await supabase.functions.invoke('director-cut-remove-burned-subtitles', {
-        body: { video_url: videoUrl, project_id: activeProjectId },
+        body: { video_url: videoUrl, project_id: activeProjectId, ...settings },
       });
       
       if (error) {
