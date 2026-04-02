@@ -95,7 +95,7 @@ export function MotionEffectsStep({
           videoDuration={videoDuration}
           keyframes={speedKeyframes}
           onKeyframesChange={handleSpeedKeyframesChange}
-          currentTime={currentTime}
+          currentTime={liveCurrentTime ?? currentTime}
           selectedSceneId={selectedSceneId || undefined}
           sceneStartTime={
             selectedSceneId
