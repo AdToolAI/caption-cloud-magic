@@ -451,6 +451,13 @@ serve(async (req) => {
         ambientVolume: sound_design.ambient_volume || 20,
         sfxTracks: sound_design.sfx_tracks || [],
       } : undefined,
+      // Subtitle Safe Zone (hard crop for burned-in subtitles)
+      subtitleSafeZone: subtitle_safe_zone?.enabled ? {
+        enabled: true,
+        zoom: subtitle_safe_zone.zoom,
+        offsetY: subtitle_safe_zone.offsetY,
+        bottomBandPercent: subtitle_safe_zone.bottomBandPercent,
+      } : undefined,
       // Duration and dimensions
       durationInSeconds: duration,
       targetWidth: width,
