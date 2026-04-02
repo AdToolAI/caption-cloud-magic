@@ -96,7 +96,7 @@ serve(async (req) => {
       ok: true,
       status: 'processing',
       prediction_id: prediction.id,
-      message: 'Verarbeitung gestartet (2 Durchläufe). Dies kann 2–5 Minuten dauern.',
+      message: 'Verarbeitung gestartet (3 Durchläufe). Dies kann 3–8 Minuten dauern.',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

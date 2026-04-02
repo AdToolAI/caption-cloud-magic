@@ -22,7 +22,6 @@ serve(async (req) => {
 
     const { id: predictionId, status, output, error: replicateError } = payload;
 
-    // Find project by prediction ID
     const { data: project, error: findError } = await supabase
       .from('director_cut_projects')
       .select('id, user_id, burned_subtitles_pass')
@@ -40,7 +39,6 @@ serve(async (req) => {
     console.log('[BurnedSubsWebhook] Found project:', project.id, 'status:', status, 'pass:', currentPass);
 
     if (status === 'succeeded' && output) {
-      // Normalize output URL
       let cleanedVideoUrl: string;
       if (typeof output === 'string') {
         cleanedVideoUrl = output;
@@ -59,14 +57,14 @@ serve(async (req) => {
         });
       }
 
-      // If Pass 1 completed → automatically start Pass 2
-      if (currentPass === 1) {
-        console.log('[BurnedSubsWebhook] Pass 1 done. Starting Pass 2 with:', cleanedVideoUrl);
+      // Pass 1 or 2 completed → start next pass
+      if (currentPass < 3) {
+        const nextPass = currentPass + 1;
+        console.log(`[BurnedSubsWebhook] Pass ${currentPass} done. Starting Pass ${nextPass} with:`, cleanedVideoUrl);
 
         const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
         if (!REPLICATE_API_KEY) {
-          console.error('[BurnedSubsWebhook] No REPLICATE_API_KEY for pass 2');
-          // Fallback: save pass 1 result as final
+          console.error('[BurnedSubsWebhook] No REPLICATE_API_KEY for next pass');
           await saveCleanedVideo(supabase, project, cleanedVideoUrl);
           return new Response(JSON.stringify({ ok: true }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -76,44 +74,46 @@ serve(async (req) => {
         try {
           const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
-          // Update pass to 2
           await supabase.from('director_cut_projects').update({
-            burned_subtitles_pass: 2,
+            burned_subtitles_pass: nextPass,
           }).eq('id', project.id);
 
           const webhookUrl = `${SUPABASE_URL}/functions/v1/director-cut-burned-subtitles-webhook`;
+
+          // Pass-specific settings
+          const passSettings = nextPass === 2
+            ? { conf_threshold: 0.03, method: "hybrid", iou_threshold: 0.25 }
+            : { conf_threshold: 0.01, method: "fast", iou_threshold: 0.2 };
 
           const prediction = await replicate.predictions.create({
             version: "247c8385f3c6c322110a6787bd2d257acc3a3d60b9ed7da1726a628f72a42c4d",
             input: {
               video: cleanedVideoUrl,
-              method: "hybrid",
-              conf_threshold: 0.03,
+              method: passSettings.method,
+              conf_threshold: passSettings.conf_threshold,
               margin: 20,
               resolution: "original",
               detection_interval: 1,
-              iou_threshold: 0.25,
+              iou_threshold: passSettings.iou_threshold,
             },
             webhook: webhookUrl,
             webhook_events_filter: ["completed"],
           });
 
-          console.log('[BurnedSubsWebhook] Pass 2 prediction created:', prediction.id);
+          console.log(`[BurnedSubsWebhook] Pass ${nextPass} prediction created:`, prediction.id);
 
-          // Update prediction ID for pass 2
           await supabase.from('director_cut_projects').update({
             burned_subtitles_prediction_id: prediction.id,
           }).eq('id', project.id);
 
-        } catch (pass2Error) {
-          console.error('[BurnedSubsWebhook] Pass 2 failed to start:', pass2Error);
-          // Save pass 1 result as fallback
+        } catch (passError) {
+          console.error(`[BurnedSubsWebhook] Pass ${nextPass} failed to start:`, passError);
           await saveCleanedVideo(supabase, project, cleanedVideoUrl);
         }
 
       } else {
-        // Pass 2 completed → save final result
-        console.log('[BurnedSubsWebhook] Pass 2 done. Saving final result.');
+        // Pass 3 completed → save final result
+        console.log('[BurnedSubsWebhook] Pass 3 done. Saving final result.');
         await saveCleanedVideo(supabase, project, cleanedVideoUrl);
       }
 
@@ -169,7 +169,6 @@ async function saveCleanedVideo(supabase: any, project: any, cleanedVideoUrl: st
 
   } catch (storageError) {
     console.error('[BurnedSubsWebhook] Storage error:', storageError);
-    // Fallback: use Replicate URL directly
     await supabase.from('director_cut_projects').update({
       burned_subtitles_status: 'completed',
       cleaned_video_url: cleanedVideoUrl,
