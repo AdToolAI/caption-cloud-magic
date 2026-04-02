@@ -1,66 +1,53 @@
 
 Ziel
 
-- Das Problem sauber lösen, statt nur zwischen Ebenen umzuschalten:
-  - Wenn Untertitel oder Text in Schritt 10 entfernt werden, müssen sie wirklich aus der Preview verschwinden.
-  - Der User soll in Schritt 10 sowohl Step-10-Untertitel als auch frühere Text-Overlays aktiv verwalten und löschen können.
+- Das Altproblem sauber schließen: Untertitel, die schon vor den letzten Änderungen im Projekt/Draft vorhanden waren, müssen in Schritt 10 ebenfalls wirklich entfernbar sein und sofort aus der Preview verschwinden.
 
-Was ich im Code gefunden habe
+Was ich im Code jetzt konkret gefunden habe
 
-- Der Preview-Player selbst rendert korrekt getrennt:
-  - `subtitleTrack.clips` = echte Step-10-Untertitel
-  - `textOverlays` = Text aus früheren Schritten
-- In `CapCutEditor.tsx` wird beim Preview aktuell nur:
-  - `subtitleTrack={showSubtitles ? subtitleTrack : ...}`
-  - `textOverlays={showTextOverlays ? textOverlays : []}`
-  übergeben.
-- Das heißt:
-  - Die Toggles blenden nur aus.
-  - Sie löschen nichts.
-- Der eigentliche Text kommt sehr wahrscheinlich aus `textOverlays`, die in `DirectorsCut.tsx` als globaler State aus Schritt 6 weitergereicht werden.
-- `CapCutEditor` hat aktuell gar keinen Callback, um diese `textOverlays` wirklich zu verändern oder zu entfernen.
+- Der Preview-Player rendert Untertitel korrekt nur aus `subtitleTrack.clips`.
+- In `CapCutEditor.tsx` gibt es aber einen lokalen `subtitleTrack`-State, der beim Mount immer mit `DEFAULT_SUBTITLE_TRACK` startet.
+- Gleichzeitig existiert in `DirectorsCut.tsx` bereits ein persistierter Parent-State:
+  - `capCutSubtitleTrack`
+  - wird aus dem Draft geladen
+  - wird an Export weitergereicht
+- Aktuell bekommt `CapCutEditor` diesen bestehenden `capCutSubtitleTrack` aber gar nicht als Initialwert zurück.
+- Folge:
+  - alter Subtitle-State aus früheren Sessions/Schritten kann im Parent/Draft weiterleben,
+  - der Editor arbeitet lokal teilweise mit einem anderen Zustand,
+  - Entfernen/Neugenerieren in Schritt 10 ist dadurch nicht robust genug für bereits vorhandene Alt-Untertitel.
 
 Saubere Lösung
 
-1. Text-Overlays in Schritt 10 wirklich editierbar machen
-- `CapCutEditor` um einen echten Callback erweitern:
-  - `onTextOverlaysChange?: (overlays: TextOverlay[]) => void`
-- Diesen Callback aus `DirectorsCut.tsx` mit `setTextOverlays` durchreichen.
-- So kann Schritt 10 nicht nur anzeigen, sondern die Overlays tatsächlich löschen.
+1. Subtitle-Track in Schritt 10 an Parent-State anbinden
+- `CapCutEditor` um Prop erweitern:
+  - `initialSubtitleTrack?: SubtitleTrack`
+- In `DirectorsCut.tsx` den vorhandenen `capCutSubtitleTrack` an `CapCutEditor` durchreichen.
+- Beim Start von Schritt 10 den lokalen `subtitleTrack` aus diesem Parent-State initialisieren statt immer leer zu starten.
 
-2. In Schritt 10 klar zwischen zwei Textquellen unterscheiden
-- In der Sidebar zwei getrennte Bereiche anzeigen:
-  - „Untertitel“
-  - „Text-Overlays aus früheren Schritten“
-- Für Text-Overlays:
-  - Anzahl anzeigen
-  - Liste der Overlays mit Textinhalt / Zeitraum anzeigen
-  - Button „Entfernen“
-  - optional „Alle Text-Overlays entfernen“
+2. Local/Parent-Sync für Altbestände robust machen
+- Wenn `initialSubtitleTrack` vorhanden ist, soll der Editor diesen vollständig übernehmen.
+- Wenn leer/undefined, dann wie bisher mit `DEFAULT_SUBTITLE_TRACK` arbeiten.
+- Wichtig: kein versehentliches Überschreiben durch Auto-Erkennung, wenn bereits Untertitel aus Draft/älterem Zustand vorhanden sind.
 
-3. Untertitel- und Overlay-Entfernung robust machen
-- Beim Entfernen aller Original-Untertitel:
-  - `selectedSubtitleId` zurücksetzen
-  - leeren State sofort sichtbar machen
-- Beim Entfernen eines Text-Overlays:
-  - direkt `onTextOverlaysChange(filtered)` aufrufen
-- Beim Entfernen aller Overlays:
-  - `onTextOverlaysChange([])`
+3. „Alle Untertitel entfernen“ wirklich global machen
+- Nicht nur „Original-Untertitel entfernen“, sondern zusätzlich eine klare Aktion:
+  - „Alle Untertitel entfernen“
+- Diese Aktion leert den kompletten `subtitleTrack.clips`-State.
+- Zusätzlich:
+  - `selectedSubtitleId = null`
+  - Parent per `onSubtitleTrackChange` sofort auf leeren Track syncen
 
-4. Preview-Diagnostik behalten, aber klar als Diagnose
-- Die bestehenden Toggle-Schalter bleiben nützlich.
-- Aber sie sollten sichtbar als „Nur Vorschau ausblenden“ formuliert werden, damit klar ist:
-  - Toggle = nicht löschen
-  - Entfernen = wirklich aus Projektzustand entfernen
+4. Original-Erkennung nur für wirklich leere Projekte
+- Die Auto-Erkennung in `CapCutEditor.tsx` läuft aktuell, wenn `subtitleTrack.clips.length === 0`.
+- Mit Initial-State aus Parent muss diese Logik so abgesichert werden, dass alte/manuelle Untertitel nicht versehentlich ersetzt oder wieder ergänzt werden.
+- Retry bleibt möglich, aber bewusst nur über den Button.
 
-5. Burned-in Text sauber kommunizieren
-- Wenn:
-  - `subtitleTrack.clips.length === 0`
-  - `textOverlays.length === 0`
-  - und trotzdem Text im Video sichtbar bleibt,
-  dann Hinweis anzeigen:
-  - Der Text ist im Quellvideo eingebrannt und kann hier nicht entfernt werden.
-- Das ist die einzige wirklich saubere Restfall-Erklärung.
+5. Sidebar klarer machen
+- Im Untertitel-Tab zwei getrennte Aktionen:
+  - „Original-Untertitel entfernen“ = nur `source === 'original'`
+  - „Alle Untertitel entfernen“ = kompletter Track leer
+- Wenn danach `existingCaptions.length === 0` und `textOverlayCount === 0`, Hinweis auf eingebrannten Text beibehalten.
 
 Betroffene Dateien
 
@@ -68,41 +55,32 @@ Betroffene Dateien
 - `src/components/directors-cut/studio/CapCutEditor.tsx`
 - `src/components/directors-cut/studio/CapCutSidebar.tsx`
 
-Konkrete Umsetzung
-
-- `DirectorsCut.tsx`
-  - `onTextOverlaysChange={setTextOverlays}` an `CapCutEditor` übergeben
-- `CapCutEditor.tsx`
-  - neues Prop `onTextOverlaysChange`
-  - Handler für:
-    - einzelnes Overlay löschen
-    - alle Overlays löschen
-  - diese Handler an `CapCutSidebar` weiterreichen
-- `CapCutSidebar.tsx`
-  - neuer Bereich „Text-Overlays“
-  - Overlay-Liste mit Remove-Actions
-  - Button „Alle entfernen“
-  - Diagnose-Toggles sprachlich trennen von echten Löschaktionen
-
 Technische Details
 
 ```text
-Aktuell:
-Schritt 10 kann textOverlays nur anzeigen oder temporär ausblenden.
-
-Benötigt:
-Schritt 10 muss textOverlays auch in den Parent-State zurückschreiben.
+Aktuell problematisch:
+Parent hält capCutSubtitleTrack
+Editor startet trotzdem lokal leer
+=> Alt-Untertitel und Editor-Zustand können auseinanderlaufen
 ```
 
 ```text
-subtitleTrack = editierbare Step-10-Untertitel
-textOverlays  = separate Textlayer aus früheren Schritten
-burned-in     = Teil des Originalvideos, nicht entfernbar
+Benötigt:
+DirectorsCut parent state
+    -> initialSubtitleTrack
+    -> CapCutEditor local subtitle state
+    -> onSubtitleTrackChange zurück an Parent
 ```
 
 Ergebnis nach dem Fix
 
-- Entfernte Untertitel verschwinden wirklich.
-- Entfernte Text-Overlays verschwinden wirklich.
-- Der User kann neue Musik und neue Untertitel sauber drüberlegen.
-- Falls danach immer noch Text sichtbar ist, ist eindeutig klar: er ist eingebrannt.
+- Auch alte Untertitel aus früheren Änderungen/Drafts werden in Schritt 10 korrekt geladen.
+- „Alle Untertitel entfernen“ leert den echten Projektzustand, nicht nur die aktuelle Ansicht.
+- Die Preview verschwindet sofort, wenn der Subtitle-Track wirklich leer ist.
+- Wenn danach weiterhin Text sichtbar bleibt, ist klar: es sind Text-Overlays oder eingebrannter Text.
+
+<lov-actions>
+<lov-suggestion message="Test the subtitle removal flow end-to-end in Step 10 with an older draft to confirm the preview clears immediately and stays cleared after reload.">Verify that it works</lov-suggestion>
+<lov-suggestion message="Add a dedicated 'Alle Untertitel entfernen' button in the subtitle sidebar and make it clear how it differs from removing only original subtitles.">Add full subtitle reset</lov-suggestion>
+<lov-suggestion message="Show subtitle source badges like 'Original', 'KI', and 'Manuell' in the subtitle list so it is obvious which captions will be removed by each action.">Show subtitle sources</lov-suggestion>
+</lov-actions>
