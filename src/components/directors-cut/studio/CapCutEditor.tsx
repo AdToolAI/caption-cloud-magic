@@ -740,13 +740,56 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     }
   }, [videoUrl, projectId, onSaveProject, startBurnedSubsPolling]);
 
+  // Capture a single frame from the video as a JPEG data URL
+  const captureVideoFrame = useCallback(async (url: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.muted = true;
+      video.preload = 'auto';
+      video.src = url;
+
+      const onError = () => reject(new Error('Video load failed'));
+      video.addEventListener('error', onError, { once: true });
+
+      video.addEventListener('loadedmetadata', () => {
+        // Seek to 25% of duration to get a representative frame with subtitles
+        video.currentTime = video.duration * 0.25;
+      }, { once: true });
+
+      video.addEventListener('seeked', () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 1280;
+          canvas.height = video.videoHeight || 720;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { reject(new Error('Canvas context failed')); return; }
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          video.src = '';
+          resolve(dataUrl);
+        } catch (e) {
+          reject(e);
+        }
+      }, { once: true });
+    });
+  }, []);
+
   // Auto-detect subtitle band via AI vision
   const [isDetectingBand, setIsDetectingBand] = useState(false);
   const handleDetectSubtitleBand = useCallback(async () => {
     setIsDetectingBand(true);
     try {
+      // Capture a frame from the video as JPEG data URL
+      let frameUrl = videoUrl;
+      try {
+        frameUrl = await captureVideoFrame(videoUrl);
+      } catch (e) {
+        console.warn('[CapCutEditor] Frame capture failed, will use fallback:', e);
+      }
+
       const { data, error } = await supabase.functions.invoke('director-cut-detect-subtitle-band', {
-        body: { video_url: videoUrl },
+        body: { video_url: frameUrl },
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error || 'Detection failed');
@@ -776,7 +819,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     } finally {
       setIsDetectingBand(false);
     }
-  }, [videoUrl, onSubtitleSafeZoneChange]);
+  }, [videoUrl, captureVideoFrame, onSubtitleSafeZoneChange]);
 
   // Handler to restore original video (toggle, don't forget cleaned result)
   const handleRestoreOriginalVideo = useCallback(() => {
