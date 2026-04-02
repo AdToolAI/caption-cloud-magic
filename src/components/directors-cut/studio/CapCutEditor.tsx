@@ -114,6 +114,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   });
   const [selectedSubtitleId, setSelectedSubtitleId] = useState<string | null>(null);
   
+  // Preview layer visibility toggles
+  const [showSubtitles, setShowSubtitles] = useState(true);
+  const [showTextOverlays, setShowTextOverlays] = useState(true);
+  
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   // DnD sensors with activation constraint to allow clicks
