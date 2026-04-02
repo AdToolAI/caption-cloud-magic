@@ -1190,6 +1190,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onRestoreOriginalVideo={handleRestoreOriginalVideo}
               subtitleSafeZone={subtitleSafeZone}
               onSubtitleSafeZoneChange={onSubtitleSafeZoneChange}
+              isDetectingBand={isDetectingBand}
+              onDetectSubtitleBand={handleDetectSubtitleBand}
               onAddVideoAsScene={async (file) => {
                 // Upload to storage and get video metadata
                 try {
