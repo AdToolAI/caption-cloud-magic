@@ -105,7 +105,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [audioEffects, setAudioEffects] = useState<AudioEffects>(DEFAULT_AUDIO_EFFECTS);
   
   // Subtitle Track State
-  const [subtitleTrack, setSubtitleTrack] = useState<SubtitleTrack>({ ...DEFAULT_SUBTITLE_TRACK });
+  const [subtitleTrack, setSubtitleTrack] = useState<SubtitleTrack>(
+    initialSubtitleTrack && initialSubtitleTrack.clips.length > 0 
+      ? initialSubtitleTrack 
+      : { ...DEFAULT_SUBTITLE_TRACK }
+  );
   const [defaultSubtitleStyle, setDefaultSubtitleStyle] = useState<Partial<SubtitleClip>>({
     position: 'bottom',
     fontSize: 'medium',
