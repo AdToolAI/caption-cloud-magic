@@ -1044,8 +1044,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 styleTransfer={styleTransfer}
                 speedKeyframes={speedKeyframes}
                 kenBurns={kenBurns}
-                textOverlays={textOverlays || []}
-                subtitleTrack={subtitleTrack}
+                textOverlays={showTextOverlays ? (textOverlays || []) : []}
+                subtitleTrack={showSubtitles ? subtitleTrack : { ...subtitleTrack, clips: [] }}
                 externalIsPlaying={isPlaying}
                 onPlayingChange={setIsPlaying}
                 originalAudioMuted={(() => {
