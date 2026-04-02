@@ -697,9 +697,109 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             {/* Burned-in Subtitle Removal */}
             <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
               <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Eingebrannte Untertitel</p>
-              <p className="text-[10px] text-white/40">
-                Falls das Originalvideo fest eingebrannte Untertitel enthält, kann die KI versuchen, diese per Video-Inpainting zu entfernen.
-              </p>
+
+              {/* Reframe Mode (Recommended) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Crop className="h-3 w-3 text-emerald-400" />
+                    <span className="text-[11px] text-white/70">Reframe (empfohlen)</span>
+                  </div>
+                  <Switch
+                    checked={subtitleSafeZone.enabled && subtitleSafeZone.mode === 'reframe'}
+                    onCheckedChange={(v) => {
+                      onSubtitleSafeZoneChange?.({
+                        ...subtitleSafeZone,
+                        enabled: v,
+                        mode: 'reframe',
+                      });
+                    }}
+                    className="scale-75"
+                  />
+                </div>
+                <p className="text-[9px] text-white/30">
+                  Untertitelbereich wird per Zoom & Verschiebung sauber aus dem Bild entfernt — deterministisch, 100% zuverlässig.
+                </p>
+
+                {subtitleSafeZone.enabled && subtitleSafeZone.mode === 'reframe' && (
+                  <div className="space-y-2 pt-1">
+                    {/* Presets */}
+                    <div className="flex gap-1">
+                      {(['light', 'medium', 'strong'] as const).map((preset) => (
+                        <button
+                          key={preset}
+                          onClick={() => {
+                            const p = SAFE_ZONE_PRESETS[preset];
+                            onSubtitleSafeZoneChange?.({
+                              ...subtitleSafeZone,
+                              preset,
+                              zoom: p.zoom!,
+                              offsetY: p.offsetY!,
+                              bottomBandPercent: p.bottomBandPercent!,
+                            });
+                          }}
+                          className={cn(
+                            "flex-1 px-2 py-1 rounded text-[10px] transition-colors",
+                            subtitleSafeZone.preset === preset
+                              ? "bg-emerald-500/20 border border-emerald-500 text-emerald-400"
+                              : "bg-[#3a3a3a] border border-[#4a4a4a] text-white/60 hover:bg-[#4a4a4a]"
+                          )}
+                        >
+                          {preset === 'light' ? 'Leicht' : preset === 'medium' ? 'Mittel' : 'Stark'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Zoom Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <label className="text-[10px] text-white/50 flex items-center gap-1">
+                          <ZoomIn className="h-2.5 w-2.5" /> Zoom
+                        </label>
+                        <span className="text-[10px] text-white/40">{Math.round((subtitleSafeZone.zoom - 1) * 100)}%</span>
+                      </div>
+                      <Slider
+                        value={[subtitleSafeZone.zoom * 100]}
+                        onValueChange={([v]) => onSubtitleSafeZoneChange?.({ ...subtitleSafeZone, preset: 'custom', zoom: v / 100 })}
+                        min={100}
+                        max={130}
+                        step={1}
+                        className="cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Vertical Offset */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <label className="text-[10px] text-white/50">Verschiebung ↑</label>
+                        <span className="text-[10px] text-white/40">{Math.abs(subtitleSafeZone.offsetY)}%</span>
+                      </div>
+                      <Slider
+                        value={[Math.abs(subtitleSafeZone.offsetY)]}
+                        onValueChange={([v]) => onSubtitleSafeZoneChange?.({ ...subtitleSafeZone, preset: 'custom', offsetY: -v })}
+                        min={0}
+                        max={20}
+                        step={1}
+                        className="cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-[#4a4a4a] my-1" />
+
+              {/* AI Mode (Experimental Fallback) */}
+              <details className="group">
+                <summary className="flex items-center gap-1.5 cursor-pointer text-[10px] text-white/40 hover:text-white/60">
+                  <Sparkles className="h-2.5 w-2.5" />
+                  KI-Rekonstruktion (experimentell)
+                </summary>
+                <div className="mt-2 space-y-2">
+                  <p className="text-[9px] text-white/30">
+                    Versucht eingebrannte Untertitel per KI-Inpainting zu rekonstruieren. Funktioniert nicht immer bei stilisierter Schrift.
+                  </p>
               {hasCleanedVideo ? (
                 <div className="space-y-2">
                   <p className="text-[10px] text-emerald-400 flex items-center gap-1">
@@ -714,25 +814,16 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     <RotateCcw className="h-2.5 w-2.5 mr-1" />
                     Original wiederherstellen
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onRemoveBurnedSubtitles?.({ conf_threshold: 0.05, margin: 20, method: 'hybrid' })}
-                    className="w-full h-7 text-[10px] border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
-                  >
-                    <Zap className="h-2.5 w-2.5 mr-1" /> Erneut (empfindlicher)
-                  </Button>
                 </div>
               ) : burnedSubsStatus === 'processing' || isRemovingBurnedSubs ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-3 w-3 animate-spin text-purple-400" />
-                    <p className="text-[10px] text-purple-400">Wird per KI entfernt (3 Durchläufe)... 3–8 Min.</p>
+                    <p className="text-[10px] text-purple-400">Wird per KI entfernt... 3–8 Min.</p>
                   </div>
                   <div className="w-full bg-[#3a3a3a] rounded-full h-1.5">
                     <div className="bg-purple-500 h-1.5 rounded-full animate-pulse" style={{ width: '45%' }} />
                   </div>
-                  <p className="text-[9px] text-white/30">Durchlauf 1: Erkennung → 2: Reste → 3: Feinbereinigung</p>
                 </div>
               ) : burnedSubsStatus === 'failed' ? (
                 <div className="space-y-2">
@@ -745,14 +836,6 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   >
                     <RotateCcw className="h-2.5 w-2.5 mr-1" /> Erneut versuchen
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onRemoveBurnedSubtitles?.({ conf_threshold: 0.05, margin: 20, method: 'hybrid' })}
-                    className="w-full h-7 text-[10px] border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
-                  >
-                    <Zap className="h-2.5 w-2.5 mr-1" /> Aggressiver erneut versuchen
-                  </Button>
                 </div>
               ) : (
                 <Button
@@ -762,9 +845,12 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   disabled={isRemovingBurnedSubs}
                   className="w-full h-7 text-[10px] border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                 >
-                  <Sparkles className="h-2.5 w-2.5 mr-1" /> Eingebrannte Untertitel entfernen
+                  <Sparkles className="h-2.5 w-2.5 mr-1" /> KI-Entfernung starten
                 </Button>
               )}
+                </div>
+              </details>
+            </div>
             </div>
 
             {/* Language Selection */}
