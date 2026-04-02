@@ -659,8 +659,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           
           if (relevantKFs.length > 0) {
             const sorted = [...relevantKFs].sort((a, b) => a.time - b.time);
+            // Scene-specific keyframes use relative time (0 to scene duration)
+            const useRelativeTime = sceneKFs.length > 0;
+            const sceneStart = sceneInfo.scene.start_time ?? 0;
+            const compareTime = useRelativeTime ? (timelineTime - sceneStart) : timelineTime;
             for (const kf of sorted) {
-              if (timelineTime >= kf.time) {
+              if (compareTime >= kf.time) {
                 activeSpeed = kf.speed;
               }
             }
