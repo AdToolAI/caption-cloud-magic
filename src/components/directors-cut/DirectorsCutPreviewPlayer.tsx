@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
+import { getSpeedAtTime } from '@/utils/speedCurve';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Play, Pause, VolumeX, Volume2, Maximize2, RotateCcw } from 'lucide-react';
