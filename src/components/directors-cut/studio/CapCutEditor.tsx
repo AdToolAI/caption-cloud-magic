@@ -1048,6 +1048,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onShowSubtitlesChange={setShowSubtitles}
               showTextOverlays={showTextOverlays}
               onShowTextOverlaysChange={setShowTextOverlays}
+              isRemovingBurnedSubs={isRemovingBurnedSubs}
+              hasCleanedVideo={!!cleanedVideoUrl}
+              onRemoveBurnedSubtitles={handleRemoveBurnedSubtitles}
+              onRestoreOriginalVideo={handleRestoreOriginalVideo}
               onAddVideoAsScene={async (file) => {
                 // Upload to storage and get video metadata
                 try {
