@@ -58,7 +58,7 @@ interface CapCutSidebarProps {
   isRemovingBurnedSubs?: boolean;
   hasCleanedVideo?: boolean;
   burnedSubsStatus?: string;
-  onRemoveBurnedSubtitles?: () => void;
+  onRemoveBurnedSubtitles?: (settings?: { conf_threshold?: number; margin?: number; method?: string }) => void;
   onRestoreOriginalVideo?: () => void;
 }
 
