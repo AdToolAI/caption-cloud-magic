@@ -1122,10 +1122,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           style={{
             zIndex: 0,
             willChange: 'transform',
-            ...(subtitleSafeZone?.enabled && subtitleSafeZone.mode === 'reframe' ? {
-              transform: `scale(${subtitleSafeZone.zoom}) translateY(${subtitleSafeZone.offsetY}%)`,
-              transformOrigin: 'center center',
-            } : {}),
+            transformOrigin: 'center center',
           }}
         >
           {/* Video Slot A */}
