@@ -563,11 +563,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             }
           }
 
-          // Apply playback rate for the matched scene
-          const sceneRate = (sceneInfo.scene as any).playbackRate ?? 1;
-          if (Math.abs(video.playbackRate - sceneRate) > 0.01) {
-            video.playbackRate = sceneRate;
-          }
+          // playbackRate is set in the unified SPEED RAMPING block below
         }
         
         // Decrement pending advance frame counter if active but not yet matched
@@ -610,10 +606,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
                   video.currentTime = nextSourceStart;
                 }
                 pendingSceneAdvanceRef.current = { targetIndex: sceneInfo.index + 1, framesLeft: 15 };
-                const nextRate = (nextScene as any).playbackRate ?? 1;
-                if (Math.abs(video.playbackRate - nextRate) > 0.01) {
-                  video.playbackRate = nextRate;
-                }
+                // playbackRate is set in the unified SPEED RAMPING block below
                 timelineTime = nextScene.start_time;
               }
             }
@@ -653,19 +646,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         }
       }
 
-      // === SPEED RAMPING ===
-      const sKeyframes = speedKeyframesRef.current;
-      if (sKeyframes && sKeyframes.length > 0 && video) {
-        // Find the applicable speed keyframe for current time
+      // === UNIFIED PLAYBACK RATE (Scene Rate + Speed Ramping) ===
+      if (video) {
+        const sceneRate = (sceneInfo?.scene as any)?.playbackRate ?? 1;
         let activeSpeed = 1;
-        if (sceneInfo) {
-          // Scene-specific keyframes first, then global
+        
+        const sKeyframes = speedKeyframesRef.current;
+        if (sKeyframes && sKeyframes.length > 0 && sceneInfo) {
           const sceneKFs = sKeyframes.filter(k => k.sceneId === sceneInfo.scene.id);
           const globalKFs = sKeyframes.filter(k => !k.sceneId);
           const relevantKFs = sceneKFs.length > 0 ? sceneKFs : globalKFs;
           
           if (relevantKFs.length > 0) {
-            // Sort by time and find the last keyframe before current time
             const sorted = [...relevantKFs].sort((a, b) => a.time - b.time);
             for (const kf of sorted) {
               if (timelineTime >= kf.time) {
@@ -675,8 +667,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           }
         }
         
-        const sceneRate = (sceneInfo?.scene as any)?.playbackRate ?? 1;
-        const targetRate = sceneRate * activeSpeed;
+        const targetRate = Math.max(0.0625, sceneRate * activeSpeed);
         if (Math.abs(video.playbackRate - targetRate) > 0.01) {
           video.playbackRate = targetRate;
         }
