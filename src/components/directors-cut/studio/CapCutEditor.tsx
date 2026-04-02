@@ -844,7 +844,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           >
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
-          <span className="text-white font-semibold text-sm">Audio Studio</span>
+          <span className="text-white font-semibold text-sm">Schritt 10 von 11 — Audio Studio</span>
         </div>
         <div className="flex items-center gap-1.5">
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10">
