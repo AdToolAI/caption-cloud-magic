@@ -654,21 +654,23 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     }
 
     return (
-      <AbsoluteFill style={{ backgroundColor: '#000' }}>
+      <AbsoluteFill style={{ backgroundColor: '#000', overflow: 'hidden' }}>
         {/* SVG Filter Definitions */}
         <SVGFilters />
         <SharpnessFilter intensity={sharpness} />
-        <Video
-          src={sourceVideoUrl}
-          pauseWhenBuffering={!previewMode}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            filter: filterStr.trim(),
-          }}
-          volume={0}
-        />
+        <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
+          <Video
+            src={sourceVideoUrl}
+            pauseWhenBuffering={!previewMode}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              filter: filterStr.trim(),
+            }}
+            volume={0}
+          />
+        </div>
         {/* VHS Scanlines for retro_vhs filter */}
         {filter === 'retro_vhs' && <VHSScanlines intensity={0.25} />}
         {/* Original Audio - skip in preview mode (native audio handles it) */}
