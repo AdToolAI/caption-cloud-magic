@@ -33,7 +33,7 @@ serve(async (req) => {
       });
     }
 
-    const { video_url, project_id } = await req.json();
+    const { video_url, project_id, conf_threshold, margin, method } = await req.json();
     if (!video_url || !project_id) {
       return new Response(JSON.stringify({ ok: false, code: 'validation', step: 'input', error: 'video_url and project_id are required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -72,9 +72,11 @@ serve(async (req) => {
       version: "247c8385f3c6c322110a6787bd2d257acc3a3d60b9ed7da1726a628f72a42c4d",
       input: {
         video: video_url,
-        method: "hybrid",
-        conf_threshold: 0.25,
-        margin: 5,
+        method: method || "hybrid",
+        conf_threshold: conf_threshold ?? 0.10,
+        margin: margin ?? 15,
+        resolution: "original",
+        detection_interval: 1,
       },
       webhook: webhookUrl,
       webhook_events_filter: ["completed"],
