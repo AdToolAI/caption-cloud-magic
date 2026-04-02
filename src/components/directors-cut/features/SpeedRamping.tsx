@@ -40,6 +40,8 @@ interface SpeedRampingProps {
   selectedSceneId?: string;
   sceneDuration?: number;
   sceneStartTime?: number;
+  onSceneDurationChange?: (sceneId: string, newDuration: number, avgSpeed: number) => void;
+  originalSceneDuration?: number;
 }
 
 export function SpeedRamping({
