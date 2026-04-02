@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE, SAFE_ZONE_PRESETS } from '@/lib/directors-cut-draft';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
