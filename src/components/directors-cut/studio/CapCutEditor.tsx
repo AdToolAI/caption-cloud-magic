@@ -57,6 +57,8 @@ interface CapCutEditorProps {
   projectId?: string | null;
   onCleanedVideoUrlChange?: (url: string | null) => void;
   onSaveProject?: () => Promise<string | null>;
+  subtitleSafeZone?: SubtitleSafeZone;
+  onSubtitleSafeZoneChange?: (zone: SubtitleSafeZone) => void;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
