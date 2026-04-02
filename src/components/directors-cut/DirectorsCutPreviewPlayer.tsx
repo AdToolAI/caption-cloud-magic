@@ -19,6 +19,21 @@ const SUBTITLE_FONT_SIZES = {
   xl: '48px',
 };
 
+type PitchAwareMediaElement = HTMLMediaElement & {
+  preservesPitch?: boolean;
+  mozPreservesPitch?: boolean;
+  webkitPreservesPitch?: boolean;
+};
+
+const configurePitchPreservation = (mediaElement: HTMLMediaElement | null, preservesPitch = true) => {
+  if (!mediaElement) return;
+
+  const pitchAwareMedia = mediaElement as PitchAwareMediaElement;
+  pitchAwareMedia.preservesPitch = preservesPitch;
+  pitchAwareMedia.mozPreservesPitch = preservesPitch;
+  pitchAwareMedia.webkitPreservesPitch = preservesPitch;
+};
+
 interface DirectorsCutPreviewPlayerProps {
   videoUrl: string;
   effects: GlobalEffects;
@@ -248,12 +263,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const src = new Audio(videoUrl);
       src.preload = 'auto';
       src.volume = isMuted ? 0 : (audio.master_volume || 100) / 100;
+      src.defaultPlaybackRate = 1;
+      src.playbackRate = 1;
+      configurePitchPreservation(src, true);
       sourceAudioRef.current = src;
     }
     if (voiceoverUrl) {
       const vo = new Audio(voiceoverUrl);
       vo.preload = 'auto';
       vo.volume = isMuted ? 0 : 1.0;
+      vo.defaultPlaybackRate = 1;
+      vo.playbackRate = 1;
+      configurePitchPreservation(vo, true);
       voiceoverAudioRef.current = vo;
     }
     if (backgroundMusicUrl) {
@@ -261,6 +282,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       bg.preload = 'auto';
       bg.volume = isMuted ? 0 : 0.3;
       bg.loop = true;
+      bg.defaultPlaybackRate = 1;
+      bg.playbackRate = 1;
+      configurePitchPreservation(bg, true);
       backgroundMusicAudioRef.current = bg;
     }
 
@@ -675,6 +699,13 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         if (Math.abs(video.playbackRate - targetRate) > 0.01) {
           video.playbackRate = targetRate;
         }
+
+        if (voiceoverAudioRef.current && Math.abs(voiceoverAudioRef.current.playbackRate - 1) > 0.001) {
+          voiceoverAudioRef.current.playbackRate = 1;
+        }
+        if (backgroundMusicAudioRef.current && Math.abs(backgroundMusicAudioRef.current.playbackRate - 1) > 0.001) {
+          backgroundMusicAudioRef.current.playbackRate = 1;
+        }
         
         // Sync only source audio with video speed (smooth interpolation)
         // Voiceover and background music stay at 1.0x to avoid pitch distortion
@@ -701,8 +732,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
       // Drift correction for source audio — SKIP during transitions to prevent rubber-banding
       if (sourceAudioRef.current && !sourceAudioRef.current.paused && !cachedActiveTrans) {
-        if (Math.abs(sourceAudioRef.current.currentTime - timelineTime) > 0.5) {
-          sourceAudioRef.current.currentTime = timelineTime;
+        if (Math.abs(sourceAudioRef.current.currentTime - videoSourceTime) > 0.5) {
+          sourceAudioRef.current.currentTime = videoSourceTime;
         }
       }
 
@@ -758,7 +789,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       video.currentTime = sourceTime;
       visualTimeRef.current = currentTime;
       setDisplayTime(currentTime);
-      if (sourceAudioRef.current) sourceAudioRef.current.currentTime = currentTime;
+      if (sourceAudioRef.current) sourceAudioRef.current.currentTime = sourceTime;
       if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = currentTime;
       if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = currentTime;
     }
@@ -766,11 +797,28 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
   // ==================== USER CONTROLS ====================
   const startAllAudio = useCallback(() => {
-    if (!originalAudioMuted) sourceAudioRef.current?.play().catch(() => {});
+    const activeVideo = getActiveVideo();
+
+    if (!originalAudioMuted && sourceAudioRef.current) {
+      if (activeVideo && Math.abs(sourceAudioRef.current.currentTime - activeVideo.currentTime) > 0.15) {
+        sourceAudioRef.current.currentTime = activeVideo.currentTime;
+      }
+      configurePitchPreservation(sourceAudioRef.current, true);
+      sourceAudioRef.current.play().catch(() => {});
+    }
+
     voiceoverShouldRecoverRef.current = false;
+    if (voiceoverAudioRef.current) {
+      voiceoverAudioRef.current.playbackRate = 1;
+      configurePitchPreservation(voiceoverAudioRef.current, true);
+    }
     playVoiceover();
-    backgroundMusicAudioRef.current?.play().catch(() => {});
-  }, [originalAudioMuted, playVoiceover]);
+    if (backgroundMusicAudioRef.current) {
+      backgroundMusicAudioRef.current.playbackRate = 1;
+      configurePitchPreservation(backgroundMusicAudioRef.current, true);
+      backgroundMusicAudioRef.current.play().catch(() => {});
+    }
+  }, [originalAudioMuted, playVoiceover, getActiveVideo]);
 
   const stopAllAudio = useCallback(() => {
     sourceAudioRef.current?.pause();
@@ -860,7 +908,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       slotA.style.opacity = '1';
     }
 
-    if (sourceAudioRef.current) sourceAudioRef.current.currentTime = newTime;
+    if (sourceAudioRef.current) sourceAudioRef.current.currentTime = sourceTime;
     if (voiceoverAudioRef.current) {
       voiceoverAudioRef.current.currentTime = newTime;
       if (isPlayingRef.current && !isMutedRef.current) {
