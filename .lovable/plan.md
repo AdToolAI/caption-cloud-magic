@@ -1,45 +1,31 @@
 
 
-## Feature: Speed Ramping passt Szenen-Dauer automatisch an
+## Fix: Audio-Geschwindigkeit an Speed Ramping anpassen
 
-### Idee
+### Problem
 
-Wenn ein Speed-Keyframe auf eine Szene angewendet wird (z.B. 0.5x Slow Motion), soll die Szene automatisch länger werden (doppelt so lang bei 0.5x). Bei 2x Speed wird die Szene halb so lang. Das entspricht "True Slow Motion" — die Timeline dehnt/staucht sich.
+Wenn Speed Ramping aktiv ist, wird nur `video.playbackRate` angepasst (Zeile 674-677). Die drei Audio-Elemente (`sourceAudioRef`, `voiceoverAudioRef`, `backgroundMusicAudioRef`) spielen weiterhin mit 1x Speed — dadurch laufen Audio und Video auseinander.
 
-### Wie es funktioniert
+### Fix
 
-Formel: `neue Dauer = Original-Dauer / durchschnittliche Speed`
+In `DirectorsCutPreviewPlayer.tsx`, direkt nach dem Setzen von `video.playbackRate` (Zeile 676), auch die `playbackRate` der Audio-Elemente synchron setzen:
 
-Beispiel:
-- Szene ist 4s lang, Speed-Keyframe auf 0.5x → Szene wird 8s
-- Szene ist 4s lang, Speed-Keyframe auf 2x → Szene wird 2s
-- Mehrere Keyframes: gewichteter Durchschnitt der Speeds
+```typescript
+// After setting video.playbackRate
+if (sourceAudioRef.current && Math.abs(sourceAudioRef.current.playbackRate - targetRate) > 0.01) {
+  sourceAudioRef.current.playbackRate = targetRate;
+}
+if (voiceoverAudioRef.current && Math.abs(voiceoverAudioRef.current.playbackRate - targetRate) > 0.01) {
+  voiceoverAudioRef.current.playbackRate = targetRate;
+}
+if (backgroundMusicAudioRef.current && Math.abs(backgroundMusicAudioRef.current.playbackRate - targetRate) > 0.01) {
+  backgroundMusicAudioRef.current.playbackRate = targetRate;
+}
+```
 
-### Technische Umsetzung
+Dadurch passen sich Voiceover und Hintergrundmusik automatisch an die aktuelle Szenen-Geschwindigkeit an.
 
-**1. `src/pages/DirectorsCut/DirectorsCut.tsx`**
+### Betroffene Datei
 
-Im `onSpeedKeyframesChange`-Callback (Zeile 737): Nach dem Speichern der Keyframes die betroffenen Szenen anpassen:
-
-- Für jede Szene mit szenen-spezifischen Keyframes den durchschnittlichen Speed berechnen
-- `original_start_time` / `original_end_time` als Referenz nutzen (existiert bereits im Typ)
-- Neue `end_time` berechnen: `start_time + (originalDuration / avgSpeed)`
-- Alle nachfolgenden Szenen auf der Timeline verschieben (cascade)
-- `playbackRate` der Szene aktualisieren (existiert bereits im Typ)
-
-**2. `src/components/directors-cut/features/SpeedRamping.tsx`**
-
-- Neue Prop `onSceneDurationChange?: (sceneId: string, newDuration: number, avgSpeed: number) => void`
-- Nach jeder Keyframe-Änderung bei szenen-spezifischen Keyframes den avgSpeed berechnen und callback aufrufen
-- Visuelles Feedback: Anzeige wie sich die Szenendauer ändert (z.B. "4.0s → 8.0s")
-
-**3. `src/components/directors-cut/steps/MotionEffectsStep.tsx`**
-
-- `onSceneDurationChange` Prop durchreichen von DirectorsCut → MotionEffectsStep → SpeedRamping
-
-### Betroffene Dateien
-
-1. `src/pages/DirectorsCut/DirectorsCut.tsx` — Szenen-Dauer bei Speed-Änderung anpassen + Cascade
-2. `src/components/directors-cut/features/SpeedRamping.tsx` — avgSpeed berechnen, Callback + UI-Feedback
-3. `src/components/directors-cut/steps/MotionEffectsStep.tsx` — Prop durchreichen
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` (Zeilen 674-678)
 
