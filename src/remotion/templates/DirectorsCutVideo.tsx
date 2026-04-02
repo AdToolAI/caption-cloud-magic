@@ -606,6 +606,15 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     return [...scenes].sort((a, b) => a.startTime - b.startTime);
   }, [scenes]);
 
+  // Subtitle Safe Zone crop style
+  const safeZoneCropStyle: React.CSSProperties = subtitleSafeZone?.enabled ? {
+    clipPath: `inset(0 0 ${subtitleSafeZone.bottomBandPercent}% 0)`,
+    transform: `scale(${subtitleSafeZone.zoom}) translateY(${subtitleSafeZone.offsetY}%)`,
+    transformOrigin: 'top center',
+    width: '100%',
+    height: '100%',
+  } : {};
+
   // Vignette style - korrigierte Formel für sichtbaren Effekt
   const vignetteStyle = vignette > 0 ? {
     background: `radial-gradient(ellipse at center, transparent 0%, transparent ${Math.max(0, 50 - vignette * 0.5)}%, rgba(0,0,0,${Math.min(1, vignette / 50)}) 100%)`,
