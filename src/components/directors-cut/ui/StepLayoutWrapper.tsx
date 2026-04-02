@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, cloneElement, isValidElement, Children } from 'react';
 import { motion } from 'framer-motion';
 import { LucideIcon } from 'lucide-react';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
