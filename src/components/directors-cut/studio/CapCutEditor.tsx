@@ -28,6 +28,7 @@ interface CapCutEditorProps {
   onNextStep?: () => void;
   // Visual effects from previous steps
   textOverlays?: TextOverlay[];
+  onTextOverlaysChange?: (overlays: TextOverlay[]) => void;
   appliedEffects?: {
     global: {
       brightness: number;
@@ -69,6 +70,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onNextStep,
   // Visual effects from previous steps
   textOverlays,
+  onTextOverlaysChange,
   appliedEffects,
   transitions,
   colorGrading,
@@ -946,6 +948,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onRemoveOriginalSubtitles={handleRemoveOriginalSubtitles}
               onRetryDetection={handleRetryDetection}
               textOverlayCount={(textOverlays || []).length}
+              textOverlays={textOverlays || []}
+              onTextOverlaysChange={onTextOverlaysChange}
               showSubtitles={showSubtitles}
               onShowSubtitlesChange={setShowSubtitles}
               showTextOverlays={showTextOverlays}
