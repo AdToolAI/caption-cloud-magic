@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { sendWebPushNotification } from "./web-push.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,35 +16,6 @@ interface PushPayload {
   url?: string;
 }
 
-// Web Push implementation using VAPID
-async function sendWebPush(
-  subscription: any,
-  payload: string,
-  vapidPublicKey: string,
-  vapidPrivateKey: string,
-  subject: string
-) {
-  const endpoint = subscription.endpoint;
-  const p256dh = subscription.keys.p256dh;
-  const auth = subscription.keys.auth;
-
-  // For web push we need to use the web-push protocol
-  // Using a simplified approach with fetch to the push endpoint
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/octet-stream",
-      TTL: "86400",
-    },
-    body: payload,
-  });
-
-  if (!response.ok && response.status !== 201) {
-    const text = await response.text();
-    throw new Error(`Push failed: ${response.status} ${text}`);
-  }
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -57,9 +29,7 @@ serve(async (req) => {
       const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY") || "";
       return new Response(
         JSON.stringify({ vapid_public_key: vapidPublicKey }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -68,10 +38,7 @@ serve(async (req) => {
     if (!user_id || !title) {
       return new Response(
         JSON.stringify({ error: "user_id and title are required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -89,10 +56,7 @@ serve(async (req) => {
     if (prefsError || !prefs?.push_enabled || !prefs?.push_subscription) {
       return new Response(
         JSON.stringify({ message: "Push not enabled for user" }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -105,40 +69,51 @@ serve(async (req) => {
     const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY") || "";
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY") || "";
 
+    if (!vapidPublicKey || !vapidPrivateKey) {
+      console.error("VAPID keys not configured");
+      return new Response(
+        JSON.stringify({ error: "VAPID keys not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     try {
-      await sendWebPush(
+      const response = await sendWebPushNotification(
         prefs.push_subscription,
         notificationPayload,
         vapidPublicKey,
         vapidPrivateKey,
         "mailto:noreply@caption-cloud.app"
       );
-      console.log("Push notification sent to user:", user_id);
+
+      if (response.ok || response.status === 201) {
+        console.log("Push notification sent to user:", user_id);
+      } else {
+        const text = await response.text();
+        console.error(`Push failed: ${response.status} ${text}`);
+
+        // If subscription is invalid (410 Gone), clean it up
+        if (response.status === 410 || response.status === 404) {
+          await supabase
+            .from("notification_preferences")
+            .update({ push_enabled: false, push_subscription: null })
+            .eq("user_id", user_id);
+          console.log("Cleaned up invalid subscription for user:", user_id);
+        }
+      }
     } catch (pushErr: any) {
       console.error("Push send error:", pushErr.message);
-      // If subscription is invalid (410 Gone), clean it up
-      if (pushErr.message?.includes("410")) {
-        await supabase
-          .from("notification_preferences")
-          .update({ push_enabled: false, push_subscription: null })
-          .eq("user_id", user_id);
-      }
     }
 
     return new Response(
       JSON.stringify({ success: true }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
     console.error("Error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
