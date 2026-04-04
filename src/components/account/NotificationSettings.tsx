@@ -95,6 +95,7 @@ export const NotificationSettings = () => {
 
   return (
     <>
+      <Card className="bg-card/60 backdrop-blur-xl border-white/10">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <BellRing className="h-5 w-5 text-primary" />
