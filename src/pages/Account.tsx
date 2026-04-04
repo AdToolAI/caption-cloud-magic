@@ -89,6 +89,13 @@ const Account = () => {
               <span className="hidden sm:inline">Datenschutz</span>
             </TabsTrigger>
             <TabsTrigger 
+              value="notifications"
+              className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
+            >
+              <Bell className="h-4 w-4" />
+              <span className="hidden sm:inline">Benachrichtigungen</span>
+            </TabsTrigger>
+            <TabsTrigger 
               value="subscription"
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
             >
