@@ -8,10 +8,12 @@ import { LottieIcons } from '../components/LottieIcons';
 // Stable Audio Layer that NEVER remounts unnecessarily - wrapped in React.memo
 const AudioLayer = memo(function AudioLayer({
   voiceoverUrl,
+  voiceoverVolume = 1.0,
   backgroundMusicUrl,
   backgroundMusicVolume = 0.3,
 }: {
   voiceoverUrl?: string;
+  voiceoverVolume?: number;
   backgroundMusicUrl?: string;
   backgroundMusicVolume?: number;
 }) {
