@@ -966,7 +966,11 @@ export default function MediaLibrary() {
         </CardContent>
       </Card>
 
-      {/* Media Grid */}
+      {/* Cloud connection prompt when not connected */}
+      {categoryFilter === 'cloud' && !cloudConnection ? (
+        <CloudStorageConnect />
+      ) : (
+      /* Media Grid */
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filteredMedia.map((item) => {
           return (
