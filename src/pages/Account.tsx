@@ -57,7 +57,7 @@ const Account = () => {
       <div className="container max-w-4xl mx-auto">
         <AccountHeroHeader />
 
-        <Tabs defaultValue="profile" className="space-y-6">
+        <Tabs defaultValue={defaultTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-6 h-14 bg-card/60 backdrop-blur-xl border border-white/10 p-1 rounded-xl">
             <TabsTrigger 
               value="profile" 
