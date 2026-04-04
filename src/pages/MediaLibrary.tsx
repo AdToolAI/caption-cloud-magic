@@ -798,7 +798,7 @@ export default function MediaLibrary() {
         <Card className="backdrop-blur-xl bg-card/60 border-white/10">
           <CardContent className="pt-6">
             <Tabs value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as typeof categoryFilter)}>
-              <TabsList className="grid w-full grid-cols-5 bg-muted/30">
+              <TabsList className="grid w-full grid-cols-6 bg-muted/30">
                 <TabsTrigger 
                   value="all" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
@@ -833,6 +833,13 @@ export default function MediaLibrary() {
                 >
                   <Layers className="h-4 w-4" />
                   Kampagnen
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="cloud" 
+                  className="flex items-center gap-2 data-[state=active]:bg-blue-500/20 data-[state=active]:shadow-[0_0_15px_hsla(210,80%,60%,0.2)]"
+                >
+                  <Cloud className="h-4 w-4" />
+                  Cloud
                 </TabsTrigger>
               </TabsList>
             </Tabs>
