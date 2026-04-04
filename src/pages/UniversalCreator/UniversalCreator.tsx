@@ -509,6 +509,7 @@ export function UniversalCreator() {
                   ...(contentConfig?.voiceoverUrl && {
                     voiceoverUrl: contentConfig.voiceoverUrl,
                     voiceoverDuration: contentConfig.voiceoverDuration || 30,
+                    voiceoverVolume: contentConfig.voiceoverVolume ?? 1.0,
                   }),
                   ...(selectedMusicUrl && {
                     backgroundMusicUrl: selectedMusicUrl,
