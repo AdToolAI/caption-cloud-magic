@@ -75,8 +75,10 @@ export function usePushNotifications() {
 
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
       });
+
+      const subJson = subscription.toJSON() as Record<string, unknown>;
 
       // Save subscription to DB
       const { error } = await supabase
@@ -84,9 +86,9 @@ export function usePushNotifications() {
         .upsert({
           user_id: user.id,
           push_enabled: true,
-          push_subscription: subscription.toJSON(),
+          push_subscription: subJson,
           updated_at: new Date().toISOString(),
-        });
+        } as any);
 
       if (error) throw error;
 
