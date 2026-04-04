@@ -25,7 +25,7 @@ const AudioLayer = memo(function AudioLayer({
         <Html5Audio
           src={voiceoverUrl}
           startFrom={0}
-          volume={1.0}
+          volume={voiceoverVolume}
           loop={false}
           pauseWhenBuffering
         />
