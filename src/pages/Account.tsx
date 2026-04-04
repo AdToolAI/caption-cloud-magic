@@ -130,6 +130,12 @@ const Account = () => {
             <PrivacyTab />
           </TabsContent>
 
+          <TabsContent value="notifications">
+            <div className="space-y-6">
+              <NotificationSettings />
+            </div>
+          </TabsContent>
+
           <TabsContent value="subscription">
             <SubscriptionTab />
           </TabsContent>
