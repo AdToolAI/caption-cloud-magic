@@ -1163,7 +1163,7 @@ export default function MediaLibrary() {
           </div>
         </Card>
       )}
-      </>) /* end cloud ternary */}
+      </>)}
 
       {/* Video Dialog */}
       <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
