@@ -17,9 +17,6 @@ interface ContentVoiceStepProps {
   value: ContentConfig | null;
   onChange: (config: ContentConfig) => void;
   projectId: string;
-  musicVolume?: number;
-  onMusicVolumeChange?: (vol: number) => void;
-  hasMusicSelected?: boolean;
 }
 
 interface Voice {
