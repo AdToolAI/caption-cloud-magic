@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { FolderOpen, Upload, HardDrive, AlertTriangle, Film } from "lucide-react";
+import { FolderOpen, Upload, HardDrive, AlertTriangle, Film, Cloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface MediaLibraryHeroHeaderProps {
@@ -8,6 +8,9 @@ interface MediaLibraryHeroHeaderProps {
   usedGB: number;
   maxGB: number;
   onUploadClick: () => void;
+  cloudConnected?: boolean;
+  cloudUsedGB?: number;
+  cloudTotalGB?: number;
 }
 
 export const MediaLibraryHeroHeader = ({
