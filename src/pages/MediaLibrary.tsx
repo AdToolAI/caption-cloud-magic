@@ -782,6 +782,9 @@ export default function MediaLibrary() {
         usedGB={usedGB}
         maxGB={MAX_STORAGE_GB}
         onUploadClick={triggerUpload}
+        cloudConnected={!!cloudConnection}
+        cloudUsedGB={cloudConnection ? cloudConnection.used_bytes / (1024 * 1024 * 1024) : 0}
+        cloudTotalGB={cloudConnection ? cloudConnection.quota_bytes / (1024 * 1024 * 1024) : 0}
       />
 
       {/* URL Import - Glassmorphism */}
