@@ -1,32 +1,22 @@
 
 
-## Plan: Push-Notifications reparieren — Service Worker registrieren
+## Fix: "Cannot read properties of undefined (reading 'split')" im Export-Schritt
 
 ### Problem
-Der Service Worker (`public/sw.js`) wird nirgends registriert. Dadurch hängt `navigator.serviceWorker.ready` endlos und der Toggle reagiert nicht.
+In `src/components/universal-creator/steps/PreviewExportStep.tsx` Zeile 663 wird `contentConfig.scriptText.split(...)` aufgerufen, ohne zu prüfen ob `scriptText` existiert. Wenn kein Script-Text vorhanden ist, ist der Wert `undefined` und `.split()` crasht.
 
-### Änderungen
+### Lösung
 
-**1. `src/main.tsx` — Service Worker Registration hinzufügen**
-- Nach dem `createRoot`-Aufruf den SW registrieren
-- Guard gegen iframe/Preview-Umgebung (damit es im Lovable-Editor nicht stört)
-- Nur in Production registrieren
+**Datei: `src/components/universal-creator/steps/PreviewExportStep.tsx`**
+- Zeile 663: Optional Chaining hinzufügen: `contentConfig.scriptText?.split(...)` mit Fallback `?? 0`
 
 ```typescript
-// Nach createRoot(...)
-const isInIframe = (() => { try { return window.self !== window.top; } catch { return true; } })();
-const isPreview = window.location.hostname.includes("id-preview--");
+// Vorher:
+{contentConfig.scriptText.split(/\s+/).filter(Boolean).length} Wörter
 
-if (!isInIframe && !isPreview && "serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js");
-}
+// Nachher:
+{contentConfig.scriptText?.split(/\s+/).filter(Boolean).length ?? 0} Wörter
 ```
 
-**2. `src/hooks/usePushNotifications.ts` — Timeout & Fallback**
-- Wenn `navigator.serviceWorker.ready` nicht innerhalb von 5 Sekunden resolved, selbst `/sw.js` registrieren und erneut versuchen
-- Bei Fehler eine klare Fehlermeldung anzeigen statt endlos zu hängen
-- Loading-State korrekt zurücksetzen bei Timeout
-
-### Ergebnis
-Nach diesen 2 Änderungen wird der Service Worker beim App-Start registriert. Der Toggle funktioniert dann: Browser fragt nach Permission → Subscription wird erstellt → Push-Notifications kommen an.
+Eine einzige Zeile — damit ist der Crash behoben.
 
