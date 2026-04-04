@@ -4,9 +4,10 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { toast } from "sonner";
-import { BellRing, Loader2 } from "lucide-react";
-
+import { BellRing, Loader2, Smartphone, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 interface NotificationPreferences {
   email_reminders: boolean;
   in_app_notifications: boolean;
@@ -93,7 +94,8 @@ export const NotificationSettings = () => {
   }
 
   return (
-    <Card className="bg-card/60 backdrop-blur-xl border-white/10">
+    <>
+      <Card className="bg-card/60 backdrop-blur-xl border-white/10">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <BellRing className="h-5 w-5 text-primary" />
@@ -159,7 +161,73 @@ export const NotificationSettings = () => {
             disabled={saving}
           />
         </div>
+        </CardContent>
+      </Card>
+
+      {/* Push Notifications */}
+      <PushNotificationCard />
+    </>
+  );
+};
+
+function PushNotificationCard() {
+  const { status, pushEnabled, loading, togglePush, isSupported, isDenied } = usePushNotifications();
+
+  return (
+    <Card className="bg-card/60 backdrop-blur-xl border-white/10">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Smartphone className="h-5 w-5 text-primary" />
+          Push-Benachrichtigungen
+        </CardTitle>
+        <CardDescription>
+          Erhalte Browser-Benachrichtigungen für geplante Posts und Erinnerungen — kostenlos
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!isSupported ? (
+          <div className="flex items-start gap-3 rounded-lg bg-muted/50 p-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">Nicht unterstützt</p>
+              <p>Dein Browser unterstützt keine Push-Benachrichtigungen. Nutze Chrome, Firefox oder Edge für diese Funktion.</p>
+              <p className="mt-1 text-xs">Auf iOS: Füge die App zum Home-Bildschirm hinzu (PWA).</p>
+            </div>
+          </div>
+        ) : isDenied ? (
+          <div className="flex items-start gap-3 rounded-lg bg-destructive/10 p-3">
+            <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">Blockiert</p>
+              <p>Push-Benachrichtigungen sind in deinen Browser-Einstellungen blockiert. Klicke auf das Schloss-Symbol in der Adressleiste, um sie zu erlauben.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Push aktivieren</Label>
+              <p className="text-xs text-muted-foreground">
+                {pushEnabled
+                  ? "Du erhältst Erinnerungen direkt im Browser"
+                  : "Aktiviere Push für Erinnerungen vor geplanten Posts"}
+              </p>
+            </div>
+            <Switch
+              checked={pushEnabled}
+              onCheckedChange={togglePush}
+              disabled={loading}
+            />
+          </div>
+        )}
+
+        {pushEnabled && (
+          <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
+            <p className="text-xs text-muted-foreground">
+              ✅ Push-Benachrichtigungen sind aktiv. Du wirst z.B. 1h und 24h vor geplanten Posts erinnert.
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
-};
+}
