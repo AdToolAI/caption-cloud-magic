@@ -119,11 +119,14 @@ serve(async (req) => {
       await sendSlackNotification(integration.slack_webhook_url, message, event);
     }
 
-    // Send to Discord if configured (using Discord webhook format)
+    // Send to Discord if configured
     const settings = integration.settings_json || {};
     if (settings.discord_webhook_url) {
       await sendDiscordNotification(settings.discord_webhook_url, message, event);
     }
+
+    // Send push notifications to workspace members
+    await sendPushToWorkspaceMembers(supabase, event.workspace_id, event, notification_type);
 
     return new Response(
       JSON.stringify({ success: true, message: "Notifications sent" }),
