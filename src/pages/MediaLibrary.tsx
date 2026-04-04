@@ -970,7 +970,8 @@ export default function MediaLibrary() {
       {categoryFilter === 'cloud' && !cloudConnection ? (
         <CloudStorageConnect />
       ) : (
-      /* Media Grid */
+      <>
+      {/* Media Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filteredMedia.map((item) => {
           return (
