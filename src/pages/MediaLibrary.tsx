@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MediaLibraryHeroHeader } from "@/components/media-library/MediaLibraryHeroHeader";
+import { CloudStorageConnect } from "@/components/media-library/CloudStorageConnect";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCloudStorage } from "@/hooks/useCloudStorage";
 
@@ -965,6 +966,11 @@ export default function MediaLibrary() {
         </CardContent>
       </Card>
 
+      {/* Cloud connection prompt when not connected */}
+      {categoryFilter === 'cloud' && !cloudConnection ? (
+        <CloudStorageConnect />
+      ) : (
+      <>
       {/* Media Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filteredMedia.map((item) => {
@@ -1142,7 +1148,7 @@ export default function MediaLibrary() {
         })}
       </div>
 
-      {filteredMedia.length === 0 && !loading && (
+      {filteredMedia.length === 0 && !loading && categoryFilter !== 'cloud' && (
         <Card className="p-12">
           <div className="text-center">
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -1157,6 +1163,7 @@ export default function MediaLibrary() {
           </div>
         </Card>
       )}
+      </>)}
 
       {/* Video Dialog */}
       <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
