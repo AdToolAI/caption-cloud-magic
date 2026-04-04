@@ -255,15 +255,65 @@ async function sendDiscordNotification(webhookUrl: string, message: string, even
   console.log("Discord notification sent successfully");
 }
 
+async function sendPushToWorkspaceMembers(supabase: any, workspaceId: string, event: any, notificationType: string) {
+  try {
+    // Get all workspace members
+    const { data: members } = await supabase
+      .from("workspace_members")
+      .select("user_id")
+      .eq("workspace_id", workspaceId);
+
+    if (!members || members.length === 0) return;
+
+    const title = event.title;
+    const typeLabels: Record<string, string> = {
+      "24h_reminder": `📅 In 24h: "${title}"`,
+      "1h_reminder": `⏰ In 1h: "${title}"`,
+      "published": `✅ Veröffentlicht: "${title}"`,
+      "approval_requested": `👀 Freigabe nötig: "${title}"`,
+      "status_changed": `🔄 Status geändert: "${title}"`,
+    };
+
+    const pushTitle = typeLabels[notificationType] || `📢 Update: "${title}"`;
+    const pushBody = `Kanäle: ${event.channels?.join(", ") || "N/A"}`;
+
+    // Send push to each member
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    await Promise.allSettled(
+      members.map((m: any) =>
+        fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({
+            user_id: m.user_id,
+            title: pushTitle,
+            body: pushBody,
+            url: "/kalender",
+          }),
+        })
+      )
+    );
+
+    console.log(`Push notifications sent to ${members.length} workspace members`);
+  } catch (err) {
+    console.error("Error sending push notifications:", err);
+  }
+}
+
 function getColorForStatus(status: string): number {
   const colors: Record<string, number> = {
-    briefing: 0x808080,       // Gray
-    in_progress: 0x3b82f6,    // Blue
-    review: 0xfbbf24,         // Yellow
-    pending_approval: 0xf97316, // Orange
-    approved: 0x22c55e,       // Green
-    scheduled: 0x6366f1,      // Indigo
-    published: 0x8b5cf6,      // Purple
+    briefing: 0x808080,
+    in_progress: 0x3b82f6,
+    review: 0xfbbf24,
+    pending_approval: 0xf97316,
+    approved: 0x22c55e,
+    scheduled: 0x6366f1,
+    published: 0x8b5cf6,
   };
   return colors[status] || 0x808080;
 }
