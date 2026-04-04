@@ -5148,6 +5148,8 @@ export type Database = {
           deadline_reminder_hours: number | null
           email_reminders: boolean | null
           in_app_notifications: boolean | null
+          push_enabled: boolean
+          push_subscription: Json | null
           render_complete_notify: boolean | null
           updated_at: string | null
           user_id: string
@@ -5158,6 +5160,8 @@ export type Database = {
           deadline_reminder_hours?: number | null
           email_reminders?: boolean | null
           in_app_notifications?: boolean | null
+          push_enabled?: boolean
+          push_subscription?: Json | null
           render_complete_notify?: boolean | null
           updated_at?: string | null
           user_id: string
@@ -5168,6 +5172,8 @@ export type Database = {
           deadline_reminder_hours?: number | null
           email_reminders?: boolean | null
           in_app_notifications?: boolean | null
+          push_enabled?: boolean
+          push_subscription?: Json | null
           render_complete_notify?: boolean | null
           updated_at?: string | null
           user_id?: string
