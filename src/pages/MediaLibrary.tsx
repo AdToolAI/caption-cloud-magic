@@ -54,7 +54,7 @@ export default function MediaLibrary() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai" | "ai_generator" | "campaign" | "video-creator">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai" | "ai_generator" | "campaign" | "video-creator" | "cloud">("all");
   const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: MAX_STORAGE_GB * 1024 });
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
