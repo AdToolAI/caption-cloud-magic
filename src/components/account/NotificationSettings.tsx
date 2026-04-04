@@ -4,9 +4,10 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { toast } from "sonner";
-import { BellRing, Loader2 } from "lucide-react";
-
+import { BellRing, Loader2, Smartphone, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 interface NotificationPreferences {
   email_reminders: boolean;
   in_app_notifications: boolean;
