@@ -559,6 +559,7 @@ const SceneRenderer: React.FC<{
 
 export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   voiceoverUrl,
+  voiceoverVolume,
   backgroundMusicUrl,
   backgroundMusicVolume = 0.3,
   subtitles,
