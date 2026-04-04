@@ -59,7 +59,20 @@ export function usePushNotifications() {
         return;
       }
 
-      const registration = await navigator.serviceWorker.ready;
+      // Wait for SW with timeout + fallback registration
+      let registration: ServiceWorkerRegistration;
+      try {
+        registration = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("SW_TIMEOUT")), 5000)
+          ),
+        ]);
+      } catch {
+        // Fallback: register SW manually
+        registration = await navigator.serviceWorker.register("/sw.js");
+        await navigator.serviceWorker.ready;
+      }
 
       // Fetch VAPID public key from edge function
       const { data: vapidData } = await supabase.functions.invoke("send-push-notification", {
