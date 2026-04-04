@@ -59,7 +59,7 @@ const Account = () => {
         <AccountHeroHeader />
 
         <Tabs defaultValue={defaultTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 h-14 bg-card/60 backdrop-blur-xl border border-white/10 p-1 rounded-xl">
+          <TabsList className="grid w-full grid-cols-7 h-14 bg-card/60 backdrop-blur-xl border border-white/10 p-1 rounded-xl">
             <TabsTrigger 
               value="profile" 
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
