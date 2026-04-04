@@ -720,6 +720,8 @@ export default function MediaLibrary() {
         return <Badge variant="outline" className="text-xs"><Layers className="h-3 w-3 mr-1" /> Kampagne</Badge>;
       case 'video-creator':
         return <Badge variant="outline" className="text-xs bg-orange-500/10 text-orange-500"><Video className="h-3 w-3 mr-1" /> Video Creator</Badge>;
+      case 'cloud':
+        return <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-500"><Cloud className="h-3 w-3 mr-1" /> Cloud</Badge>;
       default:
         return null;
     }
