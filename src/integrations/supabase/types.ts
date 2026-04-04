@@ -2755,6 +2755,63 @@ export type Database = {
           },
         ]
       }
+      cloud_storage_connections: {
+        Row: {
+          access_token_encrypted: string | null
+          account_email: string | null
+          account_name: string | null
+          auto_sync: boolean
+          created_at: string
+          folder_id: string | null
+          folder_name: string | null
+          id: string
+          is_active: boolean
+          provider: string
+          quota_bytes: number | null
+          refresh_token_encrypted: string | null
+          token_expires_at: string | null
+          updated_at: string
+          used_bytes: number | null
+          user_id: string
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          account_email?: string | null
+          account_name?: string | null
+          auto_sync?: boolean
+          created_at?: string
+          folder_id?: string | null
+          folder_name?: string | null
+          id?: string
+          is_active?: boolean
+          provider?: string
+          quota_bytes?: number | null
+          refresh_token_encrypted?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          used_bytes?: number | null
+          user_id: string
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          account_email?: string | null
+          account_name?: string | null
+          auto_sync?: boolean
+          created_at?: string
+          folder_id?: string | null
+          folder_name?: string | null
+          id?: string
+          is_active?: boolean
+          provider?: string
+          quota_bytes?: number | null
+          refresh_token_encrypted?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          used_bytes?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       coach_messages: {
         Row: {
           content: string

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download } from "lucide-react";
+import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download, Cloud } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MediaLibraryHeroHeader } from "@/components/media-library/MediaLibraryHeroHeader";
 import { motion, AnimatePresence } from "framer-motion";
+import { useCloudStorage } from "@/hooks/useCloudStorage";
 
 // Storage Limits
 const MAX_VIDEOS = 250;
@@ -26,7 +27,7 @@ const MAX_STORAGE_GB = 10;
 // Normalized media item type
 interface NormalizedMediaItem {
   id: string;
-  source: 'upload' | 'ai' | 'ai_generator' | 'campaign' | 'video-creator';
+  source: 'upload' | 'ai' | 'ai_generator' | 'campaign' | 'video-creator' | 'cloud';
   type: 'image' | 'video';
   title?: string;
   caption?: string;
@@ -38,6 +39,8 @@ interface NormalizedMediaItem {
   platforms?: string[];
   sizeBytes?: number;
   fileSizeMb?: number;
+  storageLocation?: 'local' | 'cloud';
+  driveFileId?: string;
 }
 
 export default function MediaLibrary() {
@@ -52,12 +55,13 @@ export default function MediaLibrary() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai" | "ai_generator" | "campaign" | "video-creator">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai" | "ai_generator" | "campaign" | "video-creator" | "cloud">("all");
   const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: MAX_STORAGE_GB * 1024 });
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const { connection: cloudConnection, cloudFiles, listCloudFiles, uploadToCloud, deleteFromCloud, syncing: cloudSyncing } = useCloudStorage();
 
   // Handle tab parameter from URL
   useEffect(() => {
@@ -161,7 +165,14 @@ export default function MediaLibrary() {
 
   useEffect(() => {
     applyFilters();
-  }, [media, searchQuery, filterType, categoryFilter]);
+  }, [media, searchQuery, filterType, categoryFilter, cloudFiles]);
+
+  // Auto-load cloud files when cloud tab is selected
+  useEffect(() => {
+    if (categoryFilter === 'cloud' && cloudConnection && cloudFiles.length === 0) {
+      listCloudFiles();
+    }
+  }, [categoryFilter, cloudConnection]);
 
   const loadStorageQuota = async () => {
     if (!user) return;
@@ -342,8 +353,22 @@ export default function MediaLibrary() {
   const applyFilters = () => {
     let filtered = [...media];
 
-    // Category filter
-    if (categoryFilter === "ai") {
+    // Cloud tab: show cloud files instead
+    if (categoryFilter === "cloud") {
+      const cloudMedia: NormalizedMediaItem[] = cloudFiles.map(cf => ({
+        id: cf.id,
+        source: 'cloud' as const,
+        type: cf.mimeType?.startsWith('video/') ? 'video' as const : 'image' as const,
+        title: cf.name,
+        url: cf.thumbnailLink || cf.webViewLink || '',
+        thumbUrl: cf.thumbnailLink,
+        createdAt: cf.createdTime,
+        storageLocation: 'cloud' as const,
+        driveFileId: cf.id,
+        sizeBytes: parseInt(cf.size || '0'),
+      }));
+      filtered = cloudMedia;
+    } else if (categoryFilter === "ai") {
       // Show both 'ai' and 'ai_generator' under the AI category
       filtered = filtered.filter(item => item.source === 'ai' || item.source === 'ai_generator');
     } else if (categoryFilter !== "all") {
@@ -716,6 +741,8 @@ export default function MediaLibrary() {
         return <Badge variant="outline" className="text-xs"><Layers className="h-3 w-3 mr-1" /> Kampagne</Badge>;
       case 'video-creator':
         return <Badge variant="outline" className="text-xs bg-orange-500/10 text-orange-500"><Video className="h-3 w-3 mr-1" /> Video Creator</Badge>;
+      case 'cloud':
+        return <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-500"><Cloud className="h-3 w-3 mr-1" /> Cloud</Badge>;
       default:
         return null;
     }
@@ -755,6 +782,9 @@ export default function MediaLibrary() {
         usedGB={usedGB}
         maxGB={MAX_STORAGE_GB}
         onUploadClick={triggerUpload}
+        cloudConnected={!!cloudConnection}
+        cloudUsedGB={cloudConnection ? cloudConnection.used_bytes / (1024 * 1024 * 1024) : 0}
+        cloudTotalGB={cloudConnection ? cloudConnection.quota_bytes / (1024 * 1024 * 1024) : 0}
       />
 
       {/* URL Import - Glassmorphism */}
@@ -796,7 +826,7 @@ export default function MediaLibrary() {
         <Card className="backdrop-blur-xl bg-card/60 border-white/10">
           <CardContent className="pt-6">
             <Tabs value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as typeof categoryFilter)}>
-              <TabsList className="grid w-full grid-cols-5 bg-muted/30">
+              <TabsList className="grid w-full grid-cols-6 bg-muted/30">
                 <TabsTrigger 
                   value="all" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
@@ -831,6 +861,13 @@ export default function MediaLibrary() {
                 >
                   <Layers className="h-4 w-4" />
                   Kampagnen
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="cloud" 
+                  className="flex items-center gap-2 data-[state=active]:bg-blue-500/20 data-[state=active]:shadow-[0_0_15px_hsla(210,80%,60%,0.2)]"
+                >
+                  <Cloud className="h-4 w-4" />
+                  Cloud
                 </TabsTrigger>
               </TabsList>
             </Tabs>

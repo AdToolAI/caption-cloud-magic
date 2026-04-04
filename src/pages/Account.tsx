@@ -1,4 +1,5 @@
-import { Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, User, Shield, CreditCard, Settings, Link2, Eye } from "lucide-react";
@@ -10,9 +11,34 @@ import { AdvancedTab } from "@/components/account/AdvancedTab";
 import { ConnectionsTab } from "@/components/account/ConnectionsTab";
 import { PrivacyTab } from "@/components/account/PrivacyTab";
 import { StorageUsagePanel } from "@/components/settings/StorageUsagePanel";
+import { useCloudStorage } from "@/hooks/useCloudStorage";
 
 const Account = () => {
   const { user, loading: authLoading } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { handleOAuthCallback } = useCloudStorage();
+  const [defaultTab, setDefaultTab] = useState("profile");
+
+  // Handle Google Drive OAuth callback
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    
+    if (code && state) {
+      try {
+        const stateData = JSON.parse(atob(state));
+        if (stateData.provider === 'google_drive') {
+          handleOAuthCallback(code).then(() => {
+            // Clean up URL params
+            setSearchParams({});
+            setDefaultTab("connections");
+          });
+        }
+      } catch (e) {
+        console.warn('Could not parse OAuth state');
+      }
+    }
+  }, [searchParams]);
 
   if (authLoading) {
     return (
@@ -31,7 +57,7 @@ const Account = () => {
       <div className="container max-w-4xl mx-auto">
         <AccountHeroHeader />
 
-        <Tabs defaultValue="profile" className="space-y-6">
+        <Tabs defaultValue={defaultTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-6 h-14 bg-card/60 backdrop-blur-xl border border-white/10 p-1 rounded-xl">
             <TabsTrigger 
               value="profile" 
