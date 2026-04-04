@@ -346,8 +346,22 @@ export default function MediaLibrary() {
   const applyFilters = () => {
     let filtered = [...media];
 
-    // Category filter
-    if (categoryFilter === "ai") {
+    // Cloud tab: show cloud files instead
+    if (categoryFilter === "cloud") {
+      const cloudMedia: NormalizedMediaItem[] = cloudFiles.map(cf => ({
+        id: cf.id,
+        source: 'cloud' as const,
+        type: cf.mimeType?.startsWith('video/') ? 'video' as const : 'image' as const,
+        title: cf.name,
+        url: cf.thumbnailLink || cf.webViewLink || '',
+        thumbUrl: cf.thumbnailLink,
+        createdAt: cf.createdTime,
+        storageLocation: 'cloud' as const,
+        driveFileId: cf.id,
+        sizeBytes: parseInt(cf.size || '0'),
+      }));
+      filtered = cloudMedia;
+    } else if (categoryFilter === "ai") {
       // Show both 'ai' and 'ai_generator' under the AI category
       filtered = filtered.filter(item => item.source === 'ai' || item.source === 'ai_generator');
     } else if (categoryFilter !== "all") {
