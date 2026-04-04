@@ -1,47 +1,24 @@
 
 
-## Plan: Lautstärkeregler für Voiceover und Musik in Step 2
+## Plan: Musik-Lautstärkeregler von Step 2 nach Step 4 verschieben
 
-### Was gebaut wird
+### Was sich ändert
 
-Zwei Lautstärke-Slider in der `ContentVoiceStep` (Step 2 "Content & Voice"):
+Der Hintergrundmusik-Lautstärkeregler wird aus Step 2 (Content & Voice) entfernt. Er existiert bereits in Step 4 (Audio) über die `AudioAssetSelector`-Komponente — dort bleibt er.
 
-1. **Voiceover-Lautstärke** (0–100%) — erscheint nach erfolgreicher Voiceover-Generierung, direkt im "Audio Vorschau"-Bereich
-2. **Hintergrundmusik-Lautstärke** (0–100%) — erscheint sobald Musik ausgewählt wurde (wird aus Step 4 audioConfig gelesen)
+### Änderungen
 
-Beide Werte fließen direkt in Preview und Export ein.
+**1. `ContentVoiceStep.tsx`** — Musik-Slider-Block entfernen
+- Die Props `musicVolume`, `onMusicVolumeChange`, `hasMusicSelected` aus dem Interface und der Komponente entfernen
+- Den gesamten "Hintergrundmusik"-Card-Block (Zeilen 525–551) entfernen
 
-### Technische Umsetzung
+**2. `UniversalCreator.tsx`** — Props nicht mehr übergeben
+- Die drei Props `musicVolume`, `onMusicVolumeChange`, `hasMusicSelected` aus dem `<ContentVoiceStep>`-Aufruf (Zeilen 346–348) entfernen
 
-**1. `ContentConfig` erweitern** (`src/types/universal-creator.ts`)
-- Neues Feld: `voiceoverVolume?: number` (0–1, Default 1.0)
-
-**2. `ContentVoiceStep.tsx` — Voiceover-Lautstärke-Slider**
-- Im "Audio Vorschau"-Card (nach der Play/Pause-Steuerung) einen Slider (0–100%) hinzufügen
-- Wert wird via `onChange` in `contentConfig.voiceoverVolume` gespeichert
-- Preview-Audio (`audio.volume`) wird live synchronisiert
-
-**3. `UniversalCreator.tsx` — Voiceover-Volume durchreichen**
-- Remotion Preview (Zeile 508): `voiceoverVolume` aus `contentConfig` übergeben
-- Export-Step: `voiceoverVolume` an `PreviewExportStep` weiterreichen
-
-**4. `UniversalVideo.tsx` (Remotion Template) — Voiceover-Volume nutzen**
-- Schema: `voiceoverVolume: z.number().optional()` hinzufügen
-- `AudioLayer`: neuen Prop `voiceoverVolume` akzeptieren, statt hardcoded `1.0`
-- Props durchreichen
-
-**5. `render-universal-video/index.ts` — Volume aus Request nutzen**
-- `voiceoverVolume` aus dem Request-Body lesen statt hardcoded `1`
-
-**6. Musik-Lautstärke in Step 2** (optional, da Slider bereits in Step 4 existiert)
-- Einen kompakten Musik-Volume-Slider in Step 2 einbauen, der `audioConfig.music_volume` steuert
-- Dazu muss `audioConfig` + `setAudioConfig` an `ContentVoiceStep` übergeben werden
+Der Voiceover-Lautstärkeregler bleibt in Step 2 — nur die Musik wandert raus.
 
 ### Betroffene Dateien
 
-1. `src/types/universal-creator.ts` — `voiceoverVolume` Feld
-2. `src/components/universal-creator/steps/ContentVoiceStep.tsx` — beide Slider
-3. `src/pages/UniversalCreator/UniversalCreator.tsx` — Props durchreichen
-4. `src/remotion/templates/UniversalVideo.tsx` — voiceoverVolume im AudioLayer
-5. `supabase/functions/render-universal-video/index.ts` — voiceoverVolume aus Request
+1. `src/components/universal-creator/steps/ContentVoiceStep.tsx`
+2. `src/pages/UniversalCreator/UniversalCreator.tsx`
 
