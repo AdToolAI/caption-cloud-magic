@@ -85,6 +85,7 @@ const SceneSchema = z.object({
 export const UniversalVideoSchema = z.object({
   voiceoverUrl: z.string().optional(),
   voiceoverDuration: z.number().optional(),
+  voiceoverVolume: z.number().optional(),
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().optional(),
   targetWidth: z.number().optional(),

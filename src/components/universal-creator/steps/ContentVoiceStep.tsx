@@ -485,6 +485,30 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
               </div>
             </div>
 
+            {/* Voiceover Volume Slider */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label className="flex items-center gap-1.5">
+                  <Volume2 className="h-3.5 w-3.5" />
+                  Voiceover-Lautstärke
+                </Label>
+                <span className="text-sm text-muted-foreground">
+                  {Math.round((value.voiceoverVolume ?? 1) * 100)}%
+                </span>
+              </div>
+              <Slider
+                value={[Math.round((value.voiceoverVolume ?? 1) * 100)]}
+                onValueChange={([v]) => {
+                  const vol = v / 100;
+                  onChange({ ...value, voiceoverVolume: vol });
+                  if (audio) audio.volume = vol;
+                }}
+                min={0}
+                max={100}
+                step={1}
+              />
+            </div>
+
             <div className="p-4 bg-muted/50 rounded-lg">
               <audio src={value.voiceoverUrl} preload="metadata" />
               <p className="text-xs text-muted-foreground">
