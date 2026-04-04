@@ -1147,7 +1147,7 @@ export default function MediaLibrary() {
         })}
       </div>
 
-      {filteredMedia.length === 0 && !loading && (
+      {filteredMedia.length === 0 && !loading && categoryFilter !== 'cloud' && (
         <Card className="p-12">
           <div className="text-center">
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -1161,6 +1161,7 @@ export default function MediaLibrary() {
             </Button>
           </div>
         </Card>
+      )}
       )}
 
       {/* Video Dialog */}
