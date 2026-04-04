@@ -9896,6 +9896,57 @@ export type Database = {
         }
         Relationships: []
       }
+      video_translations: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          original_transcript: string | null
+          output_video_url: string | null
+          source_language: string | null
+          source_video_url: string
+          status: string
+          target_language: string
+          translated_transcript: string | null
+          updated_at: string
+          user_id: string
+          voiceover_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          original_transcript?: string | null
+          output_video_url?: string | null
+          source_language?: string | null
+          source_video_url: string
+          status?: string
+          target_language: string
+          translated_transcript?: string | null
+          updated_at?: string
+          user_id: string
+          voiceover_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          original_transcript?: string | null
+          output_video_url?: string | null
+          source_language?: string | null
+          source_video_url?: string
+          status?: string
+          target_language?: string
+          translated_transcript?: string | null
+          updated_at?: string
+          user_id?: string
+          voiceover_url?: string | null
+        }
+        Relationships: []
+      }
       video_variants: {
         Row: {
           aspect_ratio: string | null
