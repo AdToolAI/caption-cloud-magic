@@ -3,7 +3,7 @@ import {
   Sparkles, Bot, ImagePlus,
   MessageSquare, MessageCircle, BookTemplate,
   LineChart, BarChart3, Coins, Radar, Shield,
-  FolderOpen, Mic2, Video, Film, Edit, Layers,
+  FolderOpen, Mic2, Video, Film, Edit, Layers, Languages,
   Users, Palette,
   ShieldCheck, Settings,
 } from "lucide-react";
