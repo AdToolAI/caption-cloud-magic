@@ -760,6 +760,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         {/* AUDIO LAYER - React.memo prevents remounting when other props change */}
         <AudioLayer
           voiceoverUrl={voiceoverUrl}
+          voiceoverVolume={voiceoverVolume}
           backgroundMusicUrl={backgroundMusicUrl}
           backgroundMusicVolume={backgroundMusicVolume}
         />
