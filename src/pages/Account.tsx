@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
-import { Loader2, User, Shield, CreditCard, Settings, Link2, Eye } from "lucide-react";
+import { Loader2, User, Shield, CreditCard, Settings, Link2, Eye, Bell } from "lucide-react";
 import { AccountHeroHeader } from "@/components/account/AccountHeroHeader";
 import { ProfileTab } from "@/components/account/ProfileTab";
 import { SecurityTab } from "@/components/account/SecurityTab";
