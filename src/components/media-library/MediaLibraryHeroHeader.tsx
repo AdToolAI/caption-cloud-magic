@@ -19,6 +19,9 @@ export const MediaLibraryHeroHeader = ({
   usedGB,
   maxGB,
   onUploadClick,
+  cloudConnected = false,
+  cloudUsedGB = 0,
+  cloudTotalGB = 0,
 }: MediaLibraryHeroHeaderProps) => {
   const videoPercent = Math.min((videoCount / maxVideos) * 100, 100);
   const storagePercent = Math.min((usedGB / maxGB) * 100, 100);
