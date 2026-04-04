@@ -26,7 +26,7 @@ const MAX_STORAGE_GB = 10;
 // Normalized media item type
 interface NormalizedMediaItem {
   id: string;
-  source: 'upload' | 'ai' | 'ai_generator' | 'campaign' | 'video-creator';
+  source: 'upload' | 'ai' | 'ai_generator' | 'campaign' | 'video-creator' | 'cloud';
   type: 'image' | 'video';
   title?: string;
   caption?: string;
@@ -38,6 +38,8 @@ interface NormalizedMediaItem {
   platforms?: string[];
   sizeBytes?: number;
   fileSizeMb?: number;
+  storageLocation?: 'local' | 'cloud';
+  driveFileId?: string;
 }
 
 export default function MediaLibrary() {
