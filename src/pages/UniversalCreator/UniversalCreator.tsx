@@ -343,6 +343,9 @@ export function UniversalCreator() {
           value={contentConfig}
           onChange={setContentConfig}
           projectId={projectId || ''}
+          musicVolume={audioConfig.music_volume}
+          onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
+          hasMusicSelected={!!audioConfig.background_music_id}
         />
       );
       break;

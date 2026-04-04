@@ -32,7 +32,7 @@ interface Voice {
   description?: string;
 }
 
-export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceStepProps) => {
+export const ContentVoiceStep = ({ value, onChange, projectId, musicVolume = 0.3, onMusicVolumeChange, hasMusicSelected }: ContentVoiceStepProps) => {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
