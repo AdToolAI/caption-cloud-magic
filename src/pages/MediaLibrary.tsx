@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MediaLibraryHeroHeader } from "@/components/media-library/MediaLibraryHeroHeader";
 import { motion, AnimatePresence } from "framer-motion";
+import { useCloudStorage } from "@/hooks/useCloudStorage";
 
 // Storage Limits
 const MAX_VIDEOS = 250;
