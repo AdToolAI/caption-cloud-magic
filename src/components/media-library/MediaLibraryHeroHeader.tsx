@@ -163,7 +163,33 @@ export const MediaLibraryHeroHeader = ({
                 </div>
               </div>
 
-              {/* Warning Badge */}
+              {/* Cloud Storage Meter */}
+              {cloudConnected && (
+                <div className="flex items-center gap-3">
+                  <div className="relative w-12 h-12">
+                    <svg className="w-full h-full transform -rotate-90">
+                      <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="4" fill="none" className="text-muted/20" />
+                      <motion.circle
+                        cx="24" cy="24" r="20"
+                        stroke="hsl(210, 80%, 60%)"
+                        strokeWidth="4" fill="none" strokeLinecap="round"
+                        initial={{ pathLength: 0 }}
+                        animate={{ pathLength: cloudTotalGB > 0 ? Math.min(cloudUsedGB / cloudTotalGB, 1) : 0 }}
+                        transition={{ duration: 1, ease: "easeOut", delay: 0.4 }}
+                        style={{ strokeDasharray: "1 1" }}
+                      />
+                    </svg>
+                    <Cloud className="absolute inset-0 m-auto h-4 w-4 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Cloud</p>
+                    <p className="font-bold text-foreground">
+                      {cloudUsedGB.toFixed(1)} / {cloudTotalGB.toFixed(0)} GB
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {isWarning && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
