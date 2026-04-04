@@ -101,6 +101,7 @@ const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
+const VideoTranslator = lazy(() => import("./pages/VideoTranslator"));
 const HubPage = lazy(() => import("./pages/HubPage"));
 const Community = lazy(() => import("./pages/Community"));
 
@@ -214,6 +215,7 @@ function AppLayout() {
           <Route path="/ai-video-studio" element={<AIVideoStudio />} />
           <Route path="/audio-studio" element={<AudioStudio />} />
           <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
+          <Route path="/video-translator" element={<VideoTranslator />} />
           <Route path="/community" element={<Community />} />
           <Route path="/explainer-studio" element={<Navigate to="/home" replace />} />
           <Route path="/templates" element={<ComingSoon />} />

@@ -3,7 +3,7 @@ import {
   Sparkles, Bot, ImagePlus,
   MessageSquare, MessageCircle, BookTemplate,
   LineChart, BarChart3, Coins, Radar, Shield,
-  FolderOpen, Mic2, Video, Film, Edit, Layers,
+  FolderOpen, Mic2, Video, Film, Edit, Layers, Languages,
   Users, Palette,
   ShieldCheck, Settings,
 } from "lucide-react";
@@ -79,6 +79,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", descKey: "hubItemDesc.directorsCut", icon: Edit },
       { route: "/sora-long-form", titleKey: "Sora 2 Long-Form", descKey: "hubItemDesc.soraLongForm", icon: Film },
       { route: "/ai-video-studio", titleKey: "AI Video Studio", descKey: "hubItemDesc.aiVideoStudio", icon: Sparkles },
+      { route: "/video-translator", titleKey: "Videoübersetzer", descKey: "hubItemDesc.videoTranslator", icon: Languages },
       { route: "/picture-studio", titleKey: "KI Picture Studio", descKey: "hubItemDesc.backgroundReplacer", icon: Layers },
     ],
   },
