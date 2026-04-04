@@ -660,7 +660,7 @@ export function PreviewExportStep({
           <div className="flex justify-between">
             <span className="text-muted-foreground">Script-Länge:</span>
             <span className="font-medium">
-              {contentConfig.scriptText.split(/\s+/).filter(Boolean).length} Wörter
+              {contentConfig.scriptText?.split(/\s+/).filter(Boolean).length ?? 0} Wörter
             </span>
           </div>
           <div className="flex justify-between">
