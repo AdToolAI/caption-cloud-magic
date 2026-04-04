@@ -10,6 +10,7 @@ import { SubscriptionTab } from "@/components/account/SubscriptionTab";
 import { AdvancedTab } from "@/components/account/AdvancedTab";
 import { ConnectionsTab } from "@/components/account/ConnectionsTab";
 import { PrivacyTab } from "@/components/account/PrivacyTab";
+import { NotificationSettings } from "@/components/account/NotificationSettings";
 import { StorageUsagePanel } from "@/components/settings/StorageUsagePanel";
 import { useCloudStorage } from "@/hooks/useCloudStorage";
 
