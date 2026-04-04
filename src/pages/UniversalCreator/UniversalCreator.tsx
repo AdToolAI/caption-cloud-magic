@@ -343,6 +343,9 @@ export function UniversalCreator() {
           value={contentConfig}
           onChange={setContentConfig}
           projectId={projectId || ''}
+          musicVolume={audioConfig.music_volume}
+          onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
+          hasMusicSelected={!!audioConfig.background_music_id}
         />
       );
       break;
@@ -509,6 +512,7 @@ export function UniversalCreator() {
                   ...(contentConfig?.voiceoverUrl && {
                     voiceoverUrl: contentConfig.voiceoverUrl,
                     voiceoverDuration: contentConfig.voiceoverDuration || 30,
+                    voiceoverVolume: contentConfig.voiceoverVolume ?? 1.0,
                   }),
                   ...(selectedMusicUrl && {
                     backgroundMusicUrl: selectedMusicUrl,

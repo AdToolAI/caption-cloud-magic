@@ -8,10 +8,12 @@ import { LottieIcons } from '../components/LottieIcons';
 // Stable Audio Layer that NEVER remounts unnecessarily - wrapped in React.memo
 const AudioLayer = memo(function AudioLayer({
   voiceoverUrl,
+  voiceoverVolume = 1.0,
   backgroundMusicUrl,
   backgroundMusicVolume = 0.3,
 }: {
   voiceoverUrl?: string;
+  voiceoverVolume?: number;
   backgroundMusicUrl?: string;
   backgroundMusicVolume?: number;
 }) {
@@ -23,7 +25,7 @@ const AudioLayer = memo(function AudioLayer({
         <Html5Audio
           src={voiceoverUrl}
           startFrom={0}
-          volume={1.0}
+          volume={voiceoverVolume}
           loop={false}
           pauseWhenBuffering
         />
@@ -83,6 +85,7 @@ const SceneSchema = z.object({
 export const UniversalVideoSchema = z.object({
   voiceoverUrl: z.string().optional(),
   voiceoverDuration: z.number().optional(),
+  voiceoverVolume: z.number().optional(),
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().optional(),
   targetWidth: z.number().optional(),
@@ -556,6 +559,7 @@ const SceneRenderer: React.FC<{
 
 export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   voiceoverUrl,
+  voiceoverVolume,
   backgroundMusicUrl,
   backgroundMusicVolume = 0.3,
   subtitles,
@@ -757,6 +761,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         {/* AUDIO LAYER - React.memo prevents remounting when other props change */}
         <AudioLayer
           voiceoverUrl={voiceoverUrl}
+          voiceoverVolume={voiceoverVolume}
           backgroundMusicUrl={backgroundMusicUrl}
           backgroundMusicVolume={backgroundMusicVolume}
         />
@@ -848,6 +853,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
       {/* AUDIO LAYER - React.memo prevents remounting when other props change */}
       <AudioLayer
         voiceoverUrl={voiceoverUrl}
+        voiceoverVolume={voiceoverVolume}
         backgroundMusicUrl={backgroundMusicUrl}
         backgroundMusicVolume={backgroundMusicVolume}
       />

@@ -310,6 +310,7 @@ export function PreviewExportStep({
               customizations: {
                 voiceoverUrl: contentConfig.voiceoverUrl || '',
                 voiceoverDuration: calculatedDuration,
+                voiceoverVolume: contentConfig.voiceoverVolume ?? 1.0,
                 backgroundMusicUrl: selectedMusicUrl || '',
                 backgroundMusicVolume: musicVolume,
                 subtitles: subtitleConfig?.segments || [],

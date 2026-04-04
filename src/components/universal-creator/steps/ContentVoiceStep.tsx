@@ -17,6 +17,9 @@ interface ContentVoiceStepProps {
   value: ContentConfig | null;
   onChange: (config: ContentConfig) => void;
   projectId: string;
+  musicVolume?: number;
+  onMusicVolumeChange?: (vol: number) => void;
+  hasMusicSelected?: boolean;
 }
 
 interface Voice {
@@ -29,7 +32,7 @@ interface Voice {
   description?: string;
 }
 
-export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceStepProps) => {
+export const ContentVoiceStep = ({ value, onChange, projectId, musicVolume = 0.3, onMusicVolumeChange, hasMusicSelected }: ContentVoiceStepProps) => {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -485,6 +488,30 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
               </div>
             </div>
 
+            {/* Voiceover Volume Slider */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label className="flex items-center gap-1.5">
+                  <Volume2 className="h-3.5 w-3.5" />
+                  Voiceover-Lautstärke
+                </Label>
+                <span className="text-sm text-muted-foreground">
+                  {Math.round((value.voiceoverVolume ?? 1) * 100)}%
+                </span>
+              </div>
+              <Slider
+                value={[Math.round((value.voiceoverVolume ?? 1) * 100)]}
+                onValueChange={([v]) => {
+                  const vol = v / 100;
+                  onChange({ ...value, voiceoverVolume: vol });
+                  if (audio) audio.volume = vol;
+                }}
+                min={0}
+                max={100}
+                step={1}
+              />
+            </div>
+
             <div className="p-4 bg-muted/50 rounded-lg">
               <audio src={value.voiceoverUrl} preload="metadata" />
               <p className="text-xs text-muted-foreground">
@@ -495,7 +522,34 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
         </Card>
       )}
 
-      {/* Alternative: Upload eigenes Audio */}
+      {/* Music Volume Slider - shown when music is selected */}
+      {hasMusicSelected && onMusicVolumeChange && (
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Hintergrundmusik</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <Label className="flex items-center gap-1.5">
+                <Volume2 className="h-3.5 w-3.5" />
+                Musik-Lautstärke
+              </Label>
+              <span className="text-sm text-muted-foreground">
+                {Math.round(musicVolume * 100)}%
+              </span>
+            </div>
+            <Slider
+              value={[Math.round(musicVolume * 100)]}
+              onValueChange={([v]) => onMusicVolumeChange(v / 100)}
+              min={0}
+              max={100}
+              step={1}
+            />
+            <p className="text-xs text-muted-foreground">
+              Tipp: Senke die Musik-Lautstärke wenn Voiceover aktiv ist
+            </p>
+          </div>
+        </Card>
+      )}
+
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">Oder: Eigenes Audio hochladen</h3>
         <Button variant="outline" className="w-full" disabled>
