@@ -165,7 +165,14 @@ export default function MediaLibrary() {
 
   useEffect(() => {
     applyFilters();
-  }, [media, searchQuery, filterType, categoryFilter]);
+  }, [media, searchQuery, filterType, categoryFilter, cloudFiles]);
+
+  // Auto-load cloud files when cloud tab is selected
+  useEffect(() => {
+    if (categoryFilter === 'cloud' && cloudConnection && cloudFiles.length === 0) {
+      listCloudFiles();
+    }
+  }, [categoryFilter, cloudConnection]);
 
   const loadStorageQuota = async () => {
     if (!user) return;
