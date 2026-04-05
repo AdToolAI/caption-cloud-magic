@@ -521,12 +521,15 @@ export function DirectorsCut() {
         score: b.score,
       }));
       
+      const clientExtractionFailed = timestampedFrames.length === 0;
+      
       const { data, error } = await supabase.functions.invoke('analyze-video-scenes', {
         body: {
           video_url: selectedVideo.url,
           duration: canonicalDuration,
           frames: framesForAI.length > 0 ? framesForAI : undefined,
           scene_boundaries: sceneBoundaries,
+          client_extraction_failed: clientExtractionFailed,
         },
       });
       
@@ -573,7 +576,11 @@ export function DirectorsCut() {
       
       setScenes(normalizedScenes);
       
-      const method = detectedBoundaries.length > 0 ? 'Deterministische Analyse' : 'KI Vision';
+      const method = data.analysis_mode === 'server_vision' 
+        ? 'Serverseitige Videoanalyse' 
+        : detectedBoundaries.length > 0 
+          ? 'Deterministische Analyse' 
+          : 'KI Vision';
       toast.success(`${normalizedScenes.length} Szenen erkannt (${method})`);
     } catch (error) {
       console.error('Error analyzing video:', error);
