@@ -567,47 +567,7 @@ export function DirectorsCut() {
       toast.success(`${normalizedScenes.length || 0} Szenen erkannt (Vision AI)`);
     } catch (error) {
       console.error('Error analyzing video:', error);
-      toast.error('Fehler bei der Szenenanalyse');
-      
-      const mockScenes: SceneAnalysis[] = [
-        {
-          id: '1',
-          start_time: 0,
-          end_time: 5,
-          original_start_time: 0,
-          original_end_time: 5,
-          playbackRate: 1.0,
-          description: 'Eröffnungsszene',
-          mood: 'neutral',
-          suggested_effects: [{ type: 'filter', name: 'cinematic', reason: 'Professioneller Look', confidence: 0.85 }],
-          ai_suggestions: ['Cinematic Filter für professionellen Look empfohlen'],
-        },
-        {
-          id: '2',
-          start_time: 5,
-          end_time: 15,
-          original_start_time: 5,
-          original_end_time: 15,
-          playbackRate: 1.0,
-          description: 'Hauptinhalt',
-          mood: 'dynamic',
-          suggested_effects: [{ type: 'filter', name: 'vibrant', reason: 'Erhöht visuelle Wirkung', confidence: 0.78 }],
-          ai_suggestions: ['Erhöhte Sättigung für mehr Lebendigkeit'],
-        },
-        {
-          id: '3',
-          start_time: 15,
-          end_time: 30,
-          original_start_time: 15,
-          original_end_time: 30,
-          playbackRate: 1.0,
-          description: 'Abschluss',
-          mood: 'calm',
-          suggested_effects: [{ type: 'filter', name: 'warm', reason: 'Warmes Finish', confidence: 0.82 }],
-          ai_suggestions: ['Warme Töne für emotionalen Abschluss'],
-        },
-      ];
-      setScenes(mockScenes);
+      toast.error('Fehler bei der Szenenanalyse. Bitte versuche es erneut.');
     } finally {
       setIsAnalyzing(false);
     }
