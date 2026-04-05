@@ -820,12 +820,13 @@ async function publishToTikTok(
     }
 
     const videoMedia = media[0];
-    console.log('[TikTok] Downloading video from storage:', videoMedia.path);
+    const videoPath = videoMedia.path.replace(/^.*\/media-assets\//, '');
+    console.log('[TikTok] Downloading video from storage:', videoPath, '(original:', videoMedia.path, ')');
 
     // Download video from Supabase Storage
     const { data: videoData, error: downloadError } = await supabase.storage
       .from('media-assets')
-      .download(videoMedia.path);
+      .download(videoPath);
 
     if (downloadError || !videoData) {
       console.error('[TikTok] Video download failed:', downloadError);
