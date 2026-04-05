@@ -1,22 +1,21 @@
 
 
-## Fix: "Cannot read properties of undefined (reading 'split')" im Export-Schritt
+## Plan: Push-Benachrichtigungs-Anleitung in KI-Assistenten integrieren
 
-### Problem
-In `src/components/universal-creator/steps/PreviewExportStep.tsx` Zeile 663 wird `contentConfig.scriptText.split(...)` aufgerufen, ohne zu prüfen ob `scriptText` existiert. Wenn kein Script-Text vorhanden ist, ist der Wert `undefined` und `.split()` crasht.
+### Änderung
 
-### Lösung
+**Datei: `supabase/functions/ai-companion/index.ts`**
 
-**Datei: `src/components/universal-creator/steps/PreviewExportStep.tsx`**
-- Zeile 663: Optional Chaining hinzufügen: `contentConfig.scriptText?.split(...)` mit Fallback `?? 0`
+Im `ADTOOL_KNOWLEDGE`-String einen neuen Abschnitt nach dem FAQ-Bereich einfügen:
 
-```typescript
-// Vorher:
-{contentConfig.scriptText.split(/\s+/).filter(Boolean).length} Wörter
+**Neuer Abschnitt: `📱 PUSH-BENACHRICHTIGUNGEN EINRICHTEN`**
 
-// Nachher:
-{contentConfig.scriptText?.split(/\s+/).filter(Boolean).length ?? 0} Wörter
-```
+Enthält:
+- **Android (Chrome)**: App-URL öffnen → Drei-Punkte-Menü → "Zum Startbildschirm hinzufügen" → App vom Startbildschirm öffnen → Konto → Benachrichtigungen → Push aktivieren → Chrome-Benachrichtigungen in Android-Einstellungen erlauben
+- **iPhone/iOS (Safari)**: App-URL in Safari öffnen → Teilen-Button (□↑) → "Zum Home-Bildschirm" → App vom Home-Bildschirm öffnen → Konto → Benachrichtigungen → Push aktivieren
+- **Troubleshooting**: Toggle reagiert nicht, Push blockiert, keine Benachrichtigungen trotz Aktivierung
+- **Action-Link**: `[Benachrichtigungen öffnen](/account?tab=notifications)`
 
-Eine einzige Zeile — damit ist der Crash behoben.
+### Ergebnis
+Nutzer können den KI-Assistenten fragen "Wie aktiviere ich Push-Benachrichtigungen auf dem Handy?" und erhalten eine vollständige Schritt-für-Schritt-Anleitung für ihr Gerät.
 
