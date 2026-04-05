@@ -5,6 +5,7 @@ import { FacebookPostPreview } from "@/components/post-generator/FacebookPostPre
 import { InstagramPostPreview } from "@/components/post-generator/InstagramPostPreview";
 import { LinkedInPostPreview } from "@/components/post-generator/LinkedInPostPreview";
 import { XPostPreview } from "@/components/post-generator/XPostPreview";
+import { TikTokPostPreview } from "@/components/post-generator/TikTokPostPreview";
 import { useState, useMemo } from "react";
 import { Provider } from "@/types/publish";
 import { motion, AnimatePresence } from "framer-motion";
