@@ -58,39 +58,40 @@ serve(async (req) => {
         return `Frame ${i + 1}: Sekunde ${time}`;
       }).join('\n');
 
-      const systemPrompt = `Du bist ein präziser Video-Schnitt-Analyst. Deine Aufgabe ist es, EXAKTE Schnittpunkte zu identifizieren.
+      const systemPrompt = `Du bist ein präziser Video-Schnitt-Analyst. Deine Aufgabe ist es, NUR ECHTE HARTE SCHNITTE zu identifizieren.
 
 FRAME-ZEITSTEMPEL:
 ${frames.length} Frames wurden alle 0.1 Sekunden extrahiert:
 Frame 1 = 0.0s, Frame 2 = 0.1s, Frame 3 = 0.2s, Frame 4 = 0.3s, usw.
 Formel: Frame N entspricht Sekunde (N-1) × 0.1
 
-KRITISCHE ANWEISUNG - CHRONOLOGISCHE REIHENFOLGE:
-⚠️ Du MUSST die Szenen STRIKT IN CHRONOLOGISCHER REIHENFOLGE beschreiben!
+KRITISCHE ANWEISUNG - NUR ECHTE HARTE SCHNITTE:
+⚠️ Ein SCHNITT ist NUR wenn sich das Bild ABRUPT und VOLLSTÄNDIG ändert (harter Cut)!
+⚠️ Kamerabewegung, Zoom, Schwenk, Tracking = KEIN Schnitt! Gleiche Szene!
+⚠️ Leichte Farbänderung, Belichtungsänderung = KEIN Schnitt!
+⚠️ Gleiche Szene aus leicht anderem Winkel = KEIN Schnitt!
+⚠️ Objekt bewegt sich oder dreht sich = KEIN Schnitt!
+⚠️ Wenn du dir NICHT SICHER bist ob es ein Schnitt ist → es ist KEIN Schnitt!
+⚠️ Wenn das Video KEINE harten Schnitte hat, gib NUR 1 Szene zurück!
+
+CHRONOLOGISCHE REIHENFOLGE:
 ⚠️ Szene 1 = was du in den ERSTEN Frames siehst (beginnend bei Frame 1)
-⚠️ Szene 2 = was du NACH dem ersten Schnitt siehst
-⚠️ Szene 3 = was du NACH dem zweiten Schnitt siehst
-⚠️ NIEMALS Szenen nach Ähnlichkeit oder Inhalt gruppieren/sortieren!
+⚠️ Szene 2 = was du NACH dem ersten HARTEN SCHNITT siehst
 ⚠️ Die Reihenfolge im JSON muss EXAKT der Zeit-Reihenfolge im Video entsprechen!
 
-FRAME-FÜR-FRAME VERGLEICH:
-1. Schaue Frame 1 an, dann Frame 2. SIND SIE VISUELL UNTERSCHIEDLICH?
-2. Schaue Frame 2 an, dann Frame 3. SIND SIE VISUELL UNTERSCHIEDLICH?
-3. Wiederhole für ALLE ${frames.length} Frames!
+WAS IST EIN HARTER SCHNITT (neue Szene)?
+- Das Bild ändert sich KOMPLETT und ABRUPT (anderer Ort, andere Einstellung)
+- Sprung von einer Kameraeinstellung zu einer völlig anderen
 
-WAS IST EIN SCHNITT (neue Szene)?
-- Deutlicher Wechsel des Kamerawinkels
-- Anderes Hauptobjekt/Produkt im Fokus
-- Sprung in der Position/Perspektive
-- Wechsel von Nahaufnahme zu Totale oder umgekehrt
-
-WAS IST KEIN SCHNITT (gleiche Szene)?
-- Leichte Kamerabewegung
-- Gleiche Perspektive mit kleiner Änderung
-- Objekt bewegt sich minimal
+WAS IST KEIN SCHNITT (gleiche Szene weiterlaufen lassen!):
+- Kamerabewegung (Schwenk, Zoom, Dolly, Tracking)
+- Leichte Perspektivänderung
+- Objekt bewegt sich oder dreht sich
+- Farbänderung durch Belichtung
+- Gleiche Szene aus ähnlichem Winkel
 
 SZENENGRENZE BERECHNUNG:
-Wenn Frame N und Frame N+1 UNTERSCHIEDLICH sind:
+Wenn Frame N und Frame N+1 einen HARTEN SCHNITT zeigen:
 → Schnitt passiert bei (N - 1) × 0.1 Sekunden
 → Diese Szene endet dort, nächste Szene beginnt dort
 
@@ -98,7 +99,7 @@ REGELN:
 - Erste Szene startet IMMER bei 0.0s (frame_start: 1)
 - Letzte Szene endet IMMER bei ${videoDuration}s
 - Szenenzeiten auf 0.1s genau angeben!
-- Erwarte 2-5 Szenen für ein ${videoDuration}s Video
+- Gib so viele Szenen zurück wie es ECHTE HARTE SCHNITTE gibt. Das können auch nur 1-2 sein!
 
 JSON FORMAT für jede Szene (MIT FRAME-NUMMERN!):
 {
@@ -356,13 +357,18 @@ Antworte NUR mit dem JSON-Array!`
     // No client-side frames — send video URL directly to Gemini Vision for analysis
     console.log("[analyze-video-scenes] No client-side frames, sending video_url directly to Vision AI");
 
-    const videoAnalysisPrompt = `Du bist ein präziser Video-Schnitt-Analyst. Analysiere dieses Video und identifiziere die exakten Schnittpunkte.
+    const videoAnalysisPrompt = `Du bist ein präziser Video-Schnitt-Analyst. Analysiere dieses Video und identifiziere NUR ECHTE HARTE SCHNITTE.
 
-KRITISCHE ANWEISUNG:
+KRITISCHE ANWEISUNG - NUR HARTE SCHNITTE:
+- Ein SCHNITT ist NUR wenn sich das Bild ABRUPT und VOLLSTÄNDIG ändert (harter Cut)!
+- Kamerabewegung, Zoom, Schwenk, Tracking = KEIN Schnitt! Gleiche Szene!
+- Leichte Farbänderung, Belichtungsänderung = KEIN Schnitt!
+- Gleiche Szene aus leicht anderem Winkel = KEIN Schnitt!
+- Wenn das Video KEINE harten Schnitte hat, gib NUR 1 Szene zurück!
 - Beschreibe was du TATSÄCHLICH im Video siehst
 - Szenen in CHRONOLOGISCHER REIHENFOLGE
 - Beschreibungen MAXIMAL 50 Zeichen
-- Erwarte 2-5 Szenen für ein ${videoDuration}s Video
+- Gib so viele Szenen zurück wie es ECHTE HARTE SCHNITTE gibt. Das können auch nur 1-2 sein!
 
 JSON FORMAT für jede Szene:
 {
@@ -519,13 +525,13 @@ function generateDefaultEffectsForMood(mood: string): { type: string; name: stri
   return moodEffects[mood] || moodEffects.neutral;
 }
 
-// Stabilize scenes: merge micro-scenes (<0.8s) and cap max count based on video length
+// Stabilize scenes: merge micro-scenes (<3s) and cap max count based on video length
 function stabilizeScenes(scenes: any[], videoDuration: number): any[] {
   if (scenes.length <= 1) return scenes;
   
-  const MIN_SCENE_DURATION = 0.8; // seconds — only merge truly micro-scenes
-  const MAX_SCENES_PER_10S = 3; // max 3 scenes per 10 seconds of video
-  const maxScenes = Math.max(2, Math.ceil(videoDuration / 10 * MAX_SCENES_PER_10S));
+  const MIN_SCENE_DURATION = 3.0; // seconds — merge scenes shorter than 3s
+  const MAX_SCENES_PER_10S = 1; // max 1 scene per 10 seconds of video
+  const maxScenes = Math.max(1, Math.ceil(videoDuration / 10 * MAX_SCENES_PER_10S));
   
   // Step 1: Merge micro-scenes into their neighbors
   let stabilized: any[] = [];
@@ -578,8 +584,8 @@ function stabilizeScenes(scenes: any[], videoDuration: number): any[] {
 }
 
 function generateFallbackScenes(duration: number): SceneAnalysis[] {
-  // More scenes for short videos: 15-30s gets 3 scenes instead of 2
-  const sceneCount = duration < 15 ? 2 : duration < 30 ? 3 : duration < 60 ? 4 : 5;
+  // Conservative fallback: 1 scene per 30s
+  const sceneCount = Math.max(1, Math.ceil(duration / 30));
   const sceneDuration = duration / sceneCount;
   
   const moods = ["dynamic", "calm", "energetic", "neutral"];
