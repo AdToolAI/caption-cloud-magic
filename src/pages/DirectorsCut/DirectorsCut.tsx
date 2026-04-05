@@ -525,7 +525,7 @@ export function DirectorsCut() {
         : (selectedVideo.duration || 30);
       
       // Client-side stabilization: merge micro-scenes (<1.5s)
-      const MIN_SCENE_DURATION = 1.5;
+      const MIN_SCENE_DURATION = 3.0;
       const stableScenes: any[] = [];
       for (const scene of sortedScenes) {
         const dur = (scene.end_time || 0) - (scene.start_time || 0);
