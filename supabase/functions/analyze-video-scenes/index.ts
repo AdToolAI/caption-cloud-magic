@@ -337,14 +337,15 @@ Antworte NUR mit dem JSON-Array, kein weiterer Text!`;
     return [];
   }
 
-  // Filter valid boundaries
+  // Filter valid boundaries — discard those too close to start/end (artifacts)
+  const MIN_EDGE_DISTANCE = 3.0;
   const boundaries: SceneBoundary[] = [];
   for (const item of parsed) {
     const time = typeof item.time === 'number' ? item.time : parseFloat(item.time);
     const confidence = typeof item.confidence === 'number' ? item.confidence : 0.5;
     
-    if (isNaN(time) || time <= 0.5 || time >= duration - 0.5) continue;
-    if (confidence < 0.5) continue; // Lower threshold since Gemini is analyzing real video
+    if (isNaN(time) || time < MIN_EDGE_DISTANCE || time > duration - MIN_EDGE_DISTANCE) continue;
+    if (confidence < 0.5) continue;
     
     boundaries.push({
       time,
@@ -385,11 +386,13 @@ function buildDeterministicScenes(
   }
 
   const sorted = [...cutTimes].sort((a, b) => a - b);
+  const MIN_SCENE_DURATION = 3.0;
   const scenes: { start_time: number; end_time: number }[] = [];
   let lastStart = 0;
 
   for (const t of sorted) {
-    if (t > lastStart + 0.5 && t < duration - 0.5) {
+    // Only accept boundary if it creates a scene >= 3s AND leaves >= 3s for the next scene
+    if (t > lastStart + MIN_SCENE_DURATION && t < duration - MIN_SCENE_DURATION) {
       scenes.push({ start_time: lastStart, end_time: t });
       lastStart = t;
     }
