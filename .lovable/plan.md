@@ -2,24 +2,23 @@
 
 ## Problem
 
-Die Logs zeigen klar: Gemini erkennt 4 "Boundaries" — bei 0.0s, 0.9s, 29.9s und 30.9s. Nach Filterung bleiben 0.9s und 29.9s. Das erzeugt eine Mikro-Szene von 0–0.9s (unter 1 Sekunde), die offensichtlich ein Halluzinations-Artefakt ist.
+TikTok-Publishing schlägt fehl mit "Failed to download video from storage", weil `media.path` die **volle öffentliche URL** enthält (z.B. `https://...supabase.co/storage/v1/object/public/media-assets/userId/file.mp4`), aber `supabase.storage.download()` einen **relativen Pfad** erwartet (z.B. `userId/file.mp4`).
 
-Die echte Grenze ist nur bei ~30s. Die 0.9s-Boundary ist Rauschen.
-
-## Ursache
-
-`buildDeterministicScenes()` prüft nur `t > lastStart + 0.5` — erlaubt also Szenen ab 0.5s Länge. Die Stabilisierungs-Policy von 3.0s Mindestdauer wird hier nicht angewendet.
+Facebook hat diesen Fix bereits (Zeile 633): `media[0].path.replace(/^.*\/media-assets\//, '')`. TikTok fehlt er.
 
 ## Lösung
 
-**Datei: `supabase/functions/analyze-video-scenes/index.ts`**
+**Datei: `supabase/functions/publish/index.ts`**
 
-1. **`buildDeterministicScenes()`**: Mindest-Szenenlänge von 3.0s durchsetzen. Boundaries die Szenen unter 3s erzeugen würden, werden verworfen.
+Eine Zeile hinzufügen vor dem `supabase.storage.download()` Aufruf bei TikTok (ca. Zeile 822-828):
 
-2. **`detectScenesFromVideo()`**: Boundaries zu nah am Anfang (< 3s) oder Ende (> duration - 3s) herausfiltern, da diese fast immer Artefakte sind.
+```typescript
+const videoPath = videoMedia.path.replace(/^.*\/media-assets\//, '');
+```
+
+Und dann `videoPath` statt `videoMedia.path` an `.download()` übergeben — exakt wie Facebook es bereits macht.
 
 ## Ergebnis
 
-- 0.9s-Boundary wird verworfen (zu nah am Anfang, erzeugt Mikro-Szene)
-- 29.9s-Boundary bleibt → 2 Szenen: 0–29.9s und 29.9–60s
+Das Video wird korrekt aus dem Storage heruntergeladen und der TikTok-Upload kann weiterlaufen. Der Sandbox-Testpost sollte dann als Draft im TikTok-Konto erscheinen.
 
