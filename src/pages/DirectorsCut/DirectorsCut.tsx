@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { saveDraft, loadDraft, clearDraft, SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE } from '@/lib/directors-cut-draft';
-import { extractTimestampedFrames, detectCutsAsync, type TimestampedFrame, type DetectedCut } from '@/lib/directors-cut-scene-detection';
+import { extractTimestampedFrames, extractRefinementFrames, detectBoundariesAsync, type TimestampedFrame, type DetectedBoundary } from '@/lib/directors-cut-scene-detection';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { 
@@ -453,56 +453,80 @@ export function DirectorsCut() {
         }
       }
       
-      // Step 1: Extract timestamped frames across FULL video duration
+      // Step 1: Extract timestamped frames across FULL video duration (~3fps)
       let timestampedFrames: TimestampedFrame[] = [];
-      let detectedCuts: DetectedCut[] = [];
-      let clientCutTimestamps: number[] = [];
+      let detectedBoundaries: DetectedBoundary[] = [];
       
       try {
         timestampedFrames = await extractTimestampedFrames(selectedVideo.url, canonicalDuration);
-        toast.info(`${timestampedFrames.length} Frames extrahiert, analysiere Schnitte...`);
+        toast.info(`${timestampedFrames.length} Frames extrahiert, analysiere Übergänge...`);
         
-        // Step 2: Client-side cut detection via pixel diff
-        detectedCuts = await detectCutsAsync(timestampedFrames);
-        clientCutTimestamps = detectedCuts.map(c => c.time);
+        // Step 2: Two-pass boundary detection
+        // Pass 1: Coarse scan
+        const coarseResult = await detectBoundariesAsync(timestampedFrames);
         
-        console.log(`[DirectorsCut] Client-side detected ${detectedCuts.length} cuts:`, clientCutTimestamps);
+        // Pass 2: Refine around candidates with dense frames
+        if (coarseResult.boundaries.length > 0) {
+          toast.info(`${coarseResult.boundaries.length} Kandidaten gefunden, verfeinere...`);
+          try {
+            const refinementFrames = await extractRefinementFrames(
+              selectedVideo.url, canonicalDuration,
+              coarseResult.boundaries.map(b => b.time)
+            );
+            const refined = await detectBoundariesAsync(timestampedFrames, refinementFrames);
+            detectedBoundaries = refined.boundaries;
+          } catch {
+            detectedBoundaries = coarseResult.boundaries;
+          }
+        } else {
+          detectedBoundaries = coarseResult.boundaries;
+        }
+        
+        console.log(`[DirectorsCut] Deterministic boundaries: ${detectedBoundaries.length}`, 
+          detectedBoundaries.map(b => `${b.time}s(${b.type},${b.score.toFixed(3)})`));
       } catch (frameError) {
         console.warn('[DirectorsCut] Frame extraction failed, falling back to video URL analysis:', frameError);
       }
       
-      // Step 3: Send to AI for verification + description
-      // Select subset of frames for AI (around cut points + evenly spaced)
+      // Step 3: Send boundaries + targeted frames to AI for description only
       const framesForAI: Array<{ time: number; image: string }> = [];
       if (timestampedFrames.length > 0) {
-        // Always include frames near detected cuts
-        for (const cut of detectedCuts) {
-          // Frame before cut
-          const beforeIdx = timestampedFrames.findIndex(f => f.time >= cut.time) - 1;
-          // Frame after cut
-          const afterIdx = timestampedFrames.findIndex(f => f.time >= cut.time);
+        // Include frames around each boundary (before/after)
+        for (const boundary of detectedBoundaries) {
+          const beforeIdx = timestampedFrames.findIndex(f => f.time >= boundary.time) - 1;
+          const afterIdx = timestampedFrames.findIndex(f => f.time >= boundary.time);
           if (beforeIdx >= 0) framesForAI.push(timestampedFrames[beforeIdx]);
           if (afterIdx >= 0 && afterIdx < timestampedFrames.length) framesForAI.push(timestampedFrames[afterIdx]);
         }
         
-        // Add evenly spaced frames (max 10 total for API efficiency)
-        const step = Math.max(1, Math.floor(timestampedFrames.length / 8));
-        for (let i = 0; i < timestampedFrames.length; i += step) {
-          if (!framesForAI.find(f => Math.abs(f.time - timestampedFrames[i].time) < 0.5)) {
-            framesForAI.push(timestampedFrames[i]);
+        // Add evenly spaced representative frames (1 per scene segment)
+        const boundaryTimes = [0, ...detectedBoundaries.map(b => b.time), canonicalDuration];
+        for (let s = 0; s < boundaryTimes.length - 1; s++) {
+          const midTime = (boundaryTimes[s] + boundaryTimes[s + 1]) / 2;
+          const closest = timestampedFrames.reduce((best, f) => 
+            Math.abs(f.time - midTime) < Math.abs(best.time - midTime) ? f : best
+          );
+          if (!framesForAI.find(f => Math.abs(f.time - closest.time) < 0.3)) {
+            framesForAI.push(closest);
           }
         }
         
-        // Sort by time and limit
         framesForAI.sort((a, b) => a.time - b.time);
       }
+      
+      // scene_boundaries is the authoritative source — AI only describes
+      const sceneBoundaries = detectedBoundaries.map(b => ({
+        time: b.time,
+        type: b.type,
+        score: b.score,
+      }));
       
       const { data, error } = await supabase.functions.invoke('analyze-video-scenes', {
         body: {
           video_url: selectedVideo.url,
           duration: canonicalDuration,
           frames: framesForAI.length > 0 ? framesForAI : undefined,
-          detected_cuts: clientCutTimestamps.length > 0 ? clientCutTimestamps : undefined,
+          scene_boundaries: sceneBoundaries,
         },
       });
       
