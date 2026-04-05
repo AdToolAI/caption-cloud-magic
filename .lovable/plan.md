@@ -1,18 +1,32 @@
 
 
-## Problem
+## Plan: TikTok "In App ansehen" Button nach erfolgreichem Publish
 
-TikTok gibt den Fehler `unaudited_client_can_only_post_to_private_accounts` zurück. Da dein TikTok-App-Antrag abgelehnt wurde, befindet sich die App im **Sandbox-Modus**. In diesem Modus erlaubt TikTok nur `privacy_level: 'SELF_ONLY'` (als Draft posten), nicht `PUBLIC_TO_EVERYONE`.
+### Was wird gemacht
 
-## Lösung
+Nach einem erfolgreichen TikTok-Publish wird ein Button "In TikTok ansehen" angezeigt, der den User direkt zur TikTok-App (bzw. Web-Profil) weiterleitet, wo der Draft sichtbar ist.
 
-**Datei: `supabase/functions/publish/index.ts`** (Zeile 897)
+### Umsetzung
 
-`privacy_level` von `'PUBLIC_TO_EVERYONE'` auf `'SELF_ONLY'` ändern. Das Video wird dann als Draft im TikTok-Konto des verbundenen Users erstellt — genau wie es für Sandbox-Apps vorgesehen ist.
+**Datei: `src/components/composer/PublishResultCard.tsx`**
 
-Optional: Einen Kommentar hinzufügen, dass dies nach erfolgreicher App-Review auf `PUBLIC_TO_EVERYONE` geändert werden kann.
+Aktuell zeigt die Karte bei `result.ok && result.permalink` einen "View post"-Link. TikTok liefert im Sandbox-Modus aber keinen `permalink`, da es ein Draft ist.
 
-## Ergebnis
+Änderung: Wenn `result.provider === 'tiktok'` und `result.ok` ist, aber kein `permalink` vorhanden, einen speziellen Button anzeigen:
+- Text: "In TikTok App öffnen"
+- Link: `https://www.tiktok.com` (öffnet die TikTok-App auf Mobilgeräten via Deep Link, oder das Web-Profil auf Desktop)
+- Hinweistext darunter: "Video wurde als Draft hochgeladen — öffne TikTok um es zu veröffentlichen"
 
-Der 403-Fehler verschwindet. Videos werden als Drafts in der TikTok-App hochgeladen, wo sie manuell veröffentlicht werden können.
+Zusätzlich: Falls die `social_connections`-Daten einen TikTok-Username enthalten, den Link direkt auf `https://www.tiktok.com/@username` setzen, damit der User auf seinem Profil landet.
+
+**Datei: `supabase/functions/publish/index.ts`**
+
+Bei erfolgreichem TikTok-Upload den `account_name` aus der `social_connections`-Tabelle im Response mitgeben (als `permalink`-Ersatz), z.B.:
+```
+permalink: `https://www.tiktok.com/@${connection.account_name}`
+```
+
+### Ergebnis
+
+Nach erfolgreichem TikTok-Publish erscheint ein Button der direkt zum TikTok-Profil führt, wo der Draft sichtbar ist.
 
