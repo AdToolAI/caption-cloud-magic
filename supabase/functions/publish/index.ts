@@ -806,7 +806,7 @@ async function publishToTikTok(
       };
     }
 
-    const accessToken = await decryptToken(connection.access_token_hash);
+    let accessToken = await decryptToken(connection.access_token_hash);
     if (!accessToken) {
       console.error('[TikTok] Access token is empty after decoding');
       return {
@@ -817,6 +817,41 @@ async function publishToTikTok(
       };
     }
     console.log('[TikTok] Access token decrypted, length:', accessToken.length);
+
+    // Auto-refresh if token is expired or about to expire
+    const tokenExpiresAt = connection.token_expires_at ? new Date(connection.token_expires_at).getTime() : 0;
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+    if (tokenExpiresAt > 0 && (tokenExpiresAt - now) < fiveMinutes) {
+      console.log('[TikTok] Token expired or expiring soon, refreshing...');
+      try {
+        const { refreshAccessToken } = await import('../_shared/tiktok-api.ts');
+        const refreshToken = await decryptToken(connection.refresh_token_hash);
+        const newTokens = await refreshAccessToken(refreshToken);
+        accessToken = newTokens.access_token;
+
+        const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000).toISOString();
+        await supabase
+          .from('social_connections')
+          .update({
+            access_token_hash: await encryptToken(newTokens.access_token),
+            refresh_token_hash: await encryptToken(newTokens.refresh_token),
+            token_expires_at: newExpiresAt,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', connection.id);
+
+        console.log('[TikTok] ✅ Token refreshed successfully, new expiry:', newExpiresAt);
+      } catch (refreshErr: any) {
+        console.error('[TikTok] Token refresh failed:', refreshErr.message);
+        return {
+          provider: 'tiktok',
+          ok: false,
+          error_code: 'TT_TOKEN_REFRESH_FAILED',
+          error_message: 'TikTok token expired and refresh failed. Please reconnect your TikTok account.',
+        };
+      }
+    }
 
     // TikTok requires video for posts
     if (!media || media.length === 0 || media[0].type !== 'video') {
