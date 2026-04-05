@@ -573,7 +573,7 @@ export function DirectorsCut() {
       
       setScenes(normalizedScenes);
       
-      const method = detectedCuts.length > 0 ? 'Pixel-Analyse + KI' : 'KI Vision';
+      const method = detectedBoundaries.length > 0 ? 'Deterministische Analyse' : 'KI Vision';
       toast.success(`${normalizedScenes.length} Szenen erkannt (${method})`);
     } catch (error) {
       console.error('Error analyzing video:', error);
