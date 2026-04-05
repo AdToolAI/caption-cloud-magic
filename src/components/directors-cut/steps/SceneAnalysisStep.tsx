@@ -826,10 +826,13 @@ export function SceneAnalysisStep({
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-primary" />
-                {scenes.length} Szenen erkannt
+                {scenes.length} {scenes.length === 1 ? 'Szene' : 'Szenen'} erkannt
+                <Badge variant="outline" className="text-xs font-normal">
+                  Deterministische Analyse
+                </Badge>
               </h3>
               <p className="text-sm text-muted-foreground">
-                Klicke auf eine Szene für Details und Vorschläge
+                Szenengrenzen basieren auf Pixel-, Histogramm- und Kantensignalen
               </p>
             </div>
             <Button variant="outline" onClick={applyAllSuggestions}>
