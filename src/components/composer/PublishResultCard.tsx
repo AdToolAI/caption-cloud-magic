@@ -52,7 +52,24 @@ export function PublishResultCard({ result }: PublishResultCardProps) {
           )}
         </div>
 
-        {result.ok && result.permalink && (
+        {result.ok && result.provider === 'tiktok' && (
+          <div className="mt-1 space-y-1.5">
+            <a
+              href={result.permalink || 'https://www.tiktok.com'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            >
+              In TikTok App öffnen
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+            <p className="text-xs text-muted-foreground">
+              Video wurde als Draft hochgeladen — öffne TikTok um es zu veröffentlichen
+            </p>
+          </div>
+        )}
+
+        {result.ok && result.permalink && result.provider !== 'tiktok' && (
           <a
             href={result.permalink}
             target="_blank"

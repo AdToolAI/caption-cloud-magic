@@ -944,11 +944,16 @@ async function publishToTikTok(
 
     console.log('[TikTok] ✅ Video uploaded successfully');
 
+    // Build profile link so the user can open TikTok to see the draft
+    const profileLink = connection.account_name
+      ? `https://www.tiktok.com/@${connection.account_name}`
+      : 'https://www.tiktok.com';
+
     return {
       provider: 'tiktok',
       ok: true,
       external_id: publish_id,
-      permalink: undefined, // TikTok doesn't provide direct permalink until video is processed
+      permalink: profileLink,
       error_code: undefined,
       error_message: undefined,
     };
