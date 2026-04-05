@@ -84,12 +84,24 @@ export async function refreshAccessToken(refreshToken: string): Promise<TikTokTo
   }
 
   const data = await response.json();
+  console.log('[TikTok API] Refresh response keys:', Object.keys(data));
   
-  if (data.error || !data.data) {
-    throw new Error(data.error?.message || 'Token refresh failed');
+  // Handle both top-level and nested response formats
+  const tokens = data.data || data;
+  
+  // Check for error in either format
+  if (data.error || data.error_code || tokens.error || tokens.error_code) {
+    const errMsg = data.error?.message || data.error_description || tokens.error?.message || tokens.error_description || 'Token refresh failed';
+    console.error('[TikTok API] Token refresh error:', errMsg);
+    throw new Error(errMsg);
   }
   
-  return data.data;
+  if (!tokens.access_token) {
+    console.error('[TikTok API] No access_token in refresh response:', JSON.stringify(data).substring(0, 500));
+    throw new Error('Token refresh failed: no access_token in response');
+  }
+  
+  return tokens;
 }
 
 // Check if token needs refresh (5min buffer)
