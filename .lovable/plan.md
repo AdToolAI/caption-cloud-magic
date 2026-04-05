@@ -1,24 +1,25 @@
 
 
-## Problem
+## Plan: TikTok Publishing Fix + TikTok-Vorschau
 
-TikTok-Publishing schlägt fehl mit "Failed to download video from storage", weil `media.path` die **volle öffentliche URL** enthält (z.B. `https://...supabase.co/storage/v1/object/public/media-assets/userId/file.mp4`), aber `supabase.storage.download()` einen **relativen Pfad** erwartet (z.B. `userId/file.mp4`).
+### Problem 1: "failed to parse header value"
 
-Facebook hat diesen Fix bereits (Zeile 633): `media[0].path.replace(/^.*\/media-assets\//, '')`. TikTok fehlt er.
+Der `accessToken` aus `atob(connection.access_token_hash)` enthält vermutlich Whitespace, Newlines oder andere ungültige Zeichen. Deno's `fetch` lehnt solche Header-Werte ab.
 
-## Lösung
+**Fix in `supabase/functions/publish/index.ts`** (Zeile 809):
+- Token nach `atob()` trimmen und bereinigen: `atob(...).trim().replace(/[\r\n]/g, '')`
+- Zusätzlich vor dem Fetch-Call prüfen, ob der Token nicht leer ist
 
-**Datei: `supabase/functions/publish/index.ts`**
+### Problem 2: Keine TikTok-Vorschau
 
-Eine Zeile hinzufügen vor dem `supabase.storage.download()` Aufruf bei TikTok (ca. Zeile 822-828):
+In `src/components/composer/ComposerPreview.tsx` (Zeile 209-215) steht aktuell nur ein Platzhalter-Alert "TikTok-Vorschau ist aktuell nicht verfügbar".
 
-```typescript
-const videoPath = videoMedia.path.replace(/^.*\/media-assets\//, '');
-```
+**Fix:**
+1. **Neue Komponente `src/components/post-generator/TikTokPostPreview.tsx`** erstellen — im TikTok-Stil (9:16 Hochformat, dunkler Hintergrund, Profilinfo rechts unten, Caption links unten, Musik-Bar unten)
+2. **`ComposerPreview.tsx`** aktualisieren — den Alert durch die neue `TikTokPostPreview`-Komponente ersetzen, mit denselben Props wie die anderen Previews (mediaUrl, caption, hashtags, profileName etc.)
 
-Und dann `videoPath` statt `videoMedia.path` an `.download()` übergeben — exakt wie Facebook es bereits macht.
-
-## Ergebnis
-
-Das Video wird korrekt aus dem Storage heruntergeladen und der TikTok-Upload kann weiterlaufen. Der Sandbox-Testpost sollte dann als Draft im TikTok-Konto erscheinen.
+### Betroffene Dateien
+- `supabase/functions/publish/index.ts` — Token-Bereinigung
+- `src/components/post-generator/TikTokPostPreview.tsx` — Neue Komponente
+- `src/components/composer/ComposerPreview.tsx` — TikTok-Preview einbinden
 
