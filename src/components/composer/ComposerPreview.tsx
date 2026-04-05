@@ -207,12 +207,15 @@ export function ComposerPreview({
             />
           )}
 
-          {activePlatform === 'tiktok' && (
-            <Alert className="bg-muted/30 border-white/10">
-              <AlertDescription>
-                TikTok-Vorschau ist aktuell nicht verfügbar. Ihr Video wird wie konfiguriert hochgeladen.
-              </AlertDescription>
-            </Alert>
+           {activePlatform === 'tiktok' && (
+            <TikTokPostPreview
+              mediaUrl={mediaPreviewUrl || ''}
+              mediaType={selectedMedia[0]?.type.startsWith('video/') ? 'video' : 'image'}
+              caption={(caption || textContent).slice(0, 2200)}
+              hashtags={hashtags || []}
+              profileName={profileName}
+              profileImage={profileImage}
+            />
           )}
 
           {activePlatform === 'youtube' && (
