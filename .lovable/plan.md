@@ -1,35 +1,33 @@
 
 
-## Plan: KI-Szenenanalyse — Echte Schnitterkennung statt Ratespiel
+## Umgesetzt: Deterministische Szenenanalyse (Pixel-basiert + KI-Verifikation)
 
 ### Problem
-Die KI erfindet Szenen-Schnitte, auch wenn das Video keine echten Schnitte hat. Bei einem 60s-Video mit 2 Szenen a 30s erkennt sie 5 "Szenen". Ursachen:
+Die KI hat Szenen "geraten" statt echte Schnitte zu erkennen. Ein 60s-Video mit 2 Szenen à 30s wurde als 5 Szenen erkannt.
 
-1. **Frame-Extraktion scheitert** (CORS) — 0 Frames werden gesendet
-2. **Fallback-Prompt sagt "Erwarte 2-5 Szenen"** — AI füllt das Minimum
-3. **Kein klarer Hinweis**, dass Kamerabewegung/leichte Änderungen KEINE Schnitte sind
+### Lösung (implementiert)
 
-### Änderungen
+**1. Neuer Client-seitiger Cut-Detector: `src/lib/directors-cut-scene-detection.ts`**
+- `extractTimestampedFrames()`: Frames gleichmäßig über die GESAMTE Videodauer verteilt (nicht nur erste 20s)
+- `detectCutsAsync()`: Pixel-Differenz zwischen aufeinanderfolgenden Frames → adaptive Threshold-Erkennung
+- `buildScenesFromCuts()`: Szenen aus erkannten Schnittzeiten erstellen
 
-**1. Edge Function `supabase/functions/analyze-video-scenes/index.ts`**
+**2. Frontend: `src/pages/DirectorsCut/DirectorsCut.tsx`**
+- Mock-Szenen-Fallback (3 Fake-Szenen im catch) ENTFERNT
+- Frame-Extraktion nutzt jetzt `extractTimestampedFrames()` mit voller Videolänge
+- Client-seitige Schnitterkennung VOR dem API-Aufruf
+- Erkannte Schnitt-Zeitstempel werden als `detected_cuts` an die Edge Function gesendet
+- Frames mit echten Zeitstempeln als `Array<{ time, image }>` statt `string[]`
 
-**Prompt überarbeiten (beide Pfade: mit Frames + ohne Frames):**
-- Klare Anweisung: "Nur ECHTE HARTE SCHNITTE zählen. Kamerabewegung, Zoom, Schwenk = KEIN Schnitt"
-- "Wenn keine Schnitte erkennbar sind, gib NUR 1 Szene zurück"
-- "Erwarte 2-5 Szenen" entfernen — stattdessen: "Gib so viele Szenen zurück wie es echte Schnitte gibt. Das können auch nur 1-2 sein."
-- Explizit betonen: "Farbänderungen, leichte Perspektivwechsel, gleiche Szene aus ähnlichem Winkel = KEIN Schnitt"
-
-**Fallback-Szenen konservativer:**
-- `generateFallbackScenes`: Für 60s nur 2 Szenen statt 4 (eine pro 30s statt pro 15s)
-- Generell: `sceneCount = Math.max(1, Math.ceil(duration / 30))` statt `/15`
-
-**Stabilisierung verschärfen:**
-- `MIN_SCENE_DURATION` von 0.8s auf 3.0s erhöhen — Szenen unter 3s werden zusammengeführt
-- `MAX_SCENES_PER_10S` von 3 auf 1 reduzieren (max 6 Szenen für 60s)
-
-**2. Client-seitig `src/pages/DirectorsCut/DirectorsCut.tsx`**
-- `MIN_SCENE_DURATION` client-seitig ebenfalls von 1.5s auf 3.0s erhöhen (Zeile 528)
+**3. Edge Function: `supabase/functions/analyze-video-scenes/index.ts`**
+- Akzeptiert `detected_cuts: number[]` und `frames: Array<{ time, image }>`
+- KI-Prompt: "Bestätige oder verwerfe die vorab erkannten Schnitte"
+- Kein "Rate die Szenenzahl" mehr — KI verifiziert nur noch
+- Fallback bei API-Fehler: Client-Cuts verwenden oder 1 Szene
+- `generateFallbackScenes()` → `generateSingleScene()` (immer 1 Szene)
+- `temperature` von 0.4 auf 0.2 gesenkt für konsistentere Ergebnisse
 
 ### Ergebnis
-Die KI meldet nur echte harte Schnitte. Ein 60s-Video mit 2 Szenen a 30s wird korrekt als 2 Szenen erkannt, nicht als 5.
-
+- 60s Video mit Cut bei 30s → exakt 2 Szenen
+- 60s Video ohne Cut → exakt 1 Szene
+- Analyse-Fehler → keine Fake-Szenen, stattdessen Fehlermeldung
