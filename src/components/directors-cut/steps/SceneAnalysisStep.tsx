@@ -35,49 +35,7 @@ import { supabase } from '@/integrations/supabase/client';
 // DirectorsCutPreviewPlayer removed — using native <video> for lightweight analysis preview
 import { NativeTransitionOverlay } from '../preview/NativeTransitionOverlay';
 
-// Extract video frames for Vision AI analysis
-const extractVideoFrames = async (videoUrl: string, duration: number): Promise<string[]> => {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement('video');
-    video.crossOrigin = 'anonymous';
-    video.preload = 'metadata';
-    
-    video.onerror = () => reject(new Error('Video konnte nicht geladen werden'));
-    
-    video.onloadedmetadata = async () => {
-      const frames: string[] = [];
-      const frameCount = Math.min(10, Math.max(4, Math.ceil(duration / 3))); // 1 Frame alle ~3 Sekunden
-      
-      const canvas = document.createElement('canvas');
-      canvas.width = 512; // Reduced for API efficiency
-      canvas.height = 288;
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) {
-        reject(new Error('Canvas context nicht verfügbar'));
-        return;
-      }
-      
-      for (let i = 0; i < frameCount; i++) {
-        const time = (i / frameCount) * duration;
-        video.currentTime = time;
-        
-        await new Promise<void>((seekResolve) => {
-          video.onseeked = () => seekResolve();
-        });
-        
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const frameData = canvas.toDataURL('image/jpeg', 0.6);
-        frames.push(frameData);
-        
-      }
-      
-      resolve(frames);
-    };
-    
-    video.src = videoUrl;
-  });
-};
+// Frame extraction moved to src/lib/directors-cut-scene-detection.ts
 
 interface SceneAnalysisStepPropsExtended extends SceneAnalysisStepProps {
   sceneEffects?: Record<string, SceneEffects>;
