@@ -535,6 +535,16 @@ export function DirectorsCut() {
       
       if (error) throw error;
       
+      // Check for structured backend error (scene detection failed)
+      if (data?.ok === false) {
+        console.error('[DirectorsCut] Backend analysis error:', data);
+        toast.error(data.error || 'Szenenanalyse fehlgeschlagen', {
+          description: data.detail ? String(data.detail).substring(0, 100) : undefined,
+        });
+        setIsAnalyzing(false);
+        return;
+      }
+      
       const rawScenes = data.scenes || [];
       const sortedScenes = [...rawScenes].sort((a: any, b: any) => a.start_time - b.start_time);
       
@@ -576,11 +586,12 @@ export function DirectorsCut() {
       
       setScenes(normalizedScenes);
       
-      const method = data.analysis_mode === 'server_vision' 
-        ? 'Serverseitige Videoanalyse' 
-        : detectedBoundaries.length > 0 
-          ? 'Deterministische Analyse' 
-          : 'KI Vision';
+      const modeLabels: Record<string, string> = {
+        'server_video_analysis': 'Serverseitige Videoanalyse',
+        'server_no_cuts_found': 'Keine Schnitte erkannt',
+        'client_deterministic': 'Client-Analyse',
+      };
+      const method = modeLabels[data.analysis_mode] || (detectedBoundaries.length > 0 ? 'Deterministische Analyse' : 'KI-Analyse');
       toast.success(`${normalizedScenes.length} Szenen erkannt (${method})`);
     } catch (error) {
       console.error('Error analyzing video:', error);
