@@ -412,59 +412,7 @@ export function DirectorsCut() {
     }
   };
 
-  const extractVideoFrames = async (videoUrl: string, duration: number): Promise<string[]> => {
-    return new Promise((resolve, reject) => {
-      const video = document.createElement('video');
-      video.crossOrigin = 'anonymous';
-      video.preload = 'metadata';
-      
-      video.onerror = () => resolve([]);
-      
-      video.onloadedmetadata = async () => {
-        const frames: string[] = [];
-        // Sample every 0.1s for high-precision cut detection (max 200 frames for 20s video)
-        const FRAME_INTERVAL = 0.1;
-        const frameCount = Math.min(200, Math.ceil(duration / FRAME_INTERVAL));
-        
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 288;
-        const ctx = canvas.getContext('2d');
-        
-        if (!ctx) {
-          resolve([]);
-          return;
-        }
-        
-        try {
-          for (let i = 0; i < frameCount; i++) {
-            const time = i * FRAME_INTERVAL;
-            video.currentTime = time;
-            
-            await new Promise<void>((seekResolve) => {
-              video.onseeked = () => seekResolve();
-            });
-            
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            try {
-              const frameData = canvas.toDataURL('image/jpeg', 0.6);
-              frames.push(frameData);
-            } catch (taintError) {
-              console.warn('[extractVideoFrames] Canvas tainted by CORS — cannot extract frames client-side. Video URL will be sent directly to Vision AI.', taintError);
-              resolve([]);
-              return;
-            }
-          }
-        } catch (frameError) {
-          console.error('[extractVideoFrames] Frame extraction error:', frameError);
-        }
-        
-        resolve(frames);
-      };
-      
-      video.src = videoUrl;
-    });
-  };
+  // Frame extraction + cut detection now handled by directors-cut-scene-detection.ts
 
   // Measure real video duration from URL
   const measureVideoDuration = (url: string): Promise<number> => {
@@ -490,7 +438,7 @@ export function DirectorsCut() {
     setIsAnalyzing(true);
     
     try {
-      toast.info('Extrahiere Video-Frames für KI-Analyse...');
+      toast.info('Extrahiere Video-Frames für Schnitterkennung...');
       
       // Measure real duration from video URL if not already known
       let canonicalDuration = selectedVideo.duration || 0;
@@ -500,17 +448,60 @@ export function DirectorsCut() {
           canonicalDuration = measured;
           setSelectedVideo(prev => prev ? { ...prev, duration: measured } : prev);
         } else {
-          canonicalDuration = 30; // absolute last fallback
+          canonicalDuration = 30;
         }
       }
       
-      const frames = await extractVideoFrames(selectedVideo.url, canonicalDuration);
+      // Step 1: Extract timestamped frames across FULL video duration
+      let timestampedFrames: TimestampedFrame[] = [];
+      let detectedCuts: DetectedCut[] = [];
+      let clientCutTimestamps: number[] = [];
+      
+      try {
+        timestampedFrames = await extractTimestampedFrames(selectedVideo.url, canonicalDuration);
+        toast.info(`${timestampedFrames.length} Frames extrahiert, analysiere Schnitte...`);
+        
+        // Step 2: Client-side cut detection via pixel diff
+        detectedCuts = await detectCutsAsync(timestampedFrames);
+        clientCutTimestamps = detectedCuts.map(c => c.time);
+        
+        console.log(`[DirectorsCut] Client-side detected ${detectedCuts.length} cuts:`, clientCutTimestamps);
+      } catch (frameError) {
+        console.warn('[DirectorsCut] Frame extraction failed, falling back to video URL analysis:', frameError);
+      }
+      
+      // Step 3: Send to AI for verification + description
+      // Select subset of frames for AI (around cut points + evenly spaced)
+      const framesForAI: Array<{ time: number; image: string }> = [];
+      if (timestampedFrames.length > 0) {
+        // Always include frames near detected cuts
+        for (const cut of detectedCuts) {
+          // Frame before cut
+          const beforeIdx = timestampedFrames.findIndex(f => f.time >= cut.time) - 1;
+          // Frame after cut
+          const afterIdx = timestampedFrames.findIndex(f => f.time >= cut.time);
+          if (beforeIdx >= 0) framesForAI.push(timestampedFrames[beforeIdx]);
+          if (afterIdx >= 0 && afterIdx < timestampedFrames.length) framesForAI.push(timestampedFrames[afterIdx]);
+        }
+        
+        // Add evenly spaced frames (max 10 total for API efficiency)
+        const step = Math.max(1, Math.floor(timestampedFrames.length / 8));
+        for (let i = 0; i < timestampedFrames.length; i += step) {
+          if (!framesForAI.find(f => Math.abs(f.time - timestampedFrames[i].time) < 0.5)) {
+            framesForAI.push(timestampedFrames[i]);
+          }
+        }
+        
+        // Sort by time and limit
+        framesForAI.sort((a, b) => a.time - b.time);
+      }
       
       const { data, error } = await supabase.functions.invoke('analyze-video-scenes', {
         body: {
           video_url: selectedVideo.url,
           duration: canonicalDuration,
-          frames: frames.length > 0 ? frames : undefined,
+          frames: framesForAI.length > 0 ? framesForAI : undefined,
+          detected_cuts: clientCutTimestamps.length > 0 ? clientCutTimestamps : undefined,
         },
       });
       
@@ -519,12 +510,7 @@ export function DirectorsCut() {
       const rawScenes = data.scenes || [];
       const sortedScenes = [...rawScenes].sort((a: any, b: any) => a.start_time - b.start_time);
       
-      // Use the actual video duration from scenes, not selectedVideo.duration which may be inaccurate
-      const videoDuration = rawScenes.length > 0 
-        ? Math.max(...rawScenes.map((s: any) => s.end_time || s.original_end_time || 0))
-        : (selectedVideo.duration || 30);
-      
-      // Client-side stabilization: merge micro-scenes (<1.5s)
+      // Client-side stabilization: merge micro-scenes (<3s)
       const MIN_SCENE_DURATION = 3.0;
       const stableScenes: any[] = [];
       for (const scene of sortedScenes) {
@@ -559,12 +545,11 @@ export function DirectorsCut() {
         
         currentTimelinePosition = timelineEnd;
       }
-
-      // Don't clamp scenes to videoDuration — the scenes define the actual duration
-      // The videoDuration from selectedVideo may be inaccurate (e.g. duration_in_frames / 30)
       
       setScenes(normalizedScenes);
-      toast.success(`${normalizedScenes.length || 0} Szenen erkannt (Vision AI)`);
+      
+      const method = detectedCuts.length > 0 ? 'Pixel-Analyse + KI' : 'KI Vision';
+      toast.success(`${normalizedScenes.length} Szenen erkannt (${method})`);
     } catch (error) {
       console.error('Error analyzing video:', error);
       toast.error('Fehler bei der Szenenanalyse. Bitte versuche es erneut.');
