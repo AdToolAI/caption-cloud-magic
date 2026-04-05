@@ -5,6 +5,7 @@ import { FacebookPostPreview } from "@/components/post-generator/FacebookPostPre
 import { InstagramPostPreview } from "@/components/post-generator/InstagramPostPreview";
 import { LinkedInPostPreview } from "@/components/post-generator/LinkedInPostPreview";
 import { XPostPreview } from "@/components/post-generator/XPostPreview";
+import { TikTokPostPreview } from "@/components/post-generator/TikTokPostPreview";
 import { useState, useMemo } from "react";
 import { Provider } from "@/types/publish";
 import { motion, AnimatePresence } from "framer-motion";
@@ -206,12 +207,15 @@ export function ComposerPreview({
             />
           )}
 
-          {activePlatform === 'tiktok' && (
-            <Alert className="bg-muted/30 border-white/10">
-              <AlertDescription>
-                TikTok-Vorschau ist aktuell nicht verfügbar. Ihr Video wird wie konfiguriert hochgeladen.
-              </AlertDescription>
-            </Alert>
+           {activePlatform === 'tiktok' && (
+            <TikTokPostPreview
+              mediaUrl={mediaPreviewUrl || ''}
+              mediaType={selectedMedia[0]?.type.startsWith('video/') ? 'video' : 'image'}
+              caption={(caption || textContent).slice(0, 2200)}
+              hashtags={hashtags || []}
+              profileName={profileName}
+              profileImage={profileImage}
+            />
           )}
 
           {activePlatform === 'youtube' && (

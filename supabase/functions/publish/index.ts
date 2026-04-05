@@ -806,7 +806,17 @@ async function publishToTikTok(
       };
     }
 
-    const accessToken = atob(connection.access_token_hash);
+    const accessToken = atob(connection.access_token_hash).trim().replace(/[\r\n\t]/g, '');
+    if (!accessToken) {
+      console.error('[TikTok] Access token is empty after decoding');
+      return {
+        provider: 'tiktok',
+        ok: false,
+        error_code: 'TT_INVALID_TOKEN',
+        error_message: 'TikTok access token is invalid',
+      };
+    }
+    console.log('[TikTok] Access token decoded, length:', accessToken.length);
 
     // TikTok requires video for posts
     if (!media || media.length === 0 || media[0].type !== 'video') {
