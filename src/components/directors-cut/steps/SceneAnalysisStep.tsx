@@ -828,11 +828,13 @@ export function SceneAnalysisStep({
                 <Sparkles className="w-5 h-5 text-primary" />
                 {scenes.length} {scenes.length === 1 ? 'Szene' : 'Szenen'} erkannt
                 <Badge variant="outline" className="text-xs font-normal">
-                  Videoanalyse
+                  {scenes.length === 1 ? 'Keine Schnitte erkannt' : 'Szenenanalyse'}
                 </Badge>
               </h3>
               <p className="text-sm text-muted-foreground">
-                Szenengrenzen basieren auf visueller Videoanalyse
+                {scenes.length === 1 
+                  ? 'Kein Szenenwechsel im Video gefunden' 
+                  : 'Szenengrenzen basieren auf visueller Videoanalyse'}
               </p>
             </div>
             <Button variant="outline" onClick={applyAllSuggestions}>

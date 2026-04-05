@@ -60,20 +60,42 @@ serve(async (req) => {
 
     let analysisMode = 'client_deterministic';
     let serverBoundaries: SceneBoundary[] = [];
+    let detectionError: string | null = null;
 
     // PATH A: Client provided boundaries → use them
-    // PATH B: No boundaries → server-side scene detection via Gemini Vision
+    // PATH B: No boundaries → server-side scene detection by downloading video and sending to Gemini as video
     if (!hasClientBoundaries) {
-      console.log("[analyze-video-scenes] No client boundaries — running server-side scene detection via Vision API");
-      analysisMode = 'server_vision';
+      console.log("[analyze-video-scenes] No client boundaries — running server-side video analysis");
+      analysisMode = 'server_video_analysis';
       
       try {
-        serverBoundaries = await detectScenesViaVision(video_url, videoDuration, LOVABLE_API_KEY);
+        serverBoundaries = await detectScenesFromVideo(video_url, videoDuration, LOVABLE_API_KEY);
         console.log(`[analyze-video-scenes] Server detected ${serverBoundaries.length} boundaries: ${serverBoundaries.map(b => `${b.time.toFixed(1)}s(${b.type})`).join(', ')}`);
+        
+        if (serverBoundaries.length === 0) {
+          analysisMode = 'server_no_cuts_found';
+        }
       } catch (e) {
-        console.error("[analyze-video-scenes] Server-side detection failed:", e);
-        analysisMode = 'fallback_single';
+        const errMsg = e instanceof Error ? e.message : String(e);
+        console.error("[analyze-video-scenes] Server-side detection failed:", errMsg);
+        detectionError = errMsg;
+        analysisMode = 'server_error';
+        // DO NOT silently fall back to 1 scene — return error to client
       }
+    }
+
+    // If server analysis failed, return structured error
+    if (analysisMode === 'server_error') {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: 'Serverseitige Videoanalyse fehlgeschlagen',
+          code: 'scene_detection_failed',
+          detail: detectionError,
+          analysis_mode: analysisMode,
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Build deterministic scenes
@@ -132,10 +154,8 @@ REGELN:
         for (const frame of frameImages) {
           userContent.push({ type: "image_url", image_url: { url: frame, detail: "high" } });
         }
-      } else {
-        // Send video URL directly to Gemini Vision
-        userContent.push({ type: "image_url", image_url: { url: video_url } });
       }
+      // Don't send video URL as image_url — it fails with "Unsupported image format"
 
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -209,19 +229,56 @@ REGELN:
 });
 
 /**
- * Server-side scene detection using Gemini Vision API.
- * Sends the video URL directly and asks the model to identify exact cut timestamps.
+ * Server-side scene detection: downloads the video, base64-encodes it,
+ * and sends it to Gemini as actual video content (data:video/mp4;base64,...).
+ * Gemini natively supports video analysis and can identify scene cuts.
  */
-async function detectScenesViaVision(
+async function detectScenesFromVideo(
   videoUrl: string, 
   duration: number, 
   apiKey: string
 ): Promise<SceneBoundary[]> {
-  const prompt = `Du bist ein Video-Schnitt-Detektor. Analysiere dieses ${duration.toFixed(1)}s Video und finde ALLE echten Szenenwechsel.
+  // Step 1: Download video
+  console.log(`[detectScenesFromVideo] Downloading video: ${videoUrl}`);
+  const videoResponse = await fetch(videoUrl);
+  
+  if (!videoResponse.ok) {
+    throw new Error(`Video download failed: ${videoResponse.status} ${videoResponse.statusText}`);
+  }
+  
+  const videoBytes = await videoResponse.arrayBuffer();
+  const videoSizeMB = videoBytes.byteLength / (1024 * 1024);
+  console.log(`[detectScenesFromVideo] Downloaded ${videoSizeMB.toFixed(1)}MB`);
+  
+  // Gemini supports up to ~20MB inline video; check size
+  if (videoSizeMB > 20) {
+    throw new Error(`Video too large for inline analysis: ${videoSizeMB.toFixed(1)}MB (max 20MB)`);
+  }
+  
+  // Step 2: Base64 encode
+  const uint8Array = new Uint8Array(videoBytes);
+  let binary = '';
+  // Process in chunks to avoid call stack overflow
+  const chunkSize = 8192;
+  for (let i = 0; i < uint8Array.length; i += chunkSize) {
+    const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+    binary += String.fromCharCode(...chunk);
+  }
+  const base64Video = btoa(binary);
+  
+  // Determine MIME type from URL or default to mp4
+  const mimeType = videoUrl.toLowerCase().includes('.webm') ? 'video/webm' : 'video/mp4';
+  const dataUri = `data:${mimeType};base64,${base64Video}`;
+  
+  console.log(`[detectScenesFromVideo] Encoded to base64 (${(base64Video.length / (1024 * 1024)).toFixed(1)}MB), sending to Gemini as ${mimeType}`);
+  
+  // Step 3: Send to Gemini Vision with video as data URI
+  const prompt = `Du bist ein präziser Video-Schnitt-Detektor. Analysiere dieses ${duration.toFixed(1)} Sekunden lange Video und finde ALLE echten Szenenwechsel.
 
-AUFGABE: Identifiziere die exakten Zeitpunkte, an denen ein Szenenwechsel stattfindet.
+AUFGABE: Identifiziere die exakten Zeitpunkte (in Sekunden), an denen ein Szenenwechsel stattfindet.
+
 Ein Szenenwechsel ist:
-- Harter Schnitt (abrupter Wechsel zwischen zwei verschiedenen Szenen)
+- Harter Schnitt (abrupter Wechsel zwischen zwei verschiedenen Szenen/Einstellungen)
 - Weicher Übergang (Fade, Dissolve, Morph zwischen zwei verschiedenen Szenen)
 
 KEIN Szenenwechsel ist:
@@ -230,16 +287,18 @@ KEIN Szenenwechsel ist:
 - Helligkeitsänderung durch Lichtwechsel
 - Gleiche Szene aus leicht anderem Winkel
 
-WICHTIG: Sei SEHR GENAU mit den Zeitangaben. Gib nur ECHTE, eindeutige Szenenwechsel an.
-Wenn es keine Szenenwechsel gibt, gib ein leeres Array zurück.
+WICHTIG: 
+- Sei SEHR GENAU mit den Zeitangaben
+- Gib nur ECHTE, eindeutige Szenenwechsel an
+- Wenn es keine Szenenwechsel gibt, gib ein leeres Array zurück: []
 
-Antworte NUR mit einem JSON-Array von Objekten:
+Antworte NUR mit einem JSON-Array:
 [
   { "time": 30.0, "type": "hard_cut", "confidence": 0.95, "description": "Wechsel von Szene A zu Szene B" }
 ]
 
 Mögliche Typen: "hard_cut", "soft_transition"
-confidence: 0.0 bis 1.0 (nur Wechsel mit confidence >= 0.7 sind relevant)
+confidence: 0.0 bis 1.0
 
 Antworte NUR mit dem JSON-Array, kein weiterer Text!`;
 
@@ -254,7 +313,7 @@ Antworte NUR mit dem JSON-Array, kein weiterer Text!`;
       messages: [
         { role: "user", content: [
           { type: "text", text: prompt },
-          { type: "image_url", image_url: { url: videoUrl } }
+          { type: "image_url", image_url: { url: dataUri } }
         ]}
       ],
       temperature: 0.1,
@@ -264,28 +323,28 @@ Antworte NUR mit dem JSON-Array, kein weiterer Text!`;
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Vision API error: ${response.status} - ${errorText}`);
+    throw new Error(`Gemini API error: ${response.status} - ${errorText.substring(0, 300)}`);
   }
 
   const aiResponse = await response.json();
   const content = aiResponse.choices?.[0]?.message?.content || "";
   
-  console.log(`[detectScenesViaVision] Raw AI response: ${content.substring(0, 500)}`);
+  console.log(`[detectScenesFromVideo] Raw AI response: ${content.substring(0, 500)}`);
   
   const parsed = parseAIResponse(content);
   if (!parsed || !Array.isArray(parsed)) {
-    console.log("[detectScenesViaVision] Could not parse response as array");
+    console.log("[detectScenesFromVideo] Could not parse response as array, returning empty");
     return [];
   }
 
-  // Filter valid boundaries with sufficient confidence
+  // Filter valid boundaries
   const boundaries: SceneBoundary[] = [];
   for (const item of parsed) {
     const time = typeof item.time === 'number' ? item.time : parseFloat(item.time);
     const confidence = typeof item.confidence === 'number' ? item.confidence : 0.5;
     
     if (isNaN(time) || time <= 0.5 || time >= duration - 0.5) continue;
-    if (confidence < 0.7) continue;
+    if (confidence < 0.5) continue; // Lower threshold since Gemini is analyzing real video
     
     boundaries.push({
       time,
@@ -294,17 +353,18 @@ Antworte NUR mit dem JSON-Array, kein weiterer Text!`;
     });
   }
 
-  // Sort and deduplicate (merge boundaries within 1s of each other)
+  // Sort and deduplicate (merge boundaries within 2s of each other)
   boundaries.sort((a, b) => a.time - b.time);
   const deduped: SceneBoundary[] = [];
   for (const b of boundaries) {
-    if (deduped.length === 0 || b.time - deduped[deduped.length - 1].time > 1.0) {
+    if (deduped.length === 0 || b.time - deduped[deduped.length - 1].time > 2.0) {
       deduped.push(b);
     } else if (b.score > deduped[deduped.length - 1].score) {
       deduped[deduped.length - 1] = b;
     }
   }
 
+  console.log(`[detectScenesFromVideo] Final boundaries: ${deduped.map(b => `${b.time.toFixed(1)}s(${b.type},${b.score})`).join(', ')}`);
   return deduped;
 }
 
