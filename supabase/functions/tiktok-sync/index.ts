@@ -48,22 +48,34 @@ serve(async (req) => {
     // Check if token needs refresh
     if (needsRefresh(connection.token_expires_at)) {
       console.log('Token expired or expiring soon, refreshing...');
-      const newTokens = await refreshAccessToken(refreshToken);
-      
-      const expiresAt = new Date(Date.now() + newTokens.expires_in * 1000).toISOString();
-      
-      // Update tokens in DB
-      await supabase
-        .from('social_connections')
-        .update({
-          access_token_hash: await encryptToken(newTokens.access_token),
-          refresh_token_hash: await encryptToken(newTokens.refresh_token),
-          token_expires_at: expiresAt
-        })
-        .eq('id', connection.id);
+      try {
+        const newTokens = await refreshAccessToken(refreshToken);
+        
+        const expiresAt = new Date(Date.now() + newTokens.expires_in * 1000).toISOString();
+        
+        // Update tokens in DB
+        await supabase
+          .from('social_connections')
+          .update({
+            access_token_hash: await encryptToken(newTokens.access_token),
+            refresh_token_hash: await encryptToken(newTokens.refresh_token),
+            token_expires_at: expiresAt
+          })
+          .eq('id', connection.id);
 
-      accessToken = newTokens.access_token;
-      console.log('Token refreshed successfully');
+        accessToken = newTokens.access_token;
+        console.log('Token refreshed successfully');
+      } catch (refreshError: any) {
+        console.error('Token refresh failed, reconnect required:', refreshError.message);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            reconnect_required: true,
+            error: 'TikTok-Token abgelaufen. Bitte verbinde TikTok neu.',
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Fetch user info

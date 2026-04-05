@@ -71,9 +71,11 @@ export const LinkedAccountsCard = () => {
   };
 
   const handleConnect = (platform: Platform) => {
-    // Redirect to platform connection flow
+    if (platform === 'tiktok') {
+      window.location.href = `/integrations?connect=tiktok`;
+      return;
+    }
     toast.info(`Weiterleitung zu ${PLATFORMS[platform].name}...`);
-    // TODO: Implement OAuth flow for each platform
   };
 
   const handleDisconnect = async (platform: Platform) => {
