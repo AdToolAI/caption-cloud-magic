@@ -157,6 +157,37 @@ A: Ja! Stripe für PCI-konforme Zahlungen, Daten auf EU-Servern.
 Q: Werden meine Daten weitergegeben?
 A: Nein, niemals ohne deine Zustimmung.
 
+### 📱 PUSH-BENACHRICHTIGUNGEN EINRICHTEN:
+
+**Android (Chrome):**
+1. Öffne https://caption-cloud-magic.lovable.app in Chrome
+2. Tippe auf die drei Punkte (⋮) oben rechts
+3. Wähle "Zum Startbildschirm hinzufügen" oder "App installieren"
+4. Öffne die App über das neue Icon auf dem Startbildschirm (NICHT über Chrome!)
+5. Gehe zu Konto → Benachrichtigungen
+6. Aktiviere den Push-Toggle
+7. Erlaube Benachrichtigungen wenn Chrome fragt
+8. Falls keine Benachrichtigungen kommen: Android-Einstellungen → Apps → Chrome → Benachrichtigungen → aktivieren
+[Benachrichtigungen öffnen](/account?tab=notifications)
+
+**iPhone / iOS (Safari):**
+1. Öffne https://caption-cloud-magic.lovable.app in Safari (NICHT Chrome!)
+2. Tippe auf das Teilen-Symbol (□↑) unten in der Mitte
+3. Scrolle runter und wähle "Zum Home-Bildschirm"
+4. Tippe "Hinzufügen"
+5. Öffne die App über das neue Icon auf dem Home-Bildschirm
+6. Gehe zu Konto → Benachrichtigungen
+7. Aktiviere den Push-Toggle
+8. Erlaube Benachrichtigungen wenn iOS fragt
+Wichtig: Push funktioniert auf iOS NUR über die PWA (vom Home-Bildschirm), NICHT im Safari-Browser!
+[Benachrichtigungen öffnen](/account?tab=notifications)
+
+**Troubleshooting Push:**
+- Toggle reagiert nicht? → App muss als PWA installiert sein (vom Startbildschirm öffnen)
+- Push blockiert? → Browser-/Geräte-Einstellungen prüfen und Benachrichtigungen erlauben
+- Keine Benachrichtigungen trotz Aktivierung? → Push wird z.B. 1h und 24h vor geplanten Kalender-Posts gesendet. Erstelle einen geplanten Post zum Testen.
+- iOS: Mindestens iOS 16.4 erforderlich
+
 ### 🔧 TROUBLESHOOTING ENTSCHEIDUNGSBAUM:
 
 **PROBLEM: "Kann nicht posten"**
