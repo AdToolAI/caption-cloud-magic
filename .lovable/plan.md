@@ -1,75 +1,95 @@
 
-Ziel
+Problemursache
 
-Die Szenenerkennung soll deterministisch arbeiten: echte Szenengrenzen aus dem Video berechnen und die KI nur noch für Beschreibung/Effekte nutzen. Ich plane dabei, sowohl harte Schnitte als auch klare weiche Übergänge (Fade, Dissolve, Morph) als Szenenwechsel zu behandeln.
+Die aktuelle Änderung greift in der Praxis gar nicht. Die Laufzeit-Logs der Analysefunktion zeigen:
+- `boundaries: 0`
+- `frames: 0`
+- daraus wird deterministisch genau 1 Szene gebaut
 
-Warum es aktuell scheitert
+Das heißt: Nicht die KI “rät” falsch, sondern der Client liefert der Backend-Analyse momentan keinerlei verwertbare Schnitterkennung.
 
-- `src/lib/directors-cut-scene-detection.ts`: `extractTimestampedFrames()` ist für längere Videos zu grob (`maxFrames=60`), und `detectCutsAsync()` ist mit `Math.max(0.30, mean + 3*stdDev)` zu streng.
-- Die aktuelle Logik vergleicht nur direkt benachbarte Frames. Weiche Übergänge haben oft keinen einzelnen starken Spike und werden dadurch übersehen.
-- `supabase/functions/analyze-video-scenes/index.ts` ist auf „harte Schnitte“ gebiast. Wenn der Client nichts meldet, landet das System fast automatisch bei 1 Szene.
-- `src/pages/DirectorsCut/DirectorsCut.tsx` schickt der KI bei fehlendem Cut nur wenige grob verteilte Frames statt gezielte Vorher/Nachher-Frames rund um den Übergang.
+Warum aktuell nichts erkannt wird
+
+1. `extractTimestampedFrames()` läuft im Browser mit Canvas/`video.currentTime`.
+- Bei den verwendeten Video-URLs aus der Mediathek/Render-URLs scheitert das sehr wahrscheinlich an CORS/canvas tainting oder an der Videoquelle selbst.
+- In `DirectorsCut.tsx` wird dieser Fehler nur geloggt und danach trotzdem die Analysefunktion ohne Frames/Boundaries aufgerufen.
+
+2. `analyze-video-scenes/index.ts` ist inzwischen vollständig von `scene_boundaries` abhängig.
+- Wenn keine Boundaries ankommen, baut die Funktion absichtlich nur:
+  - `0s → duration`
+- Also genau 1 Szene.
+
+3. Die UI ist irreführend.
+- `SceneAnalysisStep.tsx` zeigt immer das Badge “Deterministische Analyse”, auch wenn tatsächlich gar keine Deterministik stattgefunden hat.
+- In `DirectorsCut.tsx` steht im Toast zwar `KI Vision`, aber die eigentliche Karten-UI bleibt missverständlich.
 
 Umsetzung
 
-1. `src/lib/directors-cut-scene-detection.ts` zu echtem Szenengrenzen-Detektor ausbauen
-- Aus `detectCutsAsync()` wird ein Boundary-Detector statt nur Hard-Cut-Detector.
-- Mehrere Signale kombinieren:
-  - Pixel-/Luminanz-Differenz
-  - Histogramm-/Farbverteilung
-  - Struktur-/Kantenänderung
-  - Vorher/Nachher-Fenstervergleich um Zeitpunkt `t`
-- 2-stufige Analyse:
-  - grober Full-Video-Scan
-  - dichter Feinscan nur um starke Kandidaten
-- Feste Absolute-Schwelle entfernen und auf Peak-Prominenz / relative Ausreißer umstellen.
-- Harte Cuts und weiche Übergänge getrennt erkennen.
-- Interne Zeit präzise halten und erst fürs UI runden.
-- `buildScenesFromCuts()` zu allgemeinem Boundary-Builder erweitern.
+1. Browser-basierte Szenenerkennung nicht mehr als Primärpfad verwenden
+- `src/pages/DirectorsCut/DirectorsCut.tsx`
+- Den aktuellen Canvas-Frame-Extraktionspfad nur noch als optionalen Fast-Path behandeln.
+- Wenn Frame-Extraktion fehlschlägt oder 0 Frames liefert, direkt auf serverseitige Analyse umschalten statt “leer” weiterzumachen.
 
-2. `src/pages/DirectorsCut/DirectorsCut.tsx` auf deterministische Grenzen umstellen
-- Die erkannten Grenzen werden zur Quelle der Szenenzahl.
-- Für jeden Kandidaten gezielt Frames vor/nach dem Übergang an die KI schicken.
-- Wenn ein starker Boundary-Score vorliegt, darf die KI daraus nicht wieder 1 Szene machen.
-- Payload semantisch von `detected_cuts` auf echte `scene_boundaries` erweitern.
+2. Serverseitige echte Schnitterkennung bauen
+- Neue oder erweiterte Backend-Funktion, am besten direkt in `supabase/functions/analyze-video-scenes/index.ts`
+- Ablauf:
+  - Video von `video_url` herunterladen
+  - mit FFmpeg/ffprobe serverseitig Frames über die gesamte Dauer extrahieren
+  - harte Schnitte über echte Bilddifferenz-/Szenenwechsel-Metriken erkennen
+  - optional zusätzlich Fade/Dissolve-Kandidaten über Fenstervergleich erkennen
+- Wichtig: Die Szenengrenzen müssen im Backend entstehen, nicht im Browser.
 
-3. `supabase/functions/analyze-video-scenes/index.ts` von der Szenenzahl entkoppeln
-- Die Edge Function soll keine Szenenzahl mehr schätzen.
-- KI-Aufgabe nur noch:
-  - Szenen beschreiben
-  - Stimmung bestimmen
-  - Effekte vorschlagen
-  - optional Kandidaten kommentieren
-- Prompt von „nur harte Schnitte“ auf „erkenne explizite Szenenübergänge“ umstellen.
-- Wenn keine belastbare Grenze da ist: exakt 1 Szene, aber kein Ratespiel mehr.
+3. Deterministische Fallback-Logik im Backend ergänzen
+- Wenn keine clientseitigen `scene_boundaries` mitkommen:
+  - Backend soll selbst analysieren
+  - erst wenn auch dort wirklich kein Übergang gefunden wird, 1 Szene zurückgeben
+- Damit ist “1 Szene” nur noch das Ergebnis einer echten Negativanalyse, nicht mehr eines technischen Frame-Fehlers.
 
-4. UI transparenter machen
-- In `SceneAnalysisStep.tsx` sichtbar machen:
-  - deterministisch erkannt
-  - weicher Übergang erkannt
-  - nur KI-Beschreibung
-  - manuell prüfen
-- Exakte Grenzzeit(en) anzeigen, damit sofort sichtbar ist, ob z. B. 30.0s erkannt wurde.
+4. Analysefunktion sauber auf zwei Pfade trennen
+- Pfad A: `scene_boundaries` vom Client vorhanden
+  - Backend übernimmt sie und beschreibt nur die Szenen
+- Pfad B: keine `scene_boundaries`
+  - Backend berechnet Boundaries selbst aus dem Video
+  - danach beschreibt die KI nur die fertigen Segmente
+- So bleibt die KI weiterhin aus der Szenenzahl heraus.
 
-Validierung
+5. UI-Status ehrlich machen
+- `src/components/directors-cut/steps/SceneAnalysisStep.tsx`
+- Anzeige unterscheiden zwischen:
+  - Deterministische Analyse
+  - Serverseitige Videoanalyse
+  - Browser-Frames fehlgeschlagen
+  - Nur 1 Szene gefunden
+- Badge nicht mehr hartcodiert auf “Deterministische Analyse”.
 
-- 60s Video mit Wechsel bei 30.0s → exakt 2 Szenen
-- gleiche Szene mit Kamerabewegung → kein falscher Szenenwechsel
-- weicher Übergang bei 30s → trotzdem 2 Szenen
-- keine Übergänge → exakt 1 Szene
-- Fehler bei Frame-Extraktion → keine freie KI-Schätzung der Szenenzahl
+6. Debug-Transparenz in der Antwortstruktur
+- `analyze-video-scenes` soll zusätzlich zurückgeben:
+  - `source`
+  - `boundaries_used`
+  - `analysis_mode`
+  - `frame_extraction_method`
+  - ggf. `debug_boundary_times`
+- So sieht man sofort, ob der Cut bei ~30s überhaupt erkannt wurde.
+
+Betroffene Dateien
+
+- `src/pages/DirectorsCut/DirectorsCut.tsx`
+- `src/components/directors-cut/steps/SceneAnalysisStep.tsx`
+- `supabase/functions/analyze-video-scenes/index.ts`
+- optional neuer Backend-Helper unter `supabase/functions/_shared/` für ffmpeg/ffprobe-basierte Videoanalyse
 
 Technische Leitlinie
 
 ````text
-Video
-  -> grober Boundary-Scan
-  -> Peak-/Ramp-Kandidaten
-  -> Feinscan um Kandidaten
-  -> feste Szenengrenzen
-  -> KI beschreibt nur noch die fertigen Szenen
+Video URL
+  -> Browser-Frames versuchen (optional)
+  -> falls leer/fehlerhaft:
+       serverseitig Video downloaden
+       -> ffmpeg/ffprobe Szenenwechsel erkennen
+       -> echte Boundaries erzeugen
+  -> KI beschreibt nur die festen Segmente
 ````
 
-Ergebnis
+Erwartetes Ergebnis
 
-Danach erkennt das System Szenen anhand echter Übergangssignale im Video statt per KI-Ratespiel. In deinem Beispiel würde der Wechsel bei 30 Sekunden als konkrete Szenengrenze behandelt und zuverlässig als 2 Szenen ausgegeben.
+Danach ist die Szenenerkennung nicht mehr von Browser-CORS abhängig. Auch wenn die Frame-Extraktion im Frontend scheitert, wird das 60s-Video serverseitig direkt analysiert und der Übergang bei 30s kann als echte Szenengrenze erkannt werden, statt wieder bei 1 Szene zu landen.
