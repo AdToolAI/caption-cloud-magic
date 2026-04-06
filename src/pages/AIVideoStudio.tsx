@@ -92,6 +92,58 @@ export default function AIVideoStudio() {
     }
   }, [searchParams, refetchWallet]);
 
+  // Track active generations via realtime
+  const { data: activeGenerations } = useQuery({
+    queryKey: ['active-ai-generations', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data } = await supabase
+        .from('ai_video_generations')
+        .select('id, status')
+        .eq('user_id', user.id)
+        .in('status', ['pending', 'processing']);
+      return data || [];
+    },
+    enabled: !!user,
+    refetchInterval: 5000,
+  });
+
+  useEffect(() => {
+    setHasActiveGeneration((activeGenerations?.length ?? 0) > 0 || generating);
+  }, [activeGenerations, generating]);
+
+  // beforeunload warning when generation is active
+  useEffect(() => {
+    if (!hasActiveGeneration) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasActiveGeneration]);
+
+  // Show toast when navigating away (cleanup = unmount)
+  useEffect(() => {
+    return () => {
+      if (hasActiveGeneration) {
+        toast.info('🎬 Dein Video wird im Hintergrund fertig generiert. Du findest es im Verlauf, sobald es bereit ist.', {
+          duration: 8000,
+        });
+      }
+    };
+  }, [hasActiveGeneration]);
+
+  // Show toast on tab switch away from generate
+  const handleTabChange = useCallback((newTab: string) => {
+    if (hasActiveGeneration && activeTab === 'generate' && newTab !== 'generate') {
+      toast.info('🎬 Die Generierung läuft im Hintergrund weiter. Du findest dein Video im Verlauf.', {
+        duration: 5000,
+      });
+    }
+    setActiveTab(newTab);
+  }, [hasActiveGeneration, activeTab]);
+
   const handleRetryGeneration = (params: {
     prompt: string;
     model: string;
