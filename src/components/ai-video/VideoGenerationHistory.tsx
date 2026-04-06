@@ -430,11 +430,16 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
                       )}
                     </>
                   )}
-                  {gen.status === 'processing' && (
-                    <Button size="sm" variant="ghost" disabled>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Generierung läuft...
-                    </Button>
+                  {(gen.status === 'processing' || gen.status === 'pending') && (
+                    <div className="flex items-center gap-3">
+                      <Button size="sm" variant="ghost" disabled>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generierung läuft...
+                      </Button>
+                      <span className="text-xs text-muted-foreground animate-pulse">
+                        ⏳ Läuft im Hintergrund weiter — du kannst die Seite verlassen
+                      </span>
+                    </div>
                   )}
                   {gen.status === 'failed' && onRetryGeneration && (
                     <Button 
