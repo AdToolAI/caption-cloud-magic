@@ -1,32 +1,38 @@
 
 
-## Plan: TikTok "In App ansehen" Button nach erfolgreichem Publish
+## Plan: TikTok Redirect-URI Diagnose + Fix
 
-### Was wird gemacht
+### Analyse
 
-Nach einem erfolgreichen TikTok-Publish wird ein Button "In TikTok ansehen" angezeigt, der den User direkt zur TikTok-App (bzw. Web-Profil) weiterleitet, wo der Draft sichtbar ist.
+Der `tiktok-health`-Endpunkt zeigt aktuell nur `hasRedirectUri: true`, aber **nicht den tatsächlichen Wert**. Das ist das fehlende Puzzlestück — wir können nicht prüfen, ob die `TIKTOK_REDIRECT_URI` mit dem TikTok-Portal übereinstimmt.
+
+Auffällig: Die Projektnotizen sagen, die im Portal registrierte URI ist:
+```
+https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/tiktok-callback
+```
+Aber die Edge Function heißt **`tiktok-oauth-callback`**, was diese URL ergeben würde:
+```
+https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/tiktok-oauth-callback
+```
+
+Falls die `TIKTOK_REDIRECT_URI`-Secret nicht exakt mit der im TikTok-Portal registrierten URL übereinstimmt, lehnt TikTok den gesamten OAuth-Flow ab — mit genau diesem "client_key"-Fehler.
 
 ### Umsetzung
 
-**Datei: `src/components/composer/PublishResultCard.tsx`**
+**Schritt 1: `supabase/functions/tiktok-health/index.ts`**
+- Die tatsächliche `TIKTOK_REDIRECT_URI` im Response anzeigen (ist keine geheime Information, nur eine URL)
+- Die generierte Auth-URL als Test-Wert mitgeben
 
-Aktuell zeigt die Karte bei `result.ok && result.permalink` einen "View post"-Link. TikTok liefert im Sandbox-Modus aber keinen `permalink`, da es ein Draft ist.
+**Schritt 2: Diagnose**
+- Health-Endpunkt aufrufen und die angezeigte Redirect-URI mit dem TikTok-Portal vergleichen
+- Falls Mismatch: Secret aktualisieren oder Portal-Eintrag korrigieren
 
-Änderung: Wenn `result.provider === 'tiktok'` und `result.ok` ist, aber kein `permalink` vorhanden, einen speziellen Button anzeigen:
-- Text: "In TikTok App öffnen"
-- Link: `https://www.tiktok.com` (öffnet die TikTok-App auf Mobilgeräten via Deep Link, oder das Web-Profil auf Desktop)
-- Hinweistext darunter: "Video wurde als Draft hochgeladen — öffne TikTok um es zu veröffentlichen"
+**Schritt 3: Alle TikTok-Functions redeployen**
+- `tiktok-oauth-start`, `tiktok-oauth-callback`, `tiktok-health` frisch deployen um sicherzustellen, dass alle denselben Shared-Code verwenden
 
-Zusätzlich: Falls die `social_connections`-Daten einen TikTok-Username enthalten, den Link direkt auf `https://www.tiktok.com/@username` setzen, damit der User auf seinem Profil landet.
-
-**Datei: `supabase/functions/publish/index.ts`**
-
-Bei erfolgreichem TikTok-Upload den `account_name` aus der `social_connections`-Tabelle im Response mitgeben (als `permalink`-Ersatz), z.B.:
-```
-permalink: `https://www.tiktok.com/@${connection.account_name}`
-```
+### Betroffene Dateien
+- `supabase/functions/tiktok-health/index.ts` — Redirect-URI + Test-Auth-URL anzeigen
 
 ### Ergebnis
-
-Nach erfolgreichem TikTok-Publish erscheint ein Button der direkt zum TikTok-Profil führt, wo der Draft sichtbar ist.
+Wir sehen sofort, welche Redirect-URI tatsächlich verwendet wird und können sie mit dem Portal abgleichen. Das ist der wahrscheinlichste Grund für den "client_key"-Fehler.
 
