@@ -1,45 +1,27 @@
 
 
-## Problem
+## Plan: Hinweis beim Verlassen während Video-Generierung
 
-Google Search Console meldet zwei fehlende Felder im **Product**-Schema auf der Pricing-Seite (`/pricing`):
-1. **Missing field "review"** — Mindestens eine Review ist nötig
-2. **Missing field "aggregateRating"** — Bewertungsdurchschnitt fehlt
+### Problem
+Wenn ein Nutzer während der Video-Generierung die Seite verlässt (z.B. navigiert weg oder klickt "Neues Video starten"), gibt es keinen Hinweis, dass das Video im Hintergrund weiter generiert wird und später in der Mediathek/im Verlauf zu finden ist.
 
-Die Landing Page (`Index.tsx`) hat bereits `aggregateRating`, aber die **Pricing-Seite** (`Pricing.tsx`) hat im Product-Schema weder `review` noch `aggregateRating`.
+### Umsetzung
 
-## Lösung
+**Datei: `src/components/universal-video-creator/UniversalVideoWizard.tsx`**
 
-**Datei: `src/pages/Pricing.tsx`** — Zum bestehenden Product-Schema (Zeile 84-129) zwei Felder hinzufügen:
+1. **`beforeunload`-Warnung** — Wenn `isAutoGenerating === true`, Browser-Warning beim Tab-Schließen/Verlassen aktivieren (Standard-Browser-Dialog)
 
-1. **`aggregateRating`** — z.B. 4.8 von 5 Sternen, basierend auf 1200+ Bewertungen (gleiche Werte wie Landing Page für Konsistenz)
+2. **Toast-Hinweis bei Navigation weg** — Wenn der Nutzer während der Generierung auf "Neues Video starten", "Zurück" oder eine andere Seite navigiert, einen persistenten Toast anzeigen:
+   > "Dein Video wird im Hintergrund fertig generiert. Du findest es in deinem Verlauf unter **Sora AI Videos**, sobald es bereit ist."
 
-2. **`review`** — Mindestens eine exemplarische Review mit Autor, Bewertung und Text
+3. **"Neues Video starten"-Button absichern** — Während `isAutoGenerating` einen Bestätigungs-Dialog zeigen: "Die Generierung läuft noch im Hintergrund weiter. Du findest das Video später im Verlauf."
 
-```json
-"aggregateRating": {
-  "@type": "AggregateRating",
-  "ratingValue": "4.8",
-  "reviewCount": "1200",
-  "bestRating": "5",
-  "worstRating": "1"
-},
-"review": {
-  "@type": "Review",
-  "author": { "@type": "Person", "name": "Sarah M." },
-  "datePublished": "2025-12-15",
-  "reviewBody": "AdTool AI hat meine Social Media Strategie komplett verändert. Die KI-Captions sind unglaublich gut.",
-  "reviewRating": {
-    "@type": "Rating",
-    "ratingValue": "5",
-    "bestRating": "5"
-  }
-}
-```
+**Datei: `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`**
 
-## Ergebnis
+4. **Minimieren-Button** — Einen "Im Hintergrund weiterlaufen lassen"-Button unter dem Fortschrittsbalken hinzufügen, der den Nutzer zurück zur Hauptseite navigiert und den Toast-Hinweis zeigt.
 
-- Beide Google Search Console Warnungen werden behoben
-- Product Snippets können in den Suchergebnissen Rich Results (Sterne-Bewertung) anzeigen
-- Keine sichtbare UI-Änderung — nur strukturierte Daten im HTML
+### Ergebnis
+- Nutzer werden informiert, dass die Generierung weiterläuft
+- Klarer Verweis auf den Verlauf/Mediathek wo das fertige Video erscheint
+- Kein versehentlicher Datenverlust durch Navigation
 
