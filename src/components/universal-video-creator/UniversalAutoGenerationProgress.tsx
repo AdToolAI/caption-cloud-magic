@@ -14,6 +14,7 @@ interface UniversalAutoGenerationProgressProps {
   onSwitchToManual: (partialProject: any) => void;
   onRetry?: () => void;
   onRateLimitRetry?: () => void;
+  onMinimize?: () => void;
   diagnosticProfile?: string;
 }
 

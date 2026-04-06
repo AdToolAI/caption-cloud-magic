@@ -471,7 +471,23 @@ export function UniversalVideoWizard() {
         </DialogContent>
       </Dialog>
 
-      {/* Global Error Banner */}
+      {/* Reset Confirmation Dialog */}
+      <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Video wird noch generiert</AlertDialogTitle>
+            <AlertDialogDescription>
+              Die Generierung läuft im Hintergrund weiter. Du findest das fertige Video später unter <strong>Sora AI Videos</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={performReset}>
+              Trotzdem neues Video starten
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {error && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
