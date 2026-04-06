@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Loader2, FileText, Image, Mic, Music, Video, AlertCircle, Hand, Sparkles, Crown, RefreshCw, Bug, ChevronDown, ChevronUp, Clock, Shield } from 'lucide-react';
+import { Check, Loader2, FileText, Image, Mic, Music, Video, AlertCircle, Hand, Sparkles, Crown, RefreshCw, Bug, ChevronDown, ChevronUp, Clock, Shield, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +14,7 @@ interface UniversalAutoGenerationProgressProps {
   onSwitchToManual: (partialProject: any) => void;
   onRetry?: () => void;
   onRateLimitRetry?: () => void;
+  onMinimize?: () => void;
   diagnosticProfile?: string;
 }
 
@@ -91,6 +92,7 @@ export function UniversalAutoGenerationProgress({
   onSwitchToManual,
   onRetry,
   onRateLimitRetry,
+  onMinimize,
   diagnosticProfile = 'A',
 }: UniversalAutoGenerationProgressProps) {
   const categoryInfo = VIDEO_CATEGORIES.find(c => c.category === category);
@@ -1243,14 +1245,25 @@ export function UniversalAutoGenerationProgress({
         </motion.div>
       )}
 
-      {/* Switch to Manual */}
+      {/* Minimize / Switch to Manual */}
       {isGenerating && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1 }}
-          className="text-center"
+          className="text-center flex flex-col items-center gap-2"
         >
+          {onMinimize && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onMinimize}
+              className="border-[#F5C76A]/30 hover:bg-[#F5C76A]/10 text-[#F5C76A]"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Im Hintergrund weiterlaufen lassen
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
