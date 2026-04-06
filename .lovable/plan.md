@@ -1,22 +1,39 @@
 
 
-## Plan: Hero-Video auf der Startseite ersetzen
+## Fix: Carousel-Video pausieren wenn Vollbild-Dialog öffnet
 
-### Was wird gemacht
-Das Video in der **GadgetCard** auf der Startseite (Hero-Bereich rechts) wird durch das neue hochgeladene Video ersetzt.
+### Problem
+Wenn der User im Dashboard-Carousel ein Video abspielt (z.B. nach Unmute) und dann auf den Expand-Button klickt, läuft das Carousel-Video im Hintergrund weiter, während gleichzeitig das vergrößerte Video im Dialog startet. Zwei Videos laufen parallel.
 
-### Umsetzung
+### Ursache
+Beim Klick auf Expand (`setSelectedVideo(...)`) wird das Carousel-Video nicht pausiert. Es spielt einfach weiter, während der `VideoPreviewPlayer`-Dialog mit `autoPlay` ein zweites Video startet.
 
-**Datei: `src/components/landing/GadgetCardDynamic.tsx`**
+### Lösung
 
-1. Das hochgeladene Video (`sora-Mach_mir_bitte_ein_cooles_Werb.mp4`) wird in den `public/`-Ordner kopiert
-2. Die Video-URL in Zeile 306 wird von der aktuellen Supabase-Storage-URL auf das neue lokale Video geändert
+**Datei: `src/components/dashboard/DashboardVideoCarousel.tsx`**
 
-### Technisch
-- Aktuell: `https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/public/ai-videos/...mp4`
-- Neu: Lokale Datei aus `public/videos/hero-video.mp4`
-- Keine weiteren Änderungen nötig — Autoplay, Mute-Toggle und Play-Button bleiben bestehen
+1. Beim Öffnen des Vollbild-Dialogs (Expand-Button, Zeile ~410) das aktive Carousel-Video pausieren:
+   ```ts
+   const el = videoRefs.current[selectedIndex];
+   if (el) el.pause();
+   ```
+
+2. Beim Schließen des Dialogs (`onOpenChange`) das Carousel-Video wieder abspielen:
+   ```ts
+   onOpenChange={(open) => {
+     if (!open) {
+       setSelectedVideo(null);
+       const el = videoRefs.current[selectedIndex];
+       if (el) el.play().catch(() => {});
+     }
+   }}
+   ```
+
+**Datei: `src/components/video/VideoPreviewPlayer.tsx`**
+
+3. Beim Schließen des Dialogs das Dialog-Video stoppen (damit es nicht im Hintergrund weiterläuft), indem ein `ref` das `<video>`-Element beim Unmount pausiert.
 
 ### Ergebnis
-Das neue Werbevideo erscheint direkt in der Hero-Karte auf der Startseite.
+- Nur ein Video spielt gleichzeitig
+- Carousel-Video pausiert bei Vollbild, setzt beim Schließen fort
 
