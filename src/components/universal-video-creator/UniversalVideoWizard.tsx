@@ -668,6 +668,7 @@ export function UniversalVideoWizard() {
               onSwitchToManual={handleSwitchToManual}
               onRetry={handleRetry}
               onRateLimitRetry={handleRateLimitRetry}
+              onMinimize={handleMinimizeToBackground}
               diagnosticProfile={getDiagnosticProfile(retryCount)}
             />
           )}
