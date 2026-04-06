@@ -29,6 +29,8 @@ export const VideoPreviewPlayer = ({ open, onOpenChange, videoUrl, title }: Vide
             ref={videoRef}
             src={videoUrl}
             controls
+            controlsList="nodownload noremoteplayback"
+            disablePictureInPicture
             className="w-full h-full"
             autoPlay
           />
