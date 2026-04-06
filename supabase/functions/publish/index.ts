@@ -894,7 +894,7 @@ async function publishToTikTok(
         post_info: {
           title: text.slice(0, 150), // TikTok title max 150 chars
           description: text,
-          privacy_level: 'SELF_ONLY', // Sandbox mode: draft only. Change to 'PUBLIC_TO_EVERYONE' after app review approval
+          privacy_level: 'PUBLIC_TO_EVERYONE',
           disable_duet: false,
           disable_comment: false,
           disable_stitch: false,
