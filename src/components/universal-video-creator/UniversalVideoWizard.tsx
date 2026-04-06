@@ -79,6 +79,18 @@ export function UniversalVideoWizard() {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [rateLimitRetryKey, setRateLimitRetryKey] = useState(0);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // beforeunload warning during active generation
+  useEffect(() => {
+    if (!isAutoGenerating) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isAutoGenerating]);
 
   // Check for draft on mount — show dialog if meaningful draft exists
   useEffect(() => {
