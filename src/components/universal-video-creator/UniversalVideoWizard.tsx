@@ -16,6 +16,8 @@ import { toast } from 'sonner';
 import { VIDEO_CATEGORIES, type VideoCategory, type UniversalConsultationResult, type UniversalVideoStyle } from '@/types/universal-video-creator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { getWizardDraft, saveWizardDraft, clearAllDrafts, hasMeaningfulDraft } from '@/lib/universal-video-draft';
+import { useNavigate } from 'react-router-dom';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 // Steps for manual mode
 const STEPS_MANUAL = [
@@ -58,6 +60,7 @@ const validateConsultationResult = (result: UniversalConsultationResult): { vali
 
 export function UniversalVideoWizard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   // Draft recovery dialog state
   const [showDraftDialog, setShowDraftDialog] = useState(false);
