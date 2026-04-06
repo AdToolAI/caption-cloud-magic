@@ -217,7 +217,7 @@ export const DashboardVideoCarousel = () => {
                 playsInline
                 loop
                 preload="auto"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover demo-video-element"
               />
 
               {/* Controls */}
