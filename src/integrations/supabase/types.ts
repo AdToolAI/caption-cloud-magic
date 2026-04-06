@@ -5337,6 +5337,42 @@ export type Database = {
         }
         Relationships: []
       }
+      overlay_presets: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          is_active: boolean | null
+          name: string
+          preset_type: string
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          preset_type?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          preset_type?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payouts: {
         Row: {
           affiliate_id: string
@@ -7940,6 +7976,170 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      stream_clips: {
+        Row: {
+          clip_url: string | null
+          created_at: string
+          duration_seconds: number | null
+          export_status: string | null
+          exported_platforms: Json | null
+          id: string
+          session_id: string | null
+          start_offset_seconds: number | null
+          storage_path: string | null
+          thumbnail_url: string | null
+          title: string
+          twitch_clip_id: string | null
+          updated_at: string
+          user_id: string
+          view_count: number | null
+        }
+        Insert: {
+          clip_url?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          export_status?: string | null
+          exported_platforms?: Json | null
+          id?: string
+          session_id?: string | null
+          start_offset_seconds?: number | null
+          storage_path?: string | null
+          thumbnail_url?: string | null
+          title: string
+          twitch_clip_id?: string | null
+          updated_at?: string
+          user_id: string
+          view_count?: number | null
+        }
+        Update: {
+          clip_url?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          export_status?: string | null
+          exported_platforms?: Json | null
+          id?: string
+          session_id?: string | null
+          start_offset_seconds?: number | null
+          storage_path?: string | null
+          thumbnail_url?: string | null
+          title?: string
+          twitch_clip_id?: string | null
+          updated_at?: string
+          user_id?: string
+          view_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_clips_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "stream_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stream_schedules: {
+        Row: {
+          announce_platforms: Json | null
+          auto_announce: boolean | null
+          created_at: string
+          duration_minutes: number | null
+          game_name: string | null
+          id: string
+          platform: string
+          scheduled_at: string
+          status: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          announce_platforms?: Json | null
+          auto_announce?: boolean | null
+          created_at?: string
+          duration_minutes?: number | null
+          game_name?: string | null
+          id?: string
+          platform?: string
+          scheduled_at: string
+          status?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          announce_platforms?: Json | null
+          auto_announce?: boolean | null
+          created_at?: string
+          duration_minutes?: number | null
+          game_name?: string | null
+          id?: string
+          platform?: string
+          scheduled_at?: string
+          status?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stream_sessions: {
+        Row: {
+          avg_viewers: number | null
+          created_at: string
+          ended_at: string | null
+          game_name: string | null
+          id: string
+          metadata: Json | null
+          peak_viewers: number | null
+          platform: string
+          started_at: string | null
+          stream_id: string | null
+          thumbnail_url: string | null
+          title: string | null
+          total_chat_messages: number | null
+          updated_at: string
+          user_id: string
+          vod_url: string | null
+        }
+        Insert: {
+          avg_viewers?: number | null
+          created_at?: string
+          ended_at?: string | null
+          game_name?: string | null
+          id?: string
+          metadata?: Json | null
+          peak_viewers?: number | null
+          platform?: string
+          started_at?: string | null
+          stream_id?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          total_chat_messages?: number | null
+          updated_at?: string
+          user_id: string
+          vod_url?: string | null
+        }
+        Update: {
+          avg_viewers?: number | null
+          created_at?: string
+          ended_at?: string | null
+          game_name?: string | null
+          id?: string
+          metadata?: Json | null
+          peak_viewers?: number | null
+          platform?: string
+          started_at?: string | null
+          stream_id?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          total_chat_messages?: number | null
+          updated_at?: string
+          user_id?: string
+          vod_url?: string | null
+        }
+        Relationships: []
       }
       studio_albums: {
         Row: {

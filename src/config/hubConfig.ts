@@ -6,6 +6,7 @@ import {
   FolderOpen, Mic2, Video, Film, Edit, Layers, Languages,
   Users, Palette,
   ShieldCheck, Settings,
+  Gamepad2, Radio, Scissors,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -92,6 +93,19 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/team-workspace", titleKey: "nav.teamWorkspace", descKey: "hubItemDesc.teamWorkspace", icon: Users, plan: "pro" },
       { route: "/white-label", titleKey: "nav.whiteLabel", descKey: "hubItemDesc.whiteLabel", icon: Palette, plan: "enterprise" },
       { route: "/community", titleKey: "nav.community", descKey: "hubItemDesc.community", icon: MessageCircle },
+    ],
+  },
+  {
+    key: "gaming",
+    icon: Gamepad2,
+    titleKey: "hubs.gaming",
+    descKey: "hubDesc.gaming",
+    items: [
+      { route: "/gaming", titleKey: "Stream Dashboard", descKey: "hubItemDesc.streamDashboard", icon: Radio },
+      { route: "/gaming?tab=clips", titleKey: "Clip Creator", descKey: "hubItemDesc.clipCreator", icon: Scissors },
+      { route: "/gaming?tab=content", titleKey: "Gaming Content Studio", descKey: "hubItemDesc.gamingContent", icon: Gamepad2 },
+      { route: "/gaming?tab=analytics", titleKey: "Stream Analytics", descKey: "hubItemDesc.streamAnalytics", icon: BarChart3 },
+      { route: "/gaming?tab=chat", titleKey: "Chat Manager", descKey: "hubItemDesc.chatManager", icon: MessageSquare },
     ],
   },
   {
