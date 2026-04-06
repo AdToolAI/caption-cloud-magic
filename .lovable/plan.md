@@ -1,41 +1,85 @@
 
 
-## Problem
+## Konzept: Gaming Hub — Livestream & Content Tools für Gamer
 
-Der TikTok Access Token ist **abgelaufen** (`token_expires_at: 2026-04-05 21:12:00` — vor ca. 1 Stunde). Die `publish`-Funktion verwendet den abgelaufenen Token direkt, ohne vorher zu prüfen, ob er noch gültig ist. Das ergibt den 401-Fehler von TikTok: `access_token_invalid`.
+### Vision
 
-Die Refresh-Logik existiert bereits in `_shared/tiktok-api.ts` (`refreshAccessToken`, `needsRefresh`), wird aber in der `publish`-Funktion **nicht aufgerufen**.
+Ein neuer **"Gaming" Hub** in der Sidebar, der Gamern und Streamern dedizierte Tools bietet — von Twitch-Integration über Clip-Management bis hin zu automatisierten Stream-Highlights und Gaming-Content-Erstellung.
 
-## Lösung
-
-**Datei: `supabase/functions/publish/index.ts`** — TikTok-Publish-Bereich (ca. Zeile 795-820)
-
-Nach dem Entschlüsseln des Tokens (Zeile 809) automatisch prüfen, ob der Token abgelaufen ist, und falls ja, den Refresh-Token verwenden:
-
-1. `needsRefresh` und `refreshAccessToken` aus `_shared/tiktok-api.ts` importieren
-2. `decryptToken` und `encryptToken` aus `_shared/crypto.ts` importieren (encryptToken falls noch nicht importiert)
-3. Nach Zeile 819 einfügen:
-   - `needsRefresh(connection.token_expires_at)` prüfen
-   - Falls ja: `refreshToken = await decryptToken(connection.refresh_token_hash)`
-   - `refreshAccessToken(refreshToken)` aufrufen
-   - Neuen Access Token und Refresh Token verschlüsselt in die DB zurückschreiben
-   - `token_expires_at` aktualisieren
-   - Den neuen `accessToken` für den Rest der Funktion verwenden
+### Features im Überblick
 
 ```text
-Ablauf:
-  Token entschlüsseln
-  -> needsRefresh(token_expires_at)?
-     -> Ja: refreshAccessToken(refresh_token)
-            -> DB updaten (neuer access_token, refresh_token, expires_at)
-            -> accessToken = neuer Token
-     -> Nein: weiter mit bestehendem Token
-  -> TikTok Upload durchführen
+┌─────────────────────────────────────────────────┐
+│                  GAMING HUB                      │
+├─────────────────────────────────────────────────┤
+│                                                  │
+│  1. STREAM DASHBOARD                             │
+│     Live-Status, Chat, Viewer-Stats              │
+│     Twitch-Konto verbinden & verwalten           │
+│                                                  │
+│  2. CLIP CREATOR                                 │
+│     Automatische Highlight-Erkennung             │
+│     Clips schneiden & als Shorts exportieren     │
+│     TikTok/YouTube Shorts/Instagram Reels        │
+│                                                  │
+│  3. STREAM OVERLAY DESIGNER                      │
+│     Alerts, Panels, Webcam-Frames gestalten      │
+│     KI-generierte Overlay-Grafiken               │
+│                                                  │
+│  4. GAMING CONTENT STUDIO                        │
+│     Thumbnails für Gaming-Videos (KI)            │
+│     Stream-Ankündigungen für Social Media        │
+│     "Going Live"-Posts automatisch posten        │
+│                                                  │
+│  5. STREAM ANALYTICS                             │
+│     Viewer-Trends, Peak-Zeiten, Chat-Aktivität   │
+│     Beste Clip-Momente nach Engagement           │
+│     Wachstums-Tracking über Zeit                 │
+│                                                  │
+│  6. CHAT MANAGER                                 │
+│     Live-Chat lesen & moderieren                 │
+│     Chat-Highlights & Sentiment-Analyse          │
+│     Auto-Antworten auf häufige Fragen            │
+│                                                  │
+└─────────────────────────────────────────────────┘
 ```
 
-## Betroffene Dateien
-- `supabase/functions/publish/index.ts` — Token-Refresh vor TikTok-Upload einbauen
+### Echter Mehrwert für Gamer
 
-## Ergebnis
-Der TikTok-Token wird automatisch erneuert wenn er abgelaufen ist. Der 401-Fehler tritt nicht mehr auf, solange der Refresh-Token noch gültig ist.
+- **Stream-to-Short Pipeline**: Stream läuft → KI erkennt Highlights → automatisch Clips geschnitten → direkt als TikTok/Reels/Shorts gepostet. Spart Stunden an Nachbearbeitung.
+- **"Going Live" Automation**: Sobald der Stream startet, werden automatisch Posts auf allen verbundenen Kanälen veröffentlicht (mit Thumbnail, Titel, Link).
+- **Chat-Insights**: Welche Momente hatten die meiste Chat-Aktivität? → Das sind die besten Clip-Kandidaten.
+- **Cross-Platform Repurposing**: Ein Stream → 10+ Content-Pieces (Clips, Thumbnails, Ankündigungen, Highlights-Zusammenfassung).
+
+### Technische Umsetzung
+
+**Twitch-Integration**: Lovable hat bereits einen Twitch-Connector verfügbar. Über die Twitch Helix API können wir:
+- Stream-Status & Viewer-Daten abrufen
+- Clips erstellen und verwalten
+- Channel-Infos und Follower-Daten lesen
+- Live-Chat via WebSocket lesen
+
+**Neue Dateien**:
+- `src/pages/GamingHub.tsx` — Hauptseite mit Tab-Navigation
+- `src/components/gaming/StreamDashboard.tsx` — Live-Status & Stats
+- `src/components/gaming/ClipCreator.tsx` — Clip-Management & Export
+- `src/components/gaming/OverlayDesigner.tsx` — Overlay-Editor
+- `src/components/gaming/GamingContentStudio.tsx` — Thumbnails & Posts
+- `src/components/gaming/StreamAnalytics.tsx` — Viewer-Analytics
+- `src/components/gaming/ChatManager.tsx` — Chat-Monitoring
+- `src/hooks/useTwitchConnection.ts` — Twitch API Hook
+- Edge Functions für Twitch API Calls via Connector Gateway
+
+**Hub-Config**: Neuer Hub "Gaming" in `hubConfig.ts` mit Gamepad-Icon
+
+**Datenbank**: Tabellen für Stream-Sessions, Clips, Overlay-Presets, Stream-Schedules
+
+### Empfohlener Start (Phase 1)
+
+1. Gaming Hub Seite + Twitch-Verbindung
+2. Stream Dashboard mit Live-Status
+3. Clip Creator mit Export zu TikTok/Shorts
+4. "Going Live" Auto-Posts
+
+Spätere Phasen: Overlay Designer, Chat Manager, Stream Analytics, KI-Highlight-Erkennung
 
