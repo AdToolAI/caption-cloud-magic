@@ -1,39 +1,31 @@
 
 
-## Fix: Carousel-Video pausieren wenn Vollbild-Dialog öffnet
+## Fix: Native Video-Buttons im Vollbild-Player entfernen
 
 ### Problem
-Wenn der User im Dashboard-Carousel ein Video abspielt (z.B. nach Unmute) und dann auf den Expand-Button klickt, läuft das Carousel-Video im Hintergrund weiter, während gleichzeitig das vergrößerte Video im Dialog startet. Zwei Videos laufen parallel.
-
-### Ursache
-Beim Klick auf Expand (`setSelectedVideo(...)`) wird das Carousel-Video nicht pausiert. Es spielt einfach weiter, während der `VideoPreviewPlayer`-Dialog mit `autoPlay` ein zweites Video startet.
+Im vergrößerten Video-Dialog (`VideoPreviewPlayer`) zeigt der Browser native Buttons für "Bild-in-Bild" und "Download" an. Diese verursachen ein schwarzes Video und sind überflüssig, da der Expand-Button im Carousel bereits ausreicht.
 
 ### Lösung
 
-**Datei: `src/components/dashboard/DashboardVideoCarousel.tsx`**
-
-1. Beim Öffnen des Vollbild-Dialogs (Expand-Button, Zeile ~410) das aktive Carousel-Video pausieren:
-   ```ts
-   const el = videoRefs.current[selectedIndex];
-   if (el) el.pause();
-   ```
-
-2. Beim Schließen des Dialogs (`onOpenChange`) das Carousel-Video wieder abspielen:
-   ```ts
-   onOpenChange={(open) => {
-     if (!open) {
-       setSelectedVideo(null);
-       const el = videoRefs.current[selectedIndex];
-       if (el) el.play().catch(() => {});
-     }
-   }}
-   ```
-
 **Datei: `src/components/video/VideoPreviewPlayer.tsx`**
 
-3. Beim Schließen des Dialogs das Dialog-Video stoppen (damit es nicht im Hintergrund weiterläuft), indem ein `ref` das `<video>`-Element beim Unmount pausiert.
+Am `<video>`-Element zwei HTML-Attribute hinzufügen:
+- `disablePictureInPicture` — entfernt den Bild-in-Bild-Button
+- `controlsList="nodownload nofullscreen noremoteplayback"` — entfernt Download- und weitere überflüssige Buttons
+
+```tsx
+<video
+  ref={videoRef}
+  src={videoUrl}
+  controls
+  controlsList="nodownload noremoteplayback"
+  disablePictureInPicture
+  className="w-full h-full"
+  autoPlay
+/>
+```
 
 ### Ergebnis
-- Nur ein Video spielt gleichzeitig
-- Carousel-Video pausiert bei Vollbild, setzt beim Schließen fort
+- Nur die Standard-Steuerelemente (Play/Pause, Lautstärke, Fortschritt, Vollbild) bleiben sichtbar
+- Kein schwarzes Video mehr durch versehentliches PiP-Aktivieren
 
