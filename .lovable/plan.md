@@ -1,34 +1,22 @@
 
 
-## Plan: Hinweis beim Verlassen während Video-Generierung — AIVideoStudio
+## Plan: Hero-Video auf der Startseite ersetzen
 
-### Problem
-
-Die Sicherheitsfeatures (beforeunload-Warnung, Toast bei Navigation, Minimize-Button) wurden nur im **Universal Video Creator** implementiert. Der User generiert Videos aber über die **AI Video Studio** Seite (`/ai-video-studio` / `AIVideoStudio.tsx`), wo keine dieser Warnungen existieren.
+### Was wird gemacht
+Das Video in der **GadgetCard** auf der Startseite (Hero-Bereich rechts) wird durch das neue hochgeladene Video ersetzt.
 
 ### Umsetzung
 
-**Datei: `src/pages/AIVideoStudio.tsx`**
+**Datei: `src/components/landing/GadgetCardDynamic.tsx`**
 
-1. **`beforeunload`-Warnung** — Wenn ein Video gerade generiert wird (Status "generating"/"processing"), Browser-Warning beim Tab-Schließen aktivieren
+1. Das hochgeladene Video (`sora-Mach_mir_bitte_ein_cooles_Werb.mp4`) wird in den `public/`-Ordner kopiert
+2. Die Video-URL in Zeile 306 wird von der aktuellen Supabase-Storage-URL auf das neue lokale Video geändert
 
-2. **Tab-Wechsel absichern** — Wenn der User während einer aktiven Generierung den Tab wechselt (z.B. von "Generieren" zu "Verlauf"), einen Toast anzeigen:
-   > "Dein Video wird im Hintergrund fertig generiert. Du findest es im Verlauf, sobald es bereit ist."
-
-3. **Navigationswarnung** — Beim Verlassen der Seite (Route-Wechsel) ebenfalls Toast-Hinweis anzeigen, wenn eine Generierung aktiv ist
-
-**Datei: `src/components/ai-video/VideoGenerationHistory.tsx`**
-
-4. **Aktive Generierungen hervorheben** — Bei Videos mit Status "Wird generiert..." einen deutlicheren Hinweis anzeigen, dass die Generierung im Hintergrund weiterläuft (z.B. pulsierender Indikator + Text "Generierung läuft im Hintergrund weiter")
-
-### Technische Details
-
-- Generierungsstatus wird aus dem bestehenden State in AIVideoStudio ermittelt (polling/generation state)
-- `beforeunload` Event Listener analog zur bestehenden Implementierung im UniversalVideoWizard
-- Toast via `sonner` (bereits importiert)
-- `useNavigate` + `useEffect` cleanup für Route-Wechsel-Erkennung
+### Technisch
+- Aktuell: `https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/public/ai-videos/...mp4`
+- Neu: Lokale Datei aus `public/videos/hero-video.mp4`
+- Keine weiteren Änderungen nötig — Autoplay, Mute-Toggle und Play-Button bleiben bestehen
 
 ### Ergebnis
-- Warnungen greifen jetzt auf der Seite, die der User tatsächlich nutzt
-- Klarer Hinweis beim Tab-Schließen, Tab-Wechsel und Navigation
+Das neue Werbevideo erscheint direkt in der Hero-Karte auf der Startseite.
 
