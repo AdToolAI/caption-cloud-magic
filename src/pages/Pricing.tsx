@@ -125,6 +125,24 @@ const Pricing = () => {
               "url": "https://useadtool.ai/pricing"
             }
           ]
+        },
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "4.8",
+          "reviewCount": "1200",
+          "bestRating": "5",
+          "worstRating": "1"
+        },
+        "review": {
+          "@type": "Review",
+          "author": { "@type": "Person", "name": "Sarah M." },
+          "datePublished": "2025-12-15",
+          "reviewBody": "AdTool AI hat meine Social Media Strategie komplett verändert. Die KI-Captions sind unglaublich gut.",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5",
+            "bestRating": "5"
+          }
         }
       }
     ]
