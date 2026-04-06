@@ -1,27 +1,34 @@
 
 
-## Plan: Hinweis beim Verlassen während Video-Generierung
+## Plan: Hinweis beim Verlassen während Video-Generierung — AIVideoStudio
 
 ### Problem
-Wenn ein Nutzer während der Video-Generierung die Seite verlässt (z.B. navigiert weg oder klickt "Neues Video starten"), gibt es keinen Hinweis, dass das Video im Hintergrund weiter generiert wird und später in der Mediathek/im Verlauf zu finden ist.
+
+Die Sicherheitsfeatures (beforeunload-Warnung, Toast bei Navigation, Minimize-Button) wurden nur im **Universal Video Creator** implementiert. Der User generiert Videos aber über die **AI Video Studio** Seite (`/ai-video-studio` / `AIVideoStudio.tsx`), wo keine dieser Warnungen existieren.
 
 ### Umsetzung
 
-**Datei: `src/components/universal-video-creator/UniversalVideoWizard.tsx`**
+**Datei: `src/pages/AIVideoStudio.tsx`**
 
-1. **`beforeunload`-Warnung** — Wenn `isAutoGenerating === true`, Browser-Warning beim Tab-Schließen/Verlassen aktivieren (Standard-Browser-Dialog)
+1. **`beforeunload`-Warnung** — Wenn ein Video gerade generiert wird (Status "generating"/"processing"), Browser-Warning beim Tab-Schließen aktivieren
 
-2. **Toast-Hinweis bei Navigation weg** — Wenn der Nutzer während der Generierung auf "Neues Video starten", "Zurück" oder eine andere Seite navigiert, einen persistenten Toast anzeigen:
-   > "Dein Video wird im Hintergrund fertig generiert. Du findest es in deinem Verlauf unter **Sora AI Videos**, sobald es bereit ist."
+2. **Tab-Wechsel absichern** — Wenn der User während einer aktiven Generierung den Tab wechselt (z.B. von "Generieren" zu "Verlauf"), einen Toast anzeigen:
+   > "Dein Video wird im Hintergrund fertig generiert. Du findest es im Verlauf, sobald es bereit ist."
 
-3. **"Neues Video starten"-Button absichern** — Während `isAutoGenerating` einen Bestätigungs-Dialog zeigen: "Die Generierung läuft noch im Hintergrund weiter. Du findest das Video später im Verlauf."
+3. **Navigationswarnung** — Beim Verlassen der Seite (Route-Wechsel) ebenfalls Toast-Hinweis anzeigen, wenn eine Generierung aktiv ist
 
-**Datei: `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`**
+**Datei: `src/components/ai-video/VideoGenerationHistory.tsx`**
 
-4. **Minimieren-Button** — Einen "Im Hintergrund weiterlaufen lassen"-Button unter dem Fortschrittsbalken hinzufügen, der den Nutzer zurück zur Hauptseite navigiert und den Toast-Hinweis zeigt.
+4. **Aktive Generierungen hervorheben** — Bei Videos mit Status "Wird generiert..." einen deutlicheren Hinweis anzeigen, dass die Generierung im Hintergrund weiterläuft (z.B. pulsierender Indikator + Text "Generierung läuft im Hintergrund weiter")
+
+### Technische Details
+
+- Generierungsstatus wird aus dem bestehenden State in AIVideoStudio ermittelt (polling/generation state)
+- `beforeunload` Event Listener analog zur bestehenden Implementierung im UniversalVideoWizard
+- Toast via `sonner` (bereits importiert)
+- `useNavigate` + `useEffect` cleanup für Route-Wechsel-Erkennung
 
 ### Ergebnis
-- Nutzer werden informiert, dass die Generierung weiterläuft
-- Klarer Verweis auf den Verlauf/Mediathek wo das fertige Video erscheint
-- Kein versehentlicher Datenverlust durch Navigation
+- Warnungen greifen jetzt auf der Seite, die der User tatsächlich nutzt
+- Klarer Hinweis beim Tab-Schließen, Tab-Wechsel und Navigation
 
