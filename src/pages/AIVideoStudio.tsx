@@ -375,7 +375,7 @@ export default function AIVideoStudio() {
           </Card>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="generate">
               <Sparkles className="w-4 h-4 mr-2" />
