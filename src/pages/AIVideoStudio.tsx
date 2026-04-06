@@ -25,6 +25,7 @@ export default function AIVideoStudio() {
   const { user } = useAuth();
   const { wallet, loading: walletLoading, refetch: refetchWallet } = useAIVideoWallet();
   const [generating, setGenerating] = useState(false);
+  const [hasActiveGeneration, setHasActiveGeneration] = useState(false);
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('generate');
   const [showPromptOptimizer, setShowPromptOptimizer] = useState(false);
