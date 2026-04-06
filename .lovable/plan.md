@@ -1,38 +1,18 @@
 
 
-## Plan: TikTok Redirect-URI Diagnose + Fix
+## Problem
 
-### Analyse
+TikTok gibt den Fehler `unaudited_client_can_only_post_to_private_accounts` zurück. Da dein TikTok-App-Antrag abgelehnt wurde, befindet sich die App im **Sandbox-Modus**. In diesem Modus erlaubt TikTok nur `privacy_level: 'SELF_ONLY'` (als Draft posten), nicht `PUBLIC_TO_EVERYONE`.
 
-Der `tiktok-health`-Endpunkt zeigt aktuell nur `hasRedirectUri: true`, aber **nicht den tatsächlichen Wert**. Das ist das fehlende Puzzlestück — wir können nicht prüfen, ob die `TIKTOK_REDIRECT_URI` mit dem TikTok-Portal übereinstimmt.
+## Lösung
 
-Auffällig: Die Projektnotizen sagen, die im Portal registrierte URI ist:
-```
-https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/tiktok-callback
-```
-Aber die Edge Function heißt **`tiktok-oauth-callback`**, was diese URL ergeben würde:
-```
-https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/tiktok-oauth-callback
-```
+**Datei: `supabase/functions/publish/index.ts`** (Zeile 897)
 
-Falls die `TIKTOK_REDIRECT_URI`-Secret nicht exakt mit der im TikTok-Portal registrierten URL übereinstimmt, lehnt TikTok den gesamten OAuth-Flow ab — mit genau diesem "client_key"-Fehler.
+`privacy_level` von `'PUBLIC_TO_EVERYONE'` auf `'SELF_ONLY'` ändern. Das Video wird dann als Draft im TikTok-Konto des verbundenen Users erstellt — genau wie es für Sandbox-Apps vorgesehen ist.
 
-### Umsetzung
+Optional: Einen Kommentar hinzufügen, dass dies nach erfolgreicher App-Review auf `PUBLIC_TO_EVERYONE` geändert werden kann.
 
-**Schritt 1: `supabase/functions/tiktok-health/index.ts`**
-- Die tatsächliche `TIKTOK_REDIRECT_URI` im Response anzeigen (ist keine geheime Information, nur eine URL)
-- Die generierte Auth-URL als Test-Wert mitgeben
+## Ergebnis
 
-**Schritt 2: Diagnose**
-- Health-Endpunkt aufrufen und die angezeigte Redirect-URI mit dem TikTok-Portal vergleichen
-- Falls Mismatch: Secret aktualisieren oder Portal-Eintrag korrigieren
-
-**Schritt 3: Alle TikTok-Functions redeployen**
-- `tiktok-oauth-start`, `tiktok-oauth-callback`, `tiktok-health` frisch deployen um sicherzustellen, dass alle denselben Shared-Code verwenden
-
-### Betroffene Dateien
-- `supabase/functions/tiktok-health/index.ts` — Redirect-URI + Test-Auth-URL anzeigen
-
-### Ergebnis
-Wir sehen sofort, welche Redirect-URI tatsächlich verwendet wird und können sie mit dem Portal abgleichen. Das ist der wahrscheinlichste Grund für den "client_key"-Fehler.
+Der 403-Fehler verschwindet. Videos werden als Drafts in der TikTok-App hochgeladen, wo sie manuell veröffentlicht werden können.
 
