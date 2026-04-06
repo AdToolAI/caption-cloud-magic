@@ -229,7 +229,11 @@ export const DashboardVideoCarousel = () => {
                   {isMuted ? <VolumeX className="h-4 w-4 text-white" /> : <Volume2 className="h-4 w-4 text-white" />}
                 </button>
                 <button
-                  onClick={() => setSelectedVideo({ url: demoVideoUrl, title: 'AdTool AI: Die Lösung' })}
+                  onClick={() => {
+                    const demoEl = document.querySelector('.demo-video-element') as HTMLVideoElement;
+                    if (demoEl) demoEl.pause();
+                    setSelectedVideo({ url: demoVideoUrl, title: 'AdTool AI: Die Lösung' });
+                  }}
                   className="w-9 h-9 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md hover:bg-primary/80 transition-colors"
                 >
                   <Expand className="h-4 w-4 text-white" />
@@ -407,6 +411,8 @@ export const DashboardVideoCarousel = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              const el = videoRefs.current[selectedIndex];
+                              if (el) el.pause();
                               if (videoUrl) setSelectedVideo({ url: videoUrl, title });
                             }}
                             className="w-9 h-9 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md hover:bg-primary/80 transition-colors"
@@ -475,7 +481,13 @@ export const DashboardVideoCarousel = () => {
       {selectedVideo && (
         <VideoPreviewPlayer
           open={!!selectedVideo}
-          onOpenChange={(open) => !open && setSelectedVideo(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedVideo(null);
+              const el = videoRefs.current[selectedIndex];
+              if (el) el.play().catch(() => {});
+            }
+          }}
           videoUrl={selectedVideo.url}
           title={selectedVideo.title}
         />
