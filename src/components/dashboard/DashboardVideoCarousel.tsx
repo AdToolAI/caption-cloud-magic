@@ -271,7 +271,13 @@ export const DashboardVideoCarousel = () => {
         {selectedVideo && (
           <VideoPreviewPlayer
             open={!!selectedVideo}
-            onOpenChange={(open) => !open && setSelectedVideo(null)}
+            onOpenChange={(open) => {
+              if (!open) {
+                setSelectedVideo(null);
+                const demoEl = document.querySelector('.demo-video-element') as HTMLVideoElement;
+                if (demoEl) demoEl.play().catch(() => {});
+              }
+            }}
             videoUrl={selectedVideo.url}
             title={selectedVideo.title}
           />
