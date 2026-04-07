@@ -1180,6 +1180,7 @@ export default function MediaLibrary() {
         </Card>
       )}
       </>)}
+      </>)}
 
       {/* Video Dialog */}
       <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
