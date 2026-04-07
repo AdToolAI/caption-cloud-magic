@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload } from 'lucide-react';
+import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, FolderOpen } from 'lucide-react';
+import { AlbumImagePicker } from '@/components/media-library/AlbumImagePicker';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
@@ -47,6 +48,7 @@ export default function AIVideoStudio() {
   // Image-to-Video state
   const [referenceImage, setReferenceImage] = useState<File | null>(null);
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
+  const [albumPickerOpen, setAlbumPickerOpen] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -440,51 +442,61 @@ export default function AIVideoStudio() {
                   </p>
 
                   {!referenceImageUrl ? (
-                    <div
-                      className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-all"
-                      onClick={() => fileInputRef.current?.click()}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        e.currentTarget.classList.add('border-primary', 'bg-accent/50');
-                      }}
-                      onDragLeave={(e) => {
-                        e.currentTarget.classList.remove('border-primary', 'bg-accent/50');
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        e.currentTarget.classList.remove('border-primary', 'bg-accent/50');
-                        const file = e.dataTransfer.files[0];
-                        if (file) {
-                          const input = fileInputRef.current;
-                          if (input) {
-                            const dt = new DataTransfer();
-                            dt.items.add(file);
-                            input.files = dt.files;
-                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                    <>
+                      <div
+                        className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-all"
+                        onClick={() => fileInputRef.current?.click()}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.currentTarget.classList.add('border-primary', 'bg-accent/50');
+                        }}
+                        onDragLeave={(e) => {
+                          e.currentTarget.classList.remove('border-primary', 'bg-accent/50');
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.currentTarget.classList.remove('border-primary', 'bg-accent/50');
+                          const file = e.dataTransfer.files[0];
+                          if (file) {
+                            const input = fileInputRef.current;
+                            if (input) {
+                              const dt = new DataTransfer();
+                              dt.items.add(file);
+                              input.files = dt.files;
+                              input.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
                           }
-                        }
-                      }}
-                    >
-                      {uploadingImage ? (
-                        <Loader2 className="w-8 h-8 mx-auto mb-2 text-muted-foreground animate-spin" />
-                      ) : (
-                        <ImagePlus className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                      )}
-                      <p className="text-sm text-muted-foreground">
-                        {uploadingImage ? 'Wird hochgeladen...' : 'Klicke zum Hochladen oder ziehe ein Bild hierher'}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        PNG, JPG bis 10MB
-                      </p>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg,image/webp"
-                        className="hidden"
-                        onChange={handleImageUpload}
-                        disabled={uploadingImage}
-                      />
-                    </div>
+                        }}
+                      >
+                        {uploadingImage ? (
+                          <Loader2 className="w-8 h-8 mx-auto mb-2 text-muted-foreground animate-spin" />
+                        ) : (
+                          <ImagePlus className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                        )}
+                        <p className="text-sm text-muted-foreground">
+                          {uploadingImage ? 'Wird hochgeladen...' : 'Klicke zum Hochladen oder ziehe ein Bild hierher'}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          PNG, JPG bis 10MB
+                        </p>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/webp"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                          disabled={uploadingImage}
+                        />
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="w-full mt-2"
+                        onClick={() => setAlbumPickerOpen(true)}
+                      >
+                        <FolderOpen className="w-4 h-4 mr-2" />
+                        Aus Alben wählen
+                      </Button>
+                    </>
                   ) : (
                     <div className="relative rounded-lg overflow-hidden border border-border">
                       <img
@@ -506,6 +518,16 @@ export default function AIVideoStudio() {
                       </Badge>
                     </div>
                   )}
+
+                  <AlbumImagePicker
+                    open={albumPickerOpen}
+                    onOpenChange={setAlbumPickerOpen}
+                    onSelectImage={(url) => {
+                      setReferenceImageUrl(url);
+                      setReferenceImage(null);
+                      toast.success('Bild aus Album ausgewählt');
+                    }}
+                  />
                 </div>
 
                 {/* Model Selection */}
