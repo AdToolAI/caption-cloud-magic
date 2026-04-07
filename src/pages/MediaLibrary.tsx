@@ -831,13 +831,13 @@ export default function MediaLibrary() {
         <Card className="backdrop-blur-xl bg-card/60 border-white/10">
           <CardContent className="pt-6">
             <Tabs value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as typeof categoryFilter)}>
-              <TabsList className="grid w-full grid-cols-6 bg-muted/30">
+              <TabsList className="grid w-full grid-cols-7 bg-muted/30">
                 <TabsTrigger 
                   value="all" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
                 >
                   <FolderOpen className="h-4 w-4" />
-                  Alle Medien
+                  Alle
                 </TabsTrigger>
                 <TabsTrigger 
                   value="upload" 
@@ -851,7 +851,7 @@ export default function MediaLibrary() {
                   className="flex items-center gap-2 data-[state=active]:bg-purple-500/20 data-[state=active]:shadow-[0_0_15px_hsla(270,80%,60%,0.2)]"
                 >
                   <Sparkles className="h-4 w-4" />
-                  KI Generiert
+                  KI
                 </TabsTrigger>
                 <TabsTrigger 
                   value="video-creator" 
@@ -866,6 +866,13 @@ export default function MediaLibrary() {
                 >
                   <Layers className="h-4 w-4" />
                   Kampagnen
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="albums" 
+                  className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  Alben
                 </TabsTrigger>
                 <TabsTrigger 
                   value="cloud" 
