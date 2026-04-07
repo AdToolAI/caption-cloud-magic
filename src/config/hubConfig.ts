@@ -102,10 +102,6 @@ export const hubDefinitions: HubDefinition[] = [
     descKey: "hubDesc.gaming",
     items: [
       { route: "/gaming", titleKey: "Stream Dashboard", descKey: "hubItemDesc.streamDashboard", icon: Radio },
-      { route: "/gaming?tab=clips", titleKey: "Clip Creator", descKey: "hubItemDesc.clipCreator", icon: Scissors },
-      { route: "/gaming?tab=content", titleKey: "Gaming Content Studio", descKey: "hubItemDesc.gamingContent", icon: Gamepad2 },
-      { route: "/gaming?tab=analytics", titleKey: "Stream Analytics", descKey: "hubItemDesc.streamAnalytics", icon: BarChart3 },
-      { route: "/gaming?tab=chat", titleKey: "Chat Manager", descKey: "hubItemDesc.chatManager", icon: MessageSquare },
     ],
   },
   {
