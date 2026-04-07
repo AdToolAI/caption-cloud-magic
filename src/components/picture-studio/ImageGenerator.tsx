@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X } from "lucide-react";
+import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X, FolderOpen } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAICall } from "@/hooks/useAICall";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,6 +62,7 @@ interface GeneratedImage {
 
 export function ImageGenerator() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { executeAICall, loading, status } = useAICall();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -80,6 +82,9 @@ export function ImageGenerator() {
 
   // Lightbox state
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
+
+  // Track if a new image was just generated (for showing "Zur Mediathek" button)
+  const [justGenerated, setJustGenerated] = useState(false);
 
   // Sync state to in-memory cache on every change
   useEffect(() => {
@@ -154,11 +159,45 @@ export function ImageGenerator() {
 
       if (result?.image) {
         const imgUrl = result.image.previewUrl || result.image.url;
+        const imageId = result.image.id;
         setGeneratedImages(prev => [
           { ...result.image, url: imgUrl, prompt: prompt.trim(), style, aspectRatio: aspectRatio },
           ...prev,
         ]);
         toast.success("Bild erfolgreich generiert! 🎨");
+        setJustGenerated(true);
+
+        // Auto-assign to KI Picture Studio system album
+        if (imageId && user) {
+          try {
+            // Find or create the system album
+            let { data: systemAlbum } = await supabase
+              .from('studio_albums')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('is_system', true)
+              .eq('name', 'KI Picture Studio')
+              .maybeSingle();
+
+            if (!systemAlbum) {
+              const { data: newAlbum } = await supabase
+                .from('studio_albums')
+                .insert({ user_id: user.id, name: 'KI Picture Studio', is_system: true })
+                .select('id')
+                .single();
+              systemAlbum = newAlbum;
+            }
+
+            if (systemAlbum) {
+              await supabase
+                .from('studio_images')
+                .update({ album_id: systemAlbum.id })
+                .eq('id', imageId);
+            }
+          } catch (err) {
+            console.error('Auto-assign to system album failed:', err);
+          }
+        }
       }
     } catch (error: any) {
       if (error.code !== 'INSUFFICIENT_CREDITS') {
@@ -302,6 +341,18 @@ export function ImageGenerator() {
               </>
             )}
           </Button>
+
+          {/* Navigate to Media Library after generation */}
+          {justGenerated && generatedImages.length > 0 && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => navigate('/mediathek?tab=albums&album=ki-picture-studio')}
+            >
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Zur Mediathek — Alben
+            </Button>
+          )}
         </CardContent>
       </Card>
 

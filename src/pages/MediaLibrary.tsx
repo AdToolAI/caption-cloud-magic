@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download, Cloud } from "lucide-react";
+import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download, Cloud, Images } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MediaLibraryHeroHeader } from "@/components/media-library/MediaLibraryHeroHeader";
 import { CloudStorageConnect } from "@/components/media-library/CloudStorageConnect";
+import { MediaAlbumManager } from "@/components/media-library/MediaAlbumManager";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCloudStorage } from "@/hooks/useCloudStorage";
 
@@ -56,7 +57,7 @@ export default function MediaLibrary() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai" | "ai_generator" | "campaign" | "video-creator" | "cloud">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai" | "ai_generator" | "campaign" | "video-creator" | "cloud" | "albums">("all");
   const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: MAX_STORAGE_GB * 1024 });
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
@@ -65,6 +66,7 @@ export default function MediaLibrary() {
   const { connection: cloudConnection, cloudFiles, listCloudFiles, uploadToCloud, deleteFromCloud, syncing: cloudSyncing } = useCloudStorage();
 
   // Handle tab parameter from URL
+  const albumSlug = new URLSearchParams(location.search).get('album');
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const tabParam = searchParams.get('tab');
@@ -72,6 +74,8 @@ export default function MediaLibrary() {
       setCategoryFilter('ai');
     } else if (tabParam === 'rendered') {
       setCategoryFilter('video-creator');
+    } else if (tabParam === 'albums') {
+      setCategoryFilter('albums');
     }
   }, [location.search]);
 
@@ -353,6 +357,12 @@ export default function MediaLibrary() {
 
   const applyFilters = () => {
     let filtered = [...media];
+
+    // Albums tab: handled by MediaAlbumManager component
+    if (categoryFilter === "albums") {
+      setFilteredMedia([]);
+      return;
+    }
 
     // Cloud tab: show cloud files instead
     if (categoryFilter === "cloud") {
@@ -827,13 +837,13 @@ export default function MediaLibrary() {
         <Card className="backdrop-blur-xl bg-card/60 border-white/10">
           <CardContent className="pt-6">
             <Tabs value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as typeof categoryFilter)}>
-              <TabsList className="grid w-full grid-cols-6 bg-muted/30">
+              <TabsList className="grid w-full grid-cols-7 bg-muted/30">
                 <TabsTrigger 
                   value="all" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
                 >
                   <FolderOpen className="h-4 w-4" />
-                  Alle Medien
+                  Alle
                 </TabsTrigger>
                 <TabsTrigger 
                   value="upload" 
@@ -847,7 +857,7 @@ export default function MediaLibrary() {
                   className="flex items-center gap-2 data-[state=active]:bg-purple-500/20 data-[state=active]:shadow-[0_0_15px_hsla(270,80%,60%,0.2)]"
                 >
                   <Sparkles className="h-4 w-4" />
-                  KI Generiert
+                  KI
                 </TabsTrigger>
                 <TabsTrigger 
                   value="video-creator" 
@@ -864,6 +874,13 @@ export default function MediaLibrary() {
                   Kampagnen
                 </TabsTrigger>
                 <TabsTrigger 
+                  value="albums" 
+                  className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
+                >
+                  <Images className="h-4 w-4" />
+                  Alben
+                </TabsTrigger>
+                <TabsTrigger 
                   value="cloud" 
                   className="flex items-center gap-2 data-[state=active]:bg-blue-500/20 data-[state=active]:shadow-[0_0_15px_hsla(210,80%,60%,0.2)]"
                 >
@@ -876,6 +893,11 @@ export default function MediaLibrary() {
         </Card>
       </motion.div>
 
+      {/* Albums Tab: show MediaAlbumManager instead of grid */}
+      {categoryFilter === "albums" ? (
+        <MediaAlbumManager initialAlbumSlug={albumSlug} />
+      ) : (
+      <>
       {/* Filters & Selection Actions */}
       <Card>
         <CardContent className="pt-6">
@@ -1163,6 +1185,7 @@ export default function MediaLibrary() {
           </div>
         </Card>
       )}
+      </>)}
       </>)}
 
       {/* Video Dialog */}

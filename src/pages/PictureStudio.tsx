@@ -4,10 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Footer } from "@/components/Footer";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { Sparkles, Layers, FolderOpen } from "lucide-react";
+import { Sparkles, Layers } from "lucide-react";
 import { PictureStudioHeader } from "@/components/picture-studio/PictureStudioHeader";
 import { ImageGenerator } from "@/components/picture-studio/ImageGenerator";
-import { AlbumManager } from "@/components/picture-studio/AlbumManager";
 import { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -16,7 +15,6 @@ const SmartBackgroundTab = lazy(() => import("./BackgroundReplacer"));
 const TAB_CONFIG = [
   { value: 'generate', label: 'Generieren', icon: Sparkles },
   { value: 'background', label: 'Smart Background', icon: Layers },
-  { value: 'albums', label: 'Meine Alben', icon: FolderOpen },
 ];
 
 export default function PictureStudio() {
@@ -70,10 +68,6 @@ export default function PictureStudio() {
                 }>
                   <SmartBackgroundTab />
                 </Suspense>
-              </TabsContent>
-
-              <TabsContent value="albums" className="mt-0">
-                <AlbumManager />
               </TabsContent>
             </motion.div>
           </AnimatePresence>
