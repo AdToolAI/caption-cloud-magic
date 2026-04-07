@@ -25,6 +25,28 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) throw new Error('Unauthorized');
 
+    // Parse returnTo from body
+    let returnTo: string | null = null;
+    try {
+      const body = await req.json();
+      returnTo = body?.returnTo || null;
+    } catch (_) {
+      // no body is fine
+    }
+
+    // Validate returnTo URL
+    let safeReturnTo: string | null = null;
+    if (returnTo) {
+      try {
+        const parsed = new URL(returnTo);
+        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+          safeReturnTo = returnTo;
+        }
+      } catch (_) {
+        // invalid URL - ignore
+      }
+    }
+
     // Generate CSRF state
     const state = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10min
@@ -36,7 +58,8 @@ serve(async (req) => {
         csrf_token: state,
         user_id: user.id,
         provider: 'tiktok',
-        expires_at: expiresAt.toISOString()
+        expires_at: expiresAt.toISOString(),
+        redirect_url: safeReturnTo,
       });
 
     if (stateError) {
@@ -50,6 +73,7 @@ serve(async (req) => {
     console.log('Redirecting to TikTok OAuth (Sandbox):', {
       userId: user.id,
       state,
+      returnTo: safeReturnTo,
       env: Deno.env.get('TIKTOK_ENV')
     });
 
