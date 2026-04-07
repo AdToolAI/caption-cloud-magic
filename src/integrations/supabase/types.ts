@@ -4491,6 +4491,63 @@ export type Database = {
         }
         Relationships: []
       }
+      gaming_discord_settings: {
+        Row: {
+          auto_notify_live: boolean | null
+          auto_notify_offline: boolean | null
+          created_at: string | null
+          custom_go_live_message: string | null
+          custom_offline_message: string | null
+          embed_color: number | null
+          id: string
+          include_category: boolean | null
+          include_thumbnail: boolean | null
+          include_viewer_count: boolean | null
+          last_notification_at: string | null
+          notification_count: number | null
+          notify_on_clip: boolean | null
+          updated_at: string | null
+          user_id: string
+          webhook_url: string
+        }
+        Insert: {
+          auto_notify_live?: boolean | null
+          auto_notify_offline?: boolean | null
+          created_at?: string | null
+          custom_go_live_message?: string | null
+          custom_offline_message?: string | null
+          embed_color?: number | null
+          id?: string
+          include_category?: boolean | null
+          include_thumbnail?: boolean | null
+          include_viewer_count?: boolean | null
+          last_notification_at?: string | null
+          notification_count?: number | null
+          notify_on_clip?: boolean | null
+          updated_at?: string | null
+          user_id: string
+          webhook_url: string
+        }
+        Update: {
+          auto_notify_live?: boolean | null
+          auto_notify_offline?: boolean | null
+          created_at?: string | null
+          custom_go_live_message?: string | null
+          custom_offline_message?: string | null
+          embed_color?: number | null
+          id?: string
+          include_category?: boolean | null
+          include_thumbnail?: boolean | null
+          include_viewer_count?: boolean | null
+          last_notification_at?: string | null
+          notification_count?: number | null
+          notify_on_clip?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+          webhook_url?: string
+        }
+        Relationships: []
+      }
       generated_templates: {
         Row: {
           analysis_data: Json | null
