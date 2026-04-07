@@ -1511,7 +1511,8 @@ export const translations: Record<Language, any> = {
       einstellungen: "Settings",
       medien: "Media",
       team: "Team",
-      verwaltung: "Management"
+      verwaltung: "Management",
+      gaming: "Gaming",
     },
     hubDesc: {
       planen: "Plan, schedule, and organize your content calendar",
@@ -1521,6 +1522,7 @@ export const translations: Record<Language, any> = {
       medien: "Manage media assets, videos, and audio",
       team: "Collaborate with your team and manage workspaces",
       admin: "System administration and monitoring",
+      gaming: "Stream tools, clip creator & content automation for gamers",
     },
     hubItemDesc: {
       calendar: "Visual calendar for scheduling and managing all your posts",
@@ -1551,6 +1553,13 @@ export const translations: Record<Language, any> = {
       adminDashboard: "Overview of system status and user management",
       monitoring: "Real-time system performance monitoring",
       featureFlags: "Toggle features on and off for users",
+      streamDashboard: "Live stream status, setup & OBS integration",
+      clipCreator: "Create, manage & export Twitch clips",
+      gamingContent: "Schedule streams & manage channel rewards",
+      streamAnalytics: "Follower, subscriber & viewer analytics",
+      chatManager: "Live chat, polls, predictions & viewer list",
+      community: "Connect with other creators and share tips",
+      videoTranslator: "Translate videos into other languages with AI",
     },
     
     // Dashboard
@@ -3801,7 +3810,8 @@ export const translations: Record<Language, any> = {
       automatisieren: "Automatisieren",
       medien: "Medien",
       team: "Team",
-      verwaltung: "Verwaltung"
+      verwaltung: "Verwaltung",
+      gaming: "Gaming",
     },
     hubDesc: {
       planen: "Plane, terminiere und organisiere deinen Content-Kalender",
@@ -3811,6 +3821,7 @@ export const translations: Record<Language, any> = {
       medien: "Verwalte Medien, Videos und Audio",
       team: "Arbeite mit deinem Team zusammen",
       admin: "Systemverwaltung und Monitoring",
+      gaming: "Stream-Tools, Clip-Creator & Content-Automation für Gamer",
     },
     hubItemDesc: {
       calendar: "Visueller Kalender zum Planen und Verwalten aller Posts",
@@ -3841,6 +3852,13 @@ export const translations: Record<Language, any> = {
       adminDashboard: "Überblick über Systemstatus und Nutzerverwaltung",
       monitoring: "Echtzeit-System-Performance-Monitoring",
       featureFlags: "Features für Nutzer ein- und ausschalten",
+      streamDashboard: "Live-Stream-Status, Setup & OBS-Integration",
+      clipCreator: "Twitch-Clips erstellen, verwalten & exportieren",
+      gamingContent: "Streams planen & Channel-Rewards verwalten",
+      streamAnalytics: "Follower-, Subscriber- & Viewer-Analytics",
+      chatManager: "Live-Chat, Polls, Predictions & Viewer-Liste",
+      community: "Vernetze dich mit anderen Creatorn und teile Tipps",
+      videoTranslator: "Übersetze Videos mit KI in andere Sprachen",
     },
     
     // Dashboard
@@ -6052,7 +6070,8 @@ export const translations: Record<Language, any> = {
       automatisieren: "Automatizar",
       medien: "Medios",
       team: "Equipo",
-      verwaltung: "Gestión"
+      verwaltung: "Gestión",
+      gaming: "Gaming",
     },
     hubDesc: {
       planen: "Planifica, programa y organiza tu calendario de contenido",
@@ -6062,6 +6081,7 @@ export const translations: Record<Language, any> = {
       medien: "Gestiona archivos multimedia, videos y audio",
       team: "Colabora con tu equipo y gestiona espacios",
       admin: "Administración y monitoreo del sistema",
+      gaming: "Herramientas de streaming, clips y automatización para gamers",
     },
     hubItemDesc: {
       calendar: "Calendario visual para programar y gestionar todos tus posts",
@@ -6092,6 +6112,13 @@ export const translations: Record<Language, any> = {
       adminDashboard: "Vista general del estado del sistema",
       monitoring: "Monitoreo de rendimiento del sistema en tiempo real",
       featureFlags: "Activar y desactivar funciones para usuarios",
+      streamDashboard: "Estado del stream en vivo, setup e integración OBS",
+      clipCreator: "Crear, gestionar y exportar clips de Twitch",
+      gamingContent: "Programar streams y gestionar recompensas del canal",
+      streamAnalytics: "Analytics de seguidores, suscriptores y espectadores",
+      chatManager: "Chat en vivo, encuestas, predicciones y lista de espectadores",
+      community: "Conéctate con otros creadores y comparte consejos",
+      videoTranslator: "Traduce videos a otros idiomas con IA",
     },
     
     // Dashboard
