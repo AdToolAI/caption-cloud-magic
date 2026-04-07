@@ -23,7 +23,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useCloudStorage } from "@/hooks/useCloudStorage";
 
 // Storage Limits
-const MAX_VIDEOS = 250;
+const MAX_VIDEOS = 500;
+const MAX_IMAGES = 2500;
 const MAX_STORAGE_GB = 10;
 
 // Normalized media item type
@@ -380,10 +381,13 @@ export default function MediaLibrary() {
       }));
       filtered = cloudMedia;
     } else if (categoryFilter === "ai") {
-      // Show both 'ai' and 'ai_generator' under the AI category
-      filtered = filtered.filter(item => item.source === 'ai' || item.source === 'ai_generator');
+      // AI tab: show AI videos only, no ai_generator images (those are in Albums)
+      filtered = filtered.filter(item => item.source === 'ai' && item.type === 'video');
     } else if (categoryFilter !== "all") {
       filtered = filtered.filter(item => item.source === categoryFilter);
+    } else {
+      // "all" tab: exclude ai_generator images (they live in Albums only)
+      filtered = filtered.filter(item => item.source !== 'ai_generator');
     }
 
     // Search filter
@@ -769,6 +773,7 @@ export default function MediaLibrary() {
 
   // Calculate counts for header
   const videoCount = media.filter(m => m.type === 'video').length;
+  const imageCount = media.filter(m => m.type === 'image').length;
   const usedGB = storageQuota.used_mb / 1024;
 
   const triggerUpload = () => {
@@ -790,6 +795,8 @@ export default function MediaLibrary() {
       <MediaLibraryHeroHeader
         videoCount={videoCount}
         maxVideos={MAX_VIDEOS}
+        imageCount={imageCount}
+        maxImages={MAX_IMAGES}
         usedGB={usedGB}
         maxGB={MAX_STORAGE_GB}
         onUploadClick={triggerUpload}
