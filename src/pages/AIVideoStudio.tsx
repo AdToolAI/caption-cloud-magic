@@ -487,6 +487,14 @@ export default function AIVideoStudio() {
                         disabled={uploadingImage}
                       />
                     </div>
+                    <Button
+                      variant="outline"
+                      className="w-full mt-2"
+                      onClick={() => setAlbumPickerOpen(true)}
+                    >
+                      <FolderOpen className="w-4 h-4 mr-2" />
+                      Aus Alben wählen
+                    </Button>
                   ) : (
                     <div className="relative rounded-lg overflow-hidden border border-border">
                       <img
@@ -508,6 +516,16 @@ export default function AIVideoStudio() {
                       </Badge>
                     </div>
                   )}
+
+                  <AlbumImagePicker
+                    open={albumPickerOpen}
+                    onOpenChange={setAlbumPickerOpen}
+                    onSelectImage={(url) => {
+                      setReferenceImageUrl(url);
+                      setReferenceImage(null);
+                      toast.success('Bild aus Album ausgewählt');
+                    }}
+                  />
                 </div>
 
                 {/* Model Selection */}
