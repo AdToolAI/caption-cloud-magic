@@ -1,34 +1,41 @@
 
 
-## Plan: TikTok OAuth — Dynamische Rückleitung zur Ausgangsseite
+## Plan: Album-System in die Mediathek integrieren & KI Picture Studio verknüpfen
 
-### Problem
-1. Nach dem TikTok-Verbinden landet der User auf `/performance?tab=connections` statt dort, wo er den Flow gestartet hat (z.B. `/integrations`)
-2. TikTok überspringt den Consent-Dialog, weil die App bereits autorisiert wurde — das ist **normales Verhalten** und kein Bug
-
-### Lösung
-Das gleiche Pattern wie beim X-OAuth-Flow verwenden: Die Ausgangs-URL wird im `oauth_states`-Eintrag gespeichert und im Callback ausgelesen.
+### Überblick
+Das Album-System aus dem KI Picture Studio wird als neues Segment "Alben" in die Mediathek verschoben. KI-generierte Bilder landen automatisch im nicht-löschbaren Unterordner "KI Picture Studio". Nach der Bildgenerierung gibt es einen Button, der direkt zur Mediathek → Alben → KI Picture Studio navigiert.
 
 ### Änderungen
 
-**1. Frontend: `ConnectionsTab.tsx`** — Aktuelle URL als `returnTo` mitschicken:
-```typescript
-// TikTok OAuth start
-const { data, error } = await supabase.functions.invoke('tiktok-oauth-start', {
-  headers: { Authorization: `Bearer ${session.session?.access_token}` },
-  body: { returnTo: window.location.href }
-});
-```
+**1. Mediathek: Neues "Alben"-Tab hinzufügen**
+- `src/pages/MediaLibrary.tsx`: Tab-Leiste von 6 auf 7 Tabs erweitern (+ "Alben" mit FolderOpen-Icon)
+- `categoryFilter`-Type um `"albums"` erweitern
+- URL-Parameter `?tab=albums&album=ki-picture-studio` unterstützen
+- Wenn "Alben" aktiv: `AlbumManager`-Komponente anzeigen statt der normalen Media-Grid
 
-**2. Edge Function: `tiktok-oauth-start/index.ts`** — `redirect_url` in `oauth_states` speichern:
-- Request-Body parsen → `returnTo` extrahieren
-- `redirect_url: returnTo` zum Insert hinzufügen
+**2. AlbumManager für Mediathek anpassen**
+- `src/components/picture-studio/AlbumManager.tsx` → nach `src/components/media-library/AlbumManager.tsx` verschieben/refactoren
+- Systemalbum "KI Picture Studio" automatisch erstellen (is_system: true) beim ersten Laden, falls nicht vorhanden
+- Systemalben können nicht gelöscht werden (Delete-Button ausblenden)
+- Eigene Alben weiterhin erstellbar/löschbar
+- URL-Parameter `album` auswerten: bei `?tab=albums&album=ki-picture-studio` direkt ins KI-Album navigieren
 
-**3. Edge Function: `tiktok-oauth-callback/index.ts`** — Gespeicherte URL für Redirect verwenden:
-- `oauthState.redirect_url` auslesen
-- Statt hartcodiertem `/performance?tab=connections` die gespeicherte URL verwenden (mit Fallback)
-- Callback-Parameter (`connected=tiktok&status=success`) anhängen
+**3. DB-Migration: Systemalbum-Flag**
+- `studio_albums`-Tabelle: Spalte `is_system BOOLEAN DEFAULT false` hinzufügen
+- Damit kann das "KI Picture Studio"-Album als nicht-löschbar markiert werden
 
-### Zum Consent-Dialog
-TikTok zeigt den Autorisierungsdialog nur beim **ersten Mal**. Danach wird automatisch weitergeleitet. Um ihn erneut zu sehen, muss die App-Berechtigung im TikTok-Konto widerrufen werden. Das ist Standard-OAuth-Verhalten.
+**4. KI Picture Studio: Auto-Save ins Systemalbum**
+- `src/components/picture-studio/ImageGenerator.tsx`: Nach erfolgreicher Generierung das Bild automatisch mit der `album_id` des "KI Picture Studio"-Systemalbums in `studio_images` speichern
+- Nach der Generierung: Button "Zur Mediathek" anzeigen, der zu `/mediathek?tab=albums&album=ki-picture-studio` navigiert
+
+**5. KI Picture Studio: Album-Tab entfernen**
+- `src/pages/PictureStudio.tsx`: Den "Meine Alben"-Tab aus dem Picture Studio entfernen (nur noch "Generieren" und "Smart Background")
+- AlbumManager-Import entfernen
+
+### Ablauf für den User
+1. Bild im KI Picture Studio generieren
+2. Button "Zur Mediathek" klicken
+3. Wird zur Mediathek weitergeleitet → Tab "Alben" → Ordner "KI Picture Studio" ist automatisch geöffnet
+4. Das neue Bild ist dort sichtbar
+5. User kann eigene Alben erstellen und Bilder zwischen Alben verschieben
 
