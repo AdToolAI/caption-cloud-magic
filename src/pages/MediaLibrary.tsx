@@ -887,6 +887,11 @@ export default function MediaLibrary() {
         </Card>
       </motion.div>
 
+      {/* Albums Tab: show MediaAlbumManager instead of grid */}
+      {categoryFilter === "albums" ? (
+        <MediaAlbumManager initialAlbumSlug={albumSlug} />
+      ) : (
+      <>
       {/* Filters & Selection Actions */}
       <Card>
         <CardContent className="pt-6">
