@@ -60,7 +60,7 @@ export function DiscordIntegration() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [connected, setConnected] = useState(false);
-  const { twitchUser, streamInfo } = useTwitch();
+  const { twitchUser, stream } = useTwitch();
 
   useEffect(() => {
     loadSettings();
