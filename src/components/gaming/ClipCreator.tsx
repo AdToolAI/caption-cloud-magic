@@ -1,64 +1,82 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Scissors, Upload, Share2, Film, Clock, Eye } from "lucide-react";
-
-const mockClips = [
-  { id: "1", title: "Insane 1v5 Clutch", duration: "0:32", views: 1240, status: "ready" },
-  { id: "2", title: "Funny Fail Compilation", duration: "1:15", views: 890, status: "ready" },
-  { id: "3", title: "Best Play of the Day", duration: "0:45", views: 2100, status: "exported" },
-];
+import { Scissors, Share2, Film, Clock, Eye, Loader2, ExternalLink } from "lucide-react";
+import { useTwitch } from "@/hooks/useTwitch";
 
 export function ClipCreator() {
+  const { clips, twitchUser, isConnected, loading } = useTwitch();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="text-center py-20 text-muted-foreground">
+        Verbinde zuerst deinen Twitch-Kanal im "Stream"-Tab.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 mt-4">
-      {/* Actions */}
-      <div className="flex flex-wrap gap-3">
-        <Button className="gap-2 bg-purple-600 hover:bg-purple-700">
-          <Scissors className="h-4 w-4" />
-          Neuen Clip erstellen
-        </Button>
-        <Button variant="outline" className="gap-2">
-          <Upload className="h-4 w-4" />
-          Clip importieren
-        </Button>
-      </div>
-
       {/* Clips Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {mockClips.map((clip) => (
-          <Card key={clip.id} className="group cursor-pointer hover:border-purple-500/50 transition-colors">
-            <div className="aspect-video bg-gradient-to-br from-purple-900/40 to-violet-800/40 rounded-t-2xl flex items-center justify-center relative">
-              <Film className="h-12 w-12 text-purple-400/50" />
-              <Badge className="absolute top-2 right-2 bg-black/60 text-white text-xs">
-                {clip.duration}
-              </Badge>
-            </div>
-            <CardContent className="p-4">
-              <h3 className="font-semibold text-sm mb-2">{clip.title}</h3>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Eye className="h-3 w-3" /> {clip.views}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" /> {clip.duration}
-                  </span>
-                </div>
-                <Button variant="ghost" size="sm" className="gap-1 text-xs h-7">
-                  <Share2 className="h-3 w-3" />
-                  Export
-                </Button>
-              </div>
-              {clip.status === "exported" && (
-                <Badge variant="secondary" className="mt-2 text-xs">
-                  ✅ Exportiert
+      {clips.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Scissors className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="font-semibold">Noch keine Clips</p>
+            <p className="text-sm">Clips erscheinen hier, sobald welche auf deinem Kanal erstellt werden.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {clips.map((clip) => (
+            <Card key={clip.id} className="group cursor-pointer hover:border-purple-500/50 transition-colors overflow-hidden">
+              <div className="aspect-video relative">
+                <img
+                  src={clip.thumbnail_url}
+                  alt={clip.title}
+                  className="w-full h-full object-cover"
+                />
+                <Badge className="absolute top-2 right-2 bg-black/60 text-white text-xs">
+                  {Math.floor(clip.duration)}s
                 </Badge>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </div>
+              <CardContent className="p-4">
+                <h3 className="font-semibold text-sm mb-2 line-clamp-2">{clip.title}</h3>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Eye className="h-3 w-3" /> {clip.view_count.toLocaleString()}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {Math.floor(clip.duration)}s
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1 text-xs h-7"
+                    onClick={() => window.open(clip.url, '_blank')}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Öffnen
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  von {clip.creator_name} · {new Date(clip.created_at).toLocaleDateString('de-DE')}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Export Pipeline */}
       <Card>
