@@ -1,110 +1,110 @@
 
 
-## Plan: Professionelle Discord-Integration im Gaming Hub
+## Plan: YouTube Live / YouTube Gaming Integration im Gaming Hub
 
 ### Was gebaut wird
 
-Ein vollständiger 6. Tab "Discord" im Gaming Hub mit Webhook-basierter Discord-Integration: Go-Live-Notifications, Clip-Sharing, Stream-Ende-Zusammenfassungen und Embed-Vorschau — alles im James Bond 2028 Design.
+Ein 7. Tab **"YouTube Live"** im Gaming Hub — parallel zum Twitch-Tab, aber für YouTube-Livestreaming. Nutzt die bereits vorhandenen YouTube-Credentials (GOOGLE_CLIENT_ID/SECRET + OAuth social_connections) und die YouTube Data API v3 Live Streaming Endpoints.
 
 ### Architektur
 
 ```text
-Frontend (DiscordIntegration.tsx)
-  ↓ supabase.functions.invoke('discord-webhook')
-Edge Function (discord-webhook)
-  ↓ POST
-Discord Webhook API
+Frontend (YouTubeLiveTab.tsx)
+  ↓ supabase.functions.invoke('youtube-live')
+Edge Function (youtube-live)
+  ↓ YouTube Data API v3
+  ↓ liveBroadcasts, liveStreams, liveChatMessages
 ```
 
-### Schritt 1: DB-Migration — `gaming_discord_settings`
+### Schritt 1: Edge Function `youtube-live`
 
-```sql
-CREATE TABLE gaming_discord_settings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
-  webhook_url TEXT NOT NULL,
-  auto_notify_live BOOLEAN DEFAULT true,
-  auto_notify_offline BOOLEAN DEFAULT false,
-  notify_on_clip BOOLEAN DEFAULT false,
-  custom_go_live_message TEXT,
-  custom_offline_message TEXT,
-  embed_color INTEGER DEFAULT 9520895,
-  include_viewer_count BOOLEAN DEFAULT true,
-  include_category BOOLEAN DEFAULT true,
-  include_thumbnail BOOLEAN DEFAULT true,
-  last_notification_at TIMESTAMPTZ,
-  notification_count INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-ALTER TABLE gaming_discord_settings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users manage own discord settings"
-  ON gaming_discord_settings FOR ALL TO authenticated
-  USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
-```
+**`supabase/functions/youtube-live/index.ts`** — Proxy für YouTube Live API mit folgenden Actions:
 
-### Schritt 2: Edge Function `discord-webhook`
+| Action | YouTube API Endpoint | Funktion |
+|--------|---------------------|----------|
+| `get_broadcast` | `liveBroadcasts.list` | Aktuellen/geplanten Broadcast abrufen |
+| `create_broadcast` | `liveBroadcasts.insert` | Neuen Broadcast erstellen (Titel, Beschreibung, Zeitplan, Privacy) |
+| `update_broadcast` | `liveBroadcasts.update` | Titel/Beschreibung während des Streams ändern |
+| `transition_broadcast` | `liveBroadcasts.transition` | Status wechseln (testing → live → complete) |
+| `get_stream` | `liveStreams.list` | Stream-Key und Ingestion-URL abrufen |
+| `create_stream` | `liveStreams.insert` | Neuen Stream-Key erstellen |
+| `bind_stream` | `liveBroadcasts.bind` | Stream an Broadcast binden |
+| `get_chat` | `liveChatMessages.list` | Live-Chat lesen |
+| `send_chat` | `liveChatMessages.insert` | Chat-Nachricht senden |
+| `get_analytics` | `videos.list` (statistics) | Concurrent Viewers, Likes etc. |
 
-- `supabase/functions/discord-webhook/index.ts`
-- Unterstützt 4 Notification-Typen: `go_live`, `stream_end`, `new_clip`, `test`
-- Baut Rich Embeds mit konfigurierbarer Farbe, Thumbnail, Feldern
-- Validiert Webhook-URL (muss `discord.com/api/webhooks/` enthalten)
-- Speichert `last_notification_at` und inkrementiert `notification_count`
+Token-Refresh über verschlüsselte `social_connections`-Tokens (bestehendes Pattern).
 
-### Schritt 3: Neue Komponente `DiscordIntegration.tsx`
+### Schritt 2: Hook `useYouTubeLive`
 
-Premium-Glassmorphism-Komponente mit 4 Bereichen:
+**`src/hooks/useYouTubeLive.ts`** — React-Hook mit:
+- `broadcasts` — Liste geplanter/aktiver Broadcasts
+- `currentBroadcast` — Aktuell laufender Stream
+- `streamKey` / `ingestionUrl` — Für OBS/Streaming-Software
+- `chatMessages` — Live-Chat mit Polling
+- `createBroadcast(title, description, scheduledAt, privacy)`
+- `updateBroadcast(id, title, description)`
+- `transitionBroadcast(id, status)` — testing/live/complete
+- `sendChatMessage(liveChatId, message)`
+- `isYouTubeConnected` — Prüft social_connections für youtube
 
-**a) Webhook-Setup**
-- Input für Discord-Webhook-URL mit Validierung
-- "Verbindung testen"-Button der Test-Embed sendet
-- Anleitung: "Server-Einstellungen → Integrationen → Webhooks → Neu"
-- Verbindungsstatus-Badge (verbunden/nicht verbunden)
+### Schritt 3: Komponente `YouTubeLiveTab.tsx`
 
-**b) Notification-Einstellungen**
-- Toggle: Auto-Notify bei Go-Live (mit Custom Message)
-- Toggle: Auto-Notify bei Stream-Ende (mit Custom Message)
-- Toggle: Neue Clips automatisch teilen
-- Toggle: Zuschauerzahl anzeigen / Kategorie anzeigen / Thumbnail anzeigen
-- Farbwähler für Embed-Akzentfarbe
+**`src/components/gaming/YouTubeLiveTab.tsx`** — Premium-Glassmorphism-Komponente mit 4 Bereichen:
 
-**c) Live-Embed-Vorschau**
-- Zeigt eine Echtzeit-Vorschau des Discord-Embeds wie es in Discord aussehen wird
-- Aktualisiert sich live wenn Einstellungen geändert werden
-- Dunkler Discord-Hintergrund (#36393f) für Authentizität
+**a) Broadcast-Steuerung (Hauptbereich)**
+- Formular: Titel, Beschreibung, Zeitplan (Datum/Uhrzeit), Privacy (public/unlisted/private)
+- "Broadcast erstellen"-Button
+- Aktiver Broadcast mit Live-Indikator (rot pulsierend)
+- Status-Transitions: "Test starten" → "Live gehen" → "Stream beenden"
+- Stream-Key anzeigen (verborgen, copy-to-clipboard)
+- Ingestion-URL für OBS
 
-**d) Notification-Historie**
-- Zähler: "X Notifications gesendet"
-- Letzte Notification: Zeitstempel
-- "Jetzt Go-Live senden"-Button (manueller Trigger)
-- "Clip teilen"-Button
+**b) Live-Dashboard (während Stream)**
+- Concurrent Viewers (animiert, CountUp)
+- Likes, Chat-Rate
+- Stream-Dauer (live Timer)
+- Thumbnail-Preview
+
+**c) Live-Chat**
+- Chat-Feed mit Auto-Scroll
+- Nachricht senden
+- Moderations-Badges (Owner, Moderator)
+
+**d) Geplante Broadcasts**
+- Liste geplanter Streams mit Edit/Delete
+- Countdown zum nächsten geplanten Stream
 
 ### Schritt 4: GamingHub.tsx anpassen
 
-- 6. Tab "Discord" hinzufügen (Icon: `MessageCircle` oder Discord SVG)
-- TabsList auf `grid-cols-6` ändern
-- `DiscordIntegration` importieren und als TabsContent rendern
+- 7. Tab "YouTube" hinzufügen (YouTube-Icon, rot)
+- TabsList auf `grid-cols-7`
+- `YouTubeLiveTab` importieren und rendern
 
-### Schritt 5: Content-Tab Discord-Status
+### Schritt 5: YouTube-Verbindungsstatus
 
-- In `GamingContentStudio.tsx`: Discord-Einrichten-Button zeigt grünen Badge wenn verbunden
-- "Einrichten"-Button wechselt zum Discord-Tab
+- Prüft `social_connections` für `provider = 'youtube'`
+- Falls nicht verbunden: Setup-Anleitung mit OAuth-Flow-Button
+- Nutzt bestehenden OAuth-Callback-Flow
 
 ### Dateien
 
 | Aktion | Datei |
 |--------|-------|
-| Neu | `src/components/gaming/DiscordIntegration.tsx` |
-| Neu | `supabase/functions/discord-webhook/index.ts` |
-| Migration | `gaming_discord_settings` Tabelle |
-| Edit | `src/pages/GamingHub.tsx` (6. Tab) |
-| Edit | `src/components/gaming/GamingContentStudio.tsx` (Status-Badge) |
+| Neu | `supabase/functions/youtube-live/index.ts` |
+| Neu | `src/hooks/useYouTubeLive.ts` |
+| Neu | `src/components/gaming/YouTubeLiveTab.tsx` |
+| Edit | `src/pages/GamingHub.tsx` (7. Tab) |
 
 ### Design
 
-Konsistent mit dem Gaming Hub James Bond 2028 Stil:
+Konsistent mit Gaming Hub — James Bond 2028:
 - `backdrop-blur-xl bg-card/60 border border-white/10`
-- Purple/Violet Gradient-Texte und Glow-Shadows
-- Framer Motion staggered reveals und hover-lifts
-- Discord-spezifische Akzente (#5865F2 Blurple)
+- YouTube-spezifische Rot-Akzente (#FF0000) statt Twitch-Violet
+- Framer Motion staggered reveals
+- Live-Indikator: rot pulsierend mit Glow
+- Stream-Key-Feld: Masked Input mit Copy-Button
+
+### Ergebnis
+YouTube-Streamer können direkt aus dem Gaming Hub Broadcasts erstellen, Stream-Keys abrufen, live gehen und den Chat moderieren — parallel zur Twitch-Integration.
 
