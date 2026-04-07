@@ -197,19 +197,19 @@ export const GadgetCardDynamic = () => {
     de: {
       username: "John Doe",
       handle: "@portfolio",
-      postTitle: "Magische Weihnachten 🎄",
+      
       caption: "Perfekter Abend am Meer. Die Natur ist der beste Künstler.",
     },
     en: {
       username: "John Doe",
       handle: "@portfolio",
-      postTitle: "Magical Christmas 🎄",
+      
       caption: "Perfect evening by the sea. Nature is the best artist.",
     },
     es: {
       username: "John Doe",
       handle: "@portfolio",
-      postTitle: "Navidad Mágica 🎄",
+      
       caption: "Tarde perfecta junto al mar. La naturaleza es la mejor artista.",
     }
   };
@@ -351,11 +351,6 @@ export const GadgetCardDynamic = () => {
               )}
             </motion.button>
             
-            {/* Overlay gradient */}
-            <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent" />
-            <div className="absolute bottom-4 left-4 right-4">
-              <p className="text-white text-sm font-medium drop-shadow-lg">{currentContent.postTitle}</p>
-            </div>
             
             {/* Holographic shimmer */}
             <motion.div
