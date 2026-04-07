@@ -128,8 +128,8 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
                     onClick={() => loadImages(album.id, album.name)}
                     className="group relative rounded-lg border border-border overflow-hidden hover:border-primary/50 transition-all text-left"
                   >
-                    {album.cover_url ? (
-                      <img src={album.cover_url} alt={album.name} className="w-full h-24 object-cover" />
+                    {album.cover_image_url ? (
+                      <img src={album.cover_image_url} alt={album.name} className="w-full h-24 object-cover" />
                     ) : (
                       <div className="w-full h-24 bg-muted flex items-center justify-center">
                         <FolderOpen className="h-8 w-8 text-muted-foreground" />
