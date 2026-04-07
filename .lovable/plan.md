@@ -1,57 +1,118 @@
 
 
-## Plan: Stream-Steuerung & Voreinstellungen im Gaming Hub
+## Plan: Gaming Hub 2026 Upgrade — Vollausstattung für Twitch-Streamer
 
-### Wichtiger Hinweis
-Twitch erlaubt es **nicht**, einen Stream per API zu starten — dafür braucht man Streaming-Software (OBS, Streamlabs etc.). Was wir **können**: Alle Voreinstellungen direkt aus dem Gaming Hub konfigurieren, sodass man nur noch in OBS auf "Start" drücken muss.
+### Aktueller Stand
+Der Gaming Hub hat 5 Tabs (Stream, Clips, Content, Analytics, Chat), aber vieles ist Platzhalter oder statische Dummy-Daten. Mit den jetzt aktivierten Scopes können wir alles mit echten Daten füllen.
 
-### Was gebaut wird
+### Aktivierte Scopes (alle verfügbar)
+`channel:manage:broadcast`, `channel:manage:schedule`, `channel:manage:polls`, `channel:manage:predictions`, `channel:manage:redemptions`, `clips:edit`, `moderator:read:chatters`, `channel:read:hype_train`, `analytics:read:games`, `bits:read`, `channel:read:vips`, `channel:read:polls`, `channel:read:predictions`
 
-**1. Stream-Einstellungen Panel (im Offline-State)**
-Statt nur "Offline" anzuzeigen, ein Formular mit:
-- **Stream-Titel** bearbeiten
-- **Kategorie/Spiel** auswählen (mit Suchfeld via Twitch `GET games`)
-- **Stream-Sprache** setzen
-- **Tags** hinzufügen/entfernen
-- **Speichern**-Button → `PATCH channels` API
+---
 
-**2. Quick-Setup beim Live-State**
-Auch während des Streams Titel und Kategorie änderbar (wie im Twitch-Dashboard).
+### 1. Stream-Tab: Vollständiges Stream-Cockpit
 
-**3. Stream-Checkliste**
-Eine visuelle Checkliste vor dem Stream:
-- Titel gesetzt?
-- Kategorie gewählt?
-- "Going Live"-Posts aktiviert?
-- Chat-Regeln konfiguriert?
-- Link zu OBS/Streaming-Software öffnen
+**Offline-State → Stream-Vorbereitung:**
+- Formular: Titel, Kategorie (Autocomplete via `GET games?name=`), Sprache, Tags
+- Speichern-Button → `PATCH channels` via neue Edge Function `twitch-channel-update`
+- Pre-Stream-Checkliste (Titel gesetzt? Kategorie gewählt? OBS bereit?)
+- "OBS öffnen"-Button (Deep-Link `obsproject://`)
 
-### Technische Umsetzung
+**Live-State → Live-Steuerung:**
+- Titel & Kategorie inline editierbar (auch während des Streams)
+- Quick-Clip erstellen (`POST clips` via `twitch-clip-create` Edge Function)
+- Hype-Train-Widget (Live-Anzeige via Polling `GET hypetrain/events`)
 
-**Schritt 1: Twitch-Scopes erweitern**
-Die aktuelle Verbindung hat nicht die nötigen Berechtigungen. Reconnect mit:
-- `channel:manage:broadcast` (Titel, Kategorie, Tags ändern)
-- `channel:manage:schedule` (Stream-Zeitplan)
+**Neue Edge Functions:**
+- `twitch-channel-update` — PATCH channels (Titel, game_id, tags)
+- `twitch-games-search` — GET games?name= (Autocomplete)
+- `twitch-clip-create` — POST clips (Clip erstellen)
+- `twitch-hype-train` — GET hypetrain/events
 
-**Schritt 2: Neue Edge Function `twitch-channel-update`**
-- `PATCH channels?broadcaster_id={id}` → Titel, game_id, tags, language setzen
-- `GET games?name={query}` → Spiele/Kategorien suchen (für Autocomplete)
+### 2. Clips-Tab: Echte Clip-Erstellung
 
-**Schritt 3: Edge Function `twitch-games-search`**
-- `GET games?name={query}` für das Kategorie-Suchfeld
+**Aktuell:** Nur Anzeige existierender Clips
+**Neu:**
+- "Clip erstellen"-Button (nur sichtbar wenn Live) → `POST clips` API
+- Clip-Filter: Nach Datum, Views, Dauer sortieren
+- "Als Short exportieren"-Button → Weiterleitung zum AI Video Studio mit Clip-URL als Referenz
+- Clip-Statistiken (Views, Shares pro Clip)
 
-**Schritt 4: StreamDashboard erweitern**
-- **Offline-State**: Formular mit Titel, Kategorie (Autocomplete), Sprache, Tags + Speichern-Button + Checkliste
-- **Live-State**: Inline-Edit für Titel und Kategorie + "Auf Twitch ansehen"-Button
-- Neuer Button "Stream starten" der erklärt, dass man OBS öffnen muss (mit Deep-Link wenn möglich)
+### 3. Chat-Tab: Interaktive Chat-Tools
 
-**Schritt 5: useTwitch Hook erweitern**
-- `updateChannel(title, gameId, tags)` Funktion hinzufügen
-- `searchGames(query)` Funktion hinzufügen
+**Aktuell:** Nur-Lese-Chat + einfache Sentiment-Analyse
+**Neu:**
+- **Chat senden** via REST API (`POST chat/messages`, Scope `user:write:chat`)
+- **Viewer-Liste** live anzeigen (`GET chat/chatters`, Scope `moderator:read:chatters`)
+- **Polls erstellen & verwalten** — Poll-Panel mit Create/End (`POST polls`, `PATCH polls`)
+- **Predictions erstellen** — Wetten für Zuschauer (`POST predictions`)
+- **Hype-Train-Anzeige** — Live-Widget wenn ein Hype Train läuft
 
-### Ergebnis
-- Alle Stream-Voreinstellungen direkt im Gaming Hub konfigurierbar
-- Kategorie-Suche mit Autocomplete
-- Titel und Tags vor und während des Streams änderbar
-- Klare Checkliste vor dem Go-Live
+**Neue Edge Functions:**
+- `twitch-send-chat` — POST chat/messages
+- `twitch-chatters` — GET chat/chatters
+- `twitch-polls` — POST/GET/PATCH polls
+- `twitch-predictions` — POST/GET/PATCH predictions
+
+### 4. Analytics-Tab: Echte Daten statt Platzhalter
+
+**Aktuell:** Hardcoded Dummy-Zahlen
+**Neu:**
+- Echte Follower-Zahl via `GET channels/followers?broadcaster_id=` (Count)
+- Subscriber-Zahl via `GET subscriptions`
+- Viewer-Verlauf aus gespeicherten Stream-Sessions (DB-Tabelle `stream_sessions`)
+- Bits-Einnahmen via `GET bits/leaderboard`
+- Top-Clips der Woche nach Views
+- Stream-Historie: Vergangene Streams mit Dauer, Peak-Viewers, Kategorie
+
+**Neue Edge Functions:**
+- `twitch-followers` — GET channels/followers (count)
+- `twitch-bits` — GET bits/leaderboard
+
+**DB-Migration:**
+- Tabelle `stream_sessions` (user_id, started_at, ended_at, peak_viewers, avg_viewers, game_name, title) — wird automatisch befüllt wenn Stream-Status wechselt
+
+### 5. Content-Tab: Automatisierung aktivieren
+
+**Aktuell:** Nur UI-Platzhalter
+**Neu:**
+- **Going-Live Auto-Posts** tatsächlich verknüpfen: Wenn Stream-Status auf "live" wechselt → automatisch Posts auf verbundenen Plattformen (Instagram, TikTok, X)
+- **Stream-Kalender** aus Twitch synchronisieren via `GET schedule` und editierbar via `PATCH schedule/segment`
+- **Thumbnail-Generator** mit dem bestehenden KI Picture Studio verknüpfen (Gaming-Preset)
+
+**Neue Edge Functions:**
+- `twitch-schedule` — GET/POST/PATCH schedule
+
+### 6. Neuer Tab: Channel Points & Rewards
+
+**Neues Feature:**
+- Channel-Point-Rewards anzeigen und verwalten (`GET/POST/PATCH channel_points/custom_rewards`)
+- VIP-Liste anzeigen (`GET channels/vips`)
+- Subscriber-Liste
+
+**Neue Edge Function:**
+- `twitch-rewards` — GET/POST/PATCH channel_points/custom_rewards
+
+---
+
+### Technische Zusammenfassung
+
+| Bereich | Neue Edge Functions | DB-Änderungen |
+|---------|-------------------|---------------|
+| Stream | `twitch-channel-update`, `twitch-games-search`, `twitch-clip-create`, `twitch-hype-train` | — |
+| Chat | `twitch-send-chat`, `twitch-chatters`, `twitch-polls`, `twitch-predictions` | — |
+| Analytics | `twitch-followers`, `twitch-bits` | `stream_sessions` Tabelle |
+| Content | `twitch-schedule` | — |
+| Rewards | `twitch-rewards` | — |
+
+**Hook-Erweiterung (`useTwitch.ts`):**
+- `updateChannel()`, `searchGames()`, `createClip()`, `sendChat()`, `getViewerList()`, `createPoll()`, `createPrediction()`
+
+### Empfohlene Reihenfolge
+1. Edge Functions deployen (Stream-Steuerung zuerst)
+2. StreamDashboard mit Einstellungs-Panel + Live-Edit
+3. Chat-Tab mit Senden, Polls, Predictions
+4. Analytics mit echten Daten + stream_sessions
+5. Content-Tab Automatisierung
+6. Channel Points Tab
 
