@@ -358,6 +358,12 @@ export default function MediaLibrary() {
   const applyFilters = () => {
     let filtered = [...media];
 
+    // Albums tab: handled by MediaAlbumManager component
+    if (categoryFilter === "albums") {
+      setFilteredMedia([]);
+      return;
+    }
+
     // Cloud tab: show cloud files instead
     if (categoryFilter === "cloud") {
       const cloudMedia: NormalizedMediaItem[] = cloudFiles.map(cf => ({
