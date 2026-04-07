@@ -1,71 +1,57 @@
 
 
-## Plan: Twitch-Integration im Gaming Hub
+## Plan: Stream-Steuerung & Voreinstellungen im Gaming Hub
 
-### Architektur-Überblick
+### Wichtiger Hinweis
+Twitch erlaubt es **nicht**, einen Stream per API zu starten — dafür braucht man Streaming-Software (OBS, Streamlabs etc.). Was wir **können**: Alle Voreinstellungen direkt aus dem Gaming Hub konfigurieren, sodass man nur noch in OBS auf "Start" drücken muss.
 
-```text
-Frontend (Gaming Hub)
-  ↓ supabase.functions.invoke()
-Edge Functions (twitch-*)
-  ↓ Connector Gateway
-Twitch Helix API
-```
+### Was gebaut wird
 
-### Schritt 1: Twitch-Connector verbinden
-- Den Lovable Twitch-Connector mit dem Projekt verknüpfen
-- Stellt `TWITCH_API_KEY` und `LOVABLE_API_KEY` als Secrets bereit
-- Kein manueller API-Key nötig
+**1. Stream-Einstellungen Panel (im Offline-State)**
+Statt nur "Offline" anzuzeigen, ein Formular mit:
+- **Stream-Titel** bearbeiten
+- **Kategorie/Spiel** auswählen (mit Suchfeld via Twitch `GET games`)
+- **Stream-Sprache** setzen
+- **Tags** hinzufügen/entfernen
+- **Speichern**-Button → `PATCH channels` API
 
-### Schritt 2: Twitch-Benutzername in der DB speichern
-- **DB-Migration**: Spalte `twitch_username` zur `profiles`-Tabelle hinzufügen (oder neue Tabelle `twitch_connections`)
-- Beim Verbinden gibt der User seinen Twitch-Benutzernamen ein
-- Wird validiert via Helix API (`GET /users?login=...`)
+**2. Quick-Setup beim Live-State**
+Auch während des Streams Titel und Kategorie änderbar (wie im Twitch-Dashboard).
 
-### Schritt 3: Edge Functions erstellen
+**3. Stream-Checkliste**
+Eine visuelle Checkliste vor dem Stream:
+- Titel gesetzt?
+- Kategorie gewählt?
+- "Going Live"-Posts aktiviert?
+- Chat-Regeln konfiguriert?
+- Link zu OBS/Streaming-Software öffnen
 
-| Funktion | Zweck | Helix Endpoint |
-|----------|-------|----------------|
-| `twitch-user` | User-Info abrufen (Avatar, ID) | `GET /users` |
-| `twitch-stream` | Live-Status, Viewer, Uptime | `GET /streams` |
-| `twitch-clips` | Clips eines Channels laden | `GET /clips` |
-| `twitch-channel` | Channel-Info (Titel, Game) | `GET /channels` |
+### Technische Umsetzung
 
-Alle nutzen das Gateway-Pattern:
-```
-https://connector-gateway.lovable.dev/twitch/{endpoint}
-```
+**Schritt 1: Twitch-Scopes erweitern**
+Die aktuelle Verbindung hat nicht die nötigen Berechtigungen. Reconnect mit:
+- `channel:manage:broadcast` (Titel, Kategorie, Tags ändern)
+- `channel:manage:schedule` (Stream-Zeitplan)
 
-### Schritt 4: StreamDashboard mit echten Daten
-- **Verbindungs-Flow**: Button → Dialog für Twitch-Username → Validierung via `twitch-user` → Speichern in DB
-- **Live-Status**: Polling alle 30s via `twitch-stream` — zeigt Viewer, Uptime, Game, Bitrate
-- **Offline-State**: Wenn nicht live, letzten Stream anzeigen
+**Schritt 2: Neue Edge Function `twitch-channel-update`**
+- `PATCH channels?broadcaster_id={id}` → Titel, game_id, tags, language setzen
+- `GET games?name={query}` → Spiele/Kategorien suchen (für Autocomplete)
 
-### Schritt 5: ClipCreator mit echten Clips
-- Clips des verbundenen Channels via `twitch-clips` laden
-- Thumbnails, Titel, Views, Dauer anzeigen
-- "Export"-Button: Clip-URL an AI Video Studio / Mediathek weiterleiten
+**Schritt 3: Edge Function `twitch-games-search`**
+- `GET games?name={query}` für das Kategorie-Suchfeld
 
-### Schritt 6: ChatManager mit Live-Chat (WebSocket)
-- Anonyme IRC-Verbindung zu `wss://irc-ws.chat.twitch.tv` (kein Auth nötig zum Lesen)
-- Echte Chat-Nachrichten parsen und anzeigen
-- Sentiment-Analyse via KI (Lovable AI Gateway)
+**Schritt 4: StreamDashboard erweitern**
+- **Offline-State**: Formular mit Titel, Kategorie (Autocomplete), Sprache, Tags + Speichern-Button + Checkliste
+- **Live-State**: Inline-Edit für Titel und Kategorie + "Auf Twitch ansehen"-Button
+- Neuer Button "Stream starten" der erklärt, dass man OBS öffnen muss (mit Deep-Link wenn möglich)
 
-### Was NICHT im ersten Schritt
-- Chat-Nachrichten senden (braucht OAuth User-Token mit `user:write:chat`)
-- Follower-Daten (braucht `moderator:read:followers` Scope)
-- Stream starten/stoppen (Twitch API unterstützt das nicht)
-
-### Reihenfolge
-1. Twitch-Connector verknüpfen
-2. DB-Migration + Edge Functions
-3. StreamDashboard (Live-Status)
-4. ClipCreator (echte Clips)
-5. ChatManager (WebSocket-Chat)
+**Schritt 5: useTwitch Hook erweitern**
+- `updateChannel(title, gameId, tags)` Funktion hinzufügen
+- `searchGames(query)` Funktion hinzufügen
 
 ### Ergebnis
-- Echte Twitch-Daten statt Mock-Daten im Gaming Hub
-- Live-Stream-Status mit Auto-Refresh
-- Echte Clips mit Export-Möglichkeit
-- Live-Chat-Feed mit Sentiment-Analyse
+- Alle Stream-Voreinstellungen direkt im Gaming Hub konfigurierbar
+- Kategorie-Suche mit Autocomplete
+- Titel und Tags vor und während des Streams änderbar
+- Klare Checkliste vor dem Go-Live
 
