@@ -8,6 +8,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Radio, Users, Eye, Clock, Wifi, WifiOff, ExternalLink, Loader2, X, Gamepad2, Edit3, Save, Scissors, CheckCircle2, AlertCircle, Monitor } from "lucide-react";
 import { useTwitch } from "@/hooks/useTwitch";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
+import CountUp from "@/components/ui/count-up";
+
+const cardClass = "backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_20px_rgba(145,70,255,0.08)]";
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.1 } },
+};
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+};
 
 export function StreamDashboard() {
   const {
@@ -19,8 +31,6 @@ export function StreamDashboard() {
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [username, setUsername] = useState("");
   const [connecting, setConnecting] = useState(false);
-
-  // Stream setup state
   const [editTitle, setEditTitle] = useState("");
   const [editGameQuery, setEditGameQuery] = useState("");
   const [editGameId, setEditGameId] = useState("");
@@ -30,7 +40,6 @@ export function StreamDashboard() {
   const [saving, setSaving] = useState(false);
   const [clipping, setClipping] = useState(false);
 
-  // Init edit fields from channel/stream data
   useEffect(() => {
     if (stream) {
       setEditTitle(stream.title || "");
@@ -41,7 +50,6 @@ export function StreamDashboard() {
     }
   }, [stream, channel]);
 
-  // Game search debounce
   useEffect(() => {
     if (editGameQuery.length < 2) { setGameResults([]); return; }
     const timer = setTimeout(async () => {
@@ -89,7 +97,7 @@ export function StreamDashboard() {
     try {
       const result = await createClip();
       if (result?.edit_url) {
-        toast.success("Clip erstellt! Wird in wenigen Sekunden verfügbar.", {
+        toast.success("Clip erstellt!", {
           action: { label: "Öffnen", onClick: () => window.open(result.edit_url, '_blank') },
         });
       } else {
@@ -113,28 +121,34 @@ export function StreamDashboard() {
   if (!isConnected) {
     return (
       <>
-        <div className="flex flex-col items-center justify-center py-20 space-y-6">
-          <div className="p-6 rounded-full bg-purple-500/10 border border-purple-500/20">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="flex flex-col items-center justify-center py-20 space-y-6"
+        >
+          <div className="relative p-6 rounded-full bg-purple-500/10 border border-purple-500/20 shadow-[0_0_30px_rgba(145,70,255,0.15)]">
             <WifiOff className="h-16 w-16 text-purple-400" />
+            <div className="absolute inset-0 rounded-full bg-purple-500/5 animate-ping" />
           </div>
           <div className="text-center space-y-2 max-w-md">
-            <h2 className="text-2xl font-bold">Twitch verbinden</h2>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">Twitch verbinden</h2>
             <p className="text-muted-foreground">
               Verbinde dein Twitch-Konto, um Stream-Status, Viewer-Daten und Chat in Echtzeit zu sehen.
             </p>
           </div>
           <Button
             size="lg"
-            className="gap-2 bg-[#9146FF] hover:bg-[#7B2FFF] text-white"
+            className="gap-2 bg-[#9146FF] hover:bg-[#7B2FFF] text-white shadow-[0_0_20px_rgba(145,70,255,0.3)]"
             onClick={() => setShowConnectDialog(true)}
           >
             <TwitchIcon />
             Mit Twitch verbinden
           </Button>
-        </div>
+        </motion.div>
 
         <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
-          <DialogContent>
+          <DialogContent className={cardClass}>
             <DialogHeader>
               <DialogTitle>Twitch-Benutzername eingeben</DialogTitle>
             </DialogHeader>
@@ -169,7 +183,6 @@ export function StreamDashboard() {
       })()
     : null;
 
-  // Pre-stream checklist
   const checklist = [
     { label: "Titel gesetzt", ok: !!editTitle },
     { label: "Kategorie gewählt", ok: !!editGameQuery },
@@ -177,12 +190,17 @@ export function StreamDashboard() {
   ];
 
   return (
-    <div className="space-y-6 mt-4">
+    <motion.div
+      variants={stagger}
+      initial="hidden"
+      animate="show"
+      className="space-y-6 mt-4"
+    >
       {/* Connected Account Header */}
-      <div className="flex items-center justify-between">
+      <motion.div variants={fadeUp} className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {twitchUser?.profile_image_url && (
-            <img src={twitchUser.profile_image_url} alt="" className="h-10 w-10 rounded-full" />
+            <img src={twitchUser.profile_image_url} alt="" className="h-10 w-10 rounded-full ring-2 ring-purple-500/30" />
           )}
           <div>
             <p className="font-semibold">{twitchUser?.display_name || twitchUser?.login}</p>
@@ -192,33 +210,36 @@ export function StreamDashboard() {
         <Button variant="ghost" size="sm" onClick={handleDisconnect} className="text-destructive">
           <X className="h-4 w-4 mr-1" /> Trennen
         </Button>
-      </div>
+      </motion.div>
 
       {isLive && stream ? (
-        /* Live State */
-        <div className="space-y-4">
-          <Card className="border-green-500/30 bg-green-500/5">
+        <motion.div variants={fadeUp} className="space-y-4">
+          <Card className={`${cardClass} border-green-500/30 relative overflow-hidden`}>
+            {/* Live glow */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500/0 via-green-500 to-green-500/0" />
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Radio className="h-5 w-5 text-green-500" />
-                    <span className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full animate-pulse" />
+                    <span className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
                   </div>
                   <CardTitle className="text-lg">Stream Live</CardTitle>
-                  <Badge variant="outline" className="border-green-500/50 text-green-500">LIVE</Badge>
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30 shadow-[0_0_10px_rgba(34,197,94,0.2)]">
+                    LIVE
+                  </Badge>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="gap-2" onClick={handleCreateClip} disabled={clipping}>
+                  <Button variant="outline" size="sm" className="gap-2 border-white/10" onClick={handleCreateClip} disabled={clipping}>
                     {clipping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scissors className="h-4 w-4" />}
                     Quick-Clip
                   </Button>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={() => setIsEditing(!isEditing)}>
+                  <Button variant="outline" size="sm" className="gap-2 border-white/10" onClick={() => setIsEditing(!isEditing)}>
                     <Edit3 className="h-4 w-4" />
                     Bearbeiten
                   </Button>
                   <Button
-                    variant="outline" size="sm" className="gap-2"
+                    variant="outline" size="sm" className="gap-2 border-white/10"
                     onClick={() => window.open(`https://twitch.tv/${twitchUser?.login}`, '_blank')}
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -249,78 +270,87 @@ export function StreamDashboard() {
                 </>
               )}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
-                <StatCard icon={Users} label="Zuschauer" value={stream.viewer_count.toLocaleString()} />
-                <StatCard icon={Clock} label="Uptime" value={uptime || '-'} />
-                <StatCard icon={Eye} label="Spiel" value={stream.game_name || '-'} />
+                <StatCard icon={Users} label="Zuschauer" value={stream.viewer_count} />
+                <StatCard icon={Clock} label="Uptime" value={uptime || '-'} isText />
+                <StatCard icon={Eye} label="Spiel" value={stream.game_name || '-'} isText />
               </div>
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
       ) : (
-        /* Offline State — Stream Setup */
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Monitor className="h-5 w-5 text-purple-400" />
-                Stream vorbereiten
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <StreamSettingsForm
-                editTitle={editTitle} setEditTitle={setEditTitle}
-                editGameQuery={editGameQuery} setEditGameQuery={setEditGameQuery}
-                editGameId={editGameId} setEditGameId={setEditGameId}
-                editTags={editTags} setEditTags={setEditTags}
-                gameResults={gameResults}
-                saving={saving} onSave={handleSaveSettings}
-              />
-            </CardContent>
-          </Card>
+        <motion.div variants={stagger} className="space-y-4">
+          <motion.div variants={fadeUp}>
+            <Card className={cardClass}>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Monitor className="h-5 w-5 text-purple-400" />
+                  <span className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">Stream vorbereiten</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StreamSettingsForm
+                  editTitle={editTitle} setEditTitle={setEditTitle}
+                  editGameQuery={editGameQuery} setEditGameQuery={setEditGameQuery}
+                  editGameId={editGameId} setEditGameId={setEditGameId}
+                  editTags={editTags} setEditTags={setEditTags}
+                  gameResults={gameResults}
+                  saving={saving} onSave={handleSaveSettings}
+                />
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          {/* Pre-Stream Checklist */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Pre-Stream Checkliste</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {checklist.map((item) => (
-                  <div key={item.label} className="flex items-center gap-2 text-sm">
-                    {item.ok ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <span className={item.ok ? "text-foreground" : "text-muted-foreground"}>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-              <Button
-                className="w-full mt-4 gap-2"
-                variant="outline"
-                onClick={() => window.open('obsproject://', '_blank')}
-              >
-                <Monitor className="h-4 w-4" />
-                OBS öffnen
-              </Button>
-            </CardContent>
-          </Card>
+          <motion.div variants={fadeUp}>
+            <Card className={cardClass}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Pre-Stream Checkliste</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {checklist.map((item, i) => (
+                    <motion.div
+                      key={item.label}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      {item.ok ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className={item.ok ? "text-foreground" : "text-muted-foreground"}>{item.label}</span>
+                    </motion.div>
+                  ))}
+                </div>
+                <Button
+                  className="w-full mt-4 gap-2 border-white/10"
+                  variant="outline"
+                  onClick={() => window.open('obsproject://', '_blank')}
+                >
+                  <Monitor className="h-4 w-4" />
+                  OBS öffnen
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          {/* Offline Info */}
-          <Card>
-            <CardContent className="py-8 text-center">
-              <WifiOff className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
-              <p className="text-lg font-semibold">Offline</p>
-              <p className="text-sm text-muted-foreground">{channel?.title || 'Kein aktiver Stream'}</p>
-              {channel?.game_name && (
-                <p className="text-xs text-muted-foreground mt-1">Zuletzt: {channel.game_name}</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+          <motion.div variants={fadeUp}>
+            <Card className={`${cardClass} text-center`}>
+              <CardContent className="py-8">
+                <WifiOff className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
+                <p className="text-lg font-semibold">Offline</p>
+                <p className="text-sm text-muted-foreground">{channel?.title || 'Kein aktiver Stream'}</p>
+                {channel?.game_name && (
+                  <p className="text-xs text-muted-foreground mt-1">Zuletzt: {channel.game_name}</p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -343,12 +373,7 @@ function StreamSettingsForm({
     <div className="space-y-4">
       <div>
         <Label className="text-sm">Stream-Titel</Label>
-        <Input
-          value={editTitle}
-          onChange={(e) => setEditTitle(e.target.value)}
-          placeholder="Mein epischer Stream..."
-          className="mt-1"
-        />
+        <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Mein epischer Stream..." className="mt-1 border-white/10" />
       </div>
       <div className="relative">
         <Label className="text-sm">Kategorie</Label>
@@ -356,14 +381,14 @@ function StreamSettingsForm({
           value={editGameQuery}
           onChange={(e) => { setEditGameQuery(e.target.value); setEditGameId(""); }}
           placeholder="Spiel oder Kategorie suchen..."
-          className="mt-1"
+          className="mt-1 border-white/10"
         />
         {gameResults.length > 0 && !editGameId && (
-          <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          <div className="absolute z-10 w-full mt-1 bg-popover/95 backdrop-blur-xl border border-white/10 rounded-lg shadow-lg max-h-48 overflow-y-auto">
             {gameResults.map((g: any) => (
               <button
                 key={g.id}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2"
+                className="w-full px-3 py-2 text-left text-sm hover:bg-purple-500/10 flex items-center gap-2 transition-colors"
                 onClick={() => { setEditGameQuery(g.name); setEditGameId(g.id); }}
               >
                 {g.box_art_url && (
@@ -377,33 +402,31 @@ function StreamSettingsForm({
       </div>
       <div>
         <Label className="text-sm">Tags (kommagetrennt)</Label>
-        <Input
-          value={editTags}
-          onChange={(e) => setEditTags(e.target.value)}
-          placeholder="Deutsch, Gaming, FPS..."
-          className="mt-1"
-        />
+        <Input value={editTags} onChange={(e) => setEditTags(e.target.value)} placeholder="Deutsch, Gaming, FPS..." className="mt-1 border-white/10" />
       </div>
       <div className="flex gap-2">
-        <Button onClick={onSave} disabled={saving} className="gap-2 bg-[#9146FF] hover:bg-[#7B2FFF] text-white">
+        <Button onClick={onSave} disabled={saving} className="gap-2 bg-[#9146FF] hover:bg-[#7B2FFF] text-white shadow-[0_0_15px_rgba(145,70,255,0.2)]">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Speichern
         </Button>
-        {onCancel && (
-          <Button variant="outline" onClick={onCancel}>Abbrechen</Button>
-        )}
+        {onCancel && <Button variant="outline" onClick={onCancel} className="border-white/10">Abbrechen</Button>}
       </div>
     </div>
   );
 }
 
-function StatCard({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function StatCard({ icon: Icon, label, value, isText }: { icon: any; label: string; value: any; isText?: boolean }) {
   return (
-    <div className="p-3 rounded-lg bg-muted/50 text-center">
-      <Icon className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
-      <p className="text-xl font-bold">{value}</p>
+    <motion.div
+      whileHover={{ y: -2, scale: 1.02 }}
+      className="p-3 rounded-lg bg-card/60 backdrop-blur border border-white/10 text-center shadow-[0_0_15px_rgba(145,70,255,0.06)]"
+    >
+      <Icon className="h-4 w-4 mx-auto text-purple-400 mb-1" />
+      <p className="text-xl font-bold">
+        {isText ? value : <CountUp end={Number(value) || 0} duration={1.5} />}
+      </p>
       <p className="text-xs text-muted-foreground">{label}</p>
-    </div>
+    </motion.div>
   );
 }
 

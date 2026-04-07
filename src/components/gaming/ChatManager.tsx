@@ -7,6 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { MessageSquare, Shield, Bot, TrendingUp, Loader2, WifiOff, Send, Users, BarChart3, Vote, Trophy } from "lucide-react";
 import { useTwitch } from "@/hooks/useTwitch";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
+
+const cardClass = "backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_20px_rgba(145,70,255,0.08)]";
 
 interface ChatMessage {
   user: string;
@@ -38,7 +41,6 @@ export function ChatManager() {
 
   const wsRef = useRef<WebSocket | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
-
   const [sentiment, setSentiment] = useState({ positive: 0, neutral: 0, negative: 0, total: 0 });
 
   const simpleSentiment = (msg: string): 'positive' | 'neutral' | 'negative' => {
@@ -53,14 +55,12 @@ export function ChatManager() {
     if (!twitchUsername || wsRef.current) return;
     const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
     wsRef.current = ws;
-
     ws.onopen = () => {
       ws.send('CAP REQ :twitch.tv/tags');
       ws.send('NICK justinfan' + Math.floor(Math.random() * 100000));
       ws.send(`JOIN #${twitchUsername.toLowerCase()}`);
       setChatConnected(true);
     };
-
     ws.onmessage = (event) => {
       const lines = event.data.split('\r\n');
       for (const line of lines) {
@@ -76,7 +76,6 @@ export function ChatManager() {
         }
       }
     };
-
     ws.onclose = () => { setChatConnected(false); wsRef.current = null; };
     ws.onerror = () => { ws.close(); };
   }, [twitchUsername]);
@@ -160,22 +159,28 @@ export function ChatManager() {
   const pct = (val: number) => sentiment.total > 0 ? Math.round((val / sentiment.total) * 100) : 0;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4"
+    >
       {/* Live Chat */}
-      <Card className="lg:col-span-2">
+      <Card className={`lg:col-span-2 ${cardClass}`}>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-purple-400" />
-              Live-Chat — #{twitchUsername}
+              <span className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">
+                Live-Chat — #{twitchUsername}
+              </span>
             </CardTitle>
-            <Badge variant="outline" className={chatConnected ? "text-green-500 border-green-500/50" : "text-muted-foreground"}>
+            <Badge variant="outline" className={chatConnected ? "text-green-400 border-green-500/30 shadow-[0_0_8px_rgba(34,197,94,0.2)]" : "text-muted-foreground"}>
               {chatConnected ? "Verbunden" : "Verbindet..."}
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="h-72 overflow-y-auto space-y-1 mb-3 p-3 rounded-lg bg-muted/30 border border-border font-mono text-sm">
+          <div className="h-72 overflow-y-auto space-y-1 mb-3 p-3 rounded-lg bg-black/20 backdrop-blur border border-white/5 font-mono text-sm">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                 {isLive ? <p>Warte auf Nachrichten...</p> : (
@@ -184,16 +189,20 @@ export function ChatManager() {
               </div>
             ) : (
               messages.map((m, i) => (
-                <div key={i} className="flex gap-2">
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -5 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex gap-2"
+                >
                   <span className="font-semibold shrink-0" style={{ color: m.color }}>{m.user}:</span>
                   <span className="text-foreground break-all">{m.msg}</span>
-                </div>
+                </motion.div>
               ))
             )}
             <div ref={chatEndRef} />
           </div>
 
-          {/* Chat Input */}
           <div className="flex gap-2">
             <Input
               placeholder="Nachricht senden..."
@@ -201,8 +210,14 @@ export function ChatManager() {
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
               disabled={sending}
+              className="border-white/10"
             />
-            <Button size="icon" onClick={handleSendChat} disabled={sending || !chatInput.trim()}>
+            <Button
+              size="icon"
+              onClick={handleSendChat}
+              disabled={sending || !chatInput.trim()}
+              className="bg-[#9146FF] hover:bg-[#7B2FFF] text-white shadow-[0_0_10px_rgba(145,70,255,0.2)]"
+            >
               {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
@@ -211,54 +226,58 @@ export function ChatManager() {
 
       {/* Chat Tools */}
       <div className="space-y-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-green-400" />
-              Chat-Sentiment (Live)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <SentimentRow emoji="😊" label="Positiv" value={pct(sentiment.positive)} color="text-green-400" />
-              <SentimentRow emoji="😐" label="Neutral" value={pct(sentiment.neutral)} />
-              <SentimentRow emoji="😠" label="Negativ" value={pct(sentiment.negative)} color="text-red-400" />
-              <p className="text-xs text-muted-foreground pt-2">{sentiment.total} Nachrichten analysiert</p>
-            </div>
-          </CardContent>
-        </Card>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <Card className={cardClass}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-green-400" />
+                Chat-Sentiment (Live)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <SentimentBar emoji="😊" label="Positiv" value={pct(sentiment.positive)} color="bg-green-500" />
+                <SentimentBar emoji="😐" label="Neutral" value={pct(sentiment.neutral)} color="bg-muted-foreground" />
+                <SentimentBar emoji="😠" label="Negativ" value={pct(sentiment.negative)} color="bg-red-500" />
+                <p className="text-xs text-muted-foreground pt-1">{sentiment.total} Nachrichten analysiert</p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Users className="h-4 w-4 text-blue-400" />
-              Viewer & Interaktion
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button variant="outline" size="sm" className="w-full gap-2" onClick={handleLoadViewers}>
-              <Users className="h-3 w-3" /> Viewer-Liste
-            </Button>
-            <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => setShowPollDialog(true)}>
-              <Vote className="h-3 w-3" /> Poll erstellen
-            </Button>
-            <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => setShowPredictionDialog(true)}>
-              <Trophy className="h-3 w-3" /> Prediction erstellen
-            </Button>
-          </CardContent>
-        </Card>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <Card className={cardClass}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Users className="h-4 w-4 text-blue-400" />
+                Viewer & Interaktion
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button variant="outline" size="sm" className="w-full gap-2 border-white/10" onClick={handleLoadViewers}>
+                <Users className="h-3 w-3" /> Viewer-Liste
+              </Button>
+              <Button variant="outline" size="sm" className="w-full gap-2 border-white/10" onClick={() => setShowPollDialog(true)}>
+                <Vote className="h-3 w-3" /> Poll erstellen
+              </Button>
+              <Button variant="outline" size="sm" className="w-full gap-2 border-white/10" onClick={() => setShowPredictionDialog(true)}>
+                <Trophy className="h-3 w-3" /> Prediction erstellen
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
 
       {/* Viewer List Dialog */}
       <Dialog open={showViewers} onOpenChange={setShowViewers}>
-        <DialogContent>
+        <DialogContent className={cardClass}>
           <DialogHeader><DialogTitle>Viewer ({viewers.length})</DialogTitle></DialogHeader>
           <div className="max-h-60 overflow-y-auto space-y-1">
             {viewers.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">Keine Viewer gefunden</p>
             ) : (
               viewers.map((v: any, i: number) => (
-                <div key={i} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 text-sm">
+                <div key={i} className="flex items-center gap-2 p-2 rounded hover:bg-purple-500/10 text-sm transition-colors">
                   <Users className="h-3 w-3 text-muted-foreground" />
                   {v.user_login || v.user_name || 'Unknown'}
                 </div>
@@ -270,25 +289,20 @@ export function ChatManager() {
 
       {/* Poll Dialog */}
       <Dialog open={showPollDialog} onOpenChange={setShowPollDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Poll erstellen</DialogTitle></DialogHeader>
+        <DialogContent className={cardClass}>
+          <DialogHeader><DialogTitle className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">Poll erstellen</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <Input placeholder="Frage..." value={pollTitle} onChange={(e) => setPollTitle(e.target.value)} />
+            <Input placeholder="Frage..." value={pollTitle} onChange={(e) => setPollTitle(e.target.value)} className="border-white/10" />
             {pollChoices.map((c, i) => (
-              <Input
-                key={i}
-                placeholder={`Option ${i + 1}`}
-                value={c}
-                onChange={(e) => { const n = [...pollChoices]; n[i] = e.target.value; setPollChoices(n); }}
-              />
+              <Input key={i} placeholder={`Option ${i + 1}`} value={c} onChange={(e) => { const n = [...pollChoices]; n[i] = e.target.value; setPollChoices(n); }} className="border-white/10" />
             ))}
             {pollChoices.length < 5 && (
               <Button variant="ghost" size="sm" onClick={() => setPollChoices([...pollChoices, ""])}>+ Option</Button>
             )}
-            <Input type="number" placeholder="Dauer (Sekunden)" value={pollDuration} onChange={(e) => setPollDuration(Number(e.target.value))} />
+            <Input type="number" placeholder="Dauer (Sekunden)" value={pollDuration} onChange={(e) => setPollDuration(Number(e.target.value))} className="border-white/10" />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPollDialog(false)}>Abbrechen</Button>
+            <Button variant="outline" onClick={() => setShowPollDialog(false)} className="border-white/10">Abbrechen</Button>
             <Button onClick={handleCreatePoll} className="bg-[#9146FF] hover:bg-[#7B2FFF] text-white">Erstellen</Button>
           </DialogFooter>
         </DialogContent>
@@ -296,34 +310,39 @@ export function ChatManager() {
 
       {/* Prediction Dialog */}
       <Dialog open={showPredictionDialog} onOpenChange={setShowPredictionDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Prediction erstellen</DialogTitle></DialogHeader>
+        <DialogContent className={cardClass}>
+          <DialogHeader><DialogTitle className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">Prediction erstellen</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <Input placeholder="Frage / Thema..." value={predTitle} onChange={(e) => setPredTitle(e.target.value)} />
+            <Input placeholder="Frage / Thema..." value={predTitle} onChange={(e) => setPredTitle(e.target.value)} className="border-white/10" />
             {predOutcomes.map((o, i) => (
-              <Input
-                key={i}
-                placeholder={`Outcome ${i + 1}`}
-                value={o}
-                onChange={(e) => { const n = [...predOutcomes]; n[i] = e.target.value; setPredOutcomes(n); }}
-              />
+              <Input key={i} placeholder={`Outcome ${i + 1}`} value={o} onChange={(e) => { const n = [...predOutcomes]; n[i] = e.target.value; setPredOutcomes(n); }} className="border-white/10" />
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPredictionDialog(false)}>Abbrechen</Button>
+            <Button variant="outline" onClick={() => setShowPredictionDialog(false)} className="border-white/10">Abbrechen</Button>
             <Button onClick={handleCreatePrediction} className="bg-[#9146FF] hover:bg-[#7B2FFF] text-white">Erstellen</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 }
 
-function SentimentRow({ emoji, label, value, color }: { emoji: string; label: string; value: number; color?: string }) {
+function SentimentBar({ emoji, label, value, color }: { emoji: string; label: string; value: number; color: string }) {
   return (
-    <div className="flex justify-between text-sm">
-      <span>{emoji} {label}</span>
-      <span className={`font-semibold ${color || ''}`}>{value}%</span>
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs">
+        <span>{emoji} {label}</span>
+        <span className="font-semibold">{value}%</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-muted/30 overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${value}%` }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className={`h-full rounded-full ${color}`}
+        />
+      </div>
     </div>
   );
 }
