@@ -143,15 +143,15 @@ export function DiscordIntegration() {
       body: {
         type,
         webhook_url: settings.webhook_url,
-        stream_title: streamInfo?.title || twitchUser?.display_name + " ist live!",
-        game_name: streamInfo?.game_name || "Just Chatting",
-        viewer_count: streamInfo?.viewer_count || 0,
+        stream_title: stream?.title || twitchUser?.display_name + " ist live!",
+        game_name: stream?.game_name || "Just Chatting",
+        viewer_count: stream?.viewer_count || 0,
         embed_color: settings.embed_color,
         custom_message: type === "go_live" ? settings.custom_go_live_message : settings.custom_offline_message,
         include_viewer_count: settings.include_viewer_count,
         include_category: settings.include_category,
         include_thumbnail: settings.include_thumbnail,
-        thumbnail_url: streamInfo?.thumbnail_url?.replace("{width}", "440").replace("{height}", "248"),
+        thumbnail_url: stream?.thumbnail_url?.replace("{width}", "440").replace("{height}", "248"),
       },
     });
     if (error) {
@@ -323,7 +323,7 @@ export function DiscordIntegration() {
                   <div className="w-1 rounded-full flex-shrink-0" style={{ backgroundColor: intToHex(settings.embed_color) }} />
                   <div className="flex-1 min-w-0 space-y-2">
                     <p className="text-sm font-semibold text-white">
-                      🔴 {streamInfo?.title || twitchUser?.display_name || "Mein Stream"} ist jetzt live!
+                      🔴 {stream?.title || twitchUser?.display_name || "Mein Stream"} ist jetzt live!
                     </p>
                     <p className="text-xs" style={{ color: "#dcddde" }}>
                       {settings.custom_go_live_message || "Der Stream hat gerade begonnen — schau jetzt rein!"}
@@ -332,13 +332,13 @@ export function DiscordIntegration() {
                       {settings.include_category && (
                         <div>
                           <p className="text-[10px] font-semibold" style={{ color: "#72767d" }}>🎮 Kategorie</p>
-                          <p className="text-xs text-white">{streamInfo?.game_name || "Just Chatting"}</p>
+                          <p className="text-xs text-white">{stream?.game_name || "Just Chatting"}</p>
                         </div>
                       )}
                       {settings.include_viewer_count && (
                         <div>
                           <p className="text-[10px] font-semibold" style={{ color: "#72767d" }}>👁 Zuschauer</p>
-                          <p className="text-xs text-white">{streamInfo?.viewer_count || "0"}</p>
+                          <p className="text-xs text-white">{stream?.viewer_count || "0"}</p>
                         </div>
                       )}
                     </div>
