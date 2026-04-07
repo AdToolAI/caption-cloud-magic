@@ -16,7 +16,6 @@ const SmartBackgroundTab = lazy(() => import("./BackgroundReplacer"));
 const TAB_CONFIG = [
   { value: 'generate', label: 'Generieren', icon: Sparkles },
   { value: 'background', label: 'Smart Background', icon: Layers },
-  { value: 'albums', label: 'Meine Alben', icon: FolderOpen },
 ];
 
 export default function PictureStudio() {
