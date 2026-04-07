@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const response = await fetch(`${GATEWAY_URL}/helix/clips?broadcaster_id=${encodeURIComponent(broadcaster_id)}&first=${first}`, {
+    const response = await fetch(const response = await fetch(`${GATEWAY_URL}/clips?broadcaster_id=${encodeURIComponent(broadcaster_id)}&first=${first}`, {, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,

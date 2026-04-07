@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const response = await fetch(`${GATEWAY_URL}/helix/streams?user_login=${encodeURIComponent(user_login)}`, {
+    const response = await fetch(const response = await fetch(`${GATEWAY_URL}/streams?user_login=${encodeURIComponent(user_login)}`, {, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     const data = await response.json();
     
     // Also fetch channel info for offline state
-    const channelResponse = await fetch(`${GATEWAY_URL}/helix/search/channels?query=${encodeURIComponent(user_login)}&first=1`, {
+    const channelResponse = await fetch(const channelResponse = await fetch(`${GATEWAY_URL}/search/channels?query=${encodeURIComponent(user_login)}&first=1`, {, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,

@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const response = await fetch(`${GATEWAY_URL}/helix/users?login=${encodeURIComponent(login)}`, {
+    const response = await fetch(`${GATEWAY_URL}/users?login=${encodeURIComponent(login)}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
