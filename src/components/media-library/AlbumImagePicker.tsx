@@ -44,7 +44,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
     try {
       const { data: albumsData } = await supabase
         .from('studio_albums')
-        .select('id, name, cover_url')
+        .select('id, name, cover_image_url')
         .eq('user_id', user.id)
         .order('is_system', { ascending: false })
         .order('name');
