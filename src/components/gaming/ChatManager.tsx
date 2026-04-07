@@ -2,8 +2,11 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Shield, Bot, TrendingUp, Loader2, WifiOff } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { MessageSquare, Shield, Bot, TrendingUp, Loader2, WifiOff, Send, Users, BarChart3, Vote, Trophy } from "lucide-react";
 import { useTwitch } from "@/hooks/useTwitch";
+import { toast } from "sonner";
 
 interface ChatMessage {
   user: string;
@@ -13,13 +16,29 @@ interface ChatMessage {
 }
 
 export function ChatManager() {
-  const { twitchUsername, isConnected, isLive, loading } = useTwitch();
+  const {
+    twitchUsername, twitchUser, isConnected, isLive, loading,
+    sendChat, getViewerList, createPoll, endPoll, getPolls,
+    createPrediction, getPredictions,
+  } = useTwitch();
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatConnected, setChatConnected] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [viewers, setViewers] = useState<any[]>([]);
+  const [showViewers, setShowViewers] = useState(false);
+  const [showPollDialog, setShowPollDialog] = useState(false);
+  const [pollTitle, setPollTitle] = useState("");
+  const [pollChoices, setPollChoices] = useState(["", ""]);
+  const [pollDuration, setPollDuration] = useState(60);
+  const [showPredictionDialog, setShowPredictionDialog] = useState(false);
+  const [predTitle, setPredTitle] = useState("");
+  const [predOutcomes, setPredOutcomes] = useState(["", ""]);
+
   const wsRef = useRef<WebSocket | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Sentiment tracking
   const [sentiment, setSentiment] = useState({ positive: 0, neutral: 0, negative: 0, total: 0 });
 
   const simpleSentiment = (msg: string): 'positive' | 'neutral' | 'negative' => {
@@ -32,7 +51,6 @@ export function ChatManager() {
 
   const connectChat = useCallback(() => {
     if (!twitchUsername || wsRef.current) return;
-
     const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
     wsRef.current = ws;
 
@@ -46,60 +64,82 @@ export function ChatManager() {
     ws.onmessage = (event) => {
       const lines = event.data.split('\r\n');
       for (const line of lines) {
-        if (line.startsWith('PING')) {
-          ws.send('PONG :tmi.twitch.tv');
-          continue;
-        }
-
-        // Parse PRIVMSG
+        if (line.startsWith('PING')) { ws.send('PONG :tmi.twitch.tv'); continue; }
         const privmsgMatch = line.match(/:(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.+)/);
         if (privmsgMatch) {
           const [, user, msg] = privmsgMatch;
-          // Extract color from tags
           const colorMatch = line.match(/color=(#[0-9a-fA-F]{6})/);
-          const newMsg: ChatMessage = {
-            user,
-            msg,
-            color: colorMatch?.[1] || '#9146FF',
-            timestamp: Date.now(),
-          };
-
+          const newMsg: ChatMessage = { user, msg, color: colorMatch?.[1] || '#9146FF', timestamp: Date.now() };
           setMessages(prev => [...prev.slice(-200), newMsg]);
-
           const s = simpleSentiment(msg);
-          setSentiment(prev => ({
-            ...prev,
-            [s]: prev[s] + 1,
-            total: prev.total + 1,
-          }));
+          setSentiment(prev => ({ ...prev, [s]: prev[s] + 1, total: prev.total + 1 }));
         }
       }
     };
 
-    ws.onclose = () => {
-      setChatConnected(false);
-      wsRef.current = null;
-    };
-
-    ws.onerror = () => {
-      ws.close();
-    };
+    ws.onclose = () => { setChatConnected(false); wsRef.current = null; };
+    ws.onerror = () => { ws.close(); };
   }, [twitchUsername]);
 
   useEffect(() => {
-    if (isConnected && twitchUsername) {
-      connectChat();
-    }
-    return () => {
-      wsRef.current?.close();
-      wsRef.current = null;
-    };
+    if (isConnected && twitchUsername) connectChat();
+    return () => { wsRef.current?.close(); wsRef.current = null; };
   }, [isConnected, twitchUsername, connectChat]);
 
-  // Auto-scroll
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const handleSendChat = async () => {
+    if (!chatInput.trim()) return;
+    setSending(true);
+    try {
+      await sendChat(chatInput.trim());
+      setChatInput("");
+    } catch (e: any) {
+      toast.error(e.message || "Nachricht konnte nicht gesendet werden");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleLoadViewers = async () => {
+    const v = await getViewerList();
+    setViewers(v);
+    setShowViewers(true);
+  };
+
+  const handleCreatePoll = async () => {
+    const validChoices = pollChoices.filter(c => c.trim());
+    if (!pollTitle.trim() || validChoices.length < 2) {
+      toast.error("Titel und mindestens 2 Optionen nötig");
+      return;
+    }
+    try {
+      await createPoll(pollTitle, validChoices, pollDuration);
+      toast.success("Poll erstellt!");
+      setShowPollDialog(false);
+      setPollTitle(""); setPollChoices(["", ""]);
+    } catch (e: any) {
+      toast.error(e.message || "Poll konnte nicht erstellt werden");
+    }
+  };
+
+  const handleCreatePrediction = async () => {
+    const validOutcomes = predOutcomes.filter(o => o.trim());
+    if (!predTitle.trim() || validOutcomes.length < 2) {
+      toast.error("Titel und mindestens 2 Outcomes nötig");
+      return;
+    }
+    try {
+      await createPrediction(predTitle, validOutcomes);
+      toast.success("Prediction erstellt!");
+      setShowPredictionDialog(false);
+      setPredTitle(""); setPredOutcomes(["", ""]);
+    } catch (e: any) {
+      toast.error(e.message || "Prediction konnte nicht erstellt werden");
+    }
+  };
 
   if (loading) {
     return (
@@ -135,33 +175,37 @@ export function ChatManager() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="h-80 overflow-y-auto space-y-1 mb-4 p-3 rounded-lg bg-muted/30 border border-border font-mono text-sm">
+          <div className="h-72 overflow-y-auto space-y-1 mb-3 p-3 rounded-lg bg-muted/30 border border-border font-mono text-sm">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                {isLive ? (
-                  <p>Warte auf Nachrichten...</p>
-                ) : (
-                  <>
-                    <WifiOff className="h-8 w-8 mb-2 opacity-50" />
-                    <p>Kanal ist offline — Chat wird trotzdem angezeigt</p>
-                  </>
+                {isLive ? <p>Warte auf Nachrichten...</p> : (
+                  <><WifiOff className="h-8 w-8 mb-2 opacity-50" /><p>Kanal ist offline — Chat wird trotzdem angezeigt</p></>
                 )}
               </div>
             ) : (
               messages.map((m, i) => (
                 <div key={i} className="flex gap-2">
-                  <span className="font-semibold shrink-0" style={{ color: m.color }}>
-                    {m.user}:
-                  </span>
+                  <span className="font-semibold shrink-0" style={{ color: m.color }}>{m.user}:</span>
                   <span className="text-foreground break-all">{m.msg}</span>
                 </div>
               ))
             )}
             <div ref={chatEndRef} />
           </div>
-          <p className="text-xs text-muted-foreground">
-            📖 Nur-Lese-Modus — Chat-Nachrichten werden live via IRC empfangen
-          </p>
+
+          {/* Chat Input */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Nachricht senden..."
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
+              disabled={sending}
+            />
+            <Button size="icon" onClick={handleSendChat} disabled={sending || !chatInput.trim()}>
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -176,21 +220,10 @@ export function ChatManager() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>😊 Positiv</span>
-                <span className="font-semibold text-green-400">{pct(sentiment.positive)}%</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>😐 Neutral</span>
-                <span className="font-semibold">{pct(sentiment.neutral)}%</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>😠 Negativ</span>
-                <span className="font-semibold text-red-400">{pct(sentiment.negative)}%</span>
-              </div>
-              <p className="text-xs text-muted-foreground pt-2">
-                {sentiment.total} Nachrichten analysiert
-              </p>
+              <SentimentRow emoji="😊" label="Positiv" value={pct(sentiment.positive)} color="text-green-400" />
+              <SentimentRow emoji="😐" label="Neutral" value={pct(sentiment.neutral)} />
+              <SentimentRow emoji="😠" label="Negativ" value={pct(sentiment.negative)} color="text-red-400" />
+              <p className="text-xs text-muted-foreground pt-2">{sentiment.total} Nachrichten analysiert</p>
             </div>
           </CardContent>
         </Card>
@@ -198,22 +231,99 @@ export function ChatManager() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Shield className="h-4 w-4 text-blue-400" />
-              Moderation
+              <Users className="h-4 w-4 text-blue-400" />
+              Viewer & Interaktion
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <Button variant="outline" size="sm" className="w-full gap-2 mb-2">
-              <Shield className="h-3 w-3" />
-              Auto-Mod konfigurieren
+          <CardContent className="space-y-2">
+            <Button variant="outline" size="sm" className="w-full gap-2" onClick={handleLoadViewers}>
+              <Users className="h-3 w-3" /> Viewer-Liste
             </Button>
-            <Button variant="outline" size="sm" className="w-full gap-2">
-              <Bot className="h-3 w-3" />
-              Auto-Antworten
+            <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => setShowPollDialog(true)}>
+              <Vote className="h-3 w-3" /> Poll erstellen
+            </Button>
+            <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => setShowPredictionDialog(true)}>
+              <Trophy className="h-3 w-3" /> Prediction erstellen
             </Button>
           </CardContent>
         </Card>
       </div>
+
+      {/* Viewer List Dialog */}
+      <Dialog open={showViewers} onOpenChange={setShowViewers}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Viewer ({viewers.length})</DialogTitle></DialogHeader>
+          <div className="max-h-60 overflow-y-auto space-y-1">
+            {viewers.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Keine Viewer gefunden</p>
+            ) : (
+              viewers.map((v: any, i: number) => (
+                <div key={i} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 text-sm">
+                  <Users className="h-3 w-3 text-muted-foreground" />
+                  {v.user_login || v.user_name || 'Unknown'}
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Poll Dialog */}
+      <Dialog open={showPollDialog} onOpenChange={setShowPollDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Poll erstellen</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Input placeholder="Frage..." value={pollTitle} onChange={(e) => setPollTitle(e.target.value)} />
+            {pollChoices.map((c, i) => (
+              <Input
+                key={i}
+                placeholder={`Option ${i + 1}`}
+                value={c}
+                onChange={(e) => { const n = [...pollChoices]; n[i] = e.target.value; setPollChoices(n); }}
+              />
+            ))}
+            {pollChoices.length < 5 && (
+              <Button variant="ghost" size="sm" onClick={() => setPollChoices([...pollChoices, ""])}>+ Option</Button>
+            )}
+            <Input type="number" placeholder="Dauer (Sekunden)" value={pollDuration} onChange={(e) => setPollDuration(Number(e.target.value))} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPollDialog(false)}>Abbrechen</Button>
+            <Button onClick={handleCreatePoll} className="bg-[#9146FF] hover:bg-[#7B2FFF] text-white">Erstellen</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Prediction Dialog */}
+      <Dialog open={showPredictionDialog} onOpenChange={setShowPredictionDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Prediction erstellen</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Input placeholder="Frage / Thema..." value={predTitle} onChange={(e) => setPredTitle(e.target.value)} />
+            {predOutcomes.map((o, i) => (
+              <Input
+                key={i}
+                placeholder={`Outcome ${i + 1}`}
+                value={o}
+                onChange={(e) => { const n = [...predOutcomes]; n[i] = e.target.value; setPredOutcomes(n); }}
+              />
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPredictionDialog(false)}>Abbrechen</Button>
+            <Button onClick={handleCreatePrediction} className="bg-[#9146FF] hover:bg-[#7B2FFF] text-white">Erstellen</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function SentimentRow({ emoji, label, value, color }: { emoji: string; label: string; value: number; color?: string }) {
+  return (
+    <div className="flex justify-between text-sm">
+      <span>{emoji} {label}</span>
+      <span className={`font-semibold ${color || ''}`}>{value}%</span>
     </div>
   );
 }
