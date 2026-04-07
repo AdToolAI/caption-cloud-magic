@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 interface Album {
   id: string;
   name: string;
-  cover_url: string | null;
+  cover_image_url: string | null;
   image_count: number;
 }
 
