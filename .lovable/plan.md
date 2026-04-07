@@ -1,41 +1,35 @@
 
 
-## Plan: Album-System in die Mediathek integrieren & KI Picture Studio verknüpfen
+## Plan: Mediathek-Limits anpassen & KI-Bilder nur in Alben anzeigen
 
 ### Überblick
-Das Album-System aus dem KI Picture Studio wird als neues Segment "Alben" in die Mediathek verschoben. KI-generierte Bilder landen automatisch im nicht-löschbaren Unterordner "KI Picture Studio". Nach der Bildgenerierung gibt es einen Button, der direkt zur Mediathek → Alben → KI Picture Studio navigiert.
+1. Video-Limit von 250 auf **500** erhöhen
+2. Neues **Bilder-Limit von 2.500** mit separatem Zähler im Header
+3. Gesamtspeicher bleibt bei **10 GB**
+4. KI Picture Studio Bilder (`source: 'ai_generator'`) werden aus dem normalen Media-Grid **ausgeblendet** — sie erscheinen **nur** unter dem Tab "Alben" im Unterordner "KI Picture Studio"
 
 ### Änderungen
 
-**1. Mediathek: Neues "Alben"-Tab hinzufügen**
-- `src/pages/MediaLibrary.tsx`: Tab-Leiste von 6 auf 7 Tabs erweitern (+ "Alben" mit FolderOpen-Icon)
-- `categoryFilter`-Type um `"albums"` erweitern
-- URL-Parameter `?tab=albums&album=ki-picture-studio` unterstützen
-- Wenn "Alben" aktiv: `AlbumManager`-Komponente anzeigen statt der normalen Media-Grid
+**1. `src/pages/MediaLibrary.tsx`**
+- Konstante `MAX_VIDEOS` von 250 auf `500` ändern
+- Neue Konstante `MAX_IMAGES = 2500` hinzufügen
+- Bildanzahl berechnen: `const imageCount = media.filter(m => m.type === 'image').length`
+- `ai_generator`-Bilder aus dem normalen Grid filtern: Im `applyFilters` bei `categoryFilter === "all"` und allen anderen Tabs außer "albums" die Items mit `source === 'ai_generator'` ausschließen
+- Im KI-Tab (`categoryFilter === "ai"`) nur noch AI-Videos zeigen, keine `ai_generator`-Bilder
+- `imageCount` und `MAX_IMAGES` an den Header übergeben
 
-**2. AlbumManager für Mediathek anpassen**
-- `src/components/picture-studio/AlbumManager.tsx` → nach `src/components/media-library/AlbumManager.tsx` verschieben/refactoren
-- Systemalbum "KI Picture Studio" automatisch erstellen (is_system: true) beim ersten Laden, falls nicht vorhanden
-- Systemalben können nicht gelöscht werden (Delete-Button ausblenden)
-- Eigene Alben weiterhin erstellbar/löschbar
-- URL-Parameter `album` auswerten: bei `?tab=albums&album=ki-picture-studio` direkt ins KI-Album navigieren
+**2. `src/components/media-library/MediaLibraryHeroHeader.tsx`**
+- Neue Props: `imageCount` und `maxImages`
+- Dritten Zähler-Ring hinzufügen (neben Videos und Speicher): **Bilder X / 2.500** mit einem Images-Icon
+- Speicherlimit-Text aktualisieren: "Maximal 500 Videos oder 2.500 Bilder oder 10 GB"
+- Warning/Critical-Logik auf alle drei Limits erweitern
 
-**3. DB-Migration: Systemalbum-Flag**
-- `studio_albums`-Tabelle: Spalte `is_system BOOLEAN DEFAULT false` hinzufügen
-- Damit kann das "KI Picture Studio"-Album als nicht-löschbar markiert werden
+**3. Upload-Validierung in `MediaLibrary.tsx`**
+- Bei Upload prüfen: Wenn Bild → `imageCount < MAX_IMAGES`, wenn Video → `videoCount < MAX_VIDEOS`
+- Zusätzlich weiterhin das 10 GB Gesamtlimit prüfen
 
-**4. KI Picture Studio: Auto-Save ins Systemalbum**
-- `src/components/picture-studio/ImageGenerator.tsx`: Nach erfolgreicher Generierung das Bild automatisch mit der `album_id` des "KI Picture Studio"-Systemalbums in `studio_images` speichern
-- Nach der Generierung: Button "Zur Mediathek" anzeigen, der zu `/mediathek?tab=albums&album=ki-picture-studio` navigiert
-
-**5. KI Picture Studio: Album-Tab entfernen**
-- `src/pages/PictureStudio.tsx`: Den "Meine Alben"-Tab aus dem Picture Studio entfernen (nur noch "Generieren" und "Smart Background")
-- AlbumManager-Import entfernen
-
-### Ablauf für den User
-1. Bild im KI Picture Studio generieren
-2. Button "Zur Mediathek" klicken
-3. Wird zur Mediathek weitergeleitet → Tab "Alben" → Ordner "KI Picture Studio" ist automatisch geöffnet
-4. Das neue Bild ist dort sichtbar
-5. User kann eigene Alben erstellen und Bilder zwischen Alben verschieben
+### Ergebnis
+- Videos: max 500, Bilder: max 2.500, Speicher: max 10 GB — als separate Limits
+- KI-generierte Bilder sind ausschließlich über Mediathek → Alben → KI Picture Studio erreichbar
+- Header zeigt drei separate Zähler mit korrekten Dateigrößen
 
