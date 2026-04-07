@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download, Cloud, ImageIcon } from "lucide-react";
+import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download, Cloud, Images } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -877,7 +877,7 @@ export default function MediaLibrary() {
                   value="albums" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
                 >
-                  <ImageIcon className="h-4 w-4" />
+                  <Images className="h-4 w-4" />
                   Alben
                 </TabsTrigger>
                 <TabsTrigger 
