@@ -62,6 +62,7 @@ interface GeneratedImage {
 
 export function ImageGenerator() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { executeAICall, loading, status } = useAICall();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -81,6 +82,9 @@ export function ImageGenerator() {
 
   // Lightbox state
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
+
+  // Track if a new image was just generated (for showing "Zur Mediathek" button)
+  const [justGenerated, setJustGenerated] = useState(false);
 
   // Sync state to in-memory cache on every change
   useEffect(() => {
