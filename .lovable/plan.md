@@ -1,23 +1,71 @@
 
 
-## Plan: AI Video Guthaben auf $100 aufstocken
+## Plan: Twitch-Integration im Gaming Hub
 
-### Aktueller Stand
-- User: bestofproducts4u@gmail.com
-- Aktuelles Guthaben: **$1.38**
-- Ziel: **$100.00**
+### Architektur-Überblick
 
-### Änderung
-**DB-Migration**: `balance_euros` auf `100.00` setzen und `total_purchased_euros` entsprechend um $98.62 erhöhen (von $10.00 auf $108.62), damit die Buchführung stimmt.
-
-```sql
-UPDATE ai_video_wallets 
-SET balance_euros = 100.00,
-    total_purchased_euros = total_purchased_euros + 98.62,
-    updated_at = now()
-WHERE user_id = '8948d3d9-2c5e-4405-9e9c-1624448e7189';
+```text
+Frontend (Gaming Hub)
+  ↓ supabase.functions.invoke()
+Edge Functions (twitch-*)
+  ↓ Connector Gateway
+Twitch Helix API
 ```
 
+### Schritt 1: Twitch-Connector verbinden
+- Den Lovable Twitch-Connector mit dem Projekt verknüpfen
+- Stellt `TWITCH_API_KEY` und `LOVABLE_API_KEY` als Secrets bereit
+- Kein manueller API-Key nötig
+
+### Schritt 2: Twitch-Benutzername in der DB speichern
+- **DB-Migration**: Spalte `twitch_username` zur `profiles`-Tabelle hinzufügen (oder neue Tabelle `twitch_connections`)
+- Beim Verbinden gibt der User seinen Twitch-Benutzernamen ein
+- Wird validiert via Helix API (`GET /users?login=...`)
+
+### Schritt 3: Edge Functions erstellen
+
+| Funktion | Zweck | Helix Endpoint |
+|----------|-------|----------------|
+| `twitch-user` | User-Info abrufen (Avatar, ID) | `GET /users` |
+| `twitch-stream` | Live-Status, Viewer, Uptime | `GET /streams` |
+| `twitch-clips` | Clips eines Channels laden | `GET /clips` |
+| `twitch-channel` | Channel-Info (Titel, Game) | `GET /channels` |
+
+Alle nutzen das Gateway-Pattern:
+```
+https://connector-gateway.lovable.dev/twitch/{endpoint}
+```
+
+### Schritt 4: StreamDashboard mit echten Daten
+- **Verbindungs-Flow**: Button → Dialog für Twitch-Username → Validierung via `twitch-user` → Speichern in DB
+- **Live-Status**: Polling alle 30s via `twitch-stream` — zeigt Viewer, Uptime, Game, Bitrate
+- **Offline-State**: Wenn nicht live, letzten Stream anzeigen
+
+### Schritt 5: ClipCreator mit echten Clips
+- Clips des verbundenen Channels via `twitch-clips` laden
+- Thumbnails, Titel, Views, Dauer anzeigen
+- "Export"-Button: Clip-URL an AI Video Studio / Mediathek weiterleiten
+
+### Schritt 6: ChatManager mit Live-Chat (WebSocket)
+- Anonyme IRC-Verbindung zu `wss://irc-ws.chat.twitch.tv` (kein Auth nötig zum Lesen)
+- Echte Chat-Nachrichten parsen und anzeigen
+- Sentiment-Analyse via KI (Lovable AI Gateway)
+
+### Was NICHT im ersten Schritt
+- Chat-Nachrichten senden (braucht OAuth User-Token mit `user:write:chat`)
+- Follower-Daten (braucht `moderator:read:followers` Scope)
+- Stream starten/stoppen (Twitch API unterstützt das nicht)
+
+### Reihenfolge
+1. Twitch-Connector verknüpfen
+2. DB-Migration + Edge Functions
+3. StreamDashboard (Live-Status)
+4. ClipCreator (echte Clips)
+5. ChatManager (WebSocket-Chat)
+
 ### Ergebnis
-Guthaben wird sofort auf $100.00 angezeigt.
+- Echte Twitch-Daten statt Mock-Daten im Gaming Hub
+- Live-Stream-Status mit Auto-Refresh
+- Echte Clips mit Export-Möglichkeit
+- Live-Chat-Feed mit Sentiment-Analyse
 
