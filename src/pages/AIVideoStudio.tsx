@@ -48,6 +48,7 @@ export default function AIVideoStudio() {
   // Image-to-Video state
   const [referenceImage, setReferenceImage] = useState<File | null>(null);
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
+  const [albumPickerOpen, setAlbumPickerOpen] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
