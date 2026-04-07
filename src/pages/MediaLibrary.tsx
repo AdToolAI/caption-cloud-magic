@@ -441,13 +441,37 @@ export default function MediaLibrary() {
     if (!e.target.files || !user) return;
 
     const file = e.target.files[0];
+    const isVideo = file.type.startsWith('video/');
+    const isImage = file.type.startsWith('image/');
     
-    // Check quota against fixed limits
+    // Check specific limits
+    const currentVideoCount = media.filter(m => m.type === 'video').length;
+    const currentImageCount = media.filter(m => m.type === 'image').length;
+    
+    if (isVideo && currentVideoCount >= MAX_VIDEOS) {
+      toast({
+        title: 'Video-Limit erreicht',
+        description: `Maximal ${MAX_VIDEOS} Videos erlaubt.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (isImage && currentImageCount >= MAX_IMAGES) {
+      toast({
+        title: 'Bilder-Limit erreicht',
+        description: `Maximal ${MAX_IMAGES.toLocaleString('de-DE')} Bilder erlaubt.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Check storage quota
     const fileSizeMb = file.size / 1024 / 1024;
     if (storageQuota.used_mb + fileSizeMb > MAX_STORAGE_GB * 1024) {
       toast({
         title: 'Storage-Limit erreicht',
-        description: `Maximal ${MAX_STORAGE_GB} GB Speicher. Bei Überschreitung werden automatisch die ältesten Medien gelöscht.`,
+        description: `Maximal ${MAX_STORAGE_GB} GB Speicher.`,
         variant: 'destructive',
       });
       return;
