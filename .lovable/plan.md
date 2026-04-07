@@ -1,24 +1,23 @@
 
 
-## Plan: "Aus Mediathek importieren"-Button im AI Video Studio Referenzbild-Bereich
+## Plan: AI Video Guthaben auf $100 aufstocken
 
-### Überblick
-Neben dem bestehenden Upload-Bereich für Referenzbilder im AI Video Studio wird ein zweiter Button hinzugefügt: **"Aus Alben importieren"**. Dieser öffnet ein Modal/Dialog, das die Alben aus der Mediathek (insbesondere "KI Picture Studio") anzeigt und es erlaubt, ein Bild auszuwählen.
+### Aktueller Stand
+- User: bestofproducts4u@gmail.com
+- Aktuelles Guthaben: **$1.38**
+- Ziel: **$100.00**
 
-### Änderungen
+### Änderung
+**DB-Migration**: `balance_euros` auf `100.00` setzen und `total_purchased_euros` entsprechend um $98.62 erhöhen (von $10.00 auf $108.62), damit die Buchführung stimmt.
 
-**1. Neue Komponente: `src/components/media-library/AlbumImagePicker.tsx`**
-- Dialog/Sheet-Komponente mit Album-Liste (aus `studio_albums`) und Bild-Grid (aus `studio_images`)
-- Zeigt zuerst alle Alben als Kacheln, bei Klick die Bilder im Album
-- "Auswählen"-Button pro Bild → gibt die `image_url` zurück via Callback
-- Props: `open`, `onOpenChange`, `onSelectImage: (url: string) => void`
-
-**2. `src/pages/AIVideoStudio.tsx` anpassen**
-- `AlbumImagePicker` importieren und State für Dialog-Steuerung hinzufügen
-- Im Referenzbild-Bereich (Zeile ~442–487): Neben dem Upload-Feld einen Button **"Aus Alben wählen"** mit FolderOpen-Icon hinzufügen
-- Bei Auswahl eines Bildes aus dem Picker: `referenceImageUrl` direkt setzen (kein erneuter Upload nötig, da die Bilder bereits im Storage liegen)
+```sql
+UPDATE ai_video_wallets 
+SET balance_euros = 100.00,
+    total_purchased_euros = total_purchased_euros + 98.62,
+    updated_at = now()
+WHERE user_id = '8948d3d9-2c5e-4405-9e9c-1624448e7189';
+```
 
 ### Ergebnis
-- User kann Referenzbilder entweder hochladen ODER aus den Mediathek-Alben auswählen
-- Besonders praktisch für KI-generierte Bilder, die direkt als Video-Startpunkt dienen sollen
+Guthaben wird sofort auf $100.00 angezeigt.
 
