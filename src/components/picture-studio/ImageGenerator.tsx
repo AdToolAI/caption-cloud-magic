@@ -159,11 +159,45 @@ export function ImageGenerator() {
 
       if (result?.image) {
         const imgUrl = result.image.previewUrl || result.image.url;
+        const imageId = result.image.id;
         setGeneratedImages(prev => [
           { ...result.image, url: imgUrl, prompt: prompt.trim(), style, aspectRatio: aspectRatio },
           ...prev,
         ]);
         toast.success("Bild erfolgreich generiert! 🎨");
+        setJustGenerated(true);
+
+        // Auto-assign to KI Picture Studio system album
+        if (imageId && user) {
+          try {
+            // Find or create the system album
+            let { data: systemAlbum } = await supabase
+              .from('studio_albums')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('is_system', true)
+              .eq('name', 'KI Picture Studio')
+              .maybeSingle();
+
+            if (!systemAlbum) {
+              const { data: newAlbum } = await supabase
+                .from('studio_albums')
+                .insert({ user_id: user.id, name: 'KI Picture Studio', is_system: true })
+                .select('id')
+                .single();
+              systemAlbum = newAlbum;
+            }
+
+            if (systemAlbum) {
+              await supabase
+                .from('studio_images')
+                .update({ album_id: systemAlbum.id })
+                .eq('id', imageId);
+            }
+          } catch (err) {
+            console.error('Auto-assign to system album failed:', err);
+          }
+        }
       }
     } catch (error: any) {
       if (error.code !== 'INSUFFICIENT_CREDITS') {
