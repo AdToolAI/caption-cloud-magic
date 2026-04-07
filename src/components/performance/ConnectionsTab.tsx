@@ -273,7 +273,8 @@ export const ConnectionsTab = () => {
           const { data, error } = await supabase.functions.invoke('tiktok-oauth-start', {
             headers: {
               Authorization: `Bearer ${session.session?.access_token}`
-            }
+            },
+            body: { returnTo: window.location.href }
           });
           
           if (error) throw error;

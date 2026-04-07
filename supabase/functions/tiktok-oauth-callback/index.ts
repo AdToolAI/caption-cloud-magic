@@ -11,21 +11,21 @@ serve(async (req) => {
     const error = url.searchParams.get('error');
 
     const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://useadtool.ai';
-    const redirectBase = `${appBaseUrl}/performance?tab=connections`;
+    const defaultRedirect = `${appBaseUrl}/performance?tab=connections`;
 
     // Check for user denial
     if (error === 'access_denied') {
       console.log('User denied TikTok authorization');
       return new Response(null, {
         status: 302,
-        headers: { 'Location': `${redirectBase}&error=tiktok_oauth_denied` }
+        headers: { 'Location': `${defaultRedirect}&error=tiktok_oauth_denied` }
       });
     }
 
     if (!code || !state) {
       return new Response(null, {
         status: 302,
-        headers: { 'Location': `${redirectBase}&error=tiktok_oauth_failed` }
+        headers: { 'Location': `${defaultRedirect}&error=tiktok_oauth_failed` }
       });
     }
 
@@ -47,16 +47,17 @@ serve(async (req) => {
       console.error('Invalid or expired OAuth state:', state);
       return new Response(null, {
         status: 302,
-        headers: { 'Location': `${redirectBase}&error=tiktok_oauth_failed` }
+        headers: { 'Location': `${defaultRedirect}&error=tiktok_oauth_failed` }
       });
     }
 
     const userId = oauthState.user_id;
+    const returnUrl = oauthState.redirect_url || defaultRedirect;
 
     // Delete used state
     await supabase.from('oauth_states').delete().eq('id', oauthState.id);
 
-    console.log('TikTok OAuth callback - exchanging code for tokens:', { userId });
+    console.log('TikTok OAuth callback - exchanging code for tokens:', { userId, returnUrl });
 
     // Exchange code for tokens
     const tokenData = await exchangeCodeForTokens(code);
@@ -78,12 +79,11 @@ serve(async (req) => {
       });
     } catch (error) {
       console.warn('User info API not available, using minimal data from token:', error);
-      // Use minimal data from token response
       userInfo = {
         open_id: tokenData.open_id,
-        username: tokenData.open_id, // Use open_id as fallback username
-        display_name: `TikTok User (${tokenData.open_id.substring(0, 8)}...)`, // Readable name
-        avatar_url: '', // Empty avatar
+        username: tokenData.open_id,
+        display_name: `TikTok User (${tokenData.open_id.substring(0, 8)}...)`,
+        avatar_url: '',
         follower_count: 0,
         following_count: 0,
         video_count: 0
@@ -122,10 +122,14 @@ serve(async (req) => {
 
     console.log('TikTok connection successful for user:', userId);
 
-    // Redirect to success
+    // Build redirect URL with success params
+    const redirectUrl = new URL(returnUrl);
+    redirectUrl.searchParams.set('connected', 'tiktok');
+    redirectUrl.searchParams.set('status', 'success');
+
     return new Response(null, {
       status: 302,
-      headers: { 'Location': `${redirectBase}&connected=tiktok` }
+      headers: { 'Location': redirectUrl.toString() }
     });
 
   } catch (error: any) {
