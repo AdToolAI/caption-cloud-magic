@@ -341,6 +341,18 @@ export function ImageGenerator() {
               </>
             )}
           </Button>
+
+          {/* Navigate to Media Library after generation */}
+          {justGenerated && generatedImages.length > 0 && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => navigate('/mediathek?tab=albums&album=ki-picture-studio')}
+            >
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Zur Mediathek — Alben
+            </Button>
+          )}
         </CardContent>
       </Card>
 
