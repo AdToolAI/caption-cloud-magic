@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download, Cloud } from "lucide-react";
+import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download, Cloud, ImageIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MediaLibraryHeroHeader } from "@/components/media-library/MediaLibraryHeroHeader";
 import { CloudStorageConnect } from "@/components/media-library/CloudStorageConnect";
+import { MediaAlbumManager } from "@/components/media-library/MediaAlbumManager";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCloudStorage } from "@/hooks/useCloudStorage";
 
@@ -56,7 +57,7 @@ export default function MediaLibrary() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai" | "ai_generator" | "campaign" | "video-creator" | "cloud">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai" | "ai_generator" | "campaign" | "video-creator" | "cloud" | "albums">("all");
   const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: MAX_STORAGE_GB * 1024 });
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
@@ -65,6 +66,7 @@ export default function MediaLibrary() {
   const { connection: cloudConnection, cloudFiles, listCloudFiles, uploadToCloud, deleteFromCloud, syncing: cloudSyncing } = useCloudStorage();
 
   // Handle tab parameter from URL
+  const albumSlug = new URLSearchParams(location.search).get('album');
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const tabParam = searchParams.get('tab');
@@ -72,6 +74,8 @@ export default function MediaLibrary() {
       setCategoryFilter('ai');
     } else if (tabParam === 'rendered') {
       setCategoryFilter('video-creator');
+    } else if (tabParam === 'albums') {
+      setCategoryFilter('albums');
     }
   }, [location.search]);
 
