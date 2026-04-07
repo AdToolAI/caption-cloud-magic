@@ -1,10 +1,12 @@
 import { motion } from "framer-motion";
-import { FolderOpen, Upload, HardDrive, AlertTriangle, Film, Cloud } from "lucide-react";
+import { FolderOpen, Upload, HardDrive, AlertTriangle, Film, Cloud, Images } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface MediaLibraryHeroHeaderProps {
   videoCount: number;
   maxVideos: number;
+  imageCount: number;
+  maxImages: number;
   usedGB: number;
   maxGB: number;
   onUploadClick: () => void;
@@ -16,6 +18,8 @@ interface MediaLibraryHeroHeaderProps {
 export const MediaLibraryHeroHeader = ({
   videoCount,
   maxVideos,
+  imageCount,
+  maxImages,
   usedGB,
   maxGB,
   onUploadClick,
@@ -24,9 +28,10 @@ export const MediaLibraryHeroHeader = ({
   cloudTotalGB = 0,
 }: MediaLibraryHeroHeaderProps) => {
   const videoPercent = Math.min((videoCount / maxVideos) * 100, 100);
+  const imagePercent = Math.min((imageCount / maxImages) * 100, 100);
   const storagePercent = Math.min((usedGB / maxGB) * 100, 100);
-  const isWarning = videoPercent > 80 || storagePercent > 80;
-  const isCritical = videoPercent >= 100 || storagePercent >= 100;
+  const isWarning = videoPercent > 80 || imagePercent > 80 || storagePercent > 80;
+  const isCritical = videoPercent >= 100 || imagePercent >= 100 || storagePercent >= 100;
 
   return (
     <div className="relative overflow-hidden mb-8">
@@ -104,7 +109,7 @@ export const MediaLibraryHeroHeader = ({
                     />
                     <motion.circle
                       cx="24" cy="24" r="20"
-                      stroke={isCritical ? "hsl(var(--destructive))" : isWarning ? "hsl(45, 90%, 60%)" : "hsl(var(--primary))"}
+                      stroke={videoPercent >= 100 ? "hsl(var(--destructive))" : videoPercent > 80 ? "hsl(45, 90%, 60%)" : "hsl(var(--primary))"}
                       strokeWidth="4"
                       fill="none"
                       strokeLinecap="round"
@@ -113,7 +118,7 @@ export const MediaLibraryHeroHeader = ({
                       transition={{ duration: 1, ease: "easeOut" }}
                       style={{ 
                         strokeDasharray: "1 1",
-                        filter: isWarning ? "drop-shadow(0 0 6px hsla(45, 90%, 60%, 0.5))" : undefined
+                        filter: videoPercent > 80 ? "drop-shadow(0 0 6px hsla(45, 90%, 60%, 0.5))" : undefined
                       }}
                     />
                   </svg>
@@ -121,8 +126,44 @@ export const MediaLibraryHeroHeader = ({
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Videos</p>
-                  <p className={`font-bold ${isCritical ? "text-destructive" : isWarning ? "text-warning" : "text-foreground"}`}>
-                    {videoCount} / {maxVideos}
+                  <p className={`font-bold ${videoPercent >= 100 ? "text-destructive" : videoPercent > 80 ? "text-warning" : "text-foreground"}`}>
+                    {videoCount} / {maxVideos.toLocaleString('de-DE')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Image Count Meter */}
+              <div className="flex items-center gap-3">
+                <div className="relative w-12 h-12">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle
+                      cx="24" cy="24" r="20"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                      className="text-muted/20"
+                    />
+                    <motion.circle
+                      cx="24" cy="24" r="20"
+                      stroke={imagePercent >= 100 ? "hsl(var(--destructive))" : imagePercent > 80 ? "hsl(45, 90%, 60%)" : "hsl(280, 70%, 60%)"}
+                      strokeWidth="4"
+                      fill="none"
+                      strokeLinecap="round"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: imagePercent / 100 }}
+                      transition={{ duration: 1, ease: "easeOut", delay: 0.1 }}
+                      style={{ 
+                        strokeDasharray: "1 1",
+                        filter: imagePercent > 80 ? "drop-shadow(0 0 6px hsla(280, 70%, 60%, 0.5))" : undefined
+                      }}
+                    />
+                  </svg>
+                  <Images className="absolute inset-0 m-auto h-4 w-4 text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Bilder</p>
+                  <p className={`font-bold ${imagePercent >= 100 ? "text-destructive" : imagePercent > 80 ? "text-warning" : "text-foreground"}`}>
+                    {imageCount.toLocaleString('de-DE')} / {maxImages.toLocaleString('de-DE')}
                   </p>
                 </div>
               </div>
@@ -238,7 +279,7 @@ export const MediaLibraryHeroHeader = ({
           <p className="text-xs text-muted-foreground flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
             <span>
-              <strong>Speicherlimit:</strong> Maximal {maxVideos} Videos oder {maxGB} GB. 
+              <strong>Speicherlimit:</strong> Maximal {maxVideos.toLocaleString('de-DE')} Videos oder {maxImages.toLocaleString('de-DE')} Bilder oder {maxGB} GB. 
               Bei Überschreitung werden automatisch die ältesten Medien gelöscht.
             </span>
           </p>
