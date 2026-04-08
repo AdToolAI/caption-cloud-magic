@@ -978,42 +978,39 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   }, []);
 
   // Render polling logic
-  const startRenderPolling = useCallback((renderId: string) => {
+  const startRenderPolling = useCallback((remotionRenderId: string) => {
     if (renderPollingRef.current) clearInterval(renderPollingRef.current);
 
     const poll = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('check-render-status', {
-          body: { renderId },
+        const { data, error } = await supabase.functions.invoke('check-remotion-progress', {
+          body: { renderId: remotionRenderId, source: 'directors-cut' },
         });
         if (error || !data) return;
 
-        if (data.status === 'completed' && data.downloadUrl) {
+        const progress = data.progress;
+        if (progress?.done) {
           setRenderProgress(100);
           setRenderStatus('completed');
-          setRenderedVideoUrl(data.downloadUrl);
+          setRenderedVideoUrl(progress.outputFile || progress.url || null);
           if (renderPollingRef.current) clearInterval(renderPollingRef.current);
-        } else if (data.status === 'failed') {
+        } else if (progress?.fatalErrorEncountered) {
           setRenderStatus('failed');
-          setRenderError(data.error || 'Unbekannter Fehler');
+          setRenderError(progress.errors?.[0]?.message || 'Rendering fehlgeschlagen');
           if (renderPollingRef.current) clearInterval(renderPollingRef.current);
         } else {
-          // Simulate progress based on time elapsed
-          setRenderProgress(prev => {
-            if (prev >= 90) return 90; // Cap at 90 until actually done
-            return prev + 2;
-          });
-          if (data.status === 'rendering') setRenderStatus('rendering');
-          if (data.status === 'finalizing') setRenderStatus('finalizing');
+          const pct = Math.round((progress?.overallProgress || 0) * 100);
+          setRenderProgress(Math.max(10, Math.min(pct, 95)));
+          setRenderStatus('rendering');
         }
       } catch {
         // Silently retry on next interval
       }
     };
 
-    // Initial check after 5s, then every 15s
+    // Initial check after 5s, then every 10s
     setTimeout(poll, 5000);
-    renderPollingRef.current = setInterval(poll, 15000);
+    renderPollingRef.current = setInterval(poll, 10000);
   }, []);
 
   // Export video - trigger render via Edge Function
@@ -1069,17 +1066,21 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         return;
       }
 
-      const renderId = data?.render_id || data?.renderId;
-      if (renderId) {
-        setCurrentRenderId(renderId);
+      const remotionRenderId = data?.remotion_render_id || data?.renderId;
+      const dbRenderId = data?.render_id || data?.id;
+      if (remotionRenderId) {
+        setCurrentRenderId(dbRenderId || remotionRenderId);
         setRenderProgress(10);
         setRenderStatus('rendering');
-        startRenderPolling(renderId);
-      } else {
-        // No render_id returned — edge function may not support polling
+        startRenderPolling(remotionRenderId);
+      } else if (data?.video_url || data?.downloadUrl) {
+        // Render completed synchronously
         setRenderProgress(100);
         setRenderStatus('completed');
-        setRenderedVideoUrl(data?.video_url || data?.downloadUrl || null);
+        setRenderedVideoUrl(data.video_url || data.downloadUrl);
+      } else {
+        setRenderStatus('failed');
+        setRenderError('Keine Render-ID erhalten');
       }
 
       console.log('[Export] Render initiated:', data);
