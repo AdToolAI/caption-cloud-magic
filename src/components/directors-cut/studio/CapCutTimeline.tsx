@@ -776,16 +776,16 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             onClick={handleTimelineClick}
           >
             {/* Time Ruler */}
-            <div className="h-6 border-b border-[#2a2a2a] bg-[#1e1e1e] sticky top-0 z-20">
+            <div className="h-6 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80 sticky top-0 z-20">
               {Array.from({ length: Math.ceil(duration) + 1 }).map((_, i) => (
                 <div
                   key={i}
                   className="absolute top-0 h-full flex flex-col items-center"
                   style={{ left: `${i * zoom}px` }}
                 >
-                  <div className="w-px h-2 bg-[#4a4a4a]" />
+                  <div className="w-px h-2 bg-white/10" />
                   {i % 5 === 0 && (
-                    <span className="text-[9px] text-white/40 mt-0.5">{formatTime(i)}</span>
+                    <span className="text-[9px] text-[#F5C76A]/40 mt-0.5">{formatTime(i)}</span>
                   )}
                 </div>
               ))}
