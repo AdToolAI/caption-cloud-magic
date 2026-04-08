@@ -646,11 +646,11 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   const timelineWidth = duration * zoom + 100; // Extra space at the end
 
   return (
-    <div className="h-full flex flex-col bg-[#1a1a1a]">
+    <div className="h-full flex flex-col bg-[#050816]">
       {/* Toolbar */}
-      <div className="h-10 flex items-center justify-between px-3 border-b border-[#2a2a2a] bg-[#242424]">
+      <div className="h-10 flex items-center justify-between px-3 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80 backdrop-blur-xl">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-white/60">Timeline</span>
+          <span className="text-xs text-[#F5C76A]/60 font-medium">Timeline</span>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -661,9 +661,9 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           >
             <Minus className="h-3.5 w-3.5" />
           </Button>
-          <div className="w-16 h-1.5 bg-[#2a2a2a] rounded-full overflow-hidden">
+          <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-[#00d4ff]"
+              className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400"
               style={{ width: `${((zoom - 20) / 80) * 100}%` }}
             />
           </div>
@@ -683,11 +683,11 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
         {/* Track Headers */}
         <div className="flex-shrink-0 overflow-y-auto" style={{ width: HEADER_WIDTH }}>
           {/* Ruler placeholder */}
-          <div className="h-6 border-b border-[#2a2a2a] bg-[#242424]" />
+          <div className="h-6 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80" />
 
           {/* Video track header */}
           <div 
-            className="flex items-center gap-2 px-2 border-b border-[#2a2a2a] bg-[#242424]"
+            className="flex items-center gap-2 px-2 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/60"
             style={{ height: VIDEO_TRACK_HEIGHT }}
           >
             <span className="text-xs">🎬</span>
@@ -698,7 +698,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           {tracksBeforeSubtitle.map(track => (
             <div
               key={track.id}
-              className="flex items-center gap-1 px-2 border-b border-[#2a2a2a] bg-[#242424]"
+              className="flex items-center gap-1 px-2 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/60"
               style={{ height: TRACK_HEIGHT }}
             >
               <span className="text-xs">{track.icon}</span>
@@ -715,7 +715,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               <button
                 className={cn(
                   "w-5 h-5 flex items-center justify-center rounded hover:bg-white/10",
-                  track.solo && "text-yellow-400"
+                  track.solo && "text-[#F5C76A]"
                 )}
                 onClick={() => onTrackSolo(track.id)}
               >
@@ -727,7 +727,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           {/* Subtitle track header */}
           {subtitleTrack && (
             <div
-              className="flex items-center gap-1 px-2 border-b border-[#2a2a2a] bg-[#242424]"
+              className="flex items-center gap-1 px-2 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/60"
               style={{ height: TRACK_HEIGHT }}
             >
               <span className="text-xs">{subtitleTrack.icon}</span>
@@ -740,7 +740,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           {tracksAfterSubtitle.map(track => (
             <div
               key={track.id}
-              className="flex items-center gap-1 px-2 border-b border-[#2a2a2a] bg-[#242424]"
+              className="flex items-center gap-1 px-2 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/60"
               style={{ height: TRACK_HEIGHT }}
             >
               <span className="text-xs">{track.icon}</span>
@@ -757,7 +757,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               <button
                 className={cn(
                   "w-5 h-5 flex items-center justify-center rounded hover:bg-white/10",
-                  track.solo && "text-yellow-400"
+                  track.solo && "text-[#F5C76A]"
                 )}
                 onClick={() => onTrackSolo(track.id)}
               >
