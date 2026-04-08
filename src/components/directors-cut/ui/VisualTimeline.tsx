@@ -10,12 +10,17 @@ interface VisualTimelineProps {
   transitions: TransitionAssignment[];
   videoDuration: number;
   selectedSceneId: string | null;
-  onSceneSelect: (sceneId: string) => void;
+  selectedSceneIds?: Set<string>;
+  onSceneSelect: (sceneId: string, shiftKey: boolean) => void;
   onTransitionClick: (sceneId: string) => void;
-  // Updated: only needs sceneId and new end time - parent handles shifting
   onSceneDurationChange?: (sceneId: string, newEndTime: number) => void;
   /** @deprecated anchorTime removed — transitions anchor to original_end_time */
   onTransitionAnchorChange?: (sceneId: string, anchorTime: number) => void;
+  onScenesReorder?: (fromIndex: number, toIndex: number) => void;
+  cutSegmentMode?: boolean;
+  cutSegmentIn?: number | null;
+  cutSegmentOut?: number | null;
+  onCutSegmentClick?: (time: number) => void;
   thumbnails?: Record<string, string>;
   currentTime?: number;
 }
@@ -51,10 +56,16 @@ export function VisualTimeline({
   transitions,
   videoDuration,
   selectedSceneId,
+  selectedSceneIds = new Set(),
   onSceneSelect,
   onTransitionClick,
   onSceneDurationChange,
   onTransitionAnchorChange,
+  onScenesReorder,
+  cutSegmentMode = false,
+  cutSegmentIn = null,
+  cutSegmentOut = null,
+  onCutSegmentClick,
   thumbnails = {},
   currentTime = 0,
 }: VisualTimelineProps) {
@@ -65,6 +76,16 @@ export function VisualTimeline({
   const [dragStartX, setDragStartX] = useState<number>(0);
   const [dragStartScenes, setDragStartScenes] = useState<{ leftEnd: number; rightStart: number } | null>(null);
   
+  // Drag-to-reorder state
+  const [draggingSceneIdx, setDraggingSceneIdx] = useState<number | null>(null);
+  const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
+  const dragSceneStartX = useRef(0);
+  
+  // Trim handle state
+  const [trimmingScene, setTrimmingScene] = useState<{ id: string; edge: 'start' | 'end' } | null>(null);
+  const trimStartX = useRef(0);
+  const trimOriginalTime = useRef(0);
+  
   // Transition dot drag state
   const [draggingTransition, setDraggingTransition] = useState<{ sceneId: string; sceneIndex: number } | null>(null);
   const [dragTransitionAnchor, setDragTransitionAnchor] = useState<number | null>(null);
@@ -72,7 +93,6 @@ export function VisualTimeline({
   const dragTransitionStartAnchorRef = useRef<number>(0);
   const hasExceededDragThresholdRef = useRef<boolean>(false);
 
-  // Calculate total duration as max(end_time) — canonical duration source
   const actualTotalDuration = scenes.length > 0 ? Math.max(...scenes.map(s => s.end_time)) : videoDuration;
 
   // Handle divider drag
@@ -93,26 +113,20 @@ export function VisualTimeline({
     const rect = timelineRef.current.getBoundingClientRect();
     const deltaX = e.clientX - dragStartX;
     const deltaPercent = deltaX / rect.width;
-    
-    // Calculate delta time based on CURRENT total duration (which can change)
     const currentTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
     const deltaTime = deltaPercent * currentTotalDuration;
 
     const leftScene = scenes[draggingDivider];
-    
-    // Calculate original duration for 1:3 ratio limits
     const originalDuration = (leftScene.original_end_time ?? leftScene.end_time) - 
       (leftScene.original_start_time ?? leftScene.start_time);
-    const minDuration = Math.max(0.5, originalDuration / 3); // 3x faster max
-    const maxDuration = originalDuration * 3; // 3x slower max
+    const minDuration = Math.max(0.5, originalDuration / 3);
+    const maxDuration = originalDuration * 3;
 
-    // Calculate new end time with 1:3 ratio constraint
     const targetEndTime = dragStartScenes.leftEnd + deltaTime;
     const newDuration = targetEndTime - leftScene.start_time;
     const clampedDuration = Math.max(minDuration, Math.min(maxDuration, newDuration));
     const newLeftEnd = leftScene.start_time + clampedDuration;
 
-    // Parent handles shifting subsequent scenes
     onSceneDurationChange(leftScene.id, newLeftEnd);
   }, [draggingDivider, dragStartX, dragStartScenes, scenes, onSceneDurationChange]);
 
@@ -121,11 +135,10 @@ export function VisualTimeline({
     setDragStartScenes(null);
   }, []);
 
-  // Transition dot click handler — no more dragging, just click to open dialog
+  // Transition dot click handler
   const handleTransitionDotMouseDown = useCallback((e: React.MouseEvent, sceneId: string, sceneIndex: number) => {
     e.preventDefault();
     e.stopPropagation();
-    // No drag — just open the transition dialog
     onTransitionClick(sceneId);
   }, [onTransitionClick]);
 
@@ -133,7 +146,6 @@ export function VisualTimeline({
     if (!draggingTransition || !timelineRef.current || !onTransitionAnchorChange) return;
     
     const deltaX = e.clientX - dragTransitionStartXRef.current;
-    // Only start actual dragging after 5px threshold
     if (!hasExceededDragThresholdRef.current && Math.abs(deltaX) < 5) return;
     hasExceededDragThresholdRef.current = true;
     
@@ -151,17 +163,83 @@ export function VisualTimeline({
   }, [draggingTransition, scenes, onTransitionAnchorChange, actualTotalDuration]);
 
   const handleTransitionDotMouseUp = useCallback(() => {
-    // Only persist anchor if user actually dragged (exceeded threshold)
     if (draggingTransition && dragTransitionAnchor !== null && onTransitionAnchorChange && hasExceededDragThresholdRef.current) {
       onTransitionAnchorChange(draggingTransition.sceneId, dragTransitionAnchor);
     }
-    // If no drag happened (just a click), open the transition dialog instead
     if (draggingTransition && !hasExceededDragThresholdRef.current) {
       onTransitionClick(draggingTransition.sceneId);
     }
     setDraggingTransition(null);
     setDragTransitionAnchor(null);
   }, [draggingTransition, dragTransitionAnchor, onTransitionAnchorChange, onTransitionClick]);
+
+  // Drag-to-reorder handlers
+  const handleSceneDragStart = useCallback((e: React.MouseEvent, index: number) => {
+    if (!onScenesReorder) return;
+    e.preventDefault();
+    dragSceneStartX.current = e.clientX;
+    setDraggingSceneIdx(index);
+  }, [onScenesReorder]);
+
+  const handleSceneDragMove = useCallback((e: MouseEvent) => {
+    if (draggingSceneIdx === null || !timelineRef.current) return;
+    const rect = timelineRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = x / rect.width;
+    const time = percent * actualTotalDuration;
+    
+    // Find which scene index the cursor is over
+    let targetIdx = scenes.findIndex(s => time >= s.start_time && time < s.end_time);
+    if (targetIdx === -1) targetIdx = scenes.length - 1;
+    setDropTargetIdx(targetIdx);
+  }, [draggingSceneIdx, scenes, actualTotalDuration]);
+
+  const handleSceneDragEnd = useCallback(() => {
+    if (draggingSceneIdx !== null && dropTargetIdx !== null && onScenesReorder) {
+      onScenesReorder(draggingSceneIdx, dropTargetIdx);
+    }
+    setDraggingSceneIdx(null);
+    setDropTargetIdx(null);
+  }, [draggingSceneIdx, dropTargetIdx, onScenesReorder]);
+
+  // Trim handle handlers
+  const handleTrimStart = useCallback((e: React.MouseEvent, sceneId: string, edge: 'start' | 'end') => {
+    e.preventDefault();
+    e.stopPropagation();
+    const scene = scenes.find(s => s.id === sceneId);
+    if (!scene) return;
+    setTrimmingScene({ id: sceneId, edge });
+    trimStartX.current = e.clientX;
+    trimOriginalTime.current = edge === 'start' ? scene.start_time : scene.end_time;
+  }, [scenes]);
+
+  const handleTrimMove = useCallback((e: MouseEvent) => {
+    if (!trimmingScene || !timelineRef.current || !onSceneDurationChange) return;
+    const rect = timelineRef.current.getBoundingClientRect();
+    const deltaX = e.clientX - trimStartX.current;
+    const deltaTime = (deltaX / rect.width) * actualTotalDuration;
+    const scene = scenes.find(s => s.id === trimmingScene.id);
+    if (!scene) return;
+    
+    if (trimmingScene.edge === 'end') {
+      const newEnd = Math.max(scene.start_time + 0.5, trimOriginalTime.current + deltaTime);
+      onSceneDurationChange(scene.id, newEnd);
+    }
+    // Start trimming would need a different callback - for now just support end trim
+  }, [trimmingScene, scenes, actualTotalDuration, onSceneDurationChange]);
+
+  const handleTrimEnd = useCallback(() => {
+    setTrimmingScene(null);
+  }, []);
+
+  // Cut segment click on timeline
+  const handleTimelineClick = useCallback((e: React.MouseEvent) => {
+    if (!cutSegmentMode || !timelineRef.current || !onCutSegmentClick) return;
+    const rect = timelineRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const time = (x / rect.width) * actualTotalDuration;
+    onCutSegmentClick(Math.max(0, Math.min(actualTotalDuration, time)));
+  }, [cutSegmentMode, actualTotalDuration, onCutSegmentClick]);
 
   // Add/remove event listeners for drag
   useEffect(() => {
@@ -181,10 +259,24 @@ export function VisualTimeline({
         window.removeEventListener('mouseup', handleTransitionDotMouseUp);
       };
     }
-  }, [draggingDivider, handleMouseMove, handleMouseUp, draggingTransition, handleTransitionDotMouseMove, handleTransitionDotMouseUp]);
+    if (draggingSceneIdx !== null) {
+      window.addEventListener('mousemove', handleSceneDragMove);
+      window.addEventListener('mouseup', handleSceneDragEnd);
+      return () => {
+        window.removeEventListener('mousemove', handleSceneDragMove);
+        window.removeEventListener('mouseup', handleSceneDragEnd);
+      };
+    }
+    if (trimmingScene !== null) {
+      window.addEventListener('mousemove', handleTrimMove);
+      window.addEventListener('mouseup', handleTrimEnd);
+      return () => {
+        window.removeEventListener('mousemove', handleTrimMove);
+        window.removeEventListener('mouseup', handleTrimEnd);
+      };
+    }
+  }, [draggingDivider, handleMouseMove, handleMouseUp, draggingTransition, handleTransitionDotMouseMove, handleTransitionDotMouseUp, draggingSceneIdx, handleSceneDragMove, handleSceneDragEnd, trimmingScene, handleTrimMove, handleTrimEnd]);
 
-  // (actualTotalDuration moved up before handlers)
-  
   const getSceneWidth = (scene: SceneAnalysis) => {
     return ((scene.end_time - scene.start_time) / actualTotalDuration) * 100;
   };
@@ -195,6 +287,10 @@ export function VisualTimeline({
 
   const playheadPosition = (currentTime / actualTotalDuration) * 100;
 
+  // Cut segment overlay positions
+  const cutInPos = cutSegmentIn !== null ? (cutSegmentIn / actualTotalDuration) * 100 : null;
+  const cutOutPos = cutSegmentOut !== null ? (cutSegmentOut / actualTotalDuration) * 100 : null;
+
   return (
     <div className="space-y-3">
       {/* Timeline Header */}
@@ -202,6 +298,11 @@ export function VisualTimeline({
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Play className="h-3 w-3" />
           <span>Visual Timeline</span>
+          {cutSegmentMode && (
+            <Badge variant="destructive" className="text-[9px] h-4 animate-pulse">
+              ✂ Segment-Modus
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>Gesamt: {actualTotalDuration.toFixed(1)}s</span>
@@ -216,9 +317,13 @@ export function VisualTimeline({
       {/* Main Timeline Container */}
       <div 
         ref={timelineRef}
-        className="relative rounded-2xl bg-muted/30 backdrop-blur-sm border border-border/50 p-3 overflow-hidden"
+        className={cn(
+          "relative rounded-2xl bg-muted/30 backdrop-blur-sm border border-border/50 p-3 overflow-hidden",
+          cutSegmentMode && "ring-2 ring-destructive/30 cursor-crosshair"
+        )}
+        onClick={handleTimelineClick}
       >
-        {/* Time Markers - based on actual total duration */}
+        {/* Time Markers */}
         <div className="flex justify-between mb-2 px-1">
           {Array.from({ length: Math.ceil(actualTotalDuration / 5) + 1 }, (_, i) => (
             <span 
@@ -235,23 +340,27 @@ export function VisualTimeline({
         <div className="relative flex h-20 gap-0.5 rounded-xl overflow-hidden">
           {scenes.map((scene, index) => {
             const width = getSceneWidth(scene);
-            const isSelected = selectedSceneId === scene.id;
+            const isSelected = selectedSceneId === scene.id || selectedSceneIds.has(scene.id);
             const isHovered = hoveredScene === scene.id;
             const transition = getTransitionForScene(scene.id);
             const isLastScene = index === scenes.length - 1;
+            const isDragTarget = dropTargetIdx === index && draggingSceneIdx !== null && draggingSceneIdx !== index;
+            const isBeingDragged = draggingSceneIdx === index;
 
             return (
               <motion.div
                 key={scene.id}
-                className="relative"
-                style={{ width: `${width}%` }}
+                className={cn("relative", isDragTarget && "ring-2 ring-primary")}
+                style={{ width: `${width}%`, opacity: isBeingDragged ? 0.4 : 1 }}
                 initial={{ opacity: 0, scaleY: 0.8 }}
-                animate={{ opacity: 1, scaleY: 1 }}
+                animate={{ opacity: isBeingDragged ? 0.4 : 1, scaleY: 1 }}
                 transition={{ delay: index * 0.05 }}
               >
                 {/* Scene Block */}
                 <motion.button
-                  onClick={() => onSceneSelect(scene.id)}
+                  onClick={(e) => {
+                    if (!cutSegmentMode) onSceneSelect(scene.id, e.shiftKey);
+                  }}
                   onHoverStart={() => setHoveredScene(scene.id)}
                   onHoverEnd={() => setHoveredScene(null)}
                   whileHover={{ y: -2 }}
@@ -310,16 +419,40 @@ export function VisualTimeline({
                     </motion.div>
                   )}
 
-                  {/* Drag Handle */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <GripVertical className="h-4 w-4 text-white/50" />
-                  </div>
+                  {/* Drag Handle for reorder */}
+                  {onScenesReorder && (
+                    <div 
+                      className="absolute top-1 right-1 opacity-0 hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing z-20"
+                      onMouseDown={(e) => { e.stopPropagation(); handleSceneDragStart(e, index); }}
+                    >
+                      <div className="bg-black/60 rounded p-0.5">
+                        <GripVertical className="h-3 w-3 text-white/80" />
+                      </div>
+                    </div>
+                  )}
                 </motion.button>
+
+                {/* Trim Handles */}
+                <div
+                  className={cn(
+                    "absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize z-20",
+                    "bg-transparent hover:bg-primary/40 transition-colors rounded-l",
+                    trimmingScene?.id === scene.id && trimmingScene.edge === 'start' && "bg-primary/60"
+                  )}
+                  onMouseDown={(e) => handleTrimStart(e, scene.id, 'start')}
+                />
+                <div
+                  className={cn(
+                    "absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize z-20",
+                    "bg-transparent hover:bg-primary/40 transition-colors rounded-r",
+                    trimmingScene?.id === scene.id && trimmingScene.edge === 'end' && "bg-primary/60"
+                  )}
+                  onMouseDown={(e) => handleTrimStart(e, scene.id, 'end')}
+                />
 
                 {/* Draggable Divider + Transition Connector */}
                 {!isLastScene && (
                   <div className="absolute -right-3 top-0 bottom-0 z-20 flex items-center">
-                    {/* Draggable Divider */}
                     <motion.div
                       onMouseDown={(e) => handleDividerMouseDown(e, index)}
                       className={cn(
@@ -341,7 +474,6 @@ export function VisualTimeline({
                       </div>
                     </motion.div>
 
-                    {/* Transition Button — click only, no drag */}
                     <motion.button
                       onMouseDown={(e) => handleTransitionDotMouseDown(e, scene.id, index)}
                       onHoverStart={() => setHoveredTransition(scene.id)}
@@ -391,6 +523,33 @@ export function VisualTimeline({
               </motion.div>
             );
           })}
+
+          {/* Cut Segment Overlay */}
+          {cutSegmentMode && cutInPos !== null && (
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-destructive z-40 pointer-events-none"
+              style={{ left: `${cutInPos}%` }}
+            >
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] text-destructive font-mono bg-background px-1 rounded">IN</div>
+            </div>
+          )}
+          {cutSegmentMode && cutOutPos !== null && (
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-destructive z-40 pointer-events-none"
+              style={{ left: `${cutOutPos}%` }}
+            >
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] text-destructive font-mono bg-background px-1 rounded">OUT</div>
+            </div>
+          )}
+          {cutSegmentMode && cutInPos !== null && cutOutPos !== null && (
+            <div
+              className="absolute top-0 bottom-0 bg-destructive/20 z-30 pointer-events-none border-x border-destructive/50"
+              style={{ 
+                left: `${Math.min(cutInPos, cutOutPos)}%`, 
+                width: `${Math.abs(cutOutPos - cutInPos)}%` 
+              }}
+            />
+          )}
 
           {/* Playhead */}
           <motion.div
