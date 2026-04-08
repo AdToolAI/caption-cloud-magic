@@ -910,7 +910,15 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     for (let i = 1; i < sorted.length; i++) {
       const prev = sorted[i - 1];
       const dur = sorted[i].end_time - sorted[i].start_time;
-      sorted[i] = { ...sorted[i], start_time: prev.end_time, end_time: prev.end_time + dur };
+      const origStart = sorted[i].original_start_time ?? sorted[i].start_time;
+      const origEnd = sorted[i].original_end_time ?? sorted[i].end_time;
+      sorted[i] = {
+        ...sorted[i],
+        start_time: prev.end_time,
+        end_time: prev.end_time + dur,
+        original_start_time: origStart,
+        original_end_time: origEnd,
+      };
     }
     onScenesUpdate(sorted);
   }, [scenes, onScenesUpdate]);
