@@ -1134,10 +1134,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     }
   }, [renderedVideoUrl]);
 
+  const navigate = useNavigate();
+
   const handleRenderClose = useCallback(() => {
     setIsRendering(false);
+    stopProgressInterpolation();
     if (renderPollingRef.current) clearInterval(renderPollingRef.current);
-  }, []);
+  }, [stopProgressInterpolation]);
+
+  const handleOpenLibrary = useCallback(() => {
+    setIsRendering(false);
+    stopProgressInterpolation();
+    if (renderPollingRef.current) clearInterval(renderPollingRef.current);
+    navigate('/media-library?tab=rendered');
+  }, [navigate, stopProgressInterpolation]);
 
   const handleAddClip = useCallback((trackId: string, clip: Omit<AudioClip, 'id'>) => {
     const newClip: AudioClip = {
