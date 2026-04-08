@@ -520,6 +520,8 @@ export default function MediaLibrary() {
       });
     } finally {
       setLoading(false);
+      const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
     }
   };
 
