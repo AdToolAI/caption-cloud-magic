@@ -153,6 +153,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const rafIdRef = useRef<number>();
   const inGapRef = useRef(false);
   const gapLastTimestampRef = useRef<number>(0);
+  const gapCooldownRef = useRef<number>(0);
 
   useEffect(() => { setIsMuted(initialMuted); }, [initialMuted]);
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
