@@ -153,6 +153,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const rafIdRef = useRef<number>();
   const inGapRef = useRef(false);
   const gapLastTimestampRef = useRef<number>(0);
+  const gapCooldownRef = useRef<number>(0);
 
   useEffect(() => { setIsMuted(initialMuted); }, [initialMuted]);
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
@@ -597,6 +598,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           // Gap ended — seek to next scene and restore video
           inGapRef.current = false;
           gapLastTimestampRef.current = 0;
+          gapCooldownRef.current = 15;
           const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
           video.currentTime = nextSourceStart + 0.05;
           video.playbackRate = (nextScene as any).playbackRate ?? 1;
@@ -637,6 +639,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       // Decrement transition cooldown counter each frame
       if (transitionCooldownRef.current > 0) {
         transitionCooldownRef.current--;
+      }
+      if (gapCooldownRef.current > 0) {
+        gapCooldownRef.current--;
       }
 
       // Reverse-map to timeline time
@@ -778,26 +783,31 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           video.style.opacity = '1';
         }
       } else {
-        // Fallback: no scene found — check if we're in a gap
-        const estimatedTL = videoSourceTime;
-        let inGap = false;
-        for (let i = 0; i < sortedScenes.length - 1; i++) {
-          const gapStart = sortedScenes[i].end_time;
-          const gapEnd = sortedScenes[i + 1].start_time;
-          if (gapEnd - gapStart > 0.2 && estimatedTL >= gapStart - 0.1 && estimatedTL < gapEnd + 0.1) {
-            inGap = true;
-            inGapRef.current = true;
-            gapLastTimestampRef.current = performance.now();
-            visualTimeRef.current = estimatedTL;
-            video.pause();
-            video.style.opacity = '0';
-            const standby = getStandbyVideo();
-            if (standby) standby.style.opacity = '0';
-            rafIdRef.current = requestAnimationFrame(tick);
-            return;
+        // Fallback: no scene found — check if we're in a gap (but NOT during gap cooldown)
+        if (gapCooldownRef.current > 0) {
+          // During cooldown after gap exit, just use visualTimeRef as fallback
+          timelineTime = visualTimeRef.current;
+        } else {
+          const estimatedTL = videoSourceTime;
+          let inGap = false;
+          for (let i = 0; i < sortedScenes.length - 1; i++) {
+            const gapStart = sortedScenes[i].end_time;
+            const gapEnd = sortedScenes[i + 1].start_time;
+            if (gapEnd - gapStart > 0.2 && estimatedTL >= gapStart - 0.1 && estimatedTL < gapEnd + 0.1) {
+              inGap = true;
+              inGapRef.current = true;
+              gapLastTimestampRef.current = performance.now();
+              visualTimeRef.current = estimatedTL;
+              video.pause();
+              video.style.opacity = '0';
+              const standby = getStandbyVideo();
+              if (standby) standby.style.opacity = '0';
+              rafIdRef.current = requestAnimationFrame(tick);
+              return;
+            }
           }
+          timelineTime = videoSourceTime;
         }
-        timelineTime = videoSourceTime;
       }
 
       // Clamp timeline time
