@@ -139,51 +139,12 @@ export function DirectorsCut() {
   const [subtitleSafeZone, setSubtitleSafeZone] = useState<SubtitleSafeZone>(DEFAULT_SUBTITLE_SAFE_ZONE);
   const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | undefined>(undefined);
 
-  // --- Draft restoration on mount ---
+  // --- Clear draft on mount so F5 always resets to video selection ---
   const draftLoadedRef = useRef(false);
   useEffect(() => {
     if (draftLoadedRef.current) return;
     draftLoadedRef.current = true;
-    const draft = loadDraft();
-    if (!draft || !draft.selectedVideo) return;
-    setSelectedVideo(draft.selectedVideo);
-    if (draft.scenes?.length) setScenes(draft.scenes);
-    if (draft.transitions?.length) {
-      // Normalize legacy transitions: remap incoming-scene IDs to outgoing-scene IDs
-      const sceneIds = new Set((draft.scenes ?? []).map((s: any) => s.id));
-      const outgoingIds = new Set((draft.scenes ?? []).slice(0, -1).map((s: any) => s.id));
-      const normalized = draft.transitions.map((t: any) => {
-        // If sceneId already matches an outgoing scene, keep it
-        if (outgoingIds.has(t.sceneId)) return t;
-        // Otherwise find the outgoing scene index for this incoming scene
-        const incomingIdx = (draft.scenes ?? []).findIndex((s: any) => s.id === t.sceneId);
-        if (incomingIdx > 0) {
-          return { ...t, sceneId: (draft.scenes as any[])[incomingIdx - 1].id };
-        }
-        return t;
-      });
-      setTransitions(normalized);
-    }
-    if (draft.appliedEffects) setAppliedEffects(draft.appliedEffects);
-    if (draft.audioEnhancements) setAudioEnhancements(draft.audioEnhancements);
-    if (draft.exportSettings) setExportSettings(draft.exportSettings);
-    if (draft.styleTransfer) setStyleTransfer(draft.styleTransfer);
-    if (draft.colorGrading) setColorGrading(draft.colorGrading);
-    if (draft.sceneColorGrading) setSceneColorGrading(draft.sceneColorGrading);
-    if (draft.speedKeyframes) setSpeedKeyframes(draft.speedKeyframes);
-    if (draft.kenBurnsKeyframes) setKenBurnsKeyframes(draft.kenBurnsKeyframes);
-    if (draft.chromaKey) setChromaKey(draft.chromaKey);
-    if (draft.upscaling) setUpscaling(draft.upscaling);
-    if (draft.interpolation) setInterpolation(draft.interpolation);
-    if (draft.restoration) setRestoration(draft.restoration);
-    if (draft.objectRemoval) setObjectRemoval(draft.objectRemoval);
-    if (draft.textOverlays) setTextOverlays(draft.textOverlays);
-    if (draft.voiceOverUrl) setVoiceOverUrl(draft.voiceOverUrl);
-    if (draft.backgroundMusicUrl) setBackgroundMusicUrl(draft.backgroundMusicUrl);
-    if (draft.capCutAudioTracks) setCapCutAudioTracks(draft.capCutAudioTracks);
-    if (draft.capCutSubtitleTrack) setCapCutSubtitleTrack(draft.capCutSubtitleTrack);
-    if (draft.subtitleSafeZone) setSubtitleSafeZone(draft.subtitleSafeZone);
-    if (draft.cleanedVideoUrl) setCleanedVideoUrl(draft.cleanedVideoUrl);
+    clearDraft();
   }, []);
 
   // --- Auto-save draft on state changes (debounced) ---
