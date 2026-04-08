@@ -1615,6 +1615,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onInterpolationChange={onInterpolationChange}
               restoration={restoration}
               onRestorationChange={onRestorationChange}
+              onScenePlaybackRateChange={handleScenePlaybackRateChange}
               exportSettings={exportSettings}
               onExportSettingsChange={onExportSettingsChange}
               onStartExport={handleExportVideo}
