@@ -887,6 +887,33 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     onScenesUpdate(updatedScenes);
   }, [scenes, onScenesUpdate]);
 
+  // Scene playback rate change handler
+  const handleScenePlaybackRateChange = useCallback((sceneId: string, rate: number) => {
+    if (!onScenesUpdate) return;
+    const updatedScenes = scenes.map(s => {
+      if (s.id !== sceneId) return s;
+      const origStart = s.original_start_time ?? s.start_time;
+      const origEnd = s.original_end_time ?? s.end_time;
+      const origDuration = origEnd - origStart;
+      const newDuration = origDuration / rate;
+      return {
+        ...s,
+        original_start_time: origStart,
+        original_end_time: origEnd,
+        end_time: s.start_time + newDuration,
+        playbackRate: rate,
+      };
+    });
+    // Recalculate subsequent scene timings
+    const sorted = [...updatedScenes].sort((a, b) => a.start_time - b.start_time);
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const dur = sorted[i].end_time - sorted[i].start_time;
+      sorted[i] = { ...sorted[i], start_time: prev.end_time, end_time: prev.end_time + dur };
+    }
+    onScenesUpdate(sorted);
+  }, [scenes, onScenesUpdate]);
+
   // Add scene handler
   const handleSceneAdd = useCallback(() => {
     if (!onScenesUpdate) return;
