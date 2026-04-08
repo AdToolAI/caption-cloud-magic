@@ -52,9 +52,9 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
   };
 
   return (
-    <div className="w-64 flex flex-col border-l border-[#2a2a2a] bg-[#1e1e1e]">
-      <div className="h-10 flex items-center px-3 border-b border-[#2a2a2a] bg-[#242424]">
-        <span className="text-xs text-white/60">Properties</span>
+    <div className="w-64 flex flex-col border-l border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg">
+      <div className="h-10 flex items-center px-3 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80 backdrop-blur-xl">
+        <span className="text-xs text-[#F5C76A]/60 font-medium">Properties</span>
       </div>
 
       <div className="flex-1 overflow-auto p-3">
