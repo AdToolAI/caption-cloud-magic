@@ -1661,6 +1661,19 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           )}
         </DragOverlay>
       </DndContext>
+
+      {/* Render Overlay */}
+      <RenderOverlay
+        isVisible={isRendering}
+        progress={renderProgress}
+        status={renderStatus}
+        videoUrl={renderedVideoUrl}
+        errorMessage={renderError}
+        onDownload={handleRenderDownload}
+        onRetry={handleExportVideo}
+        onClose={handleRenderClose}
+        startedAt={renderStartedAt}
+      />
     </div>
   );
 };
