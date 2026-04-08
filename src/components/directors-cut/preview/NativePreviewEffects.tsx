@@ -26,6 +26,15 @@ const COLOR_GRADE_MAP: Record<string, string> = {
   forest: 'hue-rotate(30deg) saturate(0.8)',
   ocean: 'hue-rotate(180deg) saturate(0.6)',
   pastel: 'saturate(0.6) brightness(1.15) contrast(0.9)',
+  teal_orange: 'hue-rotate(-15deg) saturate(1.4) contrast(1.15) brightness(0.95)',
+  moonlight: 'hue-rotate(200deg) saturate(0.6) brightness(1.1) contrast(0.9)',
+  golden_hour: 'sepia(0.35) saturate(1.3) brightness(1.1)',
+  matrix: 'hue-rotate(90deg) saturate(1.2) contrast(1.3) brightness(0.9)',
+  hollywood_blue: 'hue-rotate(200deg) saturate(0.8) contrast(1.2) brightness(0.85)',
+  sunset_glow: 'sepia(0.25) hue-rotate(-15deg) saturate(1.4) brightness(1.05)',
+  forest_green: 'hue-rotate(60deg) saturate(0.75) contrast(1.1) brightness(0.95)',
+  coral_reef: 'hue-rotate(-30deg) saturate(1.3) brightness(1.1) contrast(1.05)',
+  bleach_bypass: 'saturate(0.35) contrast(1.5) brightness(1.05)',
 };
 
 /**
