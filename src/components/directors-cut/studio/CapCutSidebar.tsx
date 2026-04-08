@@ -20,6 +20,7 @@ import { CutPanel } from './sidebar/CutPanel';
 import { LookPanel } from './sidebar/LookPanel';
 import { FXPanel } from './sidebar/FXPanel';
 import { ExportPanel } from './sidebar/ExportPanel';
+import { TextOverlayEditor2028 } from '../features/TextOverlayEditor2028';
 
 interface JamendoTrack {
   id: string;
