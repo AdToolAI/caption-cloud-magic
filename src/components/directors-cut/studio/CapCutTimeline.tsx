@@ -132,8 +132,8 @@ const DraggableScene: React.FC<{
         "absolute top-1 bottom-1 rounded-lg flex flex-col cursor-grab active:cursor-grabbing group transition-all border",
         colorSet.bg, colorSet.border,
         isDragging && "opacity-50 ring-2 ring-cyan-400",
-        isSelected && "ring-2 ring-[#00d4ff] ring-offset-1 ring-offset-[#1a1a1a]",
-        isPlayheadInside && !isSelected && "ring-1 ring-yellow-400/60"
+        isSelected && "ring-2 ring-cyan-400 ring-offset-1 ring-offset-[#050816] shadow-[0_0_15px_rgba(34,211,238,0.2)]",
+        isPlayheadInside && !isSelected && "ring-1 ring-[#F5C76A]/60"
       )}
       onClick={(e) => { e.stopPropagation(); onSelect(); onSeek(scene.start_time); }}
       {...attributes}
@@ -931,12 +931,12 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               {/* Wide invisible hit area for easier grabbing */}
               <div className="absolute top-0 bottom-0 -left-3 w-7 cursor-ew-resize" />
               
-              {/* Visible playhead line */}
-              <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-[#00d4ff] -translate-x-1/2 group-hover:w-1 transition-all" />
+              {/* Visible playhead line — Gold glow */}
+              <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-[#F5C76A] -translate-x-1/2 group-hover:w-1 transition-all shadow-[0_0_8px_rgba(245,199,106,0.5)]" />
               
               {/* Larger draggable triangle/handle */}
               <div 
-                className="absolute -top-0 left-1/2 -translate-x-1/2 w-4 h-4 bg-[#00d4ff] group-hover:scale-110 transition-transform" 
+                className="absolute -top-0 left-1/2 -translate-x-1/2 w-4 h-4 bg-[#F5C76A] group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(245,199,106,0.4)]" 
                 style={{ clipPath: 'polygon(50% 100%, 0 0, 100% 0)' }} 
               />
             </div>
