@@ -73,6 +73,7 @@ interface CapCutSidebarProps {
   // New Studio Tab props
   scenes?: SceneAnalysis[];
   transitions?: TransitionAssignment[];
+  onTransitionsChange?: (transitions: TransitionAssignment[]) => void;
   selectedSceneId?: string | null;
   currentTime?: number;
   onSplitAtPlayhead?: () => void;
@@ -252,6 +253,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   // New Studio Tab props
   scenes = [],
   transitions = [],
+  onTransitionsChange,
   selectedSceneId = null,
   currentTime = 0,
   onSplitAtPlayhead,
@@ -602,6 +604,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             <CutPanel
               scenes={scenes}
               transitions={transitions}
+              onTransitionsChange={onTransitionsChange}
               selectedSceneId={selectedSceneId}
               currentTime={currentTime}
               videoDuration={videoDuration}
