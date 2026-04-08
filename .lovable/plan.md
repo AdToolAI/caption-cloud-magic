@@ -1,66 +1,49 @@
 
 
-## Plan: James Bond 2028 Design Upgrade + erweiterte Filter-Bibliothek
+## Plan: Per-Scene Filter/Color Grading + Filter-Intensitätsregler
 
 ### Problem
 
-Der Director's Cut Studio sieht derzeit wie ein Standard-Dark-Mode-Editor aus (`bg-[#1a1a1a]`, `border-[#2a2a2a]`, etc.) — ohne das James Bond 2028 Design-System (Glassmorphism, Gold-Akzente, Cyan-Glow, Neon-Effekte), das im Rest der App verwendet wird. Außerdem gibt es nur 8 Filter und 6 Color Grades — zu wenig für einen professionellen Editor.
+1. **Filter und Color Grades gelten nur global** — Obwohl `selectedSceneId` an LookPanel übergeben wird und der Typ `SceneEffects` bereits `filter`, `colorGrading` und individuelle Werte pro Szene unterstützt, schreibt LookPanel alle Änderungen nur auf `effects` (global). Der Hinweis "Änderungen gelten global. Szenen-spezifische Effekte folgen." bestätigt das.
+
+2. **Kein Intensitätsregler für Filter** — Filter sind nur an/aus. Color Grading hat bereits einen Intensitäts-Slider, Filter aber nicht.
 
 ### Lösung
 
-**1. Filter-Bibliothek massiv erweitern** (LookPanel.tsx)
+**1. Per-Scene Filter & Color Grading ermöglichen**
 
-Aktuelle 8 Filter → **20 Filter** in 4 Kategorien:
-- **Klassisch**: Original, Cinematic, Vintage, Film Noir, Muted
-- **Stimmung**: Warm, Cool, Golden Hour, Dreamy, Moody
-- **Kreativ**: Vivid, Neon Nights, Cyberpunk, Cross Process, Lomography
-- **Film**: Kodak Portra, Fuji Velvia, Technicolor, Bleach Bypass, Infrared
+- `LookPanel` erhält zwei neue Props: `sceneEffects` (Record der aktuellen Szenen-Effekte) und `onSceneEffectsChange` (Callback zum Setzen)
+- Wenn `selectedSceneId` gesetzt ist:
+  - Filter/Color-Grade/Anpassungen werden auf `sceneEffects[selectedSceneId]` geschrieben statt auf `effects`
+  - Die aktive Auswahl liest zuerst den Szenen-Wert, Fallback auf Global
+  - Der Hinweis ändert sich zu: "Änderungen gelten für Szene X"
+  - Ein kleiner "Global übernehmen"-Button ermöglicht es, Szenen-Werte auf alle Szenen zu kopieren
+- Wenn keine Szene ausgewählt ist, funktioniert alles wie bisher (global)
 
-Aktuelle 6 Color Grades → **10 Color Grades**:
-- Bestehende + Hollywood Blue, Sunset Glow, Forest Green, Coral Reef
+**2. Filter-Intensitätsregler hinzufügen**
 
-**2. James Bond 2028 Styling** — Editor-Shell upgraden
+- Neues Feld `filterIntensity` (0-100, Default 100) in `GlobalEffects` und `SceneEffects`
+- Unterhalb der Filter-Kacheln erscheint ein Slider "Intensität" (analog zum bestehenden Color-Grading-Slider), sobald ein Filter aktiv ist
+- Der Wert steuert, wie stark der CSS-Filter angewendet wird (z.B. bei 50% werden die Filter-Werte halbiert)
 
-Betroffene Elemente und ihre Änderungen:
+**3. Props-Kette verdrahten**
 
-| Element | Aktuell | Neu (James Bond 2028) |
-|---|---|---|
-| Header-Bar | `bg-[#242424]` flach | Glassmorphism `bg-[#0a0a1a]/80 backdrop-blur-xl` + subtile Gold-Border unten |
-| Sidebar | `bg-[#1e1e1e]` flach | `bg-[#0a0a1a]/90 backdrop-blur-lg` + Cyan-Glow auf aktivem Tab |
-| Tab-Trigger aktiv | `bg-[#00d4ff]/20` | Cyan-Glow-Ring `shadow-[0_0_12px_rgba(0,212,255,0.3)]` + Gold-Akzent-Linie |
-| Timeline-Header | `bg-[#1a1a1a]` | Dunkler Gradient mit subtiler Scanline-Textur |
-| Export-Button | Gradient blau-lila | Gold-Gradient `from-[#F5C76A] to-[#d4a843]` mit Glow |
-| Szenen-Blöcke | `bg-[#6366f1]` | Glassmorphism + Cyan/Gold-Border je nach Selektion |
-| Trennlinien | `border-[#2a2a2a]` | `border-[#F5C76A]/10` subtiler Gold-Shimmer |
-| Properties-Panel | `bg-[#1e1e1e]` flach | Glassmorphism-Hintergrund |
-| Studio-Titel | Weißer Text | Gold-Gradient-Text mit kleinem Glow |
-
-**3. Glow-Effekte und Farbakzente hinzufügen**
-
-- **Aktiver Tab**: Cyan-Glow-Shadow unter dem Icon
-- **Playhead**: Gold-Glow-Linie statt einfacher gelber Linie
-- **Szenen-Selection**: Cyan-Neon-Border mit Pulsieren
-- **Sidebar-Sektions-Header**: Gold-Akzent-Punkt vor dem Text
-- **Slider-Thumbs**: Cyan-Glow auf Hover
-- **Filter-Kacheln (aktiv)**: Subtiler Glow-Ring in Cyan
-- **Export-Button**: Gold mit Shimmer-Animation
+- `CapCutSidebar` leitet `sceneEffects` und `onSceneEffectsChange` an LookPanel durch (beides ist bereits als Prop im Editor verfügbar, wird aber nicht weitergereicht)
+- `CapCutEditor` hat die Daten bereits (`appliedEffects.scenes`) — muss nur die Callbacks an die Sidebar durchreichen
 
 ### Dateien
 
-| Aktion | Datei | Umfang |
-|--------|-------|--------|
-| Edit | `src/components/directors-cut/studio/sidebar/LookPanel.tsx` | 20 Filter + 10 Color Grades, Gold/Cyan-Styling auf Kacheln |
-| Edit | `src/components/directors-cut/studio/CapCutEditor.tsx` | Header, Main-Shell: Glassmorphism + Gold-Akzente |
-| Edit | `src/components/directors-cut/studio/CapCutSidebar.tsx` | Tab-Leiste: Glow-Effekte, Glassmorphism-Background |
-| Edit | `src/components/directors-cut/studio/CapCutTimeline.tsx` | Szenen-Blöcke, Playhead: Gold/Cyan-Glow |
-| Edit | `src/components/directors-cut/studio/sidebar/FXPanel.tsx` | Glassmorphism-Cards, Gold-Akzente auf Switch/Icons |
-| Edit | `src/components/directors-cut/studio/sidebar/CutPanel.tsx` | Glassmorphism + Akzent-Farben |
-| Edit | `src/components/directors-cut/studio/CapCutPropertiesPanel.tsx` | Glassmorphism-Background |
+| Aktion | Datei | Änderung |
+|--------|-------|----------|
+| Edit | `src/types/directors-cut.ts` | `filterIntensity` zu `GlobalEffects` und `SceneEffects` hinzufügen |
+| Edit | `src/components/directors-cut/studio/sidebar/LookPanel.tsx` | Per-Scene-Logik: lesen/schreiben auf richtige Ebene; Intensitäts-Slider für Filter |
+| Edit | `src/components/directors-cut/studio/CapCutSidebar.tsx` | `sceneEffects` + `onSceneEffectsChange` Props an LookPanel durchreichen |
+| Edit | `src/components/directors-cut/studio/CapCutEditor.tsx` | `sceneEffects` + Handler an Sidebar Props durchreichen |
 
-### Designprinzipien
+### Technische Details
 
-- **Subtil, nicht überladen**: Gold- und Cyan-Akzente nur an interaktiven Elementen und Fokuspunkten
-- **Glassmorphism nur auf Panels**: `backdrop-blur` + halbtransparente Backgrounds
-- **Konsistenz**: Gleiche Glow-Intensität überall, gleiche Gold-Töne (`#F5C76A`)
-- **Deep Black Base**: `#050816` / `#0a0a1a` als Basis statt `#1a1a1a`
+- `LookPanel` prüft `selectedSceneId`: wenn gesetzt → alle Änderungen gehen an `onSceneEffectsChange(sceneId, { filter, colorGrading, ... })`, sonst an `onEffectsChange` (global)
+- Aktiver Filter wird so bestimmt: `sceneEffects[selectedSceneId]?.filter ?? effects.filter`
+- Filter-Intensität moduliert den CSS-String: bei 50% wird z.B. `saturate(1.6)` zu `saturate(1.3)` (Mittelwert zwischen Neutral und Voll)
+- Die Vorschau-Komponente (`VideoPreview`) nutzt bereits `sceneEffects` — dort muss nur `filterIntensity` in die CSS-Berechnung einfließen
 
