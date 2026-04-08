@@ -1194,6 +1194,19 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       {/* Header Bar */}
       <div className="h-10 flex items-center justify-between px-3 border-b border-[#2a2a2a] bg-[#242424]">
         <div className="flex items-center gap-2">
+          {onBackToImport && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 px-2 text-white/60 hover:text-white hover:bg-white/10 text-xs gap-1"
+              onClick={onBackToImport}
+              title="Zurück zum Import"
+            >
+              <ArrowRight className="h-3.5 w-3.5 rotate-180" />
+              Zurück
+            </Button>
+          )}
+          <div className="w-px h-5 bg-[#3a3a3a]" />
           <Button 
             variant="ghost" 
             size="sm" 
@@ -1222,19 +1235,15 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           >
             {propertiesCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
           </Button>
-          {onNextStep && (
-            <>
-              <div className="w-px h-5 bg-[#3a3a3a] mx-1" />
-              <Button 
-                onClick={onNextStep}
-                size="sm"
-                className="gap-1.5 h-7 bg-primary hover:bg-primary/90 text-xs"
-              >
-                Export
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            </>
-          )}
+          <div className="w-px h-5 bg-[#3a3a3a] mx-1" />
+          <Button 
+            onClick={handleExportVideo}
+            size="sm"
+            className="gap-1.5 h-7 bg-gradient-to-r from-[#00d4ff] to-[#7c3aed] hover:opacity-90 text-xs text-white"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export
+          </Button>
         </div>
       </div>
 
@@ -1390,10 +1399,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               }}
               sceneCount={scenes.length}
               captionCount={subtitleTrack.clips.length}
-              onExportClick={onNextStep}
+              onExportClick={handleExportVideo}
               onResetClick={() => {
-                toast.info('Projekt wird zurückgesetzt...');
-                handleAudioEffectsChange(DEFAULT_AUDIO_EFFECTS);
+                if (onResetProject) {
+                  onResetProject();
+                } else {
+                  toast.info('Projekt wird zurückgesetzt...');
+                  handleAudioEffectsChange(DEFAULT_AUDIO_EFFECTS);
+                }
               }}
               // New Studio Tab props
               scenes={scenes}
