@@ -580,8 +580,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       // === GAP DETECTION: check if timeline time is in a gap between scenes ===
       // When in a gap, we manually advance timeline time and hide the video
       if (inGapRef.current) {
-        const delta = gapLastTimestampRef.current > 0 ? (now - gapLastTimestampRef.current) / 1000 : 0;
-        gapLastTimestampRef.current = now;
+        const delta = gapLastTimestampRef.current > 0 ? (gapNow - gapLastTimestampRef.current) / 1000 : 0;
+        gapLastTimestampRef.current = gapNow;
         const currentTL = visualTimeRef.current + delta;
         
         // Find the next scene that starts after our current position
