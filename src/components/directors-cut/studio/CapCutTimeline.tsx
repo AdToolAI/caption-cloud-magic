@@ -37,9 +37,12 @@ interface CapCutTimelineProps {
   onSubtitleDelete?: (clipId: string) => void;
   onSubtitleSelect?: (clipId: string | null) => void;
   selectedSubtitleId?: string | null;
+  onSplitAtPlayhead?: () => void;
+  onTrimScene?: (sceneId: string, newStart: number, newEnd: number) => void;
 }
 
 const TRACK_HEIGHT = 48;
+const VIDEO_TRACK_HEIGHT = 80;
 const HEADER_WIDTH = 120;
 
 const formatTime = (seconds: number): string => {
