@@ -6,6 +6,7 @@ import { CapCutSidebar } from './CapCutSidebar';
 import { CapCutTimeline } from './CapCutTimeline';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
 import { CapCutPropertiesPanel } from './CapCutPropertiesPanel';
+import { RenderOverlay } from './RenderOverlay';
 import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack, DEFAULT_SUBTITLE_TRACK } from '@/types/timeline';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download } from 'lucide-react';
@@ -181,6 +182,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const burnedSubsPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+
+  // Render overlay state
+  const [isRendering, setIsRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
+  const [renderStatus, setRenderStatus] = useState<'preparing' | 'rendering' | 'finalizing' | 'completed' | 'failed'>('preparing');
+  const [currentRenderId, setCurrentRenderId] = useState<string | null>(null);
+  const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
+  const [renderStartedAt, setRenderStartedAt] = useState<number>(0);
+  const renderPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // DnD sensors with activation constraint to allow clicks
   const mouseSensor = useSensor(MouseSensor, {
