@@ -102,6 +102,7 @@ interface CapCutSidebarProps {
   onInterpolationChange?: (enabled: boolean, fps: number) => void;
   restoration?: { enabled: boolean; level: string };
   onRestorationChange?: (enabled: boolean, level: string) => void;
+  onScenePlaybackRateChange?: (sceneId: string, rate: number) => void;
   // Export
   exportSettings?: { quality: string; format: string; fps: number; aspect_ratio: string };
   onExportSettingsChange?: (settings: any) => void;
