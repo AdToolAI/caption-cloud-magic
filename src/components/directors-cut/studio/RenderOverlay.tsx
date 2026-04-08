@@ -13,6 +13,7 @@ interface RenderOverlayProps {
   onDownload: () => void;
   onRetry: () => void;
   onClose: () => void;
+  onOpenLibrary?: () => void;
   startedAt?: number;
 }
 
@@ -33,6 +34,7 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
   onDownload,
   onRetry,
   onClose,
+  onOpenLibrary,
   startedAt,
 }) => {
   const estimatedRemaining = useMemo(() => {
@@ -115,6 +117,16 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
                   <Download className="h-5 w-5 mr-2" />
                   Video herunterladen
                 </Button>
+                {onOpenLibrary && (
+                  <Button
+                    onClick={onOpenLibrary}
+                    className="w-full bg-white/10 hover:bg-white/20 text-white"
+                    size="lg"
+                  >
+                    <Film className="h-5 w-5 mr-2" />
+                    Zur Mediathek
+                  </Button>
+                )}
                 <Button
                   onClick={onClose}
                   variant="outline"

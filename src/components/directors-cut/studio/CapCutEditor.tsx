@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { SceneAnalysis, AudioEnhancements, TextOverlay, TransitionAssignment } from '@/types/directors-cut';
 import { SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE } from '@/lib/directors-cut-draft';
@@ -970,11 +971,37 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     toast.success('Szene dupliziert');
   }, [scenes, onScenesUpdate]);
 
-  // Cleanup render polling on unmount
+  // Cleanup render polling + interpolation on unmount
   useEffect(() => {
     return () => {
       if (renderPollingRef.current) clearInterval(renderPollingRef.current);
     };
+  }, []);
+
+  // Smooth progress interpolation between polls
+  const serverProgressRef = useRef(0);
+  const estimatedTimeRef = useRef(120); // default 120s
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startProgressInterpolation = useCallback(() => {
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    progressIntervalRef.current = setInterval(() => {
+      setRenderProgress(prev => {
+        const server = serverProgressRef.current;
+        // Gently move toward server value, or nudge forward if server hasn't updated
+        const target = Math.max(server, prev);
+        const increment = 100 / (estimatedTimeRef.current || 120) / 5; // tick every 200ms
+        const next = Math.min(target + increment, 95); // never exceed 95 before done
+        return Math.max(prev, next); // never go backward
+      });
+    }, 200);
+  }, []);
+
+  const stopProgressInterpolation = useCallback(() => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
   }, []);
 
   // Render polling logic
@@ -990,28 +1017,37 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
         const progress = data.progress;
         if (progress?.done) {
+          stopProgressInterpolation();
           setRenderProgress(100);
           setRenderStatus('completed');
           setRenderedVideoUrl(progress.outputFile || progress.url || null);
           if (renderPollingRef.current) clearInterval(renderPollingRef.current);
         } else if (progress?.fatalErrorEncountered) {
+          stopProgressInterpolation();
           setRenderStatus('failed');
           setRenderError(progress.errors?.[0]?.message || 'Rendering fehlgeschlagen');
           if (renderPollingRef.current) clearInterval(renderPollingRef.current);
         } else {
           const pct = Math.round((progress?.overallProgress || 0) * 100);
-          setRenderProgress(Math.max(10, Math.min(pct, 95)));
-          setRenderStatus('rendering');
+          serverProgressRef.current = pct;
+          // Update status based on progress
+          if (pct >= 85) {
+            setRenderStatus('finalizing');
+          } else {
+            setRenderStatus('rendering');
+          }
         }
       } catch {
         // Silently retry on next interval
       }
     };
 
-    // Initial check after 5s, then every 10s
-    setTimeout(poll, 5000);
-    renderPollingRef.current = setInterval(poll, 10000);
-  }, []);
+    // Start interpolation immediately
+    startProgressInterpolation();
+    // Initial check after 3s, then every 8s
+    setTimeout(poll, 3000);
+    renderPollingRef.current = setInterval(poll, 8000);
+  }, [startProgressInterpolation, stopProgressInterpolation]);
 
   // Export video - trigger render via Edge Function
   const handleExportVideo = useCallback(async () => {
@@ -1070,7 +1106,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       const dbRenderId = data?.render_id || data?.id;
       if (remotionRenderId) {
         setCurrentRenderId(dbRenderId || remotionRenderId);
-        setRenderProgress(10);
+        serverProgressRef.current = 5;
+        estimatedTimeRef.current = data?.estimated_time_seconds || 120;
         setRenderStatus('rendering');
         startRenderPolling(remotionRenderId);
       } else if (data?.video_url || data?.downloadUrl) {
@@ -1097,10 +1134,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     }
   }, [renderedVideoUrl]);
 
+  const navigate = useNavigate();
+
   const handleRenderClose = useCallback(() => {
     setIsRendering(false);
+    stopProgressInterpolation();
     if (renderPollingRef.current) clearInterval(renderPollingRef.current);
-  }, []);
+  }, [stopProgressInterpolation]);
+
+  const handleOpenLibrary = useCallback(() => {
+    setIsRendering(false);
+    stopProgressInterpolation();
+    if (renderPollingRef.current) clearInterval(renderPollingRef.current);
+    navigate('/media-library?tab=rendered');
+  }, [navigate, stopProgressInterpolation]);
 
   const handleAddClip = useCallback((trackId: string, clip: Omit<AudioClip, 'id'>) => {
     const newClip: AudioClip = {
@@ -1673,6 +1720,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         onDownload={handleRenderDownload}
         onRetry={handleExportVideo}
         onClose={handleRenderClose}
+        onOpenLibrary={handleOpenLibrary}
         startedAt={renderStartedAt}
       />
     </div>
