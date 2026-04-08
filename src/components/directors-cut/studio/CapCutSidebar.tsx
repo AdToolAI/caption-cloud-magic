@@ -73,6 +73,7 @@ interface CapCutSidebarProps {
   // New Studio Tab props
   scenes?: SceneAnalysis[];
   transitions?: TransitionAssignment[];
+  onTransitionsChange?: (transitions: TransitionAssignment[]) => void;
   selectedSceneId?: string | null;
   currentTime?: number;
   onSplitAtPlayhead?: () => void;
