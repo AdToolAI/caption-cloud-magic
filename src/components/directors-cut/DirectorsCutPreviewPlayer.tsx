@@ -607,6 +607,19 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           if (standby) standby.style.opacity = '0';
           if (video.paused && isPlayingRef.current) video.play().catch(() => {});
           visualTimeRef.current = nextScene.start_time;
+          // Resume audio after gap
+          if (sourceAudioRef.current && !originalAudioMutedRef.current && !isMutedRef.current) {
+            sourceAudioRef.current.currentTime = nextSourceStart;
+            sourceAudioRef.current.play().catch(() => {});
+          }
+          if (voiceoverAudioRef.current && !isMutedRef.current) {
+            voiceoverAudioRef.current.currentTime = nextScene.start_time;
+            voiceoverAudioRef.current.play().catch(() => {});
+          }
+          if (backgroundMusicAudioRef.current && !isMutedRef.current) {
+            backgroundMusicAudioRef.current.currentTime = nextScene.start_time;
+            backgroundMusicAudioRef.current.play().catch(() => {});
+          }
           // Find index of next scene
           const idx = sortedScenes.indexOf(nextScene);
           if (idx >= 0) lastSceneIndexRef.current = idx;
@@ -746,12 +759,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
               const nextScene = sortedScenes[sceneInfo.index + 1];
               if (nextScene) {
                 const gapDuration = nextScene.start_time - sceneInfo.scene.end_time;
-                if (gapDuration > 0.2) {
+                 if (gapDuration > 0.2) {
                   // Large gap detected — enter gap mode (black screen)
                   inGapRef.current = true;
                   gapLastTimestampRef.current = performance.now();
                   visualTimeRef.current = sceneInfo.scene.end_time;
                   video.pause();
+                  sourceAudioRef.current?.pause();
+                  voiceoverAudioRef.current?.pause();
+                  backgroundMusicAudioRef.current?.pause();
                   video.style.opacity = '0';
                   const standby = getStandbyVideo();
                   if (standby) standby.style.opacity = '0';
@@ -799,6 +815,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
               gapLastTimestampRef.current = performance.now();
               visualTimeRef.current = estimatedTL;
               video.pause();
+              sourceAudioRef.current?.pause();
+              voiceoverAudioRef.current?.pause();
+              backgroundMusicAudioRef.current?.pause();
               video.style.opacity = '0';
               const standby = getStandbyVideo();
               if (standby) standby.style.opacity = '0';
