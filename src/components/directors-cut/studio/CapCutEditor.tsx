@@ -118,6 +118,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onSubtitleSafeZoneChange,
   // New studio props
   onEffectsChange,
+  onSceneEffectsChange,
   onColorGradingChange,
   onStyleTransferChange,
   chromaKey,
