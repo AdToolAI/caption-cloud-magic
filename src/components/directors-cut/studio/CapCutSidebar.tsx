@@ -639,7 +639,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           {/* TAB: Export */}
           <TabsContent value="export" className="mt-0">
             <ExportPanel
-              exportSettings={exportSettings || { quality: 'hd', format: 'mp4', fps: 30, aspect_ratio: '16:9' }}
+              exportSettings={exportSettings as any || { quality: 'hd' as const, format: 'mp4' as const, fps: 30, aspect_ratio: '16:9' }}
               onExportSettingsChange={onExportSettingsChange || (() => {})}
               onExport={onStartExport || onExportClick || (() => {})}
               videoDuration={videoDuration}
