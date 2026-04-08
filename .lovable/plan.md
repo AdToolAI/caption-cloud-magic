@@ -1,43 +1,67 @@
 
 
-## Status-Check: Director's Cut Studio
+## Plan: Szenen-Management komplett neu — groß, klar, voll interaktiv
 
-### Was bereits funktioniert ✓
+### Problem
 
-1. **Import → Studio Flow** — Video-Import führt direkt in den CapCut-Editor, kein 11-Schritt-Wizard mehr
-2. **8 Sidebar-Tabs** — Cut, Look, FX, Media, Text, Audio, Export, Settings sind alle integriert und verdrahtet
-3. **CutPanel** — Split am Playhead, Szenen löschen, duplizieren, Auto-Cut (KI-Analyse optional)
-4. **LookPanel** — Style-Presets, Farbkorrektur, Filter auf einer Seite
-5. **FXPanel** — Chroma Key, Upscaling, Interpolation, Restoration
-6. **ExportPanel** — Render-Einstellungen in der Sidebar
-7. **Scene Management** — Split, Delete, Duplicate, Reorder via Drag & Drop auf Timeline
-8. **Audio/Subtitle/Text** — Bestehende Features funktionieren weiter
-9. **Draft-Speicherung** — Auto-Save/Restore in sessionStorage
+Die Szenen-Blöcke auf der Timeline sind 48px kleine Kästchen mit nur einer Zahl. Delete ist ein 4px roter Punkt bei Hover. Kein Split-Button, keine Trim-Handles, kein visuelles Feedback. Nutzer können Szenen weder anpassen noch sinnvoll verwalten.
 
-### Potenzielle Verbesserungspunkte
+### Lösung
 
-**1. Export-Button führt ins Nichts**
-Der Export-Button in der Sidebar ruft `onExportClick` auf, was auf `onNextStep` gemappt ist. Da der Stepper entfernt wurde, fehlt der tatsächliche Render-/Download-Flow. Der Button sollte den Export direkt auslösen (Edge Function `director-cut-render`).
+**Video-Track auf 80px vergrößern** und jeden Szenen-Block zu einem vollwertigen, interaktiven Element umbauen:
 
-**2. Voice-Over Tab fehlt in der Sidebar**
-Im Plan war ein separater "Voice" Tab vorgesehen. Aktuell gibt es keinen dedizierten Voice-Tab — Voice-Over-Generierung ist nur über den alten Audio-Tab erreichbar, was versteckt wirkt.
+```text
+┌──────────────────────────────────────────────────┐
+│ ▌  ⠿  [1]  Roboter und Menschen arbei...   ✂ 🗑 ▌│  80px
+│ T       0:00 – 0:06  (6.0s)                    T│
+│ R                                               R│
+│ I  ════════════════════════════════════════════  I│
+│ M       ▓▓▓▓▓▓▓▓▓▓▓▓ Farbverlauf ▓▓▓▓▓▓▓▓▓▓   M│
+└──────────────────────────────────────────────────┘
+  ↑ Trim links (cursor-ew-resize)        Trim rechts ↑
+```
 
-**3. Kein "Zurück zum Import" Button im Studio**
-`onBackToImport` wird als Prop durchgereicht, aber es gibt keinen sichtbaren Button im Editor-UI, der diese Funktion aufruft. Nutzer sitzen im Studio fest.
+### Änderungen
 
-**4. Reset-Button nicht vollständig verdrahtet**
-`onResetProject` wird als Prop übergeben, aber der Reset-Button in der Settings-Sidebar ruft nur `handleAudioEffectsChange(DEFAULT_AUDIO_EFFECTS)` auf — nicht den echten Projekt-Reset.
+**1. `CapCutTimeline.tsx` — DraggableScene komplett neu**
 
-### Vorgeschlagene Fixes
+- **Video-Track Höhe**: `TRACK_HEIGHT` bleibt 48 für Audio, neues `VIDEO_TRACK_HEIGHT = 80` nur für Video
+- **Szenen-Block zeigt:**
+  - Grip-Handle (⠿) — **immer sichtbar**, nicht nur bei Hover
+  - Szenen-Nummer in Badge
+  - Beschreibung (truncated)
+  - Zeitangabe: `0:00 – 0:06 (6.0s)`
+  - ✂ Split-Button (oben rechts) — splittet am Playhead **wenn er über dieser Szene steht**
+  - 🗑 Delete-Button (oben rechts neben Split) — **immer sichtbar**, nicht nur bei Hover
+- **Trim-Handles**: Links und rechts 6px breite Bereiche mit `cursor-ew-resize`. Bei Drag: `start_time` / `end_time` anpassen (min 1s Dauer). Visueller Indikator (heller Strich) bei Hover.
+- **Farbverlauf**: Verschiedene Farben pro Szene-Index (indigo, purple, blue, emerald, amber), Blackscreen = dunkler
+- **Split-Indikator**: Gestrichelte vertikale Linie am Playhead innerhalb des Video-Tracks
 
-| Fix | Datei | Aufwand |
-|-----|-------|---------|
-| Export-Button → echten Render-Flow auslösen | `CapCutEditor.tsx`, `ExportPanel.tsx` | Mittel |
-| "Zurück"-Button im Header sichtbar machen | `CapCutEditor.tsx` (Header-Bar) | Klein |
-| Reset-Button korrekt verdrahten | `CapCutEditor.tsx` (Sidebar-Props) | Klein |
-| Voice-Over als eigenen Tab oder klarer im Audio-Tab platzieren | `CapCutSidebar.tsx` | Klein |
+**2. `CapCutTimeline.tsx` — Neue Props**
 
-### Empfehlung
+- `onSplitAtPlayhead?: () => void` — für den ✂ Button direkt auf der Szene
+- `onTrimScene?: (sceneId: string, newStart: number, newEnd: number) => void` — für Trim-Handles
 
-Die **Grundarchitektur funktioniert**. Die 4 Fixes oben sind kleine Verdrahtungs-Korrekturen, die den Studio-Flow abrunden. Am wichtigsten ist der **Export-Flow**, damit Nutzer tatsächlich ein fertiges Video herunterladen können.
+**3. `CapCutEditor.tsx` — Trim-Handler + Props durchreichen**
+
+- `handleTrimScene(sceneId, newStart, newEnd)` — aktualisiert die Szene und synchronisiert nachfolgende Szenen
+- Beide neuen Props an `CapCutTimeline` weitergeben
+
+**4. `CutPanel.tsx` — Szenenliste erweitert**
+
+- Editable Szenen-Name (Klick → Inline-Edit)
+- Start/End-Zeit per Eingabefeld anpassbar (nicht nur per Trim-Handle)
+- "Neue leere Szene" Button direkt in der Liste
+
+### Dateien
+
+| Aktion | Datei |
+|--------|-------|
+| Stark editieren | `CapCutTimeline.tsx` — DraggableScene neu, VIDEO_TRACK_HEIGHT, Trim-Handles, Split-Button, Split-Indikator |
+| Editieren | `CapCutEditor.tsx` — handleTrimScene + Props |
+| Editieren | `CutPanel.tsx` — Inline-Edit für Name und Zeiten |
+
+### Ergebnis
+
+Szenen sind groß, zeigen Name + Dauer + Zeitbereich. ✂ und 🗑 sind immer sichtbar. Trim-Handles an den Rändern erlauben In/Out-Anpassung per Drag. Split-Indikator zeigt wo geschnitten wird. Nutzer hat volle Kontrolle über Anzahl und Grenzen aller Szenen.
 
