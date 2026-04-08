@@ -924,6 +924,15 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     onScenesUpdate(updatedScenes);
   }, [scenes, onScenesUpdate]);
 
+  // Rename scene handler
+  const handleSceneRename = useCallback((sceneId: string, newName: string) => {
+    if (!onScenesUpdate) return;
+    const updatedScenes = scenes.map(s =>
+      s.id === sceneId ? { ...s, description: newName } : s
+    );
+    onScenesUpdate(updatedScenes);
+  }, [scenes, onScenesUpdate]);
+
   // Add scene handler
   const handleSceneAdd = useCallback(() => {
     if (!onScenesUpdate) return;
