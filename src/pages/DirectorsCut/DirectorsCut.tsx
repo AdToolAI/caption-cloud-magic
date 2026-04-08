@@ -587,7 +587,7 @@ export function DirectorsCut() {
           onColorGradingChange={(enabled, grade, intensity) => setColorGrading(prev => ({ ...prev, enabled, grade, intensity: intensity ?? prev.intensity }))}
           onStyleTransferChange={(enabled, style) => setStyleTransfer(prev => ({ ...prev, enabled, style }))}
           chromaKey={chromaKey}
-          onChromaKeyChange={setChromaKey}
+          onChromaKeyChange={(ck) => setChromaKey({ ...ck, backgroundUrl: ck.backgroundUrl ?? undefined })}
           upscaling={upscaling}
           onUpscalingChange={(enabled, resolution) => setUpscaling({ enabled, targetResolution: resolution })}
           interpolation={interpolation}
