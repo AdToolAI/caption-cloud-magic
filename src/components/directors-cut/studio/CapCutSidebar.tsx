@@ -8,13 +8,18 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, BarChart3, Zap, Keyboard, RotateCcw, Download, SlidersHorizontal, Crop, ZoomIn } from 'lucide-react';
+import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, BarChart3, Zap, Keyboard, RotateCcw, Download, SlidersHorizontal, Crop, ZoomIn, Scissors, Palette, Wand2 } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
+import { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
+import { CutPanel } from './sidebar/CutPanel';
+import { LookPanel } from './sidebar/LookPanel';
+import { FXPanel } from './sidebar/FXPanel';
+import { ExportPanel } from './sidebar/ExportPanel';
 
 interface JamendoTrack {
   id: string;
