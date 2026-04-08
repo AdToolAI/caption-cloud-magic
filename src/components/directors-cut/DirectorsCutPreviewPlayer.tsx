@@ -605,8 +605,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           video.style.opacity = '1';
           const standby = getStandbyVideo();
           if (standby) standby.style.opacity = '0';
-          if (video.paused && isPlayingRef.current) video.play().catch(() => {});
           visualTimeRef.current = nextScene.start_time;
+
+          // Set pending scene advance so scene detection picks the right scene
+          const idx = sortedScenes.indexOf(nextScene);
+          if (idx >= 0) {
+            lastSceneIndexRef.current = idx;
+            pendingSceneAdvanceRef.current = { targetIndex: idx, framesLeft: 15 };
+          }
+
+          // Play video unconditionally (was paused during gap)
+          video.play().catch(() => {});
+
           // Resume audio after gap
           if (sourceAudioRef.current && !originalAudioMutedRef.current && !isMutedRef.current) {
             sourceAudioRef.current.currentTime = nextSourceStart;
@@ -620,9 +630,6 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             backgroundMusicAudioRef.current.currentTime = nextScene.start_time;
             backgroundMusicAudioRef.current.play().catch(() => {});
           }
-          // Find index of next scene
-          const idx = sortedScenes.indexOf(nextScene);
-          if (idx >= 0) lastSceneIndexRef.current = idx;
         } else if (!nextScene || currentTL >= duration - 0.05) {
           // No next scene or past end — stop
           inGapRef.current = false;
@@ -801,8 +808,17 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       } else {
         // Fallback: no scene found — check if we're in a gap (but NOT during gap cooldown)
         if (gapCooldownRef.current > 0) {
-          // During cooldown after gap exit, just use visualTimeRef as fallback
-          timelineTime = visualTimeRef.current;
+          // During cooldown after gap exit, advance timeline from video position
+          const sceneIdx = lastSceneIndexRef.current;
+          if (sceneIdx >= 0 && sceneIdx < sortedScenes.length) {
+            const s = sortedScenes[sceneIdx];
+            const srcStart = s.original_start_time ?? s.start_time;
+            const rate = (s as any).playbackRate ?? 1;
+            const offset = (videoSourceTime - srcStart) / rate;
+            timelineTime = s.start_time + Math.max(0, offset);
+          } else {
+            timelineTime = visualTimeRef.current;
+          }
         } else {
           const estimatedTL = videoSourceTime;
           let inGap = false;
