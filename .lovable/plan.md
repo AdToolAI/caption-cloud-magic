@@ -1,36 +1,30 @@
 
 
-## Plan: Fix — Szene 2 spielt nach Black Screen nicht ab
+## Plan: F5 setzt Director's Cut zurück zur Video-Auswahl
 
-### Ursache
+### Problem
 
-Nach dem Gap-Exit wird `video.currentTime` auf die Source-Position der nächsten Szene gesetzt (z.B. 5.05s). Während der Seek noch läuft, findet `findSceneBySourceTime` die Szene möglicherweise nicht sofort. Dann greift der **Else-Block** (Zeile 780-798), der fälschlicherweise `videoSourceTime` direkt als Timeline-Zeit interpretiert:
-
-```text
-estimatedTL = videoSourceTime (z.B. 5.05)
-Gap auf Timeline: 5.00 → 6.04
-→ 5.05 liegt im Gap → sofortiger Re-Entry in Gap-Modus!
-```
-
-Das erzeugt eine Endlosschleife: Gap-Exit → Seek → Scene nicht gefunden → Source-Time als Timeline-Time interpretiert → fällt in Gap → wieder Gap-Mode → Szene 2 spielt nie.
+Der Draft wird in `sessionStorage` gespeichert und beim Laden der Seite via `loadDraft()` wiederhergestellt. Da `sessionStorage` innerhalb desselben Tabs über Seiten-Refreshes (F5) hinweg bestehen bleibt, wird der Nutzer direkt zurück ins Studio gebracht statt zur Video-Auswahl.
 
 ### Lösung
 
-**Datei: `DirectorsCutPreviewPlayer.tsx`**
+**Datei: `src/pages/DirectorsCut/DirectorsCut.tsx`**
 
-1. **Gap-Cooldown einführen**: Nach Gap-Exit einen Ref `gapCooldownRef` auf z.B. 15 Frames setzen. Während des Cooldowns überspringt der Else-Block (Zeile 780) die Gap-Re-Entry-Logik komplett
+Beim initialen Laden der Seite (`useEffect` mit leerem Dependency-Array) `clearDraft()` aufrufen, **bevor** der Draft geladen wird. Dazu einen Check einbauen, ob die Seite frisch geladen wurde (via `performance.navigation.type === 1` / `PerformanceNavigationTiming`) oder einfacher: einen `sessionStorage`-Flag (`directors-cut-session-active`) setzen. Wenn das Flag beim Laden **bereits** existiert, wurde die Seite refresht → Draft löschen und bei Video-Auswahl starten. Wenn es nicht existiert, ist es ein frischer Besuch → Flag setzen und normal fortfahren (Draft auch ignorieren, da kein vorheriger State).
 
-2. **Else-Block absichern**: Im Fallback-Block (Zeile 780-798) den Gap-Cooldown prüfen — wenn aktiv, kein Re-Entry in Gap-Mode erlauben, stattdessen einfach `timelineTime = visualTimeRef.current` als Fallback nutzen
+Alternativ (einfachster Ansatz): Die Draft-Wiederherstellung komplett entfernen. Der Draft dient dann nur noch der internen Auto-Save-Logik innerhalb einer Session, wird aber bei F5 nie wiederhergestellt.
 
-3. **Cooldown im Tick dekrementieren**: Am Anfang des Ticks (neben `transitionCooldownRef`) den `gapCooldownRef` runterzählen
+**Konkreter Ansatz**: Im `useEffect` das `loadDraft()` durch `clearDraft()` ersetzen, sodass bei jedem Mount der Seite der Draft gelöscht wird und der Nutzer immer bei der Video-Auswahl startet.
 
 ### Dateien
 
 | Aktion | Datei | Änderung |
 |--------|-------|----------|
-| Edit | `DirectorsCutPreviewPlayer.tsx` | `gapCooldownRef` einführen, bei Gap-Exit setzen, im Else-Block prüfen |
+| Edit | `src/pages/DirectorsCut/DirectorsCut.tsx` | Draft-Wiederherstellung entfernen, stattdessen `clearDraft()` beim Mount |
 
 ### Ergebnis
 
-Nach dem Black Screen wird Szene 2 zuverlässig abgespielt, ohne sofortigen Re-Entry in den Gap-Modus.
+- F5 / Page Refresh → Nutzer landet bei der Video-Auswahl
+- Alle vorherigen Änderungen werden zurückgesetzt
+- Innerhalb einer laufenden Session funktioniert Auto-Save weiterhin (Step-Navigation etc.)
 
