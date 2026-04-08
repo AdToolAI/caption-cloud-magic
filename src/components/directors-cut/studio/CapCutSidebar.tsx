@@ -8,13 +8,18 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, BarChart3, Zap, Keyboard, RotateCcw, Download, SlidersHorizontal, Crop, ZoomIn } from 'lucide-react';
+import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, BarChart3, Zap, Keyboard, RotateCcw, Download, SlidersHorizontal, Crop, ZoomIn, Scissors, Palette, Wand2 } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
+import { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
+import { CutPanel } from './sidebar/CutPanel';
+import { LookPanel } from './sidebar/LookPanel';
+import { FXPanel } from './sidebar/FXPanel';
+import { ExportPanel } from './sidebar/ExportPanel';
 
 interface JamendoTrack {
   id: string;
@@ -65,6 +70,37 @@ interface CapCutSidebarProps {
   onSubtitleSafeZoneChange?: (zone: SubtitleSafeZone) => void;
   isDetectingBand?: boolean;
   onDetectSubtitleBand?: () => void;
+  // New Studio Tab props
+  scenes?: SceneAnalysis[];
+  transitions?: TransitionAssignment[];
+  selectedSceneId?: string | null;
+  currentTime?: number;
+  onSplitAtPlayhead?: () => void;
+  onDeleteScene?: (sceneId: string) => void;
+  onDuplicateScene?: (sceneId: string) => void;
+  onSceneSelect?: (sceneId: string | null) => void;
+  onAutocut?: () => void;
+  isAnalyzing?: boolean;
+  // Look
+  appliedEffects?: { brightness: number; contrast: number; saturation: number; sharpness: number; temperature: number; vignette: number };
+  onEffectsChange?: (effects: any) => void;
+  colorGrading?: { enabled: boolean; grade: string | null; intensity: number };
+  onColorGradingChange?: (enabled: boolean, grade: string | null, intensity?: number) => void;
+  styleTransfer?: { enabled: boolean; style: string | null; intensity: number };
+  onStyleTransferChange?: (enabled: boolean, style: string | null) => void;
+  // FX
+  chromaKey?: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string };
+  onChromaKeyChange?: (ck: any) => void;
+  upscaling?: { enabled: boolean; targetResolution: string };
+  onUpscalingChange?: (enabled: boolean, resolution: string) => void;
+  interpolation?: { enabled: boolean; targetFps: number };
+  onInterpolationChange?: (enabled: boolean, fps: number) => void;
+  restoration?: { enabled: boolean; level: string };
+  onRestorationChange?: (enabled: boolean, level: string) => void;
+  // Export
+  exportSettings?: { quality: string; format: string; fps: number; aspect_ratio: string };
+  onExportSettingsChange?: (settings: any) => void;
+  onStartExport?: () => void;
 }
 
 interface Caption {
@@ -207,9 +243,37 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onSubtitleSafeZoneChange,
   isDetectingBand = false,
   onDetectSubtitleBand,
+  // New Studio Tab props
+  scenes = [],
+  transitions = [],
+  selectedSceneId = null,
+  currentTime = 0,
+  onSplitAtPlayhead,
+  onDeleteScene,
+  onDuplicateScene,
+  onSceneSelect,
+  onAutocut,
+  isAnalyzing = false,
+  appliedEffects,
+  onEffectsChange,
+  colorGrading,
+  onColorGradingChange,
+  styleTransfer,
+  onStyleTransferChange,
+  chromaKey,
+  onChromaKeyChange,
+  upscaling,
+  onUpscalingChange,
+  interpolation,
+  onInterpolationChange,
+  restoration,
+  onRestorationChange,
+  exportSettings,
+  onExportSettingsChange,
+  onStartExport,
 }) => {
   // Tab state
-  const [activeTab, setActiveTab] = useState('subtitle');
+  const [activeTab, setActiveTab] = useState('cut');
   
   // AI Captions State
   const [captionLanguage, setCaptionLanguage] = useState('de');
@@ -468,35 +532,122 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     <div className="w-72 flex flex-col border-r border-[#2a2a2a] bg-[#1e1e1e] h-full">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col h-full">
         {/* Tab Icons */}
-        <TabsList className="grid grid-cols-4 gap-1 p-2 bg-[#1a1a1a] border-b border-[#2a2a2a] h-auto rounded-none">
+        <TabsList className="grid grid-cols-8 gap-0.5 p-1.5 bg-[#1a1a1a] border-b border-[#2a2a2a] h-auto rounded-none">
+          <TabsTrigger 
+            value="cut" 
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-[#00d4ff]/20 data-[state=active]:text-[#00d4ff] text-white/50 hover:text-white/80 hover:bg-white/5"
+            title="Schnitt"
+          >
+            <Scissors className="h-3.5 w-3.5" />
+          </TabsTrigger>
+          <TabsTrigger 
+            value="look" 
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-[#00d4ff]/20 data-[state=active]:text-[#00d4ff] text-white/50 hover:text-white/80 hover:bg-white/5"
+            title="Look & Farbe"
+          >
+            <Palette className="h-3.5 w-3.5" />
+          </TabsTrigger>
+          <TabsTrigger 
+            value="fx" 
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 text-white/50 hover:text-white/80 hover:bg-white/5"
+            title="Effekte"
+          >
+            <Wand2 className="h-3.5 w-3.5" />
+          </TabsTrigger>
           <TabsTrigger 
             value="media" 
-            className="flex flex-col items-center gap-0.5 py-2 rounded-lg data-[state=active]:bg-[#00d4ff]/20 data-[state=active]:text-[#00d4ff] text-white/50 hover:text-white/80 hover:bg-white/5"
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-[#00d4ff]/20 data-[state=active]:text-[#00d4ff] text-white/50 hover:text-white/80 hover:bg-white/5"
+            title="Medien"
           >
-            <FolderUp className="h-4 w-4" />
+            <FolderUp className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="subtitle" 
-            className="flex flex-col items-center gap-0.5 py-2 rounded-lg data-[state=active]:bg-[#00d4ff]/20 data-[state=active]:text-[#00d4ff] text-white/50 hover:text-white/80 hover:bg-white/5"
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-[#00d4ff]/20 data-[state=active]:text-[#00d4ff] text-white/50 hover:text-white/80 hover:bg-white/5"
+            title="Untertitel"
           >
-            <Type className="h-4 w-4" />
+            <Type className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="audio-fx" 
-            className="flex flex-col items-center gap-0.5 py-2 rounded-lg data-[state=active]:bg-pink-500/20 data-[state=active]:text-pink-400 text-white/50 hover:text-white/80 hover:bg-white/5"
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-pink-500/20 data-[state=active]:text-pink-400 text-white/50 hover:text-white/80 hover:bg-white/5"
+            title="Audio"
           >
-            <Music className="h-4 w-4" />
+            <Music className="h-3.5 w-3.5" />
+          </TabsTrigger>
+          <TabsTrigger 
+            value="export" 
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-white/50 hover:text-white/80 hover:bg-white/5"
+            title="Export"
+          >
+            <Download className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="settings" 
-            className="flex flex-col items-center gap-0.5 py-2 rounded-lg data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50 hover:text-white/80 hover:bg-white/5"
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50 hover:text-white/80 hover:bg-white/5"
+            title="Einstellungen"
           >
-            <Settings className="h-4 w-4" />
+            <Settings className="h-3.5 w-3.5" />
           </TabsTrigger>
         </TabsList>
 
         <ScrollArea className="flex-1">
-          {/* TAB 1: Video Upload (nur Videos) */}
+          {/* TAB: Cut (Schnitt) */}
+          <TabsContent value="cut" className="mt-0">
+            <CutPanel
+              scenes={scenes}
+              transitions={transitions}
+              selectedSceneId={selectedSceneId}
+              currentTime={currentTime}
+              videoDuration={videoDuration}
+              onSplitAtPlayhead={onSplitAtPlayhead || (() => {})}
+              onDeleteScene={onDeleteScene || (() => {})}
+              onDuplicateScene={onDuplicateScene || (() => {})}
+              onSceneSelect={onSceneSelect || (() => {})}
+              onAutocut={onAutocut}
+              isAnalyzing={isAnalyzing}
+            />
+          </TabsContent>
+
+          {/* TAB: Look (Style + Farbe) */}
+          <TabsContent value="look" className="mt-0">
+            <LookPanel
+              effects={appliedEffects || { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 }}
+              onEffectsChange={onEffectsChange || (() => {})}
+              colorGrading={colorGrading || { enabled: false, grade: null, intensity: 50 }}
+              onColorGradingChange={onColorGradingChange || (() => {})}
+              styleTransfer={styleTransfer || { enabled: false, style: null, intensity: 50 }}
+              onStyleTransferChange={onStyleTransferChange || (() => {})}
+              selectedSceneId={selectedSceneId}
+            />
+          </TabsContent>
+
+          {/* TAB: FX (Effekte) */}
+          <TabsContent value="fx" className="mt-0">
+            <FXPanel
+              chromaKey={chromaKey || { enabled: false, color: '#00ff00', tolerance: 40 }}
+              onChromaKeyChange={onChromaKeyChange || (() => {})}
+              upscaling={upscaling || { enabled: false, targetResolution: '4K' }}
+              onUpscalingChange={onUpscalingChange || (() => {})}
+              interpolation={interpolation || { enabled: false, targetFps: 60 }}
+              onInterpolationChange={onInterpolationChange || (() => {})}
+              restoration={restoration || { enabled: false, level: 'medium' }}
+              onRestorationChange={onRestorationChange || (() => {})}
+            />
+          </TabsContent>
+
+          {/* TAB: Export */}
+          <TabsContent value="export" className="mt-0">
+            <ExportPanel
+              exportSettings={exportSettings as any || { quality: 'hd' as const, format: 'mp4' as const, fps: 30, aspect_ratio: '16:9' }}
+              onExportSettingsChange={onExportSettingsChange || (() => {})}
+              onExport={onStartExport || onExportClick || (() => {})}
+              videoDuration={videoDuration}
+              scenesCount={sceneCount || scenes.length}
+            />
+          </TabsContent>
+
+          {/* TAB: Video Upload (nur Videos) */}
           <TabsContent value="media" className="p-3 space-y-4 mt-0">
             <div className="flex items-center gap-2">
               <FileVideo className="h-4 w-4 text-[#00d4ff]" />
