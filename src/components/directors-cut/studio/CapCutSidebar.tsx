@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, BarChart3, Zap, Keyboard, RotateCcw, Download, SlidersHorizontal, Crop, ZoomIn, Scissors, Palette, Wand2 } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
-import { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
+import { SceneAnalysis, TransitionAssignment, TextOverlay } from '@/types/directors-cut';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,7 @@ import { CutPanel } from './sidebar/CutPanel';
 import { LookPanel } from './sidebar/LookPanel';
 import { FXPanel } from './sidebar/FXPanel';
 import { ExportPanel } from './sidebar/ExportPanel';
+import { TextOverlayEditor2028 } from '../features/TextOverlayEditor2028';
 
 interface JamendoTrack {
   id: string;
@@ -31,6 +32,7 @@ interface JamendoTrack {
 }
 
 interface CapCutSidebarProps {
+  videoUrl?: string;
   videoDuration?: number;
   voiceOverUrl?: string;
   onCaptionsGenerated?: (captions: SubtitleClip[]) => void;
@@ -55,8 +57,8 @@ interface CapCutSidebarProps {
   onRemoveAllSubtitles?: () => void;
   onRetryDetection?: () => void;
   textOverlayCount?: number;
-  textOverlays?: Array<{ id: string; text: string; startTime: number; endTime: number | null }>;
-  onTextOverlaysChange?: (overlays: any[]) => void;
+  textOverlays?: TextOverlay[];
+  onTextOverlaysChange?: (overlays: TextOverlay[]) => void;
   showSubtitles?: boolean;
   onShowSubtitlesChange?: (show: boolean) => void;
   showTextOverlays?: boolean;
@@ -211,6 +213,7 @@ const DraggableMusicItem: React.FC<{
 };
 
 export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
+  videoUrl = '',
   videoDuration = 30,
   voiceOverUrl,
   onCaptionsGenerated,
@@ -736,38 +739,14 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               </Button>
             )}
 
-            {/* Text-Overlays Management */}
-            {textOverlayCount > 0 && (
-              <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Text-Overlays ({textOverlayCount})</p>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 px-2 text-[10px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                    onClick={() => onTextOverlaysChange?.([])}
-                  >
-                    Alle entfernen
-                  </Button>
-                </div>
-                <p className="text-[10px] text-white/40">Text aus früheren Schritten (z.B. VFX)</p>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {textOverlays.map((overlay) => (
-                    <div key={overlay.id} className="flex items-center justify-between gap-1 p-1.5 rounded bg-[#1e1e1e] border border-[#333]">
-                      <span className="text-[10px] text-white/70 truncate flex-1">{overlay.text}</span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-5 w-5 p-0 text-white/40 hover:text-red-400 hover:bg-red-500/10 shrink-0"
-                        onClick={() => onTextOverlaysChange?.(textOverlays.filter(o => o.id !== overlay.id))}
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Text-Overlays Editor */}
+            <TextOverlayEditor2028
+              overlays={textOverlays}
+              onOverlaysChange={onTextOverlaysChange || (() => {})}
+              videoDuration={videoDuration}
+              currentTime={currentTime}
+              videoUrl={videoUrl}
+            />
 
             {/* Preview Layer Toggles */}
             <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
