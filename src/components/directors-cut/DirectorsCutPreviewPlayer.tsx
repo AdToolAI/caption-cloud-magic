@@ -368,6 +368,21 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
   // ==================== VIDEO EVENT HANDLERS ====================
   const handleVideoEnded = useCallback(() => {
+    // Check if there are remaining scenes on the timeline after the current position
+    const currentTime = visualTimeRef.current;
+    const video = getActiveVideo();
+    const remainingScenes = sortedScenes.filter(s => s.start_time > currentTime + 0.1);
+    
+    if (remainingScenes.length > 0 && video) {
+      // There are more scenes — seek to the next one instead of stopping
+      const nextScene = remainingScenes[0];
+      const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
+      video.currentTime = nextSourceStart + 0.05;
+      video.playbackRate = (nextScene as any).playbackRate ?? 1;
+      video.play().catch(() => {});
+      return;
+    }
+    
     setIsPlaying(false);
     isPlayingRef.current = false;
     visualTimeRef.current = 0;
@@ -382,7 +397,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     backgroundMusicAudioRef.current?.pause();
     if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
     onPlayingChange?.(false);
-  }, [onPlayingChange]);
+  }, [onPlayingChange, sortedScenes, getActiveVideo]);
 
   // ==================== FRAME CAPTURE & TRANSITION RENDERER ====================
   const frameCache = useFrameCapture(videoUrl, sortedScenes);
@@ -668,11 +683,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
               const nextScene = sortedScenes[sceneInfo.index + 1];
               if (nextScene) {
                 const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
-                if (Math.abs(video.currentTime - nextSourceStart) > 0.3) {
+                const seekDiff = Math.abs(video.currentTime - nextSourceStart);
+                // Always force a mini-seek to ensure findSceneBySourceTime picks up the new scene
+                if (seekDiff > 0.3) {
                   video.currentTime = nextSourceStart;
+                } else {
+                  // Scenes are adjacent in source — nudge forward so tolerance doesn't keep matching previous scene
+                  video.currentTime = nextSourceStart + 0.05;
                 }
+                // Set playbackRate immediately for the new scene
+                const nextRate = (nextScene as any).playbackRate ?? 1;
+                video.playbackRate = nextRate;
                 pendingSceneAdvanceRef.current = { targetIndex: sceneInfo.index + 1, framesLeft: 15 };
-                // playbackRate is set in the unified SPEED RAMPING block below
                 timelineTime = nextScene.start_time;
               }
             }
