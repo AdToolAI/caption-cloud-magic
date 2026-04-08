@@ -1720,6 +1720,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         onDownload={handleRenderDownload}
         onRetry={handleExportVideo}
         onClose={handleRenderClose}
+        onOpenLibrary={handleOpenLibrary}
         startedAt={renderStartedAt}
       />
     </div>
