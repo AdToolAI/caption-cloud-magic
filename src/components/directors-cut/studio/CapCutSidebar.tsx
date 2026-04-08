@@ -268,6 +268,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onColorGradingChange,
   styleTransfer,
   onStyleTransferChange,
+  sceneEffects,
+  onSceneEffectsChange,
   chromaKey,
   onChromaKeyChange,
   upscaling,
@@ -624,6 +626,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               styleTransfer={styleTransfer || { enabled: false, style: null, intensity: 50 }}
               onStyleTransferChange={onStyleTransferChange || (() => {})}
               selectedSceneId={selectedSceneId}
+              sceneEffects={sceneEffects}
+              onSceneEffectsChange={onSceneEffectsChange}
             />
           </TabsContent>
 
