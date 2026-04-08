@@ -1400,7 +1400,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         <div className="flex-1 flex overflow-hidden">
           {/* Left Sidebar - Collapsible */}
           <div className={cn(
-            "flex flex-col border-r border-[#2a2a2a] bg-[#1e1e1e] transition-all duration-200",
+            "flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-all duration-200",
             sidebarCollapsed ? "w-12" : "w-72"
           )}>
             {sidebarCollapsed ? (
@@ -1594,7 +1594,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           {/* Center Area */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Preview Player */}
-            <div className="h-[50%] min-h-[280px] p-2 bg-[#1a1a1a] overflow-hidden flex flex-col">
+            <div className="h-[50%] min-h-[280px] p-2 bg-[#050816] overflow-hidden flex flex-col">
               <DirectorsCutPreviewPlayer
                 fillContainer={true}
                 videoUrl={cleanedVideoUrl || videoUrl}
@@ -1627,7 +1627,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             </div>
 
             {/* Timeline */}
-            <div className="flex-1 border-t border-[#2a2a2a] overflow-hidden">
+            <div className="flex-1 border-t border-[#F5C76A]/10 overflow-hidden">
               <CapCutTimeline
                 tracks={audioTracks}
                 scenes={scenes}
@@ -1660,7 +1660,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
           {/* Right Sidebar - Collapsible */}
           <div className={cn(
-            "border-l border-[#2a2a2a] bg-[#1e1e1e] transition-all duration-200",
+            "border-l border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-all duration-200",
             propertiesCollapsed ? "w-12" : "w-72"
           )}>
             {propertiesCollapsed ? (
