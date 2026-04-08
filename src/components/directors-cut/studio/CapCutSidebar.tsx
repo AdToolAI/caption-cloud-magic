@@ -608,6 +608,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               onSceneAdd={onSceneAdd}
               onSceneRename={onSceneRename}
               onTrimScene={onTrimScene}
+              onAddVideoAsScene={onAddVideoAsScene}
             />
           </TabsContent>
 
