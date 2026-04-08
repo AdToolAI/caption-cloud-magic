@@ -426,8 +426,8 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                   {/* Transition Block between scenes (not after last scene) */}
                   {i < scenes.length - 1 && onTransitionsChange && (
                     <TransitionBlock
-                      sceneId={scenes[i + 1].id}
-                      transition={transitions.find(t => t.sceneId === scenes[i + 1].id)}
+                      sceneId={scene.id}
+                      transition={transitions.find(t => t.sceneId === scene.id)}
                       onTransitionChange={handleTransitionChange}
                     />
                   )}
