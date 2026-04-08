@@ -1,51 +1,42 @@
 
-Problem
 
-Die Übergänge sind im UI auswählbar, werden aber in der Vorschau nicht gerendert, weil die IDs an zwei Stellen unterschiedlich interpretiert werden:
+## Plan: Black Screen bei Lücken zwischen Szenen (> 0.2s)
 
-- Im `CutPanel` wird ein Übergang aktuell auf die eingehende Szene gespeichert (`sceneId={scenes[i + 1].id}`)
-- Der gemeinsame Resolver (`resolveTransitions`) sowie der Preview-Player erwarten Übergänge aber auf der ausgehenden Szene (`scene.id`)
+### Problem
 
-Dadurch findet der Renderer zur Szenengrenze oft keinen passenden Übergang, obwohl im Panel einer gesetzt wurde.
+Wenn auf der Timeline eine Lücke zwischen zwei Szenen existiert (z.B. Szene 1 endet bei 5s, Szene 2 beginnt bei 7s), spielt das Video einfach weiter statt einen Black Screen zu zeigen. Erst ab einer Lücke > 0.2s soll ein schwarzer Bildschirm erscheinen.
 
-Plan
+### Lösung
 
-1. Übergangs-Zuordnung vereinheitlichen
-- In `src/components/directors-cut/studio/sidebar/CutPanel.tsx` die Transition-Blöcke auf die ausgehende Szene mappen
-- Also den Block zwischen Szene 1 und 2 an `sceneId={scene.id}` statt `scenes[i + 1].id` hängen
-- Anzeige, Auswahl, Dauer-Slider und Entfernen damit alle dieselbe ID-Logik verwenden
+**Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`**
 
-2. Bestandsdaten kompatibel machen
-- In `src/pages/DirectorsCut/DirectorsCut.tsx` beim Laden/Initialisieren der Transitions eine kleine Normalisierung einbauen
-- Ziel: alte Drafts oder bereits gespeicherte Übergänge, die noch auf die eingehende Szene zeigen, automatisch auf die ausgehende Szene umlegen
-- So funktionieren bestehende Projekte weiter, ohne dass der Nutzer alle Übergänge neu setzen muss
+1. **Gap-Erkennung im RAF-Loop** (Zeile ~596-706): Wenn `findSceneBySourceTime` keine Szene findet ODER die aktuelle `timelineTime` zwischen zwei Szenen liegt mit einer Lücke > 0.2s:
+   - Video pausieren (oder stumm weiterlaufen lassen)
+   - Beide Video-Slots auf `opacity: 0` setzen → schwarzer Hintergrund (`bg-black` am Container) wird sichtbar
+   - Timeline-Zeit weiter hochzählen, bis die nächste Szene erreicht wird → dann Video zur Source-Position der nächsten Szene seeken und Opacity wiederherstellen
 
-3. Default-/Auto-Logik konsistent halten
-- Prüfen und angleichen, dass Standard-Transitions und AI-/AutoCut-Flows ebenfalls konsequent die ausgehende Szene referenzieren
-- Damit Sidebar, Preview und Resolver dieselbe Datenstruktur verwenden
+2. **Gap-Detection-Logik**: Im Tick prüfen:
+   ```
+   für jede Szene i: wenn scenes[i].end_time + 0.2 < scenes[i+1].start_time
+   → Lücke zwischen end_time und start_time
+   ```
+   Wenn `timelineTime` in so einer Lücke liegt → Black Screen aktivieren
 
-4. Preview-Rendering dadurch freischalten
-- `DirectorsCutPreviewPlayer.tsx` und `transitionResolver.ts` müssen voraussichtlich nicht grundlegend geändert werden, weil sie bereits konsistent auf “outgoing scene” aufgebaut sind
-- Nach der Datenkorrektur sollten Fade, Crossfade, Slide, Wipe usw. wieder sichtbar werden
+3. **Black Screen State**: Per Ref (`inGapRef`) tracken ob wir gerade in einer Lücke sind. Wenn ja:
+   - Aktives Video: `style.opacity = '0'`
+   - Canvas: `display: none`
+   - Video bleibt paused, Timeline-Zeit wird manuell weitergetrieben
+   - Beim Verlassen der Lücke: Seek zur nächsten Szene, opacity zurück auf 1, play fortsetzen
 
-Betroffene Dateien
-- `src/components/directors-cut/studio/sidebar/CutPanel.tsx`
-- `src/pages/DirectorsCut/DirectorsCut.tsx`
+### Dateien
 
-Technische Details
-```text
-Aktuell:
-[Szene A] -- Übergang -- [Szene B]
-                |
-           gespeichert als sceneId = Szene B
+| Aktion | Datei | Änderung |
+|--------|-------|----------|
+| Edit | `DirectorsCutPreviewPlayer.tsx` | Gap-Detection im RAF-Loop + Video-Opacity-Steuerung für Black Screen |
 
-Renderer erwartet:
-[Szene A] -- Übergang -- [Szene B]
-                |
-           gespeichert als sceneId = Szene A
-```
+### Ergebnis
 
-Ergebnis
-- Übergänge werden wieder sichtbar in der Vorschau
-- Bereits gesetzte Übergänge in laufenden Projekten bleiben nutzbar
-- CutPanel, Draft-Loading und Preview verwenden dieselbe Logik
+- Lücken > 0.2s zwischen Szenen zeigen einen sauberen Black Screen
+- Kleinere Lücken (≤ 0.2s) werden ignoriert (nahtloser Übergang)
+- Timeline läuft während der Lücke weiter, Video wird erst bei der nächsten Szene fortgesetzt
+
