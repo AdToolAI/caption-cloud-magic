@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Palette, Sun, Contrast, Droplets, Thermometer, Eye } from 'lucide-react';
+import { Palette, Sun, Contrast, Droplets, Thermometer, Eye, ChevronDown, ChevronRight } from 'lucide-react';
 import { GlobalEffects, FilterId } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -16,15 +16,47 @@ interface LookPanelProps {
   selectedSceneId: string | null;
 }
 
-const FILTER_PRESETS: { id: string; name: string; icon: string; css: string }[] = [
-  { id: 'none', name: 'Original', icon: '🎬', css: '' },
-  { id: 'cinematic', name: 'Cinematic', icon: '🎥', css: 'contrast(1.2) saturate(0.85)' },
-  { id: 'vintage', name: 'Vintage', icon: '📷', css: 'sepia(0.4) contrast(1.1)' },
-  { id: 'noir', name: 'Film Noir', icon: '🖤', css: 'grayscale(1) contrast(1.4)' },
-  { id: 'warm', name: 'Warm', icon: '🌅', css: 'saturate(1.3) hue-rotate(-10deg)' },
-  { id: 'cool', name: 'Cool', icon: '❄️', css: 'saturate(0.9) hue-rotate(15deg)' },
-  { id: 'vivid', name: 'Vivid', icon: '🌈', css: 'saturate(1.6) contrast(1.1)' },
-  { id: 'muted', name: 'Muted', icon: '🌫️', css: 'saturate(0.5) brightness(1.05)' },
+const FILTER_CATEGORIES = [
+  {
+    name: 'Klassisch',
+    filters: [
+      { id: 'none', name: 'Original', icon: '🎬', css: '' },
+      { id: 'cinematic', name: 'Cinematic', icon: '🎥', css: 'contrast(1.2) saturate(0.85)' },
+      { id: 'vintage', name: 'Vintage', icon: '📷', css: 'sepia(0.4) contrast(1.1)' },
+      { id: 'noir', name: 'Film Noir', icon: '🖤', css: 'grayscale(1) contrast(1.4)' },
+      { id: 'muted', name: 'Muted', icon: '🌫️', css: 'saturate(0.5) brightness(1.05)' },
+    ],
+  },
+  {
+    name: 'Stimmung',
+    filters: [
+      { id: 'warm', name: 'Warm', icon: '🌅', css: 'saturate(1.3) hue-rotate(-10deg)' },
+      { id: 'cool', name: 'Cool', icon: '❄️', css: 'saturate(0.9) hue-rotate(15deg)' },
+      { id: 'golden_hour', name: 'Golden Hour', icon: '🌄', css: 'saturate(1.2) sepia(0.2) brightness(1.1)' },
+      { id: 'dreamy', name: 'Dreamy', icon: '💫', css: 'brightness(1.1) contrast(0.9) saturate(0.8) blur(0.3px)' },
+      { id: 'moody', name: 'Moody', icon: '🌑', css: 'brightness(0.85) contrast(1.3) saturate(0.7)' },
+    ],
+  },
+  {
+    name: 'Kreativ',
+    filters: [
+      { id: 'vivid', name: 'Vivid', icon: '🌈', css: 'saturate(1.6) contrast(1.1)' },
+      { id: 'neon_nights', name: 'Neon Nights', icon: '🌃', css: 'brightness(0.9) contrast(1.4) saturate(1.5) hue-rotate(20deg)' },
+      { id: 'cyberpunk', name: 'Cyberpunk', icon: '🤖', css: 'contrast(1.3) saturate(1.4) hue-rotate(-15deg) brightness(0.95)' },
+      { id: 'cross_process', name: 'Cross Process', icon: '🔄', css: 'hue-rotate(30deg) saturate(1.3) contrast(1.1)' },
+      { id: 'lomography', name: 'Lomo', icon: '📸', css: 'contrast(1.3) saturate(1.5) brightness(0.9)' },
+    ],
+  },
+  {
+    name: 'Film',
+    filters: [
+      { id: 'kodak_portra', name: 'Kodak Portra', icon: '🎞️', css: 'saturate(0.9) contrast(1.05) sepia(0.1) brightness(1.05)' },
+      { id: 'fuji_velvia', name: 'Fuji Velvia', icon: '🏔️', css: 'saturate(1.4) contrast(1.2) brightness(0.95)' },
+      { id: 'technicolor', name: 'Technicolor', icon: '🎭', css: 'saturate(1.5) contrast(1.15) hue-rotate(-5deg)' },
+      { id: 'bleach_bypass', name: 'Bleach Bypass', icon: '⬜', css: 'saturate(0.4) contrast(1.4) brightness(1.05)' },
+      { id: 'infrared', name: 'Infrared', icon: '🔴', css: 'hue-rotate(180deg) saturate(0.8) contrast(1.2)' },
+    ],
+  },
 ];
 
 const COLOR_GRADES: { id: string; name: string; icon: string }[] = [
@@ -34,6 +66,10 @@ const COLOR_GRADES: { id: string; name: string; icon: string }[] = [
   { id: 'golden_hour', name: 'Golden Hour', icon: '🌅' },
   { id: 'matrix', name: 'Matrix', icon: '💚' },
   { id: 'bleach_bypass', name: 'Bleach Bypass', icon: '🔲' },
+  { id: 'hollywood_blue', name: 'Hollywood Blue', icon: '🔵' },
+  { id: 'sunset_glow', name: 'Sunset Glow', icon: '🌇' },
+  { id: 'forest_green', name: 'Forest Green', icon: '🌲' },
+  { id: 'coral_reef', name: 'Coral Reef', icon: '🪸' },
 ];
 
 export const LookPanel: React.FC<LookPanelProps> = ({
@@ -45,6 +81,8 @@ export const LookPanel: React.FC<LookPanelProps> = ({
   onStyleTransferChange,
   selectedSceneId,
 }) => {
+  const [expandedCategory, setExpandedCategory] = useState<string>('Klassisch');
+
   const updateEffect = (key: keyof GlobalEffects, value: number) => {
     onEffectsChange({ ...effects, [key]: value });
   };
@@ -54,72 +92,97 @@ export const LookPanel: React.FC<LookPanelProps> = ({
       <div className="p-3 space-y-4">
         {/* Header */}
         <div className="flex items-center gap-2">
-          <Palette className="h-4 w-4 text-[#00d4ff]" />
+          <div className="w-1 h-4 rounded-full bg-[#F5C76A]" />
+          <Palette className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]" />
           <span className="text-sm font-medium text-white">Look & Farbe</span>
         </div>
 
         {selectedSceneId && (
-          <p className="text-[10px] text-amber-400/80">
+          <p className="text-[10px] text-[#F5C76A]/80">
             ⚠️ Änderungen gelten global. Szenen-spezifische Effekte folgen.
           </p>
         )}
 
-        {/* Filter Presets */}
-        <div className="space-y-2">
-          <span className="text-xs text-white/50 font-medium uppercase tracking-wider">Filter</span>
-          <div className="grid grid-cols-4 gap-1.5">
-            {FILTER_PRESETS.map(filter => (
+        {/* Filter Presets — Categorized */}
+        <div className="space-y-1">
+          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">Filter</span>
+          {FILTER_CATEGORIES.map(category => (
+            <div key={category.name} className="space-y-1.5">
               <button
-                key={filter.id}
-                onClick={() => {
-                  const filterId = filter.id === 'none' ? undefined : filter.id;
-                  onEffectsChange({ ...effects, filter: filterId as FilterId | undefined });
-                }}
-                className={cn(
-                  "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors text-center",
-                  effects.filter === filter.id || (!effects.filter && filter.id === 'none')
-                    ? "bg-[#00d4ff]/20 border border-[#00d4ff]/50"
-                    : "bg-[#2a2a2a] border border-transparent hover:bg-[#333]"
-                )}
+                onClick={() => setExpandedCategory(expandedCategory === category.name ? '' : category.name)}
+                className="flex items-center gap-1.5 w-full text-left py-1 text-[11px] text-white/60 hover:text-white/90 transition-colors"
               >
-                <span className="text-lg">{filter.icon}</span>
-                <span className="text-[9px] text-white/70">{filter.name}</span>
+                {expandedCategory === category.name ? (
+                  <ChevronDown className="h-3 w-3 text-cyan-400" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
+                <span>{category.name}</span>
+                <span className="text-[9px] text-white/30 ml-auto">{category.filters.length}</span>
               </button>
-            ))}
-          </div>
+              {expandedCategory === category.name && (
+                <div className="grid grid-cols-4 gap-1.5 pl-1">
+                  {category.filters.map(filter => {
+                    const isActive = effects.filter === filter.id || (!effects.filter && filter.id === 'none');
+                    return (
+                      <button
+                        key={filter.id}
+                        onClick={() => {
+                          const filterId = filter.id === 'none' ? undefined : filter.id;
+                          onEffectsChange({ ...effects, filter: filterId as FilterId | undefined });
+                        }}
+                        className={cn(
+                          "flex flex-col items-center gap-1 p-2 rounded-lg transition-all text-center border",
+                          isActive
+                            ? "bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
+                            : "bg-[#0a0a1a]/60 border-white/5 hover:bg-white/5 hover:border-white/10"
+                        )}
+                      >
+                        <span className="text-lg">{filter.icon}</span>
+                        <span className={cn("text-[9px]", isActive ? "text-cyan-300" : "text-white/60")}>{filter.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
 
         {/* Color Grading */}
-        <div className="space-y-2 border-t border-[#3a3a3a] pt-3">
-          <span className="text-xs text-white/50 font-medium uppercase tracking-wider">Color Grading</span>
+        <div className="space-y-2 border-t border-[#F5C76A]/10 pt-3">
+          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">Color Grading</span>
           <div className="grid grid-cols-3 gap-1.5">
-            {COLOR_GRADES.map(grade => (
-              <button
-                key={grade.id}
-                onClick={() => {
-                  if (grade.id === 'none') {
-                    onColorGradingChange(false, null);
-                  } else {
-                    onColorGradingChange(true, grade.id);
-                  }
-                }}
-                className={cn(
-                  "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors",
-                  (colorGrading.enabled && colorGrading.grade === grade.id) || (!colorGrading.enabled && grade.id === 'none')
-                    ? "bg-[#00d4ff]/20 border border-[#00d4ff]/50"
-                    : "bg-[#2a2a2a] border border-transparent hover:bg-[#333]"
-                )}
-              >
-                <span className="text-sm">{grade.icon}</span>
-                <span className="text-[9px] text-white/70">{grade.name}</span>
-              </button>
-            ))}
+            {COLOR_GRADES.map(grade => {
+              const isActive = (colorGrading.enabled && colorGrading.grade === grade.id) || (!colorGrading.enabled && grade.id === 'none');
+              return (
+                <button
+                  key={grade.id}
+                  onClick={() => {
+                    if (grade.id === 'none') {
+                      onColorGradingChange(false, null);
+                    } else {
+                      onColorGradingChange(true, grade.id);
+                    }
+                  }}
+                  className={cn(
+                    "flex flex-col items-center gap-1 p-2 rounded-lg transition-all border",
+                    isActive
+                      ? "bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
+                      : "bg-[#0a0a1a]/60 border-white/5 hover:bg-white/5 hover:border-white/10"
+                  )}
+                >
+                  <span className="text-sm">{grade.icon}</span>
+                  <span className={cn("text-[9px]", isActive ? "text-cyan-300" : "text-white/60")}>{grade.name}</span>
+                </button>
+              );
+            })}
           </div>
           {colorGrading.enabled && (
             <div className="space-y-1">
               <div className="flex justify-between">
                 <label className="text-[10px] text-white/50">Intensität</label>
-                <span className="text-[10px] text-white/40">{Math.round(colorGrading.intensity * 100)}%</span>
+                <span className="text-[10px] text-cyan-400/60">{Math.round(colorGrading.intensity * 100)}%</span>
               </div>
               <Slider
                 value={[colorGrading.intensity * 100]}
@@ -134,14 +197,14 @@ export const LookPanel: React.FC<LookPanelProps> = ({
         </div>
 
         {/* Manual Adjustments */}
-        <div className="space-y-3 border-t border-[#3a3a3a] pt-3">
-          <span className="text-xs text-white/50 font-medium uppercase tracking-wider">Anpassungen</span>
+        <div className="space-y-3 border-t border-[#F5C76A]/10 pt-3">
+          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">Anpassungen</span>
 
           {/* Brightness */}
           <div className="space-y-1">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-1.5">
-                <Sun className="h-3 w-3 text-yellow-400/60" />
+                <Sun className="h-3 w-3 text-[#F5C76A]/60" />
                 <label className="text-[11px] text-white/70">Helligkeit</label>
               </div>
               <span className="text-[10px] text-white/40">{effects.brightness}%</span>
@@ -179,7 +242,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
           <div className="space-y-1">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-1.5">
-                <Droplets className="h-3 w-3 text-blue-400/60" />
+                <Droplets className="h-3 w-3 text-cyan-400/60" />
                 <label className="text-[11px] text-white/70">Sättigung</label>
               </div>
               <span className="text-[10px] text-white/40">{effects.saturation}%</span>
@@ -236,7 +299,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
           <Button
             variant="outline"
             size="sm"
-            className="w-full text-[10px] border-[#3a3a3a] text-white/50 hover:bg-[#333]"
+            className="w-full text-[10px] border-[#F5C76A]/20 text-white/50 hover:bg-[#F5C76A]/10 hover:text-[#F5C76A]/80"
             onClick={() => onEffectsChange({
               brightness: 100, contrast: 100, saturation: 100,
               sharpness: 0, temperature: 0, vignette: 0,
