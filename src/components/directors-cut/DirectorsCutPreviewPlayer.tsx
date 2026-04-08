@@ -151,6 +151,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const [displayTime, setDisplayTime] = useState(currentTime);
   const visualTimeRef = useRef(currentTime);
   const rafIdRef = useRef<number>();
+  const inGapRef = useRef(false);
+  const gapLastTimestampRef = useRef<number>(0);
 
   useEffect(() => { setIsMuted(initialMuted); }, [initialMuted]);
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
