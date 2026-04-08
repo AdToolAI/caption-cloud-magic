@@ -27,7 +27,6 @@ interface CapCutEditorProps {
   onScenesUpdate?: (scenes: SceneAnalysis[]) => void;
   voiceOverUrl?: string;
   onNextStep?: () => void;
-  // Visual effects from previous steps
   textOverlays?: TextOverlay[];
   onTextOverlaysChange?: (overlays: TextOverlay[]) => void;
   appliedEffects?: {
@@ -42,23 +41,40 @@ interface CapCutEditorProps {
     scenes: Record<string, any>;
   };
   transitions?: TransitionAssignment[];
+  onTransitionsChange?: (transitions: TransitionAssignment[]) => void;
   colorGrading?: { enabled: boolean; grade: string | null; intensity: number };
   sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
   styleTransfer?: { enabled: boolean; style: string | null; intensity: number };
   speedKeyframes?: Array<{ time: number; speed: number }>;
   kenBurns?: KenBurnsKeyframe[];
-  // Callbacks to propagate data to parent (DirectorsCut.tsx)
   onAudioTracksChange?: (tracks: AudioTrack[]) => void;
   onSubtitleTrackChange?: (track: SubtitleTrack) => void;
   onBackgroundMusicUrlChange?: (url: string | undefined) => void;
-  // Initial subtitle track from parent (for draft persistence)
   initialSubtitleTrack?: SubtitleTrack;
-  // Project ID for burned subtitle removal
   projectId?: string | null;
   onCleanedVideoUrlChange?: (url: string | null) => void;
   onSaveProject?: () => Promise<string | null>;
   subtitleSafeZone?: SubtitleSafeZone;
   onSubtitleSafeZoneChange?: (zone: SubtitleSafeZone) => void;
+  // New studio props
+  onEffectsChange?: (effects: { brightness: number; contrast: number; saturation: number; sharpness: number; temperature: number; vignette: number }) => void;
+  onColorGradingChange?: (enabled: boolean, grade: string | null, intensity?: number) => void;
+  onStyleTransferChange?: (enabled: boolean, style: string | null) => void;
+  chromaKey?: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string };
+  onChromaKeyChange?: (ck: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string }) => void;
+  upscaling?: { enabled: boolean; targetResolution: string };
+  onUpscalingChange?: (enabled: boolean, resolution: string) => void;
+  interpolation?: { enabled: boolean; targetFps: number };
+  onInterpolationChange?: (enabled: boolean, fps: number) => void;
+  restoration?: { enabled: boolean; level: string };
+  onRestorationChange?: (enabled: boolean, level: string) => void;
+  exportSettings?: { quality: string; format: string; fps: number; aspect_ratio: string };
+  onExportSettingsChange?: (settings: any) => void;
+  isAnalyzing?: boolean;
+  onStartAnalysis?: () => void;
+  onVoiceOverGenerated?: (url: string) => void;
+  onResetProject?: () => void;
+  onBackToImport?: () => void;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
