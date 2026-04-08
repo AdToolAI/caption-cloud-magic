@@ -1001,6 +1001,56 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     toast.success('Szene dupliziert');
   }, [scenes, onScenesUpdate]);
 
+  // Export video - trigger render via Edge Function
+  const handleExportVideo = useCallback(async () => {
+    try {
+      toast.info('Export wird vorbereitet...');
+      
+      let savedProjectId = projectId;
+      if (onSaveProject) {
+        savedProjectId = await onSaveProject();
+      }
+      
+      if (!savedProjectId) {
+        toast.error('Projekt konnte nicht gespeichert werden');
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('render-directors-cut', {
+        body: {
+          projectId: savedProjectId,
+          scenes: scenes.map(s => ({
+            id: s.id,
+            start_time: s.start_time,
+            end_time: s.end_time,
+            description: s.description,
+          })),
+          effects: appliedEffects?.global || { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 },
+          colorGrading,
+          styleTransfer,
+          transitions: transitions || [],
+          exportSettings: exportSettings || { quality: 'hd', format: 'mp4', fps: 30, aspect_ratio: '16:9' },
+          videoUrl: cleanedVideoUrl || videoUrl,
+          voiceOverUrl,
+          backgroundMusicUrl: audioTracks.find(t => t.id === 'track-music')?.clips?.[0]?.originalUrl || audioTracks.find(t => t.id === 'track-music')?.clips?.[0]?.url,
+          subtitleTrack: showSubtitles ? subtitleTrack : undefined,
+        },
+      });
+
+      if (error) {
+        console.error('[Export] Error:', error);
+        toast.error('Export fehlgeschlagen: ' + error.message);
+        return;
+      }
+
+      toast.success('Export gestartet! Das Rendering kann einige Minuten dauern.');
+      console.log('[Export] Render initiated:', data);
+    } catch (err) {
+      console.error('[Export] Error:', err);
+      toast.error('Export konnte nicht gestartet werden');
+    }
+  }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack]);
+
   const handleAddClip = useCallback((trackId: string, clip: Omit<AudioClip, 'id'>) => {
     const newClip: AudioClip = {
       ...clip,
