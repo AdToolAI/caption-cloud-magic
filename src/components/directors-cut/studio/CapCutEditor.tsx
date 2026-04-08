@@ -113,6 +113,25 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onSaveProject,
   subtitleSafeZone = DEFAULT_SUBTITLE_SAFE_ZONE,
   onSubtitleSafeZoneChange,
+  // New studio props
+  onEffectsChange,
+  onColorGradingChange,
+  onStyleTransferChange,
+  chromaKey,
+  onChromaKeyChange,
+  upscaling,
+  onUpscalingChange,
+  interpolation,
+  onInterpolationChange,
+  restoration,
+  onRestorationChange,
+  exportSettings,
+  onExportSettingsChange,
+  isAnalyzing,
+  onStartAnalysis,
+  onVoiceOverGenerated,
+  onResetProject,
+  onBackToImport,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
