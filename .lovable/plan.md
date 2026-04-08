@@ -1,20 +1,48 @@
 
 
-## Plan: Auto-Untertitel-Erkennung deaktivieren — nur auf Nutzerwunsch
+## Plan: Export-Fehler beheben — Feldnamen-Mismatch
 
 ### Problem
-Beim Öffnen eines Videos im Studio werden automatisch Untertitel erkannt und hinzugefügt (Zeile 550-608 in `CapCutEditor.tsx`). Der Nutzer wird nicht gefragt, ob er das möchte.
 
-### Lösung
-Den `useEffect`-Block (Zeile 550-608) entfernen, der automatisch `generate-subtitles` aufruft. Die Untertitel-Erkennung bleibt als **manuelle Aktion** erhalten — der Nutzer kann sie jederzeit über den "Retry Detection"-Button oder den Text-Tab in der Sidebar starten.
+Der Export schlägt mit **400** fehl, weil der Client camelCase-Feldnamen sendet, die Edge Function aber snake_case erwartet. Konkret:
+
+| Client sendet | Edge Function erwartet |
+|---|---|
+| `videoUrl` | `source_video_url` ← **Validierung schlägt fehl** |
+| `projectId` | `project_id` |
+| `exportSettings` | `export_settings` |
+| `colorGrading` | `color_grading` |
+| `styleTransfer` | `style_transfer` |
+| `voiceOverUrl` | `voiceover_url` |
+| `backgroundMusicUrl` | `background_music_url` |
+| `subtitleTrack` | `subtitle_track` |
+
+Die Funktion prüft `if (!source_video_url)` und gibt sofort 400 zurück.
 
 ### Änderung
 
-**Datei: `src/components/directors-cut/studio/CapCutEditor.tsx`**
+**Datei: `src/components/directors-cut/studio/CapCutEditor.tsx`** (Zeile 978-995)
 
-- **Zeile 545-608 entfernen** — den gesamten `useEffect`-Block für Auto-Detection löschen
-- Die manuellen Handler (`handleRetryDetection`, `handleRemoveOriginalSubtitles`, `handleRemoveAllSubtitles`) bleiben bestehen, damit der Nutzer bei Bedarf Untertitel generieren kann
+Body-Felder auf snake_case umbenennen + fehlende Felder ergänzen:
+
+```typescript
+body: {
+  project_id: savedProjectId,
+  source_video_url: cleanedVideoUrl || videoUrl,
+  scenes: scenes.map(s => ({ ... })),
+  effects: appliedEffects?.global || { ... },
+  color_grading: colorGrading,
+  style_transfer: styleTransfer,
+  transitions: transitions || [],
+  export_settings: exportSettings || { quality: 'hd', format: 'mp4', fps: 30, aspect_ratio: '16:9' },
+  voiceover_url: voiceOverUrl,
+  background_music_url: audioTracks.find(...),
+  subtitle_track: showSubtitles ? subtitleTrack : undefined,
+  duration_seconds: videoDuration || scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0),
+}
+```
 
 ### Ergebnis
-Keine automatischen Untertitel mehr beim Öffnen. Der Nutzer entscheidet selbst, wann und ob Untertitel generiert werden sollen.
+
+Export-Request sendet die korrekten Feldnamen → Edge Function validiert erfolgreich → Render-Job wird erstellt.
 
