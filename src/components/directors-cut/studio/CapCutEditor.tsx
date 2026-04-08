@@ -976,7 +976,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
       const { data, error } = await supabase.functions.invoke('render-directors-cut', {
         body: {
-          projectId: savedProjectId,
+          project_id: savedProjectId,
+          source_video_url: cleanedVideoUrl || videoUrl,
           scenes: scenes.map(s => ({
             id: s.id,
             start_time: s.start_time,
@@ -984,14 +985,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             description: s.description,
           })),
           effects: appliedEffects?.global || { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 },
-          colorGrading,
-          styleTransfer,
+          color_grading: colorGrading,
+          style_transfer: styleTransfer,
           transitions: transitions || [],
-          exportSettings: exportSettings || { quality: 'hd', format: 'mp4', fps: 30, aspect_ratio: '16:9' },
-          videoUrl: cleanedVideoUrl || videoUrl,
-          voiceOverUrl,
-          backgroundMusicUrl: audioTracks.find(t => t.id === 'track-music')?.clips?.[0]?.originalUrl || audioTracks.find(t => t.id === 'track-music')?.clips?.[0]?.url,
-          subtitleTrack: showSubtitles ? subtitleTrack : undefined,
+          export_settings: exportSettings || { quality: 'hd', format: 'mp4', fps: 30, aspect_ratio: '16:9' },
+          voiceover_url: voiceOverUrl,
+          background_music_url: audioTracks.find(t => t.id === 'track-music')?.clips?.[0]?.originalUrl || audioTracks.find(t => t.id === 'track-music')?.clips?.[0]?.url,
+          subtitle_track: showSubtitles ? subtitleTrack : undefined,
+          duration_seconds: videoDuration || scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0),
         },
       });
 
