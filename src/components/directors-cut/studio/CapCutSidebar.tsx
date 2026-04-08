@@ -618,6 +618,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               onColorGradingChange={onColorGradingChange || (() => {})}
               styleTransfer={styleTransfer || { enabled: false, style: null, intensity: 50 }}
               onStyleTransferChange={onStyleTransferChange || (() => {})}
+              selectedSceneId={selectedSceneId}
             />
           </TabsContent>
 
@@ -638,11 +639,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           {/* TAB: Export */}
           <TabsContent value="export" className="mt-0">
             <ExportPanel
-              settings={exportSettings || { quality: 'high', format: 'mp4', fps: 30, aspect_ratio: '16:9' }}
-              onSettingsChange={onExportSettingsChange || (() => {})}
+              exportSettings={exportSettings || { quality: 'hd', format: 'mp4', fps: 30, aspect_ratio: '16:9' }}
+              onExportSettingsChange={onExportSettingsChange || (() => {})}
               onExport={onStartExport || onExportClick || (() => {})}
               videoDuration={videoDuration}
-              sceneCount={sceneCount || scenes.length}
+              scenesCount={sceneCount || scenes.length}
             />
           </TabsContent>
 
