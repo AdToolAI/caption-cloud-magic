@@ -687,7 +687,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       timelineTime = Math.max(0, Math.min(timelineTime, duration));
       visualTimeRef.current = timelineTime;
 
-      // === KEN BURNS MOTION ===
+      // === KEN BURNS MOTION + SCENE ANIMATION ===
       const kbWrapper = kenBurnsWrapperRef.current;
       if (kbWrapper) {
         const kbKeyframes = kenBurnsRef.current;
@@ -705,6 +705,63 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             const panY = kbForScene.startY + (kbForScene.endY - kbForScene.startY) * progress;
             const szTransform = buildSafeZoneTransform();
             kbWrapper.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)${szTransform ? ' ' + szTransform : ''}`;
+            kbApplied = true;
+          }
+        }
+        // Scene animation fallback (when no Ken Burns is active)
+        if (!kbApplied && sceneInfo) {
+          const sEffects = sceneEffectsRef.current;
+          const anim = sEffects?.[sceneInfo.scene.id]?.animation;
+          if (anim && anim.type && anim.type !== 'none') {
+            const sceneStart = sceneInfo.scene.start_time;
+            const sceneDur = sceneInfo.scene.end_time - sceneStart;
+            const progress = sceneDur > 0 ? Math.max(0, Math.min(1, (timelineTime - sceneStart) / sceneDur)) : 0;
+            const intensity = (anim.intensity ?? 50) / 100;
+            const szTransform = buildSafeZoneTransform();
+            let animTransform = '';
+            switch (anim.type) {
+              case 'zoomIn': {
+                const scale = 1 + (0.4 * intensity) * progress;
+                animTransform = `scale(${scale})`;
+                break;
+              }
+              case 'zoomOut': {
+                const scale = 1 + (0.4 * intensity) * (1 - progress);
+                animTransform = `scale(${scale})`;
+                break;
+              }
+              case 'zoomInSlow': {
+                const scale = 1 + (0.2 * intensity) * progress;
+                animTransform = `scale(${scale})`;
+                break;
+              }
+              case 'zoomOutSlow': {
+                const scale = 1 + (0.2 * intensity) * (1 - progress);
+                animTransform = `scale(${scale})`;
+                break;
+              }
+              case 'panLeft': {
+                const tx = -(15 * intensity) * progress;
+                animTransform = `scale(1.15) translateX(${tx}%)`;
+                break;
+              }
+              case 'panRight': {
+                const tx = (15 * intensity) * progress;
+                animTransform = `scale(1.15) translateX(${tx}%)`;
+                break;
+              }
+              case 'panUp': {
+                const ty = -(10 * intensity) * progress;
+                animTransform = `scale(1.15) translateY(${ty}%)`;
+                break;
+              }
+              case 'panDown': {
+                const ty = (10 * intensity) * progress;
+                animTransform = `scale(1.15) translateY(${ty}%)`;
+                break;
+              }
+            }
+            kbWrapper.style.transform = `${animTransform}${szTransform ? ' ' + szTransform : ''}`;
             kbApplied = true;
           }
         }

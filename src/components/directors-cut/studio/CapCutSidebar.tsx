@@ -102,6 +102,7 @@ interface CapCutSidebarProps {
   onInterpolationChange?: (enabled: boolean, fps: number) => void;
   restoration?: { enabled: boolean; level: string };
   onRestorationChange?: (enabled: boolean, level: string) => void;
+  onScenePlaybackRateChange?: (sceneId: string, rate: number) => void;
   // Export
   exportSettings?: { quality: string; format: string; fps: number; aspect_ratio: string };
   onExportSettingsChange?: (settings: any) => void;
@@ -278,6 +279,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onInterpolationChange,
   restoration,
   onRestorationChange,
+  onScenePlaybackRateChange,
   exportSettings,
   onExportSettingsChange,
   onStartExport,
@@ -642,6 +644,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               onInterpolationChange={onInterpolationChange || (() => {})}
               restoration={restoration || { enabled: false, level: 'medium' }}
               onRestorationChange={onRestorationChange || (() => {})}
+              selectedSceneId={selectedSceneId}
+              scenes={scenes}
+              sceneEffects={sceneEffects}
+              onSceneEffectsChange={onSceneEffectsChange}
+              onScenePlaybackRateChange={onScenePlaybackRateChange}
             />
           </TabsContent>
 
