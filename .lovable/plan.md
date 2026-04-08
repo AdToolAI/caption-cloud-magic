@@ -1,49 +1,43 @@
 
 
-## Plan: Per-Scene Filter/Color Grading + Filter-Intensitätsregler
+## Plan: Filter & Color Grading zum Funktionieren bringen
 
 ### Problem
 
-1. **Filter und Color Grades gelten nur global** — Obwohl `selectedSceneId` an LookPanel übergeben wird und der Typ `SceneEffects` bereits `filter`, `colorGrading` und individuelle Werte pro Szene unterstützt, schreibt LookPanel alle Änderungen nur auf `effects` (global). Der Hinweis "Änderungen gelten global. Szenen-spezifische Effekte folgen." bestätigt das.
+Es gibt **zwei ID-Mismatches**, die dafür sorgen, dass weder Filter noch Color Grading im Video sichtbar werden:
 
-2. **Kein Intensitätsregler für Filter** — Filter sind nur an/aus. Color Grading hat bereits einen Intensitäts-Slider, Filter aber nicht.
+**1. Filter-IDs:** LookPanel definiert 20 Filter mit eigenen IDs (z.B. `neon_nights`, `kodak_portra`, `fuji_velvia`, `technicolor`, `moody`). Die Preview-Komponente (`computeFilterForTime`) sucht aber in `AVAILABLE_FILTERS` aus `types/directors-cut.ts`, wo nur 21 Filter mit teils anderen IDs stehen. Einige IDs stimmen überein (`cinematic`, `vintage`, `noir`, `cyberpunk`, `dreamy`, `infrared`, `cross_process`, `bleach_bypass`), aber viele neue IDs aus LookPanel fehlen komplett → kein CSS-Filter wird angewendet.
+
+**2. Color-Grading-IDs:** LookPanel sendet IDs wie `teal_orange`, `moonlight`, `matrix`, `hollywood_blue`, `sunset_glow`, `forest_green`, `coral_reef`. Die `NativePreviewEffects`-Komponente hat einen `COLOR_GRADE_MAP` mit völlig anderen Keys (`warm`, `cool`, `vintage`, `cinematic`, `sunset`, `forest`, `ocean`, `pastel`). **Kein einziger** LookPanel-Grading-Key existiert in der Map → Color Grading hat null Effekt.
 
 ### Lösung
 
-**1. Per-Scene Filter & Color Grading ermöglichen**
+**Datei 1: `src/types/directors-cut.ts`** — AVAILABLE_FILTERS erweitern
 
-- `LookPanel` erhält zwei neue Props: `sceneEffects` (Record der aktuellen Szenen-Effekte) und `onSceneEffectsChange` (Callback zum Setzen)
-- Wenn `selectedSceneId` gesetzt ist:
-  - Filter/Color-Grade/Anpassungen werden auf `sceneEffects[selectedSceneId]` geschrieben statt auf `effects`
-  - Die aktive Auswahl liest zuerst den Szenen-Wert, Fallback auf Global
-  - Der Hinweis ändert sich zu: "Änderungen gelten für Szene X"
-  - Ein kleiner "Global übernehmen"-Button ermöglicht es, Szenen-Werte auf alle Szenen zu kopieren
-- Wenn keine Szene ausgewählt ist, funktioniert alles wie bisher (global)
+Alle fehlenden Filter-IDs aus LookPanel hinzufügen mit passenden CSS-Preview-Strings:
+- `golden_hour`, `moody`, `neon_nights`, `lomography`, `kodak_portra`, `fuji_velvia`, `technicolor`
 
-**2. Filter-Intensitätsregler hinzufügen**
+**Datei 2: `src/components/directors-cut/preview/NativePreviewEffects.tsx`** — COLOR_GRADE_MAP synchronisieren
 
-- Neues Feld `filterIntensity` (0-100, Default 100) in `GlobalEffects` und `SceneEffects`
-- Unterhalb der Filter-Kacheln erscheint ein Slider "Intensität" (analog zum bestehenden Color-Grading-Slider), sobald ein Filter aktiv ist
-- Der Wert steuert, wie stark der CSS-Filter angewendet wird (z.B. bei 50% werden die Filter-Werte halbiert)
-
-**3. Props-Kette verdrahten**
-
-- `CapCutSidebar` leitet `sceneEffects` und `onSceneEffectsChange` an LookPanel durch (beides ist bereits als Prop im Editor verfügbar, wird aber nicht weitergereicht)
-- `CapCutEditor` hat die Daten bereits (`appliedEffects.scenes`) — muss nur die Callbacks an die Sidebar durchreichen
+Alle LookPanel-Grading-IDs mit CSS-Filtern hinzufügen:
+- `teal_orange` → Teal-Shadows + Orange-Highlights
+- `moonlight` → Blaue Kühle + niedriger Kontrast
+- `golden_hour` → Warmes Sepia + Sättigung
+- `matrix` → Grüner Hue-Rotate
+- `hollywood_blue` → Blauer Tint
+- `sunset_glow` → Warme Orange-Töne
+- `forest_green` → Grüner Hue-Shift
+- `coral_reef` → Pink/Coral Hue-Rotate
+- `bleach_bypass` → Desaturiert + Kontrast
 
 ### Dateien
 
 | Aktion | Datei | Änderung |
 |--------|-------|----------|
-| Edit | `src/types/directors-cut.ts` | `filterIntensity` zu `GlobalEffects` und `SceneEffects` hinzufügen |
-| Edit | `src/components/directors-cut/studio/sidebar/LookPanel.tsx` | Per-Scene-Logik: lesen/schreiben auf richtige Ebene; Intensitäts-Slider für Filter |
-| Edit | `src/components/directors-cut/studio/CapCutSidebar.tsx` | `sceneEffects` + `onSceneEffectsChange` Props an LookPanel durchreichen |
-| Edit | `src/components/directors-cut/studio/CapCutEditor.tsx` | `sceneEffects` + Handler an Sidebar Props durchreichen |
+| Edit | `src/types/directors-cut.ts` | 7 fehlende Filter-IDs zu AVAILABLE_FILTERS hinzufügen |
+| Edit | `src/components/directors-cut/preview/NativePreviewEffects.tsx` | 9 fehlende Color-Grade-Keys zu COLOR_GRADE_MAP hinzufügen |
 
-### Technische Details
+### Ergebnis
 
-- `LookPanel` prüft `selectedSceneId`: wenn gesetzt → alle Änderungen gehen an `onSceneEffectsChange(sceneId, { filter, colorGrading, ... })`, sonst an `onEffectsChange` (global)
-- Aktiver Filter wird so bestimmt: `sceneEffects[selectedSceneId]?.filter ?? effects.filter`
-- Filter-Intensität moduliert den CSS-String: bei 50% wird z.B. `saturate(1.6)` zu `saturate(1.3)` (Mittelwert zwischen Neutral und Voll)
-- Die Vorschau-Komponente (`VideoPreview`) nutzt bereits `sceneEffects` — dort muss nur `filterIntensity` in die CSS-Berechnung einfließen
+Alle 20 Filter und alle 10 Color Grades werden sofort in der Video-Vorschau sichtbar, sowohl global als auch pro Szene.
 
