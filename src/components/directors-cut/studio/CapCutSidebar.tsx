@@ -70,6 +70,37 @@ interface CapCutSidebarProps {
   onSubtitleSafeZoneChange?: (zone: SubtitleSafeZone) => void;
   isDetectingBand?: boolean;
   onDetectSubtitleBand?: () => void;
+  // New Studio Tab props
+  scenes?: SceneAnalysis[];
+  transitions?: TransitionAssignment[];
+  selectedSceneId?: string | null;
+  currentTime?: number;
+  onSplitAtPlayhead?: () => void;
+  onDeleteScene?: (sceneId: string) => void;
+  onDuplicateScene?: (sceneId: string) => void;
+  onSceneSelect?: (sceneId: string | null) => void;
+  onAutocut?: () => void;
+  isAnalyzing?: boolean;
+  // Look
+  appliedEffects?: { brightness: number; contrast: number; saturation: number; sharpness: number; temperature: number; vignette: number };
+  onEffectsChange?: (effects: any) => void;
+  colorGrading?: { enabled: boolean; grade: string | null; intensity: number };
+  onColorGradingChange?: (enabled: boolean, grade: string | null, intensity?: number) => void;
+  styleTransfer?: { enabled: boolean; style: string | null; intensity: number };
+  onStyleTransferChange?: (enabled: boolean, style: string | null) => void;
+  // FX
+  chromaKey?: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string };
+  onChromaKeyChange?: (ck: any) => void;
+  upscaling?: { enabled: boolean; targetResolution: string };
+  onUpscalingChange?: (enabled: boolean, resolution: string) => void;
+  interpolation?: { enabled: boolean; targetFps: number };
+  onInterpolationChange?: (enabled: boolean, fps: number) => void;
+  restoration?: { enabled: boolean; level: string };
+  onRestorationChange?: (enabled: boolean, level: string) => void;
+  // Export
+  exportSettings?: { quality: string; format: string; fps: number; aspect_ratio: string };
+  onExportSettingsChange?: (settings: any) => void;
+  onStartExport?: () => void;
 }
 
 interface Caption {
