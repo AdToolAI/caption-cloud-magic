@@ -1,30 +1,51 @@
 
 
-## Plan: F5 setzt Director's Cut zurück zur Video-Auswahl
+## Plan: Audio im Black Screen (Gap) stumm schalten
 
 ### Problem
 
-Der Draft wird in `sessionStorage` gespeichert und beim Laden der Seite via `loadDraft()` wiederhergestellt. Da `sessionStorage` innerhalb desselben Tabs über Seiten-Refreshes (F5) hinweg bestehen bleibt, wird der Nutzer direkt zurück ins Studio gebracht statt zur Video-Auswahl.
+Wenn eine Lücke > 0.2s zwischen Szenen erkannt wird, wird das Video korrekt ausgeblendet (Black Screen), aber die drei Audio-Elemente (`sourceAudioRef`, `voiceoverAudioRef`, `backgroundMusicAudioRef`) spielen weiter. Der Nutzer hört also Sound, obwohl nichts zu sehen ist.
 
 ### Lösung
 
-**Datei: `src/pages/DirectorsCut/DirectorsCut.tsx`**
+**Datei: `DirectorsCutPreviewPlayer.tsx`**
 
-Beim initialen Laden der Seite (`useEffect` mit leerem Dependency-Array) `clearDraft()` aufrufen, **bevor** der Draft geladen wird. Dazu einen Check einbauen, ob die Seite frisch geladen wurde (via `performance.navigation.type === 1` / `PerformanceNavigationTiming`) oder einfacher: einen `sessionStorage`-Flag (`directors-cut-session-active`) setzen. Wenn das Flag beim Laden **bereits** existiert, wurde die Seite refresht → Draft löschen und bei Video-Auswahl starten. Wenn es nicht existiert, ist es ein frischer Besuch → Flag setzen und normal fortfahren (Draft auch ignorieren, da kein vorheriger State).
+An **drei Stellen** im Code, wo `inGapRef.current = true` gesetzt wird (Gap-Entry), werden alle Audio-Elemente pausiert:
 
-Alternativ (einfachster Ansatz): Die Draft-Wiederherstellung komplett entfernen. Der Draft dient dann nur noch der internen Auto-Save-Logik innerhalb einer Session, wird aber bei F5 nie wiederhergestellt.
+```typescript
+sourceAudioRef.current?.pause();
+voiceoverAudioRef.current?.pause();
+backgroundMusicAudioRef.current?.pause();
+```
 
-**Konkreter Ansatz**: Im `useEffect` das `loadDraft()` durch `clearDraft()` ersetzen, sodass bei jedem Mount der Seite der Draft gelöscht wird und der Nutzer immer bei der Video-Auswahl startet.
+An der **einen Stelle**, wo der Gap endet (`inGapRef.current = false` + Seek zur nächsten Szene), werden die Audio-Elemente zur neuen Position gesynct und wieder gestartet:
+
+```typescript
+// Seek audio to next scene's source start
+const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
+if (sourceAudioRef.current && !originalAudioMutedRef.current && !isMutedRef.current) {
+  sourceAudioRef.current.currentTime = nextSourceStart;
+  sourceAudioRef.current.play().catch(() => {});
+}
+// Voiceover + Background Music: resume from timeline position
+if (voiceoverAudioRef.current && !isMutedRef.current) {
+  voiceoverAudioRef.current.currentTime = nextScene.start_time;
+  voiceoverAudioRef.current.play().catch(() => {});
+}
+if (backgroundMusicAudioRef.current && !isMutedRef.current) {
+  backgroundMusicAudioRef.current.currentTime = nextScene.start_time;
+  backgroundMusicAudioRef.current.play().catch(() => {});
+}
+```
 
 ### Dateien
 
 | Aktion | Datei | Änderung |
 |--------|-------|----------|
-| Edit | `src/pages/DirectorsCut/DirectorsCut.tsx` | Draft-Wiederherstellung entfernen, stattdessen `clearDraft()` beim Mount |
+| Edit | `DirectorsCutPreviewPlayer.tsx` | Audio bei Gap-Entry pausieren, bei Gap-Exit zum nächsten Szenen-Zeitpunkt resyncen und fortsetzen |
 
 ### Ergebnis
 
-- F5 / Page Refresh → Nutzer landet bei der Video-Auswahl
-- Alle vorherigen Änderungen werden zurückgesetzt
-- Innerhalb einer laufenden Session funktioniert Auto-Save weiterhin (Step-Navigation etc.)
+- Black Screen = komplette Stille (kein Audio)
+- Beim Übergang zur nächsten Szene startet der Sound korrekt an der richtigen Position
 
