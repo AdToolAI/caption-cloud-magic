@@ -243,9 +243,37 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onSubtitleSafeZoneChange,
   isDetectingBand = false,
   onDetectSubtitleBand,
+  // New Studio Tab props
+  scenes = [],
+  transitions = [],
+  selectedSceneId = null,
+  currentTime = 0,
+  onSplitAtPlayhead,
+  onDeleteScene,
+  onDuplicateScene,
+  onSceneSelect,
+  onAutocut,
+  isAnalyzing = false,
+  appliedEffects,
+  onEffectsChange,
+  colorGrading,
+  onColorGradingChange,
+  styleTransfer,
+  onStyleTransferChange,
+  chromaKey,
+  onChromaKeyChange,
+  upscaling,
+  onUpscalingChange,
+  interpolation,
+  onInterpolationChange,
+  restoration,
+  onRestorationChange,
+  exportSettings,
+  onExportSettingsChange,
+  onStartExport,
 }) => {
   // Tab state
-  const [activeTab, setActiveTab] = useState('subtitle');
+  const [activeTab, setActiveTab] = useState('cut');
   
   // AI Captions State
   const [captionLanguage, setCaptionLanguage] = useState('de');
