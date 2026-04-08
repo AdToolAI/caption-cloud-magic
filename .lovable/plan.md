@@ -1,54 +1,45 @@
 
 
-## Plan: Szene-2-Advance Fix — `original_start_time` für alle Szenen setzen
+## Plan: Sidebar-Clipping fix + Szenen-Advance reparieren
 
-### Problem
+### Probleme
 
-Wenn die Geschwindigkeit von Szene 1 geändert wird (z.B. 0.5x), wird deren Timeline-Dauer verdoppelt. Die nachfolgenden Szenen werden auf der Timeline korrekt verschoben (`start_time` = 20 statt 10). **Aber**: Diese Szenen bekommen kein `original_start_time` gesetzt.
+**1. Sidebar abgeschnitten**: Der Sidebar-Container hat `w-80` aber kein `flex-shrink-0`. Im Flex-Layout (`flex-1 flex overflow-hidden`) kann der Browser die Sidebar komprimieren.
 
-Im Preview-Player nutzt die Szenen-Advance-Logik:
-```
-const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
-video.currentTime = nextSourceStart;   // ← Seek im SOURCE-Video
-```
+**2. Nur Szene 1 spielt**: Die `original_start_time`-Logik ist zwar korrekt implementiert, aber der Scene-Advance hat drei subtile Probleme:
 
-Da `original_start_time` fehlt, wird `start_time` (= 20, Timeline-Zeit) als Source-Seek-Position verwendet. Aber im Source-Video liegt Szene 2 bei z.B. Sekunde 10. Ergebnis: Seek über das Video-Ende hinaus → nur Szene 1 wird abgespielt.
-
-Gleicher Bug in `findSceneBySourceTime`: `srcStart = s.original_start_time ?? s.start_time` — Szene 2 wird mit Source-Start 20 gesucht, obwohl sie bei Source 10 anfängt → nie gefunden.
+- **Seek-Schwelle zu hoch**: Bei der Szenengrenze wird nur geseekt wenn `abs(video.currentTime - nextSourceStart) > 0.3`. Wenn die Szenen direkt aneinandergrenzen (Scene1 endet bei Source 10, Scene2 beginnt bei Source 10), ist die Differenz ≈ 0 → kein Seek → Video fließt weiter, aber die Szenen-Erkennung (`findSceneBySourceTime`) findet wegen der 0.05-Toleranz weiter Scene 1 statt Scene 2
+- **PlaybackRate nicht sofort gesetzt**: Beim Szenen-Wechsel wird die neue Rate erst im "unified speed block" gesetzt (der läuft NACH der Szenen-Logik). Wenn Scene 1 = 0.5x und Scene 2 = 1x, spielt die erste Sekunde von Scene 2 noch mit 0.5x
+- **video.onEnded stoppt alles**: Wenn das physische Video endet, wird `handleVideoEnded()` ausgelöst — auch wenn noch Timeline-Szenen übrig sind (z.B. bei Multi-Clip-Szenarien)
 
 ### Lösung
 
-**Datei: `src/components/directors-cut/studio/CapCutEditor.tsx`** (Zeilen 908-915)
+**Datei 1: `CapCutEditor.tsx`** — Sidebar `flex-shrink-0`
 
-Beim Neuberechnen der nachfolgenden Szenen-Timings auch `original_start_time` und `original_end_time` setzen, falls sie noch nicht existieren — **bevor** `start_time`/`end_time` verschoben werden:
-
-```typescript
-const sorted = [...updatedScenes].sort((a, b) => a.start_time - b.start_time);
-for (let i = 1; i < sorted.length; i++) {
-  const prev = sorted[i - 1];
-  const dur = sorted[i].end_time - sorted[i].start_time;
-  // Preserve original source positions for unmodified scenes
-  const origStart = sorted[i].original_start_time ?? sorted[i].start_time;
-  const origEnd = sorted[i].original_end_time ?? sorted[i].end_time;
-  sorted[i] = {
-    ...sorted[i],
-    start_time: prev.end_time,
-    end_time: prev.end_time + dur,
-    original_start_time: origStart,
-    original_end_time: origEnd,
-  };
-}
+Zeile 1441-1442: `flex-shrink-0` hinzufügen damit die Sidebar nicht komprimiert wird:
 ```
+sidebarCollapsed ? "w-12" : "w-80 flex-shrink-0"
+```
+Gleiches für Properties-Panel (Zeile 1704-1706).
 
-Das bewahrt die echten Source-Positionen, sodass der Player korrekt im Video seekt.
+**Datei 2: `DirectorsCutPreviewPlayer.tsx`** — Scene-Advance robuster machen
+
+1. **Forcierter Mini-Seek** (Zeile ~670): Wenn die Differenz < 0.3 aber > 0 ist, trotzdem `video.currentTime = nextSourceStart + 0.05` setzen, damit `findSceneBySourceTime` Scene 2 sofort findet statt 5 Frames in der Toleranzzone von Scene 1 zu hängen
+
+2. **PlaybackRate sofort setzen** (Zeile ~675): Direkt nach dem Seek `video.playbackRate = nextScene.playbackRate ?? 1` setzen
+
+3. **onEnded-Safety** (Zeile ~370): In `handleVideoEnded` prüfen ob noch Szenen übrig sind. Falls ja, zur nächsten Szene seeken statt Playback zu stoppen
 
 ### Dateien
 
 | Aktion | Datei | Änderung |
 |--------|-------|----------|
-| Edit | `CapCutEditor.tsx` | `original_start_time`/`original_end_time` für alle nachfolgenden Szenen setzen |
+| Edit | `CapCutEditor.tsx` | `flex-shrink-0` an Sidebar + Properties Panel |
+| Edit | `DirectorsCutPreviewPlayer.tsx` | Forcierter Seek, sofortige Rate, onEnded-Safety |
 
 ### Ergebnis
 
-Alle Szenen spielen korrekt ab, auch wenn vorherige Szenen eine andere Geschwindigkeit haben. Der Player seekt zur richtigen Source-Position.
+- Sidebar wird nicht mehr abgeschnitten
+- Szenen-Wechsel funktioniert zuverlässig bei unterschiedlichen Geschwindigkeiten
+- Kein Hänger oder Verzögerung beim Übergang zwischen Szenen
 
