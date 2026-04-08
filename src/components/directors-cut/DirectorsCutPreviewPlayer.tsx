@@ -575,6 +575,62 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const video = getActiveVideo();
       if (!video) { rafIdRef.current = requestAnimationFrame(tick); return; }
 
+      const now = performance.now();
+
+      // === GAP DETECTION: check if timeline time is in a gap between scenes ===
+      // When in a gap, we manually advance timeline time and hide the video
+      if (inGapRef.current) {
+        const delta = gapLastTimestampRef.current > 0 ? (now - gapLastTimestampRef.current) / 1000 : 0;
+        gapLastTimestampRef.current = now;
+        const currentTL = visualTimeRef.current + delta;
+        
+        // Find the next scene that starts after our current position
+        let nextScene: SceneAnalysis | null = null;
+        for (const s of sortedScenes) {
+          if (s.start_time > visualTimeRef.current + 0.01) {
+            nextScene = s;
+            break;
+          }
+        }
+
+        if (nextScene && currentTL >= nextScene.start_time) {
+          // Gap ended — seek to next scene and restore video
+          inGapRef.current = false;
+          gapLastTimestampRef.current = 0;
+          const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
+          video.currentTime = nextSourceStart + 0.05;
+          video.playbackRate = (nextScene as any).playbackRate ?? 1;
+          video.style.opacity = '1';
+          const standby = getStandbyVideo();
+          if (standby) standby.style.opacity = '0';
+          if (video.paused && isPlayingRef.current) video.play().catch(() => {});
+          visualTimeRef.current = nextScene.start_time;
+          // Find index of next scene
+          const idx = sortedScenes.indexOf(nextScene);
+          if (idx >= 0) lastSceneIndexRef.current = idx;
+        } else if (!nextScene || currentTL >= duration - 0.05) {
+          // No next scene or past end — stop
+          inGapRef.current = false;
+          gapLastTimestampRef.current = 0;
+          handleVideoEnded();
+          return;
+        } else {
+          // Still in gap — advance timeline, keep video hidden
+          visualTimeRef.current = currentTL;
+          video.style.opacity = '0';
+          const standby = getStandbyVideo();
+          if (standby) standby.style.opacity = '0';
+
+          // Throttled UI updates during gap
+          const lastUpdate = visualTimeRef.current;
+          setDisplayTime(currentTL);
+          onTimeUpdateRef.current?.(currentTL);
+        }
+
+        rafIdRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
       // VIDEO-LED: read video.currentTime as source of truth
       const videoSourceTime = video.currentTime;
 
@@ -681,9 +737,23 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
               // Boundary already handled by transition handoff — skip the seek
               lastHandoffBoundaryRef.current = null;
             } else {
-              // Video reached end of scene (or end of transition window) — advance to next scene
+              // Video reached end of scene — check for gap before advancing
               const nextScene = sortedScenes[sceneInfo.index + 1];
               if (nextScene) {
+                const gapDuration = nextScene.start_time - sceneInfo.scene.end_time;
+                if (gapDuration > 0.2) {
+                  // Large gap detected — enter gap mode (black screen)
+                  inGapRef.current = true;
+                  gapLastTimestampRef.current = performance.now();
+                  visualTimeRef.current = sceneInfo.scene.end_time;
+                  video.pause();
+                  video.style.opacity = '0';
+                  const standby = getStandbyVideo();
+                  if (standby) standby.style.opacity = '0';
+                  rafIdRef.current = requestAnimationFrame(tick);
+                  return;
+                }
+                // No significant gap — normal scene advance
                 const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
                 const seekDiff = Math.abs(video.currentTime - nextSourceStart);
                 // Always force a mini-seek to ensure findSceneBySourceTime picks up the new scene
@@ -702,8 +772,31 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             }
           }
         }
+
+        // Ensure video is visible when we have a valid scene (not in gap)
+        if (!inGapRef.current) {
+          video.style.opacity = '1';
+        }
       } else {
-        // Fallback: no scene found, estimate timeline time
+        // Fallback: no scene found — check if we're in a gap
+        const estimatedTL = videoSourceTime;
+        let inGap = false;
+        for (let i = 0; i < sortedScenes.length - 1; i++) {
+          const gapStart = sortedScenes[i].end_time;
+          const gapEnd = sortedScenes[i + 1].start_time;
+          if (gapEnd - gapStart > 0.2 && estimatedTL >= gapStart - 0.1 && estimatedTL < gapEnd + 0.1) {
+            inGap = true;
+            inGapRef.current = true;
+            gapLastTimestampRef.current = performance.now();
+            visualTimeRef.current = estimatedTL;
+            video.pause();
+            video.style.opacity = '0';
+            const standby = getStandbyVideo();
+            if (standby) standby.style.opacity = '0';
+            rafIdRef.current = requestAnimationFrame(tick);
+            return;
+          }
+        }
         timelineTime = videoSourceTime;
       }
 
