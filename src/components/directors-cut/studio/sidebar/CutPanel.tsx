@@ -24,8 +24,8 @@ interface CutPanelProps {
 
 const formatTime = (s: number) => {
   const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, '0')}`;
+  const sec = (s % 60).toFixed(2);
+  return `${m}:${sec.padStart(5, '0')}`;
 };
 
 export const CutPanel: React.FC<CutPanelProps> = ({
@@ -180,7 +180,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                         </p>
                       )}
                       <p className="text-[9px] text-white/40">
-                        {formatTime(scene.start_time)} – {formatTime(scene.end_time)} ({(scene.end_time - scene.start_time).toFixed(1)}s)
+                        {formatTime(scene.start_time)} – {formatTime(scene.end_time)} ({(scene.end_time - scene.start_time).toFixed(2)}s)
                       </p>
                     </div>
 
@@ -217,9 +217,9 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                       <label className="text-[9px] text-white/30">Start:</label>
                       <input
                         type="number"
-                        step={0.1}
+                        step={0.01}
                         min={0}
-                        value={scene.start_time.toFixed(1)}
+                        value={scene.start_time.toFixed(2)}
                         onChange={(e) => {
                           const val = Math.max(0, parseFloat(e.target.value) || 0);
                           if (val < scene.end_time - 0.5) onTrimScene(scene.id, val, scene.end_time);
@@ -229,9 +229,9 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                       <label className="text-[9px] text-white/30">End:</label>
                       <input
                         type="number"
-                        step={0.1}
+                        step={0.01}
                         min={0}
-                        value={scene.end_time.toFixed(1)}
+                        value={scene.end_time.toFixed(2)}
                         onChange={(e) => {
                           const val = Math.max(scene.start_time + 0.5, parseFloat(e.target.value) || 0);
                           onTrimScene(scene.id, scene.start_time, val);
