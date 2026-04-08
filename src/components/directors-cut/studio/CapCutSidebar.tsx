@@ -279,6 +279,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onInterpolationChange,
   restoration,
   onRestorationChange,
+  onScenePlaybackRateChange,
   exportSettings,
   onExportSettingsChange,
   onStartExport,
