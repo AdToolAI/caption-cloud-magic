@@ -1,57 +1,40 @@
 
 
-## Plan: Export-Overlay mit Fortschrittsanzeige und UI-Sperre
+## Plan: Render-Fortschritt korrekt tracken — richtige Edge Function + Completion-Screen
 
 ### Problem
-Nach Klick auf "Export" zeigt der Editor nur einen Toast "Export gestartet" — der Nutzer sieht keinen Fortschritt, kann weiter editieren, und weiß nicht wann das Video fertig ist.
+
+1. **Falsche Edge Function**: Der Client pollt `check-render-status`, die nur `video_renders` abfragt. Director's Cut Renders liegen in `director_cut_renders` → jeder Poll schlägt mit "Unauthorized" fehl → Fortschritt bleibt bei 10%
+2. **Falscher Render-ID**: Der Client nutzt `render_id` (DB-UUID), aber `check-remotion-progress` braucht die `remotion_render_id`
+3. **Kein Abschluss-Feedback**: Overlay verschwindet still, ohne Erfolg/Download anzuzeigen
 
 ### Lösung
-Ein **fullscreen Render-Overlay** das über den gesamten Editor gelegt wird, sobald der Export startet. Es blockiert alle Bearbeitungsfunktionen und zeigt den Render-Fortschritt in Echtzeit.
 
-### Was gebaut wird
+Polling auf `check-remotion-progress` umstellen (die bereits Director's Cut korrekt unterstützt) und `remotion_render_id` verwenden.
 
-**1. Neue Komponente: `RenderOverlay.tsx`**
-- Fullscreen-Overlay (z-50) über dem gesamten Editor
-- Animierter Fortschrittsbalken mit Prozentanzeige
-- Status-Stufen: Vorbereitung → Rendering → Fertigstellung
-- Geschätzte Restzeit basierend auf Fortschritt
-- Bei Abschluss: Download-Button + "Zur Mediathek"-Button
-- Bei Fehler: Fehlermeldung + Retry-Button
-- Hintergrund leicht geblurred, Editor nicht klickbar
+### Änderung
 
-**2. Änderung: `CapCutEditor.tsx`**
-- State hinzufügen: `isRendering`, `renderProgress`, `currentRenderId`, `renderedVideoUrl`, `renderComplete`, `renderError`
-- Nach erfolgreichem Export-Aufruf: `render_id` aus Response speichern, Overlay anzeigen
-- **Realtime-Subscription** auf `director_cut_renders` Tabelle (gleiche Logik wie ExportRenderStep)
-- **Fallback-Polling** alle 30s via `check-remotion-progress` Edge Function
-- Bei Abschluss: Video-URL anzeigen, Download ermöglichen
-- Overlay blockiert alle Maus-Events auf den darunterliegenden Editor
+**Datei: `src/components/directors-cut/studio/CapCutEditor.tsx`**
 
-### Technische Details
+**1. Response-Handling (~Zeile 1072)**
+- Zusätzlich `remotion_render_id` aus der Response extrahieren und speichern
 
-```text
-┌─────────────────────────────────────────┐
-│           RENDER OVERLAY (z-50)         │
-│                                         │
-│     🎬 Dein Video wird gerendert...     │
-│                                         │
-│     ████████████░░░░░░░░░  62%          │
-│                                         │
-│     Geschätzte Restzeit: ~2:30 Min      │
-│                                         │
-│  [Bei Fehler: Retry]  [Bei Fertig: ⬇]  │
-└─────────────────────────────────────────┘
-```
+**2. Polling-Funktion (`startRenderPolling`, ~Zeile 981)**
+- Edge Function von `check-render-status` auf `check-remotion-progress` ändern
+- Body: `{ renderId: remotionRenderId, source: 'directors-cut' }` statt `{ renderId }`
+- Response-Mapping anpassen:
+  - `data.progress?.done` → completed
+  - `data.progress?.outputFile` → video URL
+  - `data.progress?.overallProgress` → Fortschritt (0-1, mal 100)
+  - `data.progress?.fatalErrorEncountered` → failed
+- Polling-Intervall: 10s statt 15s für schnelleres Feedback
 
-### Dateien
+**3. Completion-Handling**
+- Bei `done: true` → `setRenderProgress(100)`, `setRenderStatus('completed')`, `setRenderedVideoUrl(outputFile)`
+- Overlay bleibt sichtbar mit Download-Button und "Video fertig!" Anzeige
+- Polling-Cleanup im `useEffect`-Cleanup sicherstellen
 
-| Aktion | Datei | Beschreibung |
-|--------|-------|--------------|
-| Neu | `src/components/directors-cut/studio/RenderOverlay.tsx` | Overlay-Komponente mit Progress, Download, Fehler-Handling |
-| Edit | `src/components/directors-cut/studio/CapCutEditor.tsx` | Render-State, Realtime-Subscription, Polling, Overlay einbinden |
+### Ergebnis
 
-### Reihenfolge
-1. RenderOverlay-Komponente erstellen
-2. CapCutEditor: Render-State + Realtime/Polling-Logik aus ExportRenderStep übernehmen
-3. Overlay nach erfolgreichem Export-Aufruf anzeigen, Editor blockieren
+Fortschrittsbalken zeigt echten Render-Fortschritt (0-100%), Overlay bleibt bis zum Abschluss sichtbar, und der Nutzer sieht "Video fertig!" mit Download-Button.
 
