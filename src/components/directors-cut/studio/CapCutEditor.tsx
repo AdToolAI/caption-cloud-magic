@@ -1338,9 +1338,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     .find(c => c.id === selectedClipId);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-[#1a1a1a]">
-      {/* Header Bar */}
-      <div className="h-10 flex items-center justify-between px-3 border-b border-[#2a2a2a] bg-[#242424]">
+    <div className="h-screen flex flex-col overflow-hidden bg-[#050816]">
+      {/* Header Bar — James Bond 2028 Glassmorphism */}
+      <div className="h-10 flex items-center justify-between px-3 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80 backdrop-blur-xl">
         <div className="flex items-center gap-2">
           {onBackToImport && (
             <Button 
@@ -1354,7 +1354,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               Zurück
             </Button>
           )}
-          <div className="w-px h-5 bg-[#3a3a3a]" />
+          <div className="w-px h-5 bg-[#F5C76A]/15" />
           <Button 
             variant="ghost" 
             size="sm" 
@@ -1364,7 +1364,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           >
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
-          <span className="text-white font-semibold text-sm">Director's Cut Studio</span>
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F5C76A] to-[#FFE4A0] font-semibold text-sm drop-shadow-[0_0_8px_rgba(245,199,106,0.2)]">Director's Cut Studio</span>
         </div>
         <div className="flex items-center gap-1.5">
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10">
@@ -1373,7 +1373,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10">
             <Redo2 className="h-3.5 w-3.5" />
           </Button>
-          <div className="w-px h-5 bg-[#3a3a3a] mx-1" />
+          <div className="w-px h-5 bg-[#F5C76A]/15 mx-1" />
           <Button 
             variant="ghost" 
             size="sm" 
@@ -1383,11 +1383,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           >
             {propertiesCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
           </Button>
-          <div className="w-px h-5 bg-[#3a3a3a] mx-1" />
+          <div className="w-px h-5 bg-[#F5C76A]/15 mx-1" />
           <Button 
             onClick={handleExportVideo}
             size="sm"
-            className="gap-1.5 h-7 bg-gradient-to-r from-[#00d4ff] to-[#7c3aed] hover:opacity-90 text-xs text-white"
+            className="gap-1.5 h-7 bg-gradient-to-r from-[#F5C76A] to-[#d4a843] hover:from-[#FFE4A0] hover:to-[#F5C76A] text-xs text-black font-semibold shadow-[0_0_15px_rgba(245,199,106,0.25)]"
           >
             <Download className="h-3.5 w-3.5" />
             Export
@@ -1400,7 +1400,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         <div className="flex-1 flex overflow-hidden">
           {/* Left Sidebar - Collapsible */}
           <div className={cn(
-            "flex flex-col border-r border-[#2a2a2a] bg-[#1e1e1e] transition-all duration-200",
+            "flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-all duration-200",
             sidebarCollapsed ? "w-12" : "w-72"
           )}>
             {sidebarCollapsed ? (
@@ -1594,7 +1594,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           {/* Center Area */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Preview Player */}
-            <div className="h-[50%] min-h-[280px] p-2 bg-[#1a1a1a] overflow-hidden flex flex-col">
+            <div className="h-[50%] min-h-[280px] p-2 bg-[#050816] overflow-hidden flex flex-col">
               <DirectorsCutPreviewPlayer
                 fillContainer={true}
                 videoUrl={cleanedVideoUrl || videoUrl}
@@ -1627,7 +1627,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             </div>
 
             {/* Timeline */}
-            <div className="flex-1 border-t border-[#2a2a2a] overflow-hidden">
+            <div className="flex-1 border-t border-[#F5C76A]/10 overflow-hidden">
               <CapCutTimeline
                 tracks={audioTracks}
                 scenes={scenes}
@@ -1660,7 +1660,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
           {/* Right Sidebar - Collapsible */}
           <div className={cn(
-            "border-l border-[#2a2a2a] bg-[#1e1e1e] transition-all duration-200",
+            "border-l border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-all duration-200",
             propertiesCollapsed ? "w-12" : "w-72"
           )}>
             {propertiesCollapsed ? (

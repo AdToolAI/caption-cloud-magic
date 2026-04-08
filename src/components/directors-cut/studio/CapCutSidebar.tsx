@@ -535,55 +535,55 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   }, []);
 
   return (
-    <div className="w-72 flex flex-col border-r border-[#2a2a2a] bg-[#1e1e1e] h-full">
+    <div className="w-72 flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg h-full">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col h-full">
-        {/* Tab Icons */}
-        <TabsList className="grid grid-cols-7 gap-0.5 p-1.5 bg-[#1a1a1a] border-b border-[#2a2a2a] h-auto rounded-none">
+        {/* Tab Icons — Cyan glow on active */}
+        <TabsList className="grid grid-cols-7 gap-0.5 p-1.5 bg-[#050816] border-b border-[#F5C76A]/10 h-auto rounded-none">
           <TabsTrigger 
             value="cut" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-[#00d4ff]/20 data-[state=active]:text-[#00d4ff] text-white/50 hover:text-white/80 hover:bg-white/5"
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
             title="Schnitt"
           >
             <Scissors className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="look" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-[#00d4ff]/20 data-[state=active]:text-[#00d4ff] text-white/50 hover:text-white/80 hover:bg-white/5"
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
             title="Look & Farbe"
           >
             <Palette className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="fx" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 text-white/50 hover:text-white/80 hover:bg-white/5"
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-purple-500/15 data-[state=active]:text-purple-400 data-[state=active]:shadow-[0_0_12px_rgba(168,85,247,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
             title="Effekte"
           >
             <Wand2 className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="subtitle" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-[#00d4ff]/20 data-[state=active]:text-[#00d4ff] text-white/50 hover:text-white/80 hover:bg-white/5"
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
             title="Untertitel"
           >
             <Type className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="audio-fx" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-pink-500/20 data-[state=active]:text-pink-400 text-white/50 hover:text-white/80 hover:bg-white/5"
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-pink-500/15 data-[state=active]:text-pink-400 data-[state=active]:shadow-[0_0_12px_rgba(236,72,153,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
             title="Audio"
           >
             <Music className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="export" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-white/50 hover:text-white/80 hover:bg-white/5"
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-[#F5C76A]/15 data-[state=active]:text-[#F5C76A] data-[state=active]:shadow-[0_0_12px_rgba(245,199,106,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
             title="Export"
           >
             <Download className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="settings" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50 hover:text-white/80 hover:bg-white/5"
+            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-[0_0_8px_rgba(255,255,255,0.1)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
             title="Einstellungen"
           >
             <Settings className="h-3.5 w-3.5" />

@@ -66,7 +66,8 @@ export const CutPanel: React.FC<CutPanelProps> = ({
     <div className="p-3 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-2">
-        <Scissors className="h-4 w-4 text-[#00d4ff]" />
+        <div className="w-1 h-4 rounded-full bg-[#F5C76A]" />
+        <Scissors className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]" />
         <span className="text-sm font-medium text-white">Schnitt</span>
       </div>
 
@@ -74,7 +75,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
       <Button
         onClick={onSplitAtPlayhead}
         disabled={scenes.length === 0}
-        className="w-full bg-[#00d4ff] hover:bg-[#00b8e0] text-black font-medium"
+        className="w-full bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-black font-medium shadow-[0_0_15px_rgba(34,211,238,0.2)]"
         size="sm"
       >
         <Scissors className="h-3.5 w-3.5 mr-2" />
@@ -92,7 +93,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
             onClick={onSceneAdd}
             variant="outline"
             size="sm"
-            className="flex-1 border-[#3a3a3a] text-white/70 hover:bg-white/5"
+            className="flex-1 border-white/10 text-white/70 hover:bg-white/5 hover:border-cyan-500/30"
           >
             <Plus className="h-3.5 w-3.5 mr-2" />
             Leere Szene
@@ -115,7 +116,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
               onClick={() => videoInputRef.current?.click()}
               variant="outline"
               size="sm"
-              className="flex-1 border-[#3a3a3a] text-white/70 hover:bg-white/5"
+              className="flex-1 border-white/10 text-white/70 hover:bg-white/5 hover:border-cyan-500/30"
             >
               <FileVideo className="h-3.5 w-3.5 mr-2" />
               Video hinzufügen
@@ -127,7 +128,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
       {/* Optional Auto-Cut */}
       {onAutocut && (
         <>
-          <div className="border-t border-[#3a3a3a]" />
+          <div className="border-t border-[#F5C76A]/10" />
           <Button
             onClick={onAutocut}
             disabled={isAnalyzing}
@@ -148,9 +149,9 @@ export const CutPanel: React.FC<CutPanelProps> = ({
       )}
 
       {/* Scene List */}
-      <div className="border-t border-[#3a3a3a] pt-3">
+      <div className="border-t border-[#F5C76A]/10 pt-3">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-white/50 font-medium uppercase tracking-wider">
+          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">
             Szenen ({scenes.length})
           </span>
         </div>
@@ -169,10 +170,10 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                   key={scene.id}
                   onClick={() => onSceneSelect(scene.id)}
                   className={cn(
-                    "flex flex-col gap-1 p-2 rounded-lg cursor-pointer transition-colors group",
+                    "flex flex-col gap-1 p-2 rounded-xl cursor-pointer transition-all group border backdrop-blur-sm",
                     selectedSceneId === scene.id
-                      ? "bg-[#00d4ff]/15 border border-[#00d4ff]/30"
-                      : "bg-[#2a2a2a] hover:bg-[#333] border border-transparent"
+                      ? "bg-cyan-500/10 border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.1)]"
+                      : "bg-[#0a0a1a]/60 hover:bg-white/5 border-white/5 hover:border-white/10"
                   )}
                 >
                   <div className="flex items-center gap-2">
@@ -182,7 +183,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                       "w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0",
                       scene.isBlackscreen 
                         ? "bg-zinc-700 text-zinc-400" 
-                        : "bg-indigo-600/80 text-white"
+                        : "bg-cyan-500/20 text-cyan-300"
                     )}>
                       {i + 1}
                     </div>
@@ -196,7 +197,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                             onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingSceneId(null); }}
                             onBlur={commitEdit}
                             autoFocus
-                            className="flex-1 bg-[#1a1a1a] border border-[#3a3a3a] rounded px-1.5 py-0.5 text-[11px] text-white/90 outline-none focus:border-[#00d4ff]/50"
+                            className="flex-1 bg-[#050816] border border-cyan-500/30 rounded px-1.5 py-0.5 text-[11px] text-white/90 outline-none focus:border-cyan-400/60"
                             onClick={(e) => e.stopPropagation()}
                           />
                           <button onClick={(e) => { e.stopPropagation(); commitEdit(); }} className="p-0.5 text-green-400">
@@ -217,7 +218,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                       {onSceneRename && editingSceneId !== scene.id && (
                         <button
                           onClick={(e) => { e.stopPropagation(); startEditing(scene); }}
-                          className="p-1 rounded hover:bg-white/10 text-white/40 hover:text-white"
+                          className="p-1 rounded hover:bg-white/10 text-white/40 hover:text-cyan-300"
                           title="Umbenennen"
                         >
                           <Pencil className="h-3 w-3" />
@@ -253,7 +254,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                           const val = Math.max(0, parseFloat(e.target.value) || 0);
                           if (val < scene.end_time - 0.5) onTrimScene(scene.id, val, scene.end_time);
                         }}
-                        className="w-14 h-5 px-1 bg-[#1a1a1a] border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
+                        className="w-14 h-5 px-1 bg-[#050816] border border-white/10 rounded text-[9px] text-white/80 text-center"
                       />
                       <label className="text-[9px] text-white/30">End:</label>
                       <input
@@ -265,7 +266,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                           const val = Math.max(scene.start_time + 0.5, parseFloat(e.target.value) || 0);
                           onTrimScene(scene.id, scene.start_time, val);
                         }}
-                        className="w-14 h-5 px-1 bg-[#1a1a1a] border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
+                        className="w-14 h-5 px-1 bg-[#050816] border border-white/10 rounded text-[9px] text-white/80 text-center"
                       />
                     </div>
                   )}

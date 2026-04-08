@@ -132,8 +132,8 @@ const DraggableScene: React.FC<{
         "absolute top-1 bottom-1 rounded-lg flex flex-col cursor-grab active:cursor-grabbing group transition-all border",
         colorSet.bg, colorSet.border,
         isDragging && "opacity-50 ring-2 ring-cyan-400",
-        isSelected && "ring-2 ring-[#00d4ff] ring-offset-1 ring-offset-[#1a1a1a]",
-        isPlayheadInside && !isSelected && "ring-1 ring-yellow-400/60"
+        isSelected && "ring-2 ring-cyan-400 ring-offset-1 ring-offset-[#050816] shadow-[0_0_15px_rgba(34,211,238,0.2)]",
+        isPlayheadInside && !isSelected && "ring-1 ring-[#F5C76A]/60"
       )}
       onClick={(e) => { e.stopPropagation(); onSelect(); onSeek(scene.start_time); }}
       {...attributes}
@@ -446,7 +446,7 @@ const DraggableSubtitleClip: React.FC<{
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
-            className="w-12 h-5 px-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
+            className="w-12 h-5 px-1 bg-white/5 border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
             title="Startzeit (Sek)"
           />
           <span className="text-[9px] text-white/40">-</span>
@@ -461,7 +461,7 @@ const DraggableSubtitleClip: React.FC<{
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
-            className="w-12 h-5 px-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
+            className="w-12 h-5 px-1 bg-white/5 border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
             title="Endzeit (Sek)"
           />
         </div>
@@ -500,7 +500,7 @@ const DroppableTrack: React.FC<{
       {Array.from({ length: Math.ceil(duration) }).map((_, i) => (
         <div
           key={i}
-          className="absolute top-0 bottom-0 w-px bg-[#2a2a2a]"
+          className="absolute top-0 bottom-0 w-px bg-white/5"
           style={{ left: `${i * zoom}px` }}
         />
       ))}
@@ -646,11 +646,11 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   const timelineWidth = duration * zoom + 100; // Extra space at the end
 
   return (
-    <div className="h-full flex flex-col bg-[#1a1a1a]">
+    <div className="h-full flex flex-col bg-[#050816]">
       {/* Toolbar */}
-      <div className="h-10 flex items-center justify-between px-3 border-b border-[#2a2a2a] bg-[#242424]">
+      <div className="h-10 flex items-center justify-between px-3 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80 backdrop-blur-xl">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-white/60">Timeline</span>
+          <span className="text-xs text-[#F5C76A]/60 font-medium">Timeline</span>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -661,9 +661,9 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           >
             <Minus className="h-3.5 w-3.5" />
           </Button>
-          <div className="w-16 h-1.5 bg-[#2a2a2a] rounded-full overflow-hidden">
+          <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-[#00d4ff]"
+              className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400"
               style={{ width: `${((zoom - 20) / 80) * 100}%` }}
             />
           </div>
@@ -683,11 +683,11 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
         {/* Track Headers */}
         <div className="flex-shrink-0 overflow-y-auto" style={{ width: HEADER_WIDTH }}>
           {/* Ruler placeholder */}
-          <div className="h-6 border-b border-[#2a2a2a] bg-[#242424]" />
+          <div className="h-6 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80" />
 
           {/* Video track header */}
           <div 
-            className="flex items-center gap-2 px-2 border-b border-[#2a2a2a] bg-[#242424]"
+            className="flex items-center gap-2 px-2 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/60"
             style={{ height: VIDEO_TRACK_HEIGHT }}
           >
             <span className="text-xs">🎬</span>
@@ -698,7 +698,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           {tracksBeforeSubtitle.map(track => (
             <div
               key={track.id}
-              className="flex items-center gap-1 px-2 border-b border-[#2a2a2a] bg-[#242424]"
+              className="flex items-center gap-1 px-2 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/60"
               style={{ height: TRACK_HEIGHT }}
             >
               <span className="text-xs">{track.icon}</span>
@@ -715,7 +715,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               <button
                 className={cn(
                   "w-5 h-5 flex items-center justify-center rounded hover:bg-white/10",
-                  track.solo && "text-yellow-400"
+                  track.solo && "text-[#F5C76A]"
                 )}
                 onClick={() => onTrackSolo(track.id)}
               >
@@ -727,7 +727,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           {/* Subtitle track header */}
           {subtitleTrack && (
             <div
-              className="flex items-center gap-1 px-2 border-b border-[#2a2a2a] bg-[#242424]"
+              className="flex items-center gap-1 px-2 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/60"
               style={{ height: TRACK_HEIGHT }}
             >
               <span className="text-xs">{subtitleTrack.icon}</span>
@@ -740,7 +740,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           {tracksAfterSubtitle.map(track => (
             <div
               key={track.id}
-              className="flex items-center gap-1 px-2 border-b border-[#2a2a2a] bg-[#242424]"
+              className="flex items-center gap-1 px-2 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/60"
               style={{ height: TRACK_HEIGHT }}
             >
               <span className="text-xs">{track.icon}</span>
@@ -757,7 +757,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               <button
                 className={cn(
                   "w-5 h-5 flex items-center justify-center rounded hover:bg-white/10",
-                  track.solo && "text-yellow-400"
+                  track.solo && "text-[#F5C76A]"
                 )}
                 onClick={() => onTrackSolo(track.id)}
               >
@@ -776,16 +776,16 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             onClick={handleTimelineClick}
           >
             {/* Time Ruler */}
-            <div className="h-6 border-b border-[#2a2a2a] bg-[#1e1e1e] sticky top-0 z-20">
+            <div className="h-6 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80 sticky top-0 z-20">
               {Array.from({ length: Math.ceil(duration) + 1 }).map((_, i) => (
                 <div
                   key={i}
                   className="absolute top-0 h-full flex flex-col items-center"
                   style={{ left: `${i * zoom}px` }}
                 >
-                  <div className="w-px h-2 bg-[#4a4a4a]" />
+                  <div className="w-px h-2 bg-white/10" />
                   {i % 5 === 0 && (
-                    <span className="text-[9px] text-white/40 mt-0.5">{formatTime(i)}</span>
+                    <span className="text-[9px] text-[#F5C76A]/40 mt-0.5">{formatTime(i)}</span>
                   )}
                 </div>
               ))}
@@ -793,7 +793,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
 
             {/* Video Track */}
             <div
-              className="relative border-b border-[#2a2a2a]"
+              className="relative border-b border-[#F5C76A]/10"
               style={{ height: VIDEO_TRACK_HEIGHT }}
               onClick={() => onSceneSelect?.(null)}
             >
@@ -825,7 +825,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                       <ChevronDown className="h-2.5 w-2.5 text-white/40" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="bg-[#242424] border-[#3a3a3a]">
+                  <DropdownMenuContent align="start" className="bg-[#0a0a1a]/60 border-[#3a3a3a]">
                     {onSceneAdd && (
                       <DropdownMenuItem 
                         onClick={onSceneAdd}
@@ -853,7 +853,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             {tracksBeforeSubtitle.map(track => (
               <div
                 key={track.id}
-                className="relative border-b border-[#2a2a2a]"
+                className="relative border-b border-[#F5C76A]/10"
                 style={{ height: TRACK_HEIGHT }}
               >
                 <DroppableTrack
@@ -871,7 +871,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             {/* Subtitle Track */}
             {subtitleTrack && (
               <div
-                className="relative border-b border-[#2a2a2a]"
+                className="relative border-b border-[#F5C76A]/10"
                 style={{ height: TRACK_HEIGHT, width: `${duration * zoom}px` }}
                 onClick={() => onSubtitleSelect?.(null)}
               >
@@ -879,7 +879,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                 {Array.from({ length: Math.ceil(duration) }).map((_, i) => (
                   <div
                     key={i}
-                    className="absolute top-0 bottom-0 w-px bg-[#2a2a2a]"
+                    className="absolute top-0 bottom-0 w-px bg-white/5"
                     style={{ left: `${i * zoom}px` }}
                   />
                 ))}
@@ -903,7 +903,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             {tracksAfterSubtitle.map(track => (
               <div
                 key={track.id}
-                className="relative border-b border-[#2a2a2a]"
+                className="relative border-b border-[#F5C76A]/10"
                 style={{ height: TRACK_HEIGHT }}
               >
                 <DroppableTrack
@@ -931,12 +931,12 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               {/* Wide invisible hit area for easier grabbing */}
               <div className="absolute top-0 bottom-0 -left-3 w-7 cursor-ew-resize" />
               
-              {/* Visible playhead line */}
-              <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-[#00d4ff] -translate-x-1/2 group-hover:w-1 transition-all" />
+              {/* Visible playhead line — Gold glow */}
+              <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-[#F5C76A] -translate-x-1/2 group-hover:w-1 transition-all shadow-[0_0_8px_rgba(245,199,106,0.5)]" />
               
               {/* Larger draggable triangle/handle */}
               <div 
-                className="absolute -top-0 left-1/2 -translate-x-1/2 w-4 h-4 bg-[#00d4ff] group-hover:scale-110 transition-transform" 
+                className="absolute -top-0 left-1/2 -translate-x-1/2 w-4 h-4 bg-[#F5C76A] group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(245,199,106,0.4)]" 
                 style={{ clipPath: 'polygon(50% 100%, 0 0, 100% 0)' }} 
               />
             </div>

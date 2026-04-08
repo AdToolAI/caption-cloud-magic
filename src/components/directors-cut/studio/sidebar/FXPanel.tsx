@@ -32,15 +32,16 @@ export const FXPanel: React.FC<FXPanelProps> = ({
       <div className="p-3 space-y-4">
         {/* Header */}
         <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-[#00d4ff]" />
+          <div className="w-1 h-4 rounded-full bg-[#F5C76A]" />
+          <Zap className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]" />
           <span className="text-sm font-medium text-white">Effekte & Qualität</span>
         </div>
 
         {/* Green Screen / Chroma Key */}
-        <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
+        <div className="space-y-2 p-2.5 rounded-xl backdrop-blur-md bg-[#0a0a1a]/60 border border-white/5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <Film className="h-3 w-3 text-green-400" />
+              <Film className="h-3 w-3 text-green-400 drop-shadow-[0_0_4px_rgba(74,222,128,0.4)]" />
               <span className="text-[11px] text-white/70">Green Screen</span>
             </div>
             <Switch
@@ -57,13 +58,13 @@ export const FXPanel: React.FC<FXPanelProps> = ({
                   type="color"
                   value={chromaKey.color}
                   onChange={(e) => onChromaKeyChange({ ...chromaKey, color: e.target.value })}
-                  className="w-6 h-6 rounded cursor-pointer border border-[#3a3a3a]"
+                  className="w-6 h-6 rounded cursor-pointer border border-white/10"
                 />
               </div>
               <div className="space-y-1">
                 <div className="flex justify-between">
                   <label className="text-[10px] text-white/50">Toleranz</label>
-                  <span className="text-[10px] text-white/40">{chromaKey.tolerance}%</span>
+                  <span className="text-[10px] text-cyan-400/60">{chromaKey.tolerance}%</span>
                 </div>
                 <Slider
                   value={[chromaKey.tolerance]}
@@ -79,14 +80,14 @@ export const FXPanel: React.FC<FXPanelProps> = ({
         </div>
 
         {/* Quality Enhancement */}
-        <div className="border-t border-[#3a3a3a] pt-3 space-y-3">
-          <span className="text-xs text-white/50 font-medium uppercase tracking-wider">Qualität</span>
+        <div className="border-t border-[#F5C76A]/10 pt-3 space-y-3">
+          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">Qualität</span>
 
           {/* Upscaling */}
-          <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
+          <div className="space-y-2 p-2.5 rounded-xl backdrop-blur-md bg-[#0a0a1a]/60 border border-white/5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <ArrowUpCircle className="h-3 w-3 text-purple-400" />
+                <ArrowUpCircle className="h-3 w-3 text-purple-400 drop-shadow-[0_0_4px_rgba(192,132,252,0.4)]" />
                 <span className="text-[11px] text-white/70">KI-Upscaling</span>
               </div>
               <Switch
@@ -100,10 +101,10 @@ export const FXPanel: React.FC<FXPanelProps> = ({
                 value={upscaling.targetResolution}
                 onValueChange={(v) => onUpscalingChange(true, v)}
               >
-                <SelectTrigger className="h-7 text-[10px] bg-[#1e1e1e] border-[#3a3a3a] text-white">
+                <SelectTrigger className="h-7 text-[10px] bg-[#0a0a1a]/80 border-white/10 text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
+                <SelectContent className="bg-[#0a0a1a] border-white/10">
                   <SelectItem value="1080p" className="text-white text-xs">1080p</SelectItem>
                   <SelectItem value="2k" className="text-white text-xs">2K</SelectItem>
                   <SelectItem value="4k" className="text-white text-xs">4K</SelectItem>
@@ -113,10 +114,10 @@ export const FXPanel: React.FC<FXPanelProps> = ({
           </div>
 
           {/* Frame Interpolation */}
-          <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
+          <div className="space-y-2 p-2.5 rounded-xl backdrop-blur-md bg-[#0a0a1a]/60 border border-white/5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <Gauge className="h-3 w-3 text-cyan-400" />
+                <Gauge className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.4)]" />
                 <span className="text-[11px] text-white/70">Frame-Interpolation</span>
               </div>
               <Switch
@@ -130,10 +131,10 @@ export const FXPanel: React.FC<FXPanelProps> = ({
                 value={String(interpolation.targetFps)}
                 onValueChange={(v) => onInterpolationChange(true, Number(v))}
               >
-                <SelectTrigger className="h-7 text-[10px] bg-[#1e1e1e] border-[#3a3a3a] text-white">
+                <SelectTrigger className="h-7 text-[10px] bg-[#0a0a1a]/80 border-white/10 text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
+                <SelectContent className="bg-[#0a0a1a] border-white/10">
                   <SelectItem value="48" className="text-white text-xs">48 fps</SelectItem>
                   <SelectItem value="60" className="text-white text-xs">60 fps</SelectItem>
                   <SelectItem value="120" className="text-white text-xs">120 fps</SelectItem>
@@ -143,10 +144,10 @@ export const FXPanel: React.FC<FXPanelProps> = ({
           </div>
 
           {/* Restoration */}
-          <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
+          <div className="space-y-2 p-2.5 rounded-xl backdrop-blur-md bg-[#0a0a1a]/60 border border-white/5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <Move className="h-3 w-3 text-amber-400" />
+                <Move className="h-3 w-3 text-[#F5C76A] drop-shadow-[0_0_4px_rgba(245,199,106,0.4)]" />
                 <span className="text-[11px] text-white/70">Restaurierung</span>
               </div>
               <Switch
@@ -160,10 +161,10 @@ export const FXPanel: React.FC<FXPanelProps> = ({
                 value={restoration.level}
                 onValueChange={(v) => onRestorationChange(true, v)}
               >
-                <SelectTrigger className="h-7 text-[10px] bg-[#1e1e1e] border-[#3a3a3a] text-white">
+                <SelectTrigger className="h-7 text-[10px] bg-[#0a0a1a]/80 border-white/10 text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
+                <SelectContent className="bg-[#0a0a1a] border-white/10">
                   <SelectItem value="light" className="text-white text-xs">Leicht</SelectItem>
                   <SelectItem value="standard" className="text-white text-xs">Standard</SelectItem>
                   <SelectItem value="heavy" className="text-white text-xs">Intensiv</SelectItem>
