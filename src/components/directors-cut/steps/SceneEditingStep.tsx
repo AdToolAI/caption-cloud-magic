@@ -85,6 +85,10 @@ export function SceneEditingStep({
   },
 }: SceneEditingStepProps) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+  const [selectedSceneIds, setSelectedSceneIds] = useState<Set<string>>(new Set());
+  const [cutSegmentMode, setCutSegmentMode] = useState(false);
+  const [cutSegmentIn, setCutSegmentIn] = useState<number | null>(null);
+  const [cutSegmentOut, setCutSegmentOut] = useState<number | null>(null);
   const [editingTransitionId, setEditingTransitionId] = useState<string | null>(null);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
@@ -361,22 +365,29 @@ export function SceneEditingStep({
     const scene = scenes[sceneIndex];
     if (!scene) return;
     
-    const midPoint = (scene.start_time + scene.end_time) / 2;
-    const originalMidPoint = ((scene.original_start_time ?? scene.start_time) + (scene.original_end_time ?? scene.end_time)) / 2;
+    // Split at playhead if it's within the selected scene, otherwise midpoint
+    const playheadInScene = currentVideoTime > scene.start_time + 0.3 && currentVideoTime < scene.end_time - 0.3;
+    const splitPoint = playheadInScene ? currentVideoTime : (scene.start_time + scene.end_time) / 2;
+    
+    // Calculate original split point proportionally
+    const originalStart = scene.original_start_time ?? scene.start_time;
+    const originalEnd = scene.original_end_time ?? scene.end_time;
+    const ratio = (splitPoint - scene.start_time) / (scene.end_time - scene.start_time);
+    const originalSplitPoint = originalStart + ratio * (originalEnd - originalStart);
     
     const newScenes = [...scenes];
     const firstHalf: SceneAnalysis = {
       ...scene,
       id: `${scene.id}-a`,
-      end_time: midPoint,
-      original_end_time: originalMidPoint,
+      end_time: splitPoint,
+      original_end_time: originalSplitPoint,
       description: `${scene.description} (Teil 1)`,
     };
     const secondHalf: SceneAnalysis = {
       ...scene,
       id: `${scene.id}-b`,
-      start_time: midPoint,
-      original_start_time: originalMidPoint,
+      start_time: splitPoint,
+      original_start_time: originalSplitPoint,
       description: `${scene.description} (Teil 2)`,
     };
     
@@ -385,10 +396,12 @@ export function SceneEditingStep({
     setSelectedSceneId(firstHalf.id);
     
     toast({
-      title: 'Szene geteilt',
-      description: 'Die Szene wurde in zwei Teile aufgeteilt',
+      title: playheadInScene ? 'Am Playhead geteilt' : 'Szene geteilt',
+      description: playheadInScene 
+        ? `Szene bei ${splitPoint.toFixed(1)}s geteilt`
+        : 'Die Szene wurde in der Mitte geteilt',
     });
-  }, [selectedSceneId, scenes, onScenesUpdate, toast]);
+  }, [selectedSceneId, scenes, onScenesUpdate, toast, currentVideoTime]);
 
   const handleCopyScene = useCallback(() => {
     if (!selectedSceneId) return;
