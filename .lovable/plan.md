@@ -1,44 +1,46 @@
 
 
-## Plan: Sidebar verbreitern + Übergänge zwischen Szenen im CutPanel
+## Plan: Szenen-Geschwindigkeit in der Videowiedergabe aktivieren
 
 ### Problem
 
-1. **Sidebar zu schmal** — `w-72` (288px) schneidet Inhalte ab
-2. **Keine Möglichkeit, Übergänge zu setzen oder zu entfernen** — `transitions` und `onTransitionsChange` werden zwar als Props durchgereicht, aber im CutPanel nicht genutzt
+Der FXPanel-Speed-Slider setzt `playbackRate` auf dem Scene-Objekt und verschiebt die Timeline korrekt, aber die **tatsächliche Video-Wiedergabegeschwindigkeit** (`video.playbackRate`) wird im RAF-Loop nur aus `speedKeyframes` (Speed Ramping) berechnet. Die Scene-`playbackRate`-Eigenschaft wird komplett ignoriert → das Video spielt immer mit 1x ab, egal was im Slider eingestellt ist.
 
 ### Lösung
 
-**1. Sidebar verbreitern** (`CapCutEditor.tsx`)
+**Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`** (Zeilen 774-798)
 
-`w-72` → `w-80` (320px) an beiden Sidebar-Stellen (Zeile 1433 und 1696)
+Im "UNIFIED PLAYBACK RATE"-Block die Scene-`playbackRate` als Basis-Geschwindigkeit verwenden:
 
-**2. Übergangs-Blöcke zwischen Szenen** (`CutPanel.tsx`)
+```text
+Aktuell:
+  let activeSpeed = 1;                    ← immer 1
+  ... speedKeyframes-Logik ...
+  video.playbackRate = activeSpeed;
 
-Zwischen jeder Szene in der Szenen-Liste wird ein kleiner, anklickbarer Übergangs-Block eingefügt:
+Neu:
+  const sceneRate = (sceneInfo?.scene as any)?.playbackRate ?? 1;
+  let activeSpeed = sceneRate;             ← Scene-Speed als Basis
+  ... speedKeyframes-Logik (multipliziert auf sceneRate) ...
+  video.playbackRate = activeSpeed;
+```
 
-- **Standard: Kein Übergang** — der Block zeigt nur ein "+" Icon und "Übergang hinzufügen"
-- **Bei Klick**: expandiert zu einem Mini-Grid mit Übergangstypen (Keine, Fade, Crossfade, Slide, Zoom, Wipe, Blur, Push) + Dauer-Slider (0.1s – 3.0s)
-- **Aktiver Übergang**: wird farblich hervorgehoben mit Typ-Name und Dauer, kann per Klick auf "Entfernen" wieder gelöscht werden
-- Der Übergang wird der **nachfolgenden** Szene zugeordnet (nutzt bestehendes `TransitionAssignment`-Interface)
-
-Neue Props für CutPanel: `onTransitionsChange` (Callback)
-
-**3. Props durchreichen** (`CapCutSidebar.tsx`)
-
-`onTransitionsChange` an CutPanel weiterleiten
+Konkret:
+1. `sceneRate` aus der aktuellen Scene lesen (Zeile ~778)
+2. `activeSpeed` mit `sceneRate` statt `1` initialisieren
+3. Wenn Speed-Keyframes vorhanden: `activeSpeed = sceneRate * getSpeedAtTime(...)` — damit Speed Ramping und Scene-Speed kombinierbar sind
+4. Source-Audio ebenfalls mit `targetRate` synchronisieren (passiert bereits)
 
 ### Dateien
 
 | Aktion | Datei | Änderung |
 |--------|-------|----------|
-| Edit | `CapCutEditor.tsx` | `w-72` → `w-80`, `onTransitionsChange` an Sidebar |
-| Edit | `CapCutSidebar.tsx` | `onTransitionsChange` an CutPanel durchreichen |
-| Edit | `CutPanel.tsx` | Übergangs-Blöcke zwischen Szenen mit Typ-Auswahl + Dauer-Slider |
+| Edit | `DirectorsCutPreviewPlayer.tsx` | Scene-`playbackRate` als Basis im unified speed block verwenden |
 
 ### Ergebnis
 
-- Sidebar ist breiter, alle Inhalte sichtbar
-- Zwischen jeder Szene kann optional ein Übergang gesetzt oder entfernt werden
-- 8 Übergangstypen + einstellbare Dauer direkt im Schnitt-Panel
+- 0.5x Speed → Video spielt in Zeitlupe, Szene dauert doppelt so lang auf der Timeline
+- 2x Speed → Video spielt schnell, Szene ist halb so lang
+- Nahtlose Übergänge zwischen Szenen mit unterschiedlichen Geschwindigkeiten
+- Speed Ramping Keyframes und Scene-Speed arbeiten zusammen (multiplikativ)
 
