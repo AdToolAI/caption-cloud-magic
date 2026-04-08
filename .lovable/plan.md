@@ -1,45 +1,51 @@
 
+Problem
 
-## Plan: Sidebar-Clipping fix + Szenen-Advance reparieren
+Die Übergänge sind im UI auswählbar, werden aber in der Vorschau nicht gerendert, weil die IDs an zwei Stellen unterschiedlich interpretiert werden:
 
-### Probleme
+- Im `CutPanel` wird ein Übergang aktuell auf die eingehende Szene gespeichert (`sceneId={scenes[i + 1].id}`)
+- Der gemeinsame Resolver (`resolveTransitions`) sowie der Preview-Player erwarten Übergänge aber auf der ausgehenden Szene (`scene.id`)
 
-**1. Sidebar abgeschnitten**: Der Sidebar-Container hat `w-80` aber kein `flex-shrink-0`. Im Flex-Layout (`flex-1 flex overflow-hidden`) kann der Browser die Sidebar komprimieren.
+Dadurch findet der Renderer zur Szenengrenze oft keinen passenden Übergang, obwohl im Panel einer gesetzt wurde.
 
-**2. Nur Szene 1 spielt**: Die `original_start_time`-Logik ist zwar korrekt implementiert, aber der Scene-Advance hat drei subtile Probleme:
+Plan
 
-- **Seek-Schwelle zu hoch**: Bei der Szenengrenze wird nur geseekt wenn `abs(video.currentTime - nextSourceStart) > 0.3`. Wenn die Szenen direkt aneinandergrenzen (Scene1 endet bei Source 10, Scene2 beginnt bei Source 10), ist die Differenz ≈ 0 → kein Seek → Video fließt weiter, aber die Szenen-Erkennung (`findSceneBySourceTime`) findet wegen der 0.05-Toleranz weiter Scene 1 statt Scene 2
-- **PlaybackRate nicht sofort gesetzt**: Beim Szenen-Wechsel wird die neue Rate erst im "unified speed block" gesetzt (der läuft NACH der Szenen-Logik). Wenn Scene 1 = 0.5x und Scene 2 = 1x, spielt die erste Sekunde von Scene 2 noch mit 0.5x
-- **video.onEnded stoppt alles**: Wenn das physische Video endet, wird `handleVideoEnded()` ausgelöst — auch wenn noch Timeline-Szenen übrig sind (z.B. bei Multi-Clip-Szenarien)
+1. Übergangs-Zuordnung vereinheitlichen
+- In `src/components/directors-cut/studio/sidebar/CutPanel.tsx` die Transition-Blöcke auf die ausgehende Szene mappen
+- Also den Block zwischen Szene 1 und 2 an `sceneId={scene.id}` statt `scenes[i + 1].id` hängen
+- Anzeige, Auswahl, Dauer-Slider und Entfernen damit alle dieselbe ID-Logik verwenden
 
-### Lösung
+2. Bestandsdaten kompatibel machen
+- In `src/pages/DirectorsCut/DirectorsCut.tsx` beim Laden/Initialisieren der Transitions eine kleine Normalisierung einbauen
+- Ziel: alte Drafts oder bereits gespeicherte Übergänge, die noch auf die eingehende Szene zeigen, automatisch auf die ausgehende Szene umlegen
+- So funktionieren bestehende Projekte weiter, ohne dass der Nutzer alle Übergänge neu setzen muss
 
-**Datei 1: `CapCutEditor.tsx`** — Sidebar `flex-shrink-0`
+3. Default-/Auto-Logik konsistent halten
+- Prüfen und angleichen, dass Standard-Transitions und AI-/AutoCut-Flows ebenfalls konsequent die ausgehende Szene referenzieren
+- Damit Sidebar, Preview und Resolver dieselbe Datenstruktur verwenden
 
-Zeile 1441-1442: `flex-shrink-0` hinzufügen damit die Sidebar nicht komprimiert wird:
+4. Preview-Rendering dadurch freischalten
+- `DirectorsCutPreviewPlayer.tsx` und `transitionResolver.ts` müssen voraussichtlich nicht grundlegend geändert werden, weil sie bereits konsistent auf “outgoing scene” aufgebaut sind
+- Nach der Datenkorrektur sollten Fade, Crossfade, Slide, Wipe usw. wieder sichtbar werden
+
+Betroffene Dateien
+- `src/components/directors-cut/studio/sidebar/CutPanel.tsx`
+- `src/pages/DirectorsCut/DirectorsCut.tsx`
+
+Technische Details
+```text
+Aktuell:
+[Szene A] -- Übergang -- [Szene B]
+                |
+           gespeichert als sceneId = Szene B
+
+Renderer erwartet:
+[Szene A] -- Übergang -- [Szene B]
+                |
+           gespeichert als sceneId = Szene A
 ```
-sidebarCollapsed ? "w-12" : "w-80 flex-shrink-0"
-```
-Gleiches für Properties-Panel (Zeile 1704-1706).
 
-**Datei 2: `DirectorsCutPreviewPlayer.tsx`** — Scene-Advance robuster machen
-
-1. **Forcierter Mini-Seek** (Zeile ~670): Wenn die Differenz < 0.3 aber > 0 ist, trotzdem `video.currentTime = nextSourceStart + 0.05` setzen, damit `findSceneBySourceTime` Scene 2 sofort findet statt 5 Frames in der Toleranzzone von Scene 1 zu hängen
-
-2. **PlaybackRate sofort setzen** (Zeile ~675): Direkt nach dem Seek `video.playbackRate = nextScene.playbackRate ?? 1` setzen
-
-3. **onEnded-Safety** (Zeile ~370): In `handleVideoEnded` prüfen ob noch Szenen übrig sind. Falls ja, zur nächsten Szene seeken statt Playback zu stoppen
-
-### Dateien
-
-| Aktion | Datei | Änderung |
-|--------|-------|----------|
-| Edit | `CapCutEditor.tsx` | `flex-shrink-0` an Sidebar + Properties Panel |
-| Edit | `DirectorsCutPreviewPlayer.tsx` | Forcierter Seek, sofortige Rate, onEnded-Safety |
-
-### Ergebnis
-
-- Sidebar wird nicht mehr abgeschnitten
-- Szenen-Wechsel funktioniert zuverlässig bei unterschiedlichen Geschwindigkeiten
-- Kein Hänger oder Verzögerung beim Übergang zwischen Szenen
-
+Ergebnis
+- Übergänge werden wieder sichtbar in der Vorschau
+- Bereits gesetzte Übergänge in laufenden Projekten bleiben nutzbar
+- CutPanel, Draft-Loading und Preview verwenden dieselbe Logik
