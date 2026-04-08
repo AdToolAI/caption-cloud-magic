@@ -32,6 +32,7 @@ interface JamendoTrack {
 }
 
 interface CapCutSidebarProps {
+  videoUrl?: string;
   videoDuration?: number;
   voiceOverUrl?: string;
   onCaptionsGenerated?: (captions: SubtitleClip[]) => void;
@@ -212,6 +213,7 @@ const DraggableMusicItem: React.FC<{
 };
 
 export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
+  videoUrl = '',
   videoDuration = 30,
   voiceOverUrl,
   onCaptionsGenerated,
