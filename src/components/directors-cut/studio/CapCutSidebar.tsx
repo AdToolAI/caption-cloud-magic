@@ -81,6 +81,9 @@ interface CapCutSidebarProps {
   onSceneSelect?: (sceneId: string | null) => void;
   onAutocut?: () => void;
   isAnalyzing?: boolean;
+  onSceneAdd?: () => void;
+  onSceneRename?: (sceneId: string, newName: string) => void;
+  onTrimScene?: (sceneId: string, newStart: number, newEnd: number) => void;
   // Look
   appliedEffects?: { brightness: number; contrast: number; saturation: number; sharpness: number; temperature: number; vignette: number };
   onEffectsChange?: (effects: any) => void;
@@ -254,6 +257,9 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onSceneSelect,
   onAutocut,
   isAnalyzing = false,
+  onSceneAdd,
+  onSceneRename,
+  onTrimScene,
   appliedEffects,
   onEffectsChange,
   colorGrading,
@@ -606,6 +612,9 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               onSceneSelect={onSceneSelect || (() => {})}
               onAutocut={onAutocut}
               isAnalyzing={isAnalyzing}
+              onSceneAdd={onSceneAdd}
+              onSceneRename={onSceneRename}
+              onTrimScene={onTrimScene}
             />
           </TabsContent>
 

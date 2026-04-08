@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack } from '@/types/timeline';
 import { SceneAnalysis } from '@/types/directors-cut';
-import { Volume2, VolumeX, Headphones, Plus, Minus, X, PlusCircle, Film, Square, ChevronDown, GripVertical, MessageSquare } from 'lucide-react';
+import { Volume2, VolumeX, Headphones, Plus, Minus, X, PlusCircle, Film, Square, ChevronDown, GripVertical, MessageSquare, Scissors, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -37,9 +37,12 @@ interface CapCutTimelineProps {
   onSubtitleDelete?: (clipId: string) => void;
   onSubtitleSelect?: (clipId: string | null) => void;
   selectedSubtitleId?: string | null;
+  onSplitAtPlayhead?: () => void;
+  onTrimScene?: (sceneId: string, newStart: number, newEnd: number) => void;
 }
 
 const TRACK_HEIGHT = 48;
+const VIDEO_TRACK_HEIGHT = 80;
 const HEADER_WIDTH = 120;
 
 const formatTime = (seconds: number): string => {
@@ -48,26 +51,77 @@ const formatTime = (seconds: number): string => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-// Draggable Scene Component
+// Draggable Scene Component — redesigned for 80px height with full info + actions
 const DraggableScene: React.FC<{
   scene: SceneAnalysis;
   index: number;
   zoom: number;
   isSelected: boolean;
+  isPlayheadInside: boolean;
   onSeek: (time: number) => void;
   onSelect: () => void;
   onDelete?: () => void;
-}> = ({ scene, index, zoom, isSelected, onSeek, onSelect, onDelete }) => {
+  onSplit?: () => void;
+  onTrim?: (newStart: number, newEnd: number) => void;
+}> = ({ scene, index, zoom, isSelected, isPlayheadInside, onSeek, onSelect, onDelete, onSplit, onTrim }) => {
+  const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null);
+  const startXRef = useRef(0);
+  const originalBoundsRef = useRef({ start: 0, end: 0 });
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `scene-drag-${scene.id}`,
     data: { scene, index, type: 'scene' },
+    disabled: isResizing !== null,
   });
+
+  const SCENE_COLORS_LOCAL = [
+    { bg: 'bg-indigo-600/80', border: 'border-indigo-500/50' },
+    { bg: 'bg-purple-600/80', border: 'border-purple-500/50' },
+    { bg: 'bg-blue-600/80', border: 'border-blue-500/50' },
+    { bg: 'bg-emerald-600/80', border: 'border-emerald-500/50' },
+    { bg: 'bg-amber-600/80', border: 'border-amber-500/50' },
+  ];
+
+  const colorSet = scene.isBlackscreen
+    ? { bg: 'bg-zinc-800/80', border: 'border-zinc-600' }
+    : SCENE_COLORS_LOCAL[index % SCENE_COLORS_LOCAL.length];
+
+  const sceneWidth = (scene.end_time - scene.start_time) * zoom;
 
   const style = {
     left: `${scene.start_time * zoom}px`,
-    width: `${(scene.end_time - scene.start_time) * zoom}px`,
+    width: `${Math.max(sceneWidth, 30)}px`,
     transform: transform ? `translate3d(${transform.x}px, 0, 0)` : undefined,
     zIndex: isDragging ? 50 : undefined,
+  };
+
+  const handleTrimStart = (e: React.MouseEvent, edge: 'left' | 'right') => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsResizing(edge);
+    startXRef.current = e.clientX;
+    originalBoundsRef.current = { start: scene.start_time, end: scene.end_time };
+
+    const handleMouseMove = (moveE: MouseEvent) => {
+      const deltaX = moveE.clientX - startXRef.current;
+      const deltaTime = deltaX / zoom;
+      if (edge === 'left') {
+        const newStart = Math.max(0, originalBoundsRef.current.start + deltaTime);
+        if (newStart < scene.end_time - 1) onTrim?.(newStart, scene.end_time);
+      } else {
+        const newEnd = originalBoundsRef.current.end + deltaTime;
+        if (newEnd > scene.start_time + 1) onTrim?.(scene.start_time, newEnd);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(null);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
   };
 
   return (
@@ -75,34 +129,93 @@ const DraggableScene: React.FC<{
       ref={setNodeRef}
       style={style}
       className={cn(
-        "absolute top-1 bottom-1 rounded flex items-center cursor-grab active:cursor-grabbing group transition-all",
+        "absolute top-1 bottom-1 rounded-lg flex flex-col cursor-grab active:cursor-grabbing group transition-all border",
+        colorSet.bg, colorSet.border,
         isDragging && "opacity-50 ring-2 ring-cyan-400",
-        isSelected && "ring-2 ring-[#00d4ff]",
-        scene.isBlackscreen 
-          ? "bg-zinc-800/80 border border-dashed border-zinc-600 hover:border-zinc-500" 
-          : "bg-indigo-600/80 hover:brightness-110"
+        isSelected && "ring-2 ring-[#00d4ff] ring-offset-1 ring-offset-[#1a1a1a]",
+        isPlayheadInside && !isSelected && "ring-1 ring-yellow-400/60"
       )}
       onClick={(e) => { e.stopPropagation(); onSelect(); onSeek(scene.start_time); }}
       {...attributes}
       {...listeners}
     >
-      <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-60 transition-opacity">
-        <GripVertical className="h-3 w-3 text-white" />
+      {/* Row 1: Grip + Number + Name + Actions */}
+      <div className="flex items-center gap-1 px-1.5 pt-1 min-w-0">
+        <GripVertical className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+        <div className={cn(
+          "w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0",
+          scene.isBlackscreen ? "bg-zinc-700 text-zinc-400" : "bg-white/20 text-white"
+        )}>
+          {scene.isBlackscreen ? '⬛' : index + 1}
+        </div>
+        {sceneWidth > 60 && (
+          <span className="text-[10px] text-white/80 truncate flex-1 font-medium">
+            {scene.description?.slice(0, Math.floor(sceneWidth / 7)) || `Szene ${index + 1}`}
+          </span>
+        )}
+        <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto">
+          {onSplit && isPlayheadInside && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onSplit(); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="w-5 h-5 flex items-center justify-center rounded bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 transition-colors"
+              title="Am Playhead teilen"
+            >
+              <Scissors className="h-3 w-3" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="w-5 h-5 flex items-center justify-center rounded bg-red-500/20 hover:bg-red-500/40 text-red-300 transition-colors"
+              title="Szene löschen"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          )}
+        </div>
       </div>
-      
-      <span className="text-[10px] text-white/90 font-medium mx-auto">
-        {scene.isBlackscreen ? '⬛' : index + 1}
-      </span>
-      
-      {onDelete && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
-        >
-          <X className="h-2.5 w-2.5 text-white" />
-        </button>
-      )}
+
+      {/* Row 2: Time info */}
+      <div className="px-1.5 mt-0.5">
+        <span className="text-[9px] text-white/50 font-mono">
+          {formatTime(scene.start_time)} – {formatTime(scene.end_time)} ({(scene.end_time - scene.start_time).toFixed(1)}s)
+        </span>
+      </div>
+
+      {/* Row 3: Visual bar */}
+      <div className="flex-1 mx-1.5 mb-1 mt-1 rounded-sm bg-white/10 overflow-hidden">
+        {scene.thumbnail_url ? (
+          <div className="h-full w-full bg-cover bg-center opacity-50" style={{ backgroundImage: `url(${scene.thumbnail_url})` }} />
+        ) : (
+          <div className="h-full w-full bg-gradient-to-r from-white/5 to-white/10" />
+        )}
+      </div>
+
+      {/* Trim Handle Left */}
+      <div
+        className={cn(
+          "absolute left-0 top-0 bottom-0 w-[6px] cursor-ew-resize rounded-l-lg z-10 transition-colors",
+          isResizing === 'left' ? "bg-cyan-400/60" : "bg-transparent hover:bg-white/30"
+        )}
+        onMouseDown={(e) => handleTrimStart(e, 'left')}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <div className="absolute left-[2px] top-1/2 -translate-y-1/2 w-[2px] h-4 bg-white/40 rounded-full" />
+      </div>
+
+      {/* Trim Handle Right */}
+      <div
+        className={cn(
+          "absolute right-0 top-0 bottom-0 w-[6px] cursor-ew-resize rounded-r-lg z-10 transition-colors",
+          isResizing === 'right' ? "bg-cyan-400/60" : "bg-transparent hover:bg-white/30"
+        )}
+        onMouseDown={(e) => handleTrimStart(e, 'right')}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <div className="absolute right-[2px] top-1/2 -translate-y-1/2 w-[2px] h-4 bg-white/40 rounded-full" />
+      </div>
     </div>
   );
 };
@@ -432,6 +545,8 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   onSubtitleDelete,
   onSubtitleSelect,
   selectedSubtitleId,
+  onSplitAtPlayhead,
+  onTrimScene,
 }) => {
   const musicTrackIndex = tracks.findIndex(t => t.id === 'track-music');
   const tracksBeforeSubtitle = musicTrackIndex >= 0 ? tracks.slice(0, musicTrackIndex + 1) : tracks.slice(0, -1);
@@ -573,7 +688,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           {/* Video track header */}
           <div 
             className="flex items-center gap-2 px-2 border-b border-[#2a2a2a] bg-[#242424]"
-            style={{ height: TRACK_HEIGHT }}
+            style={{ height: VIDEO_TRACK_HEIGHT }}
           >
             <span className="text-xs">🎬</span>
             <span className="text-xs text-white/80 truncate">Video</span>
@@ -679,7 +794,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             {/* Video Track */}
             <div
               className="relative border-b border-[#2a2a2a]"
-              style={{ height: TRACK_HEIGHT }}
+              style={{ height: VIDEO_TRACK_HEIGHT }}
               onClick={() => onSceneSelect?.(null)}
             >
               {scenes.map((scene, i) => (
@@ -689,9 +804,12 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   index={i}
                   zoom={zoom}
                   isSelected={scene.id === selectedSceneId}
+                  isPlayheadInside={currentTime >= scene.start_time && currentTime < scene.end_time}
                   onSeek={onSeek}
                   onSelect={() => onSceneSelect?.(scene.id)}
                   onDelete={onSceneDelete ? () => onSceneDelete(scene.id) : undefined}
+                  onSplit={onSplitAtPlayhead}
+                  onTrim={onTrimScene ? (newStart, newEnd) => onTrimScene(scene.id, newStart, newEnd) : undefined}
                 />
               ))}
               {/* Add Scene Button with Dropdown */}
