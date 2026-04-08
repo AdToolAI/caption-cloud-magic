@@ -935,6 +935,53 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     onScenesUpdate([...scenes, newScene]);
   }, [scenes, onScenesUpdate]);
 
+  // Split scene at current playhead position
+  const handleSplitAtPlayhead = useCallback(() => {
+    if (!onScenesUpdate || scenes.length === 0) return;
+    const targetScene = scenes.find(s => currentTime >= s.start_time && currentTime < s.end_time);
+    if (!targetScene) {
+      toast.error('Playhead ist nicht innerhalb einer Szene');
+      return;
+    }
+    if (currentTime - targetScene.start_time < 0.5 || targetScene.end_time - currentTime < 0.5) {
+      toast.error('Zu nah am Szenenrand zum Teilen');
+      return;
+    }
+    const newScenes = scenes.flatMap(s => {
+      if (s.id !== targetScene.id) return [s];
+      return [
+        { ...s, id: s.id, end_time: currentTime },
+        { ...s, id: `scene-${Date.now()}`, start_time: currentTime, description: `${s.description} (Teil 2)` },
+      ];
+    });
+    onScenesUpdate(newScenes);
+    toast.success('Szene am Playhead geteilt');
+  }, [scenes, currentTime, onScenesUpdate]);
+
+  // Duplicate scene
+  const handleDuplicateScene = useCallback((sceneId: string) => {
+    if (!onScenesUpdate) return;
+    const scene = scenes.find(s => s.id === sceneId);
+    if (!scene) return;
+    const idx = scenes.indexOf(scene);
+    const newScenes = [...scenes];
+    const duplicate: SceneAnalysis = {
+      ...scene,
+      id: `scene-${Date.now()}`,
+      description: `${scene.description} (Kopie)`,
+    };
+    newScenes.splice(idx + 1, 0, duplicate);
+    let t = 0;
+    const recalculated = newScenes.map(s => {
+      const d = s.end_time - s.start_time;
+      const updated = { ...s, start_time: t, end_time: t + d };
+      t += d;
+      return updated;
+    });
+    onScenesUpdate(recalculated);
+    toast.success('Szene dupliziert');
+  }, [scenes, onScenesUpdate]);
+
   const handleAddClip = useCallback((trackId: string, clip: Omit<AudioClip, 'id'>) => {
     const newClip: AudioClip = {
       ...clip,
