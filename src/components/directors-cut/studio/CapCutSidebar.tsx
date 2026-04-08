@@ -538,7 +538,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     <div className="w-72 flex flex-col border-r border-[#2a2a2a] bg-[#1e1e1e] h-full">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col h-full">
         {/* Tab Icons */}
-        <TabsList className="grid grid-cols-8 gap-0.5 p-1.5 bg-[#1a1a1a] border-b border-[#2a2a2a] h-auto rounded-none">
+        <TabsList className="grid grid-cols-7 gap-0.5 p-1.5 bg-[#1a1a1a] border-b border-[#2a2a2a] h-auto rounded-none">
           <TabsTrigger 
             value="cut" 
             className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-[#00d4ff]/20 data-[state=active]:text-[#00d4ff] text-white/50 hover:text-white/80 hover:bg-white/5"
@@ -559,13 +559,6 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             title="Effekte"
           >
             <Wand2 className="h-3.5 w-3.5" />
-          </TabsTrigger>
-          <TabsTrigger 
-            value="media" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-[#00d4ff]/20 data-[state=active]:text-[#00d4ff] text-white/50 hover:text-white/80 hover:bg-white/5"
-            title="Medien"
-          >
-            <FolderUp className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="subtitle" 
@@ -656,77 +649,6 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             />
           </TabsContent>
 
-          {/* TAB: Video Upload (nur Videos) */}
-          <TabsContent value="media" className="p-3 space-y-4 mt-0">
-            <div className="flex items-center gap-2">
-              <FileVideo className="h-4 w-4 text-[#00d4ff]" />
-              <span className="text-sm font-medium text-white">Video hochladen</span>
-            </div>
-
-            {/* Video-Only Dropzone */}
-            <div 
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleVideoDrop}
-              onClick={() => videoInputRef.current?.click()}
-              className="border-2 border-dashed border-[#3a3a3a] rounded-lg p-6 text-center hover:border-[#00d4ff]/50 transition-colors cursor-pointer"
-            >
-              <input 
-                ref={videoInputRef}
-                type="file" 
-                className="hidden" 
-                multiple 
-                accept="video/*"
-                onChange={handleVideoFileSelect}
-              />
-              <FileVideo className="h-8 w-8 mx-auto text-white/40 mb-2" />
-              <p className="text-xs text-white/50">
-                Video hierher ziehen
-              </p>
-              <p className="text-[10px] text-white/30 mt-1">
-                MP4, MOV, WebM (max. 500MB)
-              </p>
-            </div>
-
-            {/* Uploaded Video Files List */}
-            <div className="space-y-2">
-              <label className="text-xs text-white/70">Hochgeladene Videos ({uploadedVideoFiles.length})</label>
-              {uploadedVideoFiles.length === 0 ? (
-                <div className="text-xs text-white/40 p-3 bg-[#2a2a2a] rounded">
-                  Noch keine Videos hochgeladen
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {uploadedVideoFiles.map((file, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 bg-[#2a2a2a] rounded text-xs group">
-                      <FileVideo className="h-4 w-4 text-[#00d4ff]" />
-                      <span className="flex-1 truncate text-white/80">{file.name}</span>
-                      {onAddVideoAsScene && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 px-2 text-[10px] bg-[#00d4ff]/10 hover:bg-[#00d4ff]/20 text-[#00d4ff]"
-                          onClick={() => onAddVideoAsScene(file)}
-                        >
-                          <Plus className="h-3 w-3 mr-1" />
-                          Szene
-                        </Button>
-                      )}
-                      <button 
-                        onClick={() => removeVideoFile(index)}
-                        className="text-white/40 hover:text-red-400 transition-colors"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <p className="text-[10px] text-white/40">
-              Videos können als neue Szenen zur Timeline hinzugefügt werden.
-            </p>
-          </TabsContent>
 
           {/* TAB 2: Subtitles (COMPLETE) */}
           <TabsContent value="subtitle" className="p-3 space-y-4 mt-0">

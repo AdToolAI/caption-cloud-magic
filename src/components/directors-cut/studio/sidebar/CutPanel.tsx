@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Scissors, Sparkles, Loader2, Trash2, Copy, GripVertical, Plus, Pencil, Check } from 'lucide-react';
+import { Scissors, Sparkles, Loader2, Trash2, Copy, GripVertical, Plus, Pencil, Check, FileVideo } from 'lucide-react';
 import { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -20,6 +20,7 @@ interface CutPanelProps {
   onSceneAdd?: () => void;
   onSceneRename?: (sceneId: string, newName: string) => void;
   onTrimScene?: (sceneId: string, newStart: number, newEnd: number) => void;
+  onAddVideoAsScene?: (file: File) => void;
 }
 
 const formatTime = (s: number) => {
@@ -43,9 +44,11 @@ export const CutPanel: React.FC<CutPanelProps> = ({
   onSceneAdd,
   onSceneRename,
   onTrimScene,
+  onAddVideoAsScene,
 }) => {
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const startEditing = (scene: SceneAnalysis) => {
     setEditingSceneId(scene.id);
@@ -83,17 +86,43 @@ export const CutPanel: React.FC<CutPanelProps> = ({
       </p>
 
       {/* Add new scene */}
-      {onSceneAdd && (
-        <Button
-          onClick={onSceneAdd}
-          variant="outline"
-          size="sm"
-          className="w-full border-[#3a3a3a] text-white/70 hover:bg-white/5"
-        >
-          <Plus className="h-3.5 w-3.5 mr-2" />
-          Neue leere Szene
-        </Button>
-      )}
+      <div className="flex gap-2">
+        {onSceneAdd && (
+          <Button
+            onClick={onSceneAdd}
+            variant="outline"
+            size="sm"
+            className="flex-1 border-[#3a3a3a] text-white/70 hover:bg-white/5"
+          >
+            <Plus className="h-3.5 w-3.5 mr-2" />
+            Leere Szene
+          </Button>
+        )}
+        {onAddVideoAsScene && (
+          <>
+            <input
+              ref={videoInputRef}
+              type="file"
+              className="hidden"
+              accept="video/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onAddVideoAsScene(file);
+                e.target.value = '';
+              }}
+            />
+            <Button
+              onClick={() => videoInputRef.current?.click()}
+              variant="outline"
+              size="sm"
+              className="flex-1 border-[#3a3a3a] text-white/70 hover:bg-white/5"
+            >
+              <FileVideo className="h-3.5 w-3.5 mr-2" />
+              Video hinzufügen
+            </Button>
+          </>
+        )}
+      </div>
 
       {/* Optional Auto-Cut */}
       {onAutocut && (
