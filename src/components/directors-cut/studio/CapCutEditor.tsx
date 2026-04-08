@@ -1467,6 +1467,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               </div>
             ) : (
             <CapCutSidebar 
+              videoUrl={videoUrl}
               videoDuration={actualTotalDuration}
               voiceOverUrl={voiceOverUrl}
               onCaptionsGenerated={handleCaptionsGenerated}
