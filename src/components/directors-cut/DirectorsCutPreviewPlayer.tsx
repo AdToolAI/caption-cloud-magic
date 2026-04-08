@@ -575,7 +575,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       const video = getActiveVideo();
       if (!video) { rafIdRef.current = requestAnimationFrame(tick); return; }
 
-      const now = performance.now();
+      const gapNow = performance.now();
 
       // === GAP DETECTION: check if timeline time is in a gap between scenes ===
       // When in a gap, we manually advance timeline time and hide the video
