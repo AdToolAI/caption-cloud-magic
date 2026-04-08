@@ -432,6 +432,8 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   onSubtitleDelete,
   onSubtitleSelect,
   selectedSubtitleId,
+  onSplitAtPlayhead,
+  onTrimScene,
 }) => {
   const musicTrackIndex = tracks.findIndex(t => t.id === 'track-music');
   const tracksBeforeSubtitle = musicTrackIndex >= 0 ? tracks.slice(0, musicTrackIndex + 1) : tracks.slice(0, -1);
