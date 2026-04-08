@@ -446,7 +446,7 @@ const DraggableSubtitleClip: React.FC<{
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
-            className="w-12 h-5 px-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
+            className="w-12 h-5 px-1 bg-white/5 border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
             title="Startzeit (Sek)"
           />
           <span className="text-[9px] text-white/40">-</span>
@@ -461,7 +461,7 @@ const DraggableSubtitleClip: React.FC<{
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
-            className="w-12 h-5 px-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
+            className="w-12 h-5 px-1 bg-white/5 border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
             title="Endzeit (Sek)"
           />
         </div>
@@ -500,7 +500,7 @@ const DroppableTrack: React.FC<{
       {Array.from({ length: Math.ceil(duration) }).map((_, i) => (
         <div
           key={i}
-          className="absolute top-0 bottom-0 w-px bg-[#2a2a2a]"
+          className="absolute top-0 bottom-0 w-px bg-white/5"
           style={{ left: `${i * zoom}px` }}
         />
       ))}
@@ -825,7 +825,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                       <ChevronDown className="h-2.5 w-2.5 text-white/40" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="bg-[#242424] border-[#3a3a3a]">
+                  <DropdownMenuContent align="start" className="bg-[#0a0a1a]/60 border-[#3a3a3a]">
                     {onSceneAdd && (
                       <DropdownMenuItem 
                         onClick={onSceneAdd}
@@ -879,7 +879,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                 {Array.from({ length: Math.ceil(duration) }).map((_, i) => (
                   <div
                     key={i}
-                    className="absolute top-0 bottom-0 w-px bg-[#2a2a2a]"
+                    className="absolute top-0 bottom-0 w-px bg-white/5"
                     style={{ left: `${i * zoom}px` }}
                   />
                 ))}
