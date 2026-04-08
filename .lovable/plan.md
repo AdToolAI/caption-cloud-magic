@@ -1,54 +1,44 @@
 
 
-## Plan: Szenen-Animationen (Zoom In/Out, Pan) + Geschwindigkeitsregler pro Szene
+## Plan: Sidebar verbreitern + Übergänge zwischen Szenen im CutPanel
 
 ### Problem
 
-1. **Keine Zoom/Pan-Effekte**: Es gibt keine Möglichkeit, Szenen-Animationen wie Zoom In, Zoom Out, Pan Left/Right/Up/Down zuzuweisen
-2. **Kein Geschwindigkeitsregler pro Szene**: Obwohl `SceneAnalysis.playbackRate` und `SceneEffects.speed` im Typ existieren, gibt es kein UI zum Anpassen der Geschwindigkeit (0.1x – 3x)
+1. **Sidebar zu schmal** — `w-72` (288px) schneidet Inhalte ab
+2. **Keine Möglichkeit, Übergänge zu setzen oder zu entfernen** — `transitions` und `onTransitionsChange` werden zwar als Props durchgereicht, aber im CutPanel nicht genutzt
 
 ### Lösung
 
-**1. SceneEffects erweitern** (`src/types/directors-cut.ts`)
+**1. Sidebar verbreitern** (`CapCutEditor.tsx`)
 
-Neues Feld `animation` zu `SceneEffects` hinzufügen:
-```
-animation?: {
-  type: 'none' | 'zoomIn' | 'zoomOut' | 'panLeft' | 'panRight' | 'panUp' | 'panDown' | 'zoomInSlow' | 'zoomOutSlow';
-  intensity?: number; // 0-100, default 50
-}
-```
+`w-72` → `w-80` (320px) an beiden Sidebar-Stellen (Zeile 1433 und 1696)
 
-**2. FXPanel um zwei neue Sektionen erweitern** (`FXPanel.tsx`)
+**2. Übergangs-Blöcke zwischen Szenen** (`CutPanel.tsx`)
 
-- **Szenen-Animation**: Grid mit Kacheln für None, Zoom In, Zoom Out, Zoom In (Slow), Zoom Out (Slow), Pan Left, Pan Right, Pan Up, Pan Down — nur aktiv wenn eine Szene ausgewählt ist
-- **Geschwindigkeit**: Slider von 0.1x bis 3.0x mit Anzeige des Werts, Quick-Presets (0.25x, 0.5x, 1x, 2x, 3x) — pro Szene oder global
+Zwischen jeder Szene in der Szenen-Liste wird ein kleiner, anklickbarer Übergangs-Block eingefügt:
 
-FXPanel erhält neue Props: `selectedSceneId`, `sceneEffects`, `onSceneEffectsChange`, `scenes`, `onScenePlaybackRateChange`
+- **Standard: Kein Übergang** — der Block zeigt nur ein "+" Icon und "Übergang hinzufügen"
+- **Bei Klick**: expandiert zu einem Mini-Grid mit Übergangstypen (Keine, Fade, Crossfade, Slide, Zoom, Wipe, Blur, Push) + Dauer-Slider (0.1s – 3.0s)
+- **Aktiver Übergang**: wird farblich hervorgehoben mit Typ-Name und Dauer, kann per Klick auf "Entfernen" wieder gelöscht werden
+- Der Übergang wird der **nachfolgenden** Szene zugeordnet (nutzt bestehendes `TransitionAssignment`-Interface)
 
-**3. Props-Kette verdrahten** (`CapCutSidebar.tsx` → `CapCutEditor.tsx`)
+Neue Props für CutPanel: `onTransitionsChange` (Callback)
 
-- `selectedSceneId`, `sceneEffects`, `onSceneEffectsChange` an FXPanel durchreichen
-- `onScenePlaybackRateChange` Callback: setzt `playbackRate` auf der Scene und aktualisiert `end_time` basierend auf neuer Rate
+**3. Props durchreichen** (`CapCutSidebar.tsx`)
 
-**4. Preview-Player: Animation anwenden** (`DirectorsCutPreviewPlayer.tsx` oder `useTransitionRenderer`)
-
-Im RAF-Loop die aktive Szenen-Animation als CSS-Transform auf das Video-Element anwenden (Scale + Translate, interpoliert über die Szenendauer)
+`onTransitionsChange` an CutPanel weiterleiten
 
 ### Dateien
 
 | Aktion | Datei | Änderung |
 |--------|-------|----------|
-| Edit | `src/types/directors-cut.ts` | `animation` Feld zu `SceneEffects` |
-| Edit | `src/components/directors-cut/studio/sidebar/FXPanel.tsx` | Animations-Kacheln + Speed-Slider hinzufügen |
-| Edit | `src/components/directors-cut/studio/CapCutSidebar.tsx` | Neue Props an FXPanel weiterleiten |
-| Edit | `src/components/directors-cut/studio/CapCutEditor.tsx` | Speed-Change-Handler + Props an Sidebar |
-| Edit | `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` | Animation-Transform im RAF-Loop |
+| Edit | `CapCutEditor.tsx` | `w-72` → `w-80`, `onTransitionsChange` an Sidebar |
+| Edit | `CapCutSidebar.tsx` | `onTransitionsChange` an CutPanel durchreichen |
+| Edit | `CutPanel.tsx` | Übergangs-Blöcke zwischen Szenen mit Typ-Auswahl + Dauer-Slider |
 
 ### Ergebnis
 
-- 9 Szenen-Animationen wählbar per Kachel im FX-Panel (nur bei selektierter Szene)
-- Geschwindigkeitsregler 0.1x–3.0x mit Slider + Quick-Presets
-- Animationen live in der Vorschau sichtbar
-- Geschwindigkeit beeinflusst die Szenendauer korrekt
+- Sidebar ist breiter, alle Inhalte sichtbar
+- Zwischen jeder Szene kann optional ein Übergang gesetzt oder entfernt werden
+- 8 Übergangstypen + einstellbare Dauer direkt im Schnitt-Panel
 
