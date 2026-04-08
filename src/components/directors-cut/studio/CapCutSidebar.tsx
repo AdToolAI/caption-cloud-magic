@@ -642,6 +642,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               onInterpolationChange={onInterpolationChange || (() => {})}
               restoration={restoration || { enabled: false, level: 'medium' }}
               onRestorationChange={onRestorationChange || (() => {})}
+              selectedSceneId={selectedSceneId}
+              scenes={scenes}
+              sceneEffects={sceneEffects}
+              onSceneEffectsChange={onSceneEffectsChange}
+              onScenePlaybackRateChange={onScenePlaybackRateChange}
             />
           </TabsContent>
 

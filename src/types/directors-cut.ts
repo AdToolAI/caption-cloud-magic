@@ -86,6 +86,11 @@ export interface SceneEffects {
     grade: string | null;
     intensity: number;
   };
+  // Scene animation (zoom, pan)
+  animation?: {
+    type: 'none' | 'zoomIn' | 'zoomOut' | 'panLeft' | 'panRight' | 'panUp' | 'panDown' | 'zoomInSlow' | 'zoomOutSlow';
+    intensity?: number; // 0-100, default 50
+  };
 }
 
 export interface AudioEnhancements {

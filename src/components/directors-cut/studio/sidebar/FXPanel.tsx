@@ -2,9 +2,11 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { Zap, Gauge, Move, ArrowUpCircle, Film } from 'lucide-react';
+import { Zap, Gauge, Move, ArrowUpCircle, Film, ZoomIn, ZoomOut, MoveLeft, MoveRight, MoveUp, MoveDown, Timer, RotateCcw } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import type { SceneAnalysis, SceneEffects } from '@/types/directors-cut';
+import { cn } from '@/lib/utils';
 
 interface FXPanelProps {
   chromaKey: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string };
@@ -15,7 +17,27 @@ interface FXPanelProps {
   onInterpolationChange: (enabled: boolean, fps: number) => void;
   restoration: { enabled: boolean; level: string };
   onRestorationChange: (enabled: boolean, level: string) => void;
+  // New props for animations & speed
+  selectedSceneId?: string | null;
+  scenes?: SceneAnalysis[];
+  sceneEffects?: Record<string, SceneEffects>;
+  onSceneEffectsChange?: (sceneEffects: Record<string, SceneEffects>) => void;
+  onScenePlaybackRateChange?: (sceneId: string, rate: number) => void;
 }
+
+const ANIMATION_OPTIONS = [
+  { type: 'none' as const, label: 'Keine', icon: RotateCcw },
+  { type: 'zoomIn' as const, label: 'Zoom In', icon: ZoomIn },
+  { type: 'zoomOut' as const, label: 'Zoom Out', icon: ZoomOut },
+  { type: 'zoomInSlow' as const, label: 'Zoom In (Slow)', icon: ZoomIn },
+  { type: 'zoomOutSlow' as const, label: 'Zoom Out (Slow)', icon: ZoomOut },
+  { type: 'panLeft' as const, label: 'Pan Links', icon: MoveLeft },
+  { type: 'panRight' as const, label: 'Pan Rechts', icon: MoveRight },
+  { type: 'panUp' as const, label: 'Pan Hoch', icon: MoveUp },
+  { type: 'panDown' as const, label: 'Pan Runter', icon: MoveDown },
+] as const;
+
+const SPEED_PRESETS = [0.25, 0.5, 1, 1.5, 2, 3];
 
 export const FXPanel: React.FC<FXPanelProps> = ({
   chromaKey,
@@ -26,7 +48,46 @@ export const FXPanel: React.FC<FXPanelProps> = ({
   onInterpolationChange,
   restoration,
   onRestorationChange,
+  selectedSceneId,
+  scenes = [],
+  sceneEffects = {},
+  onSceneEffectsChange,
+  onScenePlaybackRateChange,
 }) => {
+  const selectedScene = scenes.find(s => s.id === selectedSceneId);
+  const currentAnimation = selectedSceneId ? sceneEffects[selectedSceneId]?.animation?.type || 'none' : 'none';
+  const currentAnimIntensity = selectedSceneId ? sceneEffects[selectedSceneId]?.animation?.intensity ?? 50 : 50;
+  const currentSpeed = selectedScene?.playbackRate ?? sceneEffects[selectedSceneId || '']?.speed ?? 1;
+
+  const handleAnimationChange = (type: string) => {
+    if (!selectedSceneId || !onSceneEffectsChange) return;
+    const existing = sceneEffects[selectedSceneId] || {};
+    onSceneEffectsChange({
+      ...sceneEffects,
+      [selectedSceneId]: {
+        ...existing,
+        animation: { type: type as any, intensity: currentAnimIntensity },
+      },
+    });
+  };
+
+  const handleAnimIntensityChange = (intensity: number) => {
+    if (!selectedSceneId || !onSceneEffectsChange) return;
+    const existing = sceneEffects[selectedSceneId] || {};
+    onSceneEffectsChange({
+      ...sceneEffects,
+      [selectedSceneId]: {
+        ...existing,
+        animation: { type: currentAnimation as any, intensity },
+      },
+    });
+  };
+
+  const handleSpeedChange = (speed: number) => {
+    if (!selectedSceneId || !onScenePlaybackRateChange) return;
+    onScenePlaybackRateChange(selectedSceneId, speed);
+  };
+
   return (
     <ScrollArea className="h-full">
       <div className="p-3 space-y-4">
@@ -35,6 +96,95 @@ export const FXPanel: React.FC<FXPanelProps> = ({
           <div className="w-1 h-4 rounded-full bg-[#F5C76A]" />
           <Zap className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]" />
           <span className="text-sm font-medium text-white">Effekte & Qualität</span>
+        </div>
+
+        {/* Scene Animation */}
+        <div className="space-y-2 p-2.5 rounded-xl backdrop-blur-md bg-[#0a0a1a]/60 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Move className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.4)]" />
+            <span className="text-[11px] text-white/70">Szenen-Animation</span>
+            {!selectedSceneId && (
+              <span className="text-[9px] text-white/30 ml-auto">Szene auswählen</span>
+            )}
+          </div>
+          <div className={cn("grid grid-cols-3 gap-1.5", !selectedSceneId && "opacity-40 pointer-events-none")}>
+            {ANIMATION_OPTIONS.map(({ type, label, icon: Icon }) => (
+              <button
+                key={type}
+                onClick={() => handleAnimationChange(type)}
+                className={cn(
+                  "flex flex-col items-center gap-1 p-2 rounded-lg text-[9px] transition-all border",
+                  currentAnimation === type
+                    ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-[0_0_8px_rgba(34,211,238,0.2)]"
+                    : "bg-[#0a0a1a]/80 border-white/5 text-white/50 hover:border-white/20 hover:text-white/70"
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span className="leading-tight text-center">{label}</span>
+              </button>
+            ))}
+          </div>
+          {selectedSceneId && currentAnimation !== 'none' && (
+            <div className="space-y-1 pt-1">
+              <div className="flex justify-between">
+                <label className="text-[10px] text-white/50">Intensität</label>
+                <span className="text-[10px] text-cyan-400/60">{currentAnimIntensity}%</span>
+              </div>
+              <Slider
+                value={[currentAnimIntensity]}
+                onValueChange={([v]) => handleAnimIntensityChange(v)}
+                min={10}
+                max={100}
+                step={1}
+                className="cursor-pointer"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Speed Control */}
+        <div className="space-y-2 p-2.5 rounded-xl backdrop-blur-md bg-[#0a0a1a]/60 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Timer className="h-3 w-3 text-[#F5C76A] drop-shadow-[0_0_4px_rgba(245,199,106,0.4)]" />
+            <span className="text-[11px] text-white/70">Geschwindigkeit</span>
+            {!selectedSceneId && (
+              <span className="text-[9px] text-white/30 ml-auto">Szene auswählen</span>
+            )}
+          </div>
+          <div className={cn(!selectedSceneId && "opacity-40 pointer-events-none")}>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-white/50">Speed</span>
+                <span className="text-[12px] font-mono text-[#F5C76A] drop-shadow-[0_0_4px_rgba(245,199,106,0.3)]">
+                  {currentSpeed.toFixed(2)}x
+                </span>
+              </div>
+              <Slider
+                value={[currentSpeed]}
+                onValueChange={([v]) => handleSpeedChange(v)}
+                min={0.1}
+                max={3}
+                step={0.05}
+                className="cursor-pointer"
+              />
+              <div className="flex gap-1 flex-wrap">
+                {SPEED_PRESETS.map(preset => (
+                  <button
+                    key={preset}
+                    onClick={() => handleSpeedChange(preset)}
+                    className={cn(
+                      "px-2 py-0.5 rounded text-[9px] font-medium transition-all border",
+                      Math.abs(currentSpeed - preset) < 0.06
+                        ? "bg-[#F5C76A]/20 border-[#F5C76A]/50 text-[#F5C76A] shadow-[0_0_6px_rgba(245,199,106,0.2)]"
+                        : "bg-[#0a0a1a]/80 border-white/5 text-white/40 hover:border-white/20 hover:text-white/60"
+                    )}
+                  >
+                    {preset}x
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Green Screen / Chroma Key */}
