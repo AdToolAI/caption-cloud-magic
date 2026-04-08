@@ -1,46 +1,54 @@
 
 
-## Plan: Szenen-Geschwindigkeit in der Videowiedergabe aktivieren
+## Plan: Szene-2-Advance Fix — `original_start_time` für alle Szenen setzen
 
 ### Problem
 
-Der FXPanel-Speed-Slider setzt `playbackRate` auf dem Scene-Objekt und verschiebt die Timeline korrekt, aber die **tatsächliche Video-Wiedergabegeschwindigkeit** (`video.playbackRate`) wird im RAF-Loop nur aus `speedKeyframes` (Speed Ramping) berechnet. Die Scene-`playbackRate`-Eigenschaft wird komplett ignoriert → das Video spielt immer mit 1x ab, egal was im Slider eingestellt ist.
+Wenn die Geschwindigkeit von Szene 1 geändert wird (z.B. 0.5x), wird deren Timeline-Dauer verdoppelt. Die nachfolgenden Szenen werden auf der Timeline korrekt verschoben (`start_time` = 20 statt 10). **Aber**: Diese Szenen bekommen kein `original_start_time` gesetzt.
+
+Im Preview-Player nutzt die Szenen-Advance-Logik:
+```
+const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
+video.currentTime = nextSourceStart;   // ← Seek im SOURCE-Video
+```
+
+Da `original_start_time` fehlt, wird `start_time` (= 20, Timeline-Zeit) als Source-Seek-Position verwendet. Aber im Source-Video liegt Szene 2 bei z.B. Sekunde 10. Ergebnis: Seek über das Video-Ende hinaus → nur Szene 1 wird abgespielt.
+
+Gleicher Bug in `findSceneBySourceTime`: `srcStart = s.original_start_time ?? s.start_time` — Szene 2 wird mit Source-Start 20 gesucht, obwohl sie bei Source 10 anfängt → nie gefunden.
 
 ### Lösung
 
-**Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`** (Zeilen 774-798)
+**Datei: `src/components/directors-cut/studio/CapCutEditor.tsx`** (Zeilen 908-915)
 
-Im "UNIFIED PLAYBACK RATE"-Block die Scene-`playbackRate` als Basis-Geschwindigkeit verwenden:
+Beim Neuberechnen der nachfolgenden Szenen-Timings auch `original_start_time` und `original_end_time` setzen, falls sie noch nicht existieren — **bevor** `start_time`/`end_time` verschoben werden:
 
-```text
-Aktuell:
-  let activeSpeed = 1;                    ← immer 1
-  ... speedKeyframes-Logik ...
-  video.playbackRate = activeSpeed;
-
-Neu:
-  const sceneRate = (sceneInfo?.scene as any)?.playbackRate ?? 1;
-  let activeSpeed = sceneRate;             ← Scene-Speed als Basis
-  ... speedKeyframes-Logik (multipliziert auf sceneRate) ...
-  video.playbackRate = activeSpeed;
+```typescript
+const sorted = [...updatedScenes].sort((a, b) => a.start_time - b.start_time);
+for (let i = 1; i < sorted.length; i++) {
+  const prev = sorted[i - 1];
+  const dur = sorted[i].end_time - sorted[i].start_time;
+  // Preserve original source positions for unmodified scenes
+  const origStart = sorted[i].original_start_time ?? sorted[i].start_time;
+  const origEnd = sorted[i].original_end_time ?? sorted[i].end_time;
+  sorted[i] = {
+    ...sorted[i],
+    start_time: prev.end_time,
+    end_time: prev.end_time + dur,
+    original_start_time: origStart,
+    original_end_time: origEnd,
+  };
+}
 ```
 
-Konkret:
-1. `sceneRate` aus der aktuellen Scene lesen (Zeile ~778)
-2. `activeSpeed` mit `sceneRate` statt `1` initialisieren
-3. Wenn Speed-Keyframes vorhanden: `activeSpeed = sceneRate * getSpeedAtTime(...)` — damit Speed Ramping und Scene-Speed kombinierbar sind
-4. Source-Audio ebenfalls mit `targetRate` synchronisieren (passiert bereits)
+Das bewahrt die echten Source-Positionen, sodass der Player korrekt im Video seekt.
 
 ### Dateien
 
 | Aktion | Datei | Änderung |
 |--------|-------|----------|
-| Edit | `DirectorsCutPreviewPlayer.tsx` | Scene-`playbackRate` als Basis im unified speed block verwenden |
+| Edit | `CapCutEditor.tsx` | `original_start_time`/`original_end_time` für alle nachfolgenden Szenen setzen |
 
 ### Ergebnis
 
-- 0.5x Speed → Video spielt in Zeitlupe, Szene dauert doppelt so lang auf der Timeline
-- 2x Speed → Video spielt schnell, Szene ist halb so lang
-- Nahtlose Übergänge zwischen Szenen mit unterschiedlichen Geschwindigkeiten
-- Speed Ramping Keyframes und Scene-Speed arbeiten zusammen (multiplikativ)
+Alle Szenen spielen korrekt ab, auch wenn vorherige Szenen eine andere Geschwindigkeit haben. Der Player seekt zur richtigen Source-Position.
 
