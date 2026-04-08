@@ -148,7 +148,22 @@ export function DirectorsCut() {
     if (!draft || !draft.selectedVideo) return;
     setSelectedVideo(draft.selectedVideo);
     if (draft.scenes?.length) setScenes(draft.scenes);
-    if (draft.transitions?.length) setTransitions(draft.transitions);
+    if (draft.transitions?.length) {
+      // Normalize legacy transitions: remap incoming-scene IDs to outgoing-scene IDs
+      const sceneIds = new Set((draft.scenes ?? []).map((s: any) => s.id));
+      const outgoingIds = new Set((draft.scenes ?? []).slice(0, -1).map((s: any) => s.id));
+      const normalized = draft.transitions.map((t: any) => {
+        // If sceneId already matches an outgoing scene, keep it
+        if (outgoingIds.has(t.sceneId)) return t;
+        // Otherwise find the outgoing scene index for this incoming scene
+        const incomingIdx = (draft.scenes ?? []).findIndex((s: any) => s.id === t.sceneId);
+        if (incomingIdx > 0) {
+          return { ...t, sceneId: (draft.scenes as any[])[incomingIdx - 1].id };
+        }
+        return t;
+      });
+      setTransitions(normalized);
+    }
     if (draft.appliedEffects) setAppliedEffects(draft.appliedEffects);
     if (draft.audioEnhancements) setAudioEnhancements(draft.audioEnhancements);
     if (draft.exportSettings) setExportSettings(draft.exportSettings);
