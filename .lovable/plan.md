@@ -1,34 +1,22 @@
 
 
-## Plan: Text-Overlay-Editor im Studio-Sidebar integrieren
+## Plan: Demo-Video durch letztes Director's Cut Video ersetzen
 
-### Problem
+### Änderung
 
-Der Text-Tab ("Untertitel") in der Studio-Sidebar zeigt nur vorhandene Text-Overlays an und erlaubt deren Entfernung, aber es gibt keine Möglichkeit, **neue Text-Overlays zu erstellen** oder deren Animationen (Glitch, Fade, Bounce, Typewriter etc.) zu konfigurieren. Die `TextOverlayEditor2028`-Komponente existiert bereits, ist aber nur im alten Step-basierten Flow eingebunden.
+Die `output_url` in `src/constants/demo-video.ts` wird auf das zuletzt gerenderte Director's Cut Video aktualisiert.
 
-### Lösung
+**Neue URL:** `https://s3.eu-central-1.amazonaws.com/remotionlambda-eucentral1-13gm4o6s90/renders/w25s7m56p8/directors-cut-f19f61ff-9253-40da-9e49-31ac870f8557.mp4`
 
-Die `TextOverlayEditor2028`-Komponente direkt in den Text-Tab der `CapCutSidebar` einbetten. Der bestehende "Text-Overlays Management"-Block (Zeile 739-769) wird durch die vollständige Editor-Komponente ersetzt.
-
-### Änderungen
-
-**Datei: `src/components/directors-cut/studio/CapCutSidebar.tsx`**
-
-1. Import von `TextOverlayEditor2028` hinzufügen
-2. Den bestehenden minimalen Overlay-Block (nur Anzeige + Entfernen) durch die `TextOverlayEditor2028`-Komponente ersetzen
-3. Die Komponente erhält `overlays`, `onOverlaysChange`, `videoDuration`, `currentTime` und optional `videoUrl` als Props — alle bereits als Sidebar-Props verfügbar
-4. Die Props `textOverlays` von `Array<{id, text, startTime, endTime}>` auf den vollen `TextOverlay`-Typ erweitern (ist in `CapCutEditor.tsx` bereits als `TextOverlay[]` vorhanden)
+(Gerendert am 8.4.2026, 19:47 Uhr)
 
 ### Dateien
 
 | Aktion | Datei | Änderung |
 |--------|-------|----------|
-| Edit | `CapCutSidebar.tsx` | `TextOverlayEditor2028` importieren und im Text-Tab einbetten, ersetze den minimalen Overlay-Block |
+| Edit | `src/constants/demo-video.ts` | `output_url` + `created_at` + `metadata.title` aktualisieren |
 
-### Ergebnis
+### Auswirkung
 
-- Nutzer können direkt im Studio neue Text-Overlays erstellen
-- Alle 6 Animationen (Fade, Scale, Bounce, Typewriter, Highlight, Glitch) sind auswählbar
-- Position, Farbe, Schriftgröße und Timing sind konfigurierbar
-- Vorhandene Overlays können bearbeitet werden
+Das neue Video erscheint automatisch auf der Startseite (Hero/Karussell), in der Mediathek-Demo-Ansicht und überall wo `DEMO_VIDEO` referenziert wird.
 
