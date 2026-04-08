@@ -771,11 +771,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         }
       }
 
-      // === UNIFIED PLAYBACK RATE (Speed Ramping with easing interpolation) ===
+      // === UNIFIED PLAYBACK RATE (Scene speed + Speed Ramping) ===
       if (video) {
-        // Don't multiply by sceneRate — scene duration is already stretched on the timeline.
-        // Only use the keyframe-derived speed for live playbackRate.
-        let activeSpeed = 1;
+        // Use scene-level playbackRate as base speed
+        const sceneRate = sceneInfo ? ((sceneInfo.scene as any).playbackRate ?? 1) : 1;
+        let activeSpeed = sceneRate;
         
         const sKeyframes = speedKeyframesRef.current;
         if (sKeyframes && sKeyframes.length > 0 && sceneInfo) {
@@ -784,11 +784,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           const relevantKFs = sceneKFs.length > 0 ? sceneKFs : globalKFs;
           
           if (relevantKFs.length > 0) {
-            // Scene-specific keyframes use relative time (0 to scene duration)
             const useRelativeTime = sceneKFs.length > 0;
             const sceneStart = sceneInfo.scene.start_time ?? 0;
             const compareTime = useRelativeTime ? (timelineTime - sceneStart) : timelineTime;
-            activeSpeed = getSpeedAtTime(relevantKFs, compareTime);
+            // Multiply scene base rate with keyframe speed for combined effect
+            activeSpeed = sceneRate * getSpeedAtTime(relevantKFs, compareTime);
           }
         }
         
