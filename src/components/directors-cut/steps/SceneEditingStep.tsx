@@ -429,6 +429,83 @@ export function SceneEditingStep({
     });
   }, [selectedSceneId, scenes, onScenesUpdate, toast]);
 
+  // Multi-select scene handler (Shift+Click)
+  const handleSceneSelectWithMulti = useCallback((sceneId: string, shiftKey: boolean) => {
+    if (shiftKey && selectedSceneId) {
+      const startIdx = scenes.findIndex(s => s.id === selectedSceneId);
+      const endIdx = scenes.findIndex(s => s.id === sceneId);
+      const [from, to] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+      const newSelection = new Set<string>();
+      for (let i = from; i <= to; i++) newSelection.add(scenes[i].id);
+      setSelectedSceneIds(newSelection);
+    } else {
+      setSelectedSceneIds(new Set());
+      setSelectedSceneId(sceneId);
+    }
+  }, [selectedSceneId, scenes]);
+
+  const handleBatchDelete = useCallback(() => {
+    if (selectedSceneIds.size === 0) return;
+    const remaining = scenes.filter(s => !selectedSceneIds.has(s.id));
+    if (remaining.length === 0) return;
+    let curT = 0;
+    const recalc = remaining.map(s => {
+      const dur = s.end_time - s.start_time;
+      const upd = { ...s, start_time: curT, end_time: curT + dur };
+      curT += dur;
+      return upd;
+    });
+    onTransitionsChange(transitions.filter(tr => !selectedSceneIds.has(tr.sceneId)));
+    onScenesUpdate(recalc);
+    setSelectedSceneIds(new Set());
+    setSelectedSceneId(recalc[0]?.id || null);
+    toast({ title: `${selectedSceneIds.size} Szenen gelöscht` });
+  }, [selectedSceneIds, scenes, transitions, onScenesUpdate, onTransitionsChange, toast]);
+
+  const handleScenesReorder = useCallback((fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    const arr = [...scenes];
+    const [moved] = arr.splice(fromIndex, 1);
+    arr.splice(toIndex, 0, moved);
+    let curT = 0;
+    const recalc = arr.map(s => {
+      const dur = s.end_time - s.start_time;
+      const upd = { ...s, start_time: curT, end_time: curT + dur };
+      curT += dur;
+      return upd;
+    });
+    onScenesUpdate(recalc);
+    toast({ title: 'Szenen neu angeordnet' });
+  }, [scenes, onScenesUpdate, toast]);
+
+  const handleCutSegment = useCallback(() => {
+    if (cutSegmentIn === null || cutSegmentOut === null) return;
+    const inT = Math.min(cutSegmentIn, cutSegmentOut);
+    const outT = Math.max(cutSegmentIn, cutSegmentOut);
+    const affected = scenes.find(s => inT >= s.start_time && inT < s.end_time);
+    if (!affected) return;
+    const cutDur = outT - inT;
+    const sIdx = scenes.indexOf(affected);
+    const ns = [...scenes];
+    if (inT <= affected.start_time + 0.2 && outT >= affected.end_time - 0.2) {
+      ns.splice(sIdx, 1);
+    } else if (inT <= affected.start_time + 0.2) {
+      ns[sIdx] = { ...affected, start_time: outT };
+    } else if (outT >= affected.end_time - 0.2) {
+      ns[sIdx] = { ...affected, end_time: inT };
+    } else {
+      ns.splice(sIdx, 1,
+        { ...affected, id: `${affected.id}-cut-a`, end_time: inT, description: `${affected.description} (vor Schnitt)` },
+        { ...affected, id: `${affected.id}-cut-b`, start_time: outT, description: `${affected.description} (nach Schnitt)` }
+      );
+    }
+    let curT = 0;
+    const recalc = ns.map(s => { const dur = s.end_time - s.start_time; const upd = { ...s, start_time: curT, end_time: curT + dur }; curT += dur; return upd; });
+    onScenesUpdate(recalc);
+    setCutSegmentMode(false); setCutSegmentIn(null); setCutSegmentOut(null);
+    toast({ title: 'Segment entfernt', description: `${cutDur.toFixed(1)}s herausgeschnitten` });
+  }, [cutSegmentIn, cutSegmentOut, scenes, onScenesUpdate, toast]);
+
   const handleDeleteScene = useCallback(() => {
     if (!selectedSceneId || scenes.length <= 1) return;
     
