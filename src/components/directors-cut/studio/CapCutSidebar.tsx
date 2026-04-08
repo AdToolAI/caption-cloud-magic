@@ -606,6 +606,9 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               onSceneSelect={onSceneSelect || (() => {})}
               onAutocut={onAutocut}
               isAnalyzing={isAnalyzing}
+              onSceneAdd={onSceneAdd}
+              onSceneRename={onSceneRename}
+              onTrimScene={onTrimScene}
             />
           </TabsContent>
 
