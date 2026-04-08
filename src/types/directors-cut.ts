@@ -186,6 +186,13 @@ export const AVAILABLE_FILTERS = [
   { id: 'film_grain', name: '🎞️ Film Grain', preview: 'sepia(0.15) contrast(1.15) saturate(0.95)', category: 'creative', description: 'Authentisches Film-Grain + Farbshift' },
   { id: 'bleach_bypass', name: '🌫️ Bleach Bypass', preview: 'contrast(1.4) saturate(0.45) brightness(1.08)', category: 'creative', description: 'Desaturiert + Hoher Kontrast' },
   { id: 'cross_process', name: '🌈 Cross Process', preview: 'sepia(0.2) saturate(1.4) hue-rotate(-12deg) contrast(1.12)', category: 'creative', description: 'Farbkanal-Verschiebung' },
+  { id: 'golden_hour', name: '🌅 Golden Hour', preview: 'sepia(0.3) saturate(1.4) brightness(1.1) contrast(1.05)', category: 'basic' },
+  { id: 'moody', name: '🌑 Moody', preview: 'contrast(1.4) brightness(0.75) saturate(0.7) sepia(0.1)', category: 'basic' },
+  { id: 'neon_nights', name: '🌆 Neon Nights', preview: 'saturate(1.8) contrast(1.4) brightness(1.05) hue-rotate(10deg)', category: 'creative', description: 'Neon-Stadtlichter' },
+  { id: 'lomography', name: '📷 Lomography', preview: 'saturate(1.5) contrast(1.3) sepia(0.15) brightness(0.95)', category: 'creative', description: 'Lomographischer Look' },
+  { id: 'kodak_portra', name: '🎞️ Kodak Portra', preview: 'sepia(0.12) saturate(1.15) contrast(1.05) brightness(1.05)', category: 'creative', description: 'Klassischer Kodak Portra Film' },
+  { id: 'fuji_velvia', name: '🏔️ Fuji Velvia', preview: 'saturate(1.6) contrast(1.2) brightness(0.95)', category: 'creative', description: 'Fuji Velvia Diafilm' },
+  { id: 'technicolor', name: '🎬 Technicolor', preview: 'saturate(1.7) contrast(1.15) sepia(0.08) brightness(1.05)', category: 'creative', description: 'Klassischer Technicolor-Look' },
 ] as const;
 
 export type FilterId = typeof AVAILABLE_FILTERS[number]['id'];
