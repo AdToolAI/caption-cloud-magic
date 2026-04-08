@@ -1374,9 +1374,35 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onExportClick={onNextStep}
               onResetClick={() => {
                 toast.info('Projekt wird zurückgesetzt...');
-                // Reset audio effects to defaults
                 handleAudioEffectsChange(DEFAULT_AUDIO_EFFECTS);
               }}
+              // New Studio Tab props
+              scenes={scenes}
+              transitions={transitions || []}
+              selectedSceneId={selectedSceneId}
+              currentTime={currentTime}
+              onSplitAtPlayhead={handleSplitAtPlayhead}
+              onDeleteScene={handleSceneDelete}
+              onDuplicateScene={handleDuplicateScene}
+              onSceneSelect={setSelectedSceneId}
+              onAutocut={onStartAnalysis}
+              isAnalyzing={isAnalyzing}
+              appliedEffects={appliedEffects?.global}
+              onEffectsChange={onEffectsChange}
+              colorGrading={colorGrading}
+              onColorGradingChange={onColorGradingChange}
+              styleTransfer={styleTransfer}
+              onStyleTransferChange={onStyleTransferChange}
+              chromaKey={chromaKey}
+              onChromaKeyChange={onChromaKeyChange}
+              upscaling={upscaling}
+              onUpscalingChange={onUpscalingChange}
+              interpolation={interpolation}
+              onInterpolationChange={onInterpolationChange}
+              restoration={restoration}
+              onRestorationChange={onRestorationChange}
+              exportSettings={exportSettings}
+              onExportSettingsChange={onExportSettingsChange}
             />
             )}
           </div>
