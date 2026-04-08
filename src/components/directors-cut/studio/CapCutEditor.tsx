@@ -971,7 +971,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     toast.success('Szene dupliziert');
   }, [scenes, onScenesUpdate]);
 
-  // Cleanup render polling on unmount
+  // Cleanup render polling + interpolation on unmount
   useEffect(() => {
     return () => {
       if (renderPollingRef.current) clearInterval(renderPollingRef.current);
@@ -1106,7 +1106,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       const dbRenderId = data?.render_id || data?.id;
       if (remotionRenderId) {
         setCurrentRenderId(dbRenderId || remotionRenderId);
-        setRenderProgress(10);
+        serverProgressRef.current = 5;
+        estimatedTimeRef.current = data?.estimated_time_seconds || 120;
         setRenderStatus('rendering');
         startRenderPolling(remotionRenderId);
       } else if (data?.video_url || data?.downloadUrl) {
