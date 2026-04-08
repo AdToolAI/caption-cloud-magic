@@ -60,6 +60,7 @@ export interface AppliedEffects {
 
 export interface GlobalEffects {
   filter?: string;
+  filterIntensity?: number;
   brightness: number;
   contrast: number;
   saturation: number;
@@ -70,6 +71,7 @@ export interface GlobalEffects {
 
 export interface SceneEffects {
   filter?: string;
+  filterIntensity?: number;
   brightness?: number;
   contrast?: number;
   saturation?: number;
