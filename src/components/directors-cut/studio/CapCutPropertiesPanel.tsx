@@ -61,7 +61,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
         {selectedSubtitle ? (
           <div className="space-y-4">
             {/* Subtitle Header */}
-            <div className="flex items-center gap-2 pb-2 border-b border-[#3a3a3a]">
+            <div className="flex items-center gap-2 pb-2 border-b border-[#F5C76A]/10">
               <MessageSquare className="h-4 w-4 text-purple-400" />
               <span className="text-sm text-white font-medium">Untertitel</span>
             </div>
@@ -73,7 +73,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                 value={selectedSubtitle.text}
                 onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { text: e.target.value })}
                 placeholder="Untertitel-Text eingeben..."
-                className="min-h-[80px] bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white resize-none"
+                className="min-h-[80px] bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-sm text-white resize-none"
               />
             </div>
             
@@ -92,7 +92,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                     onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { 
                       startTime: Math.max(0, parseFloat(e.target.value) || 0)
                     })}
-                    className="h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white"
+                    className="h-7 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white"
                     step={0.1}
                     min={0}
                   />
@@ -105,7 +105,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                     onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { 
                       endTime: Math.max(0.1, parseFloat(e.target.value) || 0.1)
                     })}
-                    className="h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white"
+                    className="h-7 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white"
                     step={0.1}
                     min={0.1}
                   />
@@ -114,7 +114,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
             </div>
             
             {/* Duration (calculated) */}
-            <div className="flex justify-between text-xs text-white/50 bg-[#2a2a2a] px-2 py-1.5 rounded">
+            <div className="flex justify-between text-xs text-white/50 bg-[#0a0a1a]/60 px-2 py-1.5 rounded">
               <span>Dauer:</span>
               <span>{Math.max(0, selectedSubtitle.endTime - selectedSubtitle.startTime).toFixed(1)}s</span>
             </div>
@@ -134,7 +134,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                       "px-2 py-1.5 rounded text-xs transition-colors",
                       selectedSubtitle.style === style.id 
                         ? "bg-purple-600 text-white" 
-                        : "bg-[#2a2a2a] text-white/60 hover:bg-[#3a3a3a]"
+                        : "bg-[#0a0a1a]/60 text-white/60 hover:bg-[#3a3a3a]"
                     )}
                   >
                     {style.label}
@@ -158,7 +158,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                       "px-2 py-1.5 rounded text-xs transition-colors",
                       (selectedSubtitle.position || DEFAULT_SUBTITLE_STYLE.position) === pos 
                         ? "bg-purple-600 text-white" 
-                        : "bg-[#2a2a2a] text-white/60 hover:bg-[#3a3a3a]"
+                        : "bg-[#0a0a1a]/60 text-white/60 hover:bg-[#3a3a3a]"
                     )}
                   >
                     {pos === 'top' ? 'Oben' : pos === 'center' ? 'Mitte' : 'Unten'}
@@ -184,7 +184,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                       "px-2 py-1.5 rounded text-xs transition-colors",
                       (selectedSubtitle.fontSize || DEFAULT_SUBTITLE_STYLE.fontSize) === size.id 
                         ? "bg-purple-600 text-white" 
-                        : "bg-[#2a2a2a] text-white/60 hover:bg-[#3a3a3a]"
+                        : "bg-[#0a0a1a]/60 text-white/60 hover:bg-[#3a3a3a]"
                     )}
                   >
                     {size.label}
@@ -206,7 +206,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                     type="color" 
                     value={selectedSubtitle.color || DEFAULT_SUBTITLE_STYLE.color}
                     onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { color: e.target.value })}
-                    className="w-full h-8 rounded cursor-pointer bg-[#2a2a2a] border border-[#3a3a3a]"
+                    className="w-full h-8 rounded cursor-pointer bg-[#0a0a1a]/60 border border-[#F5C76A]/10"
                   />
                 </div>
                 <div>
@@ -217,7 +217,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                     onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { 
                       backgroundColor: e.target.value + 'CC'
                     })}
-                    className="w-full h-8 rounded cursor-pointer bg-[#2a2a2a] border border-[#3a3a3a]"
+                    className="w-full h-8 rounded cursor-pointer bg-[#0a0a1a]/60 border border-[#F5C76A]/10"
                   />
                 </div>
               </div>
@@ -230,7 +230,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                 value={selectedSubtitle.fontFamily || DEFAULT_SUBTITLE_STYLE.fontFamily}
                 onValueChange={(value) => onSubtitleUpdate?.(selectedSubtitle.id, { fontFamily: value })}
               >
-                <SelectTrigger className="h-8 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white">
+                <SelectTrigger className="h-8 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -256,7 +256,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                       "px-2 py-1.5 rounded text-xs transition-colors",
                       (selectedSubtitle.maxLines || DEFAULT_SUBTITLE_STYLE.maxLines) === lines 
                         ? "bg-purple-600 text-white" 
-                        : "bg-[#2a2a2a] text-white/60 hover:bg-[#3a3a3a]"
+                        : "bg-[#0a0a1a]/60 text-white/60 hover:bg-[#3a3a3a]"
                     )}
                   >
                     {lines} Zeilen
@@ -277,7 +277,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                     "px-3 py-1.5 rounded text-xs transition-colors",
                     selectedSubtitle.textStroke 
                       ? "bg-purple-600 text-white" 
-                      : "bg-[#2a2a2a] text-white/60 hover:bg-[#3a3a3a]"
+                      : "bg-[#0a0a1a]/60 text-white/60 hover:bg-[#3a3a3a]"
                   )}
                 >
                   {selectedSubtitle.textStroke ? 'Ein' : 'Aus'}
@@ -290,7 +290,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                     onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { 
                       textStrokeColor: e.target.value 
                     })}
-                    className="w-8 h-8 rounded cursor-pointer bg-[#2a2a2a] border border-[#3a3a3a]"
+                    className="w-8 h-8 rounded cursor-pointer bg-[#0a0a1a]/60 border border-[#F5C76A]/10"
                     title="Umrandungsfarbe"
                   />
                 )}
@@ -316,7 +316,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
               <Input
                 value={selectedClip.name}
                 onChange={(e) => updateClip({ name: e.target.value })}
-                className="h-8 bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white"
+                className="h-8 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-sm text-white"
               />
             </div>
 
@@ -348,7 +348,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                     type="number"
                     value={selectedClip.startTime.toFixed(1)}
                     onChange={(e) => updateClip({ startTime: parseFloat(e.target.value) || 0 })}
-                    className="h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white"
+                    className="h-7 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white"
                     step={0.1}
                   />
                 </div>
@@ -358,7 +358,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                     type="number"
                     value={selectedClip.duration.toFixed(1)}
                     onChange={(e) => updateClip({ duration: parseFloat(e.target.value) || 1 })}
-                    className="h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white"
+                    className="h-7 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white"
                     step={0.1}
                     min={0.1}
                   />
@@ -413,7 +413,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                     type="number"
                     value={selectedClip.trimStart.toFixed(1)}
                     onChange={(e) => updateClip({ trimStart: parseFloat(e.target.value) || 0 })}
-                    className="h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white"
+                    className="h-7 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white"
                     step={0.1}
                   />
                 </div>
@@ -423,7 +423,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                     type="number"
                     value={selectedClip.trimEnd.toFixed(1)}
                     onChange={(e) => updateClip({ trimEnd: parseFloat(e.target.value) || 0 })}
-                    className="h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white"
+                    className="h-7 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white"
                     step={0.1}
                   />
                 </div>
@@ -447,7 +447,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
           </div>
         ) : (
           <div className="text-center py-8">
-            <div className="w-12 h-12 rounded-full bg-[#2a2a2a] flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 rounded-full bg-[#0a0a1a]/60 flex items-center justify-center mx-auto mb-3">
               <Volume2 className="h-5 w-5 text-white/40" />
             </div>
             <p className="text-xs text-white/40">Select a clip to edit</p>
@@ -456,7 +456,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
       </div>
 
       {/* Project Audio Settings */}
-      <div className="border-t border-[#2a2a2a] p-3">
+      <div className="border-t border-[#F5C76A]/10 p-3">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xs text-white/60">Master Volume</span>
           <span className="text-xs text-white/40 ml-auto">{audioEnhancements.master_volume}%</span>
