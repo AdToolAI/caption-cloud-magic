@@ -8,7 +8,7 @@ import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
 import { CapCutPropertiesPanel } from './CapCutPropertiesPanel';
 import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack, DEFAULT_SUBTITLE_TRACK } from '@/types/timeline';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic } from 'lucide-react';
+import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
