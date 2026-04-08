@@ -101,6 +101,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onTextOverlaysChange,
   appliedEffects,
   transitions,
+  onTransitionsChange,
   colorGrading,
   sceneColorGrading,
   styleTransfer,
