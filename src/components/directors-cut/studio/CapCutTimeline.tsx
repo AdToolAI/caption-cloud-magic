@@ -793,7 +793,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
 
             {/* Video Track */}
             <div
-              className="relative border-b border-[#2a2a2a]"
+              className="relative border-b border-[#F5C76A]/10"
               style={{ height: VIDEO_TRACK_HEIGHT }}
               onClick={() => onSceneSelect?.(null)}
             >
@@ -853,7 +853,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             {tracksBeforeSubtitle.map(track => (
               <div
                 key={track.id}
-                className="relative border-b border-[#2a2a2a]"
+                className="relative border-b border-[#F5C76A]/10"
                 style={{ height: TRACK_HEIGHT }}
               >
                 <DroppableTrack
@@ -871,7 +871,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             {/* Subtitle Track */}
             {subtitleTrack && (
               <div
-                className="relative border-b border-[#2a2a2a]"
+                className="relative border-b border-[#F5C76A]/10"
                 style={{ height: TRACK_HEIGHT, width: `${duration * zoom}px` }}
                 onClick={() => onSubtitleSelect?.(null)}
               >
@@ -903,7 +903,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             {tracksAfterSubtitle.map(track => (
               <div
                 key={track.id}
-                className="relative border-b border-[#2a2a2a]"
+                className="relative border-b border-[#F5C76A]/10"
                 style={{ height: TRACK_HEIGHT }}
               >
                 <DroppableTrack
