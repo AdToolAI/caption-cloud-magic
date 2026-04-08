@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { SceneAnalysis, AudioEnhancements, TextOverlay, TransitionAssignment } from '@/types/directors-cut';
 import { SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE } from '@/lib/directors-cut-draft';
@@ -977,6 +978,32 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     };
   }, []);
 
+  // Smooth progress interpolation between polls
+  const serverProgressRef = useRef(0);
+  const estimatedTimeRef = useRef(120); // default 120s
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startProgressInterpolation = useCallback(() => {
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    progressIntervalRef.current = setInterval(() => {
+      setRenderProgress(prev => {
+        const server = serverProgressRef.current;
+        // Gently move toward server value, or nudge forward if server hasn't updated
+        const target = Math.max(server, prev);
+        const increment = 100 / (estimatedTimeRef.current || 120) / 5; // tick every 200ms
+        const next = Math.min(target + increment, 95); // never exceed 95 before done
+        return Math.max(prev, next); // never go backward
+      });
+    }, 200);
+  }, []);
+
+  const stopProgressInterpolation = useCallback(() => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+  }, []);
+
   // Render polling logic
   const startRenderPolling = useCallback((remotionRenderId: string) => {
     if (renderPollingRef.current) clearInterval(renderPollingRef.current);
@@ -990,28 +1017,37 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
         const progress = data.progress;
         if (progress?.done) {
+          stopProgressInterpolation();
           setRenderProgress(100);
           setRenderStatus('completed');
           setRenderedVideoUrl(progress.outputFile || progress.url || null);
           if (renderPollingRef.current) clearInterval(renderPollingRef.current);
         } else if (progress?.fatalErrorEncountered) {
+          stopProgressInterpolation();
           setRenderStatus('failed');
           setRenderError(progress.errors?.[0]?.message || 'Rendering fehlgeschlagen');
           if (renderPollingRef.current) clearInterval(renderPollingRef.current);
         } else {
           const pct = Math.round((progress?.overallProgress || 0) * 100);
-          setRenderProgress(Math.max(10, Math.min(pct, 95)));
-          setRenderStatus('rendering');
+          serverProgressRef.current = pct;
+          // Update status based on progress
+          if (pct >= 85) {
+            setRenderStatus('finalizing');
+          } else {
+            setRenderStatus('rendering');
+          }
         }
       } catch {
         // Silently retry on next interval
       }
     };
 
-    // Initial check after 5s, then every 10s
-    setTimeout(poll, 5000);
-    renderPollingRef.current = setInterval(poll, 10000);
-  }, []);
+    // Start interpolation immediately
+    startProgressInterpolation();
+    // Initial check after 3s, then every 8s
+    setTimeout(poll, 3000);
+    renderPollingRef.current = setInterval(poll, 8000);
+  }, [startProgressInterpolation, stopProgressInterpolation]);
 
   // Export video - trigger render via Edge Function
   const handleExportVideo = useCallback(async () => {
