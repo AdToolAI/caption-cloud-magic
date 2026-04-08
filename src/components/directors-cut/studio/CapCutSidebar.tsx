@@ -543,7 +543,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   }, []);
 
   return (
-    <div className="w-72 flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg h-full">
+    <div className="w-full flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg h-full">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col h-full">
         {/* Tab Icons — Cyan glow on active */}
         <TabsList className="grid grid-cols-7 gap-0.5 p-1.5 bg-[#050816] border-b border-[#F5C76A]/10 h-auto rounded-none">
