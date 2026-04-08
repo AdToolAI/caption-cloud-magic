@@ -933,10 +933,18 @@ export function SceneEditingStep({
         transitions={transitions}
         videoDuration={actualTotalDuration}
         selectedSceneId={selectedSceneId}
-        onSceneSelect={setSelectedSceneId}
+        selectedSceneIds={selectedSceneIds}
+        onSceneSelect={handleSceneSelectWithMulti}
         onTransitionClick={setEditingTransitionId}
         onSceneDurationChange={handleTimelineDurationChange}
-        
+        onScenesReorder={handleScenesReorder}
+        cutSegmentMode={cutSegmentMode}
+        cutSegmentIn={cutSegmentIn}
+        cutSegmentOut={cutSegmentOut}
+        onCutSegmentClick={(time) => {
+          if (cutSegmentIn === null) setCutSegmentIn(time);
+          else setCutSegmentOut(time);
+        }}
         thumbnails={thumbnails}
         currentTime={currentVideoTime}
       />
@@ -1355,15 +1363,20 @@ export function SceneEditingStep({
 
       {/* Contextual Quick Actions - Floating Action Bar */}
       <ContextualActionBar
-        visible={!!selectedSceneId}
+        visible={!!selectedSceneId || selectedSceneIds.size > 0}
         onSpeedChange={handleQuickSpeedChange}
         onSplit={handleSplitScene}
         onCopy={handleCopyScene}
-        onDelete={handleDeleteScene}
+        onDelete={selectedSceneIds.size > 1 ? handleBatchDelete : handleDeleteScene}
         onApplyEffect={handleOpenEffects}
         onAddScene={() => handleAddScene(true)}
         currentSpeed={selectedSceneSpeed}
-        sceneName={selectedScene ? `Szene ${selectedSceneIndex + 1}` : undefined}
+        sceneName={selectedSceneIds.size > 1 ? `${selectedSceneIds.size} Szenen` : selectedScene ? `Szene ${selectedSceneIndex + 1}` : undefined}
+        multiSelectCount={selectedSceneIds.size}
+        cutSegmentMode={cutSegmentMode}
+        onToggleCutSegment={() => { setCutSegmentMode(v => !v); setCutSegmentIn(null); setCutSegmentOut(null); }}
+        onApplyCutSegment={handleCutSegment}
+        canApplyCutSegment={cutSegmentIn !== null && cutSegmentOut !== null}
       />
 
       {/* AI Scene Remix Dialog */}
