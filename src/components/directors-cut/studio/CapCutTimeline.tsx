@@ -578,7 +578,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           {/* Video track header */}
           <div 
             className="flex items-center gap-2 px-2 border-b border-[#2a2a2a] bg-[#242424]"
-            style={{ height: TRACK_HEIGHT }}
+            style={{ height: VIDEO_TRACK_HEIGHT }}
           >
             <span className="text-xs">🎬</span>
             <span className="text-xs text-white/80 truncate">Video</span>
@@ -684,7 +684,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             {/* Video Track */}
             <div
               className="relative border-b border-[#2a2a2a]"
-              style={{ height: TRACK_HEIGHT }}
+              style={{ height: VIDEO_TRACK_HEIGHT }}
               onClick={() => onSceneSelect?.(null)}
             >
               {scenes.map((scene, i) => (
@@ -694,9 +694,12 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   index={i}
                   zoom={zoom}
                   isSelected={scene.id === selectedSceneId}
+                  isPlayheadInside={currentTime >= scene.start_time && currentTime < scene.end_time}
                   onSeek={onSeek}
                   onSelect={() => onSceneSelect?.(scene.id)}
                   onDelete={onSceneDelete ? () => onSceneDelete(scene.id) : undefined}
+                  onSplit={onSplitAtPlayhead}
+                  onTrim={onTrimScene ? (newStart, newEnd) => onTrimScene(scene.id, newStart, newEnd) : undefined}
                 />
               ))}
               {/* Add Scene Button with Dropdown */}
