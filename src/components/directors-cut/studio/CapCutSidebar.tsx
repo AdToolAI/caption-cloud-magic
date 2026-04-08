@@ -91,6 +91,8 @@ interface CapCutSidebarProps {
   onColorGradingChange?: (enabled: boolean, grade: string | null, intensity?: number) => void;
   styleTransfer?: { enabled: boolean; style: string | null; intensity: number };
   onStyleTransferChange?: (enabled: boolean, style: string | null) => void;
+  sceneEffects?: Record<string, any>;
+  onSceneEffectsChange?: (sceneEffects: Record<string, any>) => void;
   // FX
   chromaKey?: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string };
   onChromaKeyChange?: (ck: any) => void;
@@ -266,6 +268,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onColorGradingChange,
   styleTransfer,
   onStyleTransferChange,
+  sceneEffects,
+  onSceneEffectsChange,
   chromaKey,
   onChromaKeyChange,
   upscaling,
@@ -622,6 +626,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               styleTransfer={styleTransfer || { enabled: false, style: null, intensity: 50 }}
               onStyleTransferChange={onStyleTransferChange || (() => {})}
               selectedSceneId={selectedSceneId}
+              sceneEffects={sceneEffects}
+              onSceneEffectsChange={onSceneEffectsChange}
             />
           </TabsContent>
 

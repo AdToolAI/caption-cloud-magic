@@ -584,6 +584,7 @@ export function DirectorsCut() {
           kenBurns={kenBurnsKeyframes}
           // New studio props
           onEffectsChange={(global) => setAppliedEffects(prev => ({ ...prev, global }))}
+          onSceneEffectsChange={(scenes) => setAppliedEffects(prev => ({ ...prev, scenes }))}
           onColorGradingChange={(enabled, grade, intensity) => setColorGrading(prev => ({ ...prev, enabled, grade, intensity: intensity ?? prev.intensity }))}
           onStyleTransferChange={(enabled, style) => setStyleTransfer(prev => ({ ...prev, enabled, style }))}
           chromaKey={chromaKey}

@@ -60,6 +60,7 @@ interface CapCutEditorProps {
   onSubtitleSafeZoneChange?: (zone: SubtitleSafeZone) => void;
   // New studio props
   onEffectsChange?: (effects: { brightness: number; contrast: number; saturation: number; sharpness: number; temperature: number; vignette: number }) => void;
+  onSceneEffectsChange?: (sceneEffects: Record<string, any>) => void;
   onColorGradingChange?: (enabled: boolean, grade: string | null, intensity?: number) => void;
   onStyleTransferChange?: (enabled: boolean, style: string | null) => void;
   chromaKey?: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string };
@@ -117,6 +118,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onSubtitleSafeZoneChange,
   // New studio props
   onEffectsChange,
+  onSceneEffectsChange,
   onColorGradingChange,
   onStyleTransferChange,
   chromaKey,
@@ -1576,6 +1578,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onColorGradingChange={onColorGradingChange}
               styleTransfer={styleTransfer}
               onStyleTransferChange={onStyleTransferChange}
+              sceneEffects={appliedEffects?.scenes}
+              onSceneEffectsChange={onSceneEffectsChange}
               chromaKey={chromaKey}
               onChromaKeyChange={onChromaKeyChange}
               upscaling={upscaling}
