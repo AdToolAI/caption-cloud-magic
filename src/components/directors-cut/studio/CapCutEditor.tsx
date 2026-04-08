@@ -915,6 +915,15 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     onScenesUpdate(recalculatedScenes);
   }, [scenes, onScenesUpdate]);
 
+  // Trim scene handler — adjust start/end without recalculating other scenes
+  const handleTrimScene = useCallback((sceneId: string, newStart: number, newEnd: number) => {
+    if (!onScenesUpdate) return;
+    const updatedScenes = scenes.map(s =>
+      s.id === sceneId ? { ...s, start_time: newStart, end_time: newEnd } : s
+    );
+    onScenesUpdate(updatedScenes);
+  }, [scenes, onScenesUpdate]);
+
   // Add scene handler
   const handleSceneAdd = useCallback(() => {
     if (!onScenesUpdate) return;
@@ -1551,6 +1560,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onSubtitleUpdate={handleSubtitleUpdate}
                 onSubtitleDelete={handleSubtitleDelete}
                 onSubtitleSelect={handleSubtitleSelect}
+                onSplitAtPlayhead={handleSplitAtPlayhead}
+                onTrimScene={handleTrimScene}
               />
             </div>
           </div>
