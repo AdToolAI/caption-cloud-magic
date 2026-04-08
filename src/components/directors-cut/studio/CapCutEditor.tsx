@@ -970,10 +970,62 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     toast.success('Szene dupliziert');
   }, [scenes, onScenesUpdate]);
 
+  // Cleanup render polling on unmount
+  useEffect(() => {
+    return () => {
+      if (renderPollingRef.current) clearInterval(renderPollingRef.current);
+    };
+  }, []);
+
+  // Render polling logic
+  const startRenderPolling = useCallback((renderId: string) => {
+    if (renderPollingRef.current) clearInterval(renderPollingRef.current);
+
+    const poll = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('check-render-status', {
+          body: { renderId },
+        });
+        if (error || !data) return;
+
+        if (data.status === 'completed' && data.downloadUrl) {
+          setRenderProgress(100);
+          setRenderStatus('completed');
+          setRenderedVideoUrl(data.downloadUrl);
+          if (renderPollingRef.current) clearInterval(renderPollingRef.current);
+        } else if (data.status === 'failed') {
+          setRenderStatus('failed');
+          setRenderError(data.error || 'Unbekannter Fehler');
+          if (renderPollingRef.current) clearInterval(renderPollingRef.current);
+        } else {
+          // Simulate progress based on time elapsed
+          setRenderProgress(prev => {
+            if (prev >= 90) return 90; // Cap at 90 until actually done
+            return prev + 2;
+          });
+          if (data.status === 'rendering') setRenderStatus('rendering');
+          if (data.status === 'finalizing') setRenderStatus('finalizing');
+        }
+      } catch {
+        // Silently retry on next interval
+      }
+    };
+
+    // Initial check after 5s, then every 15s
+    setTimeout(poll, 5000);
+    renderPollingRef.current = setInterval(poll, 15000);
+  }, []);
+
   // Export video - trigger render via Edge Function
   const handleExportVideo = useCallback(async () => {
     try {
-      toast.info('Export wird vorbereitet...');
+      // Show overlay immediately
+      setIsRendering(true);
+      setRenderProgress(0);
+      setRenderStatus('preparing');
+      setRenderedVideoUrl(null);
+      setRenderError(null);
+      setRenderStartedAt(Date.now());
       
       let savedProjectId = projectId;
       if (onSaveProject) {
@@ -981,9 +1033,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       }
       
       if (!savedProjectId) {
-        toast.error('Projekt konnte nicht gespeichert werden');
+        setRenderStatus('failed');
+        setRenderError('Projekt konnte nicht gespeichert werden');
         return;
       }
+
+      setRenderProgress(5);
 
       const { data, error } = await supabase.functions.invoke('render-directors-cut', {
         body: {
@@ -1009,17 +1064,42 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
       if (error) {
         console.error('[Export] Error:', error);
-        toast.error('Export fehlgeschlagen: ' + error.message);
+        setRenderStatus('failed');
+        setRenderError(error.message);
         return;
       }
 
-      toast.success('Export gestartet! Das Rendering kann einige Minuten dauern.');
+      const renderId = data?.render_id || data?.renderId;
+      if (renderId) {
+        setCurrentRenderId(renderId);
+        setRenderProgress(10);
+        setRenderStatus('rendering');
+        startRenderPolling(renderId);
+      } else {
+        // No render_id returned — edge function may not support polling
+        setRenderProgress(100);
+        setRenderStatus('completed');
+        setRenderedVideoUrl(data?.video_url || data?.downloadUrl || null);
+      }
+
       console.log('[Export] Render initiated:', data);
     } catch (err) {
       console.error('[Export] Error:', err);
-      toast.error('Export konnte nicht gestartet werden');
+      setRenderStatus('failed');
+      setRenderError('Export konnte nicht gestartet werden');
     }
-  }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack]);
+  }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack, startRenderPolling, videoDuration]);
+
+  const handleRenderDownload = useCallback(() => {
+    if (renderedVideoUrl) {
+      window.open(renderedVideoUrl, '_blank');
+    }
+  }, [renderedVideoUrl]);
+
+  const handleRenderClose = useCallback(() => {
+    setIsRendering(false);
+    if (renderPollingRef.current) clearInterval(renderPollingRef.current);
+  }, []);
 
   const handleAddClip = useCallback((trackId: string, clip: Omit<AudioClip, 'id'>) => {
     const newClip: AudioClip = {
