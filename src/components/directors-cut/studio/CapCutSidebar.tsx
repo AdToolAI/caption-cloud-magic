@@ -592,7 +592,61 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
         </TabsList>
 
         <ScrollArea className="flex-1">
-          {/* TAB 1: Video Upload (nur Videos) */}
+          {/* TAB: Cut (Schnitt) */}
+          <TabsContent value="cut" className="mt-0">
+            <CutPanel
+              scenes={scenes}
+              transitions={transitions}
+              selectedSceneId={selectedSceneId}
+              currentTime={currentTime}
+              videoDuration={videoDuration}
+              onSplitAtPlayhead={onSplitAtPlayhead || (() => {})}
+              onDeleteScene={onDeleteScene || (() => {})}
+              onDuplicateScene={onDuplicateScene || (() => {})}
+              onSceneSelect={onSceneSelect || (() => {})}
+              onAutocut={onAutocut}
+              isAnalyzing={isAnalyzing}
+            />
+          </TabsContent>
+
+          {/* TAB: Look (Style + Farbe) */}
+          <TabsContent value="look" className="mt-0">
+            <LookPanel
+              effects={appliedEffects || { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 }}
+              onEffectsChange={onEffectsChange || (() => {})}
+              colorGrading={colorGrading || { enabled: false, grade: null, intensity: 50 }}
+              onColorGradingChange={onColorGradingChange || (() => {})}
+              styleTransfer={styleTransfer || { enabled: false, style: null, intensity: 50 }}
+              onStyleTransferChange={onStyleTransferChange || (() => {})}
+            />
+          </TabsContent>
+
+          {/* TAB: FX (Effekte) */}
+          <TabsContent value="fx" className="mt-0">
+            <FXPanel
+              chromaKey={chromaKey || { enabled: false, color: '#00ff00', tolerance: 40 }}
+              onChromaKeyChange={onChromaKeyChange || (() => {})}
+              upscaling={upscaling || { enabled: false, targetResolution: '4K' }}
+              onUpscalingChange={onUpscalingChange || (() => {})}
+              interpolation={interpolation || { enabled: false, targetFps: 60 }}
+              onInterpolationChange={onInterpolationChange || (() => {})}
+              restoration={restoration || { enabled: false, level: 'medium' }}
+              onRestorationChange={onRestorationChange || (() => {})}
+            />
+          </TabsContent>
+
+          {/* TAB: Export */}
+          <TabsContent value="export" className="mt-0">
+            <ExportPanel
+              settings={exportSettings || { quality: 'high', format: 'mp4', fps: 30, aspect_ratio: '16:9' }}
+              onSettingsChange={onExportSettingsChange || (() => {})}
+              onExport={onStartExport || onExportClick || (() => {})}
+              videoDuration={videoDuration}
+              sceneCount={sceneCount || scenes.length}
+            />
+          </TabsContent>
+
+          {/* TAB: Video Upload (nur Videos) */}
           <TabsContent value="media" className="p-3 space-y-4 mt-0">
             <div className="flex items-center gap-2">
               <FileVideo className="h-4 w-4 text-[#00d4ff]" />
