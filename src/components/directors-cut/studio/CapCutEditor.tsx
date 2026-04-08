@@ -1485,6 +1485,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onRestorationChange={onRestorationChange}
               exportSettings={exportSettings}
               onExportSettingsChange={onExportSettingsChange}
+              onStartExport={handleExportVideo}
             />
             )}
           </div>
