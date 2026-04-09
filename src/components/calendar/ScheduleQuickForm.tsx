@@ -43,7 +43,6 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
   const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [caption, setCaption] = useState('');
-  const [caption, setCaption] = useState('');
   const [when, setWhen] = useState(() => {
     const date = new Date(Date.now() + 60 * 60 * 1000);
     return date.toISOString().slice(0, 16);

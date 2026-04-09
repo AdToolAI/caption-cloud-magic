@@ -18,6 +18,7 @@ interface RecurringRuleDialogProps {
 
 export function RecurringRuleDialog({ workspace_id, open, onClose }: RecurringRuleDialogProps) {
   const { createRule, loading } = useRecurringEvents(workspace_id);
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [pattern, setPattern] = useState<string>('weekly');
   const [eventTitle, setEventTitle] = useState('');
