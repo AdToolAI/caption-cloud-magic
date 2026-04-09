@@ -26,17 +26,17 @@ export const BlackTieFooter = () => {
       { label: "Status", href: "/coming-soon" },
     ],
     company: [
-      { label: "Über uns", href: "/coming-soon" },
-      { label: "Karriere", href: "/coming-soon" },
-      { label: "Kontakt", href: "/coming-soon" },
-      { label: "Presse", href: "/coming-soon" },
+      { label: t("landing.footer.aboutUs"), href: "/coming-soon" },
+      { label: t("landing.footer.careers"), href: "/coming-soon" },
+      { label: t("landing.footer.contactLink"), href: "/coming-soon" },
+      { label: t("landing.footer.press"), href: "/coming-soon" },
     ],
     legal: [
-      { label: "Datenschutz", href: "/privacy" },
-      { label: "AGB", href: "/terms" },
-      { label: "Impressum", href: "/imprint" },
-      { label: "AVV", href: "/legal/avv" },
-      { label: "Cookie-Einstellungen", href: "#", onClick: () => window.dispatchEvent(new CustomEvent('openCookiePreferences')) },
+      { label: t("landing.footer.privacy"), href: "/privacy" },
+      { label: t("landing.footer.terms"), href: "/terms" },
+      { label: t("landing.footer.imprint"), href: "/imprint" },
+      { label: t("landing.footer.avv"), href: "/legal/avv" },
+      { label: t("landing.footer.cookieSettings"), href: "#", onClick: () => window.dispatchEvent(new CustomEvent('openCookiePreferences')) },
     ],
   };
 
@@ -46,7 +46,6 @@ export const BlackTieFooter = () => {
       
       <div className="container max-w-7xl mx-auto px-4 py-16">
         <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-12">
-          {/* Brand Column */}
           <div className="col-span-2">
             <Link to="/" className="flex items-center gap-2 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-gold-dark flex items-center justify-center">
@@ -55,8 +54,7 @@ export const BlackTieFooter = () => {
               <span className="text-xl font-bold text-foreground">AdTool AI</span>
             </Link>
             <p className="text-sm text-muted-foreground mb-6 max-w-xs">
-              Dein KI-gestütztes Marketing-Arsenal für Social Media Erfolg. 
-              Erstelle, plane und analysiere wie ein Profi.
+              {t("landing.footer.brandDescription")}
             </p>
             <div className="flex items-center gap-3">
               {socialLinks.map((social) => (
@@ -72,9 +70,8 @@ export const BlackTieFooter = () => {
             </div>
           </div>
 
-          {/* Product */}
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-4">Produkt</h4>
+            <h4 className="text-sm font-semibold text-foreground mb-4">{t("landing.footer.product")}</h4>
             <ul className="space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.label}>
@@ -86,9 +83,8 @@ export const BlackTieFooter = () => {
             </ul>
           </div>
 
-          {/* Resources */}
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-4">Ressourcen</h4>
+            <h4 className="text-sm font-semibold text-foreground mb-4">{t("landing.footer.resources")}</h4>
             <ul className="space-y-3">
               {footerLinks.resources.map((link) => (
                 <li key={link.label}>
@@ -100,9 +96,8 @@ export const BlackTieFooter = () => {
             </ul>
           </div>
 
-          {/* Company */}
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-4">Unternehmen</h4>
+            <h4 className="text-sm font-semibold text-foreground mb-4">{t("landing.footer.company")}</h4>
             <ul className="space-y-3">
               {footerLinks.company.map((link) => (
                 <li key={link.label}>
@@ -114,9 +109,8 @@ export const BlackTieFooter = () => {
             </ul>
           </div>
 
-          {/* Legal */}
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-4">Rechtliches</h4>
+            <h4 className="text-sm font-semibold text-foreground mb-4">{t("landing.footer.legal")}</h4>
             <ul className="space-y-3">
               {footerLinks.legal.map((link) => (
                 <li key={link.label}>
@@ -138,15 +132,14 @@ export const BlackTieFooter = () => {
           </div>
         </div>
 
-        {/* Bottom Bar */}
         <div className="pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} AdTool AI. Alle Rechte vorbehalten.
+            © {new Date().getFullYear()} AdTool AI. {t("landing.footer.allRightsReserved")}
           </p>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Made with</span>
+            <span>{t("landing.footer.madeWith")}</span>
             <span className="text-primary">♥</span>
-            <span>in Germany</span>
+            <span>{t("landing.footer.inGermany")}</span>
           </div>
         </div>
       </div>

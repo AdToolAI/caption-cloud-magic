@@ -3,72 +3,69 @@ import { Check, Sparkles, Crown, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
-import { translations } from "@/lib/translations";
-
-const plans = [
-  {
-    name: "Basic",
-    price: "14,95",
-    period: "/Monat",
-    description: "50 Credits",
-    icon: Sparkles,
-    features: [
-      "50 KI-Generierungen pro Monat",
-      "3 Social Media Accounts",
-      "Basis-Analytics",
-      "E-Mail Support",
-    ],
-    popular: false,
-    buttonText: "Starten",
-  },
-  {
-    name: "Pro",
-    price: "34,95",
-    period: "/Monat",
-    description: "150 Credits",
-    icon: Crown,
-    features: [
-      "150 KI-Generierungen pro Monat",
-      "10 Social Media Accounts",
-      "Erweiterte Analytics",
-      "Priority Support",
-      "Brand Kit",
-      "Content Coach",
-    ],
-    popular: true,
-    badge: "Empfohlen vom MI6",
-    buttonText: "Auf Pro upgraden",
-  },
-  {
-    name: "Enterprise",
-    price: "69,95",
-    period: "/Monat",
-    description: "Unlimited",
-    icon: Building2,
-    features: [
-      "Unbegrenzte Generierungen",
-      "Unbegrenzte Accounts",
-      "White-Label Option",
-      "Dedicated Account Manager",
-      "Custom Integrationen",
-      "SLA garantiert",
-    ],
-    popular: false,
-    buttonText: "Kontakt",
-  },
-];
 
 export const PricingSection = () => {
-  const { language } = useTranslation();
+  const { t } = useTranslation();
+
+  const plans = [
+    {
+      name: "Basic",
+      price: "14,95",
+      period: t("landing.pricing.perMonth"),
+      description: t("landing.pricing.credits50"),
+      icon: Sparkles,
+      features: [
+        t("landing.pricing.basic.f1"),
+        t("landing.pricing.basic.f2"),
+        t("landing.pricing.basic.f3"),
+        t("landing.pricing.basic.f4"),
+      ],
+      popular: false,
+      buttonText: t("landing.pricing.start"),
+    },
+    {
+      name: "Pro",
+      price: "34,95",
+      period: t("landing.pricing.perMonth"),
+      description: t("landing.pricing.credits150"),
+      icon: Crown,
+      features: [
+        t("landing.pricing.pro.f1"),
+        t("landing.pricing.pro.f2"),
+        t("landing.pricing.pro.f3"),
+        t("landing.pricing.pro.f4"),
+        t("landing.pricing.pro.f5"),
+        t("landing.pricing.pro.f6"),
+      ],
+      popular: true,
+      badge: t("landing.pricing.badge"),
+      buttonText: t("landing.pricing.upgradePro"),
+    },
+    {
+      name: "Enterprise",
+      price: "69,95",
+      period: t("landing.pricing.perMonth"),
+      description: t("landing.pricing.unlimited"),
+      icon: Building2,
+      features: [
+        t("landing.pricing.enterprise.f1"),
+        t("landing.pricing.enterprise.f2"),
+        t("landing.pricing.enterprise.f3"),
+        t("landing.pricing.enterprise.f4"),
+        t("landing.pricing.enterprise.f5"),
+        t("landing.pricing.enterprise.f6"),
+      ],
+      popular: false,
+      buttonText: t("landing.pricing.contact"),
+    },
+  ];
 
   return (
     <section id="pricing" className="py-24 px-4 relative overflow-hidden">
-      {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-background via-card/30 to-background" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-3xl" />
       
       <div className="container relative z-10 max-w-6xl mx-auto">
-        {/* Section Header */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -77,17 +74,16 @@ export const PricingSection = () => {
           className="text-center mb-16"
         >
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            <span className="text-foreground">Wähle deinen </span>
+            <span className="text-foreground">{t("landing.pricing.title1")}</span>
             <span className="bg-gradient-to-r from-primary to-gold-dark bg-clip-text text-transparent">
-              Einsatz-Level
+              {t("landing.pricing.title2")}
             </span>
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-            Flexible Pläne für Einzelkämpfer bis zu ganzen Marketing-Teams.
+            {t("landing.pricing.subtitle")}
           </p>
         </motion.div>
 
-        {/* Pricing Cards */}
         <div className="grid md:grid-cols-3 gap-8">
           {plans.map((plan, index) => (
             <motion.div
@@ -98,7 +94,6 @@ export const PricingSection = () => {
               transition={{ duration: 0.5, delay: index * 0.1 }}
               className={`relative group ${plan.popular ? 'md:-mt-4 md:mb-4' : ''}`}
             >
-              {/* Popular Badge */}
               {plan.popular && plan.badge && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
                   <div className="bg-gradient-to-r from-primary to-gold-dark text-primary-foreground text-xs font-bold px-4 py-1.5 rounded-full shadow-lg">
@@ -113,7 +108,6 @@ export const PricingSection = () => {
                   : 'border-border/50 hover:border-accent/30'
               } hover:shadow-xl hover:-translate-y-1`}>
                 
-                {/* Plan Header */}
                 <div className="text-center mb-6">
                   <div className={`w-14 h-14 rounded-2xl ${plan.popular ? 'bg-gradient-to-br from-primary/30 to-gold-dark/20' : 'bg-muted/50'} flex items-center justify-center mx-auto mb-4`}>
                     <plan.icon className={`h-7 w-7 ${plan.popular ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -126,7 +120,6 @@ export const PricingSection = () => {
                   <p className="text-sm text-muted-foreground mt-2">{plan.description}</p>
                 </div>
 
-                {/* Features */}
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-3">
@@ -136,7 +129,6 @@ export const PricingSection = () => {
                   ))}
                 </ul>
 
-                {/* CTA Button */}
                 <Button 
                   asChild 
                   className={`w-full h-11 font-semibold transition-all duration-300 ${
