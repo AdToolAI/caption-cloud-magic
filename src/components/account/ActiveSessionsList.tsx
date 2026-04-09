@@ -38,8 +38,6 @@ export const ActiveSessionsList = () => {
   const [terminatingId, setTerminatingId] = useState<string | null>(null);
   const [terminatingAll, setTerminatingAll] = useState(false);
   const dateLocale = language === 'de' ? de : language === 'es' ? es : enUS;
-  const [terminatingAll, setTerminatingAll] = useState(false);
-
   const loadSessions = async () => {
     try {
       const { data, error } = await supabase
