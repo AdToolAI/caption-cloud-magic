@@ -23,9 +23,6 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
-export default function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormProps) {
-  const { user } = useAuth();
-  const { t } = useTranslation();
 
 interface ScheduleQuickFormProps {
   workspaceId: string;
@@ -43,7 +40,7 @@ const PLATFORMS = [
 
 export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormProps) {
   const { user } = useAuth();
-  const [title, setTitle] = useState('');
+  const { t } = useTranslation();
   const [caption, setCaption] = useState('');
   const [when, setWhen] = useState(() => {
     const date = new Date(Date.now() + 60 * 60 * 1000);
