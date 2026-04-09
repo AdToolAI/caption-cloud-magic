@@ -72,8 +72,8 @@ interface CapCutEditorProps {
   onInterpolationChange?: (enabled: boolean, fps: number) => void;
   restoration?: { enabled: boolean; level: string };
   onRestorationChange?: (enabled: boolean, level: string) => void;
-  exportSettings?: { quality: string; format: string; fps: number; aspect_ratio: string };
-  onExportSettingsChange?: (settings: any) => void;
+  exportSettings?: ExportSettings;
+  onExportSettingsChange?: (settings: ExportSettings) => void;
   isAnalyzing?: boolean;
   onStartAnalysis?: () => void;
   onVoiceOverGenerated?: (url: string) => void;
