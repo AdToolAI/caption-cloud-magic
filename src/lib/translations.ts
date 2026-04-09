@@ -1918,7 +1918,18 @@ export const translations: Record<Language, any> = {
       title: "AI Recommendations for You",
       apply: "Apply",
       bestTime: "Post on {days} at {time} for +{boost}% engagement",
-      contentType: "{type} performs {boost}% better"
+      contentType: "{type} performs {boost}% better",
+      starterTips: 'Starter tips for you',
+      aiRecommendations: 'AI recommendations for you',
+      beginner1: 'Post at least 3x per week for steady growth',
+      beginner2: 'Try different posting times and watch your engagement',
+      beginner3: 'Use 5–10 relevant hashtags per post',
+      impactFoundation: 'Foundation',
+      impactStrategy: 'Strategy',
+      impactReach: 'Reach',
+      applied: 'Applied',
+      beginnerFooter: 'After 10 posts you will receive personalized AI recommendations',
+      dataFooter: 'Based on your performance data from the last 28 days',
     },
 
     // Social Proof
