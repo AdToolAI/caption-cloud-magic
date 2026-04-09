@@ -271,7 +271,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
               </Label>
               <Textarea
                 id="caption"
-                placeholder="Schreibe ein Thema oder deine Caption hier... (z.B. 'Werbung für Calvin Klein')"
+                placeholder={t("calendarSchedule.captionPlaceholder")}
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
                 disabled={busy || isGenerating}
@@ -290,7 +290,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
                   className="gap-2 border-primary/30 hover:border-primary hover:bg-primary/5 transition-all"
                 >
                   <Sparkles className="w-4 h-4 text-primary" />
-                  Mit KI generieren
+                  {t("calendarSchedule.generateWithAI")}
                   {showGeneratorPanel ? (
                     <ChevronUp className="w-3 h-3" />
                   ) : (
@@ -312,32 +312,32 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
                     <div className="mt-3 p-4 rounded-xl bg-muted/30 border border-white/10 space-y-4">
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">Ton</Label>
+                          <Label className="text-xs text-muted-foreground">{t("calendarSchedule.tone")}</Label>
                           <Select value={selectedTone} onValueChange={setSelectedTone}>
                             <SelectTrigger className="h-9">
-                              <SelectValue placeholder="Ton" />
+                              <SelectValue placeholder={t("calendarSchedule.tone")} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="professional">Professionell</SelectItem>
-                              <SelectItem value="casual">Locker</SelectItem>
-                              <SelectItem value="friendly">Freundlich</SelectItem>
-                              <SelectItem value="humorous">Humorvoll</SelectItem>
-                              <SelectItem value="inspirational">Inspirierend</SelectItem>
+                              <SelectItem value="professional">{t("calendarSchedule.professional")}</SelectItem>
+                              <SelectItem value="casual">{t("calendarSchedule.casual")}</SelectItem>
+                              <SelectItem value="friendly">{t("calendarSchedule.friendly")}</SelectItem>
+                              <SelectItem value="humorous">{t("calendarSchedule.humorous")}</SelectItem>
+                              <SelectItem value="inspirational">{t("calendarSchedule.inspirational")}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">Sprache</Label>
+                          <Label className="text-xs text-muted-foreground">{t("calendarSchedule.language")}</Label>
                           <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
                             <SelectTrigger className="h-9">
-                              <SelectValue placeholder="Sprache" />
+                              <SelectValue placeholder={t("calendarSchedule.language")} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="de">Deutsch</SelectItem>
-                              <SelectItem value="en">Englisch</SelectItem>
-                              <SelectItem value="es">Spanisch</SelectItem>
-                              <SelectItem value="fr">Französisch</SelectItem>
+                              <SelectItem value="de">{t("calendarSchedule.german")}</SelectItem>
+                              <SelectItem value="en">{t("calendarSchedule.english")}</SelectItem>
+                              <SelectItem value="es">{t("calendarSchedule.spanish")}</SelectItem>
+                              <SelectItem value="fr">{t("calendarSchedule.french")}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -365,21 +365,21 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
                         className="w-full gap-2 bg-gradient-to-r from-primary to-primary/80 
                                    hover:shadow-[0_0_20px_hsla(var(--primary)/0.3)] transition-all"
                       >
-                        {isGenerating ? (
+                         {isGenerating ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            Generiere...
+                            {t("calendarSchedule.generatingCaption")}
                           </>
                         ) : (
                           <>
                             <Wand2 className="w-4 h-4" />
-                            Caption generieren
+                            {t("calendarSchedule.generateCaption")}
                           </>
                         )}
                       </Button>
                       
                       <p className="text-xs text-muted-foreground text-center">
-                        💡 Gib oben ein Thema ein, z.B. "Werbung für Calvin Klein"
+                        {t("calendarSchedule.hint")}
                       </p>
                     </div>
                   </motion.div>
@@ -404,13 +404,13 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
                   ) : (
                     <img 
                       src={mediaPreviewUrl} 
-                      alt="Vorschau" 
+                      alt={t("calendarSchedule.preview")} 
                       className="w-full max-h-64 object-contain"
                     />
                   )}
                   <div className="p-2 bg-muted/30 flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">
-                      🎨 Aus Generator übertragen
+                      {t("calendarSchedule.fromGenerator")}
                     </span>
                     <Button
                       type="button"
@@ -421,7 +421,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
                         setMediaPreviewType(null);
                       }}
                     >
-                      Entfernen
+                      {t("calendarSchedule.remove")}
                     </Button>
                   </div>
                 </div>
@@ -440,7 +440,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
               
               {mediaPreviewUrl && (
                 <p className="text-xs text-muted-foreground">
-                  💡 Du kannst entweder das übertragene Media verwenden oder ein neues hochladen
+                  {t("calendarSchedule.mediaHint")}
                 </p>
               )}
             </div>
@@ -450,7 +450,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
 
             {/* Date/Time */}
             <div className="space-y-2">
-              <Label htmlFor="when">Veröffentlichungsdatum & Uhrzeit</Label>
+              <Label htmlFor="when">{t("calendarSchedule.publishDateTime")}</Label>
               <Input
                 id="when"
                 type="datetime-local"
@@ -466,7 +466,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
 
             {/* Platform Chips */}
             <div className="space-y-3">
-              <Label>Plattformen</Label>
+              <Label>{t("calendarSchedule.platforms")}</Label>
               <div className="flex flex-wrap gap-2">
                 {PLATFORMS.map((platform) => {
                   const isActive = channels.includes(platform.id);
@@ -504,12 +504,12 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
                 {busy ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    {selectedMedia.length > 0 ? 'Hochladen & Planen...' : 'Wird geplant...'}
+                    {selectedMedia.length > 0 ? t("calendarSchedule.uploadAndSchedule") : t("calendarSchedule.scheduling")}
                   </>
                 ) : (
                   <>
                     <Send className="h-4 w-4" />
-                    Post planen
+                    {t("calendarSchedule.schedulePosts")}
                   </>
                 )}
               </Button>

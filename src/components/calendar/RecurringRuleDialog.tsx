@@ -92,7 +92,7 @@ export function RecurringRuleDialog({ workspace_id, open, onClose }: RecurringRu
               <div>
                 <Label>Event-Titel</Label>
                 <Input
-                  placeholder="Titel des wiederkehrenden Events"
+                  placeholder={t("calendarRecurring.eventTitle")}
                   value={eventTitle}
                   onChange={(e) => setEventTitle(e.target.value)}
                 />
@@ -101,7 +101,7 @@ export function RecurringRuleDialog({ workspace_id, open, onClose }: RecurringRu
               <div>
                 <Label>Caption (optional)</Label>
                 <Textarea
-                  placeholder="Text für den Post..."
+                  placeholder={t("calendarRecurring.captionPlaceholder")}
                   value={eventCaption}
                   onChange={(e) => setEventCaption(e.target.value)}
                   rows={3}
