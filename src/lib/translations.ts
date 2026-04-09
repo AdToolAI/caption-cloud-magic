@@ -2452,6 +2452,90 @@ export const translations: Record<Language, any> = {
           posts: "Posts created",
           engagement: "Engagement"
         }
+      },
+      featureGrid: {
+        title1: "Everything you need for ",
+        title2: "Social Media Success",
+        subtitle: "A complete arsenal of tools for professional social media marketing.",
+        contentPlanning: "Content Planning",
+        contentPlanningDesc: "Plan and automate your posts for all platforms",
+        analyticsDashboard: "Analytics Dashboard",
+        analyticsDashboardDesc: "Real-time insights on performance and engagement",
+        brandKit: "Brand Kit",
+        brandKitDesc: "Consistent brand identity across all channels",
+        aiContentCoach: "AI Content Coach",
+        aiContentCoachDesc: "Personalized tips for content optimization",
+        multiPlatform: "Multi-Platform",
+        multiPlatformDesc: "Instagram, TikTok, LinkedIn, X and more",
+        goalTracking: "Goal Tracking",
+        goalTrackingDesc: "Set and achieve your marketing goals"
+      },
+      mission: {
+        badge: "Mission Control",
+        title1: "Why this tool ",
+        title2: "wins the game",
+        subtitle: "Three steps to more effective marketing – systematic, data-driven, scalable.",
+        planMonth: "Plan your month",
+        planMonthDesc: "AI-powered content planning with automatic time optimization for maximum reach.",
+        optimizePerformance: "Optimize Performance",
+        optimizePerformanceDesc: "Real-time analytics and data-driven insights for continuous improvement.",
+        scaleCampaigns: "Scale Campaigns",
+        scaleCampaignsDesc: "Automate recurring tasks and multiply your output.",
+        learnMore: "Learn more"
+      },
+      pricing: {
+        title1: "Choose your ",
+        title2: "Mission Level",
+        subtitle: "Flexible plans for solo marketers to full marketing teams.",
+        perMonth: "/month",
+        credits50: "50 Credits",
+        credits150: "150 Credits",
+        unlimited: "Unlimited",
+        badge: "Recommended by MI6",
+        start: "Get Started",
+        upgradePro: "Upgrade to Pro",
+        contact: "Contact",
+        basic: {
+          f1: "50 AI generations per month",
+          f2: "3 Social Media Accounts",
+          f3: "Basic Analytics",
+          f4: "Email Support"
+        },
+        pro: {
+          f1: "150 AI generations per month",
+          f2: "10 Social Media Accounts",
+          f3: "Advanced Analytics",
+          f4: "Priority Support",
+          f5: "Brand Kit",
+          f6: "Content Coach"
+        },
+        enterprise: {
+          f1: "Unlimited generations",
+          f2: "Unlimited Accounts",
+          f3: "White-Label Option",
+          f4: "Dedicated Account Manager",
+          f5: "Custom Integrations",
+          f6: "SLA guaranteed"
+        }
+      },
+      footer: {
+        brandDescription: "Your AI-powered marketing arsenal for social media success. Create, plan and analyze like a pro.",
+        product: "Product",
+        resources: "Resources",
+        company: "Company",
+        legal: "Legal",
+        aboutUs: "About Us",
+        careers: "Careers",
+        contactLink: "Contact",
+        press: "Press",
+        privacy: "Privacy Policy",
+        terms: "Terms of Service",
+        imprint: "Imprint",
+        avv: "DPA",
+        cookieSettings: "Cookie Settings",
+        allRightsReserved: "All rights reserved.",
+        madeWith: "Made with",
+        inGermany: "in Germany"
       }
     },
     
@@ -4756,6 +4840,90 @@ export const translations: Record<Language, any> = {
           posts: "Posts erstellt",
           engagement: "Engagement"
         }
+      },
+      featureGrid: {
+        title1: "Alles was du brauchst für ",
+        title2: "Social Media Erfolg",
+        subtitle: "Ein komplettes Arsenal an Tools für professionelles Social Media Marketing.",
+        contentPlanning: "Content Planung",
+        contentPlanningDesc: "Plane und automatisiere deine Posts für alle Plattformen",
+        analyticsDashboard: "Analytics Dashboard",
+        analyticsDashboardDesc: "Echtzeit-Insights zu Performance und Engagement",
+        brandKit: "Brand Kit",
+        brandKitDesc: "Konsistente Markenidentität über alle Kanäle",
+        aiContentCoach: "KI Content Coach",
+        aiContentCoachDesc: "Personalisierte Tipps zur Content-Optimierung",
+        multiPlatform: "Multi-Platform",
+        multiPlatformDesc: "Instagram, TikTok, LinkedIn, X und mehr",
+        goalTracking: "Zielverfolgung",
+        goalTrackingDesc: "Setze und erreiche deine Marketing-Ziele"
+      },
+      mission: {
+        badge: "Mission Control",
+        title1: "Why this tool ",
+        title2: "wins the game",
+        subtitle: "Drei Schritte zu effektiverem Marketing – systematisch, datengetrieben, skalierbar.",
+        planMonth: "Plane deinen Monat",
+        planMonthDesc: "KI-gestützte Content-Planung mit automatischer Zeitoptimierung für maximale Reichweite.",
+        optimizePerformance: "Optimiere Performance",
+        optimizePerformanceDesc: "Echtzeit-Analytics und datenbasierte Insights zur kontinuierlichen Verbesserung.",
+        scaleCampaigns: "Skaliere Kampagnen",
+        scaleCampaignsDesc: "Automatisiere wiederkehrende Aufgaben und multipliziere deinen Output.",
+        learnMore: "Mehr erfahren"
+      },
+      pricing: {
+        title1: "Wähle deinen ",
+        title2: "Einsatz-Level",
+        subtitle: "Flexible Pläne für Einzelkämpfer bis zu ganzen Marketing-Teams.",
+        perMonth: "/Monat",
+        credits50: "50 Credits",
+        credits150: "150 Credits",
+        unlimited: "Unlimited",
+        badge: "Empfohlen vom MI6",
+        start: "Starten",
+        upgradePro: "Auf Pro upgraden",
+        contact: "Kontakt",
+        basic: {
+          f1: "50 KI-Generierungen pro Monat",
+          f2: "3 Social Media Accounts",
+          f3: "Basis-Analytics",
+          f4: "E-Mail Support"
+        },
+        pro: {
+          f1: "150 KI-Generierungen pro Monat",
+          f2: "10 Social Media Accounts",
+          f3: "Erweiterte Analytics",
+          f4: "Priority Support",
+          f5: "Brand Kit",
+          f6: "Content Coach"
+        },
+        enterprise: {
+          f1: "Unbegrenzte Generierungen",
+          f2: "Unbegrenzte Accounts",
+          f3: "White-Label Option",
+          f4: "Dedicated Account Manager",
+          f5: "Custom Integrationen",
+          f6: "SLA garantiert"
+        }
+      },
+      footer: {
+        brandDescription: "Dein KI-gestütztes Marketing-Arsenal für Social Media Erfolg. Erstelle, plane und analysiere wie ein Profi.",
+        product: "Produkt",
+        resources: "Ressourcen",
+        company: "Unternehmen",
+        legal: "Rechtliches",
+        aboutUs: "Über uns",
+        careers: "Karriere",
+        contactLink: "Kontakt",
+        press: "Presse",
+        privacy: "Datenschutz",
+        terms: "AGB",
+        imprint: "Impressum",
+        avv: "AVV",
+        cookieSettings: "Cookie-Einstellungen",
+        allRightsReserved: "Alle Rechte vorbehalten.",
+        madeWith: "Made with",
+        inGermany: "in Germany"
       }
     },
     
@@ -6984,6 +7152,90 @@ export const translations: Record<Language, any> = {
           posts: "Posts creados",
           engagement: "Interacción"
         }
+      },
+      featureGrid: {
+        title1: "Todo lo que necesitas para ",
+        title2: "Éxito en Redes Sociales",
+        subtitle: "Un arsenal completo de herramientas para marketing profesional en redes sociales.",
+        contentPlanning: "Planificación de Contenido",
+        contentPlanningDesc: "Planifica y automatiza tus posts para todas las plataformas",
+        analyticsDashboard: "Panel de Analytics",
+        analyticsDashboardDesc: "Insights en tiempo real sobre rendimiento y engagement",
+        brandKit: "Brand Kit",
+        brandKitDesc: "Identidad de marca consistente en todos los canales",
+        aiContentCoach: "Coach de Contenido IA",
+        aiContentCoachDesc: "Tips personalizados para optimización de contenido",
+        multiPlatform: "Multi-Plataforma",
+        multiPlatformDesc: "Instagram, TikTok, LinkedIn, X y más",
+        goalTracking: "Seguimiento de Objetivos",
+        goalTrackingDesc: "Establece y alcanza tus objetivos de marketing"
+      },
+      mission: {
+        badge: "Mission Control",
+        title1: "Por qué esta herramienta ",
+        title2: "gana el juego",
+        subtitle: "Tres pasos hacia un marketing más efectivo – sistemático, basado en datos, escalable.",
+        planMonth: "Planifica tu mes",
+        planMonthDesc: "Planificación de contenido con IA con optimización automática de horarios para máximo alcance.",
+        optimizePerformance: "Optimiza el Rendimiento",
+        optimizePerformanceDesc: "Analytics en tiempo real e insights basados en datos para mejora continua.",
+        scaleCampaigns: "Escala Campañas",
+        scaleCampaignsDesc: "Automatiza tareas recurrentes y multiplica tu producción.",
+        learnMore: "Saber más"
+      },
+      pricing: {
+        title1: "Elige tu ",
+        title2: "Nivel de Misión",
+        subtitle: "Planes flexibles para marketers individuales hasta equipos completos.",
+        perMonth: "/mes",
+        credits50: "50 Créditos",
+        credits150: "150 Créditos",
+        unlimited: "Ilimitado",
+        badge: "Recomendado por MI6",
+        start: "Comenzar",
+        upgradePro: "Actualizar a Pro",
+        contact: "Contacto",
+        basic: {
+          f1: "50 generaciones IA por mes",
+          f2: "3 Cuentas de Redes Sociales",
+          f3: "Analytics Básico",
+          f4: "Soporte por Email"
+        },
+        pro: {
+          f1: "150 generaciones IA por mes",
+          f2: "10 Cuentas de Redes Sociales",
+          f3: "Analytics Avanzado",
+          f4: "Soporte Prioritario",
+          f5: "Brand Kit",
+          f6: "Content Coach"
+        },
+        enterprise: {
+          f1: "Generaciones ilimitadas",
+          f2: "Cuentas ilimitadas",
+          f3: "Opción White-Label",
+          f4: "Account Manager dedicado",
+          f5: "Integraciones personalizadas",
+          f6: "SLA garantizado"
+        }
+      },
+      footer: {
+        brandDescription: "Tu arsenal de marketing impulsado por IA para el éxito en redes sociales. Crea, planifica y analiza como un profesional.",
+        product: "Producto",
+        resources: "Recursos",
+        company: "Empresa",
+        legal: "Legal",
+        aboutUs: "Sobre Nosotros",
+        careers: "Carreras",
+        contactLink: "Contacto",
+        press: "Prensa",
+        privacy: "Privacidad",
+        terms: "Términos",
+        imprint: "Aviso Legal",
+        avv: "DPA",
+        cookieSettings: "Configuración de Cookies",
+        allRightsReserved: "Todos los derechos reservados.",
+        madeWith: "Hecho con",
+        inGermany: "en Alemania"
       }
     },
     
