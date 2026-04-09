@@ -381,11 +381,11 @@ const Home = () => {
   };
 
   const publishNow = async (postId: string) => {
-    toast.success("Post wird veröffentlicht...");
+    toast.success(t("homePage.postPublishing"));
   };
 
   const retry = async (postId: string) => {
-    toast.success("Post wird erneut versucht...");
+    toast.success(t("homePage.postRetrying"));
   };
 
   const handleEditPost = (post: WeekPost) => {
@@ -417,10 +417,10 @@ const Home = () => {
         ...day,
         posts: day.posts.filter(p => p.id !== post.id),
       })));
-      toast.success("Post gelöscht");
+      toast.success(t("homePage.postDeleted"));
     } catch (err) {
       console.error("Delete failed:", err);
-      toast.error("Post konnte nicht gelöscht werden");
+      toast.error(t("homePage.postDeleteFailed"));
     }
   };
 
@@ -516,7 +516,7 @@ const Home = () => {
                 <Clock className="h-4 w-4 text-warning" />
                 <span>{t("dashboard.statusBar.nextPost")}: {(() => {
                   const next = getNextPost();
-                  if (!next) return language === "de" ? "Kein Post geplant" : "No post scheduled";
+                  if (!next) return t("homePage.noPostScheduled");
                   const d = new Date(next.date);
                   const dd = String(d.getDate()).padStart(2, '0');
                   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -536,17 +536,17 @@ const Home = () => {
               {t("heroBanner.title")}
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed">
-              {language === "de" ? "Starte kostenlos. Upgrade jederzeit." : "Start free. Upgrade anytime."}
+              {t("homePage.startFree")}
             </p>
             <div className="flex justify-center gap-4 mt-8">
               <Link to="/auth">
                 <Button size="lg" className="gradient-primary text-white font-medium rounded-xl px-8 py-6 shadow-soft hover:shadow-glow hover:scale-[1.03] transition-all">
-                  {language === "de" ? "Jetzt planen" : "Start Planning"}
+                  {t("homePage.startPlanning")}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Button size="lg" variant="outline" className="rounded-xl px-8 py-6">
-                {language === "de" ? "Demo ansehen" : "Watch Demo"}
+                {t("homePage.watchDemo")}
               </Button>
             </div>
           </div>
@@ -570,7 +570,7 @@ const Home = () => {
         {user && (() => {
           const next = getNextPost();
           return (
-            <Section title={language === "de" ? "Nächster Post" : "Next Post"} description={language === "de" ? "Dein nächster geplanter Beitrag" : "Your next scheduled post"} bg="muted">
+            <Section title={t("homePage.nextPost")} description={t("homePage.nextScheduledPost")} bg="muted">
               <Card className="rounded-2xl shadow-soft">
                 <CardContent className="p-6">
                   {!next ? (
@@ -581,7 +581,7 @@ const Home = () => {
                       <Button asChild>
                         <Link to="/calendar">
                           <Plus className="h-4 w-4 mr-2" />
-                          {language === "de" ? "Neuen Post planen" : "Schedule New Post"}
+                          {t("homePage.scheduleNewPost")}
                         </Link>
                       </Button>
                     </div>
@@ -603,7 +603,7 @@ const Home = () => {
                             <PlatformBadge platform={next.post.platform as any} />
                           )}
                         </div>
-                        <p className="text-sm font-medium line-clamp-3">{next.post.contentIdea || next.post.caption || (language === "de" ? "Keine Beschreibung" : "No description")}</p>
+                        <p className="text-sm font-medium line-clamp-3">{next.post.contentIdea || next.post.caption || t("homePage.noDescription")}</p>
                         <p className="text-xs text-muted-foreground mt-2">
                           <Clock className="h-3 w-3 inline mr-1" />
                           {(() => {
@@ -631,7 +631,7 @@ const Home = () => {
             action={
               <Button asChild variant="link">
                 <Link to="/calendar">
-                  {language === "de" ? "Im Kalender planen" : "Plan in Calendar"} →
+                  {t("homePage.planInCalendar")} →
                 </Link>
               </Button>
             }
@@ -704,7 +704,7 @@ const Home = () => {
             action={
               <Button asChild variant="link">
                 <Link to="/personalized-dashboard">
-                  Personalisiertes Dashboard →
+                  {t("homePage.personalizedDashboard")} →
                 </Link>
               </Button>
             }
@@ -738,17 +738,13 @@ const Home = () => {
         <section className="bg-gradient-to-br from-muted/30 to-muted/60 rounded-3xl p-8 md:p-12 mt-16 shadow-xl">
           <div className="text-center mb-12">
             <div className="inline-block px-4 py-1.5 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 text-primary rounded-full text-xs font-bold mb-4 shadow-lg shadow-primary/10">
-              ✨ {language === "de" ? "Einfache & Transparente Preise" : language === "es" ? "Precios Simples y Transparentes" : "Simple & Transparent Pricing"}
+              ✨ {t("homePage.simpleTransparentPricing")}
             </div>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3 tracking-tight">
-              {language === "de" ? "Wachse mit AdTool AI" : language === "es" ? "Crece con AdTool AI" : "Grow with AdTool AI"}
+              {t("homePage.growWithAdTool")}
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              {language === "de" 
-                ? "Wähle den Plan, der zu deinem Workflow passt. Kostenlos starten, jederzeit upgraden." 
-                : language === "es"
-                ? "Elige el plan que se adapte a tu flujo de trabajo. Comienza gratis, actualiza en cualquier momento."
-                : "Choose the plan that fits your workflow. Start free, upgrade anytime."}
+              {t("homePage.choosePlan")}
             </p>
           </div>
           
@@ -758,16 +754,12 @@ const Home = () => {
               <div className="text-center mb-6 pb-6 border-b border-border/50">
                 <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Basic</h3>
                 <p className="text-xs text-muted-foreground mb-6 font-medium">
-                  {language === "de" 
-                    ? "Am besten für Content-Creator & kleine Unternehmen" 
-                    : language === "es"
-                    ? "Mejor para creadores de contenido y pequeñas empresas"
-                    : "Best for content creators & small businesses"}
+                  {t("homePage.bestForCreators")}
                 </p>
                 <div className="flex items-baseline justify-center gap-1.5">
                   <span className="text-4xl font-bold text-foreground tracking-tighter">€{PRICING_V21.basic.price.EUR}</span>
                   <span className="text-sm text-muted-foreground font-medium">
-                    / {language === "de" ? "Monat" : language === "es" ? "mes" : "month"}
+                    / {t("homePage.perMonth")}
                   </span>
                 </div>
               </div>
@@ -775,25 +767,25 @@ const Home = () => {
                 <li className="flex items-start gap-2.5">
                   <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {language === "de" ? "200 KI-Captions pro Monat" : "200 AI captions per month"}
+                    {t("homePage.aiCaptions200")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {language === "de" ? "Alle Premium-Templates" : "All premium templates"}
+                    {t("homePage.allPremiumTemplates")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {language === "de" ? "Hashtag-Generator" : "Hashtag Generator"}
+                    {t("homePage.hashtagGenerator")}
                   </span>
                 </li>
               </ul>
               <Button size="lg" asChild className="w-full">
                 <Link to={user ? "/pricing" : "/auth"}>
-                  {language === "de" ? "Zu Basic upgraden" : "Upgrade to Basic"}
+                  {t("homePage.upgradeToBasic")}
                 </Link>
               </Button>
             </div>
@@ -802,18 +794,18 @@ const Home = () => {
             <div className="relative flex flex-col bg-card rounded-2xl border-2 border-primary shadow-2xl shadow-primary/30 lg:scale-105 lg:z-10 hover:scale-105 lg:hover:scale-110 transition-all duration-500 p-6">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
                 <div className="bg-gradient-to-r from-primary to-accent text-white px-6 py-1.5 rounded-full text-xs font-extrabold shadow-2xl tracking-wider">
-                  ⭐ {language === "de" ? "BELIEBT" : "POPULAR"}
+                  ⭐ {t("homePage.popular")}
                 </div>
               </div>
               <div className="text-center mb-6 pb-6 border-b border-border/50">
                 <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Pro</h3>
                 <p className="text-xs text-muted-foreground mb-6 font-medium">
-                  {language === "de" ? "Perfekt für Agenturen & Teams" : "Perfect for agencies & teams"}
+                  {t("homePage.perfectForAgencies")}
                 </p>
                 <div className="flex items-baseline justify-center gap-1.5">
                   <span className="text-4xl font-bold text-foreground tracking-tighter">€34.95</span>
                   <span className="text-sm text-muted-foreground font-medium">
-                    / {language === "de" ? "Monat" : "month"}
+                    / {t("homePage.perMonth")}
                   </span>
                 </div>
               </div>
@@ -821,25 +813,25 @@ const Home = () => {
                 <li className="flex items-start gap-2.5">
                   <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {language === "de" ? "Unbegrenzte KI-Captions" : "Unlimited AI captions"}
+                    {t("homePage.unlimitedAiCaptions")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {language === "de" ? "Team-Zusammenarbeit" : "Team collaboration"}
+                    {t("homePage.teamCollaboration")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {language === "de" ? "Prioritäts-Support" : "Priority support"}
+                    {t("homePage.prioritySupport")}
                   </span>
                 </li>
               </ul>
               <Button size="lg" asChild className="w-full">
                 <Link to={user ? "/pricing" : "/auth"}>
-                  {language === "de" ? "Pro werden" : "Go Pro"}
+                  {t("homePage.goPro")}
                 </Link>
               </Button>
             </div>
@@ -849,41 +841,41 @@ const Home = () => {
               <div className="text-center mb-6 pb-6 border-b border-border/50">
                 <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Enterprise</h3>
                 <p className="text-xs text-muted-foreground mb-6 font-medium">
-                  {language === "de" ? "Für große Teams und Agenturen" : "For large teams and agencies"}
+                  {t("homePage.forLargeTeams")}
                 </p>
                 <div className="flex items-baseline justify-center gap-1.5">
                   <span className="text-4xl font-bold text-foreground tracking-tighter">€{PRICING_V21.enterprise.price.EUR}</span>
                   <span className="text-sm text-muted-foreground font-medium">
-                    / {language === "de" ? "Monat" : "month"}
+                    / {t("homePage.perMonth")}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  + Seats zu €49,99
+                  {t("homePage.plusSeats")}
                 </p>
               </div>
               <ul className="space-y-3 mb-6 flex-1">
                 <li className="flex items-start gap-2.5">
                   <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {language === "de" ? "Alles aus Pro" : "Everything in Pro"}
+                    {t("homePage.everythingInPro")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {language === "de" ? "API- und Integrationszugang" : "API and integration access"}
+                    {t("homePage.apiAccess")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {language === "de" ? "Dedizierter Account-Manager" : "Dedicated account manager"}
+                    {t("homePage.dedicatedManager")}
                   </span>
                 </li>
               </ul>
               <Button size="lg" asChild className="w-full">
                 <Link to={user ? "/pricing" : "/auth"}>
-                  {language === "de" ? "Auf Enterprise upgraden" : "Upgrade to Enterprise"}
+                  {t("homePage.upgradeToEnterprise")}
                 </Link>
               </Button>
             </div>

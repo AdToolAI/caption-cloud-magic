@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Instagram, Music, Linkedin, Youtube, Facebook, Twitter } from 'lucide-react';
 import { usePlatformCredentials, Platform } from '@/hooks/usePlatformCredentials';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const platforms: { id: Platform; name: string; icon: typeof Instagram; color: string }[] = [
   { id: 'facebook', name: 'Facebook', icon: Facebook, color: 'text-blue-500' },
@@ -15,6 +16,7 @@ const platforms: { id: Platform; name: string; icon: typeof Instagram; color: st
 export function SocialConnectionIcons() {
   const { isConnected, loading } = usePlatformCredentials();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const connectedCount = platforms.filter(p => isConnected(p.id)).length;
 
@@ -39,13 +41,13 @@ export function SocialConnectionIcons() {
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">
-                {name} – {connected ? 'Verbunden' : 'Nicht verbunden'}
+                {name} – {connected ? t("social.connected") : t("social.notConnected")}
               </TooltipContent>
             </Tooltip>
           );
         })}
         <span className="text-xs text-muted-foreground ml-1">
-          {loading ? '…' : `${connectedCount} verbunden`}
+          {loading ? '…' : `${connectedCount} ${t("social.connected").toLowerCase()}`}
         </span>
       </div>
     </TooltipProvider>

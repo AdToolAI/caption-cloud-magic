@@ -4,9 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useCredits } from "@/hooks/useCredits";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreditLimitWarning } from "./CreditLimitWarning";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export const CreditBalance = () => {
   const { balance, loading, error } = useCredits();
+  const { t } = useTranslation();
 
   if (loading) {
     return (
@@ -26,8 +28,8 @@ export const CreditBalance = () => {
     return (
       <Card className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl">
         <CardHeader>
-          <CardTitle className="text-destructive">Fehler</CardTitle>
-          <CardDescription>Credits konnten nicht geladen werden</CardDescription>
+          <CardTitle className="text-destructive">{t("credits.error")}</CardTitle>
+          <CardDescription>{t("credits.errorLoading")}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -37,6 +39,13 @@ export const CreditBalance = () => {
   const usagePercent = !isEnterprise && balance.monthly_credits > 0 
     ? Math.round((balance.balance / balance.monthly_credits) * 100)
     : 0;
+
+  const planLabel = {
+    free: t("credits.freePlan"),
+    basic: t("credits.basicPlan"),
+    pro: t("credits.proPlan"),
+    enterprise: t("credits.enterprisePlan"),
+  }[balance.plan_code] || balance.plan_code;
 
   return (
     <>
@@ -72,14 +81,11 @@ export const CreditBalance = () => {
               >
                 <Coins className="h-5 w-5 text-primary" />
               </motion.div>
-              <CardTitle>Verfügbare Credits</CardTitle>
+              <CardTitle>{t("credits.availableCredits")}</CardTitle>
             </div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 w-fit mt-2">
               <span className="text-sm font-medium text-primary">
-                {balance.plan_code === 'free' && 'Kostenloser Plan'}
-                {balance.plan_code === 'basic' && 'Basic Plan'}
-                {balance.plan_code === 'pro' && 'Pro Plan'}
-                {balance.plan_code === 'enterprise' && 'Enterprise Plan'}
+                {planLabel}
               </span>
             </div>
           </CardHeader>
@@ -96,8 +102,8 @@ export const CreditBalance = () => {
                   <InfinityIcon className="h-16 w-16" />
                 </motion.div>
                 <div className="text-sm text-muted-foreground">
-                  <div className="font-semibold text-foreground">Unbegrenzte Credits</div>
-                  <div>Nutzen Sie alle Features ohne Limit</div>
+                  <div className="font-semibold text-foreground">{t("credits.unlimitedCredits")}</div>
+                  <div>{t("credits.useAllFeatures")}</div>
                 </div>
               </div>
             ) : (
@@ -116,7 +122,7 @@ export const CreditBalance = () => {
                 
                 <div className="mt-6 space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Verbrauch</span>
+                    <span className="text-muted-foreground">{t("credits.usage")}</span>
                     <span className="font-medium text-primary">{usagePercent}%</span>
                   </div>
                   
@@ -142,7 +148,7 @@ export const CreditBalance = () => {
                     className="mt-4 flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20"
                   >
                     <TrendingUp className="h-4 w-4 text-amber-500" />
-                    <span className="text-amber-500">Ihr Credit-Guthaben wird knapp</span>
+                    <span className="text-amber-500">{t("credits.creditsRunningLow")}</span>
                   </motion.div>
                 )}
               </>

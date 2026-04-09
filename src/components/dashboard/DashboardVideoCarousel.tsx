@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { DEMO_VIDEO, isDemoVideo } from '@/constants/demo-video';
+import { useTranslation } from '@/hooks/useTranslation';
 
 /** Resolve a possibly-relative storage path to a full public URL */
 const resolveVideoUrl = (rawUrl: string): string => {
@@ -39,6 +40,7 @@ const resolveVideoUrl = (rawUrl: string): string => {
 
 export const DashboardVideoCarousel = () => {
   const { videos, isLoading } = useVideoHistory();
+  const { t, language } = useTranslation();
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
@@ -180,7 +182,7 @@ export const DashboardVideoCarousel = () => {
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <Video className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-bold text-foreground">Deine Videos</h2>
+          <h2 className="text-xl font-bold text-foreground">{t("carousel.yourVideos")}</h2>
         </div>
         <div className="flex justify-center gap-4 py-8">
           {[0, 1, 2].map(i => (
@@ -198,7 +200,7 @@ export const DashboardVideoCarousel = () => {
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <Video className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-bold text-foreground">Deine Videos</h2>
+          <h2 className="text-xl font-bold text-foreground">{t("carousel.yourVideos")}</h2>
         </div>
 
         <div className="flex justify-center" style={{ perspective: '1200px' }}>
@@ -250,8 +252,8 @@ export const DashboardVideoCarousel = () => {
 
               {/* Bottom info */}
               <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent">
-                <p className="text-sm font-medium text-white drop-shadow-md">AdTool AI: Die Lösung</p>
-                <p className="text-[10px] text-white/60 mt-0.5">Dein erstes Video könnte so aussehen</p>
+                <p className="text-sm font-medium text-white drop-shadow-md">{t("carousel.demoTitle")}</p>
+                <p className="text-[10px] text-white/60 mt-0.5">{t("carousel.firstVideoLook")}</p>
               </div>
             </div>
           </div>
@@ -262,7 +264,7 @@ export const DashboardVideoCarousel = () => {
           <Button asChild size="lg" className="shadow-glow">
             <Link to="/universal-video-creator">
               <Sparkles className="h-4 w-4 mr-2" />
-              Dein erstes Video erstellen
+              {t("carousel.createFirstVideo")}
             </Link>
           </Button>
         </div>
@@ -291,7 +293,7 @@ export const DashboardVideoCarousel = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Video className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-bold text-foreground">Deine Videos</h2>
+          <h2 className="text-xl font-bold text-foreground">{t("carousel.yourVideos")}</h2>
           <Badge variant="secondary" className="text-xs">{sortedVideos.length}</Badge>
         </div>
         <div className="flex gap-2">
@@ -382,7 +384,7 @@ export const DashboardVideoCarousel = () => {
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-muted/80">
                           <Video className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                          <p className="text-xs text-muted-foreground">Video nicht verfügbar</p>
+                          <p className="text-xs text-muted-foreground">{t("carousel.videoUnavailable")}</p>
                         </div>
                       )}
 
@@ -434,7 +436,7 @@ export const DashboardVideoCarousel = () => {
                           {title}
                         </p>
                         <p className="text-[10px] text-white/60 mt-0.5">
-                          {new Date(video.created_at).toLocaleDateString('de-DE', {
+                          {new Date(video.created_at).toLocaleDateString(language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US', {
                             day: '2-digit',
                             month: 'short',
                             year: 'numeric'
@@ -471,7 +473,7 @@ export const DashboardVideoCarousel = () => {
         <div className="flex items-center gap-2 mb-3">
           <Sparkles className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold text-foreground">News & Updates</h3>
-          <Badge variant="outline" className="text-[10px]">Demnächst</Badge>
+          <Badge variant="outline" className="text-[10px]">{t("carousel.comingSoon")}</Badge>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {['Feature Updates', 'Tutorials', 'Demo Videos'].map((label) => (

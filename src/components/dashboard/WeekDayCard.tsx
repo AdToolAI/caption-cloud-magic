@@ -2,6 +2,7 @@ import { PlatformBadge } from "@/components/ui/PlatformBadge";
 import { Button } from "@/components/ui/button";
 import { Check, Clock, Edit2, Upload, Plus, Sparkles, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export interface WeekPost {
   id: string;
@@ -29,14 +30,16 @@ interface WeekDayCardProps {
   onDelete: (post: WeekPost) => void;
 }
 
-const statusConfig = {
-  suggested: { icon: Sparkles, color: 'bg-muted text-muted-foreground', border: 'border-border', label: 'Vorgeschlagen' },
-  scheduled: { icon: Clock, color: 'bg-primary/10 text-primary', border: 'border-primary/30', label: 'Geplant' },
-  published: { icon: CheckCircle2, color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', border: 'border-green-400 dark:border-green-500', label: 'Erledigt ✓' },
-  missed: { icon: AlertCircle, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', border: 'border-orange-300 dark:border-orange-700', label: 'Verpasst' },
-};
-
 export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, onUpload, onAddPost, onDelete }: WeekDayCardProps) {
+  const { t } = useTranslation();
+
+  const statusConfig = {
+    suggested: { icon: Sparkles, color: 'bg-muted text-muted-foreground', border: 'border-border', label: t("weekCard.suggested") },
+    scheduled: { icon: Clock, color: 'bg-primary/10 text-primary', border: 'border-primary/30', label: t("weekCard.scheduled") },
+    published: { icon: CheckCircle2, color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', border: 'border-green-400 dark:border-green-500', label: t("weekCard.done") },
+    missed: { icon: AlertCircle, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', border: 'border-orange-300 dark:border-orange-700', label: t("weekCard.missed") },
+  };
+
   return (
     <div className={cn(
       "rounded-xl border p-4 transition-all",
@@ -53,7 +56,7 @@ export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, 
             {dayNumber}
           </span>
           {isToday && (
-            <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">HEUTE</span>
+            <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{t("weekCard.today")}</span>
           )}
         </div>
         <Button
@@ -69,7 +72,7 @@ export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, 
       {/* Posts */}
       {posts.length === 0 ? (
         <div className="text-center py-4">
-          <p className="text-xs text-muted-foreground">Kein Post geplant</p>
+          <p className="text-xs text-muted-foreground">{t("weekCard.noPostPlanned")}</p>
           <Button
             size="sm"
             variant="ghost"
@@ -77,7 +80,7 @@ export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, 
             onClick={() => onAddPost(date)}
           >
             <Plus className="h-3 w-3 mr-1" />
-            Post hinzufügen
+            {t("weekCard.addPost")}
           </Button>
         </div>
       ) : (
@@ -149,7 +152,7 @@ export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, 
                     onClick={() => onEdit(post)}
                   >
                     <Edit2 className="h-3 w-3 mr-1" />
-                    Bearbeiten
+                    {t("weekCard.edit")}
                   </Button>
                   {post.status !== 'published' && (
                     <Button
@@ -159,7 +162,7 @@ export function WeekDayCard({ date, dayName, dayNumber, isToday, posts, onEdit, 
                       onClick={() => onUpload(post)}
                     >
                       <Upload className="h-3 w-3 mr-1" />
-                      Hochladen
+                      {t("weekCard.upload")}
                     </Button>
                   )}
                   <Button
