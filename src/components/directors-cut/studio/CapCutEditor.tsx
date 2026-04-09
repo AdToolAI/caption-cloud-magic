@@ -179,6 +179,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Preview layer visibility toggles
   const [showSubtitles, setShowSubtitles] = useState(true);
   const [showTextOverlays, setShowTextOverlays] = useState(true);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   
   // Burned-in subtitle removal state
   const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | null>(null);
@@ -1424,7 +1425,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           </Button>
           <div className="w-px h-5 bg-[#F5C76A]/15 mx-1" />
           <Button 
-            onClick={handleExportVideo}
+            onClick={() => setShowExportDialog(true)}
             size="sm"
             className="gap-1.5 h-7 bg-gradient-to-r from-[#F5C76A] to-[#d4a843] hover:from-[#FFE4A0] hover:to-[#F5C76A] text-xs text-black font-semibold shadow-[0_0_15px_rgba(245,199,106,0.25)]"
           >
