@@ -381,11 +381,11 @@ const Home = () => {
   };
 
   const publishNow = async (postId: string) => {
-    toast.success("Post wird veröffentlicht...");
+    toast.success(t("homePage.postPublishing"));
   };
 
   const retry = async (postId: string) => {
-    toast.success("Post wird erneut versucht...");
+    toast.success(t("homePage.postRetrying"));
   };
 
   const handleEditPost = (post: WeekPost) => {
@@ -417,10 +417,10 @@ const Home = () => {
         ...day,
         posts: day.posts.filter(p => p.id !== post.id),
       })));
-      toast.success("Post gelöscht");
+      toast.success(t("homePage.postDeleted"));
     } catch (err) {
       console.error("Delete failed:", err);
-      toast.error("Post konnte nicht gelöscht werden");
+      toast.error(t("homePage.postDeleteFailed"));
     }
   };
 
@@ -516,7 +516,7 @@ const Home = () => {
                 <Clock className="h-4 w-4 text-warning" />
                 <span>{t("dashboard.statusBar.nextPost")}: {(() => {
                   const next = getNextPost();
-                  if (!next) return language === "de" ? "Kein Post geplant" : "No post scheduled";
+                  if (!next) return t("homePage.noPostScheduled");
                   const d = new Date(next.date);
                   const dd = String(d.getDate()).padStart(2, '0');
                   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -536,17 +536,17 @@ const Home = () => {
               {t("heroBanner.title")}
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed">
-              {language === "de" ? "Starte kostenlos. Upgrade jederzeit." : "Start free. Upgrade anytime."}
+              {t("homePage.startFree")}
             </p>
             <div className="flex justify-center gap-4 mt-8">
               <Link to="/auth">
                 <Button size="lg" className="gradient-primary text-white font-medium rounded-xl px-8 py-6 shadow-soft hover:shadow-glow hover:scale-[1.03] transition-all">
-                  {language === "de" ? "Jetzt planen" : "Start Planning"}
+                  {t("homePage.startPlanning")}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Button size="lg" variant="outline" className="rounded-xl px-8 py-6">
-                {language === "de" ? "Demo ansehen" : "Watch Demo"}
+                {t("homePage.watchDemo")}
               </Button>
             </div>
           </div>
@@ -570,7 +570,7 @@ const Home = () => {
         {user && (() => {
           const next = getNextPost();
           return (
-            <Section title={language === "de" ? "Nächster Post" : "Next Post"} description={language === "de" ? "Dein nächster geplanter Beitrag" : "Your next scheduled post"} bg="muted">
+            <Section title={t("homePage.nextPost")} description={t("homePage.nextScheduledPost")} bg="muted">
               <Card className="rounded-2xl shadow-soft">
                 <CardContent className="p-6">
                   {!next ? (
@@ -581,7 +581,7 @@ const Home = () => {
                       <Button asChild>
                         <Link to="/calendar">
                           <Plus className="h-4 w-4 mr-2" />
-                          {language === "de" ? "Neuen Post planen" : "Schedule New Post"}
+                          {t("homePage.scheduleNewPost")}
                         </Link>
                       </Button>
                     </div>
@@ -603,7 +603,7 @@ const Home = () => {
                             <PlatformBadge platform={next.post.platform as any} />
                           )}
                         </div>
-                        <p className="text-sm font-medium line-clamp-3">{next.post.contentIdea || next.post.caption || (language === "de" ? "Keine Beschreibung" : "No description")}</p>
+                        <p className="text-sm font-medium line-clamp-3">{next.post.contentIdea || next.post.caption || t("homePage.noDescription")}</p>
                         <p className="text-xs text-muted-foreground mt-2">
                           <Clock className="h-3 w-3 inline mr-1" />
                           {(() => {
@@ -631,7 +631,7 @@ const Home = () => {
             action={
               <Button asChild variant="link">
                 <Link to="/calendar">
-                  {language === "de" ? "Im Kalender planen" : "Plan in Calendar"} →
+                  {t("homePage.planInCalendar")} →
                 </Link>
               </Button>
             }
@@ -704,7 +704,7 @@ const Home = () => {
             action={
               <Button asChild variant="link">
                 <Link to="/personalized-dashboard">
-                  Personalisiertes Dashboard →
+                  {t("homePage.personalizedDashboard")} →
                 </Link>
               </Button>
             }
