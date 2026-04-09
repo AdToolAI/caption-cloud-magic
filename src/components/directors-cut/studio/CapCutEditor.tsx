@@ -1768,6 +1768,15 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         onOpenLibrary={handleOpenLibrary}
         startedAt={renderStartedAt}
       />
+      <ExportDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        currentSettings={exportSettings}
+        onConfirm={(newSettings) => {
+          onExportSettingsChange(newSettings);
+          setTimeout(() => handleExportVideo(), 50);
+        }}
+      />
     </div>
   );
 };
