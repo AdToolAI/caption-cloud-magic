@@ -19,8 +19,13 @@ import { Loader2, Sparkles, Wand2, ChevronDown, ChevronUp, Instagram, Music, Lin
 import { MediaUploader } from '@/components/composer/MediaUploader';
 import { uploadMediaToSupabase } from '@/lib/mediaUpload';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+
+export default function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormProps) {
+  const { user } = useAuth();
+  const { t } = useTranslation();
 
 interface ScheduleQuickFormProps {
   workspaceId: string;

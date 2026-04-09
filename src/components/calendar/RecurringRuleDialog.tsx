@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useRecurringEvents } from '@/hooks/useRecurringEvents';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Repeat } from 'lucide-react';
 
 interface RecurringRuleDialogProps {
