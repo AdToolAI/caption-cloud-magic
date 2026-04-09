@@ -207,7 +207,7 @@ export const ActiveSessionsList = () => {
           ) : (
             <LogOut className="h-4 w-4 mr-2" />
           )}
-          Alle anderen Sitzungen beenden ({otherSessionsCount})
+          {t("account.sessions.terminateAll")} ({otherSessionsCount})
         </Button>
       )}
     </div>
