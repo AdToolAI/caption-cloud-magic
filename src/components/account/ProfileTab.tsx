@@ -12,19 +12,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, User, Mail, Phone, CheckCircle2, AlertCircle, Save } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const profileSchema = z.object({
-  name: z.string()
-    .min(2, "Name muss mindestens 2 Zeichen haben")
-    .max(100, "Name darf maximal 100 Zeichen haben")
-    .optional()
-    .or(z.literal("")),
-  phone_number: z.string()
-    .regex(/^\+?[0-9\s\-()]+$/, "Ungültige Telefonnummer")
-    .min(6, "Telefonnummer zu kurz")
-    .max(20, "Telefonnummer zu lang")
-    .optional()
-    .or(z.literal(""))
+  name: z.string().min(2).max(100).optional().or(z.literal("")),
+  phone_number: z.string().regex(/^\+?[0-9\s\-()]+$/).min(6).max(20).optional().or(z.literal(""))
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -32,218 +24,120 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 export const ProfileTab = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
-      name: "",
-      phone_number: ""
-    }
+    defaultValues: { name: "", phone_number: "" }
   });
 
-  useEffect(() => {
-    if (user) {
-      loadProfile();
-    }
-  }, [user]);
+  useEffect(() => { if (user) loadProfile(); }, [user]);
 
   const loadProfile = async () => {
     if (!user) return;
-
-    const { data } = await supabase
-      .from("profiles")
-      .select("name, phone_number, email_verified")
-      .eq("id", user.id)
-      .single();
-
+    const { data } = await supabase.from("profiles").select("name, phone_number, email_verified").eq("id", user.id).single();
     if (data) {
-      form.reset({
-        name: data.name || "",
-        phone_number: data.phone_number || ""
-      });
+      form.reset({ name: data.name || "", phone_number: data.phone_number || "" });
       setEmailVerified(data.email_verified || false);
     }
   };
 
   const onSubmit = async (values: ProfileFormValues) => {
     if (!user) return;
-
     setLoading(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        name: values.name || null,
-        phone_number: values.phone_number || null,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", user.id);
-
+    const { error } = await supabase.from("profiles").update({ name: values.name || null, phone_number: values.phone_number || null, updated_at: new Date().toISOString() }).eq("id", user.id);
     setLoading(false);
-
     if (error) {
-      toast({
-        title: "Fehler",
-        description: "Profil konnte nicht aktualisiert werden",
-        variant: "destructive"
-      });
+      toast({ title: t("account.profile.error"), description: t("account.profile.errorSaving"), variant: "destructive" });
     } else {
-      toast({
-        title: "Gespeichert!",
-        description: "Ihre Profildaten wurden aktualisiert"
-      });
+      toast({ title: t("account.profile.saved"), description: t("account.profile.savedDesc") });
     }
   };
 
   const resendVerification = async () => {
     if (!user?.email) return;
-
     setResendLoading(true);
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: user.email
-    });
+    const { error } = await supabase.auth.resend({ type: "signup", email: user.email });
     setResendLoading(false);
-
     if (error) {
-      toast({
-        title: "Fehler",
-        description: error.message,
-        variant: "destructive"
-      });
+      toast({ title: t("account.profile.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({
-        title: "E-Mail gesendet",
-        description: "Verifizierungs-E-Mail wurde erneut gesendet"
-      });
+      toast({ title: t("account.profile.verificationSent"), description: t("account.profile.verificationSent") });
     }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="space-y-6"
-    >
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
       <Card className="backdrop-blur-xl bg-card/60 border border-white/10">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
-            Persönliche Informationen
+            {t("account.profile.title")}
           </CardTitle>
-          <CardDescription>
-            Verwalten Sie Ihre persönlichen Daten und Kontaktinformationen
-          </CardDescription>
+          <CardDescription>{t("account.profile.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Vollständiger Name</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Max Mustermann" 
-                        {...field} 
-                        className="h-12 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <FormField control={form.control} name="name" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("account.profile.name")}</FormLabel>
+                  <FormControl>
+                    <Input placeholder={t("account.profile.namePlaceholder")} {...field} className="h-12 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-              {/* Email with Verification Status */}
               <div className="space-y-2">
                 <FormLabel className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
-                  E-Mail-Adresse
+                  {t("account.profile.email")}
                 </FormLabel>
                 <div className="flex items-center gap-3">
-                  <Input 
-                    value={user?.email || ""} 
-                    disabled 
-                    className="flex-1 h-12 bg-muted/10 border-white/5"
-                  />
+                  <Input value={user?.email || ""} disabled className="flex-1 h-12 bg-muted/10 border-white/5" />
                   {emailVerified ? (
                     <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Verifiziert
+                      {t("account.profile.emailVerified")}
                     </Badge>
                   ) : (
                     <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 border-amber-500/20">
                       <AlertCircle className="h-3 w-3 mr-1" />
-                      Nicht verifiziert
+                      {t("account.profile.emailNotVerified")}
                     </Badge>
                   )}
                 </div>
-                <FormDescription>
-                  {emailVerified 
-                    ? "Ihre E-Mail-Adresse ist bestätigt" 
-                    : (
-                      <span className="flex items-center gap-2">
-                        Bitte bestätigen Sie Ihre E-Mail-Adresse
-                        <Button 
-                          type="button" 
-                          variant="link" 
-                          size="sm" 
-                          onClick={resendVerification}
-                          disabled={resendLoading}
-                          className="p-0 h-auto text-primary"
-                        >
-                          {resendLoading ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            "Erneut senden"
-                          )}
-                        </Button>
-                      </span>
-                    )
-                  }
-                </FormDescription>
+                {!emailVerified && (
+                  <FormDescription>
+                    <span className="flex items-center gap-2">
+                      <Button type="button" variant="link" size="sm" onClick={resendVerification} disabled={resendLoading} className="p-0 h-auto text-primary">
+                        {resendLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : t("account.profile.resendVerification")}
+                      </Button>
+                    </span>
+                  </FormDescription>
+                )}
               </div>
 
-              <FormField
-                control={form.control}
-                name="phone_number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      Telefonnummer (Optional)
-                    </FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="+49 123 456789" 
-                        {...field} 
-                        className="h-12 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Für SMS-Benachrichtigungen und Zwei-Faktor-Authentifizierung
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <FormField control={form.control} name="phone_number" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    {t("account.profile.phone")}
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder={t("account.profile.phonePlaceholder")} {...field} className="h-12 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-              <Button 
-                type="submit" 
-                disabled={loading}
-                className="h-11 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-              >
-                {loading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                Änderungen speichern
+              <Button type="submit" disabled={loading} className="h-11 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                {t("account.profile.save")}
               </Button>
             </form>
           </Form>
