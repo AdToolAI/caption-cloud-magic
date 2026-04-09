@@ -7709,6 +7709,25 @@ export const translations: Record<Language, any> = {
       }
     },
     
+    reco: {
+      title: "Recomendaciones de IA para ti",
+      apply: "Aplicar",
+      bestTime: "Publica {days} a las {time} para +{boost}% engagement",
+      contentType: "{type} rinde {boost}% mejor",
+      starterTips: 'Consejos iniciales para ti',
+      aiRecommendations: 'Recomendaciones de IA para ti',
+      beginner1: 'Publica al menos 3x por semana para un crecimiento constante',
+      beginner2: 'Prueba diferentes horarios y observa tu engagement',
+      beginner3: 'Usa 5–10 hashtags relevantes por post',
+      impactFoundation: 'Base',
+      impactStrategy: 'Estrategia',
+      impactReach: 'Alcance',
+      applied: 'Aplicado',
+      beginnerFooter: 'Después de 10 posts recibirás recomendaciones personalizadas de IA',
+      dataFooter: 'Basado en tus datos de rendimiento de los últimos 28 días',
+    },
+
+
     // Bio Optimizer
     bio_title: "Optimizador de Bio con IA",
     bio_input_audience: "Audiencia objetivo",
