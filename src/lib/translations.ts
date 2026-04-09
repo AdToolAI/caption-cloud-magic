@@ -1687,7 +1687,7 @@ export const translations: Record<Language, any> = {
       upload: "Upload",
       today: "TODAY",
     },
-    home: {
+    homePage: {
       startFree: "Start free. Upgrade anytime.",
       startPlanning: "Start Planning",
       watchDemo: "Watch Demo",
