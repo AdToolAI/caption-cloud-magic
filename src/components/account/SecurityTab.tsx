@@ -91,24 +91,23 @@ export const SecurityTab = () => {
             {t('settings.twoFactorAuth')}
           </CardTitle>
           <CardDescription>
-            Schütze dein Konto mit einem zusätzlichen Sicherheitscode
+            {t('account.twoFactor.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Status wird geladen...
+              {t('account.twoFactor.loading')}
             </div>
           ) : twoFactorEnabled ? (
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-green-500">
                 <CheckCircle className="h-5 w-5" />
-                <span className="font-medium">2FA ist aktiviert</span>
+                <span className="font-medium">{t('account.twoFactor.enabled')}</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Dein Konto ist durch Zwei-Faktor-Authentifizierung geschützt. 
-                Bei jeder Anmeldung benötigst du einen Code aus deiner Authenticator-App.
+                {t('account.twoFactor.enabledDesc')}
               </p>
               <Button 
                 variant="outline" 
@@ -116,18 +115,17 @@ export const SecurityTab = () => {
                 className="text-destructive border-destructive/30 hover:bg-destructive/10"
               >
                 <XCircle className="h-4 w-4 mr-2" />
-                2FA deaktivieren
+                {t('account.twoFactor.disable')}
               </Button>
             </div>
           ) : (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Aktiviere die Zwei-Faktor-Authentifizierung für zusätzlichen Schutz. 
-                Du benötigst eine Authenticator-App wie Google Authenticator oder Authy.
+                {t('account.twoFactor.disabled')}
               </p>
               <Button onClick={() => setShowTwoFactorSetup(true)}>
                 <Shield className="h-4 w-4 mr-2" />
-                2FA aktivieren
+                {t('account.twoFactor.enable')}
               </Button>
             </div>
           )}
@@ -142,7 +140,7 @@ export const SecurityTab = () => {
             {t('settings.activeSessions')}
           </CardTitle>
           <CardDescription>
-            Verwalte alle Geräte, auf denen du angemeldet bist
+            {t('account.sessions.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -170,21 +168,20 @@ export const SecurityTab = () => {
       <AlertDialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>2FA deaktivieren?</AlertDialogTitle>
+            <AlertDialogTitle>{t('account.twoFactor.disableTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Wenn du die Zwei-Faktor-Authentifizierung deaktivierst, wird dein Konto 
-              weniger sicher sein. Du kannst sie jederzeit wieder aktivieren.
+              {t('account.twoFactor.disableDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{t('account.twoFactor.cancel')}</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDisable2FA}
               disabled={disabling}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {disabling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Deaktivieren
+              {t('account.twoFactor.disabling')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

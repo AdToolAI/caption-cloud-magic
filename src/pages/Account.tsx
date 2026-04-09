@@ -13,12 +13,14 @@ import { PrivacyTab } from "@/components/account/PrivacyTab";
 import { NotificationSettings } from "@/components/account/NotificationSettings";
 import { StorageUsagePanel } from "@/components/settings/StorageUsagePanel";
 import { useCloudStorage } from "@/hooks/useCloudStorage";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const Account = () => {
   const { user, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { handleOAuthCallback } = useCloudStorage();
   const [defaultTab, setDefaultTab] = useState("profile");
+  const { t } = useTranslation();
 
   // Handle Google Drive OAuth callback
   useEffect(() => {
@@ -65,49 +67,49 @@ const Account = () => {
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
             >
               <User className="h-4 w-4" />
-              <span className="hidden sm:inline">Profil</span>
+              <span className="hidden sm:inline">{t("account.tabs.profile")}</span>
             </TabsTrigger>
             <TabsTrigger 
               value="security"
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
             >
               <Shield className="h-4 w-4" />
-              <span className="hidden sm:inline">Sicherheit</span>
+              <span className="hidden sm:inline">{t("account.tabs.security")}</span>
             </TabsTrigger>
             <TabsTrigger 
               value="connections"
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
             >
               <Link2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Verbindungen</span>
+              <span className="hidden sm:inline">{t("account.tabs.connections")}</span>
             </TabsTrigger>
             <TabsTrigger 
               value="privacy"
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
             >
               <Eye className="h-4 w-4" />
-              <span className="hidden sm:inline">Datenschutz</span>
+              <span className="hidden sm:inline">{t("account.tabs.privacy")}</span>
             </TabsTrigger>
             <TabsTrigger 
               value="notifications"
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
             >
               <Bell className="h-4 w-4" />
-              <span className="hidden sm:inline">Benachrichtigungen</span>
+              <span className="hidden sm:inline">{t("account.tabs.notifications")}</span>
             </TabsTrigger>
             <TabsTrigger 
               value="subscription"
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
             >
               <CreditCard className="h-4 w-4" />
-              <span className="hidden sm:inline">Abo</span>
+              <span className="hidden sm:inline">{t("account.tabs.subscription")}</span>
             </TabsTrigger>
             <TabsTrigger 
               value="advanced"
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
             >
               <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Erweitert</span>
+              <span className="hidden sm:inline">{t("account.tabs.advanced")}</span>
             </TabsTrigger>
           </TabsList>
 

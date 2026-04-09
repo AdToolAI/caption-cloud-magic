@@ -6,9 +6,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Bell, Loader2 } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export const SecurityNotificationsCard = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [securityAlerts, setSecurityAlerts] = useState(true);
@@ -52,9 +54,9 @@ export const SecurityNotificationsCard = () => {
         .eq("id", user.id);
 
       if (error) throw error;
-      toast.success("Einstellung gespeichert");
+      toast.success(t("account.security.settingSaved"));
     } catch (error: any) {
-      toast.error(error.message || "Fehler beim Speichern");
+      toast.error(error.message || t("account.security.errorSaving"));
     } finally {
       setSaving(false);
     }
@@ -85,10 +87,10 @@ export const SecurityNotificationsCard = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bell className="h-5 w-5 text-primary" />
-          Sicherheitsbenachrichtigungen
+          {t("account.security.title")}
         </CardTitle>
         <CardDescription>
-          Verwalte deine Sicherheits-E-Mails
+          {t("account.security.description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
