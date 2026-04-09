@@ -37,16 +37,15 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
   // KI Post Generation
   const handleGenerateWithAI = async () => {
     if (!event?.brief) {
-      toast.error("Bitte fülle zuerst das Briefing aus");
+      toast.error(t("calendarDrawer.briefingRequired"));
       return;
     }
     setIsGenerating(true);
     
     try {
-      // Get session for auth header
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast.error("Nicht authentifiziert");
+        toast.error(t("calendarDrawer.notAuthenticated"));
         return;
       }
 
@@ -213,25 +212,25 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
               <TabsList className={`grid w-full ${isMobile ? "grid-cols-2 gap-2" : "grid-cols-4"}`}>
                 <TabsTrigger value="details" className="gap-2">
                   <FileText className="w-4 h-4" />
-                  {!isMobile && "Details"}
+                  {!isMobile && t("calendarDrawer.details")}
                 </TabsTrigger>
                 <TabsTrigger value="tasks" className="gap-2">
                   <CheckSquare className="w-4 h-4" />
-                  {!isMobile && "Aufgaben"}
+                  {!isMobile && t("calendarDrawer.tasks")}
                 </TabsTrigger>
                 <TabsTrigger value="comments" className="gap-2">
                   <MessageSquare className="w-4 h-4" />
-                  {!isMobile && "Kommentare"}
+                  {!isMobile && t("calendarDrawer.comments")}
                 </TabsTrigger>
                 <TabsTrigger value="approval" className="gap-2">
                   <UserCheck className="w-4 h-4" />
-                  {!isMobile && "Freigabe"}
+                  {!isMobile && t("calendarDrawer.approval")}
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="details" className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label>Titel</Label>
+                  <Label>{t("calendarDrawer.title")}</Label>
                   <Input
                     value={event?.title || ""}
                     onChange={(e) => handleUpdate("title", e.target.value)}
@@ -261,13 +260,13 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Briefing</Label>
+                  <Label>{t("calendarDrawer.briefing")}</Label>
                   <Textarea
                     value={event?.brief || ""}
                     onChange={(e) => setEvent({ ...event, brief: e.target.value })}
                     onBlur={() => handleUpdate("brief", event?.brief)}
                     rows={4}
-                    placeholder="Beschreibe worum es im Post geht..."
+                    placeholder={t("calendarDrawer.briefingPlaceholder")}
                   />
                 </div>
 
@@ -288,30 +287,30 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                             ) : (
                               <Sparkles className="w-4 h-4" />
                             )}
-                            {isGenerating ? "Generiere..." : "Mit KI generieren"}
+                            {isGenerating ? t("calendarDrawer.generating") : t("calendarDrawer.generateWithAI")}
                           </Button>
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        {!event?.brief ? "Erst Briefing ausfüllen" : "Generiert Caption & Hashtags aus dem Briefing"}
+                        {!event?.brief ? t("calendarDrawer.fillBriefingFirst") : t("calendarDrawer.generatesFromBriefing")}
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Caption</Label>
+                  <Label>{t("calendarDrawer.caption")}</Label>
                   <Textarea
                     value={event?.caption || ""}
                     onChange={(e) => setEvent({ ...event, caption: e.target.value })}
                     onBlur={() => handleUpdate("caption", event?.caption)}
                     rows={6}
-                    placeholder="Schreibe hier deinen Post-Text..."
+                    placeholder={t("calendarDrawer.captionPlaceholder")}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Kanäle</Label>
+                  <Label>{t("calendarDrawer.channels")}</Label>
                   <div className="flex flex-wrap gap-2">
                     {[
                       { id: "instagram", name: "Instagram", icon: "📸", color: "bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400", textColor: "text-white" },
@@ -329,7 +328,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                             const current = event?.channels || [];
                             // Prevent removing the last platform
                             if (current.includes(platform.id) && current.length === 1) {
-                              toast.error("Mindestens eine Plattform muss ausgewählt sein");
+                              toast.error(t("calendarDrawer.atLeastOnePlatform"));
                               return;
                             }
                             const updated = current.includes(platform.id)
@@ -352,12 +351,12 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Hashtags</Label>
+                  <Label>{t("calendarDrawer.hashtags")}</Label>
                   <Input
                     value={event?.hashtags?.join(", ") || ""}
                     onChange={(e) => setEvent({ ...event, hashtags: e.target.value.split(",").map((t: string) => t.trim()).filter(Boolean) })}
                     onBlur={() => handleUpdate("hashtags", event?.hashtags || [])}
-                    placeholder="Hashtags mit Komma trennen..."
+                    placeholder={t("calendarDrawer.hashtagsPlaceholder")}
                   />
                   {event?.hashtags?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
@@ -371,7 +370,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Geplante Zeit</Label>
+                  <Label>{t("calendarDrawer.scheduledTime")}</Label>
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
                     <Input
@@ -392,7 +391,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                   <div className="space-y-3">
                     <Label className="flex items-center gap-2">
                       <Play className="w-4 h-4" />
-                      Medien-Vorschau
+                      {t("calendarDrawer.mediaPreview")}
                     </Label>
                     <div className="grid gap-3">
                       {event.assets_json.map((asset: any, index: number) => {
@@ -421,7 +420,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                               className="absolute top-2 left-2 gap-1"
                             >
                               {isVideo ? <Play className="w-3 h-3" /> : <ImageIcon className="w-3 h-3" />}
-                              {isVideo ? "Video" : "Bild"}
+                              {isVideo ? t("calendarDrawer.video") : t("calendarDrawer.image")}
                             </Badge>
                           </div>
                         );
@@ -447,7 +446,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-[250px]">
-                        <p>Erstellt einen Link zur externen Freigabe durch Kunden oder Teammitglieder</p>
+                        <p>{t("calendarDrawer.approvalTooltip")}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
