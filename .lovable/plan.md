@@ -1,55 +1,50 @@
 
 
-## Plan: Complete App Localization — Eliminate All Hardcoded German Strings
+## Plan: Localize Recommendations, Insights & PersonalizedDashboard
 
-### Scope of the Problem
-
-**329 files** across the entire app contain hardcoded German strings instead of using the `t()` translation system. This is too large for a single change. I propose a **phased approach**, starting with what's visible after login (dashboard), which is critical for the Meta App Review recordings.
-
-### Phase 1 — Dashboard & Top-Level Components (Priority: Meta Review)
-
-These are the components visible immediately after login:
-
-| File | Hardcoded German Examples |
-|------|--------------------------|
-| `CreditBalance.tsx` | "Verfügbare Credits", "Unbegrenzte Credits", "Nutzen Sie alle Features ohne Limit", "Kostenloser Plan" |
-| `DashboardVideoCarousel.tsx` | "Deine Videos", "Die Lösung", "Dein erstes Video könnte so aussehen", "Dein erstes Video erstellen", "Demnächst", "Video nicht verfügbar" |
-| `SocialConnectionIcons.tsx` | "Verbunden", "Nicht verbunden", "X verbunden" |
-| `WeekDayCard.tsx` | "Kein Post geplant", "Post hinzufügen" |
-| `Home.tsx` | "Starte kostenlos. Upgrade jederzeit.", "Demo ansehen", "Nächster Post", "Dein nächster geplanter Beitrag", "Keine Beschreibung", pricing section strings |
-| `Header.tsx` | Various navigation/UI strings |
-
-### Phase 2 — Account & Settings Pages
-
-~20 files in `src/components/account/` with strings like "Löschen", "Abbrechen", "Verbunden", "Speichern", etc.
-
-### Phase 3 — Calendar, Analytics, and remaining pages
-
-~50+ files across calendar, analytics, performance, video editor, and other feature areas.
-
-### Technical Approach
-
-For each phase:
-1. Add all missing translation keys to `src/lib/translations.ts` (en, de, es)
-2. Replace hardcoded strings with `t()` calls
-3. Replace `language === "de" ? "..." : "..."` ternaries with proper `t()` keys
-
-### Recommendation
-
-**Start with Phase 1** — this covers everything visible in the Meta App Review screencasts. Phases 2 and 3 can follow in subsequent iterations.
-
-### Files for Phase 1
+### Files to Change
 
 | Action | File | Changes |
 |--------|------|---------|
-| Edit | `src/lib/translations.ts` | Add ~40 new keys for dashboard area |
-| Edit | `src/components/credits/CreditBalance.tsx` | Replace 5 hardcoded strings with `t()` |
-| Edit | `src/components/dashboard/DashboardVideoCarousel.tsx` | Replace 6 hardcoded strings with `t()` |
-| Edit | `src/components/dashboard/SocialConnectionIcons.tsx` | Replace 3 hardcoded strings with `t()` |
-| Edit | `src/components/dashboard/WeekDayCard.tsx` | Replace 2 hardcoded strings with `t()` |
-| Edit | `src/pages/Home.tsx` | Replace ~15 ternary/hardcoded strings with `t()` |
+| Edit | `src/lib/translations.ts` | Add `reco` and `insights` keys (EN/DE/ES) — ~35 new keys |
+| Edit | `src/features/recommendations/RecoCard.tsx` | Replace all hardcoded German with `t()` calls; make `BEGINNER_RECOMMENDATIONS` a function using `t()` |
+| Edit | `src/components/recommendations/PersonalizedDashboard.tsx` | Add `useTranslation`, replace 6 hardcoded strings with `t()` |
+| Edit | `src/lib/insightRules.ts` | Add `language` parameter to all functions; use internal i18n maps for weekday names, titles, action labels, evidence strings, bucket names |
+| Edit | `src/components/performance/CaptionInsightsTab.tsx` | Pass `language` to `generateAllInsights()`, replace 4 hardcoded strings with `t()` |
+| Edit | `src/components/performance/InsightCard.tsx` | Localize priority badges ("Wichtig"/"Mittel"/"Optional") via `t()` |
+
+### Translation Keys to Add
+
+**`reco` namespace:**
+- `starterTips` / `aiRecommendations` — section headers
+- `beginner1`, `beginner2`, `beginner3` — tip texts
+- `impactFoundation`, `impactStrategy`, `impactReach` — impact labels
+- `apply`, `applied` — button labels
+- `beginnerFooter`, `dataFooter` — footer texts
+
+**`insights` namespace:**
+- `bestTimeTitle`, `postTypeTitle`, `hashtagTitle`, `captionTitle`, `trendTitle` — insight titles
+- `addToCalendar`, `createMore`, `saveAsSet`, `openTemplate`, `testPostingTime`, `tryOtherFormats` — action labels
+- `postsAnalyzed`, `last7vs14`, `topHashtags` — evidence strings
+- `captionShort`, `captionMedium`, `captionLong` — bucket names
+- `actionRecs`, `based28days`, `recalculate`, `notEnoughData` — CaptionInsightsTab strings
+- `priorityHigh`, `priorityMedium`, `priorityLow` — InsightCard badges
+- Weekday names (Sun–Sat)
+
+### Key Technical Detail: insightRules.ts
+
+The `generateAllInsights()` function and all sub-functions will accept an optional `language: 'en' | 'de' | 'es' = 'de'` parameter. An internal `i18n` object maps all strings by language, avoiding dependency on the React `useTranslation` hook (since this is a pure utility file).
+
+```text
+// Example
+const weekdays = {
+  en: ['Sunday','Monday',...],
+  de: ['Sonntag','Montag',...],
+  es: ['Domingo','Lunes',...]
+};
+```
 
 ### Result
 
-After Phase 1, the entire dashboard experience will be fully in English when the language is set to English — ready for Meta App Review recordings.
+All recommendation cards, insight cards, and the personalized dashboard display fully in the selected language.
 
