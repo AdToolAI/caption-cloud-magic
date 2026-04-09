@@ -113,10 +113,10 @@ export interface AddedSound {
 }
 
 export interface ExportSettings {
-  quality: 'hd' | '4k' | '8k';
+  quality: 'hd' | 'fhd' | '4k' | '8k';
   format: 'mp4' | 'webm' | 'mov';
   fps: number;
-  aspect_ratio: string;
+  aspect_ratio: '16:9' | '9:16' | '1:1' | '4:5';
 }
 
 // Transition Assignment for scene-specific transitions

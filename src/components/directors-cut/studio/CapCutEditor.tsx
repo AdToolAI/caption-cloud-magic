@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { SceneAnalysis, AudioEnhancements, TextOverlay, TransitionAssignment } from '@/types/directors-cut';
+import { SceneAnalysis, AudioEnhancements, TextOverlay, TransitionAssignment, ExportSettings } from '@/types/directors-cut';
+import { ExportDialog } from './ExportDialog';
 import { SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE } from '@/lib/directors-cut-draft';
 import { CapCutSidebar } from './CapCutSidebar';
 import { CapCutTimeline } from './CapCutTimeline';
@@ -71,8 +72,8 @@ interface CapCutEditorProps {
   onInterpolationChange?: (enabled: boolean, fps: number) => void;
   restoration?: { enabled: boolean; level: string };
   onRestorationChange?: (enabled: boolean, level: string) => void;
-  exportSettings?: { quality: string; format: string; fps: number; aspect_ratio: string };
-  onExportSettingsChange?: (settings: any) => void;
+  exportSettings?: ExportSettings;
+  onExportSettingsChange?: (settings: ExportSettings) => void;
   isAnalyzing?: boolean;
   onStartAnalysis?: () => void;
   onVoiceOverGenerated?: (url: string) => void;
@@ -178,6 +179,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Preview layer visibility toggles
   const [showSubtitles, setShowSubtitles] = useState(true);
   const [showTextOverlays, setShowTextOverlays] = useState(true);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   
   // Burned-in subtitle removal state
   const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | null>(null);
@@ -1423,7 +1425,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           </Button>
           <div className="w-px h-5 bg-[#F5C76A]/15 mx-1" />
           <Button 
-            onClick={handleExportVideo}
+            onClick={() => setShowExportDialog(true)}
             size="sm"
             className="gap-1.5 h-7 bg-gradient-to-r from-[#F5C76A] to-[#d4a843] hover:from-[#FFE4A0] hover:to-[#F5C76A] text-xs text-black font-semibold shadow-[0_0_15px_rgba(245,199,106,0.25)]"
           >
@@ -1765,6 +1767,15 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         onClose={handleRenderClose}
         onOpenLibrary={handleOpenLibrary}
         startedAt={renderStartedAt}
+      />
+      <ExportDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        currentSettings={exportSettings || { quality: 'fhd', format: 'mp4', fps: 30, aspect_ratio: '16:9' }}
+        onConfirm={(newSettings) => {
+          onExportSettingsChange?.(newSettings);
+          setTimeout(() => handleExportVideo(), 50);
+        }}
       />
     </div>
   );

@@ -62,10 +62,10 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
-              <SelectItem value="sd" className="text-white text-xs">SD (480p)</SelectItem>
               <SelectItem value="hd" className="text-white text-xs">HD (720p)</SelectItem>
               <SelectItem value="fhd" className="text-white text-xs">Full HD (1080p)</SelectItem>
               <SelectItem value="4k" className="text-white text-xs">4K (2160p)</SelectItem>
+              <SelectItem value="8k" className="text-white text-xs">8K (4320p)</SelectItem>
             </SelectContent>
           </Select>
         </div>

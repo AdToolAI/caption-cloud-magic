@@ -107,8 +107,8 @@ interface CapCutSidebarProps {
   onRestorationChange?: (enabled: boolean, level: string) => void;
   onScenePlaybackRateChange?: (sceneId: string, rate: number) => void;
   // Export
-  exportSettings?: { quality: string; format: string; fps: number; aspect_ratio: string };
-  onExportSettingsChange?: (settings: any) => void;
+  exportSettings?: import('@/types/directors-cut').ExportSettings;
+  onExportSettingsChange?: (settings: import('@/types/directors-cut').ExportSettings) => void;
   onStartExport?: () => void;
 }
 
