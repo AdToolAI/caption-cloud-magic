@@ -26,29 +26,31 @@ interface Recommendation {
   href: string;
 }
 
-const BEGINNER_RECOMMENDATIONS: Recommendation[] = [
-  {
-    id: 'beginner_1',
-    icon: Target,
-    text: 'Poste mindestens 3x pro Woche für stetiges Wachstum',
-    impact: 'Grundlage',
-    href: '/calendar',
-  },
-  {
-    id: 'beginner_2',
-    icon: Clock,
-    text: 'Probiere verschiedene Uhrzeiten und beobachte dein Engagement',
-    impact: 'Strategie',
-    href: '/performance',
-  },
-  {
-    id: 'beginner_3',
-    icon: Hash,
-    text: 'Verwende 5–10 relevante Hashtags pro Post',
-    impact: 'Reichweite',
-    href: '/composer',
-  },
-];
+function getBeginnerRecommendations(t: (key: string) => any): Recommendation[] {
+  return [
+    {
+      id: 'beginner_1',
+      icon: Target,
+      text: t('reco.beginner1'),
+      impact: t('reco.impactFoundation'),
+      href: '/calendar',
+    },
+    {
+      id: 'beginner_2',
+      icon: Clock,
+      text: t('reco.beginner2'),
+      impact: t('reco.impactStrategy'),
+      href: '/performance',
+    },
+    {
+      id: 'beginner_3',
+      icon: Hash,
+      text: t('reco.beginner3'),
+      impact: t('reco.impactReach'),
+      href: '/composer',
+    },
+  ];
+}
 
 function mapInsightsToRecommendations(insights: InsightCardData[]): Recommendation[] {
   return insights.slice(0, 3).map((insight, i) => ({
@@ -61,7 +63,7 @@ function mapInsightsToRecommendations(insights: InsightCardData[]): Recommendati
 }
 
 export const RecoCard = () => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const navigate = useNavigate();
   const [appliedRecs, setAppliedRecs] = useState<string[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -71,7 +73,7 @@ export const RecoCard = () => {
 
   useEffect(() => {
     fetchRecommendations();
-  }, []);
+  }, [language]);
 
   const fetchRecommendations = async () => {
     setLoading(true);
@@ -90,7 +92,7 @@ export const RecoCard = () => {
 
       if (!posts || posts.length < 10) {
         setIsBeginnerMode(true);
-        setRecommendations(BEGINNER_RECOMMENDATIONS);
+        setRecommendations(getBeginnerRecommendations(t));
         setLoading(false);
         return;
       }
@@ -101,7 +103,7 @@ export const RecoCard = () => {
         hashtags: aggregateHashtags(posts),
         captionLen: aggregateCaptionLength(posts),
         trend: aggregateTrend(posts),
-      });
+      }, language);
 
       setRecommendations(mapInsightsToRecommendations(insights));
     } catch (err) {
@@ -147,7 +149,7 @@ export const RecoCard = () => {
               <Sparkles className="h-5 w-5 text-primary" />
             </motion.div>
             <h3 className="text-lg font-semibold text-foreground">
-              {isBeginnerMode ? 'Starter-Tipps für dich' : 'KI-Empfehlungen für dich'}
+              {isBeginnerMode ? t('reco.starterTips') : t('reco.aiRecommendations')}
             </h3>
             <motion.div
               animate={{ scale: [1, 1.2, 1] }}
@@ -236,10 +238,10 @@ export const RecoCard = () => {
                         {isApplied ? (
                           <>
                             <Check className="h-3 w-3 mr-1" />
-                            Übernommen
+                            {t('reco.applied')}
                           </>
                         ) : (
-                          'Übernehmen'
+                          t('reco.apply')
                         )}
                       </Button>
                     </motion.div>
@@ -256,8 +258,8 @@ export const RecoCard = () => {
               className="w-2 h-2 rounded-full bg-accent"
             />
             {isBeginnerMode
-              ? 'Ab 10 Posts erhältst du personalisierte KI-Empfehlungen'
-              : 'Basierend auf deinen Performance-Daten der letzten 28 Tage'}
+              ? t('reco.beginnerFooter')
+              : t('reco.dataFooter')}
           </p>
         </div>
       </Card>
