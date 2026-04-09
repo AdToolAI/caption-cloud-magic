@@ -1771,9 +1771,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       <ExportDialog
         isOpen={showExportDialog}
         onClose={() => setShowExportDialog(false)}
-        currentSettings={exportSettings}
+        currentSettings={exportSettings || { quality: 'fhd', format: 'mp4', fps: 30, aspect_ratio: '16:9' }}
         onConfirm={(newSettings) => {
-          onExportSettingsChange(newSettings);
+          onExportSettingsChange?.(newSettings);
           setTimeout(() => handleExportVideo(), 50);
         }}
       />
