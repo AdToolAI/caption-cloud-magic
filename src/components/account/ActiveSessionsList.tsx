@@ -14,8 +14,9 @@ import {
   CheckCircle
 } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS, es } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface Session {
   id: string;
@@ -31,9 +32,12 @@ interface Session {
 export const ActiveSessionsList = () => {
   const { toast } = useToast();
   const { signOut } = useAuth();
+  const { t, language } = useTranslation();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [terminatingId, setTerminatingId] = useState<string | null>(null);
+  const [terminatingAll, setTerminatingAll] = useState(false);
+  const dateLocale = language === 'de' ? de : language === 'es' ? es : enUS;
   const [terminatingAll, setTerminatingAll] = useState(false);
 
   const loadSessions = async () => {
@@ -78,17 +82,10 @@ export const ActiveSessionsList = () => {
       if (error) throw error;
 
       setSessions(prev => prev.filter(s => s.id !== sessionId));
-      toast({
-        title: "Sitzung beendet",
-        description: "Die Sitzung wurde erfolgreich beendet"
-      });
+      toast({ title: t("account.sessions.terminated"), description: t("account.sessions.terminatedDesc") });
     } catch (err) {
       console.error('Error terminating session:', err);
-      toast({
-        title: "Fehler",
-        description: "Sitzung konnte nicht beendet werden",
-        variant: "destructive"
-      });
+      toast({ title: t("account.sessions.error"), description: t("account.sessions.errorTerminating"), variant: "destructive" });
     } finally {
       setTerminatingId(null);
     }
@@ -111,17 +108,10 @@ export const ActiveSessionsList = () => {
       await supabase.auth.signOut({ scope: 'others' });
 
       setSessions(prev => prev.filter(s => s.is_current));
-      toast({
-        title: "Alle anderen Sitzungen beendet",
-        description: "Du bist jetzt nur noch auf diesem Gerät angemeldet"
-      });
+      toast({ title: t("account.sessions.allTerminated"), description: t("account.sessions.allTerminatedDesc") });
     } catch (err) {
       console.error('Error terminating all sessions:', err);
-      toast({
-        title: "Fehler",
-        description: "Einige Sitzungen konnten nicht beendet werden",
-        variant: "destructive"
-      });
+      toast({ title: t("account.sessions.error"), description: t("account.sessions.errorTerminatingAll"), variant: "destructive" });
     } finally {
       setTerminatingAll(false);
     }
@@ -139,7 +129,7 @@ export const ActiveSessionsList = () => {
     return (
       <div className="text-center py-8 text-muted-foreground">
         <Monitor className="h-12 w-12 mx-auto mb-2 opacity-50" />
-        <p>Keine aktiven Sitzungen gefunden</p>
+        <p>{t("account.sessions.noSessions")}</p>
       </div>
     );
   }
@@ -162,13 +152,13 @@ export const ActiveSessionsList = () => {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">
-                      {session.browser || 'Unbekannter Browser'}
-                      {session.os ? ` auf ${session.os}` : ''}
+                      {session.browser || t("account.sessions.unknownBrowser")}
+                      {session.os ? ` ${t("account.sessions.on")} ${session.os}` : ''}
                     </span>
                     {session.is_current && (
                       <span className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                         <CheckCircle className="h-3 w-3" />
-                        Aktuelle Sitzung
+                        {t("account.sessions.currentSession")}
                       </span>
                     )}
                   </div>
@@ -181,7 +171,7 @@ export const ActiveSessionsList = () => {
                     )}
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {format(new Date(session.last_active), "dd. MMM yyyy, HH:mm", { locale: de })}
+                      {format(new Date(session.last_active), "dd. MMM yyyy, HH:mm", { locale: dateLocale })}
                     </span>
                   </div>
                 </div>

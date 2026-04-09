@@ -181,7 +181,7 @@ export const SecurityTab = () => {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {disabling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Deaktivieren
+              {t('account.twoFactor.disabling')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
