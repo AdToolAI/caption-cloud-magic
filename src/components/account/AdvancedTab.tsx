@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Loader2, Trash2, Download, FileDown, LogOut } from "lucide-react";
 
 export const AdvancedTab = () => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
@@ -39,9 +41,9 @@ export const AdvancedTab = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast({ title: "Export erfolgreich", description: "Ihre Daten wurden heruntergeladen" });
+      toast({ title: t("accountAdvanced.exportSuccess"), description: t("accountAdvanced.exportSuccessDesc") });
     } catch {
-      toast({ title: "Fehler", description: "Export fehlgeschlagen", variant: "destructive" });
+      toast({ title: t("accountAdvanced.exportError"), description: t("accountAdvanced.exportErrorDesc"), variant: "destructive" });
     }
     setLoading(false);
   };
@@ -51,14 +53,14 @@ export const AdvancedTab = () => {
     try {
       await supabase.auth.signOut({ scope: 'global' });
       toast({
-        title: "Abgemeldet",
-        description: "Sie wurden von allen Geräten abgemeldet"
+        title: t("accountAdvanced.loggedOut"),
+        description: t("accountAdvanced.loggedOutDesc")
       });
       navigate("/auth");
     } catch (error) {
       toast({
-        title: "Fehler",
-        description: "Abmeldung fehlgeschlagen",
+        title: t("accountAdvanced.logoutError"),
+        description: t("accountAdvanced.logoutErrorDesc"),
         variant: "destructive"
       });
     }
@@ -72,15 +74,14 @@ export const AdvancedTab = () => {
       transition={{ duration: 0.3 }}
       className="space-y-6"
     >
-      {/* Data Export */}
       <Card className="backdrop-blur-xl bg-card/60 border border-white/10">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Download className="h-5 w-5 text-cyan-400" />
-            Daten exportieren
+            {t("accountAdvanced.exportTitle")}
           </CardTitle>
           <CardDescription>
-            Laden Sie eine Kopie Ihrer persönlichen Daten herunter
+            {t("accountAdvanced.exportDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -95,20 +96,19 @@ export const AdvancedTab = () => {
             ) : (
               <FileDown className="h-4 w-4 mr-2" />
             )}
-            Daten als JSON exportieren
+            {t("accountAdvanced.exportButton")}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Logout All Devices */}
       <Card className="backdrop-blur-xl bg-card/60 border border-white/10">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <LogOut className="h-5 w-5 text-amber-400" />
-            Alle Geräte abmelden
+            {t("accountAdvanced.logoutAllTitle")}
           </CardTitle>
           <CardDescription>
-            Melden Sie sich von allen Geräten ab, auf denen Sie angemeldet sind
+            {t("accountAdvanced.logoutAllDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -123,20 +123,19 @@ export const AdvancedTab = () => {
             ) : (
               <LogOut className="h-4 w-4 mr-2" />
             )}
-            Überall abmelden
+            {t("accountAdvanced.logoutAllButton")}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Delete Account */}
       <Card className="backdrop-blur-xl bg-card/60 border border-destructive/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
             <Trash2 className="h-5 w-5" />
-            Konto löschen
+            {t("accountAdvanced.deleteAccountTitle")}
           </CardTitle>
           <CardDescription>
-            Löschen Sie Ihr Konto und alle damit verbundenen Daten permanent
+            {t("accountAdvanced.deleteAccountDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -146,7 +145,7 @@ export const AdvancedTab = () => {
             onClick={() => navigate("/account/delete")}
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            Konto löschen
+            {t("accountAdvanced.deleteAccountButton")}
           </Button>
         </CardContent>
       </Card>

@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Camera, Loader2, Trash2, User } from "lucide-react";
 
 interface AvatarUploadProps {
@@ -14,6 +15,7 @@ interface AvatarUploadProps {
 
 export const AvatarUpload = ({ currentAvatarUrl, onAvatarChange }: AvatarUploadProps) => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -22,21 +24,18 @@ export const AvatarUpload = ({ currentAvatarUrl, onAvatarChange }: AvatarUploadP
     const file = event.target.files?.[0];
     if (!file || !user) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
-      toast.error("Bitte wähle eine Bilddatei");
+      toast.error(t("accountAvatar.imageOnly"));
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Maximale Dateigröße: 5MB");
+      toast.error(t("accountAvatar.maxSize"));
       return;
     }
 
     setUploading(true);
     try {
-      // Delete old avatar if exists
       if (currentAvatarUrl) {
         const oldPath = currentAvatarUrl.split("/").pop();
         if (oldPath) {
@@ -44,7 +43,6 @@ export const AvatarUpload = ({ currentAvatarUrl, onAvatarChange }: AvatarUploadP
         }
       }
 
-      // Upload new avatar
       const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`;
@@ -55,12 +53,10 @@ export const AvatarUpload = ({ currentAvatarUrl, onAvatarChange }: AvatarUploadP
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from("avatars")
         .getPublicUrl(filePath);
 
-      // Update profile
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ avatar_url: publicUrl })
@@ -69,10 +65,10 @@ export const AvatarUpload = ({ currentAvatarUrl, onAvatarChange }: AvatarUploadP
       if (updateError) throw updateError;
 
       onAvatarChange(publicUrl);
-      toast.success("Profilbild aktualisiert");
+      toast.success(t("accountAvatar.updated"));
     } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error(error.message || "Fehler beim Hochladen");
+      toast.error(error.message || t("accountAvatar.uploadError"));
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -86,13 +82,11 @@ export const AvatarUpload = ({ currentAvatarUrl, onAvatarChange }: AvatarUploadP
 
     setDeleting(true);
     try {
-      // Extract file path from URL
       const urlParts = currentAvatarUrl.split("/avatars/");
       if (urlParts[1]) {
         await supabase.storage.from("avatars").remove([urlParts[1]]);
       }
 
-      // Update profile
       const { error } = await supabase
         .from("profiles")
         .update({ avatar_url: null })
@@ -101,9 +95,9 @@ export const AvatarUpload = ({ currentAvatarUrl, onAvatarChange }: AvatarUploadP
       if (error) throw error;
 
       onAvatarChange(null);
-      toast.success("Profilbild entfernt");
+      toast.success(t("accountAvatar.removed"));
     } catch (error: any) {
-      toast.error(error.message || "Fehler beim Löschen");
+      toast.error(error.message || t("accountAvatar.deleteError"));
     } finally {
       setDeleting(false);
     }
@@ -114,10 +108,10 @@ export const AvatarUpload = ({ currentAvatarUrl, onAvatarChange }: AvatarUploadP
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Camera className="h-5 w-5 text-primary" />
-          Profilbild
+          {t("accountAvatar.title")}
         </CardTitle>
         <CardDescription>
-          Lade ein Profilbild hoch (max. 5MB)
+          {t("accountAvatar.description")}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -147,12 +141,12 @@ export const AvatarUpload = ({ currentAvatarUrl, onAvatarChange }: AvatarUploadP
               {uploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Wird hochgeladen...
+                  {t("accountAvatar.uploading")}
                 </>
               ) : (
                 <>
                   <Camera className="mr-2 h-4 w-4" />
-                  Bild auswählen
+                  {t("accountAvatar.selectImage")}
                 </>
               )}
             </Button>
@@ -169,7 +163,7 @@ export const AvatarUpload = ({ currentAvatarUrl, onAvatarChange }: AvatarUploadP
                 ) : (
                   <Trash2 className="mr-2 h-4 w-4" />
                 )}
-                Entfernen
+                {t("accountAvatar.remove")}
               </Button>
             )}
           </div>

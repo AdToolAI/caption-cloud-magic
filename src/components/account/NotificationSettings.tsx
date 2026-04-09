@@ -6,8 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 import { BellRing, Loader2, Smartphone, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
 interface NotificationPreferences {
   email_reminders: boolean;
   in_app_notifications: boolean;
@@ -17,6 +19,7 @@ interface NotificationPreferences {
 
 export const NotificationSettings = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [preferences, setPreferences] = useState<NotificationPreferences>({
@@ -29,16 +32,13 @@ export const NotificationSettings = () => {
   useEffect(() => {
     const loadPreferences = async () => {
       if (!user) return;
-
       try {
         const { data, error } = await supabase
           .from("notification_preferences")
           .select("*")
           .eq("user_id", user.id)
           .single();
-
         if (error && error.code !== "PGRST116") throw error;
-        
         if (data) {
           setPreferences({
             email_reminders: data.email_reminders ?? true,
@@ -53,17 +53,14 @@ export const NotificationSettings = () => {
         setLoading(false);
       }
     };
-
     loadPreferences();
   }, [user]);
 
   const updatePreference = async (key: keyof NotificationPreferences, value: boolean) => {
     if (!user) return;
-
     setSaving(true);
     const newPreferences = { ...preferences, [key]: value };
     setPreferences(newPreferences);
-
     try {
       const { error } = await supabase
         .from("notification_preferences")
@@ -72,12 +69,11 @@ export const NotificationSettings = () => {
           ...newPreferences,
           updated_at: new Date().toISOString(),
         });
-
       if (error) throw error;
-      toast.success("Einstellung gespeichert");
+      toast.success(t("accountNotifications.saved"));
     } catch (error: any) {
       setPreferences(preferences);
-      toast.error(error.message || "Fehler beim Speichern");
+      toast.error(error.message || t("accountNotifications.saveError"));
     } finally {
       setSaving(false);
     }
@@ -96,81 +92,81 @@ export const NotificationSettings = () => {
   return (
     <>
       <Card className="bg-card/60 backdrop-blur-xl border-white/10">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BellRing className="h-5 w-5 text-primary" />
-          Benachrichtigungen
-        </CardTitle>
-        <CardDescription>
-          Verwalte deine Benachrichtigungs-Einstellungen
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label>E-Mail-Erinnerungen</Label>
-            <p className="text-xs text-muted-foreground">
-              Wichtige Updates per E-Mail erhalten
-            </p>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BellRing className="h-5 w-5 text-primary" />
+            {t("accountNotifications.title")}
+          </CardTitle>
+          <CardDescription>
+            {t("accountNotifications.description")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>{t("accountNotifications.emailReminders")}</Label>
+              <p className="text-xs text-muted-foreground">
+                {t("accountNotifications.emailRemindersDesc")}
+              </p>
+            </div>
+            <Switch
+              checked={preferences.email_reminders}
+              onCheckedChange={(checked) => updatePreference("email_reminders", checked)}
+              disabled={saving}
+            />
           </div>
-          <Switch
-            checked={preferences.email_reminders}
-            onCheckedChange={(checked) => updatePreference("email_reminders", checked)}
-            disabled={saving}
-          />
-        </div>
 
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label>In-App Benachrichtigungen</Label>
-            <p className="text-xs text-muted-foreground">
-              Benachrichtigungen in der App anzeigen
-            </p>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>{t("accountNotifications.inAppNotifications")}</Label>
+              <p className="text-xs text-muted-foreground">
+                {t("accountNotifications.inAppNotificationsDesc")}
+              </p>
+            </div>
+            <Switch
+              checked={preferences.in_app_notifications}
+              onCheckedChange={(checked) => updatePreference("in_app_notifications", checked)}
+              disabled={saving}
+            />
           </div>
-          <Switch
-            checked={preferences.in_app_notifications}
-            onCheckedChange={(checked) => updatePreference("in_app_notifications", checked)}
-            disabled={saving}
-          />
-        </div>
 
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label>Render abgeschlossen</Label>
-            <p className="text-xs text-muted-foreground">
-              Benachrichtigung wenn Videos fertig sind
-            </p>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>{t("accountNotifications.renderComplete")}</Label>
+              <p className="text-xs text-muted-foreground">
+                {t("accountNotifications.renderCompleteDesc")}
+              </p>
+            </div>
+            <Switch
+              checked={preferences.render_complete_notify}
+              onCheckedChange={(checked) => updatePreference("render_complete_notify", checked)}
+              disabled={saving}
+            />
           </div>
-          <Switch
-            checked={preferences.render_complete_notify}
-            onCheckedChange={(checked) => updatePreference("render_complete_notify", checked)}
-            disabled={saving}
-          />
-        </div>
 
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label>Freigabe-Anfragen</Label>
-            <p className="text-xs text-muted-foreground">
-              Bei neuen Freigabe-Anfragen benachrichtigen
-            </p>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>{t("accountNotifications.approvalRequests")}</Label>
+              <p className="text-xs text-muted-foreground">
+                {t("accountNotifications.approvalRequestsDesc")}
+              </p>
+            </div>
+            <Switch
+              checked={preferences.approval_request_notify}
+              onCheckedChange={(checked) => updatePreference("approval_request_notify", checked)}
+              disabled={saving}
+            />
           </div>
-          <Switch
-            checked={preferences.approval_request_notify}
-            onCheckedChange={(checked) => updatePreference("approval_request_notify", checked)}
-            disabled={saving}
-          />
-        </div>
         </CardContent>
       </Card>
 
-      {/* Push Notifications */}
       <PushNotificationCard />
     </>
   );
 };
 
 function PushNotificationCard() {
+  const { t } = useTranslation();
   const { status, pushEnabled, loading, togglePush, isSupported, isDenied } = usePushNotifications();
 
   return (
@@ -178,10 +174,10 @@ function PushNotificationCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Smartphone className="h-5 w-5 text-primary" />
-          Push-Benachrichtigungen
+          {t("accountNotifications.pushTitle")}
         </CardTitle>
         <CardDescription>
-          Erhalte Browser-Benachrichtigungen für geplante Posts und Erinnerungen — kostenlos
+          {t("accountNotifications.pushDesc")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -189,27 +185,27 @@ function PushNotificationCard() {
           <div className="flex items-start gap-3 rounded-lg bg-muted/50 p-3">
             <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
             <div className="text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Nicht unterstützt</p>
-              <p>Dein Browser unterstützt keine Push-Benachrichtigungen. Nutze Chrome, Firefox oder Edge für diese Funktion.</p>
-              <p className="mt-1 text-xs">Auf iOS: Füge die App zum Home-Bildschirm hinzu (PWA).</p>
+              <p className="font-medium text-foreground">{t("accountNotifications.notSupported")}</p>
+              <p>{t("accountNotifications.notSupportedDesc")}</p>
+              <p className="mt-1 text-xs">{t("accountNotifications.notSupportedIos")}</p>
             </div>
           </div>
         ) : isDenied ? (
           <div className="flex items-start gap-3 rounded-lg bg-destructive/10 p-3">
             <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
             <div className="text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Blockiert</p>
-              <p>Push-Benachrichtigungen sind in deinen Browser-Einstellungen blockiert. Klicke auf das Schloss-Symbol in der Adressleiste, um sie zu erlauben.</p>
+              <p className="font-medium text-foreground">{t("accountNotifications.blocked")}</p>
+              <p>{t("accountNotifications.blockedDesc")}</p>
             </div>
           </div>
         ) : (
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Push aktivieren</Label>
+              <Label>{t("accountNotifications.enablePush")}</Label>
               <p className="text-xs text-muted-foreground">
                 {pushEnabled
-                  ? "Du erhältst Erinnerungen direkt im Browser"
-                  : "Aktiviere Push für Erinnerungen vor geplanten Posts"}
+                  ? t("accountNotifications.pushEnabled")
+                  : t("accountNotifications.pushDisabled")}
               </p>
             </div>
             <Switch
@@ -217,14 +213,6 @@ function PushNotificationCard() {
               onCheckedChange={togglePush}
               disabled={loading}
             />
-          </div>
-        )}
-
-        {pushEnabled && (
-          <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
-            <p className="text-xs text-muted-foreground">
-              ✅ Push-Benachrichtigungen sind aktiv. Du wirst z.B. 1h und 24h vor geplanten Posts erinnert.
-            </p>
           </div>
         )}
       </CardContent>

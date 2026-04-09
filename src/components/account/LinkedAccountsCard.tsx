@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Link2, Loader2, Check, X } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS, es } from "date-fns/locale";
 
 type Platform = "instagram" | "tiktok" | "linkedin" | "youtube" | "facebook" | "x";
 
@@ -35,20 +36,21 @@ interface Credential {
 
 export const LinkedAccountsCard = () => {
   const { user } = useAuth();
+  const { t, language } = useTranslation();
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<Platform | null>(null);
 
+  const dateLocale = language === 'de' ? de : language === 'es' ? es : enUS;
+
   useEffect(() => {
     const loadCredentials = async () => {
       if (!user) return;
-
       try {
         const { data, error } = await supabase
           .from("social_connections")
           .select("id, provider, last_sync_at")
           .eq("user_id", user.id);
-
         if (error) throw error;
         setCredentials((data || []).map((row: any) => ({
           platform: row.provider as Platform,
@@ -62,7 +64,6 @@ export const LinkedAccountsCard = () => {
         setLoading(false);
       }
     };
-
     loadCredentials();
   }, [user]);
 
@@ -71,34 +72,28 @@ export const LinkedAccountsCard = () => {
   };
 
   const handleConnect = (platform: Platform) => {
-    // Redirect to platform connection flow
-    toast.info(`Weiterleitung zu ${PLATFORMS[platform].name}...`);
-    // TODO: Implement OAuth flow for each platform
+    toast.info(`${t("accountLinked.redirecting")} ${PLATFORMS[platform].name}...`);
   };
 
   const handleDisconnect = async (platform: Platform) => {
     if (!user) return;
-
     setActionLoading(platform);
     try {
       const credential = getCredential(platform);
       if (!credential?.connection_id) return;
-
       const { error } = await supabase
         .from("social_connections")
         .delete()
         .eq("id", credential.connection_id);
-
       if (error) throw error;
-
       setCredentials((prev) =>
         prev.map((c) =>
           c.platform === platform ? { ...c, is_connected: false } : c
         )
       );
-      toast.success(`${PLATFORMS[platform].name} getrennt`);
+      toast.success(`${PLATFORMS[platform].name} ${t("accountLinked.disconnected")}`);
     } catch (error: any) {
-      toast.error(error.message || "Fehler beim Trennen");
+      toast.error(error.message || t("accountLinked.disconnectError"));
     } finally {
       setActionLoading(null);
     }
@@ -119,10 +114,10 @@ export const LinkedAccountsCard = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Link2 className="h-5 w-5 text-primary" />
-          Verknüpfte Konten
+          {t("accountLinked.title")}
         </CardTitle>
         <CardDescription>
-          Verbinde deine Social-Media-Konten
+          {t("accountLinked.description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -145,7 +140,7 @@ export const LinkedAccountsCard = () => {
                   <p className="font-medium">{info.name}</p>
                   {isConnected && credential?.last_verified_at && (
                     <p className="text-xs text-muted-foreground">
-                      Zuletzt verifiziert: {format(new Date(credential.last_verified_at), "dd. MMM yyyy", { locale: de })}
+                      {t("accountLinked.lastVerified")}: {format(new Date(credential.last_verified_at), "dd. MMM yyyy", { locale: dateLocale })}
                     </p>
                   )}
                 </div>
@@ -156,7 +151,7 @@ export const LinkedAccountsCard = () => {
                   <>
                     <Badge variant="outline" className="border-green-500/50 text-green-500">
                       <Check className="h-3 w-3 mr-1" />
-                      Verbunden
+                      {t("accountLinked.connected")}
                     </Badge>
                     <Button
                       variant="ghost"
@@ -179,7 +174,7 @@ export const LinkedAccountsCard = () => {
                     onClick={() => handleConnect(platform)}
                     className="border-white/10"
                   >
-                    Verbinden
+                    {t("accountLinked.connect")}
                   </Button>
                 )}
               </div>
