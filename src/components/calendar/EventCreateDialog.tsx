@@ -311,12 +311,12 @@ export function EventCreateDialog({
 
   const handleGenerateCaption = async () => {
     if (!title) {
-      toast.error("Bitte gib zuerst einen Event-Titel in Step 1 ein");
+      toast.error(t("calendarEventCreate.titleRequired"));
       return;
     }
     
     if (selectedChannels.length === 0) {
-      toast.error("Bitte wähle mindestens einen Channel in Step 2 aus");
+      toast.error(t("calendarEventCreate.channelRequired"));
       return;
     }
 

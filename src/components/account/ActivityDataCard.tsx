@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Trash2, Loader2, AlertTriangle } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +19,7 @@ import {
 
 export const ActivityDataCard = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -26,7 +28,6 @@ export const ActivityDataCard = () => {
 
     setDeleting(true);
     try {
-      // Delete user sessions (except current)
       const { error: sessionsError } = await supabase
         .from("user_sessions")
         .delete()
@@ -35,7 +36,6 @@ export const ActivityDataCard = () => {
 
       if (sessionsError) throw sessionsError;
 
-      // Delete app events
       const { error: eventsError } = await supabase
         .from("app_events")
         .delete()
@@ -43,9 +43,9 @@ export const ActivityDataCard = () => {
 
       if (eventsError) throw eventsError;
 
-      toast.success("Aktivitätsdaten gelöscht");
+      toast.success(t("accountActivity.successMsg"));
     } catch (error: any) {
-      toast.error(error.message || "Fehler beim Löschen");
+      toast.error(error.message || t("accountActivity.errorMsg"));
     } finally {
       setDeleting(false);
       setShowDeleteDialog(false);
@@ -58,10 +58,10 @@ export const ActivityDataCard = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Trash2 className="h-5 w-5 text-primary" />
-            Aktivitätsdaten
+            {t("accountActivity.title")}
           </CardTitle>
           <CardDescription>
-            Lösche deine gespeicherten Aktivitätsdaten
+            {t("accountActivity.description")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -69,10 +69,9 @@ export const ActivityDataCard = () => {
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
               <div className="text-sm text-amber-500">
-                <p className="font-medium">Hinweis</p>
+                <p className="font-medium">{t("accountActivity.warning")}</p>
                 <p className="text-amber-500/80">
-                  Das Löschen entfernt deinen Login-Verlauf und App-Events.
-                  Diese Aktion kann nicht rückgängig gemacht werden.
+                  {t("accountActivity.warningText")}
                 </p>
               </div>
             </div>
@@ -87,12 +86,12 @@ export const ActivityDataCard = () => {
             {deleting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Wird gelöscht...
+                {t("accountActivity.deleting")}
               </>
             ) : (
               <>
                 <Trash2 className="mr-2 h-4 w-4" />
-                Aktivitätsdaten löschen
+                {t("accountActivity.deleteButton")}
               </>
             )}
           </Button>
@@ -102,18 +101,18 @@ export const ActivityDataCard = () => {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Aktivitätsdaten löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{t("accountActivity.confirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Diese Aktion löscht unwiderruflich:
+              {t("accountActivity.confirmDesc")}
               <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>Deinen Login-Verlauf</li>
-                <li>App-Events und Nutzungsdaten</li>
-                <li>Andere Sitzungen (außer der aktuellen)</li>
+                <li>{t("accountActivity.confirmItem1")}</li>
+                <li>{t("accountActivity.confirmItem2")}</li>
+                <li>{t("accountActivity.confirmItem3")}</li>
               </ul>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{t("accountActivity.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteActivityData}
               disabled={deleting}
@@ -122,7 +121,7 @@ export const ActivityDataCard = () => {
               {deleting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                "Endgültig löschen"
+                t("accountActivity.confirmDelete")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

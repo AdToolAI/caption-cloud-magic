@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useRecurringEvents } from '@/hooks/useRecurringEvents';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Repeat } from 'lucide-react';
 
 interface RecurringRuleDialogProps {
@@ -17,6 +18,7 @@ interface RecurringRuleDialogProps {
 
 export function RecurringRuleDialog({ workspace_id, open, onClose }: RecurringRuleDialogProps) {
   const { createRule, loading } = useRecurringEvents(workspace_id);
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [pattern, setPattern] = useState<string>('weekly');
   const [eventTitle, setEventTitle] = useState('');
@@ -92,7 +94,7 @@ export function RecurringRuleDialog({ workspace_id, open, onClose }: RecurringRu
               <div>
                 <Label>Event-Titel</Label>
                 <Input
-                  placeholder="Titel des wiederkehrenden Events"
+                  placeholder={t("calendarRecurring.eventTitle")}
                   value={eventTitle}
                   onChange={(e) => setEventTitle(e.target.value)}
                 />
@@ -101,7 +103,7 @@ export function RecurringRuleDialog({ workspace_id, open, onClose }: RecurringRu
               <div>
                 <Label>Caption (optional)</Label>
                 <Textarea
-                  placeholder="Text für den Post..."
+                  placeholder={t("calendarRecurring.captionPlaceholder")}
                   value={eventCaption}
                   onChange={(e) => setEventCaption(e.target.value)}
                   rows={3}

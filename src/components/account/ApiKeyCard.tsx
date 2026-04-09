@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Key, Loader2, Copy, RefreshCw, Eye, EyeOff } from "lucide-react";
 import {
   AlertDialog,
@@ -19,6 +20,7 @@ import {
 
 export const ApiKeyCard = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -28,14 +30,12 @@ export const ApiKeyCard = () => {
   useEffect(() => {
     const loadApiKey = async () => {
       if (!user) return;
-
       try {
         const { data, error } = await supabase
           .from("profiles")
           .select("api_key")
           .eq("id", user.id)
           .single();
-
         if (error) throw error;
         setApiKey(data?.api_key || null);
       } catch (error) {
@@ -44,12 +44,10 @@ export const ApiKeyCard = () => {
         setLoading(false);
       }
     };
-
     loadApiKey();
   }, [user]);
 
   const generateApiKey = () => {
-    // Generate a random API key
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let key = "ak_";
     for (let i = 0; i < 32; i++) {
@@ -60,23 +58,19 @@ export const ApiKeyCard = () => {
 
   const handleGenerateKey = async () => {
     if (!user) return;
-
     setGenerating(true);
     try {
       const newKey = generateApiKey();
-      
       const { error } = await supabase
         .from("profiles")
         .update({ api_key: newKey })
         .eq("id", user.id);
-
       if (error) throw error;
-
       setApiKey(newKey);
       setShowKey(true);
-      toast.success("API-Schlüssel generiert");
+      toast.success(t("accountApiKey.generated"));
     } catch (error: any) {
-      toast.error(error.message || "Fehler beim Generieren");
+      toast.error(error.message || t("accountApiKey.generateError"));
     } finally {
       setGenerating(false);
       setShowRegenerateDialog(false);
@@ -85,12 +79,11 @@ export const ApiKeyCard = () => {
 
   const handleCopy = async () => {
     if (!apiKey) return;
-    
     try {
       await navigator.clipboard.writeText(apiKey);
-      toast.success("API-Schlüssel kopiert");
+      toast.success(t("accountApiKey.copied"));
     } catch (error) {
-      toast.error("Fehler beim Kopieren");
+      toast.error(t("accountApiKey.copyError"));
     }
   };
 
@@ -115,10 +108,10 @@ export const ApiKeyCard = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Key className="h-5 w-5 text-primary" />
-            API-Schlüssel
+            {t("accountApiKey.title")}
           </CardTitle>
           <CardDescription>
-            Für externe Integrationen und Automatisierungen
+            {t("accountApiKey.description")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -130,60 +123,36 @@ export const ApiKeyCard = () => {
                   readOnly
                   className="font-mono bg-muted/20 border-white/10"
                 />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowKey(!showKey)}
-                  className="shrink-0"
-                >
-                  {showKey ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                <Button variant="ghost" size="icon" onClick={() => setShowKey(!showKey)} className="shrink-0">
+                  {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleCopy}
-                  className="shrink-0"
-                >
+                <Button variant="ghost" size="icon" onClick={handleCopy} className="shrink-0">
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
-
-              <Button
-                variant="outline"
-                onClick={() => setShowRegenerateDialog(true)}
-                className="w-full border-white/10"
-              >
+              <Button variant="outline" onClick={() => setShowRegenerateDialog(true)} className="w-full border-white/10">
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Schlüssel regenerieren
+                {t("accountApiKey.regenerateButton")}
               </Button>
-
               <p className="text-xs text-muted-foreground">
-                ⚠️ Beim Regenerieren wird der alte Schlüssel ungültig
+                {t("accountApiKey.regenerateWarning")}
               </p>
             </>
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
-                Noch kein API-Schlüssel generiert.
+                {t("accountApiKey.noKeyYet")}
               </p>
-              <Button
-                onClick={handleGenerateKey}
-                disabled={generating}
-                className="w-full"
-              >
+              <Button onClick={handleGenerateKey} disabled={generating} className="w-full">
                 {generating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Wird generiert...
+                    {t("accountApiKey.generating")}
                   </>
                 ) : (
                   <>
                     <Key className="mr-2 h-4 w-4" />
-                    API-Schlüssel generieren
+                    {t("accountApiKey.generateButton")}
                   </>
                 )}
               </Button>
@@ -195,19 +164,18 @@ export const ApiKeyCard = () => {
       <AlertDialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Schlüssel regenerieren?</AlertDialogTitle>
+            <AlertDialogTitle>{t("accountApiKey.regenerateTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Der aktuelle API-Schlüssel wird ungültig. Alle Integrationen, die
-              diesen Schlüssel verwenden, müssen aktualisiert werden.
+              {t("accountApiKey.regenerateDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{t("accountApiKey.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleGenerateKey} disabled={generating}>
               {generating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                "Regenerieren"
+                t("accountApiKey.regenerate")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

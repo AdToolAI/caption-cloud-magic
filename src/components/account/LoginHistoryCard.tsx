@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { History, Monitor, Smartphone, Tablet, Loader2, MapPin } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS, es } from "date-fns/locale";
 
 interface LoginEntry {
   id: string;
@@ -17,13 +18,15 @@ interface LoginEntry {
 
 export const LoginHistoryCard = () => {
   const { user } = useAuth();
+  const { t, language } = useTranslation();
   const [history, setHistory] = useState<LoginEntry[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const dateLocale = language === 'de' ? de : language === 'es' ? es : enUS;
 
   useEffect(() => {
     const loadHistory = async () => {
       if (!user) return;
-
       try {
         const { data, error } = await supabase
           .from("user_sessions")
@@ -31,7 +34,6 @@ export const LoginHistoryCard = () => {
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(10);
-
         if (error) throw error;
         setHistory(data || []);
       } catch (error) {
@@ -40,7 +42,6 @@ export const LoginHistoryCard = () => {
         setLoading(false);
       }
     };
-
     loadHistory();
   }, [user]);
 
@@ -60,10 +61,10 @@ export const LoginHistoryCard = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <History className="h-5 w-5 text-primary" />
-          Login-Verlauf
+          {t("accountLoginHistory.title")}
         </CardTitle>
         <CardDescription>
-          Deine letzten 10 Anmeldungen
+          {t("accountLoginHistory.description")}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -73,7 +74,7 @@ export const LoginHistoryCard = () => {
           </div>
         ) : history.length === 0 ? (
           <p className="text-muted-foreground text-center py-4">
-            Keine Login-Daten verfügbar
+            {t("accountLoginHistory.noData")}
           </p>
         ) : (
           <div className="space-y-3">
@@ -88,16 +89,16 @@ export const LoginHistoryCard = () => {
                   </div>
                   <div>
                     <p className="text-sm font-medium">
-                      {entry.browser} auf {entry.os}
+                      {entry.browser} {t("accountLoginHistory.on")} {entry.os}
                     </p>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <MapPin className="h-3 w-3" />
-                      {entry.location || "Unbekannt"}
+                      {entry.location || t("accountLoginHistory.unknown")}
                     </div>
                   </div>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {format(new Date(entry.created_at), "dd. MMM yyyy, HH:mm", { locale: de })}
+                  {format(new Date(entry.created_at), "dd. MMM yyyy, HH:mm", { locale: dateLocale })}
                 </span>
               </div>
             ))}
