@@ -17,7 +17,7 @@ import {
 } from "@/lib/postMetricsAggregation";
 
 export const CaptionInsightsTab = () => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [insights, setInsights] = useState<any[]>([]);
@@ -53,14 +53,14 @@ export const CaptionInsightsTab = () => {
         hashtags: aggregateHashtags(posts),
         captionLen: aggregateCaptionLength(posts),
         trend: aggregateTrend(posts),
-      });
+      }, language);
 
       setInsights(generatedInsights);
     } catch (error) {
       console.error('Error generating insights:', error);
       toast({
-        title: 'Fehler',
-        description: 'Insights konnten nicht geladen werden.',
+        title: t('common.error') !== 'common.error' ? t('common.error') : 'Error',
+        description: t('performance.insights.notEnoughData'),
         variant: 'destructive'
       });
     } finally {
@@ -72,12 +72,12 @@ export const CaptionInsightsTab = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Handlungsempfehlungen</h2>
-          <p className="text-muted-foreground">Basierend auf deinen letzten 28 Tagen</p>
+          <h2 className="text-2xl font-bold">{t('performance.insights.actionRecs') !== 'performance.insights.actionRecs' ? t('performance.insights.actionRecs') : t('performance.insights.recommendations')}</h2>
+          <p className="text-muted-foreground">{t('performance.insights.based28days') !== 'performance.insights.based28days' ? t('performance.insights.based28days') : t('performance.insights.subtitle')}</p>
         </div>
         <Button onClick={fetchAndGenerateInsights} disabled={loading} variant="outline">
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Neu berechnen
+          {t('performance.insights.recalculate')}
         </Button>
       </div>
 
@@ -98,7 +98,7 @@ export const CaptionInsightsTab = () => {
           <CardContent className="py-12 text-center">
             <Sparkles className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">
-              Noch nicht genug Daten für Insights (mind. 10 Posts nötig)
+              {t('performance.insights.notEnoughData')}
             </p>
           </CardContent>
         </Card>

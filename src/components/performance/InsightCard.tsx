@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { LucideIcon } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface InsightCardProps {
   title: string;
@@ -25,17 +26,19 @@ export function InsightCard({
   actions, 
   priority 
 }: InsightCardProps) {
+  const { t } = useTranslation();
+
   const priorityConfig = {
     high: {
-      badge: 'Wichtig',
+      badge: t('performance.insights.priority.high'),
       className: 'border-destructive/50 bg-destructive/5'
     },
     medium: {
-      badge: 'Mittel',
+      badge: t('performance.insights.priority.medium'),
       className: 'border-orange-500/50 bg-orange-500/5'
     },
     low: {
-      badge: 'Optional',
+      badge: t('performance.insights.priority.low'),
       className: 'border-muted-foreground/30 bg-muted/30'
     }
   };
