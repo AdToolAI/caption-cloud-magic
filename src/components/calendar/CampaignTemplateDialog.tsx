@@ -157,7 +157,7 @@ export function CampaignTemplateDialog({
       });
       
       // Show detailed error message
-      const errorMessage = error.message || error.code || "Unbekannter Fehler";
+      const errorMessage = error.message || error.code || t("calendarCampaign.unknownError");
       toast.error(`Fehler beim Erstellen der Kampagne: ${errorMessage}`);
     } finally {
       setGenerating(false);
@@ -184,11 +184,11 @@ export function CampaignTemplateDialog({
 
   const getTemplateTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      product_launch: "Produktlaunch",
-      social_sale: "Sale",
-      seasonal: "Saison",
-      educational: "Bildung",
-      event: "Event",
+      product_launch: t("calendarCampaign.productLaunch"),
+      social_sale: t("calendarCampaign.socialSale"),
+      seasonal: t("calendarCampaign.seasonal"),
+      educational: t("calendarCampaign.educational"),
+      event: t("calendarCampaign.event"),
     };
     return labels[type] || type;
   };
@@ -257,8 +257,8 @@ export function CampaignTemplateDialog({
                   <CardContent className="py-12">
                     <p className="text-sm text-muted-foreground text-center">
                       {filterTab === "my" 
-                        ? "Du hast noch keine eigenen Templates erstellt"
-                        : "Keine Templates verfügbar"}
+                        ? t("calendarCampaign.noOwnTemplates")
+                        : t("calendarCampaign.noTemplates")}
                     </p>
                   </CardContent>
                 </Card>
@@ -384,13 +384,13 @@ export function CampaignTemplateDialog({
 
         <DialogFooter className="flex-shrink-0 border-t pt-4">
           <Button variant="outline" onClick={handleClose}>
-            Abbrechen
+            {t("calendarCampaign.cancel")}
           </Button>
           <Button
             onClick={handleGenerate}
             disabled={!selectedTemplate || !campaignName || !startDate || generating}
           >
-            {generating ? "Generiert..." : "Kampagne generieren"}
+            {generating ? t("calendarCampaign.generatingCampaign") : t("calendarCampaign.generateCampaign")}
           </Button>
         </DialogFooter>
       </DialogContent>

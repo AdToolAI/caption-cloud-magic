@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Upload, X, Image, Video, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,12 +21,13 @@ export function PostMediaUploader({
   className,
 }: PostMediaUploaderProps) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
   const handleUpload = useCallback(async (file: File) => {
     if (!user) {
-      toast({ title: "Nicht angemeldet", variant: "destructive" });
+      toast({ title: t("calendarMedia.notLoggedIn"), variant: "destructive" });
       return;
     }
 
@@ -33,14 +35,14 @@ export function PostMediaUploader({
     const isImage = file.type.startsWith("image/");
 
     if (!isVideo && !isImage) {
-      toast({ title: "Nur Bilder und Videos erlaubt", variant: "destructive" });
+      toast({ title: t("calendarMedia.onlyImagesVideos"), variant: "destructive" });
       return;
     }
 
     const maxSize = isVideo ? 1024 * 1024 * 1024 : 100 * 1024 * 1024; // 1GB für Videos, 100MB für Bilder
     if (file.size > maxSize) {
       toast({
-        title: `Datei zu groß`,
+        title: t("calendarMedia.fileTooLarge"),
         description: `Maximum: ${isVideo ? "1GB" : "100MB"}`,
         variant: "destructive",
       });
@@ -63,10 +65,10 @@ export function PostMediaUploader({
         .getPublicUrl(fileName);
 
       onMediaChange(urlData.publicUrl, isVideo ? "video" : "image");
-      toast({ title: "Medium hochgeladen" });
+      toast({ title: t("calendarMedia.mediaUploaded") });
     } catch (error) {
       console.error("Upload error:", error);
-      toast({ title: "Upload fehlgeschlagen", variant: "destructive" });
+      toast({ title: t("calendarMedia.uploadFailed"), variant: "destructive" });
     } finally {
       setUploading(false);
     }
