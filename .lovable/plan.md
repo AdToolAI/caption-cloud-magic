@@ -1,51 +1,55 @@
 
 
-## Plan: Hardcoded German text on landing page through translation system
+## Plan: Complete App Localization — Eliminate All Hardcoded German Strings
 
-### Problem
+### Scope of the Problem
 
-Several landing page components have hardcoded German strings instead of using the `useTranslation()` hook. The language switcher only affects components that use `t()` calls — the rest stays German regardless of setting.
+**329 files** across the entire app contain hardcoded German strings instead of using the `t()` translation system. This is too large for a single change. I propose a **phased approach**, starting with what's visible after login (dashboard), which is critical for the Meta App Review recordings.
 
-### Affected Components & Hardcoded Strings
+### Phase 1 — Dashboard & Top-Level Components (Priority: Meta Review)
 
-**1. `src/components/landing/FeatureGrid.tsx`**
-- Section heading: "Alles was du brauchst für Social Media Erfolg"
-- Section subtitle: "Ein komplettes Arsenal an Tools..."
-- All 6 feature cards (titles + descriptions): "Content Planung", "Analytics Dashboard", "Brand Kit", "KI Content Coach", "Multi-Platform", "Zielverfolgung" + their descriptions
+These are the components visible immediately after login:
 
-**2. `src/components/landing/MissionFeatures.tsx`**
-- 3 mission cards (titles + descriptions): "Plane deinen Monat", "Optimiere Performance", "Skaliere Kampagnen"
-- Subtitle: "Drei Schritte zu effektiverem Marketing..."
-- "Mehr erfahren" link text
+| File | Hardcoded German Examples |
+|------|--------------------------|
+| `CreditBalance.tsx` | "Verfügbare Credits", "Unbegrenzte Credits", "Nutzen Sie alle Features ohne Limit", "Kostenloser Plan" |
+| `DashboardVideoCarousel.tsx` | "Deine Videos", "Die Lösung", "Dein erstes Video könnte so aussehen", "Dein erstes Video erstellen", "Demnächst", "Video nicht verfügbar" |
+| `SocialConnectionIcons.tsx` | "Verbunden", "Nicht verbunden", "X verbunden" |
+| `WeekDayCard.tsx` | "Kein Post geplant", "Post hinzufügen" |
+| `Home.tsx` | "Starte kostenlos. Upgrade jederzeit.", "Demo ansehen", "Nächster Post", "Dein nächster geplanter Beitrag", "Keine Beschreibung", pricing section strings |
+| `Header.tsx` | Various navigation/UI strings |
 
-**3. `src/components/landing/PricingSection.tsx`**
-- Section heading: "Wähle deinen Einsatz-Level"
-- Subtitle: "Flexible Pläne für Einzelkämpfer..."
-- All plan details: "/Monat", feature lists, button texts ("Starten", "Auf Pro upgraden", "Kontakt"), badge ("Empfohlen vom MI6")
+### Phase 2 — Account & Settings Pages
 
-**4. `src/components/landing/BlackTieFooter.tsx`**
-- Column headers: "Produkt", "Ressourcen", "Unternehmen", "Rechtliches"
-- Company links: "Über uns", "Karriere", "Kontakt", "Presse"
-- Legal links: "Datenschutz", "AGB", "Cookie-Einstellungen"
-- Brand description paragraph
-- "Alle Rechte vorbehalten", "Made with ♥ in Germany"
+~20 files in `src/components/account/` with strings like "Löschen", "Abbrechen", "Verbunden", "Speichern", etc.
 
-### Solution
+### Phase 3 — Calendar, Analytics, and remaining pages
 
-1. Add all missing translation keys to `src/lib/translations.ts` under `en`, `de`, and `es`
-2. Replace every hardcoded German string in the 4 components with `t('key')` calls
+~50+ files across calendar, analytics, performance, video editor, and other feature areas.
 
-### Files
+### Technical Approach
 
-| Action | File | Change |
-|--------|------|--------|
-| Edit | `src/lib/translations.ts` | Add ~60 new keys for landing page sections (features, missions, pricing, footer) |
-| Edit | `FeatureGrid.tsx` | Replace hardcoded strings with `t()` calls |
-| Edit | `MissionFeatures.tsx` | Replace hardcoded strings with `t()` calls |
-| Edit | `PricingSection.tsx` | Replace hardcoded strings with `t()` calls |
-| Edit | `BlackTieFooter.tsx` | Replace hardcoded strings with `t()` calls |
+For each phase:
+1. Add all missing translation keys to `src/lib/translations.ts` (en, de, es)
+2. Replace hardcoded strings with `t()` calls
+3. Replace `language === "de" ? "..." : "..."` ternaries with proper `t()` keys
+
+### Recommendation
+
+**Start with Phase 1** — this covers everything visible in the Meta App Review screencasts. Phases 2 and 3 can follow in subsequent iterations.
+
+### Files for Phase 1
+
+| Action | File | Changes |
+|--------|------|---------|
+| Edit | `src/lib/translations.ts` | Add ~40 new keys for dashboard area |
+| Edit | `src/components/credits/CreditBalance.tsx` | Replace 5 hardcoded strings with `t()` |
+| Edit | `src/components/dashboard/DashboardVideoCarousel.tsx` | Replace 6 hardcoded strings with `t()` |
+| Edit | `src/components/dashboard/SocialConnectionIcons.tsx` | Replace 3 hardcoded strings with `t()` |
+| Edit | `src/components/dashboard/WeekDayCard.tsx` | Replace 2 hardcoded strings with `t()` |
+| Edit | `src/pages/Home.tsx` | Replace ~15 ternary/hardcoded strings with `t()` |
 
 ### Result
 
-Switching language to English shows the entire landing page in English — no more mixed German/English content.
+After Phase 1, the entire dashboard experience will be fully in English when the language is set to English — ready for Meta App Review recordings.
 
