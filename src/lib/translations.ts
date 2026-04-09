@@ -8451,6 +8451,8 @@ export const translations: Record<Language, any> = {
       tabExport: "Exportar",
       noData: "No hay datos disponibles"
     },
+  }
+};
 
 export const detectBrowserLanguage = (): Language => {
   const browserLang = navigator.language.toLowerCase();
