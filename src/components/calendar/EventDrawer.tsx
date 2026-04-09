@@ -83,10 +83,10 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
         await handleUpdate("hashtags", hashtags);
       }
       
-      toast.success("Post erfolgreich generiert! 🎉");
+      toast.success(t("calendarDrawer.postGenerated"));
     } catch (error: any) {
       console.error("AI Generation error:", error);
-      toast.error("KI-Generierung fehlgeschlagen: " + (error.message || "Unbekannter Fehler"));
+      toast.error(t("calendarDrawer.generationFailed") + ": " + (error.message || ""));
     } finally {
       setIsGenerating(false);
     }
