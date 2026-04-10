@@ -17,6 +17,7 @@ interface FacebookPage {
   name: string;
   category: string;
   picture_url: string | null;
+  access_token: string;
 }
 
 interface FacebookPageSelectDialogProps {
@@ -74,15 +75,21 @@ export const FacebookPageSelectDialog = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Update the social_connections record with the selected page info
-      const { error } = await supabase
-        .from("social_connections")
-        .update({
-          account_name: page.name,
-          account_id: page.id,
-        })
-        .eq("user_id", user.id)
-        .eq("provider", "facebook");
+      const { data: session } = await supabase.auth.getSession();
+
+      // Call edge function to save page selection with encrypted page access token
+      const { data, error } = await supabase.functions.invoke("facebook-select-page", {
+        headers: {
+          Authorization: `Bearer ${session.session?.access_token}`,
+        },
+        body: {
+          page_id: page.id,
+          page_name: page.name,
+          page_category: page.category,
+          page_picture_url: page.picture_url,
+          page_access_token: page.access_token,
+        },
+      });
 
       if (error) throw error;
 
