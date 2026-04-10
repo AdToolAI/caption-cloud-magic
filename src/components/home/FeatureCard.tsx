@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { FeatureGuideDialog } from "@/components/onboarding/FeatureGuideDialog";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface FeatureCardProps {
   icon: React.ReactNode;
@@ -17,11 +18,13 @@ export function FeatureCard({
   icon, 
   title, 
   description, 
-  ctaLabel = "Einrichtung in 5 Schritten", 
+  ctaLabel,
   href,
   featureId
 }: FeatureCardProps) {
   const [showGuide, setShowGuide] = useState(false);
+  const { t } = useTranslation();
+  const resolvedCtaLabel = ctaLabel || t('featureCards.setupCta');
 
   return (
     <>
@@ -66,7 +69,7 @@ export function FeatureCard({
               }}
               className="flex items-center gap-1 text-sm text-primary font-medium hover:gap-2 transition-all cursor-pointer group/cta"
             >
-              {ctaLabel}
+              {resolvedCtaLabel}
               <ArrowRight className="h-3 w-3 group-hover/cta:translate-x-1 transition-transform" />
             </button>
           ) : (
@@ -74,7 +77,7 @@ export function FeatureCard({
               to={href}
               className="flex items-center gap-1 text-sm text-primary font-medium hover:gap-2 transition-all group/cta"
             >
-              {ctaLabel}
+              {resolvedCtaLabel}
               <ArrowRight className="h-3 w-3 group-hover/cta:translate-x-1 transition-transform" />
             </Link>
           )}
