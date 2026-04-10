@@ -99,7 +99,13 @@ export const ConnectionsTab = () => {
                 description: `Successfully connected to ${connected}`
               });
               await fetchConnections();
-              await handleSync(newConnection.id, connected);
+              
+              // For Facebook: Show page selection dialog instead of immediate sync
+              if (connected === 'facebook') {
+                setShowPageSelectDialog(true);
+              } else {
+                await handleSync(newConnection.id, connected);
+              }
             } else {
               console.warn(`⚠️ No connection row found for provider: ${connected}`);
               if (connected === 'x') {
