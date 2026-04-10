@@ -681,8 +681,8 @@ export default function Composer() {
         >
           <Card className="backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_30px_rgba(255,255,255,0.03)]">
             <CardHeader>
-              <CardTitle className="text-xl">Post erstellen</CardTitle>
-              <CardDescription>Verfassen Sie Ihre Nachricht und wählen Sie Zielkanäle</CardDescription>
+              <CardTitle className="text-xl">{t('composer.createPost')}</CardTitle>
+              <CardDescription>{t('composer.createPostDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
