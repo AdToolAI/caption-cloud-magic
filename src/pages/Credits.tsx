@@ -4,9 +4,13 @@ import { CreditHistory } from "@/components/credits/CreditHistory";
 import { CreditsHeroHeader } from "@/components/credits/CreditsHeroHeader";
 import { useCredits } from "@/hooks/useCredits";
 import { Sparkles, Zap, Crown } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
+import { getCurrencyForLanguage } from "@/lib/currency";
 
 const Credits = () => {
   const { balance } = useCredits();
+  const { language } = useTranslation();
+  const symbol = getCurrencyForLanguage(language) === 'USD' ? '$' : '€';
 
   const handleBuyCredits = () => {
     // TODO: Integrate with Stripe checkout
@@ -14,40 +18,40 @@ const Credits = () => {
   };
 
   const getPlanName = () => {
-    if (!balance) return 'Laden...';
-    switch (balance.plan_code) {
-      case 'free': return 'Kostenloser Plan';
-      case 'basic': return 'Basic Plan';
-      case 'pro': return 'Pro Plan';
-      case 'enterprise': return 'Enterprise Plan';
-      default: return 'Plan';
-    }
+    if (!balance) return language === 'de' ? 'Laden...' : language === 'es' ? 'Cargando...' : 'Loading...';
+    const planNames: Record<string, Record<string, string>> = {
+      free: { en: 'Free Plan', de: 'Kostenloser Plan', es: 'Plan Gratis' },
+      basic: { en: 'Basic Plan', de: 'Basic Plan', es: 'Plan Básico' },
+      pro: { en: 'Pro Plan', de: 'Pro Plan', es: 'Plan Pro' },
+      enterprise: { en: 'Enterprise Plan', de: 'Enterprise Plan', es: 'Plan Empresarial' },
+    };
+    return planNames[balance.plan_code]?.[language] || 'Plan';
   };
 
   const packages = [
     { 
       credits: 1000, 
-      name: 'Extra Paket', 
-      price: '14,95€',
+      name: language === 'de' ? 'Extra Paket' : language === 'es' ? 'Paquete Extra' : 'Extra Pack', 
+      price: `${symbol}${getCurrencyForLanguage(language) === 'USD' ? '14.95' : '14,95'}`,
       icon: Zap,
       popular: false,
-      description: 'Perfekt für gelegentliche Nutzung'
+      description: language === 'de' ? 'Perfekt für gelegentliche Nutzung' : language === 'es' ? 'Perfecto para uso ocasional' : 'Perfect for occasional use'
     },
     { 
       credits: 2500, 
-      name: 'Business Paket', 
-      price: '29,95€',
+      name: language === 'de' ? 'Business Paket' : language === 'es' ? 'Paquete Business' : 'Business Pack', 
+      price: `${symbol}${getCurrencyForLanguage(language) === 'USD' ? '29.95' : '29,95'}`,
       icon: Sparkles,
       popular: true,
-      description: 'Beliebteste Wahl für Profis'
+      description: language === 'de' ? 'Beliebteste Wahl für Profis' : language === 'es' ? 'La opción más popular para profesionales' : 'Most popular choice for pros'
     },
     { 
       credits: 5000, 
-      name: 'Enterprise Paket', 
-      price: '44,95€',
+      name: language === 'de' ? 'Enterprise Paket' : language === 'es' ? 'Paquete Enterprise' : 'Enterprise Pack', 
+      price: `${symbol}${getCurrencyForLanguage(language) === 'USD' ? '44.95' : '44,95'}`,
       icon: Crown,
       popular: false,
-      description: 'Maximale Power für Teams'
+      description: language === 'de' ? 'Maximale Power für Teams' : language === 'es' ? 'Máximo poder para equipos' : 'Maximum power for teams'
     },
   ];
 
@@ -71,9 +75,9 @@ const Credits = () => {
         >
           <div className="flex items-center gap-2 mb-6">
             <Sparkles className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-semibold">Credit-Pakete</h2>
+            <h2 className="text-xl font-semibold">{language === 'de' ? 'Credit-Pakete' : language === 'es' ? 'Paquetes de créditos' : 'Credit Packages'}</h2>
           </div>
-          <p className="text-muted-foreground text-sm mb-6">Kaufen Sie zusätzliche Credits</p>
+          <p className="text-muted-foreground text-sm mb-6">{language === 'de' ? 'Kaufen Sie zusätzliche Credits' : language === 'es' ? 'Compre créditos adicionales' : 'Buy additional credits'}</p>
           
           <div className="space-y-4">
             {packages.map((pkg, index) => {
@@ -100,11 +104,11 @@ const Credits = () => {
                       animate={{ opacity: 1, y: 0 }}
                       className="absolute -top-3 left-4 px-3 py-1 rounded-full bg-gradient-to-r from-primary to-amber-500 text-xs font-semibold text-primary-foreground"
                     >
-                      <motion.span
+                    <motion.span
                         animate={{ opacity: [1, 0.7, 1] }}
                         transition={{ duration: 1.5, repeat: Infinity }}
                       >
-                        ⭐ Beliebteste Wahl
+                        ⭐ {language === 'de' ? 'Beliebteste Wahl' : language === 'es' ? 'Más popular' : 'Most Popular'}
                       </motion.span>
                     </motion.div>
                   )}
