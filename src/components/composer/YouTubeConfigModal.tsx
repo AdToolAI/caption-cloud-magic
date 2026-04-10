@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, AlertTriangle } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface YouTubeConfig {
   privacyStatus: 'public' | 'unlisted' | 'private';
@@ -43,42 +44,20 @@ const YOUTUBE_CATEGORIES = [
   { id: '28', name: 'Science & Technology' },
 ];
 
-export function YouTubeConfigModal({
-  open,
-  onOpenChange,
-  currentConfig,
-  onSave
-}: YouTubeConfigModalProps) {
-  const [privacyStatus, setPrivacyStatus] = useState<'public' | 'unlisted' | 'private'>(
-    currentConfig?.privacyStatus || 'unlisted'
-  );
+export function YouTubeConfigModal({ open, onOpenChange, currentConfig, onSave }: YouTubeConfigModalProps) {
+  const { t } = useTranslation();
+  const [privacyStatus, setPrivacyStatus] = useState<'public' | 'unlisted' | 'private'>(currentConfig?.privacyStatus || 'unlisted');
   const [madeForKids, setMadeForKids] = useState(currentConfig?.madeForKids ?? false);
   const [categoryId, setCategoryId] = useState(currentConfig?.categoryId || '22');
   const [tagsInput, setTagsInput] = useState(currentConfig?.tags?.join(', ') || '');
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [license, setLicense] = useState<'youtube' | 'creativeCommon'>(
-    currentConfig?.license || 'youtube'
-  );
+  const [license, setLicense] = useState<'youtube' | 'creativeCommon'>(currentConfig?.license || 'youtube');
   const [embeddable, setEmbeddable] = useState(currentConfig?.embeddable ?? true);
-  const [publicStatsViewable, setPublicStatsViewable] = useState(
-    currentConfig?.publicStatsViewable ?? true
-  );
+  const [publicStatsViewable, setPublicStatsViewable] = useState(currentConfig?.publicStatsViewable ?? true);
 
   const handleSave = () => {
-    const tags = tagsInput
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
-
-    onSave({
-      privacyStatus,
-      madeForKids,
-      categoryId,
-      tags,
-      license,
-      embeddable,
-      publicStatsViewable,
-    });
+    const tags = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+    onSave({ privacyStatus, madeForKids, categoryId, tags, license, embeddable, publicStatsViewable });
     onOpenChange(false);
   };
 
@@ -86,124 +65,88 @@ export function YouTubeConfigModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>YouTube Einstellungen</DialogTitle>
+          <DialogTitle>{t('composer.ytSettings')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Privacy Status */}
           <div className="space-y-2">
-            <Label>Sichtbarkeit</Label>
+            <Label>{t('composer.visibility')}</Label>
             <Select value={privacyStatus} onValueChange={(v: any) => setPrivacyStatus(v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="public">🌍 Öffentlich</SelectItem>
-                <SelectItem value="unlisted">🔗 Nicht gelistet (Link erforderlich)</SelectItem>
-                <SelectItem value="private">🔒 Privat</SelectItem>
+                <SelectItem value="public">{t('composer.public')}</SelectItem>
+                <SelectItem value="unlisted">{t('composer.unlisted')}</SelectItem>
+                <SelectItem value="private">{t('composer.private')}</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {privacyStatus === 'public' && 'Video ist für alle sichtbar und durchsuchbar'}
-              {privacyStatus === 'unlisted' && 'Nur mit Link zugänglich, nicht in Suche'}
-              {privacyStatus === 'private' && 'Nur für dich sichtbar'}
+              {privacyStatus === 'public' && t('composer.publicDesc')}
+              {privacyStatus === 'unlisted' && t('composer.unlistedDesc')}
+              {privacyStatus === 'private' && t('composer.privateDesc')}
             </p>
           </div>
 
-          {/* Made for Kids - PFLICHT */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label className="flex items-center gap-2">
-                  Made for Kids
-                  <span className="text-xs text-red-500">*</span>
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  PFLICHT: Ist dieses Video speziell für Kinder gemacht?
-                </p>
+                <Label className="flex items-center gap-2">Made for Kids<span className="text-xs text-red-500">*</span></Label>
+                <p className="text-xs text-muted-foreground">{t('composer.madeForKidsRequired')}</p>
               </div>
               <Switch checked={madeForKids} onCheckedChange={setMadeForKids} />
             </div>
             <Alert variant={madeForKids ? "default" : "destructive"}>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription className="text-xs">
-                {madeForKids 
-                  ? 'Video wird als "für Kinder geeignet" markiert (COPPA-Compliance)'
-                  : 'Video wird als "nicht für Kinder" markiert (Standard für meiste Inhalte)'
-                }
+                {madeForKids ? t('composer.madeForKidsYes') : t('composer.madeForKidsNo')}
               </AlertDescription>
             </Alert>
           </div>
 
-          {/* Category */}
           <div className="space-y-2">
-            <Label>Kategorie</Label>
+            <Label>{t('composer.category')}</Label>
             <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {YOUTUBE_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </SelectItem>
+                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Tags */}
           <div className="space-y-2">
-            <Label>Tags (optional)</Label>
-            <Input
-              placeholder="gaming, tutorial, deutsch (komma-getrennt)"
-              value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Max. 500 Zeichen insgesamt. Tags helfen bei der Auffindbarkeit.
-            </p>
+            <Label>{t('composer.tagsOptional')}</Label>
+            <Input placeholder={t('composer.tagsPlaceholder')} value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} />
+            <p className="text-xs text-muted-foreground">{t('composer.tagsHint')}</p>
           </div>
 
-          {/* Advanced Settings */}
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
             <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium">
               <ChevronDown className={`h-4 w-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-              Erweiterte Einstellungen
+              {t('composer.advancedSettings')}
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-4 space-y-4">
-              {/* License */}
               <div className="space-y-2">
-                <Label>Lizenz</Label>
+                <Label>{t('composer.license')}</Label>
                 <Select value={license} onValueChange={(v: any) => setLicense(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="youtube">Standard YouTube-Lizenz</SelectItem>
-                    <SelectItem value="creativeCommon">Creative Commons (CC BY)</SelectItem>
+                    <SelectItem value="youtube">{t('composer.stdYtLicense')}</SelectItem>
+                    <SelectItem value="creativeCommon">{t('composer.ccLicense')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Embeddable */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>Einbettbar</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Erlaube das Einbetten auf anderen Websites
-                  </p>
+                  <Label>{t('composer.embeddable')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('composer.embeddableDesc')}</p>
                 </div>
                 <Switch checked={embeddable} onCheckedChange={setEmbeddable} />
               </div>
-
-              {/* Public Stats */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>Öffentliche Statistiken</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Zeige View-Count und Likes öffentlich an
-                  </p>
+                  <Label>{t('composer.publicStats')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('composer.publicStatsDesc')}</p>
                 </div>
                 <Switch checked={publicStatsViewable} onCheckedChange={setPublicStatsViewable} />
               </div>
@@ -212,12 +155,8 @@ export function YouTubeConfigModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Abbrechen
-          </Button>
-          <Button onClick={handleSave}>
-            Speichern
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('composer.cancel')}</Button>
+          <Button onClick={handleSave}>{t('composer.save')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

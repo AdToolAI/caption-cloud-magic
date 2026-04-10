@@ -9,12 +9,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { ChevronDown } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface ChannelConfig {
   profileId?: string;
   autoFix: boolean;
   watermarkOverride?: any;
-  timeOffset: number; // Sekunden
+  timeOffset: number;
 }
 
 interface ChannelConfigModalProps {
@@ -25,58 +26,26 @@ interface ChannelConfigModalProps {
   onSave: (config: ChannelConfig) => void;
 }
 
-export function ChannelConfigModal({
-  open,
-  onOpenChange,
-  channel,
-  currentConfig,
-  onSave
-}: ChannelConfigModalProps) {
+export function ChannelConfigModal({ open, onOpenChange, channel, currentConfig, onSave }: ChannelConfigModalProps) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [profiles, setProfiles] = useState<any[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<string | undefined>(currentConfig?.profileId);
   const [autoFix, setAutoFix] = useState(currentConfig?.autoFix ?? true);
   const [timeOffset, setTimeOffset] = useState(currentConfig?.timeOffset ?? 0);
 
-  useEffect(() => {
-    if (open && user) {
-      loadProfiles();
-    }
-  }, [open, user, channel]);
+  useEffect(() => { if (open && user) loadProfiles(); }, [open, user, channel]);
 
   const loadProfiles = async () => {
     if (!user) return;
-
-    // Get user's workspace first
-    const { data: workspace } = await supabase
-      .from('workspaces')
-      .select('id')
-      .eq('owner_id', user.id)
-      .limit(1)
-      .single();
-
+    const { data: workspace } = await supabase.from('workspaces').select('id').eq('owner_id', user.id).limit(1).single();
     if (!workspace) return;
-
-    const { data, error } = await supabase
-      .from('media_profiles')
-      .select('*')
-      .eq('workspace_id', workspace.id)
-      .eq('platform', channel)
-      .order('is_default', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setProfiles(data);
-    }
+    const { data, error } = await supabase.from('media_profiles').select('*').eq('workspace_id', workspace.id).eq('platform', channel).order('is_default', { ascending: false }).order('created_at', { ascending: false });
+    if (!error && data) setProfiles(data);
   };
 
   const handleSave = () => {
-    onSave({
-      profileId: selectedProfile,
-      autoFix,
-      timeOffset,
-      watermarkOverride: undefined // Simplified for now
-    });
+    onSave({ profileId: selectedProfile, autoFix, timeOffset, watermarkOverride: undefined });
     onOpenChange(false);
   };
 
@@ -86,21 +55,16 @@ export function ChannelConfigModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {channel.toUpperCase()} Einstellungen
-          </DialogTitle>
+          <DialogTitle>{t('composer.channelSettings', { channel: channel.toUpperCase() })}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Profil-Auswahl */}
           <div className="space-y-2">
-            <Label>Medien-Profil</Label>
+            <Label>{t('composer.mediaProfile')}</Label>
             <Select value={selectedProfile} onValueChange={setSelectedProfile}>
-              <SelectTrigger>
-                <SelectValue placeholder="Standard (keine Anpassung)" />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t('composer.defaultNoAdjust')} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Standard (keine Anpassung)</SelectItem>
+                <SelectItem value="none">{t('composer.defaultNoAdjust')}</SelectItem>
                 {profiles.map((profile) => (
                   <SelectItem key={profile.id} value={profile.id}>
                     {profile.name} {profile.is_default && '(Standard)'}
@@ -110,74 +74,50 @@ export function ChannelConfigModal({
             </Select>
           </div>
 
-          {/* Auto-Fix Toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Auto-Fix</Label>
-              <p className="text-xs text-muted-foreground">
-                Medien automatisch anpassen
-              </p>
+              <Label>{t('composer.autoFix')}</Label>
+              <p className="text-xs text-muted-foreground">{t('composer.autoFixDesc')}</p>
             </div>
             <Switch checked={autoFix} onCheckedChange={setAutoFix} />
           </div>
 
           {autoFix && selectedProfile && (
-            <Alert>
-              <AlertDescription className="text-xs">
-                Dein Video wird automatisch umgerechnet (Format, Bitrate, etc.)
-              </AlertDescription>
-            </Alert>
+            <Alert><AlertDescription className="text-xs">{t('composer.autoFixHint')}</AlertDescription></Alert>
           )}
 
-          {/* Zeitversatz */}
           <div className="space-y-2">
-            <Label>Zeitversatz</Label>
-            <Select 
-              value={timeOffset.toString()} 
-              onValueChange={(v) => setTimeOffset(parseInt(v))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+            <Label>{t('composer.timeOffset')}</Label>
+            <Select value={timeOffset.toString()} onValueChange={(v) => setTimeOffset(parseInt(v))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="0">Sofort (+0h)</SelectItem>
-                <SelectItem value="3600">+1 Stunde</SelectItem>
-                <SelectItem value="7200">+2 Stunden</SelectItem>
-                <SelectItem value="21600">+6 Stunden</SelectItem>
-                <SelectItem value="43200">+12 Stunden</SelectItem>
-                <SelectItem value="86400">+24 Stunden</SelectItem>
+                <SelectItem value="0">{t('composer.immediately')}</SelectItem>
+                <SelectItem value="3600">{t('composer.plus1h')}</SelectItem>
+                <SelectItem value="7200">{t('composer.plus2h')}</SelectItem>
+                <SelectItem value="21600">{t('composer.plus6h')}</SelectItem>
+                <SelectItem value="43200">{t('composer.plus12h')}</SelectItem>
+                <SelectItem value="86400">{t('composer.plus24h')}</SelectItem>
               </SelectContent>
             </Select>
             {timeOffset > 0 && (
-              <Alert>
-                <AlertDescription className="text-xs">
-                  Post wird auf {channel} +{timeOffsetHours}h nach Start veröffentlicht.
-                </AlertDescription>
-              </Alert>
+              <Alert><AlertDescription className="text-xs">{t('composer.timeOffsetHint', { channel, hours: timeOffsetHours })}</AlertDescription></Alert>
             )}
           </div>
 
-          {/* Wasserzeichen Override - Collapsed */}
           <Collapsible>
             <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium">
               <ChevronDown className="h-4 w-4" />
-              Wasserzeichen (erweitert)
+              {t('composer.watermarkAdvanced')}
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2">
-              <p className="text-xs text-muted-foreground">
-                Funktion in Entwicklung - Wasserzeichen werden aus dem Profil übernommen.
-              </p>
+              <p className="text-xs text-muted-foreground">{t('composer.watermarkDev')}</p>
             </CollapsibleContent>
           </Collapsible>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Abbrechen
-          </Button>
-          <Button onClick={handleSave}>
-            Speichern
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('composer.cancel')}</Button>
+          <Button onClick={handleSave}>{t('composer.save')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
