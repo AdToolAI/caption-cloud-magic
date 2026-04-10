@@ -772,7 +772,11 @@ export const ConnectionsTab = () => {
                         <div>
                           <h3 className="font-semibold">{provider.name}</h3>
                           {connected && connection && (
-                            <p className="text-xs text-muted-foreground">{connection.account_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {connection.account_metadata?.selection_required 
+                                ? 'Seitenauswahl erforderlich' 
+                                : connection.account_name}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -842,13 +846,38 @@ export const ConnectionsTab = () => {
                           </div>
                         )}
                         
+                        {/* Facebook page selection button */}
+                        {provider.id === 'facebook' && connection.account_metadata?.selection_required && (
+                          <Button 
+                            variant="default" 
+                            size="sm" 
+                            className="w-full gap-2 mb-2"
+                            onClick={() => setShowPageSelectDialog(true)}
+                          >
+                            <Facebook className="h-3 w-3" />
+                            Seite auswählen
+                          </Button>
+                        )}
+
+                        {provider.id === 'facebook' && !connection.account_metadata?.selection_required && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full gap-2 mb-2"
+                            onClick={() => setShowPageSelectDialog(true)}
+                          >
+                            <Facebook className="h-3 w-3" />
+                            Seite wechseln
+                          </Button>
+                        )}
+                        
                         <div className="flex gap-2 mt-4">
                           <Button 
                             variant="outline" 
                             size="sm" 
                             className="flex-1" 
                             onClick={() => handleSync(connection.id, provider.id)}
-                            disabled={loading || provider.id === 'linkedin'}
+                            disabled={loading || provider.id === 'linkedin' || (provider.id === 'facebook' && connection.account_metadata?.selection_required)}
                           >
                             Sync Now
                           </Button>
