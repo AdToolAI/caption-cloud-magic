@@ -706,9 +706,9 @@ export default function Composer() {
               <TabsContent value="standard" className="space-y-4 mt-6">
                 {/* Text Input */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Post-Inhalt</label>
+                  <label className="text-sm font-medium">{t('composer.postContent')}</label>
                   <Textarea
-                    placeholder="Was möchten Sie teilen?"
+                    placeholder={t('composer.postPlaceholder')}
                     value={textContent}
                     onChange={(e) => {
                       const newText = e.target.value;
@@ -732,8 +732,7 @@ export default function Composer() {
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      <strong>{channelsExceedingLimit.map(c => c.toUpperCase()).join(', ')}</strong> überschreitet das Character Limit 
-                      und wird beim Publishing übersprungen. Andere Channels werden normal gepostet.
+                      <strong>{channelsExceedingLimit.map(c => c.toUpperCase()).join(', ')}</strong> {t('composer.exceedsLimit')}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -742,8 +741,7 @@ export default function Composer() {
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      Alle ausgewählten Channels überschreiten das Character Limit ({textContent.length} Zeichen). 
-                      Bitte kürzen Sie den Text oder deaktivieren Sie restriktive Channels wie X (280 Zeichen).
+                      {t('composer.allExceedLimit', { count: textContent.length })}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -755,11 +753,11 @@ export default function Composer() {
                 {postData && (
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
-                      Zusätzliche Beschreibung (optional)
-                      <span className="text-muted-foreground ml-2">Wird nur in der Vorschau angezeigt</span>
+                      {t('composer.additionalDesc')}
+                      <span className="text-muted-foreground ml-2">{t('composer.additionalDescHint')}</span>
                     </label>
                     <Textarea
-                      placeholder="Möchten Sie eine zusätzliche Beschreibung für die Vorschau hinzufügen?"
+                      placeholder={t('composer.additionalDescPlaceholder')}
                       value={additionalDescription}
                       onChange={(e) => setAdditionalDescription(e.target.value)}
                       rows={3}
