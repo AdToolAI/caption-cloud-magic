@@ -14,6 +14,7 @@ import { PlanLimitDialog } from "./PlanLimitDialog";
 import { InstagramTokenDialog } from "./InstagramTokenDialog";
 import { TokenStatusBadge } from "./TokenStatusBadge";
 import { XConnectionCard } from "./XConnectionCard";
+import { FacebookPageSelectDialog } from "./FacebookPageSelectDialog";
 import { RefreshCw } from "lucide-react";
 
 const PROVIDERS = [
@@ -37,6 +38,7 @@ export const ConnectionsTab = () => {
   const [syncError, setSyncError] = useState<Record<string, boolean>>({});
   const [userPlan, setUserPlan] = useState<string>('free');
   const [xCallbackError, setXCallbackError] = useState<string | null>(null);
+  const [showPageSelectDialog, setShowPageSelectDialog] = useState(false);
 
   useEffect(() => {
     const initializeAndHandleCallback = async () => {
@@ -97,7 +99,13 @@ export const ConnectionsTab = () => {
                 description: `Successfully connected to ${connected}`
               });
               await fetchConnections();
-              await handleSync(newConnection.id, connected);
+              
+              // For Facebook: Show page selection dialog instead of immediate sync
+              if (connected === 'facebook') {
+                setShowPageSelectDialog(true);
+              } else {
+                await handleSync(newConnection.id, connected);
+              }
             } else {
               console.warn(`⚠️ No connection row found for provider: ${connected}`);
               if (connected === 'x') {
@@ -889,6 +897,12 @@ export const ConnectionsTab = () => {
         open={showTokenDialog}
         onOpenChange={setShowTokenDialog}
         onSuccess={fetchConnections}
+      />
+
+      <FacebookPageSelectDialog
+        open={showPageSelectDialog}
+        onOpenChange={setShowPageSelectDialog}
+        onPageSelected={fetchConnections}
       />
     </div>
   );
