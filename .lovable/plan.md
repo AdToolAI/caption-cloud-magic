@@ -1,41 +1,41 @@
 
 
-## Plan: Language-Based Currency Display (EN→USD, DE/ES→EUR)
+## Plan: Facebook-Seiten-Auswahl nach OAuth einbauen
 
 ### Problem
-All pricing displays are hardcoded to show € (EUR) regardless of UI language. The user wants English UI to show USD ($) and Spanish UI to keep EUR (€).
+Meta will beim `pages_show_list` Screencast sehen, dass die App die Facebook-Seiten des Nutzers **auflistet**. Aktuell wird nur der Name der verbundenen Seite angezeigt, aber es gibt keinen Schritt, bei dem der Nutzer seine Seiten sieht und eine auswählt.
 
-### Approach
-Add a helper that maps language to currency: `en→USD`, `de→EUR`, `es→EUR`. Use this across all pricing-related components to pick the correct symbol and formatted price.
+### Lösung
+Nach dem Facebook-OAuth einen **Seiten-Auswahl-Dialog** einbauen, der über die Graph API (`/me/accounts`) alle Seiten des Nutzers abruft und als Liste anzeigt. Der Nutzer wählt eine Seite aus, die dann als Verbindung gespeichert wird.
 
-### Files to Change
+### Technische Umsetzung
 
-| File | Changes |
-|------|---------|
-| **`src/lib/currency.ts`** | Add `getCurrencyForLanguage(lang): Currency` helper (`en→USD`, `de/es→EUR`) |
-| **`src/lib/translations.ts`** | Update EN `pricingPage` prices to USD values with `$` symbol; keep DE/ES with `€`. Add `currency` field to EN basic/enterprise plans (currently missing). |
-| **`src/pages/Pricing.tsx`** | Replace hardcoded `€{plan.price}` with dynamic currency symbol from language |
-| **`src/components/landing/PricingSection.tsx`** | Replace hardcoded `€{plan.price}` with dynamic symbol |
-| **`src/pages/Home.tsx`** | Replace 3 hardcoded `€` price displays with language-aware currency |
-| **`src/components/performance/PlanLimitDialog.tsx`** | Use language-based currency instead of hardcoded `.price.EUR` |
-| **`src/components/pricing/QuickPostUpsellModal.tsx`** | Localize hardcoded German price strings |
-| **`src/components/account/SubscriptionTab.tsx`** | Replace `{planInfo.price}€` and `pro Monat` with localized versions |
-| **`src/pages/Credits.tsx`** | Localize credit pack prices |
-| **`src/components/ai-video/AIVideoCreditPurchase.tsx`** | Default currency from language instead of `detectUserCurrency()` |
+**1. Neue Edge Function: `facebook-list-pages`**
+- Nimmt den User-Token aus der OAuth-Callback-Phase
+- Ruft `GET /me/accounts` auf der Facebook Graph API auf
+- Gibt eine Liste der Seiten zurück (Name, ID, Kategorie, Profilbild)
 
-### Translation Key Updates
+**2. Neuer Dialog: `FacebookPageSelectDialog.tsx`**
+- Wird nach erfolgreichem Facebook-OAuth angezeigt
+- Zeigt alle verfügbaren Seiten als Karten (Icon, Name, Kategorie)
+- Nutzer klickt auf eine Seite → wird als `account_name` in `social_connections` gespeichert
+- Visuell ansprechend mit Seiten-Avataren und Kategorien
 
-**EN prices** change from `"14.95"` / `currency: "€"` to `"14.95"` / `currency: "$"` (and similar for Pro/Enterprise).
-**DE/ES prices** stay as-is with `€`.
+**3. Anpassung `ConnectionsTab.tsx`**
+- Nach Facebook-OAuth-Callback: Statt direkt zu verbinden, erst den Seiten-Auswahl-Dialog öffnen
+- Nach Auswahl wird die Verbindung mit der gewählten Seite gespeichert
 
-### Technical Detail
+### Screencast-Flow danach
+1. Login → Integrations → Facebook Connect
+2. OAuth-Dialog mit `pages_show_list` Scope sichtbar
+3. **NEU:** Seiten-Auswahl-Dialog zeigt alle Seiten des Nutzers
+4. Nutzer wählt eine Seite aus
+5. Verbindung wird hergestellt → Seitenname wird angezeigt
 
-```typescript
-// src/lib/currency.ts - new helper
-export const getCurrencyForLanguage = (language: string): Currency => {
-  return language === 'en' ? 'USD' : 'EUR';
-};
-```
-
-Components will use `getCurrencyForLanguage(language)` to determine which currency symbol and price to display dynamically.
+### Dateien
+| Datei | Aktion |
+|---|---|
+| `supabase/functions/facebook-list-pages/index.ts` | Neu – Graph API `/me/accounts` aufrufen |
+| `src/components/performance/FacebookPageSelectDialog.tsx` | Neu – Seiten-Auswahl UI |
+| `src/components/performance/ConnectionsTab.tsx` | Anpassen – Dialog nach FB-OAuth triggern |
 
