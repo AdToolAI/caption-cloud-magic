@@ -732,7 +732,12 @@ async function publishToFacebook(
         );
         if (permalinkRes.ok) {
           const permalinkData = await permalinkRes.json();
-          videoPermalink = permalinkData.permalink_url;
+          if (permalinkData.permalink_url) {
+            // Graph API may return relative paths like "/reel/123/" - ensure absolute URL
+            videoPermalink = permalinkData.permalink_url.startsWith('http')
+              ? permalinkData.permalink_url
+              : `https://www.facebook.com${permalinkData.permalink_url}`;
+          }
         }
       } catch (e) {
         console.warn('[Facebook] Could not fetch video permalink:', e);
