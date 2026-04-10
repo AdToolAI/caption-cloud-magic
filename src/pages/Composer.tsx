@@ -843,12 +843,12 @@ export default function Composer() {
                     {isPublishing ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Veröffentlichen...
+                        {t('composer.publishing')}
                       </>
                     ) : (
                       <>
                         <Send className="mr-2 h-4 w-4" />
-                        Jetzt posten
+                        {t('composer.publishNow')}
                       </>
                     )}
                   </Button>
@@ -863,8 +863,8 @@ export default function Composer() {
                   defaultHashtags={postData?.hashtags || []}
                   onPublished={() => {
                     toast({
-                      title: '✅ Erfolgreich veröffentlicht',
-                      description: 'Ihr Post wurde auf den ausgewählten Plattformen veröffentlicht',
+                      title: `✅ ${t('composer.publishSuccess')}`,
+                      description: t('composer.publishSuccessDesc'),
                     });
                   }}
                 />
