@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { TrendingUp, BarChart3 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface MetricsSummary {
   provider: string;
@@ -19,7 +20,7 @@ interface MetricsChartProps {
   byProvider?: boolean;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label, locale = "en-US" }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="backdrop-blur-xl bg-card/90 border border-white/20 rounded-xl p-4 
@@ -33,7 +34,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             />
             <span className="text-muted-foreground">{entry.name}:</span>
             <span className="font-medium text-foreground">
-              {entry.value?.toLocaleString("de-DE")}
+              {entry.value?.toLocaleString(locale)}
             </span>
           </div>
         ))}
@@ -44,6 +45,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export const MetricsChart = ({ data, loading, byProvider = false }: MetricsChartProps) => {
+  const { t, language } = useTranslation();
+  const locale = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -64,7 +68,6 @@ export const MetricsChart = ({ data, loading, byProvider = false }: MetricsChart
   }
 
   if (byProvider) {
-    // Group by provider
     const providerData = data.reduce((acc, item) => {
       const existing = acc.find(p => p.provider === item.provider);
       if (existing) {
@@ -84,7 +87,6 @@ export const MetricsChart = ({ data, loading, byProvider = false }: MetricsChart
       return acc;
     }, [] as any[]);
 
-    // Calculate averages
     providerData.forEach(p => {
       p.avgEngagement = p.count > 0 ? parseFloat((p.engagement / p.count).toFixed(2)) : 0;
     });
@@ -105,7 +107,7 @@ export const MetricsChart = ({ data, loading, byProvider = false }: MetricsChart
             </div>
             <div>
               <h3 className="font-semibold text-foreground">Engagement by Platform</h3>
-              <p className="text-sm text-muted-foreground">Durchschnittliche Engagement-Rate</p>
+              <p className="text-sm text-muted-foreground">{t('analytics.unified.avgEngagementRate')}</p>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={300}>
@@ -119,7 +121,7 @@ export const MetricsChart = ({ data, loading, byProvider = false }: MetricsChart
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis dataKey="provider" stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip locale={locale} />} />
               <Legend />
               <Bar 
                 dataKey="avgEngagement" 
@@ -146,7 +148,7 @@ export const MetricsChart = ({ data, loading, byProvider = false }: MetricsChart
             </div>
             <div>
               <h3 className="font-semibold text-foreground">Total Engagement by Platform</h3>
-              <p className="text-sm text-muted-foreground">Likes und Views pro Plattform</p>
+              <p className="text-sm text-muted-foreground">{t('analytics.unified.likesAndViewsByPlatform')}</p>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={300}>
@@ -164,7 +166,7 @@ export const MetricsChart = ({ data, loading, byProvider = false }: MetricsChart
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis dataKey="provider" stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip locale={locale} />} />
               <Legend />
               <Bar dataKey="likes" fill="url(#likesGradient)" name="Likes" radius={[8, 8, 0, 0]} />
               <Bar dataKey="views" fill="url(#viewsGradient)" name="Views" radius={[8, 8, 0, 0]} />
@@ -175,9 +177,8 @@ export const MetricsChart = ({ data, loading, byProvider = false }: MetricsChart
     );
   }
 
-  // Time series data (group by day)
   const timeSeriesData = data.reduce((acc, item) => {
-    const day = new Date(item.day).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+    const day = new Date(item.day).toLocaleDateString(locale, { day: "2-digit", month: "2-digit" });
     const existing = acc.find(d => d.day === day);
     if (existing) {
       existing.likes += item.likes || 0;
@@ -208,7 +209,7 @@ export const MetricsChart = ({ data, loading, byProvider = false }: MetricsChart
           </div>
           <div>
             <h3 className="font-semibold text-foreground">Engagement Over Time</h3>
-            <p className="text-sm text-muted-foreground">Views und Likes Trends</p>
+            <p className="text-sm text-muted-foreground">{t('analytics.unified.viewsAndLikesTrends')}</p>
           </div>
         </div>
         <ResponsiveContainer width="100%" height={300}>
@@ -225,7 +226,7 @@ export const MetricsChart = ({ data, loading, byProvider = false }: MetricsChart
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
             <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
             <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip locale={locale} />} />
             <Legend />
             <Line 
               type="monotone" 
@@ -266,7 +267,7 @@ export const MetricsChart = ({ data, loading, byProvider = false }: MetricsChart
           </div>
           <div>
             <h3 className="font-semibold text-foreground">Daily Activity</h3>
-            <p className="text-sm text-muted-foreground">Engagement-Verteilung pro Tag</p>
+            <p className="text-sm text-muted-foreground">{t('analytics.unified.engagementDistribution')}</p>
           </div>
         </div>
         <ResponsiveContainer width="100%" height={300}>
@@ -280,7 +281,7 @@ export const MetricsChart = ({ data, loading, byProvider = false }: MetricsChart
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
             <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
             <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip locale={locale} />} />
             <Legend />
             <Bar 
               dataKey="likes" 

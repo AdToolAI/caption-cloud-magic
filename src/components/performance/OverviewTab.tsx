@@ -10,7 +10,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 const COLORS = ['hsl(239 84 67)', 'hsl(160 84 39)', 'hsl(25 95 53)', 'hsl(0 84 60)', 'hsl(262 83 58)', 'hsl(330 81 60)'];
 
 export const OverviewTab = () => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const locale = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<{
@@ -46,7 +47,6 @@ export const OverviewTab = () => {
 
   const fetchInstagramData = async () => {
     try {
-      // Fetch latest Instagram account data
       const { data: accountData } = await supabase
         .from('ig_account_daily')
         .select('*')
@@ -62,7 +62,6 @@ export const OverviewTab = () => {
         }));
       }
 
-      // Fetch top 10 posts (last 28 days)
       const date28DaysAgo = new Date();
       date28DaysAgo.setDate(date28DaysAgo.getDate() - 28);
 
@@ -100,7 +99,6 @@ export const OverviewTab = () => {
 
   const fetchFacebookData = async () => {
     try {
-      // Fetch latest Facebook Page data (today)
       const { data: fbData } = await supabase
         .from('fb_page_daily')
         .select('*')
@@ -129,7 +127,6 @@ export const OverviewTab = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch post metrics
       const { data: posts, error } = await supabase
         .from('post_metrics')
         .select('*')
@@ -139,10 +136,8 @@ export const OverviewTab = () => {
       if (error) throw error;
 
       if (posts && posts.length > 0) {
-        // Calculate stats
         const avgEng = posts.reduce((sum, p) => sum + (p.engagement_rate || 0), 0) / posts.length;
         
-        // Best day/hour analysis
         const dayCount: Record<string, { total: number, count: number }> = {};
         const hourCount: Record<string, { total: number, count: number }> = {};
         
@@ -178,14 +173,12 @@ export const OverviewTab = () => {
           topStyle: 'Short Hook'
         });
 
-        // Engagement over time
         const engData = posts.slice(-30).map(p => ({
-          date: new Date(p.posted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          date: new Date(p.posted_at).toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
           engagement: p.engagement_rate || 0
         }));
         setEngagementData(engData);
 
-        // Top posts
         const topPosts = [...posts]
           .sort((a, b) => (b.engagement_rate || 0) - (a.engagement_rate || 0))
           .slice(0, 10)
@@ -196,7 +189,6 @@ export const OverviewTab = () => {
           }));
         setTopPostsData(topPosts);
 
-        // Provider distribution
         const providerCount = posts.reduce((acc: Record<string, number>, p) => {
           acc[p.provider] = (acc[p.provider] || 0) + 1;
           return acc;
@@ -231,17 +223,17 @@ export const OverviewTab = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.igFollowers?.toLocaleString('de-DE') || '-'}</div>
+              <div className="text-2xl font-bold">{stats.igFollowers?.toLocaleString(locale) || '-'}</div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Reach heute</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('performance.overviewTab.reachToday')}</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.igReachToday?.toLocaleString('de-DE') || '-'}</div>
+              <div className="text-2xl font-bold">{stats.igReachToday?.toLocaleString(locale) || '-'}</div>
             </CardContent>
           </Card>
 
@@ -273,11 +265,11 @@ export const OverviewTab = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Impressions (heute)</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('performance.overviewTab.impressionsToday')}</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.fbImpressions?.toLocaleString('de-DE') || '-'}</div>
+              <div className="text-2xl font-bold">{stats.fbImpressions?.toLocaleString(locale) || '-'}</div>
             </CardContent>
           </Card>
 
@@ -287,7 +279,7 @@ export const OverviewTab = () => {
               <Hash className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.fbPostEngagements?.toLocaleString('de-DE') || '-'}</div>
+              <div className="text-2xl font-bold">{stats.fbPostEngagements?.toLocaleString(locale) || '-'}</div>
             </CardContent>
           </Card>
 
@@ -297,7 +289,7 @@ export const OverviewTab = () => {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.fbTotalActions?.toLocaleString('de-DE') || '-'}</div>
+              <div className="text-2xl font-bold">{stats.fbTotalActions?.toLocaleString(locale) || '-'}</div>
             </CardContent>
           </Card>
 
@@ -307,17 +299,17 @@ export const OverviewTab = () => {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.fbVideoViews?.toLocaleString('de-DE') || '-'}</div>
+              <div className="text-2xl font-bold">{stats.fbVideoViews?.toLocaleString(locale) || '-'}</div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Fans gesamt</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('performance.overviewTab.fansTotal')}</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.fbFansTotal?.toLocaleString('de-DE') || '-'}</div>
+              <div className="text-2xl font-bold">{stats.fbFansTotal?.toLocaleString(locale) || '-'}</div>
             </CardContent>
           </Card>
         </div>
@@ -327,36 +319,36 @@ export const OverviewTab = () => {
       {stats.igTopPosts && stats.igTopPosts.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Top 10 Instagram Posts (letzte 28 Tage)</CardTitle>
-            <CardDescription>Sortiert nach Gesamt-Engagement (Reach + Saved)</CardDescription>
+            <CardTitle>{t('performance.overviewTab.top10IgPosts')}</CardTitle>
+            <CardDescription>{t('performance.overviewTab.sortedByEngagement')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b text-left">
-                    <th className="p-2 font-medium">Datum</th>
-                    <th className="p-2 font-medium">Typ</th>
+                    <th className="p-2 font-medium">{t('performance.overviewTab.dateCol')}</th>
+                    <th className="p-2 font-medium">{t('performance.overviewTab.typeCol')}</th>
                     <th className="p-2 text-right font-medium">Reach</th>
                     <th className="p-2 text-right font-medium">Saved</th>
                     <th className="p-2 text-right font-medium">Plays</th>
-                    <th className="p-2 font-medium">Link</th>
+                    <th className="p-2 font-medium">{t('performance.overviewTab.linkCol')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {stats.igTopPosts.map((post) => (
                     <tr key={post.media_id} className="border-b hover:bg-muted/50">
-                      <td className="p-2">{new Date(post.timestamp).toLocaleDateString('de-DE')}</td>
+                      <td className="p-2">{new Date(post.timestamp).toLocaleDateString(locale)}</td>
                       <td className="p-2">
                         <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
                           {post.media_type}
                         </span>
                       </td>
-                      <td className="text-right p-2">{post.ig_media_metrics?.reach?.toLocaleString('de-DE') || '0'}</td>
-                      <td className="text-right p-2">{post.ig_media_metrics?.saved?.toLocaleString('de-DE') || '0'}</td>
+                      <td className="text-right p-2">{post.ig_media_metrics?.reach?.toLocaleString(locale) || '0'}</td>
+                      <td className="text-right p-2">{post.ig_media_metrics?.saved?.toLocaleString(locale) || '0'}</td>
                       <td className="text-right p-2">
                         {post.media_type === 'VIDEO' || post.media_type === 'REEL' 
-                          ? (post.ig_media_metrics?.plays?.toLocaleString('de-DE') || '0')
+                          ? (post.ig_media_metrics?.plays?.toLocaleString(locale) || '0')
                           : '-'
                         }
                       </td>
@@ -367,7 +359,7 @@ export const OverviewTab = () => {
                           rel="noopener noreferrer"
                           className="text-primary hover:underline text-sm"
                         >
-                          Ansehen
+                          {t('performance.overviewTab.viewPost')}
                         </a>
                       </td>
                     </tr>
@@ -390,13 +382,12 @@ export const OverviewTab = () => {
           disabled={loading}
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Alle Daten aktualisieren
+          {t('performance.overviewTab.refreshAll')}
         </Button>
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Engagement Over Time */}
         <Card>
           <CardHeader>
             <CardTitle>{t('performance.charts.engagementOverTime')}</CardTitle>
@@ -414,7 +405,6 @@ export const OverviewTab = () => {
           </CardContent>
         </Card>
 
-        {/* Provider Distribution */}
         <Card>
           <CardHeader>
             <CardTitle>{t('performance.charts.providerDistribution')}</CardTitle>
@@ -442,7 +432,6 @@ export const OverviewTab = () => {
           </CardContent>
         </Card>
 
-        {/* Top Posts */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>{t('performance.charts.topPosts')}</CardTitle>

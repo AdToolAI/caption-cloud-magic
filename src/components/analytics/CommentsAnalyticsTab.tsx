@@ -4,11 +4,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CommentDiagnostics } from "@/components/comments/CommentDiagnostics";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "@/hooks/useTranslation";
 import { MessageCircle, ThumbsUp, ThumbsDown, Minus } from "lucide-react";
 
 export function CommentsAnalyticsTab() {
   const { user } = useAuth();
+  const { t, language } = useTranslation();
+  const locale = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
   const [platform, setPlatform] = useState("all");
 
   const [comments, setComments] = useState<any[]>([]);
@@ -54,7 +56,7 @@ export function CommentsAnalyticsTab() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Alle Plattformen</SelectItem>
+            <SelectItem value="all">{t('analytics.unified.allPlatforms')}</SelectItem>
             <SelectItem value="instagram">Instagram</SelectItem>
             <SelectItem value="facebook">Facebook</SelectItem>
             <SelectItem value="youtube">YouTube</SelectItem>
@@ -71,7 +73,7 @@ export function CommentsAnalyticsTab() {
             <MessageCircle className="h-8 w-8 text-primary" />
             <div>
               <p className="text-2xl font-bold">{(comments || []).length}</p>
-              <p className="text-xs text-muted-foreground">Kommentare gesamt</p>
+              <p className="text-xs text-muted-foreground">{t('analytics.unified.totalComments')}</p>
             </div>
           </CardContent>
         </Card>
@@ -80,7 +82,7 @@ export function CommentsAnalyticsTab() {
             <ThumbsUp className="h-8 w-8 text-green-500" />
             <div>
               <p className="text-2xl font-bold">{sentimentCounts.positive}</p>
-              <p className="text-xs text-muted-foreground">Positiv</p>
+              <p className="text-xs text-muted-foreground">{t('analytics.unified.positive')}</p>
             </div>
           </CardContent>
         </Card>
@@ -89,7 +91,7 @@ export function CommentsAnalyticsTab() {
             <Minus className="h-8 w-8 text-muted-foreground" />
             <div>
               <p className="text-2xl font-bold">{sentimentCounts.neutral}</p>
-              <p className="text-xs text-muted-foreground">Neutral</p>
+              <p className="text-xs text-muted-foreground">{t('analytics.unified.neutral')}</p>
             </div>
           </CardContent>
         </Card>
@@ -98,7 +100,7 @@ export function CommentsAnalyticsTab() {
             <ThumbsDown className="h-8 w-8 text-red-500" />
             <div>
               <p className="text-2xl font-bold">{sentimentCounts.negative}</p>
-              <p className="text-xs text-muted-foreground">Negativ</p>
+              <p className="text-xs text-muted-foreground">{t('analytics.unified.negative')}</p>
             </div>
           </CardContent>
         </Card>
@@ -113,21 +115,21 @@ export function CommentsAnalyticsTab() {
       ) : (comments || []).length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            Keine Kommentare gefunden
+            {t('analytics.unified.noCommentsFound')}
           </CardContent>
         </Card>
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Letzte Kommentare</CardTitle>
+            <CardTitle className="text-sm">{t('analytics.unified.recentComments')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 max-h-96 overflow-y-auto">
             {(comments || []).map((comment: any) => (
               <div key={comment.id} className="p-3 rounded-lg border text-sm">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-medium">{comment.author_name || "Unbekannt"}</span>
+                  <span className="font-medium">{comment.author_name || t('analytics.unified.unknown')}</span>
                   <span className="text-xs text-muted-foreground">
-                    {comment.platform} · {new Date(comment.created_at).toLocaleDateString()}
+                    {comment.platform} · {new Date(comment.created_at).toLocaleDateString(locale)}
                   </span>
                 </div>
                 <p className="text-muted-foreground">{comment.text}</p>
