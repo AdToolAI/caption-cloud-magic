@@ -666,8 +666,9 @@ async function publishToFacebook(
 
       const initData = await initResponse.json();
       const uploadSessionId = initData.upload_session_id;
+      const videoId = initData.video_id;
       
-      console.log('[Facebook] Upload session started:', uploadSessionId);
+      console.log('[Facebook] Upload session started:', { uploadSessionId, videoId });
 
       // Step 2: Upload video in chunks (for simplicity, upload as single chunk if < 100MB)
       const chunkSize = Math.min(videoSize, 100 * 1024 * 1024); // 100MB max chunk
@@ -723,11 +724,11 @@ async function publishToFacebook(
 
       const finishData = await finishResponse.json();
       
-      // Fetch real permalink from Graph API
+      // Fetch real permalink from Graph API using videoId from start phase
       let videoPermalink: string | undefined;
       try {
         const permalinkRes = await fetch(
-          `https://graph.facebook.com/v18.0/${finishData.id}?fields=permalink_url&access_token=${accessToken}`
+          `https://graph.facebook.com/v18.0/${videoId}?fields=permalink_url&access_token=${accessToken}`
         );
         if (permalinkRes.ok) {
           const permalinkData = await permalinkRes.json();
@@ -737,19 +738,19 @@ async function publishToFacebook(
         console.warn('[Facebook] Could not fetch video permalink:', e);
       }
       
-      if (!videoPermalink && finishData.id) {
-        videoPermalink = `https://www.facebook.com/${pageId}/videos/${finishData.id}`;
+      if (!videoPermalink && videoId) {
+        videoPermalink = `https://www.facebook.com/${pageId}/videos/${videoId}`;
       }
 
       console.log('[Facebook] Video published', { 
-        external_id: finishData.id, 
+        external_id: videoId, 
         permalink: videoPermalink 
       });
 
       return {
         provider: 'facebook',
         ok: true,
-        external_id: finishData.id,
+        external_id: videoId,
         permalink: videoPermalink,
       };
     }
