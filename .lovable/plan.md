@@ -1,28 +1,26 @@
 
 
-# Fix: Instagram Sync – IG User ID Resolution
+# Fix: Facebook Analytics Detail-Seite zeigt nicht alle Posts
 
 ## Problem
-The `instagram-graph-sync` function tries to call `/{pageId}?fields=connected_instagram_account` to discover the Instagram User ID. But in `social_connections`, the `account_id` for Instagram is **already the IG User ID** (`17841477402452109`), not a Facebook Page ID. The Graph API returns an error because `connected_instagram_account` is not a valid field on an IG User node.
+- Die Plattform-Übersicht zeigt korrekt "18 Posts" (kein Zeitfilter)
+- Die Detail-Seite (`PlatformAnalytics.tsx`) filtert standardmäßig auf **30 Tage** → nur 4 Posts sichtbar
+- 14 ältere Posts (Aug 2025 – März 2026) werden ausgeblendet
+- Die 4 sichtbaren Posts sind echte Facebook-Posts, haben aber denselben Inhalt wie Instagram (Cross-Posts)
 
-## Fix
-In `supabase/functions/instagram-graph-sync/index.ts`, change the IG User ID resolution logic:
+## Lösung
+In `src/pages/Analytics/PlatformAnalytics.tsx`:
 
-1. **Use `account_id` directly** as the IG User ID (since it's already stored correctly)
-2. **Remove** the `connected_instagram_account` Graph API call entirely
-3. Keep the `metadata?.ig_user_id` as a secondary fallback
+1. **Mehr Zeitfilter-Optionen hinzufügen**: 7 Tage, 30 Tage, 90 Tage, **Alle**
+2. **Standard-Filter auf "Alle" setzen**, damit alle 18 Posts sofort sichtbar sind
+3. **Post-Limit erhöhen** von 10 auf 20 für die Anzeige
 
-Replace lines 58-77 with:
-```typescript
-// The account_id for Instagram connections IS the IG User ID
-const metadata = conn.account_metadata as any;
-const igUserId = metadata?.ig_user_id || conn.account_id;
-if (!igUserId) throw new Error('No Instagram User ID found. Please reconnect Instagram.');
-console.log(`[IG Sync] IG User ID: ${igUserId}`);
-```
+### Änderungen
+- `timeFilter` State erweitern: `"7" | "30" | "90" | "all"`, Default `"all"`
+- `loadData()`: Bei `"all"` den `.gte("posted_at", ...)` Filter weglassen
+- Select-Optionen: "7 Tage", "30 Tage", "90 Tage", "Alle"
+- `posts.slice(0, 20)` statt `posts.slice(0, 10)`
 
-## Technical Details
-- File: `supabase/functions/instagram-graph-sync/index.ts`
-- Lines 58-77 replaced with simplified direct ID usage
-- No database changes needed
+## Betroffene Datei
+- `src/pages/Analytics/PlatformAnalytics.tsx`
 
