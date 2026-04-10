@@ -3,9 +3,11 @@ import { Check, Sparkles, Crown, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
+import { getCurrencyForLanguage } from "@/lib/currency";
 
 export const PricingSection = () => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const currencySymbol = getCurrencyForLanguage(language) === 'USD' ? '$' : '€';
 
   const plans = [
     {
@@ -114,7 +116,7 @@ export const PricingSection = () => {
                   </div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">{plan.name}</h3>
                   <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-4xl font-bold text-foreground">€{plan.price}</span>
+                    <span className="text-4xl font-bold text-foreground">{currencySymbol}{plan.price}</span>
                     <span className="text-muted-foreground">{plan.period}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-2">{plan.description}</p>

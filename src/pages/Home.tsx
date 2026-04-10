@@ -22,6 +22,7 @@ import { FeatureGrid } from "@/components/home/FeatureGrid";
 import { DashboardVideoCarousel } from "@/components/dashboard/DashboardVideoCarousel";
 import { RecoCard } from "@/features/recommendations/RecoCard";
 import { PRICING_V21 } from "@/config/pricing";
+import { getCurrencyForLanguage } from "@/lib/currency";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
 import { NicheTutorialModal } from "@/components/onboarding/NicheTutorialModal";
@@ -757,7 +758,7 @@ const Home = () => {
                   {t("homePage.bestForCreators")}
                 </p>
                 <div className="flex items-baseline justify-center gap-1.5">
-                  <span className="text-4xl font-bold text-foreground tracking-tighter">€{PRICING_V21.basic.price.EUR}</span>
+                  <span className="text-4xl font-bold text-foreground tracking-tighter">{getCurrencyForLanguage(language) === 'USD' ? '$' : '€'}{PRICING_V21.basic.price[getCurrencyForLanguage(language)]}</span>
                   <span className="text-sm text-muted-foreground font-medium">
                     / {t("homePage.perMonth")}
                   </span>
@@ -803,7 +804,7 @@ const Home = () => {
                   {t("homePage.perfectForAgencies")}
                 </p>
                 <div className="flex items-baseline justify-center gap-1.5">
-                  <span className="text-4xl font-bold text-foreground tracking-tighter">€34.95</span>
+                  <span className="text-4xl font-bold text-foreground tracking-tighter">{getCurrencyForLanguage(language) === 'USD' ? '$' : '€'}{PRICING_V21.pro.price[getCurrencyForLanguage(language)]}</span>
                   <span className="text-sm text-muted-foreground font-medium">
                     / {t("homePage.perMonth")}
                   </span>
@@ -844,7 +845,7 @@ const Home = () => {
                   {t("homePage.forLargeTeams")}
                 </p>
                 <div className="flex items-baseline justify-center gap-1.5">
-                  <span className="text-4xl font-bold text-foreground tracking-tighter">€{PRICING_V21.enterprise.price.EUR}</span>
+                  <span className="text-4xl font-bold text-foreground tracking-tighter">{getCurrencyForLanguage(language) === 'USD' ? '$' : '€'}{PRICING_V21.enterprise.price[getCurrencyForLanguage(language)]}</span>
                   <span className="text-sm text-muted-foreground font-medium">
                     / {t("homePage.perMonth")}
                   </span>

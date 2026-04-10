@@ -6,11 +6,16 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { getProductInfo, pricingPlans } from "@/config/pricing";
 import { Crown, Calendar, CreditCard, Zap, ArrowRight, Sparkles } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
+import { getCurrencyForLanguage } from "@/lib/currency";
 
 export const SubscriptionTab = () => {
   const navigate = useNavigate();
   const { subscribed, productId, subscriptionEnd } = useAuth();
+  const { t, language } = useTranslation();
   const planInfo = getProductInfo(productId);
+  const symbol = getCurrencyForLanguage(language) === 'USD' ? '$' : '€';
+  const perMonth = language === 'de' ? 'pro Monat' : language === 'es' ? 'al mes' : 'per month';
   
   // Check if user has any paid plan (Basic, Pro, or Enterprise)
   const hasPaidPlan = subscribed && productId;
@@ -32,10 +37,10 @@ export const SubscriptionTab = () => {
             ) : (
               <Zap className="h-5 w-5 text-muted-foreground" />
             )}
-            Aktueller Plan
+            {language === 'de' ? 'Aktueller Plan' : language === 'es' ? 'Plan Actual' : 'Current Plan'}
           </CardTitle>
           <CardDescription>
-            Ihr aktuelles Abonnement und Abrechnungsdetails
+            {language === 'de' ? 'Ihr aktuelles Abonnement und Abrechnungsdetails' : language === 'es' ? 'Tu suscripción actual y detalles de facturación' : 'Your current subscription and billing details'}
           </CardDescription>
         </CardHeader>
         <CardContent className="relative space-y-6">
@@ -57,23 +62,23 @@ export const SubscriptionTab = () => {
                 <h3 className="text-xl font-semibold flex items-center gap-2">
                   {planInfo.name}
                   {hasPaidPlan && (
-                    <Badge className="bg-primary/10 text-primary border-primary/20">
-                      Aktiv
-                    </Badge>
+                     <Badge className="bg-primary/10 text-primary border-primary/20">
+                       {language === 'de' ? 'Aktiv' : language === 'es' ? 'Activo' : 'Active'}
+                     </Badge>
                   )}
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   {subscribed 
-                    ? "Zugriff auf alle Premium-Funktionen" 
-                    : "Begrenzter Zugriff auf Basis-Funktionen"}
+                    ? (language === 'de' ? 'Zugriff auf alle Premium-Funktionen' : language === 'es' ? 'Acceso a todas las funciones premium' : 'Access to all premium features')
+                    : (language === 'de' ? 'Begrenzter Zugriff auf Basis-Funktionen' : language === 'es' ? 'Acceso limitado a funciones básicas' : 'Limited access to basic features')}
                 </p>
               </div>
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold">
-                {planInfo.price}€
+                {symbol}{planInfo.price}
               </p>
-              <p className="text-sm text-muted-foreground">pro Monat</p>
+              <p className="text-sm text-muted-foreground">{perMonth}</p>
             </div>
           </div>
 
@@ -83,9 +88,9 @@ export const SubscriptionTab = () => {
               <div className="flex items-center gap-3">
                 <Calendar className="h-5 w-5 text-cyan-400" />
                 <div>
-                  <p className="font-medium">Nächster Abrechnungstermin</p>
+                  <p className="font-medium">{language === 'de' ? 'Nächster Abrechnungstermin' : language === 'es' ? 'Próxima fecha de facturación' : 'Next billing date'}</p>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(subscriptionEnd).toLocaleDateString('de-DE', {
+                    {new Date(subscriptionEnd).toLocaleDateString(language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'
@@ -106,7 +111,7 @@ export const SubscriptionTab = () => {
                   onClick={() => navigate('/billing')}
                 >
                   <CreditCard className="h-4 w-4 mr-2" />
-                  Abonnement verwalten
+                  {language === 'de' ? 'Abonnement verwalten' : language === 'es' ? 'Gestionar suscripción' : 'Manage subscription'}
                 </Button>
                 <Button 
                   variant="outline" 
@@ -114,7 +119,7 @@ export const SubscriptionTab = () => {
                   onClick={() => navigate('/credits')}
                 >
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Credits kaufen
+                  {language === 'de' ? 'Credits kaufen' : language === 'es' ? 'Comprar créditos' : 'Buy credits'}
                 </Button>
               </>
             ) : (
@@ -123,7 +128,7 @@ export const SubscriptionTab = () => {
                 onClick={() => navigate('/pricing')}
               >
                 <Crown className="h-4 w-4 mr-2" />
-                Auf Pro upgraden
+                {language === 'de' ? 'Auf Pro upgraden' : language === 'es' ? 'Actualizar a Pro' : 'Upgrade to Pro'}
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             )}
@@ -139,7 +144,7 @@ export const SubscriptionTab = () => {
             Credits
           </CardTitle>
           <CardDescription>
-            Verwalten Sie Ihre Credits für KI-Generierungen
+            {language === 'de' ? 'Verwalten Sie Ihre Credits für KI-Generierungen' : language === 'es' ? 'Gestione sus créditos para generaciones de IA' : 'Manage your credits for AI generations'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -149,7 +154,7 @@ export const SubscriptionTab = () => {
             onClick={() => navigate('/credits')}
           >
             <Sparkles className="h-4 w-4 mr-2" />
-            Credit-Übersicht öffnen
+            {language === 'de' ? 'Credit-Übersicht öffnen' : language === 'es' ? 'Abrir resumen de créditos' : 'Open credit overview'}
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </CardContent>

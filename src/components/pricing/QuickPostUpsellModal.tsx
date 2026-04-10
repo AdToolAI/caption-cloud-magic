@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Lock, Sparkles } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { getCurrencyForLanguage } from "@/lib/currency";
 
 interface QuickPostUpsellModalProps {
   open: boolean;
@@ -10,8 +11,14 @@ interface QuickPostUpsellModalProps {
 }
 
 export function QuickPostUpsellModal({ open, onClose }: QuickPostUpsellModalProps) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const navigate = useNavigate();
+  const symbol = getCurrencyForLanguage(language) === 'USD' ? '$' : '€';
+  const proPrice = getCurrencyForLanguage(language) === 'USD' ? '34.95' : '34,95';
+  const entPrice = getCurrencyForLanguage(language) === 'USD' ? '69.95' : '69,95';
+  const perMonth = language === 'de' ? 'Monat' : language === 'es' ? 'mes' : 'mo';
+  const creditsLabel = language === 'de' ? 'Credits' : language === 'es' ? 'créditos' : 'Credits';
+  const unlimitedLabel = language === 'de' ? 'Unbegrenzte' : language === 'es' ? 'Ilimitados' : 'Unlimited';
 
   return (
     <AlertDialog open={open} onOpenChange={onClose}>
@@ -37,14 +44,14 @@ export function QuickPostUpsellModal({ open, onClose }: QuickPostUpsellModalProp
               <Sparkles className="h-5 w-5 text-primary" />
               <div>
                 <p className="font-medium">Pro</p>
-                <p className="text-sm text-muted-foreground">34,95 €/Monat • 2.500 Credits</p>
+                <p className="text-sm text-muted-foreground">{symbol}{proPrice}/{perMonth} • 2.500 {creditsLabel}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/50 border border-primary/20">
               <Sparkles className="h-5 w-5 text-primary" />
               <div>
                 <p className="font-medium">Enterprise</p>
-                <p className="text-sm text-muted-foreground">69,95 €/Monat • Unbegrenzte Credits</p>
+                <p className="text-sm text-muted-foreground">{symbol}{entPrice}/{perMonth} • {unlimitedLabel} {creditsLabel}</p>
               </div>
             </div>
           </div>

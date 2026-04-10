@@ -5,13 +5,15 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, Check } from 'lucide-react';
 import { AI_VIDEO_CREDIT_PACKS } from '@/config/aiVideoCredits';
 import { Currency } from '@/config/pricing';
-import { detectUserCurrency, formatPrice, getCurrencySymbol } from '@/lib/currency';
+import { detectUserCurrency, formatPrice, getCurrencySymbol, getCurrencyForLanguage } from '@/lib/currency';
 import { supabase } from '@/integrations/supabase/client';
+import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from 'sonner';
 
 export const AIVideoCreditPurchase = () => {
+  const { language } = useTranslation();
   const [loading, setLoading] = useState<string | null>(null);
-  const [currency, setCurrency] = useState<Currency>(detectUserCurrency());
+  const [currency, setCurrency] = useState<Currency>(getCurrencyForLanguage(language));
 
   const handlePurchase = async (packId: keyof typeof AI_VIDEO_CREDIT_PACKS) => {
     setLoading(packId);

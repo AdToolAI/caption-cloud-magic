@@ -1370,7 +1370,7 @@ export const translations: Record<Language, any> = {
         basic: {
           name: "Basic",
           price: "14.95",
-          currency: "€",
+          currency: "$",
           period: "month",
           credits: "800 credits",
           description: "Perfect for content creators and small businesses",
@@ -1388,7 +1388,7 @@ export const translations: Record<Language, any> = {
         pro: {
           name: "Pro",
           price: "34.95",
-          currency: "€",
+          currency: "$",
           period: "month",
           credits: "2,500 credits",
           description: "Best for agencies and teams",
@@ -1406,7 +1406,7 @@ export const translations: Record<Language, any> = {
         enterprise: {
           name: "Enterprise",
           price: "69.95",
-          currency: "€",
+          currency: "$",
           period: "month",
           credits: "Unlimited credits",
           description: "For large teams and agencies",
@@ -1459,8 +1459,8 @@ export const translations: Record<Language, any> = {
         toPro: "Upgrade to Pro"
       },
       intro: {
-        basic: "Intro Month: Only €4.99 instead of €14.99",
-        enterprise: "Intro Month: Only €9.99 instead of €69.95",
+        basic: "Intro Month: Only $4.99 instead of $14.99",
+        enterprise: "Intro Month: Only $9.99 instead of $69.95",
         monthly: "Cancel anytime"
       },
       features: {
@@ -8487,7 +8487,8 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Básico",
-          price: "14,95 €",
+          price: "14,95",
+          currency: "€",
           period: "mes",
           credits: "800 créditos por mes",
           features: [
@@ -8515,7 +8516,8 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Empresarial",
-          price: "69,95 €",
+          price: "69,95",
+          currency: "€",
           period: "mes",
           credits: "Créditos ilimitados",
           badge: "Nivel superior",

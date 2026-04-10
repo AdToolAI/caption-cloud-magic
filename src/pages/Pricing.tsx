@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { translations } from "@/lib/translations";
+import { getCurrencyForLanguage } from "@/lib/currency";
 
 const Pricing = () => {
   const navigate = useNavigate();
@@ -204,7 +205,7 @@ const Pricing = () => {
                   <p className="text-sm text-muted-foreground mb-8 font-medium">{plan.description}</p>
                   
                   <div className="flex items-baseline justify-center gap-2">
-                    <span className="text-6xl font-extrabold text-foreground tracking-tighter">€{plan.price}</span>
+                    <span className="text-6xl font-extrabold text-foreground tracking-tighter">{t(`pricingPage.plans.${plan.planType}.currency`)}{plan.price}</span>
                     <span className="text-lg text-muted-foreground font-medium">/ {plan.period}</span>
                   </div>
                 </div>
