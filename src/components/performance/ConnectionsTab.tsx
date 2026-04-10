@@ -14,6 +14,7 @@ import { PlanLimitDialog } from "./PlanLimitDialog";
 import { InstagramTokenDialog } from "./InstagramTokenDialog";
 import { TokenStatusBadge } from "./TokenStatusBadge";
 import { XConnectionCard } from "./XConnectionCard";
+import { FacebookPageSelectDialog } from "./FacebookPageSelectDialog";
 import { RefreshCw } from "lucide-react";
 
 const PROVIDERS = [
