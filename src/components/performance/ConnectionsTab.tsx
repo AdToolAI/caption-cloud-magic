@@ -38,6 +38,7 @@ export const ConnectionsTab = () => {
   const [syncError, setSyncError] = useState<Record<string, boolean>>({});
   const [userPlan, setUserPlan] = useState<string>('free');
   const [xCallbackError, setXCallbackError] = useState<string | null>(null);
+  const [showPageSelectDialog, setShowPageSelectDialog] = useState(false);
 
   useEffect(() => {
     const initializeAndHandleCallback = async () => {
