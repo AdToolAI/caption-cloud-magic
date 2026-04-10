@@ -1,28 +1,59 @@
 
 
-# Fix: "View Post" Button für Facebook Publishing
+# Fix: Facebook "View Post" Button — Video ID from Wrong Response
 
-## Problem
-Nach dem erfolgreichen Veröffentlichen auf Facebook fehlt der "View Post"-Button, den Instagram hat. Zwei Ursachen:
+## Root Cause
+The Facebook Resumable Video Upload API works in 3 phases:
+1. **Start** → returns `{ upload_session_id, video_id, ... }`
+2. **Transfer** → uploads chunks
+3. **Finish** → returns `{ success: true }` — **no `id` field!**
 
-1. **Permalink-Format falsch**: Die Edge Function gibt `https://facebook.com/${postId}` zurück, wobei `postId` im Graph-API-Format ist (z.B. `123456789_987654321`). Dieses URL-Format funktioniert nicht zuverlässig.
-2. **Mock-Fall**: Wenn keine Verbindung besteht, wird `permalink: undefined` zurückgegeben.
+The current code reads `finishData.id` which is always `undefined`. The video ID must be captured from the **start** phase response (`initData.video_id`).
 
-## Lösung
-Die Edge Function (`supabase/functions/publish/index.ts`) anpassen, um korrekte Facebook-Permalinks zu generieren:
+## Fix (1 file)
 
-### Änderung in `publishToFacebook`
-- **Für Feed/Photo Posts** (Zeile 754-766): Nach dem erfolgreichen Post die Graph API aufrufen, um den echten Permalink zu holen:
-  ```
-  GET /{post_id}?fields=permalink_url&access_token=...
-  ```
-  Falls der API-Call fehlschlägt, als Fallback `https://www.facebook.com/${postResponse.id}` verwenden (mit `pageId_postId` Split).
+### `supabase/functions/publish/index.ts`
 
-- **Für Video Posts** (Zeile 731-736): Gleiche Logik – nach Upload den Permalink via Graph API holen oder Fallback `https://www.facebook.com/${pageId}/videos/${videoId}` verwenden.
+1. **Capture `video_id` from start phase** (~line 667):
+   ```typescript
+   const initData = await initResponse.json();
+   const uploadSessionId = initData.upload_session_id;
+   const videoId = initData.video_id; // ← ADD THIS
+   ```
 
-### Betroffene Datei
-- `supabase/functions/publish/index.ts` — `publishToFacebook` Funktion, 2 Stellen (Video-Return ~Zeile 735, Feed-Return ~Zeile 765)
+2. **Use `videoId` instead of `finishData.id`** for permalink fetch (~line 728-742):
+   ```typescript
+   // Use videoId from start phase, not finishData.id
+   const permalinkRes = await fetch(
+     `https://graph.facebook.com/v18.0/${videoId}?fields=permalink_url&access_token=${accessToken}`
+   );
+   ```
 
-### Ergebnis
-- Der `PublishResultCard` zeigt automatisch den "View post"-Link, da `result.permalink` dann korrekt gesetzt ist (die Komponente prüft bereits `result.ok && result.permalink`).
+3. **Use `videoId` in fallback URL** (~line 740-742):
+   ```typescript
+   if (!videoPermalink && videoId) {
+     videoPermalink = `https://www.facebook.com/${pageId}/videos/${videoId}`;
+   }
+   ```
+
+4. **Use `videoId` in return** (~line 749-754):
+   ```typescript
+   return {
+     provider: 'facebook',
+     ok: true,
+     external_id: videoId,
+     permalink: videoPermalink,
+   };
+   ```
+
+5. **Log with correct ID** (~line 744-747):
+   ```typescript
+   console.log('[Facebook] Video published', { 
+     external_id: videoId, 
+     permalink: videoPermalink 
+   });
+   ```
+
+## Result
+After this fix, the `publishToFacebook` video path will correctly capture the video ID and generate a working permalink, making the "View post" button appear in the UI.
 
