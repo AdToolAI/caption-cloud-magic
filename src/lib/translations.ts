@@ -2280,6 +2280,36 @@ export const translations: Record<Language, any> = {
         actionRecs: 'Action recommendations',
         based28days: 'Based on your last 28 days',
         weekdays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      },
+      overviewTab: {
+        reachToday: "Reach today",
+        impressionsToday: "Impressions (today)",
+        fansTotal: "Total fans",
+        top10IgPosts: "Top 10 Instagram Posts (last 28 days)",
+        sortedByEngagement: "Sorted by total engagement (Reach + Saved)",
+        dateCol: "Date",
+        typeCol: "Type",
+        linkCol: "Link",
+        viewPost: "View",
+        refreshAll: "Refresh all data"
+      },
+      xConnection: {
+        pleaseLogin: "Please log in first",
+        errorConnecting: "Error connecting to X",
+        tokenRefreshed: "X token successfully refreshed",
+        errorRefreshingToken: "Error refreshing token",
+        confirmDisconnect: "Do you really want to disconnect the X connection?",
+        disconnected: "X connection disconnected",
+        errorDisconnecting: "Error disconnecting",
+        notConnected: "Not connected",
+        enterpriseFeature: "Enterprise Feature",
+        connectDesc: "Connect your X account to publish posts and track performance data.",
+        enterpriseDesc: "X/Twitter integration is exclusively available for Enterprise customers.",
+        reconnect: "Reconnect",
+        connectWithX: "Connect with X",
+        upgradeToEnterprise: "Upgrade to Enterprise",
+        syncNow: "Sync now",
+        lastSync: "Last sync"
       }
     },
     
