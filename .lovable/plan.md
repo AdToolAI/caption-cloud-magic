@@ -1,96 +1,41 @@
 
-Ziel: Das Analytics Dashboard auf `/analytics` vollständig für EN/DE/ES lokalisieren. Im Screenshot ist klar, dass nicht nur einzelne Labels, sondern fast die gesamte Analytics-Erfahrung noch gemischte oder harte deutsche Strings enthält.
 
-1. Hauptseite `src/pages/UnifiedAnalytics.tsx` bereinigen
-- Alle harten UI-Texte in `t(...)` umstellen:
-  - „Zuletzt aktualisiert“
-  - „7 Tage / 30 Tage“
-  - „Plattformen verwalten“
-  - Dialogtitel für Verbindungen
-  - Tabs: „Plattformen“, „KI-Analyse“, „Kommentare“
-  - Karten-/Abschnittstitel, Beschreibungen, Buttons, Empty States, ROI-/Hashtag-/Campaign-Texte
-- Toasts lokalisieren:
-  - Auto-Refresh
-  - Fehler beim Laden
-  - manuelles Aktualisieren
-  - Hashtag-Analyse erfolgreich/fehlerhaft
-  - Best-Content-Analyse erfolgreich/fehlerhaft
-- Datums-/Zeitformatierung an Sprache koppeln statt gemischt deutsch/englisch.
+## Plan: Language-Based Currency Display (EN→USD, DE/ES→EUR)
 
-2. Overview-Komponenten lokalisieren
-- `src/components/analytics/OverviewMetrics.tsx`
-  - Deutsche Beschreibungen wie „Letzte 7 Tage“, „Alle Plattformen“, „Plattformen“, „Aktive Kanäle“ über `t(...)`
-  - Zahlenformat nicht hart `de-DE`, sondern abhängig von der aktiven Sprache
-- `src/components/analytics/MetricsChart.tsx`
-  - Untertitel wie „Durchschnittliche Engagement-Rate“, „Likes und Views pro Plattform“, „Engagement-Verteilung pro Tag“ lokalisieren
-  - Tooltip-/Datumsformatierung ebenfalls sprachabhängig machen
+### Problem
+All pricing displays are hardcoded to show € (EUR) regardless of UI language. The user wants English UI to show USD ($) and Spanish UI to keep EUR (€).
 
-3. Tabellen- und Plattformkarten lokalisieren
-- `src/components/analytics/TopPostsTable.tsx`
-  - Export-Fehler/Erfolg
-  - Tabellenüberschriften wie „Aktionen“
-  - Beschreibungen/Empty State („Noch keine Posts…“)
-  - Dialogtexte („Original Post ansehen“, „Keine Caption“)
-  - Datums-/Zahlenformatierung sprachabhängig
-- `src/components/analytics/PlatformOverviewCards.tsx`
-  - „Posts“ lokalisieren
-  - Bei Bedarf weitere Kleintexte absichern
+### Approach
+Add a helper that maps language to currency: `en→USD`, `de→EUR`, `es→EUR`. Use this across all pricing-related components to pick the correct symbol and formatted price.
 
-4. Weitere Tabs im Dashboard lokalisieren
-- `src/components/analytics/CommentsAnalyticsTab.tsx`
-  - Filter „Alle Plattformen“
-  - KPI-Texte wie „Kommentare gesamt“, „Positiv“, „Negativ“
-  - Empty State und „Letzte Kommentare“
-  - Fallback „Unbekannt“
-- `src/components/analytics/AIStrategyPanel.tsx`
-  - Komplette AI-Analyse-UI lokalisieren
-  - Rate-limit-/Credit-/Error-Toasts
-  - Button-States, Abschnittsüberschriften, Resultatkarten
+### Files to Change
 
-5. Eingebettete Performance-Komponenten prüfen und lokalisieren
-Die Analytics-Seite verwendet auch Performance-Komponenten, in denen noch harte deutsche Texte stecken:
-- `src/components/performance/OverviewTab.tsx`
-  - „Reach heute“, „Fans gesamt“, „Top 10 Instagram Posts (letzte 28 Tage)“, „Ansehen“, „Alle Daten aktualisieren“ usw.
-  - Tabellenköpfe, Beschreibungen, Datums-/Zahlenformat
-- `src/components/performance/XConnectionCard.tsx`
-  - Deutsche Verbindungs-/Fehler-/CTA-Texte lokalisieren
-- Optional mitprüfen: `ConnectionsTab.tsx`, falls der Dialog im Analytics-Dashboard direkt geöffnet wird und dort noch gemischte Strings erscheinen
+| File | Changes |
+|------|---------|
+| **`src/lib/currency.ts`** | Add `getCurrencyForLanguage(lang): Currency` helper (`en→USD`, `de/es→EUR`) |
+| **`src/lib/translations.ts`** | Update EN `pricingPage` prices to USD values with `$` symbol; keep DE/ES with `€`. Add `currency` field to EN basic/enterprise plans (currently missing). |
+| **`src/pages/Pricing.tsx`** | Replace hardcoded `€{plan.price}` with dynamic currency symbol from language |
+| **`src/components/landing/PricingSection.tsx`** | Replace hardcoded `€{plan.price}` with dynamic symbol |
+| **`src/pages/Home.tsx`** | Replace 3 hardcoded `€` price displays with language-aware currency |
+| **`src/components/performance/PlanLimitDialog.tsx`** | Use language-based currency instead of hardcoded `.price.EUR` |
+| **`src/components/pricing/QuickPostUpsellModal.tsx`** | Localize hardcoded German price strings |
+| **`src/components/account/SubscriptionTab.tsx`** | Replace `{planInfo.price}€` and `pro Monat` with localized versions |
+| **`src/pages/Credits.tsx`** | Localize credit pack prices |
+| **`src/components/ai-video/AIVideoCreditPurchase.tsx`** | Default currency from language instead of `detectUserCurrency()` |
 
-6. Übersetzungen erweitern
-- `src/lib/translations.ts`
-- Bestehenden `analytics`-Namespace erweitern statt neue verstreute Keys zu erfinden
-- Sinnvoll ergänzen:
-  - `analytics.unified.*` für Header, Filter, Tabs, Dialoge, Toasts
-  - `analytics.overview.*` für KPI-Karten und Charts
-  - `analytics.topPosts.*`
-  - `analytics.comments.*`
-  - `analytics.ai.*`
-- Falls Performance-Komponenten eingebettet bleiben:
-  - fehlende Keys unter bestehendem `performance.*` Namespace ergänzen
-- Keys in EN/DE/ES gleichzeitig pflegen, damit keine Fallback-Lücken entstehen
+### Translation Key Updates
 
-7. Technische Leitplanken
-- Vorhandenes i18n-System mit `useTranslation()` weiterverwenden
-- Keine neuen Übersetzungssysteme einführen
-- Sprache aus dem bestehenden Context verwenden
-- `Intl.NumberFormat(language)` und passende `toLocaleDateString/toLocaleTimeString`-Locales nutzen, damit auch Zahlen/Daten nicht deutsch bleiben
+**EN prices** change from `"14.95"` / `currency: "€"` to `"14.95"` / `currency: "$"` (and similar for Pro/Enterprise).
+**DE/ES prices** stay as-is with `€`.
 
-8. Ergebnis nach Umsetzung
-- Analytics Dashboard ist in englischer UI vollständig englisch
-- Keine harten deutschen Strings mehr in Header, Tabs, Cards, Dialogen, Tabellen, Toasts und Empty States
-- Datums-/Zahlenformat passt ebenfalls zur gewählten Sprache
+### Technical Detail
 
-Technische Details
-```text
-Betroffene Kern-Dateien:
-- src/pages/UnifiedAnalytics.tsx
-- src/components/analytics/OverviewMetrics.tsx
-- src/components/analytics/MetricsChart.tsx
-- src/components/analytics/TopPostsTable.tsx
-- src/components/analytics/PlatformOverviewCards.tsx
-- src/components/analytics/CommentsAnalyticsTab.tsx
-- src/components/analytics/AIStrategyPanel.tsx
-- src/components/performance/OverviewTab.tsx
-- src/components/performance/XConnectionCard.tsx
-- src/lib/translations.ts
+```typescript
+// src/lib/currency.ts - new helper
+export const getCurrencyForLanguage = (language: string): Currency => {
+  return language === 'en' ? 'USD' : 'EUR';
+};
 ```
+
+Components will use `getCurrencyForLanguage(language)` to determine which currency symbol and price to display dynamically.
+
