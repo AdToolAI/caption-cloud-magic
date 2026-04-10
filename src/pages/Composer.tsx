@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Send, Loader2, Settings, Sparkles } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 import type { Provider, PublishPayload, PublishResult, MediaItem } from "@/types/publish";
 import { OptimizationPanel } from "@/components/optimization/OptimizationPanel";
 import { TranslationPanel } from "@/components/voice/TranslationPanel";
