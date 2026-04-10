@@ -8487,7 +8487,8 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Básico",
-          price: "14,95 €",
+          price: "14,95",
+          currency: "€",
           period: "mes",
           credits: "800 créditos por mes",
           features: [
@@ -8515,7 +8516,8 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Empresarial",
-          price: "69,95 €",
+          price: "69,95",
+          currency: "€",
           period: "mes",
           credits: "Créditos ilimitados",
           badge: "Nivel superior",

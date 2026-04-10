@@ -114,7 +114,7 @@ export const PricingSection = () => {
                   </div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">{plan.name}</h3>
                   <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-4xl font-bold text-foreground">€{plan.price}</span>
+                    <span className="text-4xl font-bold text-foreground">{t(`landing.pricing.${plan.name.toLowerCase()}.currency`)}{plan.price}</span>
                     <span className="text-muted-foreground">{plan.period}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-2">{plan.description}</p>
