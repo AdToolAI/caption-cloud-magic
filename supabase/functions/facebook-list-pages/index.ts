@@ -78,6 +78,7 @@ Deno.serve(async (req) => {
       name: page.name,
       category: page.category || 'Page',
       picture_url: page.picture?.data?.url || null,
+      access_token: page.access_token,
     }));
 
     return new Response(JSON.stringify({ success: true, pages }), {
