@@ -5234,6 +5234,36 @@ export const translations: Record<Language, any> = {
         actionRecs: 'Handlungsempfehlungen',
         based28days: 'Basierend auf deinen letzten 28 Tagen',
         weekdays: ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'],
+      },
+      overviewTab: {
+        reachToday: "Reach heute",
+        impressionsToday: "Impressions (heute)",
+        fansTotal: "Fans gesamt",
+        top10IgPosts: "Top 10 Instagram Posts (letzte 28 Tage)",
+        sortedByEngagement: "Sortiert nach Gesamt-Engagement (Reach + Saved)",
+        dateCol: "Datum",
+        typeCol: "Typ",
+        linkCol: "Link",
+        viewPost: "Ansehen",
+        refreshAll: "Alle Daten aktualisieren"
+      },
+      xConnection: {
+        pleaseLogin: "Bitte melde dich zuerst an",
+        errorConnecting: "Fehler beim Verbinden mit X",
+        tokenRefreshed: "X Token erfolgreich erneuert",
+        errorRefreshingToken: "Fehler beim Erneuern des Tokens",
+        confirmDisconnect: "Möchtest du die X-Verbindung wirklich trennen?",
+        disconnected: "X-Verbindung getrennt",
+        errorDisconnecting: "Fehler beim Trennen",
+        notConnected: "Nicht verbunden",
+        enterpriseFeature: "Enterprise-Feature",
+        connectDesc: "Verbinde dein X-Konto, um Posts zu veröffentlichen und Performance-Daten zu tracken.",
+        enterpriseDesc: "X/Twitter Integration ist exklusiv für Enterprise-Kunden verfügbar.",
+        reconnect: "Erneut verbinden",
+        connectWithX: "Mit X verbinden",
+        upgradeToEnterprise: "Auf Enterprise upgraden",
+        syncNow: "Jetzt synchronisieren",
+        lastSync: "Letzte Synchronisierung"
       }
     },
     
@@ -7937,6 +7967,36 @@ export const translations: Record<Language, any> = {
         actionRecs: 'Recomendaciones de acción',
         based28days: 'Basado en tus últimos 28 días',
         weekdays: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+      },
+      overviewTab: {
+        reachToday: "Alcance hoy",
+        impressionsToday: "Impresiones (hoy)",
+        fansTotal: "Fans totales",
+        top10IgPosts: "Top 10 Posts de Instagram (últimos 28 días)",
+        sortedByEngagement: "Ordenado por engagement total (Alcance + Guardado)",
+        dateCol: "Fecha",
+        typeCol: "Tipo",
+        linkCol: "Enlace",
+        viewPost: "Ver",
+        refreshAll: "Actualizar todos los datos"
+      },
+      xConnection: {
+        pleaseLogin: "Por favor inicia sesión primero",
+        errorConnecting: "Error al conectar con X",
+        tokenRefreshed: "Token de X renovado con éxito",
+        errorRefreshingToken: "Error al renovar el token",
+        confirmDisconnect: "¿Realmente deseas desconectar la conexión con X?",
+        disconnected: "Conexión con X desconectada",
+        errorDisconnecting: "Error al desconectar",
+        notConnected: "No conectado",
+        enterpriseFeature: "Función Enterprise",
+        connectDesc: "Conecta tu cuenta de X para publicar posts y rastrear datos de rendimiento.",
+        enterpriseDesc: "La integración con X/Twitter está disponible exclusivamente para clientes Enterprise.",
+        reconnect: "Reconectar",
+        connectWithX: "Conectar con X",
+        upgradeToEnterprise: "Actualizar a Enterprise",
+        syncNow: "Sincronizar ahora",
+        lastSync: "Última sincronización"
       }
     },
     
