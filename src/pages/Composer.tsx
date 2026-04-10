@@ -687,30 +687,18 @@ export default function Composer() {
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-4 bg-muted/30 backdrop-blur-sm border border-white/10">
-                  <TabsTrigger 
-                    value="standard"
-                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all"
-                  >
-                    Standard
+                  <TabsTrigger value="standard" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all">
+                    {t('composer.tabStandard')}
                   </TabsTrigger>
-                  <TabsTrigger 
-                    value="social"
-                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all"
-                  >
-                    Direkt
+                  <TabsTrigger value="social" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all">
+                    {t('composer.tabDirect')}
                   </TabsTrigger>
-                  <TabsTrigger 
-                    value="optimize"
-                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all"
-                  >
+                  <TabsTrigger value="optimize" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all">
                     <Sparkles className="h-4 w-4 mr-2" />
-                    Optimieren
+                    {t('composer.tabOptimize')}
                   </TabsTrigger>
-                  <TabsTrigger 
-                    value="voiceover"
-                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all"
-                  >
-                    Voiceover
+                  <TabsTrigger value="voiceover" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all">
+                    {t('composer.tabVoiceover')}
                   </TabsTrigger>
                 </TabsList>
 
