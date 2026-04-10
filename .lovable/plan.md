@@ -1,26 +1,28 @@
 
 
-# Fix: Facebook Analytics Detail-Seite zeigt nicht alle Posts
+# Fix: "View Post" Button für Facebook Publishing
 
 ## Problem
-- Die Plattform-Übersicht zeigt korrekt "18 Posts" (kein Zeitfilter)
-- Die Detail-Seite (`PlatformAnalytics.tsx`) filtert standardmäßig auf **30 Tage** → nur 4 Posts sichtbar
-- 14 ältere Posts (Aug 2025 – März 2026) werden ausgeblendet
-- Die 4 sichtbaren Posts sind echte Facebook-Posts, haben aber denselben Inhalt wie Instagram (Cross-Posts)
+Nach dem erfolgreichen Veröffentlichen auf Facebook fehlt der "View Post"-Button, den Instagram hat. Zwei Ursachen:
+
+1. **Permalink-Format falsch**: Die Edge Function gibt `https://facebook.com/${postId}` zurück, wobei `postId` im Graph-API-Format ist (z.B. `123456789_987654321`). Dieses URL-Format funktioniert nicht zuverlässig.
+2. **Mock-Fall**: Wenn keine Verbindung besteht, wird `permalink: undefined` zurückgegeben.
 
 ## Lösung
-In `src/pages/Analytics/PlatformAnalytics.tsx`:
+Die Edge Function (`supabase/functions/publish/index.ts`) anpassen, um korrekte Facebook-Permalinks zu generieren:
 
-1. **Mehr Zeitfilter-Optionen hinzufügen**: 7 Tage, 30 Tage, 90 Tage, **Alle**
-2. **Standard-Filter auf "Alle" setzen**, damit alle 18 Posts sofort sichtbar sind
-3. **Post-Limit erhöhen** von 10 auf 20 für die Anzeige
+### Änderung in `publishToFacebook`
+- **Für Feed/Photo Posts** (Zeile 754-766): Nach dem erfolgreichen Post die Graph API aufrufen, um den echten Permalink zu holen:
+  ```
+  GET /{post_id}?fields=permalink_url&access_token=...
+  ```
+  Falls der API-Call fehlschlägt, als Fallback `https://www.facebook.com/${postResponse.id}` verwenden (mit `pageId_postId` Split).
 
-### Änderungen
-- `timeFilter` State erweitern: `"7" | "30" | "90" | "all"`, Default `"all"`
-- `loadData()`: Bei `"all"` den `.gte("posted_at", ...)` Filter weglassen
-- Select-Optionen: "7 Tage", "30 Tage", "90 Tage", "Alle"
-- `posts.slice(0, 20)` statt `posts.slice(0, 10)`
+- **Für Video Posts** (Zeile 731-736): Gleiche Logik – nach Upload den Permalink via Graph API holen oder Fallback `https://www.facebook.com/${pageId}/videos/${videoId}` verwenden.
 
-## Betroffene Datei
-- `src/pages/Analytics/PlatformAnalytics.tsx`
+### Betroffene Datei
+- `supabase/functions/publish/index.ts` — `publishToFacebook` Funktion, 2 Stellen (Video-Return ~Zeile 735, Feed-Return ~Zeile 765)
+
+### Ergebnis
+- Der `PublishResultCard` zeigt automatisch den "View post"-Link, da `result.permalink` dann korrekt gesetzt ist (die Komponente prüft bereits `result.ok && result.permalink`).
 
