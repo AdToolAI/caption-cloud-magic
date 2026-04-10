@@ -55,25 +55,10 @@ Deno.serve(async (req) => {
     const pageToken = await decryptToken(conn.access_token_hash);
     console.log('[IG Sync] Token decrypted');
 
-    // Get the page ID from account_metadata or account_id
+    // The account_id for Instagram connections IS the IG User ID
     const metadata = conn.account_metadata as any;
-    const pageId = metadata?.page_id || conn.account_id;
-    if (!pageId) throw new Error('No Page ID found. Please reconnect Instagram.');
-
-    // Discover Instagram User ID from the page
-    let igUserId: string;
-    try {
-      const pageData = await graphGet(`/${pageId}`, { fields: 'connected_instagram_account' }, pageToken);
-      igUserId = pageData.connected_instagram_account?.id;
-      if (!igUserId) throw new Error('No connected Instagram account found on this page.');
-    } catch (e: any) {
-      // Fallback: try account_id directly if it's an IG user ID
-      if (metadata?.ig_user_id) {
-        igUserId = metadata.ig_user_id;
-      } else {
-        throw new Error(`Could not resolve Instagram User ID: ${e.message}`);
-      }
-    }
+    const igUserId = metadata?.ig_user_id || conn.account_id;
+    if (!igUserId) throw new Error('No Instagram User ID found. Please reconnect Instagram.');
     console.log(`[IG Sync] IG User ID: ${igUserId}`);
 
     // Get profile info
