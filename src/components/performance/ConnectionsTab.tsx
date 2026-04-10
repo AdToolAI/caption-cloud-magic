@@ -124,12 +124,20 @@ export const ConnectionsTab = () => {
         
         window.history.replaceState({}, '', window.location.pathname + '?tab=connections');
       } else if (connected) {
-        // Legacy callback format (backwards compatibility) - only if no status param
-        toast({
-          title: t('common.success'),
-          description: `Successfully connected to ${connected}`
-        });
-        window.history.replaceState({}, '', window.location.pathname);
+        // Legacy callback format (backwards compatibility)
+        // For Facebook: always show page selection dialog
+        if (connected === 'facebook') {
+          setTimeout(async () => {
+            await fetchConnections();
+            setShowPageSelectDialog(true);
+          }, 1500);
+        } else {
+          toast({
+            title: t('common.success'),
+            description: `Successfully connected to ${connected}`
+          });
+        }
+        window.history.replaceState({}, '', window.location.pathname + '?tab=connections');
       } else if (error) {
         toast({
           title: t('common.error'),
