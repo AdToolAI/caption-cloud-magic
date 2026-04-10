@@ -49,3 +49,22 @@ export const getCurrencyFromLocale = (locale: string): Currency => {
   }
   return 'USD';
 };
+
+/**
+ * Get currency based on UI language
+ * EN → USD, DE/ES → EUR
+ */
+export const getCurrencyForLanguage = (language: string): Currency => {
+  return language === 'en' ? 'USD' : 'EUR';
+};
+
+/**
+ * Format a price value for display based on language
+ */
+export const formatPriceForLanguage = (amount: number, language: string): string => {
+  const currency = getCurrencyForLanguage(language);
+  if (currency === 'EUR') {
+    return `€${amount.toFixed(2).replace('.', ',')}`;
+  }
+  return `$${amount.toFixed(2)}`;
+};
