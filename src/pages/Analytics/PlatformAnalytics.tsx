@@ -36,7 +36,7 @@ export default function PlatformAnalytics() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<PlatformPost[]>([]);
-  const [timeFilter, setTimeFilter] = useState<"7" | "30">("30");
+  const [timeFilter, setTimeFilter] = useState<"7" | "30" | "90" | "all">("all");
   const [summary, setSummary] = useState({
     totalViews: 0, totalLikes: 0, totalComments: 0, totalShares: 0, avgEngagement: 0, postCount: 0,
   });
@@ -51,16 +51,19 @@ export default function PlatformAnalytics() {
     if (!user || !platform) return;
     setLoading(true);
     try {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - parseInt(timeFilter));
-
-      const { data, error } = await supabase
+      let query = supabase
         .from("post_metrics")
         .select("id, caption_text, posted_at, impressions, likes, comments, shares, engagement_rate")
         .eq("user_id", user.id)
-        .eq("provider", platform)
-        .gte("posted_at", cutoff.toISOString())
-        .order("posted_at", { ascending: false });
+        .eq("provider", platform);
+
+      if (timeFilter !== "all") {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - parseInt(timeFilter));
+        query = query.gte("posted_at", cutoff.toISOString());
+      }
+
+      const { data, error } = await query.order("posted_at", { ascending: false });
 
       if (error) throw error;
 
@@ -98,13 +101,15 @@ export default function PlatformAnalytics() {
             <p className="text-muted-foreground">Detaillierte Performance-Metriken</p>
           </div>
           <div className="ml-auto">
-            <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as "7" | "30")}>
+            <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as "7" | "30" | "90" | "all")}>
               <SelectTrigger className="w-32">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="7">7 Tage</SelectItem>
                 <SelectItem value="30">30 Tage</SelectItem>
+                <SelectItem value="90">90 Tage</SelectItem>
+                <SelectItem value="all">Alle</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -153,7 +158,7 @@ export default function PlatformAnalytics() {
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {posts.slice(0, 10).map((post) => (
+                    {posts.slice(0, 20).map((post) => (
                       <div key={post.id} className="flex items-start justify-between p-3 rounded-lg border">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm line-clamp-2">{post.caption_text || "Kein Text"}</p>
