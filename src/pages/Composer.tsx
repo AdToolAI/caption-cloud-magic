@@ -250,8 +250,8 @@ export default function Composer() {
         }
         
         toast({
-          title: "✅ Post importiert",
-          description: "Der KI-generierte Post wurde geladen. Jetzt können Sie ihn publizieren!",
+          title: `✅ ${t('composer.postImported')}`,
+          description: t('composer.postImportedDesc'),
         });
         
         // Clear after successful import
@@ -309,24 +309,24 @@ export default function Composer() {
       const hashtagText = '\n\n' + hashtags.split(',').map(h => `#${h.trim()}`).join(' ');
       setTextContent(prev => prev + hashtagText);
       toast({
-        title: '✅ Hashtags hinzugefügt',
-        description: 'Top-Hashtags wurden eingefügt.',
+        title: `✅ ${t('composer.hashtagsAdded')}`,
+        description: t('composer.hashtagsAddedDesc'),
       });
     }
     
     const postType = params.get('post_type');
     if (postType) {
       toast({
-        title: '💡 Post-Typ Empfehlung',
-        description: `Empfohlen: ${postType} für besseres Engagement`,
+        title: `💡 ${t('composer.postTypeRec')}`,
+        description: t('composer.postTypeRecDesc', { type: postType }),
       });
     }
     
     const captionHint = params.get('caption_hint');
     if (captionHint) {
       toast({
-        title: '📝 Caption-Tipp',
-        description: `Ziel: ${captionHint}`,
+        title: `📝 ${t('composer.captionTip')}`,
+        description: t('composer.captionTipDesc', { hint: captionHint }),
       });
     }
   }, [toast]);
@@ -437,8 +437,8 @@ export default function Composer() {
     // VALIDATION: Check if textContent is empty
     if (!textContent || textContent.trim().length === 0) {
       toast({
-        title: "❌ Fehler",
-        description: "Bitte geben Sie Text für Ihren Post ein.",
+        title: "❌",
+        description: t('composer.errorNoText'),
         variant: "destructive",
       });
       return;
@@ -459,8 +459,8 @@ export default function Composer() {
         if (file.type.startsWith('video/')) {
           if (file.size === 0) {
             toast({
-              title: "Ungültige Videodatei",
-              description: `Die Videodatei "${file.name}" ist leer (0 Bytes). Bitte wählen Sie ein gültiges Video.`,
+              title: t('composer.invalidVideo'),
+              description: t('composer.invalidVideoDesc', { name: file.name }),
               variant: "destructive",
             });
             setIsPublishing(false);
@@ -469,8 +469,8 @@ export default function Composer() {
           
           if (file.size < 1024) { // Less than 1KB
             toast({
-              title: "Video zu klein",
-              description: `Die Videodatei "${file.name}" ist zu klein (${file.size} Bytes). Bitte wählen Sie ein gültiges Video.`,
+              title: t('composer.videoTooSmall'),
+              description: t('composer.videoTooSmallDesc', { name: file.name, size: file.size }),
               variant: "destructive",
             });
             setIsPublishing(false);
@@ -487,8 +487,8 @@ export default function Composer() {
       
       if (fileSize === 0 || fileSize < 1024) {
         toast({
-          title: "Ungültiges Video",
-          description: `Das importierte Video ist zu klein (${fileSize} Bytes). Bitte generieren Sie ein neues Video.`,
+          title: t('composer.importedVideoInvalid'),
+          description: t('composer.importedVideoInvalidDesc', { size: fileSize }),
           variant: "destructive",
         });
         setIsPublishing(false);
@@ -512,8 +512,8 @@ export default function Composer() {
         
         if (fileSize === 0) {
           toast({
-            title: "❌ Fehler",
-            description: "Dateigröße konnte nicht ermittelt werden. Bitte laden Sie die Datei erneut hoch.",
+            title: "❌",
+            description: t('composer.fileSizeError'),
             variant: "destructive",
           });
           setIsPublishing(false);
@@ -602,10 +602,10 @@ export default function Composer() {
           .join('\n');
         
         toast({
-          title: "Publishing fehlgeschlagen",
+          title: t('composer.publishFailed'),
           description: channelsExceedingLimit.length > 0 
-            ? `Alle Kanäle überschreiten das Zeichenlimit (${textContent.length} Zeichen)`
-            : errorMessages || "Alle Kanäle konnten nicht veröffentlicht werden.",
+            ? t('composer.allChannelsExceed', { count: textContent.length })
+            : errorMessages || t('composer.allChannelsFailed'),
           variant: "destructive",
         });
       }
