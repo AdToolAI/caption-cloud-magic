@@ -794,7 +794,7 @@ export default function Composer() {
                     className="w-full mt-3"
                   >
                     <Settings className="h-4 w-4 mr-2" />
-                    YouTube-Einstellungen konfigurieren
+                    {t('composer.ytConfigBtn')}
                   </Button>
                 )}
 
@@ -807,7 +807,7 @@ export default function Composer() {
                     className="text-xs"
                   >
                     <Settings className="h-3 w-3 mr-1" />
-                    Verbindungen verwalten
+                    {t('composer.manageConnections')}
                   </Button>
                 </div>
 
@@ -816,7 +816,7 @@ export default function Composer() {
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      ⚠️ LinkedIn-Sync eingeschränkt. UGC-Post möglich; bei 403 wird kein Fehler angezeigt.
+                      ⚠️ {t('composer.linkedinWarning')}
                     </AlertDescription>
                   </Alert>
                 )}
