@@ -37,6 +37,7 @@ const DRAFT_KEY = "composer_draft";
 export default function Composer() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [textContent, setTextContent] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<File[]>([]);
   const [selectedChannels, setSelectedChannels] = useState<Provider[]>(["instagram", "facebook", "x"]);
