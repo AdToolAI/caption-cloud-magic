@@ -1,41 +1,74 @@
 
+Problem erkannt: Der neue Seiten-Auswahl-Flow ist zwar teilweise eingebaut, wird aber im echten Callback offenbar nicht erreicht. Deshalb siehst du weiter nur den bereits gespeicherten Seitennamen.
 
-## Plan: Facebook-Seiten-Auswahl nach OAuth einbauen
+Was ich im Code gefunden habe:
+- Der Dialog `FacebookPageSelectDialog` existiert und ist in `src/components/performance/ConnectionsTab.tsx` eingebunden.
+- Der Dialog öffnet nur im Branch `status === 'success'`.
+- Der allgemeine OAuth-Callback `supabase/functions/oauth-callback/index.ts` redirectet aber aktuell mit `?connected=facebook` nach `/performance` statt mit `?provider=facebook&status=success&tab=connections`.
+- Zusätzlich speichert derselbe Callback für Facebook schon sofort die erste gefundene Seite aus `/me/accounts` als Verbindung. Damit ist die Auswahl technisch schon vorweggenommen.
 
-### Problem
-Meta will beim `pages_show_list` Screencast sehen, dass die App die Facebook-Seiten des Nutzers **auflistet**. Aktuell wird nur der Name der verbundenen Seite angezeigt, aber es gibt keinen Schritt, bei dem der Nutzer seine Seiten sieht und eine auswählt.
+Warum du deshalb nur den Namen siehst:
+1. Nach OAuth landest du auf der Overview/Performance-Seite statt sicher im Connections-Flow.
+2. Der Callback schreibt bereits die erste Seite in `social_connections`.
+3. Die UI zeigt dann nur `connection.account_name` auf der Karte an.
+4. Der Auswahl-Dialog wird gar nicht oder nicht zuverlässig geöffnet.
 
-### Lösung
-Nach dem Facebook-OAuth einen **Seiten-Auswahl-Dialog** einbauen, der über die Graph API (`/me/accounts`) alle Seiten des Nutzers abruft und als Liste anzeigt. Der Nutzer wählt eine Seite aus, die dann als Verbindung gespeichert wird.
+Implementierungsplan:
+1. OAuth-Redirect für Facebook korrigieren
+- Den Facebook-Callback so anpassen, dass er nach erfolgreichem Connect auf die Connections-Ansicht mit eindeutigen Success-Parametern zurückleitet.
+- Ziel: der bestehende `status === 'success'`-Pfad in `ConnectionsTab` wird sicher ausgelöst.
 
-### Technische Umsetzung
+2. Facebook-Callback auf “User-Token zuerst, Seitenwahl danach” umstellen
+- Im Callback für Facebook nicht mehr sofort die erste Seite auswählen.
+- Stattdessen den Facebook User Access Token speichern, plus Metadaten wie `selection_required: true`.
+- `account_name` zunächst generisch setzen, z. B. „Facebook account connected“ oder den Facebook-Namen, aber nicht schon eine konkrete Seite.
 
-**1. Neue Edge Function: `facebook-list-pages`**
-- Nimmt den User-Token aus der OAuth-Callback-Phase
-- Ruft `GET /me/accounts` auf der Facebook Graph API auf
-- Gibt eine Liste der Seiten zurück (Name, ID, Kategorie, Profilbild)
+3. Seiten-Auswahl sauber finalisieren
+- `facebook-list-pages` weiter nutzen, aber auf Basis des gespeicherten User-Tokens die komplette Seitenliste laden.
+- Bei Auswahl im Dialog nicht nur `account_name` und `account_id` setzen, sondern auch:
+  - das ausgewählte Page Access Token speichern/ersetzen
+  - `selection_required` auf false setzen
+  - optional zusätzliche Seiten-Metadaten speichern (Kategorie, Bild-URL)
 
-**2. Neuer Dialog: `FacebookPageSelectDialog.tsx`**
-- Wird nach erfolgreichem Facebook-OAuth angezeigt
-- Zeigt alle verfügbaren Seiten als Karten (Icon, Name, Kategorie)
-- Nutzer klickt auf eine Seite → wird als `account_name` in `social_connections` gespeichert
-- Visuell ansprechend mit Seiten-Avataren und Kategorien
+4. Verbindungs-Karte für Facebook verbessern
+- Solange noch keine Seite gewählt wurde, statt nur eines Namens einen klaren Zustand anzeigen:
+  - „Page selection required“
+  - Button „Choose Page“
+- Nach Auswahl:
+  - Seitenname anzeigen
+  - optional kleine Zusatzinfo wie Kategorie oder Page-ID-Shortform anzeigen
+- Damit ist für den Reviewer sichtbarer, dass wirklich eine Auswahl stattgefunden hat.
 
-**3. Anpassung `ConnectionsTab.tsx`**
-- Nach Facebook-OAuth-Callback: Statt direkt zu verbinden, erst den Seiten-Auswahl-Dialog öffnen
-- Nach Auswahl wird die Verbindung mit der gewählten Seite gespeichert
+5. Sync-Verhalten anpassen
+- Für Facebook kein automatisches `handleSync(...)`, bevor eine Seite ausgewählt wurde.
+- Erst nach erfolgreicher Seitenauswahl Sync erlauben/triggern, damit keine falsche oder zufällige Seite verwendet wird.
 
-### Screencast-Flow danach
-1. Login → Integrations → Facebook Connect
-2. OAuth-Dialog mit `pages_show_list` Scope sichtbar
-3. **NEU:** Seiten-Auswahl-Dialog zeigt alle Seiten des Nutzers
-4. Nutzer wählt eine Seite aus
-5. Verbindung wird hergestellt → Seitenname wird angezeigt
+6. End-to-End prüfen
+- Flow testen:
+  - Facebook Connect
+  - Redirect zurück in Connections
+  - Dialog öffnet
+  - mehrere Seiten werden gelistet
+  - Auswahl speichert korrekt
+  - Karte zeigt gewählte Seite
+- Danach kann der Screencast für `pages_show_list` sauber aufgenommen werden.
 
-### Dateien
-| Datei | Aktion |
-|---|---|
-| `supabase/functions/facebook-list-pages/index.ts` | Neu – Graph API `/me/accounts` aufrufen |
-| `src/components/performance/FacebookPageSelectDialog.tsx` | Neu – Seiten-Auswahl UI |
-| `src/components/performance/ConnectionsTab.tsx` | Anpassen – Dialog nach FB-OAuth triggern |
+Betroffene Dateien:
+- `supabase/functions/oauth-callback/index.ts`
+- `supabase/functions/facebook-list-pages/index.ts`
+- `src/components/performance/ConnectionsTab.tsx`
+- `src/components/performance/FacebookPageSelectDialog.tsx`
 
+Technische Details:
+- Aktuelle Hauptursache ist der Mismatch zwischen Callback-Redirect und Frontend-Callback-Logik.
+- Zweite Hauptursache ist, dass Facebook im Callback schon `pagesData.data[0]` auswählt.
+- Für `pages_show_list` ist es besser, erst den User zu verbinden und dann explizit eine Seite in der UI auswählen zu lassen.
+- Optional kann `account_metadata` genutzt werden für:
+  - `selection_required`
+  - `selected_page_category`
+  - `selected_page_picture_url`
+
+Ergebnis nach Umsetzung:
+- Nicht mehr nur „der Name“ auf der Karte
+- Stattdessen ein echter, sichtbarer Schritt mit Seitenliste und Auswahl
+- Das ist deutlich review-sicherer für `pages_show_list`
