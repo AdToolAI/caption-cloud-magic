@@ -141,14 +141,8 @@ serve(async (req) => {
       ? await encryptToken(tokenData.refresh_token)
       : null;
 
-    // For Facebook, use Page Access Token instead of User Access Token
-    const finalAccessToken = provider === 'facebook' && (accountInfo as any).access_token 
-      ? (accountInfo as any).access_token 
-      : tokenData.access_token;
-    
-    const finalAccessTokenHash = finalAccessToken
-      ? await encryptToken(finalAccessToken)
-      : accessTokenHash;
+    // For Facebook: store User Access Token (page selection happens in UI)
+    const finalAccessTokenHash = accessTokenHash;
     
     // Store connection with audit trail and account metadata
     const { error: upsertError } = await supabase
@@ -163,7 +157,10 @@ serve(async (req) => {
         token_expires_at: tokenData.expires_at,
         auto_sync_enabled: true,
         last_sync_at: null,
-        account_metadata: (accountInfo as any).account_type ? { account_type: (accountInfo as any).account_type } : {}
+        account_metadata: {
+          ...(accountInfo as any).account_type ? { account_type: (accountInfo as any).account_type } : {},
+          ...(accountInfo as any).selection_required ? { selection_required: true } : {}
+        }
       }, {
         onConflict: 'user_id,provider,account_id'
       });
@@ -197,8 +194,10 @@ serve(async (req) => {
         }
       });
 
-    const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';
-    return Response.redirect(`${appUrl}/performance?connected=${provider}`, 302);
+    // Use dynamic redirect URL from stored state, fallback to APP_URL
+    const redirectUrl = storedState.redirect_url || Deno.env.get('APP_URL') || 'https://useadtool.ai';
+    const baseUrl = redirectUrl.replace(/\/integrations.*$/, '').replace(/\/performance.*$/, '');
+    return Response.redirect(`${baseUrl}/integrations?provider=${provider}&status=success&tab=connections`, 302);
 
   } catch (error) {
     console.error('OAuth callback error:', error);
@@ -291,39 +290,31 @@ async function getMetaAccountInfo(accessToken: string, provider: string) {
     };
   }
   
-  // Facebook handling: Get user's Pages and Page Access Token
-  // Step 1: Get user's Facebook Pages
-  const pagesResponse = await fetch(
-    'https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token',
+  // Facebook handling: Store User Access Token, defer page selection to UI
+  // Get basic user info for the connection record
+  const fbUserResponse = await fetch(
+    'https://graph.facebook.com/v18.0/me?fields=id,name',
     { headers: { 'Authorization': `Bearer ${accessToken}` } }
   );
 
-  if (!pagesResponse.ok) {
-    const errorText = await pagesResponse.text();
-    console.error('Failed to fetch Facebook pages:', errorText);
-    throw new Error('Failed to fetch Facebook pages');
+  if (!fbUserResponse.ok) {
+    const errorText = await fbUserResponse.text();
+    console.error('Failed to fetch Facebook user info:', errorText);
+    throw new Error('Failed to fetch Facebook user info');
   }
 
-  const pagesData = await pagesResponse.json();
+  const fbUserData = await fbUserResponse.json();
   
-  if (!pagesData.data || pagesData.data.length === 0) {
-    throw new Error('No Facebook pages found. Please connect a Facebook page to use this feature.');
-  }
-
-  // Use first page (in the future, we could implement user selection)
-  const page = pagesData.data[0];
-  
-  console.log('Facebook Page found:', {
-    id: page.id,
-    name: page.name,
-    hasToken: !!page.access_token
+  console.log('Facebook User found:', {
+    id: fbUserData.id,
+    name: fbUserData.name,
   });
   
   return {
-    id: page.id,
-    name: page.name,
-    access_token: page.access_token, // Page Access Token!
-    account_type: 'page'
+    id: fbUserData.id,
+    name: fbUserData.name,
+    account_type: 'facebook_user',
+    selection_required: true,
   };
 }
 
