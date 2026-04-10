@@ -785,7 +785,12 @@ async function publishToFacebook(
       );
       if (permalinkRes.ok) {
         const permalinkData = await permalinkRes.json();
-        postPermalink = permalinkData.permalink_url;
+        if (permalinkData.permalink_url) {
+          // Graph API may return relative paths - ensure absolute URL
+          postPermalink = permalinkData.permalink_url.startsWith('http')
+            ? permalinkData.permalink_url
+            : `https://www.facebook.com${permalinkData.permalink_url}`;
+        }
       }
     } catch (e) {
       console.warn('[Facebook] Could not fetch post permalink:', e);
