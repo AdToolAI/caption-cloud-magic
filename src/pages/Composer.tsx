@@ -919,9 +919,9 @@ export default function Composer() {
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  Live-Vorschau
+                  {t('composer.livePreview')}
                 </CardTitle>
-                <CardDescription>So wird Ihr Post aussehen</CardDescription>
+                <CardDescription>{t('composer.previewDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ComposerPreview
