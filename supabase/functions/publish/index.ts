@@ -723,16 +723,34 @@ async function publishToFacebook(
 
       const finishData = await finishResponse.json();
       
+      // Fetch real permalink from Graph API
+      let videoPermalink: string | undefined;
+      try {
+        const permalinkRes = await fetch(
+          `https://graph.facebook.com/v18.0/${finishData.id}?fields=permalink_url&access_token=${accessToken}`
+        );
+        if (permalinkRes.ok) {
+          const permalinkData = await permalinkRes.json();
+          videoPermalink = permalinkData.permalink_url;
+        }
+      } catch (e) {
+        console.warn('[Facebook] Could not fetch video permalink:', e);
+      }
+      
+      if (!videoPermalink && finishData.id) {
+        videoPermalink = `https://www.facebook.com/${pageId}/videos/${finishData.id}`;
+      }
+
       console.log('[Facebook] Video published', { 
         external_id: finishData.id, 
-        permalink: `https://facebook.com/${finishData.id}` 
+        permalink: videoPermalink 
       });
 
       return {
         provider: 'facebook',
         ok: true,
         external_id: finishData.id,
-        permalink: finishData.id ? `https://facebook.com/${finishData.id}` : undefined,
+        permalink: videoPermalink,
       };
     }
 
@@ -753,16 +771,38 @@ async function publishToFacebook(
 
     const postResponse = await graphPost(postEndpoint, params);
     
+    // Fetch real permalink from Graph API
+    let postPermalink: string | undefined;
+    try {
+      const permalinkRes = await fetch(
+        `https://graph.facebook.com/v18.0/${postResponse.id}?fields=permalink_url&access_token=${accessToken}`
+      );
+      if (permalinkRes.ok) {
+        const permalinkData = await permalinkRes.json();
+        postPermalink = permalinkData.permalink_url;
+      }
+    } catch (e) {
+      console.warn('[Facebook] Could not fetch post permalink:', e);
+    }
+    
+    if (!postPermalink && postResponse.id) {
+      // Fallback: split pageId_postId format
+      const parts = postResponse.id.split('_');
+      postPermalink = parts.length === 2
+        ? `https://www.facebook.com/${parts[0]}/posts/${parts[1]}`
+        : `https://www.facebook.com/${postResponse.id}`;
+    }
+
     console.log('[Facebook] published', { 
       external_id: postResponse.id, 
-      permalink: `https://facebook.com/${postResponse.id}` 
+      permalink: postPermalink 
     });
     
     return {
       provider: 'facebook',
       ok: true,
       external_id: postResponse.id,
-      permalink: postResponse.id ? `https://facebook.com/${postResponse.id}` : undefined,
+      permalink: postPermalink,
     };
   } catch (error: any) {
     console.error('[Facebook] Error:', error);
