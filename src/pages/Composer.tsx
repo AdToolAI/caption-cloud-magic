@@ -928,7 +928,7 @@ export default function Composer() {
                   textContent={textContent}
                   selectedMedia={selectedMedia}
                   selectedChannels={selectedChannels}
-                  profileName="Ihr Profil"
+                  profileName={t('composer.yourProfile')}
                   hook={postData?.hook}
                   caption={postData?.caption}
                   hashtags={postData?.hashtags}
@@ -993,8 +993,8 @@ export default function Composer() {
           onSave={(config) => {
             setYoutubeConfig(config);
             toast({
-              title: "YouTube-Einstellungen gespeichert",
-              description: `Privacy: ${config.privacyStatus}, Made for Kids: ${config.madeForKids ? 'Ja' : 'Nein'}`,
+              title: t('composer.ytSettingsSaved'),
+              description: `Privacy: ${config.privacyStatus}, Made for Kids: ${config.madeForKids ? 'Yes' : 'No'}`,
             });
           }}
         />
