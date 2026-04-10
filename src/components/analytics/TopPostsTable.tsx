@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ExternalLink, Download, TrendingUp, Trophy } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface TopPost {
   provider: string;
@@ -25,7 +26,7 @@ interface TopPostsTableProps {
   loading: boolean;
 }
 
-const AnimatedCounter = ({ value }: { value: number }) => {
+const AnimatedCounter = ({ value, locale = "en-US" }: { value: number; locale?: string }) => {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -47,7 +48,7 @@ const AnimatedCounter = ({ value }: { value: number }) => {
     return () => clearInterval(timer);
   }, [value]);
 
-  return <span>{count.toLocaleString("de-DE")}</span>;
+  return <span>{count.toLocaleString(locale)}</span>;
 };
 
 const getPlatformStyles = (provider: string) => {
@@ -63,11 +64,13 @@ const getPlatformStyles = (provider: string) => {
 };
 
 export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
+  const { t, language } = useTranslation();
+  const locale = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
   const [selectedPost, setSelectedPost] = useState<TopPost | null>(null);
 
   const exportToCSV = () => {
     if (!data || data.length === 0) {
-      toast.error("Keine Daten zum Exportieren");
+      toast.error(t('analytics.unified.noDataToExport'));
       return;
     }
 
@@ -91,7 +94,7 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
     a.download = `top-posts-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("CSV erfolgreich exportiert");
+    toast.success(t('analytics.unified.csvExported'));
   };
 
   if (loading) {
@@ -120,7 +123,6 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
         className="p-6 rounded-2xl backdrop-blur-xl bg-card/60 border border-white/10
                    shadow-[0_0_30px_hsla(43,90%,68%,0.08)]"
       >
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <motion.div
@@ -133,8 +135,8 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
               <Trophy className="h-6 w-6 text-primary" />
             </motion.div>
             <div>
-              <h3 className="text-xl font-bold text-foreground">Top Performing Posts</h3>
-              <p className="text-sm text-muted-foreground">Deine besten Posts nach Engagement-Rate</p>
+              <h3 className="text-xl font-bold text-foreground">{t('analytics.unified.topPerformingPosts')}</h3>
+              <p className="text-sm text-muted-foreground">{t('analytics.unified.bestPostsByEngagement')}</p>
             </div>
           </div>
           <Button 
@@ -148,7 +150,6 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
           </Button>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto rounded-xl border border-white/10">
           <Table>
             <TableHeader>
@@ -160,7 +161,7 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
                 <TableHead className="text-right text-muted-foreground">Shares</TableHead>
                 <TableHead className="text-right text-muted-foreground">Views</TableHead>
                 <TableHead className="text-right text-muted-foreground">ER %</TableHead>
-                <TableHead className="text-right text-muted-foreground">Aktionen</TableHead>
+                <TableHead className="text-right text-muted-foreground">{t('analytics.unified.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -182,7 +183,7 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
                         <TrendingUp className="h-8 w-8 text-primary/60" />
                       </motion.div>
                       <p className="text-muted-foreground">
-                        Noch keine Posts. Verbinde deine Social Accounts und veröffentliche Content!
+                        {t('analytics.unified.noPosts')}
                       </p>
                     </motion.div>
                   </TableCell>
@@ -192,7 +193,7 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
                   const isTrending = post.engagement_rate > 5;
                   const truncatedCaption = post.caption_text?.length > 50 
                     ? post.caption_text.substring(0, 50) + "..." 
-                    : post.caption_text || "Keine Caption";
+                    : post.caption_text || t('analytics.unified.noCaption');
 
                   return (
                     <motion.tr
@@ -228,16 +229,16 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-medium text-foreground">
-                        {post.likes.toLocaleString("de-DE")}
+                        {post.likes.toLocaleString(locale)}
                       </TableCell>
                       <TableCell className="text-right font-medium text-foreground">
-                        {post.comments.toLocaleString("de-DE")}
+                        {post.comments.toLocaleString(locale)}
                       </TableCell>
                       <TableCell className="text-right font-medium text-foreground">
-                        {post.shares.toLocaleString("de-DE")}
+                        {post.shares.toLocaleString(locale)}
                       </TableCell>
                       <TableCell className="text-right font-medium text-foreground">
-                        {post.views.toLocaleString("de-DE")}
+                        {post.views.toLocaleString(locale)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Badge 
@@ -280,7 +281,6 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
         </div>
       </motion.div>
 
-      {/* Details Dialog */}
       <Dialog open={!!selectedPost} onOpenChange={() => setSelectedPost(null)}>
         <DialogContent className="max-w-2xl backdrop-blur-xl bg-card/95 border border-white/10
                                    shadow-[0_0_50px_hsla(43,90%,68%,0.1)]">
@@ -291,7 +291,7 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
                               shadow-[0_0_15px_hsla(43,90%,68%,0.2)]">
                 <TrendingUp className="h-5 w-5 text-primary" />
               </div>
-              Post Details
+              {t('analytics.unified.postDetails')}
             </DialogTitle>
           </DialogHeader>
           {selectedPost && (
@@ -308,7 +308,7 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
               
               <div className="p-4 rounded-xl bg-muted/20 border border-white/10">
                 <h4 className="text-sm font-medium text-muted-foreground mb-2">Caption</h4>
-                <p className="text-sm text-foreground/80">{selectedPost.caption_text || "Keine Caption"}</p>
+                <p className="text-sm text-foreground/80">{selectedPost.caption_text || t('analytics.unified.noCaption')}</p>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
@@ -324,7 +324,7 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
                       <div key={idx} className="flex justify-between items-center">
                         <span className="text-muted-foreground text-sm">{item.label}:</span>
                         <span className="font-semibold text-foreground">
-                          <AnimatedCounter value={item.value} />
+                          <AnimatedCounter value={item.value} locale={locale} />
                         </span>
                       </div>
                     ))}
@@ -343,7 +343,7 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground text-sm">Posted:</span>
                       <span className="font-medium text-foreground">
-                        {new Date(selectedPost.posted_at).toLocaleDateString("de-DE")}
+                        {new Date(selectedPost.posted_at).toLocaleDateString(locale)}
                       </span>
                     </div>
                   </div>
@@ -357,7 +357,7 @@ export const TopPostsTable = ({ data, loading }: TopPostsTableProps) => {
               >
                 <a href={selectedPost.permalink} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  Original Post ansehen
+                  {t('analytics.unified.viewOriginalPost')}
                 </a>
               </Button>
             </div>

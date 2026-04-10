@@ -51,7 +51,7 @@ interface TopPost {
 }
 
 export default function UnifiedAnalytics() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -59,6 +59,8 @@ export default function UnifiedAnalytics() {
   const [platform, setPlatform] = useState("instagram");
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [metricsUpdateKey, setMetricsUpdateKey] = useState(0);
+  
+  const locale = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
   
   // Analytics data
   const [metricsSummary, setMetricsSummary] = useState<MetricsSummary[]>([]);
@@ -80,7 +82,7 @@ export default function UnifiedAnalytics() {
         },
         (payload) => {
           console.log('Real-time metrics update:', payload);
-          toast.success('Metriken automatisch aktualisiert');
+          toast.success(t('analytics.unified.metricsAutoUpdated'));
           setMetricsUpdateKey(prev => prev + 1);
         }
       )
@@ -163,14 +165,14 @@ export default function UnifiedAnalytics() {
       setLastUpdated(new Date());
     } catch (error) {
       console.error("Error fetching analytics:", error);
-      toast.error("Fehler beim Laden der Analytics-Daten");
+      toast.error(t('analytics.unified.errorLoadingAnalytics'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleManualRefresh = () => {
-    toast.info("Analytics werden aktualisiert...");
+    toast.info(t('analytics.unified.analyticsRefreshing'));
     fetchAnalytics();
   };
 
@@ -183,10 +185,10 @@ export default function UnifiedAnalytics() {
 
       if (error) throw error;
 
-      toast.success(`Hashtag-Analyse abgeschlossen: ${data.totalAnalyzed} Hashtags analysiert`);
+      toast.success(t('analytics.unified.hashtagAnalysisDone', { count: data.totalAnalyzed }));
       fetchAnalytics();
     } catch (error: any) {
-      toast.error(`Fehler: ${error.message}`);
+      toast.error(`${t('common.error')}: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -201,10 +203,10 @@ export default function UnifiedAnalytics() {
 
       if (error) throw error;
 
-      toast.success(`Analyse abgeschlossen: ${data.analyzed} Posts analysiert`);
+      toast.success(t('analytics.unified.analysisDone', { count: data.analyzed }));
       fetchAnalytics();
     } catch (error: any) {
-      toast.error(`Fehler: ${error.message}`);
+      toast.error(`${t('common.error')}: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -217,7 +219,7 @@ export default function UnifiedAnalytics() {
           <div>
             <h1 className="text-4xl font-bold mb-2">{t('analytics.unified.title')}</h1>
             <p className="text-muted-foreground">
-              Zuletzt aktualisiert: {lastUpdated.toLocaleTimeString()}
+              {t('analytics.unified.lastUpdated')}: {lastUpdated.toLocaleTimeString(locale)}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -226,8 +228,8 @@ export default function UnifiedAnalytics() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7">7 Tage</SelectItem>
-                <SelectItem value="30">30 Tage</SelectItem>
+                <SelectItem value="7">{t('analytics.unified.days7')}</SelectItem>
+                <SelectItem value="30">{t('analytics.unified.days30')}</SelectItem>
               </SelectContent>
             </Select>
             
@@ -235,12 +237,12 @@ export default function UnifiedAnalytics() {
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm">
                   <Settings className="h-4 w-4 mr-2" />
-                  Plattformen verwalten
+                  {t('analytics.unified.managePlatforms')}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Social-Media-Verbindungen</DialogTitle>
+                  <DialogTitle>{t('analytics.unified.socialConnections')}</DialogTitle>
                 </DialogHeader>
                 <ConnectionsTab />
               </DialogContent>
@@ -257,7 +259,7 @@ export default function UnifiedAnalytics() {
             <TabsTrigger value="overview">{t('analytics.unified.tabs.overview')}</TabsTrigger>
             <TabsTrigger value="platforms">
               <LayoutGrid className="h-3.5 w-3.5 mr-1" />
-              Plattformen
+              {t('analytics.unified.tabs.platforms')}
             </TabsTrigger>
             <TabsTrigger value="performance">{t('analytics.unified.tabs.performance')}</TabsTrigger>
             <TabsTrigger value="top-content">{t('analytics.unified.tabs.topContent')}</TabsTrigger>
@@ -265,32 +267,29 @@ export default function UnifiedAnalytics() {
             <TabsTrigger value="campaigns">{t('analytics.unified.tabs.campaigns')}</TabsTrigger>
             <TabsTrigger value="ai-strategy">
               <Brain className="h-3.5 w-3.5 mr-1" />
-              KI-Analyse
+              {t('analytics.unified.tabs.aiStrategy')}
             </TabsTrigger>
             <TabsTrigger value="comments">
               <MessageSquare className="h-3.5 w-3.5 mr-1" />
-              Kommentare
+              {t('analytics.unified.tabs.comments')}
             </TabsTrigger>
             <TabsTrigger value="reports">{t('analytics.unified.tabs.reports')}</TabsTrigger>
           </TabsList>
 
-          {/* Übersicht Tab */}
           <TabsContent value="overview" className="space-y-6">
             <OverviewMetrics data={metricsSummary} loading={loading} />
             <MetricsChart data={metricsSummary} loading={loading} />
           </TabsContent>
 
-          {/* Plattformen Tab */}
           <TabsContent value="platforms" className="space-y-6">
             <PlatformOverviewCards />
           </TabsContent>
 
-          {/* Performance Tab */}
           <TabsContent value="performance" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Platform-spezifische Performance</CardTitle>
-                <CardDescription>Detaillierte Metriken nach Plattform</CardDescription>
+                <CardTitle>{t('analytics.unified.platformPerformance')}</CardTitle>
+                <CardDescription>{t('analytics.unified.detailedMetrics')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <OverviewTab key={`overview-${metricsUpdateKey}`} />
@@ -299,7 +298,7 @@ export default function UnifiedAnalytics() {
             
             <Card>
               <CardHeader>
-                <CardTitle>Engagement-Trends</CardTitle>
+                <CardTitle>{t('analytics.unified.engagementTrends')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <EngagementTrendsTab key={`trends-${metricsUpdateKey}`} />
@@ -309,7 +308,6 @@ export default function UnifiedAnalytics() {
             <MetricsChart data={metricsSummary} loading={loading} byProvider />
           </TabsContent>
 
-          {/* Top Content Tab */}
           <TabsContent value="top-content" className="space-y-6">
             <TopPostsTable data={topPosts} loading={loading} />
             
@@ -317,9 +315,9 @@ export default function UnifiedAnalytics() {
               <CardHeader>
                 <CardTitle>
                   <Award className="h-5 w-5 inline mr-2" />
-                  Best Performing Content
+                  {t('analytics.unified.bestPerformingContent')}
                 </CardTitle>
-                <CardDescription>AI-identifizierte Top-Performer mit Insights</CardDescription>
+                <CardDescription>{t('analytics.unified.aiIdentifiedTopPerformers')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-4">
@@ -336,7 +334,7 @@ export default function UnifiedAnalytics() {
                   </Select>
                   <Button onClick={identifyBestContent} disabled={loading}>
                     <TrendingUp className="h-4 w-4 mr-2" />
-                    Best Content identifizieren
+                    {t('analytics.unified.identifyBestContent')}
                   </Button>
                 </div>
 
@@ -348,7 +346,7 @@ export default function UnifiedAnalytics() {
                           <div className="flex-1">
                             <p className="text-sm line-clamp-2">{content.caption_text}</p>
                             <p className="text-xs text-muted-foreground mt-2">
-                              {new Date(content.posted_at).toLocaleDateString()}
+                              {new Date(content.posted_at).toLocaleDateString(locale)}
                             </p>
                           </div>
                           <Badge>{content.engagement_score} Score</Badge>
@@ -371,7 +369,7 @@ export default function UnifiedAnalytics() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Caption-Insights</CardTitle>
+                <CardTitle>{t('analytics.unified.captionInsights')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <CaptionInsightsTab key={`captions-${metricsUpdateKey}`} />
@@ -379,15 +377,14 @@ export default function UnifiedAnalytics() {
             </Card>
           </TabsContent>
 
-          {/* Hashtags Tab */}
           <TabsContent value="hashtags" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>
                   <Hash className="h-5 w-5 inline mr-2" />
-                  Hashtag-Performance
+                  {t('analytics.unified.hashtagPerformanceTitle')}
                 </CardTitle>
-                <CardDescription>Analysiere deine Top-Hashtags nach Reichweite und Engagement</CardDescription>
+                <CardDescription>{t('analytics.unified.hashtagPerformanceDesc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-4">
@@ -404,7 +401,7 @@ export default function UnifiedAnalytics() {
                   </Select>
                   <Button onClick={analyzeHashtags} disabled={loading}>
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    Jetzt analysieren
+                    {t('analytics.unified.analyzeNow')}
                   </Button>
                 </div>
 
@@ -414,11 +411,11 @@ export default function UnifiedAnalytics() {
                       <div className="flex-1">
                         <p className="font-semibold">{hashtag.hashtag}</p>
                         <p className="text-sm text-muted-foreground">
-                          {hashtag.posts_count} Posts · {hashtag.total_reach} Reichweite
+                          {hashtag.posts_count} Posts · {hashtag.total_reach} {t('analytics.unified.reachLabel')}
                         </p>
                       </div>
                       <Badge variant="secondary">
-                        {hashtag.avg_engagement_rate.toFixed(2)}% Engagement
+                        {hashtag.avg_engagement_rate.toFixed(2)}% {t('analytics.unified.engagementLabel')}
                       </Badge>
                     </div>
                   ))}
@@ -427,20 +424,19 @@ export default function UnifiedAnalytics() {
             </Card>
           </TabsContent>
 
-          {/* Kampagnen Tab */}
           <TabsContent value="campaigns" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>
                   <DollarSign className="h-5 w-5 inline mr-2" />
-                  Campaign ROI
+                  {t('analytics.unified.campaignROI')}
                 </CardTitle>
-                <CardDescription>Verfolge die Performance deiner Marketing-Kampagnen</CardDescription>
+                <CardDescription>{t('analytics.unified.campaignROIDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
                 {campaignROI.length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">
-                    Noch keine Kampagnen vorhanden
+                    {t('analytics.unified.noCampaigns')}
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -449,8 +445,8 @@ export default function UnifiedAnalytics() {
                         <div>
                           <p className="font-semibold">{campaign.campaign_name}</p>
                           <p className="text-sm text-muted-foreground">
-                            {new Date(campaign.start_date).toLocaleDateString()} - 
-                            {campaign.end_date ? new Date(campaign.end_date).toLocaleDateString() : 'Laufend'}
+                            {new Date(campaign.start_date).toLocaleDateString(locale)} - 
+                            {campaign.end_date ? new Date(campaign.end_date).toLocaleDateString(locale) : t('analytics.unified.ongoing')}
                           </p>
                         </div>
                         <div className="text-right">
@@ -467,17 +463,14 @@ export default function UnifiedAnalytics() {
             </Card>
           </TabsContent>
 
-          {/* KI-Analyse Tab */}
           <TabsContent value="ai-strategy" className="space-y-6">
             <AIStrategyPanel />
           </TabsContent>
 
-          {/* Kommentare Tab */}
           <TabsContent value="comments" className="space-y-6">
             <CommentsAnalyticsTab />
           </TabsContent>
 
-          {/* Berichte Tab */}
           <TabsContent value="reports" className="space-y-6">
             <Card>
               <CardHeader>
@@ -495,7 +488,7 @@ export default function UnifiedAnalytics() {
               <CardHeader>
                 <CardTitle>
                   <Mail className="h-5 w-5 inline mr-2" />
-                  Geplante Reports
+                  {t('analytics.unified.scheduledReports')}
                 </CardTitle>
               </CardHeader>
               <CardContent>

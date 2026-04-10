@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { TrendingUp, Eye, Target, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface MetricsSummary {
   provider: string;
@@ -18,7 +19,7 @@ interface OverviewMetricsProps {
   loading: boolean;
 }
 
-const AnimatedCounter = ({ value, suffix = "" }: { value: number; suffix?: string }) => {
+const AnimatedCounter = ({ value, suffix = "", locale = "en-US" }: { value: number; suffix?: string; locale?: string }) => {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -43,7 +44,7 @@ const AnimatedCounter = ({ value, suffix = "" }: { value: number; suffix?: strin
   const formatNumber = (num: number) => {
     if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
     if (num >= 1000) return (num / 1000).toFixed(1) + "K";
-    return num.toLocaleString("de-DE");
+    return num.toLocaleString(locale);
   };
 
   return <span>{formatNumber(count)}{suffix}</span>;
@@ -75,6 +76,9 @@ const MiniSparkline = ({ trend }: { trend: "up" | "down" | "stable" }) => {
 };
 
 export const OverviewMetrics = ({ data, loading }: OverviewMetricsProps) => {
+  const { t, language } = useTranslation();
+  const locale = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
+
   const totalLikes = data.reduce((sum, item) => sum + (item.likes || 0), 0);
   const totalViews = data.reduce((sum, item) => sum + (item.views || 0), 0);
   const avgEngagement = data.length > 0
@@ -82,12 +86,18 @@ export const OverviewMetrics = ({ data, loading }: OverviewMetricsProps) => {
     : 0;
   const totalPosts = new Set(data.map(item => item.provider)).size;
 
+  const lastUpdatedDesc = language === 'de' ? 'Letzte 7 Tage' : language === 'es' ? 'Últimos 7 días' : 'Last 7 days';
+  const allPlatformsDesc = language === 'de' ? 'Alle Plattformen' : language === 'es' ? 'Todas las plataformas' : 'All platforms';
+  const engagementRateDesc = language === 'de' ? 'Engagement-Rate' : language === 'es' ? 'Tasa de engagement' : 'Engagement rate';
+  const activeChannelsDesc = language === 'de' ? 'Aktive Kanäle' : language === 'es' ? 'Canales activos' : 'Active channels';
+  const platformsTitle = language === 'de' ? 'Plattformen' : language === 'es' ? 'Plataformas' : 'Platforms';
+
   const metrics = [
     {
       title: "Total Likes",
       value: totalLikes,
       icon: TrendingUp,
-      description: "Letzte 7 Tage",
+      description: lastUpdatedDesc,
       trend: "up" as const,
       glowColor: "hsla(43, 90%, 68%, 0.15)"
     },
@@ -95,7 +105,7 @@ export const OverviewMetrics = ({ data, loading }: OverviewMetricsProps) => {
       title: "Total Views",
       value: totalViews,
       icon: Eye,
-      description: "Alle Plattformen",
+      description: allPlatformsDesc,
       trend: "up" as const,
       glowColor: "hsla(190, 90%, 50%, 0.15)"
     },
@@ -104,15 +114,15 @@ export const OverviewMetrics = ({ data, loading }: OverviewMetricsProps) => {
       value: avgEngagement,
       suffix: "%",
       icon: Target,
-      description: "Engagement-Rate",
+      description: engagementRateDesc,
       trend: "stable" as const,
       glowColor: "hsla(120, 60%, 50%, 0.15)"
     },
     {
-      title: "Plattformen",
+      title: platformsTitle,
       value: totalPosts,
       icon: FileText,
-      description: "Aktive Kanäle",
+      description: activeChannelsDesc,
       trend: "stable" as const,
       glowColor: "hsla(270, 60%, 60%, 0.15)"
     }
@@ -147,12 +157,10 @@ export const OverviewMetrics = ({ data, loading }: OverviewMetricsProps) => {
             boxShadow: `0 0 30px ${metric.glowColor}` 
           }}
         >
-          {/* Glow effect on hover */}
           <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
                style={{ background: `radial-gradient(circle at 50% 50%, ${metric.glowColor}, transparent 70%)` }} />
           
           <div className="relative z-10">
-            {/* Header with icon */}
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-medium text-muted-foreground">{metric.title}</span>
               <motion.div
@@ -165,12 +173,10 @@ export const OverviewMetrics = ({ data, loading }: OverviewMetricsProps) => {
               </motion.div>
             </div>
 
-            {/* Value with animated counter */}
             <div className="text-3xl font-bold mb-2 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
-              <AnimatedCounter value={metric.value} suffix={metric.suffix} />
+              <AnimatedCounter value={metric.value} suffix={metric.suffix} locale={locale} />
             </div>
 
-            {/* Footer with description and sparkline */}
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">{metric.description}</p>
               <MiniSparkline trend={metric.trend} />

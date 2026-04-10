@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { toast } from "sonner";
 import { Brain, Loader2, TrendingUp, AlertTriangle, Lightbulb, Target } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -16,6 +17,7 @@ interface AnalysisResult {
 
 export function AIStrategyPanel() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [rawMarkdown, setRawMarkdown] = useState<string>("");
@@ -30,11 +32,11 @@ export function AIStrategyPanel() {
 
       if (error) {
         if ((error as any)?.status === 429) {
-          toast.error("Zu viele Anfragen. Bitte versuche es später erneut.");
+          toast.error(t('analytics.unified.tooManyRequests'));
           return;
         }
         if ((error as any)?.status === 402) {
-          toast.error("Credits aufgebraucht. Bitte lade dein Konto auf.");
+          toast.error(t('analytics.unified.creditsExhausted'));
           return;
         }
         throw error;
@@ -44,10 +46,10 @@ export function AIStrategyPanel() {
         setAnalysis(data.analysis);
         setRawMarkdown(data.rawMarkdown || "");
       }
-      toast.success("KI-Analyse abgeschlossen!");
+      toast.success(t('analytics.unified.aiAnalysisComplete'));
     } catch (err: any) {
       console.error("Analysis error:", err);
-      toast.error(`Fehler bei der Analyse: ${err.message}`);
+      toast.error(t('analytics.unified.analysisError', { message: err.message }));
     } finally {
       setLoading(false);
     }
@@ -58,10 +60,9 @@ export function AIStrategyPanel() {
       <Card className="bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
         <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
           <Brain className="h-12 w-12 text-primary" />
-          <h3 className="text-xl font-semibold">KI-Performance-Analyse</h3>
+          <h3 className="text-xl font-semibold">{t('analytics.unified.aiPerformanceAnalysis')}</h3>
           <p className="text-muted-foreground text-center max-w-md">
-            Lass die KI deine Social-Media-Daten auswerten und erhalte personalisierte 
-            Tipps zur kosteneffizienten Steigerung deiner Performance.
+            {t('analytics.unified.aiPerformanceDesc')}
           </p>
           <Button onClick={runAnalysis} disabled={loading} size="lg">
             {loading ? (
@@ -69,7 +70,7 @@ export function AIStrategyPanel() {
             ) : (
               <Brain className="h-4 w-4 mr-2" />
             )}
-            {loading ? "Analysiere..." : "Jetzt analysieren"}
+            {loading ? t('analytics.unified.analyzing') : t('analytics.unified.analyzeNowBtn')}
           </Button>
         </CardContent>
       </Card>
@@ -81,10 +82,10 @@ export function AIStrategyPanel() {
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <Brain className="h-5 w-5 text-primary" />
-          KI-Analyse Ergebnis
+          {t('analytics.unified.aiAnalysisResult')}
         </h3>
         <Button variant="outline" size="sm" onClick={runAnalysis} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Erneut analysieren"}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('analytics.unified.reanalyze')}
         </Button>
       </div>
 
@@ -93,7 +94,7 @@ export function AIStrategyPanel() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-green-500" />
-              Stärken
+              {t('analytics.unified.strengths')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -112,7 +113,7 @@ export function AIStrategyPanel() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-orange-500" />
-              Verbesserungspotenzial
+              {t('analytics.unified.improvementPotential')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -132,7 +133,7 @@ export function AIStrategyPanel() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <Lightbulb className="h-4 w-4 text-primary" />
-            Konkrete Tipps
+            {t('analytics.unified.concreteTips')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -151,7 +152,7 @@ export function AIStrategyPanel() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <Target className="h-4 w-4" />
-            Strategie-Empfehlung
+            {t('analytics.unified.strategyRecommendation')}
           </CardTitle>
         </CardHeader>
         <CardContent className="prose prose-sm dark:prose-invert max-w-none">

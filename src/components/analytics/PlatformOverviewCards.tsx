@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Eye, Heart, MessageCircle, TrendingUp, Instagram, Facebook, Youtube, Music, Linkedin, Twitter } from "lucide-react";
 
 const PLATFORMS = [
@@ -28,6 +29,7 @@ interface PlatformMetrics {
 
 export function PlatformOverviewCards() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState<Record<string, PlatformMetrics>>({});
   const [connections, setConnections] = useState<Set<string>>(new Set());
@@ -41,7 +43,6 @@ export function PlatformOverviewCards() {
   const loadData = async () => {
     if (!user) return;
     try {
-      // Load connections
       const { data: conns } = await supabase
         .from("social_connections")
         .select("provider")
@@ -50,7 +51,6 @@ export function PlatformOverviewCards() {
       const connSet = new Set((conns || []).map(c => c.provider));
       setConnections(connSet);
 
-      // Load metrics per platform
       const { data: metricsData } = await supabase
         .from("post_metrics")
         .select("provider, impressions, likes, comments, shares, engagement_rate")

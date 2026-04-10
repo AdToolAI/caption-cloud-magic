@@ -10,6 +10,7 @@ import { TokenExpiryBadge } from "./TokenExpiryBadge";
 import { canUseXTwitter } from "@/lib/entitlements";
 import { PlanId } from "@/config/pricing";
 import { EnterpriseUpgradePrompt } from "@/components/team/EnterpriseUpgradePrompt";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface XConnectionCardProps {
   connection: any;
@@ -20,6 +21,8 @@ interface XConnectionCardProps {
 }
 
 export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callbackError }: XConnectionCardProps) => {
+  const { t, language } = useTranslation();
+  const locale = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -27,7 +30,6 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
 
   const hasAccess = canUseXTwitter(userPlan);
 
-  // Use callback error passed from parent (centralized handling)
   const lastError = callbackError || null;
 
   const handleConnect = async () => {
@@ -42,11 +44,10 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        toast.error("Bitte melde dich zuerst an");
+        toast.error(t('performance.xConnection.pleaseLogin'));
         return;
       }
 
-      // Send current origin so callback redirects back here
       const returnTo = `${window.location.origin}/performance?tab=connections`;
       
       const { data, error } = await supabase.functions.invoke('x-oauth-start', {
@@ -63,7 +64,7 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
       }
     } catch (error: any) {
       console.error('X connection error:', error);
-      toast.error(error.message || "Fehler beim Verbinden mit X");
+      toast.error(error.message || t('performance.xConnection.errorConnecting'));
     } finally {
       setIsConnecting(false);
     }
@@ -77,7 +78,7 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        toast.error("Bitte melde dich zuerst an");
+        toast.error(t('performance.xConnection.pleaseLogin'));
         return;
       }
 
@@ -90,11 +91,11 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
 
       if (error) throw error;
 
-      toast.success("X Token erfolgreich erneuert");
+      toast.success(t('performance.xConnection.tokenRefreshed'));
       window.location.reload();
     } catch (error: any) {
       console.error('X token refresh error:', error);
-      toast.error(error.message || "Fehler beim Erneuern des Tokens");
+      toast.error(error.message || t('performance.xConnection.errorRefreshingToken'));
     } finally {
       setIsRefreshing(false);
     }
@@ -103,7 +104,7 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
   const handleDisconnect = async () => {
     if (!connection) return;
     
-    if (!confirm("Möchtest du die X-Verbindung wirklich trennen?")) {
+    if (!confirm(t('performance.xConnection.confirmDisconnect'))) {
       return;
     }
 
@@ -112,7 +113,7 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        toast.error("Bitte melde dich zuerst an");
+        toast.error(t('performance.xConnection.pleaseLogin'));
         return;
       }
 
@@ -125,11 +126,11 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
 
       if (error) throw error;
 
-      toast.success("X-Verbindung getrennt");
+      toast.success(t('performance.xConnection.disconnected'));
       window.location.reload();
     } catch (error: any) {
       console.error('X disconnect error:', error);
-      toast.error(error.message || "Fehler beim Trennen");
+      toast.error(error.message || t('performance.xConnection.errorDisconnecting'));
     } finally {
       setIsDisconnecting(false);
     }
@@ -155,15 +156,14 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
               <div>
                 <h3 className="font-semibold">X (Twitter)</h3>
                 <p className="text-sm text-muted-foreground">
-                  {hasAccess ? "Noch nicht verbunden" : "Enterprise-Feature"}
+                  {hasAccess ? t('performance.xConnection.notConnected') : t('performance.xConnection.enterpriseFeature')}
                 </p>
               </div>
             </div>
-            <Badge variant="outline">Nicht verbunden</Badge>
+            <Badge variant="outline">{t('performance.xConnection.notConnected')}</Badge>
           </div>
           
           <div className="space-y-3">
-            {/* Inline error banner when X callback failed */}
             {lastError && (
               <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
                 <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
@@ -173,8 +173,8 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
 
             <p className="text-sm text-muted-foreground">
               {hasAccess 
-                ? "Verbinde dein X-Konto, um Posts zu veröffentlichen und Performance-Daten zu tracken."
-                : "X/Twitter Integration ist exklusiv für Enterprise-Kunden verfügbar."
+                ? t('performance.xConnection.connectDesc')
+                : t('performance.xConnection.enterpriseDesc')
               }
             </p>
             {hasAccess && (
@@ -189,10 +189,10 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
               variant={hasAccess ? "default" : "outline"}
             >
               {isConnecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {hasAccess ? (lastError ? "Erneut verbinden" : "Mit X verbinden") : (
+              {hasAccess ? (lastError ? t('performance.xConnection.reconnect') : t('performance.xConnection.connectWithX')) : (
                 <>
                   <Crown className="mr-2 h-4 w-4" />
-                  Auf Enterprise upgraden
+                  {t('performance.xConnection.upgradeToEnterprise')}
                 </>
               )}
             </Button>
@@ -245,7 +245,7 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
             className="flex-1"
           >
             {isSyncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Jetzt synchronisieren
+            {t('performance.xConnection.syncNow')}
           </Button>
           <Button
             onClick={handleRefreshToken}
@@ -275,7 +275,7 @@ export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan, callb
         
         {connection.last_sync_at && (
           <p className="text-xs text-muted-foreground">
-            Letzte Synchronisierung: {new Date(connection.last_sync_at).toLocaleString('de-DE')}
+            {t('performance.xConnection.lastSync')}: {new Date(connection.last_sync_at).toLocaleString(locale)}
           </p>
         )}
       </div>
