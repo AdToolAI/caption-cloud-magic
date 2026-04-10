@@ -898,6 +898,12 @@ export const ConnectionsTab = () => {
         onOpenChange={setShowTokenDialog}
         onSuccess={fetchConnections}
       />
+
+      <FacebookPageSelectDialog
+        open={showPageSelectDialog}
+        onOpenChange={setShowPageSelectDialog}
+        onPageSelected={fetchConnections}
+      />
     </div>
   );
 };
