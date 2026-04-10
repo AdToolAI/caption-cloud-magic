@@ -1,50 +1,32 @@
 
 
-## Plan: Localize Recommendations, Insights & PersonalizedDashboard
+## Plan: Localize Composer Page — All Components
 
-### Files to Change
+### Problem
+The entire Composer page (`/composer`) and all its sub-components still contain hardcoded German strings, visible when the UI language is set to English.
 
-| Action | File | Changes |
-|--------|------|---------|
-| Edit | `src/lib/translations.ts` | Add `reco` and `insights` keys (EN/DE/ES) — ~35 new keys |
-| Edit | `src/features/recommendations/RecoCard.tsx` | Replace all hardcoded German with `t()` calls; make `BEGINNER_RECOMMENDATIONS` a function using `t()` |
-| Edit | `src/components/recommendations/PersonalizedDashboard.tsx` | Add `useTranslation`, replace 6 hardcoded strings with `t()` |
-| Edit | `src/lib/insightRules.ts` | Add `language` parameter to all functions; use internal i18n maps for weekday names, titles, action labels, evidence strings, bucket names |
-| Edit | `src/components/performance/CaptionInsightsTab.tsx` | Pass `language` to `generateAllInsights()`, replace 4 hardcoded strings with `t()` |
-| Edit | `src/components/performance/InsightCard.tsx` | Localize priority badges ("Wichtig"/"Mittel"/"Optional") via `t()` |
+### Files & Changes (10 files)
 
-### Translation Keys to Add
+| File | German Strings to Replace |
+|------|--------------------------|
+| **`src/lib/translations.ts`** | Add `composer` namespace with ~80 keys (EN/DE/ES) |
+| **`src/components/composer/ComposerHeroHeader.tsx`** | "Content veröffentlichen", "Erstellen und veröffentlichen...", "Channels ausgewählt" |
+| **`src/pages/Composer.tsx`** | "Post erstellen", "Verfassen Sie Ihre Nachricht...", "Standard", "Direkt", "Optimieren", "Voiceover", "Post-Inhalt", "Was möchten Sie teilen?", "Zusätzliche Beschreibung", "überschreitet das Character Limit...", "Jetzt posten", "Veröffentlichen...", "YouTube-Einstellungen konfigurieren", "Verbindungen verwalten", "Live-Vorschau", "So wird Ihr Post aussehen", all toast messages (~15 German toasts) |
+| **`src/components/composer/CharacterCounter.tsx`** | "Wählen Sie Channels aus, um Zeichenlimits zu sehen" |
+| **`src/components/composer/ComposerPreview.tsx`** | "Wählen Sie mindestens einen Channel...", "Vorschau erscheint nach Eingabe...", "YouTube Video-Vorschau", "Ihr Browser unterstützt kein...", "Bitte laden Sie ein Video hoch...", "Klicken Sie auf das ⚙️ Icon...", "Ihr Profil" |
+| **`src/components/composer/ChannelSelector.tsx`** | "Ziel-Kanäle", "Einstellungen", "Wählen Sie mindestens einen Kanal aus" |
+| **`src/components/composer/MediaUploader.tsx`** | "Ungültige Auswahl", "Bilder und Videos können nicht gemischt...", "Nur 1 Video erlaubt", "Zu viele Dateien", "Datei zu groß", "Ungültiger Dateityp", "Drag & Drop oder klicken zum Upload", "Max. 4 Bilder...", "Streaming-Video" |
+| **`src/components/composer/PublishToSocialTab.tsx`** | "Plattformen auswählen", "Nicht verbunden", "Titel (YouTube)", "Video Titel für YouTube...", "Deine Caption...", "Beschreibung (YouTube)", "Veröffentlichung", "Sofort veröffentlichen", "Planen", "Datum auswählen", "Uhrzeit", "Veröffentliche...", "Jetzt veröffentlichen", "Veröffentlichung planen" |
+| **`src/components/composer/YouTubeConfigModal.tsx`** | "YouTube Einstellungen", "Sichtbarkeit", "Öffentlich", "Nicht gelistet", "Privat", all description texts, "PFLICHT", "Kategorie", "Tags", "Erweiterte Einstellungen", "Lizenz", "Einbettbar", "Öffentliche Statistiken", "Abbrechen", "Speichern" |
+| **`src/components/composer/ChannelConfigModal.tsx`** | "Einstellungen", "Medien-Profil", "Standard (keine Anpassung)", "Auto-Fix", "Medien automatisch anpassen", "Zeitversatz", "Sofort (+0h)", "+1 Stunde", etc., "Wasserzeichen (erweitert)", "Abbrechen", "Speichern" |
+| **`src/components/optimization/OptimizationPanel.tsx`** | "AI-Optimierung", "Lass die KI deinen Post analysieren...", "Post optimieren", "Analysiere...", "Optimierungs-Score", "Beste Posting-Zeit", "Verbesserungsvorschläge", "Hoher/Mittlerer/Niedriger Impact", "Aktuell:", "Vorschlag:", "Alternative Hooks", "Verbesserung(en) anwenden", "Neu analysieren" |
+| **`src/components/publishing/PlatformOptimizationHelper.tsx`** | All platform tips and specs (already shown in current-code) — ~20 strings |
 
-**`reco` namespace:**
-- `starterTips` / `aiRecommendations` — section headers
-- `beginner1`, `beginner2`, `beginner3` — tip texts
-- `impactFoundation`, `impactStrategy`, `impactReach` — impact labels
-- `apply`, `applied` — button labels
-- `beginnerFooter`, `dataFooter` — footer texts
-
-**`insights` namespace:**
-- `bestTimeTitle`, `postTypeTitle`, `hashtagTitle`, `captionTitle`, `trendTitle` — insight titles
-- `addToCalendar`, `createMore`, `saveAsSet`, `openTemplate`, `testPostingTime`, `tryOtherFormats` — action labels
-- `postsAnalyzed`, `last7vs14`, `topHashtags` — evidence strings
-- `captionShort`, `captionMedium`, `captionLong` — bucket names
-- `actionRecs`, `based28days`, `recalculate`, `notEnoughData` — CaptionInsightsTab strings
-- `priorityHigh`, `priorityMedium`, `priorityLow` — InsightCard badges
-- Weekday names (Sun–Sat)
-
-### Key Technical Detail: insightRules.ts
-
-The `generateAllInsights()` function and all sub-functions will accept an optional `language: 'en' | 'de' | 'es' = 'de'` parameter. An internal `i18n` object maps all strings by language, avoiding dependency on the React `useTranslation` hook (since this is a pure utility file).
-
-```text
-// Example
-const weekdays = {
-  en: ['Sunday','Monday',...],
-  de: ['Sonntag','Montag',...],
-  es: ['Domingo','Lunes',...]
-};
-```
+### Approach
+- Add `useTranslation` hook to each component
+- Add all keys under `composer` namespace in translations.ts
+- For `PublishToSocialTab.tsx`: also fix hardcoded `de` locale import to use dynamic locale based on language
 
 ### Result
-
-All recommendation cards, insight cards, and the personalized dashboard display fully in the selected language.
+The entire Composer page and all modals/panels will display fully in the selected language.
 
