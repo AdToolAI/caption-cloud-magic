@@ -72,7 +72,6 @@ export const SubscriptionTab = () => {
                     ? (language === 'de' ? 'Zugriff auf alle Premium-Funktionen' : language === 'es' ? 'Acceso a todas las funciones premium' : 'Access to all premium features')
                     : (language === 'de' ? 'Begrenzter Zugriff auf Basis-Funktionen' : language === 'es' ? 'Acceso limitado a funciones básicas' : 'Limited access to basic features')}
                 </p>
-                </p>
               </div>
             </div>
             <div className="text-right">
