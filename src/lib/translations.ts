@@ -1648,7 +1648,8 @@ export const translations: Record<Language, any> = {
       goals: {
         title: "Goals & Achievements",
         description: "Set social goals, track progress, celebrate milestones."
-      }
+      },
+      setupCta: "Setup in 5 steps"
     },
     credits: {
       availableCredits: "Available Credits",
@@ -4516,7 +4517,8 @@ export const translations: Record<Language, any> = {
     goals: {
       title: "Ziele & Achievements",
       description: "Setze Social-Ziele, verfolge Fortschritt, feiere Meilensteine."
-    }
+    },
+    setupCta: "Einrichtung in 5 Schritten"
   },
   credits: {
     availableCredits: "Verfügbare Credits",
@@ -7325,7 +7327,8 @@ export const translations: Record<Language, any> = {
       goals: {
         title: "Objetivos y Logros",
         description: "Establece objetivos sociales, sigue el progreso, celebra hitos."
-      }
+      },
+      setupCta: "Configuración en 5 pasos"
     },
     credits: {
       availableCredits: "Créditos Disponibles",
