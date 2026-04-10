@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
 import { Platform } from '@/hooks/useSocialPublishing';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface Props {
   platform: Platform;
@@ -16,99 +17,51 @@ interface OptimizationTip {
 }
 
 export function PlatformOptimizationHelper({ platform, videoUrl, caption, aspectRatio }: Props) {
+  const { t } = useTranslation();
+
   const getOptimizationTips = (): OptimizationTip[] => {
     const tips: OptimizationTip[] = [];
     const captionLength = caption.length;
+    const pt = (key: string, params?: Record<string, string | number>) => t(`composer.platformTips.${platform}.${key}`, params);
 
     switch (platform) {
       case 'instagram':
         if (aspectRatio !== '9:16') {
-          tips.push({
-            type: 'warning',
-            message: 'Empfohlen: 9:16 Format für beste Reels Performance'
-          });
+          tips.push({ type: 'warning', message: pt('wrongRatio') });
         } else {
-          tips.push({
-            type: 'success',
-            message: 'Perfektes Format für Instagram Reels'
-          });
+          tips.push({ type: 'success', message: pt('perfectRatio') });
         }
-        
         if (captionLength > 2200) {
-          tips.push({
-            type: 'warning',
-            message: `Caption zu lang (${captionLength}/2200 Zeichen)`
-          });
+          tips.push({ type: 'warning', message: pt('captionTooLong', { count: captionLength }) });
         }
-
-        tips.push({
-          type: 'info',
-          message: 'Nutze 3-5 relevante Hashtags für beste Reichweite'
-        });
+        tips.push({ type: 'info', message: pt('hashtagTip') });
         break;
-
       case 'tiktok':
         if (aspectRatio !== '9:16') {
-          tips.push({
-            type: 'warning',
-            message: 'TikTok funktioniert am besten mit 9:16 Videos'
-          });
+          tips.push({ type: 'warning', message: pt('wrongRatio') });
         }
-
         if (captionLength > 150) {
-          tips.push({
-            type: 'warning',
-            message: `Caption wird gekürzt (${captionLength}/150 Zeichen)`
-          });
+          tips.push({ type: 'warning', message: pt('captionTooLong', { count: captionLength }) });
         }
-
-        tips.push({
-          type: 'info',
-          message: 'Erste 3 Sekunden sind entscheidend - starte mit Hook!'
-        });
+        tips.push({ type: 'info', message: pt('hookTip') });
         break;
-
       case 'linkedin':
         if (aspectRatio === '9:16') {
-          tips.push({
-            type: 'warning',
-            message: 'LinkedIn bevorzugt 16:9 oder 1:1 Format'
-          });
+          tips.push({ type: 'warning', message: pt('wrongRatio') });
         }
-
         if (captionLength < 50) {
-          tips.push({
-            type: 'info',
-            message: 'Längere Captions (100-300 Zeichen) performen besser auf LinkedIn'
-          });
+          tips.push({ type: 'info', message: pt('shortCaption') });
         }
-
-        tips.push({
-          type: 'info',
-          message: 'Professioneller Ton und Mehrwert wichtig für B2B Audience'
-        });
+        tips.push({ type: 'info', message: pt('toneTip') });
         break;
-
       case 'youtube':
         if (captionLength > 100) {
-          tips.push({
-            type: 'warning',
-            message: 'Titel sollte unter 100 Zeichen bleiben für beste CTR'
-          });
+          tips.push({ type: 'warning', message: pt('titleTooLong') });
         }
-
-        tips.push({
-          type: 'info',
-          message: 'Füge relevante Tags für bessere Auffindbarkeit hinzu'
-        });
-
-        tips.push({
-          type: 'info',
-          message: 'Detaillierte Beschreibung verbessert SEO'
-        });
+        tips.push({ type: 'info', message: pt('tagsTip') });
+        tips.push({ type: 'info', message: pt('descTip') });
         break;
     }
-
     return tips;
   };
 
@@ -116,67 +69,33 @@ export function PlatformOptimizationHelper({ platform, videoUrl, caption, aspect
 
   const getIcon = (type: OptimizationTip['type']) => {
     switch (type) {
-      case 'success':
-        return <CheckCircle2 className="h-4 w-4 text-success" />;
-      case 'warning':
-        return <AlertCircle className="h-4 w-4 text-warning" />;
-      case 'info':
-        return <Info className="h-4 w-4 text-info" />;
+      case 'success': return <CheckCircle2 className="h-4 w-4 text-success" />;
+      case 'warning': return <AlertCircle className="h-4 w-4 text-warning" />;
+      case 'info': return <Info className="h-4 w-4 text-info" />;
     }
   };
 
-  const platformSpecs = {
-    instagram: {
-      name: 'Instagram',
-      icon: '📸',
-      optimalRatio: '9:16',
-      maxLength: '60s (Reels)',
-      captionLimit: '2,200 Zeichen'
-    },
-    tiktok: {
-      name: 'TikTok',
-      icon: '🎵',
-      optimalRatio: '9:16',
-      maxLength: '10 Minuten',
-      captionLimit: '150 Zeichen'
-    },
-    linkedin: {
-      name: 'LinkedIn',
-      icon: '💼',
-      optimalRatio: '16:9 / 1:1',
-      maxLength: '10 Minuten',
-      captionLimit: '3,000 Zeichen'
-    },
-    youtube: {
-      name: 'YouTube',
-      icon: '📺',
-      optimalRatio: '16:9',
-      maxLength: 'Unbegrenzt',
-      captionLimit: 'Titel: 100, Beschreibung: 5,000'
-    }
-  };
-
-  const spec = platformSpecs[platform];
+  const spec = t(`composer.platformSpecs.${platform}`) as any;
 
   return (
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-2xl">{spec.icon}</span>
-        <h3 className="font-semibold">{spec.name} Optimierung</h3>
+        <span className="text-2xl">{spec?.icon}</span>
+        <h3 className="font-semibold">{t('composer.platformOptimization', { name: spec?.name || platform })}</h3>
       </div>
 
       <div className="space-y-2 mb-4 text-sm">
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Optimales Format:</span>
-          <Badge variant="outline">{spec.optimalRatio}</Badge>
+          <span className="text-muted-foreground">{t('composer.optimalFormat')}</span>
+          <Badge variant="outline">{spec?.ratio}</Badge>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Max. Länge:</span>
-          <span className="font-medium">{spec.maxLength}</span>
+          <span className="text-muted-foreground">{t('composer.maxLength')}</span>
+          <span className="font-medium">{spec?.length}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Caption Limit:</span>
-          <span className="font-medium">{spec.captionLimit}</span>
+          <span className="text-muted-foreground">{t('composer.captionLimit')}</span>
+          <span className="font-medium">{spec?.caption}</span>
         </div>
       </div>
 

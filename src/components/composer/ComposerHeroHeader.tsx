@@ -1,44 +1,32 @@
 import { motion } from "framer-motion";
 import { Send, Sparkles } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface ComposerHeroHeaderProps {
   selectedChannelCount: number;
 }
 
 export function ComposerHeroHeader({ selectedChannelCount }: ComposerHeroHeaderProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-card/80 via-card/60 to-card/40 backdrop-blur-xl border border-white/10 p-8 mb-6">
       {/* Animated Background Glow Orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
           className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-primary/20 blur-3xl"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
           className="absolute -bottom-20 -left-20 w-48 h-48 rounded-full bg-cyan-500/20 blur-3xl"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.2, 0.4, 0.2],
-          }}
-          transition={{
-            duration: 5,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          animate={{ scale: [1.2, 1, 1.2], opacity: [0.2, 0.4, 0.2] }}
+          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
 
       <div className="relative z-10 flex items-center justify-between flex-wrap gap-4">
         <div className="space-y-3">
-          {/* Mission Badge */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -50,18 +38,17 @@ export function ComposerHeroHeader({ selectedChannelCount }: ComposerHeroHeaderP
               transition={{ duration: 2, repeat: Infinity }}
             />
             <span className="text-xs font-medium text-primary tracking-wide uppercase">
-              Multi-Channel Composer
+              {t('composer.heroBadge')}
             </span>
           </motion.div>
 
-          {/* Gradient Headline */}
           <motion.h1
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-primary/80 to-cyan-400 bg-clip-text text-transparent"
           >
-            Content veröffentlichen
+            {t('composer.heroTitle')}
           </motion.h1>
 
           <motion.p
@@ -70,11 +57,10 @@ export function ComposerHeroHeader({ selectedChannelCount }: ComposerHeroHeaderP
             transition={{ delay: 0.2 }}
             className="text-muted-foreground max-w-md"
           >
-            Erstellen und veröffentlichen Sie Inhalte auf mehreren Plattformen gleichzeitig
+            {t('composer.heroSubtitle')}
           </motion.p>
         </div>
 
-        {/* Channel Counter */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -93,7 +79,7 @@ export function ComposerHeroHeader({ selectedChannelCount }: ComposerHeroHeaderP
                 {selectedChannelCount}
               </motion.span>
             </div>
-            <span className="text-xs text-muted-foreground">Channels ausgewählt</span>
+            <span className="text-xs text-muted-foreground">{t('composer.channelsSelected')}</span>
           </div>
 
           <motion.div

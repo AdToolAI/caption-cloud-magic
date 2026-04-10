@@ -14,6 +14,9 @@ import { PlatformOptimizationHelper } from '@/components/publishing/PlatformOpti
 import { Instagram, Music, Linkedin, Youtube, Clock, Send, CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { es } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface PublishToSocialTabProps {
   videoUrl: string;
@@ -22,12 +25,8 @@ interface PublishToSocialTabProps {
   onPublished?: () => void;
 }
 
-export function PublishToSocialTab({
-  videoUrl,
-  defaultCaption = '',
-  defaultHashtags = [],
-  onPublished,
-}: PublishToSocialTabProps) {
+export function PublishToSocialTab({ videoUrl, defaultCaption = '', defaultHashtags = [], onPublished }: PublishToSocialTabProps) {
+  const { t, language } = useTranslation();
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([]);
   const [caption, setCaption] = useState(defaultCaption);
   const [title, setTitle] = useState('');
@@ -41,6 +40,8 @@ export function PublishToSocialTab({
   const { schedulePublication, loading: scheduling } = useScheduledPublishing();
   const { isConnected } = usePlatformCredentials();
 
+  const dateLocale = language === 'de' ? de : language === 'es' ? es : enUS;
+
   const platforms = [
     { id: 'instagram' as Platform, name: 'Instagram', icon: Instagram, color: 'text-pink-500' },
     { id: 'tiktok' as Platform, name: 'TikTok', icon: Music, color: 'text-black dark:text-white' },
@@ -49,55 +50,21 @@ export function PublishToSocialTab({
   ];
 
   const togglePlatform = (platform: Platform) => {
-    setSelectedPlatforms(prev =>
-      prev.includes(platform)
-        ? prev.filter(p => p !== platform)
-        : [...prev, platform]
-    );
+    setSelectedPlatforms(prev => prev.includes(platform) ? prev.filter(p => p !== platform) : [...prev, platform]);
   };
 
   const handlePublish = async () => {
-    if (selectedPlatforms.length === 0) {
-      return;
-    }
-
-    const hashtagArray = hashtags
-      .split(/[\s,]+/)
-      .filter(h => h.startsWith('#'))
-      .map(h => h.slice(1));
+    if (selectedPlatforms.length === 0) return;
+    const hashtagArray = hashtags.split(/[\s,]+/).filter(h => h.startsWith('#')).map(h => h.slice(1));
 
     if (publishMode === 'schedule' && scheduledDate) {
-      // Schedule publications
       const [hours, minutes] = scheduledTime.split(':');
       const publishAt = new Date(scheduledDate);
       publishAt.setHours(parseInt(hours), parseInt(minutes));
-
-      const promises = selectedPlatforms.map(platform =>
-        schedulePublication({
-          platform,
-          videoUrl,
-          caption,
-          title,
-          description,
-          hashtags: hashtagArray,
-          publishAt,
-        })
-      );
-
-      await Promise.all(promises);
+      await Promise.all(selectedPlatforms.map(platform => schedulePublication({ platform, videoUrl, caption, title, description, hashtags: hashtagArray, publishAt })));
     } else {
-      // Publish now
-      const config = {
-        videoUrl,
-        caption,
-        title,
-        description,
-        hashtags: hashtagArray,
-      };
-
-      await publishToMultiplePlatforms(config, selectedPlatforms);
+      await publishToMultiplePlatforms({ videoUrl, caption, title, description, hashtags: hashtagArray }, selectedPlatforms);
     }
-
     onPublished?.();
   };
 
@@ -106,169 +73,84 @@ export function PublishToSocialTab({
 
   return (
     <div className="space-y-6">
-      {/* Platform Selection */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Plattformen auswählen</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('composer.selectPlatforms')}</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {platforms.map(platform => {
             const Icon = platform.icon;
             const connected = isConnected(platform.id);
-            
             return (
-              <div
-                key={platform.id}
-                className={`relative p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                  selectedPlatforms.includes(platform.id)
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
-                } ${!connected ? 'opacity-50' : ''}`}
-                onClick={() => connected && togglePlatform(platform.id)}
-              >
+              <div key={platform.id} className={`relative p-4 rounded-lg border-2 transition-all cursor-pointer ${selectedPlatforms.includes(platform.id) ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'} ${!connected ? 'opacity-50' : ''}`} onClick={() => connected && togglePlatform(platform.id)}>
                 <div className="flex items-center gap-3">
-                  <Checkbox
-                    checked={selectedPlatforms.includes(platform.id)}
-                    disabled={!connected}
-                  />
+                  <Checkbox checked={selectedPlatforms.includes(platform.id)} disabled={!connected} />
                   <Icon className={`h-5 w-5 ${platform.color}`} />
                   <span className="font-medium">{platform.name}</span>
                 </div>
-                {!connected && (
-                  <span className="absolute top-2 right-2 text-xs text-muted-foreground">
-                    Nicht verbunden
-                  </span>
-                )}
+                {!connected && <span className="absolute top-2 right-2 text-xs text-muted-foreground">{t('composer.notConnected')}</span>}
               </div>
             );
           })}
         </div>
       </Card>
 
-      {/* Platform Optimization Helper */}
-      {selectedPlatforms.length > 0 && (
-        <PlatformOptimizationHelper
-          platform={selectedPlatforms[0]}
-          videoUrl={videoUrl}
-          caption={caption}
-        />
-      )}
+      {selectedPlatforms.length > 0 && <PlatformOptimizationHelper platform={selectedPlatforms[0]} videoUrl={videoUrl} caption={caption} />}
 
-      {/* Content Inputs */}
       <Card className="p-6 space-y-4">
         <div>
-          <Label htmlFor="title">Titel (YouTube)</Label>
-          <Input
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Video Titel für YouTube..."
-            maxLength={100}
-          />
+          <Label htmlFor="title">{t('composer.titleYoutube')}</Label>
+          <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('composer.titleYoutubePlaceholder')} maxLength={100} />
         </div>
-
         <div>
           <Label htmlFor="caption">Caption</Label>
-          <Textarea
-            id="caption"
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder="Deine Caption..."
-            rows={4}
-          />
+          <Textarea id="caption" value={caption} onChange={(e) => setCaption(e.target.value)} placeholder={t('composer.captionPlaceholder')} rows={4} />
         </div>
-
         <div>
-          <Label htmlFor="description">Beschreibung (YouTube)</Label>
-          <Textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Video Beschreibung für YouTube..."
-            rows={3}
-          />
+          <Label htmlFor="description">{t('composer.descYoutube')}</Label>
+          <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('composer.descYoutubePlaceholder')} rows={3} />
         </div>
-
         <div>
           <Label htmlFor="hashtags">Hashtags</Label>
-          <Input
-            id="hashtags"
-            value={hashtags}
-            onChange={(e) => setHashtags(e.target.value)}
-            placeholder="#hashtag1 #hashtag2 #hashtag3"
-          />
+          <Input id="hashtags" value={hashtags} onChange={(e) => setHashtags(e.target.value)} placeholder="#hashtag1 #hashtag2 #hashtag3" />
         </div>
       </Card>
 
-      {/* Publish Mode Selection */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Veröffentlichung</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('composer.publication')}</h3>
         <div className="flex gap-4 mb-4">
-          <Button
-            variant={publishMode === 'now' ? 'default' : 'outline'}
-            onClick={() => setPublishMode('now')}
-            className="flex-1"
-          >
-            <Send className="mr-2 h-4 w-4" />
-            Sofort veröffentlichen
+          <Button variant={publishMode === 'now' ? 'default' : 'outline'} onClick={() => setPublishMode('now')} className="flex-1">
+            <Send className="mr-2 h-4 w-4" />{t('composer.publishImmediately')}
           </Button>
-          <Button
-            variant={publishMode === 'schedule' ? 'default' : 'outline'}
-            onClick={() => setPublishMode('schedule')}
-            className="flex-1"
-          >
-            <Clock className="mr-2 h-4 w-4" />
-            Planen
+          <Button variant={publishMode === 'schedule' ? 'default' : 'outline'} onClick={() => setPublishMode('schedule')} className="flex-1">
+            <Clock className="mr-2 h-4 w-4" />{t('composer.schedule')}
           </Button>
         </div>
 
         {publishMode === 'schedule' && (
           <div className="space-y-4">
             <div>
-              <Label>Datum auswählen</Label>
+              <Label>{t('composer.selectDate')}</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {scheduledDate ? format(scheduledDate, 'PPP', { locale: de }) : 'Datum wählen'}
+                    {scheduledDate ? format(scheduledDate, 'PPP', { locale: dateLocale }) : t('composer.chooseDate')}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={scheduledDate}
-                    onSelect={setScheduledDate}
-                    disabled={(date) => date < new Date()}
-                    initialFocus
-                  />
+                  <Calendar mode="single" selected={scheduledDate} onSelect={setScheduledDate} disabled={(date) => date < new Date()} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
             <div>
-              <Label htmlFor="time">Uhrzeit</Label>
-              <Input
-                id="time"
-                type="time"
-                value={scheduledTime}
-                onChange={(e) => setScheduledTime(e.target.value)}
-              />
+              <Label htmlFor="time">{t('composer.time')}</Label>
+              <Input id="time" type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} />
             </div>
           </div>
         )}
       </Card>
 
-      {/* Publish Button */}
-      <Button
-        onClick={handlePublish}
-        disabled={!canPublish || (publishMode === 'schedule' && !scheduledDate)}
-        className="w-full"
-        size="lg"
-      >
-        {isPublishing ? (
-          <>Veröffentliche...</>
-        ) : publishMode === 'schedule' ? (
-          <>📅 Veröffentlichung planen</>
-        ) : (
-          <>🚀 Jetzt veröffentlichen</>
-        )}
+      <Button onClick={handlePublish} disabled={!canPublish || (publishMode === 'schedule' && !scheduledDate)} className="w-full" size="lg">
+        {isPublishing ? <>{t('composer.publishingNow')}</> : publishMode === 'schedule' ? <>{t('composer.schedulePubBtn')}</> : <>{t('composer.publishNowBtn')}</>}
       </Button>
     </div>
   );

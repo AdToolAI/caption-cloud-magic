@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Send, Loader2, Settings, Sparkles } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 import type { Provider, PublishPayload, PublishResult, MediaItem } from "@/types/publish";
 import { OptimizationPanel } from "@/components/optimization/OptimizationPanel";
 import { TranslationPanel } from "@/components/voice/TranslationPanel";
@@ -36,6 +37,7 @@ const DRAFT_KEY = "composer_draft";
 export default function Composer() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [textContent, setTextContent] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<File[]>([]);
   const [selectedChannels, setSelectedChannels] = useState<Provider[]>(["instagram", "facebook", "x"]);
@@ -248,8 +250,8 @@ export default function Composer() {
         }
         
         toast({
-          title: "✅ Post importiert",
-          description: "Der KI-generierte Post wurde geladen. Jetzt können Sie ihn publizieren!",
+          title: `✅ ${t('composer.postImported')}`,
+          description: t('composer.postImportedDesc'),
         });
         
         // Clear after successful import
@@ -307,24 +309,24 @@ export default function Composer() {
       const hashtagText = '\n\n' + hashtags.split(',').map(h => `#${h.trim()}`).join(' ');
       setTextContent(prev => prev + hashtagText);
       toast({
-        title: '✅ Hashtags hinzugefügt',
-        description: 'Top-Hashtags wurden eingefügt.',
+        title: `✅ ${t('composer.hashtagsAdded')}`,
+        description: t('composer.hashtagsAddedDesc'),
       });
     }
     
     const postType = params.get('post_type');
     if (postType) {
       toast({
-        title: '💡 Post-Typ Empfehlung',
-        description: `Empfohlen: ${postType} für besseres Engagement`,
+        title: `💡 ${t('composer.postTypeRec')}`,
+        description: t('composer.postTypeRecDesc', { type: postType }),
       });
     }
     
     const captionHint = params.get('caption_hint');
     if (captionHint) {
       toast({
-        title: '📝 Caption-Tipp',
-        description: `Ziel: ${captionHint}`,
+        title: `📝 ${t('composer.captionTip')}`,
+        description: t('composer.captionTipDesc', { hint: captionHint }),
       });
     }
   }, [toast]);
@@ -435,8 +437,8 @@ export default function Composer() {
     // VALIDATION: Check if textContent is empty
     if (!textContent || textContent.trim().length === 0) {
       toast({
-        title: "❌ Fehler",
-        description: "Bitte geben Sie Text für Ihren Post ein.",
+        title: "❌",
+        description: t('composer.errorNoText'),
         variant: "destructive",
       });
       return;
@@ -457,8 +459,8 @@ export default function Composer() {
         if (file.type.startsWith('video/')) {
           if (file.size === 0) {
             toast({
-              title: "Ungültige Videodatei",
-              description: `Die Videodatei "${file.name}" ist leer (0 Bytes). Bitte wählen Sie ein gültiges Video.`,
+              title: t('composer.invalidVideo'),
+              description: t('composer.invalidVideoDesc', { name: file.name }),
               variant: "destructive",
             });
             setIsPublishing(false);
@@ -467,8 +469,8 @@ export default function Composer() {
           
           if (file.size < 1024) { // Less than 1KB
             toast({
-              title: "Video zu klein",
-              description: `Die Videodatei "${file.name}" ist zu klein (${file.size} Bytes). Bitte wählen Sie ein gültiges Video.`,
+              title: t('composer.videoTooSmall'),
+              description: t('composer.videoTooSmallDesc', { name: file.name, size: file.size }),
               variant: "destructive",
             });
             setIsPublishing(false);
@@ -485,8 +487,8 @@ export default function Composer() {
       
       if (fileSize === 0 || fileSize < 1024) {
         toast({
-          title: "Ungültiges Video",
-          description: `Das importierte Video ist zu klein (${fileSize} Bytes). Bitte generieren Sie ein neues Video.`,
+          title: t('composer.importedVideoInvalid'),
+          description: t('composer.importedVideoInvalidDesc', { size: fileSize }),
           variant: "destructive",
         });
         setIsPublishing(false);
@@ -510,8 +512,8 @@ export default function Composer() {
         
         if (fileSize === 0) {
           toast({
-            title: "❌ Fehler",
-            description: "Dateigröße konnte nicht ermittelt werden. Bitte laden Sie die Datei erneut hoch.",
+            title: "❌",
+            description: t('composer.fileSizeError'),
             variant: "destructive",
           });
           setIsPublishing(false);
@@ -600,10 +602,10 @@ export default function Composer() {
           .join('\n');
         
         toast({
-          title: "Publishing fehlgeschlagen",
+          title: t('composer.publishFailed'),
           description: channelsExceedingLimit.length > 0 
-            ? `Alle Kanäle überschreiten das Zeichenlimit (${textContent.length} Zeichen)`
-            : errorMessages || "Alle Kanäle konnten nicht veröffentlicht werden.",
+            ? t('composer.allChannelsExceed', { count: textContent.length })
+            : errorMessages || t('composer.allChannelsFailed'),
           variant: "destructive",
         });
       }
@@ -679,36 +681,24 @@ export default function Composer() {
         >
           <Card className="backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_30px_rgba(255,255,255,0.03)]">
             <CardHeader>
-              <CardTitle className="text-xl">Post erstellen</CardTitle>
-              <CardDescription>Verfassen Sie Ihre Nachricht und wählen Sie Zielkanäle</CardDescription>
+              <CardTitle className="text-xl">{t('composer.createPost')}</CardTitle>
+              <CardDescription>{t('composer.createPostDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-4 bg-muted/30 backdrop-blur-sm border border-white/10">
-                  <TabsTrigger 
-                    value="standard"
-                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all"
-                  >
-                    Standard
+                  <TabsTrigger value="standard" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all">
+                    {t('composer.tabStandard')}
                   </TabsTrigger>
-                  <TabsTrigger 
-                    value="social"
-                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all"
-                  >
-                    Direkt
+                  <TabsTrigger value="social" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all">
+                    {t('composer.tabDirect')}
                   </TabsTrigger>
-                  <TabsTrigger 
-                    value="optimize"
-                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all"
-                  >
+                  <TabsTrigger value="optimize" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all">
                     <Sparkles className="h-4 w-4 mr-2" />
-                    Optimieren
+                    {t('composer.tabOptimize')}
                   </TabsTrigger>
-                  <TabsTrigger 
-                    value="voiceover"
-                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all"
-                  >
-                    Voiceover
+                  <TabsTrigger value="voiceover" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all">
+                    {t('composer.tabVoiceover')}
                   </TabsTrigger>
                 </TabsList>
 
@@ -716,9 +706,9 @@ export default function Composer() {
               <TabsContent value="standard" className="space-y-4 mt-6">
                 {/* Text Input */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Post-Inhalt</label>
+                  <label className="text-sm font-medium">{t('composer.postContent')}</label>
                   <Textarea
-                    placeholder="Was möchten Sie teilen?"
+                    placeholder={t('composer.postPlaceholder')}
                     value={textContent}
                     onChange={(e) => {
                       const newText = e.target.value;
@@ -742,8 +732,7 @@ export default function Composer() {
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      <strong>{channelsExceedingLimit.map(c => c.toUpperCase()).join(', ')}</strong> überschreitet das Character Limit 
-                      und wird beim Publishing übersprungen. Andere Channels werden normal gepostet.
+                      <strong>{channelsExceedingLimit.map(c => c.toUpperCase()).join(', ')}</strong> {t('composer.exceedsLimit')}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -752,8 +741,7 @@ export default function Composer() {
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      Alle ausgewählten Channels überschreiten das Character Limit ({textContent.length} Zeichen). 
-                      Bitte kürzen Sie den Text oder deaktivieren Sie restriktive Channels wie X (280 Zeichen).
+                      {t('composer.allExceedLimit', { count: textContent.length })}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -765,11 +753,11 @@ export default function Composer() {
                 {postData && (
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
-                      Zusätzliche Beschreibung (optional)
-                      <span className="text-muted-foreground ml-2">Wird nur in der Vorschau angezeigt</span>
+                      {t('composer.additionalDesc')}
+                      <span className="text-muted-foreground ml-2">{t('composer.additionalDescHint')}</span>
                     </label>
                     <Textarea
-                      placeholder="Möchten Sie eine zusätzliche Beschreibung für die Vorschau hinzufügen?"
+                      placeholder={t('composer.additionalDescPlaceholder')}
                       value={additionalDescription}
                       onChange={(e) => setAdditionalDescription(e.target.value)}
                       rows={3}
@@ -806,7 +794,7 @@ export default function Composer() {
                     className="w-full mt-3"
                   >
                     <Settings className="h-4 w-4 mr-2" />
-                    YouTube-Einstellungen konfigurieren
+                    {t('composer.ytConfigBtn')}
                   </Button>
                 )}
 
@@ -819,7 +807,7 @@ export default function Composer() {
                     className="text-xs"
                   >
                     <Settings className="h-3 w-3 mr-1" />
-                    Verbindungen verwalten
+                    {t('composer.manageConnections')}
                   </Button>
                 </div>
 
@@ -828,7 +816,7 @@ export default function Composer() {
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      ⚠️ LinkedIn-Sync eingeschränkt. UGC-Post möglich; bei 403 wird kein Fehler angezeigt.
+                      ⚠️ {t('composer.linkedinWarning')}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -855,12 +843,12 @@ export default function Composer() {
                     {isPublishing ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Veröffentlichen...
+                        {t('composer.publishing')}
                       </>
                     ) : (
                       <>
                         <Send className="mr-2 h-4 w-4" />
-                        Jetzt posten
+                        {t('composer.publishNow')}
                       </>
                     )}
                   </Button>
@@ -875,8 +863,8 @@ export default function Composer() {
                   defaultHashtags={postData?.hashtags || []}
                   onPublished={() => {
                     toast({
-                      title: '✅ Erfolgreich veröffentlicht',
-                      description: 'Ihr Post wurde auf den ausgewählten Plattformen veröffentlicht',
+                      title: `✅ ${t('composer.publishSuccess')}`,
+                      description: t('composer.publishSuccessDesc'),
                     });
                   }}
                 />
@@ -931,16 +919,16 @@ export default function Composer() {
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  Live-Vorschau
+                  {t('composer.livePreview')}
                 </CardTitle>
-                <CardDescription>So wird Ihr Post aussehen</CardDescription>
+                <CardDescription>{t('composer.previewDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ComposerPreview
                   textContent={textContent}
                   selectedMedia={selectedMedia}
                   selectedChannels={selectedChannels}
-                  profileName="Ihr Profil"
+                  profileName={t('composer.yourProfile')}
                   hook={postData?.hook}
                   caption={postData?.caption}
                   hashtags={postData?.hashtags}
@@ -1005,8 +993,8 @@ export default function Composer() {
           onSave={(config) => {
             setYoutubeConfig(config);
             toast({
-              title: "YouTube-Einstellungen gespeichert",
-              description: `Privacy: ${config.privacyStatus}, Made for Kids: ${config.madeForKids ? 'Ja' : 'Nein'}`,
+              title: t('composer.ytSettingsSaved'),
+              description: `Privacy: ${config.privacyStatus}, Made for Kids: ${config.madeForKids ? 'Yes' : 'No'}`,
             });
           }}
         />
