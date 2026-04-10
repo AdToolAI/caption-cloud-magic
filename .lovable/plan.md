@@ -1,33 +1,37 @@
 
-# Facebook Sync Fix: Posts in `post_metrics` schreiben
+
+# Instagram Sync Fix: Posts in `post_metrics` schreiben
 
 ## Problem
-- `facebook-page-sync` schreibt nur Seiten-Metriken in `fb_page_daily`
-- Die Platforms-Übersicht (`PlatformOverviewCards`) liest aus `post_metrics` → Facebook zeigt immer 0
-- Die Sync-Funktion nutzt hardcodierte Env-Vars statt den OAuth-Token aus `social_connections`
+Genau dasselbe Problem wie bei Facebook:
+- `instagram-graph-sync` schreibt in `ig_media` + `ig_media_metrics` — aber NICHT in `post_metrics`
+- `sync-posts-history` schreibt in `posts_history` — aber NICHT in `post_metrics`
+- Das Dashboard (`PlatformOverviewCards`) liest aus `post_metrics` → Instagram zeigt immer 0
+- `instagram-graph-sync` nutzt hardcodierte Env-Vars (`FB_USER_LL_TOKEN`, `IG_PAGE_ID`) statt den OAuth-Token aus `social_connections`
 
 ## Lösung
 
-### 1. `facebook-page-sync` Edge Function umbauen
-- **Token aus `social_connections`** laden (verschlüsselt gespeichert via `facebook-select-page`) statt `FB_USER_LL_TOKEN` Env-Var
-- **Einzelne Posts der Facebook-Seite abrufen** via Graph API (`/{page_id}/posts?fields=id,message,created_time,permalink_url,shares,reactions.summary(true),comments.summary(true),insights.metric(post_impressions,post_impressions_unique)`)
-- **Posts in `post_metrics` upserten** mit `provider: 'facebook'`, damit die Platforms-Karten sie anzeigen
-- Bestehende `fb_page_daily`-Logik beibehalten für Seiten-Level-Metriken (wird in OverviewTab genutzt)
+### 1. `instagram-graph-sync` Edge Function umbauen
+- **Token aus `social_connections`** laden und mit `decryptToken` entschlüsseln (wie bei Facebook)
+- **Instagram User ID dynamisch** über die Page ermitteln (statt `IG_PAGE_ID` Env-Var)
+- **Posts in `post_metrics` upserten** mit `provider: 'instagram'`, damit die Platform-Karten Daten anzeigen
+- Bestehende `ig_account_daily` / `ig_media` / `ig_media_metrics` Logik beibehalten
 
-### 2. Token-Entschlüsselung
-- Die Funktion `decryptToken` aus `_shared/crypto.ts` nutzen, um den Page Access Token aus `social_connections.access_token_hash` zu entschlüsseln
-
-### 3. Datenfluss nach Fix
+### 2. Datenfluss nach Fix
 ```text
-Sync Now → facebook-page-sync
+Sync Now → instagram-graph-sync
   ├─ Token aus social_connections laden + entschlüsseln
-  ├─ /{page_id}/posts → post_metrics (für Platforms-Karten)
-  └─ /{page_id}/insights → fb_page_daily (für Overview-Tab)
+  ├─ Page Token → IG User ID ermitteln
+  ├─ /{ig_user_id}/media → post_metrics (für Platform-Karten)
+  ├─ /{ig_user_id}/insights → ig_account_daily (für Overview)
+  └─ /{media_id}/insights → ig_media_metrics (Detail-Metriken)
 ```
 
-## Technische Details
-- Edge Function: `supabase/functions/facebook-page-sync/index.ts`
-- Crypto Import: `import { decryptToken } from '../_shared/crypto.ts'`
-- Upsert-Logik: `post_metrics` mit `external_id` als Conflict-Key, `provider: 'facebook'`
-- Graph API v24.0 beibehalten
-- `engagement_rate` berechnen: `(likes + comments + shares) / reach * 100`
+### Technische Details
+- Edge Function: `supabase/functions/instagram-graph-sync/index.ts`
+- Import hinzufügen: `import { decryptToken } from '../_shared/crypto.ts'`
+- Token-Quelle: `social_connections` WHERE `provider = 'instagram'`
+- Upsert: `post_metrics` mit `provider: 'instagram'`, `onConflict: 'user_id,provider,post_id'`
+- Engagement-Rate wird automatisch durch den DB-Trigger `compute_engagement_rate` berechnet
+- Medien der letzten 90 Tage statt nur 7 Tage abrufen (für mehr Datenpunkte)
+
