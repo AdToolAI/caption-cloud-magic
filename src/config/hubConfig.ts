@@ -1,7 +1,7 @@
 import {
   Home, Calendar, LayoutGrid, Edit3, Clock,
   Sparkles, Bot, ImagePlus,
-  MessageSquare, MessageCircle, BookTemplate,
+  MessageSquare, MessageCircle, BookTemplate, Workflow,
   LineChart, BarChart3, Coins, Radar, Shield,
   FolderOpen, Mic2, Video, Film, Edit, Layers, Languages,
   Users, Palette,
@@ -52,6 +52,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/coach", titleKey: "nav.coach", descKey: "hubItemDesc.coach", icon: MessageSquare },
       { route: "/comment-manager", titleKey: "nav.commentManager", descKey: "hubItemDesc.comments", icon: MessageCircle },
       { route: "/template-manager", titleKey: "nav.templateManager", descKey: "hubItemDesc.templates", icon: BookTemplate },
+      { route: "/campaigns", titleKey: "nav.campaigns", descKey: "hubItemDesc.campaigns", icon: Workflow },
     ],
   },
   {
@@ -91,6 +92,7 @@ export const hubDefinitions: HubDefinition[] = [
     descKey: "hubDesc.team",
     items: [
       { route: "/team-workspace", titleKey: "nav.teamWorkspace", descKey: "hubItemDesc.teamWorkspace", icon: Users, plan: "pro" },
+      { route: "/brand-kit", titleKey: "nav.brandKit", descKey: "hubItemDesc.brandKit", icon: Palette },
       { route: "/white-label", titleKey: "nav.whiteLabel", descKey: "hubItemDesc.whiteLabel", icon: Palette, plan: "enterprise" },
       { route: "/community", titleKey: "nav.community", descKey: "hubItemDesc.community", icon: MessageCircle },
     ],
