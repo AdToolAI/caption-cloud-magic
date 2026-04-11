@@ -20,7 +20,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS, es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PostGeneratorInline } from "@/components/campaigns/PostGeneratorInline";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface CampaignPost {
   id: string;
@@ -70,8 +71,12 @@ interface CampaignTabProps {
   workspaceId: string | null;
 }
 
+const localeMap = { en: enUS, de, es } as const;
+
 export function CampaignTab({ workspaceId }: CampaignTabProps) {
   const navigate = useNavigate();
+  const { t, language } = useTranslation();
+  const dateFnsLocale = localeMap[language] || enUS;
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [transferring, setTransferring] = useState<string | null>(null);
@@ -79,6 +84,11 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
   const [deleting, setDeleting] = useState(false);
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
   const [generatorPost, setGeneratorPost] = useState<CampaignPost | null>(null);
+
+  const dayNames = [
+    t('planner.monday'), t('planner.tuesday'), t('planner.wednesday'),
+    t('planner.thursday'), t('planner.friday'), t('planner.saturday'), t('planner.sunday')
+  ];
 
   useEffect(() => {
     fetchCampaigns();
@@ -104,43 +114,29 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
       if (error) throw error;
 
       console.log('[CampaignTab] Loaded blocks:', blocks?.length);
-      console.log('[CampaignTab] Blocks with campaign/template meta:', 
-        blocks?.filter((b: any) => b.meta?.campaign_id || b.meta?.template_id).length
-      );
 
       const { data: templates } = await supabase
         .from("calendar_campaign_templates")
         .select("id, name");
 
       const templateMap = new Map(templates?.map(t => [t.id, t.name]) || []);
-
       const campaignMap = new Map<string, Campaign>();
 
       blocks?.forEach((block: any) => {
-        // Erkennt sowohl campaign_id als auch template_id für Rückwärtskompatibilität
         const campaignId = block.meta?.campaign_id || block.meta?.template_id || block.content_items?.source_id;
         if (!campaignId) return;
-
-        const campaignName = block.meta?.campaign_name || templateMap.get(campaignId) || "Kampagne";
+        const campaignName = block.meta?.campaign_name || templateMap.get(campaignId) || t('planner.campaigns');
 
         if (!campaignMap.has(campaignId)) {
-          campaignMap.set(campaignId, {
-            templateId: campaignId,
-            name: campaignName,
-            startDate: block.start_at,
-            posts: [],
-          });
+          campaignMap.set(campaignId, { templateId: campaignId, name: campaignName, startDate: block.start_at, posts: [] });
         }
-
         campaignMap.get(campaignId)!.posts.push(block);
       });
 
-      const campaignsList = Array.from(campaignMap.values());
-      console.log('[CampaignTab] Grouped campaigns:', campaignsList.length, campaignsList.map(c => ({ name: c.name, posts: c.posts.length })));
-      setCampaigns(campaignsList);
+      setCampaigns(Array.from(campaignMap.values()));
     } catch (error) {
       console.error("[CampaignTab] Error fetching campaigns:", error);
-      toast.error("Fehler beim Laden der Kampagnen");
+      toast.error(t('planner.errorLoadingCampaigns'));
     } finally {
       setLoading(false);
     }
@@ -148,28 +144,19 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
 
   const handleTransferToCalendar = async (campaign: Campaign) => {
     if (!workspaceId) return;
-
     setTransferring(campaign.templateId);
-
     try {
       const blockIds = campaign.posts.map(p => p.id);
-
       const { data, error } = await supabase.functions.invoke("planner-to-calendar", {
-        body: {
-          blockIds,
-          workspaceId,
-          autoPublish: false,
-        },
+        body: { blockIds, workspaceId, autoPublish: false }
       });
-
       if (error) throw error;
-
-      toast.success(`✅ ${data.eventsCreated} Posts zum Kalender übertragen`);
+      toast.success(`✅ ${t('planner.postsTransferred', { count: data.eventsCreated })}`);
       fetchCampaigns();
       setTimeout(() => navigate("/calendar"), 1000);
     } catch (error: any) {
       console.error("Transfer error:", error);
-      toast.error("Fehler beim Übertragen");
+      toast.error(t('planner.errorTransferring'));
     } finally {
       setTransferring(null);
     }
@@ -177,25 +164,17 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
 
   const handleDeleteCampaign = async () => {
     if (!deletingCampaign) return;
-
     setDeleting(true);
-
     try {
       const blockIds = deletingCampaign.posts.map(p => p.id);
-
-      const { error } = await supabase
-        .from("schedule_blocks")
-        .delete()
-        .in("id", blockIds);
-
+      const { error } = await supabase.from("schedule_blocks").delete().in("id", blockIds);
       if (error) throw error;
-
-      toast.success("Kampagne gelöscht");
+      toast.success(t('planner.campaignDeleted'));
       setDeletingCampaign(null);
       fetchCampaigns();
     } catch (error: any) {
       console.error("Delete error:", error);
-      toast.error("Fehler beim Löschen");
+      toast.error(t('planner.errorDeleting'));
     } finally {
       setDeleting(false);
     }
@@ -207,26 +186,18 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
   };
 
   const formatDate = (dateStr: string) => {
-    try {
-      return format(parseISO(dateStr), "dd. MMM yyyy", { locale: de });
-    } catch {
-      return dateStr;
-    }
+    try { return format(parseISO(dateStr), "dd. MMM yyyy", { locale: dateFnsLocale }); } catch { return dateStr; }
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center gap-4"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
             <Loader2 className="h-10 w-10 animate-spin text-primary relative z-10" />
           </div>
-          <span className="text-muted-foreground text-sm">Kampagnen laden...</span>
+          <span className="text-muted-foreground text-sm">{t('planner.loadingCampaigns')}</span>
         </motion.div>
       </div>
     );
@@ -234,42 +205,25 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
 
   if (campaigns.length === 0) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         <Card className="p-10 text-center backdrop-blur-xl bg-card/60 border-white/10 relative overflow-hidden">
-          {/* Glow Background */}
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-cyan-500/5 pointer-events-none" />
-          
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2, type: "spring" }}
-            className="relative z-10"
-          >
+          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2, type: "spring" }} className="relative z-10">
             <div className="relative mx-auto mb-6 w-20 h-20">
               <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
               <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-cyan-500/20 border border-white/10 flex items-center justify-center">
                 <Package className="h-10 w-10 text-primary" />
               </div>
             </div>
-            
-            <h3 className="text-xl font-semibold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-              Keine Kampagnen vorhanden
-            </h3>
-            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-              Erstelle Kampagnen aus Templates, um sie hier zu verwalten und zum Kalender zu übertragen.
-            </p>
-            
+            <h3 className="text-xl font-semibold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">{t('planner.noCampaigns')}</h3>
+            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">{t('planner.createCampaigns')}</p>
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Button 
                 onClick={() => navigate("/templates")} 
                 className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary),0.4)] transition-all duration-300"
               >
                 <Rocket className="h-4 w-4" />
-                Zu den Templates
+                {t('planner.goToTemplates')}
                 <Sparkles className="h-3 w-3" />
               </Button>
             </motion.div>
@@ -296,23 +250,19 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
               transition={{ duration: 0.3, delay: index * 0.1 }}
             >
               <Card className="p-5 backdrop-blur-xl bg-card/60 border-white/10 hover:border-primary/30 hover:shadow-[0_0_30px_rgba(var(--primary),0.15)] transition-all duration-300 relative overflow-hidden group">
-                {/* Subtle gradient overlay on hover */}
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
                 
                 <div className="relative z-10">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <motion.div 
-                        whileHover={{ scale: 1.1, rotate: 5 }}
-                        className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20"
-                      >
+                      <motion.div whileHover={{ scale: 1.1, rotate: 5 }} className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
                         <Rocket className="h-5 w-5 text-primary" />
                       </motion.div>
                       <div>
                         <h3 className="font-semibold text-lg">{campaign.name}</h3>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                          <span>Gestartet: {formatDate(campaign.startDate)}</span>
+                          <span>{t('planner.started')}: {formatDate(campaign.startDate)}</span>
                         </div>
                       </div>
                     </div>
@@ -323,15 +273,15 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
                         : "bg-primary/10 text-primary border-primary/20"
                       }
                     >
-                      {progress === 100 ? "✓ Abgeschlossen" : "In Bearbeitung"}
+                      {progress === 100 ? `✓ ${t('planner.completed')}` : t('planner.inProgress')}
                     </Badge>
                   </div>
 
                   {/* Progress Bar */}
                   <div className="mb-5">
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-muted-foreground">Fortschritt</span>
-                      <span className="font-medium text-primary">{scheduled}/{total} Posts geplant</span>
+                      <span className="text-muted-foreground">{t('planner.progress')}</span>
+                      <span className="font-medium text-primary">{scheduled}/{total} {t('planner.postsPlanned')}</span>
                     </div>
                     <div className="h-2 bg-muted/50 rounded-full overflow-hidden relative">
                       <motion.div
@@ -363,7 +313,7 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
                               ? "bg-gradient-to-br from-primary/30 to-cyan-500/20 border-primary/50 text-primary shadow-[0_0_10px_rgba(var(--primary),0.3)]" 
                               : "bg-muted/30 border-white/10 text-muted-foreground hover:border-white/20"
                           }`}
-                          title={post.title_override || post.content_items?.title || `Tag ${idx + 1}`}
+                          title={post.title_override || post.content_items?.title || `Post ${idx + 1}`}
                         >
                           {isScheduled ? "✓" : idx + 1}
                         </motion.div>
@@ -390,12 +340,8 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
                         onClick={() => handleTransferToCalendar(campaign)}
                         disabled={isTransferring}
                       >
-                        {isTransferring ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                        Zum Kalender übertragen
+                        {isTransferring ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        {t('planner.transferToCalendar')}
                       </Button>
                     </motion.div>
                     
@@ -404,16 +350,11 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
                         size="sm" 
                         variant="outline" 
                         className="gap-2 border-white/10 hover:border-primary/30 hover:bg-primary/5"
-                        onClick={() => setExpandedCampaignId(
-                          expandedCampaignId === campaign.templateId ? null : campaign.templateId
-                        )}
+                        onClick={() => setExpandedCampaignId(expandedCampaignId === campaign.templateId ? null : campaign.templateId)}
                       >
                         <Calendar className="h-4 w-4" />
-                        Details
-                        <ChevronDown className={cn(
-                          "h-3 w-3 transition-transform duration-200",
-                          expandedCampaignId === campaign.templateId && "rotate-180"
-                        )} />
+                        {t('planner.details')}
+                        <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", expandedCampaignId === campaign.templateId && "rotate-180")} />
                       </Button>
                     </motion.div>
                     
@@ -429,7 +370,7 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
                     </motion.div>
                   </div>
 
-                  {/* Expanded Post Details Accordion */}
+                  {/* Expanded Post Details */}
                   <AnimatePresence>
                     {expandedCampaignId === campaign.templateId && (
                       <motion.div
@@ -446,7 +387,7 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
                             const postCaption = post.caption_override || post.content_items?.caption || post.meta?.cta || "";
                             const hashtags = post.meta?.hashtags || [];
                             const postType = post.meta?.post_type || "Post";
-                            const dayName = post.meta?.day || format(parseISO(post.start_at), "EEEE", { locale: de });
+                            const dayName = post.meta?.day || format(parseISO(post.start_at), "EEEE", { locale: dateFnsLocale });
                             const postTime = format(parseISO(post.start_at), "HH:mm");
 
                             return (
@@ -457,39 +398,27 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
                                 transition={{ delay: idx * 0.05 }}
                                 className="p-4 rounded-lg bg-muted/30 border border-white/5 hover:border-primary/20 transition-all"
                               >
-                                {/* Post Header */}
                                 <div className="flex items-center gap-3 mb-3">
                                   <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
                                     {idx + 1}
                                   </Badge>
-                                  <span className="text-sm text-muted-foreground">Woche {weekNumber}</span>
-                                  <Badge variant="secondary" className="text-xs">
-                                    {postType}
-                                  </Badge>
+                                  <span className="text-sm text-muted-foreground">{t('planner.week')} {weekNumber}</span>
+                                  <Badge variant="secondary" className="text-xs">{postType}</Badge>
                                 </div>
 
-                                {/* Day & Time Selection */}
                                 <div className="flex flex-wrap items-center gap-3 mb-3">
                                   <Select defaultValue={dayName.toLowerCase()}>
                                     <SelectTrigger className="w-32 h-8 text-xs">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="montag">Montag</SelectItem>
-                                      <SelectItem value="dienstag">Dienstag</SelectItem>
-                                      <SelectItem value="mittwoch">Mittwoch</SelectItem>
-                                      <SelectItem value="donnerstag">Donnerstag</SelectItem>
-                                      <SelectItem value="freitag">Freitag</SelectItem>
-                                      <SelectItem value="samstag">Samstag</SelectItem>
-                                      <SelectItem value="sonntag">Sonntag</SelectItem>
+                                      {dayNames.map((name, i) => (
+                                        <SelectItem key={i} value={name.toLowerCase()}>{name}</SelectItem>
+                                      ))}
                                     </SelectContent>
                                   </Select>
                                   
-                                  <Input 
-                                    type="time" 
-                                    defaultValue={postTime}
-                                    className="w-24 h-8 text-xs"
-                                  />
+                                  <Input type="time" defaultValue={postTime} className="w-24 h-8 text-xs" />
                                   
                                   <Badge 
                                     className={cn(
@@ -505,50 +434,33 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
                                   </Badge>
                                 </div>
 
-                                {/* Title & Caption */}
                                 <h4 className="font-medium text-sm mb-1">{postTitle}</h4>
-                                {postCaption && (
-                                  <p className="text-muted-foreground text-xs line-clamp-2 mb-2">{postCaption}</p>
-                                )}
+                                {postCaption && <p className="text-muted-foreground text-xs line-clamp-2 mb-2">{postCaption}</p>}
 
-                                {/* Hashtags */}
                                 {hashtags.length > 0 && (
                                   <div className="flex flex-wrap gap-1 mb-3">
                                     {hashtags.slice(0, 5).map((tag: string, tagIdx: number) => (
-                                      <Badge key={tagIdx} variant="secondary" className="text-xs bg-cyan-500/10 text-cyan-400 border-cyan-500/20">
-                                        #{tag}
-                                      </Badge>
+                                      <Badge key={tagIdx} variant="secondary" className="text-xs bg-cyan-500/10 text-cyan-400 border-cyan-500/20">#{tag}</Badge>
                                     ))}
-                                    {hashtags.length > 5 && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        +{hashtags.length - 5}
-                                      </Badge>
-                                    )}
+                                    {hashtags.length > 5 && <Badge variant="secondary" className="text-xs">+{hashtags.length - 5}</Badge>}
                                   </div>
                                 )}
 
-                                {/* Actions */}
                                 <div className="flex flex-wrap gap-2">
                                   <Button 
-                                    size="sm" 
-                                    variant="outline"
+                                    size="sm" variant="outline"
                                     className="h-7 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
                                     onClick={() => setGeneratorPost(post)}
                                   >
                                     <Sparkles className="h-3 w-3" />
-                                    Mit KI generieren
+                                    {t('planner.generateWithAi')}
                                   </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    className="h-7 text-xs gap-1.5 border-white/10"
-                                  >
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 border-white/10">
                                     <Eye className="h-3 w-3" />
-                                    Vorschau
+                                    {t('planner.preview')}
                                   </Button>
                                   <Button 
-                                    size="sm" 
-                                    variant="outline"
+                                    size="sm" variant="outline"
                                     className="h-7 text-xs gap-1.5 border-white/10"
                                     onClick={() => window.open('/compose', '_blank')}
                                   >
@@ -574,21 +486,20 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
       <AlertDialog open={!!deletingCampaign} onOpenChange={() => setDeletingCampaign(null)}>
         <AlertDialogContent className="backdrop-blur-xl bg-card/95 border-white/10">
           <AlertDialogHeader>
-            <AlertDialogTitle>Kampagne löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{t('planner.deleteCampaign')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Diese Aktion löscht alle {deletingCampaign?.posts.length} Posts dieser Kampagne. 
-              Dies kann nicht rückgängig gemacht werden.
+              {t('planner.deleteCampaignDesc', { count: deletingCampaign?.posts.length || 0 })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-white/10">Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel className="border-white/10">{t('planner.cancel')}</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteCampaign}
               className="bg-destructive hover:bg-destructive/90"
               disabled={deleting}
             >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Löschen
+              {t('planner.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -610,7 +521,7 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
           onClose={() => setGeneratorPost(null)}
           onApplyContent={(postId, content) => {
             console.log('[CampaignTab] Generated content for post:', postId, content);
-            toast.success("Content generiert und angewendet");
+            toast.success(t('planner.contentGenerated'));
             setGeneratorPost(null);
             fetchCampaigns();
           }}
