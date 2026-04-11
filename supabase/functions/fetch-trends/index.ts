@@ -1823,10 +1823,10 @@ serve(async (req) => {
     if (filteredTrends.length === 0) {
       let fallbackFiltered = FALLBACK_TRENDS;
     
-      if (platform) {
+      if (platform && platform !== 'all') {
         fallbackFiltered = fallbackFiltered.filter(t => t.platform === platform);
       }
-      if (category) {
+      if (category && category !== 'all') {
         fallbackFiltered = fallbackFiltered.filter(t => t.category === category);
       }
       if (language !== 'en') {
