@@ -231,7 +231,7 @@ export function PromptAssistantDialog({ open, onOpenChange, onApply }: PromptAss
             <div className="flex flex-col gap-2 pt-2">
               <Button onClick={handleApply} className="w-full h-11 bg-gradient-to-r from-primary to-primary/80" size="lg">
                 <ArrowRight className="mr-2 h-4 w-4" />
-                In Generator übernehmen
+                {t("generator_use_in_generator")}
               </Button>
               <div className="flex gap-2">
                 <Button onClick={handleCopy} variant="outline" className="flex-1 h-10 border-white/20">
