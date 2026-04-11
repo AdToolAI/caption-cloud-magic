@@ -1,84 +1,78 @@
 
 Problem:
-Die verbleibenden deutschen Texte im Post Time Adviser kommen nicht mehr aus den React-Komponenten, sondern aus den Backend-Daten selbst. Die UI nutzt bereits `t('postingTimes...')`, aber die Slot-`reasons` werden von den Backend-Funktionen auf Deutsch erzeugt und dann direkt angezeigt.
+The remaining German text in the English UI is coming from the KI-Textstudio/Generator area, not just one label. I found hardcoded German strings in the page component, the hero header, the prompt assistant dialog, and even shared AI status messages.
 
-Was ich gefunden habe:
-- `src/pages/PostingTimes.tsx`, `TopSlotsListPremium.tsx`, `TopSlotsList.tsx`, `HeatmapCalendarPremium.tsx`, `HeatmapCalendar.tsx` sind bereits auf i18n umgestellt.
-- Die deutschen Texte im Screenshot stammen aus `slot.reasons[0]` bzw. `slot.reasons.map(...)`.
-- Diese Reasons werden in zwei Backend-Funktionen hart auf Deutsch erzeugt:
-  1. `supabase/functions/posting-times-api/index.ts`
-     - z. B. `Prime-Time Abends`, `Wochenend-Entspannung`, `Basiert auf Branchen-Durchschnitten`, `Saisonal angepasst`
-  2. `supabase/functions/generate-posting-slots/index.ts`
-     - z. B. `Historisch starke Zeit`, `Positiver Trend (30d)`, `Branchen-Peak-Zeit`
+What I found:
+- `src/components/generator/GeneratorHeroHeader.tsx`
+  - hardcoded: `KI Text-Studio`, `KI-Generiert`, `Sofort einsatzbereit`, `Multi-Plattform`
+- `src/pages/Generator.tsx`
+  - hardcoded: `Prompt-Assistent öffnen`, `Prompt-Assistent`
+  - `Content-Länge`, `Kurz/Mittel/Lang`
+  - `Anzahl Hashtags`
+  - `Generating...`
+  - result labels: `(editierbar)`, `Caption bearbeiten...`
+  - toasts: `Caption generated!`, `Copied to clipboard!`, `Generiere zuerst eine Caption`, calendar success message
+  - CTA: `Zum Kalender hinzufügen`
+- `src/components/generator/PromptAssistantDialog.tsx`
+  - hardcoded toast: `Prompt übernommen!`
+  - hardcoded button text: `In Generator übernehmen`
+- `src/hooks/useAICall.ts`
+  - shared German status/toast text:
+    - `Prüfe Credits...`
+    - `Generiere...`
+    - `Wiederhole...`
+    - `Erfolgreich!`
+    - insufficient credits / rate-limit / server error messages
 
-Implementierungsplan:
-1. `posting-times-api` sprachfähig machen
-- Request-Body um `language` erweitern (`en`/`de`/`es`).
-- Alle festen Reason-Texte dort in sprachabhängige Labels umwandeln.
-- Plattform-Peak-Reasons nicht mehr als fertige deutsche Strings speichern, sondern pro Sprache ausgeben.
-- Auch Sammelgründe wie:
-  - seasonal boosted/adjusted
-  - based on industry averages
-  - personalized + industry trend
-  lokalisieren.
+Important design note:
+- The base translation file already has good generator and prompt assistant keys in EN/DE/ES.
+- So this is mostly a cleanup of hardcoded literals plus a small translation expansion.
+- `nav.textStudio` is already correct in English (`AI Text Studio`), so the remaining issue is component-level strings.
 
-2. `generate-posting-slots` ebenfalls lokalisieren
-- Die dort erzeugten `reasons` auf Englisch umstellen oder besser ebenfalls sprachabhängig generieren.
-- Wichtig: Diese Funktion schreibt in `posting_slots`; deshalb müssen künftig neu generierte Slots keine deutschen Reasons mehr speichern.
+Implementation plan:
+1. Extend `src/lib/translations.ts`
+- Add missing generator keys for:
+  - hero badge/title/highlights
+  - prompt assistant trigger text/tooltip
+  - content length label + short/medium/long options
+  - hashtag count label
+  - generating state
+  - editable/result labels and placeholders
+  - send-to-calendar CTA
+  - generator success/copy/prefill/calendar toasts
+- Add prompt assistant action/success keys for:
+  - `useInGenerator`
+  - `applied`
+- Add shared AI call status/error keys under a safe namespace (for example `aiCall.*`) to avoid collisions.
 
-3. Frontend-Request erweitern
-- In `src/hooks/usePostingTimes.ts` die aktive Sprache mitsenden:
-  - `body: { platform, days, tz, language }`
-- Query-Key um `language` ergänzen, damit beim Sprachwechsel korrekt neu geladen wird und kein alter Cache wiederverwendet wird.
+2. Localize `src/components/generator/GeneratorHeroHeader.tsx`
+- Use `useTranslation()`
+- Replace hero badge/title and feature chips with translation keys
+- Keep layout/animation unchanged.
 
-4. Caching sauber machen
-- In `posting-times-api` den Cache-Key ebenfalls um `language` erweitern.
-- Sonst könnte bei englischer UI weiterhin eine zuvor auf Deutsch gecachte Antwort zurückkommen.
+3. Localize `src/pages/Generator.tsx`
+- Replace all remaining hardcoded German/English literals with `t(...)`
+- Use translated labels for content length options and result section
+- Replace all generator toasts with translated messages
+- Keep platform names as-is unless already centralized elsewhere.
 
-5. Bestehende deutsche Slot-Daten berücksichtigen
-- Da `posting_slots.reasons` bereits deutsch in der DB liegen können, reicht eine reine UI-Änderung nicht.
-- Ich würde beim Laden aus `posting_slots` die Reasons serverseitig überschreiben bzw. normalisieren:
-  - entweder vorhandene gespeicherte Reasons ignorieren und aus `features`/Score neu sprachabhängig ableiten
-  - oder mindestens bekannte deutsche Alt-Texte per Mapping in die gewünschte Sprache umwandeln.
-- So sieht der Nutzer sofort Englisch, auch bevor ein kompletter Regenerationslauf alle Slots neu schreibt.
+4. Localize `src/components/generator/PromptAssistantDialog.tsx`
+- Replace `Prompt übernommen!` and `In Generator übernehmen` with translation keys
+- Reuse existing `wizard.useInGenerator` where possible.
 
-6. Optional robuster Schritt
-- Falls gewünscht, zusätzlich die gespeicherten `posting_slots` für alle Nutzer bei neuer Generierung in neutraler Form halten:
-  - statt lokalisierter Texte lieber Reason-Codes / Features speichern
-  - Texte erst beim Response der API in die Zielsprache rendern.
-- Das wäre die nachhaltigste Lösung gegen zukünftige Sprachmischungen.
+5. Localize shared AI status copy in `src/hooks/useAICall.ts`
+- Inject translation support into the hook
+- Replace German status messages and generic error toasts with translated keys
+- This will also improve language consistency anywhere else `useAICall()` is used.
 
-Betroffene Dateien:
-- `src/hooks/usePostingTimes.ts`
-- `supabase/functions/posting-times-api/index.ts`
-- `supabase/functions/generate-posting-slots/index.ts`
+Files to update:
+- `src/lib/translations.ts`
+- `src/components/generator/GeneratorHeroHeader.tsx`
+- `src/pages/Generator.tsx`
+- `src/components/generator/PromptAssistantDialog.tsx`
+- `src/hooks/useAICall.ts`
 
-Technische Details:
-```text
-Aktuelle Ursache:
-UI zeigt slot.reasons direkt an
-        ↓
-posting-times-api liest/generiert reasons
-        ↓
-reasons sind im Backend deutsch hardcodiert
-        ↓
-englische UI zeigt trotzdem deutsche Inhalte
-```
-
-Empfohlene Umsetzung:
-```text
-Frontend sendet language
-        ↓
-posting-times-api lokalisiert Response anhand language
-        ↓
-Cache getrennt pro Sprache
-        ↓
-Alt-Daten werden serverseitig normalisiert
-        ↓
-UI bleibt sprachkonsistent
-```
-
-Erwartetes Ergebnis:
-- Die gesamte Posting Times Ansicht ist in EN/DE/ES konsistent.
-- Kein deutscher Slot-Reason mehr in der englischen UI.
-- Sprachwechsel aktualisiert auch die API-Daten korrekt statt nur statische Labels.
+Expected result:
+- The KI-Textstudio / AI Text Studio page will be fully language-consistent in EN/DE/ES.
+- No German hero text, chips, CTA labels, assistant text, or AI status messages will remain in the English UI.
+- Shared AI loading/error badges will also match the selected language across affected tools.
