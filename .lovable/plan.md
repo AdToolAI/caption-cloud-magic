@@ -1,43 +1,36 @@
 
 
-## Plan: Trend Radar — Inhalte auf Englisch / weltweit umstellen
+## Plan: Force-Refresh der deutschen Trend-Daten in der Datenbank
 
 ### Problem
-Die ~100 Trends in `supabase/functions/fetch-trends/index.ts` sind inhaltlich komplett auf Deutsch geschrieben (Hooks, Beschreibungen, KI-Tipps, Content-Ideen, Audience-Texte) — obwohl sie als `language: "en"` markiert sind. Das ist inkonsistent und schränkt die Zielgruppe ein.
+Die `trend_entries`-Tabelle enthält noch die alten deutschen Trend-Inhalte. Die Edge Function wurde zwar mit englischen Texten aktualisiert, aber der Refresh-Mechanismus greift nicht, weil er nur auf alte Subcategory-Namen prüft — die aber bereits korrekt sind. Ergebnis: Die DB serviert weiterhin gecachte deutsche Strings.
 
 ### Lösung
-Alle hardcodierten deutschen Strings in der `generateDynamicTrends()`-Funktion ins Englische übersetzen und auf weltweite/internationale Trends ausrichten. Rein deutschsprachige Trend-Namen bleiben, wo sie als Hashtag Sinn ergeben (z.B. `#MiniSuccessStories`), aber Beschreibungen, Hooks, AI-Tips, Content-Ideen und Audience-Fit werden durchgehend Englisch.
+Den Refresh-Trigger in der Edge Function so anpassen, dass er auch erkennt, wenn Trends noch deutschen Text enthalten, und in dem Fall alle Einträge löscht und mit den neuen englischen Fallback-Daten ersetzt.
 
 ### Änderungen
 
-**`supabase/functions/fetch-trends/index.ts`** — Vollständige Übersetzung aller ~1600 Zeilen Trend-Daten:
+**`supabase/functions/fetch-trends/index.ts`** — Zusätzliche Refresh-Bedingung (~5 Zeilen):
 
-Beispiel vorher:
-```
-hook: "So habe ich in 30 Tagen 1000 neue Follower gewonnen – ohne Ads!",
-ai_tip: "Verwende Jump-Cuts mit Text-Overlays. Dauer: 15–20 Sekunden.",
-audience_fit: "Content creators und Social Media Manager",
-description: "Produziere 30 Posts an einem Tag für maximale Effizienz"
-```
+Nach der bestehenden `oldSubcategories`-Prüfung (Zeile ~1749) eine zweite Prüfung hinzufügen: Wenn existierende Trends deutsche Wörter in `description` oder `name` enthalten (z.B. "für", "Über-Nacht", "Verwandle"), wird ebenfalls ein kompletter Refresh ausgelöst.
 
-Beispiel nachher:
-```
-hook: "How I gained 1000 new followers in 30 days — without ads!",
-ai_tip: "Use jump-cuts with text overlays. Duration: 15–20 seconds.",
-audience_fit: "Content creators and social media managers",
-description: "Produce 30 posts in one day for maximum efficiency"
+```typescript
+// Additional check: detect old German content that needs refresh
+const hasGermanContent = allEcommerceTrends?.some((t: any) => {
+  const desc = t.data_json?.ai_tip || t.description || '';
+  return /\b(für|und|mit|Verwandle|Über-Nacht|Magnetischer|Kleiner)\b/.test(desc);
+});
+
+const needsRefresh = hasOldSubcategories || hasGermanContent;
 ```
 
-Betroffen sind alle Kategorien:
-- Social Media Growth (~5 Trends)
-- E-Commerce / Product Trends (~20+ Trends)
-- Health & Fitness (~10 Trends)
-- Finance (~5 Trends)
-- AI Tools (~5 Trends)
-- Parenting, Sustainability, weitere (~10+ Trends)
+Dann `if (hasOldSubcategories)` durch `if (needsRefresh)` ersetzen.
 
-### Umfang
-- **1 Datei**: `supabase/functions/fetch-trends/index.ts`
-- **~200+ deutsche Strings** → Englisch
-- Keine Strukturänderungen, keine neuen Keys, keine Frontend-Änderungen nötig
+Zusätzlich: Die Prüfung auf ALLE Trends ausdehnen (nicht nur ecommerce), damit auch Social Media / Business Trends erkannt werden.
+
+### Betroffene Datei
+- `supabase/functions/fetch-trends/index.ts` (nur ~10 Zeilen Änderung)
+
+### Nach Deployment
+Die nächste Anfrage an den Trend Radar erkennt die deutschen Inhalte, löscht alle alten Einträge und fügt die englischen neu ein. Ab dann werden nur noch englische Trends angezeigt.
 
