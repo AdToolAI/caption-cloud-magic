@@ -21,8 +21,8 @@ const generateDynamicTrends = () => {
       popularity_index: 92,
       category: "social-media",
       data_json: {
-        hook: "So habe ich in 30 Tagen 1000 neue Follower gewonnen – ohne Ads!",
-        ai_tip: "Verwende Jump-Cuts mit Text-Overlays. Dauer: 15–20 Sekunden.",
+        hook: "How I gained 1,000 new followers in 30 days — without ads!",
+        ai_tip: "Use jump-cuts with text overlays. Duration: 15–20 seconds.",
         content_ideas: [
           { title: "Before/After Growth", description: "Show analytics screenshots with storytelling", format: "reel", estimated_virality: "high" },
           { title: "Top 3 Mistakes", description: "Share what didn't work and what changed everything", format: "carousel", estimated_virality: "high" }
@@ -40,8 +40,8 @@ const generateDynamicTrends = () => {
       popularity_index: 89,
       category: "social-media",
       data_json: {
-        hook: "Der Instagram-Algorithmus funktioniert so – und niemand sagt es dir.",
-        ai_tip: "Nutze Diagramme und einfache Visualisierungen. Sprich direkt in die Kamera.",
+        hook: "This is how the Instagram algorithm really works — and nobody tells you.",
+        ai_tip: "Use diagrams and simple visuals. Speak directly into the camera.",
         content_ideas: [
           { title: "Algorithm Breakdown", description: "Explain ranking factors with visual aids", format: "video", estimated_virality: "very high" },
           { title: "Hack Series", description: "Share 3 algorithm hacks that actually work", format: "reel", estimated_virality: "high" }
@@ -55,18 +55,18 @@ const generateDynamicTrends = () => {
       platform: "instagram",
       trend_type: "content",
       name: "#ContentBatching",
-      description: "Produziere 30 Posts an einem Tag für maximale Effizienz",
+      description: "Produce 30 posts in one day for maximum efficiency",
       popularity_index: 88,
       category: "social-media",
       data_json: {
-        hook: "So erstelle ich 30 Posts in 4 Stunden – mein komplettes System",
-        ai_tip: "Zeige deinen Workflow mit Time-Lapse. Nutze Screenshots deiner Tools.",
+        hook: "How I create 30 posts in 4 hours — my complete system",
+        ai_tip: "Show your workflow with time-lapse. Use screenshots of your tools.",
         content_ideas: [
-          { title: "Batching Tutorial", description: "Step-by-step Anleitung für Content-Batching", format: "video", estimated_virality: "high" },
-          { title: "Tools & Templates", description: "Welche Tools ich für effizientes Batching nutze", format: "carousel", estimated_virality: "medium" }
+          { title: "Batching Tutorial", description: "Step-by-step guide for content batching", format: "video", estimated_virality: "high" },
+          { title: "Tools & Templates", description: "The tools I use for efficient batching", format: "carousel", estimated_virality: "medium" }
         ],
         hashtags: ["#ContentBatching", "#ProductivityHack", "#CreatorTips", "#TimeManagement"],
-        audience_fit: "Busy creators und Unternehmer",
+        audience_fit: "Busy creators and entrepreneurs",
         estimated_virality: "high"
       }
     },
@@ -74,18 +74,18 @@ const generateDynamicTrends = () => {
       platform: "youtube",
       trend_type: "content",
       name: "#StorytimeFormat",
-      description: "Persönliche Geschichten in 60-90 Sekunden erzählen",
+      description: "Tell personal stories in 60-90 seconds",
       popularity_index: 86,
       category: "social-media",
       data_json: {
-        hook: "Die Geschichte, warum ich fast aufgegeben hätte...",
-        ai_tip: "Beginne mit emotionalem Hook. Nutze Jump-Cuts und Text-Highlights.",
+        hook: "The story of why I almost gave up...",
+        ai_tip: "Start with an emotional hook. Use jump-cuts and text highlights.",
         content_ideas: [
-          { title: "Failure Story", description: "Teile deinen größten Rückschlag authentisch", format: "short", estimated_virality: "very high" },
-          { title: "Breakthrough Moment", description: "Der Tag, der alles veränderte", format: "reel", estimated_virality: "high" }
+          { title: "Failure Story", description: "Share your biggest setback authentically", format: "short", estimated_virality: "very high" },
+          { title: "Breakthrough Moment", description: "The day that changed everything", format: "reel", estimated_virality: "high" }
         ],
         hashtags: ["#Storytime", "#RealTalk", "#CreatorJourney", "#Authenticity"],
-        audience_fit: "Creator-Community",
+        audience_fit: "Creator community",
         estimated_virality: "high"
       }
     },
@@ -93,18 +93,18 @@ const generateDynamicTrends = () => {
       platform: "tiktok",
       trend_type: "content",
       name: "#ViralHookFormulas",
-      description: "Bewährte Hook-Formeln für die ersten 3 Sekunden",
+      description: "Proven hook formulas for the first 3 seconds",
       popularity_index: 91,
       category: "social-media",
       data_json: {
-        hook: "Diese 5 Wörter stoppen jeden Scroll – Nr. 3 funktioniert immer",
-        ai_tip: "Zeige Text-Overlays mit Beispielen. Schnelle Schnitte für Dynamik.",
+        hook: "These 5 words stop every scroll — #3 works every time",
+        ai_tip: "Show text overlays with examples. Fast cuts for dynamic feel.",
         content_ideas: [
-          { title: "Hook Compilation", description: "Top 10 Hooks die viral gingen mit Analysen", format: "video", estimated_virality: "very high" },
-          { title: "A/B Test Results", description: "Ich habe 50 Hooks getestet – das sind die Gewinner", format: "carousel", estimated_virality: "high" }
+          { title: "Hook Compilation", description: "Top 10 hooks that went viral with analysis", format: "video", estimated_virality: "very high" },
+          { title: "A/B Test Results", description: "I tested 50 hooks — here are the winners", format: "carousel", estimated_virality: "high" }
         ],
         hashtags: ["#ViralContent", "#HookFormula", "#ContentStrategy", "#CreatorHacks"],
-        audience_fit: "Creator die viral gehen wollen",
+        audience_fit: "Creators who want to go viral",
         estimated_virality: "very high"
       }
     }
@@ -116,39 +116,39 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Magnetischer Ladekabel-Organizer",
-      description: "Praktischer Kabelhalter mit Magneten für aufgeräumte Schreibtische",
+      name: "Magnetic Cable Organizer",
+      description: "Practical cable holder with magnets for tidy desks",
       popularity_index: 91,
       category: "ecommerce",
       data_json: {
         subcategory: "tech-gadgets",
-        price_range: "15-25 €",
-        virality_reason: "Trending auf TikTok #DeskSetup mit 45M+ Views",
-        target_audience: "Tech-affine Millennials und Remote Worker",
+        price_range: "$15-25",
+        virality_reason: "Trending on TikTok #DeskSetup with 45M+ views",
+        target_audience: "Tech-savvy millennials and remote workers",
         content_ideas: [
-          { title: "Before/After Desk Setup", description: "Zeige chaotischen vs. cleanen Arbeitsplatz", format: "reel" },
-          { title: "Problem-Solution Reel", description: "Zeige das Kabelwirrwarr-Problem und löse es", format: "reel" }
+          { title: "Before/After Desk Setup", description: "Show messy vs. clean workspace", format: "reel" },
+          { title: "Problem-Solution Reel", description: "Show the cable mess problem and solve it", format: "reel" }
         ],
         hashtags: ["#TechTok", "#ProductivityHacks", "#DeskSetup", "#WFH"],
         estimated_virality: "very high",
-        ai_tip: "Nutze 15-Sekunden-Format mit schnellen Schnitten und Magnet-Sound"
+        ai_tip: "Use 15-second format with quick cuts and magnet sound"
       }
     },
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Mini-Thermokamera fürs Smartphone",
-      description: "Wärmebild-Aufsatz zur Lecksuche und Energieberatung",
+      name: "Smartphone Thermal Camera",
+      description: "Thermal imaging attachment for leak detection and energy audits",
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
         subcategory: "tech-gadgets",
-        price_range: "80-120 €",
-        virality_reason: "DIY-Trend auf YouTube, perfekt für Hausbesitzer",
-        target_audience: "Heimwerker und Energiesparer",
+        price_range: "$80-120",
+        virality_reason: "DIY trend on YouTube, perfect for homeowners",
+        target_audience: "DIY enthusiasts and energy savers",
         content_ideas: [
-          { title: "Hidden Leak Detection", description: "Zeige wie man versteckte Probleme findet", format: "video" },
-          { title: "Energy Saving Tips", description: "Wärmebrücken finden und Geld sparen", format: "tutorial" }
+          { title: "Hidden Leak Detection", description: "Show how to find hidden problems", format: "video" },
+          { title: "Energy Saving Tips", description: "Find thermal bridges and save money", format: "tutorial" }
         ],
         hashtags: ["#HomeImprovement", "#TechGadgets", "#EnergySaving"],
         estimated_virality: "high"
@@ -157,18 +157,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "USB-C Hub mit 7 Anschlüssen",
-      description: "Kompakter Hub für Laptop mit HDMI, SD-Card, USB 3.0",
+      name: "USB-C Hub with 7 Ports",
+      description: "Compact hub for laptop with HDMI, SD card, USB 3.0",
       popularity_index: 89,
       category: "ecommerce",
       data_json: {
         subcategory: "tech-gadgets",
-        price_range: "30-45 €",
-        virality_reason: "#WorkFromHome Essentials für digitale Nomaden",
-        target_audience: "Remote Worker und Content Creator",
+        price_range: "$30-45",
+        virality_reason: "#WorkFromHome essentials for digital nomads",
+        target_audience: "Remote workers and content creators",
         content_ideas: [
-          { title: "Setup Essentials", description: "Must-have Tech für minimalistisches Setup", format: "reel" },
-          { title: "Tech Unboxing", description: "First impressions mit allen Anschlüssen", format: "video" }
+          { title: "Setup Essentials", description: "Must-have tech for a minimalist setup", format: "reel" },
+          { title: "Tech Unboxing", description: "First impressions with all port types", format: "video" }
         ],
         hashtags: ["#TechEssentials", "#RemoteWork", "#DigitalNomad", "#ProductivityGear"],
         estimated_virality: "high"
@@ -177,38 +177,38 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Wireless Charging Stand mit Uhr",
-      description: "3-in-1 Ladestation für Phone, Watch & Earbuds mit LED-Uhr",
+      name: "Wireless Charging Stand with Clock",
+      description: "3-in-1 charging station for phone, watch & earbuds with LED clock",
       popularity_index: 90,
       category: "ecommerce",
       data_json: {
         subcategory: "tech-gadgets",
-        price_range: "40-60 €",
-        virality_reason: "Aesthetic Bedside Setup Trend auf TikTok",
-        target_audience: "Tech-Enthusiasten die minimalistisches Design lieben",
+        price_range: "$40-60",
+        virality_reason: "Aesthetic bedside setup trend on TikTok",
+        target_audience: "Tech enthusiasts who love minimalist design",
         content_ideas: [
-          { title: "Nightstand Glow-Up", description: "Before/After Nachttisch-Transformation", format: "reel" },
-          { title: "Morning Routine", description: "Zeige wie alles über Nacht lädt", format: "video" }
+          { title: "Nightstand Glow-Up", description: "Before/after nightstand transformation", format: "reel" },
+          { title: "Morning Routine", description: "Show how everything charges overnight", format: "video" }
         ],
-        hashtags: ["#TechSetup", "#Aesthetic", "#NighstandGoals", "#WirelessCharging"],
+        hashtags: ["#TechSetup", "#Aesthetic", "#NightstandGoals", "#WirelessCharging"],
         estimated_virality: "very high"
       }
     },
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Mechanische Mini-Tastatur (60%)",
-      description: "Kompakte Gaming-Tastatur mit RGB und Custom Switches",
+      name: "60% Mechanical Mini Keyboard",
+      description: "Compact gaming keyboard with RGB and custom switches",
       popularity_index: 88,
       category: "ecommerce",
       data_json: {
         subcategory: "tech-gadgets",
-        price_range: "70-120 €",
-        virality_reason: "Mechanical Keyboard Community wächst exponentiell",
-        target_audience: "Gamer und Programmierer",
+        price_range: "$70-120",
+        virality_reason: "Mechanical keyboard community growing exponentially",
+        target_audience: "Gamers and programmers",
         content_ideas: [
-          { title: "Sound Test", description: "ASMR Typing Sound verschiedener Switches", format: "reel" },
-          { title: "Custom Build", description: "So baust du deine Traumtastatur", format: "tutorial" }
+          { title: "Sound Test", description: "ASMR typing sounds of different switches", format: "reel" },
+          { title: "Custom Build", description: "How to build your dream keyboard", format: "tutorial" }
         ],
         hashtags: ["#MechanicalKeyboard", "#GamingSetup", "#TechASMR", "#CustomKeyboard"],
         estimated_virality: "high"
@@ -219,18 +219,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Eisroller mit LED-Lichttherapie",
-      description: "Gesichtsroller mit Kühlung und Rotlicht gegen Falten",
+      name: "Ice Roller with LED Light Therapy",
+      description: "Facial roller with cooling and red light for anti-aging",
       popularity_index: 88,
       category: "ecommerce",
       data_json: {
         subcategory: "beauty",
-        price_range: "25-40 €",
-        virality_reason: "Beauty-Influencer zeigen Before/After-Ergebnisse",
-        target_audience: "Beauty-bewusste Frauen 25-45",
+        price_range: "$25-40",
+        virality_reason: "Beauty influencers showing before/after results",
+        target_audience: "Beauty-conscious women 25-45",
         content_ideas: [
-          { title: "Morning Skincare Routine", description: "Ice roller als Teil der Morgenroutine", format: "reel" },
-          { title: "7-Day Challenge", description: "Zeige Veränderung nach einer Woche", format: "series" }
+          { title: "Morning Skincare Routine", description: "Ice roller as part of morning routine", format: "reel" },
+          { title: "7-Day Challenge", description: "Show changes after one week", format: "series" }
         ],
         hashtags: ["#SkincareRoutine", "#BeautyTools", "#GlowUp", "#SelfCare"],
         estimated_virality: "very high"
@@ -240,17 +240,17 @@ const generateDynamicTrends = () => {
       platform: "tiktok",
       trend_type: "product",
       name: "Heatless Curling Rod Set",
-      description: "Über-Nacht-Lockenwickler aus Satin ohne Hitze",
+      description: "Overnight satin curling rods — no heat damage",
       popularity_index: 92,
       category: "ecommerce",
       data_json: {
         subcategory: "beauty",
-        price_range: "15-25 €",
-        virality_reason: "#HeatlessCurls Trend mit 500M+ Views auf TikTok",
-        target_audience: "Frauen die ihr Haar schützen wollen",
+        price_range: "$15-25",
+        virality_reason: "#HeatlessCurls trend with 500M+ views on TikTok",
+        target_audience: "Women who want to protect their hair",
         content_ideas: [
-          { title: "Before Bed Routine", description: "Zeige Anwendung und Morgenergebnis", format: "reel" },
-          { title: "Curl Comparison", description: "Heatless vs. Curling Iron Ergebnis", format: "video" }
+          { title: "Before Bed Routine", description: "Show application and morning results", format: "reel" },
+          { title: "Curl Comparison", description: "Heatless vs. curling iron results", format: "video" }
         ],
         hashtags: ["#HeatlessCurls", "#HairCare", "#BeautyHack", "#NoDamage"],
         estimated_virality: "very high"
@@ -259,18 +259,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Gua Sha Stein Set mit Rosenquarz",
-      description: "Traditionelles Massage-Tool für Gesichtskonturierung",
+      name: "Rose Quartz Gua Sha Set",
+      description: "Traditional massage tool for facial contouring",
       popularity_index: 86,
       category: "ecommerce",
       data_json: {
         subcategory: "beauty",
-        price_range: "20-35 €",
-        virality_reason: "Clean Beauty & Wellness-Trend aus Asien",
-        target_audience: "Skincare-Enthusiasten und Wellness-Community",
+        price_range: "$20-35",
+        virality_reason: "Clean beauty & wellness trend from Asia",
+        target_audience: "Skincare enthusiasts and wellness community",
         content_ideas: [
-          { title: "Gua Sha Tutorial", description: "Richtige Anwendung für Lymphdrainage", format: "tutorial" },
-          { title: "Face Sculpting", description: "Wie ich meine Jawline definiere", format: "reel" }
+          { title: "Gua Sha Tutorial", description: "Proper technique for lymphatic drainage", format: "tutorial" },
+          { title: "Face Sculpting", description: "How I define my jawline", format: "reel" }
         ],
         hashtags: ["#GuaSha", "#FaceSculpting", "#CleanBeauty", "#SelfCareSunday"],
         estimated_virality: "high"
@@ -279,18 +279,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Lash Lift Kit für Zuhause",
-      description: "Professionelles Wimpernlifting-Set für DIY-Anwendung",
+      name: "At-Home Lash Lift Kit",
+      description: "Professional lash lift set for DIY application",
       popularity_index: 89,
       category: "ecommerce",
       data_json: {
         subcategory: "beauty",
-        price_range: "25-40 €",
-        virality_reason: "Kostenersparnis vs. Salon + DIY-Beauty-Trend",
-        target_audience: "Beauty-Lover die Geld sparen wollen",
+        price_range: "$25-40",
+        virality_reason: "Cost savings vs. salon + DIY beauty trend",
+        target_audience: "Beauty lovers who want to save money",
         content_ideas: [
-          { title: "DIY Lash Lift", description: "Step-by-step Tutorial für Anfänger", format: "tutorial" },
-          { title: "Before/After Reveal", description: "Dramatische Vorher-Nachher-Transformation", format: "reel" }
+          { title: "DIY Lash Lift", description: "Step-by-step tutorial for beginners", format: "tutorial" },
+          { title: "Before/After Reveal", description: "Dramatic before-and-after transformation", format: "reel" }
         ],
         hashtags: ["#LashLift", "#DIYBeauty", "#BeautyHack", "#LashGoals"],
         estimated_virality: "very high"
@@ -299,40 +299,40 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Silikon Face Cupping Set",
-      description: "Gesichts-Schröpfset für Anti-Aging und Durchblutung",
+      name: "Silicone Face Cupping Set",
+      description: "Facial cupping set for anti-aging and circulation",
       popularity_index: 85,
       category: "ecommerce",
       data_json: {
         subcategory: "beauty",
-        price_range: "18-30 €",
-        virality_reason: "Alternative zu Botox und Fillern",
-        target_audience: "Frauen 30+ auf der Suche nach natürlichen Anti-Aging-Methoden",
+        price_range: "$18-30",
+        virality_reason: "Natural alternative to Botox and fillers",
+        target_audience: "Women 30+ looking for natural anti-aging methods",
         content_ideas: [
-          { title: "Face Cupping Routine", description: "Meine 5-Minuten Anti-Aging Routine", format: "reel" },
-          { title: "Science Behind It", description: "Warum Cupping funktioniert", format: "carousel" }
+          { title: "Face Cupping Routine", description: "My 5-minute anti-aging routine", format: "reel" },
+          { title: "Science Behind It", description: "Why cupping works for your skin", format: "carousel" }
         ],
         hashtags: ["#FaceCupping", "#AntiAging", "#NaturalBeauty", "#Skincare"],
         estimated_virality: "medium"
       }
     },
 
-    // ===== HAUSHALT (5) =====
+    // ===== HOUSEHOLD (5) =====
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Automatischer Seifenspender mit Sensor",
-      description: "Berührungsloser Spender für Küche und Bad",
+      name: "Automatic Soap Dispenser with Sensor",
+      description: "Touchless dispenser for kitchen and bathroom",
       popularity_index: 85,
       category: "ecommerce",
       data_json: {
-        subcategory: "haushalt",
-        price_range: "20-30 €",
-        virality_reason: "#SmartHome Trend, hygienisch und modern",
-        target_audience: "Familien und Design-Liebhaber",
+        subcategory: "household",
+        price_range: "$20-30",
+        virality_reason: "#SmartHome trend — hygienic and modern",
+        target_audience: "Families and design enthusiasts",
         content_ideas: [
-          { title: "Smart Home Upgrade", description: "Zeige moderne Haushalts-Upgrades", format: "carousel" },
-          { title: "Hygiene Hack", description: "Berührungslose Lösungen für cleanes Zuhause", format: "reel" }
+          { title: "Smart Home Upgrade", description: "Show modern household upgrades", format: "carousel" },
+          { title: "Hygiene Hack", description: "Touchless solutions for a clean home", format: "reel" }
         ],
         hashtags: ["#SmartHome", "#HomeHacks", "#ModernLiving"],
         estimated_virality: "medium"
@@ -341,18 +341,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Dreh-Organizer für Gewürze",
-      description: "360° drehbarer Gewürz-Turm für platzsparende Aufbewahrung",
+      name: "Rotating Spice Rack Organizer",
+      description: "360° rotating spice tower for space-saving storage",
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
-        subcategory: "haushalt",
-        price_range: "25-40 €",
-        virality_reason: "#KitchenOrganization mit 200M+ Views",
-        target_audience: "Hobby-Köche und Organisation-Enthusiasten",
+        subcategory: "household",
+        price_range: "$25-40",
+        virality_reason: "#KitchenOrganization with 200M+ views",
+        target_audience: "Home cooks and organization enthusiasts",
         content_ideas: [
-          { title: "Kitchen Makeover", description: "Vorher/Nachher Gewürz-Organisation", format: "reel" },
-          { title: "Space Saving Hacks", description: "Wie ich 50% Platz spare", format: "video" }
+          { title: "Kitchen Makeover", description: "Before/after spice organization", format: "reel" },
+          { title: "Space Saving Hacks", description: "How I saved 50% of shelf space", format: "video" }
         ],
         hashtags: ["#KitchenOrganization", "#HomeHacks", "#SpaceSaving", "#CleanTok"],
         estimated_virality: "high"
@@ -361,18 +361,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Selbstbewässernde Pflanztöpfe",
-      description: "Smart Plant Pots mit Wasserreservoir für 30 Tage",
+      name: "Self-Watering Plant Pots",
+      description: "Smart plant pots with a 30-day water reservoir",
       popularity_index: 84,
       category: "ecommerce",
       data_json: {
-        subcategory: "haushalt",
-        price_range: "15-30 €",
-        virality_reason: "#PlantParent Community wächst exponentiell",
-        target_audience: "Urban Gardeners und Pflanzenliebhaber",
+        subcategory: "household",
+        price_range: "$15-30",
+        virality_reason: "#PlantParent community growing exponentially",
+        target_audience: "Urban gardeners and plant lovers",
         content_ideas: [
-          { title: "Plant Haul", description: "Zeige deine Pflanzen-Kollektion mit Smart Pots", format: "reel" },
-          { title: "Before/After", description: "Wie meine Pflanzen seit dem Topf-Wechsel gedeihen", format: "carousel" }
+          { title: "Plant Haul", description: "Show your plant collection with smart pots", format: "reel" },
+          { title: "Before/After", description: "How my plants thrive since switching pots", format: "carousel" }
         ],
         hashtags: ["#PlantParent", "#UrbanJungle", "#PlantTok", "#IndoorPlants"],
         estimated_virality: "medium-high"
@@ -381,18 +381,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Elektrischer Flaschenöffner",
-      description: "Automatischer Öffner für Flaschen, Dosen & Gläser",
+      name: "Electric Jar & Bottle Opener",
+      description: "Automatic opener for bottles, cans & jars",
       popularity_index: 82,
       category: "ecommerce",
       data_json: {
-        subcategory: "haushalt",
-        price_range: "25-35 €",
-        virality_reason: "Perfekt für Senioren & Menschen mit Arthritis",
-        target_audience: "Senioren-Community und Geschenk-Suchende",
+        subcategory: "household",
+        price_range: "$25-35",
+        virality_reason: "Perfect for seniors & people with arthritis",
+        target_audience: "Seniors and gift shoppers",
         content_ideas: [
-          { title: "Problem Solver", description: "Nie wieder Probleme beim Öffnen", format: "reel" },
-          { title: "Gift Idea", description: "Das perfekte Geschenk für Eltern/Großeltern", format: "video" }
+          { title: "Problem Solver", description: "Never struggle with jar lids again", format: "reel" },
+          { title: "Gift Idea", description: "The perfect gift for parents/grandparents", format: "video" }
         ],
         hashtags: ["#KitchenGadgets", "#GiftIdeas", "#LifeHacks", "#AccessibleLiving"],
         estimated_virality: "medium"
@@ -401,18 +401,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Magnetische Müllsack-Halterung",
-      description: "Tür-Montage für temporären Mülleimer beim Kochen",
+      name: "Magnetic Trash Bag Holder",
+      description: "Door-mounted holder for a temporary trash bag while cooking",
       popularity_index: 88,
       category: "ecommerce",
       data_json: {
-        subcategory: "haushalt",
-        price_range: "12-20 €",
-        virality_reason: "Viral wegen Einfachheit & Preis-Leistung",
-        target_audience: "Köche und Clean-Freaks",
+        subcategory: "household",
+        price_range: "$12-20",
+        virality_reason: "Viral for its simplicity & value",
+        target_audience: "Home cooks and clean-home enthusiasts",
         content_ideas: [
-          { title: "Cooking Hack", description: "Nie wieder zum Mülleimer laufen", format: "reel" },
-          { title: "Kitchen Life Hack", description: "Der 10€-Hack der dein Leben verändert", format: "video" }
+          { title: "Cooking Hack", description: "Never walk to the trash can again", format: "reel" },
+          { title: "Kitchen Life Hack", description: "The $10 hack that changes your life", format: "video" }
         ],
         hashtags: ["#KitchenHacks", "#CookingTips", "#CleanHome", "#LifeHacks"],
         estimated_virality: "very high"
@@ -423,18 +423,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Interaktiver Katzen-Laserball",
-      description: "Selbstrollender Ball mit Laserpointer zur Katzenbeschäftigung",
+      name: "Interactive Cat Laser Ball",
+      description: "Self-rolling ball with laser pointer for cat entertainment",
       popularity_index: 90,
       category: "ecommerce",
       data_json: {
         subcategory: "pets",
-        price_range: "25-35 €",
-        virality_reason: "Katzenvideos gehen viral auf TikTok",
-        target_audience: "Katzenbesitzer und Pet-Influencer",
+        price_range: "$25-35",
+        virality_reason: "Cat videos go viral on TikTok",
+        target_audience: "Cat owners and pet influencers",
         content_ideas: [
-          { title: "Cat Reaction Video", description: "Filme die erste Reaktion deiner Katze", format: "reel" },
-          { title: "Entertainment Solution", description: "Zeige wie Katze sich selbst beschäftigt", format: "video" }
+          { title: "Cat Reaction Video", description: "Film your cat's first reaction", format: "reel" },
+          { title: "Entertainment Solution", description: "Show how your cat entertains itself", format: "video" }
         ],
         hashtags: ["#CatTok", "#PetGadgets", "#CatLovers", "#PetProducts"],
         estimated_virality: "very high"
@@ -443,18 +443,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Automatischer Futterspender mit App",
-      description: "Smart Pet Feeder mit Timer und Portionskontrolle",
+      name: "Smart Pet Feeder with App",
+      description: "Automatic pet feeder with timer and portion control",
       popularity_index: 89,
       category: "ecommerce",
       data_json: {
         subcategory: "pets",
-        price_range: "60-90 €",
-        virality_reason: "Perfekt für berufstätige Pet-Parents",
-        target_audience: "Hunde- & Katzenbesitzer die viel arbeiten",
+        price_range: "$60-90",
+        virality_reason: "Perfect for working pet parents",
+        target_audience: "Dog & cat owners with busy schedules",
         content_ideas: [
-          { title: "Pet Tech Review", description: "Meine Erfahrung nach 30 Tagen", format: "video" },
-          { title: "Peace of Mind", description: "So fütterst du auch im Urlaub automatisch", format: "reel" }
+          { title: "Pet Tech Review", description: "My experience after 30 days", format: "video" },
+          { title: "Peace of Mind", description: "Auto-feed your pet even on vacation", format: "reel" }
         ],
         hashtags: ["#PetTech", "#SmartFeeder", "#PetCare", "#DogMom"],
         estimated_virality: "high"
@@ -463,18 +463,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "GPS-Tracker für Haustiere",
-      description: "Kleiner GPS-Anhänger fürs Halsband mit Live-Tracking",
+      name: "GPS Pet Tracker",
+      description: "Small GPS collar attachment with live tracking",
       popularity_index: 91,
       category: "ecommerce",
       data_json: {
         subcategory: "pets",
-        price_range: "40-70 €",
-        virality_reason: "Sicherheit & Peace of Mind für Pet-Parents",
-        target_audience: "Hunde- und Katzenbesitzer mit Freigang",
+        price_range: "$40-70",
+        virality_reason: "Safety & peace of mind for pet parents",
+        target_audience: "Dog and cat owners with outdoor pets",
         content_ideas: [
-          { title: "Lost Pet Story", description: "Wie der GPS-Tracker meinen Hund rettete", format: "story" },
-          { title: "Live Demo", description: "Zeige die App & Tracking in Echtzeit", format: "video" }
+          { title: "Lost Pet Story", description: "How the GPS tracker saved my dog", format: "story" },
+          { title: "Live Demo", description: "Show the app & real-time tracking", format: "video" }
         ],
         hashtags: ["#PetSafety", "#GPSTracker", "#DogTok", "#PetTech"],
         estimated_virality: "very high"
@@ -483,18 +483,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Orthopädisches Hundebett mit Memory Foam",
-      description: "Gelenkschonendes Bett für ältere Hunde und große Rassen",
+      name: "Orthopedic Memory Foam Dog Bed",
+      description: "Joint-friendly bed for senior dogs and large breeds",
       popularity_index: 86,
       category: "ecommerce",
       data_json: {
         subcategory: "pets",
-        price_range: "50-90 €",
-        virality_reason: "Senior-Pet-Care-Trend wächst",
-        target_audience: "Besitzer älterer Hunde",
+        price_range: "$50-90",
+        virality_reason: "Senior pet care trend is growing",
+        target_audience: "Owners of older dogs",
         content_ideas: [
-          { title: "Before/After", description: "Wie mein Senior-Hund wieder besser schläft", format: "reel" },
-          { title: "Pet Care Tips", description: "5 Wege deinem alten Hund zu helfen", format: "carousel" }
+          { title: "Before/After", description: "How my senior dog sleeps better now", format: "reel" },
+          { title: "Pet Care Tips", description: "5 ways to help your aging dog", format: "carousel" }
         ],
         hashtags: ["#SeniorDog", "#PetCare", "#DogHealth", "#OrthopedicBed"],
         estimated_virality: "medium"
@@ -503,18 +503,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Intelligenter Hundeball mit Kamera",
-      description: "Ball mit integrierter Kamera für interaktives Spielen",
+      name: "Smart Dog Ball with Camera",
+      description: "Ball with built-in camera for interactive play",
       popularity_index: 88,
       category: "ecommerce",
       data_json: {
         subcategory: "pets",
-        price_range: "45-70 €",
-        virality_reason: "Pet-POV-Videos sind viral auf TikTok",
-        target_audience: "Content Creator mit Haustieren",
+        price_range: "$45-70",
+        virality_reason: "Pet POV videos are viral on TikTok",
+        target_audience: "Content creators with pets",
         content_ideas: [
-          { title: "Dog POV", description: "Zeige Welt aus Hunde-Perspektive", format: "reel" },
-          { title: "Interactive Play", description: "So spiele ich mit meinem Hund aus der Ferne", format: "video" }
+          { title: "Dog POV", description: "See the world from your dog's perspective", format: "reel" },
+          { title: "Interactive Play", description: "How I play with my dog remotely", format: "video" }
         ],
         hashtags: ["#DogPOV", "#PetCamera", "#DogTok", "#PetContent"],
         estimated_virality: "very high"
@@ -525,18 +525,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Smart Jump Rope mit App",
-      description: "Intelligentes Springseil mit Kalorienzähler und App-Integration",
+      name: "Smart Jump Rope with App",
+      description: "Intelligent jump rope with calorie counter and app integration",
       popularity_index: 86,
       category: "ecommerce",
       data_json: {
         subcategory: "fitness",
-        price_range: "35-50 €",
-        virality_reason: "Fitness-Trend #JumpRopeChallenge",
-        target_audience: "Fitness-Enthusiasten und Home-Workout-Fans",
+        price_range: "$35-50",
+        virality_reason: "Fitness trend #JumpRopeChallenge",
+        target_audience: "Fitness enthusiasts and home workout fans",
         content_ideas: [
-          { title: "30-Day Challenge", description: "Dokumentiere Fitness-Fortschritt", format: "series" },
-          { title: "Calorie Burn Demo", description: "Zeige wie viele Kalorien in 10 Minuten", format: "reel" }
+          { title: "30-Day Challenge", description: "Document your fitness progress", format: "series" },
+          { title: "Calorie Burn Demo", description: "Show how many calories in 10 minutes", format: "reel" }
         ],
         hashtags: ["#FitnessGadgets", "#HomeWorkout", "#JumpRope", "#FitTech"],
         estimated_virality: "high"
@@ -545,18 +545,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Resistance Bands Set mit 5 Stärken",
-      description: "Latex-Widerstandsbänder für Ganzkörper-Training",
+      name: "Resistance Bands Set (5 Levels)",
+      description: "Latex resistance bands for full-body training",
       popularity_index: 89,
       category: "ecommerce",
       data_json: {
         subcategory: "fitness",
-        price_range: "20-35 €",
-        virality_reason: "#HomeGym und platzsparendes Training",
-        target_audience: "Home-Workout-Community",
+        price_range: "$20-35",
+        virality_reason: "#HomeGym and space-saving workouts",
+        target_audience: "Home workout community",
         content_ideas: [
-          { title: "Full Body Workout", description: "30-Min Workout nur mit Bands", format: "video" },
-          { title: "Before/After", description: "Meine Transformation mit Resistance Bands", format: "reel" }
+          { title: "Full Body Workout", description: "30-min workout with bands only", format: "video" },
+          { title: "Before/After", description: "My transformation with resistance bands", format: "reel" }
         ],
         hashtags: ["#ResistanceBands", "#HomeWorkout", "#FitnessJourney", "#GymAtHome"],
         estimated_virality: "very high"
@@ -565,18 +565,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Foam Roller mit Vibration",
-      description: "Elektrischer Massage-Roller für Regeneration nach dem Training",
+      name: "Vibrating Foam Roller",
+      description: "Electric massage roller for post-workout recovery",
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
         subcategory: "fitness",
-        price_range: "60-90 €",
-        virality_reason: "Recovery & Self-Care im Fitness-Bereich",
-        target_audience: "Sportler und Fitness-Enthusiasten",
+        price_range: "$60-90",
+        virality_reason: "Recovery & self-care in the fitness space",
+        target_audience: "Athletes and fitness enthusiasts",
         content_ideas: [
-          { title: "Recovery Routine", description: "Meine Post-Workout-Regeneration", format: "reel" },
-          { title: "Foam Rolling Tutorial", description: "So nutzt du den Roller richtig", format: "tutorial" }
+          { title: "Recovery Routine", description: "My post-workout recovery routine", format: "reel" },
+          { title: "Foam Rolling Tutorial", description: "How to use the roller properly", format: "tutorial" }
         ],
         hashtags: ["#FoamRoller", "#Recovery", "#FitnessTips", "#SportsMassage"],
         estimated_virality: "high"
@@ -586,17 +586,17 @@ const generateDynamicTrends = () => {
       platform: "tiktok",
       trend_type: "product",
       name: "Ab Roller Wheel Pro",
-      description: "Bauchroller mit automatischem Rücklauf für Core-Training",
+      description: "Ab roller with automatic rebound for core training",
       popularity_index: 85,
       category: "ecommerce",
       data_json: {
         subcategory: "fitness",
-        price_range: "25-40 €",
-        virality_reason: "#AbWorkout Challenges auf TikTok",
-        target_audience: "Menschen die Sixpack wollen",
+        price_range: "$25-40",
+        virality_reason: "#AbWorkout challenges on TikTok",
+        target_audience: "People who want six-pack abs",
         content_ideas: [
-          { title: "Ab Challenge", description: "30 Tage Ab Roller Challenge", format: "series" },
-          { title: "Core Workout", description: "5-Minuten Killer-Ab-Routine", format: "reel" }
+          { title: "Ab Challenge", description: "30-day ab roller challenge", format: "series" },
+          { title: "Core Workout", description: "5-minute killer ab routine", format: "reel" }
         ],
         hashtags: ["#AbWorkout", "#CoreTraining", "#FitnessChallenge", "#Sixpack"],
         estimated_virality: "high"
@@ -605,40 +605,40 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Faltbare Yoga-Matte mit Positions-Markierungen",
-      description: "Profi-Yogamatte mit Alignment-Linien für korrekte Haltung",
+      name: "Foldable Yoga Mat with Alignment Lines",
+      description: "Pro yoga mat with position markings for correct form",
       popularity_index: 84,
       category: "ecommerce",
       data_json: {
         subcategory: "fitness",
-        price_range: "40-60 €",
-        virality_reason: "Yoga-Community wächst, besonders bei jungen Frauen",
-        target_audience: "Yoga-Anfänger und -Praktizierende",
+        price_range: "$40-60",
+        virality_reason: "Yoga community growing, especially among young women",
+        target_audience: "Yoga beginners and practitioners",
         content_ideas: [
-          { title: "Morning Yoga Flow", description: "20-Min Morgen-Yoga-Routine", format: "video" },
-          { title: "Alignment Guide", description: "Warum Position Lines beim Yoga helfen", format: "carousel" }
+          { title: "Morning Yoga Flow", description: "20-min morning yoga routine", format: "video" },
+          { title: "Alignment Guide", description: "Why position lines help your yoga practice", format: "carousel" }
         ],
         hashtags: ["#YogaMat", "#YogaPractice", "#MindfulMovement", "#YogaLife"],
         estimated_virality: "medium"
       }
     },
 
-    // ===== MODE (5) =====
+    // ===== FASHION (5) =====
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Oversized Blazer in Neutralfarben",
-      description: "Zeitloser Business-Casual Blazer für jeden Anlass",
+      name: "Oversized Neutral Blazer",
+      description: "Timeless business-casual blazer for every occasion",
       popularity_index: 90,
       category: "ecommerce",
       data_json: {
-        subcategory: "mode",
-        price_range: "60-120 €",
-        virality_reason: "#QuietLuxury und minimalistischer Stil trending",
-        target_audience: "Fashion-bewusste Frauen 25-40",
+        subcategory: "fashion",
+        price_range: "$60-120",
+        virality_reason: "#QuietLuxury and minimalist style trending",
+        target_audience: "Fashion-conscious women 25-40",
         content_ideas: [
-          { title: "5 Ways to Style", description: "Ein Blazer, 5 verschiedene Looks", format: "reel" },
-          { title: "Capsule Wardrobe", description: "Essential Pieces für zeitlosen Stil", format: "carousel" }
+          { title: "5 Ways to Style", description: "One blazer, 5 different looks", format: "reel" },
+          { title: "Capsule Wardrobe", description: "Essential pieces for timeless style", format: "carousel" }
         ],
         hashtags: ["#BlazerStyle", "#QuietLuxury", "#CapsuleWardrobe", "#TimelessFashion"],
         estimated_virality: "very high"
@@ -648,17 +648,17 @@ const generateDynamicTrends = () => {
       platform: "tiktok",
       trend_type: "product",
       name: "Chunky Gold Hoops",
-      description: "Statement Creolen aus 18K vergoldetem Edelstahl",
+      description: "Statement hoops in 18K gold-plated stainless steel",
       popularity_index: 89,
       category: "ecommerce",
       data_json: {
-        subcategory: "mode",
-        price_range: "25-45 €",
-        virality_reason: "Bold Jewelry Trend auf TikTok",
-        target_audience: "Gen Z und Millennials",
+        subcategory: "fashion",
+        price_range: "$25-45",
+        virality_reason: "Bold jewelry trend on TikTok",
+        target_audience: "Gen Z and Millennials",
         content_ideas: [
-          { title: "Jewelry Haul", description: "Zeige verschiedene Styling-Optionen", format: "reel" },
-          { title: "Everyday Glam", description: "Wie Accessories jedes Outfit upgraden", format: "video" }
+          { title: "Jewelry Haul", description: "Show different styling options", format: "reel" },
+          { title: "Everyday Glam", description: "How accessories upgrade any outfit", format: "video" }
         ],
         hashtags: ["#GoldHoops", "#JewelryTrends", "#AccessoryGame", "#StatementEarrings"],
         estimated_virality: "very high"
@@ -668,17 +668,17 @@ const generateDynamicTrends = () => {
       platform: "instagram",
       trend_type: "product",
       name: "High-Waist Straight Jeans",
-      description: "Mom Jeans im Vintage-Look aus nachhaltiger Baumwolle",
+      description: "Vintage-look mom jeans made from sustainable cotton",
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
-        subcategory: "mode",
-        price_range: "50-90 €",
-        virality_reason: "90s Fashion Revival + Nachhaltigkeits-Trend",
-        target_audience: "Sustainable Fashion Community",
+        subcategory: "fashion",
+        price_range: "$50-90",
+        virality_reason: "90s fashion revival + sustainability trend",
+        target_audience: "Sustainable fashion community",
         content_ideas: [
-          { title: "Try-On Haul", description: "Perfekte Jeans für verschiedene Körpertypen", format: "reel" },
-          { title: "Sustainable Fashion", description: "Warum ich nur noch nachhaltig kaufe", format: "video" }
+          { title: "Try-On Haul", description: "Perfect jeans for different body types", format: "reel" },
+          { title: "Sustainable Fashion", description: "Why I only buy sustainable now", format: "video" }
         ],
         hashtags: ["#MomJeans", "#SustainableFashion", "#90sFashion", "#EcoFriendly"],
         estimated_virality: "high"
@@ -688,17 +688,17 @@ const generateDynamicTrends = () => {
       platform: "tiktok",
       trend_type: "product",
       name: "Crossbody Mini Bag",
-      description: "Kleine Umhängetasche im Y2K-Stil",
+      description: "Small crossbody bag in Y2K style",
       popularity_index: 91,
       category: "ecommerce",
       data_json: {
-        subcategory: "mode",
-        price_range: "30-55 €",
-        virality_reason: "#Y2K Fashion Comeback auf TikTok",
-        target_audience: "Gen Z Fashion-Lovers",
+        subcategory: "fashion",
+        price_range: "$30-55",
+        virality_reason: "#Y2K fashion comeback on TikTok",
+        target_audience: "Gen Z fashion lovers",
         content_ideas: [
-          { title: "What's in my bag", description: "Zeige wie viel in die Mini-Bag passt", format: "reel" },
-          { title: "Y2K Outfit", description: "Kompletter 2000er-Look mit Styling-Tipps", format: "video" }
+          { title: "What's in my bag", description: "Show how much fits in the mini bag", format: "reel" },
+          { title: "Y2K Outfit", description: "Complete 2000s look with styling tips", format: "video" }
         ],
         hashtags: ["#MiniBag", "#Y2KFashion", "#ThatGirl", "#OOTD"],
         estimated_virality: "very high"
@@ -707,40 +707,40 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Weiße Chunky Sneaker",
-      description: "Platform-Sneaker im Dad-Shoe-Stil",
+      name: "White Chunky Sneakers",
+      description: "Platform sneakers in dad-shoe style",
       popularity_index: 88,
       category: "ecommerce",
       data_json: {
-        subcategory: "mode",
-        price_range: "70-130 €",
-        virality_reason: "Chunky Sneaker bleiben Dauerbrenner",
-        target_audience: "Sneakerheads und Streetwear-Fans",
+        subcategory: "fashion",
+        price_range: "$70-130",
+        virality_reason: "Chunky sneakers remain a staple trend",
+        target_audience: "Sneakerheads and streetwear fans",
         content_ideas: [
-          { title: "Sneaker Styling", description: "10 Outfits mit weißen Sneakern", format: "carousel" },
-          { title: "Unboxing", description: "First impressions + On-Feet-Look", format: "reel" }
+          { title: "Sneaker Styling", description: "10 outfits with white sneakers", format: "carousel" },
+          { title: "Unboxing", description: "First impressions + on-feet look", format: "reel" }
         ],
         hashtags: ["#ChunkySneakers", "#Sneakerhead", "#WhiteSneakers", "#Streetwear"],
         estimated_virality: "high"
       }
     },
 
-    // ===== KÜCHE (5) =====
+    // ===== KITCHEN (5) =====
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Elektrischer Milchaufschäumer mit 3 Modi",
-      description: "Cappuccino-Maker für Zuhause mit Heiß/Kalt-Funktion",
+      name: "Electric Milk Frother (3 Modes)",
+      description: "Home cappuccino maker with hot/cold function",
       popularity_index: 88,
       category: "ecommerce",
       data_json: {
-        subcategory: "küche",
-        price_range: "25-40 €",
-        virality_reason: "#CoffeeTok und Home-Barista-Trend",
-        target_audience: "Kaffee-Liebhaber",
+        subcategory: "kitchen",
+        price_range: "$25-40",
+        virality_reason: "#CoffeeTok and home barista trend",
+        target_audience: "Coffee lovers",
         content_ideas: [
-          { title: "Latte Art Tutorial", description: "Perfekten Milchschaum für Latte Art", format: "tutorial" },
-          { title: "Morning Coffee Routine", description: "Barista-Qualität zu Hause", format: "reel" }
+          { title: "Latte Art Tutorial", description: "Perfect milk foam for latte art", format: "tutorial" },
+          { title: "Morning Coffee Routine", description: "Barista quality at home", format: "reel" }
         ],
         hashtags: ["#CoffeeTok", "#HomeCafe", "#LatteArt", "#CoffeeLover"],
         estimated_virality: "very high"
@@ -749,18 +749,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Luftdichter Glas-Vorratsdosen Set",
-      description: "12-teiliges Borosilikat-Glas Set mit Bambus-Deckeln",
+      name: "Airtight Glass Storage Container Set",
+      description: "12-piece borosilicate glass set with bamboo lids",
       popularity_index: 85,
       category: "ecommerce",
       data_json: {
-        subcategory: "küche",
-        price_range: "40-60 €",
-        virality_reason: "#PantryOrganization und Zero Waste Lifestyle",
-        target_audience: "Organisations-Enthusiasten und Umweltbewusste",
+        subcategory: "kitchen",
+        price_range: "$40-60",
+        virality_reason: "#PantryOrganization and zero waste lifestyle",
+        target_audience: "Organization enthusiasts and eco-conscious shoppers",
         content_ideas: [
-          { title: "Pantry Makeover", description: "Vorher/Nachher meiner organisierten Vorratskammer", format: "reel" },
-          { title: "Zero Waste Kitchen", description: "Wie ich Plastik aus der Küche verbannt habe", format: "video" }
+          { title: "Pantry Makeover", description: "Before/after of my organized pantry", format: "reel" },
+          { title: "Zero Waste Kitchen", description: "How I eliminated plastic from my kitchen", format: "video" }
         ],
         hashtags: ["#PantryOrganization", "#ZeroWaste", "#KitchenGoals", "#Sustainable"],
         estimated_virality: "high"
@@ -769,18 +769,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Multi-Reibe mit 5 Klingen",
-      description: "Verstellbare Mandoline zum Schneiden, Hobeln, Reiben",
+      name: "Multi-Blade Mandoline Slicer",
+      description: "Adjustable mandoline for slicing, shredding, grating",
       popularity_index: 86,
       category: "ecommerce",
       data_json: {
-        subcategory: "küche",
-        price_range: "20-35 €",
-        virality_reason: "#CookingHacks Videos gehen viral",
-        target_audience: "Hobby-Köche",
+        subcategory: "kitchen",
+        price_range: "$20-35",
+        virality_reason: "#CookingHacks videos go viral",
+        target_audience: "Home cooks",
         content_ideas: [
-          { title: "Cooking Hack", description: "Spare 50% Zeit beim Gemüse schneiden", format: "reel" },
-          { title: "Recipe Demo", description: "3 schnelle Rezepte mit dem Tool", format: "video" }
+          { title: "Cooking Hack", description: "Save 50% time chopping vegetables", format: "reel" },
+          { title: "Recipe Demo", description: "3 quick recipes using this tool", format: "video" }
         ],
         hashtags: ["#CookingHacks", "#KitchenGadgets", "#RecipeTok", "#TimeSaver"],
         estimated_virality: "high"
@@ -789,18 +789,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Vakuum-Frischhalte-System",
-      description: "Elektrische Vakuumpumpe mit wiederverwertbaren Behältern",
+      name: "Vacuum Food Storage System",
+      description: "Electric vacuum pump with reusable containers",
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
-        subcategory: "küche",
-        price_range: "50-80 €",
-        virality_reason: "Food Waste Reduction + Meal Prep Trend",
-        target_audience: "Meal Prep Community und Familien",
+        subcategory: "kitchen",
+        price_range: "$50-80",
+        virality_reason: "Food waste reduction + meal prep trend",
+        target_audience: "Meal prep community and families",
         content_ideas: [
-          { title: "Meal Prep Sunday", description: "Wie ich Essen 2x länger frisch halte", format: "video" },
-          { title: "Food Waste Hack", description: "So sparst du Geld mit Vakuumieren", format: "carousel" }
+          { title: "Meal Prep Sunday", description: "How I keep food fresh 2x longer", format: "video" },
+          { title: "Food Waste Hack", description: "Save money with vacuum sealing", format: "carousel" }
         ],
         hashtags: ["#MealPrep", "#FoodStorage", "#ZeroWaste", "#KitchenHacks"],
         estimated_virality: "medium-high"
@@ -809,40 +809,40 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Silikon-Backmatten mit Messmarkierungen",
-      description: "Wiederverwendbare Backmatten ersetzen Backpapier",
+      name: "Silicone Baking Mats with Measurements",
+      description: "Reusable baking mats to replace parchment paper",
       popularity_index: 83,
       category: "ecommerce",
       data_json: {
-        subcategory: "küche",
-        price_range: "15-25 €",
-        virality_reason: "Nachhaltig Backen + #BakingTok",
-        target_audience: "Hobby-Bäcker und Umweltbewusste",
+        subcategory: "kitchen",
+        price_range: "$15-25",
+        virality_reason: "Sustainable baking + #BakingTok",
+        target_audience: "Home bakers and eco-conscious shoppers",
         content_ideas: [
-          { title: "Baking Hack", description: "Nie wieder Backpapier kaufen", format: "reel" },
-          { title: "Cookie Tutorial", description: "Perfekte Cookies mit Messmarkierungen", format: "video" }
+          { title: "Baking Hack", description: "Never buy parchment paper again", format: "reel" },
+          { title: "Cookie Tutorial", description: "Perfect cookies with measurement marks", format: "video" }
         ],
         hashtags: ["#BakingTok", "#SustainableLiving", "#BakingHacks", "#EcoFriendly"],
         estimated_virality: "medium"
       }
     },
 
-    // ===== HOME-DECOR (5) =====
+    // ===== OUTDOOR & TRAVEL (5) =====
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Kompakte Camping-Hängematte",
-      description: "Ultraleichte Hängematte mit Moskitonetz für Outdoor",
+      name: "Compact Camping Hammock",
+      description: "Ultralight hammock with mosquito net for outdoor use",
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
-        subcategory: "home-decor",
-        price_range: "40-70 €",
-        virality_reason: "#VanLife und Outdoor-Adventure-Trend",
-        target_audience: "Outdoor-Enthusiasten und Camper",
+        subcategory: "outdoor",
+        price_range: "$40-70",
+        virality_reason: "#VanLife and outdoor adventure trend",
+        target_audience: "Outdoor enthusiasts and campers",
         content_ideas: [
-          { title: "Camping Setup", description: "Perfektes Camping-Setup in 5 Minuten", format: "reel" },
-          { title: "Hidden Gem Spots", description: "Meine Top 5 Hängematten-Spots", format: "video" }
+          { title: "Camping Setup", description: "Perfect camping setup in 5 minutes", format: "reel" },
+          { title: "Hidden Gem Spots", description: "My top 5 hammock spots", format: "video" }
         ],
         hashtags: ["#VanLife", "#Camping", "#OutdoorAdventure", "#Hammocking"],
         estimated_virality: "high"
@@ -851,18 +851,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Solar-Powerbank 20.000mAh",
-      description: "Wasserdichte Powerbank mit Solar-Panel für Outdoor",
+      name: "Solar Power Bank 20,000mAh",
+      description: "Waterproof power bank with solar panel for outdoor use",
       popularity_index: 89,
       category: "ecommerce",
       data_json: {
-        subcategory: "home-decor",
-        price_range: "35-60 €",
-        virality_reason: "Essential für Digital Nomads und Camper",
-        target_audience: "Reisende und Outdoor-Lover",
+        subcategory: "outdoor",
+        price_range: "$35-60",
+        virality_reason: "Essential for digital nomads and campers",
+        target_audience: "Travelers and outdoor lovers",
         content_ideas: [
-          { title: "Festival Essential", description: "Nie wieder leerer Akku auf Festivals", format: "reel" },
-          { title: "Camping Gear", description: "Must-have für mehrtägige Touren", format: "video" }
+          { title: "Festival Essential", description: "Never run out of battery at festivals", format: "reel" },
+          { title: "Camping Gear", description: "Must-have for multi-day hikes", format: "video" }
         ],
         hashtags: ["#OutdoorGear", "#SolarPower", "#CampingEssentials", "#FestivalSeason"],
         estimated_virality: "high"
@@ -871,18 +871,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Faltbare Trinkflasche aus Silikon",
-      description: "Zusammenklappbare 600ml Flasche für Reisen",
+      name: "Collapsible Silicone Water Bottle",
+      description: "Foldable 600ml bottle for travel",
       popularity_index: 84,
       category: "ecommerce",
       data_json: {
-        subcategory: "home-decor",
-        price_range: "18-28 €",
-        virality_reason: "Platzsparend für Minimalisten und Reisende",
-        target_audience: "Digital Nomads und Backpacker",
+        subcategory: "outdoor",
+        price_range: "$18-28",
+        virality_reason: "Space-saving for minimalists and travelers",
+        target_audience: "Digital nomads and backpackers",
         content_ideas: [
-          { title: "Travel Hack", description: "Wie ich 30% Platz im Rucksack spare", format: "reel" },
-          { title: "Packing List", description: "Meine Essentials für Weltreise", format: "carousel" }
+          { title: "Travel Hack", description: "How I save 30% of backpack space", format: "reel" },
+          { title: "Packing List", description: "My essentials for world travel", format: "carousel" }
         ],
         hashtags: ["#TravelGear", "#Minimalism", "#Backpacking", "#SustainableTravel"],
         estimated_virality: "medium"
@@ -891,18 +891,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Tragbarer Mini-Grill mit Akku",
-      description: "Elektrischer Grill für Balkon, Camping & Picknick",
+      name: "Portable Electric Mini Grill",
+      description: "Battery-powered grill for balcony, camping & picnics",
       popularity_index: 86,
       category: "ecommerce",
       data_json: {
-        subcategory: "home-decor",
-        price_range: "80-120 €",
-        virality_reason: "#OutdoorCooking und Sommer-BBQ-Saison",
-        target_audience: "Grill-Fans und Outdoor-Köche",
+        subcategory: "outdoor",
+        price_range: "$80-120",
+        virality_reason: "#OutdoorCooking and summer BBQ season",
+        target_audience: "Grill fans and outdoor cooks",
         content_ideas: [
-          { title: "Camping Cooking", description: "Perfektes Steak mitten in der Natur", format: "reel" },
-          { title: "Balcony BBQ", description: "Grillen ohne Kohle – so geht's", format: "video" }
+          { title: "Camping Cooking", description: "Perfect steak in the middle of nature", format: "reel" },
+          { title: "Balcony BBQ", description: "Grilling without charcoal — here's how", format: "video" }
         ],
         hashtags: ["#BBQTime", "#OutdoorCooking", "#CampingFood", "#GrillSeason"],
         estimated_virality: "high"
@@ -911,40 +911,40 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Wasserdichte Handy-Hülle für Tauchen",
-      description: "Universal-Unterwasserhülle für Smartphones bis 30m Tiefe",
+      name: "Waterproof Phone Case for Diving",
+      description: "Universal underwater case for smartphones up to 30m depth",
       popularity_index: 88,
       category: "ecommerce",
       data_json: {
-        subcategory: "home-decor",
-        price_range: "20-35 €",
-        virality_reason: "Unterwasser-Content boomt auf Social Media",
-        target_audience: "Content Creator und Wassersport-Fans",
+        subcategory: "outdoor",
+        price_range: "$20-35",
+        virality_reason: "Underwater content is booming on social media",
+        target_audience: "Content creators and water sports fans",
         content_ideas: [
-          { title: "Underwater POV", description: "So erstellst du epische Unterwasser-Videos", format: "tutorial" },
-          { title: "Beach Content", description: "Content-Ideen für den Strand", format: "reel" }
+          { title: "Underwater POV", description: "How to create epic underwater videos", format: "tutorial" },
+          { title: "Beach Content", description: "Content ideas for the beach", format: "reel" }
         ],
         hashtags: ["#UnderwaterPhotography", "#BeachContent", "#TravelCreator", "#WaterproofCase"],
         estimated_virality: "very high"
       }
     },
 
-    // ===== PRODUKTIVITÄT (5) =====
+    // ===== PRODUCTIVITY (5) =====
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Ergonomischer Laptop-Ständer aus Aluminium",
-      description: "Verstellbarer Stand für gesunde Arbeitshaltung",
+      name: "Ergonomic Aluminum Laptop Stand",
+      description: "Adjustable stand for healthy work posture",
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
-        subcategory: "produktivität",
-        price_range: "30-50 €",
-        virality_reason: "#WFH Setup und Ergonomie-Bewusstsein",
-        target_audience: "Remote Worker und Freelancer",
+        subcategory: "productivity",
+        price_range: "$30-50",
+        virality_reason: "#WFH setup and ergonomics awareness",
+        target_audience: "Remote workers and freelancers",
         content_ideas: [
-          { title: "Desk Setup Tour", description: "Zeige dein optimiertes Home Office", format: "video" },
-          { title: "Posture Fix", description: "Wie ich Nackenschmerzen los wurde", format: "reel" }
+          { title: "Desk Setup Tour", description: "Show your optimized home office", format: "video" },
+          { title: "Posture Fix", description: "How I got rid of neck pain", format: "reel" }
         ],
         hashtags: ["#DeskSetup", "#WFH", "#Ergonomics", "#HomeOffice"],
         estimated_virality: "high"
@@ -953,18 +953,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "LED Desk Lamp mit Wireless Charging",
-      description: "Schreibtischlampe mit 3 Farbtemperaturen & Qi-Ladepad",
+      name: "LED Desk Lamp with Wireless Charging",
+      description: "Desk lamp with 3 color temperatures & Qi charging pad",
       popularity_index: 89,
       category: "ecommerce",
       data_json: {
-        subcategory: "produktivität",
-        price_range: "40-65 €",
-        virality_reason: "Aesthetic Workspace Trend + Funktionalität",
-        target_audience: "Content Creator und Design-Liebhaber",
+        subcategory: "productivity",
+        price_range: "$40-65",
+        virality_reason: "Aesthetic workspace trend + functionality",
+        target_audience: "Content creators and design lovers",
         content_ideas: [
-          { title: "Desk Glow-Up", description: "Vorher/Nachher mit perfekter Beleuchtung", format: "reel" },
-          { title: "Productivity Setup", description: "Wie Licht deine Produktivität steigert", format: "video" }
+          { title: "Desk Glow-Up", description: "Before/after with perfect lighting", format: "reel" },
+          { title: "Productivity Setup", description: "How lighting boosts your productivity", format: "video" }
         ],
         hashtags: ["#DeskLamp", "#WorkspaceAesthetic", "#ProductivityTips", "#HomeOffice"],
         estimated_virality: "very high"
@@ -973,18 +973,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Kabelkanal-Management-System",
-      description: "Selbstklebende Kabelführung für sauberen Schreibtisch",
+      name: "Cable Management System",
+      description: "Self-adhesive cable channels for a clean desk",
       popularity_index: 85,
       category: "ecommerce",
       data_json: {
-        subcategory: "produktivität",
-        price_range: "15-25 €",
-        virality_reason: "#CableManagement ist massiver Trend",
-        target_audience: "Perfektionisten und Clean-Desk-Enthusiasten",
+        subcategory: "productivity",
+        price_range: "$15-25",
+        virality_reason: "#CableManagement is a massive trend",
+        target_audience: "Perfectionists and clean-desk enthusiasts",
         content_ideas: [
-          { title: "Cable Management Tutorial", description: "Von Chaos zu Clean in 10 Minuten", format: "tutorial" },
-          { title: "Satisfying Transformation", description: "Vorher/Nachher Kabel-Transformation", format: "reel" }
+          { title: "Cable Management Tutorial", description: "From chaos to clean in 10 minutes", format: "tutorial" },
+          { title: "Satisfying Transformation", description: "Before/after cable transformation", format: "reel" }
         ],
         hashtags: ["#CableManagement", "#CleanDesk", "#Satisfying", "#DeskGoals"],
         estimated_virality: "high"
@@ -993,18 +993,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Noise-Cancelling Kopfhörer für Fokus",
-      description: "Over-Ear Kopfhörer mit Active Noise Cancellation",
+      name: "Noise-Cancelling Headphones for Focus",
+      description: "Over-ear headphones with active noise cancellation",
       popularity_index: 90,
       category: "ecommerce",
       data_json: {
-        subcategory: "produktivität",
-        price_range: "100-200 €",
-        virality_reason: "Deep Work & Produktivitäts-Trend",
-        target_audience: "Wissensarbeiter und Studenten",
+        subcategory: "productivity",
+        price_range: "$100-200",
+        virality_reason: "Deep work & productivity trend",
+        target_audience: "Knowledge workers and students",
         content_ideas: [
-          { title: "Productivity Review", description: "Wie ich meine Fokus-Zeit verdoppelt habe", format: "video" },
-          { title: "Sound Test", description: "Noise Cancelling im Großraumbüro getestet", format: "reel" }
+          { title: "Productivity Review", description: "How I doubled my focus time", format: "video" },
+          { title: "Sound Test", description: "Noise cancelling tested in an open office", format: "reel" }
         ],
         hashtags: ["#NoiseCancelling", "#DeepWork", "#ProductivityHack", "#FocusMode"],
         estimated_virality: "high"
@@ -1013,40 +1013,40 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Schreibtisch-Organizer aus Filz",
-      description: "Modulares Organizer-Set für Stifte, Notizen & Gadgets",
+      name: "Felt Desk Organizer Set",
+      description: "Modular organizer set for pens, notes & gadgets",
       popularity_index: 83,
       category: "ecommerce",
       data_json: {
-        subcategory: "produktivität",
-        price_range: "25-40 €",
-        virality_reason: "Minimalistisches Design + Organisation",
-        target_audience: "Home Office Worker die Ästhetik lieben",
+        subcategory: "productivity",
+        price_range: "$25-40",
+        virality_reason: "Minimalist design + organization",
+        target_audience: "Home office workers who love aesthetics",
         content_ideas: [
-          { title: "Desk Organization", description: "So organisiere ich meinen Arbeitsplatz", format: "reel" },
-          { title: "Minimalist Setup", description: "Weniger ist mehr – mein minimaler Desk", format: "carousel" }
+          { title: "Desk Organization", description: "How I organize my workspace", format: "reel" },
+          { title: "Minimalist Setup", description: "Less is more — my minimal desk", format: "carousel" }
         ],
         hashtags: ["#DeskOrganization", "#MinimalistDesk", "#WorkspaceGoals", "#CleanAesthetic"],
         estimated_virality: "medium"
       }
     },
 
-    // ===== GESCHENKE (5) =====
+    // ===== GIFTS & KIDS (5) =====
     {
       platform: "tiktok",
       trend_type: "product",
       name: "Montessori Activity Board",
-      description: "Holz-Lerntafel mit Schlössern, Schaltern & Reißverschlüssen",
+      description: "Wooden learning board with locks, switches & zippers",
       popularity_index: 88,
       category: "ecommerce",
       data_json: {
-        subcategory: "geschenke",
-        price_range: "40-70 €",
-        virality_reason: "#MontessoriMom Trend auf TikTok",
-        target_audience: "Eltern von Kleinkindern 1-4 Jahre",
+        subcategory: "gifts",
+        price_range: "$40-70",
+        virality_reason: "#MontessoriMom trend on TikTok",
+        target_audience: "Parents of toddlers aged 1-4",
         content_ideas: [
-          { title: "Toddler Activity", description: "Wie mein 2-Jähriger sich 30 Min allein beschäftigt", format: "reel" },
-          { title: "Educational Toys", description: "Top 5 Montessori-Spielzeuge", format: "video" }
+          { title: "Toddler Activity", description: "How my 2-year-old stays busy for 30 minutes", format: "reel" },
+          { title: "Educational Toys", description: "Top 5 Montessori toys", format: "video" }
         ],
         hashtags: ["#MontessoriToys", "#ToddlerActivities", "#EducationalToys", "#ParentingHacks"],
         estimated_virality: "very high"
@@ -1055,18 +1055,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Wiederverwendbare Wasser-Mal-Matte",
-      description: "Magische Malmatte – zeichnen mit Wasser, keine Flecken",
+      name: "Reusable Water Drawing Mat",
+      description: "Magic drawing mat — draw with water, no stains",
       popularity_index: 89,
       category: "ecommerce",
       data_json: {
-        subcategory: "geschenke",
-        price_range: "20-35 €",
-        virality_reason: "Mess-free Activity für Eltern",
-        target_audience: "Eltern die saubere Aktivitäten suchen",
+        subcategory: "gifts",
+        price_range: "$20-35",
+        virality_reason: "Mess-free activity for parents",
+        target_audience: "Parents looking for clean activities",
         content_ideas: [
-          { title: "Mess-Free Art", description: "So malen Kinder ohne Chaos", format: "reel" },
-          { title: "Travel Hack", description: "Perfekt für lange Autofahrten", format: "video" }
+          { title: "Mess-Free Art", description: "How kids create art without the mess", format: "reel" },
+          { title: "Travel Hack", description: "Perfect for long car rides", format: "video" }
         ],
         hashtags: ["#ToddlerActivities", "#MessFree", "#ParentingWin", "#KidsArt"],
         estimated_virality: "high"
@@ -1075,18 +1075,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "LED-Nachtlicht mit Farbwechsel",
-      description: "Silikon-Nachtlicht in Tierform, touch-steuerbar",
+      name: "LED Night Light with Color Change",
+      description: "Silicone night light in animal shape, touch-controlled",
       popularity_index: 86,
       category: "ecommerce",
       data_json: {
-        subcategory: "geschenke",
-        price_range: "18-30 €",
-        virality_reason: "Niedliches Design + funktional für Einschlafroutine",
-        target_audience: "Eltern von Babys und Kleinkindern",
+        subcategory: "gifts",
+        price_range: "$18-30",
+        virality_reason: "Cute design + functional for bedtime routine",
+        target_audience: "Parents of babies and toddlers",
         content_ideas: [
-          { title: "Bedtime Routine", description: "Unsere entspannte Einschlafroutine", format: "reel" },
-          { title: "Nursery Tour", description: "Kinderzimmer-Tour mit allen Gadgets", format: "video" }
+          { title: "Bedtime Routine", description: "Our relaxing bedtime routine", format: "reel" },
+          { title: "Nursery Tour", description: "Nursery tour with all the gadgets", format: "video" }
         ],
         hashtags: ["#NurseryDecor", "#BedtimeRoutine", "#ParentingHacks", "#BabyEssentials"],
         estimated_virality: "high"
@@ -1095,18 +1095,18 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "product",
-      name: "Aufblasbarer Reise-Fußstütze für Kinder",
-      description: "Fußbank fürs Flugzeug – Kinder können sich hinlegen",
+      name: "Inflatable Travel Footrest for Kids",
+      description: "Airplane footrest so kids can lie down during flights",
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
-        subcategory: "geschenke",
-        price_range: "15-25 €",
-        virality_reason: "Travel-Hack für Familien geht viral",
-        target_audience: "Reisende Eltern",
+        subcategory: "gifts",
+        price_range: "$15-25",
+        virality_reason: "Travel hack for families going viral",
+        target_audience: "Traveling parents",
         content_ideas: [
-          { title: "Travel Hack", description: "So schlafen Kinder im Flugzeug", format: "reel" },
-          { title: "Family Travel", description: "10 Hacks für entspanntes Reisen mit Kids", format: "carousel" }
+          { title: "Travel Hack", description: "How kids sleep on airplanes", format: "reel" },
+          { title: "Family Travel", description: "10 hacks for stress-free travel with kids", format: "carousel" }
         ],
         hashtags: ["#TravelWithKids", "#FamilyTravel", "#ParentingHacks", "#TravelEssentials"],
         estimated_virality: "very high"
@@ -1115,18 +1115,18 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "product",
-      name: "Kinder-Kopfhörer mit Lautstärke-Begrenzung",
-      description: "Sichere Over-Ear Kopfhörer max. 85dB für Gehörschutz",
+      name: "Kids Headphones with Volume Limit",
+      description: "Safe over-ear headphones capped at 85dB for hearing protection",
       popularity_index: 85,
       category: "ecommerce",
       data_json: {
-        subcategory: "geschenke",
-        price_range: "25-45 €",
-        virality_reason: "Screen-Time-Trend + Gesundheitsbewusstsein",
-        target_audience: "Gesundheitsbewusste Eltern",
+        subcategory: "gifts",
+        price_range: "$25-45",
+        virality_reason: "Screen time trend + health awareness",
+        target_audience: "Health-conscious parents",
         content_ideas: [
-          { title: "Screen Time Solution", description: "Wie Kinder sicher Videos schauen", format: "reel" },
-          { title: "Travel Essential", description: "Ruhige Flüge dank Kopfhörern", format: "video" }
+          { title: "Screen Time Solution", description: "How kids watch videos safely", format: "reel" },
+          { title: "Travel Essential", description: "Quiet flights thanks to headphones", format: "video" }
         ],
         hashtags: ["#KidsHeadphones", "#ScreenTime", "#ParentingTips", "#ChildSafety"],
         estimated_virality: "medium-high"
@@ -1139,49 +1139,49 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "lifestyle",
-      name: "Matcha-Trend 2025",
-      description: "Grüner Tee-Extrakt mit Antioxidantien für Fokus und Energie",
+      name: "Matcha Trend 2025",
+      description: "Green tea extract with antioxidants for focus and energy",
       popularity_index: 88,
       category: "lifestyle",
       data_json: {
         food: "Matcha",
-        benefits: "L-Theanin für Konzentration, hoher Antioxidantien-Gehalt, sanfter Energy-Boost",
+        benefits: "L-theanine for concentration, high antioxidant content, gentle energy boost",
         vitamins: ["C", "E", "K"],
         health_tips: [
-          "Trinke Matcha morgens für sanften Energy-Boost ohne Crash",
-          "Kombiniere mit Hafermilch für bessere Verträglichkeit",
-          "Verwende zeremoniellen Matcha für höchste Qualität"
+          "Drink matcha in the morning for a gentle energy boost without the crash",
+          "Combine with oat milk for better digestibility",
+          "Use ceremonial-grade matcha for highest quality"
         ],
         content_ideas: [
-          { title: "Matcha Latte Tutorial", description: "Zeige perfekte Zubereitung", format: "reel" },
-          { title: "Benefits Breakdown", description: "Erkläre gesundheitliche Vorteile visuell", format: "carousel" }
+          { title: "Matcha Latte Tutorial", description: "Show perfect preparation technique", format: "reel" },
+          { title: "Benefits Breakdown", description: "Explain health benefits visually", format: "carousel" }
         ],
         hashtags: ["#MatchaLatte", "#HealthyLiving", "#Wellness", "#CleanEating"],
-        audience_fit: "Gesundheitsbewusste Menschen 25-45",
+        audience_fit: "Health-conscious people 25-45",
         estimated_virality: "high"
       }
     },
     {
       platform: "tiktok",
       trend_type: "lifestyle",
-      name: "Kurkuma-Wasser Detox",
-      description: "Entzündungshemmendes Morgenritual mit Kurkuma und Zitrone",
+      name: "Turmeric Water Detox",
+      description: "Anti-inflammatory morning ritual with turmeric and lemon",
       popularity_index: 85,
       category: "lifestyle",
       data_json: {
-        food: "Kurkuma",
-        benefits: "Curcumin wirkt entzündungshemmend, unterstützt Immunsystem und Verdauung",
+        food: "Turmeric",
+        benefits: "Curcumin is anti-inflammatory, supports immune system and digestion",
         vitamins: ["K", "E", "B6"],
         health_tips: [
-          "Mische 1 TL Kurkuma mit warmem Wasser und Zitronensaft",
-          "Füge schwarzen Pfeffer hinzu für bessere Absorption",
-          "Trinke auf nüchternen Magen für Detox-Effekt"
+          "Mix 1 tsp turmeric with warm water and lemon juice",
+          "Add black pepper for better absorption",
+          "Drink on an empty stomach for detox effect"
         ],
         content_ideas: [
-          { title: "Morning Detox Routine", description: "Zeige Zubereitung in Morgenroutine", format: "reel" },
-          { title: "7-Day Challenge", description: "Dokumentiere Woche mit Kurkuma-Wasser", format: "series" }
+          { title: "Morning Detox Routine", description: "Show preparation in morning routine", format: "reel" },
+          { title: "7-Day Challenge", description: "Document a week with turmeric water", format: "series" }
         ],
-        hashtags: ["#DetoxWater", "#Kurkuma", "#HealthyMorning", "#Immunity"],
+        hashtags: ["#DetoxWater", "#Turmeric", "#HealthyMorning", "#Immunity"],
         audience_fit: "Health-conscious individuals interested in natural remedies",
         estimated_virality: "medium-high"
       }
@@ -1189,22 +1189,22 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "lifestyle",
-      name: "Hafermilch Revolution",
-      description: "Pflanzliche Milch-Alternative mit Ballaststoffen für Herzgesundheit",
+      name: "Oat Milk Revolution",
+      description: "Plant-based milk alternative with fiber for heart health",
       popularity_index: 83,
       category: "lifestyle",
       data_json: {
-        food: "Hafermilch",
-        benefits: "Ballaststoffe & Beta-Glucane für Herzgesundheit, klimafreundlich",
+        food: "Oat Milk",
+        benefits: "Fiber & beta-glucans for heart health, climate-friendly",
         vitamins: ["B1", "B6", "E"],
         health_tips: [
-          "Wähle ungesüßte Varianten für beste Gesundheitsvorteile",
-          "Perfekt für Kaffee durch cremige Konsistenz",
-          "Reich an Ballaststoffen – gut für Verdauung"
+          "Choose unsweetened varieties for best health benefits",
+          "Perfect for coffee due to creamy texture",
+          "Rich in fiber — great for digestion"
         ],
         content_ideas: [
-          { title: "Milk Alternative Comparison", description: "Vergleiche verschiedene Pflanzenmilch-Optionen", format: "carousel" },
-          { title: "Homemade Oat Milk", description: "DIY-Tutorial für selbstgemachte Hafermilch", format: "video" }
+          { title: "Milk Alternative Comparison", description: "Compare different plant milk options", format: "carousel" },
+          { title: "Homemade Oat Milk", description: "DIY tutorial for homemade oat milk", format: "video" }
         ],
         hashtags: ["#DairyFree", "#PlantBased", "#OatMilk", "#HealthyChoices"],
         audience_fit: "Plant-based and lactose-intolerant community",
@@ -1214,22 +1214,22 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "lifestyle",
-      name: "Ingwer-Shots für Immunsystem",
-      description: "Konzentrierte Ingwer-Shots als täglicher Immun-Booster",
+      name: "Ginger Shots for Immunity",
+      description: "Concentrated ginger shots as a daily immune booster",
       popularity_index: 87,
       category: "lifestyle",
       data_json: {
-        food: "Ingwer",
-        benefits: "Entzündungshemmend, Immunsystem-Boost, Verdauungsfördernd",
+        food: "Ginger",
+        benefits: "Anti-inflammatory, immune system boost, aids digestion",
         vitamins: ["C", "B6", "Magnesium"],
         health_tips: [
-          "Trinke 1 Shot täglich auf nüchternen Magen",
-          "Kombiniere mit Zitrone und Cayenne-Pfeffer für maximale Wirkung",
-          "Frischer Ingwer ist potenter als Pulver"
+          "Drink 1 shot daily on an empty stomach",
+          "Combine with lemon and cayenne pepper for maximum effect",
+          "Fresh ginger is more potent than powder"
         ],
         content_ideas: [
-          { title: "DIY Ginger Shots", description: "Rezept für selbstgemachte Ingwer-Shots", format: "tutorial" },
-          { title: "30-Day Challenge", description: "Dokumentiere Immunsystem-Verbesserung", format: "series" }
+          { title: "DIY Ginger Shots", description: "Recipe for homemade ginger shots", format: "tutorial" },
+          { title: "30-Day Challenge", description: "Document immune system improvement", format: "series" }
         ],
         hashtags: ["#GingerShot", "#ImmunityBoost", "#HealthyLiving", "#WellnessTips"],
         audience_fit: "Health-conscious individuals",
@@ -1239,22 +1239,22 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "lifestyle",
-      name: "Chiasamen Pudding",
-      description: "Nährstoffreicher Pudding mit Omega-3 und Proteinen",
+      name: "Chia Seed Pudding",
+      description: "Nutrient-rich pudding with omega-3 and protein",
       popularity_index: 84,
       category: "lifestyle",
       data_json: {
-        food: "Chiasamen",
-        benefits: "Hoher Omega-3-Gehalt, Protein-reich, langanhaltende Sättigung",
-        vitamins: ["Omega-3", "Calcium", "Phosphor"],
+        food: "Chia Seeds",
+        benefits: "High omega-3 content, protein-rich, long-lasting satiety",
+        vitamins: ["Omega-3", "Calcium", "Phosphorus"],
         health_tips: [
-          "Mische 3 EL Chiasamen mit 200ml Pflanzenmilch",
-          "Lass es über Nacht im Kühlschrank quellen",
-          "Toppe mit Früchten und Nüssen für zusätzliche Nährstoffe"
+          "Mix 3 tbsp chia seeds with 200ml plant milk",
+          "Let it soak overnight in the refrigerator",
+          "Top with fruits and nuts for extra nutrients"
         ],
         content_ideas: [
-          { title: "Chia Pudding Variations", description: "5 verschiedene Geschmacksrichtungen", format: "carousel" },
-          { title: "Meal Prep Breakfast", description: "Bereite 5 Frühstücke für die Woche vor", format: "video" }
+          { title: "Chia Pudding Variations", description: "5 different flavor combinations", format: "carousel" },
+          { title: "Meal Prep Breakfast", description: "Prep 5 breakfasts for the week", format: "video" }
         ],
         hashtags: ["#ChiaPudding", "#HealthyBreakfast", "#MealPrep", "#PlantBased"],
         audience_fit: "Fitness and health enthusiasts",
@@ -1264,22 +1264,22 @@ const generateDynamicTrends = () => {
     {
       platform: "tiktok",
       trend_type: "lifestyle",
-      name: "Fermentierte Foods Trend",
-      description: "Probiotika-reiche Lebensmittel für Darmgesundheit",
+      name: "Fermented Foods Trend",
+      description: "Probiotic-rich foods for gut health",
       popularity_index: 86,
       category: "lifestyle",
       data_json: {
         food: "Kimchi, Kombucha, Sauerkraut",
-        benefits: "Verbesserte Darmflora, stärkeres Immunsystem, bessere Verdauung",
-        vitamins: ["K2", "B12", "Probiotika"],
+        benefits: "Improved gut flora, stronger immune system, better digestion",
+        vitamins: ["K2", "B12", "Probiotics"],
         health_tips: [
-          "Beginne mit kleinen Portionen zur Gewöhnung",
-          "Integriere täglich fermentierte Foods für beste Ergebnisse",
-          "DIY-Fermentation spart Geld und ist einfacher als gedacht"
+          "Start with small portions to let your body adjust",
+          "Incorporate fermented foods daily for best results",
+          "DIY fermentation saves money and is easier than you think"
         ],
         content_ideas: [
-          { title: "Fermentation 101", description: "Anfänger-Guide für selbstgemachtes Kimchi", format: "tutorial" },
-          { title: "Gut Health Journey", description: "Meine 30-Tage-Transformation", format: "series" }
+          { title: "Fermentation 101", description: "Beginner's guide to homemade kimchi", format: "tutorial" },
+          { title: "Gut Health Journey", description: "My 30-day transformation", format: "series" }
         ],
         hashtags: ["#FermentedFoods", "#GutHealth", "#Probiotics", "#HealthyGut"],
         audience_fit: "Wellness community",
@@ -1293,117 +1293,117 @@ const generateDynamicTrends = () => {
     {
       platform: "linkedin",
       trend_type: "finance",
-      name: "Top Aktien der Woche",
-      description: "Übersicht der best-performenden Aktien mit Analyse",
+      name: "Top Stocks of the Week",
+      description: "Overview of the best-performing stocks with analysis",
       popularity_index: 90,
       category: "finance",
       data_json: {
         stocks: [
-          { symbol: "NVDA", change: "+5.8%", reason: "KI-Chip-Nachfrage steigt weiter", price: "~145 USD", ai_tip: "Erstelle Erklärvideo zu KI-Hardware-Markt" },
-          { symbol: "MSFT", change: "+3.2%", reason: "Cloud-Geschäft übertrifft Erwartungen", price: "~425 USD", ai_tip: "Post über Cloud-Computing Trends" },
-          { symbol: "TSLA", change: "+4.1%", reason: "Neue Gigafactory-Pläne angekündigt", price: "~265 USD", ai_tip: "E-Mobility Zukunfts-Szenario erklären" }
+          { symbol: "NVDA", change: "+5.8%", reason: "AI chip demand continues to rise", price: "~$145", ai_tip: "Create explainer video on AI hardware market" },
+          { symbol: "MSFT", change: "+3.2%", reason: "Cloud business exceeds expectations", price: "~$425", ai_tip: "Post about cloud computing trends" },
+          { symbol: "TSLA", change: "+4.1%", reason: "New Gigafactory plans announced", price: "~$265", ai_tip: "Explain e-mobility future scenarios" }
         ],
         content_ideas: [
-          { title: "Wochenanalyse", description: "Erkläre Marktbewegungen visuell mit Charts", format: "video" },
-          { title: "Stock Pick Breakdown", description: "Warum diese 3 Aktien jetzt interessant sind", format: "carousel" }
+          { title: "Weekly Analysis", description: "Explain market movements visually with charts", format: "video" },
+          { title: "Stock Pick Breakdown", description: "Why these 3 stocks are interesting right now", format: "carousel" }
         ],
-        hashtags: ["#Investing", "#StockMarket", "#FinanzielleFreiheit", "#Aktien"],
-        audience_fit: "Anleger und Finanz-interessierte 25-50",
+        hashtags: ["#Investing", "#StockMarket", "#FinancialFreedom", "#Stocks"],
+        audience_fit: "Investors and finance-interested people 25-50",
         estimated_virality: "medium-high"
       }
     },
     {
       platform: "twitter",
       trend_type: "finance",
-      name: "Krypto-Markt Update",
-      description: "Wöchentliche Übersicht der Top-Kryptowährungen",
+      name: "Crypto Market Update",
+      description: "Weekly overview of top cryptocurrencies",
       popularity_index: 89,
       category: "finance",
       data_json: {
         crypto: [
-          { name: "Bitcoin", price: "64.200 €", change: "+1.8%", market_cap: "1.26T" },
-          { name: "Ethereum", price: "3.050 €", change: "+0.9%", market_cap: "367B" },
-          { name: "Solana", price: "139 €", change: "+3.2%", market_cap: "65B" },
-          { name: "BNB", price: "525 €", change: "-0.4%", market_cap: "76B" },
-          { name: "XRP", price: "0.61 €", change: "+0.5%", market_cap: "35B" }
+          { name: "Bitcoin", price: "$68,200", change: "+1.8%", market_cap: "1.26T" },
+          { name: "Ethereum", price: "$3,250", change: "+0.9%", market_cap: "367B" },
+          { name: "Solana", price: "$148", change: "+3.2%", market_cap: "65B" },
+          { name: "BNB", price: "$558", change: "-0.4%", market_cap: "76B" },
+          { name: "XRP", price: "$0.65", change: "+0.5%", market_cap: "35B" }
         ],
         news: [
-          "Bitcoin ETF verzeichnet Rekord-Zuflüsse von $1.2B diese Woche",
-          "Ethereum bereitet größtes Netzwerk-Upgrade 'Pectra' vor",
-          "Solana erreicht neues Allzeithoch bei Transaktionen"
+          "Bitcoin ETF records record inflows of $1.2B this week",
+          "Ethereum prepares largest network upgrade 'Pectra'",
+          "Solana hits new all-time high in transactions"
         ],
         content_ideas: [
-          { title: "Crypto Weekly Wrap", description: "5-Minuten-Update zu Marktbewegungen", format: "video" },
-          { title: "Investment Strategy", description: "DCA vs. Timing – Was funktioniert besser?", format: "thread" }
+          { title: "Crypto Weekly Wrap", description: "5-minute update on market movements", format: "video" },
+          { title: "Investment Strategy", description: "DCA vs. timing — which works better?", format: "thread" }
         ],
         hashtags: ["#Crypto", "#Bitcoin", "#Blockchain", "#CryptoNews"],
-        audience_fit: "Krypto-Investoren und Tech-Enthusiasten",
+        audience_fit: "Crypto investors and tech enthusiasts",
         estimated_virality: "high"
       }
     },
     {
       platform: "linkedin",
       trend_type: "finance",
-      name: "ETF-Strategien 2025",
-      description: "Passive Anlagestrategien mit ETFs für langfristigen Vermögensaufbau",
+      name: "ETF Strategies 2025",
+      description: "Passive investment strategies with ETFs for long-term wealth building",
       popularity_index: 84,
       category: "finance",
       data_json: {
         investment_tips: [
-          "MSCI World als Basis-Investment für globale Diversifikation",
-          "Sparplan-Strategie: Monatlich 200-500€ für Cost-Average-Effekt",
-          "Rebalancing einmal jährlich für optimale Risikoverteilung"
+          "MSCI World as a base investment for global diversification",
+          "Dollar-cost averaging: $200-500/month for the averaging effect",
+          "Rebalance once a year for optimal risk distribution"
         ],
         content_ideas: [
-          { title: "ETF für Anfänger", description: "3 ETFs die jeder kennen sollte", format: "carousel" },
-          { title: "Portfolio-Aufbau", description: "Wie ich 100.000€ investieren würde", format: "article" }
+          { title: "ETF for Beginners", description: "3 ETFs everyone should know", format: "carousel" },
+          { title: "Portfolio Building", description: "How I would invest $100,000", format: "article" }
         ],
-        hashtags: ["#ETF", "#PassivIncome", "#Vermögensaufbau", "#Investing"],
-        audience_fit: "Investoren und Sparer mit langfristiger Strategie",
+        hashtags: ["#ETF", "#PassiveIncome", "#WealthBuilding", "#Investing"],
+        audience_fit: "Investors and savers with a long-term strategy",
         estimated_virality: "medium"
       }
     },
     {
       platform: "twitter",
       trend_type: "finance",
-      name: "Index-Fonds vs. Einzelaktien",
-      description: "Vergleich verschiedener Anlagestrategien für Anfänger",
+      name: "Index Funds vs. Individual Stocks",
+      description: "Comparison of investment strategies for beginners",
       popularity_index: 82,
       category: "finance",
       data_json: {
         investment_comparison: [
-          { strategy: "S&P 500 ETF", risk: "mittel", potential_return: "8-10% p.a.", effort: "minimal" },
-          { strategy: "Einzelaktien", risk: "hoch", potential_return: "variabel", effort: "hoch" },
-          { strategy: "Dividenden-ETF", risk: "mittel", potential_return: "6-8% p.a.", effort: "gering" }
+          { strategy: "S&P 500 ETF", risk: "medium", potential_return: "8-10% p.a.", effort: "minimal" },
+          { strategy: "Individual Stocks", risk: "high", potential_return: "variable", effort: "high" },
+          { strategy: "Dividend ETF", risk: "medium", potential_return: "6-8% p.a.", effort: "low" }
         ],
         content_ideas: [
-          { title: "Investment-Vergleich", description: "Welche Strategie passt zu dir?", format: "thread" },
-          { title: "Anfänger-Portfolio", description: "So würde ich heute mit 1000€ starten", format: "video" }
+          { title: "Investment Comparison", description: "Which strategy is right for you?", format: "thread" },
+          { title: "Beginner Portfolio", description: "How I'd start today with $1,000", format: "video" }
         ],
         hashtags: ["#InvestingForBeginners", "#ETF", "#StockMarket", "#PassiveIncome"],
-        audience_fit: "Investitions-Anfänger",
+        audience_fit: "Investment beginners",
         estimated_virality: "high"
       }
     },
     {
       platform: "linkedin",
       trend_type: "finance",
-      name: "Dividenden-Strategie 2025",
-      description: "Aufbau passiven Einkommens durch Dividendenaktien",
+      name: "Dividend Strategy 2025",
+      description: "Building passive income through dividend stocks",
       popularity_index: 85,
       category: "finance",
       data_json: {
         dividend_picks: [
-          { company: "Coca-Cola", yield: "3.1%", stability: "sehr hoch", streak: "62 Jahre Dividendenwachstum" },
-          { company: "Johnson & Johnson", yield: "2.9%", stability: "sehr hoch", streak: "61 Jahre Dividendenwachstum" },
-          { company: "Procter & Gamble", yield: "2.5%", stability: "sehr hoch", streak: "67 Jahre Dividendenwachstum" }
+          { company: "Coca-Cola", yield: "3.1%", stability: "very high", streak: "62 years of dividend growth" },
+          { company: "Johnson & Johnson", yield: "2.9%", stability: "very high", streak: "61 years of dividend growth" },
+          { company: "Procter & Gamble", yield: "2.5%", stability: "very high", streak: "67 years of dividend growth" }
         ],
         content_ideas: [
-          { title: "Dividenden-Portfolio", description: "Wie ich 500€ passives Einkommen generiere", format: "article" },
-          { title: "Dividend Aristocrats", description: "Die besten Dividendenzahler", format: "carousel" }
+          { title: "Dividend Portfolio", description: "How I generate $500 passive income", format: "article" },
+          { title: "Dividend Aristocrats", description: "The best dividend payers", format: "carousel" }
         ],
         hashtags: ["#DividendInvesting", "#PassiveIncome", "#LongTermInvesting", "#FinancialFreedom"],
-        audience_fit: "Langfristige Investoren",
+        audience_fit: "Long-term investors",
         estimated_virality: "medium"
       }
     }
@@ -1414,29 +1414,29 @@ const generateDynamicTrends = () => {
     {
       platform: "instagram",
       trend_type: "motivation",
-      name: "Wöchentlicher Wachstums-Impuls",
-      description: "Motivierende Zitate und praktische Tipps für Content-Creator",
+      name: "Weekly Growth Pulse",
+      description: "Motivational quotes and practical tips for content creators",
       popularity_index: 87,
       category: "motivation",
       data_json: {
         quotes: [
-          "Erfolg entsteht nicht durch Glück – sondern durch tägliche, kleine Schritte.",
-          "Wenn du müde bist, lerne zu ruhen – nicht aufzugeben.",
-          "Die besten Ideen entstehen nicht im Komfort, sondern in der Konsequenz."
+          "Success doesn't come from luck — it comes from small daily steps.",
+          "When you're tired, learn to rest — not to quit.",
+          "The best ideas don't come from comfort, but from consistency."
         ],
         growth_tips: [
-          "Analysiere wöchentlich deine 3 erfolgreichsten Posts – wiederhole, was funktioniert.",
-          "Baue eine Routine: 1 Tag Contentplanung, 3 Tage Produktion, 3 Tage Engagement.",
-          "Setze dir Mikro-Ziele: +50 Follower diese Woche ist besser als +1000 im Monat.",
-          "Kommentiere täglich 10 Posts in deiner Nische für Sichtbarkeit."
+          "Analyze your top 3 performing posts weekly — repeat what works.",
+          "Build a routine: 1 day planning, 3 days production, 3 days engagement.",
+          "Set micro-goals: +50 followers this week is better than +1000 this month.",
+          "Comment on 10 posts in your niche daily for visibility."
         ],
-        mindset_prompt: "Schreibe heute einen Post über deinen größten Rückschlag – und was du daraus gelernt hast.",
+        mindset_prompt: "Write a post today about your biggest setback — and what you learned from it.",
         content_ideas: [
-          { title: "Motivation Reel", description: "Kombiniere Zitat mit B-Roll deiner Journey", format: "reel" },
-          { title: "Growth-Tipp Carousel", description: "Teile deine 5 besten Wachstums-Hacks", format: "carousel" }
+          { title: "Motivation Reel", description: "Combine a quote with B-roll of your journey", format: "reel" },
+          { title: "Growth Tips Carousel", description: "Share your 5 best growth hacks", format: "carousel" }
         ],
         hashtags: ["#Motivation", "#CreatorLife", "#GrowthMindset", "#ContentCreator"],
-        audience_fit: "Ambitionierte Creator und Unternehmer",
+        audience_fit: "Ambitious creators and entrepreneurs",
         estimated_virality: "high"
       }
     },
@@ -1444,23 +1444,23 @@ const generateDynamicTrends = () => {
       platform: "tiktok",
       trend_type: "motivation",
       name: "5AM Club Challenge",
-      description: "Früh-Aufstehen-Bewegung für produktive Morgenroutinen",
+      description: "Early rising movement for productive morning routines",
       popularity_index: 85,
       category: "motivation",
       data_json: {
         quotes: [
-          "Gewinne den Morgen, gewinne den Tag.",
-          "Während andere schlafen, baust du dein Imperium."
+          "Win the morning, win the day.",
+          "While others sleep, you're building your empire."
         ],
         growth_tips: [
-          "Starte mit 15 Minuten früher aufstehen, steigere graduell",
-          "Bereite am Abend vor: Kleidung, Frühstück, Tagesplan",
-          "Nutze die erste Stunde für wichtigste Aufgabe (No Social Media)"
+          "Start by waking up 15 minutes earlier, increase gradually",
+          "Prepare the night before: clothes, breakfast, daily plan",
+          "Use the first hour for your most important task (no social media)"
         ],
-        mindset_prompt: "Dokumentiere deine 5AM Routine für 7 Tage und teile Learnings.",
+        mindset_prompt: "Document your 5AM routine for 7 days and share your learnings.",
         content_ideas: [
-          { title: "5AM Morning Routine", description: "Zeige deine produktive Morgenroutine", format: "reel" },
-          { title: "Transformation Story", description: "Before/After: Wie Morgenroutine dein Leben verändert", format: "video" }
+          { title: "5AM Morning Routine", description: "Show your productive morning routine", format: "reel" },
+          { title: "Transformation Story", description: "Before/after: how morning routines changed my life", format: "video" }
         ],
         hashtags: ["#5AMClub", "#MorningRoutine", "#ProductivityTips", "#SuccessMindset"],
         audience_fit: "Productivity-focused individuals and entrepreneurs",
@@ -1471,27 +1471,27 @@ const generateDynamicTrends = () => {
       platform: "linkedin",
       trend_type: "motivation",
       name: "Atomic Habits Challenge",
-      description: "Kleine Gewohnheiten mit großer Wirkung etablieren",
+      description: "Build small habits with big impact",
       popularity_index: 89,
       category: "motivation",
       data_json: {
         quotes: [
-          "Du bist nicht deine Ziele – du bist die Summe deiner Systeme.",
-          "1% besser jeden Tag = 37x besser nach einem Jahr."
+          "You are not your goals — you are the sum of your systems.",
+          "1% better every day = 37x better after one year."
         ],
         growth_tips: [
-          "Starte mit einer Mini-Habit: 1 Liegestütze, 1 Seite lesen",
-          "Stack Habits: Neue Gewohnheit an bestehende koppeln",
-          "Mache es sichtbar: Habit-Tracker an sichtbarer Stelle",
-          "Belohne dich sofort nach Erledigung für Dopamin-Kick"
+          "Start with a mini-habit: 1 push-up, 1 page of reading",
+          "Stack habits: attach new habits to existing ones",
+          "Make it visible: place your habit tracker somewhere prominent",
+          "Reward yourself immediately after completion for a dopamine hit"
         ],
-        mindset_prompt: "Welche eine Mini-Habit würde dein Leben in 6 Monaten transformieren?",
+        mindset_prompt: "Which one mini-habit would transform your life in 6 months?",
         content_ideas: [
-          { title: "Habit Stacking", description: "So etablierst du neue Routinen mühelos", format: "carousel" },
-          { title: "90-Day Challenge", description: "Dokumentiere deine Transformation", format: "series" }
+          { title: "Habit Stacking", description: "How to build new routines effortlessly", format: "carousel" },
+          { title: "90-Day Challenge", description: "Document your transformation", format: "series" }
         ],
         hashtags: ["#AtomicHabits", "#PersonalGrowth", "#HabitBuilding", "#SelfImprovement"],
-        audience_fit: "Selbstoptimierer und Wachstums-orientierte Menschen",
+        audience_fit: "Self-improvement and growth-oriented people",
         estimated_virality: "very high"
       }
     },
@@ -1499,27 +1499,27 @@ const generateDynamicTrends = () => {
       platform: "instagram",
       trend_type: "motivation",
       name: "Deep Work Sessions",
-      description: "Fokussierte Arbeit ohne Ablenkung für maximale Produktivität",
+      description: "Focused work without distractions for maximum productivity",
       popularity_index: 88,
       category: "motivation",
       data_json: {
         quotes: [
-          "Tiefe Arbeit ist die Superkraft des 21. Jahrhunderts.",
-          "Multitasking ist der Feind von Meisterschaft."
+          "Deep work is the superpower of the 21st century.",
+          "Multitasking is the enemy of mastery."
         ],
         growth_tips: [
-          "Blockiere 2-4h für Deep Work ohne Unterbrechungen",
-          "Handy in anderen Raum, alle Notifications aus",
-          "Nutze Pomodoro: 90 Min Fokus, 15 Min Pause",
-          "Tracke deine Deep Work Stunden wöchentlich"
+          "Block 2-4 hours for deep work without interruptions",
+          "Put your phone in another room, turn off all notifications",
+          "Use Pomodoro: 90 min focus, 15 min break",
+          "Track your deep work hours weekly"
         ],
-        mindset_prompt: "An welchem Projekt würdest du 1000 Stunden arbeiten, wenn Geld keine Rolle spielt?",
+        mindset_prompt: "What project would you work on for 1,000 hours if money were no object?",
         content_ideas: [
-          { title: "Deep Work Routine", description: "So strukturiere ich meine produktivsten Stunden", format: "reel" },
-          { title: "Distraction-Free Setup", description: "Mein fokussierter Workspace", format: "carousel" }
+          { title: "Deep Work Routine", description: "How I structure my most productive hours", format: "reel" },
+          { title: "Distraction-Free Setup", description: "My focused workspace", format: "carousel" }
         ],
         hashtags: ["#DeepWork", "#Productivity", "#FocusMode", "#CreatorLife"],
-        audience_fit: "Knowledge Worker und Creator",
+        audience_fit: "Knowledge workers and creators",
         estimated_virality: "high"
       }
     },
@@ -1527,27 +1527,27 @@ const generateDynamicTrends = () => {
       platform: "tiktok",
       trend_type: "motivation",
       name: "Failure Resume Trend",
-      description: "Teile deine Misserfolge als Lernmomente",
+      description: "Share your failures as learning moments",
       popularity_index: 90,
       category: "motivation",
       data_json: {
         quotes: [
-          "Misserfolg ist nicht das Gegenteil von Erfolg – er ist Teil davon.",
-          "Jedes 'Nein' bringt dich näher ans 'Ja'."
+          "Failure is not the opposite of success — it's part of it.",
+          "Every 'no' brings you closer to 'yes'."
         ],
         growth_tips: [
-          "Dokumentiere deine Fails öffentlich für Accountability",
-          "Extrahiere 3 Learnings aus jedem Rückschlag",
-          "Teile gescheiterte Projekte – es befreit und inspiriert andere",
-          "Feiere den Mut zu versuchen, nicht nur das Ergebnis"
+          "Document your failures publicly for accountability",
+          "Extract 3 learnings from every setback",
+          "Share failed projects — it frees you and inspires others",
+          "Celebrate the courage to try, not just the outcome"
         ],
-        mindset_prompt: "Welcher Misserfolg hat dich am meisten gelehrt? Teile deine Story.",
+        mindset_prompt: "Which failure taught you the most? Share your story.",
         content_ideas: [
-          { title: "My Failure Resume", description: "10 Projekte die flopped sind und was ich lernte", format: "video" },
-          { title: "Behind the Scenes", description: "Was niemand über meinen Erfolg weiß", format: "reel" }
+          { title: "My Failure Resume", description: "10 projects that flopped and what I learned", format: "video" },
+          { title: "Behind the Scenes", description: "What nobody knows about my success", format: "reel" }
         ],
         hashtags: ["#FailureResume", "#RealTalk", "#Entrepreneurship", "#GrowthMindset"],
-        audience_fit: "Unternehmer und Creator die Authentizität schätzen",
+        audience_fit: "Entrepreneurs and creators who value authenticity",
         estimated_virality: "very high"
       }
     }
@@ -1558,25 +1558,25 @@ const generateDynamicTrends = () => {
     {
       platform: "linkedin",
       trend_type: "tools",
-      name: "Top KI-Tools für Creator 2025",
-      description: "Die besten KI-Werkzeuge für Content-Erstellung und Automatisierung",
+      name: "Top AI Tools for Creators 2025",
+      description: "The best AI tools for content creation and automation",
       popularity_index: 88,
       category: "business",
       data_json: {
         tools: [
-          { name: "ChatGPT-4", function: "Content-Ideen, Textgenerierung, Brainstorming", pricing: "Free / 20€/Monat", ai_tip: "Spare täglich 1h Content-Planung" },
-          { name: "Midjourney", function: "KI-Bildgenerierung für Thumbnails & Grafiken", pricing: "10-60€/Monat", ai_tip: "Erstelle unique Visuals in Minuten" },
-          { name: "Descript", function: "Video-Editing durch Text-Bearbeitung", pricing: "Free / 24€/Monat", ai_tip: "Schneide Videos 10x schneller" },
-          { name: "Notion AI", function: "Notizen, Docs, Projektmanagement mit KI", pricing: "10€/Monat", ai_tip: "Organisiere Content-Pipeline automatisch" },
-          { name: "Opus Clip", function: "Automatische Short-Video-Generierung", pricing: "19€/Monat", ai_tip: "Aus 1 langen Video → 10 Shorts" }
+          { name: "ChatGPT-4", function: "Content ideas, text generation, brainstorming", pricing: "Free / $20/month", ai_tip: "Save 1 hour daily on content planning" },
+          { name: "Midjourney", function: "AI image generation for thumbnails & graphics", pricing: "$10-60/month", ai_tip: "Create unique visuals in minutes" },
+          { name: "Descript", function: "Video editing via text editing", pricing: "Free / $24/month", ai_tip: "Edit videos 10x faster" },
+          { name: "Notion AI", function: "Notes, docs, project management with AI", pricing: "$10/month", ai_tip: "Organize your content pipeline automatically" },
+          { name: "Opus Clip", function: "Automatic short video generation", pricing: "$19/month", ai_tip: "Turn 1 long video into 10 shorts" }
         ],
         content_ideas: [
-          { title: "Tool-Vergleich", description: "Zeige 3 KI-Tools im direkten Vergleich", format: "video" },
-          { title: "Workflow-Tutorial", description: "Demonstriere deinen kompletten KI-Workflow", format: "tutorial" },
-          { title: "ROI-Analyse", description: "Wie viel Zeit & Geld du mit KI sparst", format: "carousel" }
+          { title: "Tool Comparison", description: "Compare 3 AI tools side by side", format: "video" },
+          { title: "Workflow Tutorial", description: "Demonstrate your complete AI workflow", format: "tutorial" },
+          { title: "ROI Analysis", description: "How much time & money you save with AI", format: "carousel" }
         ],
         hashtags: ["#AITools", "#Productivity", "#CreatorTech", "#ContentCreation"],
-        audience_fit: "Tech-affine Creator und Digital-Unternehmer",
+        audience_fit: "Tech-savvy creators and digital entrepreneurs",
         estimated_virality: "high"
       }
     },
@@ -1584,23 +1584,23 @@ const generateDynamicTrends = () => {
       platform: "twitter",
       trend_type: "tools",
       name: "No-Code Revolution 2025",
-      description: "Baue SaaS-Produkte ohne zu programmieren",
+      description: "Build SaaS products without writing code",
       popularity_index: 90,
       category: "business",
       data_json: {
         tools: [
-          { name: "Bubble", function: "Komplette Web-Apps ohne Code bauen", pricing: "Free / 29€+/Monat", ai_tip: "Validiere MVPs in Wochen statt Monaten" },
-          { name: "Webflow", function: "Professionelle Websites visuell designen", pricing: "Free / 14€+/Monat", ai_tip: "Designer-Qualität ohne Developer" },
-          { name: "Zapier", function: "Automatisiere Workflows zwischen 5000+ Apps", pricing: "Free / 20€+/Monat", ai_tip: "Spare 10h+ pro Woche durch Automation" },
-          { name: "Airtable", function: "Flexible Datenbank mit Interface-Builder", pricing: "Free / 20€+/Monat", ai_tip: "CRM, Projektmanagement, Content-Hub in einem" },
-          { name: "Make (Integromat)", function: "Komplexe Automationen visuell bauen", pricing: "Free / 9€+/Monat", ai_tip: "Alternative zu Zapier mit mehr Power" }
+          { name: "Bubble", function: "Build complete web apps without code", pricing: "Free / $29+/month", ai_tip: "Validate MVPs in weeks instead of months" },
+          { name: "Webflow", function: "Design professional websites visually", pricing: "Free / $14+/month", ai_tip: "Designer quality without a developer" },
+          { name: "Zapier", function: "Automate workflows between 5000+ apps", pricing: "Free / $20+/month", ai_tip: "Save 10+ hours per week with automation" },
+          { name: "Airtable", function: "Flexible database with interface builder", pricing: "Free / $20+/month", ai_tip: "CRM, project management, content hub in one" },
+          { name: "Make (Integromat)", function: "Build complex automations visually", pricing: "Free / $9+/month", ai_tip: "Alternative to Zapier with more power" }
         ],
         content_ideas: [
-          { title: "MVP in 30 Days", description: "Wie ich mein SaaS ohne Code gebaut habe", format: "video" },
-          { title: "No-Code Stack", description: "Mein kompletter Tech-Stack ohne Programmierer", format: "thread" }
+          { title: "MVP in 30 Days", description: "How I built my SaaS without code", format: "video" },
+          { title: "No-Code Stack", description: "My complete tech stack without developers", format: "thread" }
         ],
         hashtags: ["#NoCode", "#Entrepreneurship", "#BuildInPublic", "#SaaS"],
-        audience_fit: "Non-technical Gründer und Solopreneure",
+        audience_fit: "Non-technical founders and solopreneurs",
         estimated_virality: "very high"
       }
     },
@@ -1608,67 +1608,67 @@ const generateDynamicTrends = () => {
       platform: "linkedin",
       trend_type: "tools",
       name: "Social Media Analytics Tools",
-      description: "Datengetriebene Entscheidungen für Content-Strategie",
+      description: "Data-driven decisions for content strategy",
       popularity_index: 86,
       category: "business",
       data_json: {
         tools: [
-          { name: "Later", function: "Social Media Scheduling + Analytics", pricing: "Free / 18€+/Monat", ai_tip: "Optimale Posting-Zeiten basierend auf Daten" },
-          { name: "Metricool", function: "All-in-One Analytics für alle Plattformen", pricing: "Free / 12€+/Monat", ai_tip: "Vergleiche Performance cross-platform" },
-          { name: "Brandwatch", function: "Social Listening & Trend-Analyse", pricing: "Custom Pricing", ai_tip: "Erkenne Trends bevor sie mainstream sind" }
+          { name: "Later", function: "Social media scheduling + analytics", pricing: "Free / $18+/month", ai_tip: "Optimal posting times based on data" },
+          { name: "Metricool", function: "All-in-one analytics for all platforms", pricing: "Free / $12+/month", ai_tip: "Compare performance cross-platform" },
+          { name: "Brandwatch", function: "Social listening & trend analysis", pricing: "Custom pricing", ai_tip: "Spot trends before they go mainstream" }
         ],
         content_ideas: [
-          { title: "Analytics Deep-Dive", description: "Diese Metriken sind wirklich wichtig", format: "article" },
-          { title: "Data-Driven Growth", description: "Wie ich meine Reichweite durch Daten verdoppelt habe", format: "carousel" }
+          { title: "Analytics Deep-Dive", description: "These metrics actually matter", format: "article" },
+          { title: "Data-Driven Growth", description: "How I doubled my reach through data", format: "carousel" }
         ],
         hashtags: ["#SocialMediaAnalytics", "#DataDriven", "#ContentStrategy", "#MarketingTools"],
-        audience_fit: "Social Media Manager und Marketing-Teams",
+        audience_fit: "Social media managers and marketing teams",
         estimated_virality: "high"
       }
     },
     {
       platform: "instagram",
       trend_type: "tools",
-      name: "Monetarisierungs-Plattformen für Creator",
-      description: "Verwandle deine Audience in nachhaltiges Einkommen",
+      name: "Creator Monetization Platforms",
+      description: "Turn your audience into sustainable income",
       popularity_index: 91,
       category: "business",
       data_json: {
         tools: [
-          { name: "Patreon", function: "Membership-Plattform für wiederkehrende Einnahmen", pricing: "5-12% Fee", ai_tip: "Baue loyale Community mit exklusivem Content" },
-          { name: "Gumroad", function: "Verkaufe digitale Produkte direkt", pricing: "10% Fee", ai_tip: "Perfekt für E-Books, Templates, Kurse" },
-          { name: "Stan Store", function: "Mobile-optimierter Online-Shop für Creator", pricing: "29€/Monat", ai_tip: "One-Link-Store für Instagram Bio" },
-          { name: "Ko-fi", function: "Spenden + Shop mit niedrigen Gebühren", pricing: "Free / 6€/Monat", ai_tip: "0% Fee auf Spenden" }
+          { name: "Patreon", function: "Membership platform for recurring revenue", pricing: "5-12% fee", ai_tip: "Build a loyal community with exclusive content" },
+          { name: "Gumroad", function: "Sell digital products directly", pricing: "10% fee", ai_tip: "Perfect for e-books, templates, courses" },
+          { name: "Stan Store", function: "Mobile-optimized online store for creators", pricing: "$29/month", ai_tip: "One-link store for Instagram bio" },
+          { name: "Ko-fi", function: "Tips + shop with low fees", pricing: "Free / $6/month", ai_tip: "0% fee on tips" }
         ],
         content_ideas: [
-          { title: "Monetization Strategy", description: "Wie ich 5 Einkommensströme aufgebaut habe", format: "reel" },
-          { title: "Platform Comparison", description: "Patreon vs. Ko-fi – Was lohnt sich?", format: "carousel" }
+          { title: "Monetization Strategy", description: "How I built 5 income streams", format: "reel" },
+          { title: "Platform Comparison", description: "Patreon vs. Ko-fi — which is worth it?", format: "carousel" }
         ],
         hashtags: ["#CreatorEconomy", "#Monetization", "#PassiveIncome", "#DigitalProducts"],
-        audience_fit: "Creator die ihr Einkommen diversifizieren wollen",
+        audience_fit: "Creators who want to diversify their income",
         estimated_virality: "very high"
       }
     },
     {
       platform: "youtube",
       trend_type: "tools",
-      name: "Video-Editing Tools 2025",
-      description: "Professionelle Videos schneller erstellen",
+      name: "Video Editing Tools 2025",
+      description: "Create professional videos faster",
       popularity_index: 87,
       category: "business",
       data_json: {
         tools: [
-          { name: "CapCut", function: "Kostenloser Editor mit Pro-Features", pricing: "Free / 8€/Monat", ai_tip: "AI Auto-Captions und Templates" },
-          { name: "DaVinci Resolve", function: "Hollywood-Grade Editor kostenlos", pricing: "Free / 295€ einmalig", ai_tip: "Professionelle Color-Grading Tools" },
-          { name: "Riverside.fm", function: "Remote-Interviews in Studio-Qualität", pricing: "15€+/Monat", ai_tip: "Separate Audio-Tracks für jeden Sprecher" },
-          { name: "Pictory", function: "KI erstellt Videos aus Text/Artikel", pricing: "23€+/Monat", ai_tip: "Blog-Posts zu Videos in Minuten" }
+          { name: "CapCut", function: "Free editor with pro features", pricing: "Free / $8/month", ai_tip: "AI auto-captions and templates" },
+          { name: "DaVinci Resolve", function: "Hollywood-grade editor for free", pricing: "Free / $295 one-time", ai_tip: "Professional color grading tools" },
+          { name: "Riverside.fm", function: "Remote interviews in studio quality", pricing: "$15+/month", ai_tip: "Separate audio tracks for each speaker" },
+          { name: "Pictory", function: "AI creates videos from text/articles", pricing: "$23+/month", ai_tip: "Turn blog posts into videos in minutes" }
         ],
         content_ideas: [
-          { title: "Editing Workflow", description: "So schneide ich Videos 3x schneller", format: "tutorial" },
-          { title: "Free vs. Paid", description: "Lohnen sich teure Video-Tools wirklich?", format: "video" }
+          { title: "Editing Workflow", description: "How I edit videos 3x faster", format: "tutorial" },
+          { title: "Free vs. Paid", description: "Are expensive video tools worth it?", format: "video" }
         ],
         hashtags: ["#VideoEditing", "#ContentCreation", "#YouTubeTips", "#VideoProduction"],
-        audience_fit: "Video-Creator und YouTuber",
+        audience_fit: "Video creators and YouTubers",
         estimated_virality: "high"
       }
     }
