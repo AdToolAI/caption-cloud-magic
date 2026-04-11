@@ -1,29 +1,29 @@
 
 
-## Plan: Bilder-Zähler soll alle Album-Bilder (studio_images) mitzählen
+## Plan: "In Album speichern"-Button auf jedem Medium in der Mediathek
 
-### Problem
-Der Bilder-Zähler im Header (`X / 2.500`) zählt nur Bilder aus `content_items` und `media_assets`. Die KI-generierten Bilder in `studio_images` (die nur über Alben erreichbar sind) werden nicht mitgezählt.
+### Übersicht
+Auf jedem hochgeladenen Bild/Video in der Mediathek (Upload-Tab, Alle-Tab, etc.) wird ein neuer Button "In Album speichern" (Ordner-Icon) im Hover-Overlay hinzugefügt. Beim Klick öffnet sich der bestehende `SaveToAlbumDialog` — dort kann man ein bestehendes Album wählen oder mit "+" ein neues erstellen.
 
-### Lösung
+### Änderungen
 
-**Datei: `src/pages/MediaLibrary.tsx`**
+**1. `src/pages/MediaLibrary.tsx` — Button + Dialog-Integration**
+- Neuer State: `saveToAlbumImageId` (string | null) für den Dialog
+- Im Hover-Overlay (Zeile 1085-1185) wird ein neuer `FolderPlus`-Button hinzugefügt
+- Beim Klick: Das Medium wird in `studio_images` als Eintrag erstellt (falls noch nicht vorhanden), dann öffnet sich der `SaveToAlbumDialog` mit dieser ID
+- Der `SaveToAlbumDialog` wird am Ende der Komponente eingebunden
+- Import von `SaveToAlbumDialog` und `FolderPlus` hinzufügen
 
-Beim Laden der Mediathek-Daten (in der `loadMedia`-Funktion, ca. Zeile 200-347) wird eine zusätzliche count-Query auf `studio_images` ausgeführt:
+**2. Logik für "In Album speichern"**
+- Neue Funktion `handleSaveToAlbum(item: NormalizedMediaItem)`:
+  - Erstellt einen `studio_images`-Eintrag mit `image_url = item.url`, `user_id`, `prompt = item.title`
+  - Speichert die neue ID in `saveToAlbumImageId`
+  - Öffnet den Dialog
+- Nach erfolgreichem Speichern: Dialog schließen, optional `loadMedia()` aufrufen
 
-```typescript
-const { count: studioImageCount } = await supabase
-  .from('studio_images')
-  .select('id', { count: 'exact', head: true })
-  .eq('user_id', user.id);
-```
+**3. Keine Änderungen an `SaveToAlbumDialog`**
+- Der Dialog funktioniert bereits generisch mit einer `imageId` (studio_images) und unterstützt Album-Auswahl + Neu-Erstellen
 
-Dann wird der `imageCount` in der Berechnung (Zeile 802) angepasst, sodass er die Studio-Bilder mit einbezieht. Dafür wird der `studioImageCount` als State gespeichert und zum bestehenden `imageCount` addiert:
-
-```typescript
-const imageCount = media.filter(m => m.type === 'image').length + studioImageCount;
-```
-
-### Betroffene Datei
-- `src/pages/MediaLibrary.tsx` — neuer State `studioImageCount`, zusätzliche DB-Query, angepasste Berechnung
+### Betroffene Dateien
+- `src/pages/MediaLibrary.tsx` — neuer Button im Overlay, neuer State, neue Funktion, Dialog einbinden
 
