@@ -228,18 +228,18 @@ async function generateSlotsForUser(
 
         score = Math.min(100, Math.max(0, sigmoid(raw * 4 - 2) * 100));
 
-        if (historyScore > 0) reasons.push('Historisch starke Zeit');
-        if (trendMultiplier > 1.1) reasons.push('Positiver Trend (30d)');
-        if (platformPeakBoost > 0) reasons.push(`${platform.charAt(0).toUpperCase() + platform.slice(1)}-Peak-Zeit`);
+        if (historyScore > 0) reasons.push('reason:history_strong');
+        if (trendMultiplier > 1.1) reasons.push('reason:positive_trend');
+        if (platformPeakBoost > 0) reasons.push(`reason:platform_peak:${platform}`);
       } else {
         // Without history: use industry benchmarks (more generous scoring)
         if (platformPeakBoost > 0) {
           score = 60 + platformPeakBoost * 35; // 60-95 range for peak times
-          reasons.push('✨ Branchen-Peak-Zeit');
-          reasons.push(`Basierend auf ${platform.charAt(0).toUpperCase() + platform.slice(1)}-Standards`);
+          reasons.push('reason:industry_peak');
+          reasons.push(`reason:platform_standards:${platform}`);
         } else {
           score = 30 + Math.random() * 15; // 30-45 range for non-peak
-          reasons.push('Durchschnittliche Zeit');
+          reasons.push('reason:average_time');
         }
       }
 
