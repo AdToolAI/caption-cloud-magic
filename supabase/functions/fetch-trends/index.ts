@@ -1739,21 +1739,27 @@ serve(async (req) => {
     // Check if we have any of the OLD subcategories that need to be replaced
     const oldSubcategories = ['fashion', 'kitchen', 'office', 'outdoor', 'kids'];
     
-    // Query ALL ecommerce trends to check for old subcategories
-    const { data: allEcommerceTrends } = await supabase
+    // Query ALL trends to check for old subcategories AND German content
+    const { data: allExistingTrends } = await supabase
       .from('trend_entries')
-      .select('data_json')
-      .eq('category', 'ecommerce')
-      .limit(10);
+      .select('data_json, description, name')
+      .limit(50);
 
-    const hasOldSubcategories = allEcommerceTrends?.some((t: any) => 
+    const hasOldSubcategories = allExistingTrends?.some((t: any) => 
       oldSubcategories.includes(t.data_json?.subcategory)
     );
 
-    console.log('Checking for old subcategories:', hasOldSubcategories);
+    // Detect old German content that needs refresh
+    const hasGermanContent = allExistingTrends?.some((t: any) => {
+      const text = [t.description, t.data_json?.ai_tip, t.data_json?.hook, t.name].filter(Boolean).join(' ');
+      return /\b(für|und|mit|Verwandle|Über-Nacht|Magnetischer|Kleiner|Produziere|Verwende|gewonnen|Follower gewonnen|Effizienz)\b/i.test(text);
+    });
 
-    // If we have old subcategories, refresh ALL trends
-    if (hasOldSubcategories) {
+    const needsRefresh = hasOldSubcategories || hasGermanContent;
+    console.log('Checking for refresh:', { hasOldSubcategories, hasGermanContent, needsRefresh });
+
+    // If we have old subcategories or German content, refresh ALL trends
+    if (needsRefresh) {
       console.log('Found old subcategories, refreshing ALL trends...');
       console.log('Inserting', FALLBACK_TRENDS.length, 'fallback trends...');
       
@@ -1801,10 +1807,10 @@ serve(async (req) => {
     // Apply filters
     let filteredTrends = existingTrends || [];
     
-    if (platform) {
+    if (platform && platform !== 'all') {
       filteredTrends = filteredTrends.filter(t => t.platform === platform);
     }
-    if (category) {
+    if (category && category !== 'all') {
       filteredTrends = filteredTrends.filter(t => t.category === category);
     }
     if (language !== 'en') {
@@ -1817,10 +1823,10 @@ serve(async (req) => {
     if (filteredTrends.length === 0) {
       let fallbackFiltered = FALLBACK_TRENDS;
     
-      if (platform) {
+      if (platform && platform !== 'all') {
         fallbackFiltered = fallbackFiltered.filter(t => t.platform === platform);
       }
-      if (category) {
+      if (category && category !== 'all') {
         fallbackFiltered = fallbackFiltered.filter(t => t.category === category);
       }
       if (language !== 'en') {
