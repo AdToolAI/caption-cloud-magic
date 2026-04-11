@@ -110,7 +110,7 @@ export default function AIPostGenerator() {
           setMediaPreview(data.mediaUrl);
           setMediaType(data.mediaType);
           
-          toast.success("✅ Media aus Media Library importiert");
+          toast.success(`✅ ${t('aipost_media_imported')}`);
         }
         
         sessionStorage.removeItem('generator_media_import');
@@ -169,7 +169,7 @@ export default function AIPostGenerator() {
 
   const handleGenerate = async () => {
     if (!user) {
-      toast.error("Bitte melde dich an, um Posts zu generieren");
+      toast.error(t('aipost_login_to_generate'));
       navigate("/auth");
       return;
     }
@@ -384,7 +384,7 @@ export default function AIPostGenerator() {
 
   const handleSkipSave = () => {
     console.log("🟡 User hat 'Überspringen' gewählt");
-    toast.info("Nur als Entwurf gespeichert");
+    toast.info(t('aipost_draft_only'));
     setShowSaveDialog(false);
   };
 
