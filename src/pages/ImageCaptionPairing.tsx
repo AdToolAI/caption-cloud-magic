@@ -128,8 +128,8 @@ const ImageCaptionPairing = () => {
         }
         
         toast({
-          title: "🗑️ Automatisch aufgeräumt",
-          description: `${toDelete} älteste(s) Bild(er) gelöscht (Limit: 15)`,
+          title: t("imgcap_auto_cleaned"),
+          description: t("imgcap_auto_cleaned_desc", { count: String(toDelete) }),
         });
       }
     }
@@ -226,7 +226,7 @@ const ImageCaptionPairing = () => {
 
       toast({
         title: t("common.success"),
-        description: "Captions generated successfully!",
+        description: t("imgcap_captions_success"),
       });
 
     } catch (error: any) {
@@ -270,7 +270,7 @@ const ImageCaptionPairing = () => {
     }));
     navigate('/generator');
     toast({
-      title: "✨ Caption an Generator gesendet!",
+      title: t("imgcap_caption_sent_generator"),
     });
   };
 
@@ -288,7 +288,7 @@ const ImageCaptionPairing = () => {
     sessionStorage.setItem('calendar_prefill', JSON.stringify(prefillData));
     navigate('/calendar?prefill=true');
     toast({
-      title: "📅 Caption an Kalender gesendet!",
+      title: t("imgcap_caption_sent_calendar"),
     });
   };
 
@@ -427,7 +427,7 @@ const ImageCaptionPairing = () => {
                         setImageAnalysis(null);
                       }}
                     >
-                      Anderes Bild hochladen
+                      {t('imgcap_upload_another')}
                     </Button>
                   </div>
                 ) : (
@@ -480,7 +480,7 @@ const ImageCaptionPairing = () => {
                 
                 <div className="space-y-4">
                   <div className="p-3 rounded-xl bg-muted/20 border border-white/5">
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Beschreibung:</p>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">{t('imgcap_description_label')}:</p>
                     <p className="text-sm">{imageAnalysis.description}</p>
                   </div>
 
@@ -561,7 +561,7 @@ const ImageCaptionPairing = () => {
                                    flex items-center justify-center shadow-[0_0_15px_hsla(43,90%,68%,0.2)]">
                       <Wand2 className="h-5 w-5 text-primary" />
                     </div>
-                    <h2 className="text-xl font-bold">Generierte Captions</h2>
+                    <h2 className="text-xl font-bold">{t('imgcap_generated_captions')}</h2>
                   </div>
                   <Button
                     variant="outline"
@@ -606,7 +606,7 @@ const ImageCaptionPairing = () => {
                                    hover:shadow-[0_0_15px_hsla(43,90%,68%,0.2)] transition-all"
                       >
                         <Copy className="h-4 w-4 mr-2" />
-                        Kopieren
+                        {t('imgcap_copy')}
                       </Button>
                       <Button
                         variant="outline"
@@ -615,7 +615,7 @@ const ImageCaptionPairing = () => {
                         className="bg-muted/20 border-white/10 hover:bg-muted/40"
                       >
                         <Wand2 className="h-4 w-4 mr-2" />
-                        Im Generator
+                        {t('imgcap_in_generator')}
                       </Button>
                       <Button
                         variant="outline"
@@ -624,7 +624,7 @@ const ImageCaptionPairing = () => {
                         className="bg-cyan-500/10 border-cyan-500/30 hover:bg-cyan-500/20 transition-all"
                       >
                         <Calendar className="h-4 w-4 mr-2" />
-                        Zum Kalender
+                        {t('imgcap_to_calendar')}
                       </Button>
                     </div>
                   </motion.div>
@@ -650,7 +650,7 @@ const ImageCaptionPairing = () => {
                     <Sparkles className="h-8 w-8 text-primary" />
                   </motion.div>
                   <p className="text-muted-foreground text-center">
-                    Bild wurde hochgeladen. Captions werden generiert...
+                    {t('imgcap_image_uploaded_generating')}
                   </p>
                 </div>
               </motion.div>
@@ -705,8 +705,8 @@ const ImageCaptionPairing = () => {
                         scene_type: ''
                       });
                       toast({
-                        title: "✨ Bild geladen",
-                        description: "Bild und Captions aus History übernommen",
+                        title: t("imgcap_image_loaded"),
+                        description: t("imgcap_image_loaded_desc"),
                       });
                     }}
                   >
@@ -720,7 +720,7 @@ const ImageCaptionPairing = () => {
                                     flex items-center justify-center">
                       <span className="text-sm font-medium text-primary bg-background/80 px-3 py-1.5 rounded-full
                                        shadow-[0_0_15px_hsla(43,90%,68%,0.3)] border border-primary/30">
-                        Bild verwenden
+                        {t('imgcap_use_image')}
                       </span>
                     </div>
                     <Button
