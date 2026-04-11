@@ -1,31 +1,28 @@
 
 
-## Plan: "Alle"-Tab nur Videos anzeigen, Bilder nur in Alben
+## Plan: Album-Thumbnails und KI-Bilder Auto-Zuordnung verbessern
 
-### Änderung
+### Problem 1: Album-Cover zeigt schwarzen/leeren Hintergrund
+Die Alben haben kein `cover_image_url` gesetzt. Statt nur den Fallback-Icon zu zeigen, soll dynamisch das **zuletzt hinzugefügte Bild** des Albums als Thumbnail angezeigt werden.
 
-In `src/pages/MediaLibrary.tsx`, Zeile 388-391 — der Filter für den "all"-Tab wird so angepasst, dass **nur Videos** angezeigt werden. Bilder (type `image`) werden komplett aus dem "Alle"-Tab ausgeschlossen und sind nur noch über den "Alben"-Tab erreichbar.
+### Problem 2: KI-Bilder sollen zuverlässig im "KI Picture Studio"-Album landen
+Die Frontend-Logik existiert bereits, aber die Zuordnung soll zusätzlich direkt in der Edge Function passieren, damit es zuverlässiger ist (kein Race-Condition-Risiko).
 
-### Technisches Detail
+### Änderungen
 
-Aktuelle Logik (Zeile 388-391):
-```typescript
-} else {
-  // "all" tab: exclude ai_generator images (they live in Albums only)
-  filtered = filtered.filter(item => item.source !== 'ai_generator');
-}
-```
+**1. `src/components/media-library/MediaAlbumManager.tsx`**
+- Beim Laden der Alben: Für jedes Album ohne `cover_image_url` das neueste Bild aus `studio_images` laden und als dynamisches Cover verwenden
+- Query: `studio_images` nach `album_id` filtern, `order by created_at desc`, `limit 1`, Feld `image_url` nutzen
 
-Neue Logik:
-```typescript
-} else {
-  // "all" tab: only show videos, images are only in Albums
-  filtered = filtered.filter(item => item.type === 'video');
-}
-```
+**2. `supabase/functions/generate-studio-image/index.ts`**
+- Nach dem Speichern des Bildes in `studio_images`: Direkt in der Edge Function das "KI Picture Studio" System-Album finden/erstellen und die `album_id` beim Insert setzen (statt nachträglich per Update vom Frontend)
+- Das entfernt die Abhängigkeit vom Frontend-Code für die Album-Zuordnung
 
-Das betrifft auch den **Uploads**-Tab — dort werden aktuell sowohl Bilder als auch Videos angezeigt. Soll der Uploads-Tab ebenfalls nur Videos zeigen, oder sollen hochgeladene Bilder dort weiterhin sichtbar sein?
+**3. `src/components/media-library/AlbumImagePicker.tsx`**
+- Gleiche Logik: Dynamisches Cover-Bild laden wenn `cover_image_url` null ist
 
-### Betroffene Datei
-- `src/pages/MediaLibrary.tsx` — eine Zeile ändern
+### Betroffene Dateien
+- `src/components/media-library/MediaAlbumManager.tsx` — dynamisches Album-Cover
+- `src/components/media-library/AlbumImagePicker.tsx` — dynamisches Album-Cover
+- `supabase/functions/generate-studio-image/index.ts` — album_id direkt beim Insert setzen
 
