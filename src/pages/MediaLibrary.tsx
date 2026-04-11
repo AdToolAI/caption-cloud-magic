@@ -1279,6 +1279,17 @@ export default function MediaLibrary() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Save to Album Dialog */}
+      <SaveToAlbumDialog
+        open={!!saveToAlbumImageId}
+        onOpenChange={(open) => { if (!open) setSaveToAlbumImageId(null); }}
+        imageId={saveToAlbumImageId || ''}
+        onSaved={() => {
+          setSaveToAlbumImageId(null);
+          loadMedia();
+        }}
+      />
     </div>
   );
 }
