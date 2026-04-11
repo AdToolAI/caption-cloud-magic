@@ -6,6 +6,7 @@ import { TagFilter } from "@/components/community/TagFilter";
 import { SpotlightCard } from "@/components/community/SpotlightCard";
 import { useCommunityMessages } from "@/hooks/useCommunityMessages";
 import { useAuth } from "@/hooks/useAuth";
+import { motion } from "framer-motion";
 
 export function CommunityTab() {
   const { user } = useAuth();
@@ -22,20 +23,25 @@ export function CommunityTab() {
   const requireTags = selectedChannel?.moderation_rules?.require_tags === true;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_280px] gap-4">
-      <div className="border rounded-xl bg-card overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="grid grid-cols-1 lg:grid-cols-[240px_1fr_280px] gap-4"
+    >
+      <div className="rounded-xl backdrop-blur-xl bg-card/60 border border-white/10 overflow-hidden shadow-[0_0_20px_hsla(43,90%,68%,0.04)]">
         <ChannelList
           selectedChannelId={selectedChannel?.id || null}
           onSelectChannel={setSelectedChannel}
         />
       </div>
 
-      <div className="border rounded-xl bg-card flex flex-col overflow-hidden min-h-[500px]">
+      <div className="rounded-xl backdrop-blur-xl bg-card/60 border border-white/10 flex flex-col overflow-hidden min-h-[500px] shadow-[0_0_20px_hsla(43,90%,68%,0.04)]">
         {selectedChannel ? (
           <>
-            <div className="px-4 py-3 border-b">
+            <div className="px-4 py-3 border-b border-white/10 bg-card/40 backdrop-blur-md">
               <h2 className="font-semibold text-sm flex items-center gap-2">
-                # {selectedChannel.name}
+                <span className="text-[hsl(43,90%,68%)]">#</span> {selectedChannel.name}
                 <span className="text-xs text-muted-foreground font-normal">
                   — {selectedChannel.topic}
                 </span>
@@ -54,9 +60,9 @@ export function CommunityTab() {
         )}
       </div>
 
-      <div>
+      <div className="rounded-xl backdrop-blur-xl bg-card/60 border border-white/10 overflow-hidden shadow-[0_0_20px_hsla(43,90%,68%,0.04)]">
         <SpotlightCard channelId={selectedChannel?.id || null} />
       </div>
-    </div>
+    </motion.div>
   );
 }
