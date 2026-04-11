@@ -117,7 +117,6 @@ export function CalendarToolbar({
   return (
     <div className="sticky top-0 z-10 backdrop-blur-xl bg-background/80 border-b border-white/10 pb-3 mb-3">
       <div className="flex items-center justify-between gap-3">
-        {/* View Switcher - Compact */}
         <Tabs value={currentView} onValueChange={(v) => onViewChange(v as ViewType)}>
           <TabsList className="h-9 backdrop-blur-xl bg-card/60 border border-white/10 p-0.5">
             <TabsTrigger 
@@ -142,7 +141,6 @@ export function CalendarToolbar({
           </TabsList>
         </Tabs>
 
-        {/* Actions - Compact with "More" dropdown */}
         <div className="flex items-center gap-1.5">
           {onSelectAllDrafts && (
             <Button
@@ -151,7 +149,7 @@ export function CalendarToolbar({
               onClick={onSelectAllDrafts}
               className="h-8 text-xs bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10"
             >
-              Entwürfe wählen
+              {t('calendar.selectDrafts')}
             </Button>
           )}
           
@@ -162,7 +160,7 @@ export function CalendarToolbar({
               onClick={onDeselectAll}
               className="h-8 text-xs bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10"
             >
-              Abwählen ({selectedEventsCount})
+              {t('calendar.deselect')} ({selectedEventsCount})
             </Button>
           )}
           
@@ -202,11 +200,10 @@ export function CalendarToolbar({
               className="h-8 text-xs bg-gradient-to-r from-primary to-amber-500 hover:shadow-[0_0_15px_hsla(43,90%,68%,0.3)]"
             >
               <Plus className="w-3.5 h-3.5 mr-1" />
-              Neu
+              {t('calendar.new')}
             </Button>
           )}
           
-          {/* More Dropdown - Groups less used actions */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
@@ -221,62 +218,62 @@ export function CalendarToolbar({
               {onOpenCampaignTemplates && (
                 <DropdownMenuItem onClick={onOpenCampaignTemplates} disabled={readOnly}>
                   <Rocket className="w-4 h-4 mr-2" />
-                  Templates
+                  {t('calendar.templates')}
                 </DropdownMenuItem>
               )}
               {onOpenCampaignTemplates && (
                 <DropdownMenuItem onClick={() => navigate("/calendar/templates")}>
                   <Library className="w-4 h-4 mr-2" />
-                  Vorlagen verwalten
+                  {t('calendar.manageTemplates')}
                 </DropdownMenuItem>
               )}
               {onOpenBlackoutDates && (
                 <DropdownMenuItem onClick={onOpenBlackoutDates} disabled={readOnly}>
                   <Ban className="w-4 h-4 mr-2" />
-                  Blackout Dates
+                  {t('calendar.blackoutDates')}
                 </DropdownMenuItem>
               )}
               {onOpenHolidays && (
                 <DropdownMenuItem onClick={onOpenHolidays}>
                   <PartyPopper className="w-4 h-4 mr-2" />
-                  Holidays
+                  {t('calendar.holidays')}
                 </DropdownMenuItem>
               )}
               {onOpenIntegrations && (
                 <DropdownMenuItem onClick={onOpenIntegrations} disabled={readOnly}>
                   <Settings className="w-4 h-4 mr-2" />
-                  Integrationen
+                  {t('calendar.integrationsLabel')}
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={onAddNote} disabled={readOnly}>
                 <StickyNote className="w-4 h-4 mr-2" />
-                Notiz hinzufügen
+                {t('calendar.addNoteLabel')}
               </DropdownMenuItem>
               
               <DropdownMenuSeparator className="bg-white/10" />
               
               <DropdownMenuItem onClick={onShare}>
                 <Share2 className="w-4 h-4 mr-2" />
-                Teilen
+                {t('calendar.shareLabel')}
               </DropdownMenuItem>
               
               <DropdownMenuSeparator className="bg-white/10" />
               
               <DropdownMenuItem onClick={() => onExport('csv')}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export CSV
+                {t('calendar.export.csv')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onExport('pdf')}>
                 <FileText className="w-4 h-4 mr-2" />
-                Export PDF
+                {t('calendar.export.pdf')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onExport('ics')}>
                 <FileDown className="w-4 h-4 mr-2" />
-                Export ICS
+                {t('calendar.export.ics')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onExport('metrics')}>
                 <Download className="w-4 h-4 mr-2" />
-                Export Metrics
+                {t('calendar.export.metrics')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

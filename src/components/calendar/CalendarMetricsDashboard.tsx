@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { TrendingUp, Calendar, CheckCircle, Users, Clock, BarChart3, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CountUp from "@/components/ui/count-up";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface CalendarMetric {
   label: string;
@@ -24,6 +25,7 @@ export function CalendarMetricsDashboard({
   workspaceMembers = [],
   dateRange 
 }: CalendarMetricsDashboardProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   
   const totalEvents = events.length;
@@ -57,14 +59,14 @@ export function CalendarMetricsDashboard({
 
   const metrics: CalendarMetric[] = [
     {
-      label: "Gesamt",
+      label: t('calendar.total'),
       value: totalEvents,
       numericValue: totalEvents,
       icon: <Calendar className="w-4 h-4" />,
       trend: "neutral"
     },
     {
-      label: "Veröffentlicht",
+      label: t('calendar.publishedLabel'),
       value: publishedEvents,
       numericValue: publishedEvents,
       change: `${publishRate}%`,
@@ -72,28 +74,28 @@ export function CalendarMetricsDashboard({
       trend: publishRate > 70 ? "up" : "neutral"
     },
     {
-      label: "Geplant",
+      label: t('calendar.scheduledLabel'),
       value: scheduledEvents,
       numericValue: scheduledEvents,
       icon: <Clock className="w-4 h-4" />,
       trend: "neutral"
     },
     {
-      label: "Events/Woche",
+      label: t('calendar.eventsPerWeek'),
       value: eventsPerWeek || '-',
       numericValue: eventsPerWeek,
       icon: <TrendingUp className="w-4 h-4" />,
       trend: "up"
     },
     {
-      label: "Team",
+      label: t('calendar.team'),
       value: `${teamUtilization}%`,
       numericValue: teamUtilization,
       icon: <Users className="w-4 h-4" />,
       trend: teamUtilization > 60 ? "up" : "down"
     },
     {
-      label: "Ø ETA",
+      label: t('calendar.avgEta'),
       value: avgETA > 0 ? `${avgETA}min` : '-',
       numericValue: avgETA,
       icon: <BarChart3 className="w-4 h-4" />,
@@ -115,7 +117,6 @@ export function CalendarMetricsDashboard({
   return (
     <div className="backdrop-blur-xl bg-card/40 border border-white/10 rounded-xl px-4 py-2.5">
       <div className="flex items-center justify-between">
-        {/* Compact Metrics Row */}
         <div className="flex items-center gap-6">
           {compactMetrics.map((metric, index) => (
             <motion.div 
@@ -151,7 +152,6 @@ export function CalendarMetricsDashboard({
           ))}
         </div>
 
-        {/* Expand Toggle */}
         <Button
           variant="ghost"
           size="sm"
@@ -159,14 +159,13 @@ export function CalendarMetricsDashboard({
           className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-primary/10"
         >
           {expanded ? (
-            <>Weniger <ChevronUp className="w-3 h-3 ml-1" /></>
+            <>{t('calendar.less')} <ChevronUp className="w-3 h-3 ml-1" /></>
           ) : (
-            <>Mehr <ChevronDown className="w-3 h-3 ml-1" /></>
+            <>{t('calendar.more')} <ChevronDown className="w-3 h-3 ml-1" /></>
           )}
         </Button>
       </div>
 
-      {/* Expanded Metrics */}
       <AnimatePresence>
         {expanded && (
           <motion.div

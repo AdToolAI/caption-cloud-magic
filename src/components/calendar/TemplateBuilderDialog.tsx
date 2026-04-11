@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -50,9 +51,9 @@ export function TemplateBuilderDialog({
   template,
 }: TemplateBuilderDialogProps) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   
-  // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [templateType, setTemplateType] = useState("product_launch");
@@ -67,7 +68,6 @@ export function TemplateBuilderDialog({
       setTemplateType(template.template_type);
       setDurationDays(template.duration_days);
       setIsPublic(template.is_public);
-      // Migrate old posts to new structure with defaults
       const migratedPosts = (Array.isArray(template.events_json) ? template.events_json : []).map((post: any) => ({
         day: post.day || 1,
         title: post.title || "",
@@ -84,7 +84,6 @@ export function TemplateBuilderDialog({
       }));
       setPosts(migratedPosts);
     } else {
-      // Reset form for new template
       setName("");
       setDescription("");
       setTemplateType("product_launch");
@@ -97,8 +96,8 @@ export function TemplateBuilderDialog({
   const handleSave = async () => {
     if (!name.trim()) {
       toast({
-        title: "Name fehlt",
-        description: "Bitte gib einen Namen für das Template ein.",
+        title: t('calendar.nameMissing'),
+        description: t('calendar.pleaseEnterName'),
         variant: "destructive",
       });
       return;
@@ -106,8 +105,8 @@ export function TemplateBuilderDialog({
 
     if (posts.length === 0) {
       toast({
-        title: "Keine Posts",
-        description: "Bitte füge mindestens einen Post hinzu.",
+        title: t('calendar.noPosts'),
+        description: t('calendar.pleaseAddPost'),
         variant: "destructive",
       });
       return;
@@ -116,7 +115,6 @@ export function TemplateBuilderDialog({
     try {
       setSaving(true);
 
-      // Fetch user's default workspace
       const { data: workspaces } = await supabase
         .from("workspaces")
         .select("id")
@@ -137,14 +135,12 @@ export function TemplateBuilderDialog({
 
       let error;
       if (template) {
-        // Update existing
         const result = await supabase
           .from("calendar_campaign_templates")
           .update(templateData)
           .eq("id", template.id);
         error = result.error;
       } else {
-        // Create new
         const result = await supabase
           .from("calendar_campaign_templates")
           .insert(templateData);
@@ -154,10 +150,10 @@ export function TemplateBuilderDialog({
       if (error) throw error;
 
       toast({
-        title: template ? "Template aktualisiert" : "Template erstellt",
+        title: template ? t('calendar.templateUpdated') : t('calendar.templateCreated'),
         description: template 
-          ? "Das Template wurde erfolgreich aktualisiert."
-          : "Das Template wurde erfolgreich erstellt.",
+          ? t('calendar.templateUpdatedDesc')
+          : t('calendar.templateCreatedDesc'),
       });
 
       onSaved();
@@ -165,8 +161,8 @@ export function TemplateBuilderDialog({
     } catch (error) {
       console.error("Error saving template:", error);
       toast({
-        title: "Fehler",
-        description: "Template konnte nicht gespeichert werden.",
+        title: t('calendar.templateSaveError'),
+        description: t('calendar.templateSaveErrorDesc'),
         variant: "destructive",
       });
     } finally {
@@ -179,56 +175,55 @@ export function TemplateBuilderDialog({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {template ? "Template bearbeiten" : "Neues Template erstellen"}
+            {template ? t('calendar.editTemplate') : t('calendar.newTemplate')}
           </DialogTitle>
           <DialogDescription>
-            Erstelle eine wiederverwendbare Kampagnen-Vorlage mit mehreren Posts
+            {t('calendar.createReusableTemplate')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Basic Info */}
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Template-Name *</Label>
+              <Label htmlFor="name">{t('calendar.templateName')} *</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="z.B. Black Friday Sale 2025"
+                placeholder={t('calendar.templateNamePlaceholder')}
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="description">Beschreibung</Label>
+              <Label htmlFor="description">{t('calendar.descriptionLabel')}</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Beschreibe wofür dieses Template verwendet werden soll..."
+                placeholder={t('calendar.descriptionPlaceholder')}
                 rows={3}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="type">Kategorie</Label>
+                <Label htmlFor="type">{t('calendar.categoryLabel')}</Label>
                 <Select value={templateType} onValueChange={setTemplateType}>
                   <SelectTrigger id="type">
-                    <SelectValue placeholder="Kategorie wählen" />
+                    <SelectValue placeholder={t('calendar.chooseCategory')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="product_launch">Produktlaunch</SelectItem>
-                    <SelectItem value="social_sale">Sale</SelectItem>
-                    <SelectItem value="seasonal">Saison</SelectItem>
-                    <SelectItem value="educational">Bildung</SelectItem>
-                    <SelectItem value="event">Event</SelectItem>
+                    <SelectItem value="product_launch">{t('calendar.productLaunch')}</SelectItem>
+                    <SelectItem value="social_sale">{t('calendar.sale')}</SelectItem>
+                    <SelectItem value="seasonal">{t('calendar.seasonal')}</SelectItem>
+                    <SelectItem value="educational">{t('calendar.educational')}</SelectItem>
+                    <SelectItem value="event">{t('calendar.eventCategory')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="duration">Dauer (Tage)</Label>
+                <Label htmlFor="duration">{t('calendar.durationDays')}</Label>
                 <Input
                   id="duration"
                   type="number"
@@ -242,16 +237,15 @@ export function TemplateBuilderDialog({
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Öffentlich machen</Label>
+                <Label>{t('calendar.makePublic')}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Für alle Workspace-Mitglieder sichtbar
+                  {t('calendar.visibleToAll')}
                 </p>
               </div>
               <Switch checked={isPublic} onCheckedChange={setIsPublic} />
             </div>
           </div>
 
-          {/* Post Timeline Builder */}
           <div className="border-t pt-6">
             <PostTimelineBuilder
               posts={posts}
@@ -263,10 +257,10 @@ export function TemplateBuilderDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>
-            Abbrechen
+            {t('calendar.cancelBtn')}
           </Button>
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Speichert..." : template ? "Aktualisieren" : "Erstellen"}
+            {saving ? t('calendar.savingTemplate') : template ? t('calendar.updateBtn') : t('calendar.createBtn')}
           </Button>
         </DialogFooter>
       </DialogContent>

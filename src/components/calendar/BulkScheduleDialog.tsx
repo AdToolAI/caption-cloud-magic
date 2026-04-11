@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useBulkScheduling, BulkScheduleEvent } from '@/hooks/useBulkScheduling';
-import { CalendarIcon, Upload } from 'lucide-react';
+import { CalendarIcon } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface BulkScheduleDialogProps {
   workspace_id: string;
@@ -15,6 +16,7 @@ interface BulkScheduleDialogProps {
 }
 
 export function BulkScheduleDialog({ workspace_id, open, onClose }: BulkScheduleDialogProps) {
+  const { t } = useTranslation();
   const { bulkSchedule, loading } = useBulkScheduling();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -22,16 +24,13 @@ export function BulkScheduleDialog({ workspace_id, open, onClose }: BulkSchedule
   const [eventsText, setEventsText] = useState('');
 
   const handleSubmit = async () => {
-    // Parse events from text (one per line)
     const eventLines = eventsText.split('\n').filter(line => line.trim());
     const events: BulkScheduleEvent[] = eventLines.map(line => ({
       title: line.trim(),
       channels: ['instagram', 'facebook'],
     }));
 
-    if (events.length === 0) {
-      return;
-    }
+    if (events.length === 0) return;
 
     const result = await bulkSchedule({
       workspace_id,
@@ -41,73 +40,61 @@ export function BulkScheduleDialog({ workspace_id, open, onClose }: BulkSchedule
       distribution_strategy: strategy,
     });
 
-    if (result) {
-      onClose();
-    }
+    if (result) onClose();
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Bulk Scheduling</DialogTitle>
+          <DialogTitle>{t('calendar.bulkScheduling')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Startdatum</Label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
+              <Label>{t('calendar.startDate')}</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             <div>
-              <Label>Enddatum</Label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
+              <Label>{t('calendar.endDate')}</Label>
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
             </div>
           </div>
 
           <div>
-            <Label>Verteilungs-Strategie</Label>
+            <Label>{t('calendar.distributionStrategy')}</Label>
             <Select value={strategy} onValueChange={(v: any) => setStrategy(v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="even">Gleichmäßig verteilen</SelectItem>
-                <SelectItem value="optimal">Optimal (AI-basiert)</SelectItem>
-                <SelectItem value="manual">Manuell</SelectItem>
+                <SelectItem value="even">{t('calendar.distributeEvenly')}</SelectItem>
+                <SelectItem value="optimal">{t('calendar.optimalAI')}</SelectItem>
+                <SelectItem value="manual">{t('calendar.manualStrategy')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div>
-            <Label>Events (ein Event pro Zeile)</Label>
+            <Label>{t('calendar.eventsOnePerLine')}</Label>
             <Textarea
-              placeholder="Post Titel 1&#10;Post Titel 2&#10;Post Titel 3"
+              placeholder="Post Title 1&#10;Post Title 2&#10;Post Title 3"
               value={eventsText}
               onChange={(e) => setEventsText(e.target.value)}
               rows={10}
             />
             <p className="text-sm text-muted-foreground mt-1">
-              {eventsText.split('\n').filter(l => l.trim()).length} Events
+              {eventsText.split('\n').filter(l => l.trim()).length} {t('calendar.events')}
             </p>
           </div>
         </div>
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
-            Abbrechen
+            {t('calendar.cancelBtn')}
           </Button>
           <Button onClick={handleSubmit} disabled={loading || !startDate || !endDate || !eventsText.trim()}>
             <CalendarIcon className="h-4 w-4 mr-2" />
-            {loading ? 'Plane...' : 'Events planen'}
+            {loading ? t('calendar.planningEvents') : t('calendar.planEvents')}
           </Button>
         </div>
       </DialogContent>

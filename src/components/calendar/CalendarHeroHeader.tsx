@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Calendar } from "lucide-react";
 import CountUp from "@/components/ui/count-up";
 import { useMemo } from "react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface CalendarHeroHeaderProps {
   eventCount?: number;
@@ -28,6 +29,7 @@ function FloatingParticle({ delay, x, size }: { delay: number; x: number; size: 
 }
 
 export function CalendarHeroHeader({ eventCount = 0 }: CalendarHeroHeaderProps) {
+  const { t } = useTranslation();
   const particles = useMemo(() => 
     Array.from({ length: 8 }, (_, i) => ({
       id: i,
@@ -44,26 +46,21 @@ export function CalendarHeroHeader({ eventCount = 0 }: CalendarHeroHeaderProps) 
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="relative flex items-center justify-between px-5 py-3 backdrop-blur-xl bg-card/40 border border-white/10 rounded-xl overflow-hidden"
     >
-      {/* Floating particles */}
       {particles.map(p => (
         <FloatingParticle key={p.id} delay={p.delay} x={p.x} size={p.size} />
       ))}
 
-      {/* Subtle radial glow background */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_50%,hsl(var(--primary)/0.08),transparent_60%)] pointer-events-none" />
 
-      {/* Left: Badge + Headline */}
       <div className="relative flex items-center gap-4">
-        {/* Mission Badge */}
         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/30">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
           </span>
-          <span className="text-xs font-medium text-primary">Intelligenter Kalender</span>
+          <span className="text-xs font-medium text-primary">{t('calendar.smartCalendar')}</span>
         </div>
 
-        {/* Shimmer Gradient Headline */}
         <h1 
           className="text-xl md:text-2xl font-bold bg-clip-text text-transparent"
           style={{
@@ -76,9 +73,7 @@ export function CalendarHeroHeader({ eventCount = 0 }: CalendarHeroHeaderProps) 
         </h1>
       </div>
 
-      {/* Right: Counter with pulsing glow ring */}
       <div className="relative flex items-center gap-2">
-        {/* Pulsing glow ring */}
         <div className="relative">
           <motion.div
             className="absolute -inset-1.5 rounded-xl bg-primary/20"
@@ -93,7 +88,7 @@ export function CalendarHeroHeader({ eventCount = 0 }: CalendarHeroHeaderProps) 
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Events:</span>
+          <span className="text-xs text-muted-foreground">{t('calendar.events')}:</span>
           <span className="text-lg font-bold text-foreground">
             <CountUp end={eventCount} duration={1} />
           </span>

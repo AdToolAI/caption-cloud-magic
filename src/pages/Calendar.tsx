@@ -291,7 +291,7 @@ export default function Calendar() {
       const date = getNextWeekdayDate(parseInt(presetWeekday), parseInt(presetHour));
       setPrefillDate(date);
       setShowCreateDialog(true);
-      toast.success('Beste Posting-Zeit vorausgefüllt!');
+      toast.success(t('calendar.bestPostingTimePrefilled'));
     }
   }, [searchParams, toast]);
 
@@ -567,7 +567,7 @@ export default function Calendar() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <main className="flex-1 container mx-auto px-4 py-6">
-        <Breadcrumbs category="optimize" feature="Intelligenter Kalender" />
+        <Breadcrumbs category="optimize" feature={t('calendar.smartCalendar')} />
 
         {/* Compact Layout - reduced spacing */}
         <div className="space-y-3 mt-4">

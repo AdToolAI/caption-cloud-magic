@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 import { Clock, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface TimelineSlot {
   time_start: string;
@@ -43,6 +44,8 @@ const platformColors: Record<string, string> = {
   twitter: "bg-sky-500/20 border-sky-500 hover:bg-sky-500/30",
 };
 
+const localeMap: Record<string, string> = { en: 'en-US', de: 'de-DE', es: 'es-ES' };
+
 export function TimelineScheduler({
   workspaceId,
   brandKitId,
@@ -51,6 +54,8 @@ export function TimelineScheduler({
   onScheduled,
   onClose
 }: TimelineSchedulerProps) {
+  const { t, language } = useTranslation();
+  const dateLocale = localeMap[language] || 'en-US';
   const [platform, setPlatform] = useState(defaultPlatform);
   const [weeks, setWeeks] = useState<"1" | "2">("2");
   const [timeline, setTimeline] = useState<TimelineDay[]>([]);
@@ -65,7 +70,6 @@ export function TimelineScheduler({
   const loadEventAndTimeline = async () => {
     setLoading(true);
     try {
-      // 1. Event-Daten laden
       const { data: event, error: eventError } = await supabase
         .from('calendar_events')
         .select('id, title, channels')
@@ -74,16 +78,12 @@ export function TimelineScheduler({
       
       if (eventError) {
         console.error('[Timeline] Event error:', eventError);
-        throw new Error('Event nicht gefunden');
+        throw new Error('Event not found');
       }
 
-      // 2. Platform aus Event extrahieren
       const eventPlatform = event?.channels?.[0] || 'youtube';
       setPlatform(eventPlatform);
-      
-      console.log('[Timeline] Loading for event:', event.title, 'Platform:', eventPlatform);
 
-      // 3. Timeline laden
       const startDate = new Date().toISOString().split('T')[0];
       
       const { data, error } = await supabase.functions.invoke('calendar-timeline-slots', {
@@ -96,20 +96,16 @@ export function TimelineScheduler({
         }
       });
 
-      if (error) {
-        console.error('[Timeline] API error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('[Timeline] Loaded timeline with', data?.timeline?.length, 'days');
       setTimeline(data.timeline || []);
       
       if (!data.timeline || data.timeline.length === 0) {
-        toast.info('Keine optimalen Zeiten gefunden. Versuche eine andere Plattform.');
+        toast.info(t('calendar.noOptimalTimesHint'));
       }
     } catch (error: any) {
       console.error('[Timeline] Error loading timeline:', error);
-      toast.error(error.message || 'Fehler beim Laden der Timeline');
+      toast.error(error.message || t('calendar.errorLoadingTimeline'));
     } finally {
       setLoading(false);
     }
@@ -117,7 +113,7 @@ export function TimelineScheduler({
 
   const handleSlotSelect = (date: string, slot: TimelineSlot) => {
     if (slot.is_blocked) {
-      toast.error('Dieser Zeitslot ist blockiert');
+      toast.error(t('calendar.slotBlocked'));
       return;
     }
     setSelectedSlot({ date, slot });
@@ -141,13 +137,13 @@ export function TimelineScheduler({
       if (error) throw error;
 
       const dayName = timeline.find(d => d.date === selectedSlot.date)?.day_name;
-      toast.success(`Event geplant für ${dayName}, ${selectedSlot.date} um ${selectedSlot.slot.time_start} Uhr`);
+      toast.success(`${t('calendar.eventScheduledFor')} ${dayName}, ${selectedSlot.date} ${t('calendar.atTime')} ${selectedSlot.slot.time_start}`);
       
       onScheduled?.();
       onClose();
     } catch (error) {
       console.error('Error scheduling:', error);
-      toast.error('Fehler beim Planen des Events');
+      toast.error(t('calendar.errorScheduling'));
     } finally {
       setScheduling(false);
     }
@@ -162,11 +158,10 @@ export function TimelineScheduler({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <Select value={platform} onValueChange={setPlatform}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Plattform wählen" />
+            <SelectValue placeholder={t('calendar.choosePlatform')} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="youtube">YouTube</SelectItem>
@@ -179,32 +174,30 @@ export function TimelineScheduler({
         </Select>
 
         <ToggleGroup type="single" value={weeks} onValueChange={(v) => v && setWeeks(v as "1" | "2")}>
-          <ToggleGroupItem value="1">1 Woche</ToggleGroupItem>
-          <ToggleGroupItem value="2">2 Wochen</ToggleGroupItem>
+          <ToggleGroupItem value="1">{t('calendar.oneWeek')}</ToggleGroupItem>
+          <ToggleGroupItem value="2">{t('calendar.twoWeeks')}</ToggleGroupItem>
         </ToggleGroup>
       </div>
 
-      {/* Selected Slot Preview */}
       {selectedSlot && (
         <div className="p-4 border rounded-lg bg-primary/5 space-y-2">
-          <p className="font-semibold text-sm">Ausgewählter Zeitslot:</p>
+          <p className="font-semibold text-sm">{t('calendar.selectedSlot')}:</p>
           <p className="text-sm">
-            {timeline.find(d => d.date === selectedSlot.date)?.day_name}, {selectedSlot.date} um {selectedSlot.slot.time_start} Uhr
+            {timeline.find(d => d.date === selectedSlot.date)?.day_name}, {selectedSlot.date} {t('calendar.atTime')} {selectedSlot.slot.time_start}
           </p>
           <p className="text-xs text-muted-foreground">{selectedSlot.slot.reason}</p>
           <div className="flex gap-2">
             <Button onClick={confirmSchedule} disabled={scheduling} size="sm">
               {scheduling ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Jetzt planen
+              {t('calendar.scheduleNow')}
             </Button>
             <Button onClick={() => setSelectedSlot(null)} variant="outline" size="sm">
-              Abbrechen
+              {t('calendar.cancelBtn')}
             </Button>
           </div>
         </div>
       )}
 
-      {/* Timeline */}
       {loading ? (
         <div className="flex items-center justify-center h-[400px]">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -214,21 +207,19 @@ export function TimelineScheduler({
           <div className="space-y-3">
             {timeline.map((day) => (
               <div key={day.date} className="grid grid-cols-[140px_1fr] gap-4 pb-3 border-b last:border-0">
-                {/* Day Label */}
                 <div className="space-y-1">
                   <p className="font-semibold text-sm">{day.day_name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(day.date).toLocaleDateString('de-DE', { 
+                    {new Date(day.date).toLocaleDateString(dateLocale, { 
                       day: '2-digit', 
                       month: 'short' 
                     })}
                   </p>
                 </div>
 
-                {/* Time Slots */}
                 <div className="flex gap-2 flex-wrap items-start">
                   {day.slots.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Keine optimalen Zeiten</p>
+                    <p className="text-xs text-muted-foreground">{t('calendar.noOptimalTimes')}</p>
                   ) : (
                     day.slots.map((slot, idx) => (
                       <TooltipProvider key={idx}>
@@ -261,11 +252,11 @@ export function TimelineScheduler({
                               <p className="text-xs leading-relaxed">{slot.reason}</p>
                               {!slot.is_blocked && (
                                 <p className="text-xs text-green-600 font-medium">
-                                  Geschätzte Reichweitensteigerung: +{slot.estimated_reach_boost}%
+                                  {t('calendar.estimatedReachBoost')}: +{slot.estimated_reach_boost}%
                                 </p>
                               )}
                               <p className="text-xs text-muted-foreground">
-                                Score: {slot.score}%
+                                {t('calendar.scoreLabel')}: {slot.score}%
                               </p>
                             </div>
                           </TooltipContent>
