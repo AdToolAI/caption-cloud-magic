@@ -386,8 +386,8 @@ export default function MediaLibrary() {
     } else if (categoryFilter !== "all") {
       filtered = filtered.filter(item => item.source === categoryFilter);
     } else {
-      // "all" tab: exclude ai_generator images (they live in Albums only)
-      filtered = filtered.filter(item => item.source !== 'ai_generator');
+      // "all" tab: only show videos, images are only in Albums
+      filtered = filtered.filter(item => item.type === 'video');
     }
 
     // Search filter
