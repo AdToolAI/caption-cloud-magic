@@ -82,7 +82,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
             block: 'start' 
           });
         }, 100);
-        toast.info('✅ Post-Daten aus Generator übernommen');
+        toast.info(t('calendar.postDataImported'));
       } catch (e) {
         console.error('Error loading prefill data:', e);
       }
@@ -93,17 +93,17 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
     e.preventDefault();
     
     if (!workspaceId) {
-      toast.error('Bitte wähle zuerst einen Workspace');
+      toast.error(t('calendar.selectWorkspaceFirst'));
       return;
     }
 
     if (!user) {
-      toast.error('Du musst eingeloggt sein');
+      toast.error(t('calendar.mustBeLoggedIn'));
       return;
     }
 
     if (channels.length === 0) {
-      toast.error('Bitte wähle mindestens eine Plattform');
+      toast.error(t('calendar.selectAtLeastOnePlatform'));
       return;
     }
 
@@ -111,7 +111,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
     try {
       let mediaUrls: any[] = [];
       if (selectedMedia.length > 0) {
-        toast.info('Medien werden hochgeladen...');
+        toast.info(t('calendar.uploadingMedia'));
         const uploaded = await uploadMediaToSupabase(selectedMedia, user.id);
         mediaUrls = uploaded.map(m => ({
           type: m.type,
@@ -150,7 +150,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
       onSuccess?.(event.id);
     } catch (error: any) {
       console.error('Schedule error:', error);
-      toast.error(error.message || 'Post konnte nicht geplant werden');
+      toast.error(error.message || t('calendar.couldNotSchedule'));
     } finally {
       setBusy(false);
     }
@@ -168,7 +168,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
 
   const handleGenerateCaption = async () => {
     if (caption.trim().length < 3) {
-      toast.error('Bitte gib zuerst ein Thema/Brief ein (min. 3 Zeichen)');
+      toast.error(t('calendar.enterTopicFirst'));
       return;
     }
     
@@ -192,10 +192,10 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
       setCaption(fullCaption);
       setShowGeneratorPanel(false);
       
-      toast.success('✨ Caption erfolgreich generiert!');
+      toast.success(t('calendar.captionGenerated'));
     } catch (error: any) {
       console.error('Generate error:', error);
-      toast.error(error.message || 'Generierung fehlgeschlagen');
+      toast.error(error.message || t('calendar.generationFailed'));
     } finally {
       setIsGenerating(false);
     }
@@ -238,13 +238,13 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg bg-gradient-to-r from-primary via-amber-400 to-primary bg-clip-text text-transparent">
-                Schnell-Planung
+                ${t('calendar.quickSchedule')}
               </CardTitle>
-              <CardDescription>Erstelle und plane einen Post in Sekunden</CardDescription>
+              <CardDescription>${t('calendar.createAndSchedule')}</CardDescription>
             </div>
             {isPrefilled && (
               <Badge variant="secondary" className="text-xs">
-                🎨 Aus Generator importiert
+                🎨 ${t('calendar.importedFromGenerator')}
               </Badge>
             )}
           </div>
@@ -253,10 +253,10 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Title */}
             <div className="space-y-2">
-              <Label htmlFor="title">Titel (optional)</Label>
+              <Label htmlFor="title">${t('calendar.titleOptional')}</Label>
               <Input
                 id="title"
-                placeholder="Interner Titel für diesen Post"
+                placeholder="${t('calendar.internalTitle')}"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={busy}
@@ -267,7 +267,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
             {/* Caption */}
             <div className="space-y-2">
               <Label htmlFor="caption">
-                Caption / Post-Text
+                ${t('calendar.captionPostText')}
                 <span className="ml-2 text-xs text-muted-foreground">
                   {caption.length} / {captionMaxLength}
                 </span>
