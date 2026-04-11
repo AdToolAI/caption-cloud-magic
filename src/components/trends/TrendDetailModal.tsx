@@ -35,8 +35,9 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "@/hooks/useTranslation";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, es, enUS } from "date-fns/locale";
 
 interface Trend {
   id: string;
@@ -119,11 +120,14 @@ export function TrendDetailModal({
   defaultTab = 'overview',
 }: TrendDetailModalProps) {
   const { toast } = useToast();
+  const { t, language } = useTranslation();
   const [articles, setArticles] = useState<RelatedArticle[]>([]);
   const [videos, setVideos] = useState<RelatedVideo[]>([]);
   const [loadingArticles, setLoadingArticles] = useState(false);
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [mediaLoaded, setMediaLoaded] = useState(false);
+
+  const dateFnsLocale = language === 'de' ? de : language === 'es' ? es : enUS;
 
   useEffect(() => {
     if (open && trend) {
@@ -225,7 +229,7 @@ export function TrendDetailModal({
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
-                Popularität
+                {t('trends.popularityLabel')}
               </span>
               <span className="font-bold text-primary">{trend.popularity_index}/100</span>
             </div>
@@ -246,11 +250,11 @@ export function TrendDetailModal({
             <TabsList className="w-full bg-muted/30 border border-white/5">
               <TabsTrigger value="overview" className="flex-1 gap-2 data-[state=active]:bg-primary/20">
                 <FileText className="w-4 h-4" />
-                Übersicht
+                {t('trends.overview')}
               </TabsTrigger>
               <TabsTrigger value="analysis" className="flex-1 gap-2 data-[state=active]:bg-primary/20">
                 <Sparkles className="w-4 h-4" />
-                KI-Analyse
+                {t('trends.aiAnalysis')}
                 {analysisData && (
                   <Badge variant="secondary" className="ml-1 text-xs bg-green-500/20 text-green-400">
                     ✓
@@ -259,7 +263,7 @@ export function TrendDetailModal({
               </TabsTrigger>
               <TabsTrigger value="articles" className="flex-1 gap-2 data-[state=active]:bg-primary/20">
                 <Link2 className="w-4 h-4" />
-                Artikel
+                {t('trends.articles')}
                 {articles.length > 0 && (
                   <Badge variant="secondary" className="ml-1 text-xs bg-blue-500/20 text-blue-400">
                     {articles.length}
@@ -268,7 +272,7 @@ export function TrendDetailModal({
               </TabsTrigger>
               <TabsTrigger value="media" className="flex-1 gap-2 data-[state=active]:bg-primary/20">
                 <Video className="w-4 h-4" />
-                Medien
+                {t('trends.media')}
                 {videos.length > 0 && (
                   <Badge variant="secondary" className="ml-1 text-xs bg-red-500/20 text-red-400">
                     {videos.length}
@@ -281,23 +285,21 @@ export function TrendDetailModal({
           <ScrollArea className="flex-1 max-h-[50vh]">
             {/* Overview Tab */}
             <TabsContent value="overview" className="p-6 space-y-6 mt-0">
-              {/* Description */}
               <div className="space-y-2">
                 <h3 className="font-semibold text-lg flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-primary" />
-                  Beschreibung
+                  {t('trends.description')}
                 </h3>
                 <p className="text-muted-foreground leading-relaxed">
                   {trend.description}
                 </p>
               </div>
 
-              {/* Content Ideas from trend data */}
               {trend.data_json?.content_ideas && trend.data_json.content_ideas.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="font-semibold text-lg flex items-center gap-2">
                     <Lightbulb className="w-5 h-5 text-yellow-500" />
-                    Content-Ideen
+                    {t('trends.contentIdeas')}
                   </h3>
                   <div className="space-y-2">
                     {trend.data_json.content_ideas.map((idea: { title?: string; description?: string; format?: string } | string, idx: number) => (
@@ -332,12 +334,11 @@ export function TrendDetailModal({
                 </div>
               )}
 
-              {/* Hashtags from trend data */}
               {trend.data_json?.hashtags && trend.data_json.hashtags.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="font-semibold text-lg flex items-center gap-2">
                     <Hash className="w-5 h-5 text-cyan-500" />
-                    Empfohlene Hashtags
+                    {t('trends.recommendedHashtags')}
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {trend.data_json.hashtags.map((tag: string, idx: number) => (
@@ -355,12 +356,11 @@ export function TrendDetailModal({
                 </div>
               )}
 
-              {/* Audience Fit */}
               {trend.data_json?.audience_fit && (
                 <div className="space-y-3">
                   <h3 className="font-semibold text-lg flex items-center gap-2">
                     <Target className="w-5 h-5 text-purple-500" />
-                    Zielgruppe
+                    {t('trends.targetAudience')}
                   </h3>
                   <p className="text-muted-foreground p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
                     {trend.data_json.audience_fit}
@@ -379,12 +379,11 @@ export function TrendDetailModal({
                   >
                     <Sparkles className="w-12 h-12 text-primary" />
                   </motion.div>
-                  <p className="text-muted-foreground">KI analysiert den Trend...</p>
-                  <p className="text-xs text-muted-foreground/60">Generiere Content-Strategien und Ideen</p>
+                  <p className="text-muted-foreground">{t('trends.aiAnalyzing')}</p>
+                  <p className="text-xs text-muted-foreground/60">{t('trends.generatingStrategies')}</p>
                 </div>
               ) : analysisData ? (
                 <>
-                  {/* Summary */}
                   {analysisData.summary && (
                     <motion.div 
                       initial={{ opacity: 0, y: 10 }}
@@ -393,7 +392,7 @@ export function TrendDetailModal({
                     >
                       <h4 className="font-semibold mb-2 flex items-center gap-2">
                         <Zap className="w-4 h-4 text-primary" />
-                        Zusammenfassung
+                        {t('trends.summary')}
                       </h4>
                       <p className="text-sm text-muted-foreground leading-relaxed">
                         {analysisData.summary}
@@ -401,12 +400,11 @@ export function TrendDetailModal({
                     </motion.div>
                   )}
 
-                  {/* Content Ideas */}
                   {ideas.length > 0 && (
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Lightbulb className="w-5 h-5 text-yellow-500" />
-                        Content-Ideen ({ideas.length})
+                        {t('trends.contentIdeas')} ({ideas.length})
                       </h4>
                       <div className="space-y-3">
                         {ideas.map((idea, idx) => (
@@ -454,12 +452,11 @@ export function TrendDetailModal({
                     </div>
                   )}
 
-                  {/* Hashtag Strategy */}
                   {(hashtags.length > 0 || hashtagStrategy) && (
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Hash className="w-5 h-5 text-cyan-500" />
-                        Hashtag-Strategie
+                        {t('trends.hashtagStrategy')}
                       </h4>
                       
                       {hashtagStrategy ? (
@@ -510,12 +507,11 @@ export function TrendDetailModal({
                     </div>
                   )}
 
-                  {/* Best Posting Times */}
                   {analysisData.best_posting_times && (
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Clock className="w-5 h-5 text-green-500" />
-                        Beste Posting-Zeiten
+                        {t('trends.bestPostingTimes')}
                       </h4>
                       {typeof analysisData.best_posting_times === 'string' ? (
                         <p className="text-sm text-muted-foreground p-3 bg-green-500/10 rounded-lg border border-green-500/20">
@@ -533,12 +529,11 @@ export function TrendDetailModal({
                     </div>
                   )}
 
-                  {/* Recommended Platforms */}
                   {analysisData.recommended_platforms && analysisData.recommended_platforms.length > 0 && (
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Target className="w-5 h-5 text-purple-500" />
-                        Empfohlene Plattformen
+                        {t('trends.recommendedPlatforms')}
                       </h4>
                       <div className="flex flex-wrap gap-2">
                         {analysisData.recommended_platforms.map((platform, idx) => (
@@ -550,12 +545,11 @@ export function TrendDetailModal({
                     </div>
                   )}
 
-                  {/* Pro Tips */}
                   {analysisData.pro_tips && analysisData.pro_tips.length > 0 && (
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2">
                         <CheckCircle className="w-5 h-5 text-green-500" />
-                        Pro-Tipps
+                        {t('trends.proTips')}
                       </h4>
                       <div className="space-y-2">
                         {analysisData.pro_tips.map((tip, idx) => (
@@ -568,12 +562,11 @@ export function TrendDetailModal({
                     </div>
                   )}
 
-                  {/* Mistakes to Avoid */}
                   {analysisData.mistakes_to_avoid && analysisData.mistakes_to_avoid.length > 0 && (
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2">
                         <AlertTriangle className="w-5 h-5 text-red-500" />
-                        Fehler vermeiden
+                        {t('trends.avoidMistakes')}
                       </h4>
                       <div className="space-y-2">
                         {analysisData.mistakes_to_avoid.map((mistake, idx) => (
@@ -602,9 +595,9 @@ export function TrendDetailModal({
                     <Sparkles className="w-12 h-12 text-primary" />
                   </motion.div>
                   <div className="text-center space-y-2">
-                    <h4 className="font-semibold text-lg">Noch keine Analyse vorhanden</h4>
+                    <h4 className="font-semibold text-lg">{t('trends.noAnalysisYet')}</h4>
                     <p className="text-sm text-muted-foreground max-w-sm">
-                      Lass die KI diesen Trend analysieren und erhalte maßgeschneiderte Content-Strategien, Hooks und Hashtags.
+                      {t('trends.noAnalysisDesc')}
                     </p>
                   </div>
                   <Button
@@ -613,13 +606,13 @@ export function TrendDetailModal({
                     className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)] transition-all"
                   >
                     <Sparkles className="w-4 h-4" />
-                    Jetzt analysieren (3 Credits)
+                    {t('trends.analyzeNowCredits')}
                   </Button>
                 </div>
               )}
             </TabsContent>
 
-            {/* Articles Tab - Next Level Glassmorphism */}
+            {/* Articles Tab */}
             <TabsContent value="articles" className="p-6 space-y-4 mt-0">
               {loadingArticles ? (
                 <div className="grid grid-cols-2 gap-3">
@@ -635,13 +628,12 @@ export function TrendDetailModal({
                 </div>
               ) : articles.length > 0 ? (
                 <div className="space-y-4">
-                  {/* Powered by badge */}
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/5 border border-primary/20 text-xs text-primary/80">
                       <Zap className="w-3 h-3" />
-                      <span className="tracking-wider uppercase font-semibold">Live Web-Suche</span>
+                      <span className="tracking-wider uppercase font-semibold">{t('trends.liveWebSearch')}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground">{articles.length} Quellen</span>
+                    <span className="text-xs text-muted-foreground">{articles.length} {t('trends.sources')}</span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -649,7 +641,6 @@ export function TrendDetailModal({
                       const source = article.source || (() => {
                         try { return new URL(article.url).hostname.replace('www.', ''); } catch { return ''; }
                       })();
-                      // Generate a unique gradient based on source name
                       const gradientHue = source ? (source.charCodeAt(0) * 7 + (source.charCodeAt(1) || 0) * 13) % 360 : 200;
                       return (
                         <motion.a
@@ -662,16 +653,13 @@ export function TrendDetailModal({
                           transition={{ delay: idx * 0.08, type: "spring", stiffness: 200, damping: 20 }}
                           className={`group relative block rounded-xl border border-white/[0.06] bg-card/50 backdrop-blur-sm overflow-hidden hover:border-primary/40 hover:shadow-[0_0_40px_-10px_hsl(var(--primary)/0.2)] hover:-translate-y-1 transition-all duration-300 ${idx === 0 ? 'sm:col-span-2' : ''}`}
                         >
-                          {/* Visual thumbnail area with source-based gradient */}
                           <div className="relative aspect-[16/9] overflow-hidden" style={{
                             background: `linear-gradient(135deg, hsla(${gradientHue}, 60%, 30%, 0.4) 0%, hsla(${(gradientHue + 60) % 360}, 50%, 20%, 0.3) 100%)`
                           }}>
-                            {/* Decorative grid pattern */}
                             <div className="absolute inset-0 opacity-[0.04]" style={{
                               backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
                               backgroundSize: '20px 20px'
                             }} />
-                            {/* Large centered favicon */}
                             {source && (
                               <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="relative">
@@ -687,15 +675,12 @@ export function TrendDetailModal({
                                 </div>
                               </div>
                             )}
-                            {/* Bottom gradient overlay for text */}
                             <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-card to-transparent" />
-                            {/* External link icon */}
                             <div className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/10 border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-sm">
                               <ExternalLink className="w-4 h-4 text-white/80" />
                             </div>
                           </div>
 
-                          {/* Content */}
                           <div className="p-4 space-y-2">
                             <h4 className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors duration-200 line-clamp-2">
                               {article.title}
@@ -713,7 +698,6 @@ export function TrendDetailModal({
                             )}
                           </div>
 
-                          {/* Hover glow border */}
                           <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
                             <div className="absolute inset-0 rounded-xl" style={{
                               background: 'linear-gradient(135deg, hsla(43,90%,68%,0.1), transparent 50%, hsla(187,84%,55%,0.08))',
@@ -729,12 +713,12 @@ export function TrendDetailModal({
                   <div className="p-4 rounded-full bg-muted/20 border border-white/5">
                     <Search className="w-8 h-8 text-muted-foreground/30" />
                   </div>
-                  <p className="text-muted-foreground text-sm">Keine verwandten Artikel gefunden</p>
+                  <p className="text-muted-foreground text-sm">{t('trends.noArticlesFound')}</p>
                 </div>
               )}
             </TabsContent>
 
-            {/* Media Tab - Next Level Visual Grid */}
+            {/* Media Tab */}
             <TabsContent value="media" className="p-6 space-y-4 mt-0">
               {loadingArticles ? (
                 <div className="grid grid-cols-2 gap-3">
@@ -752,16 +736,14 @@ export function TrendDetailModal({
                 </div>
               ) : videos.length > 0 ? (
                 <div className="space-y-4">
-                  {/* Header badge */}
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-xs text-red-400">
                       <Play className="w-3 h-3" />
                       <span className="tracking-wider uppercase font-semibold">YouTube</span>
                     </div>
-                    <span className="text-xs text-muted-foreground">{videos.length} Suchanfragen</span>
+                    <span className="text-xs text-muted-foreground">{videos.length} {t('trends.searchQueries')}</span>
                   </div>
 
-                  {/* Visual Grid - first item featured full-width */}
                   <div className="grid grid-cols-2 gap-3">
                     {videos.map((video, idx) => (
                       <motion.a
@@ -774,21 +756,16 @@ export function TrendDetailModal({
                         transition={{ delay: idx * 0.1, type: "spring", stiffness: 180, damping: 20 }}
                         className={`group relative block rounded-xl border border-white/[0.06] bg-card/50 backdrop-blur-sm overflow-hidden hover:border-red-500/40 hover:shadow-[0_0_40px_-10px_rgba(239,68,68,0.2)] hover:-translate-y-1 transition-all duration-300 ${idx === 0 ? 'col-span-2' : ''}`}
                       >
-                        {/* Video thumbnail area */}
                         <div className={`relative ${idx === 0 ? 'aspect-video' : 'aspect-[16/9]'} overflow-hidden bg-gradient-to-br from-red-950/60 via-red-900/30 to-card`}>
-                          {/* YouTube-style gradient background */}
                           <div className="absolute inset-0" style={{
                             background: `radial-gradient(ellipse at 30% 40%, rgba(239,68,68,0.15) 0%, transparent 60%), radial-gradient(ellipse at 70% 70%, rgba(220,38,38,0.1) 0%, transparent 50%)`
                           }} />
-                          {/* Decorative scanlines */}
                           <div className="absolute inset-0 opacity-[0.03]" style={{
                             backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.05) 2px, rgba(255,255,255,0.05) 4px)'
                           }} />
 
-                          {/* Central play button with glow */}
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="relative">
-                              {/* Outer glow ring */}
                               <motion.div
                                 className="absolute inset-0 rounded-full blur-xl bg-red-500/30 scale-[2]"
                                 animate={{ 
@@ -797,14 +774,12 @@ export function TrendDetailModal({
                                 }}
                                 transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
                               />
-                              {/* Play button */}
                               <div className={`relative ${idx === 0 ? 'w-16 h-16' : 'w-12 h-12'} rounded-full bg-red-600/90 border-2 border-red-400/40 flex items-center justify-center shadow-[0_0_30px_rgba(239,68,68,0.4)] group-hover:scale-110 group-hover:shadow-[0_0_50px_rgba(239,68,68,0.6)] group-hover:bg-red-600 transition-all duration-300`}>
                                 <Play className={`${idx === 0 ? 'w-7 h-7' : 'w-5 h-5'} text-white fill-white ml-0.5`} />
                               </div>
                             </div>
                           </div>
 
-                          {/* Bottom gradient with search query text */}
                           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-card via-card/80 to-transparent">
                             <p className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
                               <Search className="w-3 h-3" />
@@ -813,7 +788,6 @@ export function TrendDetailModal({
                           </div>
                         </div>
 
-                        {/* Card content */}
                         <div className="p-3 space-y-1">
                           <h5 className="font-semibold text-sm group-hover:text-red-400 transition-colors line-clamp-2 leading-snug">
                             {video.title}
@@ -821,12 +795,11 @@ export function TrendDetailModal({
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
                               <ExternalLink className="w-3 h-3" />
-                              YouTube durchsuchen
+                              YouTube
                             </div>
                           </div>
                         </div>
 
-                        {/* Hover neon border glow */}
                         <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
                           <div className="absolute inset-0 rounded-xl" style={{
                             background: 'linear-gradient(135deg, rgba(239,68,68,0.08), transparent 50%, rgba(220,38,38,0.06))',
@@ -836,7 +809,6 @@ export function TrendDetailModal({
                     ))}
                   </div>
 
-                  {/* Direct YouTube search CTA */}
                   <motion.a
                     href={`https://www.youtube.com/results?search_query=${encodeURIComponent(trend?.name || '')}`}
                     target="_blank"
@@ -847,7 +819,7 @@ export function TrendDetailModal({
                     className="group flex items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/10 text-sm text-muted-foreground hover:border-red-500/30 hover:text-red-400 hover:bg-red-500/[0.03] transition-all duration-300"
                   >
                     <Search className="w-4 h-4" />
-                    Alle Videos auf YouTube suchen
+                    {t('trends.searchYouTube')}
                     <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </motion.a>
                 </div>
@@ -856,7 +828,7 @@ export function TrendDetailModal({
                   <div className="p-4 rounded-full bg-muted/20 border border-white/5">
                     <Video className="w-8 h-8 text-muted-foreground/30" />
                   </div>
-                  <p className="text-muted-foreground text-sm">Keine Videos gefunden</p>
+                  <p className="text-muted-foreground text-sm">{t('trends.noVideosFound')}</p>
                 </div>
               )}
             </TabsContent>
@@ -865,11 +837,10 @@ export function TrendDetailModal({
 
         {/* Footer with Actions */}
         <div className="p-4 border-t border-white/5 bg-muted/20 flex items-center justify-between gap-4">
-          {/* Bookmark Date if saved */}
           {isBookmarked && bookmarkDate && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Calendar className="w-3 h-3" />
-              <span>Gespeichert am {format(new Date(bookmarkDate), 'dd. MMM yyyy', { locale: de })}</span>
+              <span>{t('trends.savedOn')} {format(new Date(bookmarkDate), 'dd. MMM yyyy', { locale: dateFnsLocale })}</span>
             </div>
           )}
           
@@ -879,17 +850,17 @@ export function TrendDetailModal({
               onClick={() => onOpenChange(false)}
               className="border-white/10"
             >
-              Schließen
+              {t('trends.close')}
             </Button>
             
             <Button
               onClick={() => {
                 onToggleBookmark(trend.id);
                 toast({
-                  title: isBookmarked ? "Trend entfernt" : "Trend gespeichert",
+                  title: isBookmarked ? t('trends.trendRemoved') : t('trends.trendSaved'),
                   description: isBookmarked 
-                    ? "Der Trend wurde aus deinen Gespeicherten entfernt" 
-                    : "Der Trend wurde zu deinen Gespeicherten hinzugefügt",
+                    ? t('trends.trendRemovedDesc')
+                    : t('trends.trendSavedDesc'),
                 });
               }}
               className={`gap-2 ${
@@ -908,7 +879,7 @@ export function TrendDetailModal({
                     className="flex items-center gap-2"
                   >
                     <BookmarkCheck className="w-4 h-4" />
-                    Gespeichert
+                    {t('trends.savedLabel')}
                   </motion.div>
                 ) : (
                   <motion.div
@@ -919,7 +890,7 @@ export function TrendDetailModal({
                     className="flex items-center gap-2"
                   >
                     <Bookmark className="w-4 h-4" />
-                    Trend speichern
+                    {t('trends.saveTrend')}
                   </motion.div>
                 )}
               </AnimatePresence>

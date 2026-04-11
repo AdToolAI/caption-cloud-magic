@@ -44,7 +44,6 @@ interface TrendIdeas {
 
 // --- Mini Sparkline SVG ---
 function Sparkline({ value, color }: { value: number; color: string }) {
-  // Generate a fake sparkline path based on the popularity value
   const points = Array.from({ length: 12 }, (_, i) => {
     const base = value * 0.6;
     const variance = Math.sin(i * 1.2 + value * 0.1) * 15 + Math.cos(i * 0.7) * 10;
@@ -85,11 +84,10 @@ function Sparkline({ value, color }: { value: number; color: string }) {
 // --- Marquee Ticker ---
 function TrendTicker({ trends }: { trends: Trend[] }) {
   if (trends.length === 0) return null;
-  const doubled = [...trends, ...trends]; // duplicate for seamless loop
+  const doubled = [...trends, ...trends];
   
   return (
     <div className="relative overflow-hidden py-3 mb-8">
-      {/* Fade edges */}
       <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-background to-transparent z-10" />
       <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-background to-transparent z-10" />
       
@@ -119,7 +117,7 @@ function TrendTicker({ trends }: { trends: Trend[] }) {
 }
 
 // --- Floating Stats Section ---
-function FloatingStats({ trends }: { trends: Trend[] }) {
+function FloatingStats({ trends, t }: { trends: Trend[]; t: (key: string) => string }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
   
@@ -127,10 +125,10 @@ function FloatingStats({ trends }: { trends: Trend[] }) {
   const hotTrends = trends.filter(t => t.popularity_index > 80).length;
   
   const stats = [
-    { label: "Trends analysiert", value: trends.length, icon: BarChart3, color: "from-primary/20 to-amber-500/20", textColor: "text-primary" },
-    { label: "Plattformen", value: platforms.size || 5, icon: Globe, color: "from-cyan-500/20 to-blue-500/20", textColor: "text-cyan-400" },
-    { label: "Hot Trends", value: hotTrends || 12, icon: Flame, color: "from-red-500/20 to-orange-500/20", textColor: "text-red-400" },
-    { label: "Kategorien", value: 6, icon: Users, color: "from-purple-500/20 to-pink-500/20", textColor: "text-purple-400" },
+    { label: t('trends.trendsAnalyzed'), value: trends.length, icon: BarChart3, color: "from-primary/20 to-amber-500/20", textColor: "text-primary" },
+    { label: t('trends.platforms'), value: platforms.size || 5, icon: Globe, color: "from-cyan-500/20 to-blue-500/20", textColor: "text-cyan-400" },
+    { label: t('trends.hotTrends'), value: hotTrends || 12, icon: Flame, color: "from-red-500/20 to-orange-500/20", textColor: "text-red-400" },
+    { label: t('trends.categories'), value: 6, icon: Users, color: "from-purple-500/20 to-pink-500/20", textColor: "text-purple-400" },
   ];
 
   return (
@@ -165,7 +163,7 @@ function FloatingStats({ trends }: { trends: Trend[] }) {
 }
 
 // --- Hero Carousel ---
-function HeroCarousel({ trends, onAnalyze }: { trends: Trend[]; onAnalyze: (t: Trend) => void }) {
+function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t: Trend) => void; t: (key: string) => string }) {
   const [current, setCurrent] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
 
@@ -189,7 +187,7 @@ function HeroCarousel({ trends, onAnalyze }: { trends: Trend[]; onAnalyze: (t: T
   const facts = [
     trend.platform && `📱 ${trend.platform.charAt(0).toUpperCase() + trend.platform.slice(1)}`,
     trend.category && `🏷️ ${trend.category}`,
-    trend.popularity_index && `🔥 Popularität: ${trend.popularity_index}/100`,
+    trend.popularity_index && `🔥 ${t('trends.popularityLabel')}: ${trend.popularity_index}/100`,
   ].filter(Boolean);
 
   return (
@@ -204,8 +202,8 @@ function HeroCarousel({ trends, onAnalyze }: { trends: Trend[]; onAnalyze: (t: T
             <Zap className="w-6 h-6 text-orange-500" />
           </motion.div>
           <div>
-            <h2 className="text-2xl font-bold">Top-Trends der Woche</h2>
-            <p className="text-sm text-muted-foreground">Die heißesten Trends im Überblick</p>
+            <h2 className="text-2xl font-bold">{t('trends.topTrends')}</h2>
+            <p className="text-sm text-muted-foreground">{t('trends.topTrendsSubtitleAlt')}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -238,21 +236,17 @@ function HeroCarousel({ trends, onAnalyze }: { trends: Trend[]; onAnalyze: (t: T
             transition={{ duration: 0.5 }}
             className={`relative w-full bg-gradient-to-br ${gradient} rounded-2xl overflow-hidden`}
           >
-            {/* Scanline overlay */}
             <div className="absolute inset-0 opacity-[0.06]" style={{
               backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.4) 2px, rgba(0,0,0,0.4) 4px)',
             }} />
-            {/* Moving gradient overlay */}
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
               animate={{ x: ['-100%', '200%'] }}
               transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
             />
-            {/* Dark overlay for readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
             
             <div className="relative z-10 p-8 md:p-12 flex flex-col justify-end min-h-[280px]">
-              {/* Rank badge */}
               <motion.div
                 className="absolute top-6 left-6 flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-md rounded-full border border-white/20"
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -260,10 +254,9 @@ function HeroCarousel({ trends, onAnalyze }: { trends: Trend[]; onAnalyze: (t: T
                 transition={{ delay: 0.3 }}
               >
                 <span className="text-white font-bold text-lg">#{current + 1}</span>
-                <span className="text-white/60 text-sm">von {trends.length}</span>
+                <span className="text-white/60 text-sm">{t('trends.ofCount')} {trends.length}</span>
               </motion.div>
 
-              {/* Trending NOW badge for hot ones */}
               {trend.popularity_index > 85 && (
                 <motion.div
                   className="absolute top-6 right-6 flex items-center gap-2 px-4 py-2 bg-red-500/30 backdrop-blur-md rounded-full border border-red-400/40"
@@ -275,7 +268,6 @@ function HeroCarousel({ trends, onAnalyze }: { trends: Trend[]; onAnalyze: (t: T
                 </motion.div>
               )}
 
-              {/* Typewriter title */}
               <motion.h3
                 className="text-3xl md:text-4xl font-bold text-white mb-4 max-w-2xl"
                 initial={{ opacity: 0, y: 20 }}
@@ -294,7 +286,6 @@ function HeroCarousel({ trends, onAnalyze }: { trends: Trend[]; onAnalyze: (t: T
                 {trend.description}
               </motion.p>
 
-              {/* Animated fact chips */}
               <div className="flex flex-wrap gap-3 mb-6">
                 {facts.map((fact, i) => (
                   <motion.span
@@ -319,7 +310,7 @@ function HeroCarousel({ trends, onAnalyze }: { trends: Trend[]; onAnalyze: (t: T
                   className="relative overflow-hidden bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/30 hover:shadow-[0_0_30px_hsla(0,0%,100%,0.2)] transition-all"
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Jetzt analysieren
+                  {t('trends.analyzeNow')}
                   <motion.div
                     className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                     animate={{ x: ['-100%', '100%'] }}
@@ -332,7 +323,6 @@ function HeroCarousel({ trends, onAnalyze }: { trends: Trend[]; onAnalyze: (t: T
         </AnimatePresence>
       </div>
 
-      {/* Dots */}
       <div className="flex justify-center gap-2 mt-4">
         {trends.map((_, i) => (
           <button
@@ -413,7 +403,7 @@ export default function TrendRadar() {
       setTrends(data.trends || []);
     } catch (error) {
       console.error('Error fetching trends:', error);
-      toast({ title: "Error loading trends", description: error instanceof Error ? error.message : 'Unknown error', variant: "destructive" });
+      toast({ title: "Error loading trends", description: error instanceof Error ? error.message : t('trends.unknownError'), variant: "destructive" });
     } finally { setLoading(false); }
   };
 
@@ -457,17 +447,17 @@ export default function TrendRadar() {
       });
       setTrendIdeas(prev => ({ ...prev, [trend.id]: data }));
       setExpandedTrend(trend.id);
-      toast({ title: "Analyse abgeschlossen", description: `${data.content_ideas?.length || data.ideas?.length} Content-Ideen generiert` });
+      toast({ title: t('trends.analysisComplete'), description: `${data.content_ideas?.length || data.ideas?.length} ${t('trends.ideasGenerated')}` });
     } catch (error: any) {
       console.error('Error analyzing trend:', error);
       if (error.code !== 'INSUFFICIENT_CREDITS') {
-        toast({ title: "Analyse fehlgeschlagen", description: error instanceof Error ? error.message : 'Unknown error', variant: "destructive" });
+        toast({ title: t('trends.analysisFailed'), description: error instanceof Error ? error.message : t('trends.unknownError'), variant: "destructive" });
       }
     } finally { setAnalyzing(null); }
   };
 
   const toggleBookmark = async (trendId: string) => {
-    if (!trendId) { toast({ title: "Fehler", description: "Dieser Trend kann nicht gespeichert werden", variant: "destructive" }); return; }
+    if (!trendId) { toast({ title: t('trends.error'), description: t('trends.cannotSave'), variant: "destructive" }); return; }
     const isCurrentlyBookmarked = bookmarked.includes(trendId);
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -476,15 +466,15 @@ export default function TrendRadar() {
         const { error } = await supabase.from('trend_bookmarks').delete().eq('trend_id', trendId).eq('user_id', currentUser.id);
         if (error) throw error;
         setBookmarked(prev => prev.filter(id => id !== trendId));
-        toast({ title: "Bookmark entfernt" });
+        toast({ title: t('trends.bookmarkRemoved') });
       } else {
         const { error } = await supabase.from('trend_bookmarks').insert({ trend_id: trendId, user_id: currentUser.id });
         if (error) throw error;
         setBookmarked(prev => [...prev, trendId]);
-        toast({ title: "Trend gespeichert" });
+        toast({ title: t('trends.trendSaved') });
       }
     } catch (error) {
-      toast({ title: "Fehler", description: error instanceof Error ? error.message : 'Unbekannter Fehler', variant: "destructive" });
+      toast({ title: t('trends.error'), description: error instanceof Error ? error.message : t('trends.unknownError'), variant: "destructive" });
     }
   };
 
@@ -508,16 +498,16 @@ export default function TrendRadar() {
   ];
 
   const ecommerceSubcategories = [
-    { id: 'tech-gadgets', name: 'Tech-Gadgets & Smart-Tools', icon: '📱' },
-    { id: 'haushalt', name: 'Haushalts-Innovationen', icon: '🏠' },
-    { id: 'beauty', name: 'Beauty & Skincare', icon: '💄' },
-    { id: 'pets', name: 'Haustier-Gadgets', icon: '🐾' },
-    { id: 'fitness', name: 'Fitness & Wellness', icon: '💪' },
-    { id: 'home-decor', name: 'Home-Decor & Einrichtung', icon: '🛋️' },
-    { id: 'mode', name: 'Mode & Accessoires', icon: '👗' },
-    { id: 'küche', name: 'Küche & Genuss', icon: '🍳' },
-    { id: 'geschenke', name: 'Geschenkideen unter 30 €', icon: '🎁' },
-    { id: 'produktivität', name: 'Produktivität & Arbeitsalltag', icon: '💼' },
+    { id: 'tech-gadgets', name: t('trends.ecommSubTechGadgets'), icon: '📱' },
+    { id: 'haushalt', name: t('trends.ecommSubHousehold'), icon: '🏠' },
+    { id: 'beauty', name: t('trends.ecommSubBeauty'), icon: '💄' },
+    { id: 'pets', name: t('trends.ecommSubPets'), icon: '🐾' },
+    { id: 'fitness', name: t('trends.ecommSubFitness'), icon: '💪' },
+    { id: 'home-decor', name: t('trends.ecommSubHomeDecor'), icon: '🛋️' },
+    { id: 'mode', name: t('trends.ecommSubFashion'), icon: '👗' },
+    { id: 'küche', name: t('trends.ecommSubKitchen'), icon: '🍳' },
+    { id: 'geschenke', name: t('trends.ecommSubGifts'), icon: '🎁' },
+    { id: 'produktivität', name: t('trends.ecommSubProductivity'), icon: '💼' },
   ];
 
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } };
@@ -535,7 +525,6 @@ export default function TrendRadar() {
     <div className="min-h-screen flex flex-col bg-background">
       <main className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 py-8">
         <div className="container mx-auto px-4 max-w-7xl">
-          {/* Hero Section */}
           <TrendRadarHeroHeader
             viewMode={viewMode}
             onViewModeChange={setViewMode}
@@ -545,10 +534,8 @@ export default function TrendRadar() {
             trendsCount={trends.length}
           />
 
-          {/* === LIVE TICKER === */}
           {trends.length > 0 && <TrendTicker trends={trends} />}
 
-          {/* Niche Categories with animated icons */}
           <motion.div className="mb-12" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <div className="flex items-center gap-3 mb-6">
               <motion.div className="p-3 bg-gradient-to-br from-primary/20 to-cyan-500/20 rounded-xl border border-primary/20" whileHover={{ scale: 1.05, rotate: 5 }}>
@@ -588,10 +575,9 @@ export default function TrendRadar() {
             </motion.div>
           </motion.div>
 
-          {/* E-Commerce Subcategories */}
           {categoryFilter === 'ecommerce' && (
             <motion.div className="mb-12" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><span className="text-2xl">🛒</span>E-Commerce Produkt-Kategorien</h3>
+              <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><span className="text-2xl">🛒</span>{t('trends.ecommerceCategories')}</h3>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 {ecommerceSubcategories.map((sub, index) => (
                   <motion.div key={sub.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.05 }}>
@@ -602,7 +588,7 @@ export default function TrendRadar() {
                           const { data, error } = await supabase.functions.invoke('fetch-trends', { body: { language: 'en', category: 'ecommerce' } });
                           if (error) throw error;
                           setTrends((data.trends || []).filter((t: any) => t.data_json?.subcategory === sub.id));
-                        } catch (error) { toast({ title: "Fehler beim Laden", description: "Trends konnten nicht geladen werden", variant: "destructive" }); }
+                        } catch (error) { toast({ title: t('trends.error'), description: t('trends.loadError'), variant: "destructive" }); }
                         finally { setLoading(false); }
                       }}
                     >
@@ -615,15 +601,12 @@ export default function TrendRadar() {
             </motion.div>
           )}
 
-          {/* === HERO CAROUSEL (replaces static top-trends grid) === */}
           {viewMode === 'discover' && topTrends.length > 0 && (
-            <HeroCarousel trends={topTrends} onAnalyze={(trend) => analyzeTrend(trend)} />
+            <HeroCarousel trends={topTrends} onAnalyze={(trend) => analyzeTrend(trend)} t={t} />
           )}
 
-          {/* === FLOATING STATS === */}
-          {viewMode === 'discover' && trends.length > 0 && <FloatingStats trends={trends} />}
+          {viewMode === 'discover' && trends.length > 0 && <FloatingStats trends={trends} t={t} />}
 
-          {/* Filters & Search */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
             <Card className="mb-8 backdrop-blur-xl bg-card/30 border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.15)] relative overflow-hidden">
               <div className="absolute inset-0 rounded-2xl opacity-30 pointer-events-none" style={{ background: 'linear-gradient(135deg, hsla(43,90%,68%,0.1), transparent 40%, transparent 60%, hsla(187,80%,50%,0.1))' }} />
@@ -668,7 +651,6 @@ export default function TrendRadar() {
             </Card>
           </motion.div>
 
-          {/* Trends Grid */}
           {loading ? (
             <motion.div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" variants={containerVariants} initial="hidden" animate="visible">
               {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -696,16 +678,16 @@ export default function TrendRadar() {
                       <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }} className="inline-block">
                         <Bookmark className="w-16 h-16 text-muted-foreground/50 mx-auto" />
                       </motion.div>
-                      <p className="text-muted-foreground text-lg">Du hast noch keine Trends gespeichert</p>
-                      <Button onClick={() => setViewMode('discover')} className="bg-gradient-to-r from-primary to-primary/80"><TrendingUp className="w-4 h-4 mr-2" />Trends entdecken</Button>
+                      <p className="text-muted-foreground text-lg">{t('trends.noSavedTrends')}</p>
+                      <Button onClick={() => setViewMode('discover')} className="bg-gradient-to-r from-primary to-primary/80"><TrendingUp className="w-4 h-4 mr-2" />{t('trends.discoverTrends')}</Button>
                     </>
                   ) : (
                     <>
                       <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ duration: 2, repeat: Infinity }} className="inline-block">
                         <TrendingUp className="w-16 h-16 text-muted-foreground/50 mx-auto" />
                       </motion.div>
-                      <p className="text-muted-foreground text-lg">Keine Trends gefunden</p>
-                      <Button onClick={fetchTrends} className="bg-gradient-to-r from-primary to-primary/80"><Sparkles className="w-4 h-4 mr-2" />Trends neu laden</Button>
+                      <p className="text-muted-foreground text-lg">{t('trends.noTrendsFound')}</p>
+                      <Button onClick={fetchTrends} className="bg-gradient-to-r from-primary to-primary/80"><Sparkles className="w-4 h-4 mr-2" />{t('trends.reloadTrends')}</Button>
                     </>
                   )}
                 </CardContent>
@@ -743,13 +725,11 @@ export default function TrendRadar() {
                             className="group relative overflow-hidden backdrop-blur-xl bg-card/40 border-white/10 hover:border-primary/50 hover:shadow-[0_0_35px_hsla(43,90%,68%,0.2)] transition-all duration-500 h-full"
                             onClick={() => analyzeTrend(trend)}
                           >
-                            {/* Platform Gradient Header */}
                             <div className={`relative h-20 bg-gradient-to-br ${gradient} overflow-hidden`}>
                               <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.4) 2px, rgba(0,0,0,0.4) 4px)' }} />
                               <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" animate={{ x: ['-100%', '200%'] }} transition={{ duration: 3, repeat: Infinity, repeatDelay: 4, ease: 'easeInOut' }} />
                               <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-xs font-semibold border border-white/20 uppercase tracking-wider">{trend.platform}</div>
                               
-                              {/* TRENDING NOW badge */}
                               {isHot && (
                                 <motion.div
                                   className="absolute top-3 right-3 flex items-center gap-1 px-3 py-1 rounded-full bg-red-500/30 backdrop-blur-sm border border-red-400/40"
@@ -782,21 +762,18 @@ export default function TrendRadar() {
 
                               <p className="text-sm text-muted-foreground line-clamp-2">{trend.description}</p>
 
-                              {/* Sparkline + Popularity */}
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <Sparkline value={trend.popularity_index} color={getSparkColor(trend.platform)} />
                                   <span className="text-sm font-bold text-primary">{trend.popularity_index}/100</span>
                                 </div>
-                                {/* Flip button */}
                                 <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-primary"
                                   onClick={(e) => { e.stopPropagation(); toggleFlip(trend.id); }}
                                 >
-                                  Quick-Facts →
+                                  {t('trends.quickFacts')} →
                                 </Button>
                               </div>
 
-                              {/* Neon Popularity Bar */}
                               <div className="w-full bg-muted/20 rounded-full h-1.5 overflow-hidden relative">
                                 <motion.div className={`bg-gradient-to-r ${gradient} h-1.5 rounded-full relative z-10`} initial={{ width: 0 }} animate={{ width: `${trend.popularity_index}%` }} transition={{ duration: 1, delay: index * 0.05 }} />
                                 <motion.div className={`absolute top-0 left-0 h-1.5 rounded-full bg-gradient-to-r ${gradient} blur-sm opacity-50`} initial={{ width: 0 }} animate={{ width: `${trend.popularity_index}%` }} transition={{ duration: 1, delay: index * 0.05 }} />
@@ -813,10 +790,10 @@ export default function TrendRadar() {
 
                               <div className="pt-3 border-t border-white/5 flex gap-2">
                                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openTrendDetail(trend); }} className="flex-1 border-white/10 hover:border-primary/50 hover:bg-primary/5">
-                                  <ExternalLink className="w-4 h-4 mr-2" />Mehr erfahren
+                                  <ExternalLink className="w-4 h-4 mr-2" />{t('trends.learnMore')}
                                 </Button>
                                 <Button onClick={(e) => { e.stopPropagation(); analyzeTrend(trend); }} disabled={analyzing === trend.id} className="flex-1 relative overflow-hidden bg-gradient-to-r from-primary/80 to-primary hover:from-primary hover:to-primary/90 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)] transition-all" size="sm">
-                                  {analyzing === trend.id ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t('trends.analyzing')}</>) : (<><Sparkles className="w-4 h-4 mr-2" />Analysieren</>)}
+                                  {analyzing === trend.id ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t('trends.analyzing')}</>) : (<><Sparkles className="w-4 h-4 mr-2" />{t('trends.analyze')}</>)}
                                 </Button>
                               </div>
                             </CardContent>
@@ -834,25 +811,25 @@ export default function TrendRadar() {
                             <div className={`h-3 bg-gradient-to-r ${gradient}`} />
                             <CardContent className="p-6 space-y-4">
                               <div className="flex items-center justify-between">
-                                <h3 className="font-bold text-lg text-primary">Quick Facts</h3>
-                                <Button variant="ghost" size="sm" className="text-xs" onClick={(e) => { e.stopPropagation(); toggleFlip(trend.id); }}>← Zurück</Button>
+                                <h3 className="font-bold text-lg text-primary">{t('trends.quickFacts')}</h3>
+                                <Button variant="ghost" size="sm" className="text-xs" onClick={(e) => { e.stopPropagation(); toggleFlip(trend.id); }}>← {t('trends.back')}</Button>
                               </div>
                               
                               <div className="space-y-3">
                                 <div className="p-3 bg-muted/10 rounded-lg border border-white/5">
-                                  <span className="text-xs text-muted-foreground">Plattform</span>
+                                  <span className="text-xs text-muted-foreground">{t('trends.platformLabel')}</span>
                                   <p className="font-semibold capitalize">{trend.platform}</p>
                                 </div>
                                 <div className="p-3 bg-muted/10 rounded-lg border border-white/5">
-                                  <span className="text-xs text-muted-foreground">Kategorie</span>
-                                  <p className="font-semibold">{trend.category || 'Allgemein'}</p>
+                                  <span className="text-xs text-muted-foreground">{t('trends.categoryLabel')}</span>
+                                  <p className="font-semibold">{trend.category || t('trends.general')}</p>
                                 </div>
                                 <div className="p-3 bg-muted/10 rounded-lg border border-white/5">
-                                  <span className="text-xs text-muted-foreground">Typ</span>
+                                  <span className="text-xs text-muted-foreground">{t('trends.type')}</span>
                                   <p className="font-semibold">{trend.trend_type}</p>
                                 </div>
                                 <div className="p-3 bg-muted/10 rounded-lg border border-white/5">
-                                  <span className="text-xs text-muted-foreground">Popularität</span>
+                                  <span className="text-xs text-muted-foreground">{t('trends.popularityLabel')}</span>
                                   <div className="flex items-center gap-2">
                                     <span className="font-bold text-primary text-xl">{trend.popularity_index}</span>
                                     <span className="text-muted-foreground text-sm">/ 100</span>
@@ -860,14 +837,14 @@ export default function TrendRadar() {
                                 </div>
                                 {trend.data_json?.audience_fit && (
                                   <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
-                                    <span className="text-xs text-muted-foreground flex items-center gap-1"><Target className="w-3 h-3" /> Zielgruppe</span>
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1"><Target className="w-3 h-3" /> {t('trends.targetAudience')}</span>
                                     <p className="text-sm mt-1">{trend.data_json.audience_fit}</p>
                                   </div>
                                 )}
                               </div>
 
                               <Button onClick={() => analyzeTrend(trend)} className="w-full bg-gradient-to-r from-primary/80 to-primary" size="sm">
-                                <Sparkles className="w-4 h-4 mr-2" />Vollständige Analyse
+                                <Sparkles className="w-4 h-4 mr-2" />{t('trends.fullAnalysis')}
                               </Button>
                             </CardContent>
                           </Card>

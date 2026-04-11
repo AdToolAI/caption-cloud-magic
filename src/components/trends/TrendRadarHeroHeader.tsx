@@ -72,7 +72,7 @@ export function TrendRadarHeroHeader({
               animate={{ scale: [1, 1.3, 1], opacity: [1, 0.7, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
             />
-            <span className="text-sm font-medium text-primary">KI-Trendradar</span>
+            <span className="text-sm font-medium text-primary">{t('trends.aiTrendRadar')}</span>
             <Radar className="w-4 h-4 text-primary" />
           </motion.div>
 
@@ -158,7 +158,7 @@ export function TrendRadarHeroHeader({
             ) : (
               <Sparkles className="w-4 h-4" />
             )}
-            Neu laden
+            {t('trends.reload')}
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent"
               animate={{ x: ['-100%', '100%'] }}
