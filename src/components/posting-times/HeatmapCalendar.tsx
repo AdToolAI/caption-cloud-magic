@@ -1,8 +1,9 @@
 import { format, addDays, startOfDay } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { de, enUS, es } from 'date-fns/locale';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PostingSlot } from '@/hooks/usePostingTimes';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface HeatmapCalendarProps {
   slots: Record<string, PostingSlot[]>;
@@ -20,18 +21,19 @@ function scoreToColor(score: number): string {
 }
 
 export function HeatmapCalendar({ slots, platform, onSlotClick }: HeatmapCalendarProps) {
-  // Generate 14 days starting from today
+  const { language } = useTranslation();
+  const dateFnsLocale = language === 'de' ? de : language === 'es' ? es : enUS;
+
   const days = Array.from({ length: 14 }, (_, i) => {
     const date = addDays(startOfDay(new Date()), i);
     return {
       date,
       dateStr: format(date, 'yyyy-MM-dd'),
-      dayName: format(date, 'EEE', { locale: de }),
+      dayName: format(date, 'EEE', { locale: dateFnsLocale }),
       dayNumber: format(date, 'd'),
     };
   });
 
-  // Group days into weeks (7 days each)
   const weeks: typeof days[] = [];
   for (let i = 0; i < days.length; i += 7) {
     weeks.push(days.slice(i, i + 7));
@@ -44,20 +46,14 @@ export function HeatmapCalendar({ slots, platform, onSlotClick }: HeatmapCalenda
           <div key={weekIdx} className="grid grid-cols-7 gap-2">
             {week.map((day) => {
               const daySlots = slots[day.dateStr] || [];
-              // Get top 24 hourly slots (or fewer if not available)
               const hourlySlots = daySlots.slice(0, 24);
 
               return (
                 <div key={day.dateStr} className="space-y-1">
-                  {/* Day header */}
                   <div className="text-center">
-                    <div className="text-xs font-medium text-muted-foreground">
-                      {day.dayName}
-                    </div>
+                    <div className="text-xs font-medium text-muted-foreground">{day.dayName}</div>
                     <div className="text-sm font-semibold">{day.dayNumber}</div>
                   </div>
-
-                  {/* Hourly slots grid */}
                   <div className="grid grid-cols-4 gap-0.5">
                     {hourlySlots.map((slot, idx) => {
                       const hour = new Date(slot.start).getHours();
@@ -104,30 +100,21 @@ export function HeatmapCalendar({ slots, platform, onSlotClick }: HeatmapCalenda
         ))}
       </TooltipProvider>
 
-      {/* Legend */}
       <div className="flex items-center justify-center gap-4 pt-4 border-t">
         <div className="text-xs text-muted-foreground">Score:</div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-green-600 border border-green-700" />
-            <span className="text-xs">85-100</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-green-500 border border-green-600" />
-            <span className="text-xs">70-84</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-green-400 border border-green-500" />
-            <span className="text-xs">55-69</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-amber-400 border border-amber-500" />
-            <span className="text-xs">40-54</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-amber-300 border border-amber-400" />
-            <span className="text-xs">&lt;40</span>
-          </div>
+          {[
+            { label: '85-100', bg: 'bg-green-600 border-green-700' },
+            { label: '70-84', bg: 'bg-green-500 border-green-600' },
+            { label: '55-69', bg: 'bg-green-400 border-green-500' },
+            { label: '40-54', bg: 'bg-amber-400 border-amber-500' },
+            { label: '<40', bg: 'bg-amber-300 border-amber-400' },
+          ].map(({ label, bg }) => (
+            <div key={label} className="flex items-center gap-1">
+              <div className={cn("w-4 h-4 rounded border", bg)} />
+              <span className="text-xs">{label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -3,13 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
 import { 
   Instagram, 
   Linkedin, 
   Youtube, 
   Facebook,
-  RefreshCw,
   Calendar,
   TrendingUp,
   Sparkles,
@@ -23,6 +21,7 @@ import { Banner } from '@/components/ui/Banner';
 import { toast } from 'sonner';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const PLATFORMS = [
   { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'text-pink-500' },
@@ -35,6 +34,7 @@ const PLATFORMS = [
 
 export default function PostingTimes() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [selectedPlatform, setSelectedPlatform] = useState('instagram');
   const [isSyncing, setIsSyncing] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -50,11 +50,11 @@ export default function PostingTimes() {
     setIsSyncing(true);
     try {
       await syncHistory();
-      toast.success('Posts synchronisiert');
+      toast.success(t('postingTimes.syncSuccess'));
       refetch();
     } catch (error) {
       console.error('Sync error:', error);
-      toast.error('Fehler beim Synchronisieren');
+      toast.error(t('postingTimes.syncError'));
     } finally {
       setIsSyncing(false);
     }
@@ -84,14 +84,12 @@ export default function PostingTimes() {
   return (
     <PageWrapper>
       <div className="container max-w-7xl mx-auto p-6 space-y-6">
-        {/* Hero Header */}
         <PostingTimesHeroHeader
           metadata={data?.metadata}
           isSyncing={isSyncing}
           onSync={handleSync}
         />
 
-        {/* Benchmark Info Banner */}
         <AnimatePresence>
           {showBenchmarkBanner && (
             <motion.div
@@ -101,22 +99,20 @@ export default function PostingTimes() {
             >
               <Banner
                 type="info"
-                title="Branchen-Empfehlungen aktiv"
+                title={t('postingTimes.industryRecsActive')}
                 dismissible
                 onDismiss={() => setBannerDismissed(true)}
                 action={{
-                  label: 'Accounts synchronisieren',
+                  label: t('postingTimes.syncAccounts'),
                   onClick: handleSync,
                 }}
               >
-                Diese Empfehlungen basieren auf Branchen-Durchschnitten und saisonalen Trends.
-                Verbinde deine Accounts für personalisierte, auf deine Performance abgestimmte Zeiten.
+                {t('postingTimes.industryRecsDesc')}
               </Banner>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Platform Tabs */}
         <Tabs value={selectedPlatform} onValueChange={setSelectedPlatform}>
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -176,28 +172,27 @@ export default function PostingTimes() {
                     exit={{ opacity: 0, y: -20 }}
                     className="space-y-6"
                   >
-                    {/* Heatmap Calendar - ALWAYS rendered */}
                     <div className="backdrop-blur-xl bg-card/40 border border-white/10 rounded-2xl p-6">
                       <div className="flex items-center justify-between mb-6">
                         <div>
                           <h2 className="text-xl font-bold flex items-center gap-2">
                             <TrendingUp className="w-5 h-5 text-primary" />
                             <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-                              14-Tage-Prognose
+                              {t('postingTimes.forecast14')}
                             </span>
                           </h2>
                           <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
-                            Klicke auf eine Zeit, um direkt im Kalender zu planen
+                            {t('postingTimes.clickToSchedule')}
                             {dataSource === 'industry_benchmark' && (
                               <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary">
                                 <Info className="w-3 h-3" />
-                                Branchen-Daten
+                                {t('postingTimes.industryData')}
                               </span>
                             )}
                             {dataSource === 'blended' && (
                               <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                                 <Sparkles className="w-3 h-3" />
-                                Personalisiert
+                                {t('postingTimes.personalized')}
                               </span>
                             )}
                           </p>
@@ -211,21 +206,20 @@ export default function PostingTimes() {
                       />
                     </div>
 
-                    {/* Top Slots List - ALWAYS rendered */}
                     <div className="backdrop-blur-xl bg-card/40 border border-white/10 rounded-2xl p-6">
                       <div className="flex items-center justify-between mb-6">
                         <div>
                           <h2 className="text-xl font-bold flex items-center gap-2">
                             <Calendar className="w-5 h-5 text-cyan-400" />
-                            <span>Top-Zeiten der nächsten 7 Tage</span>
+                            <span>{t('postingTimes.topTimesNext7')}</span>
                           </h2>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Die besten 3 Zeitfenster pro Tag
+                            {t('postingTimes.best3Slots')}
                           </p>
                         </div>
                         <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30">
                           <Sparkles className="w-3 h-3 text-cyan-400" />
-                          <span className="text-xs font-medium text-cyan-400">KI-optimiert</span>
+                          <span className="text-xs font-medium text-cyan-400">{t('postingTimes.aiOptimized')}</span>
                         </div>
                       </div>
 
