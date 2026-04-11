@@ -2064,7 +2064,8 @@ export const translations: Record<Language, any> = {
       account: "Account",
       billing: "Billing",
       pricing: "Pricing",
-      faq: "FAQ"
+      faq: "FAQ",
+      community: "Community"
     },
     
     // Authentication
@@ -5018,7 +5019,8 @@ export const translations: Record<Language, any> = {
       account: "Konto",
       billing: "Abrechnung",
       pricing: "Preise",
-      faq: "FAQ"
+      faq: "FAQ",
+      community: "Community"
     },
     
     // Authentication
@@ -7760,7 +7762,8 @@ export const translations: Record<Language, any> = {
       account: "Cuenta",
       billing: "Facturación",
       pricing: "Precios",
-      faq: "FAQ"
+      faq: "FAQ",
+      community: "Comunidad"
     },
     
     // Authentication
