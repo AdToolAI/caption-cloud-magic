@@ -64,6 +64,7 @@ export default function MediaLibrary() {
   const [importUrl, setImportUrl] = useState("");
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [studioImageCount, setStudioImageCount] = useState(0);
   const { connection: cloudConnection, cloudFiles, listCloudFiles, uploadToCloud, deleteFromCloud, syncing: cloudSyncing } = useCloudStorage();
 
   // Handle tab parameter from URL
@@ -338,6 +339,13 @@ export default function MediaLibrary() {
       }, 0);
 
       setStorageQuota(prev => ({ ...prev, used_mb: totalUsedMB }));
+
+      // Fetch studio_images count for the image counter
+      const { count: studioCount } = await supabase
+        .from('studio_images')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      setStudioImageCount(studioCount || 0);
 
       // Merge and sort by creation date - including AI videos
       const merged = [...normalizedAssets, ...normalizedContent, ...normalizedVideoCreations].sort(
@@ -799,7 +807,7 @@ export default function MediaLibrary() {
 
   // Calculate counts for header
   const videoCount = media.filter(m => m.type === 'video').length;
-  const imageCount = media.filter(m => m.type === 'image').length;
+  const imageCount = media.filter(m => m.type === 'image').length + studioImageCount;
   const usedGB = storageQuota.used_mb / 1024;
 
   const triggerUpload = () => {
