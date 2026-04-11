@@ -137,7 +137,8 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
         media: mediaUrls,
       });
 
-      toast.success(`Post geplant für ${new Date(when).toLocaleString('de-DE')} auf ${channels.length} Plattform(en)`);
+      const localeStr = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
+      toast.success(`${t('calendar.postScheduledFor')} ${new Date(when).toLocaleString(localeStr)} — ${channels.length} ${t('calendar.onPlatforms')}`);
       
       setTitle('');
       setCaption('');
