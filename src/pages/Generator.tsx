@@ -48,7 +48,7 @@ const Generator = () => {
     if (wizardPrompt) {
       setTopic(wizardPrompt);
       localStorage.removeItem("wizardPrompt");
-      toast.success("Prompt loaded from Wizard!");
+      toast.success(t('generator_prompt_loaded'));
     }
 
     // Generator Prefill von ImageCaptionPairing
@@ -61,7 +61,7 @@ const Generator = () => {
         if (data.hashtags) setHashtags(data.hashtags);
         if (data.platform) setPlatform(data.platform);
         localStorage.removeItem('generator_prefill');
-        toast.success("Caption vom Bild-Caption Pairing geladen!");
+        toast.success(t('generator_prefill_loaded'));
       } catch (e) {
         console.error('Error parsing generator_prefill:', e);
       }
@@ -73,7 +73,7 @@ const Generator = () => {
     
     if (prefill) {
       setTopic(decodeURIComponent(prefill));
-      toast.success("Content loaded!");
+      toast.success(t('generator_content_loaded'));
     }
     
     if (urlPlatform) {
@@ -141,7 +141,7 @@ const Generator = () => {
         },
       }, { silent: true });
       
-      toast.success("Caption generated!");
+      toast.success(t('generator_caption_generated'));
     } catch (error: any) {
       if (error.code !== 'INSUFFICIENT_CREDITS') {
         let errorMessage = t('generator_error_unexpected');
@@ -180,7 +180,7 @@ const Generator = () => {
       user_id: user?.id
     });
     
-    toast.success("Copied to clipboard!");
+    toast.success(t('generator_copied'));
   };
 
   const handleNew = async () => {
@@ -191,7 +191,7 @@ const Generator = () => {
 
   const handleSendToCalendar = () => {
     if (!caption) {
-      toast.error("Generiere zuerst eine Caption");
+      toast.error(t('generator_generate_first'));
       return;
     }
     
@@ -207,7 +207,7 @@ const Generator = () => {
     
     sessionStorage.setItem('calendar_prefill', JSON.stringify(prefillData));
     navigate('/calendar?prefill=true');
-    toast.success('📅 Post an Kalender gesendet - Jetzt Zeit & Details festlegen!');
+    toast.success(t('generator_calendar_success'));
   };
 
   if (authLoading) {
@@ -275,10 +275,10 @@ const Generator = () => {
                     variant="outline"
                     onClick={() => setIsAssistantOpen(true)}
                     className="h-12 px-4 border-white/20 hover:border-primary/60 hover:bg-primary/10 shrink-0"
-                    title="Prompt-Assistent öffnen"
+                    title={t('generator_open_assistant')}
                   >
                     <Wand2 className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Prompt-Assistent</span>
+                    <span className="hidden sm:inline">{t('generator_prompt_assistant')}</span>
                   </Button>
                 </div>
               </div>
