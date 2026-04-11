@@ -1,9 +1,10 @@
 import { format, addDays, startOfDay } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { de, enUS, es } from 'date-fns/locale';
 import { motion } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PostingSlot } from '@/hooks/usePostingTimes';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface HeatmapCalendarPremiumProps {
   slots: Record<string, PostingSlot[]>;
@@ -12,59 +13,36 @@ interface HeatmapCalendarPremiumProps {
 }
 
 function getScoreStyle(score: number): { bg: string; glow: string; pulse: boolean } {
-  if (score >= 85) return { 
-    bg: 'bg-emerald-500', 
-    glow: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
-    pulse: true 
-  };
-  if (score >= 70) return { 
-    bg: 'bg-emerald-400', 
-    glow: 'shadow-[0_0_8px_rgba(52,211,153,0.4)]',
-    pulse: false 
-  };
-  if (score >= 55) return { 
-    bg: 'bg-cyan-400', 
-    glow: 'shadow-[0_0_6px_rgba(34,211,238,0.3)]',
-    pulse: false 
-  };
-  if (score >= 40) return { 
-    bg: 'bg-amber-400', 
-    glow: '',
-    pulse: false 
-  };
-  if (score > 0) return { 
-    bg: 'bg-amber-300/60', 
-    glow: '',
-    pulse: false 
-  };
+  if (score >= 85) return { bg: 'bg-emerald-500', glow: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]', pulse: true };
+  if (score >= 70) return { bg: 'bg-emerald-400', glow: 'shadow-[0_0_8px_rgba(52,211,153,0.4)]', pulse: false };
+  if (score >= 55) return { bg: 'bg-cyan-400', glow: 'shadow-[0_0_6px_rgba(34,211,238,0.3)]', pulse: false };
+  if (score >= 40) return { bg: 'bg-amber-400', glow: '', pulse: false };
+  if (score > 0) return { bg: 'bg-amber-300/60', glow: '', pulse: false };
   return { bg: 'bg-muted/30', glow: '', pulse: false };
 }
 
 export function HeatmapCalendarPremium({ slots, platform, onSlotClick }: HeatmapCalendarPremiumProps) {
-  // Generate 14 days starting from today
+  const { t, language } = useTranslation();
+  const dateFnsLocale = language === 'de' ? de : language === 'es' ? es : enUS;
+
   const days = Array.from({ length: 14 }, (_, i) => {
     const date = addDays(startOfDay(new Date()), i);
     return {
       date,
       dateStr: format(date, 'yyyy-MM-dd'),
-      dayName: format(date, 'EEE', { locale: de }),
+      dayName: format(date, 'EEE', { locale: dateFnsLocale }),
       dayNumber: format(date, 'd'),
       isToday: i === 0,
     };
   });
 
-  // Group days into weeks (7 days each)
   const weeks: typeof days[] = [];
   for (let i = 0; i < days.length; i += 7) {
     weeks.push(days.slice(i, i + 7));
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="space-y-6"
-    >
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <TooltipProvider>
         {weeks.map((week, weekIdx) => (
           <motion.div
@@ -92,26 +70,18 @@ export function HeatmapCalendarPremium({ slots, platform, onSlotClick }: Heatmap
                       : "bg-card/40 border-white/10 hover:border-white/20 hover:bg-card/60"
                   )}
                 >
-                  {/* Day header */}
                   <div className="text-center mb-2">
-                    <div className={cn(
-                      "text-xs font-medium",
-                      day.isToday ? "text-primary" : "text-muted-foreground"
-                    )}>
+                    <div className={cn("text-xs font-medium", day.isToday ? "text-primary" : "text-muted-foreground")}>
                       {day.dayName}
                     </div>
-                    <div className={cn(
-                      "text-lg font-bold",
-                      day.isToday && "text-primary"
-                    )}>
+                    <div className={cn("text-lg font-bold", day.isToday && "text-primary")}>
                       {day.dayNumber}
                     </div>
                     {day.isToday && (
-                      <div className="text-[10px] text-primary font-medium">Heute</div>
+                      <div className="text-[10px] text-primary font-medium">{t('postingTimes.today')}</div>
                     )}
                   </div>
 
-                  {/* Hourly slots grid */}
                   <div className="grid grid-cols-4 gap-1">
                     {hourlySlots.map((slot, idx) => {
                       const hour = new Date(slot.start).getHours();
@@ -127,20 +97,13 @@ export function HeatmapCalendarPremium({ slots, platform, onSlotClick }: Heatmap
                               onClick={() => onSlotClick?.(slot)}
                               className={cn(
                                 "relative h-6 rounded-md transition-all cursor-pointer flex items-center justify-center text-[10px] font-bold",
-                                style.bg,
-                                style.glow,
-                                style.pulse && "animate-pulse"
+                                style.bg, style.glow, style.pulse && "animate-pulse"
                               )}
                             >
-                              {showLabel && (
-                                <span className="text-white drop-shadow-md">{hour}</span>
-                              )}
+                              {showLabel && <span className="text-white drop-shadow-md">{hour}</span>}
                             </motion.button>
                           </TooltipTrigger>
-                          <TooltipContent 
-                            side="top" 
-                            className="backdrop-blur-xl bg-card/90 border-white/20 shadow-xl"
-                          >
+                          <TooltipContent side="top" className="backdrop-blur-xl bg-card/90 border-white/20 shadow-xl">
                             <div className="space-y-2 p-1">
                               <div className="flex items-center gap-2">
                                 <div className={cn("w-3 h-3 rounded", style.bg)} />
@@ -167,7 +130,6 @@ export function HeatmapCalendarPremium({ slots, platform, onSlotClick }: Heatmap
                     })}
                   </div>
 
-                  {/* Best score indicator */}
                   {topScore >= 85 && (
                     <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full animate-ping" />
                   )}
@@ -178,7 +140,6 @@ export function HeatmapCalendarPremium({ slots, platform, onSlotClick }: Heatmap
         ))}
       </TooltipProvider>
 
-      {/* Premium Legend */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -194,11 +155,7 @@ export function HeatmapCalendarPremium({ slots, platform, onSlotClick }: Heatmap
             { label: '40-54', bg: 'bg-amber-400', glow: '' },
             { label: '<40', bg: 'bg-amber-300/60', glow: '' },
           ].map(({ label, bg, glow }) => (
-            <motion.div
-              key={label}
-              whileHover={{ scale: 1.05 }}
-              className="flex items-center gap-1.5"
-            >
+            <motion.div key={label} whileHover={{ scale: 1.05 }} className="flex items-center gap-1.5">
               <div className={cn("w-4 h-4 rounded", bg, glow)} />
               <span className="text-xs font-medium text-muted-foreground">{label}</span>
             </motion.div>
