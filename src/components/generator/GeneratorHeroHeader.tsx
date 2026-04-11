@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { Sparkles, MessageSquare, Zap } from 'lucide-react';
 import { CreditBalance } from '@/components/credits/CreditBalance';
 import { AICallStatus } from '@/components/ai/AICallStatus';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface GeneratorHeroHeaderProps {
   status: {
@@ -12,6 +13,8 @@ interface GeneratorHeroHeaderProps {
 }
 
 export function GeneratorHeroHeader({ status }: GeneratorHeroHeaderProps) {
+  const { t } = useTranslation();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -24,18 +27,12 @@ export function GeneratorHeroHeader({ status }: GeneratorHeroHeaderProps) {
       
       {/* Floating Orbs */}
       <motion.div
-        animate={{ 
-          scale: [1, 1.2, 1],
-          opacity: [0.3, 0.5, 0.3]
-        }}
+        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
         transition={{ duration: 4, repeat: Infinity }}
         className="absolute -top-10 left-1/4 w-32 h-32 bg-primary/10 rounded-full blur-3xl"
       />
       <motion.div
-        animate={{ 
-          scale: [1, 1.3, 1],
-          opacity: [0.2, 0.4, 0.2]
-        }}
+        animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.4, 0.2] }}
         transition={{ duration: 5, repeat: Infinity, delay: 1 }}
         className="absolute -top-5 right-1/4 w-40 h-40 bg-accent/10 rounded-full blur-3xl"
       />
@@ -55,7 +52,7 @@ export function GeneratorHeroHeader({ status }: GeneratorHeroHeaderProps) {
         </span>
         <MessageSquare className="h-3.5 w-3.5 text-primary" />
         <span className="text-xs font-medium text-primary uppercase tracking-wider">
-          KI Text-Studio
+          {t('generator_hero_badge')}
         </span>
       </motion.div>
 
@@ -66,7 +63,7 @@ export function GeneratorHeroHeader({ status }: GeneratorHeroHeaderProps) {
         transition={{ delay: 0.3 }}
         className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary via-primary to-accent bg-clip-text text-transparent"
       >
-        KI Text-Studio
+        {t('generator_hero_title')}
       </motion.h1>
 
       {/* Credits Card */}
@@ -99,9 +96,9 @@ export function GeneratorHeroHeader({ status }: GeneratorHeroHeaderProps) {
         className="flex flex-wrap justify-center gap-3 mt-6"
       >
         {[
-          { icon: Sparkles, label: 'KI-Generiert' },
-          { icon: Zap, label: 'Sofort einsatzbereit' },
-          { icon: MessageSquare, label: 'Multi-Plattform' },
+          { icon: Sparkles, label: t('generator_hero_ai_generated') },
+          { icon: Zap, label: t('generator_hero_instant') },
+          { icon: MessageSquare, label: t('generator_hero_multi_platform') },
         ].map((item, idx) => (
           <div
             key={idx}

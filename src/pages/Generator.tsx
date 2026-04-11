@@ -48,7 +48,7 @@ const Generator = () => {
     if (wizardPrompt) {
       setTopic(wizardPrompt);
       localStorage.removeItem("wizardPrompt");
-      toast.success("Prompt loaded from Wizard!");
+      toast.success(t('generator_prompt_loaded'));
     }
 
     // Generator Prefill von ImageCaptionPairing
@@ -61,7 +61,7 @@ const Generator = () => {
         if (data.hashtags) setHashtags(data.hashtags);
         if (data.platform) setPlatform(data.platform);
         localStorage.removeItem('generator_prefill');
-        toast.success("Caption vom Bild-Caption Pairing geladen!");
+        toast.success(t('generator_prefill_loaded'));
       } catch (e) {
         console.error('Error parsing generator_prefill:', e);
       }
@@ -73,7 +73,7 @@ const Generator = () => {
     
     if (prefill) {
       setTopic(decodeURIComponent(prefill));
-      toast.success("Content loaded!");
+      toast.success(t('generator_content_loaded'));
     }
     
     if (urlPlatform) {
@@ -141,7 +141,7 @@ const Generator = () => {
         },
       }, { silent: true });
       
-      toast.success("Caption generated!");
+      toast.success(t('generator_caption_generated'));
     } catch (error: any) {
       if (error.code !== 'INSUFFICIENT_CREDITS') {
         let errorMessage = t('generator_error_unexpected');
@@ -180,7 +180,7 @@ const Generator = () => {
       user_id: user?.id
     });
     
-    toast.success("Copied to clipboard!");
+    toast.success(t('generator_copied'));
   };
 
   const handleNew = async () => {
@@ -191,7 +191,7 @@ const Generator = () => {
 
   const handleSendToCalendar = () => {
     if (!caption) {
-      toast.error("Generiere zuerst eine Caption");
+      toast.error(t('generator_generate_first'));
       return;
     }
     
@@ -207,7 +207,7 @@ const Generator = () => {
     
     sessionStorage.setItem('calendar_prefill', JSON.stringify(prefillData));
     navigate('/calendar?prefill=true');
-    toast.success('📅 Post an Kalender gesendet - Jetzt Zeit & Details festlegen!');
+    toast.success(t('generator_calendar_success'));
   };
 
   if (authLoading) {
@@ -275,10 +275,10 @@ const Generator = () => {
                     variant="outline"
                     onClick={() => setIsAssistantOpen(true)}
                     className="h-12 px-4 border-white/20 hover:border-primary/60 hover:bg-primary/10 shrink-0"
-                    title="Prompt-Assistent öffnen"
+                    title={t('generator_open_assistant')}
                   >
                     <Wand2 className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Prompt-Assistent</span>
+                    <span className="hidden sm:inline">{t('generator_prompt_assistant')}</span>
                   </Button>
                 </div>
               </div>
@@ -328,7 +328,7 @@ const Generator = () => {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-muted-foreground">
-                    Content-Länge
+                    {t('generator_content_length')}
                   </Label>
                   <Select 
                     value={contentLength} 
@@ -339,9 +339,9 @@ const Generator = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-popover/95 backdrop-blur-xl border-white/10 z-50">
-                      <SelectItem value="short">Kurz (~120 Zeichen)</SelectItem>
-                      <SelectItem value="medium">Mittel (~250 Zeichen)</SelectItem>
-                      <SelectItem value="long">Lang (~400 Zeichen)</SelectItem>
+                      <SelectItem value="short">{t('generator_length_short')}</SelectItem>
+                      <SelectItem value="medium">{t('generator_length_medium')}</SelectItem>
+                      <SelectItem value="long">{t('generator_length_long')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -349,7 +349,7 @@ const Generator = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium text-muted-foreground">
-                      Anzahl Hashtags
+                      {t('generator_hashtag_count')}
                     </Label>
                     <span className="text-sm font-medium text-primary">{hashtagCount}</span>
                   </div>
@@ -388,7 +388,7 @@ const Generator = () => {
                     ) : (
                       <Sparkles className="h-5 w-5" />
                     )}
-                    {isGenerating ? 'Generating...' : t('btn_generate')}
+                    {isGenerating ? t('generator_generating') : t('btn_generate')}
                   </span>
                 </Button>
               </motion.div>
@@ -405,14 +405,14 @@ const Generator = () => {
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-green-400" />
                       <Label className="text-sm font-medium">Caption</Label>
-                      <span className="text-xs text-muted-foreground">(editierbar)</span>
+                      <span className="text-xs text-muted-foreground">{t('generator_editable')}</span>
                     </div>
                     <Textarea
                       value={caption}
                       onChange={(e) => setCaption(e.target.value)}
                       className="min-h-[120px] bg-muted/20 border-white/10 focus:border-primary/60 
                                  focus:ring-2 focus:ring-primary/20 resize-y text-foreground"
-                      placeholder="Caption bearbeiten..."
+                      placeholder={t('generator_caption_placeholder')}
                     />
                   </div>
 
@@ -420,7 +420,7 @@ const Generator = () => {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Label className="text-sm font-medium text-muted-foreground">Hashtags</Label>
-                      <span className="text-xs text-muted-foreground">(editierbar)</span>
+                      <span className="text-xs text-muted-foreground">{t('generator_editable')}</span>
                     </div>
                     <Input
                       value={hashtags.join(' ')}
@@ -458,7 +458,7 @@ const Generator = () => {
                                    hover:shadow-[0_0_20px_hsla(142,70%,45%,0.3)]"
                       >
                         <Calendar className="mr-2 h-4 w-4" />
-                        Zum Kalender hinzufügen
+                        {t('generator_send_to_calendar')}
                       </Button>
                     </motion.div>
                   </div>
