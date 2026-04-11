@@ -40,7 +40,7 @@ const PLATFORMS = [
 
 export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormProps) {
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [title, setTitle] = useState('');
   const [caption, setCaption] = useState('');
   const [when, setWhen] = useState(() => {
