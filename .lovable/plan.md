@@ -1,78 +1,44 @@
 
-Problem:
-The remaining German text in the English UI is coming from the KI-Textstudio/Generator area, not just one label. I found hardcoded German strings in the page component, the hero header, the prompt assistant dialog, and even shared AI status messages.
 
-What I found:
-- `src/components/generator/GeneratorHeroHeader.tsx`
-  - hardcoded: `KI Text-Studio`, `KI-Generiert`, `Sofort einsatzbereit`, `Multi-Plattform`
-- `src/pages/Generator.tsx`
-  - hardcoded: `Prompt-Assistent öffnen`, `Prompt-Assistent`
-  - `Content-Länge`, `Kurz/Mittel/Lang`
-  - `Anzahl Hashtags`
-  - `Generating...`
-  - result labels: `(editierbar)`, `Caption bearbeiten...`
-  - toasts: `Caption generated!`, `Copied to clipboard!`, `Generiere zuerst eine Caption`, calendar success message
-  - CTA: `Zum Kalender hinzufügen`
-- `src/components/generator/PromptAssistantDialog.tsx`
-  - hardcoded toast: `Prompt übernommen!`
-  - hardcoded button text: `In Generator übernehmen`
-- `src/hooks/useAICall.ts`
-  - shared German status/toast text:
-    - `Prüfe Credits...`
-    - `Generiere...`
-    - `Wiederhole...`
-    - `Erfolgreich!`
-    - insufficient credits / rate-limit / server error messages
+## Plan: KI-Post-Generator v2 — Full Localization
 
-Important design note:
-- The base translation file already has good generator and prompt assistant keys in EN/DE/ES.
-- So this is mostly a cleanup of hardcoded literals plus a small translation expansion.
-- `nav.textStudio` is already correct in English (`AI Text Studio`), so the remaining issue is component-level strings.
+### Problem
+The entire KI-Post-Generator v2 page and its 3 sub-components contain ~80 hardcoded German strings that don't react to the language setting. Translation keys (`aipost_*`) already exist in `translations.ts` for EN/DE/ES but are not used.
 
-Implementation plan:
-1. Extend `src/lib/translations.ts`
-- Add missing generator keys for:
-  - hero badge/title/highlights
-  - prompt assistant trigger text/tooltip
-  - content length label + short/medium/long options
-  - hashtag count label
-  - generating state
-  - editable/result labels and placeholders
-  - send-to-calendar CTA
-  - generator success/copy/prefill/calendar toasts
-- Add prompt assistant action/success keys for:
-  - `useInGenerator`
-  - `applied`
-- Add shared AI call status/error keys under a safe namespace (for example `aiCall.*`) to avoid collisions.
+### Changes
 
-2. Localize `src/components/generator/GeneratorHeroHeader.tsx`
-- Use `useTranslation()`
-- Replace hero badge/title and feature chips with translation keys
-- Keep layout/animation unchanged.
+**1. `src/lib/translations.ts` — Add ~40 missing keys (all 3 languages)**
 
-3. Localize `src/pages/Generator.tsx`
-- Replace all remaining hardcoded German/English literals with `t(...)`
-- Use translated labels for content length options and result section
-- Replace all generator toasts with translated messages
-- Keep platform names as-is unless already centralized elsewhere.
+New keys needed for strings not yet covered by existing `aipost_*` keys:
+- PostGeneratorHeroHeader: badge, title, subtitle
+- PostInputPanel: "Post erstellen", "Lade ein Bild hoch...", "Bild/Video hochladen (optional)", "Klicken zum Hochladen", "Bilder: max 10MB...", video limits, "Kurzbeschreibung / Briefing", placeholder, characters count, "Plattform(en)", "Stil-Vorlage", "Sprache(n)", "Tonfall" + options (Freundlich/Professionell/Locker/Inspirierend), "CTA (optional)", placeholder, "Erweiterte Optionen", all option labels, "Generiere Post...", "Post generieren", "Aktives Brand-Set"
+- PreviewTabs: tab labels (Vorschau/Varianten/Plattform/Bild/Scores), "Hook-Varianten", "Zeichen", "Hauptcaption", "Caption B (A/B-Test)", "Hashtag-Sets", "Alt-Text (Barrierefreiheit)", "Plattform-Limits", hashtag warnings, "Zeichen übrig", "Compliance-Hinweise", video upload note, empty states, action buttons (An Composer/Kopieren/Kalender/Freigabe), score labels
+- AIPostGenerator page: all toast messages, error messages, dialog texts ("Post erfolgreich generiert!", "Möchtest du...", "Zukünftig automatisch speichern", "Nicht speichern", "In Media Library speichern"), breadcrumb feature name
+- MediaLibrary toast references ("An KI-Post-Generator senden")
 
-4. Localize `src/components/generator/PromptAssistantDialog.tsx`
-- Replace `Prompt übernommen!` and `In Generator übernehmen` with translation keys
-- Reuse existing `wizard.useInGenerator` where possible.
+**2. `src/components/post-generator/PostGeneratorHeroHeader.tsx`**
+- Add `useTranslation` hook
+- Replace badge, h1, subtitle with `t('aipost_...')` keys
 
-5. Localize shared AI status copy in `src/hooks/useAICall.ts`
-- Inject translation support into the hook
-- Replace German status messages and generic error toasts with translated keys
-- This will also improve language consistency anywhere else `useAICall()` is used.
+**3. `src/components/post-generator/PostInputPanel.tsx`**
+- Add `useTranslation` hook
+- Replace all ~30 hardcoded labels, placeholders, option texts, and button text
 
-Files to update:
+**4. `src/components/post-generator/PreviewTabs.tsx`**
+- Add `useTranslation` hook
+- Replace all ~25 tab labels, section headers, action buttons, empty states, and toast messages
+
+**5. `src/pages/AIPostGenerator.tsx`**
+- Replace all ~15 toast messages, error strings, dialog texts, and breadcrumb label with `t(...)` calls
+
+**6. `src/pages/MediaLibrary.tsx`** (minor)
+- Replace 3 tooltip/toast strings referencing "KI-Post-Generator"
+
+### Files affected (6)
 - `src/lib/translations.ts`
-- `src/components/generator/GeneratorHeroHeader.tsx`
-- `src/pages/Generator.tsx`
-- `src/components/generator/PromptAssistantDialog.tsx`
-- `src/hooks/useAICall.ts`
+- `src/components/post-generator/PostGeneratorHeroHeader.tsx`
+- `src/components/post-generator/PostInputPanel.tsx`
+- `src/components/post-generator/PreviewTabs.tsx`
+- `src/pages/AIPostGenerator.tsx`
+- `src/pages/MediaLibrary.tsx`
 
-Expected result:
-- The KI-Textstudio / AI Text Studio page will be fully language-consistent in EN/DE/ES.
-- No German hero text, chips, CTA labels, assistant text, or AI status messages will remain in the English UI.
-- Shared AI loading/error badges will also match the selected language across affected tools.
