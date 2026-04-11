@@ -606,7 +606,7 @@ const ImageCaptionPairing = () => {
                                    hover:shadow-[0_0_15px_hsla(43,90%,68%,0.2)] transition-all"
                       >
                         <Copy className="h-4 w-4 mr-2" />
-                        Kopieren
+                        {t('imgcap_copy')}
                       </Button>
                       <Button
                         variant="outline"
@@ -615,7 +615,7 @@ const ImageCaptionPairing = () => {
                         className="bg-muted/20 border-white/10 hover:bg-muted/40"
                       >
                         <Wand2 className="h-4 w-4 mr-2" />
-                        Im Generator
+                        {t('imgcap_in_generator')}
                       </Button>
                       <Button
                         variant="outline"
@@ -624,7 +624,7 @@ const ImageCaptionPairing = () => {
                         className="bg-cyan-500/10 border-cyan-500/30 hover:bg-cyan-500/20 transition-all"
                       >
                         <Calendar className="h-4 w-4 mr-2" />
-                        Zum Kalender
+                        {t('imgcap_to_calendar')}
                       </Button>
                     </div>
                   </motion.div>
@@ -650,7 +650,7 @@ const ImageCaptionPairing = () => {
                     <Sparkles className="h-8 w-8 text-primary" />
                   </motion.div>
                   <p className="text-muted-foreground text-center">
-                    Bild wurde hochgeladen. Captions werden generiert...
+                    {t('imgcap_image_uploaded_generating')}
                   </p>
                 </div>
               </motion.div>
