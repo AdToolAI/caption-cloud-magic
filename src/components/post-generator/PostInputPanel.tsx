@@ -10,6 +10,7 @@ import { Instagram, Facebook, Linkedin, Upload, Sparkles, Twitter, Video, Youtub
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface PostInputPanelProps {
   brief: string;
@@ -66,24 +67,18 @@ export function PostInputPanel({
   onGenerate,
   isGenerating,
 }: PostInputPanelProps) {
+  const { t } = useTranslation();
   const activeBrand = brandKits.find((k) => k.id === selectedBrandKit);
 
   const getPlatformIcon = (p: string) => {
     switch (p) {
-      case "instagram":
-        return <Instagram className="h-4 w-4" />;
-      case "facebook":
-        return <Facebook className="h-4 w-4" />;
-      case "linkedin":
-        return <Linkedin className="h-4 w-4" />;
-      case "x":
-        return <Twitter className="h-4 w-4" />;
-      case "tiktok":
-        return <Video className="h-4 w-4" />;
-      case "youtube":
-        return <Youtube className="h-4 w-4" />;
-      default:
-        return null;
+      case "instagram": return <Instagram className="h-4 w-4" />;
+      case "facebook": return <Facebook className="h-4 w-4" />;
+      case "linkedin": return <Linkedin className="h-4 w-4" />;
+      case "x": return <Twitter className="h-4 w-4" />;
+      case "tiktok": return <Video className="h-4 w-4" />;
+      case "youtube": return <Youtube className="h-4 w-4" />;
+      default: return null;
     }
   };
 
@@ -105,21 +100,21 @@ export function PostInputPanel({
           <Image className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h2 className="text-xl font-semibold">Post erstellen</h2>
-          <p className="text-sm text-muted-foreground">Lade ein Bild hoch und beschreibe deinen Post</p>
+          <h2 className="text-xl font-semibold">{t('aipost_create_post')}</h2>
+          <p className="text-sm text-muted-foreground">{t('aipost_create_post_desc')}</p>
         </div>
       </div>
 
       {/* Active Brand Badge */}
       {activeBrand && (
         <Badge variant="secondary" className="bg-primary/20 border border-primary/30 text-primary">
-          💜 Aktives Brand-Set: {activeBrand.brand_name || activeBrand.mood}
+          💜 {t('aipost_active_brand')}: {activeBrand.brand_name || activeBrand.mood}
         </Badge>
       )}
 
-      {/* Media Upload - Premium Styling */}
+      {/* Media Upload */}
       <div>
-        <Label className="text-sm font-medium">Bild/Video hochladen (optional)</Label>
+        <Label className="text-sm font-medium">{t('aipost_upload_media')}</Label>
         <div className="mt-2 border-2 border-dashed border-white/20 rounded-xl p-8 text-center 
                         hover:border-primary/50 hover:shadow-[0_0_30px_hsla(43,90%,68%,0.1)]
                         transition-all duration-300 cursor-pointer bg-muted/10 group">
@@ -151,9 +146,9 @@ export function PostInputPanel({
                   <Upload className="h-12 w-12 mx-auto mb-2 text-muted-foreground group-hover:text-primary transition-colors" />
                 </motion.div>
                 <p className="text-sm text-muted-foreground">
-                  Klicken zum Hochladen
+                  {t('aipost_click_to_upload')}
                   <br />
-                  <span className="text-xs">Bilder: max 10MB | Videos: max 1GB (MP4, MOV)</span>
+                  <span className="text-xs">{t('aipost_upload_limits')}</span>
                 </p>
               </>
             )}
@@ -162,32 +157,32 @@ export function PostInputPanel({
         {mediaType === 'video' && (
           <Alert className="mt-2 bg-muted/20 border-white/10">
             <AlertDescription className="text-xs">
-              📹 <strong>Video-Limits:</strong> Instagram Reels (3-90s) • Facebook (unbegrenzt) • TikTok (bis 10min)
+              📹 <strong>{t('aipost_video_limits')}</strong> {t('aipost_video_limits_detail')}
             </AlertDescription>
           </Alert>
         )}
       </div>
 
-      {/* Kurzbeschreibung / Briefing */}
+      {/* Briefing */}
       <div>
-        <Label className="text-sm font-medium">Kurzbeschreibung / Briefing</Label>
+        <Label className="text-sm font-medium">{t('aipost_briefing')}</Label>
         <Textarea
           value={brief}
           onChange={(e) => setBrief(e.target.value)}
-          placeholder="2-3 Stichpunkte genügen – wir bauen Hook, Caption & Hashtags..."
+          placeholder={t('aipost_briefing_placeholder')}
           maxLength={1500}
           rows={4}
           className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 
                      focus:ring-2 focus:ring-primary/20 resize-none"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          🪄 {brief.length}/1500 Zeichen
+          🪄 {brief.length}/1500 {t('aipost_characters')}
         </p>
       </div>
 
-      {/* Plattformen als Premium Chips */}
+      {/* Platforms */}
       <div>
-        <Label className="text-sm font-medium mb-3 block">Plattform(en)</Label>
+        <Label className="text-sm font-medium mb-3 block">{t('aipost_platforms')}</Label>
         <div className="flex flex-wrap gap-2">
           {["instagram", "facebook", "x", "linkedin", "tiktok", "youtube"].map((p, index) => (
             <motion.div
@@ -218,25 +213,25 @@ export function PostInputPanel({
         </div>
       </div>
 
-      {/* Stil-Vorlage */}
+      {/* Style Preset */}
       <div>
-        <Label className="text-sm font-medium">Stil-Vorlage</Label>
+        <Label className="text-sm font-medium">{t('aipost_style')}</Label>
         <Select value={stylePreset} onValueChange={setStylePreset}>
           <SelectTrigger className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 
                                     focus:ring-2 focus:ring-primary/20 h-12">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="clean">Clean</SelectItem>
-            <SelectItem value="bold">Bold</SelectItem>
-            <SelectItem value="editorial">Editorial</SelectItem>
+            <SelectItem value="clean">{t('aipost_style_clean')}</SelectItem>
+            <SelectItem value="bold">{t('aipost_style_bold')}</SelectItem>
+            <SelectItem value="editorial">{t('aipost_style_editorial')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {/* Sprache(n) als Premium Chips */}
+      {/* Languages */}
       <div>
-        <Label className="text-sm font-medium mb-3 block">Sprache(n)</Label>
+        <Label className="text-sm font-medium mb-3 block">{t('aipost_languages')}</Label>
         <div className="flex gap-2">
           {["de", "en", "es"].map((l) => (
             <div
@@ -261,19 +256,19 @@ export function PostInputPanel({
         </div>
       </div>
 
-      {/* Tonfall */}
+      {/* Tone */}
       <div>
-        <Label className="text-sm font-medium">Tonfall</Label>
+        <Label className="text-sm font-medium">{t('aipost_tone')}</Label>
         <Select value={tone} onValueChange={setTone}>
           <SelectTrigger className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 
                                     focus:ring-2 focus:ring-primary/20 h-12">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="friendly">Freundlich</SelectItem>
-            <SelectItem value="professional">Professionell</SelectItem>
-            <SelectItem value="casual">Locker</SelectItem>
-            <SelectItem value="inspirational">Inspirierend</SelectItem>
+            <SelectItem value="friendly">{t('aipost_tone_friendly')}</SelectItem>
+            <SelectItem value="professional">{t('aipost_tone_professional')}</SelectItem>
+            <SelectItem value="casual">{t('aipost_tone_casual')}</SelectItem>
+            <SelectItem value="inspirational">{t('aipost_tone_inspirational')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -281,7 +276,7 @@ export function PostInputPanel({
       {/* Brand-Kit */}
       {brandKits.length > 0 && (
         <div>
-          <Label className="text-sm font-medium">Brand-Kit</Label>
+          <Label className="text-sm font-medium">{t('aipost_brand_kit')}</Label>
           <Select value={selectedBrandKit} onValueChange={setSelectedBrandKit}>
             <SelectTrigger className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 
                                       focus:ring-2 focus:ring-primary/20 h-12">
@@ -299,89 +294,58 @@ export function PostInputPanel({
         </div>
       )}
 
-      {/* CTA (optional) */}
+      {/* CTA */}
       <div>
-        <Label className="text-sm font-medium">CTA (optional)</Label>
+        <Label className="text-sm font-medium">{t('aipost_cta')}</Label>
         <Input
           value={ctaInput}
           onChange={(e) => setCTAInput(e.target.value)}
-          placeholder="z.B. Jetzt testen – Link in Bio"
+          placeholder={t('aipost_cta_placeholder')}
           className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 
                      focus:ring-2 focus:ring-primary/20 h-12"
         />
       </div>
 
-      {/* Optionen Section with Divider */}
+      {/* Advanced Options */}
       <div className="space-y-4 border-t border-white/10 pt-6 mt-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 
                           flex items-center justify-center shadow-[0_0_15px_hsla(43,90%,68%,0.15)]">
             <Settings className="h-5 w-5 text-primary" />
           </div>
-          <Label className="text-base font-semibold">Erweiterte Optionen</Label>
+          <Label className="text-base font-semibold">{t('aipost_advanced_options')}</Label>
         </div>
 
         <div className="flex items-center justify-between p-3 rounded-xl bg-muted/10 border border-white/5">
-          <Label htmlFor="localize" className="text-sm">
-            Lokalisieren (Währung/Emoji)
-          </Label>
-          <Switch
-            id="localize"
-            checked={options.localize}
-            onCheckedChange={(checked) => setOptions({ ...options, localize: checked })}
-          />
+          <Label htmlFor="localize" className="text-sm">{t('aipost_option_localize')}</Label>
+          <Switch id="localize" checked={options.localize} onCheckedChange={(checked) => setOptions({ ...options, localize: checked })} />
         </div>
 
         <div className="p-3 rounded-xl bg-muted/10 border border-white/5 space-y-2">
           <div className="flex items-center justify-between">
-            <Label className="text-sm">Brand-Treue erzwingen</Label>
+            <Label className="text-sm">{t('aipost_option_brand_fidelity')}</Label>
             <span className="text-sm font-medium text-primary">{options.brandFidelity}%</span>
           </div>
-          <Slider
-            value={[options.brandFidelity]}
-            onValueChange={(v) => setOptions({ ...options, brandFidelity: v[0] })}
-            min={60}
-            max={100}
-            step={5}
-            className="w-full"
-          />
+          <Slider value={[options.brandFidelity]} onValueChange={(v) => setOptions({ ...options, brandFidelity: v[0] })} min={60} max={100} step={5} className="w-full" />
         </div>
 
         <div className="flex items-center justify-between p-3 rounded-xl bg-muted/10 border border-white/5">
-          <Label htmlFor="abVariant" className="text-sm">
-            A/B-Variante erzeugen
-          </Label>
-          <Switch
-            id="abVariant"
-            checked={options.abVariant}
-            onCheckedChange={(checked) => setOptions({ ...options, abVariant: checked })}
-          />
+          <Label htmlFor="abVariant" className="text-sm">{t('aipost_option_ab_variant')}</Label>
+          <Switch id="abVariant" checked={options.abVariant} onCheckedChange={(checked) => setOptions({ ...options, abVariant: checked })} />
         </div>
 
         <div className="flex items-center justify-between p-3 rounded-xl bg-muted/10 border border-white/5">
-          <Label htmlFor="altText" className="text-sm">
-            Alt-Text automatisch erzeugen
-          </Label>
-          <Switch
-            id="altText"
-            checked={options.altText}
-            onCheckedChange={(checked) => setOptions({ ...options, altText: checked })}
-          />
+          <Label htmlFor="altText" className="text-sm">{t('aipost_option_alt_text')}</Label>
+          <Switch id="altText" checked={options.altText} onCheckedChange={(checked) => setOptions({ ...options, altText: checked })} />
         </div>
 
         <div className="flex items-center justify-between p-3 rounded-xl bg-muted/10 border border-white/5">
-          <Label htmlFor="utm" className="text-sm">
-            UTM-Link generieren
-          </Label>
-          <Switch
-            id="utm"
-            checked={options.utm}
-            onCheckedChange={(checked) => setOptions({ ...options, utm: checked })}
-          />
+          <Label htmlFor="utm" className="text-sm">{t('aipost_option_utm')}</Label>
+          <Switch id="utm" checked={options.utm} onCheckedChange={(checked) => setOptions({ ...options, utm: checked })} />
         </div>
       </div>
 
-      {/* Generate Button with Shimmer */}
+      {/* Generate Button */}
       <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
         <Button
           onClick={onGenerate}
@@ -392,15 +356,14 @@ export function PostInputPanel({
                      transition-all duration-300"
           size="lg"
         >
-          {/* Shimmer Effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent 
                           translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
           {isGenerating ? (
-            <>Generiere Post...</>
+            <>{t('aipost_generating')}</>
           ) : (
             <>
               <Sparkles className="mr-2 h-5 w-5" />
-              Post generieren
+              {t('aipost_generate_button')}
             </>
           )}
         </Button>

@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import React from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface PreviewTabsProps {
   draft: any | null;
@@ -38,6 +39,7 @@ export function PreviewTabs({
 }: PreviewTabsProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [selectedLanguage, setSelectedLanguage] = React.useState<string>('de');
   const [previewPlatform, setPreviewPlatform] = React.useState<'facebook' | 'instagram' | 'linkedin' | 'x'>('facebook');
 
@@ -65,14 +67,14 @@ export function PreviewTabs({
     
     if (!user) {
       localStorage.setItem('composer_import', JSON.stringify(composerData));
-      toast.info('🔐 Bitte melde dich an, um den Post zu veröffentlichen');
+      toast.info(`🔐 ${t('aipost_login_to_publish')}`);
       navigate('/auth');
       return;
     }
     
     sessionStorage.setItem('composer_import', JSON.stringify(composerData));
     navigate('/composer');
-    toast.success('📤 Post an Composer gesendet!');
+    toast.success(`📤 ${t('aipost_sent_to_composer')}`);
   };
 
   const availableLanguages = draft?.languages || ['de'];
@@ -108,7 +110,7 @@ export function PreviewTabs({
           >
             <Sparkles className="h-10 w-10 text-primary/60" />
           </motion.div>
-          <p className="text-sm">Lade ein Bild hoch und generiere deinen Post, um die Vorschau zu sehen</p>
+          <p className="text-sm">{t('aipost_empty_state')}</p>
         </div>
       </div>
     );
@@ -127,7 +129,7 @@ export function PreviewTabs({
 
   return (
     <div className="h-full p-6">
-      {/* Language Selector for Multi-Language - Premium Styling */}
+      {/* Language Selector */}
       {availableLanguages.length > 1 && (
         <div className="flex gap-2 mb-4 p-2 bg-muted/20 rounded-xl border border-white/10">
           {availableLanguages.map((lang: string) => (
@@ -151,46 +153,25 @@ export function PreviewTabs({
       
       <Tabs defaultValue="preview" className="w-full">
         <TabsList className="grid w-full grid-cols-5 bg-muted/20 border border-white/10 rounded-xl p-1">
-          <TabsTrigger 
-            value="preview"
-            className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary
-                       data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] rounded-lg"
-          >
-            Vorschau
+          <TabsTrigger value="preview" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] rounded-lg">
+            {t('aipost_tab_preview')}
           </TabsTrigger>
-          <TabsTrigger 
-            value="variants"
-            className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary
-                       data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] rounded-lg"
-          >
-            Varianten
+          <TabsTrigger value="variants" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] rounded-lg">
+            {t('aipost_tab_variants')}
           </TabsTrigger>
-          <TabsTrigger 
-            value="platform"
-            className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary
-                       data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] rounded-lg"
-          >
-            Plattform
+          <TabsTrigger value="platform" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] rounded-lg">
+            {t('aipost_tab_platform')}
           </TabsTrigger>
-          <TabsTrigger 
-            value="image"
-            className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary
-                       data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] rounded-lg"
-          >
-            Bild
+          <TabsTrigger value="image" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] rounded-lg">
+            {t('aipost_tab_image')}
           </TabsTrigger>
-          <TabsTrigger 
-            value="scores"
-            className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary
-                       data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] rounded-lg"
-          >
-            Scores
+          <TabsTrigger value="scores" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] rounded-lg">
+            {t('aipost_tab_scores')}
           </TabsTrigger>
         </TabsList>
 
         {/* Tab 0: Social Media Previews */}
         <TabsContent value="preview" className="space-y-4 mt-6">
-          {/* Platform Selector - Premium Styling */}
           <div className="flex gap-2 mb-6 justify-center flex-wrap">
             {(['facebook', 'instagram', 'linkedin', 'x'] as const).map((platform) => (
               <Button 
@@ -210,7 +191,6 @@ export function PreviewTabs({
             ))}
           </div>
 
-          {/* Conditional Platform Previews */}
           {previewPlatform === 'facebook' && (
             <FacebookPostPreview
               mediaUrl={draft.media_url || mediaPreview || ''}
@@ -222,7 +202,6 @@ export function PreviewTabs({
               profileImage={undefined}
             />
           )}
-
           {previewPlatform === 'instagram' && (
             <InstagramPostPreview
               mediaUrl={draft.media_url || mediaPreview || ''}
@@ -234,7 +213,6 @@ export function PreviewTabs({
               profileImage={undefined}
             />
           )}
-
           {previewPlatform === 'linkedin' && (
             <LinkedInPostPreview
               mediaUrl={draft.media_url || mediaPreview || ''}
@@ -247,7 +225,6 @@ export function PreviewTabs({
               profileImage={undefined}
             />
           )}
-
           {previewPlatform === 'x' && (
             <XPostPreview
               mediaUrl={draft.media_url || mediaPreview || ''}
@@ -262,11 +239,10 @@ export function PreviewTabs({
           )}
         </TabsContent>
 
-        {/* Tab 1: Varianten */}
+        {/* Tab 1: Variants */}
         <TabsContent value="variants" className="space-y-6 mt-6">
-          {/* Hooks */}
           <div>
-            <Label className="text-sm font-semibold">Hook-Varianten</Label>
+            <Label className="text-sm font-semibold">{t('aipost_hook_variants')}</Label>
             <div className="space-y-2 mt-2">
               {["A", "B", "C"].map((variant, index) => (
                 <motion.div 
@@ -274,16 +250,14 @@ export function PreviewTabs({
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="p-3 bg-muted/20 border border-white/10 rounded-xl
-                             hover:border-primary/30 hover:shadow-[0_0_15px_hsla(43,90%,68%,0.1)]
-                             transition-all duration-300"
+                  className="p-3 bg-muted/20 border border-white/10 rounded-xl hover:border-primary/30 hover:shadow-[0_0_15px_hsla(43,90%,68%,0.1)] transition-all duration-300"
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <Badge variant="outline" className="bg-primary/10 border-primary/30 text-primary">
                       Hook {variant}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
-                      {hooks?.[variant]?.length || 0} Zeichen
+                      {hooks?.[variant]?.length || 0} {t('aipost_chars')}
                     </span>
                   </div>
                   <p className="text-sm">{hooks?.[variant] || "-"}</p>
@@ -292,27 +266,24 @@ export function PreviewTabs({
             </div>
           </div>
 
-          {/* Hauptcaption */}
           <div>
-            <Label className="text-sm font-semibold">Hauptcaption</Label>
+            <Label className="text-sm font-semibold">{t('aipost_main_caption')}</Label>
             <div className="p-4 bg-muted/20 border border-white/10 rounded-xl mt-2">
               <p className="whitespace-pre-wrap text-sm">{caption}</p>
             </div>
           </div>
 
-          {/* A/B Variante */}
           {caption_b && (
             <div>
-              <Label className="text-sm font-semibold">Caption B (A/B-Test)</Label>
+              <Label className="text-sm font-semibold">{t('aipost_caption_b')}</Label>
               <div className="p-4 bg-muted/20 border border-white/10 rounded-xl mt-2">
                 <p className="whitespace-pre-wrap text-sm">{caption_b}</p>
               </div>
             </div>
           )}
 
-          {/* Hashtag-Sets */}
           <div>
-            <Label className="text-sm font-semibold">Hashtag-Sets</Label>
+            <Label className="text-sm font-semibold">{t('aipost_hashtag_sets')}</Label>
             <div className="space-y-2 mt-2">
               {["reach", "niche", "brand"].map((setName, index) => (
                 <motion.div 
@@ -338,10 +309,9 @@ export function PreviewTabs({
             </div>
           </div>
 
-          {/* Alt-Text */}
           {alt_text && (
             <div>
-              <Label className="text-sm font-semibold">Alt-Text (Barrierefreiheit)</Label>
+              <Label className="text-sm font-semibold">{t('aipost_alt_text_label')}</Label>
               <div className="p-3 bg-muted/20 border border-white/10 rounded-xl mt-2">
                 <p className="text-sm">{alt_text}</p>
               </div>
@@ -349,9 +319,9 @@ export function PreviewTabs({
           )}
         </TabsContent>
 
-        {/* Tab 2: Plattform-Vorschau */}
+        {/* Tab 2: Platform Limits */}
         <TabsContent value="platform" className="space-y-4 mt-6">
-          <Label className="text-sm font-semibold">Plattform-Limits</Label>
+          <Label className="text-sm font-semibold">{t('aipost_platform_limits')}</Label>
           {platforms?.map((platform: string, index: number) => {
             const totalHashtags = (hashtags?.reach?.length || 0) + 
                                  (hashtags?.niche?.length || 0) + 
@@ -366,17 +336,14 @@ export function PreviewTabs({
             let hashtagWarning = "";
 
             if (isIG) {
-              limit = 2200;
-              hashtagLimit = 30;
-              if (totalHashtags > 30) hashtagWarning = "IG: max 30 Hashtags – bitte reduzieren.";
+              limit = 2200; hashtagLimit = 30;
+              if (totalHashtags > 30) hashtagWarning = t('aipost_ig_hashtag_warn');
             } else if (isFB) {
-              limit = 5000;
-              hashtagLimit = 10;
-              if (totalHashtags > 10) hashtagWarning = "FB: max 10 Hashtags empfohlen.";
+              limit = 5000; hashtagLimit = 10;
+              if (totalHashtags > 10) hashtagWarning = t('aipost_fb_hashtag_warn');
             } else if (isLI) {
-              limit = 3000;
-              hashtagLimit = 5;
-              if (totalHashtags > 5) hashtagWarning = "LI: 3-5 Hashtags empfohlen.";
+              limit = 3000; hashtagLimit = 5;
+              if (totalHashtags > 5) hashtagWarning = t('aipost_li_hashtag_warn');
             }
 
             const remaining = limit - captionLength;
@@ -388,14 +355,13 @@ export function PreviewTabs({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="p-4 border border-white/10 rounded-xl bg-muted/10
-                           hover:border-primary/30 transition-all"
+                className="p-4 border border-white/10 rounded-xl bg-muted/10 hover:border-primary/30 transition-all"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold capitalize">{platform}</span>
                   <Badge variant={isOverLimit ? "destructive" : "secondary"} 
                          className={!isOverLimit ? "bg-primary/10 border border-primary/20" : ""}>
-                    {remaining} Zeichen übrig
+                    {remaining} {t('aipost_chars_remaining')}
                   </Badge>
                 </div>
                 <Progress value={(captionLength / limit) * 100} className="h-2 mb-2" />
@@ -411,10 +377,9 @@ export function PreviewTabs({
             );
           })}
 
-          {/* Compliance-Warnungen */}
           {warnings.length > 0 && (
             <div>
-              <Label className="text-sm font-semibold">Compliance-Hinweise</Label>
+              <Label className="text-sm font-semibold">{t('aipost_compliance_notes')}</Label>
               <div className="space-y-2 mt-2">
                 {warnings.map((warning: string, idx: number) => (
                   <Alert key={idx} variant="destructive">
@@ -426,7 +391,7 @@ export function PreviewTabs({
           )}
         </TabsContent>
 
-        {/* Tab 3: Bild & Crops */}
+        {/* Tab 3: Image & Crops */}
         <TabsContent value="image" className="space-y-4 mt-6">
           {(draft?.media_url || mediaPreview) ? (
             mediaType === 'video' || draft.media_type === 'video' ? (
@@ -439,7 +404,7 @@ export function PreviewTabs({
                 />
                 <Alert className="bg-muted/20 border-white/10">
                   <AlertDescription>
-                    📹 <strong>Video hochgeladen</strong> - Wird automatisch für alle Plattformen optimiert.
+                    📹 <strong>{t('aipost_video_uploaded')}</strong> - {t('aipost_video_uploaded_desc')}
                   </AlertDescription>
                 </Alert>
               </div>
@@ -451,11 +416,10 @@ export function PreviewTabs({
             )
           ) : (
             <div className="text-center text-muted-foreground p-8">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-muted/20 border border-white/10
-                              flex items-center justify-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-muted/20 border border-white/10 flex items-center justify-center">
                 <ImageIcon className="h-8 w-8 opacity-50" />
               </div>
-              <p className="text-sm">Kein Bild/Video hochgeladen</p>
+              <p className="text-sm">{t('aipost_no_media')}</p>
             </div>
           )}
         </TabsContent>
@@ -467,7 +431,7 @@ export function PreviewTabs({
             animate={{ opacity: 1, y: 0 }}
             className="p-4 rounded-xl bg-muted/10 border border-white/10"
           >
-            <Label className="text-sm font-semibold">Hook-Score</Label>
+            <Label className="text-sm font-semibold">{t('aipost_hook_score')}</Label>
             <div className="flex items-center gap-4 mt-2">
               <div className="flex-1">
                 <Progress value={scores?.hook || 0} className="h-3" />
@@ -487,7 +451,7 @@ export function PreviewTabs({
             transition={{ delay: 0.1 }}
             className="p-4 rounded-xl bg-muted/10 border border-white/10"
           >
-            <Label className="text-sm font-semibold">CTA-Score</Label>
+            <Label className="text-sm font-semibold">{t('aipost_cta_score')}</Label>
             <div className="flex items-center gap-4 mt-2">
               <div className="flex-1">
                 <Progress value={scores?.cta || 0} className="h-3" />
@@ -503,51 +467,30 @@ export function PreviewTabs({
         </TabsContent>
       </Tabs>
 
-      {/* Aktionen - Premium Styling */}
+      {/* Action Buttons */}
       <div className="flex gap-2 flex-wrap mt-6 pt-6 border-t border-white/10">
         <Button 
           onClick={handleSendToComposer} 
-          className="flex-1 h-12 bg-gradient-to-r from-primary to-primary/80
-                     hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)] transition-all"
+          className="flex-1 h-12 bg-gradient-to-r from-primary to-primary/80 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)] transition-all"
         >
           <ExternalLink className="h-4 w-4 mr-2" />
-          An Composer
+          {t('aipost_to_composer')}
         </Button>
-        <Button 
-          onClick={onCopyCaption} 
-          variant="outline" 
-          size="sm"
-          className="h-12 border-white/20 hover:bg-white/5 hover:border-primary/40"
-        >
+        <Button onClick={onCopyCaption} variant="outline" size="sm" className="h-12 border-white/20 hover:bg-white/5 hover:border-primary/40">
           <Copy className="h-4 w-4 mr-2" />
-          Kopieren
+          {t('aipost_copy')}
         </Button>
-        <Button 
-          onClick={onExportZip} 
-          variant="outline" 
-          size="sm"
-          className="h-12 border-white/20 hover:bg-white/5 hover:border-primary/40"
-        >
+        <Button onClick={onExportZip} variant="outline" size="sm" className="h-12 border-white/20 hover:bg-white/5 hover:border-primary/40">
           <Download className="h-4 w-4 mr-2" />
           ZIP
         </Button>
-        <Button 
-          onClick={onSendToCalendar} 
-          variant="outline" 
-          size="sm"
-          className="h-12 border-white/20 hover:bg-white/5 hover:border-primary/40"
-        >
+        <Button onClick={onSendToCalendar} variant="outline" size="sm" className="h-12 border-white/20 hover:bg-white/5 hover:border-primary/40">
           <Calendar className="h-4 w-4 mr-2" />
-          Kalender
+          {t('aipost_calendar')}
         </Button>
-        <Button 
-          onClick={onSendToReview} 
-          variant="outline" 
-          size="sm"
-          className="h-12 border-white/20 hover:bg-white/5 hover:border-primary/40"
-        >
+        <Button onClick={onSendToReview} variant="outline" size="sm" className="h-12 border-white/20 hover:bg-white/5 hover:border-primary/40">
           <Send className="h-4 w-4 mr-2" />
-          Freigabe
+          {t('aipost_review')}
         </Button>
       </div>
     </div>
