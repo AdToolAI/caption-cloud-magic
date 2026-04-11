@@ -66,7 +66,7 @@ export function PromptAssistantDialog({ open, onOpenChange, onApply }: PromptAss
   const handleApply = () => {
     onApply(optimizedPrompt);
     onOpenChange(false);
-    toast.success("Prompt übernommen!");
+    toast.success(t("generator_prompt_applied"));
   };
 
   const handleCopy = async () => {
