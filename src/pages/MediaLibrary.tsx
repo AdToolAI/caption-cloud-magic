@@ -626,8 +626,8 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: "📸 Media gesendet",
-      description: "Wird im KI-Post-Generator geladen...",
+      title: `📸 ${t('aipost_media_sent')}`,
+      description: t('aipost_media_sent_loading'),
     });
     
     navigate('/ai-post-generator');

@@ -130,18 +130,18 @@ export default function AIPostGenerator() {
     // Validate size
     const maxSize = isVideo ? 1024 * 1024 * 1024 : 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      toast.error(`${isVideo ? 'Video' : 'Bild'} muss unter ${isVideo ? '1' : '10'}${isVideo ? 'GB' : 'MB'} sein`);
+      toast.error(`${isVideo ? 'Video' : t('aipost_upload_image')} ${t('aipost_file_size_error')} ${isVideo ? '1GB' : '10MB'}`);
       return;
     }
 
     // Validate format
     if (isVideo && !['video/mp4', 'video/quicktime'].includes(file.type)) {
-      toast.error('Nur MP4 und MOV Videos werden unterstützt');
+      toast.error(t('aipost_only_mp4_mov'));
       return;
     }
 
     if (isImage && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error('Nur JPEG, PNG und WEBP Bilder werden unterstützt');
+      toast.error(t('aipost_only_jpeg_png'));
       return;
     }
 
@@ -175,12 +175,12 @@ export default function AIPostGenerator() {
     }
 
     if (!brief.trim()) {
-      toast.error("Bitte gib eine Kurzbeschreibung ein");
+      toast.error(t('aipost_enter_brief'));
       return;
     }
 
     if (platforms.length === 0) {
-      toast.error("Bitte wähle mindestens eine Plattform");
+      toast.error(t('aipost_select_platform'));
       return;
     }
 
@@ -208,7 +208,7 @@ export default function AIPostGenerator() {
 
       // Get current session for authentication
       if (!session) {
-        toast.error("Sitzung abgelaufen. Bitte melde dich erneut an.");
+        toast.error(t('aipost_session_expired'));
         navigate("/auth");
         return;
       }
@@ -253,19 +253,19 @@ export default function AIPostGenerator() {
       } else {
         console.log("🔵 Dialog öffnen - User entscheidet...");
         setShowSaveDialog(true);
-        toast.info("💾 Möchtest du diesen Post speichern?", {
-          description: "Wähle eine Option im Dialog",
+        toast.info(`💾 ${t('aipost_want_to_save')}`, {
+          description: t('aipost_choose_option'),
           duration: 5000
         });
       }
       
-      toast.success("Post generiert! 🎉");
+      toast.success(t('aipost_generated_success'));
     } catch (error: any) {
       console.error("Generation error:", error);
-      let errorMessage = "Fehler beim Generieren des Posts";
+      let errorMessage = t('aipost_generation_error');
 
       if (error.message?.includes("non-2xx")) {
-        errorMessage = "Server-Fehler. Bitte versuche es erneut.";
+        errorMessage = t('aipost_server_error');
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -297,7 +297,7 @@ export default function AIPostGenerator() {
     
     if (!draft) {
       console.error("❌ Kein Draft zum Speichern");
-      toast.error("Kein Draft zum Speichern");
+      toast.error(t('aipost_no_draft'));
       return;
     }
     
@@ -314,7 +314,7 @@ export default function AIPostGenerator() {
       
       if (wsError) {
         console.error("❌ Fehler beim Laden der Workspace ID:", wsError);
-        toast.error("Workspace konnte nicht geladen werden");
+        toast.error(t('aipost_save_error'));
         return;
       }
       
@@ -327,11 +327,11 @@ export default function AIPostGenerator() {
     
     if (!targetWorkspaceId) {
       console.error("❌ Keine Workspace ID gefunden");
-      toast.error("Keine Workspace-Daten gefunden");
+      toast.error(t('aipost_save_error'));
       return;
     }
     
-    const toastId = toast.loading("Speichere in Media Library...");
+    const toastId = toast.loading(t('aipost_saving'));
     
     try {
       const fileSizeMB = await getMediaFileSize(draft.media_url, draft.media_type);
@@ -371,14 +371,14 @@ export default function AIPostGenerator() {
 
       console.log("✅ Erfolgreich in content_items gespeichert");
       toast.dismiss(toastId);
-      toast.success("✅ In Media Library gespeichert!", {
-        description: "Jetzt in der Media Library verfügbar"
+      toast.success(`✅ ${t('aipost_saved_success')}`, {
+        description: t('aipost_saved_desc')
       });
       setShowSaveDialog(false);
     } catch (error: any) {
       console.error("❌ Fehler beim Speichern:", error);
       toast.dismiss(toastId);
-      toast.error("Fehler beim Speichern: " + error.message);
+      toast.error(`${t('aipost_save_error')}: ` + error.message);
     }
   };
 
@@ -393,7 +393,7 @@ export default function AIPostGenerator() {
     const { hooks, caption, hashtags } = currentDraft;
     const fullCaption = `${hooks.A}\n\n${caption}\n\n${hashtags.reach.join(" ")}`;
     navigator.clipboard.writeText(fullCaption);
-    toast.success("Caption in Zwischenablage kopiert! 📋");
+    toast.success(t('aipost_caption_copied'));
   };
 
   const handleExportZip = async () => {
@@ -415,11 +415,11 @@ export default function AIPostGenerator() {
         link.click();
         document.body.removeChild(link);
         
-        toast.success("✅ ZIP-Bundle wurde heruntergeladen");
+        toast.success(`✅ ${t('aipost_zip_downloaded')}`);
       }
     } catch (error: any) {
       console.error('Export error:', error);
-      toast.error(`Export fehlgeschlagen: ${error.message}`);
+      toast.error(`${t('aipost_export_failed')}: ${error.message}`);
     } finally {
       setIsGenerating(false);
     }
@@ -450,17 +450,17 @@ export default function AIPostGenerator() {
     
     sessionStorage.setItem('calendar_prefill', JSON.stringify(prefillData));
     navigate('/calendar?prefill=true');
-    toast.success('📅 Post an Kalender gesendet - Jetzt Zeit & Details festlegen!');
+    toast.success(`📅 ${t('aipost_sent_to_calendar')}`);
   };
 
   const handleSendToReview = () => {
-    toast.info("Freigabe-Workflow kommt bald - Benötigt Team-Workspace 👥");
+    toast.info(t('aipost_review_coming'));
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <main className="flex-1 container mx-auto px-4 py-8">
-        <Breadcrumbs category="design" feature="KI-Post-Generator v2" />
+        <Breadcrumbs category="design" feature={t('aipost_breadcrumb')} />
 
         {/* Hero Header */}
         <PostGeneratorHeroHeader />
@@ -536,12 +536,12 @@ export default function AIPostGenerator() {
                 </motion.div>
               </div>
               <AlertDialogTitle className="text-center text-xl">
-                Post erfolgreich generiert!
+                {t('aipost_save_dialog_title')}
               </AlertDialogTitle>
               <AlertDialogDescription className="space-y-3">
-                <p className="text-center">Möchtest du diesen Post in deiner Media Library speichern?</p>
+                <p className="text-center">{t('aipost_save_dialog_desc')}</p>
                 <div className="bg-muted/30 border border-white/10 p-3 rounded-xl text-sm">
-                  📚 In der Media Library kannst du den Post später im Planner wiederverwenden.
+                  📚 {t('aipost_save_dialog_info')}
                 </div>
                 <div className="flex items-center gap-2 pt-2">
                   <Checkbox 
@@ -555,7 +555,7 @@ export default function AIPostGenerator() {
                     }}
                   />
                   <label htmlFor="auto-save" className="text-sm cursor-pointer">
-                    Zukünftig automatisch speichern
+                    {t('aipost_auto_save_label')}
                   </label>
                 </div>
               </AlertDialogDescription>
@@ -565,14 +565,14 @@ export default function AIPostGenerator() {
                 onClick={handleSkipSave}
                 className="border-white/20 hover:bg-white/5"
               >
-                Nicht speichern
+                {t('aipost_skip_save')}
               </AlertDialogCancel>
               <AlertDialogAction 
                 onClick={() => handleSaveToLibrary()}
                 className="bg-gradient-to-r from-primary to-primary/80 
                            hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)]"
               >
-                In Media Library speichern
+                {t('aipost_save_to_library')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
