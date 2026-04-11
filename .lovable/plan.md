@@ -1,66 +1,74 @@
 
 
-## Plan: Usage Reports — Hardcoded German Strings lokalisieren
+## Plan: TrendRadar — Hardcodierte deutsche Strings lokalisieren
 
 ### Problem
-Die Seite "Usage Reports" und alle zugehörigen Komponenten enthalten ~25 hardcodierte deutsche Strings, die auch im englischen/spanischen UI angezeigt werden.
+`TrendRadar.tsx`, `TrendRadarHeroHeader.tsx` und `TrendDetailModal.tsx` enthalten ~40 hardcodierte deutsche Strings, die auch im englischen/spanischen UI erscheinen.
 
 ### Änderungen
 
-**1. `src/lib/translations.ts` — Neue Übersetzungsschlüssel hinzufügen**
+**1. `src/lib/translations.ts` — Neue Keys im `trends`-Block (alle 3 Sprachen)**
 
-Neuer Block `usageReports` unter allen 3 Sprachen:
-
-| Key | DE | EN | ES |
+| Key | EN | DE | ES |
 |---|---|---|---|
-| `usageReports.title` | Usage Reports | Usage Reports | Informes de Uso |
-| `usageReports.subtitle` | Credit-Verbrauch und Kosten-Optimierung | Credit usage and cost optimization | Consumo de créditos y optimización de costes |
-| `usageReports.creditsUsed` | Credits Verbraucht | Credits Used | Créditos Usados |
-| `usageReports.last30Days` | Letzte 30 Tage | Last 30 days | Últimos 30 días |
-| `usageReports.savingsPotential` | Spar-Potenzial | Savings Potential | Potencial de Ahorro |
-| `usageReports.creditsSavable` | Credits sparen möglich | Credits savable | Créditos ahorrables |
-| `usageReports.remotionUsage` | Remotion Nutzung | Remotion Usage | Uso de Remotion |
-| `usageReports.ofRenders` | der Renders | of renders | de renders |
-| `usageReports.tabSavings` | Spar-Potenzial | Savings Potential | Potencial de Ahorro |
-| `usageReports.tabBreakdown` | Breakdown | Breakdown | Desglose |
-| `usageReports.tabEngines` | Engine-Vergleich | Engine Comparison | Comparación de Engines |
-| `usageReports.savingsRecommendations` | Spar-Empfehlungen | Savings Recommendations | Recomendaciones de Ahorro |
-| `usageReports.optimizationTips` | Optimierungs-Tipps für geringere Kosten | Optimization tips for lower costs | Consejos de optimización para menores costes |
-| `usageReports.noRecommendations` | Keine Empfehlungen verfügbar | No recommendations available | Sin recomendaciones disponibles |
-| `usageReports.totalSavingsPotential` | Gesamt-Spar-Potenzial | Total Savings Potential | Potencial de Ahorro Total |
-| `usageReports.potentialSave` | Potenzial: {count} Credits sparen | Potential: save {count} credits | Potencial: ahorrar {count} créditos |
-| `usageReports.engineComparison` | Engine-Vergleich | Engine Comparison | Comparación de Engines |
-| `usageReports.engineUsage` | Remotion vs. Shotstack Nutzung | Remotion vs. Shotstack usage | Uso de Remotion vs. Shotstack |
-| `usageReports.ofCredits` | der Credits | of credits | de créditos |
-| `usageReports.creditsPerRender` | Credits/Render | credits/render | créditos/render |
-| `usageReports.totalRenders` | Gesamt Renders | Total Renders | Renders Totales |
-| `usageReports.totalCredits` | Gesamt Credits | Total Credits | Créditos Totales |
-| `usageReports.breakdownByFeature` | Breakdown nach Feature | Breakdown by Feature | Desglose por Función |
-| `usageReports.creditDistFeature` | Credit-Verteilung nach Funktionen | Credit distribution by feature | Distribución de créditos por función |
-| `usageReports.breakdownByEngine` | Breakdown nach Engine | Breakdown by Engine | Desglose por Engine |
-| `usageReports.creditDistEngine` | Credit-Verteilung nach Render-Engine | Credit distribution by render engine | Distribución de créditos por engine |
-| `usageReports.noData` | Keine Daten verfügbar | No data available | Sin datos disponibles |
+| `trends.aiTrendRadar` | AI Trend Radar | KI-Trendradar | Radar de Tendencias IA |
+| `trends.reload` | Reload | Neu laden | Recargar |
+| `trends.trendsAnalyzed` | Trends analyzed | Trends analysiert | Tendencias analizadas |
+| `trends.platforms` | Platforms | Plattformen | Plataformas |
+| `trends.categories` | Categories | Kategorien | Categorías |
+| `trends.topTrendsSubtitleAlt` | The hottest trends at a glance | Die heißesten Trends im Überblick | Las tendencias más calientes |
+| `trends.analyzeNow` | Analyze now | Jetzt analysieren | Analizar ahora |
+| `trends.ofCount` | of | von | de |
+| `trends.learnMore` | Learn more | Mehr erfahren | Saber más |
+| `trends.analyze` | Analyze | Analysieren | Analizar |
+| `trends.quickFacts` | Quick Facts | Quick-Facts | Datos rápidos |
+| `trends.back` | Back | Zurück | Volver |
+| `trends.platformLabel` | Platform | Plattform | Plataforma |
+| `trends.categoryLabel` | Category | Kategorie | Categoría |
+| `trends.general` | General | Allgemein | General |
+| `trends.type` | Type | Typ | Tipo |
+| `trends.popularityLabel` | Popularity | Popularität | Popularidad |
+| `trends.targetAudience` | Target Audience | Zielgruppe | Audiencia objetivo |
+| `trends.fullAnalysis` | Full Analysis | Vollständige Analyse | Análisis completo |
+| `trends.noSavedTrends` | You haven't saved any trends yet | Du hast noch keine Trends gespeichert | Aún no has guardado tendencias |
+| `trends.discoverTrends` | Discover trends | Trends entdecken | Descubrir tendencias |
+| `trends.noTrendsFound` | No trends found | Keine Trends gefunden | No se encontraron tendencias |
+| `trends.reloadTrends` | Reload trends | Trends neu laden | Recargar tendencias |
+| `trends.analysisComplete` | Analysis complete | Analyse abgeschlossen | Análisis completado |
+| `trends.ideasGenerated` | content ideas generated | Content-Ideen generiert | ideas de contenido generadas |
+| `trends.analysisFailed` | Analysis failed | Analyse fehlgeschlagen | Análisis fallido |
+| `trends.error` | Error | Fehler | Error |
+| `trends.cannotSave` | This trend cannot be saved | Dieser Trend kann nicht gespeichert werden | Esta tendencia no se puede guardar |
+| `trends.bookmarkRemoved` | Bookmark removed | Bookmark entfernt | Marcador eliminado |
+| `trends.trendSaved` | Trend saved | Trend gespeichert | Tendencia guardada |
+| `trends.unknownError` | Unknown error | Unbekannter Fehler | Error desconocido |
+| `trends.loadError` | Could not load trends | Trends konnten nicht geladen werden | No se pudieron cargar las tendencias |
+| `trends.ecommerceCategories` | E-Commerce Product Categories | E-Commerce Produkt-Kategorien | Categorías de productos E-Commerce |
+| `trends.overview` | Overview | Übersicht | Resumen |
+| `trends.contentIdeas` | Content Ideas | Content-Ideen | Ideas de contenido |
+| `trends.recommendedHashtags` | Recommended Hashtags | Empfohlene Hashtags | Hashtags recomendados |
+| `trends.hashtagStrategy` | Hashtag Strategy | Hashtag-Strategie | Estrategia de hashtags |
 
-**2. `src/pages/Analytics/UsageReports.tsx` — `useTranslation` einbinden**
-- Import `useTranslation`, alle Strings durch `t('usageReports.xxx')` ersetzen
+Plus E-Commerce Subcategory-Namen lokalisieren.
 
-**3. `src/components/analytics/CreditUsageDashboard.tsx` — lokalisieren**
-- Import `useTranslation`, alle 6 hardcoded Strings ersetzen
+**2. `src/pages/TrendRadar.tsx` — Alle ~30 hardcoded Strings ersetzen**
+- `FloatingStats`: labels durch `t()` ersetzen
+- `HeroCarousel`: "Top-Trends der Woche", "Die heißesten...", "von", "Popularität:", "Jetzt analysieren"
+- Main component: "Du hast noch keine...", "Trends entdecken", "Keine Trends gefunden", "Trends neu laden", "Mehr erfahren", "Analysieren", "Quick-Facts", "Zurück", "Plattform", "Kategorie", "Allgemein", "Popularität", "Zielgruppe", "Vollständige Analyse", "E-Commerce Produkt-Kategorien"
+- Toast-Texte: "Analyse abgeschlossen", "Analyse fehlgeschlagen", "Fehler", "Bookmark entfernt", "Trend gespeichert"
+- E-Commerce Subcategories
 
-**4. `src/components/analytics/SavingsRecommendations.tsx` — lokalisieren**
-- Import `useTranslation`, alle 5 hardcoded Strings ersetzen
+**3. `src/components/trends/TrendRadarHeroHeader.tsx` — 2 Strings**
+- "KI-Trendradar" → `t('trends.aiTrendRadar')`
+- "Neu laden" → `t('trends.reload')`
 
-**5. `src/components/analytics/RenderEngineComparison.tsx` — lokalisieren**
-- Import `useTranslation`, alle 6 hardcoded Strings ersetzen
-
-**6. `src/components/analytics/CostBreakdownPie.tsx` — lokalisieren**
-- Import `useTranslation`, "Keine Daten verfügbar" ersetzen
+**4. `src/components/trends/TrendDetailModal.tsx` — ~10 Strings**
+- "Popularität", "Übersicht", "Content-Ideen", "Empfohlene Hashtags", "Zielgruppe", "Hashtag-Strategie"
+- `date-fns/locale` dynamisch nach Sprache wählen (statt immer `de`)
 
 ### Betroffene Dateien
 - `src/lib/translations.ts`
-- `src/pages/Analytics/UsageReports.tsx`
-- `src/components/analytics/CreditUsageDashboard.tsx`
-- `src/components/analytics/SavingsRecommendations.tsx`
-- `src/components/analytics/RenderEngineComparison.tsx`
-- `src/components/analytics/CostBreakdownPie.tsx`
+- `src/pages/TrendRadar.tsx`
+- `src/components/trends/TrendRadarHeroHeader.tsx`
+- `src/components/trends/TrendDetailModal.tsx`
 
