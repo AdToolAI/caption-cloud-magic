@@ -274,6 +274,27 @@ MANDATORY RULES:
       .getPublicUrl(fileName);
     const imageUrl = publicUrlData.publicUrl;
 
+    // Find or create the "KI Picture Studio" system album for auto-assignment
+    let albumId: string | null = null;
+    const { data: systemAlbum } = await supabase
+      .from('studio_albums')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('is_system', true)
+      .eq('name', 'KI Picture Studio')
+      .maybeSingle();
+
+    if (systemAlbum) {
+      albumId = systemAlbum.id;
+    } else {
+      const { data: newAlbum } = await supabase
+        .from('studio_albums')
+        .insert({ user_id: user.id, name: 'KI Picture Studio', is_system: true })
+        .select('id')
+        .single();
+      albumId = newAlbum?.id || null;
+    }
+
     const { data: savedImage, error: saveError } = await supabase
       .from('studio_images')
       .insert({
@@ -284,6 +305,7 @@ MANDATORY RULES:
         model_used: usedModel,
         aspect_ratio: aspectRatio,
         source: editMode ? 'upload' : 'generated',
+        album_id: albumId,
         metadata_json: { quality, editMode, referenceImageUrl: editMode ? referenceImageUrl : null, attemptedModels },
       })
       .select()

@@ -50,14 +50,29 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
         .order('name');
 
       if (albumsData) {
-        // Get image counts per album
+        // Get image counts and dynamic covers per album
         const albumsWithCounts = await Promise.all(
           albumsData.map(async (album) => {
-            const { count } = await supabase
-              .from('studio_images')
-              .select('id', { count: 'exact', head: true })
-              .eq('album_id', album.id);
-            return { ...album, image_count: count || 0 };
+            const [{ count }, { data: latestImg }] = await Promise.all([
+              supabase
+                .from('studio_images')
+                .select('id', { count: 'exact', head: true })
+                .eq('album_id', album.id),
+              !album.cover_image_url
+                ? supabase
+                    .from('studio_images')
+                    .select('image_url')
+                    .eq('album_id', album.id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle()
+                : Promise.resolve({ data: null }),
+            ]);
+            return {
+              ...album,
+              image_count: count || 0,
+              cover_image_url: album.cover_image_url || latestImg?.image_url || null,
+            };
           })
         );
         setAlbums(albumsWithCounts.filter(a => a.image_count > 0));
