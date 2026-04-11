@@ -1,7 +1,10 @@
 import { motion } from "framer-motion";
 import { Rocket } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export function PostGeneratorHeroHeader() {
+  const { t } = useTranslation();
+
   return (
     <div className="relative mb-10">
       {/* Background Glow Effects */}
@@ -39,7 +42,7 @@ export function PostGeneratorHeroHeader() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
           </span>
-          <span className="text-sm font-medium text-primary">KI-Post-Generator v2</span>
+          <span className="text-sm font-medium text-primary">{t('aipost_badge')}</span>
         </motion.div>
 
         {/* Headline */}
@@ -51,7 +54,7 @@ export function PostGeneratorHeroHeader() {
                      bg-gradient-to-r from-primary via-purple-400 to-primary 
                      bg-clip-text text-transparent"
         >
-          KI-Post-Generator v2
+          {t('aipost_title')}
           <motion.span
             animate={{ rotate: [0, 10, -10, 0] }}
             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -68,7 +71,7 @@ export function PostGeneratorHeroHeader() {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="text-lg text-muted-foreground max-w-2xl"
         >
-          Agentur-Level Posts mit Hook-Optimierung, Brand-Sync & A/B-Planung
+          {t('aipost_hero_subtitle')}
         </motion.p>
       </div>
     </div>
