@@ -109,10 +109,27 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
         if (img.album_id) counts[img.album_id] = (counts[img.album_id] || 0) + 1;
       });
 
+      // For albums without cover_image_url, fetch latest image as dynamic cover
+      const albumsNeedingCover = albumsRes.data.filter(a => !a.cover_image_url);
+      const coverPromises = albumsNeedingCover.map(async (album) => {
+        const { data: latestImg } = await supabase
+          .from('studio_images')
+          .select('image_url')
+          .eq('album_id', album.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        return { albumId: album.id, coverUrl: latestImg?.image_url || null };
+      });
+      const dynamicCovers = await Promise.all(coverPromises);
+      const coverMap: Record<string, string> = {};
+      dynamicCovers.forEach(c => { if (c.coverUrl) coverMap[c.albumId] = c.coverUrl; });
+
       const albumList = albumsRes.data.map(a => ({
         ...a,
         is_system: (a as any).is_system ?? false,
         image_count: counts[a.id] || 0,
+        cover_image_url: a.cover_image_url || coverMap[a.id] || null,
       }));
       setAlbums(albumList);
 
