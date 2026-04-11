@@ -539,7 +539,7 @@ export const translations: Record<Language, any> = {
       // Actions
       actions: {
         createEvent: "Create Post",
-        addNote: "Add Note",
+        addNoteLabel: "Add Note",
         autoSchedule: "Auto-Schedule",
         manageIntegrations: "Manage Integrations",
         sendForApproval: "Send for Approval",
@@ -548,7 +548,7 @@ export const translations: Record<Language, any> = {
         exportCSV: "Export CSV",
         exportICS: "Export ICS",
         filter: "Filter",
-        share: "Share",
+        shareLabel: "Share",
         settings: "Settings",
         bulkEdit: "Bulk Edit",
         bulkDelete: "Bulk Delete",
@@ -784,7 +784,7 @@ export const translations: Record<Language, any> = {
       deselect: "Deselect",
       new: "New",
       manageTemplates: "Manage Templates",
-      integrations: "Integrations",
+      integrationsLabel: "Integrations",
       addNote: "Add Note",
       share: "Share",
 
@@ -871,7 +871,7 @@ export const translations: Record<Language, any> = {
       // Post Timeline Builder
       postsInTemplate: "Posts in this Template",
       postsDefined: "post(s) defined",
-      addPost: "Add Post",
+      addPostLabel: "Add Post",
       noPostsYet: "No posts yet",
       addPostsToCreate: "Add posts to create your template",
       postType: "Post Type",
@@ -4003,7 +4003,7 @@ export const translations: Record<Language, any> = {
       // Actions
       actions: {
         createEvent: "Beitrag erstellen",
-        addNote: "Notiz hinzufügen",
+        addNoteLabel: "Notiz hinzufügen",
         autoSchedule: "Auto-Planen",
         manageIntegrations: "Integrationen verwalten",
         sendForApproval: "Zur Freigabe senden",
@@ -4012,7 +4012,7 @@ export const translations: Record<Language, any> = {
         exportCSV: "CSV exportieren",
         exportICS: "ICS exportieren",
         filter: "Filtern",
-        share: "Teilen",
+        shareLabel: "Teilen",
         settings: "Einstellungen",
         bulkEdit: "Massenbearbeitung",
         bulkDelete: "Alle löschen",
@@ -4134,7 +4134,7 @@ export const translations: Record<Language, any> = {
       deselect: "Abwählen",
       new: "Neu",
       manageTemplates: "Vorlagen verwalten",
-      integrations: "Integrationen",
+      integrationsLabel: "Integrationen",
       addNote: "Notiz hinzufügen",
       share: "Teilen",
 
@@ -4221,7 +4221,7 @@ export const translations: Record<Language, any> = {
       // Post Timeline Builder
       postsInTemplate: "Posts in diesem Template",
       postsDefined: "Post(s) definiert",
-      addPost: "Post hinzufügen",
+      addPostLabel: "Post hinzufügen",
       noPostsYet: "Noch keine Posts",
       addPostsToCreate: "Füge Posts hinzu, um dein Template zu erstellen",
       postType: "Post-Typ",
@@ -7352,7 +7352,7 @@ export const translations: Record<Language, any> = {
         exportCSV: "Exportar CSV",
         exportICS: "Exportar ICS",
         filter: "Filtrar",
-        share: "Compartir",
+        shareLabel: "Compartir",
         settings: "Configuración",
         bulkEdit: "Edición masiva",
         bulkDelete: "Eliminar todo",
@@ -7474,8 +7474,8 @@ export const translations: Record<Language, any> = {
       deselect: "Deseleccionar",
       new: "Nuevo",
       manageTemplates: "Gestionar Plantillas",
-      integrations: "Integraciones",
-      addNote: "Añadir Nota",
+      integrationsLabel: "Integraciones",
+      addNoteLabel: "Añadir Nota",
       share: "Compartir",
 
       // Metrics
@@ -7561,7 +7561,7 @@ export const translations: Record<Language, any> = {
       // Post Timeline Builder
       postsInTemplate: "Posts en esta Plantilla",
       postsDefined: "post(s) definidos",
-      addPost: "Añadir Post",
+      addPostLabel: "Añadir Post",
       noPostsYet: "Aún no hay posts",
       addPostsToCreate: "Añade posts para crear tu plantilla",
       postType: "Tipo de Post",
