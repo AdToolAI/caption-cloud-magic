@@ -1,29 +1,25 @@
 
 
-## Plan: "In Album speichern"-Button auf jedem Medium in der Mediathek
+## Plan: UserMenu und Hub-Navigation umstrukturieren
 
-### Übersicht
-Auf jedem hochgeladenen Bild/Video in der Mediathek (Upload-Tab, Alle-Tab, etc.) wird ein neuer Button "In Album speichern" (Ordner-Icon) im Hover-Overlay hinzugefügt. Beim Klick öffnet sich der bestehende `SaveToAlbumDialog` — dort kann man ein bestehendes Album wählen oder mit "+" ein neues erstellen.
+### 4 Änderungen
 
-### Änderungen
+**1. Brand Kit → Team-Hub verschieben**
+- In `hubConfig.ts`: Neuen Eintrag `{ route: "/brand-kit", titleKey: "nav.brandKit", descKey: "hubItemDesc.brandKit", icon: Palette }` zum Team-Hub hinzufügen
+- In `UserMenu.tsx`: Brand Kit Menüpunkt entfernen
 
-**1. `src/pages/MediaLibrary.tsx` — Button + Dialog-Integration**
-- Neuer State: `saveToAlbumImageId` (string | null) für den Dialog
-- Im Hover-Overlay (Zeile 1085-1185) wird ein neuer `FolderPlus`-Button hinzugefügt
-- Beim Klick: Das Medium wird in `studio_images` als Eintrag erstellt (falls noch nicht vorhanden), dann öffnet sich der `SaveToAlbumDialog` mit dieser ID
-- Der `SaveToAlbumDialog` wird am Ende der Komponente eingebunden
-- Import von `SaveToAlbumDialog` und `FolderPlus` hinzufügen
+**2. Instagram Publishing → nur für Testaccount sichtbar**
+- In `UserMenu.tsx`: Instagram Publishing Menüpunkt nur anzeigen wenn `user.email === 'bestofproducts4@gmail.com'`
 
-**2. Logik für "In Album speichern"**
-- Neue Funktion `handleSaveToAlbum(item: NormalizedMediaItem)`:
-  - Erstellt einen `studio_images`-Eintrag mit `image_url = item.url`, `user_id`, `prompt = item.title`
-  - Speichert die neue ID in `saveToAlbumImageId`
-  - Öffnet den Dialog
-- Nach erfolgreichem Speichern: Dialog schließen, optional `loadMedia()` aufrufen
+**3. Integrations aus UserMenu entfernen**
+- In `UserMenu.tsx`: Den Integrations-Link komplett entfernen (Zeile 77-82)
+- Die "AUTOMATE"-Sektion wird damit auch entfernt (kein Inhalt mehr nötig ausser ggf. Instagram Publishing für Testaccount)
 
-**3. Keine Änderungen an `SaveToAlbumDialog`**
-- Der Dialog funktioniert bereits generisch mit einer `imageId` (studio_images) und unterstützt Album-Auswahl + Neu-Erstellen
+**4. Campaign Assistant → Optimieren-Hub verschieben**
+- In `hubConfig.ts`: Neuen Eintrag `{ route: "/campaigns", titleKey: "nav.campaigns", descKey: "hubItemDesc.campaigns", icon: Workflow }` zum Optimieren-Hub hinzufügen
+- In `UserMenu.tsx`: Campaign Assistant Menüpunkt entfernen
 
 ### Betroffene Dateien
-- `src/pages/MediaLibrary.tsx` — neuer Button im Overlay, neuer State, neue Funktion, Dialog einbinden
+- `src/config/hubConfig.ts` — Brand Kit zu Team, Campaigns zu Optimieren
+- `src/components/layout/UserMenu.tsx` — Brand Kit, Integrations, Campaigns entfernen; Instagram Publishing nur für Testaccount
 
