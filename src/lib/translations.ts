@@ -785,7 +785,7 @@ export const translations: Record<Language, any> = {
       new: "New",
       manageTemplates: "Manage Templates",
       integrationsLabel: "Integrations",
-      addNote: "Add Note",
+      addNoteLabel: "Add Note",
       share: "Share",
 
       // Metrics
@@ -4135,7 +4135,7 @@ export const translations: Record<Language, any> = {
       new: "Neu",
       manageTemplates: "Vorlagen verwalten",
       integrationsLabel: "Integrationen",
-      addNote: "Notiz hinzufügen",
+      addNoteLabel: "Notiz hinzufügen",
       share: "Teilen",
 
       // Metrics
