@@ -1807,10 +1807,10 @@ serve(async (req) => {
     // Apply filters
     let filteredTrends = existingTrends || [];
     
-    if (platform) {
+    if (platform && platform !== 'all') {
       filteredTrends = filteredTrends.filter(t => t.platform === platform);
     }
-    if (category) {
+    if (category && category !== 'all') {
       filteredTrends = filteredTrends.filter(t => t.category === category);
     }
     if (language !== 'en') {
