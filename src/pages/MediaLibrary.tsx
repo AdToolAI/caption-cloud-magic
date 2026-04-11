@@ -66,7 +66,27 @@ export default function MediaLibrary() {
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [studioImageCount, setStudioImageCount] = useState(0);
+  const [saveToAlbumImageId, setSaveToAlbumImageId] = useState<string | null>(null);
   const { connection: cloudConnection, cloudFiles, listCloudFiles, uploadToCloud, deleteFromCloud, syncing: cloudSyncing } = useCloudStorage();
+
+  const handleSaveToAlbum = async (item: NormalizedMediaItem) => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('studio_images')
+      .insert({
+        user_id: user.id,
+        image_url: item.url,
+        prompt: item.title || 'Upload',
+        style: 'upload'
+      })
+      .select('id')
+      .single();
+    if (data) {
+      setSaveToAlbumImageId(data.id);
+    } else {
+      toast({ title: "Fehler beim Vorbereiten", variant: "destructive" });
+    }
+  };
 
   // Handle tab parameter from URL
   const albumSlug = new URLSearchParams(location.search).get('album');
