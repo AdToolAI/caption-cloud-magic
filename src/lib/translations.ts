@@ -787,7 +787,6 @@ export const translations: Record<Language, any> = {
       integrations: "Integrations",
       addNote: "Add Note",
       share: "Share",
-      blackoutDates: "Blackout Dates",
 
       // Metrics
       total: "Total",
@@ -4138,7 +4137,6 @@ export const translations: Record<Language, any> = {
       integrations: "Integrationen",
       addNote: "Notiz hinzufügen",
       share: "Teilen",
-      blackoutDates: "Blackout Dates",
 
       // Metrics
       total: "Gesamt",
@@ -7479,7 +7477,6 @@ export const translations: Record<Language, any> = {
       integrations: "Integraciones",
       addNote: "Añadir Nota",
       share: "Compartir",
-      blackoutDates: "Fechas Bloqueadas",
 
       // Metrics
       total: "Total",
