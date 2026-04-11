@@ -242,19 +242,19 @@ export function CalendarToolbar({
               {onOpenIntegrations && (
                 <DropdownMenuItem onClick={onOpenIntegrations} disabled={readOnly}>
                   <Settings className="w-4 h-4 mr-2" />
-                  {t('calendar.integrations')}
+                  {t('calendar.integrationsLabel')}
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={onAddNote} disabled={readOnly}>
                 <StickyNote className="w-4 h-4 mr-2" />
-                {t('calendar.addNote')}
+                {t('calendar.addNoteLabel')}
               </DropdownMenuItem>
               
               <DropdownMenuSeparator className="bg-white/10" />
               
               <DropdownMenuItem onClick={onShare}>
                 <Share2 className="w-4 h-4 mr-2" />
-                {t('calendar.share')}
+                {t('calendar.shareLabel')}
               </DropdownMenuItem>
               
               <DropdownMenuSeparator className="bg-white/10" />

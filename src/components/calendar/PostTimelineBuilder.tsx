@@ -157,7 +157,7 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
         </div>
         <Button onClick={addPost} size="sm" className="gap-1">
           <Plus className="h-4 w-4" />
-          {t('calendar.addPost')}
+          {t('calendar.addPostLabel')}
         </Button>
       </div>
 
