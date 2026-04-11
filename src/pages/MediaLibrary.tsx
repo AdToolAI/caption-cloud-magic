@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download, Cloud, Images } from "lucide-react";
+import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download, Cloud, Images, FolderPlus } from "lucide-react";
+import { SaveToAlbumDialog } from "@/components/picture-studio/SaveToAlbumDialog";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -65,7 +66,27 @@ export default function MediaLibrary() {
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [studioImageCount, setStudioImageCount] = useState(0);
+  const [saveToAlbumImageId, setSaveToAlbumImageId] = useState<string | null>(null);
   const { connection: cloudConnection, cloudFiles, listCloudFiles, uploadToCloud, deleteFromCloud, syncing: cloudSyncing } = useCloudStorage();
+
+  const handleSaveToAlbum = async (item: NormalizedMediaItem) => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('studio_images')
+      .insert({
+        user_id: user.id,
+        image_url: item.url,
+        prompt: item.title || 'Upload',
+        style: 'upload'
+      })
+      .select('id')
+      .single();
+    if (data) {
+      setSaveToAlbumImageId(data.id);
+    } else {
+      toast({ title: "Fehler beim Vorbereiten", variant: "destructive" });
+    }
+  };
 
   // Handle tab parameter from URL
   const albumSlug = new URLSearchParams(location.search).get('album');
@@ -1172,6 +1193,19 @@ export default function MediaLibrary() {
                       <TooltipTrigger asChild>
                         <Button 
                           size="icon" 
+                          variant="secondary"
+                          onClick={() => handleSaveToAlbum(item)}
+                        >
+                          <FolderPlus className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>In Album speichern</TooltipContent>
+                    </Tooltip>
+                    
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          size="icon" 
                           variant="destructive"
                           onClick={() => handleDelete(item.id, item)}
                         >
@@ -1245,6 +1279,17 @@ export default function MediaLibrary() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Save to Album Dialog */}
+      <SaveToAlbumDialog
+        open={!!saveToAlbumImageId}
+        onOpenChange={(open) => { if (!open) setSaveToAlbumImageId(null); }}
+        imageId={saveToAlbumImageId || ''}
+        onSaved={() => {
+          setSaveToAlbumImageId(null);
+          loadMedia();
+        }}
+      />
     </div>
   );
 }
