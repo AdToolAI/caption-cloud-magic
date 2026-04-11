@@ -1,75 +1,70 @@
 
 
-## Plan: Content Command Center — Hardcoded German Strings lokalisieren
+## Plan: Posting Times Advisor — Localize all German strings
 
 ### Problem
-Das Content Command Center (Kalender-Seite) und ~10 zugehörige Komponenten enthalten ~80 hardcodierte deutsche Strings, die nicht auf die gewählte Sprache reagieren.
+The Posting Times page and its 5 sub-components contain ~25 hardcoded German strings and hardcoded `de` date-fns locale.
 
-### Änderungen
+### Changes
 
-**1. `src/lib/translations.ts` — Neue Keys im `calendar`-Block erweitern (alle 3 Sprachen)**
+**1. `src/lib/translations.ts` — Add `postingTimes` block (~20 keys × 3 languages)**
 
-Neue Keys für alle noch fehlenden Strings:
+| Key | EN | DE | ES |
+|---|---|---|---|
+| `livePrognosis` | Live Forecast | Live-Prognose | Pronóstico en vivo |
+| `title` | Posting Time Advisor | Posting-Zeit-Berater | Asesor de Horarios |
+| `subtitle` | AI-optimized time recommendations based on your performance history and platform peaks | KI-optimierte Zeitempfehlungen... | Recomendaciones optimizadas por IA... |
+| `updated` | Updated | Aktualisiert | Actualizado |
+| `daysHistory` | days history | Tage Historie | días de historial |
+| `sync` | Synchronize | Synchronisieren | Sincronizar |
+| `syncSuccess` | Posts synchronized | Posts synchronisiert | Posts sincronizados |
+| `syncError` | Error synchronizing | Fehler beim Synchronisieren | Error al sincronizar |
+| `industryRecsActive` | Industry recommendations active | Branchen-Empfehlungen aktiv | Recomendaciones del sector activas |
+| `industryRecsDesc` | These recommendations are based on industry averages and seasonal trends. Connect your accounts for personalized times. | Diese Empfehlungen basieren auf... | Estas recomendaciones se basan en... |
+| `syncAccounts` | Sync accounts | Accounts synchronisieren | Sincronizar cuentas |
+| `forecast14` | 14-Day Forecast | 14-Tage-Prognose | Pronóstico de 14 días |
+| `clickToSchedule` | Click a time to schedule directly in the calendar | Klicke auf eine Zeit... | Haz clic en una hora... |
+| `industryData` | Industry Data | Branchen-Daten | Datos del sector |
+| `personalized` | Personalized | Personalisiert | Personalizado |
+| `topTimesNext7` | Top times for the next 7 days | Top-Zeiten der nächsten 7 Tage | Mejores horarios de los próximos 7 días |
+| `best3Slots` | Best 3 time slots per day | Die besten 3 Zeitfenster pro Tag | Los 3 mejores horarios por día |
+| `aiOptimized` | AI-optimized | KI-optimiert | Optimizado por IA |
+| `today` | Today | Heute | Hoy |
+| `schedule` | Schedule | Planen | Planificar |
+| `topN` | Top | Top | Top |
+| `times` | times | Zeiten | horarios |
 
-| Key-Bereich | Beispiel-Keys (EN / DE) |
-|---|---|
-| Hero Header | `smartCalendar` / Smart Calendar / Intelligenter Kalender |
-| Toolbar | `selectDrafts` / Select Drafts / Entwürfe wählen, `deselect` / Deselect / Abwählen, `new` / New / Neu, `manageTemplates` / Manage Templates / Vorlagen verwalten, `integrations` / Integrations / Integrationen, `addNote` / Add Note / Notiz hinzufügen, `share` / Share / Teilen |
-| Metrics | `total` / Total / Gesamt, `published` / Published / Veröffentlicht, `scheduled` / Scheduled / Geplant, `eventsPerWeek` / Events/Week / Events/Woche, `avgEta` / Avg ETA / Ø ETA, `more` / More / Mehr, `less` / Less / Weniger |
-| Publishing Panel | `publishQueue` / Publishing Queue / Veröffentlichungs-Warteschlange, `queued` / Queued / In Warteschlange, `failed` / Failed / Fehlgeschlagen, `noActivePublications` / No active publications, `scheduledPostsAppearHere`, `untitledPost`, `attempt` / Attempt / Versuch, `publishFailed`, `nextRetry`, `publishLogs` / Publishing Logs, `selectEvent` / Select Event |
-| Quick Schedule Form | `quickSchedule` / Quick Schedule / Schnell-Planung, `createAndSchedule` / Create and schedule a post in seconds, `importedFromGenerator`, `titleOptional`, `internalTitle`, `captionPostText`, various toast messages |
-| Template Builder | `editTemplate` / Edit Template, `newTemplate` / New Template, `templateName`, `description`, `category`, `chooseCategory`, `productLaunch`, `sale`, `seasonal`, `educational`, `event`, `duration`, `makePublic`, `visibleToAll`, `saving`, `update`, `create` |
-| Post Timeline Builder | `postType`, `media`, `fromLibrary`, `aiGenerate`, `day`, `estimatedTime`, `title`, `briefingNotes`, `caption`, `platforms`, `deletePost`, `untitledPost` |
-| Calendar Header | `syncSuccess` / Calendar synced successfully / Kalender erfolgreich synchronisiert, `syncFailed` |
-| Media Library Picker | `cancel` / Cancel / Abbrechen |
-| Bulk Schedule | `cancel` |
-| Timeline Scheduler | `choosePlatform`, `cancel`, `noOptimalTimes` |
+**2. `src/pages/PostingTimes.tsx` — Replace ~10 strings**
+- Banner title, description, action label
+- "14-Tage-Prognose", "Klicke auf eine Zeit...", "Branchen-Daten", "Personalisiert"
+- "Top-Zeiten der nächsten 7 Tage", "Die besten 3 Zeitfenster pro Tag", "KI-optimiert"
+- Toast messages
 
-**2. `src/components/calendar/CalendarHeroHeader.tsx` — 2 Strings**
-- "Intelligenter Kalender" → `t('calendar.smartCalendar')`
-- "Events:" bleibt (oder `t('calendar.events')`)
+**3. `src/components/posting-times/PostingTimesHeroHeader.tsx` — Replace ~5 strings**
+- "Live-Prognose", "Posting-Zeit-Berater", subtitle, "Aktualisiert:", "Tage Historie", "Synchronisieren"
+- Dynamic date-fns locale
 
-**3. `src/components/calendar/CalendarToolbar.tsx` — ~8 Strings**
-- "Entwürfe wählen", "Abwählen", "Neu", "Vorlagen verwalten", "Integrationen", "Notiz hinzufügen", "Teilen"
+**4. `src/components/posting-times/HeatmapCalendarPremium.tsx` — Replace 1 string + locale**
+- "Heute" → `t('postingTimes.today')`
+- `{ locale: de }` → dynamic locale
 
-**4. `src/components/calendar/CalendarMetricsDashboard.tsx` — ~8 Strings**
-- "Gesamt", "Veröffentlicht", "Geplant", "Events/Woche", "Ø ETA", "Mehr", "Weniger"
+**5. `src/components/posting-times/TopSlotsListPremium.tsx` — Replace 2 strings + locale**
+- "Heute" → `t('postingTimes.today')`, "Planen" → `t('postingTimes.schedule')`
+- `{ locale: de }` → dynamic locale
 
-**5. `src/components/calendar/PublishingStatusPanel.tsx` — ~12 Strings**
-- Queue labels, status badges, toast messages, date formatting (`de-DE` → dynamic)
+**6. `src/components/posting-times/TopSlotsList.tsx` — Replace 2 strings + locale**
+- "Zeiten" → `t('postingTimes.times')`, "Planen" → `t('postingTimes.schedule')`
+- `{ locale: de }` → dynamic locale
 
-**6. `src/components/calendar/ScheduleQuickForm.tsx` — ~10 Strings**
-- "Schnell-Planung", "Erstelle und plane...", title/caption labels, toast messages, date formatting
+**7. `src/components/posting-times/HeatmapCalendar.tsx` — locale only**
+- `{ locale: de }` → dynamic locale
 
-**7. `src/components/calendar/TemplateBuilderDialog.tsx` — ~15 Strings**
-- Dialog title, labels, categories, buttons, toasts
-
-**8. `src/components/calendar/PostTimelineBuilder.tsx` — ~10 Strings**
-- Labels, placeholders, button text
-
-**9. `src/pages/Calendar.tsx` — 1 String**
-- Breadcrumb: "Intelligenter Kalender" → `t('nav.calendar')`
-
-**10. Weitere kleine Dateien** (~1-3 Strings je):
-- `CalendarHeader.tsx` (toast messages)
-- `MediaLibraryPickerDialog.tsx` ("Abbrechen")
-- `BulkScheduleDialog.tsx` ("Abbrechen")
-- `TimelineScheduler.tsx` ("Plattform wählen", "Abbrechen", toast)
-- `IntegrationSettingsDialog.tsx` ("Bitte wähle zuerst...")
-
-### Betroffene Dateien
-- `src/lib/translations.ts` (add ~60 keys × 3 languages)
-- `src/pages/Calendar.tsx`
-- `src/components/calendar/CalendarHeroHeader.tsx`
-- `src/components/calendar/CalendarToolbar.tsx`
-- `src/components/calendar/CalendarMetricsDashboard.tsx`
-- `src/components/calendar/PublishingStatusPanel.tsx`
-- `src/components/calendar/ScheduleQuickForm.tsx`
-- `src/components/calendar/TemplateBuilderDialog.tsx`
-- `src/components/calendar/PostTimelineBuilder.tsx`
-- `src/components/calendar/CalendarHeader.tsx`
-- `src/components/calendar/MediaLibraryPickerDialog.tsx`
-- `src/components/calendar/BulkScheduleDialog.tsx`
-- `src/components/calendar/TimelineScheduler.tsx`
-- `src/components/calendar/IntegrationSettingsDialog.tsx`
+### Files affected
+- `src/lib/translations.ts`
+- `src/pages/PostingTimes.tsx`
+- `src/components/posting-times/PostingTimesHeroHeader.tsx`
+- `src/components/posting-times/HeatmapCalendarPremium.tsx`
+- `src/components/posting-times/TopSlotsListPremium.tsx`
+- `src/components/posting-times/TopSlotsList.tsx`
+- `src/components/posting-times/HeatmapCalendar.tsx`
 
