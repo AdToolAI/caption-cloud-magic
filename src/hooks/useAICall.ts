@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { useCreditReservation, ReservationResult } from './useCreditReservation';
 import { FeatureCost } from '@/lib/featureCosts';
+import { useTranslation } from './useTranslation';
 
 interface AICallOptions {
   featureCode: FeatureCost;
@@ -27,6 +28,7 @@ export function useAICall() {
   const [status, setStatus] = useState<AICallStatus>({ stage: 'idle', message: '' });
   const [loading, setLoading] = useState(false);
   const { checkPreflight, reserve, commit, refund } = useCreditReservation();
+  const { t } = useTranslation();
 
   const executeAICall = async <T = any>(options: AICallOptions): Promise<T> => {
     const { featureCode, estimatedCost, apiCall, metadata } = options;
@@ -36,13 +38,13 @@ export function useAICall() {
 
     try {
       // Stage 1: Credit Preflight Check
-      setStatus({ stage: 'credit_check', message: 'Prüfe Credits...' });
+      setStatus({ stage: 'credit_check', message: t('aiCall_checking_credits') });
       
       const preflightResult = await checkPreflight(featureCode, estimatedCost);
       
       if (!preflightResult.allowed) {
         const error: any = new Error(
-          `Nicht genügend Credits. Benötigt: ${preflightResult.required_credits}, Verfügbar: ${preflightResult.available_balance}`
+          t('aiCall_insufficient_credits', { required: preflightResult.required_credits, available: preflightResult.available_balance })
         );
         error.code = 'INSUFFICIENT_CREDITS';
         error.requiredCredits = preflightResult.required_credits;
@@ -54,7 +56,7 @@ export function useAICall() {
       reservation = await reserve(featureCode, estimatedCost, metadata);
 
       // Stage 3: Execute API Call with basic retry
-      setStatus({ stage: 'executing', message: 'Generiere...' });
+      setStatus({ stage: 'executing', message: t('aiCall_generating') });
       
       let result: T;
       let lastError: any;
@@ -69,16 +71,16 @@ export function useAICall() {
           
           // Only retry on rate limits or server errors
           if ((error.status === 429 || error.status >= 500) && attempt < maxAttempts) {
-            const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
+            const delay = Math.pow(2, attempt - 1) * 1000;
             setStatus({ 
               stage: 'retrying', 
-              message: `Wiederhole (${attempt}/${maxAttempts})...`,
+              message: t('aiCall_retrying', { attempt, max: maxAttempts }),
               retryAttempt: attempt 
             });
-            toast.info(`Wiederhole Anfrage (${attempt}/${maxAttempts})...`);
+            toast.info(t('aiCall_retrying', { attempt, max: maxAttempts }));
             await new Promise(resolve => setTimeout(resolve, delay));
           } else {
-            throw error; // Don't retry on client errors
+            throw error;
           }
         }
       }
@@ -90,7 +92,7 @@ export function useAICall() {
       // Stage 4: Commit Credits
       await commit(reservation.reservation_id);
 
-      setStatus({ stage: 'success', message: 'Erfolgreich!' });
+      setStatus({ stage: 'success', message: t('aiCall_success') });
       return result!;
 
     } catch (error: any) {
@@ -104,26 +106,25 @@ export function useAICall() {
       // Handle specific errors
       if (error.code === 'INSUFFICIENT_CREDITS') {
         toast.error(
-          `Nicht genügend Credits: ${error.requiredCredits} benötigt, ${error.availableBalance} verfügbar`,
+          t('aiCall_insufficient_credits', { required: error.requiredCredits, available: error.availableBalance }),
           { duration: 5000 }
         );
         throw error;
       }
 
       if (error.status === 429) {
-        toast.error('Zu viele Anfragen. Bitte versuche es in ein paar Sekunden erneut.');
+        toast.error(t('aiCall_rate_limit'));
       } else if (error.status === 402) {
-        toast.error('Zahlungspflichtig. Bitte fülle dein Credit-Guthaben auf.');
+        toast.error(t('aiCall_payment_required'));
       } else if (error.status >= 500) {
-        toast.error('Server-Fehler. Bitte versuche es später erneut.');
+        toast.error(t('aiCall_server_error'));
       } else {
-        toast.error(error.message || 'Ein Fehler ist aufgetreten');
+        toast.error(error.message || t('aiCall_generic_error'));
       }
 
       throw error;
     } finally {
       setLoading(false);
-      // Reset status after 2 seconds
       setTimeout(() => {
         setStatus({ stage: 'idle', message: '' });
       }, 2000);
