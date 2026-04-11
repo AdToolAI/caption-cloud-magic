@@ -1,74 +1,43 @@
 
 
-## Plan: TrendRadar — Hardcodierte deutsche Strings lokalisieren
+## Plan: Trend Radar — Inhalte auf Englisch / weltweit umstellen
 
 ### Problem
-`TrendRadar.tsx`, `TrendRadarHeroHeader.tsx` und `TrendDetailModal.tsx` enthalten ~40 hardcodierte deutsche Strings, die auch im englischen/spanischen UI erscheinen.
+Die ~100 Trends in `supabase/functions/fetch-trends/index.ts` sind inhaltlich komplett auf Deutsch geschrieben (Hooks, Beschreibungen, KI-Tipps, Content-Ideen, Audience-Texte) — obwohl sie als `language: "en"` markiert sind. Das ist inkonsistent und schränkt die Zielgruppe ein.
+
+### Lösung
+Alle hardcodierten deutschen Strings in der `generateDynamicTrends()`-Funktion ins Englische übersetzen und auf weltweite/internationale Trends ausrichten. Rein deutschsprachige Trend-Namen bleiben, wo sie als Hashtag Sinn ergeben (z.B. `#MiniSuccessStories`), aber Beschreibungen, Hooks, AI-Tips, Content-Ideen und Audience-Fit werden durchgehend Englisch.
 
 ### Änderungen
 
-**1. `src/lib/translations.ts` — Neue Keys im `trends`-Block (alle 3 Sprachen)**
+**`supabase/functions/fetch-trends/index.ts`** — Vollständige Übersetzung aller ~1600 Zeilen Trend-Daten:
 
-| Key | EN | DE | ES |
-|---|---|---|---|
-| `trends.aiTrendRadar` | AI Trend Radar | KI-Trendradar | Radar de Tendencias IA |
-| `trends.reload` | Reload | Neu laden | Recargar |
-| `trends.trendsAnalyzed` | Trends analyzed | Trends analysiert | Tendencias analizadas |
-| `trends.platforms` | Platforms | Plattformen | Plataformas |
-| `trends.categories` | Categories | Kategorien | Categorías |
-| `trends.topTrendsSubtitleAlt` | The hottest trends at a glance | Die heißesten Trends im Überblick | Las tendencias más calientes |
-| `trends.analyzeNow` | Analyze now | Jetzt analysieren | Analizar ahora |
-| `trends.ofCount` | of | von | de |
-| `trends.learnMore` | Learn more | Mehr erfahren | Saber más |
-| `trends.analyze` | Analyze | Analysieren | Analizar |
-| `trends.quickFacts` | Quick Facts | Quick-Facts | Datos rápidos |
-| `trends.back` | Back | Zurück | Volver |
-| `trends.platformLabel` | Platform | Plattform | Plataforma |
-| `trends.categoryLabel` | Category | Kategorie | Categoría |
-| `trends.general` | General | Allgemein | General |
-| `trends.type` | Type | Typ | Tipo |
-| `trends.popularityLabel` | Popularity | Popularität | Popularidad |
-| `trends.targetAudience` | Target Audience | Zielgruppe | Audiencia objetivo |
-| `trends.fullAnalysis` | Full Analysis | Vollständige Analyse | Análisis completo |
-| `trends.noSavedTrends` | You haven't saved any trends yet | Du hast noch keine Trends gespeichert | Aún no has guardado tendencias |
-| `trends.discoverTrends` | Discover trends | Trends entdecken | Descubrir tendencias |
-| `trends.noTrendsFound` | No trends found | Keine Trends gefunden | No se encontraron tendencias |
-| `trends.reloadTrends` | Reload trends | Trends neu laden | Recargar tendencias |
-| `trends.analysisComplete` | Analysis complete | Analyse abgeschlossen | Análisis completado |
-| `trends.ideasGenerated` | content ideas generated | Content-Ideen generiert | ideas de contenido generadas |
-| `trends.analysisFailed` | Analysis failed | Analyse fehlgeschlagen | Análisis fallido |
-| `trends.error` | Error | Fehler | Error |
-| `trends.cannotSave` | This trend cannot be saved | Dieser Trend kann nicht gespeichert werden | Esta tendencia no se puede guardar |
-| `trends.bookmarkRemoved` | Bookmark removed | Bookmark entfernt | Marcador eliminado |
-| `trends.trendSaved` | Trend saved | Trend gespeichert | Tendencia guardada |
-| `trends.unknownError` | Unknown error | Unbekannter Fehler | Error desconocido |
-| `trends.loadError` | Could not load trends | Trends konnten nicht geladen werden | No se pudieron cargar las tendencias |
-| `trends.ecommerceCategories` | E-Commerce Product Categories | E-Commerce Produkt-Kategorien | Categorías de productos E-Commerce |
-| `trends.overview` | Overview | Übersicht | Resumen |
-| `trends.contentIdeas` | Content Ideas | Content-Ideen | Ideas de contenido |
-| `trends.recommendedHashtags` | Recommended Hashtags | Empfohlene Hashtags | Hashtags recomendados |
-| `trends.hashtagStrategy` | Hashtag Strategy | Hashtag-Strategie | Estrategia de hashtags |
+Beispiel vorher:
+```
+hook: "So habe ich in 30 Tagen 1000 neue Follower gewonnen – ohne Ads!",
+ai_tip: "Verwende Jump-Cuts mit Text-Overlays. Dauer: 15–20 Sekunden.",
+audience_fit: "Content creators und Social Media Manager",
+description: "Produziere 30 Posts an einem Tag für maximale Effizienz"
+```
 
-Plus E-Commerce Subcategory-Namen lokalisieren.
+Beispiel nachher:
+```
+hook: "How I gained 1000 new followers in 30 days — without ads!",
+ai_tip: "Use jump-cuts with text overlays. Duration: 15–20 seconds.",
+audience_fit: "Content creators and social media managers",
+description: "Produce 30 posts in one day for maximum efficiency"
+```
 
-**2. `src/pages/TrendRadar.tsx` — Alle ~30 hardcoded Strings ersetzen**
-- `FloatingStats`: labels durch `t()` ersetzen
-- `HeroCarousel`: "Top-Trends der Woche", "Die heißesten...", "von", "Popularität:", "Jetzt analysieren"
-- Main component: "Du hast noch keine...", "Trends entdecken", "Keine Trends gefunden", "Trends neu laden", "Mehr erfahren", "Analysieren", "Quick-Facts", "Zurück", "Plattform", "Kategorie", "Allgemein", "Popularität", "Zielgruppe", "Vollständige Analyse", "E-Commerce Produkt-Kategorien"
-- Toast-Texte: "Analyse abgeschlossen", "Analyse fehlgeschlagen", "Fehler", "Bookmark entfernt", "Trend gespeichert"
-- E-Commerce Subcategories
+Betroffen sind alle Kategorien:
+- Social Media Growth (~5 Trends)
+- E-Commerce / Product Trends (~20+ Trends)
+- Health & Fitness (~10 Trends)
+- Finance (~5 Trends)
+- AI Tools (~5 Trends)
+- Parenting, Sustainability, weitere (~10+ Trends)
 
-**3. `src/components/trends/TrendRadarHeroHeader.tsx` — 2 Strings**
-- "KI-Trendradar" → `t('trends.aiTrendRadar')`
-- "Neu laden" → `t('trends.reload')`
-
-**4. `src/components/trends/TrendDetailModal.tsx` — ~10 Strings**
-- "Popularität", "Übersicht", "Content-Ideen", "Empfohlene Hashtags", "Zielgruppe", "Hashtag-Strategie"
-- `date-fns/locale` dynamisch nach Sprache wählen (statt immer `de`)
-
-### Betroffene Dateien
-- `src/lib/translations.ts`
-- `src/pages/TrendRadar.tsx`
-- `src/components/trends/TrendRadarHeroHeader.tsx`
-- `src/components/trends/TrendDetailModal.tsx`
+### Umfang
+- **1 Datei**: `supabase/functions/fetch-trends/index.ts`
+- **~200+ deutsche Strings** → Englisch
+- Keine Strukturänderungen, keine neuen Keys, keine Frontend-Änderungen nötig
 
