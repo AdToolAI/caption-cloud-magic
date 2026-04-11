@@ -10532,6 +10532,31 @@ translations.es.composer = {
     tiktok: { name: "TikTok", icon: "🎵", ratio: "9:16", length: "10 minutos", caption: "150 caracteres" },
     linkedin: { name: "LinkedIn", icon: "💼", ratio: "16:9 / 1:1", length: "10 minutos", caption: "3.000 caracteres" },
     youtube: { name: "YouTube", icon: "📺", ratio: "16:9", length: "Ilimitado", caption: "Título: 100, Descripción: 5.000" }
+  },
+    postingTimes: {
+      livePrognosis: "Pronóstico en vivo",
+      title: "Asesor de Horarios",
+      subtitle: "Recomendaciones de horarios optimizadas por IA basadas en tu historial de rendimiento y picos de plataforma",
+      updated: "Actualizado",
+      daysHistory: "días de historial",
+      sync: "Sincronizar",
+      syncSuccess: "Posts sincronizados",
+      syncError: "Error al sincronizar",
+      industryRecsActive: "Recomendaciones del sector activas",
+      industryRecsDesc: "Estas recomendaciones se basan en promedios del sector y tendencias estacionales. Conecta tus cuentas para horarios personalizados.",
+      syncAccounts: "Sincronizar cuentas",
+      forecast14: "Pronóstico de 14 días",
+      clickToSchedule: "Haz clic en una hora para planificar directamente en el calendario",
+      industryData: "Datos del sector",
+      personalized: "Personalizado",
+      topTimesNext7: "Mejores horarios de los próximos 7 días",
+      best3Slots: "Los 3 mejores horarios por día",
+      aiOptimized: "Optimizado por IA",
+      today: "Hoy",
+      schedule: "Planificar",
+      topN: "Top",
+      times: "horarios",
+    },
   }
 };
 
