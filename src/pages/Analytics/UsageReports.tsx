@@ -6,9 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUsageReports } from '@/hooks/useUsageReports';
 import { CostBreakdownPie } from '@/components/analytics/CostBreakdownPie';
 import { RenderEngineComparison } from '@/components/analytics/RenderEngineComparison';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function UsageReports() {
   const { reports, savingsAnalysis } = useUsageReports();
+  const { t } = useTranslation();
   const latestReport = reports[0];
 
   return (
@@ -18,17 +20,17 @@ export default function UsageReports() {
         <main className="flex-1 p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             <div>
-              <h1 className="text-3xl font-bold">Usage Reports</h1>
-              <p className="text-muted-foreground">Credit-Verbrauch und Kosten-Optimierung</p>
+              <h1 className="text-3xl font-bold">{t('usageReports.title')}</h1>
+              <p className="text-muted-foreground">{t('usageReports.subtitle')}</p>
             </div>
 
             <CreditUsageDashboard />
 
             <Tabs defaultValue="savings" className="space-y-4">
               <TabsList>
-                <TabsTrigger value="savings">Spar-Potenzial</TabsTrigger>
-                <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
-                <TabsTrigger value="engines">Engine-Vergleich</TabsTrigger>
+                <TabsTrigger value="savings">{t('usageReports.tabSavings')}</TabsTrigger>
+                <TabsTrigger value="breakdown">{t('usageReports.tabBreakdown')}</TabsTrigger>
+                <TabsTrigger value="engines">{t('usageReports.tabEngines')}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="savings" className="space-y-4">
@@ -40,15 +42,15 @@ export default function UsageReports() {
                   {latestReport?.breakdown_by_feature && (
                     <CostBreakdownPie 
                       data={latestReport.breakdown_by_feature}
-                      title="Breakdown nach Feature"
-                      description="Credit-Verteilung nach Funktionen"
+                      title={t('usageReports.breakdownByFeature')}
+                      description={t('usageReports.creditDistFeature')}
                     />
                   )}
                   {latestReport?.breakdown_by_engine && (
                     <CostBreakdownPie 
                       data={latestReport.breakdown_by_engine}
-                      title="Breakdown nach Engine"
-                      description="Credit-Verteilung nach Render-Engine"
+                      title={t('usageReports.breakdownByEngine')}
+                      description={t('usageReports.creditDistEngine')}
                     />
                   )}
                 </div>
@@ -70,4 +72,4 @@ export default function UsageReports() {
       </div>
     </SidebarProvider>
   );
-};
+}

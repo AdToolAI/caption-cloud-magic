@@ -2,10 +2,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { TrendingDown, Lightbulb, AlertCircle } from 'lucide-react';
 import { useUsageReports } from '@/hooks/useUsageReports';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useEffect } from 'react';
 
 export const SavingsRecommendations = () => {
   const { savingsAnalysis, calculateSavings } = useUsageReports();
+  const { t } = useTranslation();
 
   useEffect(() => {
     calculateSavings(30);
@@ -41,15 +43,15 @@ export const SavingsRecommendations = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingDown className="w-5 h-5" />
-            Spar-Empfehlungen
+            {t('usageReports.savingsRecommendations')}
           </CardTitle>
           <CardDescription>
-            Optimierungs-Tipps für geringere Kosten
+            {t('usageReports.optimizationTips')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            Keine Empfehlungen verfügbar
+            {t('usageReports.noRecommendations')}
           </div>
         </CardContent>
       </Card>
@@ -61,10 +63,10 @@ export const SavingsRecommendations = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingDown className="w-5 h-5" />
-          Spar-Empfehlungen
+          {t('usageReports.savingsRecommendations')}
         </CardTitle>
         <CardDescription>
-          Potenzial: {savingsAnalysis.potentialSavings} Credits sparen
+          {t('usageReports.potentialSave', { count: savingsAnalysis.potentialSavings })}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -86,7 +88,7 @@ export const SavingsRecommendations = () => {
                         {rec.type}
                       </Badge>
                       <Badge variant="secondary" className="text-xs">
-                        {rec.savingsPotential} Credits
+                        {rec.savingsPotential} {t('usageReports.credits')}
                       </Badge>
                     </div>
                     <p className="text-sm">{rec.message}</p>
@@ -99,9 +101,9 @@ export const SavingsRecommendations = () => {
 
         <div className="mt-6 p-4 bg-primary/10 rounded-lg">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Gesamt-Spar-Potenzial</span>
+            <span className="text-sm font-medium">{t('usageReports.totalSavingsPotential')}</span>
             <span className="text-2xl font-bold text-primary">
-              {savingsAnalysis.potentialSavings} Credits
+              {savingsAnalysis.potentialSavings} {t('usageReports.credits')}
             </span>
           </div>
         </div>

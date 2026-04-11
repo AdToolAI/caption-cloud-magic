@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { PieChart as PieIcon } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface CostBreakdownPieProps {
   data: Record<string, number>;
@@ -20,6 +21,7 @@ const COLORS = [
 ];
 
 export const CostBreakdownPie = ({ data, title, description }: CostBreakdownPieProps) => {
+  const { t } = useTranslation();
   const chartData = Object.entries(data).map(([name, value]) => ({
     name,
     value,
@@ -58,7 +60,7 @@ export const CostBreakdownPie = ({ data, title, description }: CostBreakdownPieP
           </ResponsiveContainer>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
-            Keine Daten verfügbar
+            {t('usageReports.noData')}
           </div>
         )}
       </CardContent>
