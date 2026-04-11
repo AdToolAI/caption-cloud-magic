@@ -1,28 +1,29 @@
 
 
-## Plan: Album-Thumbnails und KI-Bilder Auto-Zuordnung verbessern
+## Plan: Bilder-Zähler soll alle Album-Bilder (studio_images) mitzählen
 
-### Problem 1: Album-Cover zeigt schwarzen/leeren Hintergrund
-Die Alben haben kein `cover_image_url` gesetzt. Statt nur den Fallback-Icon zu zeigen, soll dynamisch das **zuletzt hinzugefügte Bild** des Albums als Thumbnail angezeigt werden.
+### Problem
+Der Bilder-Zähler im Header (`X / 2.500`) zählt nur Bilder aus `content_items` und `media_assets`. Die KI-generierten Bilder in `studio_images` (die nur über Alben erreichbar sind) werden nicht mitgezählt.
 
-### Problem 2: KI-Bilder sollen zuverlässig im "KI Picture Studio"-Album landen
-Die Frontend-Logik existiert bereits, aber die Zuordnung soll zusätzlich direkt in der Edge Function passieren, damit es zuverlässiger ist (kein Race-Condition-Risiko).
+### Lösung
 
-### Änderungen
+**Datei: `src/pages/MediaLibrary.tsx`**
 
-**1. `src/components/media-library/MediaAlbumManager.tsx`**
-- Beim Laden der Alben: Für jedes Album ohne `cover_image_url` das neueste Bild aus `studio_images` laden und als dynamisches Cover verwenden
-- Query: `studio_images` nach `album_id` filtern, `order by created_at desc`, `limit 1`, Feld `image_url` nutzen
+Beim Laden der Mediathek-Daten (in der `loadMedia`-Funktion, ca. Zeile 200-347) wird eine zusätzliche count-Query auf `studio_images` ausgeführt:
 
-**2. `supabase/functions/generate-studio-image/index.ts`**
-- Nach dem Speichern des Bildes in `studio_images`: Direkt in der Edge Function das "KI Picture Studio" System-Album finden/erstellen und die `album_id` beim Insert setzen (statt nachträglich per Update vom Frontend)
-- Das entfernt die Abhängigkeit vom Frontend-Code für die Album-Zuordnung
+```typescript
+const { count: studioImageCount } = await supabase
+  .from('studio_images')
+  .select('id', { count: 'exact', head: true })
+  .eq('user_id', user.id);
+```
 
-**3. `src/components/media-library/AlbumImagePicker.tsx`**
-- Gleiche Logik: Dynamisches Cover-Bild laden wenn `cover_image_url` null ist
+Dann wird der `imageCount` in der Berechnung (Zeile 802) angepasst, sodass er die Studio-Bilder mit einbezieht. Dafür wird der `studioImageCount` als State gespeichert und zum bestehenden `imageCount` addiert:
 
-### Betroffene Dateien
-- `src/components/media-library/MediaAlbumManager.tsx` — dynamisches Album-Cover
-- `src/components/media-library/AlbumImagePicker.tsx` — dynamisches Album-Cover
-- `supabase/functions/generate-studio-image/index.ts` — album_id direkt beim Insert setzen
+```typescript
+const imageCount = media.filter(m => m.type === 'image').length + studioImageCount;
+```
+
+### Betroffene Datei
+- `src/pages/MediaLibrary.tsx` — neuer State `studioImageCount`, zusätzliche DB-Query, angepasste Berechnung
 
