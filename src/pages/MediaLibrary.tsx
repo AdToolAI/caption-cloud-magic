@@ -1193,6 +1193,19 @@ export default function MediaLibrary() {
                       <TooltipTrigger asChild>
                         <Button 
                           size="icon" 
+                          variant="secondary"
+                          onClick={() => handleSaveToAlbum(item)}
+                        >
+                          <FolderPlus className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>In Album speichern</TooltipContent>
+                    </Tooltip>
+                    
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          size="icon" 
                           variant="destructive"
                           onClick={() => handleDelete(item.id, item)}
                         >
