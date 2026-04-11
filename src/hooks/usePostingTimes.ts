@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface PostingSlot {
   start: string;
@@ -43,11 +44,13 @@ export function usePostingTimes({
   tz = Intl.DateTimeFormat().resolvedOptions().timeZone,
   enabled = true 
 }: UsePostingTimesParams) {
+  const { language } = useTranslation();
+
   return useQuery({
-    queryKey: ['posting-times', platform, days, tz],
+    queryKey: ['posting-times', platform, days, tz, language],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('posting-times-api', {
-        body: { platform, days, tz }
+        body: { platform, days, tz, language }
       });
 
       if (error) {
@@ -57,8 +60,8 @@ export function usePostingTimes({
 
       return data as PostingTimesData;
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    refetchInterval: 15 * 60 * 1000, // 15 minutes
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: 15 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: 3,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
