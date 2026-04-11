@@ -85,11 +85,11 @@ export function CalendarHeader({
         .update({ updated_at: new Date().toISOString() })
         .eq("workspace_id", workspaceId);
 
-      toast.success("✅ Kalender erfolgreich synchronisiert");
+      toast.success(`✅ ${t('calendar.syncSuccess')}`);
       fetchGoogleStatus();
     } catch (error: any) {
       console.error("Sync failed:", error);
-      toast.error("❌ Synchronisierung fehlgeschlagen");
+      toast.error(`❌ ${t('calendar.syncFailed')}`);
     } finally {
       setSyncing(false);
     }
@@ -100,7 +100,6 @@ export function CalendarHeader({
       "flex gap-3 px-4 py-3 backdrop-blur-xl bg-card/60 border border-white/10 rounded-xl",
       isMobile ? "flex-col" : "items-center justify-between"
     )}>
-      {/* Left: Filter Dropdowns */}
       <div className={cn(
         "flex gap-2",
         isMobile ? "flex-col w-full" : "items-center"
@@ -160,7 +159,6 @@ export function CalendarHeader({
         </Select>
       </div>
 
-      {/* Right: Google Calendar Status (compact) */}
       {workspaceId && (
         <div className={cn(
           "flex gap-2",

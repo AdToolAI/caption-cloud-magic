@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ export function MediaLibraryPickerDialog({
   onSelect,
 }: MediaLibraryPickerDialogProps) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -47,7 +49,6 @@ export function MediaLibraryPickerDialog({
     const fetchItems = async () => {
       setLoading(true);
       try {
-        // Get user's workspace first
         const { data: workspaces } = await supabase
           .from("workspaces")
           .select("id")
@@ -105,16 +106,15 @@ export function MediaLibraryPickerDialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>Aus Media Library wählen</DialogTitle>
+          <DialogTitle>{t('calendar.chooseFromLibrary')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Search & Filters */}
           <div className="flex gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Suchen..."
+                placeholder={t('calendar.searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
@@ -122,24 +122,23 @@ export function MediaLibraryPickerDialog({
             </div>
             <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
               <TabsList>
-                <TabsTrigger value="all">Alle</TabsTrigger>
+                <TabsTrigger value="all">{t('calendar.allFilter')}</TabsTrigger>
                 <TabsTrigger value="image" className="gap-1">
                   <Image className="h-3 w-3" />
-                  Bilder
+                  {t('calendar.imagesFilter')}
                 </TabsTrigger>
                 <TabsTrigger value="video" className="gap-1">
                   <Video className="h-3 w-3" />
-                  Videos
+                  {t('calendar.videosFilter')}
                 </TabsTrigger>
                 <TabsTrigger value="ai" className="gap-1">
                   <Sparkles className="h-3 w-3" />
-                  KI-Posts
+                  {t('calendar.aiPostsFilter')}
                 </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
 
-          {/* Media Grid */}
           <ScrollArea className="h-[400px]">
             {loading ? (
               <div className="flex items-center justify-center h-full">
@@ -148,7 +147,7 @@ export function MediaLibraryPickerDialog({
             ) : items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                 <Image className="h-12 w-12 mb-2 opacity-50" />
-                <p>Keine Medien gefunden</p>
+                <p>{t('calendar.noMediaFound')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-3 p-1">
@@ -165,16 +164,9 @@ export function MediaLibraryPickerDialog({
                   >
                     {item.thumb_url ? (
                       item.type === "video" ? (
-                        <video
-                          src={item.thumb_url}
-                          className="w-full h-28 object-cover"
-                        />
+                        <video src={item.thumb_url} className="w-full h-28 object-cover" />
                       ) : (
-                        <img
-                          src={item.thumb_url}
-                          alt={item.title}
-                          className="w-full h-28 object-cover"
-                        />
+                        <img src={item.thumb_url} alt={item.title} className="w-full h-28 object-cover" />
                       )
                     ) : (
                       <div className="w-full h-28 bg-white/5 flex items-center justify-center">
@@ -182,19 +174,17 @@ export function MediaLibraryPickerDialog({
                       </div>
                     )}
 
-                    {/* Selection Check */}
                     {selectedId === item.id && (
                       <div className="absolute top-2 right-2 bg-primary rounded-full p-1">
                         <Check className="h-3 w-3 text-primary-foreground" />
                       </div>
                     )}
 
-                    {/* Type Badge */}
                     <div className="absolute top-2 left-2">
                       {item.source === "ai-post-generator" ? (
                         <div className="bg-gold/90 text-black px-1.5 py-0.5 rounded text-xs flex items-center gap-1">
                           <Sparkles className="h-2.5 w-2.5" />
-                          KI
+                          AI
                         </div>
                       ) : item.type === "video" ? (
                         <div className="bg-primary/90 text-primary-foreground px-1.5 py-0.5 rounded text-xs">
@@ -203,7 +193,6 @@ export function MediaLibraryPickerDialog({
                       ) : null}
                     </div>
 
-                    {/* Title Overlay */}
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
                       <p className="text-xs text-white truncate">{item.title}</p>
                     </div>
@@ -213,13 +202,12 @@ export function MediaLibraryPickerDialog({
             )}
           </ScrollArea>
 
-          {/* Actions */}
           <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
             <Button variant="outline" onClick={onClose}>
-              Abbrechen
+              {t('calendar.cancelBtn')}
             </Button>
             <Button onClick={handleSelect} disabled={!selectedId}>
-              Auswählen
+              {t('calendar.selectBtn')}
             </Button>
           </div>
         </div>

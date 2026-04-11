@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, CheckCircle2, XCircle, AlertCircle, Clock, RefreshCw, ExternalLink, Inbox } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface PublishLog {
   id: string;
@@ -30,7 +31,11 @@ interface CalendarEvent {
   start_at: string;
 }
 
+const localeMap: Record<string, string> = { en: 'en-US', de: 'de-DE', es: 'es-ES' };
+
 export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) {
+  const { t, language } = useTranslation();
+  const dateLocale = localeMap[language] || 'en-US';
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   const { data: activeEvents, refetch: refetchEvents } = useQuery({
@@ -107,9 +112,9 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-      queued: { variant: "default", label: "In Warteschlange" },
-      published: { variant: "secondary", label: "Veröffentlicht" },
-      failed: { variant: "destructive", label: "Fehlgeschlagen" },
+      queued: { variant: "default", label: t('calendar.queued') },
+      published: { variant: "secondary", label: t('calendar.publishedStatus') },
+      failed: { variant: "destructive", label: t('calendar.failedStatus') },
     };
     const c = config[status] || { variant: "outline" as const, label: status };
     return (
@@ -134,11 +139,11 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
 
       if (error) throw error;
 
-      toast.success('Event wird erneut verarbeitet');
+      toast.success(t('calendar.retrySuccess'));
       refetchEvents();
     } catch (error) {
       console.error('Error retrying event:', error);
-      toast.error('Erneuter Versuch fehlgeschlagen');
+      toast.error(t('calendar.retryFailed'));
     }
   };
 
@@ -146,7 +151,7 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
     return (
       <Card className="backdrop-blur-xl bg-card/40 border-white/10">
         <CardHeader>
-          <CardTitle className="text-lg">Veröffentlichungs-Warteschlange</CardTitle>
+          <CardTitle className="text-lg">{t('calendar.publishQueue')}</CardTitle>
         </CardHeader>
         <CardContent>
           <motion.div 
@@ -162,8 +167,8 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
             >
               <Inbox className="h-8 w-8 text-primary/60" />
             </motion.div>
-            <p className="text-sm text-muted-foreground">Keine aktiven Veröffentlichungen</p>
-            <p className="text-xs text-muted-foreground/60 mt-1">Geplante Posts erscheinen hier automatisch</p>
+            <p className="text-sm text-muted-foreground">{t('calendar.noActivePublications')}</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">{t('calendar.scheduledPostsAppearHere')}</p>
           </motion.div>
         </CardContent>
       </Card>
@@ -172,11 +177,10 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {/* Queue List */}
       <Card className="backdrop-blur-xl bg-card/40 border-white/10">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            Veröffentlichungs-Warteschlange
+            {t('calendar.publishQueue')}
             <Badge variant="outline" className="border-primary/30">{activeEvents.length}</Badge>
           </CardTitle>
         </CardHeader>
@@ -199,7 +203,7 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
                       <div className="flex items-center gap-2 mb-1">
                         {getStatusIcon(event.status)}
                         <span className="font-medium text-sm truncate">
-                          {event.title || 'Unbenannter Post'}
+                          {event.title || t('calendar.untitledPost')}
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground truncate mb-2">
@@ -214,7 +218,7 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
                         ))}
                         {event.attempt_no > 0 && (
                           <Badge variant="secondary" className="text-xs">
-                            Versuch {event.attempt_no}
+                            {t('calendar.attempt')} {event.attempt_no}
                           </Badge>
                         )}
                       </div>
@@ -236,12 +240,12 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
                   {event.error && (
                     <div className="mt-2 p-2 bg-destructive/10 rounded text-xs text-destructive">
                       <AlertCircle className="h-3 w-3 inline mr-1" />
-                      {event.error.message || 'Veröffentlichung fehlgeschlagen'}
+                      {event.error.message || t('calendar.publishFailed')}
                     </div>
                   )}
                   {event.next_retry_at && (
                     <div className="mt-2 text-xs text-muted-foreground">
-                      Nächster Versuch: {new Date(event.next_retry_at).toLocaleString('de-DE')}
+                      {t('calendar.nextRetry')}: {new Date(event.next_retry_at).toLocaleString(dateLocale)}
                     </div>
                   )}
                 </motion.div>
@@ -251,11 +255,10 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
         </CardContent>
       </Card>
 
-      {/* Logs Panel */}
       <Card className="backdrop-blur-xl bg-card/40 border-white/10">
         <CardHeader>
           <CardTitle className="text-lg">
-            {selectedEventId ? 'Veröffentlichungs-Logs' : 'Event auswählen'}
+            {selectedEventId ? t('calendar.publishLogs') : t('calendar.selectEvent')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -277,7 +280,7 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
                       <div className="flex-1">
                         <div className="font-medium mb-1">{log.message}</div>
                         <div className="text-muted-foreground">
-                          {new Date(log.at).toLocaleString('de-DE')}
+                          {new Date(log.at).toLocaleString(dateLocale)}
                         </div>
                         {log.meta?.results && (
                           <div className="mt-2 space-y-1">
@@ -293,7 +296,7 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
                                     rel="noopener noreferrer"
                                     className="text-primary hover:underline flex items-center gap-1"
                                   >
-                                    Anzeigen <ExternalLink className="h-3 w-3" />
+                                    {t('calendar.viewLink')} <ExternalLink className="h-3 w-3" />
                                   </a>
                                 )}
                                 {result.error_message && (
@@ -311,7 +314,7 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
             </ScrollArea>
           ) : (
             <div className="h-[400px] flex items-center justify-center text-muted-foreground">
-              Wähle ein Event um Logs anzuzeigen
+              {t('calendar.selectEvent')}
             </div>
           )}
         </CardContent>

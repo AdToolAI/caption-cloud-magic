@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { PostMediaUploader } from "./PostMediaUploader";
 import { MediaLibraryPickerDialog } from "./MediaLibraryPickerDialog";
 import { PostTypeSelector, PostType } from "./PostTypeSelector";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface Post {
   day: number;
@@ -52,6 +53,7 @@ const AVAILABLE_CHANNELS = [
 ];
 
 export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimelineBuilderProps) {
+  const { t } = useTranslation();
   const [expandedPosts, setExpandedPosts] = useState<Set<number>>(new Set([0]));
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [activePostIndex, setActivePostIndex] = useState<number | null>(null);
@@ -148,14 +150,14 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Posts in diesem Template</h3>
+          <h3 className="text-lg font-semibold">{t('calendar.postsInTemplate')}</h3>
           <p className="text-sm text-muted-foreground">
-            {posts.length} Post{posts.length !== 1 ? "s" : ""} definiert
+            {posts.length} {t('calendar.postsDefined')}
           </p>
         </div>
         <Button onClick={addPost} size="sm" className="gap-1">
           <Plus className="h-4 w-4" />
-          Post hinzufügen
+          {t('calendar.addPost')}
         </Button>
       </div>
 
@@ -163,8 +165,8 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
         <Card className="p-8 text-center border-dashed">
           <div className="text-muted-foreground">
             <Image className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p className="font-medium">Noch keine Posts</p>
-            <p className="text-sm mt-1">Füge Posts hinzu, um dein Template zu erstellen</p>
+            <p className="font-medium">{t('calendar.noPostsYet')}</p>
+            <p className="text-sm mt-1">{t('calendar.addPostsToCreate')}</p>
           </div>
         </Card>
       ) : (
@@ -181,12 +183,10 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
                   expandedPosts.has(index) && "ring-1 ring-primary/30"
                 )}
               >
-                {/* Header */}
                 <CollapsibleTrigger asChild>
                   <div className="flex items-center gap-3 p-3 cursor-pointer hover:bg-white/5 transition-colors">
                     <GripVertical className="h-4 w-4 text-muted-foreground/50" />
 
-                    {/* Media Preview */}
                     {post.mediaUrl ? (
                       <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
                         {post.mediaType === "video" ? (
@@ -213,10 +213,10 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs">
-                          Tag {post.day}
+                          {t('calendar.dayLabel')} {post.day}
                         </Badge>
                         <span className="font-medium truncate">
-                          {post.title || "Unbenannter Post"}
+                          {post.title || t('calendar.untitledPost')}
                         </span>
                       </div>
                       <div className="flex items-center gap-1 mt-1">
@@ -248,22 +248,19 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
                   </div>
                 </CollapsibleTrigger>
 
-                {/* Expanded Content */}
                 <CollapsibleContent>
                   <div className="border-t border-white/10 p-4 space-y-4">
-                    {/* Post Type Selector */}
                     <div className="space-y-2">
-                      <Label>Post-Typ</Label>
+                      <Label>{t('calendar.postType')}</Label>
                       <PostTypeSelector
                         value={post.postType}
                         onChange={(type) => updatePost(index, "postType", type)}
                       />
                     </div>
 
-                    {/* Media Section (for image/video/carousel) */}
                     {post.postType !== "text" && (
                       <div className="space-y-2">
-                        <Label>Medien</Label>
+                        <Label>{t('calendar.mediaLabel')}</Label>
                         <PostMediaUploader
                           mediaUrl={post.mediaUrl}
                           mediaType={post.mediaType}
@@ -284,7 +281,7 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
                             onClick={() => openMediaPicker(index)}
                           >
                             <FolderOpen className="h-3.5 w-3.5" />
-                            Aus Library
+                            {t('calendar.fromLibrary')}
                           </Button>
                           <Button
                             variant="outline"
@@ -293,16 +290,15 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
                             onClick={navigateToAIGenerator}
                           >
                             <Sparkles className="h-3.5 w-3.5" />
-                            KI generieren
+                            {t('calendar.aiGenerate')}
                           </Button>
                         </div>
                       </div>
                     )}
 
-                    {/* Basic Info */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Tag</Label>
+                        <Label>{t('calendar.dayLabel')}</Label>
                         <Input
                           type="number"
                           min={1}
@@ -314,7 +310,7 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Geschätzte Zeit (Min)</Label>
+                        <Label>{t('calendar.estimatedTime')}</Label>
                         <Input
                           type="number"
                           min={5}
@@ -325,37 +321,36 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Titel</Label>
+                      <Label>{t('calendar.titleLabel')}</Label>
                       <Input
                         value={post.title}
                         onChange={(e) => updatePost(index, "title", e.target.value)}
-                        placeholder="Post-Titel eingeben..."
+                        placeholder={t('calendar.enterPostTitle')}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Briefing / Notizen</Label>
+                      <Label>{t('calendar.briefingNotes')}</Label>
                       <Textarea
                         value={post.brief}
                         onChange={(e) => updatePost(index, "brief", e.target.value)}
-                        placeholder="Interne Notizen oder Briefing..."
+                        placeholder={t('calendar.internalNotesPlaceholder')}
                         rows={2}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Caption</Label>
+                      <Label>{t('calendar.captionLabel')}</Label>
                       <Textarea
                         value={post.caption}
                         onChange={(e) => updatePost(index, "caption", e.target.value)}
-                        placeholder="Post-Caption schreiben..."
+                        placeholder={t('calendar.writeCaptionPlaceholder')}
                         rows={3}
                       />
                     </div>
 
-                    {/* Channels */}
                     <div className="space-y-2">
-                      <Label>Plattformen</Label>
+                      <Label>{t('calendar.platformsLabel')}</Label>
                       <div className="flex flex-wrap gap-2">
                         {AVAILABLE_CHANNELS.map((channel) => (
                           <Badge
@@ -375,7 +370,6 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
                       </div>
                     </div>
 
-                    {/* Hashtags */}
                     <div className="space-y-2">
                       <Label>Hashtags</Label>
                       <Input
@@ -385,7 +379,6 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
                       />
                     </div>
 
-                    {/* Delete Button */}
                     <div className="flex justify-end pt-2 border-t border-white/10">
                       <Button
                         variant="ghost"
@@ -394,7 +387,7 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
                         onClick={() => removePost(index)}
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
-                        Post löschen
+                        {t('calendar.deletePost')}
                       </Button>
                     </div>
                   </div>
@@ -405,7 +398,6 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
         </div>
       )}
 
-      {/* Media Library Picker Dialog */}
       <MediaLibraryPickerDialog
         open={mediaPickerOpen}
         onClose={() => {

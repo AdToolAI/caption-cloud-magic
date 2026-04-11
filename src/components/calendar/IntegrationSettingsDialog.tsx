@@ -26,7 +26,6 @@ export function IntegrationSettingsDialog({ open, onClose, workspaceId }: Integr
   const { t } = useTranslation();
   const isMobile = useIsMobile();
 
-  // Show fallback if no workspace is selected
   if (!workspaceId) {
     const fallbackContent = (
       <div className="flex flex-col items-center justify-center p-8 text-center">
@@ -35,7 +34,7 @@ export function IntegrationSettingsDialog({ open, onClose, workspaceId }: Integr
           {t("calendar.integrations.noWorkspace")}
         </h3>
         <p className="text-sm text-muted-foreground">
-          Bitte wähle zuerst einen Workspace aus, um Integrationen zu verwalten.
+          {t("calendar.noWorkspaceSelected")}
         </p>
       </div>
     );
