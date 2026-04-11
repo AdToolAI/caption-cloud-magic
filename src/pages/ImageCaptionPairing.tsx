@@ -705,8 +705,8 @@ const ImageCaptionPairing = () => {
                         scene_type: ''
                       });
                       toast({
-                        title: "✨ Bild geladen",
-                        description: "Bild und Captions aus History übernommen",
+                        title: t("imgcap_image_loaded"),
+                        description: t("imgcap_image_loaded_desc"),
                       });
                     }}
                   >
@@ -720,7 +720,7 @@ const ImageCaptionPairing = () => {
                                     flex items-center justify-center">
                       <span className="text-sm font-medium text-primary bg-background/80 px-3 py-1.5 rounded-full
                                        shadow-[0_0_15px_hsla(43,90%,68%,0.3)] border border-primary/30">
-                        Bild verwenden
+                        {t('imgcap_use_image')}
                       </span>
                     </div>
                     <Button
