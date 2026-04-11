@@ -11,6 +11,7 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/NotificationBell";
 import { SocialConnectionIcons } from "@/components/dashboard/SocialConnectionIcons";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export function AppHeader() {
   const { toggleSidebar } = useSidebar();
@@ -56,6 +57,7 @@ export function AppHeader() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2 ml-12">
+          <LanguageSwitcher />
           <ThemeToggle />
           {user && (
             <Button asChild variant="ghost" size="icon" className="rounded-xl" aria-label="Community">
