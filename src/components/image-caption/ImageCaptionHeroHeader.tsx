@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { ImagePlus, Zap } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface ImageCaptionHeroHeaderProps {
   dailyUploads: number;
@@ -7,6 +8,8 @@ interface ImageCaptionHeroHeaderProps {
 }
 
 const ImageCaptionHeroHeader = ({ dailyUploads, isPro }: ImageCaptionHeroHeaderProps) => {
+  const { t } = useTranslation();
+
   return (
     <div className="relative mb-10 overflow-hidden">
       {/* Background glow effects */}
@@ -43,7 +46,7 @@ const ImageCaptionHeroHeader = ({ dailyUploads, isPro }: ImageCaptionHeroHeaderP
             transition={{ duration: 2, repeat: Infinity }}
             className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_hsla(43,90%,68%,0.8)]"
           />
-          <span className="text-sm font-medium text-primary">KI-Bild-Caption Pairing</span>
+          <span className="text-sm font-medium text-primary">{t('imgcap_badge')}</span>
         </motion.div>
 
         {/* Main Headline */}
@@ -64,7 +67,7 @@ const ImageCaptionHeroHeader = ({ dailyUploads, isPro }: ImageCaptionHeroHeaderP
             <ImagePlus className="h-7 w-7 text-primary" />
           </motion.div>
           <span className="bg-gradient-to-r from-primary via-primary to-cyan-400 bg-clip-text text-transparent">
-            Bild-Caption Pairing
+            {t('imgcap_hero_title')}
           </span>
         </motion.h1>
 
@@ -76,7 +79,7 @@ const ImageCaptionHeroHeader = ({ dailyUploads, isPro }: ImageCaptionHeroHeaderP
           className="flex items-center gap-4 flex-wrap"
         >
           <p className="text-muted-foreground text-lg">
-            KI analysiert dein Bild und generiert perfekte Captions
+            {t('imgcap_hero_subtitle')}
           </p>
           
           {!isPro && (
@@ -91,7 +94,7 @@ const ImageCaptionHeroHeader = ({ dailyUploads, isPro }: ImageCaptionHeroHeaderP
                 <Zap className="h-3.5 w-3.5 text-primary" />
               </div>
               <span className="text-sm text-muted-foreground">
-                Uploads heute: <span className="text-primary font-semibold">{dailyUploads}/2</span>
+                {t('imgcap_uploads_today')}: <span className="text-primary font-semibold">{dailyUploads}/2</span>
               </span>
             </motion.div>
           )}
