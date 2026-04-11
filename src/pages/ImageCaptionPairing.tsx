@@ -128,8 +128,8 @@ const ImageCaptionPairing = () => {
         }
         
         toast({
-          title: "🗑️ Automatisch aufgeräumt",
-          description: `${toDelete} älteste(s) Bild(er) gelöscht (Limit: 15)`,
+          title: t("imgcap_auto_cleaned"),
+          description: t("imgcap_auto_cleaned_desc", { count: String(toDelete) }),
         });
       }
     }
@@ -226,7 +226,7 @@ const ImageCaptionPairing = () => {
 
       toast({
         title: t("common.success"),
-        description: "Captions generated successfully!",
+        description: t("imgcap_captions_success"),
       });
 
     } catch (error: any) {
@@ -270,7 +270,7 @@ const ImageCaptionPairing = () => {
     }));
     navigate('/generator');
     toast({
-      title: "✨ Caption an Generator gesendet!",
+      title: t("imgcap_caption_sent_generator"),
     });
   };
 
@@ -288,7 +288,7 @@ const ImageCaptionPairing = () => {
     sessionStorage.setItem('calendar_prefill', JSON.stringify(prefillData));
     navigate('/calendar?prefill=true');
     toast({
-      title: "📅 Caption an Kalender gesendet!",
+      title: t("imgcap_caption_sent_calendar"),
     });
   };
 
@@ -427,7 +427,7 @@ const ImageCaptionPairing = () => {
                         setImageAnalysis(null);
                       }}
                     >
-                      Anderes Bild hochladen
+                      {t('imgcap_upload_another')}
                     </Button>
                   </div>
                 ) : (
@@ -480,7 +480,7 @@ const ImageCaptionPairing = () => {
                 
                 <div className="space-y-4">
                   <div className="p-3 rounded-xl bg-muted/20 border border-white/5">
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Beschreibung:</p>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">{t('imgcap_description_label')}:</p>
                     <p className="text-sm">{imageAnalysis.description}</p>
                   </div>
 
@@ -561,7 +561,7 @@ const ImageCaptionPairing = () => {
                                    flex items-center justify-center shadow-[0_0_15px_hsla(43,90%,68%,0.2)]">
                       <Wand2 className="h-5 w-5 text-primary" />
                     </div>
-                    <h2 className="text-xl font-bold">Generierte Captions</h2>
+                    <h2 className="text-xl font-bold">{t('imgcap_generated_captions')}</h2>
                   </div>
                   <Button
                     variant="outline"
