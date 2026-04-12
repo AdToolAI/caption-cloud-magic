@@ -1,29 +1,27 @@
 
 
-## Plan: Localize Gaming Hub (EN/DE/ES)
+## Plan: Localize Account Settings page (EN/DE/ES)
 
 ### Problem
-The entire Gaming Hub module (8 files) has ~150 hardcoded German strings visible in the English UI.
+The Account page header and a few sub-components have hardcoded German strings visible in the English UI. From the screenshot: "Konto-Einstellungen", "Geschützt", "Verifiziert".
 
-### Files to edit (9 files)
+### Files to edit (3 files)
 
-| File | German strings (~count) |
-|------|------------------------|
-| `src/lib/translations.ts` | Add ~150 `gaming.*` keys (EN/DE/ES) |
-| `src/pages/GamingHub.tsx` | ~2 — SEO description |
-| `src/components/gaming/GamingHubHeroHeader.tsx` | ~4 — subtitle, connection status text |
-| `src/components/gaming/StreamDashboard.tsx` | ~35 — "Twitch verbinden", "Stream vorbereiten", "Stream-Titel", "Kategorie", "Tags (kommagetrennt)", "Speichern", "Abbrechen", "Trennen", "Bearbeiten", "Zuschauer", "Pre-Stream Checkliste", "Titel gesetzt", "Kategorie gewählt", "OBS bereit/öffnen", "Offline", "Kein aktiver Stream", toasts, dialog labels |
-| `src/components/gaming/ClipCreator.tsx` | ~12 — "Verbinde zuerst...", "Clip erstellen", "Neueste", "Meiste Views", "Längste", "Noch keine Clips", "Öffnen", "Als Short", date locale |
-| `src/components/gaming/GamingContentStudio.tsx` | ~15 — "KI Thumbnail Generator", "Erstelle professionelle...", "Zum KI Picture Studio", "Going Live Auto-Posts", "Einrichten", "Stream-Kalender", "Kein Stream-Kalender konfiguriert", "Keine Custom Rewards konfiguriert", date locale |
-| `src/components/gaming/StreamAnalytics.tsx` | ~8 — "Verbinde zuerst...", "Clips gesamt", "Clip-Views gesamt", "Top Clips nach Views", "Noch keine Clips vorhanden", "Kanal-Info", "Keine Beschreibung" |
-| `src/components/gaming/ChatManager.tsx` | ~25 — "Verbinde zuerst...", "Verbunden/Verbindet...", "Warte auf Nachrichten...", "Kanal ist offline...", "Nachricht senden...", "Positiv/Neutral/Negativ", "Nachrichten analysiert", "Viewer & Interaktion", "Viewer-Liste", "Poll erstellen", "Prediction erstellen", "Frage...", "Dauer (Sekunden)", "Abbrechen", "Erstellen", toasts |
-| `src/components/gaming/DiscordIntegration.tsx` | ~30 — "Automatische Benachrichtigungen...", "Verbunden/Nicht verbunden", "Webhook einrichten", "So findest du die Webhook-URL", instructions, "Test senden", "Speichern", "Benachrichtigungen", "Go-Live Benachrichtigung", "Stream-Ende Benachrichtigung", "Clips teilen", "Embed-Inhalte", "Zuschauerzahl", "Embed-Vorschau", "Aktionen & Statistik", "Go-Live senden", "Stream-Ende senden", "Clip teilen", toasts, date locale |
-| `src/components/gaming/YouTubeLiveTab.tsx` | ~25 — "YouTube Live verbinden", "Verbinde deinen YouTube-Kanal...", "Broadcast erstellen", "Beschreibung", "Zeitplan", "Sichtbarkeit", "Öffentlich/Nicht gelistet/Privat", "Stream-Key", "Erstellen", "Broadcasts", "Keine Broadcasts vorhanden", "Live-Chat", "Chat starten", "Kein aktiver Live-Chat", "Warte auf Nachrichten...", "Drücke 'Chat starten'", "Nachricht senden...", "Test starten", "Stream binden", "Live gehen", "Stream beenden", date locale |
+| File | Hardcoded German strings |
+|------|--------------------------|
+| `src/lib/translations.ts` | Add ~10 `account.*` keys for header + timezone + security toasts |
+| `src/components/account/AccountHeroHeader.tsx` | 3 — "Konto-Einstellungen", "Geschützt", "Verifiziert" |
+| `src/components/account/SecurityTab.tsx` | 4 — toast messages: "2FA deaktiviert", "Zwei-Faktor-Authentifizierung wurde deaktiviert", "Fehler", "2FA konnte nicht deaktiviert werden" |
+| `src/components/account/TimezoneSelect.tsx` | 4 — "Zeitzone", "Deine Zeitzone für Planungen...", "Zeitzone auswählen", "Zeitzone gespeichert", "Fehler beim Speichern" |
 
 ### Approach
-1. Add `gaming.*` namespace to `translations.ts` with all keys in EN/DE/ES. DE values = exact current hardcoded strings.
-2. Add `useTranslation` hook to all 8 component files, replace strings with `t()` calls.
-3. Switch date locale dynamically (`toLocaleDateString` / `toLocaleString` using language-appropriate locale string).
-4. German UI remains identical -- no visual changes for DE users.
-5. Single batch edit of all files.
+1. Add missing translation keys to `translations.ts` (EN/DE/ES). DE = current hardcoded strings.
+2. Add `useTranslation` hook to `AccountHeroHeader.tsx` and `TimezoneSelect.tsx`; use existing hook in `SecurityTab.tsx`.
+3. Replace hardcoded strings with `t()` calls.
+4. German UI unchanged.
+
+### Technical details
+- AccountHeroHeader: `t('account.header.title')`, `t('account.header.protected')`, `t('account.header.verified')`
+- TimezoneSelect: `t('account.timezone.title')`, `t('account.timezone.subtitle')`, `t('account.timezone.select')`, `t('account.timezone.saved')`, `t('account.timezone.error')`
+- SecurityTab: Replace hardcoded toast strings with `t('account.twoFactor.deactivated')`, `t('account.twoFactor.deactivatedDesc')`, `t('account.twoFactor.error')`, `t('account.twoFactor.errorDisabling')`
 
