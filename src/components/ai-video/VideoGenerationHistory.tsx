@@ -13,6 +13,13 @@ import { toast as sonnerToast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
 import { formatPrice, getCurrencyForLanguage } from '@/lib/currency';
 
+const MODEL_DISPLAY_NAMES: Record<string, string> = {
+  'sora-2-standard': 'Sora 2 Standard',
+  'sora-2-pro': 'Sora 2 Pro',
+  'kling-3-standard': 'Kling 3.0 Standard',
+  'kling-3-pro': 'Kling 3.0 Pro',
+};
+
 interface VideoGeneration {
   id: string;
   prompt: string;
@@ -262,7 +269,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium line-clamp-2 break-words mb-1">{gen.prompt}</h4>
                     <p className="text-sm text-muted-foreground">
-                      {gen.model === 'sora-2-pro' ? 'Sora 2 Pro' : 'Sora 2 Standard'}
+                      {MODEL_DISPLAY_NAMES[gen.model] || gen.model}
                       {' · '}{gen.duration_seconds}s{' · '}{formatPrice(gen.total_cost_euros, currency)}
                     </p>
                   </div>
