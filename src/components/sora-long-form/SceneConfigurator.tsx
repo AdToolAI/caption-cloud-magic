@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Upload, X, Image as ImageIcon, ArrowLeft, ArrowRight, Loader2, Link2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,9 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/useTranslation';
+import { formatPriceForLanguage } from '@/lib/currency';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { calculateSceneCost, TRANSITION_OPTIONS } from '@/types/sora-long-form';
+import { calculateSceneCost } from '@/types/sora-long-form';
 import type { Sora2LongFormProject, Sora2Scene, SceneDuration, TransitionType } from '@/types/sora-long-form';
 
 interface SceneConfiguratorProps {
@@ -29,30 +31,36 @@ export function SceneConfigurator({
   onBack,
 }: SceneConfiguratorProps) {
   const { toast } = useToast();
+  const { t, language } = useTranslation();
   const [selectedScene, setSelectedScene] = useState(0);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const TRANSITION_OPTIONS = useMemo(() => [
+    { value: 'none', label: t('soraLf.transitionNone') },
+    { value: 'fade', label: t('soraLf.transitionFade') },
+    { value: 'crossfade', label: t('soraLf.transitionCrossfade') },
+    { value: 'slide', label: t('soraLf.transitionSlide') },
+    { value: 'zoom', label: t('soraLf.transitionZoom') },
+    { value: 'wipe', label: t('soraLf.transitionWipe') },
+  ], [t]);
+
   const updateScene = (index: number, updates: Partial<Sora2Scene>) => {
     const newScenes = [...scenes];
     newScenes[index] = { ...newScenes[index], ...updates };
-    
     if (updates.duration) {
       newScenes[index].cost_euros = calculateSceneCost(updates.duration, project.model);
     }
-    
     onUpdateScenes(newScenes);
   };
 
-  // Only Scene 1 can have a reference image uploaded
   const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      toast({ title: 'Nur Bilder erlaubt', variant: 'destructive' });
+      toast({ title: t('soraLf.onlyImagesAllowed'), variant: 'destructive' });
       return;
     }
-
     if (file.size > 10 * 1024 * 1024) {
-      toast({ title: 'Bild zu groß (max 10MB)', variant: 'destructive' });
+      toast({ title: t('soraLf.imageTooLargeUpload'), variant: 'destructive' });
       return;
     }
 
@@ -60,10 +68,10 @@ export function SceneConfigurator({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast({ title: 'Nicht angemeldet', variant: 'destructive' });
+        toast({ title: t('soraLf.notLoggedInShort'), variant: 'destructive' });
         return;
       }
-      
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${project.id}/scene-1-reference-${Date.now()}.${fileExt}`;
 
@@ -77,12 +85,11 @@ export function SceneConfigurator({
         .from('ai-video-reference')
         .getPublicUrl(fileName);
 
-      // Only update Scene 1 (index 0)
       updateScene(0, { reference_image_url: publicUrl });
-      toast({ title: 'Referenzbild für Szene 1 hochgeladen' });
+      toast({ title: t('soraLf.scene1ImageUploaded') });
     } catch (error) {
       console.error('Upload error:', error);
-      toast({ title: 'Upload fehlgeschlagen', variant: 'destructive' });
+      toast({ title: t('soraLf.uploadFailed'), variant: 'destructive' });
     } finally {
       setUploadingImage(false);
     }
@@ -98,18 +105,15 @@ export function SceneConfigurator({
 
   return (
     <div className="space-y-6">
-      {/* Frame-Chain Info */}
       <Alert className="bg-primary/5 border-primary/20">
         <Link2 className="h-4 w-4 text-primary" />
         <AlertDescription className="text-sm">
-          <span className="font-semibold">Frame-Chain Technologie:</span> Nur Szene 1 benötigt ein optionales Referenzbild. 
-          Alle weiteren Szenen nutzen automatisch den letzten Frame der vorherigen Szene für nahtlose Übergänge.
+          <span className="font-semibold">{t('soraLf.frameChainTech')}</span> {t('soraLf.frameChainDesc')}
         </AlertDescription>
       </Alert>
 
-      {/* Scene Thumbnails */}
       <div>
-        <h3 className="text-lg font-semibold mb-4">Szenen konfigurieren</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('soraLf.configureScenes')}</h3>
         <div className="flex gap-2 overflow-x-auto pb-2">
           {scenes.map((scene, index) => (
             <button
@@ -123,17 +127,12 @@ export function SceneConfigurator({
               )}
             >
               {index === 0 && scene.reference_image_url ? (
-                <img
-                  src={scene.reference_image_url}
-                  alt={`Szene ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
+                <img src={scene.reference_image_url} alt={`${t('soraLf.sceneLabel').replace('{index}', String(index + 1))}`} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full bg-muted flex items-center justify-center">
                   <span className="text-sm font-medium">{index + 1}</span>
                 </div>
               )}
-              {/* Frame-Chain indicator for scenes 2+ */}
               {index > 0 && (
                 <div className="absolute bottom-0 left-0 right-0 bg-primary/80 text-[8px] text-center text-primary-foreground py-0.5">
                   Frame-Chain
@@ -144,13 +143,12 @@ export function SceneConfigurator({
         </div>
       </div>
 
-      {/* Selected Scene Editor */}
       {currentScene && (
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-semibold flex items-center gap-2">
-              Szene {selectedScene + 1} von {scenes.length}
-              <Badge variant="outline">{currentScene.duration} Sek.</Badge>
+              {t('soraLf.sceneOf').replace('{current}', String(selectedScene + 1)).replace('{total}', String(scenes.length))}
+              <Badge variant="outline">{currentScene.duration} {t('soraLf.secShort')}</Badge>
               {selectedScene > 0 && (
                 <Badge variant="secondary" className="text-xs">
                   <Link2 className="h-3 w-3 mr-1" />
@@ -159,57 +157,48 @@ export function SceneConfigurator({
               )}
             </h4>
             <span className="text-sm text-muted-foreground">
-              Kosten: {currentScene.cost_euros.toFixed(2)}€
+              {t('soraLf.cost')} {formatPriceForLanguage(currentScene.cost_euros, language)}
             </span>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left: Prompt */}
             <div className="space-y-4">
               <div>
-                <Label>Visual Prompt</Label>
+                <Label>{t('soraLf.visualPrompt')}</Label>
                 <Textarea
                   value={currentScene.prompt}
                   onChange={(e) => updateScene(selectedScene, { prompt: e.target.value })}
-                  placeholder="Detaillierte visuelle Beschreibung für Sora 2..."
+                  placeholder={t('soraLf.promptPlaceholder')}
                   className="mt-1 min-h-[150px]"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Beschreibe in Englisch für beste Ergebnisse: Kamerawinkel, Beleuchtung, Bewegungen, Stimmung.
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">{t('soraLf.describeInEnglish')}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Dauer</Label>
+                  <Label>{t('soraLf.durationLabel')}</Label>
                   <Select
                     value={currentScene.duration.toString()}
                     onValueChange={(v) => updateScene(selectedScene, { duration: parseInt(v) as SceneDuration })}
                   >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="4">4 Sekunden</SelectItem>
-                      <SelectItem value="8">8 Sekunden</SelectItem>
-                      <SelectItem value="12">12 Sekunden</SelectItem>
+                      <SelectItem value="4">{t('soraLf.fourSeconds')}</SelectItem>
+                      <SelectItem value="8">{t('soraLf.eightSeconds')}</SelectItem>
+                      <SelectItem value="12">{t('soraLf.twelveSeconds')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label>Übergang</Label>
+                  <Label>{t('soraLf.transitionLabel')}</Label>
                   <Select
                     value={currentScene.transition_type}
                     onValueChange={(v) => updateScene(selectedScene, { transition_type: v as TransitionType })}
                   >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {TRANSITION_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -217,19 +206,14 @@ export function SceneConfigurator({
               </div>
             </div>
 
-            {/* Right: Image Upload (Only for Scene 1) or Frame-Chain Info */}
             <div>
               {selectedScene === 0 ? (
                 <>
-                  <Label>Referenzbild (Optional - für Image-to-Video)</Label>
+                  <Label>{t('soraLf.referenceImageI2V')}</Label>
                   <div className="mt-1">
                     {currentScene.reference_image_url ? (
                       <div className="relative aspect-video rounded-lg overflow-hidden border border-border">
-                        <img
-                          src={currentScene.reference_image_url}
-                          alt="Referenz"
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={currentScene.reference_image_url} alt="Reference" className="w-full h-full object-cover" />
                         <button
                           onClick={removeImage}
                           className="absolute top-2 right-2 p-1.5 bg-background/80 rounded-full hover:bg-destructive hover:text-destructive-foreground transition-colors"
@@ -238,7 +222,7 @@ export function SceneConfigurator({
                         </button>
                         <Badge className="absolute bottom-2 left-2 bg-green-500">
                           <ImageIcon className="h-3 w-3 mr-1" />
-                          I2V aktiv
+                          {t('soraLf.i2vActive')}
                         </Badge>
                       </div>
                     ) : (
@@ -254,12 +238,8 @@ export function SceneConfigurator({
                         ) : (
                           <>
                             <Upload className="h-8 w-8 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">
-                              Bild hochladen für Image-to-Video
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Max 10MB • JPG, PNG, WebP
-                            </p>
+                            <p className="text-sm text-muted-foreground">{t('soraLf.uploadForI2V')}</p>
+                            <p className="text-xs text-muted-foreground">{t('soraLf.maxFileSize')}</p>
                           </>
                         )}
                       </div>
@@ -276,31 +256,24 @@ export function SceneConfigurator({
                       }}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Dieses Bild wird als Startpunkt für das erste Video verwendet.
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">{t('soraLf.startImageInfo')}</p>
                 </>
               ) : (
                 <div className="space-y-3">
-                  <Label>Referenz für diese Szene</Label>
+                  <Label>{t('soraLf.referenceForScene')}</Label>
                   <div className="aspect-video rounded-lg border border-primary/30 bg-primary/5 flex flex-col items-center justify-center gap-3 p-4">
                     <div className="p-3 bg-primary/10 rounded-full">
                       <Link2 className="h-8 w-8 text-primary" />
                     </div>
                     <div className="text-center">
-                      <p className="font-medium text-sm">Frame-Chain aktiv</p>
+                      <p className="font-medium text-sm">{t('soraLf.frameChainActive')}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Der letzte Frame von Szene {selectedScene} wird automatisch 
-                        als Referenzbild für diese Szene verwendet.
+                        {t('soraLf.frameChainSceneInfo').replace('{prev}', String(selectedScene))}
                       </p>
                     </div>
-                    <Badge variant="outline" className="mt-2">
-                      Nahtloser Übergang garantiert
-                    </Badge>
+                    <Badge variant="outline" className="mt-2">{t('soraLf.seamlessTransition')}</Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Diese Technik sorgt für visuelle Kontinuität zwischen allen Szenen.
-                  </p>
+                  <p className="text-xs text-muted-foreground">{t('soraLf.visualContinuity')}</p>
                 </div>
               )}
             </div>
@@ -308,28 +281,24 @@ export function SceneConfigurator({
         </Card>
       )}
 
-      {/* Navigation */}
       <Card className="p-4 bg-muted/50">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">
-              {hasReferenceImage ? '1 Referenzbild für Szene 1' : 'Kein Referenzbild (Text-to-Video für Szene 1)'}
+              {hasReferenceImage ? t('soraLf.oneRefImage') : t('soraLf.noRefImage')}
               {' • '}
-              {scenes.length - 1} Szenen mit Frame-Chain
+              {t('soraLf.scenesWithFrameChain').replace('{count}', String(scenes.length - 1))}
               {' • '}
-              Geschätzte Kosten: <span className="font-semibold text-primary">{totalCost.toFixed(2)}€</span>
+              {t('soraLf.estimatedCost')}: <span className="font-semibold text-primary">{formatPriceForLanguage(totalCost, language)}</span>
             </p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onBack}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Zurück
+              {t('soraLf.back')}
             </Button>
-            <Button
-              onClick={onNext}
-              disabled={scenes.some(s => !s.prompt.trim())}
-            >
-              Generierung starten
+            <Button onClick={onNext} disabled={scenes.some(s => !s.prompt.trim())}>
+              {t('soraLf.startGeneration')}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>

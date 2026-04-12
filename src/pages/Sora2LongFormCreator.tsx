@@ -6,17 +6,18 @@ import { Button } from '@/components/ui/button';
 import { LongFormWizard } from '@/components/sora-long-form/LongFormWizard';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { Sora2LongFormProject, Sora2Scene } from '@/types/sora-long-form';
 
 export default function Sora2LongFormCreator() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [project, setProject] = useState<Sora2LongFormProject | null>(null);
   const [scenes, setScenes] = useState<Sora2Scene[]>([]);
   const [loading, setLoading] = useState(false);
   const updateLockRef = useRef(false);
 
-  // Create new project on mount
   useEffect(() => {
     createNewProject();
   }, []);
@@ -26,7 +27,7 @@ export default function Sora2LongFormCreator() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast({ title: 'Nicht angemeldet', variant: 'destructive' });
+        toast({ title: t('soraLf.notLoggedIn'), variant: 'destructive' });
         navigate('/auth');
         return;
       }
@@ -35,7 +36,7 @@ export default function Sora2LongFormCreator() {
         .from('sora_long_form_projects')
         .insert({
           user_id: user.id,
-          name: 'Neues Long-Form Video',
+          name: t('soraLf.newLongFormVideo'),
           target_duration: 30,
           aspect_ratio: '16:9',
           model: 'sora-2-standard',
@@ -45,13 +46,12 @@ export default function Sora2LongFormCreator() {
         .single();
 
       if (error) throw error;
-
       setProject(data as Sora2LongFormProject);
     } catch (error) {
       console.error('Error creating project:', error);
       toast({
-        title: 'Fehler',
-        description: 'Projekt konnte nicht erstellt werden',
+        title: t('soraLf.errorTitle'),
+        description: t('soraLf.projectCreateError'),
         variant: 'destructive',
       });
     } finally {
@@ -61,21 +61,18 @@ export default function Sora2LongFormCreator() {
 
   const updateProject = async (updates: Partial<Sora2LongFormProject>) => {
     if (!project) return;
-
     try {
       const { error } = await supabase
         .from('sora_long_form_projects')
         .update(updates)
         .eq('id', project.id);
-
       if (error) throw error;
-
       setProject({ ...project, ...updates });
     } catch (error) {
       console.error('Error updating project:', error);
       toast({
-        title: 'Fehler',
-        description: 'Projekt konnte nicht aktualisiert werden',
+        title: t('soraLf.errorTitle'),
+        description: t('soraLf.projectUpdateError'),
         variant: 'destructive',
       });
     }
@@ -84,14 +81,12 @@ export default function Sora2LongFormCreator() {
   const updateScenes = async (newScenes: Sora2Scene[]) => {
     if (!project) return;
 
-    // ✅ BLOCKING: Don't update DB during generation - only local state
     if (project.status === 'generating') {
       console.warn('[Scenes] Update blocked during generation - only updating local state');
       setScenes(newScenes);
       return;
     }
 
-    // ✅ LOCK: Prevent parallel calls
     if (updateLockRef.current) {
       console.warn('[Scenes] Update already in progress - skipping');
       return;
@@ -100,11 +95,9 @@ export default function Sora2LongFormCreator() {
     updateLockRef.current = true;
 
     try {
-      // Separate scenes with real IDs vs temp IDs
       const existingScenes = newScenes.filter(s => !s.id.startsWith('temp-'));
       const newTempScenes = newScenes.filter(s => s.id.startsWith('temp-'));
 
-      // ✅ UPSERT existing scenes (preserves IDs!)
       if (existingScenes.length > 0) {
         const { error: upsertError } = await supabase
           .from('sora_long_form_scenes')
@@ -123,11 +116,9 @@ export default function Sora2LongFormCreator() {
             })),
             { onConflict: 'id' }
           );
-
         if (upsertError) throw upsertError;
       }
 
-      // ✅ INSERT new temp scenes and get real IDs back
       if (newTempScenes.length > 0) {
         const { data: insertedScenes, error: insertError } = await supabase
           .from('sora_long_form_scenes')
@@ -148,11 +139,9 @@ export default function Sora2LongFormCreator() {
 
         if (insertError) throw insertError;
 
-        // Replace temp IDs with real DB IDs
         if (insertedScenes) {
           const updatedScenes = newScenes.map(scene => {
             if (scene.id.startsWith('temp-')) {
-              // Find matching inserted scene by order
               const inserted = insertedScenes.find(
                 is => is.scene_order === newScenes.findIndex(s => s.id === scene.id)
               );
@@ -171,8 +160,8 @@ export default function Sora2LongFormCreator() {
     } catch (error) {
       console.error('Error updating scenes:', error);
       toast({
-        title: 'Fehler',
-        description: 'Szenen konnten nicht aktualisiert werden',
+        title: t('soraLf.errorTitle'),
+        description: t('soraLf.scenesUpdateError'),
         variant: 'destructive',
       });
     } finally {
@@ -180,7 +169,6 @@ export default function Sora2LongFormCreator() {
     }
   };
 
-  // Function for local-only scene updates (used by Realtime)
   const updateScenesLocal = (newScenes: Sora2Scene[]) => {
     setScenes(newScenes);
   };
@@ -190,7 +178,7 @@ export default function Sora2LongFormCreator() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Film className="h-12 w-12 text-primary animate-pulse mx-auto mb-4" />
-          <p className="text-muted-foreground">Projekt wird erstellt...</p>
+          <p className="text-muted-foreground">{t('soraLf.projectCreating')}</p>
         </div>
       </div>
     );
@@ -199,20 +187,15 @@ export default function Sora2LongFormCreator() {
   return (
     <>
       <Helmet>
-        <title>Sora 2 Long-Form Creator | AdTool</title>
-        <meta name="description" content="Erstelle längere Videos mit Sora 2 durch intelligente Szenen-Kombination" />
+        <title>{t('soraLf.pageTitle')} | AdTool</title>
+        <meta name="description" content={t('soraLf.pageSubtitle')} />
       </Helmet>
 
       <div className="min-h-screen bg-background">
-        {/* Header */}
         <header className="border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate(-1)}
-              >
+              <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="flex items-center gap-3">
@@ -220,21 +203,20 @@ export default function Sora2LongFormCreator() {
                   <Film className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-lg font-semibold">Sora 2 Long-Form Creator</h1>
-                  <p className="text-sm text-muted-foreground">Erstelle längere Videos (30s - 120s)</p>
+                  <h1 className="text-lg font-semibold">{t('soraLf.pageTitle')}</h1>
+                  <p className="text-sm text-muted-foreground">{t('soraLf.pageSubtitle')}</p>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
                 <Sparkles className="h-4 w-4 inline mr-1" />
-                Powered by Sora 2
+                {t('soraLf.poweredBy')}
               </span>
             </div>
           </div>
         </header>
 
-        {/* Main Content */}
         <main className="container mx-auto px-4 py-8">
           <LongFormWizard
             project={project}

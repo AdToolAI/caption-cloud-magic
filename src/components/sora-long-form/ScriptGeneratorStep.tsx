@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Wand2, Loader2, Plus, Trash2, ArrowLeft, ArrowRight, Upload, X, ImageIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,8 +6,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/useTranslation';
+import { formatPriceForLanguage } from '@/lib/currency';
 import { supabase } from '@/integrations/supabase/client';
-import { getRequiredSceneCount, calculateSceneCost, TRANSITION_OPTIONS } from '@/types/sora-long-form';
+import { getRequiredSceneCount, calculateSceneCost } from '@/types/sora-long-form';
 import type { Sora2LongFormProject, Sora2Scene, SceneDuration, TransitionType } from '@/types/sora-long-form';
 
 interface ScriptGeneratorStepProps {
@@ -19,14 +21,6 @@ interface ScriptGeneratorStepProps {
   onBack: () => void;
 }
 
-const TONE_OPTIONS = [
-  { value: 'professional', label: 'Professionell' },
-  { value: 'casual', label: 'Locker' },
-  { value: 'dramatic', label: 'Dramatisch' },
-  { value: 'inspirational', label: 'Inspirierend' },
-  { value: 'educational', label: 'Lehrreich' },
-];
-
 export function ScriptGeneratorStep({
   project,
   scenes,
@@ -36,6 +30,7 @@ export function ScriptGeneratorStep({
   onBack,
 }: ScriptGeneratorStepProps) {
   const { toast } = useToast();
+  const { t, language } = useTranslation();
   const [idea, setIdea] = useState('');
   const [tone, setTone] = useState('professional');
   const [generating, setGenerating] = useState(false);
@@ -43,24 +38,36 @@ export function ScriptGeneratorStep({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const TONE_OPTIONS = useMemo(() => [
+    { value: 'professional', label: t('soraLf.toneProfessional') },
+    { value: 'casual', label: t('soraLf.toneCasual') },
+    { value: 'dramatic', label: t('soraLf.toneDramatic') },
+    { value: 'inspirational', label: t('soraLf.toneInspirational') },
+    { value: 'educational', label: t('soraLf.toneEducational') },
+  ], [t]);
+
+  const TRANSITION_OPTIONS = useMemo(() => [
+    { value: 'none', label: t('soraLf.transitionNone') },
+    { value: 'fade', label: t('soraLf.transitionFade') },
+    { value: 'crossfade', label: t('soraLf.transitionCrossfade') },
+    { value: 'slide', label: t('soraLf.transitionSlide') },
+    { value: 'zoom', label: t('soraLf.transitionZoom') },
+    { value: 'wipe', label: t('soraLf.transitionWipe') },
+  ], [t]);
+
   const requiredScenes = getRequiredSceneCount(project.target_duration);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast({ title: 'Bild zu groß', description: 'Maximal 5MB erlaubt', variant: 'destructive' });
+      toast({ title: t('soraLf.imageTooLarge'), description: t('soraLf.imageTooLargeDesc'), variant: 'destructive' });
       return;
     }
-
-    // Check file type
     if (!file.type.startsWith('image/')) {
-      toast({ title: 'Ungültiges Format', description: 'Nur Bilder erlaubt', variant: 'destructive' });
+      toast({ title: t('soraLf.invalidFormat'), description: t('soraLf.invalidFormatDesc'), variant: 'destructive' });
       return;
     }
-
     setReferenceImage(file);
     const reader = new FileReader();
     reader.onload = (e) => setImagePreview(e.target?.result as string);
@@ -78,7 +85,7 @@ export function ScriptGeneratorStep({
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('image/')) {
       if (file.size > 5 * 1024 * 1024) {
-        toast({ title: 'Bild zu groß', description: 'Maximal 5MB erlaubt', variant: 'destructive' });
+        toast({ title: t('soraLf.imageTooLarge'), description: t('soraLf.imageTooLargeDesc'), variant: 'destructive' });
         return;
       }
       setReferenceImage(file);
@@ -93,7 +100,6 @@ export function ScriptGeneratorStep({
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
-        // Remove data URL prefix to get pure base64
         const base64 = result.split(',')[1];
         resolve(base64);
       };
@@ -104,22 +110,20 @@ export function ScriptGeneratorStep({
 
   const generateScript = async () => {
     if (!idea.trim()) {
-      toast({ title: 'Bitte gib eine Idee ein', variant: 'destructive' });
+      toast({ title: t('soraLf.enterIdeaFirst'), variant: 'destructive' });
       return;
     }
 
     setGenerating(true);
     try {
-      // Prepare request body
       const requestBody: any = {
         idea,
         targetDuration: project.target_duration,
         aspectRatio: project.aspect_ratio,
         tone,
-        language: 'de',
+        language: language === 'en' ? 'en' : language === 'es' ? 'es' : 'de',
       };
 
-      // Add reference image if present
       if (referenceImage) {
         requestBody.referenceImageBase64 = await convertToBase64(referenceImage);
       }
@@ -130,7 +134,6 @@ export function ScriptGeneratorStep({
 
       if (error) throw error;
 
-      // Convert generated script to scenes
       const newScenes: Sora2Scene[] = data.scenes.map((scene: any, index: number) => ({
         id: `temp-${Date.now()}-${index}`,
         project_id: project.id,
@@ -146,13 +149,15 @@ export function ScriptGeneratorStep({
       await onUpdateProject({ script: data.synopsis });
       await onUpdateScenes(newScenes);
 
-      toast({ 
-        title: 'Skript generiert!', 
-        description: `${newScenes.length} Szenen erstellt${referenceImage ? ' (basierend auf Bildanalyse)' : ''}` 
+      toast({
+        title: t('soraLf.scriptGenerated'),
+        description: t('soraLf.scriptGeneratedDesc')
+          .replace('{count}', String(newScenes.length))
+          .replace('{suffix}', referenceImage ? t('soraLf.scriptGeneratedImageSuffix') : ''),
       });
     } catch (error) {
       console.error('Error generating script:', error);
-      toast({ title: 'Fehler', description: 'Skript konnte nicht generiert werden', variant: 'destructive' });
+      toast({ title: t('soraLf.errorTitle'), description: t('soraLf.scriptError'), variant: 'destructive' });
     } finally {
       setGenerating(false);
     }
@@ -176,11 +181,9 @@ export function ScriptGeneratorStep({
   const updateScene = (index: number, updates: Partial<Sora2Scene>) => {
     const newScenes = [...scenes];
     newScenes[index] = { ...newScenes[index], ...updates };
-    
     if (updates.duration) {
       newScenes[index].cost_euros = calculateSceneCost(updates.duration, project.model);
     }
-    
     onUpdateScenes(newScenes);
   };
 
@@ -194,22 +197,20 @@ export function ScriptGeneratorStep({
 
   return (
     <div className="space-y-6">
-      {/* AI Script Generator */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Wand2 className="h-5 w-5 text-primary" />
-          AI Skript-Generator mit Vision
+          {t('soraLf.aiScriptGenerator')}
         </h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Lade ein Referenzbild hoch und beschreibe deine Idee. Die AI analysiert das Bild und erstellt {requiredScenes} Szenen mit nahtlosen Übergängen.
+          {t('soraLf.aiScriptDesc').replace('{count}', String(requiredScenes))}
         </p>
-        
+
         <div className="space-y-4">
-          {/* Reference Image Upload */}
           <div>
             <Label className="flex items-center gap-2 mb-2">
               <ImageIcon className="h-4 w-4" />
-              Referenzbild (optional)
+              {t('soraLf.referenceImageOptional')}
             </Label>
             <div
               className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
@@ -221,95 +222,60 @@ export function ScriptGeneratorStep({
               {imagePreview ? (
                 <div className="flex items-center gap-4">
                   <div className="relative">
-                    <img 
-                      src={imagePreview} 
-                      alt="Referenz" 
-                      className="max-h-32 rounded-lg object-contain"
-                    />
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute -top-2 -right-2 h-6 w-6"
-                      onClick={removeImage}
-                    >
+                    <img src={imagePreview} alt="Reference" className="max-h-32 rounded-lg object-contain" />
+                    <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={removeImage}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium">{referenceImage?.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Die AI analysiert dieses Bild und erstellt darauf basierend visuelle Prompts mit Frame-Chain-Kontinuität
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t('soraLf.imageAnalysisInfo')}</p>
                   </div>
                 </div>
               ) : (
-                <div 
-                  className="text-center cursor-pointer"
-                  onClick={() => fileInputRef.current?.click()}
-                >
+                <div className="text-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                   <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm font-medium">Bild hochladen oder hierher ziehen</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    PNG, JPG bis 5MB • Das Bild wird analysiert für präzise Szenen-Prompts
-                  </p>
+                  <p className="text-sm font-medium">{t('soraLf.uploadOrDrag')}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('soraLf.uploadHint')}</p>
                 </div>
               )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
             </div>
           </div>
 
-          {/* Video Idea */}
           <div>
-            <Label>Video-Idee</Label>
+            <Label>{t('soraLf.videoIdea')}</Label>
             <Textarea
               value={idea}
               onChange={(e) => setIdea(e.target.value)}
-              placeholder={referenceImage 
-                ? "z.B. Ein elegantes Werbevideo für dieses Produkt mit Fokus auf Details und Atmosphäre..."
-                : "z.B. Ein inspirierendes Video über die Schönheit der Natur, von Sonnenaufgang bis Sonnenuntergang..."
-              }
+              placeholder={referenceImage ? t('soraLf.placeholderWithImage') : t('soraLf.placeholderWithoutImage')}
               className="mt-1 min-h-[100px]"
             />
           </div>
 
-          {/* Tone & Generate Button */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Ton</Label>
+              <Label>{t('soraLf.toneLabel')}</Label>
               <Select value={tone} onValueChange={setTone}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {TONE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex items-end">
-              <Button
-                onClick={generateScript}
-                disabled={generating || !idea.trim()}
-                className="w-full"
-              >
+              <Button onClick={generateScript} disabled={generating || !idea.trim()} className="w-full">
                 {generating ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {referenceImage ? 'Analysiere Bild...' : 'Generiere...'}
+                    {referenceImage ? t('soraLf.analyzingImage') : t('soraLf.generating')}
                   </>
                 ) : (
                   <>
                     <Wand2 className="h-4 w-4 mr-2" />
-                    {referenceImage ? 'Mit Bild generieren' : 'Skript generieren'}
+                    {referenceImage ? t('soraLf.generateWithImage') : t('soraLf.generateScript')}
                   </>
                 )}
               </Button>
@@ -318,30 +284,26 @@ export function ScriptGeneratorStep({
 
           {referenceImage && (
             <p className="text-xs text-primary bg-primary/10 p-2 rounded">
-              💡 Das Bild wird analysiert: Objekte, Farben, Stil und Atmosphäre fließen in die Szenen-Prompts ein. 
-              Die AI plant nahtlose Übergänge für Frame-Chain-Generierung.
+              {t('soraLf.imageAnalysisTip')}
             </p>
           )}
         </div>
       </Card>
 
-      {/* Scenes List */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">
-            Szenen ({scenes.length} / {requiredScenes} empfohlen)
+            {t('soraLf.scenesCount').replace('{current}', String(scenes.length)).replace('{recommended}', String(requiredScenes))}
           </h3>
           <Button variant="outline" size="sm" onClick={addEmptyScene}>
             <Plus className="h-4 w-4 mr-2" />
-            Szene hinzufügen
+            {t('soraLf.addScene')}
           </Button>
         </div>
 
         {scenes.length === 0 ? (
           <Card className="p-8 text-center">
-            <p className="text-muted-foreground">
-              Nutze den AI-Generator oben oder füge manuell Szenen hinzu.
-            </p>
+            <p className="text-muted-foreground">{t('soraLf.noScenesHint')}</p>
           </Card>
         ) : (
           <div className="space-y-4">
@@ -353,56 +315,45 @@ export function ScriptGeneratorStep({
                   </div>
                   <div className="flex-1 space-y-3">
                     <div>
-                      <Label className="text-xs">Visual Prompt</Label>
+                      <Label className="text-xs">{t('soraLf.visualPrompt')}</Label>
                       <Textarea
                         value={scene.prompt}
                         onChange={(e) => updateScene(index, { prompt: e.target.value })}
-                        placeholder="Detaillierte visuelle Beschreibung für Sora 2..."
+                        placeholder={t('soraLf.promptPlaceholder')}
                         className="mt-1 text-sm"
                       />
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                       <div>
-                        <Label className="text-xs">Dauer</Label>
+                        <Label className="text-xs">{t('soraLf.durationLabel')}</Label>
                         <Select
                           value={scene.duration.toString()}
                           onValueChange={(v) => updateScene(index, { duration: parseInt(v) as SceneDuration })}
                         >
-                          <SelectTrigger className="mt-1 h-9">
-                            <SelectValue />
-                          </SelectTrigger>
+                          <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="4">4 Sek.</SelectItem>
-                            <SelectItem value="8">8 Sek.</SelectItem>
-                            <SelectItem value="12">12 Sek.</SelectItem>
+                            <SelectItem value="4">4 {t('soraLf.secShort')}</SelectItem>
+                            <SelectItem value="8">8 {t('soraLf.secShort')}</SelectItem>
+                            <SelectItem value="12">12 {t('soraLf.secShort')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div>
-                        <Label className="text-xs">Übergang</Label>
+                        <Label className="text-xs">{t('soraLf.transitionLabel')}</Label>
                         <Select
                           value={scene.transition_type}
                           onValueChange={(v) => updateScene(index, { transition_type: v as TransitionType })}
                         >
-                          <SelectTrigger className="mt-1 h-9">
-                            <SelectValue />
-                          </SelectTrigger>
+                          <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {TRANSITION_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="flex items-end">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeScene(index)}
-                          className="text-destructive hover:text-destructive"
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => removeScene(index)} className="text-destructive hover:text-destructive">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -415,26 +366,22 @@ export function ScriptGeneratorStep({
         )}
       </div>
 
-      {/* Summary & Navigation */}
       <Card className="p-4 bg-muted/50">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">
-              Gesamtdauer: <span className="font-semibold text-foreground">{totalDuration} Sekunden</span>
+              {t('soraLf.totalDuration')} <span className="font-semibold text-foreground">{totalDuration} {t('soraLf.seconds')}</span>
               {' • '}
-              Geschätzte Kosten: <span className="font-semibold text-primary">{totalCost.toFixed(2)}€</span>
+              {t('soraLf.estimatedCost')}: <span className="font-semibold text-primary">{formatPriceForLanguage(totalCost, language)}</span>
             </p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onBack}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Zurück
+              {t('soraLf.back')}
             </Button>
-            <Button
-              onClick={onNext}
-              disabled={scenes.length === 0 || scenes.some(s => !s.prompt.trim())}
-            >
-              Weiter
+            <Button onClick={onNext} disabled={scenes.length === 0 || scenes.some(s => !s.prompt.trim())}>
+              {t('soraLf.next')}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Clock, Film, Wand2, Settings, Play, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 import { FormatStep } from './FormatStep';
 import { ScriptGeneratorStep } from './ScriptGeneratorStep';
 import { SceneConfigurator } from './SceneConfigurator';
@@ -18,15 +19,6 @@ interface LongFormWizardProps {
   onUpdateScenesLocal: (scenes: Sora2Scene[]) => void;
 }
 
-const STEPS = [
-  { id: 'format', label: 'Format', icon: Clock },
-  { id: 'script', label: 'Skript', icon: Wand2 },
-  { id: 'scenes', label: 'Szenen', icon: Film },
-  { id: 'generate', label: 'Generieren', icon: Play },
-  { id: 'transitions', label: 'Übergänge', icon: Settings },
-  { id: 'export', label: 'Export', icon: Download },
-];
-
 export function LongFormWizard({
   project,
   scenes,
@@ -35,23 +27,26 @@ export function LongFormWizard({
   onUpdateScenesLocal,
 }: LongFormWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const { t } = useTranslation();
+
+  const STEPS = useMemo(() => [
+    { id: 'format', label: t('soraLf.stepFormat'), icon: Clock },
+    { id: 'script', label: t('soraLf.stepScript'), icon: Wand2 },
+    { id: 'scenes', label: t('soraLf.stepScenes'), icon: Film },
+    { id: 'generate', label: t('soraLf.stepGenerate'), icon: Play },
+    { id: 'transitions', label: t('soraLf.stepTransitions'), icon: Settings },
+    { id: 'export', label: t('soraLf.stepExport'), icon: Download },
+  ], [t]);
 
   const canProceed = () => {
     switch (currentStep) {
-      case 0: // Format
-        return true;
-      case 1: // Script
-        return scenes.length > 0;
-      case 2: // Scenes
-        return scenes.every(s => s.prompt.trim().length > 0);
-      case 3: // Generate
-        return scenes.every(s => s.status === 'completed');
-      case 4: // Transitions
-        return true;
-      case 5: // Export
-        return project.final_video_url !== undefined;
-      default:
-        return false;
+      case 0: return true;
+      case 1: return scenes.length > 0;
+      case 2: return scenes.every(s => s.prompt.trim().length > 0);
+      case 3: return scenes.every(s => s.status === 'completed');
+      case 4: return true;
+      case 5: return project.final_video_url !== undefined;
+      default: return false;
     }
   };
 
@@ -69,7 +64,6 @@ export function LongFormWizard({
 
   return (
     <div className="max-w-6xl mx-auto">
-      {/* Stepper */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           {STEPS.map((step, index) => {
@@ -78,10 +72,7 @@ export function LongFormWizard({
             const isCompleted = index < currentStep;
 
             return (
-              <div
-                key={step.id}
-                className="flex items-center"
-              >
+              <div key={step.id} className="flex items-center">
                 <button
                   onClick={() => index < currentStep && setCurrentStep(index)}
                   disabled={index > currentStep}
@@ -92,20 +83,11 @@ export function LongFormWizard({
                     !isActive && !isCompleted && 'bg-muted text-muted-foreground'
                   )}
                 >
-                  {isCompleted ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <Icon className="h-4 w-4" />
-                  )}
+                  {isCompleted ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                   <span className="hidden sm:inline text-sm font-medium">{step.label}</span>
                 </button>
                 {index < STEPS.length - 1 && (
-                  <div
-                    className={cn(
-                      'h-px w-8 mx-2',
-                      isCompleted ? 'bg-primary' : 'bg-border'
-                    )}
-                  />
+                  <div className={cn('h-px w-8 mx-2', isCompleted ? 'bg-primary' : 'bg-border')} />
                 )}
               </div>
             );
@@ -113,7 +95,6 @@ export function LongFormWizard({
         </div>
       </div>
 
-      {/* Step Content */}
       <AnimatePresence mode="wait">
         <motion.div
           key={currentStep}
@@ -122,60 +103,12 @@ export function LongFormWizard({
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.3 }}
         >
-          {currentStep === 0 && (
-            <FormatStep
-              project={project}
-              onUpdate={onUpdateProject}
-              onNext={handleNext}
-            />
-          )}
-          {currentStep === 1 && (
-            <ScriptGeneratorStep
-              project={project}
-              scenes={scenes}
-              onUpdateProject={onUpdateProject}
-              onUpdateScenes={onUpdateScenes}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
-          {currentStep === 2 && (
-            <SceneConfigurator
-              project={project}
-              scenes={scenes}
-              onUpdateScenes={onUpdateScenes}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
-          {currentStep === 3 && (
-            <SceneGenerationProgress
-              project={project}
-              scenes={scenes}
-              onUpdateScenes={onUpdateScenes}
-              onUpdateScenesLocal={onUpdateScenesLocal}
-              onUpdateProject={onUpdateProject}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
-          {currentStep === 4 && (
-            <TransitionEditor
-              project={project}
-              scenes={scenes}
-              onUpdateScenes={onUpdateScenes}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
-          {currentStep === 5 && (
-            <FinalExport
-              project={project}
-              scenes={scenes}
-              onUpdateProject={onUpdateProject}
-              onBack={handleBack}
-            />
-          )}
+          {currentStep === 0 && <FormatStep project={project} onUpdate={onUpdateProject} onNext={handleNext} />}
+          {currentStep === 1 && <ScriptGeneratorStep project={project} scenes={scenes} onUpdateProject={onUpdateProject} onUpdateScenes={onUpdateScenes} onNext={handleNext} onBack={handleBack} />}
+          {currentStep === 2 && <SceneConfigurator project={project} scenes={scenes} onUpdateScenes={onUpdateScenes} onNext={handleNext} onBack={handleBack} />}
+          {currentStep === 3 && <SceneGenerationProgress project={project} scenes={scenes} onUpdateScenes={onUpdateScenes} onUpdateScenesLocal={onUpdateScenesLocal} onUpdateProject={onUpdateProject} onNext={handleNext} onBack={handleBack} />}
+          {currentStep === 4 && <TransitionEditor project={project} scenes={scenes} onUpdateScenes={onUpdateScenes} onNext={handleNext} onBack={handleBack} />}
+          {currentStep === 5 && <FinalExport project={project} scenes={scenes} onUpdateProject={onUpdateProject} onBack={handleBack} />}
         </motion.div>
       </AnimatePresence>
     </div>

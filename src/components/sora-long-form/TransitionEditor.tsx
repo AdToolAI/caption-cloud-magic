@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { TRANSITION_OPTIONS } from '@/types/sora-long-form';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { Sora2LongFormProject, Sora2Scene, TransitionType } from '@/types/sora-long-form';
 
 interface TransitionEditorProps {
@@ -23,6 +24,17 @@ export function TransitionEditor({
   onNext,
   onBack,
 }: TransitionEditorProps) {
+  const { t } = useTranslation();
+
+  const TRANSITION_OPTIONS = useMemo(() => [
+    { value: 'none' as TransitionType, label: t('soraLf.transitionNone') },
+    { value: 'fade' as TransitionType, label: t('soraLf.transitionFade') },
+    { value: 'crossfade' as TransitionType, label: t('soraLf.transitionCrossfade') },
+    { value: 'slide' as TransitionType, label: t('soraLf.transitionSlide') },
+    { value: 'zoom' as TransitionType, label: t('soraLf.transitionZoom') },
+    { value: 'wipe' as TransitionType, label: t('soraLf.transitionWipe') },
+  ], [t]);
+
   const updateTransition = (index: number, type: TransitionType, duration?: number) => {
     const newScenes = [...scenes];
     newScenes[index] = {
@@ -36,17 +48,13 @@ export function TransitionEditor({
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-lg font-semibold">Übergänge anpassen</h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Definiere präzise Übergänge zwischen den Szenen
-        </p>
+        <h3 className="text-lg font-semibold">{t('soraLf.adjustTransitions')}</h3>
+        <p className="text-sm text-muted-foreground mt-1">{t('soraLf.adjustTransitionsDesc')}</p>
       </div>
 
-      {/* Timeline View */}
       <div className="space-y-4">
         {scenes.map((scene, index) => (
           <div key={scene.id} className="flex items-stretch gap-4">
-            {/* Scene Preview */}
             <Card className="flex-shrink-0 w-48 p-3">
               <div className="aspect-video rounded-lg overflow-hidden bg-muted mb-2">
                 {scene.generated_video_url ? (
@@ -60,33 +68,28 @@ export function TransitionEditor({
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-sm">
-                    Szene {index + 1}
+                    {t('soraLf.sceneLabel').replace('{index}', String(index + 1))}
                   </div>
                 )}
               </div>
               <p className="text-xs text-muted-foreground text-center">
-                {scene.duration} Sekunden
+                {scene.duration} {t('soraLf.seconds')}
               </p>
             </Card>
 
-            {/* Transition (if not last scene) */}
             {index < scenes.length - 1 && (
               <Card className="flex-1 p-4">
                 <div className="flex items-center gap-4 h-full">
                   <div className="flex-1">
-                    <Label className="text-xs text-muted-foreground">Übergang</Label>
+                    <Label className="text-xs text-muted-foreground">{t('soraLf.transitionSelectLabel')}</Label>
                     <Select
                       value={scene.transition_type}
                       onValueChange={(v) => updateTransition(index, v as TransitionType)}
                     >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {TRANSITION_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -95,7 +98,7 @@ export function TransitionEditor({
                   {scene.transition_type !== 'none' && (
                     <div className="flex-1">
                       <Label className="text-xs text-muted-foreground">
-                        Dauer: {scene.transition_duration.toFixed(1)}s
+                        {t('soraLf.transitionDurationLabel').replace('{value}', scene.transition_duration.toFixed(1))}
                       </Label>
                       <Slider
                         value={[scene.transition_duration]}
@@ -108,7 +111,6 @@ export function TransitionEditor({
                     </div>
                   )}
 
-                  {/* Visual Indicator */}
                   <div className="flex-shrink-0 flex items-center">
                     <div className={cn(
                       'h-8 w-16 rounded flex items-center justify-center text-xs font-medium',
@@ -119,7 +121,7 @@ export function TransitionEditor({
                       scene.transition_type === 'zoom' && 'bg-orange-500/20 text-orange-600',
                       scene.transition_type === 'wipe' && 'bg-pink-500/20 text-pink-600',
                     )}>
-                      {TRANSITION_OPTIONS.find(t => t.value === scene.transition_type)?.label}
+                      {TRANSITION_OPTIONS.find(tr => tr.value === scene.transition_type)?.label}
                     </div>
                   </div>
                 </div>
@@ -129,76 +131,39 @@ export function TransitionEditor({
         ))}
       </div>
 
-      {/* Quick Actions */}
       <Card className="p-4">
-        <Label className="text-sm font-medium mb-3 block">Schnellaktionen</Label>
+        <Label className="text-sm font-medium mb-3 block">{t('soraLf.quickActions')}</Label>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const newScenes = scenes.map(s => ({ ...s, transition_type: 'crossfade' as TransitionType }));
-              onUpdateScenes(newScenes);
-            }}
-          >
-            Alle: Crossfade
+          <Button variant="outline" size="sm" onClick={() => onUpdateScenes(scenes.map(s => ({ ...s, transition_type: 'crossfade' as TransitionType })))}>
+            {t('soraLf.allCrossfade')}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const newScenes = scenes.map(s => ({ ...s, transition_type: 'fade' as TransitionType }));
-              onUpdateScenes(newScenes);
-            }}
-          >
-            Alle: Fade
+          <Button variant="outline" size="sm" onClick={() => onUpdateScenes(scenes.map(s => ({ ...s, transition_type: 'fade' as TransitionType })))}>
+            {t('soraLf.allFade')}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const newScenes = scenes.map(s => ({ ...s, transition_type: 'none' as TransitionType }));
-              onUpdateScenes(newScenes);
-            }}
-          >
-            Alle: Keine
+          <Button variant="outline" size="sm" onClick={() => onUpdateScenes(scenes.map(s => ({ ...s, transition_type: 'none' as TransitionType })))}>
+            {t('soraLf.allNone')}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const newScenes = scenes.map(s => ({ ...s, transition_duration: 0.5 }));
-              onUpdateScenes(newScenes);
-            }}
-          >
-            Dauer: 0.5s
+          <Button variant="outline" size="sm" onClick={() => onUpdateScenes(scenes.map(s => ({ ...s, transition_duration: 0.5 })))}>
+            {t('soraLf.durationHalf')}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const newScenes = scenes.map(s => ({ ...s, transition_duration: 1.0 }));
-              onUpdateScenes(newScenes);
-            }}
-          >
-            Dauer: 1.0s
+          <Button variant="outline" size="sm" onClick={() => onUpdateScenes(scenes.map(s => ({ ...s, transition_duration: 1.0 })))}>
+            {t('soraLf.durationOne')}
           </Button>
         </div>
       </Card>
 
-      {/* Navigation */}
       <Card className="p-4 bg-muted/50">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {scenes.filter(s => s.transition_type !== 'none').length} Übergänge definiert
+            {t('soraLf.transitionsDefined').replace('{count}', String(scenes.filter(s => s.transition_type !== 'none').length))}
           </p>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onBack}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Zurück
+              {t('soraLf.back')}
             </Button>
             <Button onClick={onNext}>
-              Zum Export
+              {t('soraLf.toExport')}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
