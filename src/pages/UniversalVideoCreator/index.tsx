@@ -1,12 +1,14 @@
 import { Helmet } from "react-helmet-async";
 import { UniversalVideoWizard } from "@/components/universal-video-creator";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const UniversalVideoCreator = () => {
+  const { t } = useTranslation();
   return (
     <>
       <Helmet>
-        <title>Universal Video Creator | AdTool</title>
-        <meta name="description" content="Erstelle professionelle Videos mit dem Universal Video Creator - KI-gestützte Videoerstellung mit allen Animationen und Effekten." />
+        <title>{t('uvc.pageTitle')}</title>
+        <meta name="description" content={t('uvc.pageMeta')} />
       </Helmet>
       <UniversalVideoWizard />
     </>
