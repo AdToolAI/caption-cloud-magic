@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { VIDEO_CATEGORIES, type VideoCategory, type UniversalConsultationResult } from '@/types/universal-video-creator';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useLocalizedCategoryName } from '@/hooks/useLocalizedVideoCategories';
 
 interface UniversalAutoGenerationProgressProps {
   consultationResult: UniversalConsultationResult;
@@ -21,22 +23,13 @@ interface UniversalAutoGenerationProgressProps {
 const isRateLimitError = (msg: string): boolean =>
   /rate exceeded|concurrency limit|throttl|capacity_cooldown/i.test(msg);
 
-/**
- * r28: Unified error classification — replaces fragile per-site string matching.
- * Checks result_data.errorCategory first (backend-set), then falls back to message parsing.
- */
 const classifyPipelineError = (resultData: any, statusMessage: string): string => {
-  // Primary: backend-set structured category
   if (resultData?.errorCategory && resultData.errorCategory !== 'unknown') {
     return resultData.errorCategory;
   }
-  // Fallback: parse status message
   const msg = (statusMessage || '').toLowerCase();
   if (/rate exceeded|concurrency limit|throttl|capacity_cooldown/i.test(msg)) return 'rate_limit';
-  // r33: Audio corruption detection — ffprobe crashes on corrupt audio files
   if (/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i.test(msg)) return 'audio_corruption';
-  // r32: Lottie stall detection — classify as lambda_crash BEFORE timeout check
-  // (Lottie error messages may contain "timeout" in docs links, so order matters)
   if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(msg)) return 'lambda_crash';
   if (/timeout|zeitlimit|frames pro lambda|120s|600s/i.test(msg)) return 'timeout';
   if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(msg)) return 'lambda_crash';
@@ -59,18 +52,6 @@ const FORMAT_LABELS: Record<string, { label: string; description: string }> = {
   '4:5': { label: '4:5', description: 'Instagram Portrait' },
   '16:9': { label: '16:9', description: 'YouTube / Website' },
 };
-
-function buildSteps(aspectRatio?: string): StepConfig[] {
-  const format = FORMAT_LABELS[aspectRatio || '16:9'] || FORMAT_LABELS['16:9'];
-  return [
-    { id: 'script', label: 'Drehbuch', description: 'KI generiert Drehbuch', icon: FileText },
-    { id: 'character-sheet', label: 'Charakter', description: 'Character Sheet erstellen', icon: Image },
-    { id: 'visuals', label: 'Visuals', description: 'Premium Szenen-Bilder', icon: Image },
-    { id: 'voiceover', label: 'Voice-Over', description: 'Professionelle Sprachausgabe', icon: Mic },
-    { id: 'music', label: 'Musik', description: 'Passende Hintergrundmusik', icon: Music },
-    { id: 'rendering', label: format.label, description: format.description, icon: Video },
-  ];
-}
 
 const STEP_TO_INDEX: Record<string, number> = {
   'pending': 0, 'initializing': 0, 'generating_script': 0, 'script_complete': 0,
@@ -95,7 +76,8 @@ export function UniversalAutoGenerationProgress({
   onMinimize,
   diagnosticProfile = 'A',
 }: UniversalAutoGenerationProgressProps) {
-  const categoryInfo = VIDEO_CATEGORIES.find(c => c.category === category);
+  const { t } = useTranslation();
+  const categoryName = useLocalizedCategoryName(category);
   
   const selectedAspectRatio = consultationResult?.aspectRatio 
     || (consultationResult as any)?.format 
@@ -103,6 +85,19 @@ export function UniversalAutoGenerationProgress({
     || (consultationResult as any)?.recommendation?.aspectRatio
     || (consultationResult as any)?.recommendation?.format
     || '16:9';
+
+  function buildSteps(aspectRatio?: string): StepConfig[] {
+    const format = FORMAT_LABELS[aspectRatio || '16:9'] || FORMAT_LABELS['16:9'];
+    return [
+      { id: 'script', label: t('uvc.genScript'), description: t('uvc.genScriptDesc'), icon: FileText },
+      { id: 'character-sheet', label: t('uvc.genCharacter'), description: t('uvc.genCharacterDesc'), icon: Image },
+      { id: 'visuals', label: t('uvc.genVisualsLabel'), description: t('uvc.genVisualsDesc'), icon: Image },
+      { id: 'voiceover', label: t('uvc.genVoiceover'), description: t('uvc.genVoiceoverDesc'), icon: Mic },
+      { id: 'music', label: t('uvc.genMusic'), description: t('uvc.genMusicDesc'), icon: Music },
+      { id: 'rendering', label: format.label, description: format.description, icon: Video },
+    ];
+  }
+
   const STEPS = buildSteps(selectedAspectRatio);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<GenerationStep[]>([]);
@@ -111,11 +106,10 @@ export function UniversalAutoGenerationProgress({
   const [project, setProject] = useState<any>(null);
   const [progress, setProgress] = useState(0);
   const [generatedAssets, setGeneratedAssets] = useState<Record<string, string>>({});
-  const [statusMessage, setStatusMessage] = useState<string>('Initialisiere...');
+  const [statusMessage, setStatusMessage] = useState<string>(t('uvc.genInitializing'));
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
   const [debugLoading, setDebugLoading] = useState(false);
-  // r25: Capacity cooldown state
   const [capacityCooldown, setCapacityCooldown] = useState(false);
   const [cooldownMinutes, setCooldownMinutes] = useState(0);
   const [retryInfo, setRetryInfo] = useState<{ renderOnlyAttempts: number; totalAttempts: number }>({ renderOnlyAttempts: 0, totalAttempts: 0 });
@@ -133,36 +127,32 @@ export function UniversalAutoGenerationProgress({
   const retryTriggeredRef = useRef<boolean>(false);
   const renderOnlyRetryCountRef = useRef<number>(0);
   const totalRetryCountRef = useRef<number>(0);
-  // r37: Dedup — track the last failure signature to prevent double-counting from Realtime + Polling race
   const lastFailureSignatureRef = useRef<string | null>(null);
-  // r25: Track whether component is still mounted
   const mountedRef = useRef<boolean>(true);
 
-  // r25: Cleanup helper that ALSO removes realtime channels
+  const getErrorLabel = (cat: string): string => {
+    switch (cat) {
+      case 'timeout': return t('uvc.genLabelTimeout');
+      case 'rate_limit': return t('uvc.genLabelRateLimit');
+      case 'audio_corruption': return t('uvc.genLabelAudioError');
+      case 'lambda_crash': return t('uvc.genLabelLambdaCrash');
+      default: return cat;
+    }
+  };
+
   const cleanupAll = useCallback(() => {
     if (channelRef.current) {
-      console.log('[UniversalAutoGen] 🧹 Removing realtime channel');
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-    if (clientRenderPollRef.current) {
-      clearInterval(clientRenderPollRef.current);
-      clientRenderPollRef.current = null;
-    }
-    if (retryCountdownRef.current) {
-      clearInterval(retryCountdownRef.current);
-      retryCountdownRef.current = null;
-    }
+    if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
+    if (clientRenderPollRef.current) { clearInterval(clientRenderPollRef.current); clientRenderPollRef.current = null; }
+    if (retryCountdownRef.current) { clearInterval(retryCountdownRef.current); retryCountdownRef.current = null; }
   }, []);
 
   useEffect(() => {
     mountedRef.current = true;
     startAutoGeneration();
-
     return () => {
       mountedRef.current = false;
       cleanupAll();
@@ -170,44 +160,23 @@ export function UniversalAutoGenerationProgress({
   }, []);
 
   const subscribeToProgress = (progressId: string) => {
-    // r25: ALWAYS cleanup old channel before creating new one
     if (channelRef.current) {
-      console.log('[UniversalAutoGen] 🧹 Removing OLD channel before subscribing to new progressId');
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    // Also stop old polling
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-    
-    console.log('[UniversalAutoGen] Subscribing to progress:', progressId);
+    if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
     
     const channel = supabase
       .channel(`universal-progress-${progressId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'universal_video_progress',
-          filter: `id=eq.${progressId}`
-        },
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'universal_video_progress', filter: `id=eq.${progressId}` },
         (payload) => {
           if (!mountedRef.current) return;
-          // r25: Ignore updates for wrong progressId (stale channel events)
-          if (payload.new && (payload.new as any).id !== progressIdRef.current) {
-            console.log('[UniversalAutoGen] ⏭️ Ignoring stale channel event for:', (payload.new as any).id, 'current:', progressIdRef.current);
-            return;
-          }
+          if (payload.new && (payload.new as any).id !== progressIdRef.current) return;
           handleProgressUpdate(payload.new as any);
         }
       )
       .subscribe((status) => {
-        if (status !== 'SUBSCRIBED') {
-          startFallbackPolling(progressId);
-        }
+        if (status !== 'SUBSCRIBED') startFallbackPolling(progressId);
       });
     
     channelRef.current = channel;
@@ -217,16 +186,9 @@ export function UniversalAutoGenerationProgress({
   const startFallbackPolling = (progressId: string) => {
     if (pollIntervalRef.current) return;
     
-    // Initial fetch
     (async () => {
-      const { data } = await supabase
-        .from('universal_video_progress')
-        .select('*')
-        .eq('id', progressId)
-        .single();
-      if (data && mountedRef.current) {
-        handleProgressUpdate(data);
-      }
+      const { data } = await supabase.from('universal_video_progress').select('*').eq('id', progressId).single();
+      if (data && mountedRef.current) handleProgressUpdate(data);
     })();
     
     pollIntervalRef.current = window.setInterval(async () => {
@@ -234,19 +196,9 @@ export function UniversalAutoGenerationProgress({
       try {
         const currentProgressId = progressIdRef.current;
         if (!currentProgressId) return;
-        
-        const { data, error } = await supabase
-          .from('universal_video_progress')
-          .select('*')
-          .eq('id', currentProgressId)
-          .single();
-        
-        if (data && !error && mountedRef.current) {
-          handleProgressUpdate(data);
-        }
-      } catch (e) {
-        console.error('[UniversalAutoGen] Polling error:', e);
-      }
+        const { data, error } = await supabase.from('universal_video_progress').select('*').eq('id', currentProgressId).single();
+        if (data && !error && mountedRef.current) handleProgressUpdate(data);
+      } catch (e) { console.error('[UniversalAutoGen] Polling error:', e); }
     }, 1000);
   };
 
@@ -257,12 +209,10 @@ export function UniversalAutoGenerationProgress({
     const stepIndex = STEP_TO_INDEX[data.current_step] ?? 0;
     setCurrentStepIndex(stepIndex);
     setProgress(prev => Math.max(prev, data.progress_percent || 0));
-    setStatusMessage(data.status_message || 'Verarbeite...');
+    setStatusMessage(data.status_message || t('uvc.genProcessing'));
     
     const completed: GenerationStep[] = [];
-    for (let i = 0; i < stepIndex; i++) {
-      completed.push(STEPS[i].id);
-    }
+    for (let i = 0; i < stepIndex; i++) completed.push(STEPS[i].id);
     setCompletedSteps(completed);
     
     if (data.result_data && typeof data.result_data === 'object') {
@@ -270,23 +220,14 @@ export function UniversalAutoGenerationProgress({
       if (resultData.assets && Array.isArray(resultData.assets)) {
         const assetMap: Record<string, string> = {};
         resultData.assets.forEach((asset: any, idx: number) => {
-          if (asset.imageUrl) {
-            assetMap[`scene-${idx}`] = asset.imageUrl;
-          }
+          if (asset.imageUrl) assetMap[`scene-${idx}`] = asset.imageUrl;
         });
         setGeneratedAssets(assetMap);
       }
       
-      // ZWEI-PHASEN: Client erkennt 'ready_to_render' und ruft invoke-remotion-render direkt auf
       if (data.current_step === 'ready_to_render' && resultData.lambdaPayload) {
-        if (invokedRenderIdRef.current === resultData.renderId || invokeInFlightRef.current) {
-          return;
-        }
-        if (clientRenderPollRef.current) {
-          clearInterval(clientRenderPollRef.current);
-          clientRenderPollRef.current = null;
-        }
-        console.log('[UniversalAutoGen] 🚀 Phase 2: Client invokes invoke-remotion-render directly');
+        if (invokedRenderIdRef.current === resultData.renderId || invokeInFlightRef.current) return;
+        if (clientRenderPollRef.current) { clearInterval(clientRenderPollRef.current); clientRenderPollRef.current = null; }
         invokeRenderFromClient(resultData.lambdaPayload, resultData.renderId, resultData.progressId || data.id || progressIdRef.current);
         return;
       }
@@ -299,99 +240,63 @@ export function UniversalAutoGenerationProgress({
     
     if (data.status === 'failed') {
       const resultData = data.result_data as any;
-      const failMsg = data.status_message || 'Ein Fehler ist aufgetreten';
-      
-      // r28: Use unified classifyPipelineError (checks result_data.errorCategory first)
+      const failMsg = data.status_message || t('uvc.genUnknownError');
       const effectiveCategory = classifyPipelineError(resultData, failMsg);
       
-      console.log(`[UniversalAutoGen] 🏷️ Pipeline error category: ${effectiveCategory} (backend: ${resultData?.errorCategory || 'none'})`);
-      
-      // r28: DEDUPE GUARD — prevent double-counting from Realtime + Polling race
       const failedRenderId = resultData?.renderId || resultData?.webhookRenderId;
       const currentRenderId = invokedRenderIdRef.current;
+      if (currentRenderId && failedRenderId && currentRenderId !== failedRenderId) return;
       
-      if (currentRenderId && failedRenderId && currentRenderId !== failedRenderId) {
-        console.log('[UniversalAutoGen] ⏭️ Ignoring stale failure from old render:', failedRenderId);
-        return;
-      }
-      
-      // r37: DEDUP — Build failure signature and skip if already processed
       const failureSignature = `${failedRenderId || data.id}:${effectiveCategory}:${failMsg.substring(0, 50)}`;
-      if (lastFailureSignatureRef.current === failureSignature) {
-        console.log('[UniversalAutoGen] ⏭️ r37 Duplicate failure event, skipping:', failureSignature);
-        return;
-      }
+      if (lastFailureSignatureRef.current === failureSignature) return;
       lastFailureSignatureRef.current = failureSignature;
       
-      // r37: If a retry is already scheduled/in-progress and this is a retryable error, don't set error state
       const isRetryableCategory = effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash' || effectiveCategory === 'audio_corruption';
-      if (retryTriggeredRef.current && isRetryableCategory) {
-        console.log('[UniversalAutoGen] ⏭️ r37 Retry already scheduled, ignoring duplicate retryable failure');
-        return;
-      }
+      if (retryTriggeredRef.current && isRetryableCategory) return;
       
-      // r25: GLOBAL RETRY CAP — absolute maximum
       totalRetryCountRef.current++;
       setRetryInfo(prev => ({ ...prev, totalAttempts: totalRetryCountRef.current }));
       
       if (totalRetryCountRef.current > 5) {
-        console.log(`[UniversalAutoGen] 🛑 Global retry cap reached (${totalRetryCountRef.current})`);
-        setError('Maximale Anzahl an Versuchen erreicht (5/5). Bitte warte einige Minuten und versuche es dann manuell erneut.');
+        setError(t('uvc.genMaxRetries'));
         setProgress(0);
         setIsGenerating(false);
         cleanupAll();
         return;
       }
       
-      // r25: RENDER-ONLY RETRY for infrastructure errors — max 3 attempts
       if (isRetryableCategory && !retryTriggeredRef.current) {
         if (renderOnlyRetryCountRef.current < 3 && progressIdRef.current) {
           retryTriggeredRef.current = true;
           renderOnlyRetryCountRef.current++;
           setRetryInfo(prev => ({ ...prev, renderOnlyAttempts: renderOnlyRetryCountRef.current }));
           
-          // r31/r37: Exponential backoff for rate-limit (60s/120s/180s), flat 30s for timeout/crash
           const attempt = renderOnlyRetryCountRef.current;
-          const waitSec = effectiveCategory === 'rate_limit' 
-            ? 60 * attempt  // 60s, 120s, 180s
-            : effectiveCategory === 'audio_corruption'
-            ? 5             // audio corruption: fast retry (just stripping audio)
-            : 30;           // timeout/crash: flat 30s
-          const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : effectiveCategory === 'audio_corruption' ? 'Audio-Fehler' : 'Lambda-Crash';
+          const waitSec = effectiveCategory === 'rate_limit' ? 60 * attempt : effectiveCategory === 'audio_corruption' ? 5 : 30;
+          const label = getErrorLabel(effectiveCategory);
           
-          console.log(`[UniversalAutoGen] 🔄 r37 Render-Only Retry (${label}, attempt ${attempt}/3), waiting ${waitSec}s`);
           setError(null);
           setProgress(0);
           cleanupAll();
           
-          // Start countdown timer
           setRetryCountdownSec(waitSec);
-          setStatusMessage(`🔄 ${label} — Auto-Retry in ${waitSec}s (${attempt}/3)... Assets werden wiederverwendet.`);
+          setStatusMessage(t('uvc.genAutoRetryLabel', { label, sec: String(waitSec), attempt: String(attempt) }));
           
           retryCountdownRef.current = window.setInterval(() => {
             setRetryCountdownSec(prev => {
               if (prev <= 1) {
-                if (retryCountdownRef.current) {
-                  clearInterval(retryCountdownRef.current);
-                  retryCountdownRef.current = null;
-                }
+                if (retryCountdownRef.current) { clearInterval(retryCountdownRef.current); retryCountdownRef.current = null; }
                 return 0;
               }
               const next = prev - 1;
-              setStatusMessage(`🔄 ${label} — Auto-Retry in ${next}s (${attempt}/3)... Assets werden wiederverwendet.`);
+              setStatusMessage(t('uvc.genAutoRetryLabel', { label, sec: String(next), attempt: String(attempt) }));
               return next;
             });
           }, 1000);
           
-          setTimeout(() => {
-            if (mountedRef.current) {
-              startRenderOnlyRetry();
-            }
-          }, waitSec * 1000);
+          setTimeout(() => { if (mountedRef.current) startRenderOnlyRetry(); }, waitSec * 1000);
           return;
         }
-        // Exhausted render-only retries → capacity cooldown
-        console.log('[UniversalAutoGen] 🛑 Render-only retries exhausted → capacity cooldown');
         setCapacityCooldown(true);
         setCooldownMinutes(10);
         setError(null);
@@ -400,7 +305,6 @@ export function UniversalAutoGenerationProgress({
         return;
       }
 
-      // Unknown errors — show to user, NO auto-retry
       setError(failMsg);
       setProgress(0);
       setIsGenerating(false);
@@ -416,79 +320,53 @@ export function UniversalAutoGenerationProgress({
   };
 
   const stopAllPolling = () => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-    if (clientRenderPollRef.current) {
-      clearInterval(clientRenderPollRef.current);
-      clientRenderPollRef.current = null;
-    }
+    if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
+    if (clientRenderPollRef.current) { clearInterval(clientRenderPollRef.current); clientRenderPollRef.current = null; }
   };
 
   const startRenderOnlyRetry = async () => {
     const existingProgressId = progressIdRef.current;
     if (!existingProgressId) {
-      setError('Render-Only Retry nicht möglich — kein Progress vorhanden.');
+      setError(t('uvc.genRenderOnlyNotPossible'));
       setIsGenerating(false);
       return;
     }
     
-    console.log(`[UniversalAutoGen] 🔄 r25: Starting render-only retry for progress: ${existingProgressId}`);
     setIsGenerating(true);
     setError(null);
     setCapacityCooldown(false);
-    setStatusMessage('🔄 Render-Only Retry — Assets werden wiederverwendet...');
+    setStatusMessage(t('uvc.genRenderOnlyRetrying'));
     setProgress(0);
     retryTriggeredRef.current = false;
     invokeInFlightRef.current = false;
     invokedRenderIdRef.current = null;
-    // r37: Reset failure signature so new failures are counted
     lastFailureSignatureRef.current = null;
     
     try {
       const response = await supabase.functions.invoke('auto-generate-universal-video', {
-        body: {
-          userId,
-          renderOnly: true,
-          existingProgressId,
-        }
+        body: { userId, renderOnly: true, existingProgressId }
       });
       
-      // r40: Robust FunctionsHttpError parsing for 429/capacity_cooldown
       if (response.error) {
         let parsedBody: any = null;
         try {
-          // FunctionsHttpError stores the Response in .context — extract JSON body
           const ctx = (response.error as any)?.context;
-          if (ctx && typeof ctx.json === 'function') {
-            parsedBody = await ctx.json();
-          } else if (ctx && typeof ctx.status === 'number') {
-            // Fallback: status-only check
-            parsedBody = { _status: ctx.status };
-          }
-        } catch { /* ignore parse errors */ }
+          if (ctx && typeof ctx.json === 'function') parsedBody = await ctx.json();
+          else if (ctx && typeof ctx.status === 'number') parsedBody = { _status: ctx.status };
+        } catch { }
         
-        // Check parsed body OR response.data for capacity_cooldown
-        const isCapacityCooldown = 
-          parsedBody?.error === 'capacity_cooldown' ||
-          response.data?.error === 'capacity_cooldown' ||
-          (parsedBody?._status === 429);
-        
+        const isCapacityCooldown = parsedBody?.error === 'capacity_cooldown' || response.data?.error === 'capacity_cooldown' || (parsedBody?._status === 429);
         if (isCapacityCooldown) {
           const cooldown = parsedBody?.cooldownMinutes || response.data?.cooldownMinutes || 10;
-          console.log(`[UniversalAutoGen] 🛑 r40 Backend returned capacity_cooldown (${cooldown}min)`);
           setCapacityCooldown(true);
           setCooldownMinutes(cooldown);
           setIsGenerating(false);
           return;
         }
         
-        // r43: Handle structured error codes from backend
         const backendErrorCode = parsedBody?.error || response.data?.error;
         if (backendErrorCode === 'render_only_source_missing_payload') {
-          console.log(`[UniversalAutoGen] ⚠️ r43: render_only_source_missing_payload — suggesting full restart`);
-          setError('Render-Payload nicht mehr verfügbar. Bitte starte eine neue Video-Generierung.');
+          setError(t('uvc.genRenderPayloadMissing'));
           setIsGenerating(false);
           return;
         }
@@ -497,8 +375,6 @@ export function UniversalAutoGenerationProgress({
       }
       
       const data = response.data;
-      
-      // r25: Handle capacity_cooldown from 429 response (non-error path)
       if (data?.error === 'capacity_cooldown') {
         setCapacityCooldown(true);
         setCooldownMinutes(data.cooldownMinutes || 10);
@@ -507,67 +383,47 @@ export function UniversalAutoGenerationProgress({
       }
       
       if (data?.progressId) {
-        console.log(`[UniversalAutoGen] 🔄 Render-only got new progressId: ${data.progressId}`);
         progressIdRef.current = data.progressId;
         subscribeToProgress(data.progressId);
       }
     } catch (err) {
       console.error('[UniversalAutoGen] ❌ Render-only retry failed:', err);
-      setError(`Render-Only Retry fehlgeschlagen: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
+      setError(t('uvc.genRenderOnlyFailed', { msg: err instanceof Error ? err.message : 'Unknown' }));
       setIsGenerating(false);
     }
   };
 
   const invokeRenderFromClient = async (lambdaPayload: any, renderId: string, progressId: string) => {
-    if (invokeInFlightRef.current || invokedRenderIdRef.current === renderId) {
-      return;
-    }
+    if (invokeInFlightRef.current || invokedRenderIdRef.current === renderId) return;
     invokeInFlightRef.current = true;
     
     try {
-      setStatusMessage('🎬 Starte Video-Rendering...');
+      setStatusMessage(t('uvc.genStartingRender'));
       
       const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user?.id) {
-        throw new Error('Nicht authentifiziert');
-      }
+      if (!session?.session?.user?.id) throw new Error(t('uvc.genNotAuthenticated'));
       
       const response = await supabase.functions.invoke('invoke-remotion-render', {
-        body: {
-          lambdaPayload,
-          pendingRenderId: renderId,
-          userId: session.session.user.id,
-          progressId,
-        }
+        body: { lambdaPayload, pendingRenderId: renderId, userId: session.session.user.id, progressId }
       });
       
-      if (response.error) {
-        throw new Error(response.error.message || 'Render-Start fehlgeschlagen');
-      }
+      if (response.error) throw new Error(response.error.message || t('uvc.genRenderStartFailed'));
       
-      console.log('[UniversalAutoGen] ✅ invoke-remotion-render success:', response.data);
       invokedRenderIdRef.current = renderId;
       startClientRenderPolling(renderId, progressId);
-      
     } catch (err) {
-      console.error('[UniversalAutoGen] ❌ Client render invocation failed:', err);
-      
       const isFetchError = err instanceof Error && (
-        err.message.includes('FunctionsFetchError') || 
-        err.message.includes('Failed to fetch') ||
-        err.message.includes('CORS') ||
-        err.message.includes('NetworkError') ||
-        err.message.includes('AbortError') ||
-        err.name === 'FunctionsFetchError'
+        err.message.includes('FunctionsFetchError') || err.message.includes('Failed to fetch') ||
+        err.message.includes('CORS') || err.message.includes('NetworkError') ||
+        err.message.includes('AbortError') || err.name === 'FunctionsFetchError'
       );
       
       if (isFetchError) {
-        console.log('[UniversalAutoGen] 🔄 Network/timeout error — starting optimistic polling');
-        setStatusMessage('🎬 Video-Rendering gestartet, überprüfe Status...');
+        setStatusMessage(t('uvc.genNetworkError'));
         invokedRenderIdRef.current = renderId;
         startClientRenderPolling(renderId, progressId);
       } else {
-        setError(`Rendering konnte nicht gestartet werden: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
+        setError(t('uvc.genRenderCouldNotStart', { msg: err instanceof Error ? err.message : 'Unknown' }));
         setIsGenerating(false);
         cleanupAll();
       }
@@ -578,39 +434,24 @@ export function UniversalAutoGenerationProgress({
 
   const startClientRenderPolling = (renderId: string, progressId: string | null) => {
     if (clientRenderPollRef.current) return;
-    
-    // Stop DB polling
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
+    if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
     
     renderStartTimeRef.current = Date.now();
     let lastRenderProgress = -1;
     let staleCount = 0;
-    console.log('[UniversalAutoGen] 🎬 Starting client-side render polling for:', renderId);
     
     clientRenderPollRef.current = window.setInterval(async () => {
       if (!mountedRef.current) return;
       
-      // Timeout after 15 minutes
       if (renderStartTimeRef.current && Date.now() - renderStartTimeRef.current > 15 * 60 * 1000) {
         if (progressIdRef.current) {
           try {
-            await supabase
-              .from('universal_video_progress')
-              .update({
-                status: 'failed',
-                current_step: 'failed',
-                status_message: 'Rendering-Timeout nach 15 Minuten',
-              })
-              .eq('id', progressIdRef.current);
-          } catch (e) {
-            console.error('[UniversalAutoGen] Failed to update progress on timeout:', e);
-          }
+            await supabase.from('universal_video_progress').update({
+              status: 'failed', current_step: 'failed', status_message: t('uvc.genRenderTimeoutMsg'),
+            }).eq('id', progressIdRef.current);
+          } catch (e) { }
         }
-        
-        setError('Video-Rendering hat das Zeitlimit überschritten (15 Minuten).');
+        setError(t('uvc.genRenderTimeout'));
         setIsGenerating(false);
         cleanupAll();
         return;
@@ -620,11 +461,7 @@ export function UniversalAutoGenerationProgress({
         const response = await supabase.functions.invoke('check-remotion-progress', {
           body: { renderId, source: 'universal-creator' }
         });
-        
-        if (response.error) {
-          console.warn('[UniversalAutoGen] Check progress error:', response.error);
-          return;
-        }
+        if (response.error) return;
         
         const progressData = response.data?.progress || {};
         const { done, outputFile, overallProgress, fatalErrorEncountered, errors, progressSource } = progressData;
@@ -632,28 +469,16 @@ export function UniversalAutoGenerationProgress({
         if (fatalErrorEncountered) {
           const errorMsg = Array.isArray(errors) 
             ? errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
-            : 'Render-Fehler';
+            : t('uvc.genRenderStartFailed');
           
-          // r28: Use unified classifyPipelineError
           const effectiveCategory = classifyPipelineError(progressData, errorMsg);
-          
-          // r37: Dedup guard for polling path
           const pollingFailSig = `poll:${renderId}:${effectiveCategory}:${errorMsg.substring(0, 50)}`;
-          if (lastFailureSignatureRef.current === pollingFailSig) {
-            console.log('[UniversalAutoGen] ⏭️ r37 Duplicate polling failure, skipping');
-            return;
-          }
+          if (lastFailureSignatureRef.current === pollingFailSig) return;
           lastFailureSignatureRef.current = pollingFailSig;
           
           const isRetryableCategory = effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash' || effectiveCategory === 'audio_corruption';
+          if (retryTriggeredRef.current && isRetryableCategory) return;
           
-          // r37: If retry already scheduled, don't override with error state
-          if (retryTriggeredRef.current && isRetryableCategory) {
-            console.log('[UniversalAutoGen] ⏭️ r37 Retry already scheduled (polling path), ignoring');
-            return;
-          }
-          
-          // r25: RENDER-ONLY RETRY for infrastructure errors detected during render polling
           if (isRetryableCategory && !retryTriggeredRef.current) {
             if (renderOnlyRetryCountRef.current < 3 && progressIdRef.current) {
               retryTriggeredRef.current = true;
@@ -661,43 +486,32 @@ export function UniversalAutoGenerationProgress({
               totalRetryCountRef.current++;
               setRetryInfo({ renderOnlyAttempts: renderOnlyRetryCountRef.current, totalAttempts: totalRetryCountRef.current });
               
-              // r37: Exponential backoff for rate_limit (60/120/180), fast for audio, flat 30s for others
               const attempt = renderOnlyRetryCountRef.current;
-              const waitSec = effectiveCategory === 'rate_limit'
-                ? 60 * attempt
-                : effectiveCategory === 'audio_corruption' ? 5 : 30;
-              const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : effectiveCategory === 'audio_corruption' ? 'Audio-Fehler' : 'Lambda-Crash';
+              const waitSec = effectiveCategory === 'rate_limit' ? 60 * attempt : effectiveCategory === 'audio_corruption' ? 5 : 30;
+              const label = getErrorLabel(effectiveCategory);
               
-              console.log(`[UniversalAutoGen] 🔄 r37 Render-Only Retry in polling (${label}, attempt ${attempt}/3), waiting ${waitSec}s`);
               setError(null);
               setProgress(0);
               cleanupAll();
               
-              // Start countdown timer (same as Phase 1)
               setRetryCountdownSec(waitSec);
-              setStatusMessage(`🔄 ${label} — Auto-Retry in ${waitSec}s (${attempt}/3)... Assets werden wiederverwendet.`);
+              setStatusMessage(t('uvc.genAutoRetryLabel', { label, sec: String(waitSec), attempt: String(attempt) }));
               
               retryCountdownRef.current = window.setInterval(() => {
                 setRetryCountdownSec(prev => {
                   if (prev <= 1) {
-                    if (retryCountdownRef.current) {
-                      clearInterval(retryCountdownRef.current);
-                      retryCountdownRef.current = null;
-                    }
+                    if (retryCountdownRef.current) { clearInterval(retryCountdownRef.current); retryCountdownRef.current = null; }
                     return 0;
                   }
                   const next = prev - 1;
-                  setStatusMessage(`🔄 ${label} — Auto-Retry in ${next}s (${attempt}/3)... Assets werden wiederverwendet.`);
+                  setStatusMessage(t('uvc.genAutoRetryLabel', { label, sec: String(next), attempt: String(attempt) }));
                   return next;
                 });
               }, 1000);
               
-              setTimeout(() => {
-                if (mountedRef.current) startRenderOnlyRetry();
-              }, waitSec * 1000);
+              setTimeout(() => { if (mountedRef.current) startRenderOnlyRetry(); }, waitSec * 1000);
               return;
             }
-            // Exhausted → capacity cooldown
             setCapacityCooldown(true);
             setCooldownMinutes(10);
             setIsGenerating(false);
@@ -705,7 +519,7 @@ export function UniversalAutoGenerationProgress({
             return;
           }
           
-          setError(`Rendering fehlgeschlagen: ${errorMsg}`);
+          setError(t('uvc.genRenderFailed', { msg: errorMsg }));
           setIsGenerating(false);
           cleanupAll();
           return;
@@ -714,52 +528,40 @@ export function UniversalAutoGenerationProgress({
         const renderPercent = typeof overallProgress === 'number' ? overallProgress : 0;
         const displayPercent = 90 + Math.floor(renderPercent * 10);
         setProgress(prev => Math.max(prev, displayPercent));
-        setStatusMessage(`Rendering... ${Math.floor(renderPercent * 100)}%`);
+        setStatusMessage(t('uvc.genRendPercent', { percent: String(Math.floor(renderPercent * 100)) }));
         
         if (progressSource === 's3-progress-json') {
           if (renderPercent === lastRenderProgress) {
             staleCount++;
             if (staleCount >= 10) {
-              setError('Rendering macht keinen Fortschritt.');
+              setError(t('uvc.genRenderNoProgress'));
               setIsGenerating(false);
               cleanupAll();
               return;
             }
-          } else {
-            staleCount = 0;
-            lastRenderProgress = renderPercent;
-          }
+          } else { staleCount = 0; lastRenderProgress = renderPercent; }
         } else if (progressSource === 'time-based') {
-          // No stale detection for time-based
+          // No stale detection
         } else {
           if (renderPercent === lastRenderProgress) {
             staleCount++;
             if (staleCount >= 15) {
-              setError('Video-Rendering hat das Zeitlimit überschritten.');
+              setError(t('uvc.genRenderTimeLimitExceeded'));
               setIsGenerating(false);
               cleanupAll();
               return;
             }
-          } else {
-            staleCount = 0;
-            lastRenderProgress = renderPercent;
-          }
+          } else { staleCount = 0; lastRenderProgress = renderPercent; }
         }
         
         if (done && outputFile) {
-          console.log('[UniversalAutoGen] ✅ Client-side detected render complete:', outputFile);
           setProgress(100);
-          setStatusMessage('Video fertig!');
+          setStatusMessage(t('uvc.genVideoReady'));
           setIsGenerating(false);
           cleanupAll();
           
           if (progressId) {
-            const { data: finalData } = await supabase
-              .from('universal_video_progress')
-              .select('*')
-              .eq('id', progressId)
-              .single();
-            
+            const { data: finalData } = await supabase.from('universal_video_progress').select('*').eq('id', progressId).single();
             if (finalData?.result_data && typeof finalData.result_data === 'object') {
               const mergedResult = { ...(finalData.result_data as Record<string, unknown>), outputUrl: outputFile };
               setProject(mergedResult);
@@ -781,41 +583,26 @@ export function UniversalAutoGenerationProgress({
     setIsGenerating(true);
     setError(null);
     setCapacityCooldown(false);
-    setStatusMessage('🚀 Starte KI-Generierung...');
+    setStatusMessage(t('uvc.genStartingAI'));
     setProgress(0);
 
     try {
       const response = await supabase.functions.invoke('auto-generate-universal-video', {
-        body: {
-          consultationResult,
-          category,
-          userId,
-          diagnosticProfile,
-        }
+        body: { consultationResult, category, userId, diagnosticProfile }
       });
 
       if (response.error) {
-        // r40: Robust FunctionsHttpError parsing for 429/capacity_cooldown
         let parsedBody: any = null;
         try {
           const ctx = (response.error as any)?.context;
-          if (ctx && typeof ctx.json === 'function') {
-            parsedBody = await ctx.json();
-          } else if (ctx && typeof ctx.status === 'number') {
-            parsedBody = { _status: ctx.status };
-          }
-        } catch { /* ignore parse errors */ }
+          if (ctx && typeof ctx.json === 'function') parsedBody = await ctx.json();
+          else if (ctx && typeof ctx.status === 'number') parsedBody = { _status: ctx.status };
+        } catch { }
         
-        const isCapacityCooldown = 
-          parsedBody?.error === 'capacity_cooldown' ||
-          response.data?.error === 'capacity_cooldown' ||
-          (parsedBody?._status === 429);
-        
+        const isCapacityCooldown = parsedBody?.error === 'capacity_cooldown' || response.data?.error === 'capacity_cooldown' || (parsedBody?._status === 429);
         if (isCapacityCooldown) {
-          const cooldown = parsedBody?.cooldownMinutes || response.data?.cooldownMinutes || 10;
-          console.log(`[UniversalAutoGen] 🛑 r40 capacity_cooldown detected (${cooldown}min)`);
           setCapacityCooldown(true);
-          setCooldownMinutes(cooldown);
+          setCooldownMinutes(parsedBody?.cooldownMinutes || response.data?.cooldownMinutes || 10);
           setIsGenerating(false);
           return;
         }
@@ -823,8 +610,6 @@ export function UniversalAutoGenerationProgress({
       }
 
       const data = response.data;
-      
-      // r25: Handle capacity_cooldown from server-side circuit breaker
       if (data?.error === 'capacity_cooldown') {
         setCapacityCooldown(true);
         setCooldownMinutes(data.cooldownMinutes || 10);
@@ -835,51 +620,29 @@ export function UniversalAutoGenerationProgress({
       if (data?.progressId) {
         progressIdRef.current = data.progressId;
         subscribeToProgress(data.progressId);
-        
-        const { data: initialProgress } = await supabase
-          .from('universal_video_progress')
-          .select('*')
-          .eq('id', data.progressId)
-          .single();
-        
-        if (initialProgress && mountedRef.current) {
-          handleProgressUpdate(initialProgress);
-        }
+        const { data: initialProgress } = await supabase.from('universal_video_progress').select('*').eq('id', data.progressId).single();
+        if (initialProgress && mountedRef.current) handleProgressUpdate(initialProgress);
       }
-
-      if (data?.project) {
-        setProject(data.project);
-        onComplete(data.project);
-      }
-
+      if (data?.project) { setProject(data.project); onComplete(data.project); }
     } catch (err) {
       console.error('[UniversalAutoGen] ❌ Error:', err);
-      setError(err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten');
+      setError(err instanceof Error ? err.message : t('uvc.genUnknownError'));
       setIsGenerating(false);
     }
   };
 
-  const handleSwitchToManual = () => {
-    onSwitchToManual(project);
-  };
+  const handleSwitchToManual = () => { onSwitchToManual(project); };
 
   const fetchDebugData = async () => {
     setDebugLoading(true);
     try {
-      const response = await supabase.functions.invoke('debug-render-status', {
-        body: { progressId: progressIdRef.current }
-      });
+      const response = await supabase.functions.invoke('debug-render-status', { body: { progressId: progressIdRef.current } });
       setDebugData(response.data);
-    } catch (e) {
-      setDebugData({ error: e instanceof Error ? e.message : 'Fetch failed' });
-    } finally {
-      setDebugLoading(false);
-    }
+    } catch (e) { setDebugData({ error: e instanceof Error ? e.message : 'Fetch failed' }); }
+    finally { setDebugLoading(false); }
   };
 
-  // r25: Manual retry handler (only for capacity cooldown or final errors)
   const handleManualRetry = () => {
-    // Reset all counters
     renderOnlyRetryCountRef.current = 0;
     totalRetryCountRef.current = 0;
     retryTriggeredRef.current = false;
@@ -888,12 +651,7 @@ export function UniversalAutoGenerationProgress({
     setRetryInfo({ renderOnlyAttempts: 0, totalAttempts: 0 });
     setCapacityCooldown(false);
     setError(null);
-    
-    if (onRetry) {
-      onRetry();
-    } else {
-      startAutoGeneration();
-    }
+    if (onRetry) onRetry(); else startAutoGeneration();
   };
 
   const currentStep = STEPS[currentStepIndex] || STEPS[STEPS.length - 1];
@@ -901,39 +659,25 @@ export function UniversalAutoGenerationProgress({
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
-      >
-        <motion.div 
-          initial={{ scale: 0.9 }}
-          animate={{ scale: 1 }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#F5C76A]/10 border border-[#F5C76A]/30 mb-4"
-        >
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
+        <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#F5C76A]/10 border border-[#F5C76A]/30 mb-4">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F5C76A] opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-[#F5C76A]" />
           </span>
-          <span className="text-sm font-medium text-[#F5C76A]">{categoryInfo?.name} wird erstellt</span>
+          <span className="text-sm font-medium text-[#F5C76A]">{t('uvc.genCategoryCreating', { name: categoryName })}</span>
         </motion.div>
         
         <h2 className="text-3xl font-bold mb-2">
           <span className="bg-gradient-to-r from-[#F5C76A] via-amber-300 to-[#F5C76A] bg-clip-text text-transparent">
-            Dein Video wird erstellt
+            {t('uvc.genVideoCreating')}
           </span>
         </h2>
-        <p className="text-muted-foreground">
-          Lehn dich zurück – die KI arbeitet für dich
-        </p>
+        <p className="text-muted-foreground">{t('uvc.genSitBack')}</p>
       </motion.div>
 
       {/* Progress Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8 p-4 bg-card/40 backdrop-blur-xl border border-white/10 rounded-2xl"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 p-4 bg-card/40 backdrop-blur-xl border border-white/10 rounded-2xl">
         <div className="flex justify-between text-sm mb-3">
           <span className="text-muted-foreground flex items-center gap-2">
             <Crown className="h-4 w-4 text-[#F5C76A]" />
@@ -942,21 +686,14 @@ export function UniversalAutoGenerationProgress({
           <span className="text-[#F5C76A] font-bold">{Math.round(progress)}%</span>
         </div>
         <div className="h-3 bg-muted/20 rounded-full overflow-hidden border border-white/5">
-          <motion.div
-            className="h-full bg-gradient-to-r from-[#F5C76A] via-amber-400 to-[#F5C76A] relative"
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer_2s_infinite]" 
-                 style={{ backgroundSize: '200% 100%' }} />
+          <motion.div className="h-full bg-gradient-to-r from-[#F5C76A] via-amber-400 to-[#F5C76A] relative" initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 0.5, ease: 'easeOut' }}>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer_2s_infinite]" style={{ backgroundSize: '200% 100%' }} />
           </motion.div>
         </div>
-        {/* r25: Retry info display */}
         {(retryInfo.renderOnlyAttempts > 0 || retryInfo.totalAttempts > 0) && (
           <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-            <span>Render-Retries: {retryInfo.renderOnlyAttempts}/3</span>
-            <span>Gesamt: {retryInfo.totalAttempts}/5</span>
+            <span>{t('uvc.genRenderRetries', { count: String(retryInfo.renderOnlyAttempts) })}</span>
+            <span>{t('uvc.genTotalAttempts', { count: String(retryInfo.totalAttempts) })}</span>
           </div>
         )}
       </motion.div>
@@ -968,40 +705,22 @@ export function UniversalAutoGenerationProgress({
           const isCompleted = completedSteps.includes(step.id);
           const isCurrent = index === currentStepIndex && isGenerating;
           const isPending = index > currentStepIndex;
-
           return (
-            <motion.div
-              key={step.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.1 }}
-              className={cn(
-                "relative p-4 rounded-xl border backdrop-blur-sm transition-all duration-300",
+            <motion.div key={step.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.1 }}
+              className={cn("relative p-4 rounded-xl border backdrop-blur-sm transition-all duration-300",
                 isCompleted && "bg-[#F5C76A]/10 border-[#F5C76A]/30 shadow-[0_0_15px_rgba(245,199,106,0.1)]",
                 isCurrent && "bg-[#F5C76A]/20 border-[#F5C76A]/50 shadow-[0_0_25px_rgba(245,199,106,0.2)]",
                 isPending && "bg-muted/10 border-white/5 opacity-50"
-              )}
-            >
+              )}>
               <div className="flex items-center gap-3 mb-2">
-                <div className={cn(
-                  "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
+                <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center transition-all",
                   isCompleted && "bg-[#F5C76A] text-black",
                   isCurrent && "bg-[#F5C76A]/30 border border-[#F5C76A]/50",
                   isPending && "bg-muted/20 border border-white/10"
                 )}>
-                  {isCompleted ? (
-                    <Check className="h-4 w-4" />
-                  ) : isCurrent ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-[#F5C76A]" />
-                  ) : (
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                  )}
+                  {isCompleted ? <Check className="h-4 w-4" /> : isCurrent ? <Loader2 className="h-4 w-4 animate-spin text-[#F5C76A]" /> : <Icon className="h-4 w-4 text-muted-foreground" />}
                 </div>
-                <span className={cn(
-                  "text-sm font-medium",
-                  isCompleted && "text-[#F5C76A]",
-                  isCurrent && "text-[#F5C76A]"
-                )}>{step.label}</span>
+                <span className={cn("text-sm font-medium", (isCompleted || isCurrent) && "text-[#F5C76A]")}>{step.label}</span>
               </div>
               <p className="text-xs text-muted-foreground">{step.description}</p>
             </motion.div>
@@ -1010,39 +729,24 @@ export function UniversalAutoGenerationProgress({
       </div>
 
       {/* Current Step Detail */}
-      <motion.div
-        key={currentStepIndex}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-card/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 mb-6 relative overflow-hidden"
-      >
+      <motion.div key={currentStepIndex} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="bg-card/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 mb-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-[#F5C76A]/5 via-transparent to-cyan-500/5 pointer-events-none" />
-        
         <div className="flex items-center gap-4 relative">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#F5C76A]/20 to-amber-500/10 flex items-center justify-center border border-[#F5C76A]/30">
-            {isGenerating ? (
-              <Loader2 className="h-6 w-6 text-[#F5C76A] animate-spin" />
-            ) : (
-              <Sparkles className="h-6 w-6 text-[#F5C76A]" />
-            )}
+            {isGenerating ? <Loader2 className="h-6 w-6 text-[#F5C76A] animate-spin" /> : <Sparkles className="h-6 w-6 text-[#F5C76A]" />}
           </div>
           <div>
             <h3 className="text-lg font-semibold text-[#F5C76A]">{currentStep.label}</h3>
             <p className="text-sm text-muted-foreground">{statusMessage}</p>
           </div>
         </div>
-
         {Object.keys(generatedAssets).length > 0 && (
           <div className="mt-6 grid grid-cols-5 gap-2">
             <AnimatePresence>
               {Object.entries(generatedAssets).map(([key, url], index) => (
-                <motion.div
-                  key={key}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="aspect-video rounded-lg overflow-hidden border border-[#F5C76A]/30 shadow-[0_0_10px_rgba(245,199,106,0.1)]"
-                >
+                <motion.div key={key} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.1 }}
+                  className="aspect-video rounded-lg overflow-hidden border border-[#F5C76A]/30 shadow-[0_0_10px_rgba(245,199,106,0.1)]">
                   <img src={url} alt={key} className="w-full h-full object-cover" />
                 </motion.div>
               ))}
@@ -1051,46 +755,30 @@ export function UniversalAutoGenerationProgress({
         )}
       </motion.div>
 
-      {/* r25: Capacity Cooldown State */}
+      {/* Capacity Cooldown State */}
       {capacityCooldown && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-6 mb-6"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-6 mb-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
               <Shield className="h-6 w-6 text-amber-400" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-amber-400 mb-1">Kapazitäts-Schutz aktiviert</h3>
-              <p className="text-sm text-muted-foreground">
-                Das Rendering-System ist aktuell ausgelastet. Deine Assets (Bilder, Voiceover, Musik) 
-                sind gespeichert und werden beim nächsten Versuch wiederverwendet.
-              </p>
+              <h3 className="font-semibold text-amber-400 mb-1">{t('uvc.genCapacityTitle')}</h3>
+              <p className="text-sm text-muted-foreground">{t('uvc.genCapacityDesc')}</p>
               <div className="flex items-center gap-2 mt-2 text-xs text-amber-400/70">
                 <Clock className="h-3 w-3" />
-                <span>Empfohlene Wartezeit: {cooldownMinutes} Minuten</span>
+                <span>{t('uvc.genCapacityWait', { minutes: String(cooldownMinutes) })}</span>
               </div>
             </div>
           </div>
           <div className="mt-4 flex gap-3">
-            <Button 
-              variant="outline"
-              onClick={handleManualRetry}
-              className="border-amber-500/30 hover:bg-amber-500/10 text-amber-400"
-            >
+            <Button variant="outline" onClick={handleManualRetry} className="border-amber-500/30 hover:bg-amber-500/10 text-amber-400">
               <RefreshCw className="h-4 w-4 mr-2" />
-              Manuell erneut versuchen
+              {t('uvc.genManualRetry')}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSwitchToManual}
-              className="text-muted-foreground hover:text-foreground"
-            >
+            <Button variant="ghost" size="sm" onClick={handleSwitchToManual} className="text-muted-foreground hover:text-foreground">
               <Hand className="h-4 w-4 mr-2" />
-              Manueller Modus
+              {t('uvc.genManualMode')}
             </Button>
           </div>
         </motion.div>
@@ -1098,25 +786,16 @@ export function UniversalAutoGenerationProgress({
 
       {/* Error State */}
       {error && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-6"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-6">
           <div className="flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-destructive" />
             <div className="flex-1">
-              <p className="font-medium text-destructive">Fehler bei der Generierung</p>
+              <p className="font-medium text-destructive">{t('uvc.genErrorTitle')}</p>
               <p className="text-sm text-muted-foreground">{error}</p>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleManualRetry}
-              className="border-destructive/30 hover:bg-destructive/10"
-            >
+            <Button variant="outline" size="sm" onClick={handleManualRetry} className="border-destructive/30 hover:bg-destructive/10">
               <RefreshCw className="h-4 w-4 mr-2" />
-              Erneut versuchen
+              {t('uvc.retryBtn')}
             </Button>
           </div>
         </motion.div>
@@ -1124,30 +803,19 @@ export function UniversalAutoGenerationProgress({
 
       {/* Debug Panel */}
       {(isGenerating || error || capacityCooldown) && progressIdRef.current && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 2 }}
-          className="mb-6"
-        >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2 }} className="mb-6">
           <button
-            onClick={() => {
-              setDebugOpen(!debugOpen);
-              if (!debugOpen && !debugData) fetchDebugData();
-            }}
+            onClick={() => { setDebugOpen(!debugOpen); if (!debugOpen && !debugData) fetchDebugData(); }}
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <Bug className="h-3 w-3" />
-            <span>Diagnose</span>
+            <span>{t('uvc.genDiagnosis')}</span>
             {debugOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
 
           {debugOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              className="mt-2 p-4 bg-card/60 border border-border rounded-xl text-xs font-mono overflow-auto max-h-80"
-            >
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+              className="mt-2 p-4 bg-card/60 border border-border rounded-xl text-xs font-mono overflow-auto max-h-80">
               <div className="flex justify-between items-center mb-3">
                 <span className="text-muted-foreground">Progress-ID: {progressIdRef.current}</span>
                 <Button variant="ghost" size="sm" onClick={fetchDebugData} disabled={debugLoading} className="h-6 px-2 text-xs">
@@ -1155,14 +823,12 @@ export function UniversalAutoGenerationProgress({
                 </Button>
               </div>
 
-              {/* r42: Isolation diagnostics */}
               <div className="mb-2 p-2 bg-muted/20 rounded">
                 <div>Render-Only Retries: <span className="text-[#F5C76A]">{retryInfo.renderOnlyAttempts}/3</span></div>
                 <div>Total Attempts: <span className="text-[#F5C76A]">{retryInfo.totalAttempts}/5</span></div>
                 <div>Cooldown: <span className={capacityCooldown ? "text-amber-400" : "text-green-500"}>{capacityCooldown ? `Active (${cooldownMinutes}min)` : 'Inactive'}</span></div>
               </div>
 
-              {/* r42: Live forensics from result_data */}
               {debugData?.progress?.result_data && (() => {
                 const rd = debugData.progress.result_data as any;
                 const hasForensics = rd?.isolationStep || rd?.effectiveFlags || rd?.sourceErrorCategory || rd?.failureStage;
@@ -1193,8 +859,7 @@ export function UniversalAutoGenerationProgress({
                   {debugData.diagnosis && (
                     <div className="space-y-1">
                       {(debugData.diagnosis as string[]).map((d: string, i: number) => (
-                        <div key={i} className={cn(
-                          "py-0.5",
+                        <div key={i} className={cn("py-0.5",
                           d.startsWith('❌') && "text-destructive",
                           d.startsWith('⚠️') && "text-yellow-500",
                           d.startsWith('✅') && "text-green-500",
@@ -1203,7 +868,6 @@ export function UniversalAutoGenerationProgress({
                       ))}
                     </div>
                   )}
-
                   {debugData.render && (
                     <div className="pt-2 border-t border-border">
                       <div>Render Status: <span className="text-foreground">{debugData.render.status}</span></div>
@@ -1212,9 +876,7 @@ export function UniversalAutoGenerationProgress({
                       {debugData.render?.content_config && (
                         <>
                           <div>Tracking Mode: <span className="text-foreground">{(debugData.render.content_config as any)?.tracking_mode || '—'}</span></div>
-                          <div>Real Render ID: <span className={((debugData.render.content_config as any)?.real_remotion_render_id) ? "text-green-500" : "text-yellow-500"}>
-                            {(debugData.render.content_config as any)?.real_remotion_render_id || 'pending'}
-                          </span></div>
+                          <div>Real Render ID: <span className={((debugData.render.content_config as any)?.real_remotion_render_id) ? "text-green-500" : "text-yellow-500"}>{(debugData.render.content_config as any)?.real_remotion_render_id || 'pending'}</span></div>
                           <div>Lambda Fn: <span className="text-foreground">{(debugData.render.content_config as any)?.lambda_function || '—'}</span></div>
                           <div>OutName: <span className="text-foreground">{(debugData.render.content_config as any)?.out_name || '—'}</span></div>
                         </>
@@ -1224,7 +886,6 @@ export function UniversalAutoGenerationProgress({
                       <div>Updated: {new Date(debugData.render.updated_at).toLocaleTimeString()}</div>
                     </div>
                   )}
-
                   {debugData.progress && (
                     <div className="pt-2 border-t border-border">
                       <div>Progress Step: <span className="text-foreground">{debugData.progress.current_step}</span></div>
@@ -1237,7 +898,7 @@ export function UniversalAutoGenerationProgress({
                 </div>
               ) : debugLoading ? (
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Lade Diagnose...
+                  <Loader2 className="h-3 w-3 animate-spin" /> Loading...
                 </div>
               ) : null}
             </motion.div>
@@ -1247,31 +908,16 @@ export function UniversalAutoGenerationProgress({
 
       {/* Minimize / Switch to Manual */}
       {isGenerating && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="text-center flex flex-col items-center gap-2"
-        >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="text-center flex flex-col items-center gap-2">
           {onMinimize && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onMinimize}
-              className="border-[#F5C76A]/30 hover:bg-[#F5C76A]/10 text-[#F5C76A]"
-            >
+            <Button variant="outline" size="sm" onClick={onMinimize} className="border-[#F5C76A]/30 hover:bg-[#F5C76A]/10 text-[#F5C76A]">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Im Hintergrund weiterlaufen lassen
+              {t('uvc.minimizeMsg').substring(0, 40)}...
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSwitchToManual}
-            className="text-muted-foreground hover:text-foreground"
-          >
+          <Button variant="ghost" size="sm" onClick={handleSwitchToManual} className="text-muted-foreground hover:text-foreground">
             <Hand className="h-4 w-4 mr-2" />
-            Zum manuellen Modus wechseln
+            {t('uvc.genManualMode')}
           </Button>
         </motion.div>
       )}
