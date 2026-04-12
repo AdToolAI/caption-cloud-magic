@@ -1,57 +1,41 @@
 
 
-## Plan: Wan 2.1 Video Studio
+## Fix: Wan Video — Modell auf Wan 2.5 upgraden
 
-Neue Seite `/wan-video-studio` für Wan 2.1 (WaveSpeed/wan-video) — nach dem bewährten Muster von Seedance/Kling.
+### Problem
+Das aktuelle Modell `wavespeedai/wan-2.1-t2v-720p` hat **keinen `duration`-Parameter**. Es produziert immer ~5s Videos, egal welche Dauer eingestellt wird. Der Parameter wird stillschweigend ignoriert.
 
-### Replicate-Modell
-- **Text-to-Video**: `wavespeedai/wan-2.1-t2v-720p` (Standard) — schnelle Inferenz
-- **Image-to-Video**: `wavespeedai/wan-2.1-i2v-720p`
-- Parameter: `prompt`, `aspect_ratio` (16:9, 9:16, 1:1), `seed`
-- Output: Video-URL direkt (kein Webhook nötig bei WaveSpeed, aber wir nutzen den bestehenden Webhook-Flow)
+### Lösung
+Upgrade auf die offiziellen **Wan 2.5** Modelle (`wan-video/wan-2.5-t2v` und `wan-video/wan-2.5-i2v`), die einen echten `duration`-Parameter mit Werten **5 oder 10 Sekunden** unterstützen.
 
-### Preise
-| Modell | Preis/Sek |
-|--------|-----------|
-| Wan Standard (720p) | €0,10 / $0,10 |
-| Wan Pro (1080p) | €0,15 / $0,15 |
+### Wichtige API-Unterschiede
 
-### Umfang
+| Parameter | WaveSpeed (alt) | Wan 2.5 (neu) |
+|-----------|----------------|---------------|
+| Duration | nicht vorhanden | `duration`: 5 oder 10 |
+| Aspect Ratio | `aspect_ratio`: "16:9" | T2V: `size`: "1280*720" / I2V: `resolution`: "720p" |
+| Max Duration | - | 10 Sekunden |
 
-**1. Config: `src/config/wanVideoCredits.ts`**
-- Modell-Definition mit Preisen, Dauer (3–12s), Aspect Ratios
-- Typen exportieren
+### Änderungen
 
-**2. Edge Function: `supabase/functions/generate-wan-video/index.ts`**
-- Auth + Wallet-Prüfung + Credits-Abzug (via `deduct_ai_video_credits`)
-- Replicate API-Aufruf für `wavespeedai/wan-2.1-t2v-720p`
-- Image-to-Video via `wavespeedai/wan-2.1-i2v-720p`
-- DB-Eintrag in `ai_video_generations`
-- Webhook über bestehenden `replicate-webhook`
-- Duration-Cap als Sicherheitsnetz
+**1. `src/config/wanVideoCredits.ts`**
+- `maxDuration` von 12 auf **10** ändern
+- Duration-Schritte auf 5 und 10 beschränken (Slider durch Toggle/Select ersetzen)
+- Beschreibung aktualisieren ("Wan 2.5")
 
-**3. Seite: `src/pages/WanVideoStudio.tsx`**
-- Prompt-Eingabe mit VideoPromptOptimizer
-- Modell-/Dauer-/Aspect-Ratio-Auswahl
-- Image-to-Video Upload
-- Wallet-Anzeige + Credit-Kauf
-- Generierungs-History
-- Prompt-Tipps
+**2. `supabase/functions/generate-wan-video/index.ts`**
+- Modelle auf `wan-video/wan-2.5-t2v` (T2V) und `wan-video/wan-2.5-i2v` (I2V) ändern
+- `aspect_ratio` → `size` Mapping für T2V (z.B. "16:9" → "1280*720")
+- `aspect_ratio` → `resolution` für I2V (z.B. "720p")
+- Duration auf 5 oder 10 cappen (nächster gültiger Wert)
 
-**4. Routing: `src/App.tsx`**
-- Lazy-Import + Route `/wan-video-studio`
+**3. `src/pages/WanVideoStudio.tsx`**
+- Duration-Slider durch Auswahl von 5s oder 10s ersetzen
+- Labels und Beschreibungen auf "Wan 2.5" aktualisieren
 
-**5. Cross-Links**
-- Navigation-Buttons in AIVideoStudio, KlingVideoStudio, SeedanceVideoStudio → Wan 2.1
-- Und umgekehrt von Wan zu den anderen Studios
-
-**6. History: `VideoGenerationHistory.tsx`**
-- `MODEL_DISPLAY_NAMES` um `wan-standard` / `wan-pro` erweitern
-
-### Keine DB-Änderungen nötig
-Bestehende `ai_video_generations`-Tabelle und Wallet werden wiederverwendet.
+**4. `src/components/ai-video/VideoGenerationHistory.tsx`**
+- Model-Display-Names um Wan 2.5 ergänzen
 
 ### Dateien
-- **Neu**: `src/config/wanVideoCredits.ts`, `src/pages/WanVideoStudio.tsx`, `supabase/functions/generate-wan-video/index.ts`
-- **Edit**: `src/App.tsx`, `src/components/ai-video/VideoGenerationHistory.tsx`, `src/pages/AIVideoStudio.tsx`, `src/pages/KlingVideoStudio.tsx`, `src/pages/SeedanceVideoStudio.tsx`
+- **Edit**: `src/config/wanVideoCredits.ts`, `supabase/functions/generate-wan-video/index.ts`, `src/pages/WanVideoStudio.tsx`, `src/components/ai-video/VideoGenerationHistory.tsx`
 
