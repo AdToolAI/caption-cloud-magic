@@ -1,14 +1,17 @@
 import { Helmet } from 'react-helmet-async';
 import { UniversalCreator } from './UniversalCreator';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function UniversalCreatorPage() {
+  const { t } = useTranslation();
+  
   return (
     <>
       <Helmet>
-        <title>Universal Content Creator | Video erstellen</title>
+        <title>{t('uc.pageTitle')}</title>
         <meta 
           name="description" 
-          content="Erstelle professionelle Videos mit Voice-over, Untertiteln und Multi-Format Export für alle Social Media Plattformen" 
+          content={t('uc.pageDesc')} 
         />
       </Helmet>
       <UniversalCreator />

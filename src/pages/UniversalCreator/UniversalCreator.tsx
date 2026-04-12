@@ -18,24 +18,26 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
 import { useSceneManager } from '@/hooks/useSceneManager';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface WizardStep {
   id: 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
   title: string;
-  description: string;
+  descKey: string;
 }
 
 const WIZARD_STEPS: WizardStep[] = [
-  { id: 'format', title: 'Format', description: 'Wähle Platform & Auflösung' },
-  { id: 'content', title: 'Content & Voice', description: 'Script & Voice-over erstellen' },
-  { id: 'scenes', title: 'Scenes', description: 'Multi-Scene Timeline erstellen' },
-  { id: 'audio', title: 'Audio', description: 'Musik & Sound hinzufügen' },
-  { id: 'subtitles', title: 'Subtitles', description: 'Untertitel generieren & stylen' },
-  { id: 'export', title: 'Export', description: 'Rendern & Exportieren' },
+  { id: 'format', title: 'Format', descKey: 'uc.stepFormatDesc' },
+  { id: 'content', title: 'Content & Voice', descKey: 'uc.stepContentDesc' },
+  { id: 'scenes', title: 'Scenes', descKey: 'uc.stepScenesDesc' },
+  { id: 'audio', title: 'Audio', descKey: 'uc.stepAudioDesc' },
+  { id: 'subtitles', title: 'Subtitles', descKey: 'uc.stepSubtitlesDesc' },
+  { id: 'export', title: 'Export', descKey: 'uc.stepExportDesc' },
 ];
 
 export function UniversalCreator() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
   const [projectId, setProjectId] = useState<string>();
   const [formatConfig, setFormatConfig] = useState<FormatConfig | null>(null);
@@ -52,13 +54,10 @@ export function UniversalCreator() {
   const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig>();
   const [videoQuality, setVideoQuality] = useState<'hd' | '4k'>('hd');
   
-  // Calculate display dimensions based on quality selection
   const getDisplayDimensions = (format: FormatConfig, quality: 'hd' | '4k') => {
     if (quality === 'hd') {
       return { width: format.width, height: format.height };
     }
-    
-    // 4K dimensions mapping
     const fourKMap: Record<string, { width: number; height: number }> = {
       '9:16': { width: 2160, height: 3840 },
       '16:9': { width: 3840, height: 2160 },
@@ -66,14 +65,11 @@ export function UniversalCreator() {
       '4:5': { width: 2160, height: 2700 },
       '4:3': { width: 2880, height: 2160 },
     };
-    
     return fourKMap[format.aspectRatio] || { width: 2160, height: 3840 };
   };
   
-  // Scene management
   const { scenes, addScene, setScenes } = useSceneManager();
 
-  // Fetch selected music URL when background_music_id changes
   useEffect(() => {
     const fetchMusicUrl = async () => {
       if (audioConfig.background_music_id) {
@@ -86,65 +82,38 @@ export function UniversalCreator() {
             .single();
           
           if (!error && data) {
-            console.log('[UniversalCreator] Music data fetched:', data);
-            
-            // NULL CHECK to prevent TypeError
             if (!data.url && !data.storage_url) {
-              console.log('[UniversalCreator] No URL available');
               setSelectedMusicUrl(null);
               return;
             }
-            
-            // If we already have a storage_url, use it directly
             if (data.storage_url) {
-              console.log('[UniversalCreator] Using existing storage URL:', data.storage_url);
               setSelectedMusicUrl(data.storage_url);
               return;
             }
-            
-            // Otherwise, upload to storage for Jamendo URLs
             if (data.url && (data.url.includes('jamendo.com') || data.url.includes('storage.jamendo.com'))) {
-              console.log('[UniversalCreator] Uploading Jamendo music to storage...');
               const { data: uploadData, error: uploadError } = await supabase.functions.invoke('upload-music-to-storage', {
                 body: { originalUrl: data.url, projectId }
               });
-              
-              if (uploadError) {
-                console.error('[UniversalCreator] Error uploading music:', uploadError);
-                return;
-              }
-              
-              console.log('[UniversalCreator] Music uploaded to storage:', uploadData.storageUrl);
-              
-              // Save storage URL to database for future use
+              if (uploadError) return;
               await supabase
                 .from('universal_audio_assets')
                 .update({ storage_url: uploadData.storageUrl })
                 .eq('id', audioConfig.background_music_id);
-              
               setSelectedMusicUrl(uploadData.storageUrl);
             } else {
-              // Use URL directly for non-Jamendo sources
-              console.log('[UniversalCreator] Using direct URL:', data.url);
               setSelectedMusicUrl(data.url);
             }
-          } else {
-            console.error('[UniversalCreator] Error fetching music URL:', error);
           }
         } catch (error) {
           console.error('[UniversalCreator] Exception fetching music URL:', error);
         }
       } else {
-        console.log('[UniversalCreator] No music selected, clearing URL');
         setSelectedMusicUrl(null);
       }
     };
-
     fetchMusicUrl();
   }, [audioConfig.background_music_id, projectId]);
 
-
-  // Debug component lifecycle
   useEffect(() => {
     console.log('[UniversalCreator] Component mounted');
     return () => console.log('[UniversalCreator] Component unmounted');
@@ -163,21 +132,17 @@ export function UniversalCreator() {
     });
   }, [formatConfig, contentConfig, scenes, audioConfig]);
 
-  // Auto-save interval
   useEffect(() => {
     const interval = setInterval(() => {
       if (formatConfig) {
-        console.log('[UniversalCreator] Auto-saving progress...');
         saveProgress();
       }
     }, 10000);
-    
     return () => clearInterval(interval);
   }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig]);
 
   const handleNext = async () => {
     if (currentStep < WIZARD_STEPS.length - 1) {
-      // Auto-save progress
       await saveProgress();
       setCurrentStep(currentStep + 1);
     }
@@ -191,10 +156,8 @@ export function UniversalCreator() {
 
   const saveProgress = async () => {
     if (!user || !formatConfig) return;
-
     try {
       if (!projectId) {
-        // Create new project
         const { data, error } = await supabase
           .from('content_projects')
           .insert([{
@@ -214,11 +177,9 @@ export function UniversalCreator() {
           }])
           .select()
           .single();
-
         if (error) throw error;
         setProjectId(data.id);
       } else {
-        // Update existing project
         await supabase
           .from('content_projects')
           .update({
@@ -238,7 +199,6 @@ export function UniversalCreator() {
     }
   };
 
-  // LocalStorage backup as fallback
   const saveToLocalStorage = () => {
     const state = {
       currentStep,
@@ -251,7 +211,6 @@ export function UniversalCreator() {
       timestamp: Date.now(),
     };
     localStorage.setItem('universal-creator-backup', JSON.stringify(state));
-    console.log('[UniversalCreator] Backup saved to localStorage');
   };
 
   const restoreFromLocalStorage = () => {
@@ -260,10 +219,7 @@ export function UniversalCreator() {
       if (backup) {
         const state = JSON.parse(backup);
         const age = Date.now() - state.timestamp;
-        
-        // Only restore if backup is less than 1 hour old
         if (age < 3600000) {
-          console.log('[UniversalCreator] Restoring from backup...');
           setCurrentStep(state.currentStep);
           setFormatConfig(state.formatConfig);
           setContentConfig(state.contentConfig);
@@ -278,14 +234,12 @@ export function UniversalCreator() {
     }
   };
 
-  // Auto-backup state changes
   useEffect(() => {
     if (formatConfig) {
       saveToLocalStorage();
     }
   }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig]);
 
-  // Restore on mount
   useEffect(() => {
     if (!formatConfig && !contentConfig) {
       restoreFromLocalStorage();
@@ -294,29 +248,17 @@ export function UniversalCreator() {
 
   const canProceed = () => {
     switch (currentStep) {
-      case 0:
-        return formatConfig !== null;
+      case 0: return formatConfig !== null;
       case 1:
-        // Voice-over is now optional
-        if (contentConfig?.useVoiceover === false) {
-          return true; // No voiceover wanted → OK
-        }
-        // If voiceover wanted, both fields must be filled
+        if (contentConfig?.useVoiceover === false) return true;
         return !!(contentConfig?.scriptText && contentConfig?.voiceoverUrl);
-      case 2:
-        return scenes.length > 0; // At least one scene required
-      case 3:
-        return true; // Audio is optional
+      case 2: return scenes.length > 0;
+      case 3: return true;
       case 4:
-        // Subtitles only required if voiceover present
-        if (!contentConfig?.voiceoverUrl) {
-          return true; // No voiceover → subtitles optional
-        }
+        if (!contentConfig?.voiceoverUrl) return true;
         return !!(subtitleConfig?.segments && subtitleConfig.segments.length > 0);
-      case 5:
-        return true;
-      default:
-        return false;
+      case 5: return true;
+      default: return false;
     }
   };
 
@@ -325,59 +267,36 @@ export function UniversalCreator() {
       const sceneBackground = mapBackgroundAssetToUniversalVideo(backgroundAsset);
       addScene(sceneBackground, 5);
     } else {
-      // Add default color background
       addScene({ type: 'color', color: '#000000' }, 5);
     }
   };
 
-  // Render step content directly to maintain stable component references
   let stepContent: React.ReactNode;
-
   switch (WIZARD_STEPS[currentStep].id) {
     case 'format':
       stepContent = <FormatSelectionStep value={formatConfig} onChange={setFormatConfig} />;
       break;
     case 'content':
-      stepContent = (
-        <ContentVoiceStep
-          value={contentConfig}
-          onChange={setContentConfig}
-          projectId={projectId || ''}
-        />
-      );
+      stepContent = <ContentVoiceStep value={contentConfig} onChange={setContentConfig} projectId={projectId || ''} />;
       break;
     case 'scenes':
       stepContent = (
         <div className="space-y-6">
-          <BackgroundAssetSelector
-            selectedAsset={backgroundAsset}
-            onSelectAsset={setBackgroundAsset}
-          />
-          <SceneTimeline 
-            scenes={scenes} 
-            onScenesChange={setScenes}
-            onAddScene={handleAddScene}
-          />
+          <BackgroundAssetSelector selectedAsset={backgroundAsset} onSelectAsset={setBackgroundAsset} />
+          <SceneTimeline scenes={scenes} onScenesChange={setScenes} onAddScene={handleAddScene} />
         </div>
       );
       break;
-      case 'audio':
-        stepContent = (
-          <AudioAssetSelector
-            selectedMusicId={audioConfig.background_music_id}
-            musicVolume={audioConfig.music_volume}
-            onMusicSelect={(id) => {
-              console.log('[UniversalCreator] Music selected:', id);
-              setAudioConfig(prev => {
-                const newConfig = { ...prev, background_music_id: id };
-                console.log('[UniversalCreator] New audio config:', newConfig);
-                return newConfig;
-              });
-            }}
-            onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
-          />
-        );
-        break;
+    case 'audio':
+      stepContent = (
+        <AudioAssetSelector
+          selectedMusicId={audioConfig.background_music_id}
+          musicVolume={audioConfig.music_volume}
+          onMusicSelect={(id) => setAudioConfig(prev => ({ ...prev, background_music_id: id }))}
+          onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
+        />
+      );
+      break;
     case 'subtitles':
       stepContent = (
         <SubtitleTimingStep
@@ -433,7 +352,7 @@ export function UniversalCreator() {
                     {step.title}
                   </span>
                   <p className="text-xs text-muted-foreground hidden md:block">
-                    {step.description}
+                    {t(step.descKey)}
                   </p>
                 </div>
               </div>
@@ -451,7 +370,6 @@ export function UniversalCreator() {
 
       {/* Step Content with Live Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content Area */}
         <div className="lg:col-span-2 min-h-[500px]">
           {stepContent}
         </div>
@@ -459,49 +377,29 @@ export function UniversalCreator() {
         {/* Live Preview Panel */}
         <div className="lg:col-span-1">
           <Card className="p-6 sticky top-6 space-y-4">
-            <h3 className="text-lg font-semibold">Live Preview</h3>
+            <h3 className="text-lg font-semibold">{t('uc.livePreview')}</h3>
             
-            {/* Simple Video Preview for Steps 2-3 (no Remotion Player = no audio issues) */}
             {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 2 && currentStep < 4 && (
               <div className="relative rounded-lg overflow-hidden bg-black" style={{ aspectRatio: formatConfig.width / formatConfig.height }}>
                 {scenes.length > 0 && scenes[0]?.background?.videoUrl ? (
-                  <video
-                    src={scenes[0].background.videoUrl}
-                    className="w-full h-full object-contain"
-                    loop
-                    muted
-                    autoPlay
-                    playsInline
-                  />
+                  <video src={scenes[0].background.videoUrl} className="w-full h-full object-contain" loop muted autoPlay playsInline />
                 ) : backgroundAsset?.url ? (
                   backgroundAsset.type === 'video' ? (
-                    <video
-                      src={backgroundAsset.url}
-                      className="w-full h-full object-contain"
-                      loop
-                      muted
-                      autoPlay
-                      playsInline
-                    />
+                    <video src={backgroundAsset.url} className="w-full h-full object-contain" loop muted autoPlay playsInline />
                   ) : (
-                    <img
-                      src={backgroundAsset.url}
-                      alt="Background"
-                      className="w-full h-full object-contain"
-                    />
+                    <img src={backgroundAsset.url} alt="Background" className="w-full h-full object-contain" />
                   )
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <p className="text-sm text-muted-foreground">Preview lädt...</p>
+                    <p className="text-sm text-muted-foreground">{t('uc.previewLoading')}</p>
                   </div>
                 )}
                 <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                  Einfache Preview (Sound ab Step 4)
+                  {t('uc.simplePreview')}
                 </div>
               </div>
             )}
 
-            {/* Full Remotion Player Preview - Only from Step 4 onwards when audio is available */}
             {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 4 && (
               <RemotionPreviewPlayer
                 componentName="UniversalCreatorVideo"
@@ -517,17 +415,9 @@ export function UniversalCreator() {
                   }),
                   subtitles: subtitleConfig?.segments || [],
                   subtitleStyle: subtitleConfig?.style || {
-                    position: 'bottom',
-                    font: 'Inter',
-                    fontSize: 48,
-                    color: '#ffffff',
-                    backgroundColor: '#000000',
-                    backgroundOpacity: 0.5,
-                    animation: 'fade',
-                    animationSpeed: 1,
-                    outlineStyle: 'stroke',
-                    outlineColor: '#000000',
-                    outlineWidth: 2,
+                    position: 'bottom', font: 'Inter', fontSize: 48, color: '#ffffff',
+                    backgroundColor: '#000000', backgroundOpacity: 0.5, animation: 'fade',
+                    animationSpeed: 1, outlineStyle: 'stroke', outlineColor: '#000000', outlineWidth: 2,
                   },
                   background: scenes.length > 0 ? undefined : mapBackgroundAssetToUniversalVideo(backgroundAsset),
                   scenes: scenes.length > 0 ? scenes : undefined,
@@ -544,13 +434,12 @@ export function UniversalCreator() {
               />
             )}
 
-            {/* Preview Info */}
             {!contentConfig?.voiceoverUrl && scenes.length === 0 && (
               <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
                 <p className="text-sm text-muted-foreground text-center px-4">
                   {currentStep < 2 
-                    ? "Preview wird nach Szenen-Erstellung verfügbar"
-                    : "Fügen Sie Szenen hinzu, um die Preview zu sehen"
+                    ? t('uc.previewAvailableAfterScenes')
+                    : t('uc.addScenesToSeePreview')
                   }
                 </p>
               </div>
@@ -561,11 +450,11 @@ export function UniversalCreator() {
               {formatConfig && (
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Format:</span>
+                    <span className="text-muted-foreground">{t('uc.format')}:</span>
                     <span className="font-medium">{formatConfig.aspectRatio}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Auflösung:</span>
+                    <span className="text-muted-foreground">{t('uc.resolution')}:</span>
                     <span className="font-medium flex items-center gap-2">
                       {getDisplayDimensions(formatConfig, videoQuality).width}x
                       {getDisplayDimensions(formatConfig, videoQuality).height}
@@ -582,16 +471,14 @@ export function UniversalCreator() {
               {contentConfig && (
                 <div className="space-y-2 pt-2 border-t">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Voice-over:</span>
-                    <span className={`font-medium ${
-                      contentConfig.voiceoverUrl ? 'text-green-500' : 'text-muted-foreground'
-                    }`}>
-                      {contentConfig.voiceoverUrl ? '✓' : 'Ohne Sprechtext'}
+                    <span className="text-muted-foreground">{t('uc.voiceOver')}:</span>
+                    <span className={`font-medium ${contentConfig.voiceoverUrl ? 'text-green-500' : 'text-muted-foreground'}`}>
+                      {contentConfig.voiceoverUrl ? '✓' : t('uc.withoutNarration')}
                     </span>
                   </div>
                   {contentConfig.voiceoverUrl && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Dauer:</span>
+                      <span className="text-muted-foreground">{t('uc.duration')}:</span>
                       <span className="font-medium">{contentConfig.voiceoverDuration}s</span>
                     </div>
                   )}
@@ -601,11 +488,11 @@ export function UniversalCreator() {
               {scenes.length > 0 ? (
                 <div className="space-y-2 pt-2 border-t">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Szenen:</span>
+                    <span className="text-muted-foreground">{t('uc.scenes')}:</span>
                     <span className="font-medium">{scenes.length}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Gesamt-Dauer:</span>
+                    <span className="text-muted-foreground">{t('uc.totalDuration')}:</span>
                     <span className="font-medium">
                       {scenes.reduce((sum, s) => sum + s.duration, 0).toFixed(1)}s
                     </span>
@@ -614,7 +501,7 @@ export function UniversalCreator() {
               ) : backgroundAsset && (
                 <div className="space-y-2 pt-2 border-t">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Hintergrund:</span>
+                    <span className="text-muted-foreground">{t('uc.background')}:</span>
                     <span className="font-medium capitalize">{backgroundAsset.type}</span>
                   </div>
                 </div>
@@ -623,7 +510,7 @@ export function UniversalCreator() {
               {subtitleConfig?.segments && subtitleConfig.segments.length > 0 && (
                 <div className="space-y-2 pt-2 border-t">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Untertitel:</span>
+                    <span className="text-muted-foreground">{t('uc.subtitles')}:</span>
                     <span className="font-medium text-green-500">✓ {subtitleConfig.segments.length}</span>
                   </div>
                 </div>
@@ -638,12 +525,12 @@ export function UniversalCreator() {
         <div className="flex justify-between">
           <Button variant="outline" onClick={handlePrevious} disabled={currentStep === 0}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Zurück
+            {t('uc.back')}
           </Button>
           
           {currentStep < WIZARD_STEPS.length - 1 && (
             <Button onClick={handleNext} disabled={!canProceed()}>
-              Weiter
+              {t('uc.next')}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           )}
