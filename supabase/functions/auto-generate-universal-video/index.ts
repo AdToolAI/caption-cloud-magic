@@ -691,7 +691,7 @@ async function runGenerationPipeline(
     }
 
     // Step 1: Generate Script INLINE (no Edge-to-Edge fetch → no 504 cold-start timeout)
-    await updateProgress(supabase, progressId, 'generating_script', 5, '📝 Drehbuch wird erstellt...');
+    await updateProgress(supabase, progressId, 'generating_script', 5, msg('generating_script', lang));
     await delay(500);
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -704,7 +704,8 @@ async function runGenerationPipeline(
       script = await generateScriptInline(
         { ...briefing, moodConfig: briefing.moodConfig },
         LOVABLE_API_KEY,
-        120000, // 120s timeout with AbortController
+        120000,
+        lang,
       );
     } catch (scriptErr: any) {
       console.error('[auto-generate-universal-video] Inline script generation failed:', scriptErr.message);
@@ -713,13 +714,13 @@ async function runGenerationPipeline(
 
     console.log(`[auto-generate-universal-video] Script generated inline: ${script.scenes.length} scenes`);
 
-    await updateProgress(supabase, progressId, 'script_complete', 15, '✅ Drehbuch fertig!', { script });
+    await updateProgress(supabase, progressId, 'script_complete', 15, msg('script_complete', lang), { script });
     await delay(500);
 
     // Step 2: Generate Character Sheet if needed (25%)
     let characterSheetUrl = null;
     if (briefing.hasCharacter) {
-      await updateProgress(supabase, progressId, 'generating_character', 20, '🎭 Charakter wird erstellt...');
+      await updateProgress(supabase, progressId, 'generating_character', 20, msg('generating_character', lang));
       await delay(500);
 
       const characterResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
@@ -741,7 +742,7 @@ async function runGenerationPipeline(
         console.log(`[auto-generate-universal-video] Character sheet generated`);
       }
 
-      await updateProgress(supabase, progressId, 'character_complete', 25, '✅ Charakter fertig!', { characterSheetUrl });
+      await updateProgress(supabase, progressId, 'character_complete', 25, msg('character_complete', lang), { characterSheetUrl });
       await delay(500);
     }
 
