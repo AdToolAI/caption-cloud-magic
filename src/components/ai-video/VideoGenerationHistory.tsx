@@ -269,7 +269,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium line-clamp-2 break-words mb-1">{gen.prompt}</h4>
                     <p className="text-sm text-muted-foreground">
-                      {gen.model === 'sora-2-pro' ? 'Sora 2 Pro' : 'Sora 2 Standard'}
+                      {MODEL_DISPLAY_NAMES[gen.model] || gen.model}
                       {' · '}{gen.duration_seconds}s{' · '}{formatPrice(gen.total_cost_euros, currency)}
                     </p>
                   </div>
