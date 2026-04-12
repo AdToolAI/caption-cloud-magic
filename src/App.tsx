@@ -215,6 +215,7 @@ function AppLayout() {
           <Route path="/instagram-publishing" element={<InstagramPublishing />} />
           <Route path="/composer" element={<Composer />} />
           <Route path="/ai-video-studio" element={<AIVideoStudio />} />
+          <Route path="/kling-video-studio" element={<KlingVideoStudio />} />
           <Route path="/audio-studio" element={<AudioStudio />} />
           <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
           <Route path="/video-translator" element={<VideoTranslator />} />
