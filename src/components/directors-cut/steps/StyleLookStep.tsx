@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { motion } from 'framer-motion';
 import { Wand2 } from 'lucide-react';
 import { GlobalEffects, SceneEffects, SceneAnalysis, TransitionAssignment, AudioEnhancements, FilterId } from '@/types/directors-cut';
@@ -30,6 +31,7 @@ export function StyleLookStep({
   audio,
   onStyleTransferChange 
 }: StyleLookStepProps) {
+  const { t } = useTranslation();
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
   // Get current filter based on selection
@@ -70,7 +72,7 @@ export function StyleLookStep({
       transitions={transitions}
       audio={audio}
       title="Style & Look"
-      description="Wähle Filter und Stile für dein Video"
+      description={t("dc.styleLookDesc")}
       icon={Wand2}
     >
       {/* Combined AI Style Transfer + Filter Selection with Split-View */}

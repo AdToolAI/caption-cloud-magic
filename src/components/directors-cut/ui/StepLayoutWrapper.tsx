@@ -1,4 +1,5 @@
 import { ReactNode, useState, cloneElement, isValidElement, Children } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { motion } from 'framer-motion';
 import { LucideIcon } from 'lucide-react';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
@@ -65,6 +66,7 @@ export function StepLayoutWrapper({
   voiceoverUrl,
   backgroundMusicUrl,
 }: StepLayoutWrapperProps) {
+  const { t } = useTranslation();
   const [currentTime, setCurrentTime] = useState(0);
 
   return (
@@ -121,7 +123,7 @@ export function StepLayoutWrapper({
             animate={{ opacity: 1, x: 0 }}
             className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-primary/80 backdrop-blur-sm text-primary-foreground text-sm font-medium"
           >
-            Szene {scenes.findIndex(s => s.id === selectedSceneId) + 1}
+            {t('dc.sceneOverlay', { index: scenes.findIndex(s => s.id === selectedSceneId) + 1 })}
           </motion.div>
         )}
       </motion.div>

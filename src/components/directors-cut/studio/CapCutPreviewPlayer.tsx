@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -58,6 +59,7 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
   onMuteToggle,
   onPlayingChange,
 }) => {
+  const { t } = useTranslation();
   const mainVideoRef = useRef<HTMLVideoElement>(null);
   const additionalVideoRef = useRef<HTMLVideoElement>(null);
   const animationRef = useRef<number>();
@@ -346,8 +348,8 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
         {/* Blackscreen overlay */}
         {currentScene?.isBlackscreen && (
           <div className="absolute inset-0 bg-black flex flex-col items-center justify-center z-10">
-            <div className="text-white/30 text-sm font-medium">Blackscreen</div>
-            <div className="text-white/20 text-xs mt-1">Szene {scenes.indexOf(currentScene) + 1}</div>
+            <div className="text-white/30 text-sm font-medium">{t('dc.blackscreen')}</div>
+            <div className="text-white/20 text-xs mt-1">{t('dc.sceneLabel', { index: scenes.indexOf(currentScene) + 1 })}</div>
           </div>
         )}
 
