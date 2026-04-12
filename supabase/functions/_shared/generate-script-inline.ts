@@ -381,29 +381,24 @@ export async function generateScriptInline(
   timeoutMs: number = 120000,
   language: string = 'de',
 ): Promise<any> {
+  const lang: Lang = (language === 'en' || language === 'es') ? language : 'de';
   const categoryKey = getCategoryKey(briefing.category || 'custom');
   const styleProfile = CATEGORY_STYLE_PROFILES[categoryKey] || CATEGORY_STYLE_PROFILES['custom'];
 
-  console.log(`[generate-script-inline] Category: ${briefing.category} → Profile: ${categoryKey}`);
+  console.log(`[generate-script-inline] Category: ${briefing.category} → Profile: ${categoryKey}, lang: ${lang}`);
 
-  const structure = STORYTELLING_STRUCTURES[briefing.storytellingStructure] || STORYTELLING_STRUCTURES['problem-solution'];
+  const structureSet = STORYTELLING_STRUCTURES[briefing.storytellingStructure] || STORYTELLING_STRUCTURES['problem-solution'];
+  const structure = structureSet[lang] || structureSet['de'];
   const scenesCount = structure.structure.length;
   const effectiveDuration = briefing.videoDuration || briefing.duration || 60;
   const sceneDuration = Math.floor(effectiveDuration / scenesCount);
 
-  const categoryAnimationGuide = `
-FORMAT-SPEZIFISCHES DESIGN-SYSTEM FÜR "${categoryKey.toUpperCase()}":
-VISUELLER STIL: ${styleProfile.visualDirection}
-TEMPO & PACING: ${styleProfile.pacingGuide}
-ERLAUBTE ANIMATIONEN:
+  const animGuide = `
+ALLOWED ANIMATIONS for "${categoryKey}":
 - animation: ${styleProfile.animationSet.map(a => `"${a}"`).join(' | ')}
 - textAnimation: ${styleProfile.textAnimationSet.map(a => `"${a}"`).join(' | ')}
-CHARACTER-EINSATZ: ${styleProfile.characterUsage}
-EFFEKTE: ${styleProfile.effectsProfile}
-ÜBERGÄNGE: ${styleProfile.transitionStyle}
-SOUND-DESIGN: ${styleProfile.soundDesign}
 
-ANIMATIONS PRO SZENEN-TYP:
+ANIMATIONS PER SCENE TYPE:
 hook: animation="${getDefaultAnimation('hook', categoryKey)}" textAnimation="${getDefaultTextAnimation('hook', categoryKey)}" soundEffect="${getDefaultSoundEffect('hook', categoryKey)}"
 problem: animation="${getDefaultAnimation('problem', categoryKey)}" textAnimation="${getDefaultTextAnimation('problem', categoryKey)}" soundEffect="${getDefaultSoundEffect('problem', categoryKey)}"
 solution: animation="${getDefaultAnimation('solution', categoryKey)}" textAnimation="${getDefaultTextAnimation('solution', categoryKey)}" soundEffect="${getDefaultSoundEffect('solution', categoryKey)}"
@@ -411,100 +406,51 @@ feature: animation="${getDefaultAnimation('feature', categoryKey)}" textAnimatio
 cta: animation="${getDefaultAnimation('cta', categoryKey)}" textAnimation="${getDefaultTextAnimation('cta', categoryKey)}" soundEffect="${getDefaultSoundEffect('cta', categoryKey)}"
 `;
 
-  const systemPrompt = `Du bist ein erfahrener Drehbuchautor für professionelle, animierte Videos.
+  const voiceoverLangMap: Record<Lang, string> = { de: 'DEUTSCH', en: 'ENGLISH', es: 'ESPAÑOL' };
 
-WICHTIG: Du erstellst ein "${categoryKey}"-Video. Halte dich STRIKT an das Design-System!
+  const coreRules = `
+- visualDescription MUST be in ENGLISH (image generation)
+- NOT allowed in visualDescription: "A person", "A man", "A woman", "hand", "finger", "Digital world", "Abstract shapes"
+- Adapt EVERY visualDescription to visual style "${briefing.visualStyle || 'modern-3d'}"
+- CTA scene MUST include website URL "${briefing.websiteUrl || ''}" in voiceover
+- NEVER describe objects with text/numbers (no dashboards, charts, monitors)
+- Use ONLY animations from the allowed set for "${categoryKey}"!`;
 
-STORYTELLING-STRUKTUR: ${structure.name}
-SZENEN: ${structure.structure.join(' → ')}
+  const jsonSchema = `{
+  "title": "...", "totalDuration": ${effectiveDuration}, "category": "${categoryKey}",
+  "scenes": [{ "sceneNumber": 1, "sceneType": "hook|problem|solution|feature|proof|cta|intro|benefit",
+    "title": "...", "voiceover": "spoken text in ${voiceoverLangMap[lang]}...",
+    "visualDescription": "ENGLISH image prompt...", "durationSeconds": ${sceneDuration},
+    "animation": "from set", "kenBurnsDirection": "in|out|left|right", "textAnimation": "from set",
+    "soundEffect": "whoosh|pop|success|alert|none", "showCharacter": true|false,
+    "characterPosition": "left|right", "characterGesture": "pointing|thinking|celebrating|waving|idle|explaining",
+    "statsOverlay": null, "beatAligned": false,
+    "transitionIn": "fade|slide|zoom|morph|dissolve", "transitionOut": "fade|slide|zoom|morph|dissolve" }],
+  "summary": "..." }`;
 
-${categoryAnimationGuide}
-
-REGELN:
-1. Erstelle genau ${scenesCount} Szenen entsprechend der Struktur
-2. Jede Szene hat ~${sceneDuration} Sekunden
-3. Schreibe den Sprechertext (voiceover) für jede Szene
-4. Die visualDescription MUSS auf ENGLISCH sein
-5. Der Text muss natürlich klingen und zum Vorlesen geeignet sein
-6. Verwende NUR Animationen aus dem erlaubten Set für "${categoryKey}"!
-7. Jede visualDescription folgt: [OBJEKT/SZENE] + [ZUSTAND/DETAIL] + [UMGEBUNG] + [BELEUCHTUNG] — NIEMALS Menschen beschreiben!
-   KRITISCH: Passe JEDE visualDescription an den visuellen Stil "${briefing.visualStyle || 'modern-3d'}" an!
-   Style-spezifische Beschreibungsregeln:
-   - comic/cartoon: "bold outlines, flat colors, cel-shaded, comic panel composition" — NIEMALS "volumetric lighting", "film grain", "shallow depth of field"
-   - cinematic: "dramatic volumetric lighting, shallow depth of field, film grain, anamorphic" — NIEMALS "flat colors", "bold outlines"
-   - watercolor: "soft watercolor washes, paper texture, gentle color bleeds, wet-on-wet" — NIEMALS "sharp edges", "neon", "3D render"
-   - anime: "cel-shaded, vibrant anime colors, Studio Ghibli style background" — NIEMALS "photorealistic", "film grain"
-   - neon-cyberpunk: "neon glow, dark background, electric colors, holographic" — NIEMALS "pastel", "watercolor", "hand-drawn"
-   - vintage-retro: "muted 70s tones, halftone texture, nostalgic warm colors" — NIEMALS "neon", "cyberpunk", "modern 3D"
-   - hand-drawn: "pencil sketch, crosshatching, charcoal texture, sketchbook" — NIEMALS "3D render", "neon", "photorealistic"
-   - clay-3d: "claymation texture, plasticine, stop-motion, soft rounded shapes" — NIEMALS "flat 2D", "pencil sketch"
-   - paper-cutout: "layered paper textures, cut paper edges, collage, craft paper" — NIEMALS "3D render", "photorealistic"
-   - documentary: "naturalistic, muted earthy tones, observational composition" — OK mit "natural lighting"
-   - minimalist: "vast negative space, single object, zen simplicity" — NIEMALS "busy", "cluttered", "many objects"
-   - bold-colorful: "vivid saturated pop-art colors, Memphis design, high contrast" — NIEMALS "muted", "pastel", "minimal"
-   - Für alle anderen Stile: passende Beschreibungen zum gewählten Stil verwenden!
-   WICHTIG: Die visualDescription MUSS den gewählten Stil widerspiegeln, nicht den Standard-Cinematic-Look!
-8. NICHT erlaubt in visualDescription: "A person", "A man", "A woman", "hand", "finger", "Digital world", "Abstract shapes"
-9. Die CTA-Szene MUSS die Website-URL "${briefing.websiteUrl || ''}" im Voiceover enthalten
-10. NIEMALS Objekte mit Text/Zahlen beschreiben (keine Dashboards, Charts, Monitore)
-
-AUSGABEFORMAT (JSON):
-{
-  "title": "Videotitel",
-  "totalDuration": ${effectiveDuration},
-  "category": "${categoryKey}",
-  "scenes": [
-    {
-      "sceneNumber": 1,
-      "sceneType": "hook|problem|solution|feature|proof|cta|intro|benefit",
-      "title": "Szenen-Titel",
-      "voiceover": "Der gesprochene Text...",
-      "visualDescription": "ENGLISH image prompt...",
-      "durationSeconds": ${sceneDuration},
-      "animation": "aus erlaubtem Set",
-      "kenBurnsDirection": "in|out|left|right",
-      "textAnimation": "aus erlaubtem Set",
-      "soundEffect": "whoosh|pop|success|alert|none",
-      "showCharacter": true|false,
-      "characterPosition": "left|right",
-      "characterGesture": "pointing|thinking|celebrating|waving|idle|explaining",
-      "statsOverlay": null,
-      "beatAligned": false,
-      "transitionIn": "fade|slide|zoom|morph|dissolve",
-      "transitionOut": "fade|slide|zoom|morph|dissolve"
-    }
-  ],
-  "summary": "Kurze Zusammenfassung"
-}`;
+  const systemPromptIntro: Record<Lang, string> = {
+    de: `Du bist ein erfahrener Drehbuchautor für professionelle, animierte Videos.\n\nWICHTIG: Du erstellst ein "${categoryKey}"-Video. Halte dich STRIKT an das Design-System!\n\nSTORYTELLING-STRUKTUR: ${structure.name}\nSZENEN: ${structure.structure.join(' → ')}\n\n${animGuide}\n\nREGELN:\n1. Erstelle genau ${scenesCount} Szenen\n2. Jede Szene ~${sceneDuration} Sekunden\n3. Sprechertext AUF ${voiceoverLangMap[lang]}\n${coreRules}\n\nAUSGABEFORMAT (JSON):\n${jsonSchema}`,
+    en: `You are an experienced scriptwriter for professional, animated videos.\n\nIMPORTANT: You are creating a "${categoryKey}" video. Follow the design system STRICTLY!\n\nSTORYTELLING STRUCTURE: ${structure.name}\nSCENES: ${structure.structure.join(' → ')}\n\n${animGuide}\n\nRULES:\n1. Create exactly ${scenesCount} scenes\n2. Each scene ~${sceneDuration} seconds\n3. Write voiceover IN ${voiceoverLangMap[lang]}\n${coreRules}\n\nOUTPUT FORMAT (JSON):\n${jsonSchema}`,
+    es: `Eres un guionista experimentado para videos profesionales y animados.\n\nIMPORTANTE: Estás creando un video "${categoryKey}". ¡Sigue el sistema de diseño ESTRICTAMENTE!\n\nESTRUCTURA: ${structure.name}\nESCENAS: ${structure.structure.join(' → ')}\n\n${animGuide}\n\nREGLAS:\n1. Crea exactamente ${scenesCount} escenas\n2. Cada escena ~${sceneDuration} segundos\n3. Narración EN ${voiceoverLangMap[lang]}\n${coreRules}\n\nFORMATO DE SALIDA (JSON):\n${jsonSchema}`,
+  };
+  const systemPrompt = systemPromptIntro[lang];
 
   const moodConfig = briefing.moodConfig;
-  const moodInstructions = moodConfig ? `
-STIMMUNGS-PRESET: "${moodConfig.preset}"
-- Text-Dichte: ${moodConfig.textDensity < 33 ? 'WENIG' : moodConfig.textDensity < 66 ? 'MITTEL' : 'VIEL'}
-- Animations-Intensität: ${moodConfig.animationIntensity < 33 ? 'SUBTIL' : moodConfig.animationIntensity < 66 ? 'NORMAL' : 'DYNAMISCH'}
-` : '';
+  const moodInstructions = moodConfig ? `MOOD: "${moodConfig.preset}" | textDensity=${moodConfig.textDensity} | animIntensity=${moodConfig.animationIntensity}` : '';
 
-  const userPrompt = `Erstelle ein ${briefing.category}-Video-Drehbuch im "${categoryKey}"-Stil:
+  const userPrompt = `Create a ${briefing.category} video script ("${categoryKey}" style):
 ${moodInstructions}
-**Projekt:** ${briefing.projectName || 'Video-Projekt'}
-**Unternehmen:** ${briefing.companyName || '-'}
-**Produkt/Service:** ${briefing.productName || '-'}
-**Beschreibung:** ${briefing.productDescription || '-'}
-**Zielgruppe:** ${briefing.targetAudience || 'Allgemein'}
-**Kernproblem:** ${briefing.coreProblem || '-'}
-**Lösung:** ${briefing.solution || '-'}
-**USPs:** ${Array.isArray(briefing.uniqueSellingPoints) ? briefing.uniqueSellingPoints.join(', ') : (briefing.uniqueSellingPoints || '-')}
-**Kernbotschaft:** ${briefing.keyMessage || '-'}
-**Gewünschte Aktion:** ${briefing.desiredAction || '-'}
-**CTA-Text:** ${briefing.ctaText || '-'}
-**Visueller Stil:** ${briefing.visualStyle || 'modern-3d'}
-**Emotionaler Ton:** ${briefing.emotionalTone || 'professionell'}
-**Markenfarben:** ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'Standard')}
-**Videolänge:** ${effectiveDuration} Sekunden
-**Format:** ${briefing.aspectRatio || '16:9'}
-**Website/URL:** ${briefing.websiteUrl || '-'}
-${briefing.hasCharacter ? `**Charakter:** ${briefing.characterName || 'Protagonist'} - ${briefing.characterDescription || 'Sympathische Figur'}` : ''}
-**Zusätzliche Infos:** ${JSON.stringify(briefing.categorySpecific || {})}`;
+Project: ${briefing.projectName || '-'} | Company: ${briefing.companyName || '-'}
+Product: ${briefing.productName || '-'} | Description: ${briefing.productDescription || '-'}
+Audience: ${briefing.targetAudience || 'General'} | Problem: ${briefing.coreProblem || '-'}
+Solution: ${briefing.solution || '-'} | USPs: ${Array.isArray(briefing.uniqueSellingPoints) ? briefing.uniqueSellingPoints.join(', ') : (briefing.uniqueSellingPoints || '-')}
+Key message: ${briefing.keyMessage || '-'} | CTA: ${briefing.ctaText || '-'}
+Visual style: ${briefing.visualStyle || 'modern-3d'} | Tone: ${briefing.emotionalTone || 'professional'}
+Colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'Default')}
+Duration: ${effectiveDuration}s | Format: ${briefing.aspectRatio || '16:9'} | URL: ${briefing.websiteUrl || '-'}
+${briefing.hasCharacter ? `Character: ${briefing.characterName || 'Protagonist'} - ${briefing.characterDescription || 'Likeable'}` : ''}
+Extra: ${JSON.stringify(briefing.categorySpecific || {})}
+IMPORTANT: Write ALL voiceover text in ${voiceoverLangMap[lang]}!`;
 
   // Call AI with AbortController timeout
   const controller = new AbortController();
