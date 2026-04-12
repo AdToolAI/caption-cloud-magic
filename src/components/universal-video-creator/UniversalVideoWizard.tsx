@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, FileText, Image, Play, Music, Download, Sparkles, Layout, MessageCircle, Loader2, Video, AlertTriangle, RefreshCw, ArrowLeft, RotateCcw, Palette, Film } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useLocalizedVideoCategories } from '@/hooks/useLocalizedVideoCategories';
 import { Button } from '@/components/ui/button';
 import { CategorySelector } from './CategorySelector';
 import { MoodPresetSelector, type MoodConfig } from './MoodPresetSelector';
