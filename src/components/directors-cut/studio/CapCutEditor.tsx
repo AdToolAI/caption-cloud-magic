@@ -1002,11 +1002,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       description: `${scene.description} ${t('dc.copySuffix')}`,
     };
     newScenes.splice(idx + 1, 0, duplicate);
-    let t = 0;
+    let cursor = 0;
     const recalculated = newScenes.map(s => {
       const d = s.end_time - s.start_time;
-      const updated = { ...s, start_time: t, end_time: t + d };
-      t += d;
+      const updated = { ...s, start_time: cursor, end_time: cursor + d };
+      cursor += d;
       return updated;
     });
     onScenesUpdate(recalculated);
