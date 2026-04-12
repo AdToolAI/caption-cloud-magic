@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useNavigate } from "react-router-dom";
 import { Link2, Loader2, Check, X } from "lucide-react";
 import { format } from "date-fns";
 import { de, enUS, es } from "date-fns/locale";
@@ -37,6 +38,7 @@ interface Credential {
 export const LinkedAccountsCard = () => {
   const { user } = useAuth();
   const { t, language } = useTranslation();
+  const navigate = useNavigate();
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<Platform | null>(null);
@@ -72,7 +74,7 @@ export const LinkedAccountsCard = () => {
   };
 
   const handleConnect = (platform: Platform) => {
-    toast.info(`${t("accountLinked.redirecting")} ${PLATFORMS[platform].name}...`);
+    navigate('/integrations');
   };
 
   const handleDisconnect = async (platform: Platform) => {
