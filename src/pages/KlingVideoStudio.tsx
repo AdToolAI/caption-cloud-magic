@@ -457,6 +457,12 @@ export default function KlingVideoStudio() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <VideoPromptOptimizer
+        open={showPromptOptimizer}
+        onClose={() => setShowPromptOptimizer(false)}
+        onPromptGenerated={(optimized) => setPrompt(optimized)}
+      />
     </>
   );
 }
