@@ -379,6 +379,7 @@ export async function generateScriptInline(
   briefing: any,
   apiKey: string,
   timeoutMs: number = 120000,
+  language: string = 'de',
 ): Promise<any> {
   const categoryKey = getCategoryKey(briefing.category || 'custom');
   const styleProfile = CATEGORY_STYLE_PROFILES[categoryKey] || CATEGORY_STYLE_PROFILES['custom'];
