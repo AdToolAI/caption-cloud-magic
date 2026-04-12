@@ -7,6 +7,7 @@ import { Upload, Film, Check, Play, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { VideoImportStepProps, SelectedVideo } from '@/types/directors-cut';
 
 export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportStepProps) {
@@ -14,6 +15,9 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const { t, language } = useTranslation();
+
+  const dateLocale = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
 
   // Fetch videos from media library
   const { data: libraryVideos, isLoading: isLoadingLibrary } = useQuery({
@@ -42,36 +46,29 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
     
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      toast.error('Bitte melde dich an');
+      toast.error(t('dc.pleaseSignIn'));
       return;
     }
 
-    // Validate file type
     if (!file.type.startsWith('video/')) {
-      toast.error('Bitte wähle eine Video-Datei aus');
+      toast.error(t('dc.selectVideoFile'));
       return;
     }
 
-    // Validate file size (max 500MB)
     if (file.size > 500 * 1024 * 1024) {
-      toast.error('Video darf maximal 500MB groß sein');
+      toast.error(t('dc.videoMaxSize'));
       return;
     }
 
-    // Validate video duration (max 10 minutes) BEFORE upload
     const duration = await getVideoDuration(file);
     if (duration > 600) {
-      toast.error(
-        'Videos dürfen maximal 10 Minuten lang sein. Für längere Videos: Erstelle mehrere Sequenzen à 10 Minuten und kombiniere sie anschließend.',
-        { duration: 6000 }
-      );
+      toast.error(t('dc.videoMaxDuration'), { duration: 6000 });
       return;
     }
 
     setIsUploading(true);
 
     try {
-      // Upload to Supabase Storage
       const fileName = `${user.id}/${Date.now()}_${file.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('video-assets')
@@ -79,27 +76,25 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('video-assets')
         .getPublicUrl(uploadData.path);
 
-      // Get video duration
-      const duration = await getVideoDuration(file);
+      const dur = await getVideoDuration(file);
 
       const video: SelectedVideo = {
         url: publicUrl,
         name: file.name,
-        duration,
+        duration: dur,
         source: 'upload',
       };
 
       onVideoSelect(video);
       setPreviewUrl(publicUrl);
-      toast.success('Video erfolgreich hochgeladen');
+      toast.success(t('dc.videoUploaded'));
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Fehler beim Hochladen des Videos');
+      toast.error(t('dc.uploadError'));
     } finally {
       setIsUploading(false);
     }
@@ -113,7 +108,7 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
         URL.revokeObjectURL(video.src);
         resolve(video.duration);
       };
-      video.onerror = () => resolve(30); // Default duration
+      video.onerror = () => resolve(30);
       video.src = URL.createObjectURL(file);
     });
   };
@@ -122,7 +117,6 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
     const metadata = video.metadata as Record<string, any> || {};
     let duration = metadata?.duration_seconds || undefined;
     
-    // If no duration in metadata, measure from video URL
     if (!duration && video.output_url) {
       try {
         const measured = await new Promise<number>((resolve) => {
@@ -143,7 +137,7 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
     const selected: SelectedVideo = {
       id: video.id,
       url: video.output_url,
-      name: metadata?.title || video.project_name || 'Video aus Mediathek',
+      name: metadata?.title || video.project_name || t('dc.videoFromLibrary'),
       duration,
       thumbnail_url: video.thumbnail_url,
       source: 'media_library',
@@ -158,11 +152,11 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="library">
             <Film className="w-4 h-4 mr-2" />
-            Aus Mediathek
+            {t('dc.fromMediaLibrary')}
           </TabsTrigger>
           <TabsTrigger value="upload">
             <Upload className="w-4 h-4 mr-2" />
-            Hochladen
+            {t('dc.upload')}
           </TabsTrigger>
         </TabsList>
 
@@ -178,7 +172,7 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
                   const isSelected = selectedVideo?.id === video.id;
                   const metadata = video.metadata as Record<string, any> || {};
                   const durationSec = metadata?.duration_seconds ? Math.round(metadata.duration_seconds) : (video.duration_in_frames ? Math.round(video.duration_in_frames / 30) : null);
-                  const videoTitle = metadata?.title || 'Unbenanntes Video';
+                  const videoTitle = metadata?.title || t('dc.untitledVideo');
                   return (
                     <Card
                       key={video.id}
@@ -217,7 +211,7 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
                           {videoTitle}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {new Date(video.created_at).toLocaleDateString('de-DE')}
+                          {new Date(video.created_at).toLocaleDateString(dateLocale)}
                         </p>
                       </div>
                     </Card>
@@ -228,9 +222,9 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
           ) : (
             <div className="flex flex-col items-center justify-center h-48 text-center">
               <Film className="w-12 h-12 text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">Keine Videos in der Mediathek</p>
+              <p className="text-muted-foreground">{t('dc.noLibraryVideos')}</p>
               <p className="text-sm text-muted-foreground">
-                Erstelle zuerst ein Video im Universal Creator
+                {t('dc.createVideoFirst')}
               </p>
             </div>
           )}
@@ -255,17 +249,17 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
             {isUploading ? (
               <div className="flex flex-col items-center">
                 <Loader2 className="w-12 h-12 text-primary animate-spin mb-3" />
-                <p className="text-lg font-medium">Video wird hochgeladen...</p>
+                <p className="text-lg font-medium">{t('dc.uploading')}</p>
               </div>
             ) : (
               <>
                 <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-lg font-medium mb-1">Video hochladen</p>
+                <p className="text-lg font-medium mb-1">{t('dc.uploadVideoTitle')}</p>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Klicke oder ziehe ein Video hierher
+                  {t('dc.uploadVideoDesc')}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Unterstützte Formate: MP4, MOV, WebM • Max. 500MB
+                  {t('dc.supportedFormats')}
                 </p>
               </>
             )}
@@ -278,7 +272,7 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
         <div className="mt-6">
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             <Play className="w-4 h-4" />
-            Video-Vorschau
+            {t('dc.videoPreview')}
           </h3>
           <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
             <video
@@ -292,9 +286,9 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
             <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
               <span>📁 {selectedVideo.name}</span>
               {selectedVideo.duration && (
-                <span>⏱️ {Math.round(selectedVideo.duration)} Sekunden</span>
+                <span>⏱️ {Math.round(selectedVideo.duration)} {t('dc.seconds')}</span>
               )}
-              <span className="text-primary">✓ Ausgewählt</span>
+              <span className="text-primary">✓ {t('dc.selected')}</span>
             </div>
           )}
         </div>

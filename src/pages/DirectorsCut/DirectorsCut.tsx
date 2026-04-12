@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft, Film, RotateCcw
 } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -34,6 +35,7 @@ import type {
 export function DirectorsCut() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { t } = useTranslation();
   const [user, setUser] = useState<any>(null);
   
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -195,13 +197,13 @@ export function DirectorsCut() {
       case 'apply_style':
         if (params?.style) {
           setStyleTransfer({ enabled: true, style: params.style, intensity: 0.8 });
-          toast.success(`Style "${params.style}" angewendet`);
+          toast.success(t('dc.styleApplied', { style: params.style }));
         }
         break;
       case 'apply_color':
         if (params?.preset) {
           setColorGrading({ enabled: true, grade: params.preset, intensity: 0.7 });
-          toast.success(`Farbkorrektur "${params.preset}" angewendet`);
+          toast.success(t('dc.colorCorrectionApplied', { preset: params.preset }));
         }
         break;
       case 'adjust_volume':
@@ -214,7 +216,7 @@ export function DirectorsCut() {
         break;
       case 'noise_reduction':
         setAudioEnhancements(prev => ({ ...prev, noise_reduction: true }));
-        toast.success('Rauschunterdrückung aktiviert');
+        toast.success(t('dc.noiseReductionActivated'));
         break;
       case 'export':
         if (params?.quality === '4k') {
@@ -255,7 +257,7 @@ export function DirectorsCut() {
       setSelectedVideo({
         id: sourceProjectId || undefined,
         url: sourceVideoUrl,
-        name: 'Importiertes Video',
+        name: t('dc.importedVideo'),
         source: 'universal_creator',
       });
     }
@@ -290,7 +292,7 @@ export function DirectorsCut() {
             source_video_url: selectedVideo.url,
             source_video_id: selectedVideo.id || null,
             duration_seconds: selectedVideo.duration || null,
-            project_name: selectedVideo.name || 'Unbenanntes Projekt',
+            project_name: selectedVideo.name || t('dc.untitledProject'),
           })
           .select('id')
           .single();
@@ -301,7 +303,7 @@ export function DirectorsCut() {
       }
     } catch (error) {
       console.error('Error saving project:', error);
-      toast.error('Fehler beim Speichern des Projekts');
+      toast.error(t('dc.errorSavingProject'));
       return null;
     }
   };
@@ -330,7 +332,7 @@ export function DirectorsCut() {
     setIsAnalyzing(true);
     
     try {
-      toast.info('Extrahiere Video-Frames für Schnitterkennung...');
+      toast.info(t('dc.extractingFrames'));
       
       let canonicalDuration = selectedVideo.duration || 0;
       if (!canonicalDuration) {
@@ -348,12 +350,12 @@ export function DirectorsCut() {
       
       try {
         timestampedFrames = await extractTimestampedFrames(selectedVideo.url, canonicalDuration);
-        toast.info(`${timestampedFrames.length} Frames extrahiert, analysiere Übergänge...`);
+        toast.info(t('dc.framesExtracted', { count: timestampedFrames.length }));
         
         const coarseResult = await detectBoundariesAsync(timestampedFrames);
         
         if (coarseResult.boundaries.length > 0) {
-          toast.info(`${coarseResult.boundaries.length} Kandidaten gefunden, verfeinere...`);
+          toast.info(t('dc.candidatesFound', { count: coarseResult.boundaries.length }));
           try {
             const refinementFrames = await extractRefinementFrames(
               selectedVideo.url, canonicalDuration,
@@ -415,7 +417,7 @@ export function DirectorsCut() {
       if (error) throw error;
       
       if (data?.ok === false) {
-        toast.error(data.error || 'Szenenanalyse fehlgeschlagen');
+        toast.error(data.error || t('dc.sceneAnalysisFailed'));
         setIsAnalyzing(false);
         return;
       }
@@ -458,10 +460,10 @@ export function DirectorsCut() {
       }
       
       setScenes(normalizedScenes);
-      toast.success(`${normalizedScenes.length} Szenen erkannt`);
+      toast.success(t('dc.scenesDetected', { count: normalizedScenes.length }));
     } catch (error) {
       console.error('Error analyzing video:', error);
-      toast.error('Fehler bei der Szenenanalyse. Bitte versuche es erneut.');
+      toast.error(t('dc.sceneAnalysisError'));
     } finally {
       setIsAnalyzing(false);
     }
@@ -492,7 +494,7 @@ export function DirectorsCut() {
     setCapCutAudioTracks([]);
     setCapCutSubtitleTrack(undefined);
     setSubtitleSafeZone(DEFAULT_SUBTITLE_SAFE_ZONE);
-    toast.success('Projekt zurückgesetzt');
+    toast.success(t('dc.projectReset'));
   }, []);
 
   // Two modes: Import (no video) or Studio (video selected)
@@ -505,14 +507,14 @@ export function DirectorsCut() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold">Universal Director's Cut</h1>
+              <h1 className="text-3xl font-bold">{t('dc.pageTitle')}</h1>
               <p className="text-muted-foreground">
-                Importiere ein Video und bearbeite es im Studio
+                {t('dc.importSubtitle')}
               </p>
             </div>
             <Button variant="outline" onClick={() => navigate('/mediathek')}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Zur Mediathek
+              {t('dc.toMediaLibrary')}
             </Button>
           </div>
 
@@ -521,8 +523,8 @@ export function DirectorsCut() {
               <div className="flex items-center gap-3 mb-6">
                 <Film className="w-5 h-5 text-primary" />
                 <div>
-                  <h2 className="text-lg font-semibold">Video importieren</h2>
-                  <p className="text-sm text-muted-foreground">Wähle ein Video aus deiner Mediathek oder lade ein neues hoch</p>
+                  <h2 className="text-lg font-semibold">{t('dc.importVideo')}</h2>
+                  <p className="text-sm text-muted-foreground">{t('dc.importVideoDesc')}</p>
                 </div>
               </div>
               
