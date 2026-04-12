@@ -16661,6 +16661,7 @@ Object.assign(translations.es, {
 });
 
 
+export const detectBrowserLanguage = (): Language => {
   const browserLang = navigator.language.toLowerCase();
   if (browserLang.startsWith('de')) return 'de';
   if (browserLang.startsWith('es')) return 'es';
