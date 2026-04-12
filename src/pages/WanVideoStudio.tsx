@@ -5,9 +5,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Label } from '@/components/ui/label';
-import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, ArrowLeft, Wand2 } from 'lucide-react';
+import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, ArrowLeft, Wand2, Clock } from 'lucide-react';
 import { VideoPromptOptimizer } from '@/components/ai-video/VideoPromptOptimizer';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
@@ -104,7 +104,7 @@ export default function WanVideoStudio() {
         throw new Error(data.error);
       }
 
-      toast.success(`Wan 2.1 Video wird generiert! Kosten: ${currencySymbol}${cost.toFixed(2)}`);
+      toast.success(`Wan 2.5 Video wird generiert! Kosten: ${currencySymbol}${cost.toFixed(2)}`);
       refetchWallet();
       setActiveTab('history');
     } catch (err: any) {
@@ -117,8 +117,8 @@ export default function WanVideoStudio() {
   return (
     <>
       <Helmet>
-        <title>Wan 2.1 Video Studio | AI Video Generator</title>
-        <meta name="description" content="Generate AI videos with Wan 2.1 by WaveSpeed - Fast Text-to-Video and Image-to-Video" />
+        <title>Wan 2.5 Video Studio | AI Video Generator</title>
+        <meta name="description" content="Generate AI videos with Wan 2.5 - Fast Text-to-Video and Image-to-Video" />
       </Helmet>
 
       <div className="container mx-auto px-4 py-6 max-w-5xl">
@@ -126,11 +126,11 @@ export default function WanVideoStudio() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">Wan 2.1 Video Studio</h1>
+              <h1 className="text-2xl font-bold">Wan 2.5 Video Studio</h1>
               <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">Neu</Badge>
             </div>
             <p className="text-muted-foreground text-sm mt-1">
-              Text-to-Video & Image-to-Video • 3–12 Sekunden • WaveSpeed
+              Text-to-Video & Image-to-Video • 5 oder 10 Sekunden
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -186,7 +186,7 @@ export default function WanVideoStudio() {
                   <p className="text-xs text-muted-foreground mt-1">{prompt.length}/2000</p>
                   <div className="mt-2 p-2 rounded-md bg-muted/50 border border-border/50">
                     <p className="text-xs text-muted-foreground">
-                      💡 <strong>Tipp:</strong> Wan 2.1 ist besonders gut bei schnellen, flüssigen Bewegungen. Beschreibe Kamerabewegungen und Beleuchtung auf Englisch für beste Ergebnisse.
+                      💡 <strong>Tipp:</strong> Wan 2.5 ist besonders gut bei schnellen, flüssigen Bewegungen. Beschreibe Kamerabewegungen und Beleuchtung auf Englisch für beste Ergebnisse.
                     </p>
                   </div>
                 </Card>
@@ -215,24 +215,27 @@ export default function WanVideoStudio() {
                   </div>
                 </Card>
 
-                {/* Duration Slider */}
+                {/* Duration Selection */}
                 <Card className="p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <Label className="text-sm font-medium">Dauer: {duration} Sekunden</Label>
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Clock className="h-4 w-4" />Dauer
+                    </Label>
                     <span className="text-sm font-semibold text-primary">{currencySymbol}{cost.toFixed(2)}</span>
                   </div>
-                  <Slider
-                    value={[duration]}
-                    onValueChange={([v]) => setDuration(v)}
-                    min={3}
-                    max={modelConfig.maxDuration}
-                    step={1}
+                  <ToggleGroup
+                    type="single"
+                    value={String(duration)}
+                    onValueChange={(v) => v && setDuration(Number(v))}
                     className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>3s</span>
-                    <span>{modelConfig.maxDuration}s</span>
-                  </div>
+                  >
+                    <ToggleGroupItem value="5" className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                      5 Sekunden
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="10" className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                      10 Sekunden
+                    </ToggleGroupItem>
+                  </ToggleGroup>
                 </Card>
 
                 {/* Aspect Ratio */}
@@ -341,11 +344,9 @@ export default function WanVideoStudio() {
                   <div className="text-xs space-y-1 text-muted-foreground">
                     <div className="flex justify-between"><span>Standard 5s</span><span>{currencySymbol}0.50</span></div>
                     <div className="flex justify-between"><span>Standard 10s</span><span>{currencySymbol}1.00</span></div>
-                    <div className="flex justify-between"><span>Standard 12s</span><span>{currencySymbol}1.20</span></div>
                     <hr className="my-1" />
                     <div className="flex justify-between"><span>Pro 5s</span><span>{currencySymbol}0.75</span></div>
                     <div className="flex justify-between"><span>Pro 10s</span><span>{currencySymbol}1.50</span></div>
-                    <div className="flex justify-between"><span>Pro 12s</span><span>{currencySymbol}1.80</span></div>
                   </div>
                 </Card>
               </div>
