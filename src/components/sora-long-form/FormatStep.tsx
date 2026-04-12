@@ -1,9 +1,12 @@
+import { useMemo } from 'react';
 import { Clock, Monitor, Smartphone, Square, Zap, Crown } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { calculateProjectCost, getRequiredSceneCount, COST_PER_SECOND } from '@/types/sora-long-form';
+import { useTranslation } from '@/hooks/useTranslation';
+import { formatPriceForLanguage } from '@/lib/currency';
+import { calculateProjectCost, getRequiredSceneCount } from '@/types/sora-long-form';
 import type { Sora2LongFormProject, TargetDuration, AspectRatio, ModelType } from '@/types/sora-long-form';
 
 interface FormatStepProps {
@@ -12,24 +15,26 @@ interface FormatStepProps {
   onNext: () => void;
 }
 
-const DURATION_OPTIONS: { value: TargetDuration; label: string; scenes: number }[] = [
-  { value: 30, label: '30 Sek.', scenes: 3 },
-  { value: 60, label: '60 Sek.', scenes: 5 },
-  { value: 120, label: '120 Sek.', scenes: 10 },
-];
-
-const ASPECT_OPTIONS: { value: AspectRatio; label: string; icon: React.ComponentType<any>; desc: string }[] = [
-  { value: '16:9', label: '16:9', icon: Monitor, desc: 'YouTube, TV' },
-  { value: '9:16', label: '9:16', icon: Smartphone, desc: 'TikTok, Reels' },
-  { value: '1:1', label: '1:1', icon: Square, desc: 'Instagram' },
-];
-
-const MODEL_OPTIONS: { value: ModelType; label: string; icon: React.ComponentType<any>; desc: string; costPerSec: number }[] = [
-  { value: 'sora-2-standard', label: 'Standard', icon: Zap, desc: 'Schnell & kostengünstig', costPerSec: 0.25 },
-  { value: 'sora-2-pro', label: 'Pro', icon: Crown, desc: 'Höchste Qualität', costPerSec: 0.53 },
+const ASPECT_OPTIONS: { value: AspectRatio; icon: React.ComponentType<any>; desc: string }[] = [
+  { value: '16:9', icon: Monitor, desc: 'YouTube, TV' },
+  { value: '9:16', icon: Smartphone, desc: 'TikTok, Reels' },
+  { value: '1:1', icon: Square, desc: 'Instagram' },
 ];
 
 export function FormatStep({ project, onUpdate, onNext }: FormatStepProps) {
+  const { t, language } = useTranslation();
+
+  const DURATION_OPTIONS: { value: TargetDuration; label: string; scenes: number }[] = useMemo(() => [
+    { value: 30, label: `30 ${t('soraLf.sec')}`, scenes: 3 },
+    { value: 60, label: `60 ${t('soraLf.sec')}`, scenes: 5 },
+    { value: 120, label: `120 ${t('soraLf.sec')}`, scenes: 10 },
+  ], [t]);
+
+  const MODEL_OPTIONS = useMemo(() => [
+    { value: 'sora-2-standard' as ModelType, label: t('soraLf.modelStandard'), icon: Zap, desc: t('soraLf.modelStandardDesc'), costPerSec: 0.25 },
+    { value: 'sora-2-pro' as ModelType, label: t('soraLf.modelPro'), icon: Crown, desc: t('soraLf.modelProDesc'), costPerSec: 0.53 },
+  ], [t]);
+
   const sceneCount = getRequiredSceneCount(project.target_duration);
   const estimatedCost = calculateProjectCost(
     Array(sceneCount).fill({ duration: 12 }),
@@ -38,11 +43,10 @@ export function FormatStep({ project, onUpdate, onNext }: FormatStepProps) {
 
   return (
     <div className="space-y-8">
-      {/* Video Duration */}
       <div>
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Clock className="h-5 w-5 text-primary" />
-          Videolänge wählen
+          {t('soraLf.chooseVideoDuration')}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {DURATION_OPTIONS.map((option) => {
@@ -65,11 +69,11 @@ export function FormatStep({ project, onUpdate, onNext }: FormatStepProps) {
               >
                 <div className="text-center">
                   <h4 className="text-2xl font-bold">{option.label}</h4>
-                  <p className="text-muted-foreground mt-1">{option.scenes} Szenen</p>
+                  <p className="text-muted-foreground mt-1">{option.scenes} {t('soraLf.scenes')}</p>
                   <div className="mt-3 pt-3 border-t border-border">
-                    <p className="text-sm text-muted-foreground">Geschätzte Kosten</p>
+                    <p className="text-sm text-muted-foreground">{t('soraLf.estimatedCost')}</p>
                     <p className="text-lg font-semibold text-primary">
-                      ~{cost.toFixed(2)}€
+                      ~{formatPriceForLanguage(cost, language)}
                     </p>
                   </div>
                 </div>
@@ -79,9 +83,8 @@ export function FormatStep({ project, onUpdate, onNext }: FormatStepProps) {
         </div>
       </div>
 
-      {/* Aspect Ratio */}
       <div>
-        <h3 className="text-lg font-semibold mb-4">Seitenverhältnis</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('soraLf.aspectRatio')}</h3>
         <div className="grid grid-cols-3 gap-4">
           {ASPECT_OPTIONS.map((option) => {
             const Icon = option.icon;
@@ -100,7 +103,7 @@ export function FormatStep({ project, onUpdate, onNext }: FormatStepProps) {
               >
                 <div className="text-center">
                   <Icon className="h-8 w-8 mx-auto mb-2" />
-                  <h4 className="font-semibold">{option.label}</h4>
+                  <h4 className="font-semibold">{option.value}</h4>
                   <p className="text-xs text-muted-foreground">{option.desc}</p>
                 </div>
               </Card>
@@ -109,9 +112,8 @@ export function FormatStep({ project, onUpdate, onNext }: FormatStepProps) {
         </div>
       </div>
 
-      {/* Model Selection */}
       <div>
-        <h3 className="text-lg font-semibold mb-4">Sora 2 Modell</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('soraLf.soraModel')}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {MODEL_OPTIONS.map((option) => {
             const Icon = option.icon;
@@ -141,12 +143,12 @@ export function FormatStep({ project, onUpdate, onNext }: FormatStepProps) {
                     <div className="flex items-center gap-2">
                       <h4 className="font-semibold">{option.label}</h4>
                       {option.value === 'sora-2-pro' && (
-                        <Badge variant="secondary" className="bg-amber-500/20 text-amber-600">Premium</Badge>
+                        <Badge variant="secondary" className="bg-amber-500/20 text-amber-600">{t('soraLf.premium')}</Badge>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">{option.desc}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {option.costPerSec}€ pro Sekunde
+                      {formatPriceForLanguage(option.costPerSec, language)} {t('soraLf.perSecond')}
                     </p>
                   </div>
                 </div>
@@ -156,20 +158,19 @@ export function FormatStep({ project, onUpdate, onNext }: FormatStepProps) {
         </div>
       </div>
 
-      {/* Summary & Next */}
       <Card className="p-6 bg-primary/5 border-primary/20">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="font-semibold">Zusammenfassung</h4>
+            <h4 className="font-semibold">{t('soraLf.summary')}</h4>
             <p className="text-sm text-muted-foreground mt-1">
-              {project.target_duration} Sekunden • {sceneCount} Szenen • {project.aspect_ratio} • Sora 2 {project.model === 'sora-2-pro' ? 'Pro' : 'Standard'}
+              {project.target_duration} {t('soraLf.seconds')} • {sceneCount} {t('soraLf.scenes')} • {project.aspect_ratio} • Sora 2 {project.model === 'sora-2-pro' ? 'Pro' : t('soraLf.modelStandard')}
             </p>
             <p className="text-lg font-semibold text-primary mt-2">
-              Geschätzte Kosten: ~{estimatedCost.toFixed(2)}€
+              {t('soraLf.estimatedCost')}: ~{formatPriceForLanguage(estimatedCost, language)}
             </p>
           </div>
           <Button size="lg" onClick={onNext}>
-            Weiter zum Skript
+            {t('soraLf.nextToScript')}
           </Button>
         </div>
       </Card>
