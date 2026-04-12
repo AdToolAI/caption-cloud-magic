@@ -59,18 +59,60 @@ async function retryAiForValidJson(
   }
 }
 
-// Storytelling structure templates
-const STORYTELLING_STRUCTURES: Record<string, { name: string; structure: string[] }> = {
-  '3-act': { name: '3-Akt-Struktur', structure: ['Einleitung/Setup', 'Hauptteil/Konflikt', 'Auflösung/Schluss'] },
-  'hero-journey': { name: 'Heldenreise', structure: ['Gewöhnliche Welt', 'Ruf zum Abenteuer', 'Weigerung', 'Mentor trifft Held', 'Überschreiten der Schwelle', 'Prüfungen', 'Tiefster Punkt', 'Belohnung', 'Rückkehr', 'Transformation'] },
-  'aida': { name: 'AIDA', structure: ['Attention (Aufmerksamkeit)', 'Interest (Interesse)', 'Desire (Verlangen)', 'Action (Handlung)'] },
-  'problem-solution': { name: 'Problem-Lösung', structure: ['Problem vorstellen', 'Schmerzpunkte vertiefen', 'Lösung präsentieren', 'Benefits zeigen', 'CTA'] },
-  'feature-showcase': { name: 'Feature-Showcase', structure: ['Einleitung', 'Feature 1', 'Feature 2', 'Feature 3', 'Zusammenfassung', 'CTA'] },
-  'testimonial-arc': { name: 'Testimonial-Arc', structure: ['Vorstellung der Person', 'Problem beschreiben', 'Entdeckung der Lösung', 'Transformation', 'Empfehlung'] },
-  'before-after': { name: 'Vorher-Nachher', structure: ['Situation vorher', 'Der Wendepunkt', 'Situation nachher', 'Wie es funktioniert', 'CTA'] },
-  'comparison': { name: 'Vergleich', structure: ['Einleitung', 'Option A vorstellen', 'Option B vorstellen', 'Direkter Vergleich', 'Gewinner/Empfehlung'] },
-  'list-format': { name: 'Listenformat', structure: ['Hook', 'Punkt 1', 'Punkt 2', 'Punkt 3', 'Punkt 4', 'Punkt 5', 'Zusammenfassung'] },
-  'hook-value-cta': { name: 'Hook-Value-CTA', structure: ['Starker Hook', 'Wert liefern', 'Mehr Wert', 'CTA'] },
+// Storytelling structure templates — localized
+type Lang = 'en' | 'de' | 'es';
+
+const STORYTELLING_STRUCTURES: Record<string, Record<Lang, { name: string; structure: string[] }>> = {
+  '3-act': {
+    de: { name: '3-Akt-Struktur', structure: ['Einleitung/Setup', 'Hauptteil/Konflikt', 'Auflösung/Schluss'] },
+    en: { name: '3-Act Structure', structure: ['Introduction/Setup', 'Main Part/Conflict', 'Resolution/Conclusion'] },
+    es: { name: 'Estructura de 3 actos', structure: ['Introducción/Setup', 'Parte principal/Conflicto', 'Resolución/Conclusión'] },
+  },
+  'hero-journey': {
+    de: { name: 'Heldenreise', structure: ['Gewöhnliche Welt', 'Ruf zum Abenteuer', 'Weigerung', 'Mentor trifft Held', 'Überschreiten der Schwelle', 'Prüfungen', 'Tiefster Punkt', 'Belohnung', 'Rückkehr', 'Transformation'] },
+    en: { name: 'Hero\'s Journey', structure: ['Ordinary World', 'Call to Adventure', 'Refusal', 'Meeting the Mentor', 'Crossing the Threshold', 'Trials', 'Darkest Moment', 'Reward', 'Return', 'Transformation'] },
+    es: { name: 'Viaje del héroe', structure: ['Mundo ordinario', 'Llamada a la aventura', 'Rechazo', 'Encuentro con el mentor', 'Cruce del umbral', 'Pruebas', 'Momento más oscuro', 'Recompensa', 'Regreso', 'Transformación'] },
+  },
+  'aida': {
+    de: { name: 'AIDA', structure: ['Attention (Aufmerksamkeit)', 'Interest (Interesse)', 'Desire (Verlangen)', 'Action (Handlung)'] },
+    en: { name: 'AIDA', structure: ['Attention', 'Interest', 'Desire', 'Action'] },
+    es: { name: 'AIDA', structure: ['Atención', 'Interés', 'Deseo', 'Acción'] },
+  },
+  'problem-solution': {
+    de: { name: 'Problem-Lösung', structure: ['Problem vorstellen', 'Schmerzpunkte vertiefen', 'Lösung präsentieren', 'Benefits zeigen', 'CTA'] },
+    en: { name: 'Problem-Solution', structure: ['Present the problem', 'Deepen pain points', 'Present the solution', 'Show benefits', 'CTA'] },
+    es: { name: 'Problema-Solución', structure: ['Presentar el problema', 'Profundizar puntos de dolor', 'Presentar la solución', 'Mostrar beneficios', 'CTA'] },
+  },
+  'feature-showcase': {
+    de: { name: 'Feature-Showcase', structure: ['Einleitung', 'Feature 1', 'Feature 2', 'Feature 3', 'Zusammenfassung', 'CTA'] },
+    en: { name: 'Feature Showcase', structure: ['Introduction', 'Feature 1', 'Feature 2', 'Feature 3', 'Summary', 'CTA'] },
+    es: { name: 'Showcase de funciones', structure: ['Introducción', 'Función 1', 'Función 2', 'Función 3', 'Resumen', 'CTA'] },
+  },
+  'testimonial-arc': {
+    de: { name: 'Testimonial-Arc', structure: ['Vorstellung der Person', 'Problem beschreiben', 'Entdeckung der Lösung', 'Transformation', 'Empfehlung'] },
+    en: { name: 'Testimonial Arc', structure: ['Introduce the person', 'Describe the problem', 'Discover the solution', 'Transformation', 'Recommendation'] },
+    es: { name: 'Arco testimonial', structure: ['Presentar a la persona', 'Describir el problema', 'Descubrir la solución', 'Transformación', 'Recomendación'] },
+  },
+  'before-after': {
+    de: { name: 'Vorher-Nachher', structure: ['Situation vorher', 'Der Wendepunkt', 'Situation nachher', 'Wie es funktioniert', 'CTA'] },
+    en: { name: 'Before-After', structure: ['Situation before', 'The turning point', 'Situation after', 'How it works', 'CTA'] },
+    es: { name: 'Antes-Después', structure: ['Situación antes', 'El punto de inflexión', 'Situación después', 'Cómo funciona', 'CTA'] },
+  },
+  'comparison': {
+    de: { name: 'Vergleich', structure: ['Einleitung', 'Option A vorstellen', 'Option B vorstellen', 'Direkter Vergleich', 'Gewinner/Empfehlung'] },
+    en: { name: 'Comparison', structure: ['Introduction', 'Present Option A', 'Present Option B', 'Direct comparison', 'Winner/Recommendation'] },
+    es: { name: 'Comparación', structure: ['Introducción', 'Presentar opción A', 'Presentar opción B', 'Comparación directa', 'Ganador/Recomendación'] },
+  },
+  'list-format': {
+    de: { name: 'Listenformat', structure: ['Hook', 'Punkt 1', 'Punkt 2', 'Punkt 3', 'Punkt 4', 'Punkt 5', 'Zusammenfassung'] },
+    en: { name: 'List Format', structure: ['Hook', 'Point 1', 'Point 2', 'Point 3', 'Point 4', 'Point 5', 'Summary'] },
+    es: { name: 'Formato de lista', structure: ['Gancho', 'Punto 1', 'Punto 2', 'Punto 3', 'Punto 4', 'Punto 5', 'Resumen'] },
+  },
+  'hook-value-cta': {
+    de: { name: 'Hook-Value-CTA', structure: ['Starker Hook', 'Wert liefern', 'Mehr Wert', 'CTA'] },
+    en: { name: 'Hook-Value-CTA', structure: ['Strong Hook', 'Deliver value', 'More value', 'CTA'] },
+    es: { name: 'Gancho-Valor-CTA', structure: ['Gancho fuerte', 'Entregar valor', 'Más valor', 'CTA'] },
+  },
 };
 
 interface CategoryStyleProfile {
