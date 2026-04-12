@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
 import { CutPanel } from './sidebar/CutPanel';
+import { useTranslation } from '@/hooks/useTranslation';
 import { LookPanel } from './sidebar/LookPanel';
 import { FXPanel } from './sidebar/FXPanel';
 import { ExportPanel } from './sidebar/ExportPanel';
@@ -289,6 +290,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onExportSettingsChange,
   onStartExport,
 }) => {
+  const { t } = useTranslation();
   // Tab state
   const [activeTab, setActiveTab] = useState('cut');
   
@@ -376,7 +378,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
         setGeneratedCaptions(transcribedCaptions.map(c => ({ id: c.id, startTime: c.startTime, endTime: c.endTime, text: c.text })));
         onCaptionsGenerated?.(transcribedCaptions);
-        toast.success(`${transcribedCaptions.length} Untertitel aus Voiceover erstellt`);
+        toast.success(t('dc.captionsFromVoiceover', { count: transcribedCaptions.length }));
       } else {
         // Create empty placeholder captions
         const segmentCount = Math.max(3, Math.floor(videoDuration / 5));
@@ -395,11 +397,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
         
         setGeneratedCaptions(placeholderCaptions.map(c => ({ id: c.id, startTime: c.startTime, endTime: c.endTime, text: c.text })));
         onCaptionsGenerated?.(placeholderCaptions);
-        toast.success(`${placeholderCaptions.length} leere Untertitel-Felder erstellt`);
+        toast.success(t('dc.emptyCaptionsCreated', { count: placeholderCaptions.length }));
       }
     } catch (error) {
       console.error('Caption generation error:', error);
-      toast.error('Fehler bei der Untertitel-Generierung');
+      toast.error(t('dc.captionGenerationError'));
     } finally {
       setIsGeneratingCaptions(false);
     }
@@ -410,7 +412,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('video/'));
     if (files.length > 0) {
       setUploadedVideoFiles(prev => [...prev, ...files]);
-      toast.success(`${files.length} Video(s) hochgeladen`);
+      toast.success(t('dc.videosUploaded', { count: files.length }));
     }
   };
 
@@ -419,9 +421,9 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video/'));
     if (files.length > 0) {
       setUploadedVideoFiles(prev => [...prev, ...files]);
-      toast.success(`${files.length} Video(s) hochgeladen`);
+      toast.success(t('dc.videosUploaded', { count: files.length }));
     } else {
-      toast.error('Bitte nur Video-Dateien hochladen');
+      toast.error(t('dc.onlyVideoFiles'));
     }
   };
 
@@ -434,7 +436,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('audio/'));
     if (files.length > 0) {
       setUploadedAudioFiles(prev => [...prev, ...files]);
-      toast.success(`${files.length} Audio-Datei(en) hochgeladen`);
+      toast.success(t('dc.audioFilesUploaded', { count: files.length }));
     }
   };
 
@@ -443,9 +445,9 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('audio/'));
     if (files.length > 0) {
       setUploadedAudioFiles(prev => [...prev, ...files]);
-      toast.success(`${files.length} Audio-Datei(en) hochgeladen`);
+      toast.success(t('dc.audioFilesUploaded', { count: files.length }));
     } else {
-      toast.error('Bitte nur Audio-Dateien hochladen');
+      toast.error(t('dc.onlyAudioFiles'));
     }
   };
 
@@ -461,7 +463,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
       onMusicDrop?.({
         id: `upload-${Date.now()}`,
         name: file.name,
-        artist: 'Hochgeladen',
+        artist: t('dc.uploaded'),
         duration: audio.duration || 30,
         audioUrl: url,
         imageUrl: '',
@@ -473,7 +475,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
       onMusicDrop?.({
         id: `upload-${Date.now()}`,
         name: file.name,
-        artist: 'Hochgeladen',
+        artist: t('dc.uploaded'),
         duration: 30,
         audioUrl: url,
         imageUrl: '',
@@ -485,7 +487,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   // Jamendo Music Search
   const handleMusicSearch = async () => {
     if (!musicSearchQuery.trim() && !selectedMood && !selectedGenre) {
-      toast.error('Bitte Suchbegriff oder Filter eingeben');
+      toast.error(t('dc.searchTermOrFilter'));
       return;
     }
     
@@ -513,11 +515,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
       setMusicSearchResults(tracks);
       if (tracks.length === 0) {
-        toast.info('Keine Musik gefunden');
+        toast.info(t('dc.noMusicFound'));
       }
     } catch (error) {
       console.error('Music search error:', error);
-      toast.error('Fehler bei der Musiksuche');
+      toast.error(t('dc.musicSearchError'));
     } finally {
       setIsSearchingMusic(false);
     }
@@ -553,49 +555,49 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           <TabsTrigger 
             value="cut" 
             className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title="Schnitt"
+            title={t('dc.tabCut')}
           >
             <Scissors className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="look" 
             className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title="Look & Farbe"
+            title={t('dc.tabLook')}
           >
             <Palette className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="fx" 
             className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-purple-500/15 data-[state=active]:text-purple-400 data-[state=active]:shadow-[0_0_12px_rgba(168,85,247,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title="Effekte"
+            title={t('dc.tabFX')}
           >
             <Wand2 className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="subtitle" 
             className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title="Untertitel"
+            title={t('dc.tabSubtitle')}
           >
             <Type className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="audio-fx" 
             className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-pink-500/15 data-[state=active]:text-pink-400 data-[state=active]:shadow-[0_0_12px_rgba(236,72,153,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title="Audio"
+            title={t('dc.tabAudio')}
           >
             <Music className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="export" 
             className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-[#F5C76A]/15 data-[state=active]:text-[#F5C76A] data-[state=active]:shadow-[0_0_12px_rgba(245,199,106,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title="Export"
+            title={t('dc.tabExport')}
           >
             <Download className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger 
             value="settings" 
             className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-[0_0_8px_rgba(255,255,255,0.1)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title="Einstellungen"
+            title={t('dc.tabSettings')}
           >
             <Settings className="h-3.5 w-3.5" />
           </TabsTrigger>
@@ -675,21 +677,21 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             {/* Header */}
             <div className="flex items-center gap-2">
               <Type className="h-4 w-4 text-[#00d4ff]" />
-              <span className="text-sm font-medium text-white">Untertitel</span>
+              <span className="text-sm font-medium text-white">{t('dc.subtitles')}</span>
             </div>
 
             {/* Original Subtitles Detection Banner */}
             {isDetectingOriginalSubs && (
               <div className="p-2.5 rounded bg-indigo-500/10 border border-indigo-500/30 flex items-center gap-2">
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
-                <p className="text-[11px] text-indigo-300">Original-Untertitel werden erkannt...</p>
+                <p className="text-[11px] text-indigo-300">{t('dc.detectingOriginalSubs')}</p>
               </div>
             )}
 
             {hasOriginalSubtitles && !isDetectingOriginalSubs && (
               <div className="p-2.5 rounded bg-indigo-500/10 border border-indigo-500/30 space-y-2">
                 <p className="text-[11px] text-indigo-300 flex items-center gap-1.5">
-                  🎬 Original-Untertitel erkannt
+                  🎬 {t('dc.originalSubsDetected')}
                 </p>
                 <div className="flex gap-2">
                   <Button
@@ -723,7 +725,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 className="w-full h-7 text-[10px] border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10"
               >
                 <RotateCcw className="h-2.5 w-2.5 mr-1" />
-                Original-Untertitel erneut erkennen
+                {t('dc.retryDetection')}
               </Button>
             )}
 
@@ -735,7 +737,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 onClick={onRemoveAllSubtitles}
                 className="w-full h-7 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
               >
-                Alle Untertitel entfernen ({existingCaptions.length})
+                {t('dc.removeAllSubtitles', { count: existingCaptions.length })}
               </Button>
             )}
 
@@ -750,7 +752,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
             {/* Preview Layer Toggles */}
             <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
-              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Vorschau-Sichtbarkeit</p>
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">{t('dc.previewVisibility')}</p>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-white/70">💬 Untertitel</span>
                 <Switch
@@ -771,16 +773,16 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               )}
               {existingCaptions.length === 0 && textOverlayCount === 0 && !hasCleanedVideo && (
                 <p className="text-[10px] text-amber-400/80 mt-1">
-                  ⚠️ Falls weiterhin Text sichtbar ist, ist er im Originalvideo eingebrannt.
+                  ⚠️ {t('dc.burnedInTextWarning')}
                 </p>
               )}
             </div>
 
             {/* Burned-in Subtitle Removal */}
             <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
-              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Eingebrannter Text im Video</p>
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">{t('dc.burnedInText')}</p>
               <p className="text-[9px] text-white/30">
-                Entfernt sichtbaren Text im Bild durch automatischen Zuschnitt.
+                {t('dc.burnedInTextDesc')}
               </p>
 
               {/* Auto-Detect + Apply Button */}
@@ -794,17 +796,17 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 {isDetectingBand ? (
                   <>
                     <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                    Wird analysiert...
+                    {t('dc.beingAnalyzed')}
                   </>
                 ) : subtitleSafeZone.enabled && subtitleSafeZone.mode === 'reframe' ? (
                   <>
                     <Crop className="h-3 w-3 mr-1.5" />
-                    ✅ Zuschnitt aktiv
+                    ✅ {t('dc.cropActive')}
                   </>
                 ) : (
                   <>
                     <Crop className="h-3 w-3 mr-1.5" />
-                    Automatisch sauber entfernen
+                    {t('dc.autoCleanRemove')}
                   </>
                 )}
               </Button>
@@ -814,7 +816,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Crop className="h-3 w-3 text-emerald-400" />
-                    <span className="text-[11px] text-white/70">Reframe (empfohlen)</span>
+                    <span className="text-[11px] text-white/70">{t('dc.reframeRecommended')}</span>
                   </div>
                   <Switch
                     checked={subtitleSafeZone.enabled && subtitleSafeZone.mode === 'reframe'}
@@ -829,7 +831,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   />
                 </div>
                 <p className="text-[9px] text-white/30">
-                  Untertitelbereich wird per Zoom & Verschiebung sauber aus dem Bild entfernt — deterministisch, 100% zuverlässig.
+                  {t('dc.reframeDesc')}
                 </p>
 
                 {subtitleSafeZone.enabled && subtitleSafeZone.mode === 'reframe' && (
@@ -934,12 +936,12 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 </summary>
                 <div className="mt-2 space-y-2">
                   <p className="text-[9px] text-white/30">
-                    Versucht eingebrannte Untertitel per KI-Inpainting zu rekonstruieren. Funktioniert nicht immer bei stilisierter Schrift.
+                    {t('dc.aiReconstructionDesc')}
                   </p>
               {hasCleanedVideo ? (
                 <div className="space-y-2">
                   <p className="text-[10px] text-emerald-400 flex items-center gap-1">
-                    ✅ Bereinigtes Video aktiv
+                    ✅ {t('dc.cleanedVideoActive')}
                   </p>
                   <Button
                     size="sm"
@@ -948,14 +950,14 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     className="w-full h-7 text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
                   >
                     <RotateCcw className="h-2.5 w-2.5 mr-1" />
-                    Original wiederherstellen
+                    {t('dc.restoreOriginal')}
                   </Button>
                 </div>
               ) : burnedSubsStatus === 'processing' || isRemovingBurnedSubs ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-3 w-3 animate-spin text-purple-400" />
-                    <p className="text-[10px] text-purple-400">Wird per KI entfernt... 3–8 Min.</p>
+                    <p className="text-[10px] text-purple-400">{t('dc.aiRemovalProgress')}</p>
                   </div>
                   <div className="w-full bg-[#3a3a3a] rounded-full h-1.5">
                     <div className="bg-purple-500 h-1.5 rounded-full animate-pulse" style={{ width: '45%' }} />
@@ -963,14 +965,14 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 </div>
               ) : burnedSubsStatus === 'failed' ? (
                 <div className="space-y-2">
-                  <p className="text-[10px] text-red-400">❌ Entfernung fehlgeschlagen</p>
+                  <p className="text-[10px] text-red-400">❌ {t('dc.aiRemovalFailed')}</p>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => onRemoveBurnedSubtitles?.()}
                     className="w-full h-7 text-[10px] border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                   >
-                    <RotateCcw className="h-2.5 w-2.5 mr-1" /> Erneut versuchen
+                    <RotateCcw className="h-2.5 w-2.5 mr-1" /> {t('dc.retryRender')}
                   </Button>
                 </div>
               ) : (
@@ -981,7 +983,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   disabled={isRemovingBurnedSubs}
                   className="w-full h-7 text-[10px] border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                 >
-                  <Sparkles className="h-2.5 w-2.5 mr-1" /> KI-Entfernung starten
+                  <Sparkles className="h-2.5 w-2.5 mr-1" /> {t('dc.startAiRemoval')}
                 </Button>
               )}
                 </div>
@@ -990,10 +992,10 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
             {/* Language Selection */}
             <div className="space-y-2">
-              <label className="text-xs text-white/70">Sprache</label>
+              <label className="text-xs text-white/70">{t('dc.language')}</label>
               <Select value={captionLanguage} onValueChange={setCaptionLanguage}>
                 <SelectTrigger className="w-full h-8 bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white">
-                  <SelectValue placeholder="Sprache wählen" />
+                  <SelectValue placeholder={t('dc.chooseLanguage')} />
                 </SelectTrigger>
                 <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
                   <SelectItem value="de" className="text-white">🇩🇪 Deutsch</SelectItem>
@@ -1007,7 +1009,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             {/* Selected Subtitle Text Edit */}
             <div className="space-y-2">
               <label className="text-xs text-white/70">
-                Untertitel-Text {selectedSubtitleId && <span className="text-[#00d4ff]">(ausgewählt)</span>}
+                {t('dc.subtitleText')} {selectedSubtitleId && <span className="text-[#00d4ff]">{t('dc.subtitleSelected')}</span>}
               </label>
               <Textarea
                 value={selectedSubtitleText}
@@ -1016,7 +1018,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     onSubtitleTextUpdate?.(selectedSubtitleId, e.target.value);
                   }
                 }}
-                placeholder={selectedSubtitleId ? "Text eingeben..." : "Klicke auf einen Untertitel in der Timeline oder Liste"}
+                placeholder={selectedSubtitleId ? t('dc.enterText') : t('dc.clickSubtitleHint')}
                 disabled={!selectedSubtitleId}
                 className="bg-[#2a2a2a] border-[#3a3a3a] text-white placeholder:text-white/40 resize-none text-sm min-h-[60px]"
                 rows={2}
@@ -1047,17 +1049,17 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
             {/* Divider */}
             <div className="border-t border-[#3a3a3a] pt-4">
-              <h4 className="text-xs font-medium text-white/70 mb-3">Styling-Optionen</h4>
+              <h4 className="text-xs font-medium text-white/70 mb-3">{t('dc.stylingOptions')}</h4>
             </div>
 
             {/* Position */}
             <div className="space-y-2">
-              <label className="text-xs text-white/70">Position</label>
+              <label className="text-xs text-white/70">{t('dc.position')}</label>
               <div className="flex gap-1">
                 {[
-                  { value: 'top', icon: AlignVerticalJustifyStart, label: 'Oben' },
-                  { value: 'center', icon: AlignVerticalJustifyCenter, label: 'Mitte' },
-                  { value: 'bottom', icon: AlignVerticalJustifyEnd, label: 'Unten' },
+                  { value: 'top', icon: AlignVerticalJustifyStart, label: t('dc.posTop') },
+                  { value: 'center', icon: AlignVerticalJustifyCenter, label: t('dc.posCenter') },
+                  { value: 'bottom', icon: AlignVerticalJustifyEnd, label: t('dc.posBottom') },
                 ].map(({ value, icon: Icon, label }) => (
                   <button
                     key={value}
@@ -1078,7 +1080,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
             {/* Font Size */}
             <div className="space-y-2">
-              <label className="text-xs text-white/70">Schriftgröße</label>
+              <label className="text-xs text-white/70">{t('dc.fontSize')}</label>
               <div className="flex gap-1">
                 {['small', 'medium', 'large', 'xl'].map((size) => (
                   <button
@@ -1100,7 +1102,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             {/* Colors */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label className="text-xs text-white/70">Textfarbe</label>
+                <label className="text-xs text-white/70">{t('dc.textColor')}</label>
                 <div className="flex items-center gap-2">
                   <input 
                     type="color" 
@@ -1112,7 +1114,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-xs text-white/70">Hintergrund</label>
+                <label className="text-xs text-white/70">{t('dc.background')}</label>
                 <div className="flex items-center gap-2">
                   <input 
                     type="color" 
@@ -1126,7 +1128,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
             {/* Font Family */}
             <div className="space-y-2">
-              <label className="text-xs text-white/70">Schriftart</label>
+              <label className="text-xs text-white/70">{t('dc.fontFamily')}</label>
               <Select value={localStyle.fontFamily || 'Inter'} onValueChange={(v) => updateStyle({ fontFamily: v })}>
                 <SelectTrigger className="w-full h-8 bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white">
                   <SelectValue />
@@ -1143,7 +1145,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
             {/* Max Lines */}
             <div className="space-y-2">
-              <label className="text-xs text-white/70">Max. Zeilen</label>
+              <label className="text-xs text-white/70">{t('dc.maxLines')}</label>
               <div className="flex gap-2">
                 {[2, 3].map((lines) => (
                   <button
@@ -1156,7 +1158,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                         : "bg-[#2a2a2a] border border-[#3a3a3a] text-white/60 hover:bg-[#3a3a3a]"
                     )}
                   >
-                    {lines} Zeilen
+                    {t('dc.lines', { n: lines })}
                   </button>
                 ))}
               </div>
@@ -1164,7 +1166,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
             {/* Text Stroke / Outline */}
             <div className="space-y-2">
-              <label className="text-xs text-white/70">Umrandung</label>
+              <label className="text-xs text-white/70">{t('dc.outline')}</label>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => updateStyle({ textStroke: !localStyle.textStroke })}
@@ -1175,7 +1177,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                       : "bg-[#2a2a2a] border border-[#3a3a3a] text-white/60 hover:bg-[#3a3a3a]"
                   )}
                 >
-                  {localStyle.textStroke ? 'Ein' : 'Aus'}
+                  {localStyle.textStroke ? t('dc.outlineOn') : t('dc.outlineOff')}
                 </button>
                 {localStyle.textStroke && (
                   <>
@@ -1206,11 +1208,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               {voiceOverUrl ? (
                 <p className="text-[10px] text-emerald-400/80 flex items-center gap-1.5">
                   <Mic className="h-3 w-3" />
-                  Voiceover erkannt - KI-Transkription wird verwendet
+                  {t('dc.voiceoverDetected')}
                 </p>
               ) : (
                 <p className="text-[10px] text-white/50">
-                  Kein Voiceover - Es werden leere Untertitel-Felder erstellt, die du in der Timeline bearbeiten kannst
+                  {t('dc.noVoiceover')}
                 </p>
               )}
             </div>
@@ -1222,11 +1224,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               className="w-full bg-[#00d4ff] hover:bg-[#00b8e0] text-black"
             >
               {isGeneratingCaptions ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generiere...</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t('dc.generating')}</>
               ) : voiceOverUrl ? (
-                <><Sparkles className="h-4 w-4 mr-2" /> Aus Voiceover transkribieren</>
+                <><Sparkles className="h-4 w-4 mr-2" /> {t('dc.transcribeFromVoiceover')}</>
               ) : (
-                <><Type className="h-4 w-4 mr-2" /> Leere Untertitel erstellen</>
+                <><Type className="h-4 w-4 mr-2" /> {t('dc.createEmptySubtitles')}</>
               )}
             </Button>
 
@@ -1249,12 +1251,12 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 };
                 // Add to existing captions instead of overwriting
                 onCaptionsGenerated?.([...existingCaptions, newSubtitle]);
-                toast.success('Neuer Untertitel hinzugefügt');
+                toast.success(t('dc.newSubtitleAdded'));
               }}
               className="w-full border-[#3a3a3a] bg-transparent hover:bg-[#2a2a2a] text-white/70 hover:text-white"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Neuen Untertitel hinzufügen
+              {t('dc.addNewSubtitle')}
             </Button>
 
             {/* Generated Captions Preview */}
@@ -1431,7 +1433,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               )}
 
               <p className="text-[10px] text-white/40">
-                Ziehe Musik in die Timeline, um sie hinzuzufügen
+                {t('dc.dragMusicToTimeline')}
               </p>
             </div>
 
@@ -1539,7 +1541,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
             <div className="border-t border-[#3a3a3a] pt-4">
               <p className="text-[10px] text-white/40">
-                Diese Effekte werden auf alle Audio-Spuren angewendet und können beim Export beibehalten werden.
+                {t('dc.audioEffectsHint')}
               </p>
             </div>
           </TabsContent>
@@ -1549,30 +1551,30 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             {/* Header */}
             <div className="flex items-center gap-2">
               <Settings className="h-4 w-4 text-white/70" />
-              <span className="text-sm font-medium text-white">Einstellungen</span>
+              <span className="text-sm font-medium text-white">{t('dc.settings')}</span>
             </div>
 
             {/* Projekt-Info */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-3.5 w-3.5 text-cyan-400" />
-                <span className="text-xs font-medium text-white/70">Projekt-Info</span>
+                <span className="text-xs font-medium text-white/70">{t('dc.projectInfoLabel')}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="p-2 bg-[#2a2a2a] rounded">
-                  <div className="text-[10px] text-white/40">Dauer</div>
+                  <div className="text-[10px] text-white/40">{t('dc.durationInfo')}</div>
                   <div className="text-sm text-white font-mono">{formatDuration(videoDuration)}</div>
                 </div>
                 <div className="p-2 bg-[#2a2a2a] rounded">
-                  <div className="text-[10px] text-white/40">Szenen</div>
+                  <div className="text-[10px] text-white/40">{t('dc.scenesInfo')}</div>
                   <div className="text-sm text-white font-mono">{sceneCount}</div>
                 </div>
                 <div className="p-2 bg-[#2a2a2a] rounded">
-                  <div className="text-[10px] text-white/40">Audio-Spuren</div>
+                  <div className="text-[10px] text-white/40">{t('dc.audioTracks')}</div>
                   <div className="text-sm text-white font-mono">4</div>
                 </div>
                 <div className="p-2 bg-[#2a2a2a] rounded">
-                  <div className="text-[10px] text-white/40">Untertitel</div>
+                  <div className="text-[10px] text-white/40">{t('dc.subtitlesInfo')}</div>
                   <div className="text-sm text-white font-mono">{captionCount}</div>
                 </div>
               </div>
@@ -1609,7 +1611,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Keyboard className="h-3.5 w-3.5 text-purple-400" />
-                <span className="text-xs font-medium text-white/70">Tastaturkürzel</span>
+                <span className="text-xs font-medium text-white/70">{t('dc.keyboardShortcuts')}</span>
               </div>
               <div className="space-y-1 text-[10px]">
                 <div className="flex justify-between p-1.5 bg-[#2a2a2a] rounded">
@@ -1618,15 +1620,15 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 </div>
                 <div className="flex justify-between p-1.5 bg-[#2a2a2a] rounded">
                   <kbd className="px-1.5 py-0.5 bg-[#3a3a3a] rounded text-white/60 font-mono">←/→</kbd>
-                  <span className="text-white/50">Frame springen</span>
+                  <span className="text-white/50">{t('dc.frameJump')}</span>
                 </div>
                 <div className="flex justify-between p-1.5 bg-[#2a2a2a] rounded">
                   <kbd className="px-1.5 py-0.5 bg-[#3a3a3a] rounded text-white/60 font-mono">Ctrl+Z</kbd>
-                  <span className="text-white/50">Rückgängig</span>
+                  <span className="text-white/50">{t('dc.shortcutUndo')}</span>
                 </div>
                 <div className="flex justify-between p-1.5 bg-[#2a2a2a] rounded">
                   <kbd className="px-1.5 py-0.5 bg-[#3a3a3a] rounded text-white/60 font-mono">Del</kbd>
-                  <span className="text-white/50">Clip löschen</span>
+                  <span className="text-white/50">{t('dc.deleteClip')}</span>
                 </div>
               </div>
             </div>

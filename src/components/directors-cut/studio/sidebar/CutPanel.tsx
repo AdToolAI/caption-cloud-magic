@@ -1,10 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Scissors, Sparkles, Loader2, Trash2, Copy, GripVertical, Plus, Pencil, Check, FileVideo, ChevronDown, ChevronUp, X, ArrowRightLeft } from 'lucide-react';
 import { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface CutPanelProps {
   scenes: SceneAnalysis[];
@@ -43,10 +44,11 @@ const TRANSITION_TYPES = [
 ] as const;
 
 const TransitionBlock: React.FC<{
+  t: (key: string, params?: Record<string, string | number>) => any;
   sceneId: string;
   transition?: TransitionAssignment;
   onTransitionChange: (sceneId: string, type: string | null, duration?: number) => void;
-}> = ({ sceneId, transition, onTransitionChange }) => {
+}> = ({ t, sceneId, transition, onTransitionChange }) => {
   const [expanded, setExpanded] = useState(false);
   const hasTransition = transition && transition.transitionType !== 'none';
 
@@ -71,7 +73,7 @@ const TransitionBlock: React.FC<{
           ) : (
             <>
               <Plus className="h-3 w-3" />
-              <span>Übergang</span>
+              <span>{t('dc.transition')}</span>
             </>
           )}
         </button>
@@ -92,25 +94,25 @@ const TransitionBlock: React.FC<{
 
           {/* Transition type grid */}
           <div className="grid grid-cols-4 gap-1">
-            {TRANSITION_TYPES.map((t) => (
+            {TRANSITION_TYPES.map((tr) => (
               <button
-                key={t.id}
+                key={tr.id}
                 onClick={() => {
-                  if (t.id === 'none') {
+                  if (tr.id === 'none') {
                     onTransitionChange(sceneId, null);
                   } else {
-                    onTransitionChange(sceneId, t.id, transition?.duration ?? 1.2);
+                    onTransitionChange(sceneId, tr.id, transition?.duration ?? 1.2);
                   }
                 }}
                 className={cn(
                   "flex flex-col items-center gap-0.5 p-1.5 rounded-lg border text-[9px] transition-all",
-                  (hasTransition && transition?.transitionType === t.id) || (!hasTransition && t.id === 'none')
+                  (hasTransition && transition?.transitionType === t.id) || (!hasTransition && tr.id === 'none')
                     ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300 shadow-[0_0_8px_rgba(34,211,238,0.15)]"
                     : "border-white/5 text-white/50 hover:border-white/15 hover:bg-white/5"
                 )}
               >
-                <span className="text-sm leading-none">{t.icon}</span>
-                <span>{t.name}</span>
+                <span className="text-sm leading-none">{tr.icon}</span>
+                <span>{tr.id === 'none' ? t('dc.transitionNone') : tr.name}</span>
               </button>
             ))}
           </div>
@@ -119,7 +121,7 @@ const TransitionBlock: React.FC<{
           {hasTransition && (
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[9px] text-white/40">Dauer</span>
+                <span className="text-[9px] text-white/40">{t('dc.duration')}</span>
                 <span className="text-[9px] text-cyan-300 font-mono">{transition!.duration.toFixed(1)}s</span>
               </div>
               <Slider
@@ -146,7 +148,7 @@ const TransitionBlock: React.FC<{
               className="w-full h-6 text-[10px] text-red-400/70 hover:text-red-400 hover:bg-red-500/10"
             >
               <X className="h-3 w-3 mr-1" />
-              Übergang entfernen
+              {t('dc.removeTransition')}
             </Button>
           )}
         </div>
@@ -173,6 +175,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
   onTrimScene,
   onAddVideoAsScene,
 }) => {
+  const { t } = useTranslation();
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -218,7 +221,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
       <div className="flex items-center gap-2">
         <div className="w-1 h-4 rounded-full bg-[#F5C76A]" />
         <Scissors className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]" />
-        <span className="text-sm font-medium text-white">Schnitt</span>
+        <span className="text-sm font-medium text-white">{t('dc.cutTitle')}</span>
       </div>
 
       {/* Split at Playhead */}
@@ -229,11 +232,11 @@ export const CutPanel: React.FC<CutPanelProps> = ({
         size="sm"
       >
         <Scissors className="h-3.5 w-3.5 mr-2" />
-        Am Playhead teilen (S)
+        {t('dc.splitAtPlayhead')}
       </Button>
 
       <p className="text-[10px] text-white/40">
-        Playhead: {formatTime(currentTime)} — Klicke oder drücke S zum Teilen
+        {t('dc.playheadInfo', { time: formatTime(currentTime) })}
       </p>
 
       {/* Add new scene */}
@@ -287,13 +290,13 @@ export const CutPanel: React.FC<CutPanelProps> = ({
             className="w-full border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
           >
             {isAnalyzing ? (
-              <><Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> Analysiert...</>
+              <><Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> {t('dc.analyzing')}</>
             ) : (
-              <><Sparkles className="h-3.5 w-3.5 mr-2" /> Auto-Cut (KI-Analyse)</>
+              <><Sparkles className="h-3.5 w-3.5 mr-2" /> {t('dc.autoCutAI')}</>
             )}
           </Button>
           <p className="text-[10px] text-white/30">
-            KI erkennt automatisch Szenenwechsel. Optional.
+            {t('dc.autoCutDesc')}
           </p>
         </>
       )}
@@ -302,14 +305,14 @@ export const CutPanel: React.FC<CutPanelProps> = ({
       <div className="border-t border-[#F5C76A]/10 pt-3">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">
-            Szenen ({scenes.length})
+            {t('dc.scenesCount', { count: scenes.length })}
           </span>
         </div>
 
         {scenes.length === 0 ? (
           <div className="text-center py-6">
             <p className="text-xs text-white/40">
-              Noch keine Szenen. Nutze "Am Playhead teilen" oder "Auto-Cut".
+              {t('dc.noScenesYet')}
             </p>
           </div>
         ) : (
@@ -357,7 +360,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                           </div>
                         ) : (
                           <p className="text-[11px] text-white/80 truncate">
-                            {scene.description || `Szene ${i + 1}`}
+                            {scene.description || t('dc.scene', { n: i + 1 })}
                           </p>
                         )}
                         <p className="text-[9px] text-white/40">
@@ -370,7 +373,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                           <button
                             onClick={(e) => { e.stopPropagation(); startEditing(scene); }}
                             className="p-1 rounded hover:bg-white/10 text-white/40 hover:text-cyan-300"
-                            title="Umbenennen"
+                            title={t('dc.rename')}
                           >
                             <Pencil className="h-3 w-3" />
                           </button>
@@ -378,14 +381,14 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                         <button
                           onClick={(e) => { e.stopPropagation(); onDuplicateScene(scene.id); }}
                           className="p-1 rounded hover:bg-white/10 text-white/40 hover:text-white"
-                          title="Duplizieren"
+                          title={t('dc.duplicate')}
                         >
                           <Copy className="h-3 w-3" />
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); onDeleteScene(scene.id); }}
                           className="p-1 rounded hover:bg-red-500/20 text-white/40 hover:text-red-400"
-                          title="Löschen"
+                          title={t('dc.deleteLabel')}
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -426,6 +429,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                   {/* Transition Block between scenes (not after last scene) */}
                   {i < scenes.length - 1 && onTransitionsChange && (
                     <TransitionBlock
+                      t={t}
                       sceneId={scene.id}
                       transition={transitions.find(t => t.sceneId === scene.id)}
                       onTransitionChange={handleTransitionChange}
