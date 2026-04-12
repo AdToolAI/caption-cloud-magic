@@ -61,6 +61,7 @@ export function VoiceOverStep({
   speedKeyframes,
   kenBurns,
 }: VoiceOverStepProps) {
+  const { t } = useTranslation();
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [generatedVoiceOverUrl, setGeneratedVoiceOverUrl] = useState<string | undefined>(undefined);
   const [voiceOverSettings, setVoiceOverSettings] = useState({
@@ -90,8 +91,8 @@ export function VoiceOverStep({
       sceneEffects={sceneEffects}
       transitions={transitions}
       audio={audio}
-      title="KI Voice-Over"
-      description="Generiere professionelle Sprachaufnahmen mit KI"
+      title={t("dc.voiceOverTitle")}
+      description={t("dc.voiceOverDesc")}
       icon={Mic}
       showSceneSelector={false}
       textOverlays={textOverlays}

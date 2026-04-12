@@ -70,6 +70,7 @@ export function SpecialEffectsStep({
   colorGrading,
   sceneColorGrading,
 }: SpecialEffectsStepProps) {
+  const { t } = useTranslation();
   const [cropVariants, setCropVariants] = useState<CropVariant[]>([]);
 
   return (
@@ -83,8 +84,8 @@ export function SpecialEffectsStep({
       sceneEffects={sceneEffects}
       transitions={transitions}
       audio={audio}
-      title="Spezialeffekte"
-      description="Text-Overlays und Smart Cropping"
+      title={t("dc.specialEffectsTitle")}
+      description={t("dc.specialEffectsDesc")}
       icon={Zap}
       showSceneSelector={false}
       textOverlays={textOverlays}

@@ -31,6 +31,7 @@ export function StyleLookStep({
   audio,
   onStyleTransferChange 
 }: StyleLookStepProps) {
+  const { t } = useTranslation();
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
   // Get current filter based on selection
@@ -71,7 +72,7 @@ export function StyleLookStep({
       transitions={transitions}
       audio={audio}
       title="Style & Look"
-      description="Wähle Filter und Stile für dein Video"
+      description={t("dc.styleLookDesc")}
       icon={Wand2}
     >
       {/* Combined AI Style Transfer + Filter Selection with Split-View */}
