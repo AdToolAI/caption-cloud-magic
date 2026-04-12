@@ -13,6 +13,13 @@ import { toast as sonnerToast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
 import { formatPrice, getCurrencyForLanguage } from '@/lib/currency';
 
+const MODEL_DISPLAY_NAMES: Record<string, string> = {
+  'sora-2-standard': 'Sora 2 Standard',
+  'sora-2-pro': 'Sora 2 Pro',
+  'kling-3-standard': 'Kling 3.0 Standard',
+  'kling-3-pro': 'Kling 3.0 Pro',
+};
+
 interface VideoGeneration {
   id: string;
   prompt: string;
