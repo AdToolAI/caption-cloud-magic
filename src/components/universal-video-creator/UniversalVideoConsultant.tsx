@@ -11,6 +11,8 @@ import { ALL_CATEGORY_INTERVIEWS } from '@/config/universal-video-interviews';
 import type { UniversalGenerationMode } from './UniversalModeSelector';
 import ReactMarkdown from 'react-markdown';
 import { getConsultantDraft, saveConsultantDraft } from '@/lib/universal-video-draft';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useLocalizedVideoCategories } from '@/hooks/useLocalizedVideoCategories';
 
 interface Message {
   id: string;
@@ -32,7 +34,9 @@ export function UniversalVideoConsultant({
   onConsultationComplete, 
   onSkip 
 }: UniversalVideoConsultantProps) {
-  const categoryInfo = VIDEO_CATEGORIES.find(c => c.category === category);
+  const { t, language } = useTranslation();
+  const localizedCategories = useLocalizedVideoCategories();
+  const categoryInfo = localizedCategories.find(c => c.category === category);
   const interview = ALL_CATEGORY_INTERVIEWS[category];
   const totalPhases = interview?.phases?.length || 10;
   const firstPhase = interview?.phases?.[0];
@@ -41,21 +45,16 @@ export function UniversalVideoConsultant({
     id: '1',
     role: 'assistant',
     content: mode === 'full-service' 
-      ? `Willkommen! Ich bin **Max**, dein Video-Marketing-Stratege.
-
-Du hast dich für ein **${categoryInfo?.name}** im **Full-Service-Modus** entschieden – ausgezeichnete Wahl.
-
-In **${totalPhases} präzisen Fragen** entwickeln wir gemeinsam dein perfektes Video-Konzept. Danach übernimmt die KI und erstellt alles automatisch.
-
-**Phase 1/${totalPhases}:** ${firstPhase?.question || 'Was ist das Hauptziel deines Videos?'}`
-      : `Willkommen! Ich bin **Max**, dein Video-Marketing-Stratege.
-
-Der **manuelle Modus** für dein **${categoryInfo?.name}** gibt dir volle kreative Kontrolle.
-
-Lass uns mit ein paar strategischen Fragen starten.
-
-**${firstPhase?.question || 'Was ist das Hauptziel deines Videos?'}**`,
-    quickReplies: firstPhase?.quickReplies || ['Mehr Verkäufe', 'Brand Awareness', 'Kundenschulung', 'Produkt erklären']
+      ? t('uvc.consultantWelcomeFS', { 
+          category: categoryInfo?.name || '', 
+          phases: String(totalPhases), 
+          question: firstPhase?.question || '' 
+        })
+      : t('uvc.consultantWelcomeManual', { 
+          category: categoryInfo?.name || '', 
+          question: firstPhase?.question || '' 
+        }),
+    quickReplies: firstPhase?.quickReplies
   };
 
   // Restore full state from draft
@@ -128,13 +127,11 @@ Lass uns mit ein paar strategischen Fragen starten.
       content: content.trim()
     };
 
-    // Check for duplicate before adding (only on first attempt)
     if (retryCount === 0 && !addMessageSafely(userMessage)) return;
     
     setInput('');
     setIsLoading(true);
 
-    // Create AbortController with 90s timeout for long AI responses
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       console.log('[Consultant] Request timeout after 90s');
@@ -142,7 +139,6 @@ Lass uns mit ein paar strategischen Fragen starten.
     }, 90000);
 
     try {
-      // Deduplicate messages by role+content before sending to API
       const allMessages = [...messages, ...(retryCount === 0 ? [userMessage] : [])];
       const seen = new Set<string>();
       const deduped = allMessages.filter(m => {
@@ -159,7 +155,8 @@ Lass uns mit ein paar strategischen Fragen starten.
             content: m.content
           })),
           category,
-          mode
+          mode,
+          language
         }
       });
 
@@ -169,10 +166,8 @@ Lass uns mit ein paar strategischen Fragen starten.
 
       const data = response.data;
       
-      // Update progress
       setConsultationProgress(data.progress || 0);
 
-      // Add assistant response with unique ID
       const assistantMessageId = `assistant-${Date.now()}`;
       const assistantMessage: Message = {
         id: assistantMessageId,
@@ -183,9 +178,7 @@ Lass uns mit ein paar strategischen Fragen starten.
 
       addMessageSafely(assistantMessage);
 
-      // Check if consultation is complete
       if (data.isComplete && data.recommendation && data.progress >= 100) {
-        // ✅ r59: Persist recommendation so "Video erstellen" can use it
         setLastRecommendation(data.recommendation);
         if (mode === 'full-service') {
           setTimeout(() => {
@@ -193,16 +186,14 @@ Lass uns mit ein paar strategischen Fragen starten.
             const confirmMessage: Message = {
               id: confirmMessageId,
               role: 'assistant',
-              content: `**Exzellent! Dein ${categoryInfo?.name}-Briefing ist komplett.**
-
-${data.recommendation.productSummary ? `📦 **Thema:** ${data.recommendation.productSummary}` : ''}
-${data.recommendation.targetAudience?.length ? `👥 **Zielgruppe:** ${data.recommendation.targetAudience.join(', ')}` : ''}
-${data.recommendation.recommendedStyle ? `🎨 **Stil:** ${data.recommendation.recommendedStyle}` : ''}
-${data.recommendation.recommendedTone ? `🎭 **Tonalität:** ${data.recommendation.recommendedTone}` : ''}
-${data.recommendation.recommendedDuration ? `⏱️ **Länge:** ${data.recommendation.recommendedDuration}s` : ''}
-
-Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
-              quickReplies: ['Video erstellen', 'Lieber manuell']
+              content: t('uvc.consultantBriefingComplete', { category: categoryInfo?.name || '' }) + '\n\n' +
+                (data.recommendation.productSummary ? `📦 **${data.recommendation.productSummary}**\n` : '') +
+                (data.recommendation.targetAudience?.length ? `👥 ${data.recommendation.targetAudience.join(', ')}\n` : '') +
+                (data.recommendation.recommendedStyle ? `🎨 ${data.recommendation.recommendedStyle}\n` : '') +
+                (data.recommendation.recommendedTone ? `🎭 ${data.recommendation.recommendedTone}\n` : '') +
+                (data.recommendation.recommendedDuration ? `⏱️ ${data.recommendation.recommendedDuration}s\n` : '') +
+                '\n' + t('uvc.consultantCreateQuestion'),
+              quickReplies: [t('uvc.consultantCreateVideo'), t('uvc.consultantPreferManual')]
             };
             addMessageSafely(confirmMessage);
             setShowModeChoice(true);
@@ -221,10 +212,9 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
       clearTimeout(timeoutId);
       console.error('Consultant error:', error);
       
-      // Retry logic with exponential backoff (max 2 retries)
       if ((error?.name === 'AbortError' || error?.message?.includes('timeout')) && retryCount < 2) {
         console.log(`[Consultant] Retrying... attempt ${retryCount + 1}/2`);
-        const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s
+        const delay = Math.pow(2, retryCount) * 1000;
         await new Promise(resolve => setTimeout(resolve, delay));
         return sendMessage(content, retryCount + 1);
       }
@@ -234,9 +224,9 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
         id: errorMessageId,
         role: 'assistant',
         content: retryCount > 0 
-          ? 'Die Verbindung ist leider abgebrochen. Bitte versuche es erneut.'
-          : 'Es gab einen technischen Fehler. Bitte versuche es erneut.',
-        quickReplies: ['Erneut versuchen', 'Beratung überspringen']
+          ? t('uvc.consultantConnectionLost')
+          : t('uvc.consultantTechError'),
+        quickReplies: [t('uvc.consultantRetry'), t('uvc.consultantSkipConsult')]
       };
       addMessageSafely(errorMessage);
     } finally {
@@ -249,14 +239,13 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
     if (quickReplyLocked || isLoading) return;
     setQuickReplyLocked(true);
     
-    if (reply === 'Beratung überspringen') {
+    if (reply === t('uvc.consultantSkipConsult')) {
       onSkip();
       return;
     }
     
     if (showModeChoice) {
-      if (reply.includes('Video erstellen')) {
-        // ✅ r59: Use preserved interview data instead of empty fallback
+      if (reply === t('uvc.consultantCreateVideo')) {
         if (lastRecommendation) {
           console.log('[Consultant] Using lastRecommendation with interview data:', Object.keys(lastRecommendation));
           onConsultationComplete({
@@ -268,7 +257,6 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
           return;
         }
         
-        // Fallback: only if recommendation was somehow lost
         console.warn('[Consultant] lastRecommendation is null, using fallback');
         const userMessages = messages.filter(m => m.role === 'user');
         const productMessage = userMessages.find((m, idx) => idx >= 1 && m.content.length > 20);
@@ -281,7 +269,7 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
           companyName: '',
           productName: productSummary,
           productDescription: productSummary,
-          targetAudience: 'Allgemein',
+          targetAudience: '',
           coreProblem: '',
           solution: '',
           uniqueSellingPoints: [],
@@ -294,7 +282,7 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
           brandColors: [],
           hasCharacter: true,
           voiceGender: 'male',
-          voiceLanguage: 'de',
+          voiceLanguage: language === 'en' ? 'en' : language === 'es' ? 'es' : 'de',
           voiceTone: 'professionell',
           musicStyle: 'corporate',
           musicMood: 'inspirational',
@@ -307,7 +295,7 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
         
         onConsultationComplete(result);
         return;
-      } else if (reply.includes('manuell')) {
+      } else if (reply === t('uvc.consultantPreferManual')) {
         onSkip();
         return;
       }
@@ -325,7 +313,7 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Header - James Bond 2028 */}
+      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -336,12 +324,10 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
           boxShadow: '0 0 60px rgba(245,199,106,0.1), inset 0 1px 0 rgba(255,255,255,0.05)'
         }}
       >
-        {/* Background effects */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(245,199,106,0.08),transparent_50%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(34,211,238,0.05),transparent_50%)]" />
         
         <div className="relative flex items-center gap-5">
-          {/* Avatar */}
           <div className="relative">
             <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-gold/30 to-cyan-500/20 blur-md" />
             <div className="relative">
@@ -354,7 +340,6 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
             />
           </div>
           
-          {/* Info */}
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-1">
               <h3 className="font-heading text-2xl font-bold bg-gradient-to-r from-gold via-amber-300 to-gold bg-clip-text text-transparent">
@@ -362,7 +347,7 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
               </h3>
               <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gold/10 border border-gold/30 text-gold flex items-center gap-1.5">
                 <Zap className="h-3 w-3" />
-                Video-Stratege
+                {t('uvc.consultantVideoStrategist')}
               </span>
               <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
                 {categoryInfo?.name}
@@ -370,8 +355,8 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
             </div>
             <p className="text-sm text-muted-foreground/80">
               {mode === 'full-service' 
-                ? `Phase ${currentPhase} von ${totalPhases} • ${Math.round(consultationProgress)}% abgeschlossen`
-                : 'Strategische Beratung für dein perfektes Video'
+                ? t('uvc.consultantPhaseOf', { current: String(currentPhase), total: String(totalPhases), percent: String(Math.round(consultationProgress)) })
+                : t('uvc.consultantStrategicAdvice')
               }
             </p>
           </div>
@@ -383,18 +368,18 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
               onClick={onSkip} 
               className="text-muted-foreground hover:text-gold hover:bg-gold/10 transition-all"
             >
-              Überspringen
+              {t('uvc.consultantSkip')}
             </Button>
           )}
         </div>
       </motion.div>
 
-      {/* Progress Bar - Premium Neon */}
+      {/* Progress Bar */}
       <div className="mb-8 relative">
         <div className="flex justify-between text-xs mb-3">
           <span className="flex items-center gap-2 text-muted-foreground">
             <Crown className="h-3.5 w-3.5 text-gold" />
-            <span className="font-medium">{categoryInfo?.name}-Beratung</span>
+            <span className="font-medium">{categoryInfo?.name} {t('uvc.consultantConsultation')}</span>
           </span>
           <span className="text-gold font-bold">{Math.round(consultationProgress)}%</span>
         </div>
@@ -414,7 +399,6 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
           </motion.div>
         </div>
         
-        {/* Phase dots */}
         {mode === 'full-service' && (
           <div className="flex justify-between mt-3 px-1">
             {Array.from({ length: Math.min(totalPhases, 10) }, (_, i) => (
@@ -437,7 +421,7 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
         )}
       </div>
 
-      {/* Chat Container - Glassmorphism */}
+      {/* Chat Container */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -449,7 +433,6 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
           backdropFilter: 'blur(20px)'
         }}
       >
-        {/* Grid pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(245,199,106,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(245,199,106,0.02)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
         
         <div className="p-5 min-h-[420px] max-h-[500px] overflow-y-auto relative">
@@ -516,7 +499,6 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
             })()}
           </AnimatePresence>
           
-          {/* Typing indicator */}
           {isLoading && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -540,7 +522,7 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
         </div>
       </motion.div>
 
-      {/* Input - Premium Style */}
+      {/* Input */}
       <motion.form 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -552,7 +534,7 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Schreibe deine Antwort..."
+          placeholder={t('uvc.consultantPlaceholder')}
           disabled={isLoading}
           className={cn(
             "flex-1 bg-background/50 border border-white/10 rounded-xl px-5 py-4 text-[15px]",

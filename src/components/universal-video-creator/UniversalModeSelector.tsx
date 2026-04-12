@@ -3,8 +3,9 @@ import { Sparkles, Hand, ArrowRight, Clock, Zap, Palette, Video, MessageSquare }
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { VideoCategory } from '@/types/universal-video-creator';
-import { VIDEO_CATEGORIES } from '@/types/universal-video-creator';
 import { ALL_CATEGORY_INTERVIEWS } from '@/config/universal-video-interviews';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useLocalizedVideoCategories } from '@/hooks/useLocalizedVideoCategories';
 
 export type UniversalGenerationMode = 'full-service' | 'manual';
 
@@ -15,7 +16,9 @@ interface UniversalModeSelectorProps {
 }
 
 export function UniversalModeSelector({ selectedCategory, onSelectMode, onBack }: UniversalModeSelectorProps) {
-  const category = VIDEO_CATEGORIES.find(c => c.category === selectedCategory);
+  const { t } = useTranslation();
+  const localizedCategories = useLocalizedVideoCategories();
+  const category = localizedCategories.find(c => c.category === selectedCategory);
   const interview = ALL_CATEGORY_INTERVIEWS[selectedCategory];
   const questionCount = interview?.phases?.length || 20;
 
@@ -33,16 +36,16 @@ export function UniversalModeSelector({ selectedCategory, onSelectMode, onBack }
         >
           <Video className="h-4 w-4 text-[#F5C76A]" />
           <span className="text-sm font-medium text-[#F5C76A]">{category?.name}</span>
-          <span className="text-xs text-muted-foreground">• Kategorie ändern</span>
+          <span className="text-xs text-muted-foreground">• {t('uvc.changeCategory')}</span>
         </button>
         
         <h2 className="text-3xl font-bold mb-4">
           <span className="bg-gradient-to-r from-[#F5C76A] via-amber-300 to-[#F5C76A] bg-clip-text text-transparent">
-            Wie möchtest du dein {category?.name} erstellen?
+            {t('uvc.modeHeading', { name: category?.name || '' })}
           </span>
         </h2>
         <p className="text-muted-foreground text-lg">
-          Wähle zwischen vollautomatischer KI-Erstellung oder manueller Kontrolle
+          {t('uvc.modeSubheading')}
         </p>
       </motion.div>
 
@@ -64,55 +67,51 @@ export function UniversalModeSelector({ selectedCategory, onSelectMode, onBack }
           {/* Recommended Badge */}
           <div className="absolute top-4 right-4">
             <div className="px-3 py-1 rounded-full bg-[#F5C76A]/20 border border-[#F5C76A]/40 text-xs font-medium text-[#F5C76A]">
-              Empfohlen
+              {t('uvc.recommended')}
             </div>
           </div>
 
           <div className="p-8">
-            {/* Icon */}
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#F5C76A]/30 to-purple-500/30 flex items-center justify-center mb-6">
               <Sparkles className="h-8 w-8 text-[#F5C76A]" />
             </div>
 
-            {/* Title */}
-            <h3 className="text-2xl font-bold mb-2">🤖 Full-Service KI</h3>
+            <h3 className="text-2xl font-bold mb-2">{t('uvc.fullServiceTitle')}</h3>
             <p className="text-muted-foreground mb-6">
-              Lehn dich zurück – die KI erstellt dein komplettes {category?.name} automatisch
+              {t('uvc.fullServiceDesc', { name: category?.name || '' })}
             </p>
 
-            {/* Features */}
             <div className="space-y-3 mb-8">
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-8 h-8 rounded-lg bg-[#F5C76A]/20 flex items-center justify-center">
                   <MessageSquare className="h-4 w-4 text-[#F5C76A]" />
                 </div>
-                <span>{questionCount} tiefgehende Interview-Fragen</span>
+                <span>{t('uvc.deepQuestions', { count: questionCount })}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
                   <Clock className="h-4 w-4 text-green-400" />
                 </div>
-                <span>Fertig in ~5-15 Minuten</span>
+                <span>{t('uvc.readyIn')}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
                   <Zap className="h-4 w-4 text-cyan-400" />
                 </div>
-                <span>Keine manuelle Arbeit nötig</span>
+                <span>{t('uvc.noManualWork')}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
                   <Palette className="h-4 w-4 text-purple-400" />
                 </div>
-                <span>Premium Flux 1.1 Pro Visuals</span>
+                <span>{t('uvc.premiumVisuals')}</span>
               </div>
             </div>
 
-            {/* What you get */}
             <div className="bg-muted/20 rounded-xl p-4 mb-6">
-              <p className="text-xs text-muted-foreground mb-2">Du erhältst:</p>
+              <p className="text-xs text-muted-foreground mb-2">{t('uvc.youGet')}:</p>
               <p className="text-sm">
-                ✓ KI-Drehbuch  ✓ Premium Visuals  ✓ Voice-Over  ✓ Musik  ✓ 3 Formate
+                {t('uvc.youGetList')}
               </p>
             </div>
 
@@ -123,7 +122,7 @@ export function UniversalModeSelector({ selectedCategory, onSelectMode, onBack }
                 "hover:shadow-[0_0_30px_rgba(245,199,106,0.4)] text-black font-semibold"
               )}
             >
-              Full-Service starten
+              {t('uvc.startFullService')}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -144,50 +143,46 @@ export function UniversalModeSelector({ selectedCategory, onSelectMode, onBack }
           onClick={() => onSelectMode('manual')}
         >
           <div className="p-8">
-            {/* Icon */}
             <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-6">
               <Hand className="h-8 w-8 text-foreground" />
             </div>
 
-            {/* Title */}
-            <h3 className="text-2xl font-bold mb-2">✋ Manueller Modus</h3>
+            <h3 className="text-2xl font-bold mb-2">{t('uvc.manualTitle')}</h3>
             <p className="text-muted-foreground mb-6">
-              Volle Kontrolle über jeden Schritt – für kreative Perfektion
+              {t('uvc.manualDesc')}
             </p>
 
-            {/* Features */}
             <div className="space-y-3 mb-8">
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-8 h-8 rounded-lg bg-muted/30 flex items-center justify-center">
                   <Palette className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <span>Jeden Schritt selbst gestalten</span>
+                <span>{t('uvc.manualF1')}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-8 h-8 rounded-lg bg-muted/30 flex items-center justify-center">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <span>~20-40 Minuten Bearbeitung</span>
+                <span>{t('uvc.manualF2')}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-8 h-8 rounded-lg bg-muted/30 flex items-center justify-center">
                   <Hand className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <span>Szenen einzeln bearbeiten</span>
+                <span>{t('uvc.manualF3')}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-8 h-8 rounded-lg bg-muted/30 flex items-center justify-center">
                   <Video className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <span>Bis zu 5 Minuten Videolänge</span>
+                <span>{t('uvc.manualF4')}</span>
               </div>
             </div>
 
-            {/* Steps preview */}
             <div className="bg-muted/20 rounded-xl p-4 mb-6">
-              <p className="text-xs text-muted-foreground mb-2">8 Schritte:</p>
+              <p className="text-xs text-muted-foreground mb-2">{t('uvc.manualSteps')}</p>
               <p className="text-sm">
-                Briefing → Drehbuch → Storyboard → Visuals → Animation → Audio → Export
+                {t('uvc.manualStepsList')}
               </p>
             </div>
 
@@ -196,7 +191,7 @@ export function UniversalModeSelector({ selectedCategory, onSelectMode, onBack }
               size="lg" 
               className="w-full"
             >
-              Manuell starten
+              {t('uvc.startManual')}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -210,7 +205,7 @@ export function UniversalModeSelector({ selectedCategory, onSelectMode, onBack }
         transition={{ delay: 0.4 }}
         className="text-center text-sm text-muted-foreground mt-8"
       >
-        💡 Du kannst jederzeit vom Full-Service in den manuellen Modus wechseln
+        {t('uvc.modeSwitchNote')}
       </motion.p>
     </div>
   );
