@@ -185,7 +185,7 @@ serve(async (req) => {
             console.log(`[auto-generate-universal-video] 🛑 r25 HARD STOP: ${recentFailures.length} failures in 10min for user ${userId}. Returning capacity_cooldown.`);
             return new Response(JSON.stringify({ 
               error: 'capacity_cooldown',
-              message: 'Zu viele fehlgeschlagene Versuche. Bitte warte 10 Minuten und versuche es dann erneut.',
+              message: msg('capacity_cooldown', lang),
               cooldownMinutes: 10,
               failureCount: recentFailures.length,
             }), {
@@ -225,7 +225,7 @@ serve(async (req) => {
               status: 'processing',
               current_step: 'rendering',
               progress_percent: 85,
-              status_message: '🔄 Server-seitig erzwungener Render-Only Retry — Assets werden wiederverwendet...',
+              status_message: msg('render_only_forced', lang),
               briefing_json: existingProgress.briefing_json,
             })
             .select()
@@ -291,7 +291,7 @@ serve(async (req) => {
           console.warn(`[auto-generate-universal-video] ❌ r43: No lambdaPayload found in chain. Returning structured error.`);
           return new Response(JSON.stringify({
             error: 'render_only_source_missing_payload',
-            message: 'Kein wiederverwendbarer Render-Payload gefunden. Bitte starte eine neue Generierung.',
+          message: msg('render_only_no_payload', lang),
           }), {
             status: 422,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -321,7 +321,7 @@ serve(async (req) => {
         console.log(`[auto-generate-universal-video] 🛑 r25: Render-only limit reached (${renderOnlyAttempts}/3)`);
         return new Response(JSON.stringify({
           error: 'capacity_cooldown',
-          message: 'Maximale Render-Retries erreicht. Bitte warte einige Minuten.',
+          message: msg('render_retry_limit', lang),
           cooldownMinutes: 5,
           renderOnlyAttempts,
         }), {
@@ -339,7 +339,7 @@ serve(async (req) => {
           status: 'processing',
           current_step: 'rendering',
           progress_percent: 85,
-          status_message: '🔄 Render-Only Retry — Assets werden wiederverwendet...',
+          status_message: msg('render_only_retry', lang),
           briefing_json: existingProgress.briefing_json,
         })
         .select()
