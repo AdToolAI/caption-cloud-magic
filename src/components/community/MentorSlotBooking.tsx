@@ -3,10 +3,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, User } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS, es } from "date-fns/locale";
 import { useMentorSlots } from "@/hooks/useMentorSlots";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "@/hooks/useTranslation";
+
+function getDateLocale(lang: string) {
+  if (lang === 'de') return de;
+  if (lang === 'es') return es;
+  return enUS;
+}
 
 interface MentorSlotBookingProps {
   channelId: string | null;
@@ -14,6 +21,8 @@ interface MentorSlotBookingProps {
 
 export function MentorSlotBooking({ channelId }: MentorSlotBookingProps) {
   const { user } = useAuth();
+  const { t, language } = useTranslation();
+  const dateLocale = getDateLocale(language);
   const { slots, loading, bookSlot } = useMentorSlots(channelId);
 
   const openSlots = slots.filter((s) => s.status === "open");
@@ -36,12 +45,12 @@ export function MentorSlotBooking({ channelId }: MentorSlotBookingProps) {
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Calendar className="h-4 w-4 text-primary" />
-          Peer-Mentoring Slots
+          {t('community.peerMentoring')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {openSlots.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Keine offenen Slots verfügbar.</p>
+          <p className="text-xs text-muted-foreground">{t('community.noOpenSlots')}</p>
         ) : (
           openSlots.map((slot) => (
             <div
@@ -52,13 +61,13 @@ export function MentorSlotBooking({ channelId }: MentorSlotBookingProps) {
                 <User className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-xs font-medium">
-                    {slot.profiles?.email?.split("@")[0] || "Mentor"}
+                    {slot.profiles?.email?.split("@")[0] || t('community.mentor')}
                   </p>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Clock className="h-3 w-3" />
-                    {format(new Date(slot.slot_time), "dd. MMM HH:mm", { locale: de })}
+                    {format(new Date(slot.slot_time), "dd. MMM HH:mm", { locale: dateLocale })}
                     <Badge variant="outline" className="text-xs ml-1">
-                      {slot.duration_min} min
+                      {slot.duration_min} {t('community.min')}
                     </Badge>
                   </div>
                 </div>
@@ -69,7 +78,7 @@ export function MentorSlotBooking({ channelId }: MentorSlotBookingProps) {
                 onClick={() => bookSlot(slot.id)}
                 disabled={slot.mentor_user_id === user?.id}
               >
-                Buchen
+                {t('community.book')}
               </Button>
             </div>
           ))

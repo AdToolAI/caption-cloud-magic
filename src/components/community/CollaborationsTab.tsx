@@ -6,14 +6,23 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Handshake, Plus, User, X } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS, es } from "date-fns/locale";
 import { useCollaborations } from "@/hooks/useCollaborations";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/hooks/useTranslation";
+
+function getDateLocale(lang: string) {
+  if (lang === 'de') return de;
+  if (lang === 'es') return es;
+  return enUS;
+}
 
 export function CollaborationsTab() {
   const { user } = useAuth();
+  const { t, language } = useTranslation();
+  const dateLocale = getDateLocale(language);
   const { posts, loading, createPost, updateStatus } = useCollaborations();
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState("");
@@ -39,6 +48,12 @@ export function CollaborationsTab() {
   };
 
   const filtered = filterStatus === "all" ? posts : posts.filter((p) => p.status === filterStatus);
+
+  const statusLabel = (status: string) => {
+    if (status === "open") return t('community.filterOpen');
+    if (status === "taken") return t('community.filterTaken');
+    return t('community.filterClosed');
+  };
 
   if (loading) {
     return (
@@ -73,12 +88,12 @@ export function CollaborationsTab() {
                 : "border-white/10 hover:bg-white/5 backdrop-blur-md"
               }
             >
-              {s === "all" ? "Alle" : s === "open" ? "Offen" : s === "taken" ? "Vergeben" : "Geschlossen"}
+              {s === "all" ? t('community.filterAll') : s === "open" ? t('community.filterOpen') : s === "taken" ? t('community.filterTaken') : t('community.filterClosed')}
             </Button>
           ))}
         </div>
         <Button size="sm" onClick={() => setShowCreate(!showCreate)} className="gap-2 shadow-[0_0_15px_hsla(43,90%,68%,0.1)]">
-          <Plus className="h-4 w-4" /> Neuer Post
+          <Plus className="h-4 w-4" /> {t('community.newPost')}
         </Button>
       </div>
 
@@ -88,13 +103,13 @@ export function CollaborationsTab() {
           <Card className="backdrop-blur-xl bg-card/60 border-white/10">
             <CardContent className="p-4 space-y-3">
               <Input
-                placeholder="Titel der Kollaboration"
+                placeholder={t('community.collabTitle')}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="bg-card/60 border-white/10"
               />
               <Textarea
-                placeholder="Beschreibe dein Projekt und was du suchst..."
+                placeholder={t('community.describeProject')}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
@@ -102,13 +117,13 @@ export function CollaborationsTab() {
               />
               <div className="flex gap-2">
                 <Input
-                  placeholder="Skill hinzufügen (z.B. Video-Editing)"
+                  placeholder={t('community.addSkill')}
                   value={skillInput}
                   onChange={(e) => setSkillInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddSkill())}
                   className="flex-1 bg-card/60 border-white/10"
                 />
-                <Button variant="outline" size="sm" onClick={handleAddSkill} className="border-white/10 hover:bg-white/5">Hinzufügen</Button>
+                <Button variant="outline" size="sm" onClick={handleAddSkill} className="border-white/10 hover:bg-white/5">{t('community.add')}</Button>
               </div>
               {skills.length > 0 && (
                 <div className="flex gap-1 flex-wrap">
@@ -124,9 +139,9 @@ export function CollaborationsTab() {
                 </div>
               )}
               <div className="flex justify-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)} className="hover:bg-white/5">Abbrechen</Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)} className="hover:bg-white/5">{t('community.cancel')}</Button>
                 <Button size="sm" onClick={handleCreate} disabled={!title.trim() || !description.trim()} className="shadow-[0_0_15px_hsla(43,90%,68%,0.1)]">
-                  Veröffentlichen
+                  {t('community.publish')}
                 </Button>
               </div>
             </CardContent>
@@ -144,7 +159,7 @@ export function CollaborationsTab() {
           <motion.div animate={{ y: [0, -5, 0] }} transition={{ duration: 3, repeat: Infinity }}>
             <Handshake className="h-8 w-8 mb-2 opacity-40 text-[hsl(43,90%,68%)]" />
           </motion.div>
-          <p className="text-sm">Keine Kollaborationen gefunden.</p>
+          <p className="text-sm">{t('community.noCollabs')}</p>
         </motion.div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -163,7 +178,7 @@ export function CollaborationsTab() {
                       variant={post.status === "open" ? "default" : post.status === "taken" ? "secondary" : "outline"}
                       className={`text-xs shrink-0 ${post.status === "open" ? "shadow-[0_0_10px_hsla(43,90%,68%,0.15)]" : ""}`}
                     >
-                      {post.status === "open" ? "Offen" : post.status === "taken" ? "Vergeben" : "Geschlossen"}
+                      {statusLabel(post.status)}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -179,9 +194,9 @@ export function CollaborationsTab() {
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <User className="h-3 w-3" />
-                      {post.profiles?.email?.split("@")[0] || "Anonym"}
+                      {post.profiles?.email?.split("@")[0] || t('community.anonymous')}
                     </div>
-                    <span>{format(new Date(post.created_at), "dd. MMM yyyy", { locale: de })}</span>
+                    <span>{format(new Date(post.created_at), "dd. MMM yyyy", { locale: dateLocale })}</span>
                   </div>
                   {post.user_id === user?.id && post.status === "open" && (
                     <div className="flex gap-2">
@@ -191,7 +206,7 @@ export function CollaborationsTab() {
                         className="text-xs border-white/10 hover:bg-white/5"
                         onClick={() => updateStatus(post.id, "taken")}
                       >
-                        Als vergeben markieren
+                        {t('community.markTaken')}
                       </Button>
                       <Button
                         size="sm"
@@ -199,7 +214,7 @@ export function CollaborationsTab() {
                         className="text-xs hover:bg-white/5"
                         onClick={() => updateStatus(post.id, "closed")}
                       >
-                        Schließen
+                        {t('community.close')}
                       </Button>
                     </div>
                   )}

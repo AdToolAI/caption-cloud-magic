@@ -3,9 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Megaphone } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS, es } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface Announcement {
   id: string;
@@ -15,9 +16,17 @@ interface Announcement {
   created_at: string;
 }
 
+function getDateLocale(lang: string) {
+  if (lang === 'de') return de;
+  if (lang === 'es') return es;
+  return enUS;
+}
+
 export function PlatformAnnouncements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
+  const { t, language } = useTranslation();
+  const dateLocale = getDateLocale(language);
 
   useEffect(() => {
     const fetch = async () => {
@@ -54,7 +63,7 @@ export function PlatformAnnouncements() {
         <motion.div animate={{ y: [0, -5, 0] }} transition={{ duration: 3, repeat: Infinity }}>
           <Megaphone className="h-8 w-8 mb-2 opacity-40 text-[hsl(43,90%,68%)]" />
         </motion.div>
-        <p className="text-sm">Keine Ankündigungen vorhanden.</p>
+        <p className="text-sm">{t('community.noAnnouncements')}</p>
       </motion.div>
     );
   }
@@ -78,11 +87,11 @@ export function PlatformAnnouncements() {
             <h3 className="text-sm font-semibold">{a.title}</h3>
             {a.priority === "high" && (
               <Badge variant="destructive" className="text-xs shadow-[0_0_10px_hsla(0,80%,60%,0.2)]">
-                Wichtig
+                {t('community.important')}
               </Badge>
             )}
             <span className="text-xs text-muted-foreground ml-auto">
-              {format(new Date(a.created_at), "dd. MMM yyyy", { locale: de })}
+              {format(new Date(a.created_at), "dd. MMM yyyy", { locale: dateLocale })}
             </span>
           </div>
           <p className="text-sm text-muted-foreground whitespace-pre-wrap">{a.content}</p>

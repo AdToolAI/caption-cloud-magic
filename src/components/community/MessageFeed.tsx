@@ -3,8 +3,15 @@ import { Badge } from "@/components/ui/badge";
 import { Star, Shield, User } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS, es } from "date-fns/locale";
 import type { CommunityMessage } from "@/hooks/useCommunityMessages";
+import { useTranslation } from "@/hooks/useTranslation";
+
+function getDateLocale(lang: string) {
+  if (lang === 'de') return de;
+  if (lang === 'es') return es;
+  return enUS;
+}
 
 interface MessageFeedProps {
   messages: CommunityMessage[];
@@ -13,6 +20,9 @@ interface MessageFeedProps {
 }
 
 export function MessageFeed({ messages, loading, filterTags }: MessageFeedProps) {
+  const { t, language } = useTranslation();
+  const dateLocale = getDateLocale(language);
+
   const filteredMessages = useMemo(() => {
     if (filterTags.length === 0) return messages;
     return messages.filter((m) =>
@@ -39,8 +49,8 @@ export function MessageFeed({ messages, loading, filterTags }: MessageFeedProps)
   if (filteredMessages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-        <p className="text-sm">Noch keine Nachrichten in diesem Channel.</p>
-        <p className="text-xs mt-1">Sei der Erste, der schreibt!</p>
+        <p className="text-sm">{t('community.noMessages')}</p>
+        <p className="text-xs mt-1">{t('community.beFirst')}</p>
       </div>
     );
   }
@@ -62,19 +72,19 @@ export function MessageFeed({ messages, loading, filterTags }: MessageFeedProps)
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm font-medium truncate">
-                {msg.profiles?.email?.split("@")[0] || "Anonym"}
+                {msg.profiles?.email?.split("@")[0] || t('community.anonymous')}
               </span>
               <span className="text-xs text-muted-foreground">
-                {format(new Date(msg.created_at), "dd. MMM HH:mm", { locale: de })}
+                {format(new Date(msg.created_at), "dd. MMM HH:mm", { locale: dateLocale })}
               </span>
               {msg.is_spotlight && (
                 <Badge variant="secondary" className="text-xs gap-1">
-                  <Star className="h-3 w-3" /> Spotlight
+                  <Star className="h-3 w-3" /> {t('community.spotlight')}
                 </Badge>
               )}
               {msg.moderation_status === "flagged" && (
                 <Badge variant="destructive" className="text-xs gap-1">
-                  <Shield className="h-3 w-3" /> Moderiert
+                  <Shield className="h-3 w-3" /> {t('community.moderated')}
                 </Badge>
               )}
             </div>

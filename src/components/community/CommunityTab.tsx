@@ -7,9 +7,11 @@ import { SpotlightCard } from "@/components/community/SpotlightCard";
 import { useCommunityMessages } from "@/hooks/useCommunityMessages";
 import { useAuth } from "@/hooks/useAuth";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export function CommunityTab() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [selectedChannel, setSelectedChannel] = useState<CommunityChannel | null>(null);
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const { messages, loading, sendMessage } = useCommunityMessages(selectedChannel?.id || null);
@@ -55,7 +57,7 @@ export function CommunityTab() {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <p className="text-sm">Wähle einen Channel aus, um loszulegen.</p>
+            <p className="text-sm">{t('community.selectChannel')}</p>
           </div>
         )}
       </div>

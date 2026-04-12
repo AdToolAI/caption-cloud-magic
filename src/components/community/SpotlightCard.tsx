@@ -4,7 +4,14 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Star, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, formatDistanceToNow } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS, es } from "date-fns/locale";
+import { useTranslation } from "@/hooks/useTranslation";
+
+function getDateLocale(lang: string) {
+  if (lang === 'de') return de;
+  if (lang === 'es') return es;
+  return enUS;
+}
 
 interface SpotlightCardProps {
   channelId: string | null;
@@ -13,6 +20,8 @@ interface SpotlightCardProps {
 export function SpotlightCard({ channelId }: SpotlightCardProps) {
   const [spotlight, setSpotlight] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { t, language } = useTranslation();
+  const dateLocale = getDateLocale(language);
 
   useEffect(() => {
     if (!channelId) { setLoading(false); return; }
@@ -43,7 +52,7 @@ export function SpotlightCard({ channelId }: SpotlightCardProps) {
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Star className="h-4 w-4 text-primary" />
-          Spotlight Post
+          {t('community.spotlightPost')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -57,7 +66,7 @@ export function SpotlightCard({ channelId }: SpotlightCardProps) {
         )}
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Clock className="h-3 w-3" />
-          Nächste Rotation: {formatDistanceToNow(nextRotation, { locale: de, addSuffix: true })}
+          {t('community.nextRotation')} {formatDistanceToNow(nextRotation, { locale: dateLocale, addSuffix: true })}
         </div>
       </CardContent>
     </Card>

@@ -6,6 +6,7 @@ import { MentoringTab } from "@/components/community/MentoringTab";
 import { CollaborationsTab } from "@/components/community/CollaborationsTab";
 import { motion } from "framer-motion";
 import { useMemo } from "react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -54,6 +55,8 @@ function FloatingParticles() {
 }
 
 export default function Community() {
+  const { t } = useTranslation();
+
   return (
     <motion.div
       className="container py-6 relative"
@@ -80,10 +83,10 @@ export default function Community() {
               WebkitTextFillColor: "transparent",
             }}
           >
-            Creator Community
+            {t('community.heroTitle')}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Dein exklusives Netzwerk — Nachrichten, Channels, Mentoring & Kollaborationen.
+            {t('community.heroSubtitle')}
           </p>
         </div>
       </motion.div>
@@ -102,19 +105,19 @@ export default function Community() {
           <TabsList className="grid w-full grid-cols-4 backdrop-blur-xl bg-card/60 border border-white/10 rounded-xl p-1">
             <TabsTrigger value="messages" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[hsla(43,90%,68%,0.15)] data-[state=active]:to-[hsla(187,84%,55%,0.1)] data-[state=active]:border-[hsla(43,90%,68%,0.3)] data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.1)] rounded-lg transition-all duration-300">
               <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">Nachrichten</span>
+              <span className="hidden sm:inline">{t('community.tabMessages')}</span>
             </TabsTrigger>
             <TabsTrigger value="community" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[hsla(43,90%,68%,0.15)] data-[state=active]:to-[hsla(187,84%,55%,0.1)] data-[state=active]:border-[hsla(43,90%,68%,0.3)] data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.1)] rounded-lg transition-all duration-300">
               <Hash className="h-4 w-4" />
-              <span className="hidden sm:inline">Community</span>
+              <span className="hidden sm:inline">{t('community.tabCommunity')}</span>
             </TabsTrigger>
             <TabsTrigger value="mentoring" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[hsla(43,90%,68%,0.15)] data-[state=active]:to-[hsla(187,84%,55%,0.1)] data-[state=active]:border-[hsla(43,90%,68%,0.3)] data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.1)] rounded-lg transition-all duration-300">
               <Calendar className="h-4 w-4" />
-              <span className="hidden sm:inline">Mentoring</span>
+              <span className="hidden sm:inline">{t('community.tabMentoring')}</span>
             </TabsTrigger>
             <TabsTrigger value="collaborations" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[hsla(43,90%,68%,0.15)] data-[state=active]:to-[hsla(187,84%,55%,0.1)] data-[state=active]:border-[hsla(43,90%,68%,0.3)] data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.1)] rounded-lg transition-all duration-300">
               <Handshake className="h-4 w-4" />
-              <span className="hidden sm:inline">Kollaborationen</span>
+              <span className="hidden sm:inline">{t('community.tabCollaborations')}</span>
             </TabsTrigger>
           </TabsList>
 

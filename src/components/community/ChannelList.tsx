@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Hash, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export interface CommunityChannel {
   id: string;
@@ -21,6 +22,7 @@ interface ChannelListProps {
 export function ChannelList({ selectedChannelId, onSelectChannel }: ChannelListProps) {
   const [channels, setChannels] = useState<CommunityChannel[]>([]);
   const [loading, setLoading] = useState(true);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const fetch = async () => {
@@ -48,7 +50,7 @@ export function ChannelList({ selectedChannelId, onSelectChannel }: ChannelListP
   if (channels.length === 0) {
     return (
       <div className="p-4 text-sm text-muted-foreground text-center">
-        Noch keine Channels vorhanden.
+        {t('community.noChannels')}
       </div>
     );
   }
@@ -56,7 +58,7 @@ export function ChannelList({ selectedChannelId, onSelectChannel }: ChannelListP
   return (
     <div className="space-y-1 p-2">
       <p className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-        Channels
+        {t('community.channelsHeader')}
       </p>
       {channels.map((ch) => (
         <button

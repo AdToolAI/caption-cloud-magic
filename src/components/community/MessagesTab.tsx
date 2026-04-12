@@ -4,9 +4,11 @@ import { MessageSquare, Megaphone } from "lucide-react";
 import { DirectMessages } from "./DirectMessages";
 import { PlatformAnnouncements } from "./PlatformAnnouncements";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export function MessagesTab() {
   const [view, setView] = useState<"dms" | "announcements">("dms");
+  const { t } = useTranslation();
 
   return (
     <motion.div
@@ -23,7 +25,7 @@ export function MessagesTab() {
           className={`gap-2 transition-all duration-300 ${view === "dms" ? "shadow-[0_0_15px_hsla(43,90%,68%,0.15)]" : "hover:bg-white/5"}`}
         >
           <MessageSquare className="h-4 w-4" />
-          Direktnachrichten
+          {t('community.directMessages')}
         </Button>
         <Button
           variant={view === "announcements" ? "default" : "ghost"}
@@ -32,7 +34,7 @@ export function MessagesTab() {
           className={`gap-2 transition-all duration-300 ${view === "announcements" ? "shadow-[0_0_15px_hsla(43,90%,68%,0.15)]" : "hover:bg-white/5"}`}
         >
           <Megaphone className="h-4 w-4" />
-          Plattform-Updates
+          {t('community.platformUpdates')}
         </Button>
       </div>
 
