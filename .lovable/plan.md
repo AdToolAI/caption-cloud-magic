@@ -1,29 +1,54 @@
 
 
-## Fix: Prompt-Optimierung für Kling 3.0 Studio
+## Plan: Seedance 2.0 Video Studio
 
-### Problem
-Der Prompt wurde auf Deutsch und ohne Bewegungsbeschreibung gesendet: *"Erstelle mir bitte ein Werbevideo zu AdTool AI"*. Kling interpretiert das wörtlich — Bild wird leicht verzerrt, keine echte Animation.
+Eigene Seite `/seedance-video-studio` für Seedance 2.0 (ByteDance) — nach dem gleichen Muster wie Kling 3.0.
 
-### Lösung: Automatische Prompt-Optimierung + Tipps
+### Replicate-Modell
+Seedance 2.0 ist auf Replicate verfügbar als `bytedance/seedance-1-lite` (aktuell verfügbare Version). Unterstützt Text-to-Video und Image-to-Video.
 
-**1. Prompt-Optimizer im Kling Studio integrieren**
-- Den bestehenden `VideoPromptOptimizer` (bereits für Sora 2 vorhanden) auch im Kling Studio verfügbar machen
-- Button "✨ Prompt optimieren" neben dem Prompt-Feld
-- Übersetzt automatisch ins Englische und fügt Kamerabewegungen, Beleuchtung etc. hinzu
+### Preise
+Bevor ich implementiere: Welche Preise pro Sekunde sollen für Seedance gelten?
 
-**2. Automatische Prompt-Verbesserung in der Edge Function**
-- `generate-kling-video/index.ts`: Wenn der Prompt deutsch ist oder keine Bewegungsbeschreibung enthält, automatisch über Lovable AI optimieren (ähnlich wie `optimize-video-prompt`)
-- Alternativ: Einfacher Fallback mit englischem Prefix wie `"Cinematic smooth camera movement: "` + übersetzter Prompt
+| Modell | Vorschlag |
+|--------|-----------|
+| Seedance Standard | €0,15/Sek? |
+| Seedance Pro | €0,20/Sek? |
 
-**3. Prompt-Hinweise im UI**
-- Placeholder-Text mit Beispiel-Prompt auf Englisch
-- Hinweis-Box: "Tipps: Schreibe auf Englisch, beschreibe Kamerabewegungen (zoom, pan, dolly), vermeide abstrakte Anweisungen"
+Oder soll es nur ein Modell geben (wie bei Seedance Lite)?
 
-### Dateien
-- `src/pages/KlingVideoStudio.tsx` — VideoPromptOptimizer-Button + Prompt-Tipps hinzufügen
-- `supabase/functions/generate-kling-video/index.ts` — Optional: automatische Prompt-Verbesserung vor Replicate-Aufruf
+### Umfang (analog zu Kling)
 
-### Empfohlener Ansatz
-Einfachste und effektivste Lösung: Den bestehenden `VideoPromptOptimizer`-Dialog (nutzt bereits Lovable AI) im Kling Studio einbinden + bessere Placeholder-Texte. Keine neue Edge Function nötig.
+**1. Config: `src/config/seedanceVideoCredits.ts`**
+- Modell-Definition mit Preisen, Dauer (3-15s), Aspect Ratios
+- Export der Typen
+
+**2. Edge Function: `supabase/functions/generate-seedance-video/index.ts`**
+- Auth + Wallet-Prüfung + Credits-Abzug
+- Replicate API-Aufruf für Seedance
+- DB-Eintrag in `ai_video_generations`
+- Webhook über bestehenden `replicate-webhook`
+
+**3. Seite: `src/pages/SeedanceVideoStudio.tsx`**
+- Prompt-Eingabe mit VideoPromptOptimizer
+- Modell-/Dauer-/Aspect-Ratio-Auswahl
+- Image-to-Video Upload
+- Wallet-Anzeige + Credit-Kauf
+- Generierungs-History (gemeinsam)
+- Prompt-Tipps
+
+**4. Routing: `src/App.tsx`**
+- Route `/seedance-video-studio` hinzufügen
+
+**5. Cross-Links**
+- Links von AIVideoStudio und KlingVideoStudio zu Seedance (und umgekehrt)
+
+**6. History: `VideoGenerationHistory.tsx`**
+- `MODEL_DISPLAY_NAMES` um Seedance-Modelle erweitern
+
+### Keine DB-Änderungen nötig
+Bestehende `ai_video_generations`-Tabelle und Wallet werden wiederverwendet.
+
+### Offene Frage
+Bitte kurz bestätigen: **Welche Preise pro Sekunde** und **welche Modellvarianten** (Standard/Pro oder nur eine)?
 
