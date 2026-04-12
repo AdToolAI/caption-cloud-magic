@@ -1,52 +1,29 @@
 
 
-## Plan: Complete Director's Cut Localization (Phases 4-5)
+## Plan: Fix Director's Cut Translation Key Overwrites
 
-There are still ~35 files with hardcoded German strings. Here's the remaining work broken into manageable batches.
+### Problem
+The `dc` translation namespace is defined **twice** — once inside the main `translations` object (inline, ~300 keys per language) and again via `translations.en.dc = {...}` appended at the bottom of the file (~100 keys). The appended assignment **completely overwrites** the inline block, destroying ~200 keys. This is why the UI shows raw keys like `dc.cutTitle`, `dc.lookTitle`, `dc.fxTitle`, `dc.exportTitle`, etc.
 
-### Batch 1 — Studio Core (6 files)
-- `CapCutEditor.tsx` — toasts (Projekt wird gespeichert, Szene am Playhead geteilt, etc.), blackscreen labels
-- `CapCutTimeline.tsx` — scene labels, context menu items, "Klicken zum Bearbeiten"
-- `CapCutPreviewPlayer.tsx` — "Blackscreen", "Szene X"
-- `CapCutPropertiesPanel.tsx` — property labels
-- `FloatingAIPanel.tsx` — AI panel labels
-- `AudioStudioPro.tsx` — audio labels
+Additionally, the Spanish `dc` block at line 11590 is **outside** the `es` object entirely (the `es` object closes at line 11046), making it dead code.
 
-### Batch 2 — Steps + UI Dialogs (8 files)
-- `StyleLookStep.tsx` — "Wähle Filter und Stile für dein Video"
-- `ColorCorrectionStep.tsx` — "Szene zurücksetzen", "Alle zurücksetzen"
-- `SceneEditingStep.tsx` — ~30 strings: toast messages, keyboard shortcuts, scene actions
-- `SceneSelector.tsx` — "Szene X", "Änderungen gelten nur für diese Szene"
-- `SmartTemplates.tsx` — template descriptions, "Klicke auf ein Template..."
-- `AISceneRemix.tsx` — remix strategy descriptions
-- `AddMediaDialog.tsx` — "Medien hinzufügen"
-- `ContextualActionBar.tsx` — action labels, tooltips
-- `StepLayoutWrapper.tsx`, `VisualTimeline.tsx` — scene labels
+### Fix
 
-### Batch 3 — AI Features (14 files)
-- `AITransitions.tsx` — transition descriptions, toast messages, "Analysiere Szenen..."
-- `AIStyleTransfer.tsx` — "Filter auf ausgewählte Szene angewendet"
-- `AISoraEnhance.tsx` — style descriptions, "KI-Überarbeitung mit Sora 2"
-- `AIColorGrading.tsx` — "Szenen-Grading entfernen"
-- `BeatSyncEditor.tsx` — "Schnitte auf Beat"
-- `SpeedRamping.tsx` — keyframe labels
-- `AIAutoCut.tsx`, `AISoundDesign.tsx`, `AIVoiceOver.tsx`, `AIVideoRestoration.tsx`, `AIVideoUpscaling.tsx`, `AIFrameInterpolation.tsx`, `GreenScreenChromaKey.tsx`, `KenBurnsEffect.tsx`
-- `TextOverlayEditor.tsx`, `TextOverlayEditor2028.tsx`
+1. **Merge the appended blocks into the inline blocks** — take every key from `translations.en.dc` (line 13943), `translations.de.dc` (line 14043), and `translations.es.dc` (line 14143) that isn't already in the inline blocks and add them there.
 
-### Batch 4 — Timeline (8 files)
-- `EditableVideoTrack.tsx` — "Szene splitten", "Mit vorheriger verbinden", "KI-Effekte"
-- `MultiTrackTimeline.tsx`, `MultiTrackTimelinePro.tsx` — track labels
-- `TimelineStudio.tsx`, `TimelineStudioPro.tsx` — scene labels
-- `AIToolsSidebar.tsx`, `AIToolsSidebarExpanded.tsx` — all AI tool labels
-- `NeonMultiTrackTimeline.tsx`, `FuturisticPreviewPlayer.tsx`
+2. **Delete the appended `translations.*.dc = {...}` blocks** (lines 13940-14248) to eliminate the overwrite.
 
-### Approach
-- Add ~150 new `dc.*` keys to `translations.ts` (EN/DE/ES) across batches
-- DE values = existing hardcoded strings (zero visual change for German users)
-- Each file gets `useTranslation` hook, all strings wrapped with `t()`
-- Static arrays use `useMemo` for language reactivity
-- Will implement in 4 messages (1 batch per message)
+3. **Move the orphaned Spanish `dc` block** (line 11590) into the `es` object before its closing `}` at line 11045, merging it with any keys from the appended ES block.
 
-### Estimated effort
-4 implementation messages, each handling one batch.
+4. **Deduplicate** — where both inline and appended blocks define the same key (e.g. `splitAtPlayhead`, `durationLabel`), keep the inline version (which has the correct translations) and discard duplicates from the appended block.
+
+### Scope
+- Single file: `src/lib/translations.ts`
+- No component changes needed — all components already reference the correct `t('dc.xxx')` keys
+- All three languages (EN/DE/ES) affected
+
+### Technical detail
+- The inline EN block (lines 3653-3975) has keys like `cutTitle`, `lookTitle`, `fxTitle`, `exportTitle`, `qualityLabel`, `format`, `fps`, `aspectRatio`, `filterClassic`, `filterMood`, `colorGrading`, `scenesCount`, `noScenesYet`, `autoCutAI`, `autoCutDesc`, `playheadInfo`, `emptyScene`, `addVideo`, `fromMediaLibrary`, `upload`, `untitledVideo`, etc.
+- The appended EN block (lines 13943-14041) has keys like `back`, `backToImport`, `openSidebar`, `closeSidebar`, `originalSubsRemoved`, `burnedSubsRemoved`, `masterVolumeLabel`, `subtitleStyleStandard`, `sceneOverlay`, etc.
+- After merging, each language's `dc` block will have all ~350+ keys in one place inside the main object.
 
