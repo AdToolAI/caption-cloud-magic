@@ -1553,7 +1553,7 @@ async function runGenerationPipeline(
     } catch (preflightErr) {
       const msg = preflightErr instanceof Error ? preflightErr.message : String(preflightErr);
       console.error(`❌ Pre-flight JSON parse error: ${msg}`);
-      await updateProgress(supabase, progressId, 'failed', 0, `Pre-flight Fehler: ${msg}`);
+      await updateProgress(supabase, progressId, 'failed', 0, `${i18n('error_preflight', lang)}: ${msg}`);
       return;
     }
 
