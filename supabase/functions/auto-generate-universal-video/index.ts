@@ -1143,7 +1143,7 @@ async function runGenerationPipeline(
         scriptText: fullScript,
         voice: briefing.voiceGender === 'female' ? 'sarah' : 'roger',
         voiceGender: briefing.voiceGender || 'male',
-        language: briefing.voiceLanguage || 'de',
+        language: briefing.voiceLanguage || lang || 'de',
         withTimestamps: true,
       }),
     });
@@ -1185,7 +1185,7 @@ async function runGenerationPipeline(
           },
           body: JSON.stringify({
             audioUrl: voiceoverUrl,
-            language: briefing.voiceLanguage || 'de',
+            language: briefing.voiceLanguage || lang || 'de',
           }),
         });
 
