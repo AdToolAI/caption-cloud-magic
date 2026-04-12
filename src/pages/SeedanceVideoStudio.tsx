@@ -225,13 +225,13 @@ export default function SeedanceVideoStudio() {
                     value={[duration]}
                     onValueChange={([v]) => setDuration(v)}
                     min={3}
-                    max={15}
+                    max={modelConfig.maxDuration}
                     step={1}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground mt-1">
                     <span>3s</span>
-                    <span>15s</span>
+                    <span>{modelConfig.maxDuration}s</span>
                   </div>
                 </Card>
 
