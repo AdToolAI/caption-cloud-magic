@@ -14,6 +14,7 @@ import { FEATURE_COSTS, ESTIMATED_COSTS } from '@/lib/featureCosts';
 import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface PreviewExportStepProps {
   formatConfig: FormatConfig;
@@ -50,6 +51,7 @@ export function PreviewExportStep({
   videoQuality,
   onVideoQualityChange,
 }: PreviewExportStepProps) {
+  const { t } = useTranslation();
   const [isRendering, setIsRendering] = useState(false);
   const [renderJobs, setRenderJobs] = useState<RenderJob[]>([]);
   const [selectedFormats, setSelectedFormats] = useState<FormatConfig[]>([formatConfig]);
@@ -95,7 +97,7 @@ export function PreviewExportStep({
               console.log(`🎥 Updating job ${j.id} with status: ${newData.status}`);
               
               if (newData.status === 'completed') {
-                toast.success(`Video für ${j.format.platform} fertig gerendert!`);
+                toast.success(t('uc.renderCompleted', { platform: j.format.platform }));
                 return { 
                   ...j, 
                   status: 'completed' as const, 
@@ -103,11 +105,11 @@ export function PreviewExportStep({
                   downloadUrl: newData.video_url 
                 };
               } else if (newData.status === 'failed') {
-                toast.error(`Render für ${j.format.platform} fehlgeschlagen`);
+                toast.error(t('uc.renderFailed', { platform: j.format.platform }));
                 return { 
                   ...j, 
                   status: 'failed' as const, 
-                  error: newData.error_message || 'Rendering fehlgeschlagen' 
+                  error: newData.error_message || t('uc.failed')
                 };
               }
               return j;
@@ -123,11 +125,10 @@ export function PreviewExportStep({
                 // Commit credits for successful renders
                 const actualCost = successCount * ESTIMATED_COSTS.video_render;
                 commit(reservationId, actualCost).catch(console.error);
-                toast.success(`${successCount} Video(s) erfolgreich gerendert! ${actualCost} Credits verwendet.`);
+                toast.success(t('uc.videosRendered', { count: String(successCount), credits: String(actualCost) }));
               } else {
-                // Refund if all failed
-                refund(reservationId, "Alle Renders fehlgeschlagen").catch(console.error);
-                toast.error('Alle Renders fehlgeschlagen. Credits wurden zurückerstattet.');
+                refund(reservationId, "All renders failed").catch(console.error);
+                toast.error(t('uc.renderAllFailed'));
               }
               
               setReservationId(null);
@@ -229,7 +230,7 @@ export function PreviewExportStep({
 
   const handleRenderVideo = async () => {
     if (selectedFormats.length === 0) {
-      toast.error('Bitte wähle mindestens ein Format aus');
+      toast.error(t('uc.selectAtLeastOneFormat'));
       return;
     }
 
@@ -282,7 +283,7 @@ export function PreviewExportStep({
           
           // Check if we have valid scenes to render
           if (scenes.length > 0 && validatedScenes.length === 0) {
-            throw new Error('Keine gültigen Szenen zum Rendern. Bitte überprüfe die Szenen-Dauer.');
+            throw new Error(t('uc.noValidScenes'));
           }
           
           // Calculate duration: use the LONGER of voiceover or scenes
@@ -292,7 +293,7 @@ export function PreviewExportStep({
 
           // Validate calculatedDuration
           if (!Number.isFinite(calculatedDuration) || calculatedDuration <= 0) {
-            throw new Error('Ungültige Video-Dauer. Bitte überprüfe Voiceover oder Szenen.');
+            throw new Error(t('uc.invalidDuration'));
           }
 
           console.log('🎬 Sending to render:', { 
@@ -348,7 +349,7 @@ export function PreviewExportStep({
 
           // New webhook-based architecture: receive render_id, not output_url
           if (!data?.render_id) {
-            throw new Error('Render-ID nicht erhalten');
+            throw new Error(t('uc.renderIdMissing'));
           }
 
           console.log('🎬 Render started with ID:', data.render_id);
@@ -368,7 +369,7 @@ export function PreviewExportStep({
             )
           );
 
-          toast.success(`Rendering für ${job.format.platform} gestartet. Dies dauert 2-5 Minuten...`);
+          toast.success(t('uc.renderStarted', { platform: job.format.platform }));
 
         } catch (error: any) {
           console.error('Error rendering format:', error);
@@ -383,7 +384,7 @@ export function PreviewExportStep({
                 : j
             )
           );
-          toast.error(`Fehler bei ${job.format.platform}: ${error.message}`);
+          toast.error(`${t('uc.renderFailed', { platform: job.format.platform })}: ${error.message}`);
         }
       }
 
@@ -419,15 +420,15 @@ export function PreviewExportStep({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold mb-2">Vorschau & Export</h2>
+        <h2 className="text-2xl font-semibold mb-2">{t('uc.previewAndExport')}</h2>
         <p className="text-muted-foreground">
-          Rendere dein Video in mehreren Formaten für verschiedene Plattformen
+          {t('uc.renderMultiFormat')}
         </p>
       </div>
 
       {/* Format Selection */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Export-Formate auswählen</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('uc.selectExportFormats')}</h3>
         <div className="space-y-3">
           {formatOptions.map((format, index) => (
             <div key={index} className="flex items-center space-x-3">
@@ -456,7 +457,7 @@ export function PreviewExportStep({
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Sparkles className="h-5 w-5" />
-          Video-Qualität
+          {t('uc.videoQuality')}
         </h3>
         <RadioGroup 
           value={videoQuality} 
@@ -466,16 +467,16 @@ export function PreviewExportStep({
           <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-accent/50 cursor-pointer">
             <RadioGroupItem value="hd" id="quality-hd" />
             <Label htmlFor="quality-hd" className="flex-1 cursor-pointer">
-              <div className="font-medium">HD (1080p)</div>
-              <div className="text-sm text-muted-foreground">Standardqualität • Schneller Render</div>
+              <div className="font-medium">{t('uc.hdQuality')}</div>
+              <div className="text-sm text-muted-foreground">{t('uc.hdDesc')}</div>
             </Label>
             <Badge variant="outline">1x Credits</Badge>
           </div>
           <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-accent/50 cursor-pointer">
             <RadioGroupItem value="4k" id="quality-4k" />
             <Label htmlFor="quality-4k" className="flex-1 cursor-pointer">
-              <div className="font-medium">4K (2160p)</div>
-              <div className="text-sm text-muted-foreground">Ultra-HD • Premium Qualität</div>
+              <div className="font-medium">{t('uc.fourKQuality')}</div>
+              <div className="text-sm text-muted-foreground">{t('uc.fourKDesc')}</div>
             </Label>
             <Badge variant="secondary">2x Credits</Badge>
           </div>
@@ -484,7 +485,7 @@ export function PreviewExportStep({
 
       {/* Preview */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Vorschau</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('uc.preview')}</h3>
         <div 
           className="bg-muted rounded-lg overflow-hidden"
           style={{
@@ -500,7 +501,7 @@ export function PreviewExportStep({
             <div className="text-center space-y-4 p-8">
               <Video className="h-16 w-16 mx-auto text-muted-foreground" />
               <div>
-                <p className="font-medium">Video-Vorschau</p>
+                <p className="font-medium">{t('uc.videoPreview')}</p>
                 <p className="text-sm text-muted-foreground">
                   {formatConfig.width}x{formatConfig.height} • {contentConfig.voiceoverDuration || (scenes.length > 0 ? scenes.reduce((sum, s) => sum + s.duration, 0) : 0).toFixed(0)}s
                 </p>
@@ -521,15 +522,15 @@ export function PreviewExportStep({
           <div className="flex items-center gap-2">
             <Coins className="h-5 w-5 text-primary" />
             <div>
-              <p className="text-sm font-medium">Deine Credits</p>
+              <p className="text-sm font-medium">{t('uc.yourCredits')}</p>
               <p className="text-2xl font-bold">{balance?.balance || 0}</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-sm text-muted-foreground">Kosten für Render</p>
+            <p className="text-sm text-muted-foreground">{t('uc.renderCost')}</p>
             <p className="text-xl font-semibold text-primary">{totalCost} Credits</p>
             <p className="text-xs text-muted-foreground">
-              ({ESTIMATED_COSTS.video_render} pro Format)
+              ({ESTIMATED_COSTS.video_render} {t('uc.perFormat')})
             </p>
           </div>
         </div>
@@ -537,10 +538,10 @@ export function PreviewExportStep({
         {balance && balance.balance < totalCost && (
           <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
             <p className="text-sm text-destructive font-medium">
-              ⚠️ Nicht genügend Credits verfügbar
+              ⚠️ {t('uc.notEnoughCredits')}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Du benötigst {totalCost - balance.balance} weitere Credits
+              {t('uc.needMoreCredits', { count: String(totalCost - balance.balance) })}
             </p>
           </div>
         )}
@@ -556,12 +557,12 @@ export function PreviewExportStep({
           {isRendering ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Rendere {renderJobs.length} Format(e)...
+              {t('uc.renderingFormats', { count: String(renderJobs.length) })}
             </>
           ) : (
             <>
               <Sparkles className="mr-2 h-4 w-4" />
-              {selectedFormats.length} Format(e) rendern
+              {t('uc.renderFormats', { count: String(selectedFormats.length) })}
             </>
           )}
         </Button>
@@ -570,7 +571,7 @@ export function PreviewExportStep({
       {/* Render Progress */}
       {renderJobs.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-lg font-semibold">Render-Status</h3>
+          <h3 className="text-lg font-semibold">{t('uc.renderStatus')}</h3>
           {renderJobs.map((job, index) => (
             <Card key={index} className="p-4">
               <div className="space-y-3">
@@ -582,10 +583,10 @@ export function PreviewExportStep({
                     job.status === 'rendering' ? 'text-blue-500' :
                     'text-muted-foreground'
                   }`}>
-                    {job.status === 'pending' && 'Ausstehend...'}
-                    {job.status === 'rendering' && 'Wird gerendert...'}
-                    {job.status === 'completed' && '✓ Abgeschlossen'}
-                    {job.status === 'failed' && '✗ Fehlgeschlagen'}
+                    {job.status === 'pending' && t('uc.pending')}
+                    {job.status === 'rendering' && t('uc.rendering')}
+                    {job.status === 'completed' && `✓ ${t('uc.completed')}`}
+                    {job.status === 'failed' && `✗ ${t('uc.failed')}`}
                   </span>
                 </div>
 
@@ -593,7 +594,7 @@ export function PreviewExportStep({
                   <div className="space-y-2">
                     <Progress value={job.progress} className="w-full" />
                     <p className="text-xs text-muted-foreground">
-                      Rendering läuft... Dies kann 2-5 Minuten dauern. Status wird automatisch aktualisiert.
+                      {t('uc.renderingInProgress')}
                     </p>
                   </div>
                 )}
@@ -607,7 +608,7 @@ export function PreviewExportStep({
                       className="w-full"
                     >
                       <Download className="mr-2 h-4 w-4" />
-                      Download
+                      {t('uc.download')}
                     </Button>
                     
                     <div className="grid grid-cols-3 gap-2">
@@ -618,7 +619,7 @@ export function PreviewExportStep({
                         className="w-full"
                       >
                         <Sparkles className="mr-2 h-4 w-4" />
-                        An KI-Post
+                        {t('uc.toAIPost')}
                       </Button>
                       
                       <Button
@@ -628,7 +629,7 @@ export function PreviewExportStep({
                         className="w-full"
                       >
                         <Video className="mr-2 h-4 w-4" />
-                        An Director's Cut
+                        {t('uc.toDirectorsCut')}
                       </Button>
 
                       <Button
@@ -638,7 +639,7 @@ export function PreviewExportStep({
                         className="w-full"
                       >
                         <FolderOpen className="mr-2 h-4 w-4" />
-                        Zur Mediathek
+                        {t('uc.toMediaLibrary')}
                       </Button>
                     </div>
                   </div>
@@ -655,26 +656,26 @@ export function PreviewExportStep({
 
       {/* Export Summary */}
       <Card className="p-6 bg-muted/50">
-        <h3 className="text-lg font-semibold mb-3">Export-Zusammenfassung</h3>
+        <h3 className="text-lg font-semibold mb-3">{t('uc.exportSummary')}</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Script-Länge:</span>
+            <span className="text-muted-foreground">{t('uc.scriptLength')}:</span>
             <span className="font-medium">
-              {contentConfig.scriptText?.split(/\s+/).filter(Boolean).length ?? 0} Wörter
+              {contentConfig.scriptText?.split(/\s+/).filter(Boolean).length ?? 0} {t('uc.words')}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Voice-over Dauer:</span>
+            <span className="text-muted-foreground">{t('uc.voiceoverDuration')}:</span>
             <span className="font-medium">
               {contentConfig.voiceoverDuration?.toFixed(1)}s
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Untertitel-Segmente:</span>
+            <span className="text-muted-foreground">{t('uc.subtitleSegmentsCount')}:</span>
             <span className="font-medium">{subtitleConfig.segments.length}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Ausgewählte Formate:</span>
+            <span className="text-muted-foreground">{t('uc.selectedFormats')}:</span>
             <span className="font-medium">{selectedFormats.length}</span>
           </div>
         </div>
