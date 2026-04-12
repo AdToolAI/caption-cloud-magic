@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Languages, Play, Download, RotateCcw, Check, Loader2, AlertCircle, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,12 +10,13 @@ import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
 import { useVideoTranslation, TranslationStatus } from '@/hooks/useVideoTranslation';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 const LANGUAGES = [
   { value: 'de', label: '🇩🇪 Deutsch' },
-  { value: 'en', label: '🇬🇧 English' },
+  { value: 'en', label: '🇺🇸 English' },
   { value: 'es', label: '🇪🇸 Español' },
   { value: 'fr', label: '🇫🇷 Français' },
   { value: 'it', label: '🇮🇹 Italiano' },
@@ -32,25 +33,9 @@ const LANGUAGES = [
   { value: 'sv', label: '🇸🇪 Svenska' },
 ];
 
-const VOICES = [
-  { value: 'EXAVITQu4vr4xnSDxMaL', label: 'Sarah (weiblich)' },
-  { value: 'JBFqnCBsd6RMkjVDRZzb', label: 'George (männlich)' },
-  { value: 'CwhRBWXzGAHq8TQ4Fs17', label: 'Roger (männlich)' },
-  { value: 'FGY2WhTYpPnrIDTdsKH5', label: 'Laura (weiblich)' },
-  { value: 'onwK4e9ZLuTAKqWW03F9', label: 'Daniel (männlich)' },
-  { value: 'pFZP5JQG7iQjIQuC4Bku', label: 'Lily (weiblich)' },
-];
-
-const STEPS: { status: TranslationStatus; label: string }[] = [
-  { status: 'transcribing', label: 'Transkription' },
-  { status: 'translating', label: 'Übersetzung' },
-  { status: 'generating', label: 'Voiceover' },
-  { status: 'rendering', label: 'Zusammenführung' },
-  { status: 'completed', label: 'Fertig' },
-];
-
 export default function VideoTranslator() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { status, translation, progressPercent, startTranslation, reset } = useVideoTranslation();
   const [targetLanguage, setTargetLanguage] = useState('en');
   const [voiceId, setVoiceId] = useState('');
@@ -58,6 +43,23 @@ export default function VideoTranslator() {
   const [videoUrl, setVideoUrl] = useState('');
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  const voices = useMemo(() => [
+    { value: 'EXAVITQu4vr4xnSDxMaL', label: `Sarah (${t('vidTrans.female')})` },
+    { value: 'JBFqnCBsd6RMkjVDRZzb', label: `George (${t('vidTrans.male')})` },
+    { value: 'CwhRBWXzGAHq8TQ4Fs17', label: `Roger (${t('vidTrans.male')})` },
+    { value: 'FGY2WhTYpPnrIDTdsKH5', label: `Laura (${t('vidTrans.female')})` },
+    { value: 'onwK4e9ZLuTAKqWW03F9', label: `Daniel (${t('vidTrans.male')})` },
+    { value: 'pFZP5JQG7iQjIQuC4Bku', label: `Lily (${t('vidTrans.female')})` },
+  ], [t]);
+
+  const steps: { status: TranslationStatus; label: string }[] = useMemo(() => [
+    { status: 'transcribing', label: t('vidTrans.stepTranscription') },
+    { status: 'translating', label: t('vidTrans.stepTranslation') },
+    { status: 'generating', label: t('vidTrans.stepVoiceover') },
+    { status: 'rendering', label: t('vidTrans.stepMerge') },
+    { status: 'completed', label: t('vidTrans.stepDone') },
+  ], [t]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -71,7 +73,7 @@ export default function VideoTranslator() {
     onDrop,
     accept: { 'video/*': ['.mp4', '.mov', '.avi', '.webm', '.mkv'] },
     maxFiles: 1,
-    maxSize: 500 * 1024 * 1024, // 500MB
+    maxSize: 500 * 1024 * 1024,
   });
 
   const handleStart = async () => {
@@ -79,7 +81,6 @@ export default function VideoTranslator() {
 
     let finalVideoUrl = videoUrl;
 
-    // Upload file if needed
     if (videoFile && !videoUrl) {
       setUploading(true);
       const ext = videoFile.name.split('.').pop();
@@ -110,7 +111,7 @@ export default function VideoTranslator() {
   };
 
   const isProcessing = ['uploading', 'transcribing', 'translating', 'generating', 'rendering'].includes(status);
-  const currentStepIndex = STEPS.findIndex(s => s.status === status);
+  const currentStepIndex = steps.findIndex(s => s.status === status);
 
   return (
     <div className="container max-w-4xl mx-auto py-8 px-4 space-y-8">
@@ -118,11 +119,11 @@ export default function VideoTranslator() {
       <div className="text-center space-y-3">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
           <Languages className="h-4 w-4" />
-          Videoübersetzer
+          {t('vidTrans.badge')}
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">Video automatisch übersetzen</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t('vidTrans.title')}</h1>
         <p className="text-muted-foreground max-w-xl mx-auto">
-          Lade ein Video hoch — die KI erkennt die Sprache, übersetzt den Inhalt und erstellt ein synchronisiertes Voiceover in deiner Zielsprache.
+          {t('vidTrans.description')}
         </p>
       </div>
 
@@ -130,8 +131,8 @@ export default function VideoTranslator() {
       {status === 'idle' && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Video auswählen</CardTitle>
-            <CardDescription>Lade ein Video hoch oder füge eine URL ein</CardDescription>
+            <CardTitle className="text-lg">{t('vidTrans.selectVideo')}</CardTitle>
+            <CardDescription>{t('vidTrans.selectVideoDesc')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Dropzone */}
@@ -155,8 +156,8 @@ export default function VideoTranslator() {
               ) : (
                 <div className="space-y-2">
                   <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
-                  <p className="font-medium">Video hier ablegen</p>
-                  <p className="text-sm text-muted-foreground">MP4, MOV, AVI, WebM — max 500 MB</p>
+                  <p className="font-medium">{t('vidTrans.dropVideo')}</p>
+                  <p className="text-sm text-muted-foreground">{t('vidTrans.dropFormats')}</p>
                 </div>
               )}
             </div>
@@ -164,12 +165,12 @@ export default function VideoTranslator() {
             {/* OR URL */}
             <div className="flex items-center gap-4">
               <div className="h-px flex-1 bg-border" />
-              <span className="text-xs text-muted-foreground">ODER</span>
+              <span className="text-xs text-muted-foreground">{t('vidTrans.or')}</span>
               <div className="h-px flex-1 bg-border" />
             </div>
 
             <div>
-              <Label>Video-URL</Label>
+              <Label>{t('vidTrans.videoUrl')}</Label>
               <Input
                 placeholder="https://example.com/video.mp4"
                 value={videoUrl}
@@ -180,7 +181,7 @@ export default function VideoTranslator() {
             {/* Settings */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Zielsprache</Label>
+                <Label>{t('vidTrans.targetLanguage')}</Label>
                 <Select value={targetLanguage} onValueChange={setTargetLanguage}>
                   <SelectTrigger>
                     <SelectValue />
@@ -194,13 +195,13 @@ export default function VideoTranslator() {
               </div>
 
               <div className="space-y-2">
-                <Label>Stimme (optional)</Label>
+                <Label>{t('vidTrans.voiceOptional')}</Label>
                 <Select value={voiceId} onValueChange={setVoiceId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Standard-Stimme" />
+                    <SelectValue placeholder={t('vidTrans.defaultVoice')} />
                   </SelectTrigger>
                   <SelectContent>
-                    {VOICES.map(v => (
+                    {voices.map(v => (
                       <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -210,7 +211,7 @@ export default function VideoTranslator() {
 
             <div className="flex items-center gap-3">
               <Switch checked={includeSubtitles} onCheckedChange={setIncludeSubtitles} />
-              <Label>Untertitel generieren</Label>
+              <Label>{t('vidTrans.generateSubtitles')}</Label>
             </div>
 
             <Button
@@ -220,9 +221,9 @@ export default function VideoTranslator() {
               size="lg"
             >
               {uploading ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Wird hochgeladen...</>
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> {t('vidTrans.uploading')}</>
               ) : (
-                <><Languages className="h-4 w-4 mr-2" /> Übersetzen starten</>
+                <><Languages className="h-4 w-4 mr-2" /> {t('vidTrans.startTranslation')}</>
               )}
             </Button>
           </CardContent>
@@ -235,13 +236,13 @@ export default function VideoTranslator() {
           <CardContent className="py-8 space-y-6">
             <div className="text-center space-y-2">
               <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-              <h3 className="font-semibold text-lg">Video wird übersetzt...</h3>
+              <h3 className="font-semibold text-lg">{t('vidTrans.translating')}</h3>
               <p className="text-sm text-muted-foreground">
-                {status === 'transcribing' && 'Sprache wird erkannt und transkribiert...'}
-                {status === 'translating' && 'Text wird übersetzt...'}
-                {status === 'generating' && 'Voiceover wird generiert...'}
-                {status === 'rendering' && 'Video wird zusammengesetzt...'}
-                {status === 'uploading' && 'Video wird hochgeladen...'}
+                {status === 'transcribing' && t('vidTrans.statusTranscribing')}
+                {status === 'translating' && t('vidTrans.statusTranslating')}
+                {status === 'generating' && t('vidTrans.statusGenerating')}
+                {status === 'rendering' && t('vidTrans.statusRendering')}
+                {status === 'uploading' && t('vidTrans.statusUploading')}
               </p>
             </div>
 
@@ -249,7 +250,7 @@ export default function VideoTranslator() {
 
             {/* Step indicators */}
             <div className="flex items-center justify-between">
-              {STEPS.map((step, i) => {
+              {steps.map((step, i) => {
                 const isCompleted = currentStepIndex > i;
                 const isCurrent = currentStepIndex === i;
                 return (
@@ -272,7 +273,7 @@ export default function VideoTranslator() {
               })}
             </div>
 
-            <p className="text-center text-sm text-muted-foreground">{progressPercent}% abgeschlossen</p>
+            <p className="text-center text-sm text-muted-foreground">{progressPercent}% {t('vidTrans.percentComplete')}</p>
           </CardContent>
         </Card>
       )}
@@ -282,10 +283,10 @@ export default function VideoTranslator() {
         <Card className="border-destructive/50">
           <CardContent className="py-8 text-center space-y-4">
             <AlertCircle className="h-10 w-10 mx-auto text-destructive" />
-            <h3 className="font-semibold text-lg">Übersetzung fehlgeschlagen</h3>
-            <p className="text-sm text-muted-foreground">{translation?.error_message || 'Ein unbekannter Fehler ist aufgetreten.'}</p>
+            <h3 className="font-semibold text-lg">{t('vidTrans.errorTitle')}</h3>
+            <p className="text-sm text-muted-foreground">{translation?.error_message || t('vidTrans.errorDefault')}</p>
             <Button variant="outline" onClick={reset}>
-              <RotateCcw className="h-4 w-4 mr-2" /> Nochmal versuchen
+              <RotateCcw className="h-4 w-4 mr-2" /> {t('vidTrans.retry')}
             </Button>
           </CardContent>
         </Card>
@@ -297,22 +298,22 @@ export default function VideoTranslator() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Check className="h-5 w-5 text-primary" />
-              Übersetzung fertig
+              {t('vidTrans.resultTitle')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Transcript comparison */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-muted-foreground">Originaltext ({translation.source_language})</Label>
+                <Label className="text-muted-foreground">{t('vidTrans.originalText')} ({translation.source_language})</Label>
                 <div className="p-3 rounded-lg bg-muted/50 text-sm max-h-40 overflow-y-auto">
-                  {translation.original_transcript || 'Nicht verfügbar'}
+                  {translation.original_transcript || t('vidTrans.notAvailable')}
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-primary font-medium">Übersetzung ({translation.target_language})</Label>
+                <Label className="text-primary font-medium">{t('vidTrans.translationLabel')} ({translation.target_language})</Label>
                 <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm max-h-40 overflow-y-auto">
-                  {translation.translated_transcript || 'Nicht verfügbar'}
+                  {translation.translated_transcript || t('vidTrans.notAvailable')}
                 </div>
               </div>
             </div>
@@ -332,12 +333,12 @@ export default function VideoTranslator() {
               {translation.voiceover_url && (
                 <Button asChild variant="outline">
                   <a href={translation.voiceover_url} download target="_blank" rel="noopener noreferrer">
-                    <Download className="h-4 w-4 mr-2" /> Voiceover herunterladen
+                    <Download className="h-4 w-4 mr-2" /> {t('vidTrans.downloadVoiceover')}
                   </a>
                 </Button>
               )}
               <Button variant="outline" onClick={reset}>
-                <RotateCcw className="h-4 w-4 mr-2" /> Neues Video übersetzen
+                <RotateCcw className="h-4 w-4 mr-2" /> {t('vidTrans.newTranslation')}
               </Button>
             </div>
           </CardContent>
