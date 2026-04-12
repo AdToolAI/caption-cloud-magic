@@ -348,8 +348,8 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
         {/* Blackscreen overlay */}
         {currentScene?.isBlackscreen && (
           <div className="absolute inset-0 bg-black flex flex-col items-center justify-center z-10">
-            <div className="text-white/30 text-sm font-medium">Blackscreen</div>
-            <div className="text-white/20 text-xs mt-1">Szene {scenes.indexOf(currentScene) + 1}</div>
+            <div className="text-white/30 text-sm font-medium">{t('dc.blackscreen')}</div>
+            <div className="text-white/20 text-xs mt-1">{t('dc.sceneLabel', { index: scenes.indexOf(currentScene) + 1 })}</div>
           </div>
         )}
 

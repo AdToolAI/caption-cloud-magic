@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Zap } from 'lucide-react';
 import { TextOverlayEditor2028 } from '../features/TextOverlayEditor2028';
 import { SmartCropping } from '../features/SmartCropping';

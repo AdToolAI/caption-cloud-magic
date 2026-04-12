@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Mic } from 'lucide-react';
 import { AIVoiceOver } from '../features/AIVoiceOver';
 import { StepLayoutWrapper } from '../ui/StepLayoutWrapper';

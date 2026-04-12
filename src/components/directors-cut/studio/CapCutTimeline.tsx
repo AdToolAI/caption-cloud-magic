@@ -151,7 +151,7 @@ const DraggableScene: React.FC<{
         </div>
         {sceneWidth > 60 && (
           <span className="text-[10px] text-white/80 truncate flex-1 font-medium">
-            {scene.description?.slice(0, Math.floor(sceneWidth / 7)) || `Szene ${index + 1}`}
+            {scene.description?.slice(0, Math.floor(sceneWidth / 7)) || t('dc.sceneLabel', { index: index + 1 })}
           </span>
         )}
         <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto">
@@ -160,7 +160,7 @@ const DraggableScene: React.FC<{
               onClick={(e) => { e.stopPropagation(); onSplit(); }}
               onPointerDown={(e) => e.stopPropagation()}
               className="w-5 h-5 flex items-center justify-center rounded bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 transition-colors"
-              title="Am Playhead teilen"
+              title={t('dc.splitAtPlayhead')}
             >
               <Scissors className="h-3 w-3" />
             </button>
@@ -170,7 +170,7 @@ const DraggableScene: React.FC<{
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
               onPointerDown={(e) => e.stopPropagation()}
               className="w-5 h-5 flex items-center justify-center rounded bg-red-500/20 hover:bg-red-500/40 text-red-300 transition-colors"
-              title="Szene löschen"
+              title={t('dc.deleteScene')}
             >
               <Trash2 className="h-3 w-3" />
             </button>
@@ -399,11 +399,11 @@ const DraggableSubtitleClip: React.FC<{
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             className="relative z-10 w-full h-full bg-transparent text-[10px] text-white px-1.5 outline-none border-none"
-            placeholder="Text eingeben..."
+            placeholder={t('dc.enterText')}
           />
         ) : (
           <span className="relative z-10 text-[10px] text-white/90 truncate px-1.5 font-medium">
-            {clip.text || 'Klicken zum Bearbeiten...'}
+            {clip.text || t('dc.clickToEdit')}
           </span>
         )}
         
@@ -448,7 +448,7 @@ const DraggableSubtitleClip: React.FC<{
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             className="w-12 h-5 px-1 bg-white/5 border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
-            title="Startzeit (Sek)"
+            title={t('dc.startTimeSec')}
           />
           <span className="text-[9px] text-white/40">-</span>
           <input
@@ -463,7 +463,7 @@ const DraggableSubtitleClip: React.FC<{
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             className="w-12 h-5 px-1 bg-white/5 border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
-            title="Endzeit (Sek)"
+            title={t('dc.endTimeSec')}
           />
         </div>
       )}
@@ -820,7 +820,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                     <button
                       className="absolute top-1 bottom-1 w-10 flex items-center justify-center gap-0.5 bg-white/5 hover:bg-white/10 border border-dashed border-white/20 hover:border-white/40 rounded transition-colors"
                       style={{ left: `${(scenes[scenes.length - 1]?.end_time || 0) * zoom + 4}px` }}
-                      title="Neue Szene hinzufügen"
+                      title={t('dc.addNewScene')}
                     >
                       <PlusCircle className="h-3.5 w-3.5 text-white/40" />
                       <ChevronDown className="h-2.5 w-2.5 text-white/40" />
@@ -833,7 +833,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                         className="text-white/80 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
                       >
                         <Square className="h-4 w-4 mr-2 text-zinc-400" />
-                        Leere Szene (Blackscreen)
+                        {t('dc.emptySceneBlackscreen')}
                       </DropdownMenuItem>
                     )}
                     {onSceneAddFromMedia && (
@@ -842,7 +842,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                         className="text-white/80 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
                       >
                         <Film className="h-4 w-4 mr-2 text-indigo-400" />
-                        Video aus Mediathek
+                        {t('dc.videoFromLibrary')}
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>

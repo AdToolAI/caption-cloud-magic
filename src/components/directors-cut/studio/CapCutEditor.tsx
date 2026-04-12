@@ -453,7 +453,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               const voiceoverClip: AudioClip = {
                 id: `voiceover-${Date.now() + 1}`,
                 trackId: 'track-voiceover',
-                name: 'KI Voice-Over',
+                name: t('dc.aiVoiceOverClip'),
                 url: voiceOverUrl,
                 startTime: 0,
                 duration: 10, // Temporary duration until actual audio loads
@@ -573,7 +573,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       ...prev,
       clips: prev.clips.filter(c => c.source !== 'original'),
     }));
-    toast.success('Original-Untertitel entfernt');
+    toast.success(t('dc.originalSubsRemoved'));
   }, []);
 
   // Handler to remove ALL subtitles (original + generated + manual)
@@ -581,7 +581,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     userClearedSubtitlesRef.current = true;
     setSubtitleTrack(prev => ({ ...prev, clips: [] }));
     setSelectedSubtitleId(null);
-    toast.success('Alle Untertitel entfernt');
+    toast.success(t('dc.allSubsRemoved'));
   }, []);
 
   // Handler to retry original subtitle detection
@@ -617,11 +617,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         if (originalSubs.length > 0) {
           originalSubsDetectedRef.current = true;
           setSubtitleTrack(prev => ({ ...prev, clips: originalSubs }));
-          toast.success(`🎬 ${originalSubs.length} Original-Untertitel erkannt`);
+          toast.success(t('dc.originalSubsDetected', { count: originalSubs.length }));
         }
       } catch (err) {
         console.error('[CapCutEditor] Retry detection failed:', err);
-        toast.error('Erkennung fehlgeschlagen. Bitte erneut versuchen.');
+        toast.error(t('dc.detectionFailed'));
       } finally {
         setIsDetectingOriginalSubs(false);
       }
@@ -649,11 +649,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           setCleanedVideoUrl(data.cleaned_video_url);
           onCleanedVideoUrlChange?.(data.cleaned_video_url);
           setIsRemovingBurnedSubs(false);
-          toast.success('Eingebrannte Untertitel erfolgreich entfernt!');
+          toast.success(t('dc.burnedSubsRemoved'));
           if (burnedSubsPollingRef.current) clearInterval(burnedSubsPollingRef.current);
         } else if (data.burned_subtitles_status === 'failed') {
           setIsRemovingBurnedSubs(false);
-          toast.error(data.burned_subtitles_error || 'Entfernung fehlgeschlagen');
+          toast.error(data.burned_subtitles_error || t('dc.burnedSubsRemovalFailed'));
           if (burnedSubsPollingRef.current) clearInterval(burnedSubsPollingRef.current);
         }
       } catch (e) {
@@ -695,24 +695,24 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const handleRemoveBurnedSubtitles = useCallback(async (settings?: { conf_threshold?: number; margin?: number; method?: string }) => {
     let activeProjectId = projectId;
     if (!activeProjectId && onSaveProject) {
-      toast.info('Projekt wird gespeichert...');
+      toast.info(t('dc.projectSaving'));
       activeProjectId = await onSaveProject();
     }
     if (!activeProjectId) {
-      toast.error('Projekt konnte nicht gespeichert werden.');
+      toast.error(t('dc.projectSaveFailed'));
       return;
     }
     setIsRemovingBurnedSubs(true);
     setBurnedSubsStatus('processing');
     try {
-      toast.info('Eingebrannte Untertitel werden per KI entfernt... (1–3 Min.)');
+      toast.info(t('dc.burnedSubsRemoving'));
       const { data, error } = await supabase.functions.invoke('director-cut-remove-burned-subtitles', {
         body: { video_url: videoUrl, project_id: activeProjectId, ...settings },
       });
       
       if (error) {
         // Try to extract structured error
-        let errorMsg = 'Entfernung fehlgeschlagen';
+        let errorMsg = t('dc.burnedSubsRemovalFailed');
         try {
           const errBody = await (error as any)?.context?.json?.();
           if (errBody?.error) errorMsg = errBody.error;
@@ -721,7 +721,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       }
       
       if (!data?.ok) {
-        throw new Error(data?.error || 'Unbekannter Fehler');
+        throw new Error(data?.error || t('dc.unknownError'));
       }
       
       // Start polling for completion
@@ -730,7 +730,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       console.error('[CapCutEditor] Burned subtitle removal failed:', err);
       setIsRemovingBurnedSubs(false);
       setBurnedSubsStatus('failed');
-      toast.error(err instanceof Error ? err.message : 'Entfernung fehlgeschlagen');
+      toast.error(err instanceof Error ? err.message : t('dc.burnedSubsRemovalFailed'));
     }
   }, [videoUrl, projectId, onSaveProject, startBurnedSubsPolling]);
 
@@ -797,7 +797,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         offsetY: sz.offsetY,
         bottomBandPercent: sz.bottomBandPercent,
       });
-      toast.success(`Untertitelbereich erkannt (${sz.bottomBandPercent}%) — Zuschnitt aktiv`);
+      toast.success(t('dc.subtitleBandDetected', { percent: sz.bottomBandPercent }));
     } catch (err) {
       console.error('[CapCutEditor] Band detection failed:', err);
       // Fallback: apply medium preset
@@ -809,7 +809,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         offsetY: -6,
         bottomBandPercent: 12,
       });
-      toast.info('Automatische Erkennung fehlgeschlagen — Standard-Zuschnitt angewendet');
+      toast.info(t('dc.autoDetectionFailed'));
     } finally {
       setIsDetectingBand(false);
     }
@@ -819,7 +819,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const handleRestoreOriginalVideo = useCallback(() => {
     setCleanedVideoUrl(null);
     onCleanedVideoUrlChange?.(null);
-    toast.success('Originalvideo wiederhergestellt');
+    toast.success(t('dc.originalVideoRestored'));
   }, [onCleanedVideoUrlChange]);
 
   // Delete clip handler
@@ -936,8 +936,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       id: `scene-${Date.now()}`,
       start_time: newStartTime,
       end_time: newStartTime + 5, // 5 seconds blackscreen
-      description: 'Neue Szene (Blackscreen)',
-      content_description: 'Leere Szene - Video oder Bild hinzufügen',
+      description: t('dc.newSceneBlackscreen'),
+      content_description: t('dc.emptySceneDesc'),
       suggested_effects: [],
       isBlackscreen: true,
     };
@@ -953,8 +953,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       id: `scene-${Date.now()}`,
       start_time: newStartTime,
       end_time: newStartTime + duration,
-      description: name || 'Hochgeladenes Video',
-      content_description: 'Video aus Upload',
+      description: name || t('dc.uploadedVideo'),
+      content_description: t('dc.videoFromUpload'),
       suggested_effects: [],
       isBlackscreen: false,
       additionalMedia: {
@@ -971,22 +971,22 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     if (!onScenesUpdate || scenes.length === 0) return;
     const targetScene = scenes.find(s => currentTime >= s.start_time && currentTime < s.end_time);
     if (!targetScene) {
-      toast.error('Playhead ist nicht innerhalb einer Szene');
+      toast.error(t('dc.playheadNotInScene'));
       return;
     }
     if (currentTime - targetScene.start_time < 0.5 || targetScene.end_time - currentTime < 0.5) {
-      toast.error('Zu nah am Szenenrand zum Teilen');
+      toast.error(t('dc.tooCloseToEdge'));
       return;
     }
     const newScenes = scenes.flatMap(s => {
       if (s.id !== targetScene.id) return [s];
       return [
         { ...s, id: s.id, end_time: currentTime },
-        { ...s, id: `scene-${Date.now()}`, start_time: currentTime, description: `${s.description} (Teil 2)` },
+        { ...s, id: `scene-${Date.now()}`, start_time: currentTime, description: `${s.description} ${t('dc.partSuffix')}` },
       ];
     });
     onScenesUpdate(newScenes);
-    toast.success('Szene am Playhead geteilt');
+    toast.success(t('dc.sceneSplitAtPlayhead'));
   }, [scenes, currentTime, onScenesUpdate]);
 
   // Duplicate scene
@@ -999,7 +999,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const duplicate: SceneAnalysis = {
       ...scene,
       id: `scene-${Date.now()}`,
-      description: `${scene.description} (Kopie)`,
+      description: `${scene.description} ${t('dc.copySuffix')}`,
     };
     newScenes.splice(idx + 1, 0, duplicate);
     let t = 0;
@@ -1010,7 +1010,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       return updated;
     });
     onScenesUpdate(recalculated);
-    toast.success('Szene dupliziert');
+    toast.success(t('dc.sceneDuplicated'));
   }, [scenes, onScenesUpdate]);
 
   // Cleanup render polling + interpolation on unmount
@@ -1067,7 +1067,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         } else if (progress?.fatalErrorEncountered) {
           stopProgressInterpolation();
           setRenderStatus('failed');
-          setRenderError(progress.errors?.[0]?.message || 'Rendering fehlgeschlagen');
+          setRenderError(progress.errors?.[0]?.message || t('dc.renderingFailed'));
           if (renderPollingRef.current) clearInterval(renderPollingRef.current);
         } else {
           const pct = Math.round((progress?.overallProgress || 0) * 100);
@@ -1109,7 +1109,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       
       if (!savedProjectId) {
         setRenderStatus('failed');
-        setRenderError('Projekt konnte nicht gespeichert werden');
+        setRenderError(t('dc.projectCouldNotSave'));
         return;
       }
 
@@ -1159,14 +1159,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         setRenderedVideoUrl(data.video_url || data.downloadUrl);
       } else {
         setRenderStatus('failed');
-        setRenderError('Keine Render-ID erhalten');
+        setRenderError(t('dc.noRenderIdReceived'));
       }
 
       console.log('[Export] Render initiated:', data);
     } catch (err) {
       console.error('[Export] Error:', err);
       setRenderStatus('failed');
-      setRenderError('Export konnte nicht gestartet werden');
+      setRenderError(t('dc.exportCouldNotStart'));
     }
   }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack, startRenderPolling, videoDuration]);
 
@@ -1231,7 +1231,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const data = event.active.data.current;
     if (data?.type === 'scene') {
       setActiveDragItem({
-        name: `Szene ${data.index + 1}`,
+        name: t('dc.sceneLabel', { index: data.index + 1 }),
         type: 'scene',
         color: data.scene?.isBlackscreen ? '#3f3f46' : '#6366f1',
       });
@@ -1293,7 +1293,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       });
       
       onScenesUpdate(reorderedScenes);
-      toast.success('Szenen-Reihenfolge aktualisiert');
+      toast.success(t('dc.sceneOrderUpdated'));
       return;
     }
 
@@ -1308,7 +1308,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
       // Block video files from being dropped into audio-only tracks
       if (isAudioOnlyTrack && isVideoFile(fileUrl) && !isAudioFile(fileUrl)) {
-        toast.error('Videodateien können nicht in Audio-Tracks gezogen werden. Bitte verwende nur Audio-Dateien.');
+        toast.error(t('dc.videoFilesNotInAudioTracks'));
         return;
       }
 
@@ -1340,7 +1340,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
       // Block video files from being moved to audio-only tracks
       if (isAudioOnlyTrack && isVideoFile(fileUrl) && !isAudioFile(fileUrl)) {
-        toast.error('Videodateien können nicht in Audio-Tracks verschoben werden.');
+        toast.error(t('dc.videoFilesNotMovable'));
         return;
       }
 
@@ -1390,7 +1390,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               size="sm" 
               className="h-7 px-2 text-white/60 hover:text-white hover:bg-white/10 text-xs gap-1"
               onClick={onBackToImport}
-              title="Zurück zum Import"
+              title={t('dc.backToImport')}
             >
               <ArrowRight className="h-3.5 w-3.5 rotate-180" />
               Zurück
@@ -1402,7 +1402,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             size="sm" 
             className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            title={sidebarCollapsed ? "Sidebar öffnen" : "Sidebar schließen"}
+            title={sidebarCollapsed ? t('dc.openSidebar') : t('dc.closeSidebar')}
           >
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
@@ -1421,7 +1421,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             size="sm" 
             className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10"
             onClick={() => setPropertiesCollapsed(!propertiesCollapsed)}
-            title={propertiesCollapsed ? "Eigenschaften öffnen" : "Eigenschaften schließen"}
+            title={propertiesCollapsed ? t('dc.openProperties') : t('dc.closeProperties')}
           >
             {propertiesCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
           </Button>
@@ -1520,7 +1520,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onAddVideoAsScene={async (file) => {
                 // Upload to storage and get video metadata
                 try {
-                  toast.info('Video wird verarbeitet...');
+                  toast.info(t('dc.videoProcessing'));
                   
                   // Create object URL to get video duration
                   const objectUrl = URL.createObjectURL(file);
@@ -1533,18 +1533,18 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                     
                     // Add as new scene
                     handleAddVideoAsScene(objectUrl, duration, file.name);
-                    toast.success(`"${file.name}" als neue Szene hinzugefügt`);
+                    toast.success(t('dc.videoAddedAsScene', { name: file.name }));
                   };
                   
                   video.onerror = () => {
                     URL.revokeObjectURL(objectUrl);
-                    toast.error('Fehler beim Laden des Videos');
+                    toast.error(t('dc.videoLoadError'));
                   };
                   
                   video.src = objectUrl;
                 } catch (error) {
                   console.error('Error adding video as scene:', error);
-                  toast.error('Fehler beim Hinzufügen des Videos');
+                  toast.error(t('dc.videoAddError'));
                 }
               }}
               onMusicDrop={async (track) => {
@@ -1554,7 +1554,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 // If Jamendo URL, upload to storage for faster browser preview
                 if (originalUrl.includes('jamendo.com') || originalUrl.includes('storage.jamendo.com')) {
                   try {
-                    toast.info('Musik wird vorbereitet...');
+                    toast.info(t('dc.musicPreparing'));
                     const { data, error } = await supabase.functions.invoke('upload-music-to-storage', {
                       body: { originalUrl: originalUrl, projectId: 'directors-cut' }
                     });
@@ -1586,7 +1586,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                   color: '#10b981',
                 };
                 handleAddClip('track-music', newClip);
-                toast.success(`"${track.name}" zur Musik-Spur hinzugefügt`);
+                toast.success(t('dc.musicAddedToTrack', { name: track.name }));
               }}
               sceneCount={scenes.length}
               captionCount={subtitleTrack.clips.length}
@@ -1595,7 +1595,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 if (onResetProject) {
                   onResetProject();
                 } else {
-                  toast.info('Projekt wird zurückgesetzt...');
+                  toast.info(t('dc.projectResetting'));
                   handleAudioEffectsChange(DEFAULT_AUDIO_EFFECTS);
                 }
               }}
@@ -1695,7 +1695,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onClipResize={handleClipResize}
                 onSceneDelete={handleSceneDelete}
                 onSceneAdd={handleSceneAdd}
-                onSceneAddFromMedia={() => toast.info('Mediathek-Integration kommt bald! Nutze für jetzt den Upload in der Sidebar.')}
+                onSceneAddFromMedia={() => toast.info(t('dc.mediaLibraryComingSoon'))}
                 onSubtitleUpdate={handleSubtitleUpdate}
                 onSubtitleDelete={handleSubtitleDelete}
                 onSubtitleSelect={handleSubtitleSelect}
@@ -1715,7 +1715,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 <button 
                   onClick={() => setPropertiesCollapsed(false)}
                   className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-                  title="Eigenschaften öffnen"
+                  title={t('dc.openProperties')}
                 >
                   <Settings className="h-5 w-5" />
                 </button>

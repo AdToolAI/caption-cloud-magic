@@ -59,7 +59,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
   return (
     <div className="w-64 flex flex-col border-l border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg">
       <div className="h-10 flex items-center px-3 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80 backdrop-blur-xl">
-        <span className="text-xs text-[#F5C76A]/60 font-medium">Properties</span>
+        <span className="text-xs text-[#F5C76A]/60 font-medium">{t('dc.propertiesHeader')}</span>
       </div>
 
       <div className="flex-1 overflow-auto p-3">
@@ -68,7 +68,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
             {/* Subtitle Header */}
             <div className="flex items-center gap-2 pb-2 border-b border-[#F5C76A]/10">
               <MessageSquare className="h-4 w-4 text-purple-400" />
-              <span className="text-sm text-white font-medium">Untertitel</span>
+              <span className="text-sm text-white font-medium">{t('dc.subtitleHeader')}</span>
             </div>
             
             {/* Text Input */}
@@ -77,7 +77,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
               <Textarea
                 value={selectedSubtitle.text}
                 onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { text: e.target.value })}
-                placeholder="Untertitel-Text eingeben..."
+                placeholder={t('dc.subtitlePlaceholder')}
                 className="min-h-[80px] bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-sm text-white resize-none"
               />
             </div>
@@ -86,11 +86,11 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Clock className="h-3.5 w-3.5 text-purple-400" />
-                <label className="text-xs text-white/60">Timing</label>
+                <label className="text-xs text-white/60">{t('dc.timingLabel')}</label>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-white/40 block mb-1">Start (Sek)</label>
+                  <label className="text-[10px] text-white/40 block mb-1">{t('dc.startSec')}</label>
                   <Input
                     type="number"
                     value={selectedSubtitle.startTime.toFixed(1)}
@@ -103,7 +103,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-white/40 block mb-1">Ende (Sek)</label>
+                  <label className="text-[10px] text-white/40 block mb-1">{t('dc.endSec')}</label>
                   <Input
                     type="number"
                     value={selectedSubtitle.endTime.toFixed(1)}
@@ -120,7 +120,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
             
             {/* Duration (calculated) */}
             <div className="flex justify-between text-xs text-white/50 bg-[#0a0a1a]/60 px-2 py-1.5 rounded">
-              <span>Dauer:</span>
+              <span>{t('dc.durationLabel')}</span>
               <span>{Math.max(0, selectedSubtitle.endTime - selectedSubtitle.startTime).toFixed(1)}s</span>
             </div>
             
@@ -128,7 +128,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Type className="h-3.5 w-3.5 text-purple-400" />
-                <label className="text-xs text-white/60">Stil</label>
+                <label className="text-xs text-white/60">{t('dc.styleLabel')}</label>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {SUBTITLE_STYLES.map(style => (
@@ -152,7 +152,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <AlignVerticalJustifyCenter className="h-3.5 w-3.5 text-purple-400" />
-                <label className="text-xs text-white/60">Position</label>
+                <label className="text-xs text-white/60">{t('dc.positionLabel')}</label>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {(['top', 'center', 'bottom'] as const).map(pos => (
@@ -166,7 +166,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                         : "bg-[#0a0a1a]/60 text-white/60 hover:bg-[#3a3a3a]"
                     )}
                   >
-                    {pos === 'top' ? 'Oben' : pos === 'center' ? 'Mitte' : 'Unten'}
+                    {pos === 'top' ? t('dc.positionTop') : pos === 'center' ? t('dc.positionCenter') : t('dc.positionBottom')}
                   </button>
                 ))}
               </div>
@@ -174,7 +174,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
 
             {/* Font Size */}
             <div>
-              <label className="text-xs text-white/60 block mb-2">Schriftgröße</label>
+              <label className="text-xs text-white/60 block mb-2">{t('dc.fontSizeLabel')}</label>
               <div className="grid grid-cols-4 gap-1">
                 {([
                   { id: 'small', label: 'S' },
@@ -202,11 +202,11 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Palette className="h-3.5 w-3.5 text-purple-400" />
-                <label className="text-xs text-white/60">Farben</label>
+                <label className="text-xs text-white/60">{t('dc.colorsLabel')}</label>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] text-white/40 block mb-1.5">Text</label>
+                  <label className="text-[10px] text-white/40 block mb-1.5">{t('dc.textColorLabel')}</label>
                   <input 
                     type="color" 
                     value={selectedSubtitle.color || DEFAULT_SUBTITLE_STYLE.color}
@@ -215,7 +215,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-white/40 block mb-1.5">Hintergrund</label>
+                  <label className="text-[10px] text-white/40 block mb-1.5">{t('dc.backgroundColorLabel')}</label>
                   <input 
                     type="color" 
                     value={(selectedSubtitle.backgroundColor || DEFAULT_SUBTITLE_STYLE.backgroundColor).slice(0, 7)}
@@ -230,7 +230,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
 
             {/* Font Family */}
             <div>
-              <label className="text-xs text-white/60 block mb-1.5">Schriftart</label>
+              <label className="text-xs text-white/60 block mb-1.5">{t('dc.fontFamilyLabel')}</label>
               <Select
                 value={selectedSubtitle.fontFamily || DEFAULT_SUBTITLE_STYLE.fontFamily}
                 onValueChange={(value) => onSubtitleUpdate?.(selectedSubtitle.id, { fontFamily: value })}
@@ -251,7 +251,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
 
             {/* Max Lines */}
             <div>
-              <label className="text-xs text-white/60 block mb-2">Max. Zeilen</label>
+              <label className="text-xs text-white/60 block mb-2">{t('dc.maxLinesLabel')}</label>
               <div className="grid grid-cols-2 gap-2">
                 {([2, 3] as const).map(lines => (
                   <button
@@ -264,7 +264,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                         : "bg-[#0a0a1a]/60 text-white/60 hover:bg-[#3a3a3a]"
                     )}
                   >
-                    {lines} Zeilen
+                    {lines} {t('dc.linesUnit')}
                   </button>
                 ))}
               </div>
@@ -272,7 +272,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
 
             {/* Text Outline / Umrandung */}
             <div>
-              <label className="text-xs text-white/60 block mb-2">Umrandung</label>
+              <label className="text-xs text-white/60 block mb-2">{t('dc.outlineLabel')}</label>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => onSubtitleUpdate?.(selectedSubtitle.id, { 
@@ -285,7 +285,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                       : "bg-[#0a0a1a]/60 text-white/60 hover:bg-[#3a3a3a]"
                   )}
                 >
-                  {selectedSubtitle.textStroke ? 'Ein' : 'Aus'}
+                  {selectedSubtitle.textStroke ? t('dc.outlineOn') : t('dc.outlineOff')}
                 </button>
                 
                 {selectedSubtitle.textStroke && (
@@ -296,7 +296,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                       textStrokeColor: e.target.value 
                     })}
                     className="w-8 h-8 rounded cursor-pointer bg-[#0a0a1a]/60 border border-[#F5C76A]/10"
-                    title="Umrandungsfarbe"
+                    title={t('dc.outlineColorTitle')}
                   />
                 )}
               </div>
@@ -310,7 +310,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
               className="w-full mt-4"
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Untertitel löschen
+              {t('dc.deleteSubtitle')}
             </Button>
           </div>
         ) : selectedClip ? (
@@ -344,7 +344,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Clock className="h-3.5 w-3.5 text-[#00d4ff]" />
-                <label className="text-xs text-white/60">Timing</label>
+                <label className="text-xs text-white/60">{t('dc.timingLabel')}</label>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -444,9 +444,9 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                 className="w-full mt-4"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                {selectedClip.source === 'original' ? 'Original Audio entfernen' : 
-                 selectedClip.source === 'ai-generated' ? 'Voice-Over entfernen' : 
-                 'Audio-Clip löschen'}
+                {selectedClip.source === 'original' ? t('dc.removeOriginalAudio') : 
+                 selectedClip.source === 'ai-generated' ? t('dc.removeVoiceOver') : 
+                 t('dc.deleteAudioClip')}
               </Button>
             )}
           </div>
@@ -455,7 +455,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
             <div className="w-12 h-12 rounded-full bg-[#0a0a1a]/60 flex items-center justify-center mx-auto mb-3">
               <Volume2 className="h-5 w-5 text-white/40" />
             </div>
-            <p className="text-xs text-white/40">Select a clip to edit</p>
+            <p className="text-xs text-white/40">{t('dc.selectClipToEdit')}</p>
           </div>
         )}
       </div>
@@ -463,7 +463,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
       {/* Project Audio Settings */}
       <div className="border-t border-[#F5C76A]/10 p-3">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-xs text-white/60">Master Volume</span>
+          <span className="text-xs text-white/60">{t('dc.masterVolumeLabel')}</span>
           <span className="text-xs text-white/40 ml-auto">{audioEnhancements.master_volume}%</span>
         </div>
         <Slider

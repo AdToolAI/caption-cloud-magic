@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { motion } from 'framer-motion';
 import { Wand2 } from 'lucide-react';
 import { GlobalEffects, SceneEffects, SceneAnalysis, TransitionAssignment, AudioEnhancements, FilterId } from '@/types/directors-cut';
