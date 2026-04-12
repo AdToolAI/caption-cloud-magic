@@ -15330,6 +15330,9 @@ Object.assign(translations.es, {
     newTranslation: 'Traducir nuevo video',
     hubTitle: 'Traductor de video',
   },
+});
+
+Object.assign(translations.en, {
   picStudio: {
     pageTitle: 'AI Picture Studio',
     breadcrumbCategory: 'Create',
