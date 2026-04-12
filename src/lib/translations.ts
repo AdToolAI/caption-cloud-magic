@@ -1785,6 +1785,8 @@ export const translations: Record<Language, any> = {
       chatManager: "Live chat, polls, predictions & viewer list",
       community: "Connect with other creators and share tips",
       videoTranslator: "Translate videos into other languages with AI",
+      brandKit: "Define your brand colors, logos and voice",
+      campaigns: "Plan and manage marketing campaigns",
     },
     
     // Dashboard
@@ -5592,6 +5594,8 @@ export const translations: Record<Language, any> = {
       chatManager: "Live-Chat, Polls, Predictions & Viewer-Liste",
       community: "Vernetze dich mit anderen Creatorn und teile Tipps",
       videoTranslator: "Übersetze Videos mit KI in andere Sprachen",
+      brandKit: "Definiere Markenfarben, Logos und Stimme",
+      campaigns: "Plane und verwalte Marketing-Kampagnen",
     },
     
     // Dashboard
@@ -9357,6 +9361,8 @@ export const translations: Record<Language, any> = {
       chatManager: "Chat en vivo, encuestas, predicciones y lista de espectadores",
       community: "Conéctate con otros creadores y comparte consejos",
       videoTranslator: "Traduce videos a otros idiomas con IA",
+      brandKit: "Define los colores, logos y voz de tu marca",
+      campaigns: "Planifica y gestiona campañas de marketing",
     },
     
     // Dashboard
