@@ -455,7 +455,7 @@ serve(async (req) => {
     const responseBody = JSON.stringify({ progressId, status: 'started' });
     
     EdgeRuntime.waitUntil(
-      runGenerationPipeline(supabase, progressId, actualBriefing, userId, diagProfile, profileFlags)
+      runGenerationPipeline(supabase, progressId, actualBriefing, userId, diagProfile, profileFlags, lang)
         .catch((err) => {
           console.error('[auto-generate-universal-video] Pipeline error in waitUntil:', err);
         })
