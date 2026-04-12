@@ -309,12 +309,20 @@ export default function AIVideoStudio() {
             {t('aiVid.pageTitle')}
           </h1>
           <p className="text-muted-foreground mt-2">{t('aiVid.pageSubtitle')}</p>
-          <Link to="/kling-video-studio">
-            <Button variant="outline" size="sm" className="mt-3">
-              <Sparkles className="w-4 h-4 mr-2" />
-              Kling 3.0 Studio →
-            </Button>
-          </Link>
+          <div className="flex gap-2 mt-3">
+            <Link to="/kling-video-studio">
+              <Button variant="outline" size="sm">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Kling 3.0 Studio →
+              </Button>
+            </Link>
+            <Link to="/seedance-video-studio">
+              <Button variant="outline" size="sm">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Seedance 2.0 Studio →
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="mb-6">
