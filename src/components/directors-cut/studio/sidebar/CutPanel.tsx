@@ -32,16 +32,27 @@ const formatTime = (s: number) => {
   return `${m}:${sec.padStart(5, '0')}`;
 };
 
-const TRANSITION_TYPES = [
-  { id: 'none', name: 'Keine', icon: '✕' },
-  { id: 'fade', name: 'Fade', icon: '◐' },
-  { id: 'crossfade', name: 'Crossfade', icon: '◑' },
-  { id: 'slide', name: 'Slide', icon: '▶' },
-  { id: 'zoom', name: 'Zoom', icon: '⊕' },
-  { id: 'wipe', name: 'Wipe', icon: '▤' },
-  { id: 'blur', name: 'Blur', icon: '◌' },
-  { id: 'push', name: 'Push', icon: '⇥' },
+const TRANSITION_TYPE_IDS = [
+  { id: 'none', icon: '✕' },
+  { id: 'fade', icon: '◐' },
+  { id: 'crossfade', icon: '◑' },
+  { id: 'slide', icon: '▶' },
+  { id: 'zoom', icon: '⊕' },
+  { id: 'wipe', icon: '▤' },
+  { id: 'blur', icon: '◌' },
+  { id: 'push', icon: '⇥' },
 ] as const;
+
+const TRANSITION_NAME_KEYS: Record<string, string> = {
+  none: 'dc.transitionNone',
+  fade: 'Fade',
+  crossfade: 'Crossfade',
+  slide: 'Slide',
+  zoom: 'Zoom',
+  wipe: 'Wipe',
+  blur: 'Blur',
+  push: 'Push',
+};
 
 const TransitionBlock: React.FC<{
   sceneId: string;
