@@ -76,7 +76,7 @@ export function UniversalAutoGenerationProgress({
   onMinimize,
   diagnosticProfile = 'A',
 }: UniversalAutoGenerationProgressProps) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const categoryName = useLocalizedCategoryName(category);
   
   const selectedAspectRatio = consultationResult?.aspectRatio 
