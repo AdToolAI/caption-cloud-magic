@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r72-inline-script-gen-2026-03-23";
+const AUTO_GEN_BUILD_TAG = "r73-i18n-pipeline-2026-04-12";
 import { generateScriptInline } from "../_shared/generate-script-inline.ts";
+import { msg as i18n } from "../_shared/pipeline-i18n.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -120,7 +121,8 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { briefing, consultationResult, userId, diagnosticProfile, debugMode, renderOnly, existingProgressId } = await req.json();
+    const { briefing, consultationResult, userId, diagnosticProfile, debugMode, renderOnly, existingProgressId, language } = await req.json();
+    const lang = (language === 'en' || language === 'es') ? language : 'de';
     
     const actualBriefing = briefing || consultationResult;
     console.log(`[auto-generate] visualStyle from briefing: "${actualBriefing?.visualStyle}"`);
@@ -183,7 +185,7 @@ serve(async (req) => {
             console.log(`[auto-generate-universal-video] 🛑 r25 HARD STOP: ${recentFailures.length} failures in 10min for user ${userId}. Returning capacity_cooldown.`);
             return new Response(JSON.stringify({ 
               error: 'capacity_cooldown',
-              message: 'Zu viele fehlgeschlagene Versuche. Bitte warte 10 Minuten und versuche es dann erneut.',
+              message: i18n('capacity_cooldown', lang),
               cooldownMinutes: 10,
               failureCount: recentFailures.length,
             }), {
@@ -223,7 +225,7 @@ serve(async (req) => {
               status: 'processing',
               current_step: 'rendering',
               progress_percent: 85,
-              status_message: '🔄 Server-seitig erzwungener Render-Only Retry — Assets werden wiederverwendet...',
+              status_message: i18n('render_only_forced', lang),
               briefing_json: existingProgress.briefing_json,
             })
             .select()
@@ -289,7 +291,7 @@ serve(async (req) => {
           console.warn(`[auto-generate-universal-video] ❌ r43: No lambdaPayload found in chain. Returning structured error.`);
           return new Response(JSON.stringify({
             error: 'render_only_source_missing_payload',
-            message: 'Kein wiederverwendbarer Render-Payload gefunden. Bitte starte eine neue Generierung.',
+          message: i18n('render_only_no_payload', lang),
           }), {
             status: 422,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -319,7 +321,7 @@ serve(async (req) => {
         console.log(`[auto-generate-universal-video] 🛑 r25: Render-only limit reached (${renderOnlyAttempts}/3)`);
         return new Response(JSON.stringify({
           error: 'capacity_cooldown',
-          message: 'Maximale Render-Retries erreicht. Bitte warte einige Minuten.',
+          message: i18n('render_retry_limit', lang),
           cooldownMinutes: 5,
           renderOnlyAttempts,
         }), {
@@ -337,7 +339,7 @@ serve(async (req) => {
           status: 'processing',
           current_step: 'rendering',
           progress_percent: 85,
-          status_message: '🔄 Render-Only Retry — Assets werden wiederverwendet...',
+          status_message: i18n('render_only_retry', lang),
           briefing_json: existingProgress.briefing_json,
         })
         .select()
@@ -453,7 +455,7 @@ serve(async (req) => {
     const responseBody = JSON.stringify({ progressId, status: 'started' });
     
     EdgeRuntime.waitUntil(
-      runGenerationPipeline(supabase, progressId, actualBriefing, userId, diagProfile, profileFlags)
+      runGenerationPipeline(supabase, progressId, actualBriefing, userId, diagProfile, profileFlags, lang)
         .catch((err) => {
           console.error('[auto-generate-universal-video] Pipeline error in waitUntil:', err);
         })
@@ -480,6 +482,7 @@ async function runGenerationPipeline(
   userId: string,
   diagProfile: string = 'A',
   profileFlags: Record<string, boolean> = {},
+  lang: string = 'de',
 ) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -688,7 +691,7 @@ async function runGenerationPipeline(
     }
 
     // Step 1: Generate Script INLINE (no Edge-to-Edge fetch → no 504 cold-start timeout)
-    await updateProgress(supabase, progressId, 'generating_script', 5, '📝 Drehbuch wird erstellt...');
+    await updateProgress(supabase, progressId, 'generating_script', 5, i18n('generating_script', lang));
     await delay(500);
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -701,7 +704,8 @@ async function runGenerationPipeline(
       script = await generateScriptInline(
         { ...briefing, moodConfig: briefing.moodConfig },
         LOVABLE_API_KEY,
-        120000, // 120s timeout with AbortController
+        120000,
+        lang,
       );
     } catch (scriptErr: any) {
       console.error('[auto-generate-universal-video] Inline script generation failed:', scriptErr.message);
@@ -710,13 +714,13 @@ async function runGenerationPipeline(
 
     console.log(`[auto-generate-universal-video] Script generated inline: ${script.scenes.length} scenes`);
 
-    await updateProgress(supabase, progressId, 'script_complete', 15, '✅ Drehbuch fertig!', { script });
+    await updateProgress(supabase, progressId, 'script_complete', 15, i18n('script_complete', lang), { script });
     await delay(500);
 
     // Step 2: Generate Character Sheet if needed (25%)
     let characterSheetUrl = null;
     if (briefing.hasCharacter) {
-      await updateProgress(supabase, progressId, 'generating_character', 20, '🎭 Charakter wird erstellt...');
+      await updateProgress(supabase, progressId, 'generating_character', 20, i18n('generating_character', lang));
       await delay(500);
 
       const characterResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
@@ -738,14 +742,14 @@ async function runGenerationPipeline(
         console.log(`[auto-generate-universal-video] Character sheet generated`);
       }
 
-      await updateProgress(supabase, progressId, 'character_complete', 25, '✅ Charakter fertig!', { characterSheetUrl });
+      await updateProgress(supabase, progressId, 'character_complete', 25, i18n('character_complete', lang), { characterSheetUrl });
       await delay(500);
     }
 
     // Step 3: Generate Scene Visuals (25% - 60%) - SEQUENTIAL BATCHES to avoid rate limits
     // Hook/CTA scenes are generated FIRST with more retries (5 instead of 3)
     const totalScenes = script.scenes.length;
-    await updateProgress(supabase, progressId, 'generating_visuals', 30, `🎨 ${totalScenes} Szenen-Bilder werden erstellt...`);
+    await updateProgress(supabase, progressId, 'generating_visuals', 30, i18n('generating_visuals', lang));
 
     const BATCH_SIZE = 2;
     const sceneVisuals: (string | null)[] = new Array(script.scenes.length).fill(null);
@@ -895,7 +899,7 @@ async function runGenerationPipeline(
 
       const completedCount = sceneVisuals.filter(v => v !== null).length;
       const progress = 30 + Math.floor((completedCount / totalScenes) * 30);
-      await updateProgress(supabase, progressId, 'generating_visuals', progress, `🎨 ${completedCount}/${totalScenes} Szenen-Bilder fertig (Priorität)...`);
+      await updateProgress(supabase, progressId, 'generating_visuals', progress, i18n('visuals_progress_priority', lang, { done: String(completedCount), total: String(totalScenes) }));
       if (batchStart + BATCH_SIZE < priorityIndices.length) await delay(500);
     }
 
@@ -907,7 +911,7 @@ async function runGenerationPipeline(
 
       const completedCount = sceneVisuals.filter(v => v !== null).length;
       const progress = 30 + Math.floor((completedCount / totalScenes) * 30);
-      await updateProgress(supabase, progressId, 'generating_visuals', progress, `🎨 ${completedCount}/${totalScenes} Szenen-Bilder fertig...`);
+      await updateProgress(supabase, progressId, 'generating_visuals', progress, i18n('visuals_progress', lang, { done: String(completedCount), total: String(totalScenes) }));
       if (batchStart + BATCH_SIZE < normalIndices.length) await delay(500);
     }
 
@@ -1121,10 +1125,10 @@ async function runGenerationPipeline(
 
     console.log(`[r50-validate] SUMMARY: ${r50ValidatedCount} validated, ${r50GradientForcedCount} forced to gradient`);
 
-    await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals, r47_assetNormalize: { normalized: normalizedCount, svgFallback: fallbackCount, gradientForced: gradientForcedCount, skipped: skippedCount }, r50_validation: { validated: r50ValidatedCount, gradientForced: r50GradientForcedCount } });
+    await updateProgress(supabase, progressId, 'visuals_complete', 60, i18n('visuals_complete', lang), { sceneVisuals, r47_assetNormalize: { normalized: normalizedCount, svgFallback: fallbackCount, gradientForced: gradientForcedCount, skipped: skippedCount }, r50_validation: { validated: r50ValidatedCount, gradientForced: r50GradientForcedCount } });
 
     // Step 4: Generate Voice-Over WITH TIMESTAMPS for Lip-Sync (60% - 70%)
-    await updateProgress(supabase, progressId, 'generating_voiceover', 65, '🎙️ Voiceover wird erstellt...');
+    await updateProgress(supabase, progressId, 'generating_voiceover', 65, i18n('generating_voiceover', lang));
     await delay(500);
 
     const fullScript = script.scenes.map((s: any) => s.voiceover).join(' ');
@@ -1139,7 +1143,7 @@ async function runGenerationPipeline(
         scriptText: fullScript,
         voice: briefing.voiceGender === 'female' ? 'sarah' : 'roger',
         voiceGender: briefing.voiceGender || 'male',
-        language: briefing.voiceLanguage || 'de',
+        language: briefing.voiceLanguage || lang || 'de',
         withTimestamps: true,
       }),
     });
@@ -1163,13 +1167,13 @@ async function runGenerationPipeline(
       console.error('[auto-generate-universal-video] Voiceover failed:', voiceoverResponse.status, errorText);
     }
 
-    await updateProgress(supabase, progressId, 'voiceover_complete', 70, '✅ Voiceover fertig!', { voiceoverUrl });
+    await updateProgress(supabase, progressId, 'voiceover_complete', 70, i18n('voiceover_complete', lang), { voiceoverUrl });
     await delay(500);
 
     // Step 4b: Generate Subtitles from Voiceover (70% - 75%)
     let subtitles = null;
     if (voiceoverUrl) {
-      await updateProgress(supabase, progressId, 'generating_subtitles', 72, '📝 Untertitel werden erstellt...');
+      await updateProgress(supabase, progressId, 'generating_subtitles', 72, i18n('generating_subtitles', lang));
       await delay(500);
 
       try {
@@ -1181,7 +1185,7 @@ async function runGenerationPipeline(
           },
           body: JSON.stringify({
             audioUrl: voiceoverUrl,
-            language: briefing.voiceLanguage || 'de',
+            language: briefing.voiceLanguage || lang || 'de',
           }),
         });
 
@@ -1196,25 +1200,25 @@ async function runGenerationPipeline(
         console.error('[auto-generate-universal-video] Subtitle error:', e);
       }
 
-      await updateProgress(supabase, progressId, 'subtitles_complete', 75, '✅ Untertitel fertig!');
+      await updateProgress(supabase, progressId, 'subtitles_complete', 75, i18n('subtitles_complete', lang));
       await delay(500);
     }
 
     // Step 5: Select Background Music (75% - 78%)
     // r63 Phase 2: Background music RE-ENABLED — voiceover confirmed stable in r62
-    await updateProgress(supabase, progressId, 'selecting_music', 76, '🎵 Hintergrundmusik wird ausgewählt...');
+    await updateProgress(supabase, progressId, 'selecting_music', 76, i18n('selecting_music', lang));
     await delay(500);
 
     const musicUrl = await selectBackgroundMusic(supabase, briefing.musicStyle, briefing.musicMood, supabaseUrl, supabaseServiceKey);
     console.log(`[auto-generate] r63 Phase 2: Background music ${musicUrl ? 'selected' : 'not found'}: ${musicUrl?.substring(0, 80)}`);
 
-    await updateProgress(supabase, progressId, 'music_complete', 78, musicUrl ? '✅ Hintergrundmusik ausgewählt!' : '✅ Audio vorbereitet (nur Voiceover)');
+    await updateProgress(supabase, progressId, 'music_complete', 78, musicUrl ? i18n('music_complete_with', lang) : i18n('music_complete_without', lang));
     await delay(500);
 
     // Step 5b: Analyze Music Beats (78% - 82%)
     let beatSyncData = null;
     if (musicUrl) {
-      await updateProgress(supabase, progressId, 'analyzing_beats', 79, '🎼 Beat-Analyse läuft...');
+      await updateProgress(supabase, progressId, 'analyzing_beats', 79, i18n('analyzing_beats', lang));
       await delay(500);
 
       try {
@@ -1243,12 +1247,12 @@ async function runGenerationPipeline(
         console.error('[auto-generate-universal-video] Beat analysis error:', e);
       }
 
-      await updateProgress(supabase, progressId, 'beats_complete', 82, '✅ Beat-Analyse fertig!');
+      await updateProgress(supabase, progressId, 'beats_complete', 82, i18n('beats_complete', lang));
       await delay(500);
     }
 
     // Step 6: Render Video (82% - 100%)
-    await updateProgress(supabase, progressId, 'rendering', 85, '🎬 Video wird gerendert...');
+    await updateProgress(supabase, progressId, 'rendering', 85, i18n('rendering', lang));
     await delay(500);
 
     console.log('[auto-generate-universal-video] Starting DIRECT Lambda invocation (no intermediate hop)...');
@@ -1541,7 +1545,7 @@ async function runGenerationPipeline(
       if (preflightErrors.length > 0) {
         const errorMsg = `PRE-FLIGHT VALIDATION FAILED (${preflightErrors.length} errors): ${preflightErrors.join('; ')}`;
         console.error(`❌ ${errorMsg}`);
-        await updateProgress(supabase, progressId, 'failed', 0, `Schema-Fehler: ${errorMsg}`);
+        await updateProgress(supabase, progressId, 'failed', 0, `${i18n('error_schema', lang)}: ${errorMsg}`);
         return;
       }
       
@@ -1549,7 +1553,7 @@ async function runGenerationPipeline(
     } catch (preflightErr) {
       const msg = preflightErr instanceof Error ? preflightErr.message : String(preflightErr);
       console.error(`❌ Pre-flight JSON parse error: ${msg}`);
-      await updateProgress(supabase, progressId, 'failed', 0, `Pre-flight Fehler: ${msg}`);
+      await updateProgress(supabase, progressId, 'failed', 0, `${i18n('error_preflight', lang)}: ${msg}`);
       return;
     }
 
@@ -1666,7 +1670,7 @@ async function runGenerationPipeline(
     const payloadSizeBytes = new TextEncoder().encode(JSON.stringify(lambdaPayload)).length;
     console.log(`📦 Payload size: ${(payloadSizeBytes / 1024).toFixed(1)} KB`);
 
-    await updateProgress(supabase, progressId, 'ready_to_render', 88, '🚀 Rendering wird vorbereitet...', {
+    await updateProgress(supabase, progressId, 'ready_to_render', 88, i18n('rendering_preparing', lang), {
       renderId: pendingRenderId,
       outName: `universal-video-${pendingRenderId}.mp4`,
       lambdaPayload: lambdaPayload,
@@ -1684,7 +1688,7 @@ async function runGenerationPipeline(
     
     // r25: Tag error with category for frontend decision-making
     const errorCategory = isInfraError(errorMessage) ? 'rate_limit' : 'unknown';
-    await updateProgress(supabase, progressId, 'failed', 0, `Fehler: ${errorMessage}`, {
+    await updateProgress(supabase, progressId, 'failed', 0, `${i18n('error_generic', lang)}: ${errorMessage}`, {
       errorCategory,
       errorMessage,
     });
@@ -2096,7 +2100,7 @@ async function runRenderOnlyPipeline(
     console.error(`[render-only] ❌ Pipeline error:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorCategory = isInfraError(errorMessage) ? (errorMessage.toLowerCase().includes('timeout') ? 'timeout' : 'rate_limit') : 'unknown';
-    await updateProgress(supabase, newProgressId, 'failed', 0, `Render-Only Fehler: ${errorMessage}`, {
+    await updateProgress(supabase, newProgressId, 'failed', 0, `${i18n('error_render_only', lang)}: ${errorMessage}`, {
       errorCategory,
       errorMessage,
       sourceProgressId: chainSourceProgressId,
