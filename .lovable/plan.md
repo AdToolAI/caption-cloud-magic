@@ -1,54 +1,23 @@
 
 
-## Plan: Seedance 2.0 Video Studio
+## Fix: Seedance 2.0 Duration-Limit
 
-Eigene Seite `/seedance-video-studio` für Seedance 2.0 (ByteDance) — nach dem gleichen Muster wie Kling 3.0.
+### Problem
+Replicate's `bytedance/seedance-1-lite` model rejects `duration > 12`:
+```
+input.duration: Must be less than or equal to 12
+```
+The config in `src/config/seedanceVideoCredits.ts` sets `maxDuration: 15`, so users can select 15s which then fails.
 
-### Replicate-Modell
-Seedance 2.0 ist auf Replicate verfügbar als `bytedance/seedance-1-lite` (aktuell verfügbare Version). Unterstützt Text-to-Video und Image-to-Video.
+### Fix
 
-### Preise
-Bevor ich implementiere: Welche Preise pro Sekunde sollen für Seedance gelten?
+**1. `src/config/seedanceVideoCredits.ts`** — Change `maxDuration` from `15` to `12` for both Standard and Pro models.
 
-| Modell | Vorschlag |
-|--------|-----------|
-| Seedance Standard | €0,15/Sek? |
-| Seedance Pro | €0,20/Sek? |
+**2. `src/pages/SeedanceVideoStudio.tsx`** — Ensure the duration slider respects the model's `maxDuration` (it likely already reads from config, but verify the slider max matches).
 
-Oder soll es nur ein Modell geben (wie bei Seedance Lite)?
+No Edge Function changes needed — the input is already passed through correctly; the issue is that the UI allows an invalid value.
 
-### Umfang (analog zu Kling)
-
-**1. Config: `src/config/seedanceVideoCredits.ts`**
-- Modell-Definition mit Preisen, Dauer (3-15s), Aspect Ratios
-- Export der Typen
-
-**2. Edge Function: `supabase/functions/generate-seedance-video/index.ts`**
-- Auth + Wallet-Prüfung + Credits-Abzug
-- Replicate API-Aufruf für Seedance
-- DB-Eintrag in `ai_video_generations`
-- Webhook über bestehenden `replicate-webhook`
-
-**3. Seite: `src/pages/SeedanceVideoStudio.tsx`**
-- Prompt-Eingabe mit VideoPromptOptimizer
-- Modell-/Dauer-/Aspect-Ratio-Auswahl
-- Image-to-Video Upload
-- Wallet-Anzeige + Credit-Kauf
-- Generierungs-History (gemeinsam)
-- Prompt-Tipps
-
-**4. Routing: `src/App.tsx`**
-- Route `/seedance-video-studio` hinzufügen
-
-**5. Cross-Links**
-- Links von AIVideoStudio und KlingVideoStudio zu Seedance (und umgekehrt)
-
-**6. History: `VideoGenerationHistory.tsx`**
-- `MODEL_DISPLAY_NAMES` um Seedance-Modelle erweitern
-
-### Keine DB-Änderungen nötig
-Bestehende `ai_video_generations`-Tabelle und Wallet werden wiederverwendet.
-
-### Offene Frage
-Bitte kurz bestätigen: **Welche Preise pro Sekunde** und **welche Modellvarianten** (Standard/Pro oder nur eine)?
+### Dateien
+- `src/config/seedanceVideoCredits.ts` — `maxDuration: 15` → `maxDuration: 12`
+- `src/pages/SeedanceVideoStudio.tsx` — verify slider uses config max (minor fix if hardcoded)
 
