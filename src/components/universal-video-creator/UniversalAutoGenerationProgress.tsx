@@ -588,7 +588,7 @@ export function UniversalAutoGenerationProgress({
 
     try {
       const response = await supabase.functions.invoke('auto-generate-universal-video', {
-        body: { consultationResult, category, userId, diagnosticProfile }
+        body: { consultationResult, category, userId, diagnosticProfile, language }
       });
 
       if (response.error) {
