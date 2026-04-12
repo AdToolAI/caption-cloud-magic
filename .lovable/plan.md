@@ -1,13 +1,20 @@
 
 
-## Plan: Remove Pricing Section from Landing Page
+## Plan: Restore Pricing on Landing Page + Remove from Overview
 
 ### Problem
-The pricing cards are shown on the landing page overview, but they're redundant since pricing is already accessible via the top-right navigation ("Preise" / "Pricing" link).
+The previous change incorrectly removed pricing from the **landing page** (Index.tsx) instead of the **logged-in Overview/Dashboard** (Home.tsx). The pricing cards at the bottom of the Overview page (Home.tsx, lines 738-884) are what should be removed, since logged-in users can already access pricing via the nav link.
 
 ### Changes
 
-**`src/pages/Index.tsx`** — Remove lines 95-96 (the `<PricingSection />` component and its comment). Also remove the unused import of `PricingSection` on line 12.
+**`src/pages/Index.tsx`** — Re-add the `PricingSection` import and component between FeatureGrid and FAQ:
+```tsx
+import { PricingSection } from "@/components/landing/PricingSection";
+// ...
+<FeatureGrid />
+<PricingSection />
+{/* FAQ Section */}
+```
 
-That's it — a 3-line deletion. The `PricingSection` component file itself stays in the codebase in case it's used elsewhere (e.g. the dedicated pricing page).
+**`src/pages/Home.tsx`** — Delete the entire Pricing Section block (lines 738-884), including the `{/* Pricing Section */}` comment and the `<section>` with all three plan cards. Also remove the now-unused `PRICING_V21` import and `Check` icon import if no longer used elsewhere in the file.
 
