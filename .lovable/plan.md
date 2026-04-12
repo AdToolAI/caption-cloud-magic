@@ -1,44 +1,32 @@
 
 
-## Plan: KI-Post-Generator v2 — Full Localization
+## Plan: Universal Content Creator — Full Localization
 
-### Problem
-The entire KI-Post-Generator v2 page and its 3 sub-components contain ~80 hardcoded German strings that don't react to the language setting. Translation keys (`aipost_*`) already exist in `translations.ts` for EN/DE/ES but are not used.
+### Safety Guarantee
+All current German strings will be preserved exactly as the `de` translation values. The English UI will get proper English translations, and Spanish will get Spanish. Each language is strictly separated — no cross-contamination.
 
-### Changes
+### Files to Edit (13 files)
 
-**1. `src/lib/translations.ts` — Add ~40 missing keys (all 3 languages)**
+**1. `src/lib/translations.ts`** — Add ~100 new keys under `uc_*` prefix for all 3 languages (EN/DE/ES)
+- Every current hardcoded German string becomes the `de` value verbatim
+- English and Spanish get proper translations
 
-New keys needed for strings not yet covered by existing `aipost_*` keys:
-- PostGeneratorHeroHeader: badge, title, subtitle
-- PostInputPanel: "Post erstellen", "Lade ein Bild hoch...", "Bild/Video hochladen (optional)", "Klicken zum Hochladen", "Bilder: max 10MB...", video limits, "Kurzbeschreibung / Briefing", placeholder, characters count, "Plattform(en)", "Stil-Vorlage", "Sprache(n)", "Tonfall" + options (Freundlich/Professionell/Locker/Inspirierend), "CTA (optional)", placeholder, "Erweiterte Optionen", all option labels, "Generiere Post...", "Post generieren", "Aktives Brand-Set"
-- PreviewTabs: tab labels (Vorschau/Varianten/Plattform/Bild/Scores), "Hook-Varianten", "Zeichen", "Hauptcaption", "Caption B (A/B-Test)", "Hashtag-Sets", "Alt-Text (Barrierefreiheit)", "Plattform-Limits", hashtag warnings, "Zeichen übrig", "Compliance-Hinweise", video upload note, empty states, action buttons (An Composer/Kopieren/Kalender/Freigabe), score labels
-- AIPostGenerator page: all toast messages, error messages, dialog texts ("Post erfolgreich generiert!", "Möchtest du...", "Zukünftig automatisch speichern", "Nicht speichern", "In Media Library speichern"), breadcrumb feature name
-- MediaLibrary toast references ("An KI-Post-Generator senden")
+**2. `src/pages/UniversalCreator/index.tsx`** — Localize Helmet title/meta
 
-**2. `src/components/post-generator/PostGeneratorHeroHeader.tsx`**
-- Add `useTranslation` hook
-- Replace badge, h1, subtitle with `t('aipost_...')` keys
+**3. `src/pages/UniversalCreator/UniversalCreator.tsx`** — Wizard step descriptions, preview panel labels, navigation buttons
 
-**3. `src/components/post-generator/PostInputPanel.tsx`**
-- Add `useTranslation` hook
-- Replace all ~30 hardcoded labels, placeholders, option texts, and button text
+**4-7. Step components** — `FormatSelectionStep.tsx`, `ContentVoiceStep.tsx`, `SubtitleTimingStep.tsx`, `PreviewExportStep.tsx` — All labels, toasts, placeholders
 
-**4. `src/components/post-generator/PreviewTabs.tsx`**
-- Add `useTranslation` hook
-- Replace all ~25 tab labels, section headers, action buttons, empty states, and toast messages
+**8-10. Supporting components** — `BackgroundAssetSelector.tsx`, `AudioAssetSelector.tsx`, `SceneTimeline.tsx` — Tabs, upload text, search states, toasts
 
-**5. `src/pages/AIPostGenerator.tsx`**
-- Replace all ~15 toast messages, error strings, dialog texts, and breadcrumb label with `t(...)` calls
+**11. `VoiceoverScriptGenerator.tsx`** — Dialog text, tone options; pass active app language instead of hardcoded `'de'`
 
-**6. `src/pages/MediaLibrary.tsx`** (minor)
-- Replace 3 tooltip/toast strings referencing "KI-Post-Generator"
+**12. `SubtitleStyleEditor.tsx`** — Style labels, animation/outline names
 
-### Files affected (6)
-- `src/lib/translations.ts`
-- `src/components/post-generator/PostGeneratorHeroHeader.tsx`
-- `src/components/post-generator/PostInputPanel.tsx`
-- `src/components/post-generator/PreviewTabs.tsx`
-- `src/pages/AIPostGenerator.tsx`
-- `src/pages/MediaLibrary.tsx`
+**13. `generate-voiceover-script/index.ts`** — Accept language parameter, generate script/tips in requested language (with German as default fallback)
+
+### How German UI stays safe
+- Pattern: `t('uc_choose_platform')` → DE returns `"Plattform wählen"`, EN returns `"Choose Platform"`
+- The German values are the exact strings currently hardcoded — no rewording
+- The edge function defaults to German if no language is passed, preserving current behavior
 
