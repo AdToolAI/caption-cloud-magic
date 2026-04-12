@@ -2144,6 +2144,18 @@ export const translations: Record<Language, any> = {
       postRetrying: "Post is being retried...",
     },
     account: {
+      header: {
+        title: "Account Settings",
+        protected: "Protected",
+        verified: "Verified",
+      },
+      timezone: {
+        title: "Timezone",
+        subtitle: "Your timezone for scheduling and notifications",
+        select: "Select timezone",
+        saved: "Timezone saved",
+        error: "Error saving",
+      },
       tabs: {
         profile: "Profile",
         security: "Security",
@@ -6138,6 +6150,18 @@ export const translations: Record<Language, any> = {
     postRetrying: "Post wird erneut versucht...",
   },
   account: {
+    header: {
+      title: "Konto-Einstellungen",
+      protected: "Geschützt",
+      verified: "Verifiziert",
+    },
+    timezone: {
+      title: "Zeitzone",
+      subtitle: "Deine Zeitzone für Planungen und Benachrichtigungen",
+      select: "Zeitzone auswählen",
+      saved: "Zeitzone gespeichert",
+      error: "Fehler beim Speichern",
+    },
     tabs: {
       profile: "Profil",
       security: "Sicherheit",
@@ -10073,6 +10097,8 @@ export const translations: Record<Language, any> = {
       postRetrying: "Reintentando post...",
     },
     account: {
+      header: { title: "Configuración de Cuenta", protected: "Protegido", verified: "Verificado" },
+      timezone: { title: "Zona Horaria", subtitle: "Tu zona horaria para planificación y notificaciones", select: "Seleccionar zona horaria", saved: "Zona horaria guardada", error: "Error al guardar" },
       tabs: { profile: "Perfil", security: "Seguridad", connections: "Conexiones", privacy: "Privacidad", notifications: "Notificaciones", subscription: "Suscripción", advanced: "Avanzado" },
       profile: { title: "Información Personal", description: "Gestiona tus datos personales", name: "Nombre", namePlaceholder: "Tu nombre", email: "Correo Electrónico", emailNotVerified: "No verificado", emailVerified: "Verificado", resendVerification: "Reenviar verificación", verificationSent: "Correo de verificación enviado", phone: "Teléfono", phonePlaceholder: "ej. +34 612 345 678", save: "Guardar Cambios", saving: "Guardando...", saved: "¡Guardado!", savedDesc: "Tu perfil ha sido actualizado", error: "Error", errorSaving: "No se pudo actualizar el perfil" },
       password: { title: "Cambiar Contraseña", description: "Actualiza tu contraseña para más seguridad", newPassword: "Nueva Contraseña", confirmPassword: "Confirmar Contraseña", change: "Cambiar Contraseña", changing: "Cambiando...", changed: "Contraseña cambiada", errorChanging: "Error al cambiar contraseña", minChars: "Mínimo 8 caracteres", uppercase: "Al menos una mayúscula", lowercase: "Al menos una minúscula", number: "Al menos un número", mismatch: "Las contraseñas no coinciden" },

@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Globe, Loader2 } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const TIMEZONES = [
   { value: "Europe/Berlin", label: "Berlin (MEZ/MESZ)" },
@@ -26,6 +27,7 @@ const TIMEZONES = [
 
 export const TimezoneSelect = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [timezone, setTimezone] = useState("Europe/Berlin");
@@ -76,9 +78,9 @@ export const TimezoneSelect = () => {
         .eq("id", user.id);
 
       if (error) throw error;
-      toast.success("Zeitzone gespeichert");
+      toast.success(t('account.timezone.saved'));
     } catch (error: any) {
-      toast.error(error.message || "Fehler beim Speichern");
+      toast.error(error.message || t('account.timezone.error'));
     } finally {
       setSaving(false);
     }
@@ -99,18 +101,18 @@ export const TimezoneSelect = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Globe className="h-5 w-5 text-primary" />
-          Zeitzone
+          {t('account.timezone.title')}
         </CardTitle>
         <CardDescription>
-          Deine Zeitzone für Planungen und Benachrichtigungen
+          {t('account.timezone.subtitle')}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          <Label>Zeitzone auswählen</Label>
+          <Label>{t('account.timezone.select')}</Label>
           <Select value={timezone} onValueChange={handleTimezoneChange} disabled={saving}>
             <SelectTrigger className="bg-muted/20 border-white/10">
-              <SelectValue placeholder="Zeitzone wählen" />
+              <SelectValue placeholder={t('account.timezone.select')} />
             </SelectTrigger>
             <SelectContent>
               {TIMEZONES.map((tz) => (
