@@ -59,6 +59,7 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
   onMuteToggle,
   onPlayingChange,
 }) => {
+  const { t } = useTranslation();
   const mainVideoRef = useRef<HTMLVideoElement>(null);
   const additionalVideoRef = useRef<HTMLVideoElement>(null);
   const animationRef = useRef<number>();

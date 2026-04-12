@@ -40,6 +40,15 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
   onSubtitleDelete,
   onClipDelete,
 }) => {
+  const { t } = useTranslation();
+
+  const SUBTITLE_STYLES = useMemo(() => [
+    { id: 'standard', label: t('dc.subtitleStyleStandard') },
+    { id: 'tiktok', label: t('dc.subtitleStyleTiktok') },
+    { id: 'subtitle', label: t('dc.subtitleStyleSubtitle') },
+    { id: 'highlight', label: t('dc.subtitleStyleHighlight') },
+  ] as const, [t]);
+
   const updateClip = (updates: Partial<AudioClip>) => {
     if (!selectedClip) return;
     onTracksChange(

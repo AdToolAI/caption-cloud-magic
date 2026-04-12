@@ -140,6 +140,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onResetProject,
   onBackToImport,
 }) => {
+  const { t } = useTranslation();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(100);
