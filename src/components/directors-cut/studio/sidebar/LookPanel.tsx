@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Palette, Sun, Contrast, Droplets, Thermometer, Eye, ChevronDown, ChevronRight, Layers, Globe } from 'lucide-react';
 import { GlobalEffects, SceneEffects, FilterId } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface LookPanelProps {
   effects: GlobalEffects;

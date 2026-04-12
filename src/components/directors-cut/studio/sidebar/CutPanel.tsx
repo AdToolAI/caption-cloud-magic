@@ -1,10 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Scissors, Sparkles, Loader2, Trash2, Copy, GripVertical, Plus, Pencil, Check, FileVideo, ChevronDown, ChevronUp, X, ArrowRightLeft } from 'lucide-react';
 import { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface CutPanelProps {
   scenes: SceneAnalysis[];
