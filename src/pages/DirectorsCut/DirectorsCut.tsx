@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft, Film, RotateCcw
 } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
