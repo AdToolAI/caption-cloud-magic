@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { BlackTieHero } from "@/components/landing/BlackTieHero";
 import { MissionFeatures } from "@/components/landing/MissionFeatures";
 import { FeatureGrid } from "@/components/landing/FeatureGrid";
-import { PricingSection } from "@/components/landing/PricingSection";
+
 import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
 import { FAQ } from "@/components/FAQ";
 
@@ -92,8 +92,6 @@ const Index = () => {
           {/* Feature Grid */}
           <FeatureGrid />
 
-          {/* Pricing Section */}
-          <PricingSection />
 
           {/* FAQ Section */}
           <section id="faq" className="py-24 px-4 bg-card/30">
