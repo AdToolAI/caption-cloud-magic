@@ -21,7 +21,7 @@ interface LookPanelProps {
 
 const FILTER_CATEGORIES = [
   {
-    name: 'Klassisch',
+    name: 'filterClassic',
     filters: [
       { id: 'none', name: 'Original', icon: '🎬', css: '' },
       { id: 'cinematic', name: 'Cinematic', icon: '🎥', css: 'contrast(1.2) saturate(0.85)' },
@@ -31,7 +31,7 @@ const FILTER_CATEGORIES = [
     ],
   },
   {
-    name: 'Stimmung',
+    name: 'filterMood',
     filters: [
       { id: 'warm', name: 'Warm', icon: '🌅', css: 'saturate(1.3) hue-rotate(-10deg)' },
       { id: 'cool', name: 'Cool', icon: '❄️', css: 'saturate(0.9) hue-rotate(15deg)' },
@@ -41,7 +41,7 @@ const FILTER_CATEGORIES = [
     ],
   },
   {
-    name: 'Kreativ',
+    name: 'filterCreative',
     filters: [
       { id: 'vivid', name: 'Vivid', icon: '🌈', css: 'saturate(1.6) contrast(1.1)' },
       { id: 'neon_nights', name: 'Neon Nights', icon: '🌃', css: 'brightness(0.9) contrast(1.4) saturate(1.5) hue-rotate(20deg)' },
@@ -51,7 +51,7 @@ const FILTER_CATEGORIES = [
     ],
   },
   {
-    name: 'Film',
+    name: 'filterFilm',
     filters: [
       { id: 'kodak_portra', name: 'Kodak Portra', icon: '🎞️', css: 'saturate(0.9) contrast(1.05) sepia(0.1) brightness(1.05)' },
       { id: 'fuji_velvia', name: 'Fuji Velvia', icon: '🏔️', css: 'saturate(1.4) contrast(1.2) brightness(0.95)' },
@@ -63,7 +63,7 @@ const FILTER_CATEGORIES = [
 ];
 
 const COLOR_GRADES: { id: string; name: string; icon: string }[] = [
-  { id: 'none', name: 'Keine', icon: '⚪' },
+  { id: 'none', name: 'gradeNone', icon: '⚪' },
   { id: 'teal_orange', name: 'Teal & Orange', icon: '🟠' },
   { id: 'moonlight', name: 'Moonlight', icon: '🌙' },
   { id: 'golden_hour', name: 'Golden Hour', icon: '🌅' },
@@ -86,6 +86,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
   sceneEffects = {},
   onSceneEffectsChange,
 }) => {
+  const { t } = useTranslation();
   const [expandedCategory, setExpandedCategory] = useState<string>('Klassisch');
 
   const isSceneMode = !!selectedSceneId;
@@ -180,7 +181,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
         <div className="flex items-center gap-2">
           <div className="w-1 h-4 rounded-full bg-[#F5C76A]" />
           <Palette className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]" />
-          <span className="text-sm font-medium text-white">Look & Farbe</span>
+          <span className="text-sm font-medium text-white">{t('dc.lookTitle')}</span>
         </div>
 
         {/* Scene/Global indicator */}
@@ -193,19 +194,19 @@ export const LookPanel: React.FC<LookPanelProps> = ({
           {isSceneMode ? (
             <>
               <Layers className="h-3 w-3" />
-              Änderungen gelten für ausgewählte Szene
+              {t('dc.changesApplyToScene')}
             </>
           ) : (
             <>
               <Globe className="h-3 w-3" />
-              Änderungen gelten global für das gesamte Video
+              {t('dc.changesApplyGlobal')}
             </>
           )}
         </div>
 
         {/* Filter Presets — Categorized */}
         <div className="space-y-1">
-          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">Filter</span>
+          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">{t('dc.filter')}</span>
           {FILTER_CATEGORIES.map(category => (
             <div key={category.name} className="space-y-1.5">
               <button
@@ -217,7 +218,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
                 ) : (
                   <ChevronRight className="h-3 w-3" />
                 )}
-                <span>{category.name}</span>
+                <span>{t(`dc.${category.name}`)}</span>
                 <span className="text-[9px] text-white/30 ml-auto">{category.filters.length}</span>
               </button>
               {expandedCategory === category.name && (
@@ -249,7 +250,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
           {activeFilter && activeFilter !== 'none' && (
             <div className="space-y-1 pt-2 pl-1">
               <div className="flex justify-between">
-                <label className="text-[10px] text-white/50">Filter-Intensität</label>
+                <label className="text-[10px] text-white/50">{t('dc.filterIntensity')}</label>
                 <span className="text-[10px] text-cyan-400/60">{activeFilterIntensity}%</span>
               </div>
               <Slider
@@ -266,7 +267,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
 
         {/* Color Grading */}
         <div className="space-y-2 border-t border-[#F5C76A]/10 pt-3">
-          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">Color Grading</span>
+          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">{t('dc.colorGrading')}</span>
           <div className="grid grid-cols-3 gap-1.5">
             {COLOR_GRADES.map(grade => {
               const isActive = (activeColorGrading.enabled && activeColorGrading.grade === grade.id) || (!activeColorGrading.enabled && grade.id === 'none');
@@ -282,7 +283,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
                   )}
                 >
                   <span className="text-sm">{grade.icon}</span>
-                  <span className={cn("text-[9px]", isActive ? "text-cyan-300" : "text-white/60")}>{grade.name}</span>
+                  <span className={cn("text-[9px]", isActive ? "text-cyan-300" : "text-white/60")}>{grade.id === 'none' ? t('dc.gradeNone') : grade.name}</span>
                 </button>
               );
             })}
@@ -290,7 +291,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
           {activeColorGrading.enabled && activeColorGrading.grade && (
             <div className="space-y-1">
               <div className="flex justify-between">
-                <label className="text-[10px] text-white/50">Intensität</label>
+                <label className="text-[10px] text-white/50">{t('dc.intensity')}</label>
                 <span className="text-[10px] text-cyan-400/60">{Math.round(activeColorGrading.intensity * 100)}%</span>
               </div>
               <Slider
@@ -307,14 +308,14 @@ export const LookPanel: React.FC<LookPanelProps> = ({
 
         {/* Manual Adjustments */}
         <div className="space-y-3 border-t border-[#F5C76A]/10 pt-3">
-          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">Anpassungen</span>
+          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">{t('dc.adjustments')}</span>
 
           {/* Brightness */}
           <div className="space-y-1">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-1.5">
                 <Sun className="h-3 w-3 text-[#F5C76A]/60" />
-                <label className="text-[11px] text-white/70">Helligkeit</label>
+                <label className="text-[11px] text-white/70">{t('dc.brightness')}</label>
               </div>
               <span className="text-[10px] text-white/40">{getEffectValue('brightness')}%</span>
             </div>
@@ -333,7 +334,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-1.5">
                 <Contrast className="h-3 w-3 text-white/60" />
-                <label className="text-[11px] text-white/70">Kontrast</label>
+                <label className="text-[11px] text-white/70">{t('dc.contrast')}</label>
               </div>
               <span className="text-[10px] text-white/40">{getEffectValue('contrast')}%</span>
             </div>
@@ -352,7 +353,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-1.5">
                 <Droplets className="h-3 w-3 text-cyan-400/60" />
-                <label className="text-[11px] text-white/70">Sättigung</label>
+                <label className="text-[11px] text-white/70">{t('dc.saturation')}</label>
               </div>
               <span className="text-[10px] text-white/40">{getEffectValue('saturation')}%</span>
             </div>
@@ -371,7 +372,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-1.5">
                 <Thermometer className="h-3 w-3 text-orange-400/60" />
-                <label className="text-[11px] text-white/70">Temperatur</label>
+                <label className="text-[11px] text-white/70">{t('dc.temperature')}</label>
               </div>
               <span className="text-[10px] text-white/40">{getEffectValue('temperature')}</span>
             </div>
@@ -390,7 +391,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-1.5">
                 <Eye className="h-3 w-3 text-white/40" />
-                <label className="text-[11px] text-white/70">Vignette</label>
+                <label className="text-[11px] text-white/70">{t('dc.vignette')}</label>
               </div>
               <span className="text-[10px] text-white/40">{getEffectValue('vignette')}%</span>
             </div>
@@ -424,7 +425,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
               }
             }}
           >
-            {isSceneMode ? 'Szenen-Effekte zurücksetzen' : 'Auf Standard zurücksetzen'}
+            {isSceneMode ? '{t('dc.resetSceneEffects')}' : '{t('dc.resetToDefault')}'}
           </Button>
         </div>
       </div>

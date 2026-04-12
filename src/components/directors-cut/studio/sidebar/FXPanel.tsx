@@ -27,15 +27,15 @@ interface FXPanelProps {
 }
 
 const ANIMATION_OPTIONS = [
-  { type: 'none' as const, label: 'Keine', icon: RotateCcw },
+  { type: 'none' as const, label: 'animNone', icon: RotateCcw },
   { type: 'zoomIn' as const, label: 'Zoom In', icon: ZoomIn },
   { type: 'zoomOut' as const, label: 'Zoom Out', icon: ZoomOut },
   { type: 'zoomInSlow' as const, label: 'Zoom In (Slow)', icon: ZoomIn },
   { type: 'zoomOutSlow' as const, label: 'Zoom Out (Slow)', icon: ZoomOut },
-  { type: 'panLeft' as const, label: 'Pan Links', icon: MoveLeft },
-  { type: 'panRight' as const, label: 'Pan Rechts', icon: MoveRight },
-  { type: 'panUp' as const, label: 'Pan Hoch', icon: MoveUp },
-  { type: 'panDown' as const, label: 'Pan Runter', icon: MoveDown },
+  { type: 'panLeft' as const, label: 'panLeft', icon: MoveLeft },
+  { type: 'panRight' as const, label: 'panRight', icon: MoveRight },
+  { type: 'panUp' as const, label: 'panUp', icon: MoveUp },
+  { type: 'panDown' as const, label: 'panDown', icon: MoveDown },
 ] as const;
 
 const SPEED_PRESETS = [0.25, 0.5, 1, 1.5, 2, 3];
@@ -55,6 +55,7 @@ export const FXPanel: React.FC<FXPanelProps> = ({
   onSceneEffectsChange,
   onScenePlaybackRateChange,
 }) => {
+  const { t } = useTranslation();
   const selectedScene = scenes.find(s => s.id === selectedSceneId);
   const currentAnimation = selectedSceneId ? sceneEffects[selectedSceneId]?.animation?.type || 'none' : 'none';
   const currentAnimIntensity = selectedSceneId ? sceneEffects[selectedSceneId]?.animation?.intensity ?? 50 : 50;
@@ -96,16 +97,16 @@ export const FXPanel: React.FC<FXPanelProps> = ({
         <div className="flex items-center gap-2">
           <div className="w-1 h-4 rounded-full bg-[#F5C76A]" />
           <Zap className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]" />
-          <span className="text-sm font-medium text-white">Effekte & Qualität</span>
+          <span className="text-sm font-medium text-white">{t('dc.fxTitle')}</span>
         </div>
 
         {/* Scene Animation */}
         <div className="space-y-2 p-2.5 rounded-xl backdrop-blur-md bg-[#0a0a1a]/60 border border-white/5">
           <div className="flex items-center gap-1.5 mb-2">
             <Move className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.4)]" />
-            <span className="text-[11px] text-white/70">Szenen-Animation</span>
+            <span className="text-[11px] text-white/70">{t('dc.sceneAnimation')}</span>
             {!selectedSceneId && (
-              <span className="text-[9px] text-white/30 ml-auto">Szene auswählen</span>
+              <span className="text-[9px] text-white/30 ml-auto">{t('dc.selectScene')}</span>
             )}
           </div>
           <div className={cn("grid grid-cols-3 gap-1.5", !selectedSceneId && "opacity-40 pointer-events-none")}>
@@ -121,14 +122,14 @@ export const FXPanel: React.FC<FXPanelProps> = ({
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
-                <span className="leading-tight text-center">{label}</span>
+                <span className="leading-tight text-center">{['animNone','panLeft','panRight','panUp','panDown'].includes(label) ? t(`dc.${label}`) : label}</span>
               </button>
             ))}
           </div>
           {selectedSceneId && currentAnimation !== 'none' && (
             <div className="space-y-1 pt-1">
               <div className="flex justify-between">
-                <label className="text-[10px] text-white/50">Intensität</label>
+                <label className="text-[10px] text-white/50">{t('dc.intensity')}</label>
                 <span className="text-[10px] text-cyan-400/60">{currentAnimIntensity}%</span>
               </div>
               <Slider
@@ -147,9 +148,9 @@ export const FXPanel: React.FC<FXPanelProps> = ({
         <div className="space-y-2 p-2.5 rounded-xl backdrop-blur-md bg-[#0a0a1a]/60 border border-white/5">
           <div className="flex items-center gap-1.5 mb-2">
             <Timer className="h-3 w-3 text-[#F5C76A] drop-shadow-[0_0_4px_rgba(245,199,106,0.4)]" />
-            <span className="text-[11px] text-white/70">Geschwindigkeit</span>
+            <span className="text-[11px] text-white/70">{t('dc.speed')}</span>
             {!selectedSceneId && (
-              <span className="text-[9px] text-white/30 ml-auto">Szene auswählen</span>
+              <span className="text-[9px] text-white/30 ml-auto">{t('dc.selectScene')}</span>
             )}
           </div>
           <div className={cn(!selectedSceneId && "opacity-40 pointer-events-none")}>
@@ -193,7 +194,7 @@ export const FXPanel: React.FC<FXPanelProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Film className="h-3 w-3 text-green-400 drop-shadow-[0_0_4px_rgba(74,222,128,0.4)]" />
-              <span className="text-[11px] text-white/70">Green Screen</span>
+              <span className="text-[11px] text-white/70">{t('dc.greenScreen')}</span>
             </div>
             <Switch
               checked={chromaKey.enabled}
@@ -204,7 +205,7 @@ export const FXPanel: React.FC<FXPanelProps> = ({
           {chromaKey.enabled && (
             <div className="space-y-2 pt-1">
               <div className="flex items-center gap-2">
-                <label className="text-[10px] text-white/50">Farbe</label>
+                <label className="text-[10px] text-white/50">{t('dc.color')}</label>
                 <input
                   type="color"
                   value={chromaKey.color}
@@ -214,7 +215,7 @@ export const FXPanel: React.FC<FXPanelProps> = ({
               </div>
               <div className="space-y-1">
                 <div className="flex justify-between">
-                  <label className="text-[10px] text-white/50">Toleranz</label>
+                  <label className="text-[10px] text-white/50">{t('dc.tolerance')}</label>
                   <span className="text-[10px] text-cyan-400/60">{chromaKey.tolerance}%</span>
                 </div>
                 <Slider
@@ -232,14 +233,14 @@ export const FXPanel: React.FC<FXPanelProps> = ({
 
         {/* Quality Enhancement */}
         <div className="border-t border-[#F5C76A]/10 pt-3 space-y-3">
-          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">Qualität</span>
+          <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">{t('dc.quality')}</span>
 
           {/* Upscaling */}
           <div className="space-y-2 p-2.5 rounded-xl backdrop-blur-md bg-[#0a0a1a]/60 border border-white/5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <ArrowUpCircle className="h-3 w-3 text-purple-400 drop-shadow-[0_0_4px_rgba(192,132,252,0.4)]" />
-                <span className="text-[11px] text-white/70">KI-Upscaling</span>
+                <span className="text-[11px] text-white/70">{t('dc.aiUpscaling')}</span>
               </div>
               <Switch
                 checked={upscaling.enabled}
@@ -269,7 +270,7 @@ export const FXPanel: React.FC<FXPanelProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Gauge className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.4)]" />
-                <span className="text-[11px] text-white/70">Frame-Interpolation</span>
+                <span className="text-[11px] text-white/70">{t('dc.frameInterpolation')}</span>
               </div>
               <Switch
                 checked={interpolation.enabled}
@@ -299,7 +300,7 @@ export const FXPanel: React.FC<FXPanelProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Move className="h-3 w-3 text-[#F5C76A] drop-shadow-[0_0_4px_rgba(245,199,106,0.4)]" />
-                <span className="text-[11px] text-white/70">Restaurierung</span>
+                <span className="text-[11px] text-white/70">{t('dc.restoration')}</span>
               </div>
               <Switch
                 checked={restoration.enabled}
@@ -316,9 +317,9 @@ export const FXPanel: React.FC<FXPanelProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-[#0a0a1a] border-white/10">
-                  <SelectItem value="light" className="text-white text-xs">Leicht</SelectItem>
+                  <SelectItem value="light" className="text-white text-xs">{t('dc.restorationLight')}</SelectItem>
                   <SelectItem value="standard" className="text-white text-xs">Standard</SelectItem>
-                  <SelectItem value="heavy" className="text-white text-xs">Intensiv</SelectItem>
+                  <SelectItem value="heavy" className="text-white text-xs">{t('dc.restorationHeavy')}</SelectItem>
                 </SelectContent>
               </Select>
             )}
