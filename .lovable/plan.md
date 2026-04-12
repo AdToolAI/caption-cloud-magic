@@ -1,24 +1,29 @@
 
 
-## Plan: Fix Kling 3.0 Duration Check Constraint
+## Fix: Kling 3.0 Modell-Anzeige in der Video-Historie
 
 ### Problem
-The `ai_video_generations` table has a check constraint `ai_video_generations_duration_seconds_check` that only allows `duration_seconds IN (4, 8, 12)` -- these are Sora 2's fixed durations. Kling 3.0 needs 3-15 seconds (any integer), so inserts fail.
+In `src/components/ai-video/VideoGenerationHistory.tsx` Zeile 265 ist die Modell-Anzeige hardcoded:
+```typescript
+{gen.model === 'sora-2-pro' ? 'Sora 2 Pro' : 'Sora 2 Standard'}
+```
+Alle Videos — auch Kling-Generierungen — werden als "Sora 2 Standard" angezeigt.
 
-### Fix
+### Lösung
+Die Zeile durch eine Map ersetzen, die alle Modelle korrekt auflöst:
 
-**Database Migration**: Drop the old constraint and replace it with one that allows both Sora 2 and Kling durations:
+```typescript
+const MODEL_DISPLAY_NAMES: Record<string, string> = {
+  'sora-2-standard': 'Sora 2 Standard',
+  'sora-2-pro': 'Sora 2 Pro',
+  'kling-3-standard': 'Kling 3.0 Standard',
+  'kling-3-pro': 'Kling 3.0 Pro',
+};
 
-```sql
-ALTER TABLE ai_video_generations 
-  DROP CONSTRAINT ai_video_generations_duration_seconds_check;
-
-ALTER TABLE ai_video_generations 
-  ADD CONSTRAINT ai_video_generations_duration_seconds_check 
-  CHECK (duration_seconds >= 3 AND duration_seconds <= 180);
+// In der Anzeige:
+{MODEL_DISPLAY_NAMES[gen.model] || gen.model}
 ```
 
-This allows 3-180 seconds, covering Kling's 3-15s range and future models with longer durations (Kling supports up to 180s in multi-shot mode).
-
-No code changes needed -- the edge function and frontend are already correct.
+### Datei
+- `src/components/ai-video/VideoGenerationHistory.tsx` — eine Zeile anpassen + Map hinzufügen
 
