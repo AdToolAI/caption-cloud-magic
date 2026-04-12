@@ -1,34 +1,16 @@
 
 
-## Plan: Localize KI Picture Studio (EN/DE/ES)
+## Fix: KI Picture Studio translations showing raw keys in English UI
 
-### Problem
-The KI Picture Studio module (generate tab + Smart Background tab) has ~200 hardcoded German strings visible in the English UI across 9 files.
+### Root Cause
+The English `picStudio` translations (lines 15333–15526) were accidentally placed **inside** the `Object.assign(translations.es, {...})` block (which starts at line 15291 for ES `vidTrans`). This means:
+- The EN locale has **no** `picStudio` namespace → raw keys like `picStudio.pageTitle` are displayed
+- The ES locale gets the **English** picStudio values (overwriting its own Spanish ones at line 15578)
 
-### Files to edit (10 files)
+### Fix (1 file: `src/lib/translations.ts`)
+1. **Close** the ES `Object.assign` block **before** the EN `picStudio` block — add `});` after line 15332 (end of ES `vidTrans`)
+2. **Open** a new `Object.assign(translations.en, {` before the `picStudio:` block at line 15333
+3. **Close** it with `});` after line 15526 (end of the EN `picStudio` block)
 
-| File | German strings (~count) |
-|------|------------------------|
-| `src/lib/translations.ts` | Add ~150 `picStudio.*` keys (EN/DE/ES) |
-| `src/pages/PictureStudio.tsx` | ~5 — "Generieren", "KI Picture Studio", "Erstellen", breadcrumbs |
-| `src/components/picture-studio/PictureStudioHeader.tsx` | ~3 — "KI Picture Studio", "Text-to-Image · Smart Background · Alben" |
-| `src/components/picture-studio/ImageGenerator.tsx` | ~25 — STYLES labels (Realistisch, Aquarell, Ölgemälde...), ASPECT_RATIOS labels (Quadrat, Vertikal...), "Seitenverhältnis", "Qualität", "Schnell", "Bild generieren", "Bild hochladen", placeholder, toasts, "Generierte Bilder", "Zur Mediathek — Alben" |
-| `src/components/picture-studio/SaveToAlbumDialog.tsx` | ~6 — "In Album speichern", "Noch keine Alben vorhanden", "Neues Album erstellen", toasts |
-| `src/components/picture-studio/StudioLightbox.tsx` | ~3 — "In Album", "Löschen", "Download" |
-| `src/pages/BackgroundReplacer.tsx` | ~40 — CATEGORIES labels, scene pool names, "Produktbild hochladen", "Kategorie", "Anzahl Varianten", "Szenen-Diversität maximieren", "Lichtpräferenz", "Varianten generieren", "Vorschau-Galerie", "Übernommene Variante", "Alle Varianten", "Freistellungs-Qualität", "KI-Hintergrund-Ersteller v3", toasts |
-| `src/components/background/SceneGallery.tsx` | ~6 — "Übernehmen", "Qualität", "Schatten", "Farbe" |
-| `src/components/background/ExportControls.tsx` | ~8 — "Post planen", toasts ("Bitte wählen Sie...", "Bundle wird erstellt...", "Szenen an Post-Generator übergeben") |
-| `src/components/background/ImageLightbox.tsx` | ~8 — "Vorher", "Nachher", "Übernehmen", "Szene", "Kamera", "Qualität", "Schatten", "Farbe" |
-| `src/components/background/ProductInsightBanner.tsx` | ~8 — categoryLabels, "KI-Produkterkennung", "Erkannt:", "Kategorie", "Licht", "Intensität", "Übernommen", "Empfehlung übernehmen" |
-| `src/components/background/BackgroundReplacerHeroHeader.tsx` | ~3 — "7 Kategorien", "KI-Analyse" |
-
-### Approach
-1. Add `picStudio.*` namespace to `translations.ts` with all keys. DE values = exact current hardcoded strings.
-2. Add `useTranslation` hook to all 9 component files, replace strings with `t()`.
-3. Wrap static arrays (STYLES, ASPECT_RATIOS, CATEGORIES, scene pools, categoryLabels) in `useMemo` for language reactivity.
-4. German UI remains identical — no visual changes for DE users.
-5. Scene pool names (e.g. "Wald Holzbrücke") will be translated to English equivalents for the EN UI.
-
-### Single batch
-All files edited together in one pass.
+This is a structural bracket fix — no translation content changes needed. The German UI remains untouched.
 
