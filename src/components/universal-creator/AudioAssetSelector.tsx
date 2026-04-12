@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
   Select,
   SelectContent,
@@ -44,6 +45,7 @@ export const AudioAssetSelector = ({
   onMusicVolumeChange,
 }: AudioAssetSelectorProps) => {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('library');
   
@@ -113,7 +115,7 @@ export const AudioAssetSelector = ({
 
       // Validate track URL
       if (!track.url) {
-        throw new Error('Track hat keine gültige Audio-URL');
+        throw new Error(t('uc.trackNoUrl'));
       }
 
       const { data, error } = await supabase
@@ -139,14 +141,14 @@ export const AudioAssetSelector = ({
       return data;
     },
     onSuccess: (data) => {
-      toast({ title: 'Musik zur Bibliothek hinzugefügt' });
+      toast({ title: t('uc.musicAddedToLibrary') });
       queryClient.invalidateQueries({ queryKey: ['audio-library'] });
       onMusicSelect(data.id);
       setActiveTab('library');
     },
     onError: (error: any) => {
       toast({
-        title: 'Fehler',
+        title: t('uc.audioError'),
         description: error.message,
         variant: 'destructive',
       });
@@ -204,13 +206,13 @@ export const AudioAssetSelector = ({
       return data;
     },
     onSuccess: (data) => {
-      toast({ title: 'Musik hochgeladen!' });
+      toast({ title: t('uc.musicUploaded') });
       queryClient.invalidateQueries({ queryKey: ['audio-library'] });
       onMusicSelect(data.id);
     },
     onError: (error: any) => {
       toast({
-        title: 'Upload fehlgeschlagen',
+        title: t('uc.uploadFailed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -223,9 +225,8 @@ export const AudioAssetSelector = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Falls es eine hochgeladene Datei ist, auch aus Storage löschen
+      // If uploaded file, also delete from storage
       if (track.source === 'upload' && track.url) {
-        // Extrahiere den Pfad aus der URL
         const urlParts = track.url.split('/audio-assets/');
         if (urlParts[1]) {
           await supabase.storage
@@ -234,7 +235,7 @@ export const AudioAssetSelector = ({
         }
       }
 
-      // Lösche den Eintrag aus der Datenbank
+      // Delete from database
       const { error } = await supabase
         .from('universal_audio_assets')
         .delete()
@@ -245,17 +246,17 @@ export const AudioAssetSelector = ({
       return track.id;
     },
     onSuccess: (deletedId) => {
-      toast({ title: 'Musik gelöscht' });
+      toast({ title: t('uc.musicDeleted') });
       queryClient.invalidateQueries({ queryKey: ['audio-library'] });
       
-      // Falls der gelöschte Track ausgewählt war, Auswahl aufheben
+      // If deleted track was selected, deselect
       if (selectedMusicId === deletedId) {
         onMusicSelect(null);
       }
     },
     onError: (error: any) => {
       toast({
-        title: 'Löschen fehlgeschlagen',
+        title: t('uc.deleteFailed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -283,8 +284,8 @@ export const AudioAssetSelector = ({
         audio.play().catch(err => {
           console.error('[AudioAssetSelector] Audio play failed:', err.name, err.message);
           toast({ 
-            title: 'Audio-Fehler', 
-            description: err.message || 'Wiedergabe fehlgeschlagen',
+            title: t('uc.audioError'), 
+            description: err.message || t('uc.playbackFailed'),
             variant: 'destructive'
           });
           setPlayingAudio(null);
@@ -302,8 +303,8 @@ export const AudioAssetSelector = ({
           src: target.src
         });
         toast({ 
-          title: 'Audio-Fehler', 
-          description: 'Audio konnte nicht geladen werden',
+          title: t('uc.audioError'), 
+          description: t('uc.audioLoadError'),
           variant: 'destructive'
         });
         setPlayingAudio(null);
@@ -328,18 +329,18 @@ export const AudioAssetSelector = ({
       <Card className="p-6">
         <div className="flex items-center gap-2 mb-4">
           <Music className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold">Hintergrundmusik</h3>
+          <h3 className="font-semibold">{t('uc.backgroundMusic')}</h3>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-2 w-full mb-4">
             <TabsTrigger value="library">
               <Music className="h-4 w-4 mr-2" />
-              Meine Musik
+              {t('uc.myMusic')}
             </TabsTrigger>
             <TabsTrigger value="stock">
               <Search className="h-4 w-4 mr-2" />
-              Stock Musik
+              {t('uc.stockMusic')}
             </TabsTrigger>
           </TabsList>
 
@@ -348,7 +349,7 @@ export const AudioAssetSelector = ({
             {selectedMusicId && (
               <Card className="p-4 bg-primary/5 border-primary">
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-semibold text-primary">✓ Ausgewählter Track</h4>
+                  <h4 className="text-sm font-semibold text-primary">✓ {t('uc.selectedTrack')}</h4>
                   <div className="flex gap-2">
                     <Button
                       type="button"
@@ -370,7 +371,7 @@ export const AudioAssetSelector = ({
                       ) : (
                         <Play className="h-4 w-4 mr-2" />
                       )}
-                      Testen
+                      {t('uc.test')}
                     </Button>
                     <Button
                       type="button"
@@ -379,11 +380,11 @@ export const AudioAssetSelector = ({
                       onClick={(e) => {
                         e.stopPropagation();
                         onMusicSelect(null);
-                        toast({ title: 'Musik entfernt' });
+                        toast({ title: t('uc.musicRemoved') });
                       }}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
-                      Entfernen
+                      {t('uc.remove')}
                     </Button>
                   </div>
                 </div>
@@ -412,8 +413,8 @@ export const AudioAssetSelector = ({
               <div className="text-center space-y-2">
                 <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
                 <div className="space-y-1">
-                  <p className="text-sm font-medium">Musik hochladen</p>
-                  <p className="text-xs text-muted-foreground">MP3, WAV, OGG, M4A (max. 50MB)</p>
+                  <p className="text-sm font-medium">{t('uc.uploadMusic')}</p>
+                  <p className="text-xs text-muted-foreground">{t('uc.audioFormats')}</p>
                 </div>
                 <Input
                   type="file"
@@ -423,8 +424,8 @@ export const AudioAssetSelector = ({
                     if (file) {
                       if (file.size > 52428800) {
                         toast({
-                          title: 'Datei zu groß',
-                          description: 'Maximale Dateigröße: 50MB',
+                          title: t('uc.fileTooLarge'),
+                          description: t('uc.maxFileSize'),
                           variant: 'destructive',
                         });
                         return;
@@ -439,7 +440,7 @@ export const AudioAssetSelector = ({
                 {uploadMusic.isPending && (
                   <div className="flex items-center gap-2 justify-center text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Wird hochgeladen...</span>
+                    <span>{t('uc.uploading')}</span>
                   </div>
                 )}
               </div>
@@ -447,7 +448,7 @@ export const AudioAssetSelector = ({
 
             {/* Music Library - Available Tracks */}
             <div>
-              <h4 className="text-sm font-semibold mb-3">Verfügbare Musik</h4>
+              <h4 className="text-sm font-semibold mb-3">{t('uc.availableMusic')}</h4>
               {libraryLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -455,8 +456,8 @@ export const AudioAssetSelector = ({
               ) : musicTracks.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Music className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Noch keine Musik in deiner Bibliothek</p>
-                  <p className="text-xs mt-2">Lade eigene Musik hoch oder füge Stock-Musik hinzu</p>
+                  <p>{t('uc.noMusicInLibrary')}</p>
+                  <p className="text-xs mt-2">{t('uc.uploadOrAddStock')}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3">
@@ -506,7 +507,7 @@ export const AudioAssetSelector = ({
                       </Button>
                       {selectedMusicId === track.id ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-primary font-medium">Bereits ausgewählt</span>
+                          <span className="text-sm text-primary font-medium">{t('uc.alreadySelected')}</span>
                           <Button
                             type="button"
                             variant="ghost"
@@ -539,10 +540,10 @@ export const AudioAssetSelector = ({
                               e.preventDefault();
                               e.stopPropagation();
                               onMusicSelect(track.id);
-                              toast({ title: 'Musik ausgewählt' });
+                              toast({ title: t('uc.musicSelected') });
                             }}
                           >
-                            Auswählen
+                            {t('uc.select')}
                           </Button>
                           <Button
                             type="button"
@@ -577,17 +578,17 @@ export const AudioAssetSelector = ({
           <TabsContent value="stock" className="space-y-4">
             <div className="flex gap-2">
               <Input
-                placeholder="Nach Musik suchen..."
+                placeholder={t('uc.searchMusic')}
                 value={musicSearchQuery}
                 onChange={(e) => setMusicSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && setSearchTriggered(true)}
               />
               <Select value={selectedMood} onValueChange={setSelectedMood}>
                 <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Stimmung" />
+                  <SelectValue placeholder={t('uc.mood')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Alle</SelectItem>
+                  <SelectItem value="all">{t('uc.allMoods')}</SelectItem>
                   <SelectItem value="upbeat">Upbeat</SelectItem>
                   <SelectItem value="chill">Chill</SelectItem>
                   <SelectItem value="epic">Epic</SelectItem>
@@ -597,10 +598,10 @@ export const AudioAssetSelector = ({
               </Select>
               <Select value={selectedGenre} onValueChange={setSelectedGenre}>
                 <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Genre" />
+                  <SelectValue placeholder={t('uc.genre')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Alle</SelectItem>
+                  <SelectItem value="all">{t('uc.allGenres')}</SelectItem>
                   <SelectItem value="pop">Pop</SelectItem>
                   <SelectItem value="rock">Rock</SelectItem>
                   <SelectItem value="elektronisch">Electronic</SelectItem>
@@ -638,7 +639,7 @@ export const AudioAssetSelector = ({
                         <Badge variant="outline">{track.genre}</Badge>
                         <Badge variant="outline">{track.mood}</Badge>
                         <span>{track.duration}s</span>
-                        <Badge variant="secondary" className="ml-auto">Lizenzfrei</Badge>
+                        <Badge variant="secondary" className="ml-auto">{t('uc.royaltyFree')}</Badge>
                       </div>
                     </div>
                     <Button
@@ -672,18 +673,18 @@ export const AudioAssetSelector = ({
             ) : searchTriggered && stockMusic && stockMusic.length === 0 ? (
               <div className="text-center py-8">
                 <Music className="h-12 w-12 mx-auto mb-2 opacity-50 text-muted-foreground" />
-                <p className="text-muted-foreground mb-2">Keine Musik gefunden</p>
-                <p className="text-xs text-muted-foreground">Versuche andere Suchbegriffe, Stimmungen oder Genres</p>
+                <p className="text-muted-foreground mb-2">{t('uc.noMusicFound')}</p>
+                <p className="text-xs text-muted-foreground">{t('uc.tryOtherTerms')}</p>
                 <p className="text-sm text-muted-foreground">
-                  Versuche andere Begriffe wie: beach, rock, jazz, happy, relax
+                  {t('uc.tryOtherKeywords')}
                 </p>
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <Music className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p className="mb-2">Suche nach lizenzfreier Stock-Musik von Jamendo</p>
+                <p className="mb-2">{t('uc.searchStockMusicJamendo')}</p>
                 <p className="text-xs mt-2">
-                  Wähle eine Stimmung und Genre oder suche nach Stichworten
+                  {t('uc.chooseMoodGenre')}
                 </p>
                 <Button 
                   variant="outline" 
@@ -691,7 +692,7 @@ export const AudioAssetSelector = ({
                   onClick={() => setSearchTriggered(true)}
                 >
                   <Search className="h-4 w-4 mr-2" />
-                  Beliebte Tracks laden
+                  {t('uc.loadPopularTracks')}
                 </Button>
               </div>
             )}
@@ -704,7 +705,7 @@ export const AudioAssetSelector = ({
             <div className="flex items-center gap-3">
               <Volume2 className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium min-w-[100px]">
-                Lautstärke: {Math.round(musicVolume * 100)}%
+                {t('uc.volume')}: {Math.round(musicVolume * 100)}%
               </span>
               <Slider
                 value={[musicVolume]}
