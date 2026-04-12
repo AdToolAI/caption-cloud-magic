@@ -1670,7 +1670,7 @@ async function runGenerationPipeline(
     const payloadSizeBytes = new TextEncoder().encode(JSON.stringify(lambdaPayload)).length;
     console.log(`📦 Payload size: ${(payloadSizeBytes / 1024).toFixed(1)} KB`);
 
-    await updateProgress(supabase, progressId, 'ready_to_render', 88, '🚀 Rendering wird vorbereitet...', {
+    await updateProgress(supabase, progressId, 'ready_to_render', 88, i18n('rendering_preparing', lang), {
       renderId: pendingRenderId,
       outName: `universal-video-${pendingRenderId}.mp4`,
       lambdaPayload: lambdaPayload,
@@ -1688,7 +1688,7 @@ async function runGenerationPipeline(
     
     // r25: Tag error with category for frontend decision-making
     const errorCategory = isInfraError(errorMessage) ? 'rate_limit' : 'unknown';
-    await updateProgress(supabase, progressId, 'failed', 0, `Fehler: ${errorMessage}`, {
+    await updateProgress(supabase, progressId, 'failed', 0, `${i18n('error_generic', lang)}: ${errorMessage}`, {
       errorCategory,
       errorMessage,
     });
@@ -2100,7 +2100,7 @@ async function runRenderOnlyPipeline(
     console.error(`[render-only] ❌ Pipeline error:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorCategory = isInfraError(errorMessage) ? (errorMessage.toLowerCase().includes('timeout') ? 'timeout' : 'rate_limit') : 'unknown';
-    await updateProgress(supabase, newProgressId, 'failed', 0, `Render-Only Fehler: ${errorMessage}`, {
+    await updateProgress(supabase, newProgressId, 'failed', 0, `${i18n('error_render_only', lang)}: ${errorMessage}`, {
       errorCategory,
       errorMessage,
       sourceProgressId: chainSourceProgressId,
