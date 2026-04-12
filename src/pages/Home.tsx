@@ -4,7 +4,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, Check, Plus, Calendar as CalendarIcon, FileText, TrendingUp, Lightbulb, Clock, Eye, Send, RefreshCw, ImageIcon } from "lucide-react";
+import { ArrowRight, Plus, Calendar as CalendarIcon, FileText, TrendingUp, Lightbulb, Clock, Eye, Send, RefreshCw, ImageIcon } from "lucide-react";
 
 import { SEO } from "@/components/SEO";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,8 +21,6 @@ import { toast } from "sonner";
 import { FeatureGrid } from "@/components/home/FeatureGrid";
 import { DashboardVideoCarousel } from "@/components/dashboard/DashboardVideoCarousel";
 import { RecoCard } from "@/features/recommendations/RecoCard";
-import { PRICING_V21 } from "@/config/pricing";
-import { getCurrencyForLanguage } from "@/lib/currency";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
 import { NicheTutorialModal } from "@/components/onboarding/NicheTutorialModal";
@@ -735,153 +733,6 @@ const Home = () => {
           </Section>
         )}
 
-        {/* Pricing Section */}
-        <section className="bg-gradient-to-br from-muted/30 to-muted/60 rounded-3xl p-8 md:p-12 mt-16 shadow-xl">
-          <div className="text-center mb-12">
-            <div className="inline-block px-4 py-1.5 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 text-primary rounded-full text-xs font-bold mb-4 shadow-lg shadow-primary/10">
-              ✨ {t("homePage.simpleTransparentPricing")}
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3 tracking-tight">
-              {t("homePage.growWithAdTool")}
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              {t("homePage.choosePlan")}
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {/* Basic Plan */}
-            <div className="relative flex flex-col bg-card rounded-2xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-6">
-              <div className="text-center mb-6 pb-6 border-b border-border/50">
-                <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Basic</h3>
-                <p className="text-xs text-muted-foreground mb-6 font-medium">
-                  {t("homePage.bestForCreators")}
-                </p>
-                <div className="flex items-baseline justify-center gap-1.5">
-                  <span className="text-4xl font-bold text-foreground tracking-tighter">{getCurrencyForLanguage(language) === 'USD' ? '$' : '€'}{PRICING_V21.basic.price[getCurrencyForLanguage(language)]}</span>
-                  <span className="text-sm text-muted-foreground font-medium">
-                    / {t("homePage.perMonth")}
-                  </span>
-                </div>
-              </div>
-              <ul className="space-y-3 mb-6 flex-1">
-                <li className="flex items-start gap-2.5">
-                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {t("homePage.aiCaptions200")}
-                  </span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {t("homePage.allPremiumTemplates")}
-                  </span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {t("homePage.hashtagGenerator")}
-                  </span>
-                </li>
-              </ul>
-              <Button size="lg" asChild className="w-full">
-                <Link to={user ? "/pricing" : "/auth"}>
-                  {t("homePage.upgradeToBasic")}
-                </Link>
-              </Button>
-            </div>
-
-            {/* Pro Plan */}
-            <div className="relative flex flex-col bg-card rounded-2xl border-2 border-primary shadow-2xl shadow-primary/30 lg:scale-105 lg:z-10 hover:scale-105 lg:hover:scale-110 transition-all duration-500 p-6">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
-                <div className="bg-gradient-to-r from-primary to-accent text-white px-6 py-1.5 rounded-full text-xs font-extrabold shadow-2xl tracking-wider">
-                  ⭐ {t("homePage.popular")}
-                </div>
-              </div>
-              <div className="text-center mb-6 pb-6 border-b border-border/50">
-                <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Pro</h3>
-                <p className="text-xs text-muted-foreground mb-6 font-medium">
-                  {t("homePage.perfectForAgencies")}
-                </p>
-                <div className="flex items-baseline justify-center gap-1.5">
-                  <span className="text-4xl font-bold text-foreground tracking-tighter">{getCurrencyForLanguage(language) === 'USD' ? '$' : '€'}{PRICING_V21.pro.price[getCurrencyForLanguage(language)]}</span>
-                  <span className="text-sm text-muted-foreground font-medium">
-                    / {t("homePage.perMonth")}
-                  </span>
-                </div>
-              </div>
-              <ul className="space-y-3 mb-6 flex-1">
-                <li className="flex items-start gap-2.5">
-                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {t("homePage.unlimitedAiCaptions")}
-                  </span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {t("homePage.teamCollaboration")}
-                  </span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {t("homePage.prioritySupport")}
-                  </span>
-                </li>
-              </ul>
-              <Button size="lg" asChild className="w-full">
-                <Link to={user ? "/pricing" : "/auth"}>
-                  {t("homePage.goPro")}
-                </Link>
-              </Button>
-            </div>
-
-            {/* Enterprise Plan */}
-            <div className="relative flex flex-col bg-card rounded-2xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-6">
-              <div className="text-center mb-6 pb-6 border-b border-border/50">
-                <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Enterprise</h3>
-                <p className="text-xs text-muted-foreground mb-6 font-medium">
-                  {t("homePage.forLargeTeams")}
-                </p>
-                <div className="flex items-baseline justify-center gap-1.5">
-                  <span className="text-4xl font-bold text-foreground tracking-tighter">{getCurrencyForLanguage(language) === 'USD' ? '$' : '€'}{PRICING_V21.enterprise.price[getCurrencyForLanguage(language)]}</span>
-                  <span className="text-sm text-muted-foreground font-medium">
-                    / {t("homePage.perMonth")}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {t("homePage.plusSeats")}
-                </p>
-              </div>
-              <ul className="space-y-3 mb-6 flex-1">
-                <li className="flex items-start gap-2.5">
-                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {t("homePage.everythingInPro")}
-                  </span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {t("homePage.apiAccess")}
-                  </span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {t("homePage.dedicatedManager")}
-                  </span>
-                </li>
-              </ul>
-              <Button size="lg" asChild className="w-full">
-                <Link to={user ? "/pricing" : "/auth"}>
-                  {t("homePage.upgradeToEnterprise")}
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </section>
       </div>
     </div>
   );
