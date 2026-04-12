@@ -5,33 +5,27 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, Check } from 'lucide-react';
 import { AI_VIDEO_CREDIT_PACKS } from '@/config/aiVideoCredits';
 import { Currency } from '@/config/pricing';
-import { detectUserCurrency, formatPrice, getCurrencySymbol, getCurrencyForLanguage } from '@/lib/currency';
+import { formatPrice, getCurrencyForLanguage } from '@/lib/currency';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from 'sonner';
 
 export const AIVideoCreditPurchase = () => {
-  const { language } = useTranslation();
+  const { language, t } = useTranslation();
   const [loading, setLoading] = useState<string | null>(null);
-  const [currency, setCurrency] = useState<Currency>(getCurrencyForLanguage(language));
+  const currency: Currency = getCurrencyForLanguage(language);
 
   const handlePurchase = async (packId: keyof typeof AI_VIDEO_CREDIT_PACKS) => {
     setLoading(packId);
-    
     try {
       const { data, error } = await supabase.functions.invoke('ai-video-purchase-credits', {
         body: { packId, currency }
       });
-
       if (error) throw error;
-
-      // Redirect to Stripe Checkout
-      if (data.url) {
-        window.open(data.url, '_blank');
-      }
+      if (data.url) window.open(data.url, '_blank');
     } catch (error) {
       console.error('Purchase error:', error);
-      toast.error('Fehler beim Kaufvorgang');
+      toast.error(t('aiVid.purchaseError'));
     } finally {
       setLoading(null);
     }
@@ -39,35 +33,11 @@ export const AIVideoCreditPurchase = () => {
 
   return (
     <div className="space-y-6">
-      {/* Currency Toggle */}
-      <div className="flex justify-center gap-2">
-        <Button
-          variant={currency === 'EUR' ? 'default' : 'outline'}
-          onClick={() => setCurrency('EUR')}
-          size="sm"
-        >
-          🇪🇺 EUR (€)
-        </Button>
-        <Button
-          variant={currency === 'USD' ? 'default' : 'outline'}
-          onClick={() => setCurrency('USD')}
-          size="sm"
-        >
-          🇺🇸 USD ($)
-        </Button>
-      </div>
-
-      {/* Credit Packs Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {Object.entries(AI_VIDEO_CREDIT_PACKS).map(([key, pack]) => (
-          <Card 
-            key={key}
-            className={`p-6 relative ${pack.popular ? 'border-primary border-2' : ''}`}
-          >
+          <Card key={key} className={`p-6 relative ${pack.popular ? 'border-primary border-2' : ''}`}>
             {pack.badge && (
-              <Badge className="absolute top-4 right-4" variant="secondary">
-                {pack.badge}
-              </Badge>
+              <Badge className="absolute top-4 right-4" variant="secondary">{pack.badge}</Badge>
             )}
             {pack.bestValue && (
               <Badge className="absolute top-4 right-4 bg-gradient-to-r from-purple-500 to-pink-500">
@@ -75,72 +45,52 @@ export const AIVideoCreditPurchase = () => {
                 Best Value
               </Badge>
             )}
-            
+
             <div className="space-y-4">
               <div>
                 <h3 className="text-lg font-semibold">{pack.name[currency]}</h3>
                 <p className="text-xs text-muted-foreground mt-1">{pack.description[currency]}</p>
                 <div className="mt-3">
-                  <span className="text-3xl font-bold">
-                    {formatPrice(pack.price[currency], currency)}
-                  </span>
+                  <span className="text-3xl font-bold">{formatPrice(pack.price[currency], currency)}</span>
                 </div>
               </div>
 
               <div className="space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-primary" />
-                  <span>
-                    {formatPrice(pack.price[currency], currency)} Credits
-                  </span>
+                  <span>{formatPrice(pack.price[currency], currency)} Credits</span>
                 </div>
                 {pack.bonusPercent > 0 && (
                   <div className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-primary" />
-                    <span className="text-primary font-medium">
-                      +{formatPrice(pack.bonus[currency], currency)} Bonus
-                    </span>
+                    <span className="text-primary font-medium">+{formatPrice(pack.bonus[currency], currency)} Bonus</span>
                   </div>
                 )}
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-primary" />
-                  <span>
-                    = {formatPrice(pack.totalCredits[currency], currency)} gesamt
-                  </span>
+                  <span>= {formatPrice(pack.totalCredits[currency], currency)} {t('aiVid.total')}</span>
                 </div>
                 <div className="pt-2 border-t space-y-1">
-                  <p className="text-xs font-medium mb-1">Beispiele mit Sora 2 Standard:</p>
+                  <p className="text-xs font-medium mb-1">{t('aiVid.examplesWithSora')}</p>
                   <div className="space-y-0.5 text-xs text-muted-foreground">
-                    <div className="flex justify-between">
-                      <span>10 Sek Videos:</span>
-                      <span className="font-medium">≈ {Math.floor(pack.totalCredits[currency] / 2.5)} Videos</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>15 Sek Videos:</span>
-                      <span className="font-medium">≈ {Math.floor(pack.totalCredits[currency] / 3.75)} Videos</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>20 Sek Videos:</span>
-                      <span className="font-medium">≈ {Math.floor(pack.totalCredits[currency] / 5.0)} Videos</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>30 Sek Videos:</span>
-                      <span className="font-medium">≈ {Math.floor(pack.totalCredits[currency] / 7.5)} Videos</span>
-                    </div>
+                    {[10, 15, 20, 30].map((sec) => (
+                      <div key={sec} className="flex justify-between">
+                        <span>{t('aiVid.secVideos', { sec: String(sec) })}:</span>
+                        <span className="font-medium">{t('aiVid.videos', { count: String(Math.floor(pack.totalCredits[currency] / (sec * 0.25))) })}</span>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-[10px] text-muted-foreground pt-1">
-                    Sora 2 Pro kostet doppelt so viel
-                  </p>
+                  <p className="text-[10px] text-muted-foreground pt-1">{t('aiVid.soraProDouble')}</p>
                 </div>
               </div>
 
-              <Button 
+              <Button
                 className="w-full"
                 onClick={() => handlePurchase(key as any)}
                 disabled={loading !== null}
                 variant={pack.popular ? 'default' : 'outline'}
               >
-                {loading === key ? 'Lädt...' : 'Jetzt kaufen'}
+                {loading === key ? t('aiVid.loadingBtn') : t('aiVid.buyNow')}
               </Button>
             </div>
           </Card>
