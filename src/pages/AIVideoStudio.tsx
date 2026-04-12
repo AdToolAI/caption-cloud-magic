@@ -309,6 +309,12 @@ export default function AIVideoStudio() {
             {t('aiVid.pageTitle')}
           </h1>
           <p className="text-muted-foreground mt-2">{t('aiVid.pageSubtitle')}</p>
+          <Link to="/kling-video-studio">
+            <Button variant="outline" size="sm" className="mt-3">
+              <Sparkles className="w-4 h-4 mr-2" />
+              Kling 3.0 Studio →
+            </Button>
+          </Link>
         </div>
 
         <div className="mb-6">
