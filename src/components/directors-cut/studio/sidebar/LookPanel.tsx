@@ -425,7 +425,7 @@ export const LookPanel: React.FC<LookPanelProps> = ({
               }
             }}
           >
-            {isSceneMode ? '{t('dc.resetSceneEffects')}' : '{t('dc.resetToDefault')}'}
+            {isSceneMode ? t('dc.resetSceneEffects') : t('dc.resetToDefault')}
           </Button>
         </div>
       </div>
