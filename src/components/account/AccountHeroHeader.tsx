@@ -2,9 +2,11 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { getProductInfo } from "@/config/pricing";
 import { Settings, Shield, CheckCircle2, Crown } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export const AccountHeroHeader = () => {
   const { user, subscribed, productId } = useAuth();
+  const { t } = useTranslation();
   const planInfo = getProductInfo(productId);
   const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
 
@@ -74,7 +76,7 @@ export const AccountHeroHeader = () => {
               transition={{ delay: 0.1 }}
               className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text"
             >
-              Konto-Einstellungen
+              {t('account.header.title')}
             </motion.h1>
 
             <motion.p
@@ -108,13 +110,13 @@ export const AccountHeroHeader = () => {
           {/* Security Badge */}
           <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/30 border border-white/10">
             <Shield className="h-4 w-4 text-cyan-400" />
-            <span className="text-sm font-medium">Geschützt</span>
+            <span className="text-sm font-medium">{t('account.header.protected')}</span>
           </div>
 
           {/* Verified Badge */}
           <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/10 border border-green-500/20">
             <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <span className="text-sm font-medium text-green-500">Verifiziert</span>
+            <span className="text-sm font-medium text-green-500">{t('account.header.verified')}</span>
           </div>
         </motion.div>
       </div>

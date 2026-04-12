@@ -2144,6 +2144,18 @@ export const translations: Record<Language, any> = {
       postRetrying: "Post is being retried...",
     },
     account: {
+      header: {
+        title: "Account Settings",
+        protected: "Protected",
+        verified: "Verified",
+      },
+      timezone: {
+        title: "Timezone",
+        subtitle: "Your timezone for scheduling and notifications",
+        select: "Select timezone",
+        saved: "Timezone saved",
+        error: "Error saving",
+      },
       tabs: {
         profile: "Profile",
         security: "Security",
@@ -6138,6 +6150,18 @@ export const translations: Record<Language, any> = {
     postRetrying: "Post wird erneut versucht...",
   },
   account: {
+    header: {
+      title: "Konto-Einstellungen",
+      protected: "Geschützt",
+      verified: "Verifiziert",
+    },
+    timezone: {
+      title: "Zeitzone",
+      subtitle: "Deine Zeitzone für Planungen und Benachrichtigungen",
+      select: "Zeitzone auswählen",
+      saved: "Zeitzone gespeichert",
+      error: "Fehler beim Speichern",
+    },
     tabs: {
       profile: "Profil",
       security: "Sicherheit",

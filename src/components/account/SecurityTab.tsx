@@ -63,14 +63,14 @@ export const SecurityTab = () => {
       setTwoFactorEnabled(false);
       setShowDisableDialog(false);
       toast({
-        title: "2FA deaktiviert",
-        description: "Zwei-Faktor-Authentifizierung wurde deaktiviert"
+        title: t('account.twoFactor.disabled2fa'),
+        description: t('account.twoFactor.disabledDesc')
       });
     } catch (err: any) {
       console.error('Error disabling 2FA:', err);
       toast({
-        title: "Fehler",
-        description: err.message || "2FA konnte nicht deaktiviert werden",
+        title: t('account.sessions.error'),
+        description: err.message || t('account.twoFactor.disabledDesc'),
         variant: "destructive"
       });
     } finally {
