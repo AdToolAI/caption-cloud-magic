@@ -5,8 +5,10 @@ import {
   ArrowRight, Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { VIDEO_CATEGORIES, type VideoCategory } from '@/types/universal-video-creator';
+import { type VideoCategory } from '@/types/universal-video-creator';
 import { ALL_CATEGORY_INTERVIEWS } from '@/config/universal-video-interviews';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useLocalizedVideoCategories } from '@/hooks/useLocalizedVideoCategories';
 
 interface CategorySelectorProps {
   selectedCategory: VideoCategory | null;
@@ -44,6 +46,9 @@ const CATEGORY_COLORS: Record<VideoCategory, string> = {
 };
 
 export function CategorySelector({ selectedCategory, onSelectCategory }: CategorySelectorProps) {
+  const { t } = useTranslation();
+  const localizedCategories = useLocalizedVideoCategories();
+
   return (
     <div className="max-w-6xl mx-auto">
       <motion.div
@@ -60,23 +65,22 @@ export function CategorySelector({ selectedCategory, onSelectCategory }: Categor
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F5C76A] opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-[#F5C76A]" />
           </span>
-          <span className="text-sm font-medium text-[#F5C76A]">12 Videokategorien verfügbar</span>
+          <span className="text-sm font-medium text-[#F5C76A]">{t('uvc.categoriesAvailable')}</span>
         </motion.div>
         
         <h2 className="text-3xl font-bold mb-3">
           <span className="bg-gradient-to-r from-[#F5C76A] via-amber-300 to-[#F5C76A] bg-clip-text text-transparent">
-            Welche Art von Video möchtest du erstellen?
+            {t('uvc.chooseCategoryHeading')}
           </span>
         </h2>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Jede Kategorie hat ein speziell optimiertes Interview mit 20-24 tiefgehenden Fragen 
-          für das bestmögliche Ergebnis
+          {t('uvc.chooseCategoryDesc')}
         </p>
       </motion.div>
 
       {/* Category Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {VIDEO_CATEGORIES.map((categoryInfo, index) => {
+        {localizedCategories.map((categoryInfo, index) => {
           const Icon = CATEGORY_ICONS[categoryInfo.category];
           const colorClass = CATEGORY_COLORS[categoryInfo.category];
           const isSelected = selectedCategory === categoryInfo.category;
@@ -139,7 +143,7 @@ export function CategorySelector({ selectedCategory, onSelectCategory }: Categor
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <MessageSquare className="h-3 w-3" />
-                  {questionCount} Fragen
+                  {questionCount} {t('uvc.questionsLabel')}
                 </span>
                 <ArrowRight className={cn(
                   "h-4 w-4 transition-all",
@@ -167,7 +171,7 @@ export function CategorySelector({ selectedCategory, onSelectCategory }: Categor
             <div className="flex items-center gap-4">
               {(() => {
                 const Icon = CATEGORY_ICONS[selectedCategory];
-                const category = VIDEO_CATEGORIES.find(c => c.category === selectedCategory);
+                const category = localizedCategories.find(c => c.category === selectedCategory);
                 return (
                   <>
                     <div className="w-14 h-14 rounded-xl bg-[#F5C76A]/20 border border-[#F5C76A]/30 flex items-center justify-center">
@@ -185,7 +189,7 @@ export function CategorySelector({ selectedCategory, onSelectCategory }: Categor
               <div className="text-2xl font-bold text-[#F5C76A]">
                 {ALL_CATEGORY_INTERVIEWS[selectedCategory]?.phases?.length || 20}
               </div>
-              <div className="text-xs text-muted-foreground">Interview-Phasen</div>
+              <div className="text-xs text-muted-foreground">{t('uvc.interviewPhases')}</div>
             </div>
           </div>
         </motion.div>
