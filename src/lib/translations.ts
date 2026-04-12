@@ -15959,8 +15959,3 @@ export const detectBrowserLanguage = (): Language => {
   if (browserLang.startsWith('es')) return 'es';
   return 'en';
 };
-  const browserLang = navigator.language.toLowerCase();
-  if (browserLang.startsWith('de')) return 'de';
-  if (browserLang.startsWith('es')) return 'es';
-  return 'en';
-};
