@@ -6,14 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, Video, ArrowLeft, Volume2, Wand2 } from 'lucide-react';
+import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, ArrowLeft, Wand2 } from 'lucide-react';
 import { VideoPromptOptimizer } from '@/components/ai-video/VideoPromptOptimizer';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
-import { KLING_VIDEO_MODELS, KlingVideoModel, KlingAspectRatio } from '@/config/klingVideoCredits';
+import { WAN_VIDEO_MODELS, WanVideoModel, WanAspectRatio } from '@/config/wanVideoCredits';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,7 +21,7 @@ import { getCurrencyForLanguage, formatPrice } from '@/lib/currency';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Currency } from '@/config/pricing';
 
-export default function KlingVideoStudio() {
+export default function WanVideoStudio() {
   const { user } = useAuth();
   const { language, t } = useTranslation();
   const { wallet, loading: walletLoading, refetch: refetchWallet } = useAIVideoWallet();
@@ -30,35 +29,24 @@ export default function KlingVideoStudio() {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('generate');
 
-  // Generation parameters
   const [prompt, setPrompt] = useState('');
-  const [model, setModel] = useState<KlingVideoModel>('kling-3-standard');
+  const [model, setModel] = useState<WanVideoModel>('wan-standard');
   const [duration, setDuration] = useState(5);
-  const [aspectRatio, setAspectRatio] = useState<KlingAspectRatio>('16:9');
-  const [generateAudio, setGenerateAudio] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState<WanAspectRatio>('16:9');
 
-  // Image-to-Video
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
-  const [endImageUrl, setEndImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const startImageRef = useRef<HTMLInputElement>(null);
-  const endImageRef = useRef<HTMLInputElement>(null);
 
-  // Video-to-Video
-  const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
-  const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
-  const [uploadingVideo, setUploadingVideo] = useState(false);
-  const videoRef = useRef<HTMLInputElement>(null);
   const [showPromptOptimizer, setShowPromptOptimizer] = useState(false);
 
   const currency: Currency = getCurrencyForLanguage(language);
-  const modelConfig = KLING_VIDEO_MODELS[model];
+  const modelConfig = WAN_VIDEO_MODELS[model];
   const costPerSecond = modelConfig.costPerSecond[currency];
   const cost = duration * costPerSecond;
   const canAfford = wallet && wallet.balance_euros >= cost;
   const currencySymbol = currency === 'USD' ? '$' : '€';
 
-  // Handle payment success
   useEffect(() => {
     const payment = searchParams.get('payment');
     if (payment === 'success') {
@@ -67,36 +55,25 @@ export default function KlingVideoStudio() {
     }
   }, [searchParams]);
 
-  const uploadFile = async (file: File, type: 'image' | 'video'): Promise<string | null> => {
+  const uploadFile = async (file: File): Promise<string | null> => {
     if (!user) return null;
-    const bucket = type === 'image' ? 'ai-video-reference' : 'ai-videos';
     const ext = file.name.split('.').pop();
-    const path = `${user.id}/kling-${Date.now()}.${ext}`;
+    const path = `${user.id}/wan-${Date.now()}.${ext}`;
 
-    const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
+    const { error } = await supabase.storage.from('ai-video-reference').upload(path, file, { upsert: true });
     if (error) {
       toast.error('Upload fehlgeschlagen');
       return null;
     }
-    const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(path);
+    const { data: { publicUrl } } = supabase.storage.from('ai-video-reference').getPublicUrl(path);
     return publicUrl;
   };
 
-  const handleImageUpload = async (file: File, target: 'start' | 'end') => {
+  const handleImageUpload = async (file: File) => {
     setUploadingImage(true);
-    const url = await uploadFile(file, 'image');
-    if (url) {
-      if (target === 'start') setStartImageUrl(url);
-      else setEndImageUrl(url);
-    }
+    const url = await uploadFile(file);
+    if (url) setStartImageUrl(url);
     setUploadingImage(false);
-  };
-
-  const handleVideoUpload = async (file: File) => {
-    setUploadingVideo(true);
-    const url = await uploadFile(file, 'video');
-    if (url) setReferenceVideoUrl(url);
-    setUploadingVideo(false);
   };
 
   const handleGenerate = async () => {
@@ -109,17 +86,13 @@ export default function KlingVideoStudio() {
 
     setGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-kling-video', {
+      const { data, error } = await supabase.functions.invoke('generate-wan-video', {
         body: {
           prompt: prompt.trim(),
           model,
           duration,
           aspectRatio,
-          generateAudio,
           startImageUrl,
-          endImageUrl,
-          referenceVideoUrl,
-          videoReferenceType: referenceVideoUrl ? videoReferenceType : undefined,
         },
       });
 
@@ -131,7 +104,7 @@ export default function KlingVideoStudio() {
         throw new Error(data.error);
       }
 
-      toast.success(`Kling 3.0 Video wird generiert! Kosten: ${currencySymbol}${cost.toFixed(2)}`);
+      toast.success(`Wan 2.1 Video wird generiert! Kosten: ${currencySymbol}${cost.toFixed(2)}`);
       refetchWallet();
       setActiveTab('history');
     } catch (err: any) {
@@ -144,8 +117,8 @@ export default function KlingVideoStudio() {
   return (
     <>
       <Helmet>
-        <title>Kling 3.0 Video Studio | AI Video Generator</title>
-        <meta name="description" content="Generate AI videos with Kling 3.0 - Text-to-Video, Image-to-Video, and Video-to-Video" />
+        <title>Wan 2.1 Video Studio | AI Video Generator</title>
+        <meta name="description" content="Generate AI videos with Wan 2.1 by WaveSpeed - Fast Text-to-Video and Image-to-Video" />
       </Helmet>
 
       <div className="container mx-auto px-4 py-6 max-w-5xl">
@@ -153,11 +126,11 @@ export default function KlingVideoStudio() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">Kling 3.0 Video Studio</h1>
+              <h1 className="text-2xl font-bold">Wan 2.1 Video Studio</h1>
               <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">Neu</Badge>
             </div>
             <p className="text-muted-foreground text-sm mt-1">
-              Text-to-Video, Image-to-Video & Video-to-Video • 3–15 Sekunden • Native Audio
+              Text-to-Video & Image-to-Video • 3–12 Sekunden • WaveSpeed
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -167,14 +140,14 @@ export default function KlingVideoStudio() {
                 Sora 2
               </Button>
             </Link>
+            <Link to="/kling-video-studio">
+              <Button variant="outline" size="sm">
+                Kling 3.0
+              </Button>
+            </Link>
             <Link to="/seedance-video-studio">
               <Button variant="outline" size="sm">
                 Seedance 2.0
-              </Button>
-            </Link>
-            <Link to="/wan-video-studio">
-              <Button variant="outline" size="sm">
-                Wan 2.1
               </Button>
             </Link>
             {wallet && (
@@ -192,10 +165,8 @@ export default function KlingVideoStudio() {
             <TabsTrigger value="history"><History className="h-4 w-4 mr-1" />Verlauf</TabsTrigger>
           </TabsList>
 
-          {/* GENERATE TAB */}
           <TabsContent value="generate">
             <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-              {/* Main form */}
               <div className="space-y-5">
                 {/* Prompt */}
                 <Card className="p-4">
@@ -215,7 +186,7 @@ export default function KlingVideoStudio() {
                   <p className="text-xs text-muted-foreground mt-1">{prompt.length}/2000</p>
                   <div className="mt-2 p-2 rounded-md bg-muted/50 border border-border/50">
                     <p className="text-xs text-muted-foreground">
-                      💡 <strong>Tipp:</strong> Schreibe auf Englisch für beste Ergebnisse. Beschreibe Kamerabewegungen (zoom, pan, dolly, tracking shot) und Beleuchtung (golden hour, dramatic lighting). Vermeide abstrakte Anweisungen wie "erstelle ein Werbevideo".
+                      💡 <strong>Tipp:</strong> Wan 2.1 ist besonders gut bei schnellen, flüssigen Bewegungen. Beschreibe Kamerabewegungen und Beleuchtung auf Englisch für beste Ergebnisse.
                     </p>
                   </div>
                 </Card>
@@ -224,7 +195,7 @@ export default function KlingVideoStudio() {
                 <Card className="p-4">
                   <Label className="text-sm font-medium mb-3 block">Modell</Label>
                   <div className="grid grid-cols-2 gap-3">
-                    {(Object.entries(KLING_VIDEO_MODELS) as [KlingVideoModel, typeof KLING_VIDEO_MODELS[KlingVideoModel]][]).map(([key, m]) => (
+                    {(Object.entries(WAN_VIDEO_MODELS) as [WanVideoModel, typeof WAN_VIDEO_MODELS[WanVideoModel]][]).map(([key, m]) => (
                       <button
                         key={key}
                         onClick={() => setModel(key)}
@@ -254,13 +225,13 @@ export default function KlingVideoStudio() {
                     value={[duration]}
                     onValueChange={([v]) => setDuration(v)}
                     min={3}
-                    max={15}
+                    max={modelConfig.maxDuration}
                     step={1}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground mt-1">
                     <span>3s</span>
-                    <span>15s</span>
+                    <span>{modelConfig.maxDuration}s</span>
                   </div>
                 </Card>
 
@@ -268,7 +239,7 @@ export default function KlingVideoStudio() {
                 <Card className="p-4">
                   <Label className="text-sm font-medium mb-3 block">Seitenverhältnis</Label>
                   <div className="flex gap-2">
-                    {(['16:9', '9:16', '1:1'] as KlingAspectRatio[]).map((ar) => (
+                    {(['16:9', '9:16', '1:1'] as WanAspectRatio[]).map((ar) => (
                       <Button
                         key={ar}
                         variant={aspectRatio === ar ? 'default' : 'outline'}
@@ -281,107 +252,43 @@ export default function KlingVideoStudio() {
                   </div>
                 </Card>
 
-                {/* Audio Toggle */}
-                <Card className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Volume2 className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm font-medium">Native Audio generieren</Label>
-                    </div>
-                    <Switch checked={generateAudio} onCheckedChange={setGenerateAudio} />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Kling generiert passende Soundeffekte zum Video</p>
-                </Card>
-
                 {/* Image-to-Video */}
                 <Card className="p-4">
                   <Label className="text-sm font-medium mb-3 block">
                     <ImagePlus className="h-4 w-4 inline mr-1" />Image-to-Video (optional)
                   </Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Start Image */}
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-2">Start-Frame</p>
-                      {startImageUrl ? (
-                        <div className="relative">
-                          <img src={startImageUrl} alt="Start" className="w-full h-24 object-cover rounded-lg" />
-                          <Button size="icon" variant="destructive" className="absolute top-1 right-1 h-6 w-6" onClick={() => setStartImageUrl(null)}>
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => startImageRef.current?.click()} disabled={uploadingImage}>
-                          {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
-                          Upload
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Startbild hochladen</p>
+                    {startImageUrl ? (
+                      <div className="relative">
+                        <img src={startImageUrl} alt="Start" className="w-full h-32 object-cover rounded-lg" />
+                        <Button size="icon" variant="destructive" className="absolute top-1 right-1 h-6 w-6" onClick={() => setStartImageUrl(null)}>
+                          <X className="h-3 w-3" />
                         </Button>
-                      )}
-                      <input ref={startImageRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'start')} />
-                    </div>
-                    {/* End Image */}
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-2">End-Frame (optional)</p>
-                      {endImageUrl ? (
-                        <div className="relative">
-                          <img src={endImageUrl} alt="End" className="w-full h-24 object-cover rounded-lg" />
-                          <Button size="icon" variant="destructive" className="absolute top-1 right-1 h-6 w-6" onClick={() => setEndImageUrl(null)}>
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => endImageRef.current?.click()} disabled={uploadingImage}>
-                          {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
-                          Upload
-                        </Button>
-                      )}
-                      <input ref={endImageRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'end')} />
-                    </div>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" className="w-full" onClick={() => startImageRef.current?.click()} disabled={uploadingImage}>
+                        {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+                        Bild hochladen
+                      </Button>
+                    )}
+                    <input ref={startImageRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
                   </div>
-                </Card>
-
-                {/* Video-to-Video */}
-                <Card className="p-4">
-                  <Label className="text-sm font-medium mb-3 block">
-                    <Video className="h-4 w-4 inline mr-1" />Video-to-Video (optional)
-                  </Label>
-                  {referenceVideoUrl ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground truncate max-w-[200px]">Referenzvideo hochgeladen</span>
-                        <Button size="sm" variant="destructive" onClick={() => setReferenceVideoUrl(null)}>
-                          <X className="h-3 w-3 mr-1" />Entfernen
-                        </Button>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant={videoReferenceType === 'feature' ? 'default' : 'outline'} onClick={() => setVideoReferenceType('feature')}>
-                          Style Transfer
-                        </Button>
-                        <Button size="sm" variant={videoReferenceType === 'base' ? 'default' : 'outline'} onClick={() => setVideoReferenceType('base')}>
-                          Video Editing
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button variant="outline" size="sm" onClick={() => videoRef.current?.click()} disabled={uploadingVideo}>
-                      {uploadingVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
-                      Video hochladen
-                    </Button>
-                  )}
-                  <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleVideoUpload(e.target.files[0])} />
                 </Card>
               </div>
 
-              {/* Sidebar - Cost Summary */}
+              {/* Sidebar */}
               <div className="space-y-4">
                 <Card className="p-4 sticky top-4">
                   <h3 className="font-semibold mb-3">Zusammenfassung</h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Modell</span>
-                      <span>{KLING_VIDEO_MODELS[model].name}</span>
+                      <span>{WAN_VIDEO_MODELS[model].name}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Qualität</span>
-                      <span>{KLING_VIDEO_MODELS[model].quality}</span>
+                      <span>{WAN_VIDEO_MODELS[model].quality}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Dauer</span>
@@ -391,20 +298,10 @@ export default function KlingVideoStudio() {
                       <span className="text-muted-foreground">Format</span>
                       <span>{aspectRatio}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Audio</span>
-                      <span>{generateAudio ? 'Ja' : 'Nein'}</span>
-                    </div>
                     {startImageUrl && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Modus</span>
                         <span>Image-to-Video</span>
-                      </div>
-                    )}
-                    {referenceVideoUrl && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Modus</span>
-                        <span>Video-to-Video</span>
                       </div>
                     )}
                     <hr className="my-2" />
@@ -439,29 +336,26 @@ export default function KlingVideoStudio() {
                   )}
                 </Card>
 
-                {/* Price table */}
                 <Card className="p-4">
                   <h4 className="font-medium text-sm mb-2">Preisübersicht</h4>
                   <div className="text-xs space-y-1 text-muted-foreground">
-                    <div className="flex justify-between"><span>Standard 5s</span><span>{currencySymbol}0.75</span></div>
-                    <div className="flex justify-between"><span>Standard 10s</span><span>{currencySymbol}1.50</span></div>
-                    <div className="flex justify-between"><span>Standard 15s</span><span>{currencySymbol}2.25</span></div>
+                    <div className="flex justify-between"><span>Standard 5s</span><span>{currencySymbol}0.50</span></div>
+                    <div className="flex justify-between"><span>Standard 10s</span><span>{currencySymbol}1.00</span></div>
+                    <div className="flex justify-between"><span>Standard 12s</span><span>{currencySymbol}1.20</span></div>
                     <hr className="my-1" />
-                    <div className="flex justify-between"><span>Pro 5s</span><span>{currencySymbol}1.00</span></div>
-                    <div className="flex justify-between"><span>Pro 10s</span><span>{currencySymbol}2.00</span></div>
-                    <div className="flex justify-between"><span>Pro 15s</span><span>{currencySymbol}3.00</span></div>
+                    <div className="flex justify-between"><span>Pro 5s</span><span>{currencySymbol}0.75</span></div>
+                    <div className="flex justify-between"><span>Pro 10s</span><span>{currencySymbol}1.50</span></div>
+                    <div className="flex justify-between"><span>Pro 12s</span><span>{currencySymbol}1.80</span></div>
                   </div>
                 </Card>
               </div>
             </div>
           </TabsContent>
 
-          {/* CREDITS TAB */}
           <TabsContent value="credits">
             <AIVideoCreditPurchase />
           </TabsContent>
 
-          {/* HISTORY TAB */}
           <TabsContent value="history">
             <VideoGenerationHistory />
           </TabsContent>

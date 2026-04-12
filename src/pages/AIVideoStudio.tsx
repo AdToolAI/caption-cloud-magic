@@ -322,6 +322,12 @@ export default function AIVideoStudio() {
                 Seedance 2.0 Studio →
               </Button>
             </Link>
+            <Link to="/wan-video-studio">
+              <Button variant="outline" size="sm">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Wan 2.1 Studio →
+              </Button>
+            </Link>
           </div>
         </div>
 

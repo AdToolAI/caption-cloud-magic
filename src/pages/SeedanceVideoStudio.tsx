@@ -148,6 +148,11 @@ export default function SeedanceVideoStudio() {
                 Kling 3.0
               </Button>
             </Link>
+            <Link to="/wan-video-studio">
+              <Button variant="outline" size="sm">
+                Wan 2.1
+              </Button>
+            </Link>
             {wallet && (
               <Badge variant="outline" className="text-base px-3 py-1">
                 {currencySymbol}{wallet.balance_euros.toFixed(2)} Credits
