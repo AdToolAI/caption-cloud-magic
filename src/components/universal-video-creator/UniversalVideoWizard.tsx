@@ -4,7 +4,7 @@ import { Check, FileText, Image, Play, Music, Download, Sparkles, Layout, Messag
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useLocalizedVideoCategories } from '@/hooks/useLocalizedVideoCategories';
+import { useLocalizedVideoCategories, useLocalizedCategoryName } from '@/hooks/useLocalizedVideoCategories';
 import { Button } from '@/components/ui/button';
 import { CategorySelector } from './CategorySelector';
 import { MoodPresetSelector, type MoodConfig } from './MoodPresetSelector';
@@ -21,48 +21,11 @@ import { getWizardDraft, saveWizardDraft, clearAllDrafts, hasMeaningfulDraft } f
 import { useNavigate } from 'react-router-dom';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
-// Steps for manual mode
-const STEPS_MANUAL = [
-  { id: 'category', label: 'Kategorie', icon: Video, description: 'Video-Typ wählen' },
-  { id: 'mood', label: 'Stimmung', icon: Palette, description: 'Stil & Stimmung' },
-  { id: 'visual-style', label: 'Filmart', icon: Film, description: 'Visueller Stil' },
-  { id: 'mode-select', label: 'Modus', icon: Sparkles, description: 'Wähle deinen Weg' },
-  { id: 'consultation', label: 'Beratung', icon: MessageCircle, description: 'KI-Berater' },
-  { id: 'briefing', label: 'Briefing', icon: FileText, description: 'Produkt & Zielgruppe' },
-  { id: 'script', label: 'Drehbuch', icon: Sparkles, description: 'KI-generiert' },
-  { id: 'storyboard', label: 'Storyboard', icon: Layout, description: 'Szenen bearbeiten' },
-  { id: 'visuals', label: 'Visuals', icon: Image, description: 'Assets generieren' },
-  { id: 'animation', label: 'Animation', icon: Play, description: 'Bewegung & Übergänge' },
-  { id: 'audio', label: 'Audio', icon: Music, description: 'Voice-Over & Musik' },
-  { id: 'export', label: 'Export', icon: Download, description: 'Rendern & Download' },
-];
-
-// Steps for full-service mode  
-const STEPS_FULL_SERVICE = [
-  { id: 'category', label: 'Kategorie', icon: Video, description: 'Video-Typ wählen' },
-  { id: 'mood', label: 'Stimmung', icon: Palette, description: 'Stil & Stimmung' },
-  { id: 'visual-style', label: 'Filmart', icon: Film, description: 'Visueller Stil' },
-  { id: 'mode-select', label: 'Modus', icon: Sparkles, description: 'Wähle deinen Weg' },
-  { id: 'consultation', label: 'Beratung', icon: MessageCircle, description: '20-24 Phasen Interview' },
-  { id: 'generating', label: 'KI erstellt', icon: Loader2, description: 'Automatisch' },
-  { id: 'preview', label: 'Vorschau', icon: Play, description: 'Live-Preview' },
-  { id: 'export', label: 'Download', icon: Download, description: '3 Formate' },
-];
-
-// Validate consultation result has minimum required data
-const validateConsultationResult = (result: UniversalConsultationResult): { valid: boolean; errors: string[] } => {
-  const errors: string[] = [];
-  
-  if (!result.category) errors.push('Kategorie fehlt');
-  if (!result.productDescription && !result.productName) errors.push('Produktbeschreibung fehlt');
-  if (!result.storytellingStructure) errors.push('Storytelling-Struktur fehlt');
-  
-  return { valid: errors.length === 0, errors };
-};
-
 export function UniversalVideoWizard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { t, language } = useTranslation();
+  const localizedCategories = useLocalizedVideoCategories();
   
   // Draft recovery dialog state
   const [showDraftDialog, setShowDraftDialog] = useState(false);
@@ -83,6 +46,49 @@ export function UniversalVideoWizard() {
   const [rateLimitRetryKey, setRateLimitRetryKey] = useState(0);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
+  // Helper to get localized category name
+  const getCategoryName = (cat: VideoCategory | null): string => {
+    if (!cat) return '';
+    return localizedCategories.find(c => c.category === cat)?.name || '';
+  };
+
+  // Steps for manual mode
+  const STEPS_MANUAL = [
+    { id: 'category', label: t('uvc.stepCategory'), icon: Video, description: t('uvc.stepCategoryDesc') },
+    { id: 'mood', label: t('uvc.stepMood'), icon: Palette, description: t('uvc.stepMoodDesc') },
+    { id: 'visual-style', label: t('uvc.stepVisualStyle'), icon: Film, description: t('uvc.stepVisualStyleDesc') },
+    { id: 'mode-select', label: t('uvc.stepMode'), icon: Sparkles, description: t('uvc.stepModeDesc') },
+    { id: 'consultation', label: t('uvc.stepConsultation'), icon: MessageCircle, description: t('uvc.stepConsultationDesc') },
+    { id: 'briefing', label: t('uvc.stepBriefing'), icon: FileText, description: t('uvc.stepBriefingDesc') },
+    { id: 'script', label: t('uvc.stepScript'), icon: Sparkles, description: t('uvc.stepScriptDesc') },
+    { id: 'storyboard', label: t('uvc.stepStoryboard'), icon: Layout, description: t('uvc.stepStoryboardDesc') },
+    { id: 'visuals', label: t('uvc.stepVisuals'), icon: Image, description: t('uvc.stepVisualsDesc') },
+    { id: 'animation', label: t('uvc.stepAnimation'), icon: Play, description: t('uvc.stepAnimationDesc') },
+    { id: 'audio', label: t('uvc.stepAudio'), icon: Music, description: t('uvc.stepAudioDesc') },
+    { id: 'export', label: t('uvc.stepExport'), icon: Download, description: t('uvc.stepExportDesc') },
+  ];
+
+  // Steps for full-service mode  
+  const STEPS_FULL_SERVICE = [
+    { id: 'category', label: t('uvc.stepCategory'), icon: Video, description: t('uvc.stepCategoryDesc') },
+    { id: 'mood', label: t('uvc.stepMood'), icon: Palette, description: t('uvc.stepMoodDesc') },
+    { id: 'visual-style', label: t('uvc.stepVisualStyle'), icon: Film, description: t('uvc.stepVisualStyleDesc') },
+    { id: 'mode-select', label: t('uvc.stepMode'), icon: Sparkles, description: t('uvc.stepModeDesc') },
+    { id: 'consultation', label: t('uvc.stepConsultation'), icon: MessageCircle, description: t('uvc.stepConsultationDescFull') },
+    { id: 'generating', label: t('uvc.stepGenerating'), icon: Loader2, description: t('uvc.stepGeneratingDesc') },
+    { id: 'preview', label: t('uvc.stepPreview'), icon: Play, description: t('uvc.stepPreviewDesc') },
+    { id: 'export', label: t('uvc.stepDownload'), icon: Download, description: t('uvc.stepDownloadDesc') },
+  ];
+
+  // Validate consultation result has minimum required data
+  const validateConsultationResult = (result: UniversalConsultationResult): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    if (!result.category) errors.push(t('uvc.valCategoryMissing'));
+    if (!result.productDescription && !result.productName) errors.push(t('uvc.valProductMissing'));
+    if (!result.storytellingStructure) errors.push(t('uvc.valStructureMissing'));
+    return { valid: errors.length === 0, errors };
+  };
+
   // beforeunload warning during active generation
   useEffect(() => {
     if (!isAutoGenerating) return;
@@ -98,7 +104,6 @@ export function UniversalVideoWizard() {
   useEffect(() => {
     if (draftChecked) return;
     setDraftChecked(true);
-    
     if (hasMeaningfulDraft()) {
       setShowDraftDialog(true);
     }
@@ -184,10 +189,10 @@ export function UniversalVideoWizard() {
   const STEPS = generationMode === 'full-service' ? STEPS_FULL_SERVICE : 
                 generationMode === 'manual' ? STEPS_MANUAL :
                 [
-                  { id: 'category', label: 'Kategorie', icon: Video, description: 'Video-Typ wählen' },
-                  { id: 'mood', label: 'Stimmung', icon: Palette, description: 'Stil & Stimmung' },
-                  { id: 'visual-style', label: 'Filmart', icon: Film, description: 'Visueller Stil' },
-                  { id: 'mode-select', label: 'Modus', icon: Sparkles, description: 'Wähle deinen Weg' }
+                  { id: 'category', label: t('uvc.stepCategory'), icon: Video, description: t('uvc.stepCategoryDesc') },
+                  { id: 'mood', label: t('uvc.stepMood'), icon: Palette, description: t('uvc.stepMoodDesc') },
+                  { id: 'visual-style', label: t('uvc.stepVisualStyle'), icon: Film, description: t('uvc.stepVisualStyleDesc') },
+                  { id: 'mode-select', label: t('uvc.stepMode'), icon: Sparkles, description: t('uvc.stepModeDesc') }
                 ];
 
   const handleCategorySelect = (category: VideoCategory) => {
@@ -203,17 +208,17 @@ export function UniversalVideoWizard() {
 
   const handleMoodConfirm = (config: MoodConfig) => {
     setMoodConfig(config);
-    setCurrentStep(2); // → visual-style
+    setCurrentStep(2);
   };
 
   const handleVisualStyleConfirm = (style: UniversalVideoStyle) => {
     setSelectedVisualStyle(style);
-    setCurrentStep(3); // → mode-select
+    setCurrentStep(3);
   };
 
   const handleModeSelect = (mode: UniversalGenerationMode) => {
     setGenerationMode(mode);
-    setCurrentStep(4); // → consultation
+    setCurrentStep(4);
   };
 
   const handleBackToCategory = () => {
@@ -221,7 +226,6 @@ export function UniversalVideoWizard() {
     setGenerationMode(null);
     setCurrentStep(0);
     setError(null);
-    // Don't clear drafts on back — only on explicit reset
   };
 
   const handleResetWizard = () => {
@@ -234,7 +238,7 @@ export function UniversalVideoWizard() {
 
   const performReset = () => {
     if (isAutoGenerating) {
-      toast.info('🎬 Dein Video wird im Hintergrund fertig generiert. Du findest es unter Sora AI Videos, sobald es bereit ist.', { duration: 8000 });
+      toast.info(t('uvc.toastBackgroundGeneration'), { duration: 8000 });
     }
     setSelectedCategory(null);
     setGenerationMode(null);
@@ -250,7 +254,7 @@ export function UniversalVideoWizard() {
   };
 
   const handleMinimizeToBackground = () => {
-    toast.info('🎬 Dein Video wird im Hintergrund fertig generiert. Du findest es unter Sora AI Videos, sobald es bereit ist.', { duration: 8000 });
+    toast.info(t('uvc.toastBackgroundGeneration'), { duration: 8000 });
     navigate('/sora-ai-videos');
   };
 
@@ -266,7 +270,6 @@ export function UniversalVideoWizard() {
       result.moodConfig = moodConfig;
     }
 
-    // Inject pre-selected visual style
     if (selectedVisualStyle) {
       result.visualStyle = selectedVisualStyle;
       console.log('[Wizard] Injected selectedVisualStyle into consultation result:', selectedVisualStyle);
@@ -283,8 +286,8 @@ export function UniversalVideoWizard() {
       dbFallbackAttempted.current = false;
       
       setIsAutoGenerating(true);
-      setCurrentStep(5); // → generating
-      toast.info('🚀 Video-Generierung gestartet!');
+      setCurrentStep(5);
+      toast.info(t('uvc.toastVideoStarted'));
     } else {
       setCurrentStep(5);
     }
@@ -292,12 +295,12 @@ export function UniversalVideoWizard() {
 
   const handleConsultationSkip = () => {
     if (generationMode === 'full-service') {
-      toast.error('Im Full-Service-Modus ist die Beratung erforderlich');
+      toast.error(t('uvc.toastConsultationRequired'));
       return;
     }
     const defaultResult: UniversalConsultationResult = {
       category: selectedCategory!,
-      projectName: `${VIDEO_CATEGORIES.find(c => c.category === selectedCategory)?.name || 'Video'}-Projekt`,
+      projectName: `${getCategoryName(selectedCategory)}-Projekt`,
       completedAt: new Date().toISOString(),
       companyName: '',
       productName: '',
@@ -315,7 +318,7 @@ export function UniversalVideoWizard() {
       brandColors: [],
       hasCharacter: false,
       voiceGender: 'male',
-      voiceLanguage: 'de',
+      voiceLanguage: language === 'en' ? 'en' : language === 'es' ? 'es' : 'de',
       voiceTone: 'professionell',
       musicStyle: 'corporate',
       musicMood: 'inspirational',
@@ -326,23 +329,21 @@ export function UniversalVideoWizard() {
       briefingSummary: '',
     };
     setConsultationResult(defaultResult);
-    setCurrentStep(4); // → consultation
+    setCurrentStep(4);
   };
 
   const handleAutoGenerationComplete = (project: any) => {
     if (!project || !project.outputUrl) {
       console.warn('[UniversalVideoWizard] Phase12: onComplete called without valid project, staying in error state');
-      setError('Video-Generierung fehlgeschlagen. Bitte versuche es erneut.');
+      setError(t('uvc.generationFailedDesc'));
       setIsAutoGenerating(false);
       return;
     }
     
     setAutoGeneratedProject(project);
     setIsAutoGenerating(false);
-    setCurrentStep(6); // → preview
-    toast.success('🎬 Video erfolgreich erstellt!');
-    
-    // Don't clear consultant state here — keep draft until user explicitly starts new video
+    setCurrentStep(6);
+    toast.success(t('uvc.toastVideoCreated'));
   };
 
   const handleAutoGenerationError = (errorMessage: string) => {
@@ -361,7 +362,7 @@ export function UniversalVideoWizard() {
     } else {
       setCurrentStep(4);
     }
-    toast.info('Zum manuellen Modus gewechselt');
+    toast.info(t('uvc.toastSwitchedToManual'));
   };
 
   const MAX_AUTO_RETRIES = 9;
@@ -382,7 +383,7 @@ export function UniversalVideoWizard() {
     
     if (newRetryCount > MAX_AUTO_RETRIES) {
       console.log(`[UniversalVideoWizard] Max retries (${MAX_AUTO_RETRIES}) reached, showing final error`);
-      setError('Alle Diagnoseprofile (A–O) getestet – der Fehler tritt weiterhin auf. Bitte kontaktiere den Support.');
+      setError(t('uvc.toastMaxRetries'));
       return;
     }
     
@@ -390,13 +391,13 @@ export function UniversalVideoWizard() {
     
     const diagProfile = getDiagnosticProfile(newRetryCount);
     console.log(`[UniversalVideoWizard] Retry #${newRetryCount}/${MAX_AUTO_RETRIES}, diagnosticProfile=${diagProfile}`);
-    toast.info(`🔍 Diagnose-Profil ${diagProfile} wird getestet... (${newRetryCount}/${MAX_AUTO_RETRIES})`);
+    toast.info(t('uvc.toastDiagProfile', { profile: diagProfile, count: String(newRetryCount), max: String(MAX_AUTO_RETRIES) }));
     
     setTimeout(() => {
       if (consultationResult && generationMode === 'full-service') {
         console.log('[UniversalVideoWizard] Re-mounting with isAutoGenerating=true, profile:', diagProfile);
         setIsAutoGenerating(true);
-        setCurrentStep(5); // → generating
+        setCurrentStep(5);
       }
     }, 150);
   };
@@ -410,13 +411,13 @@ export function UniversalVideoWizard() {
     setTimeout(() => {
       if (consultationResult && generationMode === 'full-service') {
         setIsAutoGenerating(true);
-        setCurrentStep(5); // → generating
+        setCurrentStep(5);
       }
     }, 150);
   };
 
   const handleBackToConsultation = () => {
-    setCurrentStep(4); // → consultation
+    setCurrentStep(4);
     setIsAutoGenerating(false);
     setError(null);
   };
@@ -429,7 +430,7 @@ export function UniversalVideoWizard() {
   };
 
   const currentStepId = STEPS[currentStep]?.id;
-  const categoryInfo = selectedCategory ? VIDEO_CATEGORIES.find(c => c.category === selectedCategory) : null;
+  const categoryName = getCategoryName(selectedCategory);
 
   // Auth check
   if (!user) {
@@ -438,9 +439,9 @@ export function UniversalVideoWizard() {
         <div className="w-20 h-20 rounded-full bg-muted/20 flex items-center justify-center mx-auto mb-6 border border-white/10">
           <AlertTriangle className="h-10 w-10 text-amber-500" />
         </div>
-        <h2 className="text-2xl font-bold mb-4">Anmeldung erforderlich</h2>
+        <h2 className="text-2xl font-bold mb-4">{t('uvc.loginRequired')}</h2>
         <p className="text-muted-foreground mb-6">
-          Bitte melde dich an, um den Universal Video Creator zu nutzen.
+          {t('uvc.loginRequiredDesc')}
         </p>
       </div>
     );
@@ -454,20 +455,20 @@ export function UniversalVideoWizard() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-[#F5C76A]" />
-              Entwurf gefunden
+              {t('uvc.draftFound')}
             </DialogTitle>
             <DialogDescription>
-              Du hast ein begonnenes Video-Interview. Möchtest du dort weitermachen oder neu starten?
+              {t('uvc.draftFoundDesc')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2 sm:gap-2">
             <Button variant="outline" onClick={handleStartFresh}>
               <RotateCcw className="h-4 w-4 mr-2" />
-              Neu starten
+              {t('uvc.startFresh')}
             </Button>
             <Button onClick={handleResumeDraft} className="bg-gradient-to-r from-[#F5C76A] to-amber-500 text-black hover:shadow-[0_0_20px_rgba(245,199,106,0.4)]">
               <Play className="h-4 w-4 mr-2" />
-              Fortfahren
+              {t('uvc.continueBtn')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -477,15 +478,15 @@ export function UniversalVideoWizard() {
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Video wird noch generiert</AlertDialogTitle>
+            <AlertDialogTitle>{t('uvc.videoStillGenerating')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Die Generierung läuft im Hintergrund weiter. Du findest das fertige Video später unter <strong>Sora AI Videos</strong>.
+              {t('uvc.videoStillGeneratingDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{t('uvc.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={performReset}>
-              Trotzdem neues Video starten
+              {t('uvc.startNewVideoAnyway')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -502,15 +503,15 @@ export function UniversalVideoWizard() {
           </div>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={() => setError(null)}>
-              Schließen
+              {t('uvc.close')}
             </Button>
             <Button variant="outline" size="sm" onClick={handleBackToConsultation} className="border-muted">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Zurück zum Interview
+              {t('uvc.backToInterview')}
             </Button>
             <Button variant="outline" size="sm" onClick={handleRetry} className="border-destructive/30">
               <RefreshCw className="h-4 w-4 mr-2" />
-              Erneut versuchen
+              {t('uvc.retryBtn')}
             </Button>
           </div>
         </motion.div>
@@ -526,12 +527,12 @@ export function UniversalVideoWizard() {
           {currentStepId !== 'generating' && (
             <Button variant="ghost" size="sm" onClick={handleBack} className="text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Zurück
+              {t('uvc.back')}
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={handleResetWizard}>
             <RotateCcw className="h-4 w-4 mr-2" />
-            Neues Video starten
+            {t('uvc.startNewVideo')}
           </Button>
         </motion.div>
       )}
@@ -623,7 +624,7 @@ export function UniversalVideoWizard() {
                       "transition-all duration-300"
                     )}
                   >
-                    Mit {categoryInfo?.name} fortfahren
+                    {t('uvc.continueWith')} {categoryName}
                   </button>
                 </motion.div>
               )}
@@ -683,26 +684,26 @@ export function UniversalVideoWizard() {
                   <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mx-auto border border-border animate-pulse">
                     <RefreshCw className="h-10 w-10 text-muted-foreground animate-spin" />
                   </div>
-                  <h2 className="text-2xl font-bold">Projekt wird geladen…</h2>
-                  <p className="text-muted-foreground">Daten werden aus der Datenbank wiederhergestellt.</p>
+                  <h2 className="text-2xl font-bold">{t('uvc.projectLoading')}</h2>
+                  <p className="text-muted-foreground">{t('uvc.projectLoadingDesc')}</p>
                 </>
               ) : (
                 <>
                   <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mx-auto border border-destructive/30">
                     <AlertTriangle className="h-10 w-10 text-destructive" />
                   </div>
-                  <h2 className="text-2xl font-bold">Generierung fehlgeschlagen</h2>
+                  <h2 className="text-2xl font-bold">{t('uvc.generationFailed')}</h2>
                   <p className="text-muted-foreground">
-                    {error || 'Die Video-Generierung konnte nicht abgeschlossen werden.'}
+                    {error || t('uvc.generationFailedDesc')}
                   </p>
                   <div className="flex gap-4 justify-center">
                     <Button variant="outline" onClick={handleBackToConsultation}>
                       <ArrowLeft className="h-4 w-4 mr-2" />
-                      Zurück zum Interview
+                      {t('uvc.backToInterview')}
                     </Button>
                     <Button onClick={handleRetry}>
                       <RefreshCw className="h-4 w-4 mr-2" />
-                      Erneut versuchen
+                      {t('uvc.retryBtn')}
                     </Button>
                   </div>
                 </>
@@ -714,9 +715,9 @@ export function UniversalVideoWizard() {
           {currentStepId === 'preview' && autoGeneratedProject && (
             <div className="space-y-6">
               <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold mb-2 text-[#F5C76A]">Video-Vorschau</h2>
+                <h2 className="text-2xl font-bold mb-2 text-[#F5C76A]">{t('uvc.videoPreview')}</h2>
                 <p className="text-muted-foreground">
-                  Dein {categoryInfo?.name} wurde erfolgreich erstellt!
+                  {t('uvc.videoCreatedSuccess', { name: categoryName })}
                 </p>
               </div>
               <UniversalPreviewPlayer
@@ -735,7 +736,7 @@ export function UniversalVideoWizard() {
               userId={user.id}
               onBack={() => setCurrentStep(currentStep - 1)}
               onComplete={(renders) => {
-                toast.success(`🎬 ${renders.length} Video(s) erfolgreich exportiert!`);
+                toast.success(t('uvc.toastExportSuccess', { count: String(renders.length) }));
               }}
             />
           )}
@@ -750,20 +751,20 @@ export function UniversalVideoWizard() {
                 {STEPS.find(s => s.id === currentStepId)?.label}
               </h2>
               <p className="text-muted-foreground mb-6">
-                Manueller Modus kommt bald
+                {t('uvc.manualModeSoon')}
               </p>
               <div className="flex gap-4 justify-center">
                 <button
                   onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
                   className="px-6 py-2 rounded-xl border border-white/10 hover:bg-white/5 transition-colors"
                 >
-                  Zurück
+                  {t('uvc.back')}
                 </button>
                 <button
                   onClick={() => setCurrentStep(Math.min(STEPS.length - 1, currentStep + 1))}
                   className="px-6 py-2 rounded-xl bg-[#F5C76A] text-black font-semibold hover:shadow-[0_0_20px_rgba(245,199,106,0.4)] transition-all"
                 >
-                  Weiter
+                  {t('uvc.nextBtn')}
                 </button>
               </div>
             </div>

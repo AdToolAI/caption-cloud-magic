@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { UniversalCreatorVideo } from '@/remotion/templates/UniversalCreatorVideo';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface UniversalPreviewPlayerProps {
   project: {
@@ -37,6 +38,7 @@ export function UniversalPreviewPlayer({
   onExport,
   showExportButton = true,
 }: UniversalPreviewPlayerProps) {
+  const { t } = useTranslation();
   const playerRef = useRef<PlayerRef>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -49,7 +51,6 @@ export function UniversalPreviewPlayer({
 
   const dimensions = ASPECT_DIMENSIONS[selectedAspect];
   
-  // Calculate total duration from scenes
   const totalDuration = useMemo(() => {
     if (!project.scenes || project.scenes.length === 0) return 30;
     return project.scenes.reduce((sum, scene) => sum + (scene.duration || 5), 0);
@@ -76,7 +77,6 @@ export function UniversalPreviewPlayer({
     showWatermark: false,
   }), [project, isMuted, volume, dimensions]);
 
-  // Phase 12: Detect video end via polling current frame
   useEffect(() => {
     const interval = setInterval(() => {
       if (!playerRef.current) return;
@@ -93,7 +93,6 @@ export function UniversalPreviewPlayer({
 
   const handlePlayPause = useCallback(() => {
     if (!playerRef.current) return;
-    
     if (isPlaying) {
       playerRef.current.pause();
     } else {
@@ -108,7 +107,6 @@ export function UniversalPreviewPlayer({
     const frame = Math.floor(newTime[0] * fps);
     playerRef.current.seekTo(frame);
     setCurrentTime(newTime[0]);
-    // Phase 12: Detect video end for clickable link overlay
     setIsVideoEnded(newTime[0] >= totalDuration - 0.5);
   }, [fps, totalDuration]);
 
@@ -138,16 +136,13 @@ export function UniversalPreviewPlayer({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Calculate container aspect ratio for responsive sizing
   const containerStyle = useMemo(() => {
-    const aspectRatioValue = dimensions.width / dimensions.height;
     if (selectedAspect === '9:16') {
       return { maxWidth: '350px', margin: '0 auto' };
     }
     return { width: '100%' };
-  }, [selectedAspect, dimensions]);
+  }, [selectedAspect]);
 
-  // Check if project has enough data for preview
   const hasValidData = useMemo(() => {
     return (project.scenes && project.scenes.length > 0) || !!project.outputUrl;
   }, [project.scenes, project.outputUrl]);
@@ -160,9 +155,9 @@ export function UniversalPreviewPlayer({
         <div className="w-20 h-20 rounded-full bg-muted/20 flex items-center justify-center mb-6 border border-white/10">
           <AlertCircle className="h-10 w-10 text-muted-foreground" />
         </div>
-        <h3 className="text-lg font-semibold mb-2">Keine Video-Daten</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('uvc.previewNoData')}</h3>
         <p className="text-sm text-muted-foreground max-w-md">
-          Das Projekt enthält keine Szenen. Bitte generiere zuerst ein Video.
+          {t('uvc.previewNoDataDesc')}
         </p>
       </div>
     );
@@ -215,7 +210,6 @@ export function UniversalPreviewPlayer({
               />
             </div>
 
-            {/* Phase 12: Clickable brand URL overlay when video ends */}
             {brandUrl && isVideoEnded && (
               <a
                 href={brandUrl.startsWith('http') ? brandUrl : `https://${brandUrl}`}
@@ -229,7 +223,6 @@ export function UniversalPreviewPlayer({
 
             {/* Custom Controls Overlay */}
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4">
-              {/* Progress Bar */}
               <div className="mb-3">
                 <Slider
                   value={[currentTime]}
@@ -245,64 +238,27 @@ export function UniversalPreviewPlayer({
                 </div>
               </div>
 
-              {/* Control Buttons */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handlePlayPause}
-                    className="text-white hover:bg-white/10 h-10 w-10"
-                  >
-                    {isPlaying ? (
-                      <Pause className="h-5 w-5" />
-                    ) : (
-                      <Play className="h-5 w-5 ml-0.5" />
-                    )}
+                  <Button variant="ghost" size="icon" onClick={handlePlayPause} className="text-white hover:bg-white/10 h-10 w-10">
+                    {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
                   </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleRestart}
-                    className="text-white hover:bg-white/10 h-8 w-8"
-                  >
+                  <Button variant="ghost" size="icon" onClick={handleRestart} className="text-white hover:bg-white/10 h-8 w-8">
                     <RotateCcw className="h-4 w-4" />
                   </Button>
-
                   <div className="flex items-center gap-2 ml-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleMuteToggle}
-                      className="text-white hover:bg-white/10 h-8 w-8"
-                    >
-                      {isMuted || volume === 0 ? (
-                        <VolumeX className="h-4 w-4" />
-                      ) : (
-                        <Volume2 className="h-4 w-4" />
-                      )}
+                    <Button variant="ghost" size="icon" onClick={handleMuteToggle} className="text-white hover:bg-white/10 h-8 w-8">
+                      {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                     </Button>
-                    <Slider
-                      value={[isMuted ? 0 : volume]}
-                      min={0}
-                      max={1}
-                      step={0.1}
-                      onValueChange={handleVolumeChange}
-                      className="w-20"
-                    />
+                    <Slider value={[isMuted ? 0 : volume]} min={0} max={1} step={0.1} onValueChange={handleVolumeChange} className="w-20" />
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   {showExportButton && onExport && (
-                    <Button
-                      onClick={onExport}
-                      className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90 gap-2"
-                      size="sm"
-                    >
+                    <Button onClick={onExport} className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90 gap-2" size="sm">
                       <Download className="h-4 w-4" />
-                      Exportieren
+                      {t('uvc.previewExport')}
                     </Button>
                   )}
                 </div>
@@ -323,15 +279,10 @@ export function UniversalPreviewPlayer({
       {/* Download button for MP4 fallback */}
       {!hasScenes && project.outputUrl && (
         <div className="flex items-center justify-center gap-3">
-          <a
-            href={project.outputUrl}
-            download
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a href={project.outputUrl} download target="_blank" rel="noopener noreferrer">
             <Button className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90 gap-2">
               <Download className="h-4 w-4" />
-              Video herunterladen
+              {t('uvc.previewDownload')}
             </Button>
           </a>
         </div>
@@ -340,7 +291,7 @@ export function UniversalPreviewPlayer({
       {/* Scene Info */}
       {hasScenes && (
         <div className="text-center text-sm text-muted-foreground">
-          {project.scenes!.length} Szenen • {formatTime(totalDuration)} Gesamtdauer
+          {t('uvc.previewScenes', { count: String(project.scenes!.length), duration: formatTime(totalDuration) })}
         </div>
       )}
     </div>
