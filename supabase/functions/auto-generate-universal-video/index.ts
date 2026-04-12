@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r72-inline-script-gen-2026-03-23";
+const AUTO_GEN_BUILD_TAG = "r73-i18n-pipeline-2026-04-12";
 import { generateScriptInline } from "../_shared/generate-script-inline.ts";
+import { msg } from "../_shared/pipeline-i18n.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
