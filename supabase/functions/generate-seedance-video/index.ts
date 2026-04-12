@@ -170,7 +170,7 @@ serve(async (req) => {
     // Build Seedance input
     const replicateInput: Record<string, any> = {
       prompt,
-      duration: duration,
+      duration: Math.min(duration, 12),
       aspect_ratio: aspectRatio,
     };
 
