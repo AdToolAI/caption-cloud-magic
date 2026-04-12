@@ -482,6 +482,7 @@ async function runGenerationPipeline(
   userId: string,
   diagProfile: string = 'A',
   profileFlags: Record<string, boolean> = {},
+  lang: string = 'de',
 ) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
