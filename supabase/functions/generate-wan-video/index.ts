@@ -14,13 +14,20 @@ const MODEL_PRICING: Record<string, Record<string, number>> = {
 
 const REPLICATE_MODELS: Record<string, { t2v: string; i2v: string }> = {
   'wan-standard': {
-    t2v: 'wavespeedai/wan-2.1-t2v-720p',
-    i2v: 'wavespeedai/wan-2.1-i2v-720p',
+    t2v: 'wan-video/wan-2.5-t2v',
+    i2v: 'wan-video/wan-2.5-i2v',
   },
   'wan-pro': {
-    t2v: 'wavespeedai/wan-2.1-t2v-720p',
-    i2v: 'wavespeedai/wan-2.1-i2v-720p',
+    t2v: 'wan-video/wan-2.5-t2v',
+    i2v: 'wan-video/wan-2.5-i2v',
   },
+};
+
+// Wan 2.5 size mapping for T2V
+const ASPECT_RATIO_TO_SIZE: Record<string, string> = {
+  '16:9': '1280*720',
+  '9:16': '720*1280',
+  '1:1': '720*720',
 };
 
 interface GenerateRequest {
@@ -58,19 +65,12 @@ serve(async (req) => {
     const body = await req.json() as GenerateRequest;
     const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl } = body;
 
-    // Cap duration at 12s safety net
-    const duration = Math.min(rawDuration, 12);
-
-    if (duration < 3 || duration > 12) {
-      return new Response(
-        JSON.stringify({ error: "Duration must be between 3 and 12 seconds for Wan 2.1" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Wan 2.5 only supports 5 or 10 seconds — snap to nearest valid value
+    const duration = rawDuration >= 8 ? 10 : 5;
 
     const isImageToVideo = !!startImageUrl;
     const mode = isImageToVideo ? 'Image-to-Video' : 'Text-to-Video';
-    console.log(`[generate-wan-video] Mode: ${mode}`);
+    console.log(`[generate-wan-video] Mode: ${mode}, Duration: ${duration}s`);
 
     // Get wallet currency
     const { data: walletPreview } = await supabaseClient
@@ -181,15 +181,17 @@ serve(async (req) => {
     const modelConfig = REPLICATE_MODELS[model] || REPLICATE_MODELS['wan-standard'];
     const replicateModel = isImageToVideo ? modelConfig.i2v : modelConfig.t2v;
 
-    // Build input
+    // Build input — Wan 2.5 uses different params than WaveSpeed
     const replicateInput: Record<string, any> = {
       prompt,
-      duration: duration,
-      aspect_ratio: aspectRatio,
+      duration,
     };
 
-    if (startImageUrl) {
+    if (isImageToVideo) {
       replicateInput.image = startImageUrl;
+      replicateInput.resolution = resolution; // I2V uses "resolution" param
+    } else {
+      replicateInput.size = ASPECT_RATIO_TO_SIZE[aspectRatio] || '1280*720'; // T2V uses "size" param
     }
 
     console.log(`[generate-wan-video] Using model: ${replicateModel}`);
