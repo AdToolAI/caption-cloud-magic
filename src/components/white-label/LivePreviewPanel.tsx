@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { Monitor, Smartphone, Globe } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface LivePreviewPanelProps {
   brandName: string;
@@ -18,6 +19,8 @@ export const LivePreviewPanel = ({
   accentColor,
   faviconUrl,
 }: LivePreviewPanelProps) => {
+  const { t } = useTranslation();
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -29,7 +32,7 @@ export const LivePreviewPanel = ({
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <Monitor className="w-5 h-5 text-primary" />
-            Live-Vorschau
+            {t('wl.livePreview')}
           </h3>
           <div className="flex gap-2">
             <button className="p-2 rounded-lg bg-primary/20 text-primary">
@@ -43,7 +46,6 @@ export const LivePreviewPanel = ({
 
         {/* Browser Window Preview */}
         <div className="rounded-xl overflow-hidden border border-white/10 bg-background">
-          {/* Browser Tab */}
           <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b border-white/10">
             <div className="flex gap-1.5">
               <div className="w-3 h-3 rounded-full bg-red-500/70" />
@@ -59,14 +61,12 @@ export const LivePreviewPanel = ({
             )}
           </div>
 
-          {/* Page Content Preview */}
           <div className="p-4 min-h-[200px]" style={{ background: `linear-gradient(135deg, ${primaryColor}10, ${secondaryColor}10)` }}>
-            {/* Header */}
             <div className="flex items-center justify-between mb-6 pb-3 border-b border-white/10">
               {logoUrl ? (
                 <img src={logoUrl} alt="Logo" className="h-8 object-contain" />
               ) : (
-                <div 
+                <div
                   className="h-8 px-4 rounded-lg flex items-center font-bold text-white"
                   style={{ backgroundColor: primaryColor }}
                 >
@@ -79,9 +79,8 @@ export const LivePreviewPanel = ({
               </div>
             </div>
 
-            {/* Content Blocks */}
             <div className="space-y-3">
-              <div 
+              <div
                 className="h-12 rounded-lg flex items-center justify-center text-white text-sm font-medium"
                 style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}
               >
@@ -91,7 +90,7 @@ export const LivePreviewPanel = ({
                 <div className="h-16 rounded-lg bg-card/60 border border-white/10" />
                 <div className="h-16 rounded-lg bg-card/60 border border-white/10" />
               </div>
-              <div 
+              <div
                 className="h-8 rounded-lg flex items-center justify-center text-white text-xs"
                 style={{ backgroundColor: accentColor }}
               >
@@ -104,24 +103,15 @@ export const LivePreviewPanel = ({
         {/* Color Summary */}
         <div className="flex items-center justify-center gap-4 pt-4 border-t border-white/10">
           <div className="text-center">
-            <div 
-              className="w-10 h-10 rounded-xl shadow-lg mb-1 mx-auto ring-2 ring-white/10"
-              style={{ backgroundColor: primaryColor }}
-            />
+            <div className="w-10 h-10 rounded-xl shadow-lg mb-1 mx-auto ring-2 ring-white/10" style={{ backgroundColor: primaryColor }} />
             <span className="text-xs text-muted-foreground">Primary</span>
           </div>
           <div className="text-center">
-            <div 
-              className="w-10 h-10 rounded-xl shadow-lg mb-1 mx-auto ring-2 ring-white/10"
-              style={{ backgroundColor: secondaryColor }}
-            />
+            <div className="w-10 h-10 rounded-xl shadow-lg mb-1 mx-auto ring-2 ring-white/10" style={{ backgroundColor: secondaryColor }} />
             <span className="text-xs text-muted-foreground">Secondary</span>
           </div>
           <div className="text-center">
-            <div 
-              className="w-10 h-10 rounded-xl shadow-lg mb-1 mx-auto ring-2 ring-white/10"
-              style={{ backgroundColor: accentColor }}
-            />
+            <div className="w-10 h-10 rounded-xl shadow-lg mb-1 mx-auto ring-2 ring-white/10" style={{ backgroundColor: accentColor }} />
             <span className="text-xs text-muted-foreground">Accent</span>
           </div>
         </div>
