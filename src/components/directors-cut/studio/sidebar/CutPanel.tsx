@@ -106,7 +106,7 @@ const TransitionBlock: React.FC<{
                 }}
                 className={cn(
                   "flex flex-col items-center gap-0.5 p-1.5 rounded-lg border text-[9px] transition-all",
-                  (hasTransition && transition?.transitionType === t.id) || (!hasTransition && tr.id === 'none')
+                  (hasTransition && transition?.transitionType === tr.id) || (!hasTransition && tr.id === 'none')
                     ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300 shadow-[0_0_8px_rgba(34,211,238,0.15)]"
                     : "border-white/5 text-white/50 hover:border-white/15 hover:bg-white/5"
                 )}
