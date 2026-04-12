@@ -98,6 +98,7 @@ const PlatformAnalytics = lazy(() => import("./pages/Analytics/PlatformAnalytics
 const Admin = lazy(() => import("./pages/Admin"));
 
 const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
+const KlingVideoStudio = lazy(() => import("./pages/KlingVideoStudio"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
