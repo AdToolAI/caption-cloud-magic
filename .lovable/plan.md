@@ -1,40 +1,59 @@
 
 
-## Plan: Fix Missing Translations in Universal Video Creator
+## Plan: Localize Universal Director's Cut (EN/DE/ES)
 
 ### Problem
-The localization has two categories of issues visible in the screenshots:
+The entire Director's Cut module (57 files, ~31K lines of code) has all UI strings hardcoded in German. None of these components use the `useTranslation` hook. When the UI language is set to English or Spanish, every label, toast, error message, and description still appears in German.
 
-1. **Key mismatches** — Components reference translation keys that don't exist. The translations were added with different names than what the components use (e.g., component uses `uvc.finetuning` but translation defines `uvc.moodFinetuning`).
+### Scope
+~169 unique German string patterns across these file groups:
 
-2. **German interview questions in English UI** — The initial consultant welcome message includes `firstPhase?.question` from the local config file (`universal-video-interviews.ts`), which is entirely in German. The edge function returns localized questions, but the very first message bypasses it.
+| Group | Files | Examples |
+|---|---|---|
+| **Main page** | `DirectorsCut.tsx`, `UniversalDirectorsCut.tsx` | "Importiere ein Video", "Zur Mediathek", "Projekt zurückgesetzt" |
+| **Import step** | `VideoImportStep.tsx` | "Aus Mediathek", "Hochladen", "Unbenanntes Video", "Video hochladen" |
+| **Studio core** | `CapCutEditor.tsx`, `CapCutSidebar.tsx`, `CapCutTimeline.tsx`, `CapCutPreviewPlayer.tsx`, `CapCutPropertiesPanel.tsx` | Tab labels, analysis toasts, reset messages |
+| **Sidebar panels** | `CutPanel.tsx`, `LookPanel.tsx`, `FXPanel.tsx`, `ExportPanel.tsx` | Filter names, effect descriptions, export labels |
+| **AI features** (18 files) | `AIAutoCut.tsx`, `AITransitions.tsx`, `AIVoiceOver.tsx`, `AISoundDesign.tsx`, etc. | "KI-Überarbeitung", "Nicht genügend Credits", voice descriptions |
+| **Timeline** | `MultiTrackTimeline.tsx`, `TimelineStudio.tsx`, etc. | Track labels, context menus |
+| **UI dialogs** | `TransitionPicker.tsx`, `SmartTemplates.tsx`, `AddMediaDialog.tsx`, etc. | Transition names/descriptions, template names |
+| **Export** | `ExportRenderStep.tsx`, `ExportDialog.tsx`, `RenderOverlay.tsx` | Resolution labels, progress messages |
 
-### Fix (2 files)
+### Approach
 
-**File 1: `src/lib/translations.ts`**
-Add the missing alias keys to all three languages so the component references resolve. These are simple additions that point to the same values already defined under different names:
+**Phase 1 — Translation keys** (`src/lib/translations.ts`)
+- Add a `dc` namespace with ~200 keys covering all Director's Cut strings for EN, DE, and ES
+- Organize by sub-section: `dc.import.*`, `dc.studio.*`, `dc.ai.*`, `dc.export.*`, `dc.timeline.*`, `dc.effects.*`
 
-| Component uses | Add as alias (EN / DE / ES) |
-|---|---|
-| `chooseCategoryHeading` | "What kind of video do you want to create?" / "Welche Art von Video..." / "¿Qué tipo..." |
-| `chooseCategoryDesc` | Same as `categoryOptimizedInterview` |
-| `questionsLabel` | "Questions" / "Fragen" / "Preguntas" |
-| `finetuning` | Same as `moodFinetuning` |
-| `textAmount` | Same as `moodTextAmount` |
-| `densityLow/Medium/High` | Same as `moodTextLow/Medium/High` |
-| `animIntensity` | Same as `moodAnimIntensity` |
-| `intensitySubtle/Normal/Dynamic` | Same as `moodAnimSubtle/Normal/Dynamic` |
-| `sceneBadges` | Same as `moodSceneBadges` |
-| `deepQuestions` | Same as `fullServiceQ` |
-| `readyIn` | Same as `fullServiceTime` |
-| `noManualWork` | "No manual work required" / "Kein manueller Aufwand nötig" / "Sin trabajo manual necesario" |
-| `premiumVisuals` | "Premium AI visuals" / "Premium KI-Visuals" / "Visuales premium con IA" |
-| `filmTypesHint` | Same as `filmTypesDesc` |
-| `designStylesHint` | Same as `styleDirectionsDesc` |
+**Phase 2 — High-visibility pages** (5 files)
+- `DirectorsCut.tsx` — page title, subtitle, toasts, "Zur Mediathek"
+- `UniversalDirectorsCut.tsx` — landing page title and descriptions
+- `VideoImportStep.tsx` — tabs, toasts, empty state, upload messages
+- `CapCutEditor.tsx` — studio header, analysis button
+- `CapCutSidebar.tsx` — tab labels
 
-**File 2: `src/components/universal-video-creator/UniversalVideoConsultant.tsx`**
-Change the initial message to NOT embed `firstPhase?.question` from the German config file. Instead, use a localized first-question string from the translations, or omit the question from the welcome message entirely (since the edge function will send the first real question in the correct language on the first API call).
+**Phase 3 — Sidebar panels + Export** (6 files)
+- `CutPanel.tsx`, `LookPanel.tsx`, `FXPanel.tsx`, `ExportPanel.tsx`
+- `ExportDialog.tsx`, `ExportRenderStep.tsx`, `RenderOverlay.tsx`
 
-### Result
-All raw `uvc.*` keys will resolve to proper translated strings. The consultant interview will start fully in the user's language.
+**Phase 4 — AI features** (18 files)
+- All `AI*.tsx` files in `features/`
+- Toast messages, credit errors, generation status, voice/sound descriptions
+
+**Phase 5 — Timeline + UI dialogs** (~15 files)
+- Timeline components, `TransitionPicker`, `SmartTemplates`, `AddMediaDialog`, etc.
+
+### Safety
+- German translations will be set to the **existing hardcoded values** — zero visible change for DE users
+- EN and ES get new translated strings
+- Date formatting will use locale-aware `toLocaleDateString()` based on language
+
+### Estimated effort
+This is comparable to the UVC localization (~4 implementation messages due to the 57-file scope). I recommend proceeding phase by phase with confirmation between phases.
+
+### Technical details
+- Each file gets `import { useTranslation } from '@/hooks/useTranslation'` and `const { t } = useTranslation()` 
+- All hardcoded German strings replaced with `t('dc.keyName')`
+- Toast calls like `toast.success('Projekt zurückgesetzt')` become `toast.success(t('dc.projectReset'))`
+- Static arrays (filter lists, transition presets) will use `useMemo` with `t()` to stay reactive to language changes
 
