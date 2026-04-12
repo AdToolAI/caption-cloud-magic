@@ -1,40 +1,28 @@
 
 
-## Plan: Localize AI Video Studio (EN/DE/ES)
+## Plan: Localize Video Translator (EN/DE/ES)
 
 ### Problem
-The AI Video Studio page and its 3 sub-components have ~150 hardcoded German strings visible when the UI is set to English. Currency also needs to show `$` for EN.
+`src/pages/VideoTranslator.tsx` has ~50 hardcoded German strings. The English UI shows everything in German.
 
-### Files to edit (4 files)
+### Scope — 2 files
 
-| File | Hardcoded strings (~count) |
-|------|---------------------------|
-| `src/pages/AIVideoStudio.tsx` | ~40 — page title, subtitle, wallet label, tab labels, form labels, placeholders, toasts, error messages, info banners, buttons |
-| `src/components/ai-video/VideoGenerationHistory.tsx` | ~35 — status badges, error messages, info banner, action buttons, toasts, date locale |
-| `src/components/ai-video/AIVideoCreditPurchase.tsx` | ~15 — "gesamt", "Beispiele mit Sora 2 Standard", "Sek Videos", "Jetzt kaufen", "Lädt...", "Sora 2 Pro kostet doppelt", toast |
-| `src/components/ai-video/VideoPromptOptimizer.tsx` | ~20 — dialog title, labels, placeholders, toasts, buttons |
+| File | Changes |
+|------|---------|
+| `src/lib/translations.ts` | Add ~40 `vidTrans.*` keys (EN/DE/ES). DE = current hardcoded strings. |
+| `src/pages/VideoTranslator.tsx` | Add `useTranslation` hook, replace all hardcoded strings with `t()`. Wrap `VOICES` and `STEPS` arrays in `useMemo`. Fix English flag from 🇬🇧 to 🇺🇸 in `LANGUAGES` list. |
+| `src/config/hubConfig.ts` | Change `titleKey` from hardcoded "Videoübersetzer" to a translation key. |
+
+### Key strings to localize
+
+- **Hero**: "Videoübersetzer", "Video automatisch übersetzen", description paragraph
+- **Input card**: "Video auswählen", "Lade ein Video hoch oder füge eine URL ein", "Video hier ablegen", "ODER", "Video-URL", "Zielsprache", "Stimme (optional)", "Standard-Stimme", "Untertitel generieren", "Übersetzen starten", "Wird hochgeladen..."
+- **Voice labels**: "weiblich"/"männlich" → "female"/"male" / "femenina"/"masculina"
+- **Progress steps**: "Transkription", "Übersetzung", "Voiceover", "Zusammenführung", "Fertig", status messages, "% abgeschlossen"
+- **Error**: "Übersetzung fehlgeschlagen", "Ein unbekannter Fehler...", "Nochmal versuchen"
+- **Result**: "Übersetzung fertig", "Originaltext", "Übersetzung", "Nicht verfügbar", "Voiceover herunterladen", "Neues Video übersetzen"
 
 ### Approach
-
-1. **Add `aiVid.*` namespace** to `translations.ts` with ~110 keys × 3 languages (EN/DE/ES). German values = current hardcoded strings (no visual change for DE users).
-
-2. **Refactor all 4 files** to use `useTranslation` hook, replacing every hardcoded string with `t('aiVid.xxx')`.
-
-3. **Currency-aware display**: Use `getCurrencyForLanguage(language)` so EN shows `$`, DE/ES shows `€`. Already partially done in `AIVideoCreditPurchase` but missing in the main page and history.
-
-4. **Date locale**: `VideoGenerationHistory.tsx` hardcodes `locale: de` for `formatDistanceToNow` — switch to language-aware locale (`en` → English, `de` → German, `es` → Spanish) using existing `date-fns/locale` imports.
-
-5. **No changes to German UI** — all DE translation values will be exact copies of the current hardcoded strings.
-
-### Key strings being localized
-
-- **Page**: "AI Video Studio", "Generiere professionelle Videos mit Sora 2", "Dein Guthaben", "Credits kaufen", "Generieren", "Verlauf"
-- **Form**: "Video-Beschreibung", "Prompt optimieren", "Referenzbild (Optional)", "Video-Dauer", "Seitenverhältnis", "Kosten", "Video generieren"
-- **History**: "Warteschlange", "Wird generiert...", "Fertig", "Fehlgeschlagen", "Abspielen", "Download", "In Mediathek speichern", info banner text
-- **Credits**: "gesamt", "Beispiele mit Sora 2 Standard", "Jetzt kaufen", "Sora 2 Pro kostet doppelt"
-- **Optimizer**: "Prompt optimieren", "Deine Video-Idee", "Stil (optional)", "Stimmung (optional)", "Optimierter Prompt"
-- **Toasts/Errors**: All error messages, success messages, validation messages
-
-### Single batch
-All 5 files (translations.ts + 4 components) edited together.
+- German UI unchanged — DE values are exact copies of current hardcoded strings
+- Single batch edit of all files
 
