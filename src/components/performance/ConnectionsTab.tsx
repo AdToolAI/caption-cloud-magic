@@ -54,7 +54,7 @@ export const ConnectionsTab = () => {
 
       if (connected && status === 'error') {
         // OAuth callback returned an error
-        const errorMessage = params.get('message') || 'Verbindung fehlgeschlagen';
+        const errorMessage = params.get('message') || t('socialIntegrations.connectionFailed');
         const decodedMessage = decodeURIComponent(errorMessage);
         
         // If this is an X error, store it for the XConnectionCard
@@ -80,7 +80,7 @@ export const ConnectionsTab = () => {
             if (sessionError || !session) {
               console.error('❌ Session refresh failed:', sessionError);
               if (connected === 'x') {
-                setXCallbackError('Session konnte nicht erneuert werden. Bitte erneut verbinden.');
+                setXCallbackError(t('socialIntegrations.sessionRefreshFailed'));
               }
               return;
             }
@@ -109,11 +109,11 @@ export const ConnectionsTab = () => {
             } else {
               console.warn(`⚠️ No connection row found for provider: ${connected}`);
               if (connected === 'x') {
-                setXCallbackError('Verbindung konnte nicht gespeichert werden. Bitte erneut versuchen.');
+                setXCallbackError(t('socialIntegrations.connectionNotSaved'));
               }
               toast({
                 title: t('common.error'),
-                description: `${connected} Verbindung wurde nicht gespeichert. Bitte erneut verbinden.`,
+                description: `${connected} ${t('socialIntegrations.connectionNotSavedShort')}`,
                 variant: "destructive"
               });
             }
@@ -265,7 +265,7 @@ export const ConnectionsTab = () => {
           
           toast({
             title: t('common.success'),
-            description: `${providerName} erfolgreich verbunden!`
+            description: `${providerName} ${t('socialIntegrations.successConnected')}`
           });
           
           await fetchConnections();
@@ -403,8 +403,8 @@ export const ConnectionsTab = () => {
         if (!session || sessionError) {
           console.error('No valid session for OAuth:', { sessionError, providerId });
           toast({
-            title: 'Authentifizierung erforderlich',
-            description: 'Bitte melden Sie sich erneut an',
+            title: t('socialIntegrations.authRequired'),
+            description: t('socialIntegrations.pleaseReLogin'),
             variant: 'destructive'
           });
           return;
@@ -466,7 +466,7 @@ export const ConnectionsTab = () => {
         const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
         
         if (refreshError || !refreshedSession) {
-          throw new Error('Nicht authentifiziert - Bitte neu anmelden');
+          throw new Error(t('socialIntegrations.notAuthenticated'));
         }
         
         session = refreshedSession;
@@ -489,7 +489,7 @@ export const ConnectionsTab = () => {
         if (data.success) {
           toast({
             title: t('common.success'),
-            description: `Instagram erfolgreich synchronisiert: ${data.mediaSynced} Posts aktualisiert`
+            description: `Instagram ${t('socialIntegrations.syncSuccess')}: ${data.mediaSynced} ${t('socialIntegrations.postsUpdated')}`
           });
           
           await emit({
@@ -503,7 +503,7 @@ export const ConnectionsTab = () => {
             },
           }, { silent: true });
         } else {
-          throw new Error(data.error || 'Sync fehlgeschlagen');
+          throw new Error(data.error || t('socialIntegrations.syncFailed'));
         }
       } else if (provider === 'facebook') {
         // Use new Facebook Page sync function
@@ -516,7 +516,7 @@ export const ConnectionsTab = () => {
         if (data.success) {
           toast({
             title: t('common.success'),
-            description: `Facebook erfolgreich synchronisiert!`
+            description: `Facebook ${t('socialIntegrations.syncSuccess')}!`
           });
           
           await emit({
@@ -528,7 +528,7 @@ export const ConnectionsTab = () => {
             },
           }, { silent: true });
         } else {
-          throw new Error(data.error || 'Sync fehlgeschlagen');
+          throw new Error(data.error || t('socialIntegrations.syncFailed'));
         }
       } else if (provider === 'tiktok') {
         // Use TikTok sync function
@@ -541,7 +541,7 @@ export const ConnectionsTab = () => {
         if (data.success) {
           toast({
             title: t('common.success'),
-            description: `TikTok erfolgreich synchronisiert: ${data.profile.display_name}`
+            description: `TikTok ${t('socialIntegrations.syncSuccess')}: ${data.profile.display_name}`
           });
           
           await emit({
@@ -554,7 +554,7 @@ export const ConnectionsTab = () => {
             },
           }, { silent: true });
         } else {
-          throw new Error(data.error || 'Sync fehlgeschlagen');
+          throw new Error(data.error || t('socialIntegrations.syncFailed'));
         }
       } else {
         // Use v2 sync function for other providers (YouTube, X, LinkedIn)
@@ -569,8 +569,8 @@ export const ConnectionsTab = () => {
         if (data?.reconnect_required) {
           const providerLabel = provider === 'x' ? 'X' : provider.charAt(0).toUpperCase() + provider.slice(1);
           toast({
-            title: `${providerLabel} Token abgelaufen`,
-            description: `Bitte trenne die Verbindung und verbinde ${providerLabel} erneut.`,
+            title: `${providerLabel} ${t('socialIntegrations.tokenExpired')}`,
+            description: t('socialIntegrations.tokenExpiredDesc', { provider: providerLabel }),
             variant: "destructive"
           });
           setSyncError(prev => ({ ...prev, [connectionId]: true }));
@@ -605,18 +605,18 @@ export const ConnectionsTab = () => {
       if (error.message?.includes('Unauthorized') || error.message?.includes('authorization') || error.message?.includes('authentifiziert')) {
         toast({
           title: t('common.error'),
-          description: 'Session abgelaufen. Bitte lade die Seite neu und versuche es erneut.',
+          description: t('socialIntegrations.sessionExpired'),
           variant: "destructive",
           action: (
             <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-              Neu laden
+              {t('socialIntegrations.reload')}
             </Button>
           )
         });
       } else {
         toast({
           title: t('common.error'),
-          description: error.message || 'Sync fehlgeschlagen',
+          description: error.message || t('socialIntegrations.syncFailed'),
           variant: "destructive"
         });
       }
@@ -773,8 +773,8 @@ export const ConnectionsTab = () => {
                           <h3 className="font-semibold">{provider.name}</h3>
                           {connected && connection && (
                             <p className="text-xs text-muted-foreground">
-                              {connection.account_metadata?.selection_required 
-                                ? 'Seitenauswahl erforderlich' 
+                            {connection.account_metadata?.selection_required 
+                                ? t('socialIntegrations.pageSelectionRequired') 
                                 : connection.account_name}
                             </p>
                           )}
@@ -806,7 +806,7 @@ export const ConnectionsTab = () => {
                             onClick={() => setShowTokenDialog(true)}
                           >
                             <RefreshCw className="h-3 w-3" />
-                            Token erneuern
+                            {t('socialIntegrations.renewToken')}
                           </Button>
                         )}
 
@@ -830,7 +830,7 @@ export const ConnectionsTab = () => {
                               onClick={() => handleUploadDraft(connection.id)}
                             >
                               <Upload className="h-3 w-3" />
-                              Upload Draft (Optional)
+                              {t('socialIntegrations.uploadDraft')}
                             </Button>
                           </>
                         )}
@@ -840,8 +840,8 @@ export const ConnectionsTab = () => {
                           <div className="bg-orange-50 border border-orange-200 rounded-md p-3 text-xs text-orange-700 flex items-start gap-2 mb-2">
                             <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                             <span>
-                              <strong>Post-Sync eingeschränkt (API-Policy).</strong><br />
-                              UGC-Publishing verfügbar.
+                              <strong>{t('socialIntegrations.linkedinRestricted')}</strong><br />
+                              {t('socialIntegrations.ugcAvailable')}
                             </span>
                           </div>
                         )}
@@ -855,7 +855,7 @@ export const ConnectionsTab = () => {
                             onClick={() => setShowPageSelectDialog(true)}
                           >
                             <Facebook className="h-3 w-3" />
-                            Seite auswählen
+                            {t('socialIntegrations.selectPage')}
                           </Button>
                         )}
 
@@ -867,7 +867,7 @@ export const ConnectionsTab = () => {
                             onClick={() => setShowPageSelectDialog(true)}
                           >
                             <Facebook className="h-3 w-3" />
-                            Seite wechseln
+                            {t('socialIntegrations.changePage')}
                           </Button>
                         )}
                         
@@ -879,7 +879,7 @@ export const ConnectionsTab = () => {
                             onClick={() => handleSync(connection.id, provider.id)}
                             disabled={loading || provider.id === 'linkedin' || (provider.id === 'facebook' && connection.account_metadata?.selection_required)}
                           >
-                            Sync Now
+                            {t('socialIntegrations.syncNow')}
                           </Button>
                           <Button 
                             variant="destructive" 
