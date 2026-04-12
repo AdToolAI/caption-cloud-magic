@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { X, GripVertical, Download, FolderPlus, Check } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface Scene {
   variant: number;
@@ -33,6 +34,7 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose, onDownload,
   const [sliderPos, setSliderPos] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  const { t } = useTranslation();
 
   const handlePointerDown = useCallback(() => {
     isDragging.current = true;
@@ -93,7 +95,6 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose, onDownload,
             className="relative max-w-4xl w-full mx-4 flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Top action bar */}
             <div className="flex items-center justify-between">
               <div className="flex gap-2">
                 <Button
@@ -103,7 +104,7 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose, onDownload,
                   className="bg-white/10 border-white/20 text-white hover:bg-white/20"
                 >
                   <Download className="h-4 w-4 mr-1.5" />
-                  Download
+                  {t('picStudio.download')}
                 </Button>
                 {onSaveToAlbum && (
                   <Button
@@ -113,7 +114,7 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose, onDownload,
                     className="bg-white/10 border-white/20 text-white hover:bg-white/20"
                   >
                     <FolderPlus className="h-4 w-4 mr-1.5" />
-                    In Album
+                    {t('picStudio.toAlbum')}
                   </Button>
                 )}
                 {onAcceptScene && (
@@ -123,7 +124,7 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose, onDownload,
                     className="bg-primary hover:bg-primary/90 text-primary-foreground"
                   >
                     <Check className="h-4 w-4 mr-1.5" />
-                    Übernehmen
+                    {t('picStudio.acceptLabel')}
                   </Button>
                 )}
               </div>
@@ -137,7 +138,6 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose, onDownload,
               </Button>
             </div>
 
-            {/* Before/After Slider */}
             <div
               ref={containerRef}
               className="relative aspect-square max-h-[70vh] rounded-xl overflow-hidden cursor-col-resize select-none"
@@ -145,7 +145,6 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose, onDownload,
               onPointerUp={handlePointerUp}
               onPointerLeave={handlePointerUp}
             >
-              {/* After (full image behind) */}
               <img
                 src={scene.imageUrl}
                 alt="Generated"
@@ -153,7 +152,6 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose, onDownload,
                 draggable={false}
               />
 
-              {/* Before (cutout, clipped) */}
               <div
                 className="absolute inset-0"
                 style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}
@@ -166,7 +164,6 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose, onDownload,
                 />
               </div>
 
-              {/* Slider handle */}
               <div
                 className="absolute top-0 bottom-0 z-10 flex items-center"
                 style={{ left: `${sliderPos}%`, transform: 'translateX(-50%)' }}
@@ -178,46 +175,44 @@ export function ImageLightbox({ scene, cutoutPreview, open, onClose, onDownload,
                 </div>
               </div>
 
-              {/* Labels */}
               <div className="absolute top-3 left-3 z-10">
                 <Badge variant="outline" className="bg-black/60 text-white border-white/20 text-xs">
-                  Vorher
+                  {t('picStudio.beforeLabel')}
                 </Badge>
               </div>
               <div className="absolute top-3 right-3 z-10">
                 <Badge variant="outline" className="bg-black/60 text-white border-white/20 text-xs">
-                  Nachher
+                  {t('picStudio.afterLabel')}
                 </Badge>
               </div>
             </div>
 
-            {/* Metadata panel */}
             <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-white">
               <div>
-                <p className="text-white/50 text-xs">Szene</p>
+                <p className="text-white/50 text-xs">{t('picStudio.sceneLabel')}</p>
                 <p className="font-medium">{scene.sceneName || `Variant ${scene.variant}`}</p>
               </div>
               {scene.cameraSetup && (
                 <div>
-                  <p className="text-white/50 text-xs">Kamera</p>
+                  <p className="text-white/50 text-xs">{t('picStudio.cameraLabel')}</p>
                   <p className="font-medium text-xs">{scene.cameraSetup}</p>
                 </div>
               )}
               {scene.qualityScores && (
                 <>
                   <div>
-                    <p className="text-white/50 text-xs">Qualität</p>
+                    <p className="text-white/50 text-xs">{t('picStudio.qualityMetric')}</p>
                     <p className={`font-bold ${getQualityColor(scene.qualityScores.overall)}`}>
                       {scene.qualityScores.overall}/100
                     </p>
                   </div>
                   <div className="flex gap-4">
                     <div>
-                      <p className="text-white/50 text-xs">Schatten</p>
+                      <p className="text-white/50 text-xs">{t('picStudio.shadowMetric')}</p>
                       <p className="font-medium">{scene.qualityScores.shadow}/100</p>
                     </div>
                     <div>
-                      <p className="text-white/50 text-xs">Farbe</p>
+                      <p className="text-white/50 text-xs">{t('picStudio.colorMetric')}</p>
                       <p className="font-medium">{scene.qualityScores.color}/100</p>
                     </div>
                   </div>

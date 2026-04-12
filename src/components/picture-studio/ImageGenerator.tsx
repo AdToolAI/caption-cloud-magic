@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X, FolderOpen } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAICall } from "@/hooks/useAICall";
+import { useTranslation } from "@/hooks/useTranslation";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageCard } from "./ImageCard";
@@ -17,40 +18,6 @@ import { StudioLightbox } from "./StudioLightbox";
 import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 import { FEATURE_COSTS, ESTIMATED_COSTS } from "@/lib/featureCosts";
 import { getCachedState, setCachedState } from "./imageGeneratorCache";
-
-const STYLES = [
-  { value: 'realistic', label: 'Realistisch' },
-  { value: 'cinematic', label: 'Cinematic' },
-  { value: 'watercolor', label: 'Aquarell' },
-  { value: 'neon-cyberpunk', label: 'Neon Cyberpunk' },
-  { value: 'anime', label: 'Anime' },
-  { value: 'oil-painting', label: 'Ölgemälde' },
-  { value: 'pop-art', label: 'Pop Art' },
-  { value: 'minimalist', label: 'Minimalistisch' },
-  { value: 'vintage', label: 'Vintage' },
-  { value: 'fantasy', label: 'Fantasy' },
-  { value: 'product-photo', label: 'Produktfoto' },
-  { value: 'abstract', label: 'Abstrakt' },
-  { value: 'sketch', label: 'Bleistiftskizze' },
-  { value: '3d-render', label: '3D Render' },
-  { value: 'noir', label: 'Film Noir' },
-  { value: 'pastel', label: 'Pastell' },
-  { value: 'comic', label: 'Comic' },
-  { value: 'surreal', label: 'Surreal' },
-  { value: 'architectural', label: 'Architektur' },
-  { value: 'editorial', label: 'Editorial' },
-  { value: 'brand-logo', label: 'Brand Logo' },
-];
-
-const ASPECT_RATIOS = [
-  { value: '1:1', label: '1:1 Quadrat' },
-  { value: '16:9', label: '16:9 Landscape' },
-  { value: '9:16', label: '9:16 Portrait' },
-  { value: '4:5', label: '4:5 Instagram' },
-  { value: '4:3', label: '4:3 Header' },
-  { value: '3:4', label: '3:4 Vertikal' },
-  { value: '2:1', label: '2:1 Banner' },
-];
 
 interface GeneratedImage {
   id?: string;
@@ -64,7 +31,42 @@ export function ImageGenerator() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { executeAICall, loading, status } = useAICall();
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const STYLES = useMemo(() => [
+    { value: 'realistic', label: t('picStudio.styleRealistic') },
+    { value: 'cinematic', label: t('picStudio.styleCinematic') },
+    { value: 'watercolor', label: t('picStudio.styleWatercolor') },
+    { value: 'neon-cyberpunk', label: t('picStudio.styleNeonCyberpunk') },
+    { value: 'anime', label: t('picStudio.styleAnime') },
+    { value: 'oil-painting', label: t('picStudio.styleOilPainting') },
+    { value: 'pop-art', label: t('picStudio.stylePopArt') },
+    { value: 'minimalist', label: t('picStudio.styleMinimalist') },
+    { value: 'vintage', label: t('picStudio.styleVintage') },
+    { value: 'fantasy', label: t('picStudio.styleFantasy') },
+    { value: 'product-photo', label: t('picStudio.styleProductPhoto') },
+    { value: 'abstract', label: t('picStudio.styleAbstract') },
+    { value: 'sketch', label: t('picStudio.styleSketch') },
+    { value: '3d-render', label: t('picStudio.style3dRender') },
+    { value: 'noir', label: t('picStudio.styleNoir') },
+    { value: 'pastel', label: t('picStudio.stylePastel') },
+    { value: 'comic', label: t('picStudio.styleComic') },
+    { value: 'surreal', label: t('picStudio.styleSurreal') },
+    { value: 'architectural', label: t('picStudio.styleArchitectural') },
+    { value: 'editorial', label: t('picStudio.styleEditorial') },
+    { value: 'brand-logo', label: t('picStudio.styleBrandLogo') },
+  ], [t]);
+
+  const ASPECT_RATIOS = useMemo(() => [
+    { value: '1:1', label: t('picStudio.arSquare') },
+    { value: '16:9', label: t('picStudio.arLandscape') },
+    { value: '9:16', label: t('picStudio.arPortrait') },
+    { value: '4:5', label: t('picStudio.arInstagram') },
+    { value: '4:3', label: t('picStudio.arHeader') },
+    { value: '3:4', label: t('picStudio.arVertical') },
+    { value: '2:1', label: t('picStudio.arBanner') },
+  ], [t]);
 
   const cached = getCachedState();
 
@@ -76,17 +78,11 @@ export function ImageGenerator() {
   const [referenceImage, setReferenceImage] = useState<string | null>(cached?.referenceImage ?? null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
   
-  // Album save state
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [selectedImageForAlbum, setSelectedImageForAlbum] = useState<GeneratedImage | null>(null);
-
-  // Lightbox state
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
-
-  // Track if a new image was just generated (for showing "Zur Mediathek" button)
   const [justGenerated, setJustGenerated] = useState(false);
 
-  // Sync state to in-memory cache on every change
   useEffect(() => {
     setCachedState({ prompt, style, aspectRatio, quality, editMode, referenceImage, generatedImages });
   }, [prompt, style, aspectRatio, quality, editMode, referenceImage, generatedImages]);
@@ -104,11 +100,11 @@ export function ImageGenerator() {
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      toast.error("Bitte gib einen Prompt ein");
+      toast.error(t('picStudio.promptRequired'));
       return;
     }
     if (!user) {
-      toast.error("Bitte melde dich an");
+      toast.error(t('picStudio.loginRequired'));
       return;
     }
 
@@ -128,10 +124,8 @@ export function ImageGenerator() {
             }
           });
 
-          // Normalize edge function errors to expose status
           if (error) {
             const fnError: any = error;
-            // Try to extract structured response from FunctionsHttpError
             if (fnError.context && typeof fnError.context.json === 'function') {
               try {
                 const body = await fnError.context.json();
@@ -141,13 +135,13 @@ export function ImageGenerator() {
                 normalized.attemptedModels = body?.attemptedModels;
                 throw normalized;
               } catch (parseErr: any) {
-                if (parseErr.status) throw parseErr; // re-throw normalized
+                if (parseErr.status) throw parseErr;
               }
             }
             throw error;
           }
           if (data?.ok === false) {
-            const normalized: any = new Error(data.error || 'Generierung fehlgeschlagen');
+            const normalized: any = new Error(data.error || 'Generation failed');
             normalized.status = data.code || 500;
             normalized.step = data.step;
             throw normalized;
@@ -164,13 +158,11 @@ export function ImageGenerator() {
           { ...result.image, url: imgUrl, prompt: prompt.trim(), style, aspectRatio: aspectRatio },
           ...prev,
         ]);
-        toast.success("Bild erfolgreich generiert! 🎨");
+        toast.success(t('picStudio.imageGenerated'));
         setJustGenerated(true);
 
-        // Auto-assign to KI Picture Studio system album
         if (imageId && user) {
           try {
-            // Find or create the system album
             let { data: systemAlbum } = await supabase
               .from('studio_albums')
               .select('id')
@@ -201,14 +193,14 @@ export function ImageGenerator() {
       }
     } catch (error: any) {
       if (error.code !== 'INSUFFICIENT_CREDITS') {
-        toast.error(error.message || "Fehler bei der Bildgenerierung");
+        toast.error(error.message || t('picStudio.imageGenerationError'));
       }
     }
   };
 
   const handleSaveToAlbum = (image: GeneratedImage) => {
     if (!image.id) {
-      toast.error("Dieses Bild hat keine ID — bitte warte bis es gespeichert ist.");
+      toast.error(t('picStudio.noIdYet'));
       return;
     }
     setSelectedImageForAlbum(image);
@@ -228,45 +220,40 @@ export function ImageGenerator() {
       return;
     }
     try {
-      // Delete from storage
       const url = new URL(image.url);
       const pathMatch = url.pathname.match(/\/object\/public\/background-projects\/(.+)/);
       if (pathMatch) {
         await supabase.storage.from('background-projects').remove([pathMatch[1]]);
       }
-      // Delete from DB
       await supabase.from('studio_images').delete().eq('id', image.id);
       setGeneratedImages(prev => prev.filter(img => img.id !== image.id));
-      toast.success("Bild gelöscht 🗑️");
+      toast.success(t('picStudio.imageDeleted'));
     } catch (err) {
       console.error(err);
-      toast.error("Fehler beim Löschen");
+      toast.error(t('picStudio.deleteError'));
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Generator Controls */}
       <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
         <CardContent className="p-6 space-y-5">
-          {/* Prompt */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Wand2 className="h-4 w-4 text-primary" />
-              Prompt
+              {t('picStudio.prompt')}
             </Label>
             <Textarea
-              placeholder="Beschreibe dein Bild... z.B. 'Ein futuristisches Büro mit Neonlichtern und einem eleganten Schreibtisch'"
+              placeholder={t('picStudio.promptPlaceholder')}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               className="min-h-[100px] bg-background/50 border-border/50 resize-none"
             />
           </div>
 
-          {/* Style + Aspect Ratio + Quality */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Style</Label>
+              <Label>{t('picStudio.styleLabel')}</Label>
               <Select value={style} onValueChange={setStyle}>
                 <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -277,7 +264,7 @@ export function ImageGenerator() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Seitenverhältnis</Label>
+              <Label>{t('picStudio.aspectRatio')}</Label>
               <Select value={aspectRatio} onValueChange={setAspectRatio}>
                 <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -288,20 +275,19 @@ export function ImageGenerator() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Qualität</Label>
+              <Label>{t('picStudio.qualityLabel')}</Label>
               <div className="flex items-center gap-3 h-10">
-                <span className={`text-sm ${quality === 'fast' ? 'text-foreground' : 'text-muted-foreground'}`}>Schnell</span>
+                <span className={`text-sm ${quality === 'fast' ? 'text-foreground' : 'text-muted-foreground'}`}>{t('picStudio.qualityFast')}</span>
                 <Switch checked={quality === 'pro'} onCheckedChange={(v) => setQuality(v ? 'pro' : 'fast')} />
-                <span className={`text-sm ${quality === 'pro' ? 'text-foreground' : 'text-muted-foreground'}`}>Pro</span>
+                <span className={`text-sm ${quality === 'pro' ? 'text-foreground' : 'text-muted-foreground'}`}>{t('picStudio.qualityPro')}</span>
               </div>
             </div>
           </div>
 
-          {/* Image-to-Image */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Switch checked={editMode} onCheckedChange={(v) => { setEditMode(v); if (!v) setReferenceImage(null); }} />
-              <Label className="text-sm">Image-to-Image</Label>
+              <Label className="text-sm">{t('picStudio.imageToImage')}</Label>
             </div>
             {editMode && (
               <div className="flex items-center gap-2">
@@ -314,7 +300,7 @@ export function ImageGenerator() {
                   </div>
                 ) : (
                   <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                    <Upload className="h-3.5 w-3.5 mr-1" /> Bild hochladen
+                    <Upload className="h-3.5 w-3.5 mr-1" /> {t('picStudio.uploadImage')}
                   </Button>
                 )}
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
@@ -322,7 +308,6 @@ export function ImageGenerator() {
             )}
           </div>
 
-          {/* Generate Button */}
           <Button
             className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground"
             size="lg"
@@ -332,17 +317,16 @@ export function ImageGenerator() {
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {status.message || 'Generiere...'}
+                {status.message || t('picStudio.generating')}
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4 mr-2" />
-                Bild generieren
+                {t('picStudio.generateImage')}
               </>
             )}
           </Button>
 
-          {/* Navigate to Media Library after generation */}
           {justGenerated && generatedImages.length > 0 && (
             <Button
               variant="outline"
@@ -350,19 +334,18 @@ export function ImageGenerator() {
               onClick={() => navigate('/mediathek?tab=albums&album=ki-picture-studio')}
             >
               <FolderOpen className="h-4 w-4 mr-2" />
-              Zur Mediathek — Alben
+              {t('picStudio.goToMediaLibrary')}
             </Button>
           )}
         </CardContent>
       </Card>
 
-      {/* Generated Images Gallery */}
       <AnimatePresence>
         {generatedImages.length > 0 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <ImageIcon className="h-5 w-5 text-primary" />
-              Generierte Bilder ({generatedImages.length})
+              {t('picStudio.generatedImages')} ({generatedImages.length})
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               <AnimatePresence>
@@ -382,7 +365,6 @@ export function ImageGenerator() {
         )}
       </AnimatePresence>
 
-      {/* Save to Album Dialog */}
       {selectedImageForAlbum?.id && (
         <SaveToAlbumDialog
           open={albumDialogOpen}
@@ -392,7 +374,6 @@ export function ImageGenerator() {
         />
       )}
 
-      {/* Lightbox */}
       <StudioLightbox
         image={lightboxImage}
         open={!!lightboxImage}

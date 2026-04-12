@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -7,20 +7,22 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Sparkles, Layers } from "lucide-react";
 import { PictureStudioHeader } from "@/components/picture-studio/PictureStudioHeader";
 import { ImageGenerator } from "@/components/picture-studio/ImageGenerator";
+import { useTranslation } from "@/hooks/useTranslation";
 import { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
 
 const SmartBackgroundTab = lazy(() => import("./BackgroundReplacer"));
 
-const TAB_CONFIG = [
-  { value: 'generate', label: 'Generieren', icon: Sparkles },
-  { value: 'background', label: 'Smart Background', icon: Layers },
-];
-
 export default function PictureStudio() {
   const [searchParams, setSearchParams] = useSearchParams();
   const defaultTab = searchParams.get('tab') || 'generate';
   const [activeTab, setActiveTab] = useState(defaultTab);
+  const { t } = useTranslation();
+
+  const TAB_CONFIG = useMemo(() => [
+    { value: 'generate', label: t('picStudio.tabGenerate'), icon: Sparkles },
+    { value: 'background', label: t('picStudio.tabBackground'), icon: Layers },
+  ], [t]);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -30,7 +32,7 @@ export default function PictureStudio() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 max-w-7xl">
-        <Breadcrumbs feature="KI Picture Studio" category="Erstellen" />
+        <Breadcrumbs feature={t('picStudio.pageTitle')} category={t('picStudio.breadcrumbCategory')} />
 
         <PictureStudioHeader />
 

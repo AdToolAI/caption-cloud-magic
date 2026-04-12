@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Camera, Sparkles, ImagePlus } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface Particle {
   id: number;
@@ -14,6 +15,7 @@ interface Particle {
 
 export function PictureStudioHeader() {
   const [particles, setParticles] = useState<Particle[]>([]);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const generated = Array.from({ length: 20 }, (_, i) => ({
@@ -33,7 +35,6 @@ export function PictureStudioHeader() {
       animate={{ opacity: 1, y: 0 }}
       className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-background via-background to-primary/5 p-8 mb-8"
     >
-      {/* Animated particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {particles.map((p) => (
           <motion.div
@@ -46,7 +47,6 @@ export function PictureStudioHeader() {
         ))}
       </div>
 
-      {/* Shimmer border */}
       <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-primary/10 to-transparent animate-shimmer" />
 
       <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-6">
@@ -57,7 +57,7 @@ export function PictureStudioHeader() {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent font-display">
-                KI Picture Studio
+                {t('picStudio.pageTitle')}
               </h1>
               <Badge className="bg-primary/20 text-primary border border-primary/30 animate-pulse text-xs">
                 v1
@@ -65,7 +65,7 @@ export function PictureStudioHeader() {
             </div>
             <p className="text-muted-foreground text-sm flex items-center gap-2">
               <ImagePlus className="h-3.5 w-3.5" />
-              Text-to-Image · Smart Background · Alben
+              {t('picStudio.headerSubtitle')}
             </p>
           </div>
         </div>
