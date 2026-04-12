@@ -6,6 +6,7 @@ import { Image, Send, Calendar, Sparkles, Loader2, Gift, Crown, Star } from "luc
 import { useTwitch } from "@/hooks/useTwitch";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const cardClass = "backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_20px_rgba(145,70,255,0.08)]";
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.1 } } };
@@ -19,6 +20,9 @@ export function GamingContentStudio() {
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [loadingRewards, setLoadingRewards] = useState(false);
   const navigate = useNavigate();
+  const { t, language } = useTranslation();
+
+  const getLocaleStr = () => language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
 
   useEffect(() => {
     if (!isConnected || !twitchUser?.id) return;
@@ -42,7 +46,7 @@ export function GamingContentStudio() {
   if (!isConnected) {
     return (
       <div className="text-center py-20 text-muted-foreground">
-        Verbinde zuerst deinen Twitch-Kanal im "Stream"-Tab.
+        {t('gaming.connectFirst')}
       </div>
     );
   }
@@ -58,16 +62,16 @@ export function GamingContentStudio() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Image className="h-5 w-5 text-purple-400" />
-                <span className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">KI Thumbnail Generator</span>
+                <span className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">{t('gaming.aiThumbnailGenerator')}</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Erstelle professionelle Gaming-Thumbnails mit KI — optimiert für YouTube und Twitch.
+                {t('gaming.aiThumbnailDesc')}
               </p>
               <Button className="w-full gap-2 bg-[#9146FF] hover:bg-[#7B2FFF] text-white shadow-[0_0_15px_rgba(145,70,255,0.2)]" onClick={() => navigate('/picture-studio')}>
                 <Sparkles className="h-4 w-4" />
-                Zum KI Picture Studio
+                {t('gaming.goToPictureStudio')}
               </Button>
             </CardContent>
           </Card>
@@ -79,18 +83,18 @@ export function GamingContentStudio() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Send className="h-5 w-5 text-green-400" />
-                "Going Live" Auto-Posts
+                {t('gaming.goingLiveAutoPosts')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Sobald dein Stream startet, werden automatisch Ankündigungen gepostet.
+                {t('gaming.goingLiveAutoDesc')}
               </p>
               <div className="space-y-3">
                 {["Instagram", "TikTok", "X (Twitter)", "Discord"].map((platform) => (
                   <div key={platform} className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-white/5">
                     <span className="text-sm font-medium">{platform}</span>
-                    <Button variant="outline" size="sm" className="h-7 text-xs border-white/10">Einrichten</Button>
+                    <Button variant="outline" size="sm" className="h-7 text-xs border-white/10">{t('gaming.setupBtn')}</Button>
                   </div>
                 ))}
               </div>
@@ -104,14 +108,14 @@ export function GamingContentStudio() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-blue-400" />
-                Stream-Kalender
+                {t('gaming.streamCalendar')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {loadingSchedule ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin text-purple-400" /></div>
               ) : scheduleSegments.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">Kein Stream-Kalender konfiguriert.</p>
+                <p className="text-sm text-muted-foreground text-center py-6">{t('gaming.noStreamCalendar')}</p>
               ) : (
                 <div className="space-y-2">
                   {scheduleSegments.slice(0, 5).map((seg: any, i: number) => (
@@ -123,7 +127,7 @@ export function GamingContentStudio() {
                       <div>
                         <p className="font-medium">{seg.title || 'Stream'}</p>
                         <p className="text-xs text-muted-foreground">
-                          {seg.start_time ? new Date(seg.start_time).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
+                          {seg.start_time ? new Date(seg.start_time).toLocaleDateString(getLocaleStr(), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
                         </p>
                       </div>
                       {seg.category?.name && <Badge variant="outline" className="text-xs border-white/10">{seg.category.name}</Badge>}
@@ -141,14 +145,14 @@ export function GamingContentStudio() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Gift className="h-5 w-5 text-yellow-400" />
-                Channel Points & Rewards
+                {t('gaming.channelPointsRewards')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {loadingRewards ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin text-purple-400" /></div>
               ) : rewards.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">Keine Custom Rewards konfiguriert.</p>
+                <p className="text-sm text-muted-foreground text-center py-6">{t('gaming.noCustomRewards')}</p>
               ) : (
                 <div className="space-y-2">
                   {rewards.map((r: any) => (

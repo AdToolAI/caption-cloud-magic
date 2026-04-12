@@ -10,6 +10,7 @@ import { useTwitch } from "@/hooks/useTwitch";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import CountUp from "@/components/ui/count-up";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const cardClass = "backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_20px_rgba(145,70,255,0.08)]";
 const stagger = {
@@ -27,6 +28,7 @@ export function StreamDashboard() {
     isConnected, isLive, connectTwitch, disconnectTwitch,
     updateChannel, searchGames, createClip,
   } = useTwitch();
+  const { t } = useTranslation();
 
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [username, setUsername] = useState("");
@@ -66,9 +68,9 @@ export function StreamDashboard() {
       await connectTwitch(username.trim());
       setShowConnectDialog(false);
       setUsername("");
-      toast.success("Twitch verbunden!");
+      toast.success(t('gaming.twitchConnected'));
     } catch (e: any) {
-      toast.error(e.message || "Verbindung fehlgeschlagen");
+      toast.error(e.message || t('gaming.connectionFailed'));
     } finally {
       setConnecting(false);
     }
@@ -76,17 +78,17 @@ export function StreamDashboard() {
 
   const handleDisconnect = async () => {
     await disconnectTwitch();
-    toast.success("Twitch getrennt");
+    toast.success(t('gaming.twitchDisconnected'));
   };
 
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
       await updateChannel(editTitle || undefined, editGameId || undefined, editTags ? editTags.split(",").map(t => t.trim()) : undefined);
-      toast.success("Stream-Einstellungen gespeichert!");
+      toast.success(t('gaming.streamSettingsSaved'));
       setIsEditing(false);
     } catch (e: any) {
-      toast.error(e.message || "Fehler beim Speichern");
+      toast.error(e.message || t('gaming.saveError'));
     } finally {
       setSaving(false);
     }
@@ -97,14 +99,14 @@ export function StreamDashboard() {
     try {
       const result = await createClip();
       if (result?.edit_url) {
-        toast.success("Clip erstellt!", {
-          action: { label: "Öffnen", onClick: () => window.open(result.edit_url, '_blank') },
+        toast.success(t('gaming.clipCreated'), {
+          action: { label: t('gaming.openBtn'), onClick: () => window.open(result.edit_url, '_blank') },
         });
       } else {
-        toast.success("Clip wird erstellt...");
+        toast.success(t('gaming.clipCreating'));
       }
     } catch (e: any) {
-      toast.error(e.message || "Clip konnte nicht erstellt werden");
+      toast.error(e.message || t('gaming.clipCreateError'));
     } finally {
       setClipping(false);
     }
@@ -132,9 +134,9 @@ export function StreamDashboard() {
             <div className="absolute inset-0 rounded-full bg-purple-500/5 animate-ping" />
           </div>
           <div className="text-center space-y-2 max-w-md">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">Twitch verbinden</h2>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">{t('gaming.connectTwitch')}</h2>
             <p className="text-muted-foreground">
-              Verbinde dein Twitch-Konto, um Stream-Status, Viewer-Daten und Chat in Echtzeit zu sehen.
+              {t('gaming.connectTwitchDesc')}
             </p>
           </div>
           <Button
@@ -143,29 +145,29 @@ export function StreamDashboard() {
             onClick={() => setShowConnectDialog(true)}
           >
             <TwitchIcon />
-            Mit Twitch verbinden
+            {t('gaming.connectWithTwitch')}
           </Button>
         </motion.div>
 
         <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
           <DialogContent className={cardClass}>
             <DialogHeader>
-              <DialogTitle>Twitch-Benutzername eingeben</DialogTitle>
+              <DialogTitle>{t('gaming.enterUsername')}</DialogTitle>
             </DialogHeader>
             <Input
-              placeholder="z.B. ninja, pokimane..."
+              placeholder={t('gaming.usernamePlaceholder')}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
             />
             <p className="text-xs text-muted-foreground">
-              Gib deinen Twitch-Benutzernamen ein, um deinen Kanal zu verbinden.
+              {t('gaming.usernameHint')}
             </p>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowConnectDialog(false)}>Abbrechen</Button>
+              <Button variant="outline" onClick={() => setShowConnectDialog(false)}>{t('gaming.cancelBtn')}</Button>
               <Button onClick={handleConnect} disabled={connecting || !username.trim()} className="bg-[#9146FF] hover:bg-[#7B2FFF] text-white">
                 {connecting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Verbinden
+                {t('gaming.connectBtn')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -184,9 +186,9 @@ export function StreamDashboard() {
     : null;
 
   const checklist = [
-    { label: "Titel gesetzt", ok: !!editTitle },
-    { label: "Kategorie gewählt", ok: !!editGameQuery },
-    { label: "OBS bereit", ok: false },
+    { label: t('gaming.titleSet'), ok: !!editTitle },
+    { label: t('gaming.categoryChosen'), ok: !!editGameQuery },
+    { label: t('gaming.obsReady'), ok: false },
   ];
 
   return (
@@ -208,7 +210,7 @@ export function StreamDashboard() {
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={handleDisconnect} className="text-destructive">
-          <X className="h-4 w-4 mr-1" /> Trennen
+          <X className="h-4 w-4 mr-1" /> {t('gaming.disconnectBtn')}
         </Button>
       </motion.div>
 
@@ -224,7 +226,7 @@ export function StreamDashboard() {
                     <Radio className="h-5 w-5 text-green-500" />
                     <span className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
                   </div>
-                  <CardTitle className="text-lg">Stream Live</CardTitle>
+                  <CardTitle className="text-lg">{t('gaming.streamLive')}</CardTitle>
                   <Badge className="bg-green-500/20 text-green-400 border-green-500/30 shadow-[0_0_10px_rgba(34,197,94,0.2)]">
                     LIVE
                   </Badge>
@@ -232,18 +234,18 @@ export function StreamDashboard() {
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" className="gap-2 border-white/10" onClick={handleCreateClip} disabled={clipping}>
                     {clipping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scissors className="h-4 w-4" />}
-                    Quick-Clip
+                    {t('gaming.quickClip')}
                   </Button>
                   <Button variant="outline" size="sm" className="gap-2 border-white/10" onClick={() => setIsEditing(!isEditing)}>
                     <Edit3 className="h-4 w-4" />
-                    Bearbeiten
+                    {t('gaming.editBtn')}
                   </Button>
                   <Button
                     variant="outline" size="sm" className="gap-2 border-white/10"
                     onClick={() => window.open(`https://twitch.tv/${twitchUser?.login}`, '_blank')}
                   >
                     <ExternalLink className="h-4 w-4" />
-                    Auf Twitch
+                    {t('gaming.onTwitch')}
                   </Button>
                 </div>
               </div>
@@ -258,6 +260,7 @@ export function StreamDashboard() {
                   gameResults={gameResults}
                   saving={saving} onSave={handleSaveSettings}
                   onCancel={() => setIsEditing(false)}
+                  t={t}
                 />
               ) : (
                 <>
@@ -270,9 +273,9 @@ export function StreamDashboard() {
                 </>
               )}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
-                <StatCard icon={Users} label="Zuschauer" value={stream.viewer_count} />
-                <StatCard icon={Clock} label="Uptime" value={uptime || '-'} isText />
-                <StatCard icon={Eye} label="Spiel" value={stream.game_name || '-'} isText />
+                <StatCard icon={Users} label={t('gaming.viewers')} value={stream.viewer_count} />
+                <StatCard icon={Clock} label={t('gaming.uptime')} value={uptime || '-'} isText />
+                <StatCard icon={Eye} label={t('gaming.game')} value={stream.game_name || '-'} isText />
               </div>
             </CardContent>
           </Card>
@@ -284,7 +287,7 @@ export function StreamDashboard() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Monitor className="h-5 w-5 text-purple-400" />
-                  <span className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">Stream vorbereiten</span>
+                  <span className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">{t('gaming.prepareStream')}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -295,6 +298,7 @@ export function StreamDashboard() {
                   editTags={editTags} setEditTags={setEditTags}
                   gameResults={gameResults}
                   saving={saving} onSave={handleSaveSettings}
+                  t={t}
                 />
               </CardContent>
             </Card>
@@ -303,7 +307,7 @@ export function StreamDashboard() {
           <motion.div variants={fadeUp}>
             <Card className={cardClass}>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Pre-Stream Checkliste</CardTitle>
+                <CardTitle className="text-sm">{t('gaming.preStreamChecklist')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -330,7 +334,7 @@ export function StreamDashboard() {
                   onClick={() => window.open('obsproject://', '_blank')}
                 >
                   <Monitor className="h-4 w-4" />
-                  OBS öffnen
+                  {t('gaming.openObs')}
                 </Button>
               </CardContent>
             </Card>
@@ -340,10 +344,10 @@ export function StreamDashboard() {
             <Card className={`${cardClass} text-center`}>
               <CardContent className="py-8">
                 <WifiOff className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
-                <p className="text-lg font-semibold">Offline</p>
-                <p className="text-sm text-muted-foreground">{channel?.title || 'Kein aktiver Stream'}</p>
+                <p className="text-lg font-semibold">{t('gaming.offline')}</p>
+                <p className="text-sm text-muted-foreground">{channel?.title || t('gaming.noActiveStream')}</p>
                 {channel?.game_name && (
-                  <p className="text-xs text-muted-foreground mt-1">Zuletzt: {channel.game_name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('gaming.lastPlayed')} {channel.game_name}</p>
                 )}
               </CardContent>
             </Card>
@@ -361,6 +365,7 @@ function StreamSettingsForm({
   editTags, setEditTags,
   gameResults,
   saving, onSave, onCancel,
+  t,
 }: {
   editTitle: string; setEditTitle: (v: string) => void;
   editGameQuery: string; setEditGameQuery: (v: string) => void;
@@ -368,19 +373,20 @@ function StreamSettingsForm({
   editTags: string; setEditTags: (v: string) => void;
   gameResults: any[];
   saving: boolean; onSave: () => void; onCancel?: () => void;
+  t: (key: string) => string;
 }) {
   return (
     <div className="space-y-4">
       <div>
-        <Label className="text-sm">Stream-Titel</Label>
-        <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Mein epischer Stream..." className="mt-1 border-white/10" />
+        <Label className="text-sm">{t('gaming.streamTitle')}</Label>
+        <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder={t('gaming.streamTitlePlaceholder')} className="mt-1 border-white/10" />
       </div>
       <div className="relative">
-        <Label className="text-sm">Kategorie</Label>
+        <Label className="text-sm">{t('gaming.category')}</Label>
         <Input
           value={editGameQuery}
           onChange={(e) => { setEditGameQuery(e.target.value); setEditGameId(""); }}
-          placeholder="Spiel oder Kategorie suchen..."
+          placeholder={t('gaming.categoryPlaceholder')}
           className="mt-1 border-white/10"
         />
         {gameResults.length > 0 && !editGameId && (
@@ -401,15 +407,15 @@ function StreamSettingsForm({
         )}
       </div>
       <div>
-        <Label className="text-sm">Tags (kommagetrennt)</Label>
-        <Input value={editTags} onChange={(e) => setEditTags(e.target.value)} placeholder="Deutsch, Gaming, FPS..." className="mt-1 border-white/10" />
+        <Label className="text-sm">{t('gaming.tagsLabel')}</Label>
+        <Input value={editTags} onChange={(e) => setEditTags(e.target.value)} placeholder={t('gaming.tagsPlaceholder')} className="mt-1 border-white/10" />
       </div>
       <div className="flex gap-2">
         <Button onClick={onSave} disabled={saving} className="gap-2 bg-[#9146FF] hover:bg-[#7B2FFF] text-white shadow-[0_0_15px_rgba(145,70,255,0.2)]">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Speichern
+          {t('gaming.saveBtn')}
         </Button>
-        {onCancel && <Button variant="outline" onClick={onCancel} className="border-white/10">Abbrechen</Button>}
+        {onCancel && <Button variant="outline" onClick={onCancel} className="border-white/10">{t('gaming.cancelBtn')}</Button>}
       </div>
     </div>
   );

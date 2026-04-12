@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useTwitch } from "@/hooks/useTwitch";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const cardClass = "backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_20px_rgba(145,70,255,0.08)]";
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.1 } } };
@@ -61,6 +62,9 @@ export function DiscordIntegration() {
   const [testing, setTesting] = useState(false);
   const [connected, setConnected] = useState(false);
   const { twitchUser, stream } = useTwitch();
+  const { t, language } = useTranslation();
+
+  const getLocaleStr = () => language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
 
   useEffect(() => {
     loadSettings();
@@ -90,7 +94,7 @@ export function DiscordIntegration() {
     if (!user) { setSaving(false); return; }
 
     if (!settings.webhook_url.includes("discord.com/api/webhooks/") && !settings.webhook_url.includes("discordapp.com/api/webhooks/")) {
-      toast.error("Ungültige Discord Webhook-URL");
+      toast.error(t('gaming.invalidWebhookUrl'));
       setSaving(false);
       return;
     }
@@ -114,10 +118,10 @@ export function DiscordIntegration() {
       : await supabase.from("gaming_discord_settings" as any).insert(payload);
 
     if (error) {
-      toast.error("Fehler beim Speichern");
+      toast.error(t('gaming.discordSaveError'));
       console.error(error);
     } else {
-      toast.success("Discord-Einstellungen gespeichert");
+      toast.success(t('gaming.discordSettingsSaved'));
       setConnected(true);
     }
     setSaving(false);
@@ -129,9 +133,9 @@ export function DiscordIntegration() {
       body: { type: "test", webhook_url: settings.webhook_url },
     });
     if (error || !data?.success) {
-      toast.error("Webhook-Test fehlgeschlagen");
+      toast.error(t('gaming.webhookTestFailed'));
     } else {
-      toast.success("Test-Nachricht gesendet! Prüfe deinen Discord-Kanal.");
+      toast.success(t('gaming.webhookTestSuccess'));
       setConnected(true);
       loadSettings();
     }
@@ -143,7 +147,7 @@ export function DiscordIntegration() {
       body: {
         type,
         webhook_url: settings.webhook_url,
-        stream_title: stream?.title || twitchUser?.display_name + " ist live!",
+        stream_title: stream?.title || twitchUser?.display_name + ` ${t('gaming.isNowLive')}`,
         game_name: stream?.game_name || "Just Chatting",
         viewer_count: stream?.viewer_count || 0,
         embed_color: settings.embed_color,
@@ -155,9 +159,14 @@ export function DiscordIntegration() {
       },
     });
     if (error) {
-      toast.error("Fehler beim Senden");
+      toast.error(t('gaming.sendError'));
     } else {
-      toast.success(`${type === "go_live" ? "Go-Live" : type === "stream_end" ? "Stream-Ende" : "Clip"}-Benachrichtigung gesendet!`);
+      const msgs: Record<string, string> = {
+        go_live: t('gaming.goLiveNotifSent'),
+        stream_end: t('gaming.streamEndNotifSent'),
+        new_clip: t('gaming.clipNotifSent'),
+      };
+      toast.success(msgs[type]);
       loadSettings();
     }
   };
@@ -181,12 +190,12 @@ export function DiscordIntegration() {
         </div>
         <div>
           <h2 className="text-xl font-bold bg-gradient-to-r from-[#5865F2] to-purple-400 bg-clip-text text-transparent">
-            Discord Integration
+            {t('gaming.discordIntegration')}
           </h2>
-          <p className="text-sm text-muted-foreground">Automatische Benachrichtigungen für deinen Discord-Server</p>
+          <p className="text-sm text-muted-foreground">{t('gaming.discordAutoNotify')}</p>
         </div>
         <Badge variant={connected ? "default" : "secondary"} className={connected ? "ml-auto bg-emerald-500/20 text-emerald-300 border-emerald-500/30" : "ml-auto"}>
-          {connected ? <><CheckCircle2 className="h-3 w-3 mr-1" /> Verbunden</> : <><XCircle className="h-3 w-3 mr-1" /> Nicht verbunden</>}
+          {connected ? <><CheckCircle2 className="h-3 w-3 mr-1" /> {t('gaming.discordConnected')}</> : <><XCircle className="h-3 w-3 mr-1" /> {t('gaming.discordNotConnected')}</>}
         </Badge>
       </motion.div>
 
@@ -196,20 +205,20 @@ export function DiscordIntegration() {
           <Card className={cardClass}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Webhook className="h-4 w-4 text-[#5865F2]" /> Webhook einrichten
+                <Webhook className="h-4 w-4 text-[#5865F2]" /> {t('gaming.webhookSetup')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-3 rounded-lg bg-[#5865F2]/10 border border-[#5865F2]/20 text-xs text-muted-foreground">
-                <p className="font-medium text-[#5865F2] mb-1">So findest du die Webhook-URL:</p>
+                <p className="font-medium text-[#5865F2] mb-1">{t('gaming.webhookHowTo')}</p>
                 <ol className="list-decimal list-inside space-y-0.5">
-                  <li>Discord → Server-Einstellungen</li>
-                  <li>Integrationen → Webhooks</li>
-                  <li>Neuer Webhook → URL kopieren</li>
+                  <li>{t('gaming.webhookStep1')}</li>
+                  <li>{t('gaming.webhookStep2')}</li>
+                  <li>{t('gaming.webhookStep3')}</li>
                 </ol>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="webhook-url">Webhook-URL</Label>
+                <Label htmlFor="webhook-url">{t('gaming.webhookUrl')}</Label>
                 <Input
                   id="webhook-url"
                   placeholder="https://discord.com/api/webhooks/..."
@@ -227,11 +236,11 @@ export function DiscordIntegration() {
                   className="border-[#5865F2]/30 hover:bg-[#5865F2]/10"
                 >
                   {testing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
-                  Test senden
+                  {t('gaming.sendTest')}
                 </Button>
                 <Button onClick={saveSettings} disabled={saving || !settings.webhook_url} size="sm" className="bg-[#5865F2] hover:bg-[#4752C4]">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Settings2 className="h-4 w-4 mr-1" />}
-                  Speichern
+                  {t('gaming.saveBtn')}
                 </Button>
               </div>
             </CardContent>
@@ -243,20 +252,20 @@ export function DiscordIntegration() {
           <Card className={cardClass}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Bell className="h-4 w-4 text-purple-400" /> Benachrichtigungen
+                <Bell className="h-4 w-4 text-purple-400" /> {t('gaming.notifications')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Radio className="h-4 w-4 text-red-400" />
-                  <Label htmlFor="auto-live" className="text-sm">Go-Live Benachrichtigung</Label>
+                  <Label htmlFor="auto-live" className="text-sm">{t('gaming.goLiveNotification')}</Label>
                 </div>
                 <Switch id="auto-live" checked={settings.auto_notify_live} onCheckedChange={(v) => setSettings((s) => ({ ...s, auto_notify_live: v }))} />
               </div>
               {settings.auto_notify_live && (
                 <Textarea
-                  placeholder="Eigene Go-Live Nachricht (optional)..."
+                  placeholder={t('gaming.customGoLiveMessage')}
                   value={settings.custom_go_live_message}
                   onChange={(e) => setSettings((s) => ({ ...s, custom_go_live_message: e.target.value }))}
                   className="text-xs min-h-[60px]"
@@ -266,7 +275,7 @@ export function DiscordIntegration() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <XCircle className="h-4 w-4 text-muted-foreground" />
-                  <Label htmlFor="auto-offline" className="text-sm">Stream-Ende Benachrichtigung</Label>
+                  <Label htmlFor="auto-offline" className="text-sm">{t('gaming.streamEndNotification')}</Label>
                 </div>
                 <Switch id="auto-offline" checked={settings.auto_notify_offline} onCheckedChange={(v) => setSettings((s) => ({ ...s, auto_notify_offline: v }))} />
               </div>
@@ -274,27 +283,27 @@ export function DiscordIntegration() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Scissors className="h-4 w-4 text-purple-400" />
-                  <Label htmlFor="auto-clip" className="text-sm">Clips teilen</Label>
+                  <Label htmlFor="auto-clip" className="text-sm">{t('gaming.shareClips')}</Label>
                 </div>
                 <Switch id="auto-clip" checked={settings.notify_on_clip} onCheckedChange={(v) => setSettings((s) => ({ ...s, notify_on_clip: v }))} />
               </div>
 
               <div className="border-t border-white/5 pt-3 space-y-3">
-                <p className="text-xs text-muted-foreground font-medium">Embed-Inhalte</p>
+                <p className="text-xs text-muted-foreground font-medium">{t('gaming.embedContents')}</p>
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="inc-viewers" className="text-xs">Zuschauerzahl</Label>
+                  <Label htmlFor="inc-viewers" className="text-xs">{t('gaming.viewerCount')}</Label>
                   <Switch id="inc-viewers" checked={settings.include_viewer_count} onCheckedChange={(v) => setSettings((s) => ({ ...s, include_viewer_count: v }))} />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="inc-cat" className="text-xs">Kategorie</Label>
+                  <Label htmlFor="inc-cat" className="text-xs">{t('gaming.categoryLabel')}</Label>
                   <Switch id="inc-cat" checked={settings.include_category} onCheckedChange={(v) => setSettings((s) => ({ ...s, include_category: v }))} />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="inc-thumb" className="text-xs">Thumbnail</Label>
+                  <Label htmlFor="inc-thumb" className="text-xs">{t('gaming.thumbnail')}</Label>
                   <Switch id="inc-thumb" checked={settings.include_thumbnail} onCheckedChange={(v) => setSettings((s) => ({ ...s, include_thumbnail: v }))} />
                 </div>
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="embed-color" className="text-xs">Embed-Farbe</Label>
+                  <Label htmlFor="embed-color" className="text-xs">{t('gaming.embedColor')}</Label>
                   <input
                     id="embed-color"
                     type="color"
@@ -313,41 +322,40 @@ export function DiscordIntegration() {
           <Card className={cardClass}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Eye className="h-4 w-4 text-purple-400" /> Embed-Vorschau
+                <Eye className="h-4 w-4 text-purple-400" /> {t('gaming.embedPreview')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg p-4" style={{ backgroundColor: "#36393f" }}>
-                {/* Discord embed mock */}
                 <div className="flex gap-3">
                   <div className="w-1 rounded-full flex-shrink-0" style={{ backgroundColor: intToHex(settings.embed_color) }} />
                   <div className="flex-1 min-w-0 space-y-2">
                     <p className="text-sm font-semibold text-white">
-                      🔴 {stream?.title || twitchUser?.display_name || "Mein Stream"} ist jetzt live!
+                      🔴 {stream?.title || twitchUser?.display_name || "Stream"} {t('gaming.isNowLive')}
                     </p>
                     <p className="text-xs" style={{ color: "#dcddde" }}>
-                      {settings.custom_go_live_message || "Der Stream hat gerade begonnen — schau jetzt rein!"}
+                      {settings.custom_go_live_message || t('gaming.defaultGoLiveMsg')}
                     </p>
                     <div className="flex gap-4">
                       {settings.include_category && (
                         <div>
-                          <p className="text-[10px] font-semibold" style={{ color: "#72767d" }}>🎮 Kategorie</p>
+                          <p className="text-[10px] font-semibold" style={{ color: "#72767d" }}>🎮 {t('gaming.categoryLabel')}</p>
                           <p className="text-xs text-white">{stream?.game_name || "Just Chatting"}</p>
                         </div>
                       )}
                       {settings.include_viewer_count && (
                         <div>
-                          <p className="text-[10px] font-semibold" style={{ color: "#72767d" }}>👁 Zuschauer</p>
+                          <p className="text-[10px] font-semibold" style={{ color: "#72767d" }}>👁 {t('gaming.viewers')}</p>
                           <p className="text-xs text-white">{stream?.viewer_count || "0"}</p>
                         </div>
                       )}
                     </div>
                     {settings.include_thumbnail && (
                       <div className="rounded bg-black/30 h-24 flex items-center justify-center mt-2">
-                        <p className="text-[10px] text-white/40">Stream Thumbnail</p>
+                        <p className="text-[10px] text-white/40">{t('gaming.streamThumbnail')}</p>
                       </div>
                     )}
-                    <p className="text-[10px]" style={{ color: "#72767d" }}>CaptionGenie Gaming Hub • Heute</p>
+                    <p className="text-[10px]" style={{ color: "#72767d" }}>CaptionGenie Gaming Hub • {t('gaming.today')}</p>
                   </div>
                 </div>
               </div>
@@ -360,22 +368,22 @@ export function DiscordIntegration() {
           <Card className={cardClass}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Send className="h-4 w-4 text-purple-400" /> Aktionen & Statistik
+                <Send className="h-4 w-4 text-purple-400" /> {t('gaming.actionsStats')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 p-3 text-center">
                   <p className="text-2xl font-bold text-purple-300">{settings.notification_count}</p>
-                  <p className="text-[10px] text-muted-foreground">Notifications gesendet</p>
+                  <p className="text-[10px] text-muted-foreground">{t('gaming.notificationsSent')}</p>
                 </div>
                 <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 p-3 text-center">
                   <p className="text-sm font-medium text-purple-300">
                     {settings.last_notification_at
-                      ? new Date(settings.last_notification_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+                      ? new Date(settings.last_notification_at).toLocaleDateString(getLocaleStr(), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
                       : "—"}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">Letzte Benachrichtigung</p>
+                  <p className="text-[10px] text-muted-foreground">{t('gaming.lastNotification')}</p>
                 </div>
               </div>
 
@@ -387,7 +395,7 @@ export function DiscordIntegration() {
                   className="w-full bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30"
                   variant="outline"
                 >
-                  <Radio className="h-4 w-4 mr-2" /> Go-Live senden
+                  <Radio className="h-4 w-4 mr-2" /> {t('gaming.sendGoLive')}
                 </Button>
                 <Button
                   onClick={() => sendNotification("stream_end")}
@@ -396,7 +404,7 @@ export function DiscordIntegration() {
                   variant="outline"
                   className="w-full"
                 >
-                  <XCircle className="h-4 w-4 mr-2" /> Stream-Ende senden
+                  <XCircle className="h-4 w-4 mr-2" /> {t('gaming.sendStreamEnd')}
                 </Button>
                 <Button
                   onClick={() => sendNotification("new_clip")}
@@ -405,7 +413,7 @@ export function DiscordIntegration() {
                   variant="outline"
                   className="w-full"
                 >
-                  <Scissors className="h-4 w-4 mr-2" /> Clip teilen
+                  <Scissors className="h-4 w-4 mr-2" /> {t('gaming.shareClip')}
                 </Button>
               </div>
             </CardContent>

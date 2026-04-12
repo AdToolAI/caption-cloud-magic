@@ -4,6 +4,7 @@ import { BarChart3, TrendingUp, Users, Clock, Target, Loader2, Heart, Star } fro
 import { useTwitch } from "@/hooks/useTwitch";
 import { motion } from "framer-motion";
 import CountUp from "@/components/ui/count-up";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const cardClass = "backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_20px_rgba(145,70,255,0.08)]";
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.1 } } };
@@ -13,6 +14,7 @@ export function StreamAnalytics() {
   const { twitchUser, isConnected, loading, clips, getFollowerCount } = useTwitch();
   const [stats, setStats] = useState({ followers: 0, subscribers: 0 });
   const [loadingStats, setLoadingStats] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!isConnected || !twitchUser?.id) return;
@@ -33,7 +35,7 @@ export function StreamAnalytics() {
   if (!isConnected) {
     return (
       <div className="text-center py-20 text-muted-foreground">
-        Verbinde zuerst deinen Twitch-Kanal im "Stream"-Tab.
+        {t('gaming.connectFirst')}
       </div>
     );
   }
@@ -41,10 +43,10 @@ export function StreamAnalytics() {
   const topClips = [...clips].sort((a, b) => b.view_count - a.view_count).slice(0, 5);
 
   const kpiCards = [
-    { icon: Users, label: "Follower", value: stats.followers, color: "text-purple-400", glow: "shadow-[0_0_20px_rgba(145,70,255,0.15)]" },
-    { icon: Heart, label: "Subscriber", value: stats.subscribers, color: "text-pink-400", glow: "shadow-[0_0_20px_rgba(236,72,153,0.15)]" },
-    { icon: Star, label: "Clips gesamt", value: clips.length, color: "text-yellow-400", glow: "shadow-[0_0_20px_rgba(250,204,21,0.15)]" },
-    { icon: TrendingUp, label: "Clip-Views gesamt", value: clips.reduce((sum, c) => sum + c.view_count, 0), color: "text-green-400", glow: "shadow-[0_0_20px_rgba(34,197,94,0.15)]" },
+    { icon: Users, label: t('gaming.follower'), value: stats.followers, color: "text-purple-400", glow: "shadow-[0_0_20px_rgba(145,70,255,0.15)]" },
+    { icon: Heart, label: t('gaming.subscriber'), value: stats.subscribers, color: "text-pink-400", glow: "shadow-[0_0_20px_rgba(236,72,153,0.15)]" },
+    { icon: Star, label: t('gaming.totalClips'), value: clips.length, color: "text-yellow-400", glow: "shadow-[0_0_20px_rgba(250,204,21,0.15)]" },
+    { icon: TrendingUp, label: t('gaming.totalClipViews'), value: clips.reduce((sum, c) => sum + c.view_count, 0), color: "text-green-400", glow: "shadow-[0_0_20px_rgba(34,197,94,0.15)]" },
   ];
 
   return (
@@ -74,13 +76,13 @@ export function StreamAnalytics() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-purple-400" />
-              <span className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">Top Clips nach Views</span>
+              <span className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">{t('gaming.topClipsByViews')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             {topClips.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
-                Noch keine Clips vorhanden.
+                {t('gaming.noClipsAvailable')}
               </p>
             ) : (
               <div className="space-y-3">
@@ -109,7 +111,7 @@ export function StreamAnalytics() {
         <motion.div variants={fadeUp}>
           <Card className={cardClass}>
             <CardHeader>
-              <CardTitle className="text-lg">Kanal-Info</CardTitle>
+              <CardTitle className="text-lg">{t('gaming.channelInfo')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-4">
@@ -118,7 +120,7 @@ export function StreamAnalytics() {
                 )}
                 <div>
                   <p className="text-lg font-bold">{twitchUser.display_name}</p>
-                  <p className="text-sm text-muted-foreground">{twitchUser.description || 'Keine Beschreibung'}</p>
+                  <p className="text-sm text-muted-foreground">{twitchUser.description || t('gaming.noDescription')}</p>
                 </div>
               </div>
             </CardContent>
