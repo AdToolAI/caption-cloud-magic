@@ -1,23 +1,19 @@
 
 
-## Fix: Seedance 2.0 Duration-Limit
+## Fix: Seedance 2.0 Duration-Slider noch auf 15s
 
 ### Problem
-Replicate's `bytedance/seedance-1-lite` model rejects `duration > 12`:
-```
-input.duration: Must be less than or equal to 12
-```
-The config in `src/config/seedanceVideoCredits.ts` sets `maxDuration: 15`, so users can select 15s which then fails.
+Die Config wurde auf `maxDuration: 12` geändert, aber der Slider in `SeedanceVideoStudio.tsx` ist hardcoded auf `max={15}`. Deshalb können Nutzer weiterhin 15s auswählen, was Replicate ablehnt.
 
 ### Fix
 
-**1. `src/config/seedanceVideoCredits.ts`** — Change `maxDuration` from `15` to `12` for both Standard and Pro models.
+**`src/pages/SeedanceVideoStudio.tsx`** — 3 Änderungen:
 
-**2. `src/pages/SeedanceVideoStudio.tsx`** — Ensure the duration slider respects the model's `maxDuration` (it likely already reads from config, but verify the slider max matches).
-
-No Edge Function changes needed — the input is already passed through correctly; the issue is that the UI allows an invalid value.
+1. **Zeile 228**: `max={15}` → `max={selectedModelConfig.maxDuration}` (oder direkt `max={12}`)
+2. **Zeile 234**: `<span>15s</span>` → `<span>{selectedModelConfig.maxDuration}s</span>`
+3. **Edge Function Zeile 173**: `duration: Math.min(duration, 12)` als Sicherheitsnetz
 
 ### Dateien
-- `src/config/seedanceVideoCredits.ts` — `maxDuration: 15` → `maxDuration: 12`
-- `src/pages/SeedanceVideoStudio.tsx` — verify slider uses config max (minor fix if hardcoded)
+- `src/pages/SeedanceVideoStudio.tsx` — Slider-Max und Label anpassen
+- `supabase/functions/generate-seedance-video/index.ts` — Duration cappen
 
