@@ -152,7 +152,7 @@ export default function KlingVideoStudio() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold">Kling 3.0 Video Studio</h1>
-              <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Neu</Badge>
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">Neu</Badge>
             </div>
             <p className="text-muted-foreground text-sm mt-1">
               Text-to-Video, Image-to-Video & Video-to-Video • 3–15 Sekunden • Native Audio
@@ -436,12 +436,12 @@ export default function KlingVideoStudio() {
 
           {/* CREDITS TAB */}
           <TabsContent value="credits">
-            <AIVideoCreditPurchase returnUrl="/kling-video-studio" />
+            <AIVideoCreditPurchase />
           </TabsContent>
 
           {/* HISTORY TAB */}
           <TabsContent value="history">
-            <VideoGenerationHistory modelFilter={['kling-3-standard', 'kling-3-pro']} />
+            <VideoGenerationHistory />
           </TabsContent>
         </Tabs>
       </div>
