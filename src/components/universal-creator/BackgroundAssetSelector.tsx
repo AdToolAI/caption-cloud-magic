@@ -10,6 +10,7 @@ import { Palette, Sparkles, Video, Image as ImageIcon, Upload, Trash2, Check, Se
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { BackgroundAsset } from '@/types/background-assets';
 
 interface BackgroundAssetSelectorProps {
@@ -33,6 +34,7 @@ const PRESET_GRADIENTS = [
 
 export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: BackgroundAssetSelectorProps) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [selectedColor, setSelectedColor] = useState('#000000');
   const [gradientColors, setGradientColors] = useState<[string, string]>(['#667eea', '#764ba2']);
@@ -111,7 +113,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['background-assets'] });
       onSelectAsset(data);
-      toast.success('Farb-Hintergrund erstellt');
+      toast.success(t('uc.colorBgCreated'));
     },
   });
 
@@ -135,7 +137,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['background-assets'] });
       onSelectAsset(data);
-      toast.success('Gradient-Hintergrund erstellt');
+      toast.success(t('uc.gradientBgCreated'));
     },
   });
 
@@ -178,10 +180,10 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
 
       queryClient.invalidateQueries({ queryKey: ['background-assets'] });
       onSelectAsset(assetData as BackgroundAsset);
-      toast.success(`${type === 'video' ? 'Video' : 'Bild'} hochgeladen`);
+      toast.success(`${type === 'video' ? 'Video' : t('uc.images')} ${t('uc.uploaded')}`);
     } catch (error: any) {
       console.error('Upload error:', error);
-      toast.error(`Fehler beim Upload: ${error.message}`);
+      toast.error(`${t('uc.uploadError')}: ${error.message}`);
     } finally {
       setUploading(false);
     }
@@ -196,7 +198,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
     
     // Limit to 10 files
     if (fileArray.length > maxFiles) {
-      toast.error(`Maximal ${maxFiles} Bilder gleichzeitig erlaubt`);
+      toast.error(t('uc.maxImagesError', { count: maxFiles }));
       return;
     }
     
@@ -204,11 +206,11 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
     const validFiles: File[] = [];
     for (const file of fileArray) {
       if (!file.type.startsWith('image/')) {
-        toast.error(`${file.name} ist kein Bild`);
+        toast.error(`${file.name} ${t('uc.notAnImage')}`);
         continue;
       }
       if (file.size > 10 * 1024 * 1024) { // 10MB
-        toast.error(`${file.name} überschreitet 10MB`);
+        toast.error(`${file.name} ${t('uc.exceeds10MB')}`);
         continue;
       }
       validFiles.push(file);
@@ -217,7 +219,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
     if (validFiles.length === 0) return;
     
     setUploading(true);
-    toast.info(`${validFiles.length} Bild(er) werden hochgeladen...`);
+    toast.info(`${validFiles.length} ${t('uc.imagesUploading')}`);
     
     try {
       // Upload all files in parallel
@@ -264,10 +266,10 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
         onSelectAsset(results[0] as BackgroundAsset);
       }
       
-      toast.success(`${results.length} Bild(er) erfolgreich hochgeladen`);
+      toast.success(`${results.length} ${t('uc.imagesUploaded')}`);
     } catch (error: any) {
       console.error('Multi-upload error:', error);
-      toast.error(`Fehler beim Upload: ${error.message}`);
+      toast.error(`${t('uc.uploadError')}: ${error.message}`);
     } finally {
       setUploading(false);
     }
@@ -291,7 +293,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['background-assets'] });
-      toast.success('Asset gelöscht');
+      toast.success(t('uc.assetDeleted'));
     },
   });
 
@@ -357,33 +359,33 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
   return (
     <div className="space-y-6">
       <Card className="p-6">
-        <h2 className="text-xl font-semibold mb-4">Hintergrund wählen</h2>
+        <h2 className="text-xl font-semibold mb-4">{t('uc.chooseBackground')}</h2>
 
         <Tabs defaultValue="colors">
           <TabsList className="grid w-full grid-cols-6 text-xs">
             <TabsTrigger value="colors">
               <Palette className="h-4 w-4 mr-1" />
-              Farben
+              {t('uc.colors')}
             </TabsTrigger>
             <TabsTrigger value="gradients">
               <Sparkles className="h-4 w-4 mr-1" />
-              Gradients
+              {t('uc.gradients')}
             </TabsTrigger>
             <TabsTrigger value="videos">
               <Video className="h-4 w-4 mr-1" />
-              Videos
+              {t('uc.videos')}
             </TabsTrigger>
             <TabsTrigger value="images">
               <ImageIcon className="h-4 w-4 mr-1" />
-              Bilder
+              {t('uc.images')}
             </TabsTrigger>
             <TabsTrigger value="stock-images">
               <Search className="h-4 w-4 mr-1" />
-              Stock Bilder
+              {t('uc.stockImages')}
             </TabsTrigger>
             <TabsTrigger value="stock-videos">
               <Search className="h-4 w-4 mr-1" />
-              Stock Videos
+              {t('uc.stockVideos')}
             </TabsTrigger>
           </TabsList>
 
@@ -391,7 +393,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
           <TabsContent value="colors" className="space-y-4">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Eigene Farbe</Label>
+                <Label>{t('uc.customColor')}</Label>
                 <div className="flex gap-2">
                   <Input
                     type="color"
@@ -406,13 +408,13 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                     className="flex-1"
                   />
                   <Button onClick={() => createColorAsset.mutate(selectedColor)}>
-                    Hinzufügen
+                    {t('uc.add')}
                   </Button>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Vordefinierte Farben</Label>
+                <Label>{t('uc.predefinedColors')}</Label>
                 <div className="grid grid-cols-8 gap-2">
                   {PRESET_COLORS.map((color) => (
                     <button
@@ -427,7 +429,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
               </div>
 
               <div className="space-y-2">
-                <Label>Meine Farben</Label>
+                <Label>{t('uc.myColors')}</Label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {assets.filter((a) => a.type === 'color').map(renderAssetCard)}
                 </div>
@@ -439,10 +441,10 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
           <TabsContent value="gradients" className="space-y-4">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Eigener Gradient</Label>
+                <Label>{t('uc.customGradient')}</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label className="text-xs">Farbe 1</Label>
+                    <Label className="text-xs">{t('uc.color1')}</Label>
                     <Input
                       type="color"
                       value={gradientColors[0]}
@@ -450,7 +452,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Farbe 2</Label>
+                    <Label className="text-xs">{t('uc.color2')}</Label>
                     <Input
                       type="color"
                       value={gradientColors[1]}
@@ -474,12 +476,12 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                     createGradientAsset.mutate({ colors: gradientColors, direction: gradientDirection })
                   }
                 >
-                  Gradient hinzufügen
+                  {t('uc.addGradient')}
                 </Button>
               </div>
 
               <div className="space-y-2">
-                <Label>Vordefinierte Gradients</Label>
+                <Label>{t('uc.predefinedGradients')}</Label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {PRESET_GRADIENTS.map((preset, idx) => (
                     <button
@@ -501,7 +503,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
               </div>
 
               <div className="space-y-2">
-                <Label>Meine Gradients</Label>
+                <Label>{t('uc.myGradients')}</Label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {assets.filter((a) => a.type === 'gradient').map(renderAssetCard)}
                 </div>
@@ -516,8 +518,8 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                 <Label htmlFor="video-upload" className="cursor-pointer">
                   <div className="flex flex-col items-center gap-2 py-8">
                     <Upload className="h-12 w-12 text-muted-foreground" />
-                    <p className="text-sm font-medium">Video hochladen</p>
-                    <p className="text-xs text-muted-foreground">MP4, MOV, max 100MB</p>
+                    <p className="text-sm font-medium">{t('uc.uploadVideo')}</p>
+                    <p className="text-xs text-muted-foreground">{t('uc.videoFormats')}</p>
                   </div>
                 </Label>
                 <Input
@@ -534,7 +536,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
               </Card>
 
               <div className="space-y-2">
-                <Label>Meine Videos</Label>
+                <Label>{t('uc.myVideos')}</Label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {assets.filter((a) => a.type === 'video').map(renderAssetCard)}
                 </div>
@@ -549,8 +551,8 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                 <Label htmlFor="image-upload" className="cursor-pointer">
                   <div className="flex flex-col items-center gap-2 py-8">
                     <Upload className="h-12 w-12 text-muted-foreground" />
-                    <p className="text-sm font-medium">Bild(er) hochladen</p>
-                    <p className="text-xs text-muted-foreground">JPG, PNG, max 10MB pro Bild, bis zu 10 Bilder</p>
+                    <p className="text-sm font-medium">{t('uc.uploadImages')}</p>
+                    <p className="text-xs text-muted-foreground">{t('uc.imageFormats')}</p>
                   </div>
                 </Label>
                 <Input
@@ -570,7 +572,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
               </Card>
 
               <div className="space-y-2">
-                <Label>Meine Bilder</Label>
+                <Label>{t('uc.myImages')}</Label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {assets.filter((a) => a.type === 'image').map(renderAssetCard)}
                 </div>
@@ -583,7 +585,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
             <div className="space-y-4">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Nach Stock-Bildern suchen... (z.B. 'sunset', 'mountain landscape')"
+                  placeholder={t('uc.searchStockImages')}
                   value={stockImageQuery}
                   onChange={(e) => setStockImageQuery(e.target.value)}
                   onKeyDown={(e) => {
@@ -608,15 +610,15 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
               {imageSearchTriggered && stockImageQuery && (
                 <div className="text-sm text-muted-foreground">
                   {isSearchingImages ? (
-                    'Suche nach Bildern...'
+                    t('uc.searchingImages')
                   ) : stockImages?.images?.length > 0 ? (
                     <>
-                      {stockImages.images.length} Bilder gefunden
-                      {stockImages.sources?.pixabay > 0 && ` • ${stockImages.sources.pixabay} von Pixabay`}
-                      {stockImages.sources?.pexels > 0 && ` • ${stockImages.sources.pexels} von Pexels`}
+                      {stockImages.images.length} {t('uc.imagesFound')}
+                      {stockImages.sources?.pixabay > 0 && ` • ${stockImages.sources.pixabay} Pixabay`}
+                      {stockImages.sources?.pexels > 0 && ` • ${stockImages.sources.pexels} Pexels`}
                     </>
                   ) : (
-                    'Keine Bilder gefunden. Versuche andere Suchbegriffe.'
+                    t('uc.noImagesFound')
                   )}
                 </div>
               )}
@@ -625,10 +627,10 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                 <div className="text-center py-12 text-muted-foreground">
                   <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-sm font-medium mb-2">
-                    Suche nach professionellen Stock-Bildern
+                    {t('uc.searchProfessionalImages')}
                   </p>
                   <p className="text-xs">
-                    Kostenlos • Hohe Qualität • Kommerzielle Nutzung erlaubt
+                    {t('uc.freeHighQuality')}
                   </p>
                 </div>
               )}
@@ -658,10 +660,10 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
 
                           queryClient.invalidateQueries({ queryKey: ['background-assets'] });
                           onSelectAsset(asset as BackgroundAsset);
-                          toast.success('Stock-Bild zur Bibliothek hinzugefügt');
+                          toast.success(t('uc.stockImageAdded'));
                         } catch (error: any) {
                           console.error('Error saving stock image:', error);
-                          toast.error('Fehler beim Hinzufügen des Bildes');
+                          toast.error(t('uc.errorAddingImage'));
                         }
                       }}
                     >
@@ -699,7 +701,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
             <div className="space-y-4">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Nach Stock-Videos suchen... (z.B. 'ocean waves', 'city night')"
+                  placeholder={t('uc.searchStockVideos')}
                   value={stockVideoQuery}
                   onChange={(e) => setStockVideoQuery(e.target.value)}
                   onKeyDown={(e) => {
@@ -724,15 +726,15 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
               {videoSearchTriggered && stockVideoQuery && (
                 <div className="text-sm text-muted-foreground">
                   {isSearchingVideos ? (
-                    'Suche nach Videos...'
+                    t('uc.searchingVideos')
                   ) : stockVideos?.videos?.length > 0 ? (
                     <>
-                      {stockVideos.videos.length} Videos gefunden
-                      {stockVideos.sources?.pixabay > 0 && ` • ${stockVideos.sources.pixabay} von Pixabay`}
-                      {stockVideos.sources?.pexels > 0 && ` • ${stockVideos.sources.pexels} von Pexels`}
+                      {stockVideos.videos.length} {t('uc.videosFound')}
+                      {stockVideos.sources?.pixabay > 0 && ` • ${stockVideos.sources.pixabay} Pixabay`}
+                      {stockVideos.sources?.pexels > 0 && ` • ${stockVideos.sources.pexels} Pexels`}
                     </>
                   ) : (
-                    'Keine Videos gefunden. Versuche andere Suchbegriffe.'
+                    t('uc.noVideosFound')
                   )}
                 </div>
               )}
@@ -741,10 +743,10 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                 <div className="text-center py-12 text-muted-foreground">
                   <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-sm font-medium mb-2">
-                    Suche nach professionellen Stock-Videos
+                    {t('uc.searchProfessionalVideos')}
                   </p>
                   <p className="text-xs">
-                    Kostenlos • 4K verfügbar • Kommerzielle Nutzung erlaubt
+                    {t('uc.free4K')}
                   </p>
                 </div>
               )}
@@ -775,10 +777,10 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
 
                           queryClient.invalidateQueries({ queryKey: ['background-assets'] });
                           onSelectAsset(asset as BackgroundAsset);
-                          toast.success('Stock-Video zur Bibliothek hinzugefügt');
+                          toast.success(t('uc.stockVideoAdded'));
                         } catch (error: any) {
                           console.error('Error saving stock video:', error);
-                          toast.error('Fehler beim Hinzufügen des Videos');
+                          toast.error(t('uc.errorAddingVideo'));
                         }
                       }}
                     >
