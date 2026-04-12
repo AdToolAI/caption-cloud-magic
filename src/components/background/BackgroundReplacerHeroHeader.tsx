@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Image, Zap, Layers, Sparkles, Cpu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useMemo } from "react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 function FloatingParticles() {
   const particles = useMemo(() => 
@@ -44,9 +45,10 @@ function FloatingParticles() {
 }
 
 export function BackgroundReplacerHeroHeader() {
+  const { t } = useTranslation();
+
   return (
     <div className="relative mb-8 overflow-hidden rounded-2xl p-1">
-      {/* Shimmer border */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
         <motion.div
           className="absolute inset-0 bg-gradient-to-r from-primary/30 via-cyan-400/40 to-primary/30"
@@ -57,7 +59,6 @@ export function BackgroundReplacerHeroHeader() {
       </div>
 
       <div className="relative bg-card/95 backdrop-blur-xl rounded-[14px] p-6 md:p-8">
-        {/* Glow Orbs */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[14px]">
           <motion.div
             className="absolute -top-20 -left-20 w-64 h-64 bg-primary/20 rounded-full blur-3xl"
@@ -76,7 +77,6 @@ export function BackgroundReplacerHeroHeader() {
         <div className="relative z-10">
           <div className="flex items-start justify-between">
             <div>
-              {/* Mission Badge */}
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -94,7 +94,6 @@ export function BackgroundReplacerHeroHeader() {
                 </Badge>
               </motion.div>
 
-              {/* Gradient Headline */}
               <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -112,10 +111,9 @@ export function BackgroundReplacerHeroHeader() {
                 transition={{ duration: 0.5, delay: 0.2 }}
                 className="text-lg text-muted-foreground mb-4"
               >
-                KI-Produkterkennung · Pro Compositing · Nano Banana 2
+                {t('picStudio.heroSubtitle')}
               </motion.p>
 
-              {/* Stats Badges */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -124,11 +122,11 @@ export function BackgroundReplacerHeroHeader() {
               >
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-md bg-card/40 border border-white/10">
                   <Layers className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">7 Kategorien</span>
+                  <span className="text-sm font-medium">{t('picStudio.heroCategories')}</span>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-md bg-card/40 border border-white/10">
                   <Cpu className="h-4 w-4 text-cyan-400" />
-                  <span className="text-sm font-medium">KI-Analyse</span>
+                  <span className="text-sm font-medium">{t('picStudio.heroAiAnalysis')}</span>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-md bg-card/40 border border-white/10">
                   <Sparkles className="h-4 w-4 text-amber-400" />
@@ -137,7 +135,6 @@ export function BackgroundReplacerHeroHeader() {
               </motion.div>
             </div>
 
-            {/* v3 Badge with Pulsating Glow */}
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -154,7 +151,6 @@ export function BackgroundReplacerHeroHeader() {
                   variant="default" 
                   className="relative gap-2 text-base px-5 py-2.5 bg-gradient-to-r from-primary to-cyan-500 border-0 shadow-lg overflow-hidden"
                 >
-                  {/* Shimmer Effect */}
                   <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                   <Zap className="h-5 w-5" />
                   v3

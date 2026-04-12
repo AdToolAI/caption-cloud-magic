@@ -3,6 +3,7 @@ import { Download, Package, ArrowRight, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import JSZip from "jszip";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface ExportControlsProps {
   selectedImages: Set<number>;
@@ -12,10 +13,11 @@ interface ExportControlsProps {
 
 export const ExportControls = ({ selectedImages, scenes, onClearSelection }: ExportControlsProps) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleDownloadSelected = async () => {
     if (selectedImages.size === 0) {
-      toast.error("Bitte wählen Sie mindestens ein Bild aus");
+      toast.error(t('picStudio.selectAtLeastOne'));
       return;
     }
 
@@ -26,7 +28,7 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
       link.href = scene.imageUrl;
       link.download = `scene-variant-${scene.variant}.png`;
       link.click();
-      toast.success("Bild wird heruntergeladen");
+      toast.success(t('picStudio.imageDownloading'));
     } else {
       await handleExportBundle();
     }
@@ -34,11 +36,11 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
 
   const handleExportBundle = async () => {
     if (selectedImages.size === 0) {
-      toast.error("Bitte wählen Sie mindestens ein Bild aus");
+      toast.error(t('picStudio.selectAtLeastOne'));
       return;
     }
 
-    toast.info("Bundle wird erstellt...");
+    toast.info(t('picStudio.bundleCreating'));
     
     try {
       const zip = new JSZip();
@@ -69,17 +71,17 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
       link.click();
       URL.revokeObjectURL(url);
 
-      toast.success(`Bundle mit ${selectedImages.size} Szenen erstellt`);
+      toast.success(`${t('picStudio.bundleCreated')} ${selectedImages.size} ${t('picStudio.bundleScenes')}`);
       onClearSelection();
     } catch (error) {
       console.error('Export error:', error);
-      toast.error("Fehler beim Erstellen des Bundles");
+      toast.error(t('picStudio.bundleError'));
     }
   };
 
   const handleUseInPostGenerator = () => {
     if (selectedImages.size === 0) {
-      toast.error("Bitte wählen Sie mindestens ein Bild aus");
+      toast.error(t('picStudio.selectAtLeastOne'));
       return;
     }
     
@@ -87,12 +89,12 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
     sessionStorage.setItem('backgroundScenes', JSON.stringify(selectedScenes));
     
     navigate('/ai-post-generator');
-    toast.success("Szenen an Post-Generator übergeben");
+    toast.success(t('picStudio.scenesToPostGen'));
   };
 
   const handleSchedulePost = () => {
     if (selectedImages.size === 0) {
-      toast.error("Bitte wählen Sie mindestens ein Bild aus");
+      toast.error(t('picStudio.selectAtLeastOne'));
       return;
     }
 
@@ -100,7 +102,7 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
     sessionStorage.setItem('backgroundScenes', JSON.stringify(selectedScenes));
     
     navigate('/calendar');
-    toast.success("Szenen für Kalenderplanung übergeben");
+    toast.success(t('picStudio.scenesToCalendar'));
   };
 
   return (
@@ -115,7 +117,7 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
         >
           <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
           <Download className="h-4 w-4 mr-2" />
-          Download ({selectedImages.size})
+          {t('picStudio.downloadCount')} ({selectedImages.size})
         </Button>
         
         {selectedImages.size > 1 && (
@@ -127,7 +129,7 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
           >
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
             <Package className="h-4 w-4 mr-2" />
-            ZIP Bundle
+            {t('picStudio.zipBundle')}
           </Button>
         )}
       </div>
@@ -141,7 +143,7 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
         >
           <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
           <ArrowRight className="h-4 w-4 mr-2" />
-          Post-Generator
+          {t('picStudio.postGenerator')}
         </Button>
         
         <Button 
@@ -153,7 +155,7 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
         >
           <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
           <Calendar className="h-4 w-4 mr-2" />
-          Post planen
+          {t('picStudio.schedulePlan')}
         </Button>
       </div>
     </div>

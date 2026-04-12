@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Footer } from "@/components/Footer";
@@ -28,16 +28,6 @@ import { ImageLightbox } from "@/components/background/ImageLightbox";
 import { SaveToAlbumDialog } from "@/components/picture-studio/SaveToAlbumDialog";
 import { ESTIMATED_COSTS } from "@/lib/featureCosts";
 
-const CATEGORIES = [
-  { value: 'workspace', label: 'Arbeitsplatz' },
-  { value: 'outdoor', label: 'Outdoor/Natur' },
-  { value: 'urban', label: 'Urban' },
-  { value: 'studio', label: 'Studio/Minimal' },
-  { value: 'wellness', label: 'Wellness' },
-  { value: 'tech', label: 'Tech' },
-  { value: 'luxury', label: 'Luxury' }
-];
-
 const LIGHTING_OPTIONS = ['natural', 'studio', 'dramatic', 'neutral'];
 const VARIANT_OPTIONS = [5, 10];
 
@@ -56,6 +46,26 @@ export default function BackgroundReplacer() {
   const location = useLocation();
   const { executeAICall, loading: aiCallLoading, status } = useAICall();
   const { checkRateLimit, getRemainingCalls, resetTime } = useAIRateLimit({ maxRequests: 2, windowMs: 60000 });
+
+  const CATEGORIES = useMemo(() => [
+    { value: 'workspace', label: t('picStudio.catWorkspace') },
+    { value: 'outdoor', label: t('picStudio.catOutdoor') },
+    { value: 'urban', label: t('picStudio.catUrban') },
+    { value: 'studio', label: t('picStudio.catStudio') },
+    { value: 'wellness', label: t('picStudio.catWellness') },
+    { value: 'tech', label: t('picStudio.catTech') },
+    { value: 'luxury', label: t('picStudio.catLuxury') },
+  ], [t]);
+
+  const scenePoolMap = useMemo((): Record<string, string[]> => ({
+    workspace: [t('picStudio.spHomeOfficeWood'), t('picStudio.spCoWorkingConcrete'), t('picStudio.spAgencyStudio'), t('picStudio.spDesignerMarble'), t('picStudio.spMinimalDesk'), t('picStudio.spCoffeeShop'), t('picStudio.spTechDeskRgb')],
+    outdoor: [t('picStudio.spForestBridge'), t('picStudio.spMountainMeadow'), t('picStudio.spRiverbank'), t('picStudio.spCoastSand'), t('picStudio.spDesertDunes'), t('picStudio.spSnowscape'), t('picStudio.spForestClearing')],
+    urban: [t('picStudio.spRooftopSkyline'), t('picStudio.spCobblestoneAlley'), t('picStudio.spModernLobby'), t('picStudio.spSubwayStation'), t('picStudio.spConcreteSteps'), t('picStudio.spStreetCorner')],
+    studio: [t('picStudio.spGradientLight'), t('picStudio.spSoftboxSetup'), t('picStudio.spAcrylMirror'), t('picStudio.spFabricLinen'), t('picStudio.spMarbleWhiteGray'), t('picStudio.spColorGradient')],
+    wellness: [t('picStudio.spSpaTowel'), t('picStudio.spEucalyptus'), t('picStudio.spStoneBalance'), t('picStudio.spWoodYogaMat')],
+    tech: [t('picStudio.spDarkNeon'), t('picStudio.spCircuitBoard'), t('picStudio.spGlassFiber'), t('picStudio.spBrushedMetal')],
+    luxury: [t('picStudio.spVelvetDarkBlue'), t('picStudio.spLeatherCognac'), t('picStudio.spMarbleBlackGold'), t('picStudio.spCrystalGlass')],
+  }), [t]);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -96,11 +106,11 @@ export default function BackgroundReplacer() {
               const file = new File([blob], 'imported-image.jpg', { type: 'image/jpeg' });
               setImageFile(file);
               setImagePreview(URL.createObjectURL(blob));
-              toast.success("✅ Bild aus Media Library importiert");
+              toast.success(t('picStudio.importedFromMedia'));
             })
             .catch(err => {
               console.error('Failed to load image:', err);
-              toast.error("Fehler beim Laden des Bildes");
+              toast.error(t('picStudio.importError'));
             });
         }
         sessionStorage.removeItem('bg_replacer_import');
@@ -111,8 +121,8 @@ export default function BackgroundReplacer() {
   }, [user]);
 
   useEffect(() => {
-    updateScenePool(category);
-  }, [category]);
+    setScenePool(scenePoolMap[category] || scenePoolMap['workspace']);
+  }, [category, scenePoolMap]);
 
   const fetchBrandKits = async () => {
     const { data } = await supabase
@@ -122,32 +132,19 @@ export default function BackgroundReplacer() {
     if (data) setBrandKits(data);
   };
 
-  const updateScenePool = (cat: string) => {
-    const pools: Record<string, string[]> = {
-      workspace: ['Home Office Holz', 'Co-Working Beton', 'Agentur Studio', 'Designer Marmor', 'Minimal Desk', 'Coffee Shop', 'Tech Desk RGB'],
-      outdoor: ['Wald Holzbrücke', 'Bergwiese', 'Flussufer', 'Küste Sand', 'Wüste Dünen', 'Schneelandschaft', 'Waldlichtung'],
-      urban: ['Rooftop Skyline', 'Pflastergasse', 'Moderne Lobby', 'U-Bahn Station', 'Beton Stufen', 'Straßenecke'],
-      studio: ['Gradient Hell', 'Softbox Setup', 'Acryl Spiegelplatte', 'Stoff Leinen', 'Marmor Weiß-Grau', 'Farbverlauf'],
-      wellness: ['Spa Handtuch', 'Eukalyptus Zweige', 'Stein Balance', 'Holz Yoga-Matte'],
-      tech: ['Dunkel Neon-Akzente', 'Circuit Board', 'Glas Fiber Optik', 'Metall Gebürstet'],
-      luxury: ['Samt Dunkelblau', 'Leder Cognac', 'Marmor Schwarz-Gold', 'Kristall Glas']
-    };
-    setScenePool(pools[cat] || pools['workspace']);
-  };
-
   const handleApplySuggestion = (suggestion: AISuggestion) => {
     setCategory(suggestion.suggestedCategory);
     setLighting(suggestion.suggestedLighting);
     setStyleIntensity([suggestion.suggestedIntensity]);
     setSuggestionApplied(true);
-    toast.success(`Einstellungen für "${suggestion.productType}" übernommen`);
+    toast.success(`${t('picStudio.settingsApplied')} "${suggestion.productType}"`);
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 15 * 1024 * 1024) {
-        toast.error("Bild muss unter 15MB sein");
+        toast.error(t('picStudio.fileTooLarge'));
         return;
       }
       setImageFile(file);
@@ -166,13 +163,13 @@ export default function BackgroundReplacer() {
 
   const handleRemoveBackground = async (file: File) => {
     if (!user) {
-      toast.error("Bitte melden Sie sich an");
+      toast.error(t('picStudio.loginRequired'));
       navigate("/auth");
       return;
     }
 
     setIsRemoving(true);
-    toast.info("Hintergrund wird entfernt mit Edge-Refinement...");
+    toast.info(t('picStudio.bgRemoving'));
 
     try {
       const img = await loadImage(file);
@@ -193,11 +190,11 @@ export default function BackgroundReplacer() {
         .getPublicUrl(fileName);
 
       setCutoutPreview(publicUrl);
-      const qualityText = edgeScore >= 85 ? 'Exzellent' : edgeScore >= 70 ? 'Gut' : 'Akzeptabel';
-      toast.success(`Hintergrund entfernt! Kanten-Qualität: ${edgeScore}/100 (${qualityText})`);
+      const qualityText = edgeScore >= 85 ? t('picStudio.qualityExcellent') : edgeScore >= 70 ? t('picStudio.qualityGood') : t('picStudio.qualityOk');
+      toast.success(`${t('picStudio.bgRemoved')} ${edgeScore}/100 (${qualityText})`);
     } catch (error: any) {
       console.error('Background removal error:', error);
-      toast.error("Fehler beim Entfernen des Hintergrunds");
+      toast.error(t('picStudio.bgRemoveError'));
     } finally {
       setIsRemoving(false);
     }
@@ -205,13 +202,13 @@ export default function BackgroundReplacer() {
 
   const handleGenerateScenes = async () => {
     if (!user) {
-      toast.error("Bitte melden Sie sich an");
+      toast.error(t('picStudio.loginRequired'));
       navigate("/auth");
       return;
     }
 
     if (!cutoutPreview) {
-      toast.error("Bitte laden Sie zuerst ein Bild hoch");
+      toast.error(t('picStudio.uploadFirst'));
       return;
     }
 
@@ -273,15 +270,15 @@ export default function BackgroundReplacer() {
           .reduce((sum: number, s: any) => sum + s.qualityScores.overall, 0) / data.results_json.length;
         
         toast.success(
-          `✅ ${data.results_json.length} Varianten generiert!\n` +
-          `📊 Durchschn. Qualität: ${Math.round(avgQuality)}/100\n` +
-          `🎬 ${scenesUsed.length} unterschiedliche Szenen verwendet`
+          `✅ ${data.results_json.length} ${t('picStudio.variantsGenerated')}\n` +
+          `📊 ${t('picStudio.avgQuality')} ${Math.round(avgQuality)}/100\n` +
+          `🎬 ${scenesUsed.length} ${t('picStudio.scenesUsed')}`
         );
       }
     } catch (error: any) {
       console.error('Generation error:', error);
       if (error.code !== 'INSUFFICIENT_CREDITS') {
-        toast.error(error.message || "Fehler bei der Generierung");
+        toast.error(error.message || t('picStudio.generationError'));
       }
     } finally {
       setIsGenerating(false);
@@ -301,13 +298,12 @@ export default function BackgroundReplacer() {
   const handleAcceptScene = (index: number) => {
     setAcceptedScene(generatedScenes[index]);
     setLightboxScene(null);
-    toast.success("Variante übernommen! 🎉");
+    toast.success(t('picStudio.variantAccepted'));
   };
 
   const handleSaveToAlbum = async (imageUrl: string) => {
     if (!user) return;
     
-    // First save to studio_images, then open album dialog
     const { data, error } = await supabase
       .from('studio_images')
       .insert({
@@ -322,7 +318,7 @@ export default function BackgroundReplacer() {
       .single();
     
     if (error) {
-      toast.error("Fehler beim Speichern");
+      toast.error(t('picStudio.saveError'));
       return;
     }
     
@@ -345,10 +341,8 @@ export default function BackgroundReplacer() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <Breadcrumbs category="design" feature="Smart Background" />
         
-        {/* Premium Hero Header */}
         <BackgroundReplacerHeroHeader />
 
-        {/* AI Product Insight Banner */}
         {aiSuggestion && (
           <ProductInsightBanner
             suggestion={aiSuggestion}
@@ -357,7 +351,6 @@ export default function BackgroundReplacer() {
           />
         )}
         
-        {/* AI Status & Rate Limit */}
         <div className="mb-6 flex items-center gap-4">
           <AICallStatus stage={status.stage} message={status.message} retryAttempt={status.retryAttempt} />
           <RateLimitIndicator 
@@ -368,7 +361,6 @@ export default function BackgroundReplacer() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Input Panel */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -376,9 +368,8 @@ export default function BackgroundReplacer() {
           >
             <Card className="backdrop-blur-xl bg-card/60 border-white/10 shadow-[0_0_30px_hsla(43,90%,68%,0.08)] hover:shadow-[0_0_40px_hsla(43,90%,68%,0.12)] transition-all duration-300">
               <CardContent className="p-6 space-y-6">
-                {/* Image Upload */}
                 <div>
-                  <Label className="text-sm font-medium">Produktbild hochladen</Label>
+                  <Label className="text-sm font-medium">{t('picStudio.uploadProductImage')}</Label>
                   <motion.div 
                     className="mt-2 relative group"
                     whileHover={{ scale: 1.01 }}
@@ -401,13 +392,13 @@ export default function BackgroundReplacer() {
                             {cutoutPreview && (
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <p className="text-sm font-medium">Freigestellt:</p>
+                                  <p className="text-sm font-medium">{t('picStudio.cutoutLabel')}</p>
                                   {edgeQuality > 0 && (
                                     <Badge 
                                       variant={edgeQuality >= 85 ? "default" : edgeQuality >= 70 ? "secondary" : "outline"}
                                       className={edgeQuality >= 85 ? "shadow-[0_0_10px_hsla(142,76%,36%,0.4)]" : edgeQuality >= 70 ? "shadow-[0_0_10px_hsla(43,90%,68%,0.4)]" : ""}
                                     >
-                                      Kanten: {edgeQuality}/100
+                                      {t('picStudio.edgesLabel')} {edgeQuality}/100
                                     </Badge>
                                   )}
                                 </div>
@@ -428,7 +419,7 @@ export default function BackgroundReplacer() {
                               )}
                             </motion.div>
                             <p className="text-sm text-muted-foreground">
-                              {isRemoving ? 'Hintergrund wird entfernt...' : 'Klicken zum Hochladen (max 15MB)'}
+                              {isRemoving ? t('picStudio.removingBg') : t('picStudio.clickToUpload')}
                             </p>
                           </>
                         )}
@@ -437,9 +428,8 @@ export default function BackgroundReplacer() {
                   </motion.div>
                 </div>
 
-                {/* Category */}
                 <div>
-                  <Label className="text-sm font-medium">Kategorie</Label>
+                  <Label className="text-sm font-medium">{t('picStudio.categoryLabel')}</Label>
                   <Select value={category} onValueChange={setCategory}>
                     <SelectTrigger className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
                       <SelectValue />
@@ -452,7 +442,6 @@ export default function BackgroundReplacer() {
                   </Select>
                 </div>
 
-                {/* Scene Pool */}
                 {scenePool.length > 0 && (
                   <motion.div 
                     className="backdrop-blur-md bg-muted/20 border border-white/10 p-4 rounded-xl"
@@ -462,7 +451,7 @@ export default function BackgroundReplacer() {
                   >
                     <div className="flex items-center gap-2 mb-3">
                       <Info className="h-4 w-4 text-primary" />
-                      <Label className="text-xs font-medium">Szenen-Pool ({scenePool.length} verfügbar)</Label>
+                      <Label className="text-xs font-medium">{t('picStudio.scenePoolLabel')} ({scenePool.length} {t('picStudio.scenePoolAvailable')})</Label>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {scenePool.slice(0, 6).map((scene, i) => (
@@ -485,7 +474,7 @@ export default function BackgroundReplacer() {
                           whileHover={{ scale: 1.05 }}
                         >
                           <Badge variant="outline" className="text-xs backdrop-blur-sm bg-primary/10 border-primary/30 text-primary">
-                            +{scenePool.length - 6} mehr
+                            +{scenePool.length - 6} {t('picStudio.scenePoolMore')}
                           </Badge>
                         </motion.div>
                       )}
@@ -493,9 +482,8 @@ export default function BackgroundReplacer() {
                   </motion.div>
                 )}
 
-                {/* Variant Count */}
                 <div>
-                  <Label className="text-sm font-medium">Anzahl Varianten</Label>
+                  <Label className="text-sm font-medium">{t('picStudio.variantCountLabel')}</Label>
                   <Select value={variantCount.toString()} onValueChange={(v) => setVariantCount(Number(v))}>
                     <SelectTrigger className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
                       <SelectValue />
@@ -503,16 +491,15 @@ export default function BackgroundReplacer() {
                     <SelectContent>
                       {VARIANT_OPTIONS.map((count) => (
                         <SelectItem key={count} value={count.toString()}>
-                          {count} Varianten
+                          {count} {t('picStudio.variantsUnit')}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Diversity Toggle */}
                 <div className="flex items-center justify-between p-3 rounded-lg bg-muted/10 border border-white/5">
-                  <Label htmlFor="diversity" className="text-sm font-medium cursor-pointer">Szenen-Diversität maximieren</Label>
+                  <Label htmlFor="diversity" className="text-sm font-medium cursor-pointer">{t('picStudio.diversityToggle')}</Label>
                   <Switch
                     id="diversity"
                     checked={diversify}
@@ -525,13 +512,12 @@ export default function BackgroundReplacer() {
                     animate={{ opacity: 1, height: 'auto' }}
                     className="text-xs text-primary -mt-4"
                   >
-                    ✓ Aktiv: Wir vermeiden ähnliche Hintergründe, Props und Blickwinkel
+                    {t('picStudio.diversityActive')}
                   </motion.p>
                 )}
 
-                {/* Lighting */}
                 <div>
-                  <Label className="text-sm font-medium">Lichtpräferenz</Label>
+                  <Label className="text-sm font-medium">{t('picStudio.lightingLabel')}</Label>
                   <Select value={lighting} onValueChange={setLighting}>
                     <SelectTrigger className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
                       <SelectValue />
@@ -546,10 +532,9 @@ export default function BackgroundReplacer() {
                   </Select>
                 </div>
 
-                {/* Style Intensity */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <Label className="text-sm font-medium">Style Intensity</Label>
+                    <Label className="text-sm font-medium">{t('picStudio.styleIntensityLabel')}</Label>
                     <span className="text-sm font-bold text-primary">{styleIntensity[0]}/10</span>
                   </div>
                   <Slider
@@ -562,16 +547,15 @@ export default function BackgroundReplacer() {
                   />
                 </div>
 
-                {/* Brand Kit */}
                 {brandKits.length > 0 && (
                   <div>
-                    <Label className="text-sm font-medium">Brand Kit (Optional)</Label>
+                    <Label className="text-sm font-medium">{t('picStudio.brandKitOptional')}</Label>
                     <Select value={selectedBrandKit} onValueChange={setSelectedBrandKit}>
                       <SelectTrigger className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
-                        <SelectValue placeholder="Kein Brand Kit" />
+                        <SelectValue placeholder={t('picStudio.noBrandKit')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">Kein Brand Kit</SelectItem>
+                        <SelectItem value="none">{t('picStudio.noBrandKit')}</SelectItem>
                         {brandKits.map((kit) => (
                           <SelectItem key={kit.id} value={kit.id}>
                             {kit.brand_name || `Brand Kit (${kit.mood})`}
@@ -582,7 +566,6 @@ export default function BackgroundReplacer() {
                   </div>
                 )}
 
-                {/* Generate Button */}
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -597,12 +580,12 @@ export default function BackgroundReplacer() {
                     {isGenerating ? (
                       <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Generiere {variantCount} Varianten...
+                        {t('picStudio.generatingVariants')}
                       </>
                     ) : (
                       <>
                         <Sparkles className="mr-2 h-5 w-5" />
-                        {variantCount} Varianten generieren
+                        {variantCount} {t('picStudio.generateVariants')}
                       </>
                     )}
                   </Button>
@@ -611,7 +594,6 @@ export default function BackgroundReplacer() {
             </Card>
           </motion.div>
 
-          {/* Preview Panel */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -620,12 +602,11 @@ export default function BackgroundReplacer() {
             <Card className="backdrop-blur-xl bg-card/60 border-white/10 overflow-hidden shadow-[0_0_30px_hsla(43,90%,68%,0.08)]">
               <CardContent className="p-0">
                 {acceptedScene ? (
-                  /* Accepted single scene view */
                   <div className="flex flex-col">
                     <div className="p-6 border-b border-white/10">
                       <div className="flex items-center justify-between mb-4">
                         <div>
-                          <h3 className="text-lg font-semibold">Übernommene Variante</h3>
+                          <h3 className="text-lg font-semibold">{t('picStudio.acceptedVariant')}</h3>
                           <p className="text-sm text-muted-foreground">
                             {acceptedScene.sceneName || `Variant ${acceptedScene.variant}`}
                           </p>
@@ -637,7 +618,7 @@ export default function BackgroundReplacer() {
                           className="gap-1.5"
                         >
                           <ArrowLeft className="h-4 w-4" />
-                          Alle Varianten
+                          {t('picStudio.allVariants')}
                         </Button>
                       </div>
                     </div>
@@ -653,7 +634,7 @@ export default function BackgroundReplacer() {
                           size="sm"
                           onClick={() => handleSaveToAlbum(acceptedScene.imageUrl)}
                         >
-                          In Album speichern
+                          {t('picStudio.saveToAlbum')}
                         </Button>
                         <Button
                           variant="outline"
@@ -665,7 +646,7 @@ export default function BackgroundReplacer() {
                             a.click();
                           }}
                         >
-                          Download
+                          {t('picStudio.download')}
                         </Button>
                       </div>
                     </div>
@@ -680,9 +661,9 @@ export default function BackgroundReplacer() {
                     <div className="p-6 border-b border-white/10">
                       <div className="flex items-center justify-between mb-4">
                         <div>
-                          <h3 className="text-lg font-semibold">Vorschau-Galerie</h3>
+                          <h3 className="text-lg font-semibold">{t('picStudio.previewGallery')}</h3>
                           <p className="text-sm text-muted-foreground">
-                            {generatedScenes.length} Varianten · KI-bewertet · Klick für Vollbild
+                            {generatedScenes.length} {t('picStudio.previewSubtitle')}
                           </p>
                         </div>
                         <Badge variant="default" className="gap-2 bg-gradient-to-r from-primary/80 to-cyan-500/80 border-0">
@@ -693,12 +674,12 @@ export default function BackgroundReplacer() {
                       
                       {edgeQuality > 0 && (
                         <div className="flex items-center gap-2 text-sm">
-                          <span className="text-muted-foreground">Freistellungs-Qualität:</span>
+                          <span className="text-muted-foreground">{t('picStudio.cutoutQualityLabel')}:</span>
                           <Badge 
                             variant={edgeQuality >= 85 ? "default" : edgeQuality >= 70 ? "secondary" : "outline"}
                             className={edgeQuality >= 85 ? "shadow-[0_0_10px_hsla(142,76%,36%,0.4)]" : edgeQuality >= 70 ? "shadow-[0_0_10px_hsla(43,90%,68%,0.4)]" : ""}
                           >
-                            {edgeQuality}/100 {edgeQuality >= 85 ? '✓ Exzellent' : edgeQuality >= 70 ? '✓ Gut' : '⚠ OK'}
+                            {edgeQuality}/100 {edgeQuality >= 85 ? `✓ ${t('picStudio.qualityExcellent')}` : edgeQuality >= 70 ? `✓ ${t('picStudio.qualityGood')}` : `⚠ ${t('picStudio.qualityOk')}`}
                           </Badge>
                         </div>
                       )}
@@ -738,11 +719,10 @@ export default function BackgroundReplacer() {
                         <Sparkles className="h-16 w-16 mx-auto mb-4 text-primary/50" />
                       </motion.div>
                       <p className="text-lg font-medium mb-2 bg-gradient-to-r from-primary to-cyan-400 bg-clip-text text-transparent">
-                        KI-Hintergrund-Ersteller v3
+                        {t('picStudio.bgCreatorTitle')}
                       </p>
-                      <p className="text-sm">
-                        Laden Sie ein Produktbild hoch und generieren Sie<br />
-                        professionelle Varianten mit KI-Produkterkennung & Qualitätsbewertung
+                      <p className="text-sm whitespace-pre-line">
+                        {t('picStudio.bgCreatorDesc')}
                       </p>
                     </div>
                   </div>
@@ -755,7 +735,6 @@ export default function BackgroundReplacer() {
 
       <Footer />
 
-      {/* Fullscreen Lightbox */}
       {lightboxScene !== null && generatedScenes[lightboxScene] && (
         <ImageLightbox
           scene={generatedScenes[lightboxScene]}
@@ -767,12 +746,11 @@ export default function BackgroundReplacer() {
         />
       )}
 
-      {/* Save to Album Dialog */}
       <SaveToAlbumDialog
         open={albumDialogOpen}
         onOpenChange={setAlbumDialogOpen}
         imageId={albumImageId}
-        onSaved={() => toast.success("Im Album gespeichert! 📁")}
+        onSaved={() => toast.success(t('picStudio.savedToAlbum'))}
       />
     </div>
   );

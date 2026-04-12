@@ -1,6 +1,7 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Download, FolderPlus, Trash2, X } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface StudioLightboxProps {
   image: {
@@ -18,6 +19,7 @@ interface StudioLightboxProps {
 }
 
 export function StudioLightbox({ image, open, onOpenChange, onDownload, onSaveToAlbum, onDelete }: StudioLightboxProps) {
+  const { t } = useTranslation();
   if (!image) return null;
 
   const handleDownload = async () => {
@@ -39,7 +41,6 @@ export function StudioLightbox({ image, open, onOpenChange, onDownload, onSaveTo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl w-[95vw] p-0 gap-0 bg-background border-border overflow-hidden">
         <div className="relative">
-          {/* Close button */}
           <Button
             variant="ghost"
             size="icon"
@@ -49,7 +50,6 @@ export function StudioLightbox({ image, open, onOpenChange, onDownload, onSaveTo
             <X className="h-4 w-4" />
           </Button>
 
-          {/* Image */}
           <div className="bg-white flex items-center justify-center min-h-[300px] max-h-[70vh]">
             <img
               src={image.url}
@@ -58,23 +58,22 @@ export function StudioLightbox({ image, open, onOpenChange, onDownload, onSaveTo
             />
           </div>
 
-          {/* Info + Actions */}
           <div className="p-4 space-y-3">
             {image.prompt && (
               <p className="text-sm text-muted-foreground">{image.prompt}</p>
             )}
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={handleDownload}>
-                <Download className="h-4 w-4 mr-1" /> Download
+                <Download className="h-4 w-4 mr-1" /> {t('picStudio.download')}
               </Button>
               {onSaveToAlbum && (
                 <Button variant="outline" size="sm" onClick={() => { onSaveToAlbum(image); onOpenChange(false); }}>
-                  <FolderPlus className="h-4 w-4 mr-1" /> In Album
+                  <FolderPlus className="h-4 w-4 mr-1" /> {t('picStudio.toAlbum')}
                 </Button>
               )}
               {onDelete && (
                 <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => { onDelete(image); onOpenChange(false); }}>
-                  <Trash2 className="h-4 w-4 mr-1" /> Löschen
+                  <Trash2 className="h-4 w-4 mr-1" /> {t('picStudio.deleteLabel')}
                 </Button>
               )}
             </div>

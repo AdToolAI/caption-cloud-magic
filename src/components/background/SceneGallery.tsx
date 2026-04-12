@@ -3,6 +3,7 @@ import { CheckCircle2, Expand, FolderPlus, Check as CheckIcon } from "lucide-rea
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface Scene {
   variant: number;
@@ -33,6 +34,7 @@ interface SceneGalleryProps {
 
 export const SceneGallery = ({ scenes, selectedImages, onToggleSelection, onOpenLightbox, onSaveToAlbum, onAcceptScene }: SceneGalleryProps) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const { t } = useTranslation();
 
   const getQualityGlow = (score?: number) => {
     if (!score) return "";
@@ -78,7 +80,6 @@ export const SceneGallery = ({ scenes, selectedImages, onToggleSelection, onOpen
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
                 
-                {/* Quality Badge - Top Left */}
                 {scene.quality && (
                   <div className="absolute top-2 left-2">
                     <Badge 
@@ -90,7 +91,6 @@ export const SceneGallery = ({ scenes, selectedImages, onToggleSelection, onOpen
                   </div>
                 )}
 
-                {/* Selection Checkbox - Top Right */}
                 <div
                   className="absolute top-2 right-2 z-10"
                   onClick={(e) => {
@@ -107,7 +107,6 @@ export const SceneGallery = ({ scenes, selectedImages, onToggleSelection, onOpen
                   </div>
                 </div>
 
-                {/* Action buttons on hover */}
                 {isHovered && (
                   <motion.div
                     initial={{ opacity: 0, y: 4 }}
@@ -133,20 +132,18 @@ export const SceneGallery = ({ scenes, selectedImages, onToggleSelection, onOpen
                           onAcceptScene(index);
                         }}
                       >
-                        Übernehmen
+                        {t('picStudio.acceptLabel')}
                       </button>
                     )}
                   </motion.div>
                 )}
 
-                {/* Scene Name - Bottom gradient */}
                 {!isHovered && scene.sceneName && (
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
                     <p className="text-white text-xs font-medium">{scene.sceneName}</p>
                   </div>
                 )}
 
-                {/* Hover Overlay with Details */}
                 {isHovered && (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -168,24 +165,24 @@ export const SceneGallery = ({ scenes, selectedImages, onToggleSelection, onOpen
                       {scene.qualityScores && (
                         <>
                           <div className="flex items-center justify-between">
-                            <span className="opacity-70">Qualität:</span>
+                            <span className="opacity-70">{t('picStudio.qualityMetric')}</span>
                             <span className={scene.qualityScores.overall >= 85 ? "text-emerald-400" : scene.qualityScores.overall >= 70 ? "text-amber-400" : "text-red-400"}>
                               {scene.qualityScores.overall}/100
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="opacity-70">Schatten:</span>
+                            <span className="opacity-70">{t('picStudio.shadowMetric')}</span>
                             <span>{scene.qualityScores.shadow}/100</span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="opacity-70">Farbe:</span>
+                            <span className="opacity-70">{t('picStudio.colorMetric')}</span>
                             <span>{scene.qualityScores.color}/100</span>
                           </div>
                         </>
                       )}
                       {scene.cameraSetup && (
                         <div className="mt-2 pt-2 border-t border-white/20">
-                          <span className="opacity-70 block mb-1">Camera:</span>
+                          <span className="opacity-70 block mb-1">{t('picStudio.cameraLabel')}:</span>
                           <span className="text-xs line-clamp-1">{scene.cameraSetup}</span>
                         </div>
                       )}

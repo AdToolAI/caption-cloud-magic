@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FolderPlus, Folder, Loader2, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -21,6 +22,7 @@ interface SaveToAlbumDialogProps {
 
 export function SaveToAlbumDialog({ open, onOpenChange, imageId, onSaved }: SaveToAlbumDialogProps) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -52,9 +54,9 @@ export function SaveToAlbumDialog({ open, onOpenChange, imageId, onSaved }: Save
       .eq('id', imageId);
     
     if (error) {
-      toast.error("Fehler beim Speichern");
+      toast.error(t('picStudio.albumSaveError'));
     } else {
-      toast.success("Bild im Album gespeichert! 📁");
+      toast.success(t('picStudio.albumSaved'));
       onSaved();
       onOpenChange(false);
     }
@@ -71,7 +73,7 @@ export function SaveToAlbumDialog({ open, onOpenChange, imageId, onSaved }: Save
       .single();
     
     if (error || !data) {
-      toast.error("Fehler beim Erstellen");
+      toast.error(t('picStudio.albumSaveError'));
       setCreating(false);
       return;
     }
@@ -88,7 +90,7 @@ export function SaveToAlbumDialog({ open, onOpenChange, imageId, onSaved }: Save
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FolderPlus className="h-5 w-5 text-primary" />
-            In Album speichern
+            {t('picStudio.saveToAlbum')}
           </DialogTitle>
         </DialogHeader>
 
@@ -112,7 +114,7 @@ export function SaveToAlbumDialog({ open, onOpenChange, imageId, onSaved }: Save
 
             {albums.length === 0 && !showCreate && (
               <p className="text-sm text-muted-foreground text-center py-4">
-                Noch keine Alben vorhanden
+                {t('picStudio.noAlbumsYet')}
               </p>
             )}
           </div>
@@ -133,7 +135,7 @@ export function SaveToAlbumDialog({ open, onOpenChange, imageId, onSaved }: Save
           </div>
         ) : (
           <Button variant="outline" className="w-full" onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Neues Album erstellen
+            <Plus className="h-4 w-4 mr-1" /> {t('picStudio.createNewAlbum')}
           </Button>
         )}
       </DialogContent>
