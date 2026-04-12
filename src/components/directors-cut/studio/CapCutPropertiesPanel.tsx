@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { AudioTrack, AudioClip, SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { AudioEnhancements } from '@/types/directors-cut';
 import { Slider } from '@/components/ui/slider';

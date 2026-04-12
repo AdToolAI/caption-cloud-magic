@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';

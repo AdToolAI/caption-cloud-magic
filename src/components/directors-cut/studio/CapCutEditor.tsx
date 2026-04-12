@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { SceneAnalysis, AudioEnhancements, TextOverlay, TransitionAssignment, ExportSettings } from '@/types/directors-cut';
