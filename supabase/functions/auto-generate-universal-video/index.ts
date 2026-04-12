@@ -749,7 +749,7 @@ async function runGenerationPipeline(
     // Step 3: Generate Scene Visuals (25% - 60%) - SEQUENTIAL BATCHES to avoid rate limits
     // Hook/CTA scenes are generated FIRST with more retries (5 instead of 3)
     const totalScenes = script.scenes.length;
-    await updateProgress(supabase, progressId, 'generating_visuals', 30, `🎨 ${totalScenes} Szenen-Bilder werden erstellt...`);
+    await updateProgress(supabase, progressId, 'generating_visuals', 30, msg('generating_visuals', lang));
 
     const BATCH_SIZE = 2;
     const sceneVisuals: (string | null)[] = new Array(script.scenes.length).fill(null);
@@ -899,7 +899,7 @@ async function runGenerationPipeline(
 
       const completedCount = sceneVisuals.filter(v => v !== null).length;
       const progress = 30 + Math.floor((completedCount / totalScenes) * 30);
-      await updateProgress(supabase, progressId, 'generating_visuals', progress, `🎨 ${completedCount}/${totalScenes} Szenen-Bilder fertig (Priorität)...`);
+      await updateProgress(supabase, progressId, 'generating_visuals', progress, msg('visuals_progress_priority', lang, { done: String(completedCount), total: String(totalScenes) }));
       if (batchStart + BATCH_SIZE < priorityIndices.length) await delay(500);
     }
 
@@ -911,7 +911,7 @@ async function runGenerationPipeline(
 
       const completedCount = sceneVisuals.filter(v => v !== null).length;
       const progress = 30 + Math.floor((completedCount / totalScenes) * 30);
-      await updateProgress(supabase, progressId, 'generating_visuals', progress, `🎨 ${completedCount}/${totalScenes} Szenen-Bilder fertig...`);
+      await updateProgress(supabase, progressId, 'generating_visuals', progress, msg('visuals_progress', lang, { done: String(completedCount), total: String(totalScenes) }));
       if (batchStart + BATCH_SIZE < normalIndices.length) await delay(500);
     }
 
@@ -1125,10 +1125,10 @@ async function runGenerationPipeline(
 
     console.log(`[r50-validate] SUMMARY: ${r50ValidatedCount} validated, ${r50GradientForcedCount} forced to gradient`);
 
-    await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals, r47_assetNormalize: { normalized: normalizedCount, svgFallback: fallbackCount, gradientForced: gradientForcedCount, skipped: skippedCount }, r50_validation: { validated: r50ValidatedCount, gradientForced: r50GradientForcedCount } });
+    await updateProgress(supabase, progressId, 'visuals_complete', 60, msg('visuals_complete', lang), { sceneVisuals, r47_assetNormalize: { normalized: normalizedCount, svgFallback: fallbackCount, gradientForced: gradientForcedCount, skipped: skippedCount }, r50_validation: { validated: r50ValidatedCount, gradientForced: r50GradientForcedCount } });
 
     // Step 4: Generate Voice-Over WITH TIMESTAMPS for Lip-Sync (60% - 70%)
-    await updateProgress(supabase, progressId, 'generating_voiceover', 65, '🎙️ Voiceover wird erstellt...');
+    await updateProgress(supabase, progressId, 'generating_voiceover', 65, msg('generating_voiceover', lang));
     await delay(500);
 
     const fullScript = script.scenes.map((s: any) => s.voiceover).join(' ');
@@ -1167,13 +1167,13 @@ async function runGenerationPipeline(
       console.error('[auto-generate-universal-video] Voiceover failed:', voiceoverResponse.status, errorText);
     }
 
-    await updateProgress(supabase, progressId, 'voiceover_complete', 70, '✅ Voiceover fertig!', { voiceoverUrl });
+    await updateProgress(supabase, progressId, 'voiceover_complete', 70, msg('voiceover_complete', lang), { voiceoverUrl });
     await delay(500);
 
     // Step 4b: Generate Subtitles from Voiceover (70% - 75%)
     let subtitles = null;
     if (voiceoverUrl) {
-      await updateProgress(supabase, progressId, 'generating_subtitles', 72, '📝 Untertitel werden erstellt...');
+      await updateProgress(supabase, progressId, 'generating_subtitles', 72, msg('generating_subtitles', lang));
       await delay(500);
 
       try {
@@ -1200,25 +1200,25 @@ async function runGenerationPipeline(
         console.error('[auto-generate-universal-video] Subtitle error:', e);
       }
 
-      await updateProgress(supabase, progressId, 'subtitles_complete', 75, '✅ Untertitel fertig!');
+      await updateProgress(supabase, progressId, 'subtitles_complete', 75, msg('subtitles_complete', lang));
       await delay(500);
     }
 
     // Step 5: Select Background Music (75% - 78%)
     // r63 Phase 2: Background music RE-ENABLED — voiceover confirmed stable in r62
-    await updateProgress(supabase, progressId, 'selecting_music', 76, '🎵 Hintergrundmusik wird ausgewählt...');
+    await updateProgress(supabase, progressId, 'selecting_music', 76, msg('selecting_music', lang));
     await delay(500);
 
     const musicUrl = await selectBackgroundMusic(supabase, briefing.musicStyle, briefing.musicMood, supabaseUrl, supabaseServiceKey);
     console.log(`[auto-generate] r63 Phase 2: Background music ${musicUrl ? 'selected' : 'not found'}: ${musicUrl?.substring(0, 80)}`);
 
-    await updateProgress(supabase, progressId, 'music_complete', 78, musicUrl ? '✅ Hintergrundmusik ausgewählt!' : '✅ Audio vorbereitet (nur Voiceover)');
+    await updateProgress(supabase, progressId, 'music_complete', 78, musicUrl ? msg('music_complete_with', lang) : msg('music_complete_without', lang));
     await delay(500);
 
     // Step 5b: Analyze Music Beats (78% - 82%)
     let beatSyncData = null;
     if (musicUrl) {
-      await updateProgress(supabase, progressId, 'analyzing_beats', 79, '🎼 Beat-Analyse läuft...');
+      await updateProgress(supabase, progressId, 'analyzing_beats', 79, msg('analyzing_beats', lang));
       await delay(500);
 
       try {
@@ -1247,12 +1247,12 @@ async function runGenerationPipeline(
         console.error('[auto-generate-universal-video] Beat analysis error:', e);
       }
 
-      await updateProgress(supabase, progressId, 'beats_complete', 82, '✅ Beat-Analyse fertig!');
+      await updateProgress(supabase, progressId, 'beats_complete', 82, msg('beats_complete', lang));
       await delay(500);
     }
 
     // Step 6: Render Video (82% - 100%)
-    await updateProgress(supabase, progressId, 'rendering', 85, '🎬 Video wird gerendert...');
+    await updateProgress(supabase, progressId, 'rendering', 85, msg('rendering', lang));
     await delay(500);
 
     console.log('[auto-generate-universal-video] Starting DIRECT Lambda invocation (no intermediate hop)...');
@@ -1545,7 +1545,7 @@ async function runGenerationPipeline(
       if (preflightErrors.length > 0) {
         const errorMsg = `PRE-FLIGHT VALIDATION FAILED (${preflightErrors.length} errors): ${preflightErrors.join('; ')}`;
         console.error(`❌ ${errorMsg}`);
-        await updateProgress(supabase, progressId, 'failed', 0, `Schema-Fehler: ${errorMsg}`);
+        await updateProgress(supabase, progressId, 'failed', 0, `${msg('error_schema', lang)}: ${errorMsg}`);
         return;
       }
       
