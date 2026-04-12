@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Tag } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface TagFilterProps {
   selectedTags: string[];
@@ -11,6 +12,7 @@ interface TagFilterProps {
 
 export function TagFilter({ selectedTags, onTagsChange }: TagFilterProps) {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const fetch = async () => {
@@ -20,14 +22,14 @@ export function TagFilter({ selectedTags, onTagsChange }: TagFilterProps) {
         .order("usage_count", { ascending: false })
         .limit(20);
 
-      if (data) setAvailableTags(data.map((t: any) => t.tag));
+      if (data) setAvailableTags(data.map((tg: any) => tg.tag));
     };
     fetch();
   }, []);
 
   const toggleTag = (tag: string) => {
     if (selectedTags.includes(tag)) {
-      onTagsChange(selectedTags.filter((t) => t !== tag));
+      onTagsChange(selectedTags.filter((tg) => tg !== tag));
     } else {
       onTagsChange([...selectedTags, tag]);
     }
@@ -56,7 +58,7 @@ export function TagFilter({ selectedTags, onTagsChange }: TagFilterProps) {
           onClick={() => onTagsChange([])}
           className="text-xs text-muted-foreground hover:text-foreground ml-1"
         >
-          Alle zurücksetzen
+          {t('community.resetAll')}
         </button>
       )}
     </div>

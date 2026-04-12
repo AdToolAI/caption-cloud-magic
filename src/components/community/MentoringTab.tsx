@@ -5,11 +5,18 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Calendar, Clock, User, Plus, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS, es } from "date-fns/locale";
 import { useMentorSlots } from "@/hooks/useMentorSlots";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/hooks/useTranslation";
+
+function getDateLocale(lang: string) {
+  if (lang === 'de') return de;
+  if (lang === 'es') return es;
+  return enUS;
+}
 
 const cardVariants = {
   hidden: { opacity: 0, y: 16 },
@@ -22,6 +29,8 @@ const cardVariants = {
 
 export function MentoringTab() {
   const { user } = useAuth();
+  const { t, language } = useTranslation();
+  const dateLocale = getDateLocale(language);
   const { slots, loading, bookSlot, createSlot } = useMentorSlots();
   const [showCreate, setShowCreate] = useState(false);
   const [slotTime, setSlotTime] = useState("");
@@ -69,10 +78,10 @@ export function MentoringTab() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-[hsl(43,90%,68%)]" />
-                Eigenen Mentor-Slot anbieten
+                {t('community.offerSlot')}
               </CardTitle>
               <Button size="sm" variant="outline" onClick={() => setShowCreate(!showCreate)} className="border-white/10 hover:bg-white/5">
-                <Plus className="h-4 w-4 mr-1" /> Slot erstellen
+                <Plus className="h-4 w-4 mr-1" /> {t('community.createSlot')}
               </Button>
             </div>
           </CardHeader>
@@ -95,7 +104,7 @@ export function MentoringTab() {
                   placeholder="Min"
                 />
                 <Button onClick={handleCreate} disabled={!slotTime} className="shadow-[0_0_15px_hsla(43,90%,68%,0.1)]">
-                  Erstellen
+                  {t('community.create')}
                 </Button>
               </div>
             </CardContent>
@@ -106,10 +115,10 @@ export function MentoringTab() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {[
           {
-            title: "Verfügbare Slots",
+            title: t('community.availableSlots'),
             icon: null,
             items: openSlots,
-            empty: "Keine offenen Slots verfügbar.",
+            empty: t('community.noOpenSlots'),
             renderItem: (slot: any) => (
               <div key={slot.id} className="flex items-center justify-between p-2 rounded-xl border border-white/10 bg-card/40 backdrop-blur-md hover:bg-white/5 transition-all">
                 <div className="flex items-center gap-2">
@@ -117,56 +126,56 @@ export function MentoringTab() {
                     <User className="h-3 w-3 text-[hsl(43,90%,68%)]" />
                   </div>
                   <div>
-                    <p className="text-xs font-medium">{slot.profiles?.email?.split("@")[0] || "Mentor"}</p>
+                    <p className="text-xs font-medium">{slot.profiles?.email?.split("@")[0] || t('community.mentor')}</p>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
-                      {format(new Date(slot.slot_time), "dd. MMM HH:mm", { locale: de })}
-                      <Badge variant="outline" className="text-xs ml-1 border-white/10">{slot.duration_min} min</Badge>
+                      {format(new Date(slot.slot_time), "dd. MMM HH:mm", { locale: dateLocale })}
+                      <Badge variant="outline" className="text-xs ml-1 border-white/10">{slot.duration_min} {t('community.min')}</Badge>
                     </div>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => bookSlot(slot.id)} className="border-white/10 hover:bg-white/5">Buchen</Button>
+                <Button size="sm" variant="outline" onClick={() => bookSlot(slot.id)} className="border-white/10 hover:bg-white/5">{t('community.book')}</Button>
               </div>
             ),
           },
           {
-            title: "Meine angebotenen Slots",
+            title: t('community.myOfferedSlots'),
             icon: null,
             items: mySlots,
-            empty: "Du hast noch keine Slots erstellt.",
+            empty: t('community.noSlotsCreated'),
             renderItem: (slot: any) => (
               <div key={slot.id} className="flex items-center justify-between p-2 rounded-xl border border-white/10 bg-card/40 backdrop-blur-md">
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  {format(new Date(slot.slot_time), "dd. MMM HH:mm", { locale: de })}
+                  {format(new Date(slot.slot_time), "dd. MMM HH:mm", { locale: dateLocale })}
                 </div>
                 <Badge
                   variant={slot.status === "booked" ? "default" : "secondary"}
                   className={`text-xs ${slot.status === "booked" ? "shadow-[0_0_10px_hsla(43,90%,68%,0.15)]" : ""}`}
                 >
-                  {slot.status === "booked" ? "Gebucht" : "Offen"}
+                  {slot.status === "booked" ? t('community.statusBooked') : t('community.statusOpen')}
                 </Badge>
               </div>
             ),
           },
           {
-            title: "Meine gebuchten Sessions",
+            title: t('community.myBookedSessions'),
             icon: <CheckCircle className="h-4 w-4 text-[hsl(43,90%,68%)]" />,
             items: bookedByMe,
-            empty: "Noch keine Sessions gebucht.",
+            empty: t('community.noSessionsBooked'),
             renderItem: (slot: any) => (
               <div key={slot.id} className="p-2 rounded-xl border border-[hsla(43,90%,68%,0.15)] bg-[hsla(43,90%,68%,0.04)]">
-                <p className="text-xs font-medium">{slot.profiles?.email?.split("@")[0] || "Mentor"}</p>
+                <p className="text-xs font-medium">{slot.profiles?.email?.split("@")[0] || t('community.mentor')}</p>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  {format(new Date(slot.slot_time), "dd. MMM HH:mm", { locale: de })}
-                  <Badge variant="outline" className="text-xs ml-1 border-white/10">{slot.duration_min} min</Badge>
+                  {format(new Date(slot.slot_time), "dd. MMM HH:mm", { locale: dateLocale })}
+                  <Badge variant="outline" className="text-xs ml-1 border-white/10">{slot.duration_min} {t('community.min')}</Badge>
                 </div>
               </div>
             ),
           },
         ].map((section, idx) => (
-          <motion.div key={section.title} custom={idx + 1} variants={cardVariants} initial="hidden" animate="visible">
+          <motion.div key={idx} custom={idx + 1} variants={cardVariants} initial="hidden" animate="visible">
             <Card className="backdrop-blur-xl bg-card/60 border-white/10 shadow-[0_0_20px_hsla(43,90%,68%,0.04)] hover:shadow-[0_0_30px_hsla(43,90%,68%,0.1)] hover:-translate-y-1 transition-all duration-300">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">

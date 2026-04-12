@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Send, Plus, X } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface MessageComposerProps {
   onSend: (content: string, tags: string[]) => Promise<void>;
@@ -16,19 +17,20 @@ export function MessageComposer({ onSend, canPost, requireTags }: MessageCompose
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [sending, setSending] = useState(false);
+  const { t } = useTranslation();
 
   if (!canPost) {
     return (
       <div className="p-4 border-t bg-muted/30 text-center text-sm text-muted-foreground">
-        Du bist nicht berechtigt, in diesem Channel zu posten.
+        {t('community.notAllowed')}
       </div>
     );
   }
 
   const addTag = () => {
-    const t = tagInput.trim().toLowerCase();
-    if (t && !tags.includes(t)) {
-      setTags([...tags, t]);
+    const tVal = tagInput.trim().toLowerCase();
+    if (tVal && !tags.includes(tVal)) {
+      setTags([...tags, tVal]);
     }
     setTagInput("");
   };
@@ -57,7 +59,7 @@ export function MessageComposer({ onSend, canPost, requireTags }: MessageCompose
           {tags.map((tag) => (
             <Badge key={tag} variant="secondary" className="gap-1 text-xs">
               {tag}
-              <X className="h-3 w-3 cursor-pointer" onClick={() => setTags(tags.filter((t) => t !== tag))} />
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setTags(tags.filter((tg) => tg !== tag))} />
             </Badge>
           ))}
         </div>
@@ -68,7 +70,7 @@ export function MessageComposer({ onSend, canPost, requireTags }: MessageCompose
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Nachricht schreiben..."
+            placeholder={t('community.writeMessage')}
             className="min-h-[40px] max-h-[120px] resize-none"
             rows={1}
           />
@@ -79,7 +81,7 @@ export function MessageComposer({ onSend, canPost, requireTags }: MessageCompose
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
-              placeholder="Tag..."
+              placeholder={t('community.tagPlaceholder')}
               className="w-20 h-8 text-xs"
             />
             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={addTag}>
@@ -92,7 +94,7 @@ export function MessageComposer({ onSend, canPost, requireTags }: MessageCompose
         </div>
       </div>
       {requireTags && tags.length === 0 && (
-        <p className="text-xs text-destructive">Mindestens ein Tag erforderlich.</p>
+        <p className="text-xs text-destructive">{t('community.tagRequired')}</p>
       )}
     </div>
   );

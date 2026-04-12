@@ -4,14 +4,23 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { User, Send, ArrowLeft, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS, es } from "date-fns/locale";
 import { useDirectMessages } from "@/hooks/useDirectMessages";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "@/hooks/useTranslation";
+
+function getDateLocale(lang: string) {
+  if (lang === 'de') return de;
+  if (lang === 'es') return es;
+  return enUS;
+}
 
 export function DirectMessages() {
   const { user } = useAuth();
+  const { t, language } = useTranslation();
+  const dateLocale = getDateLocale(language);
   const [selectedPartner, setSelectedPartner] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const { messages, conversations, loading, sendMessage } = useDirectMessages(selectedPartner);
@@ -32,7 +41,6 @@ export function DirectMessages() {
     );
   }
 
-  // Chat view
   if (selectedPartner) {
     return (
       <div className="flex flex-col h-[500px]">
@@ -66,7 +74,7 @@ export function DirectMessages() {
                 >
                   <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                   <p className="text-xs opacity-50 mt-1">
-                    {format(new Date(msg.created_at), "HH:mm", { locale: de })}
+                    {format(new Date(msg.created_at), "HH:mm", { locale: dateLocale })}
                   </p>
                 </div>
               </motion.div>
@@ -77,7 +85,7 @@ export function DirectMessages() {
           <Input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Nachricht schreiben..."
+            placeholder={t('community.writeMessage')}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
             className="bg-card/60 backdrop-blur-md border-white/10 focus:border-[hsla(43,90%,68%,0.3)]"
           />
@@ -94,7 +102,6 @@ export function DirectMessages() {
     );
   }
 
-  // Conversation list
   return (
     <div className="space-y-1 p-2">
       {conversations.length === 0 ? (
@@ -109,8 +116,8 @@ export function DirectMessages() {
           >
             <MessageSquare className="h-8 w-8 mb-2 opacity-40 text-[hsl(43,90%,68%)]" />
           </motion.div>
-          <p className="text-sm">Noch keine Konversationen.</p>
-          <p className="text-xs mt-1 opacity-60">Starte einen Chat mit einem Creator!</p>
+          <p className="text-sm">{t('community.noConversations')}</p>
+          <p className="text-xs mt-1 opacity-60">{t('community.startChat')}</p>
         </motion.div>
       ) : (
         conversations.map((conv, idx) => (
@@ -131,7 +138,7 @@ export function DirectMessages() {
                   {conv.partner_email.split("@")[0]}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {format(new Date(conv.last_message_at), "dd. MMM", { locale: de })}
+                  {format(new Date(conv.last_message_at), "dd. MMM", { locale: dateLocale })}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground truncate">{conv.last_message}</p>
