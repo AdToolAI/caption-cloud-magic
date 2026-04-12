@@ -18,6 +18,8 @@ const MODEL_DISPLAY_NAMES: Record<string, string> = {
   'sora-2-pro': 'Sora 2 Pro',
   'kling-3-standard': 'Kling 3.0 Standard',
   'kling-3-pro': 'Kling 3.0 Pro',
+  'seedance-standard': 'Seedance 2.0 Standard',
+  'seedance-pro': 'Seedance 2.0 Pro',
 };
 
 interface VideoGeneration {
