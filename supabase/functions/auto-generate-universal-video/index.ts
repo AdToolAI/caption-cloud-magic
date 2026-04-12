@@ -121,7 +121,8 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { briefing, consultationResult, userId, diagnosticProfile, debugMode, renderOnly, existingProgressId } = await req.json();
+    const { briefing, consultationResult, userId, diagnosticProfile, debugMode, renderOnly, existingProgressId, language } = await req.json();
+    const lang = (language === 'en' || language === 'es') ? language : 'de';
     
     const actualBriefing = briefing || consultationResult;
     console.log(`[auto-generate] visualStyle from briefing: "${actualBriefing?.visualStyle}"`);
