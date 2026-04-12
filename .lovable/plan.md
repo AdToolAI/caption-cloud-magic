@@ -1,29 +1,29 @@
 
 
-## Fix: Kling 3.0 Modell-Anzeige in der Video-Historie
+## Fix: Prompt-Optimierung für Kling 3.0 Studio
 
 ### Problem
-In `src/components/ai-video/VideoGenerationHistory.tsx` Zeile 265 ist die Modell-Anzeige hardcoded:
-```typescript
-{gen.model === 'sora-2-pro' ? 'Sora 2 Pro' : 'Sora 2 Standard'}
-```
-Alle Videos — auch Kling-Generierungen — werden als "Sora 2 Standard" angezeigt.
+Der Prompt wurde auf Deutsch und ohne Bewegungsbeschreibung gesendet: *"Erstelle mir bitte ein Werbevideo zu AdTool AI"*. Kling interpretiert das wörtlich — Bild wird leicht verzerrt, keine echte Animation.
 
-### Lösung
-Die Zeile durch eine Map ersetzen, die alle Modelle korrekt auflöst:
+### Lösung: Automatische Prompt-Optimierung + Tipps
 
-```typescript
-const MODEL_DISPLAY_NAMES: Record<string, string> = {
-  'sora-2-standard': 'Sora 2 Standard',
-  'sora-2-pro': 'Sora 2 Pro',
-  'kling-3-standard': 'Kling 3.0 Standard',
-  'kling-3-pro': 'Kling 3.0 Pro',
-};
+**1. Prompt-Optimizer im Kling Studio integrieren**
+- Den bestehenden `VideoPromptOptimizer` (bereits für Sora 2 vorhanden) auch im Kling Studio verfügbar machen
+- Button "✨ Prompt optimieren" neben dem Prompt-Feld
+- Übersetzt automatisch ins Englische und fügt Kamerabewegungen, Beleuchtung etc. hinzu
 
-// In der Anzeige:
-{MODEL_DISPLAY_NAMES[gen.model] || gen.model}
-```
+**2. Automatische Prompt-Verbesserung in der Edge Function**
+- `generate-kling-video/index.ts`: Wenn der Prompt deutsch ist oder keine Bewegungsbeschreibung enthält, automatisch über Lovable AI optimieren (ähnlich wie `optimize-video-prompt`)
+- Alternativ: Einfacher Fallback mit englischem Prefix wie `"Cinematic smooth camera movement: "` + übersetzter Prompt
 
-### Datei
-- `src/components/ai-video/VideoGenerationHistory.tsx` — eine Zeile anpassen + Map hinzufügen
+**3. Prompt-Hinweise im UI**
+- Placeholder-Text mit Beispiel-Prompt auf Englisch
+- Hinweis-Box: "Tipps: Schreibe auf Englisch, beschreibe Kamerabewegungen (zoom, pan, dolly), vermeide abstrakte Anweisungen"
+
+### Dateien
+- `src/pages/KlingVideoStudio.tsx` — VideoPromptOptimizer-Button + Prompt-Tipps hinzufügen
+- `supabase/functions/generate-kling-video/index.ts` — Optional: automatische Prompt-Verbesserung vor Replicate-Aufruf
+
+### Empfohlener Ansatz
+Einfachste und effektivste Lösung: Den bestehenden `VideoPromptOptimizer`-Dialog (nutzt bereits Lovable AI) im Kling Studio einbinden + bessere Placeholder-Texte. Keine neue Edge Function nötig.
 
