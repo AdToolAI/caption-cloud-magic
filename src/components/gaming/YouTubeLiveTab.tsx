@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import CountUp from "@/components/ui/count-up";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const card = "backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl p-6 shadow-[0_0_20px_rgba(145,70,255,0.08)]";
 const ytRed = "#FF0000";
@@ -20,6 +21,9 @@ const ytRed = "#FF0000";
 export function YouTubeLiveTab() {
   const yt = useYouTubeLive();
   const { toast } = useToast();
+  const { t, language } = useTranslation();
+
+  const getLocaleStr = () => language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
 
   // Form state
   const [title, setTitle] = useState("");
@@ -54,7 +58,6 @@ export function YouTubeLiveTab() {
 
   const activeStream = yt.streams[0];
 
-  // Poll video stats for live broadcast
   useEffect(() => {
     if (!activeBroadcast) return;
     const poll = async () => {
@@ -74,12 +77,11 @@ export function YouTubeLiveTab() {
         title, description, scheduledTime || new Date().toISOString(), privacy
       );
       setTitle(""); setDescription(""); setScheduledTime("");
-      // Auto-bind stream if available
       if (activeStream && res?.id) {
         await yt.bindStream(res.id, activeStream.id);
       }
     } catch (err: any) {
-      toast({ title: "Fehler", description: err.message, variant: "destructive" });
+      toast({ title: t('gaming.errorLabel'), description: err.message, variant: "destructive" });
     } finally {
       setCreating(false);
     }
@@ -91,13 +93,13 @@ export function YouTubeLiveTab() {
       await yt.sendChatMessage(currentBroadcast.snippet.liveChatId, chatInput);
       setChatInput("");
     } catch (err: any) {
-      toast({ title: "Chat-Fehler", description: err.message, variant: "destructive" });
+      toast({ title: t('gaming.chatError'), description: err.message, variant: "destructive" });
     }
   };
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: `📋 ${label} kopiert` });
+    toast({ title: `📋 ${label} ${t('gaming.copied')}` });
   };
 
   // Not connected state
@@ -110,12 +112,12 @@ export function YouTubeLiveTab() {
               <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
             </svg>
           </div>
-          <h3 className="text-xl font-bold text-foreground">YouTube Live verbinden</h3>
+          <h3 className="text-xl font-bold text-foreground">{t('gaming.ytConnectTitle')}</h3>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Verbinde deinen YouTube-Kanal über die Integrationen-Seite, um Live-Broadcasts direkt aus CaptionGenie zu steuern.
+            {t('gaming.ytConnectDesc')}
           </p>
           <Button variant="outline" className="border-[#FF0000]/30 text-[#FF0000] hover:bg-[#FF0000]/10" asChild>
-            <a href="/integrations">Zur YouTube-Integration →</a>
+            <a href="/integrations">{t('gaming.ytGoToIntegration')}</a>
           </Button>
         </div>
       </motion.div>
@@ -183,13 +185,13 @@ export function YouTubeLiveTab() {
               {isTesting && (
                 <Button size="sm" className="bg-[#FF0000] hover:bg-[#CC0000] text-white"
                   onClick={() => yt.transitionBroadcast(activeBroadcast.id, "live")}>
-                  <Play className="w-4 h-4 mr-1" /> Live gehen
+                  <Play className="w-4 h-4 mr-1" /> {t('gaming.goLive')}
                 </Button>
               )}
               {isLive && (
                 <Button size="sm" variant="destructive"
                   onClick={() => yt.transitionBroadcast(activeBroadcast.id, "complete")}>
-                  <Square className="w-4 h-4 mr-1" /> Stream beenden
+                  <Square className="w-4 h-4 mr-1" /> {t('gaming.endStream')}
                 </Button>
               )}
               <Button size="sm" variant="ghost" asChild>
@@ -209,35 +211,35 @@ export function YouTubeLiveTab() {
             <div className="w-8 h-8 rounded-lg bg-[#FF0000]/10 flex items-center justify-center">
               <Plus className="w-4 h-4 text-[#FF0000]" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">Broadcast erstellen</h3>
+            <h3 className="text-lg font-bold text-foreground">{t('gaming.createBroadcast')}</h3>
           </div>
           <div className="space-y-3">
             <div>
-              <Label className="text-xs text-muted-foreground">Titel</Label>
-              <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Stream-Titel..."
+              <Label className="text-xs text-muted-foreground">{t('gaming.titleLabel')}</Label>
+              <Input value={title} onChange={e => setTitle(e.target.value)} placeholder={t('gaming.streamTitlePlaceholderYt')}
                 className="bg-background/50 border-white/10" />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Beschreibung</Label>
-              <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Stream-Beschreibung..."
+              <Label className="text-xs text-muted-foreground">{t('gaming.descriptionLabel')}</Label>
+              <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder={t('gaming.streamDescPlaceholder')}
                 className="bg-background/50 border-white/10 min-h-[60px]" rows={2} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs text-muted-foreground">Zeitplan</Label>
+                <Label className="text-xs text-muted-foreground">{t('gaming.schedule')}</Label>
                 <Input type="datetime-local" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)}
                   className="bg-background/50 border-white/10" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Sichtbarkeit</Label>
+                <Label className="text-xs text-muted-foreground">{t('gaming.visibility')}</Label>
                 <Select value={privacy} onValueChange={setPrivacy}>
                   <SelectTrigger className="bg-background/50 border-white/10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="public">Öffentlich</SelectItem>
-                    <SelectItem value="unlisted">Nicht gelistet</SelectItem>
-                    <SelectItem value="private">Privat</SelectItem>
+                    <SelectItem value="public">{t('gaming.visPublic')}</SelectItem>
+                    <SelectItem value="unlisted">{t('gaming.visUnlisted')}</SelectItem>
+                    <SelectItem value="private">{t('gaming.visPrivate')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -245,7 +247,7 @@ export function YouTubeLiveTab() {
             <Button className="w-full bg-[#FF0000] hover:bg-[#CC0000] text-white" disabled={!title.trim() || creating}
               onClick={handleCreate}>
               {creating ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Radio className="w-4 h-4 mr-2" />}
-              Broadcast erstellen
+              {t('gaming.createBroadcast')}
             </Button>
           </div>
         </motion.div>
@@ -257,12 +259,12 @@ export function YouTubeLiveTab() {
               <div className="w-8 h-8 rounded-lg bg-[#FF0000]/10 flex items-center justify-center">
                 <Key className="w-4 h-4 text-[#FF0000]" />
               </div>
-              <h3 className="text-lg font-bold text-foreground">Stream-Key</h3>
+              <h3 className="text-lg font-bold text-foreground">{t('gaming.streamKey')}</h3>
             </div>
             {!activeStream && (
               <Button size="sm" variant="outline" className="border-[#FF0000]/30 text-[#FF0000]"
                 onClick={() => yt.createStream("CaptionGenie Stream")}>
-                <Plus className="w-3 h-3 mr-1" /> Erstellen
+                <Plus className="w-3 h-3 mr-1" /> {t('gaming.createStreamKey')}
               </Button>
             )}
           </div>
@@ -270,7 +272,7 @@ export function YouTubeLiveTab() {
           {activeStream ? (
             <div className="space-y-3">
               <div>
-                <Label className="text-xs text-muted-foreground">Stream-Key</Label>
+                <Label className="text-xs text-muted-foreground">{t('gaming.streamKey')}</Label>
                 <div className="flex gap-2">
                   <Input readOnly value={showKey ? activeStream.cdn.ingestionInfo.streamName : "••••••••••••••••••••"}
                     className="bg-background/50 border-white/10 font-mono text-xs" />
@@ -278,18 +280,18 @@ export function YouTubeLiveTab() {
                     <Eye className="w-4 h-4" />
                   </Button>
                   <Button size="icon" variant="ghost"
-                    onClick={() => copyToClipboard(activeStream.cdn.ingestionInfo.streamName, "Stream-Key")}>
+                    onClick={() => copyToClipboard(activeStream.cdn.ingestionInfo.streamName, t('gaming.streamKey'))}>
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Server-URL</Label>
+                <Label className="text-xs text-muted-foreground">{t('gaming.serverUrl')}</Label>
                 <div className="flex gap-2">
                   <Input readOnly value={activeStream.cdn.ingestionInfo.ingestionAddress}
                     className="bg-background/50 border-white/10 font-mono text-xs" />
                   <Button size="icon" variant="ghost"
-                    onClick={() => copyToClipboard(activeStream.cdn.ingestionInfo.ingestionAddress, "Server-URL")}>
+                    onClick={() => copyToClipboard(activeStream.cdn.ingestionInfo.ingestionAddress, t('gaming.serverUrl'))}>
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
@@ -309,19 +311,19 @@ export function YouTubeLiveTab() {
           ) : (
             <div className="text-center py-6 text-muted-foreground text-sm">
               <Key className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p>Noch kein Stream-Key erstellt</p>
+              <p>{t('gaming.noStreamKey')}</p>
             </div>
           )}
         </motion.div>
 
-        {/* Geplante Broadcasts */}
+        {/* Broadcasts */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className={card}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-[#FF0000]/10 flex items-center justify-center">
                 <Clock className="w-4 h-4 text-[#FF0000]" />
               </div>
-              <h3 className="text-lg font-bold text-foreground">Broadcasts</h3>
+              <h3 className="text-lg font-bold text-foreground">{t('gaming.broadcasts')}</h3>
             </div>
             <Button size="sm" variant="ghost" onClick={yt.fetchBroadcasts} disabled={yt.loading}>
               <RefreshCw className={`w-4 h-4 ${yt.loading ? "animate-spin" : ""}`} />
@@ -330,7 +332,7 @@ export function YouTubeLiveTab() {
 
           <div className="space-y-2 max-h-[300px] overflow-y-auto">
             {yt.broadcasts.length === 0 ? (
-              <p className="text-center text-muted-foreground text-sm py-4">Keine Broadcasts vorhanden</p>
+              <p className="text-center text-muted-foreground text-sm py-4">{t('gaming.noBroadcasts')}</p>
             ) : (
               yt.broadcasts.map(b => (
                 <div key={b.id}
@@ -347,18 +349,18 @@ export function YouTubeLiveTab() {
                     }>{b.status.lifeCycleStatus}</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(b.snippet.scheduledStartTime).toLocaleString("de-DE")}
+                    {new Date(b.snippet.scheduledStartTime).toLocaleString(getLocaleStr())}
                   </p>
                   {b.status.lifeCycleStatus === "ready" && activeStream && (
                     <div className="flex gap-2 mt-2">
                       <Button size="sm" variant="outline" className="h-7 text-xs border-yellow-500/30 text-yellow-400"
                         onClick={e => { e.stopPropagation(); yt.transitionBroadcast(b.id, "testing"); }}>
-                        Test starten
+                        {t('gaming.startTest')}
                       </Button>
                       {!b.contentDetails?.boundStreamId && (
                         <Button size="sm" variant="outline" className="h-7 text-xs border-[#FF0000]/30 text-[#FF0000]"
                           onClick={e => { e.stopPropagation(); yt.bindStream(b.id, activeStream.id); }}>
-                          <Link2 className="w-3 h-3 mr-1" /> Stream binden
+                          <Link2 className="w-3 h-3 mr-1" /> {t('gaming.bindStream')}
                         </Button>
                       )}
                     </div>
@@ -376,7 +378,7 @@ export function YouTubeLiveTab() {
               <div className="w-8 h-8 rounded-lg bg-[#FF0000]/10 flex items-center justify-center">
                 <MessageSquare className="w-4 h-4 text-[#FF0000]" />
               </div>
-              <h3 className="text-lg font-bold text-foreground">Live-Chat</h3>
+              <h3 className="text-lg font-bold text-foreground">{t('gaming.ytLiveChat')}</h3>
             </div>
             {currentBroadcast?.snippet.liveChatId && (
               <Button size="sm" variant={yt.chatPolling ? "destructive" : "outline"}
@@ -385,7 +387,7 @@ export function YouTubeLiveTab() {
                   ? yt.stopChatPolling()
                   : yt.startChatPolling(currentBroadcast.snippet.liveChatId!)
                 }>
-                {yt.chatPolling ? "Stop" : "Chat starten"}
+                {yt.chatPolling ? "Stop" : t('gaming.startChat')}
               </Button>
             )}
           </div>
@@ -394,10 +396,10 @@ export function YouTubeLiveTab() {
             {yt.chatMessages.length === 0 ? (
               <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
                 {!currentBroadcast?.snippet.liveChatId
-                  ? "Kein aktiver Live-Chat"
+                  ? t('gaming.noActiveLiveChat')
                   : yt.chatPolling
-                    ? "Warte auf Nachrichten..."
-                    : "Drücke 'Chat starten'"}
+                    ? t('gaming.waitingForMessages')
+                    : t('gaming.pressStartChat')}
               </div>
             ) : (
               yt.chatMessages.map(msg => (
@@ -423,7 +425,7 @@ export function YouTubeLiveTab() {
           {currentBroadcast?.snippet.liveChatId && yt.chatPolling && (
             <div className="flex gap-2">
               <Input value={chatInput} onChange={e => setChatInput(e.target.value)}
-                placeholder="Nachricht senden..." className="bg-background/50 border-white/10"
+                placeholder={t('gaming.ytSendMessage')} className="bg-background/50 border-white/10"
                 onKeyDown={e => e.key === "Enter" && handleSendChat()} />
               <Button size="icon" className="bg-[#FF0000] hover:bg-[#CC0000]" onClick={handleSendChat} disabled={!chatInput.trim()}>
                 <Send className="w-4 h-4" />

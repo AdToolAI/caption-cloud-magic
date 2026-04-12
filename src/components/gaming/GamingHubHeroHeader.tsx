@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Gamepad2, Wifi, WifiOff } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface GamingHubHeroHeaderProps {
   isConnected: boolean;
@@ -7,6 +8,8 @@ interface GamingHubHeroHeaderProps {
 }
 
 export function GamingHubHeroHeader({ isConnected, twitchUsername }: GamingHubHeroHeaderProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-card/40 backdrop-blur-xl p-8 mb-6">
       {/* Glow Orbs */}
@@ -27,7 +30,7 @@ export function GamingHubHeroHeader({ isConnected, twitchUsername }: GamingHubHe
               <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping ${isConnected ? 'bg-green-400' : 'bg-purple-400'}`} />
               <span className={`relative inline-flex rounded-full h-2 w-2 ${isConnected ? 'bg-green-500' : 'bg-purple-500'}`} />
             </span>
-            {isConnected ? `Twitch Connected · ${twitchUsername}` : 'Gaming Hub'}
+            {isConnected ? `Twitch Connected · ${twitchUsername}` : t('gaming.gamingHub')}
           </div>
         </motion.div>
 
@@ -43,10 +46,10 @@ export function GamingHubHeroHeader({ isConnected, twitchUsername }: GamingHubHe
           </div>
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 via-violet-400 to-purple-300 bg-clip-text text-transparent">
-              Gaming Hub
+              {t('gaming.gamingHub')}
             </h1>
             <p className="text-muted-foreground text-sm mt-0.5">
-              Stream-Tools, Clip-Creator & Content-Automation für Gamer
+              {t('gaming.heroSubtitle')}
             </p>
           </div>
         </motion.div>
@@ -60,7 +63,7 @@ export function GamingHubHeroHeader({ isConnected, twitchUsername }: GamingHubHe
             className="mt-4 flex items-center gap-2 text-xs text-muted-foreground"
           >
             <Wifi className="h-3 w-3 text-green-400" />
-            <span>Verbunden mit Twitch · Alle Features freigeschaltet</span>
+            <span>{t('gaming.twitchConnectedStatus')}</span>
           </motion.div>
         )}
       </div>

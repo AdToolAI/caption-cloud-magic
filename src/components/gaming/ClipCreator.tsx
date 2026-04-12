@@ -8,6 +8,7 @@ import { useTwitch } from "@/hooks/useTwitch";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const cardClass = "backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_20px_rgba(145,70,255,0.08)]";
 
@@ -16,15 +17,18 @@ export function ClipCreator() {
   const [clipping, setClipping] = useState(false);
   const [sortBy, setSortBy] = useState<string>("date");
   const navigate = useNavigate();
+  const { t, language } = useTranslation();
+
+  const getLocaleStr = () => language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
 
   const handleCreateClip = async () => {
     setClipping(true);
     try {
       await createClip();
-      toast.success("Clip wird erstellt...");
+      toast.success(t('gaming.clipCreating'));
       setTimeout(() => fetchClips(), 5000);
     } catch (e: any) {
-      toast.error(e.message || "Clip konnte nicht erstellt werden");
+      toast.error(e.message || t('gaming.clipCreateError'));
     } finally {
       setClipping(false);
     }
@@ -45,7 +49,7 @@ export function ClipCreator() {
   if (!isConnected) {
     return (
       <div className="text-center py-20 text-muted-foreground">
-        Verbinde zuerst deinen Twitch-Kanal im "Stream"-Tab.
+        {t('gaming.connectFirst')}
       </div>
     );
   }
@@ -66,7 +70,7 @@ export function ClipCreator() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">
-            Clips ({clips.length})
+            {t('gaming.clips')} ({clips.length})
           </h2>
           {isLive && (
             <Button
@@ -76,7 +80,7 @@ export function ClipCreator() {
               disabled={clipping}
             >
               {clipping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Clip erstellen
+              {t('gaming.createClip')}
             </Button>
           )}
         </div>
@@ -86,9 +90,9 @@ export function ClipCreator() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="backdrop-blur-xl bg-popover/95 border-white/10">
-            <SelectItem value="date">Neueste</SelectItem>
-            <SelectItem value="views">Meiste Views</SelectItem>
-            <SelectItem value="duration">Längste</SelectItem>
+            <SelectItem value="date">{t('gaming.sortNewest')}</SelectItem>
+            <SelectItem value="views">{t('gaming.sortMostViews')}</SelectItem>
+            <SelectItem value="duration">{t('gaming.sortLongest')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -98,11 +102,9 @@ export function ClipCreator() {
         <Card className={cardClass}>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Scissors className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="font-semibold">Noch keine Clips</p>
+            <p className="font-semibold">{t('gaming.noClips')}</p>
             <p className="text-sm">
-              {isLive
-                ? 'Erstelle jetzt einen Clip mit dem Button oben!'
-                : 'Clips erscheinen hier, sobald welche auf deinem Kanal erstellt werden.'}
+              {isLive ? t('gaming.noClipsLive') : t('gaming.noClipsOffline')}
             </p>
           </CardContent>
         </Card>
@@ -142,18 +144,18 @@ export function ClipCreator() {
                       onClick={() => window.open(clip.url, '_blank')}
                     >
                       <ExternalLink className="h-3 w-3" />
-                      Öffnen
+                      {t('gaming.openClip')}
                     </Button>
                     <Button
                       variant="outline" size="sm" className="gap-1 text-xs h-7 flex-1 border-white/10"
                       onClick={() => handleExportToVideoStudio(clip.url, clip.title)}
                     >
                       <Film className="h-3 w-3" />
-                      Als Short
+                      {t('gaming.asShort')}
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    von {clip.creator_name} · {new Date(clip.created_at).toLocaleDateString('de-DE')}
+                    {t('gaming.clipBy')} {clip.creator_name} · {new Date(clip.created_at).toLocaleDateString(getLocaleStr())}
                   </p>
                 </CardContent>
               </Card>

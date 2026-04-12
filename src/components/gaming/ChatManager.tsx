@@ -8,6 +8,7 @@ import { MessageSquare, Shield, Bot, TrendingUp, Loader2, WifiOff, Send, Users, 
 import { useTwitch } from "@/hooks/useTwitch";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const cardClass = "backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_20px_rgba(145,70,255,0.08)]";
 
@@ -24,6 +25,7 @@ export function ChatManager() {
     sendChat, getViewerList, createPoll, endPoll, getPolls,
     createPrediction, getPredictions,
   } = useTwitch();
+  const { t } = useTranslation();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatConnected, setChatConnected] = useState(false);
@@ -96,7 +98,7 @@ export function ChatManager() {
       await sendChat(chatInput.trim());
       setChatInput("");
     } catch (e: any) {
-      toast.error(e.message || "Nachricht konnte nicht gesendet werden");
+      toast.error(e.message || t('gaming.messageSendError'));
     } finally {
       setSending(false);
     }
@@ -111,32 +113,32 @@ export function ChatManager() {
   const handleCreatePoll = async () => {
     const validChoices = pollChoices.filter(c => c.trim());
     if (!pollTitle.trim() || validChoices.length < 2) {
-      toast.error("Titel und mindestens 2 Optionen nötig");
+      toast.error(t('gaming.titleAnd2Options'));
       return;
     }
     try {
       await createPoll(pollTitle, validChoices, pollDuration);
-      toast.success("Poll erstellt!");
+      toast.success(t('gaming.pollCreated'));
       setShowPollDialog(false);
       setPollTitle(""); setPollChoices(["", ""]);
     } catch (e: any) {
-      toast.error(e.message || "Poll konnte nicht erstellt werden");
+      toast.error(e.message || t('gaming.pollCreateError'));
     }
   };
 
   const handleCreatePrediction = async () => {
     const validOutcomes = predOutcomes.filter(o => o.trim());
     if (!predTitle.trim() || validOutcomes.length < 2) {
-      toast.error("Titel und mindestens 2 Outcomes nötig");
+      toast.error(t('gaming.titleAnd2Outcomes'));
       return;
     }
     try {
       await createPrediction(predTitle, validOutcomes);
-      toast.success("Prediction erstellt!");
+      toast.success(t('gaming.predictionCreated'));
       setShowPredictionDialog(false);
       setPredTitle(""); setPredOutcomes(["", ""]);
     } catch (e: any) {
-      toast.error(e.message || "Prediction konnte nicht erstellt werden");
+      toast.error(e.message || t('gaming.predictionCreateError'));
     }
   };
 
@@ -151,7 +153,7 @@ export function ChatManager() {
   if (!isConnected) {
     return (
       <div className="text-center py-20 text-muted-foreground">
-        Verbinde zuerst deinen Twitch-Kanal im "Stream"-Tab.
+        {t('gaming.connectFirst')}
       </div>
     );
   }
@@ -171,11 +173,11 @@ export function ChatManager() {
             <CardTitle className="text-lg flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-purple-400" />
               <span className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">
-                Live-Chat — #{twitchUsername}
+                {t('gaming.liveChat')} — #{twitchUsername}
               </span>
             </CardTitle>
             <Badge variant="outline" className={chatConnected ? "text-green-400 border-green-500/30 shadow-[0_0_8px_rgba(34,197,94,0.2)]" : "text-muted-foreground"}>
-              {chatConnected ? "Verbunden" : "Verbindet..."}
+              {chatConnected ? t('gaming.chatConnected') : t('gaming.chatConnecting')}
             </Badge>
           </div>
         </CardHeader>
@@ -183,8 +185,8 @@ export function ChatManager() {
           <div className="h-72 overflow-y-auto space-y-1 mb-3 p-3 rounded-lg bg-black/20 backdrop-blur border border-white/5 font-mono text-sm">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                {isLive ? <p>Warte auf Nachrichten...</p> : (
-                  <><WifiOff className="h-8 w-8 mb-2 opacity-50" /><p>Kanal ist offline — Chat wird trotzdem angezeigt</p></>
+                {isLive ? <p>{t('gaming.waitingForMessages')}</p> : (
+                  <><WifiOff className="h-8 w-8 mb-2 opacity-50" /><p>{t('gaming.channelOfflineChat')}</p></>
                 )}
               </div>
             ) : (
@@ -205,7 +207,7 @@ export function ChatManager() {
 
           <div className="flex gap-2">
             <Input
-              placeholder="Nachricht senden..."
+              placeholder={t('gaming.sendMessage')}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
@@ -231,15 +233,15 @@ export function ChatManager() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-green-400" />
-                Chat-Sentiment (Live)
+                {t('gaming.chatSentiment')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <SentimentBar emoji="😊" label="Positiv" value={pct(sentiment.positive)} color="bg-green-500" />
-                <SentimentBar emoji="😐" label="Neutral" value={pct(sentiment.neutral)} color="bg-muted-foreground" />
-                <SentimentBar emoji="😠" label="Negativ" value={pct(sentiment.negative)} color="bg-red-500" />
-                <p className="text-xs text-muted-foreground pt-1">{sentiment.total} Nachrichten analysiert</p>
+                <SentimentBar emoji="😊" label={t('gaming.positive')} value={pct(sentiment.positive)} color="bg-green-500" />
+                <SentimentBar emoji="😐" label={t('gaming.neutral')} value={pct(sentiment.neutral)} color="bg-muted-foreground" />
+                <SentimentBar emoji="😠" label={t('gaming.negative')} value={pct(sentiment.negative)} color="bg-red-500" />
+                <p className="text-xs text-muted-foreground pt-1">{sentiment.total} {t('gaming.messagesAnalyzed')}</p>
               </div>
             </CardContent>
           </Card>
@@ -250,18 +252,18 @@ export function ChatManager() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Users className="h-4 w-4 text-blue-400" />
-                Viewer & Interaktion
+                {t('gaming.viewerInteraction')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <Button variant="outline" size="sm" className="w-full gap-2 border-white/10" onClick={handleLoadViewers}>
-                <Users className="h-3 w-3" /> Viewer-Liste
+                <Users className="h-3 w-3" /> {t('gaming.viewerList')}
               </Button>
               <Button variant="outline" size="sm" className="w-full gap-2 border-white/10" onClick={() => setShowPollDialog(true)}>
-                <Vote className="h-3 w-3" /> Poll erstellen
+                <Vote className="h-3 w-3" /> {t('gaming.createPoll')}
               </Button>
               <Button variant="outline" size="sm" className="w-full gap-2 border-white/10" onClick={() => setShowPredictionDialog(true)}>
-                <Trophy className="h-3 w-3" /> Prediction erstellen
+                <Trophy className="h-3 w-3" /> {t('gaming.createPrediction')}
               </Button>
             </CardContent>
           </Card>
@@ -274,7 +276,7 @@ export function ChatManager() {
           <DialogHeader><DialogTitle>Viewer ({viewers.length})</DialogTitle></DialogHeader>
           <div className="max-h-60 overflow-y-auto space-y-1">
             {viewers.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Keine Viewer gefunden</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{t('gaming.noViewersFound')}</p>
             ) : (
               viewers.map((v: any, i: number) => (
                 <div key={i} className="flex items-center gap-2 p-2 rounded hover:bg-purple-500/10 text-sm transition-colors">
@@ -290,20 +292,20 @@ export function ChatManager() {
       {/* Poll Dialog */}
       <Dialog open={showPollDialog} onOpenChange={setShowPollDialog}>
         <DialogContent className={cardClass}>
-          <DialogHeader><DialogTitle className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">Poll erstellen</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">{t('gaming.pollCreateTitle')}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <Input placeholder="Frage..." value={pollTitle} onChange={(e) => setPollTitle(e.target.value)} className="border-white/10" />
+            <Input placeholder={t('gaming.questionPlaceholder')} value={pollTitle} onChange={(e) => setPollTitle(e.target.value)} className="border-white/10" />
             {pollChoices.map((c, i) => (
               <Input key={i} placeholder={`Option ${i + 1}`} value={c} onChange={(e) => { const n = [...pollChoices]; n[i] = e.target.value; setPollChoices(n); }} className="border-white/10" />
             ))}
             {pollChoices.length < 5 && (
               <Button variant="ghost" size="sm" onClick={() => setPollChoices([...pollChoices, ""])}>+ Option</Button>
             )}
-            <Input type="number" placeholder="Dauer (Sekunden)" value={pollDuration} onChange={(e) => setPollDuration(Number(e.target.value))} className="border-white/10" />
+            <Input type="number" placeholder={t('gaming.durationSeconds')} value={pollDuration} onChange={(e) => setPollDuration(Number(e.target.value))} className="border-white/10" />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPollDialog(false)} className="border-white/10">Abbrechen</Button>
-            <Button onClick={handleCreatePoll} className="bg-[#9146FF] hover:bg-[#7B2FFF] text-white">Erstellen</Button>
+            <Button variant="outline" onClick={() => setShowPollDialog(false)} className="border-white/10">{t('gaming.cancelBtn')}</Button>
+            <Button onClick={handleCreatePoll} className="bg-[#9146FF] hover:bg-[#7B2FFF] text-white">{t('gaming.createBtn')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -311,16 +313,16 @@ export function ChatManager() {
       {/* Prediction Dialog */}
       <Dialog open={showPredictionDialog} onOpenChange={setShowPredictionDialog}>
         <DialogContent className={cardClass}>
-          <DialogHeader><DialogTitle className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">Prediction erstellen</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">{t('gaming.predictionCreateTitle')}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <Input placeholder="Frage / Thema..." value={predTitle} onChange={(e) => setPredTitle(e.target.value)} className="border-white/10" />
+            <Input placeholder={t('gaming.questionTopicPlaceholder')} value={predTitle} onChange={(e) => setPredTitle(e.target.value)} className="border-white/10" />
             {predOutcomes.map((o, i) => (
               <Input key={i} placeholder={`Outcome ${i + 1}`} value={o} onChange={(e) => { const n = [...predOutcomes]; n[i] = e.target.value; setPredOutcomes(n); }} className="border-white/10" />
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPredictionDialog(false)} className="border-white/10">Abbrechen</Button>
-            <Button onClick={handleCreatePrediction} className="bg-[#9146FF] hover:bg-[#7B2FFF] text-white">Erstellen</Button>
+            <Button variant="outline" onClick={() => setShowPredictionDialog(false)} className="border-white/10">{t('gaming.cancelBtn')}</Button>
+            <Button onClick={handleCreatePrediction} className="bg-[#9146FF] hover:bg-[#7B2FFF] text-white">{t('gaming.createBtn')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
