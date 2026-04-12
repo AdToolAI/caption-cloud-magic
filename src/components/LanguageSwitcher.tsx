@@ -10,7 +10,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { Language } from "@/lib/translations";
 
 const languages = [
-  { code: 'en' as Language, label: 'English', flag: '🇬🇧' },
+  { code: 'en' as Language, label: 'English (US)', flag: '🇺🇸' },
   { code: 'de' as Language, label: 'Deutsch', flag: '🇩🇪' },
   { code: 'es' as Language, label: 'Español', flag: '🇪🇸' },
 ];
