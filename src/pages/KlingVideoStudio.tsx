@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, Video, ArrowLeft, Volume2 } from 'lucide-react';
+import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, Video, ArrowLeft, Volume2, Wand2 } from 'lucide-react';
+import { VideoPromptOptimizer } from '@/components/ai-video/VideoPromptOptimizer';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
@@ -48,6 +49,7 @@ export default function KlingVideoStudio() {
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const videoRef = useRef<HTMLInputElement>(null);
+  const [showPromptOptimizer, setShowPromptOptimizer] = useState(false);
 
   const currency: Currency = getCurrencyForLanguage(language);
   const modelConfig = KLING_VIDEO_MODELS[model];
@@ -187,15 +189,25 @@ export default function KlingVideoStudio() {
               <div className="space-y-5">
                 {/* Prompt */}
                 <Card className="p-4">
-                  <Label className="text-sm font-medium mb-2 block">Prompt</Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-sm font-medium">Prompt</Label>
+                    <Button variant="outline" size="sm" onClick={() => setShowPromptOptimizer(true)} className="h-7 text-xs">
+                      <Wand2 className="h-3 w-3 mr-1" />✨ Prompt optimieren
+                    </Button>
+                  </div>
                   <Textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Beschreibe dein Video... z.B. 'Ein goldener Sonnenuntergang über dem Meer, sanfte Wellen, cinematic'"
+                    placeholder="A golden retriever running through autumn leaves in slow motion, cinematic dolly shot, warm golden hour lighting, 4K quality"
                     className="min-h-[100px]"
                     maxLength={2000}
                   />
                   <p className="text-xs text-muted-foreground mt-1">{prompt.length}/2000</p>
+                  <div className="mt-2 p-2 rounded-md bg-muted/50 border border-border/50">
+                    <p className="text-xs text-muted-foreground">
+                      💡 <strong>Tipp:</strong> Schreibe auf Englisch für beste Ergebnisse. Beschreibe Kamerabewegungen (zoom, pan, dolly, tracking shot) und Beleuchtung (golden hour, dramatic lighting). Vermeide abstrakte Anweisungen wie "erstelle ein Werbevideo".
+                    </p>
+                  </div>
                 </Card>
 
                 {/* Model Selection */}
