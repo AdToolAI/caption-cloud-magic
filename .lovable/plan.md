@@ -1,27 +1,36 @@
 
 
-## Plan: Localize Account Settings page (EN/DE/ES)
+## Plan: Fix Connect Navigation + Localize Integrations Page
 
-### Problem
-The Account page header and a few sub-components have hardcoded German strings visible in the English UI. From the screenshot: "Konto-Einstellungen", "Geschützt", "Verifiziert".
+### Two issues to fix
+
+**Issue 1**: Clicking "Connect" in Account Settings > Connections just shows a toast instead of navigating to the Social Media Integrations page (`/integrations`).
+
+**Issue 2**: The Integrations page and its ConnectionsTab have ~35 hardcoded German strings visible in the English UI.
 
 ### Files to edit (3 files)
 
-| File | Hardcoded German strings |
-|------|--------------------------|
-| `src/lib/translations.ts` | Add ~10 `account.*` keys for header + timezone + security toasts |
-| `src/components/account/AccountHeroHeader.tsx` | 3 — "Konto-Einstellungen", "Geschützt", "Verifiziert" |
-| `src/components/account/SecurityTab.tsx` | 4 — toast messages: "2FA deaktiviert", "Zwei-Faktor-Authentifizierung wurde deaktiviert", "Fehler", "2FA konnte nicht deaktiviert werden" |
-| `src/components/account/TimezoneSelect.tsx` | 4 — "Zeitzone", "Deine Zeitzone für Planungen...", "Zeitzone auswählen", "Zeitzone gespeichert", "Fehler beim Speichern" |
+| File | Changes |
+|------|---------|
+| `src/components/account/LinkedAccountsCard.tsx` | Change `handleConnect` to navigate to `/integrations` instead of showing a toast |
+| `src/lib/translations.ts` | Add `integrations.*` keys (EN/DE/ES) for ~15 strings on the Integrations page |
+| `src/pages/Integrations.tsx` | Add `useTranslation`, replace all hardcoded German strings with `t()` calls |
+| `src/components/performance/ConnectionsTab.tsx` | Replace ~20 hardcoded German strings (toasts, labels, buttons) with `t()` calls and add corresponding keys |
 
-### Approach
-1. Add missing translation keys to `translations.ts` (EN/DE/ES). DE = current hardcoded strings.
-2. Add `useTranslation` hook to `AccountHeroHeader.tsx` and `TimezoneSelect.tsx`; use existing hook in `SecurityTab.tsx`.
-3. Replace hardcoded strings with `t()` calls.
-4. German UI unchanged.
+### Hardcoded German strings to localize
 
-### Technical details
-- AccountHeroHeader: `t('account.header.title')`, `t('account.header.protected')`, `t('account.header.verified')`
-- TimezoneSelect: `t('account.timezone.title')`, `t('account.timezone.subtitle')`, `t('account.timezone.select')`, `t('account.timezone.saved')`, `t('account.timezone.error')`
-- SecurityTab: Replace hardcoded toast strings with `t('account.twoFactor.deactivated')`, `t('account.twoFactor.deactivatedDesc')`, `t('account.twoFactor.error')`, `t('account.twoFactor.errorDisabling')`
+**Integrations.tsx (~10)**:
+- "Social-Media-Integrationen", subtitle text, "Sichere OAuth 2.0 Authentifizierung", "Automatische Synchronisation", "Dein aktueller Plan", "Keine Verbindungen", "Bis zu 3 Plattformen", "Unbegrenzte Verbindungen", "Jetzt upgraden →", Pro plan upgrade hint
+
+**ConnectionsTab.tsx (~20)**:
+- "Verbindung fehlgeschlagen", "Session konnte nicht erneuert werden", "Verbindung konnte nicht gespeichert werden", "Authentifizierung erforderlich", "Bitte melden Sie sich erneut an"
+- "erfolgreich verbunden!", "erfolgreich synchronisiert", "Sync fehlgeschlagen"
+- "Token abgelaufen", "Bitte trenne die Verbindung und verbinde…erneut"
+- "Session abgelaufen. Bitte lade die Seite neu…", "Neu laden"
+- "Token erneuern", "Seite auswählen", "Seite wechseln", "Seitenauswahl erforderlich"
+- "Post-Sync eingeschränkt (API-Policy). UGC-Publishing verfügbar."
+- "Sync Now", "Upload Draft (Optional)"
+
+### Navigation fix detail
+In `LinkedAccountsCard.tsx`, `handleConnect` will use `useNavigate()` to redirect to `/integrations` so the user lands on the full Social Media Integrations page where the real OAuth connect flow lives.
 
