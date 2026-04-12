@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Download, RotateCcw, Film, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface RenderOverlayProps {
   isVisible: boolean;
@@ -17,14 +18,6 @@ interface RenderOverlayProps {
   startedAt?: number;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  preparing: 'Vorbereitung...',
-  rendering: 'Video wird gerendert...',
-  finalizing: 'Fertigstellung...',
-  completed: 'Video fertig!',
-  failed: 'Fehler beim Rendering',
-};
-
 export const RenderOverlay: React.FC<RenderOverlayProps> = ({
   isVisible,
   progress,
@@ -37,6 +30,16 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
   onOpenLibrary,
   startedAt,
 }) => {
+  const { t } = useTranslation();
+
+  const STATUS_LABELS: Record<string, string> = {
+    preparing: t('dc.preparing'),
+    rendering: t('dc.rendering'),
+    finalizing: t('dc.finalizing'),
+    completed: t('dc.completed'),
+    failed: t('dc.renderFailed'),
+  };
+
   const estimatedRemaining = useMemo(() => {
     if (!startedAt || progress <= 2 || status === 'completed' || status === 'failed') return null;
     const elapsed = (Date.now() - startedAt) / 1000;
@@ -45,8 +48,9 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
     const remaining = (100 - progress) / rate;
     const mins = Math.floor(remaining / 60);
     const secs = Math.floor(remaining % 60);
-    return mins > 0 ? `~${mins}:${secs.toString().padStart(2, '0')} Min` : `~${secs}s`;
-  }, [startedAt, progress, status]);
+    const timeStr = mins > 0 ? `~${mins}:${secs.toString().padStart(2, '0')} Min` : `~${secs}s`;
+    return t('dc.estimatedRemaining', { time: timeStr });
+  }, [startedAt, progress, status, t]);
 
   return (
     <AnimatePresence>
@@ -100,7 +104,7 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
                 <div className="flex justify-between text-sm">
                   <span className="text-white/50">{Math.round(progress)}%</span>
                   {estimatedRemaining && (
-                    <span className="text-white/40">Geschätzte Restzeit: {estimatedRemaining}</span>
+                    <span className="text-white/40">{estimatedRemaining}</span>
                   )}
                 </div>
               </div>
@@ -115,7 +119,7 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
                   size="lg"
                 >
                   <Download className="h-5 w-5 mr-2" />
-                  Video herunterladen
+                  {t('dc.downloadVideo')}
                 </Button>
                 {onOpenLibrary && (
                   <Button
@@ -124,7 +128,7 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
                     size="lg"
                   >
                     <Film className="h-5 w-5 mr-2" />
-                    Zur Mediathek
+                    {t('dc.toMediaLibrary')}
                   </Button>
                 )}
                 <Button
@@ -132,7 +136,7 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
                   variant="outline"
                   className="w-full border-white/20 text-white/70 hover:text-white hover:bg-white/10"
                 >
-                  Zurück zum Editor
+                  {t('dc.backToEditor')}
                 </Button>
               </div>
             )}
@@ -151,14 +155,14 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
                   size="lg"
                 >
                   <RotateCcw className="h-5 w-5 mr-2" />
-                  Erneut versuchen
+                  {t('dc.retryRender')}
                 </Button>
                 <Button
                   onClick={onClose}
                   variant="outline"
                   className="w-full border-white/20 text-white/70 hover:text-white hover:bg-white/10"
                 >
-                  Abbrechen
+                  {t('dc.cancelRender')}
                 </Button>
               </div>
             )}
@@ -166,7 +170,7 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
             {/* Hint */}
             {status !== 'completed' && status !== 'failed' && (
               <p className="text-xs text-white/30 text-center mt-4">
-                Bitte schließe diese Seite nicht. Das Rendering läuft serverseitig.
+                {t('dc.renderHint')}
               </p>
             )}
           </motion.div>

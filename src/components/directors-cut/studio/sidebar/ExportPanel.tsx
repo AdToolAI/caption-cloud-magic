@@ -4,6 +4,7 @@ import { Download, Film } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ExportSettings } from '@/types/directors-cut';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface ExportPanelProps {
   exportSettings: ExportSettings;
@@ -20,6 +21,8 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   scenesCount,
   videoDuration,
 }) => {
+  const { t } = useTranslation();
+
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
@@ -32,28 +35,28 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
         {/* Header */}
         <div className="flex items-center gap-2">
           <Download className="h-4 w-4 text-[#00d4ff]" />
-          <span className="text-sm font-medium text-white">Export</span>
+          <span className="text-sm font-medium text-white">{t('dc.exportTitle')}</span>
         </div>
 
         {/* Project Info */}
         <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
           <div className="flex items-center gap-1.5 mb-1">
             <Film className="h-3 w-3 text-white/40" />
-            <span className="text-[11px] text-white/50 font-medium">Projekt-Info</span>
+            <span className="text-[11px] text-white/50 font-medium">{t('dc.projectInfo')}</span>
           </div>
           <div className="flex justify-between text-[10px]">
-            <span className="text-white/40">Szenen</span>
+            <span className="text-white/40">{t('dc.scenes')}</span>
             <span className="text-white/70">{scenesCount}</span>
           </div>
           <div className="flex justify-between text-[10px]">
-            <span className="text-white/40">Dauer</span>
+            <span className="text-white/40">{t('dc.durationLabel')}</span>
             <span className="text-white/70">{formatTime(videoDuration)}</span>
           </div>
         </div>
 
         {/* Quality */}
         <div className="space-y-2">
-          <label className="text-xs text-white/50 font-medium">Qualität</label>
+          <label className="text-xs text-white/50 font-medium">{t('dc.qualityLabel')}</label>
           <Select
             value={exportSettings.quality}
             onValueChange={(v) => onExportSettingsChange({ ...exportSettings, quality: v as any })}
@@ -72,7 +75,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
 
         {/* Format */}
         <div className="space-y-2">
-          <label className="text-xs text-white/50 font-medium">Format</label>
+          <label className="text-xs text-white/50 font-medium">{t('dc.format')}</label>
           <Select
             value={exportSettings.format}
             onValueChange={(v) => onExportSettingsChange({ ...exportSettings, format: v as any })}
@@ -90,7 +93,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
 
         {/* FPS */}
         <div className="space-y-2">
-          <label className="text-xs text-white/50 font-medium">FPS</label>
+          <label className="text-xs text-white/50 font-medium">{t('dc.fps')}</label>
           <Select
             value={String(exportSettings.fps)}
             onValueChange={(v) => onExportSettingsChange({ ...exportSettings, fps: Number(v) as any })}
@@ -108,7 +111,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
 
         {/* Aspect Ratio */}
         <div className="space-y-2">
-          <label className="text-xs text-white/50 font-medium">Seitenverhältnis</label>
+          <label className="text-xs text-white/50 font-medium">{t('dc.aspectRatio')}</label>
           <Select
             value={exportSettings.aspect_ratio}
             onValueChange={(v) => onExportSettingsChange({ ...exportSettings, aspect_ratio: v as any })}
@@ -117,9 +120,9 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
-              <SelectItem value="16:9" className="text-white text-xs">16:9 (Widescreen)</SelectItem>
-              <SelectItem value="9:16" className="text-white text-xs">9:16 (Portrait)</SelectItem>
-              <SelectItem value="1:1" className="text-white text-xs">1:1 (Quadrat)</SelectItem>
+              <SelectItem value="16:9" className="text-white text-xs">16:9 ({t('dc.widescreenLabel')})</SelectItem>
+              <SelectItem value="9:16" className="text-white text-xs">9:16 ({t('dc.portraitLabel')})</SelectItem>
+              <SelectItem value="1:1" className="text-white text-xs">1:1 ({t('dc.squareLabel')})</SelectItem>
               <SelectItem value="4:3" className="text-white text-xs">4:3 (Classic)</SelectItem>
             </SelectContent>
           </Select>
@@ -132,11 +135,11 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           size="lg"
         >
           <Download className="h-4 w-4 mr-2" />
-          Video exportieren
+          {t('dc.exportVideo')}
         </Button>
 
         <p className="text-[10px] text-white/30 text-center">
-          Das Video wird serverseitig gerendert und zum Download bereitgestellt.
+          {t('dc.exportHint')}
         </p>
       </div>
     </ScrollArea>
