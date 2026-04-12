@@ -22,12 +22,7 @@ interface CapCutPropertiesPanelProps {
   onClipDelete?: (clipId: string) => void;
 }
 
-const SUBTITLE_STYLES = [
-  { id: 'standard', label: 'Standard' },
-  { id: 'tiktok', label: 'TikTok' },
-  { id: 'subtitle', label: 'Untertitel' },
-  { id: 'highlight', label: 'Highlight' },
-] as const;
+// SUBTITLE_STYLES moved inside component as useMemo for i18n reactivity
 
 export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
   selectedClip,
