@@ -65,6 +65,7 @@ const DraggableScene: React.FC<{
   onSplit?: () => void;
   onTrim?: (newStart: number, newEnd: number) => void;
 }> = ({ scene, index, zoom, isSelected, isPlayheadInside, onSeek, onSelect, onDelete, onSplit, onTrim }) => {
+  const { t } = useTranslation();
   const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null);
   const startXRef = useRef(0);
   const originalBoundsRef = useRef({ start: 0, end: 0 });
@@ -309,6 +310,7 @@ const DraggableSubtitleClip: React.FC<{
   onUpdate: (updates: Partial<SubtitleClip>) => void;
   onDelete?: () => void;
 }> = ({ clip, zoom, isSelected, onSelect, onUpdate, onDelete }) => {
+  const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(clip.text);
   const inputRef = useRef<HTMLInputElement>(null);
