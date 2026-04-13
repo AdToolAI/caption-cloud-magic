@@ -47,7 +47,7 @@ export function TrendCardMedia({ category, platform, index, className = '', heig
       {/* Real Unsplash Image */}
       {!error && (
         <img
-          src={getImageUrl(category, index)}
+          src={imageUrl || getImageUrl(category, index)}
           alt=""
           loading="lazy"
           onLoad={() => setLoaded(true)}
@@ -146,7 +146,7 @@ export function PopularityRing({ value, size = 36 }: { value: number; size?: num
 }
 
 // Hero background with Ken Burns effect
-export function HeroMediaBackground({ category, platform, index }: { category: string; platform: string; index: number }) {
+export function HeroMediaBackground({ category, platform, index, imageUrl }: { category: string; platform: string; index: number; imageUrl?: string }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const visuals = platformVisuals[platform] || platformVisuals.twitter;
