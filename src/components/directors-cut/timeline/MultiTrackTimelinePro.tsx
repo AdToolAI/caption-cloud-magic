@@ -85,15 +85,31 @@ export function MultiTrackTimelinePro({
     const clipId = active.id as string;
     const targetTrackId = over.id as string;
     const deltaTime = delta.x / zoom;
+    const SNAP_THRESHOLD = 0.5; // seconds
 
     const newTracks = audioTracks.map(track => {
       const clipIndex = track.clips.findIndex(c => c.id === clipId);
       
       if (clipIndex !== -1) {
         const clip = track.clips[clipIndex];
+        let newStartTime = Math.max(0, clip.startTime + deltaTime);
+        
+        // Snap to playhead
+        if (Math.abs(newStartTime - currentTime) < SNAP_THRESHOLD) {
+          newStartTime = currentTime;
+        }
+        // Snap clip end to playhead
+        if (Math.abs((newStartTime + clip.duration) - currentTime) < SNAP_THRESHOLD) {
+          newStartTime = currentTime - clip.duration;
+        }
+        // Snap to start
+        if (newStartTime < SNAP_THRESHOLD && newStartTime > 0) {
+          newStartTime = 0;
+        }
+
         const updatedClip = {
           ...clip,
-          startTime: Math.max(0, clip.startTime + deltaTime),
+          startTime: Math.max(0, newStartTime),
           trackId: targetTrackId.startsWith('track-') ? targetTrackId : track.id,
         };
 
