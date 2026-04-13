@@ -1,51 +1,71 @@
 
 
-## Plan: Trend-Ticker mit Bildern — Futuristisches Hologramm-Design
+## Plan: Trend Radar — Professional Media-Rich Redesign
 
-### Konzept
-Die bestehende NewsTicker-Leiste wird auf halbe Höhe (h-5/h-6 statt h-10) reduziert und zeigt statt statischer Tipps echte Trends aus dem Trend Radar. Jeder Trend erscheint als kompakte "Hologramm-Karte" mit kleinem Thumbnail-Bild, Trend-Name und Plattform-Icon — alles horizontal scrollend im Marquee-Stil.
+### Problem
+The current Trend Radar uses plain CSS gradient backgrounds (purple, pink, orange) on trend cards and the hero carousel. It looks generic and dated — no real images, no media previews, no visual richness. A professional social media tool should be visually immersive.
 
-### Design-Vision: "Holographic Intel Strip"
-- **Halbe Höhe**: Von `h-10` auf `h-6` (24px)
-- **Trend-Cards im Scroll**: Statt reiner Text-Zeile kleine "Micro-Cards" mit:
-  - Winziges Thumbnail (20x20px, abgerundete Ecken, Cyan-Glow-Border)
-  - Trend-Name in Gold (truncated, max ~120px)
-  - Plattform-Indikator als farbiger Dot (TikTok=cyan, Instagram=pink, YouTube=red)
-  - Popularity als Mini-Balken oder Pulse-Animation
-- **Separator**: Vertikale leuchtende Linie zwischen den Trend-Cards statt ◆
-- **Scan-Line-Effekt**: Ein subtiler horizontaler Lichtstreifen, der periodisch über die Leiste "scannt" (CSS animation)
-- **Label**: "TREND RADAR" statt "LIVE TIPS" mit Radar-Pulse-Animation
+### Vision
+Transform the Trend Radar into a media-rich, visually stunning experience using **real imagery** from Unsplash (free API, no key needed for `source.unsplash.com`), platform-authentic design patterns, and cinematic visual effects.
 
-### Datenquelle
-- Trends kommen aus der `fetch-trends` Edge Function (gleiche wie TrendRadar-Seite)
-- Fallback: Wenn keine Trends geladen, statische Tipps als Placeholder
-- Bilder: Generierte Plattform-Icons/Gradient-Thumbnails (Trends haben keine echten Bilder), erzeugt per CSS-Gradient basierend auf Kategorie/Plattform
-- Refresh alle 60 Minuten (wie bisher)
+### Changes
 
-### Technische Umsetzung
+#### 1. New Component: `TrendCardMedia.tsx`
+A reusable component that generates rich visual backgrounds for each trend card:
+- **Dynamic Unsplash images** based on trend category/keywords (e.g., `source.unsplash.com/400x200/?fitness,workout` for fitness trends)
+- Keyword mapping: category → relevant photo search terms (social-media → "phone,content", ecommerce → "product,shopping", lifestyle → "wellness,nature", business → "office,technology", finance → "investment,money", motivation → "success,mountains")
+- **Glassmorphism overlay** with gradient from platform color (subtle tint, not full solid)
+- **Lazy loading** with skeleton shimmer while images load
+- Fallback to current gradient if image fails
 
-1. **NewsTicker.tsx komplett umbauen**
-   - Trends per `supabase.functions.invoke('fetch-trends')` laden
-   - `h-10` → `h-6`, Text/Badge/Switch proportional verkleinern
-   - Trend-Items als Inline-Flex-Cards mit generiertem Thumbnail rendern
-   - Scan-Line-Animation als zusätzliches CSS-Overlay
-   - Click auf Trend → Navigation zum TrendRadar
+#### 2. Redesigned Trend Cards (`TrendRadar.tsx` — card section)
+Each card gets a cinematic makeover:
+- **Taller image header** (h-20 → h-40): Full bleed Unsplash image with dark gradient overlay from bottom
+- **Platform badge** redesigned: Actual platform logo-style icon (Instagram gradient circle, TikTok vibrating logo, YouTube play button) instead of plain text
+- **Popularity as a glowing arc/ring** instead of just a number — a small SVG donut chart with glow
+- **Hover effect**: Image zooms slightly (scale 1.05), card lifts with cinematic shadow
+- **"HOT" badge**: Animated fire gradient border instead of red pill
+- **Category tag** with subtle icon and frosted glass background
+- Card background: Very subtle frosted glass with image reflection/blur behind
 
-2. **Generierte Thumbnails**
-   - Kein echtes Bild nötig — CSS-Gradient-Squares mit Plattform-Icon-Overlay
-   - Farbe basierend auf Plattform (TikTok=cyan, Instagram=gradient pink-orange, YouTube=red, LinkedIn=blue)
-   - Leichter Glow-Rand für Hologramm-Effekt
+#### 3. Redesigned Hero Carousel
+- **Full-width cinematic hero** with Unsplash background image per trend
+- **Ken Burns effect**: Slow zoom/pan animation on the background image
+- **Split layout**: Image on right (60%), content on left (40%) with glassmorphism panel
+- **Video preview indicator**: If trend has video content ideas, show a subtle play button overlay
+- **Progress bar** at bottom showing auto-advance timing (like Instagram Stories)
+- Platform-colored accent line at bottom instead of full gradient
 
-3. **Scan-Line Keyframe** (in tailwind.config.ts)
-   - Neuer Keyframe `scanline`: horizontaler weißer Streifen bewegt sich von links nach rechts
+#### 4. Niche Category Cards Enhancement
+- Replace emoji-only icons with **Unsplash micro-thumbnails** (tiny 48x48 images) + icon overlay
+- Active state: Image becomes full-color, inactive: grayscale with subtle tint
+- Hover: Image pans slightly, border glows
 
-### Betroffene Dateien
-- `src/components/dashboard/NewsTicker.tsx` — Kompletter Umbau
-- `tailwind.config.ts` — Scanline-Keyframe hinzufügen
+#### 5. Visual Polish (James Bond 2028)
+- **Scanline overlay** on hero images (subtle horizontal lines like a premium display)
+- **Gold/cyan accent lighting**: Thin glowing lines framing key sections
+- **Particle/noise texture** overlay on dark sections for depth
+- **Typography**: Trend names in `font-display` (Playfair Display) for headlines
+- **Micro-interactions**: Card flip has a brief light flash, bookmark adds a pulse ring
 
-### Ergebnis
-- Halbe Höhe, doppelt so futuristisch
-- Echte Trend-Daten mit visuellen Mini-Cards statt nur Text
-- Hologramm-Scan-Line-Effekt für einzigartigen Sci-Fi-Look
-- Klickbar für direkten Sprung zum Trend Radar
+#### 6. Stats Section Enhancement
+- Add mini Unsplash background thumbnails behind each stat card (blurred, 10% opacity)
+- Stat numbers use `font-display` with subtle text-shadow glow
+
+### Technical Approach
+- Use `https://images.unsplash.com/photo-{id}?w=400&h=200&fit=crop` for deterministic images, or `source.unsplash.com/{w}x{h}/?{keywords}` for dynamic ones
+- Image loading state managed per-card with `onLoad`/`onError` handlers
+- CSS `object-fit: cover` for consistent image sizing
+- All images get `loading="lazy"` for performance
+- Keyword mapping as a simple utility function
+
+### Files to Create
+- `src/components/trends/TrendCardMedia.tsx` — Image/media background component
+
+### Files to Edit
+- `src/pages/TrendRadar.tsx` — Major card and carousel redesign
+- `src/components/trends/TrendRadarHeroHeader.tsx` — Minor polish
+
+### Scope
+This is a significant visual overhaul but stays within existing data structures. No database or edge function changes needed. All image sourcing uses free Unsplash URLs (no API key required).
 
