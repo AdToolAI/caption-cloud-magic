@@ -1,0 +1,378 @@
+import { useState, useEffect, useRef } from 'react';
+import { Helmet } from 'react-helmet-async';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, ArrowLeft, Wand2, Clock, Camera, RotateCcw } from 'lucide-react';
+import { VideoPromptOptimizer } from '@/components/ai-video/VideoPromptOptimizer';
+import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
+import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
+import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
+import { LUMA_VIDEO_MODELS, LumaVideoModel, LumaAspectRatio, LUMA_CAMERA_CONCEPTS, LumaCameraConcept } from '@/config/lumaVideoCredits';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { useSearchParams, Link } from 'react-router-dom';
+import { getCurrencyForLanguage, formatPrice } from '@/lib/currency';
+import { useTranslation } from '@/hooks/useTranslation';
+import { Currency } from '@/config/pricing';
+
+export default function LumaVideoStudio() {
+  const { user } = useAuth();
+  const { language, t } = useTranslation();
+  const { wallet, loading: walletLoading, refetch: refetchWallet } = useAIVideoWallet();
+  const [generating, setGenerating] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState('generate');
+
+  const [prompt, setPrompt] = useState('');
+  const [model, setModel] = useState<LumaVideoModel>('luma-standard');
+  const [duration, setDuration] = useState(5);
+  const [aspectRatio, setAspectRatio] = useState<LumaAspectRatio>('16:9');
+  const [cameraConcept, setCameraConcept] = useState<LumaCameraConcept>('none');
+  const [loop, setLoop] = useState(false);
+
+  const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
+  const [endImageUrl, setEndImageUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const startImageRef = useRef<HTMLInputElement>(null);
+  const endImageRef = useRef<HTMLInputElement>(null);
+
+  const [showPromptOptimizer, setShowPromptOptimizer] = useState(false);
+
+  const currency: Currency = getCurrencyForLanguage(language);
+  const modelConfig = LUMA_VIDEO_MODELS[model];
+  const costPerSecond = modelConfig.costPerSecond[currency];
+  const cost = duration * costPerSecond;
+  const canAfford = wallet && wallet.balance_euros >= cost;
+  const currencySymbol = currency === 'USD' ? '$' : '€';
+
+  useEffect(() => {
+    const payment = searchParams.get('payment');
+    if (payment === 'success') { toast.success('Credits erfolgreich gekauft!'); refetchWallet(); }
+  }, [searchParams]);
+
+  const uploadFile = async (file: File): Promise<string | null> => {
+    if (!user) return null;
+    const ext = file.name.split('.').pop();
+    const path = `${user.id}/luma-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('ai-video-reference').upload(path, file, { upsert: true });
+    if (error) { toast.error('Upload fehlgeschlagen'); return null; }
+    const { data: { publicUrl } } = supabase.storage.from('ai-video-reference').getPublicUrl(path);
+    return publicUrl;
+  };
+
+  const handleImageUpload = async (file: File, target: 'start' | 'end') => {
+    setUploadingImage(true);
+    const url = await uploadFile(file);
+    if (url) {
+      if (target === 'start') setStartImageUrl(url);
+      else setEndImageUrl(url);
+    }
+    setUploadingImage(false);
+  };
+
+  const handleGenerate = async () => {
+    if (!prompt.trim() || !user) return;
+    if (!canAfford) { toast.error('Nicht genügend Credits'); setActiveTab('credits'); return; }
+
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-luma-video', {
+        body: {
+          prompt: prompt.trim(), model, duration, aspectRatio,
+          startImageUrl, endImageUrl, loop, cameraConcept,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        if (data.code === 'INSUFFICIENT_CREDITS' || data.code === 'NO_WALLET') setActiveTab('credits');
+        throw new Error(data.error);
+      }
+      toast.success(`Luma Ray 2 Video wird generiert! Kosten: ${currencySymbol}${cost.toFixed(2)}`);
+      refetchWallet();
+      setActiveTab('history');
+    } catch (err: any) {
+      toast.error(err.message || 'Fehler bei der Videogenerierung');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <>
+      <Helmet>
+        <title>Luma Ray 2 Video Studio | AI Video Generator</title>
+        <meta name="description" content="Generate cinematic AI videos with Luma Ray 2 - Camera concepts, loops & more" />
+      </Helmet>
+
+      <div className="container mx-auto px-4 py-6 max-w-5xl">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold">Luma Ray 2 Video Studio</h1>
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">Neu</Badge>
+            </div>
+            <p className="text-muted-foreground text-sm mt-1">
+              Cinematic & Surreal • 5 oder 9 Sekunden • Camera Concepts
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link to="/ai-video-studio">
+              <Button variant="outline" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-1" />AI Video Studio
+              </Button>
+            </Link>
+            {wallet && (
+              <Badge variant="outline" className="text-base px-3 py-1">
+                {currencySymbol}{wallet.balance_euros.toFixed(2)} Credits
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="generate"><Sparkles className="h-4 w-4 mr-1" />Generieren</TabsTrigger>
+            <TabsTrigger value="credits"><CreditCard className="h-4 w-4 mr-1" />Credits</TabsTrigger>
+            <TabsTrigger value="history"><History className="h-4 w-4 mr-1" />Verlauf</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="generate">
+            <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+              <div className="space-y-5">
+                {/* Prompt */}
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-sm font-medium">Prompt</Label>
+                    <Button variant="outline" size="sm" onClick={() => setShowPromptOptimizer(true)} className="h-7 text-xs">
+                      <Wand2 className="h-3 w-3 mr-1" />✨ Prompt optimieren
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="A dreamlike underwater scene with bioluminescent jellyfish floating through ancient ruins, cinematic orbit shot, ethereal lighting"
+                    className="min-h-[100px]"
+                    maxLength={2000}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">{prompt.length}/2000</p>
+                  <div className="mt-2 p-2 rounded-md bg-muted/50 border border-border/50">
+                    <p className="text-xs text-muted-foreground">
+                      💡 <strong>Tipp:</strong> Luma Ray 2 glänzt bei cinematic, surrealen und künstlerischen Szenen. Nutze Kamera-Konzepte für beeindruckende Kamerafahrten.
+                    </p>
+                  </div>
+                </Card>
+
+                {/* Model Selection */}
+                <Card className="p-4">
+                  <Label className="text-sm font-medium mb-3 block">Modell</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(Object.entries(LUMA_VIDEO_MODELS) as [LumaVideoModel, typeof LUMA_VIDEO_MODELS[LumaVideoModel]][]).map(([key, m]) => (
+                      <button
+                        key={key}
+                        onClick={() => setModel(key)}
+                        className={`p-3 rounded-lg border text-left transition-all ${
+                          model === key ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-border hover:border-primary/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-sm">{m.name}</span>
+                          <Badge variant="outline" className="text-xs">{m.badge}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{m.quality} • {currencySymbol}{m.costPerSecond[currency].toFixed(2)}/Sek</p>
+                      </button>
+                    ))}
+                  </div>
+                </Card>
+
+                {/* Duration Selection */}
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Clock className="h-4 w-4" />Dauer
+                    </Label>
+                    <span className="text-sm font-semibold text-primary">{currencySymbol}{cost.toFixed(2)}</span>
+                  </div>
+                  <ToggleGroup
+                    type="single"
+                    value={String(duration)}
+                    onValueChange={(v) => v && setDuration(Number(v))}
+                    className="w-full"
+                  >
+                    <ToggleGroupItem value="5" className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                      5 Sekunden
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="9" className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                      9 Sekunden
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </Card>
+
+                {/* Aspect Ratio */}
+                <Card className="p-4">
+                  <Label className="text-sm font-medium mb-3 block">Seitenverhältnis</Label>
+                  <div className="flex gap-2">
+                    {(['16:9', '9:16', '1:1'] as LumaAspectRatio[]).map((ar) => (
+                      <Button key={ar} variant={aspectRatio === ar ? 'default' : 'outline'} size="sm" onClick={() => setAspectRatio(ar)}>
+                        {ar === '16:9' ? '🖥️ 16:9' : ar === '9:16' ? '📱 9:16' : '⬜ 1:1'}
+                      </Button>
+                    ))}
+                  </div>
+                </Card>
+
+                {/* Camera Concepts */}
+                <Card className="p-4">
+                  <Label className="text-sm font-medium mb-3 block flex items-center gap-1.5">
+                    <Camera className="h-4 w-4" />Kamera-Konzept (optional)
+                  </Label>
+                  <Select value={cameraConcept} onValueChange={(v) => setCameraConcept(v as LumaCameraConcept)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Kamera-Konzept wählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LUMA_CAMERA_CONCEPTS.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.label} — {c.description}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Kamera-Konzepte steuern die Kamerabewegung im generierten Video.
+                  </p>
+                </Card>
+
+                {/* Loop Toggle */}
+                <Card className="p-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <RotateCcw className="h-4 w-4" />Loop-Modus
+                    </Label>
+                    <Switch checked={loop} onCheckedChange={setLoop} />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">Video wird nahtlos in einer Endlosschleife abgespielt.</p>
+                </Card>
+
+                {/* Image-to-Video */}
+                <Card className="p-4">
+                  <Label className="text-sm font-medium mb-3 block">
+                    <ImagePlus className="h-4 w-4 inline mr-1" />Image-to-Video (optional)
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Start Image */}
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">Startbild</p>
+                      {startImageUrl ? (
+                        <div className="relative">
+                          <img src={startImageUrl} alt="Start" className="w-full h-24 object-cover rounded-lg" />
+                          <Button size="icon" variant="destructive" className="absolute top-1 right-1 h-5 w-5" onClick={() => setStartImageUrl(null)}>
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => startImageRef.current?.click()} disabled={uploadingImage}>
+                          {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+                          Start
+                        </Button>
+                      )}
+                      <input ref={startImageRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'start')} />
+                    </div>
+                    {/* End Image */}
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">Endbild</p>
+                      {endImageUrl ? (
+                        <div className="relative">
+                          <img src={endImageUrl} alt="End" className="w-full h-24 object-cover rounded-lg" />
+                          <Button size="icon" variant="destructive" className="absolute top-1 right-1 h-5 w-5" onClick={() => setEndImageUrl(null)}>
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => endImageRef.current?.click()} disabled={uploadingImage}>
+                          {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+                          Ende
+                        </Button>
+                      )}
+                      <input ref={endImageRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'end')} />
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Sidebar */}
+              <div className="space-y-4">
+                <Card className="p-4 sticky top-4">
+                  <h3 className="font-semibold mb-3">Zusammenfassung</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Modell</span><span>{LUMA_VIDEO_MODELS[model].name}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Qualität</span><span>{LUMA_VIDEO_MODELS[model].quality}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Dauer</span><span>{duration}s</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Format</span><span>{aspectRatio}</span></div>
+                    {cameraConcept !== 'none' && (
+                      <div className="flex justify-between"><span className="text-muted-foreground">Kamera</span><span>{LUMA_CAMERA_CONCEPTS.find(c => c.id === cameraConcept)?.label}</span></div>
+                    )}
+                    {loop && <div className="flex justify-between"><span className="text-muted-foreground">Loop</span><span>Ja</span></div>}
+                    {startImageUrl && <div className="flex justify-between"><span className="text-muted-foreground">Start</span><span>Bild</span></div>}
+                    {endImageUrl && <div className="flex justify-between"><span className="text-muted-foreground">Ende</span><span>Bild</span></div>}
+                    <hr className="my-2" />
+                    <div className="flex justify-between font-semibold text-base">
+                      <span>Kosten</span>
+                      <span className="text-primary">{currencySymbol}{cost.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Guthaben</span>
+                      <span>{wallet ? `${currencySymbol}${wallet.balance_euros.toFixed(2)}` : '...'}</span>
+                    </div>
+                  </div>
+
+                  <Button className="w-full mt-4" size="lg" onClick={handleGenerate} disabled={generating || !prompt.trim() || !canAfford || walletLoading}>
+                    {generating ? (<><Loader2 className="h-4 w-4 animate-spin mr-2" />Generiere...</>) : (<><Sparkles className="h-4 w-4 mr-2" />Video generieren</>)}
+                  </Button>
+
+                  {!canAfford && !walletLoading && (
+                    <p className="text-xs text-destructive mt-2 text-center">
+                      Nicht genügend Credits.{' '}
+                      <button className="underline" onClick={() => setActiveTab('credits')}>Credits kaufen</button>
+                    </p>
+                  )}
+                </Card>
+
+                <Card className="p-4">
+                  <h4 className="font-medium text-sm mb-2">Preisübersicht</h4>
+                  <div className="text-xs space-y-1 text-muted-foreground">
+                    <div className="flex justify-between"><span>Standard 5s</span><span>{currencySymbol}0.90</span></div>
+                    <div className="flex justify-between"><span>Standard 9s</span><span>{currencySymbol}1.62</span></div>
+                    <hr className="my-1" />
+                    <div className="flex justify-between"><span>Pro 5s</span><span>{currencySymbol}1.25</span></div>
+                    <div className="flex justify-between"><span>Pro 9s</span><span>{currencySymbol}2.25</span></div>
+                  </div>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="credits">
+            <AIVideoCreditPurchase />
+          </TabsContent>
+
+          <TabsContent value="history">
+            <VideoGenerationHistory />
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <VideoPromptOptimizer
+        open={showPromptOptimizer}
+        onClose={() => setShowPromptOptimizer(false)}
+        onPromptGenerated={(optimized) => setPrompt(optimized)}
+      />
+    </>
+  );
+}
