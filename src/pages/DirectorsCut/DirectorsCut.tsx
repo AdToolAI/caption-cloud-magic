@@ -141,83 +141,101 @@ export function DirectorsCut() {
   const [subtitleSafeZone, setSubtitleSafeZone] = useState<SubtitleSafeZone>(DEFAULT_SUBTITLE_SAFE_ZONE);
   const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | undefined>(undefined);
 
-  // --- On mount: F5 (reload) → reset; SPA navigation → restore draft ---
+  // --- On mount: real F5 reload → reset; SPA navigation → restore draft ---
   const draftLoadedRef = useRef(false);
+
   useEffect(() => {
-    if (draftLoadedRef.current) return;
-    draftLoadedRef.current = true;
+    // Install beforeunload flag so we know if the *next* load is a reload
+    const removeFlag = installReloadFlag();
 
-    const navEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
-    const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
+    if (!draftLoadedRef.current) {
+      draftLoadedRef.current = true;
 
-    if (isReload) {
-      clearDraft();
-      return;
+      if (consumeReloadReset()) {
+        // Real browser reload while DC was open → clear everything
+        clearDraft();
+      } else {
+        // SPA navigation back → restore previous session
+        const draft = loadDraft();
+        if (draft && draft.selectedVideo) {
+          setSelectedVideo(draft.selectedVideo);
+          setScenes(draft.scenes || []);
+          setTransitions(draft.transitions || []);
+          setAppliedEffects(draft.appliedEffects || appliedEffects);
+          setAudioEnhancements(draft.audioEnhancements || audioEnhancements);
+          setExportSettings(draft.exportSettings || exportSettings);
+          setStyleTransfer(draft.styleTransfer || styleTransfer);
+          setColorGrading(draft.colorGrading || colorGrading);
+          setSceneColorGrading(draft.sceneColorGrading || {});
+          setSpeedKeyframes(draft.speedKeyframes || []);
+          setKenBurnsKeyframes(draft.kenBurnsKeyframes || []);
+          setChromaKey(draft.chromaKey || chromaKey);
+          setUpscaling(draft.upscaling || upscaling);
+          setInterpolation(draft.interpolation || interpolation);
+          setRestoration(draft.restoration || restoration);
+          setObjectRemoval(draft.objectRemoval || objectRemoval);
+          setTextOverlays(draft.textOverlays || []);
+          setVoiceOverUrl(draft.voiceOverUrl);
+          setBackgroundMusicUrl(draft.backgroundMusicUrl);
+          setCapCutAudioTracks(draft.capCutAudioTracks || []);
+          setCapCutSubtitleTrack(draft.capCutSubtitleTrack);
+          setSubtitleSafeZone(draft.subtitleSafeZone || DEFAULT_SUBTITLE_SAFE_ZONE);
+          setCleanedVideoUrl(draft.cleanedVideoUrl);
+        }
+      }
     }
 
-    const draft = loadDraft();
-    if (draft && draft.selectedVideo) {
-      setSelectedVideo(draft.selectedVideo);
-      setScenes(draft.scenes || []);
-      setTransitions(draft.transitions || []);
-      setAppliedEffects(draft.appliedEffects || appliedEffects);
-      setAudioEnhancements(draft.audioEnhancements || audioEnhancements);
-      setExportSettings(draft.exportSettings || exportSettings);
-      setStyleTransfer(draft.styleTransfer || styleTransfer);
-      setColorGrading(draft.colorGrading || colorGrading);
-      setSceneColorGrading(draft.sceneColorGrading || {});
-      setSpeedKeyframes(draft.speedKeyframes || []);
-      setKenBurnsKeyframes(draft.kenBurnsKeyframes || []);
-      setChromaKey(draft.chromaKey || chromaKey);
-      setUpscaling(draft.upscaling || upscaling);
-      setInterpolation(draft.interpolation || interpolation);
-      setRestoration(draft.restoration || restoration);
-      setObjectRemoval(draft.objectRemoval || objectRemoval);
-      setTextOverlays(draft.textOverlays || []);
-      setVoiceOverUrl(draft.voiceOverUrl);
-      setBackgroundMusicUrl(draft.backgroundMusicUrl);
-      setCapCutAudioTracks(draft.capCutAudioTracks || []);
-      setCapCutSubtitleTrack(draft.capCutSubtitleTrack);
-      setSubtitleSafeZone(draft.subtitleSafeZone || DEFAULT_SUBTITLE_SAFE_ZONE);
-      setCleanedVideoUrl(draft.cleanedVideoUrl);
-    }
+    return removeFlag;
   }, []);
 
-  // --- Auto-save draft on state changes (debounced) ---
+  // --- Auto-save draft on state changes (debounced) + flush on unmount ---
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestSnapshotRef = useRef<Parameters<typeof saveDraft>[0] | null>(null);
+
+  // Keep a ref to the latest snapshot so we can flush it synchronously on unmount
+  const currentSnapshot = useMemo(() => ({
+    currentStep: selectedVideo ? 10 : 1,
+    selectedVideo,
+    scenes,
+    transitions,
+    appliedEffects,
+    audioEnhancements,
+    exportSettings,
+    styleTransfer,
+    colorGrading,
+    sceneColorGrading,
+    speedKeyframes,
+    kenBurnsKeyframes,
+    chromaKey,
+    upscaling,
+    interpolation,
+    restoration,
+    objectRemoval,
+    textOverlays,
+    voiceOverUrl,
+    backgroundMusicUrl,
+    capCutAudioTracks,
+    capCutSubtitleTrack,
+    subtitleSafeZone,
+    cleanedVideoUrl,
+  }), [selectedVideo, scenes, transitions, appliedEffects, audioEnhancements, exportSettings, styleTransfer, colorGrading, sceneColorGrading, speedKeyframes, kenBurnsKeyframes, chromaKey, upscaling, interpolation, restoration, objectRemoval, textOverlays, voiceOverUrl, backgroundMusicUrl, capCutAudioTracks, capCutSubtitleTrack, subtitleSafeZone, cleanedVideoUrl]);
+
+  latestSnapshotRef.current = currentSnapshot;
+
   useEffect(() => {
     if (!draftLoadedRef.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      saveDraft({
-        currentStep: selectedVideo ? 10 : 1, // Always save as "in studio" if video selected
-        selectedVideo,
-        scenes,
-        transitions,
-        appliedEffects,
-        audioEnhancements,
-        exportSettings,
-        styleTransfer,
-        colorGrading,
-        sceneColorGrading,
-        speedKeyframes,
-        kenBurnsKeyframes,
-        chromaKey,
-        upscaling,
-        interpolation,
-        restoration,
-        objectRemoval,
-        textOverlays,
-        voiceOverUrl,
-        backgroundMusicUrl,
-        capCutAudioTracks,
-        capCutSubtitleTrack,
-        subtitleSafeZone,
-        cleanedVideoUrl,
-      });
+      saveDraft(currentSnapshot);
     }, 500);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [selectedVideo, scenes, transitions, appliedEffects, audioEnhancements, exportSettings, styleTransfer, colorGrading, sceneColorGrading, speedKeyframes, kenBurnsKeyframes, chromaKey, upscaling, interpolation, restoration, objectRemoval, textOverlays, voiceOverUrl, backgroundMusicUrl, capCutAudioTracks, capCutSubtitleTrack, subtitleSafeZone, cleanedVideoUrl]);
+    return () => {
+      // On unmount (navigating away): flush the latest state immediately
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (latestSnapshotRef.current) {
+        saveDraft(latestSnapshotRef.current);
+      }
+    };
+  }, [currentSnapshot]);
 
   // Dynamic video duration
   const actualTotalDuration = useMemo(() => {
