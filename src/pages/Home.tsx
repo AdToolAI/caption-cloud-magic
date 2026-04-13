@@ -20,6 +20,7 @@ import { PlatformBadge } from "@/components/ui/PlatformBadge";
 import { toast } from "sonner";
 import { FeatureGrid } from "@/components/home/FeatureGrid";
 import { DashboardVideoCarousel } from "@/components/dashboard/DashboardVideoCarousel";
+import { NewsTicker } from "@/components/dashboard/NewsTicker";
 import { RecoCard } from "@/features/recommendations/RecoCard";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
