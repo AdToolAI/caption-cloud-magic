@@ -5198,6 +5198,27 @@ export type Database = {
           },
         ]
       }
+      news_radar_cache: {
+        Row: {
+          fetched_at: string
+          id: string
+          language: string
+          news_json: Json
+        }
+        Insert: {
+          fetched_at?: string
+          id?: string
+          language?: string
+          news_json?: Json
+        }
+        Update: {
+          fetched_at?: string
+          id?: string
+          language?: string
+          news_json?: Json
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           approval_request_notify: boolean | null
