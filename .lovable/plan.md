@@ -1,47 +1,30 @@
 
-## Plan: Exportierte Untertitel wirklich sichtbar machen
 
-### Was ich bereits verifiziert habe
-- Der Editor sendet inzwischen korrekt `subtitle_track` mit den Untertiteln.
-- Der Render-Job speichert diese Untertitel auch korrekt in der Datenbank.
-- Die aktuelle `DirectorsCutVideo`-Composition im Code rendert Untertitel bereits im Export-Pfad.
-- Damit liegt der verbleibende Fehler sehr wahrscheinlich nicht mehr im Editor-Payload, sondern im serverseitigen Render-Bundle, das aktuell fürs finale Video verwendet wird.
-- Zusätzlich gibt es eine sichtbare Abweichung zwischen Studio und Export: Im Studio sitzen Untertitel deutlich höher, im Export aktuell zu nah am unteren Rand. Dadurch können sie in der Video-Vorschau hinter den nativen Player-Controls verschwinden.
+## Plan: Videos nach Render nicht mehr temporär verschwinden lassen
 
-### Umsetzung
-1. **Render-Bundle synchronisieren**
-   - Sicherstellen, dass der Backend-Renderer wirklich die aktuelle `DirectorsCutVideo`-Version nutzt.
-   - Falls nötig das verwendete Remotion-/Render-Bundle neu veröffentlichen bzw. auf die aktuelle Version zeigen lassen.
-   - Optional einen kleinen Versionsmarker/Debug-Log einbauen, damit sofort klar ist, ob der neue Bundle aktiv ist.
+### Ursache
+Wenn ein neuer Render abgeschlossen wird, ruft der Code `invalidateQueries({ queryKey: ['video-history'] })` auf. Dadurch:
+1. Der Query hat kein `staleTime` — jede Invalidierung löst sofort einen Refetch aus
+2. Während des Refetch wird `videos` kurzzeitig `undefined` oder leer, was **alle** Video-Elemente im Carousel unmountet
+3. Die `<video>`-Elemente mounten neu und müssen sich alle gleichzeitig neu laden — das dauert bei 10 Videos mit S3-URLs leicht 1-2 Minuten
+4. Das `errorVideos`/`retriedVideos` State wird durch den Re-Mount zurückgesetzt, was zu erneuten Ladefehlern führt
 
-2. **Export-Renderer für Untertitel an die Studio-Vorschau angleichen**
-   - Datei: `src/remotion/templates/DirectorsCutVideo.tsx`
-   - Untertitel im Export genauso positionieren wie im Studio-Preview.
-   - Fehlende Stil-Details übernehmen: konsistente Bottom-Offset-Logik, `maxLines`, `textStroke`, gleiche Font-/Size-Mappings und Umbruch-Verhalten.
+### Fix
 
-3. **Preview und Export gegen erneute Abweichungen härten**
-   - Gemeinsame Subtitle-Konstanten oder Helper verwenden, damit Layout und Styling nicht in zwei Pfaden auseinanderlaufen.
+**1. `useVideoHistory.ts` — Query-Caching härten**
+- `staleTime: 60_000` (1 Minute) setzen, damit nicht jeder Invalidate sofort refetcht
+- `placeholderData: keepPreviousData` verwenden, damit die vorherigen Videos sichtbar bleiben, während im Hintergrund neue Daten geladen werden
 
-4. **End-to-end verifizieren**
-   - Neues Director’s-Cut-Video exportieren.
-   - Prüfen in:
-     - Studio-Preview
-     - Export-Vorschau/Modal
-     - heruntergeladener MP4
-   - Speziell kontrollieren, dass alle Untertitel-Segmente sichtbar eingebrannt sind.
+**2. `DashboardVideoCarousel.tsx` — Video-Elemente stabil halten**
+- `videoUrl` memoizen, damit sich die `src` der Video-Elemente nicht ändert, wenn dieselben Daten zurückkommen
+- `errorVideos` und `retriedVideos` State beim Datenrefresh nicht zurücksetzen
 
-### Technische Details
-- Bestätigte Datenkette:
-  `CapCutEditor -> render-directors-cut -> director_cut_renders.render_config.subtitleTrack`
-- Der letzte Render-Job enthält bereits valide Untertitelclips mit `visible: true`.
-- Das spricht dafür, dass der offene Fehler **nach** dem Request entsteht.
-- Wahrscheinlich betroffene Dateien:
-  - `src/remotion/templates/DirectorsCutVideo.tsx`
-  - `supabase/functions/render-directors-cut/index.ts` (falls ich Versionsmarker/zusätzliche Logs ergänze)
-  - optional eine kleine gemeinsame Subtitle-Utility
-- Keine Datenbank- oder Auth-Änderungen nötig.
+### Betroffene Dateien
+- **Edit:** `src/hooks/useVideoHistory.ts` — `staleTime` + `placeholderData` hinzufügen
+- **Edit:** `src/components/dashboard/DashboardVideoCarousel.tsx` — stabile Video-Keys + memoized URLs
 
 ### Ergebnis
-- Untertitel sind im final exportierten Video wieder sichtbar.
-- Export und Studio-Vorschau sehen gleich aus.
-- Künftige Subtitle-Fixes greifen nicht mehr nur in einem der beiden Render-Pfade.
+- Bestehende Videos bleiben während eines Refetch sichtbar
+- Neue Videos tauchen nahtlos auf, sobald der Refetch abgeschlossen ist
+- Kein 2-Minuten-Blackout mehr nach einem neuen Render
+
