@@ -23,10 +23,8 @@ const platformVisuals: Record<string, { gradient: string; Icon: typeof Globe; gl
 };
 
 function getImageUrl(category: string, index: number): string {
-  const keywords = categoryImageMap[category?.toLowerCase()] || 'technology,digital,abstract';
-  // Use a seed based on index for consistent but varied images
-  const seed = index * 137 + category.length * 31;
-  return `https://source.unsplash.com/600x400/?${keywords}&sig=${seed}`;
+  const seed = index * 137 + (category?.length || 5) * 31;
+  return `https://picsum.photos/seed/${category}-${seed}/600/400`;
 }
 
 interface TrendCardMediaProps {
