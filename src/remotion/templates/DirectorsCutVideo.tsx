@@ -9,6 +9,17 @@ import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInter
 import { z } from 'zod';
 import { SVGFilters, SVG_FILTER_IDS, isSVGFilter, VHSScanlines, VignetteOverlay } from '../components/SVGFilters';
 import { TextOverlayRenderer, TextOverlayProps } from '../components/TextOverlayRenderer';
+import {
+  SUBTITLE_FONT_SIZE_MAP,
+  SUBTITLE_DEFAULT_BG,
+  SUBTITLE_DEFAULT_COLOR,
+  SUBTITLE_DEFAULT_FONT_FAMILY,
+  SUBTITLE_DEFAULT_FONT_SIZE,
+  SUBTITLE_BOTTOM_PADDING,
+  SUBTITLE_TOP_PADDING,
+  SUBTITLE_Z_INDEX,
+  SUBTITLE_RENDER_VERSION,
+} from '../utils/subtitleConstants';
 
 // Font: Inter loaded via native FontFace API
 const fontFamily = 'Inter';
@@ -579,6 +590,11 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   const { fps, durationInFrames } = useVideoConfig();
   const currentTimeSeconds = frame / fps;
 
+  // Log render version once on first frame for bundle verification
+  useEffect(() => {
+    console.log(`[DirectorsCutVideo] Bundle version: ${SUBTITLE_RENDER_VERSION}, subtitleTrack clips: ${subtitleTrack?.clips?.length ?? 0}, visible: ${subtitleTrack?.visible}`);
+  }, []);
+
   // Load font using native FontFace API (same as UniversalVideo.tsx)
   useEffect(() => {
     const handle = delayRender('Loading Inter font for Director\'s Cut...');
@@ -897,24 +913,28 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           );
         })}
         {/* Subtitles */}
-        {subtitleTrack?.clips?.map((clip) => {
+        {subtitleTrack?.visible !== false && subtitleTrack?.clips?.map((clip) => {
           const startFrame = Math.floor(clip.startTime * fps);
           const endFrame = Math.floor(clip.endTime * fps);
           const clipDuration = Math.max(1, endFrame - startFrame);
-          const fontSizeMap: Record<string, string> = { small: '24px', medium: '36px', large: '48px', xl: '64px' };
           return (
             <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
               <AbsoluteFill style={{
                 display: 'flex', justifyContent: 'center',
                 alignItems: clip.position === 'top' ? 'flex-start' : clip.position === 'center' ? 'center' : 'flex-end',
-                padding: '5%', pointerEvents: 'none', zIndex: 100,
+                paddingTop: clip.position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
+                paddingBottom: clip.position !== 'top' && clip.position !== 'center' ? SUBTITLE_BOTTOM_PADDING : '5%',
+                paddingLeft: '5%', paddingRight: '5%',
+                pointerEvents: 'none', zIndex: SUBTITLE_Z_INDEX,
               }}>
                 <div style={{
-                  backgroundColor: clip.backgroundColor || 'rgba(0,0,0,0.7)',
-                  color: clip.color || '#FFFFFF', padding: '12px 24px', borderRadius: '8px',
-                  fontSize: fontSizeMap[clip.fontSize || 'medium'] || '36px',
-                  fontFamily: clip.fontFamily || fontFamily, fontWeight: 'bold',
+                  backgroundColor: clip.backgroundColor || SUBTITLE_DEFAULT_BG,
+                  color: clip.color || SUBTITLE_DEFAULT_COLOR,
+                  padding: '14px 28px', borderRadius: '8px',
+                  fontSize: SUBTITLE_FONT_SIZE_MAP[clip.fontSize || SUBTITLE_DEFAULT_FONT_SIZE] || SUBTITLE_FONT_SIZE_MAP.medium,
+                  fontFamily: clip.fontFamily || SUBTITLE_DEFAULT_FONT_FAMILY, fontWeight: 'bold',
                   textAlign: 'center', maxWidth: '90%', lineHeight: 1.4,
+                  textShadow: '0 2px 4px rgba(0,0,0,0.5)',
                 }}>
                   {clip.text}
                 </div>
@@ -1114,17 +1134,10 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       })}
 
       {/* Subtitles */}
-      {subtitleTrack?.clips?.map((clip) => {
+      {subtitleTrack?.visible !== false && subtitleTrack?.clips?.map((clip) => {
         const startFrame = Math.floor(clip.startTime * fps);
         const endFrame = Math.floor(clip.endTime * fps);
         const clipDuration = Math.max(1, endFrame - startFrame);
-        
-        const fontSizeMap: Record<string, string> = {
-          small: '24px',
-          medium: '36px',
-          large: '48px',
-          xl: '64px',
-        };
         
         return (
           <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
@@ -1133,21 +1146,25 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
               justifyContent: 'center',
               alignItems: clip.position === 'top' ? 'flex-start' : 
                          clip.position === 'center' ? 'center' : 'flex-end',
-              padding: '5%',
+              paddingTop: clip.position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
+              paddingBottom: clip.position !== 'top' && clip.position !== 'center' ? SUBTITLE_BOTTOM_PADDING : '5%',
+              paddingLeft: '5%',
+              paddingRight: '5%',
               pointerEvents: 'none',
-              zIndex: 100,
+              zIndex: SUBTITLE_Z_INDEX,
             }}>
               <div style={{
-                backgroundColor: clip.backgroundColor || 'rgba(0,0,0,0.7)',
-                color: clip.color || '#FFFFFF',
-                padding: '12px 24px',
+                backgroundColor: clip.backgroundColor || SUBTITLE_DEFAULT_BG,
+                color: clip.color || SUBTITLE_DEFAULT_COLOR,
+                padding: '14px 28px',
                 borderRadius: '8px',
-                fontSize: fontSizeMap[clip.fontSize || 'medium'] || '36px',
-                fontFamily: clip.fontFamily || fontFamily,
+                fontSize: SUBTITLE_FONT_SIZE_MAP[clip.fontSize || SUBTITLE_DEFAULT_FONT_SIZE] || SUBTITLE_FONT_SIZE_MAP.medium,
+                fontFamily: clip.fontFamily || SUBTITLE_DEFAULT_FONT_FAMILY,
                 fontWeight: 'bold',
                 textAlign: 'center',
                 maxWidth: '90%',
                 lineHeight: 1.4,
+                textShadow: '0 2px 4px rgba(0,0,0,0.5)',
               }}>
                 {clip.text}
               </div>

@@ -211,6 +211,11 @@ serve(async (req) => {
     console.log(`[RenderDirectorsCut] Filter value:`, effects?.filter);
     console.log(`[RenderDirectorsCut] Scene effects:`, JSON.stringify(scene_effects));
     console.log(`[RenderDirectorsCut] Subtitle track:`, JSON.stringify(subtitle_track));
+    console.log(`[RenderDirectorsCut] Subtitle track clips count:`, subtitle_track?.clips?.length ?? 0);
+    console.log(`[RenderDirectorsCut] Subtitle track visible:`, subtitle_track?.visible);
+    if (subtitle_track?.clips?.length > 0) {
+      console.log(`[RenderDirectorsCut] First subtitle clip:`, JSON.stringify(subtitle_track.clips[0]));
+    }
     console.log(`[RenderDirectorsCut] Text overlays:`, JSON.stringify(text_overlays));
 
     const duration = duration_seconds || 30;
