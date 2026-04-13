@@ -555,14 +555,7 @@ const Home = () => {
       <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
         {/* Hero Banner */}
         {user && (
-          <DashboardVideoCarousel />
-        )}
-
-        {/* Quick Actions - Sticky */}
-        {user && (
-          <div className="sticky top-14 z-30 bg-gradient-to-b from-background via-background/95 to-transparent backdrop-blur-md py-3 -mx-4 px-4 md:mx-0 md:px-0">
-            <QuickActions actions={quickActions} />
-          </div>
+          <DashboardVideoCarousel quickActions={quickActions} />
         )}
 
         {/* Nächster Post Section */}
