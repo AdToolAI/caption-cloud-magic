@@ -1,30 +1,41 @@
 
 
-## Plan: AI-Skript für leere Untertitel generieren
+## Plan: Voiceover aus Untertiteln generieren mit Lautstärke-Regler
 
 ### Feature
-Nach dem Erstellen leerer Untertitel erscheint ein neuer Button "KI-Skript für Untertitel". Der User beschreibt kurz das Thema (z.B. "Werbung für Firma XY"), die KI generiert ein Skript passend zur Gesamtdauer aller Untertitel-Slots und füllt sie automatisch.
+In der CapCut-Sidebar (Untertitel-Tab) erscheint ein neuer Bereich "Voiceover aus Untertiteln", wenn Untertitel mit Text vorhanden sind. Der User kann:
+- Per Klick alle Untertitel-Texte zu einem zusammenhängenden Voiceover generieren lassen
+- Stimme und Sprache wählen
+- Die Lautstärke des generierten Voiceovers einstellen
+- Das Voiceover wird automatisch als Clip in den Voiceover-Track eingefügt
 
 ### Umsetzung
 
-**1. Neue Edge Function** `supabase/functions/generate-subtitle-script/index.ts`
-- Erhält: `idea`, `segments` (Array mit `{startTime, endTime}`), `tone`, `language`
-- Berechnet Gesamtdauer und Wort-Budget aus den Segmenten
-- Prompt: "Schreibe ein Skript mit genau N Segmenten, jedes Segment hat X Sekunden Sprechzeit"
-- KI liefert ein Array von Texten zurück, eines pro Segment
-- Nutzt Lovable AI Gateway (`google/gemini-2.5-flash`)
+**1. Neue UI-Sektion in `CapCutSidebar.tsx`** (nach der AI-Script-Sektion, ca. Zeile 1375)
+- Komponente `SubtitleVoiceoverSection` — sichtbar wenn Untertitel mit Text vorhanden sind
+- Voice-Select (Sarah, Roger, Aria, Laura etc.) + Sprache (DE/EN/ES)
+- Lautstärke-Slider (0–100%)
+- "Voiceover generieren" Button
+- Nutzt die bestehende Edge Function `director-cut-voice-over` mit dem kombinierten Untertitel-Text
+- Bei Erfolg: Callback `onVoiceOverGenerated` aufrufen → fügt Clip automatisch in den Voiceover-Track ein (bestehende Logik in CapCutEditor)
 
-**2. UI in CapCutSidebar.tsx** (nach dem "Leere Untertitel erstellen"-Button, Zeile ~1233)
-- Nur sichtbar wenn leere Untertitel existieren (`existingCaptions.length > 0 && existingCaptions.some(c => !c.text)`)
-- Textarea für Themenbeschreibung + Tone-Select (Freundlich/Professionell/Energetisch)
-- "KI-Skript generieren" Button
-- Bei Erfolg: jeder leere Untertitel-Slot wird mit dem passenden Segment-Text gefüllt via `onCaptionsGenerated`
+**2. Props erweitern** in `CapCutSidebar`
+- `onVoiceOverGenerated` Prop durchreichen (existiert bereits in CapCutEditor, muss nur an Sidebar weitergegeben werden)
 
-**3. Translations** `src/lib/translations.ts`
-- Neue Keys: `dc.aiSubtitleScript`, `dc.aiSubtitleScriptDesc`, `dc.aiSubtitleScriptPlaceholder`, `dc.generateSubtitleScript`, `dc.subtitlesFilled` (DE/EN/ES)
+**3. Voiceover-Lautstärke** 
+- Der Volume-Slider steuert die Track-Lautstärke des Voiceover-Tracks
+- Dazu `onVoiceoverVolumeChange` Callback oder direktes Setzen über bestehende Audio-Track-Logik
+
+**4. Translations** in `src/lib/translations.ts`
+- Neue Keys: `dc.subtitleVoiceover`, `dc.subtitleVoiceoverDesc`, `dc.generateVoiceoverFromSubs`, `dc.voiceoverVolume`, `dc.voiceoverVoice` (DE/EN/ES)
 
 ### Dateien
-- **Neu**: `supabase/functions/generate-subtitle-script/index.ts`
-- **Edit**: `src/components/directors-cut/studio/CapCutSidebar.tsx` — UI für Skript-Input + Fill-Logik
+- **Edit**: `src/components/directors-cut/studio/CapCutSidebar.tsx` — Neue `SubtitleVoiceoverSection` Komponente + Props
+- **Edit**: `src/components/directors-cut/studio/CapCutEditor.tsx` — `onVoiceOverGenerated` an Sidebar durchreichen
 - **Edit**: `src/lib/translations.ts` — Neue Übersetzungskeys
+
+### Bestehende Infrastruktur (wird wiederverwendet)
+- Edge Function `director-cut-voice-over` — generiert TTS via ElevenLabs, speichert in Storage
+- `onVoiceOverGenerated` Callback — fügt Audio automatisch in Voiceover-Track ein
+- Voiceover-Track mit Volume-Control in der Timeline
 
