@@ -20,4 +20,4 @@ export const SUBTITLE_TOP_PADDING = '8%';
 export const SUBTITLE_Z_INDEX = 200;
 
 /** Version marker — bump on every subtitle-related change to verify bundle freshness */
-export const SUBTITLE_RENDER_VERSION = 'v2026-04-13b';
+export const SUBTITLE_RENDER_VERSION = 'v2026-04-13c-fallback-fix';
