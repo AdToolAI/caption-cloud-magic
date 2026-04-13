@@ -248,7 +248,7 @@ function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t
             className="relative w-full rounded-2xl overflow-hidden"
           >
             {/* Real image background with Ken Burns */}
-            <HeroMediaBackground category={trend.category} platform={trend.platform} index={current} />
+            <HeroMediaBackground category={trend.category} platform={trend.platform} index={current} imageUrl={trend.data_json?.image_url} />
             
             <div className="relative z-10 p-8 md:p-12 flex flex-col justify-end min-h-[340px]">
               {/* Top bar */}
@@ -759,7 +759,7 @@ export default function TrendRadar() {
                           >
                             {/* Media-rich image header */}
                             <div className="relative">
-                              <TrendCardMedia category={trend.category} platform={trend.platform} index={index} height="h-44" />
+                              <TrendCardMedia category={trend.category} platform={trend.platform} index={index} height="h-44" imageUrl={trend.data_json?.image_url} />
                               
                               {/* Platform badge */}
                               <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md text-white text-xs font-semibold border border-white/20 uppercase tracking-wider">
