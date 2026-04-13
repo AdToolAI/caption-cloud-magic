@@ -1133,7 +1133,24 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           export_settings: exportSettings || { quality: 'hd', format: 'mp4', fps: 30, aspect_ratio: '16:9' },
           voiceover_url: voiceOverUrl,
           background_music_url: audioTracks.find(t => t.id === 'track-music')?.clips?.[0]?.originalUrl || audioTracks.find(t => t.id === 'track-music')?.clips?.[0]?.url,
-          subtitle_track: showSubtitles ? subtitleTrack : undefined,
+          subtitle_track: showSubtitles && subtitleTrack.clips.length > 0 ? {
+            id: subtitleTrack.id,
+            name: subtitleTrack.name,
+            clips: subtitleTrack.clips
+              .filter(c => c.text?.trim())
+              .map(c => ({
+                id: c.id,
+                startTime: c.startTime,
+                endTime: c.endTime,
+                text: c.text,
+                position: c.position,
+                fontSize: c.fontSize,
+                color: c.color,
+                backgroundColor: c.backgroundColor,
+                fontFamily: c.fontFamily,
+              })),
+            visible: subtitleTrack.visible,
+          } : undefined,
           duration_seconds: videoDuration || scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0),
         },
       });
