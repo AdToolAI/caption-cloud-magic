@@ -1,28 +1,43 @@
 
 
-## Plan: Enterprise-Credits nach rechts mit leuchtenden Linien
+## Plan: TV-Style News-Ticker für Content-Tipps
 
-### Änderungen
+### Konzept
+Ein horizontaler, durchlaufender Ticker-Balken wie bei Nachrichtensendern (CNN/Bloomberg-Stil), der ständig Content-Tipps, Plattform-Updates und Weisheiten durchscrollt. Platziert direkt unter dem Header, über dem Dashboard-Content. Im James Bond 2028 Stil mit Gold-Akzenten und Glassmorphism.
 
-1. **Enterprise-Bereich nach rechts ausrichten**
-   - In `CreditBalance.tsx` Zeile 94: `flex items-center gap-4` → `flex items-center justify-end gap-4`
-   - Dadurch rutscht der Infinity-Icon + Text-Block an den rechten Rand des Cards
+### Umsetzung
 
-2. **Komplette Umrandung entfernen, leuchtende Linien hinzufügen**
-   - Card-Border `border border-white/10` entfernen oder auf `border-0` setzen
-   - Zwei vertikale leuchtende Linien als Pseudo-Elemente oder separate Divs:
-     - Links: `absolute left-0 top-4 bottom-4 w-px bg-gradient-to-b from-transparent via-primary/60 to-transparent`
-     - Rechts: `absolute right-0 top-4 bottom-4 w-px bg-gradient-to-b from-transparent via-primary/60 to-transparent`
-   - Optional: Glow-Effekt auf den Linien mit `shadow-[0_0_8px_hsla(43,90%,68%,0.5)]`
+1. **Neue Komponente `NewsTicker.tsx` erstellen**
+   - Horizontaler Balken mit CSS-Animation (`@keyframes marquee`) für endloses Durchlaufen
+   - Gold-leuchtende Trennlinien oben und unten (wie Enterprise-Credits-Pattern)
+   - Dunkler glassmorphism Hintergrund (`bg-black/40 backdrop-blur-md`)
+   - Links ein Label-Badge "LIVE TIPS" oder "💡 CONTENT INTEL" im Gold-Stil
+   - Rechts scrollender Text mit Tipps, getrennt durch Gold-Diamonds (◆)
+   - Hover pausiert die Animation
 
-3. **Card-Padding anpassen**
-   - Bei rechtsbündiger Ausrichtung ggf. `pr-6` beibehalten, aber `pl-6` reduzieren oder anpassen für Symmetrie
+2. **Tipps-Datenbank**
+   - Statisches Array mit 15-20 Content-Tipps auf Deutsch (z.B. "Poste Reels zwischen 18-20 Uhr für 3x mehr Reichweite", "Nutze 3-5 Hashtags für optimale Sichtbarkeit")
+   - Tipps rotieren bei jedem Laden zufällig
+   - Später erweiterbar mit personalisierten Tipps aus der DB
 
-### Betroffene Datei
-- `src/components/credits/CreditBalance.tsx`
+3. **Integration in Home.tsx**
+   - Direkt unter dem "Tipp des Tages"-Bereich bzw. als Ersatz dafür
+   - Nur für eingeloggte User sichtbar
+   - Schmale Höhe (~36-40px) um wenig Platz zu nehmen
+
+4. **Styling (James Bond 2028)**
+   - Hintergrund: `bg-gradient-to-r from-black/60 via-[#0a0f1e]/80 to-black/60`
+   - Text: Gold (`text-primary`) oder helles Weiß
+   - Leuchtende Linien oben/unten: `bg-gradient-to-r from-transparent via-primary/40 to-transparent`
+   - Label-Badge: Gold-Border mit Glow
+   - Smooth infinite scroll animation
+
+### Betroffene Dateien
+- `src/components/dashboard/NewsTicker.tsx` — Neue Komponente
+- `src/pages/Home.tsx` — Integration
 
 ### Ergebnis
-- Enterprise-Plan-Anzeige (Infinity-Icon + "Unbegrenzte Credits") sitzt rechts im Card
-- Keine sichtbare Box-Umrandung mehr, stattdessen zwei elegante, leuchtende vertikale Linien links und rechts
-- Modernes, aufgeräumtes Erscheinungsbild im James-Bond-Design (Gold/Cyan-Glow)
+- TV-Nachrichtensender-Feeling mit durchlaufenden Content-Tipps
+- Passt zum James Bond 2028 Premium-Look
+- Nimmt minimal Platz ein, liefert aber ständig Mehrwert
 
