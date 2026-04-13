@@ -22,6 +22,10 @@ const MODEL_DISPLAY_NAMES: Record<string, string> = {
   'seedance-pro': 'Seedance 2.0 Pro',
   'wan-standard': 'Wan 2.5 Standard',
   'wan-pro': 'Wan 2.5 Pro',
+  'hailuo-standard': 'Hailuo 2.3 Standard',
+  'hailuo-pro': 'Hailuo 2.3 Pro',
+  'luma-standard': 'Luma Ray 2 Standard',
+  'luma-pro': 'Luma Ray 2 Pro',
 };
 
 interface VideoGeneration {

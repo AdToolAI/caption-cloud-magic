@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, FolderOpen, Video, Film, Wand2, Clapperboard } from 'lucide-react';
+import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, FolderOpen, Video, Film, Wand2, Clapperboard, Eye, Camera } from 'lucide-react';
 import { AlbumImagePicker } from '@/components/media-library/AlbumImagePicker';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
@@ -273,6 +273,28 @@ export default function AIVideoStudio() {
       link: '/wan-video-studio',
       icon: Wand2,
     },
+    {
+      name: 'Hailuo 2.3',
+      provider: 'MiniMax',
+      description: language === 'de' ? 'Realistische Gesichter, Bewegung & Charaktere' : 'Realistic faces, motion & characters',
+      features: ['Text-to-Video', 'Image-to-Video', '1080p', 'Realistic Motion'],
+      pricing: `${currSymbol}0.15–0.20/s`,
+      maxDuration: '10s',
+      quality: '1080p',
+      link: '/hailuo-video-studio',
+      icon: Eye,
+    },
+    {
+      name: 'Luma Ray 2',
+      provider: 'Luma AI',
+      description: language === 'de' ? 'Cinematic Szenen, surreale & künstlerische Projekte' : 'Cinematic scenes, surreal & artistic projects',
+      features: ['Text-to-Video', 'Image-to-Video', 'Camera Concepts', 'Loop'],
+      pricing: `${currSymbol}0.18–0.25/s`,
+      maxDuration: '9s',
+      quality: '720p',
+      link: '/luma-video-studio',
+      icon: Camera,
+    },
   ];
 
   if (!canUseAIVideoGeneration(userWallet?.plan_code as PlanId)) {
@@ -366,7 +388,7 @@ export default function AIVideoStudio() {
                 AI Video Studio
               </h1>
               <p className="text-muted-foreground mt-1 text-sm md:text-base">
-                {language === 'de' ? '4 KI-Modelle. Endlose kreative Möglichkeiten.' : language === 'es' ? '4 modelos de IA. Posibilidades creativas infinitas.' : '4 AI models. Endless creative possibilities.'}
+                {language === 'de' ? '6 KI-Modelle. Endlose kreative Möglichkeiten.' : language === 'es' ? '6 modelos de IA. Posibilidades creativas infinitas.' : '6 AI models. Endless creative possibilities.'}
               </p>
             </div>
             {/* Wallet Badge */}
@@ -418,7 +440,7 @@ export default function AIVideoStudio() {
             <AIVideoDisclaimer />
 
             {/* Provider Grid */}
-            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {providers.map((p, idx) => {
                 const cardLink = p.tab === 'generate' ? '#' : p.link;
                 return (
