@@ -279,9 +279,9 @@ export default function AIVideoStudio() {
               <Film className="w-4 h-4 mr-2" />
               Studios
             </TabsTrigger>
-            <TabsTrigger value="generate">
-              <Sparkles className="w-4 h-4 mr-2" />
-              Sora 2
+            <TabsTrigger value="legal">
+              <ShieldAlert className="w-4 h-4 mr-2" />
+              {language === 'de' ? 'Rechtliches' : language === 'es' ? 'Legal' : 'Legal'}
             </TabsTrigger>
             <TabsTrigger value="history">
               <History className="w-4 h-4 mr-2" />
@@ -295,172 +295,26 @@ export default function AIVideoStudio() {
 
           {/* ── TAB: Studios Overview ── */}
           <TabsContent value="studios" className="space-y-6">
-            {/* Disclaimer */}
-            <AIVideoDisclaimer />
-
             {/* Provider Grid */}
             <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {providers.map((p, idx) => {
-                const cardLink = p.tab === 'generate' ? '#' : p.link;
-                return (
-                  <div key={p.name} onClick={() => { if (p.tab === 'generate') setActiveTab('generate'); }}>
-                    <AIVideoProviderCard
-                      {...p}
-                      index={idx}
-                      link={cardLink}
-                    />
-                  </div>
-                );
-              })}
+              {providers.map((p, idx) => (
+                <AIVideoProviderCard
+                  key={p.name}
+                  {...p}
+                  index={idx}
+                />
+              ))}
             </motion.div>
           </TabsContent>
 
-          {/* ── TAB: Sora 2 Generate ── */}
-          <TabsContent value="generate" className="space-y-6">
-            <Card className="p-6">
-              <div className="space-y-6">
-                {/* Prompt */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium">{t('aiVid.videoDescription')}</label>
-                    <Button variant="outline" size="sm" onClick={() => setShowPromptOptimizer(true)}>
-                      <Sparkles className="w-3 h-3 mr-1" />
-                      {t('aiVid.optimizePrompt')}
-                    </Button>
-                  </div>
-                  <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t('aiVid.promptPlaceholder')} rows={4} className="resize-none" />
-                  <div className="mt-2 p-3 bg-primary/5 border border-primary/20 rounded-md">
-                    <p className="text-xs text-muted-foreground flex items-start gap-2">
-                      <span className="text-primary">ℹ️</span>
-                      <span><strong>{t('aiVid.promptHintTitle')}</strong> {t('aiVid.promptHint')}</span>
-                    </p>
-                  </div>
-                </div>
-
-                {/* Reference Image */}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">{t('aiVid.referenceImage')}</label>
-                  <p className="text-xs text-muted-foreground mb-3">{t('aiVid.referenceImageDesc')}</p>
-                  {!referenceImageUrl ? (
-                    <>
-                      <div
-                        className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-all"
-                        onClick={() => fileInputRef.current?.click()}
-                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-primary', 'bg-accent/50'); }}
-                        onDragLeave={(e) => { e.currentTarget.classList.remove('border-primary', 'bg-accent/50'); }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          e.currentTarget.classList.remove('border-primary', 'bg-accent/50');
-                          const file = e.dataTransfer.files[0];
-                          if (file && fileInputRef.current) {
-                            const dt = new DataTransfer();
-                            dt.items.add(file);
-                            fileInputRef.current.files = dt.files;
-                            fileInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
-                          }
-                        }}
-                      >
-                        {uploadingImage ? (
-                          <Loader2 className="w-8 h-8 mx-auto mb-2 text-muted-foreground animate-spin" />
-                        ) : (
-                          <ImagePlus className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                        )}
-                        <p className="text-sm text-muted-foreground">{uploadingImage ? t('aiVid.uploading') : t('aiVid.uploadOrDrag')}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{t('aiVid.uploadLimit')}</p>
-                        <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={handleImageUpload} disabled={uploadingImage} />
-                      </div>
-                      <Button variant="outline" className="w-full mt-2" onClick={() => setAlbumPickerOpen(true)}>
-                        <FolderOpen className="w-4 h-4 mr-2" />
-                        {t('aiVid.chooseFromAlbums')}
-                      </Button>
-                    </>
-                  ) : (
-                    <div className="relative rounded-lg overflow-hidden border border-border">
-                      <img src={referenceImageUrl} alt={t('aiVid.referenceImage')} className="w-full max-h-48 object-contain bg-muted" />
-                      <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-8 w-8" onClick={handleRemoveImage}>
-                        <X className="w-4 h-4" />
-                      </Button>
-                      <Badge className="absolute bottom-2 left-2 bg-primary/90" variant="default">
-                        <ImagePlus className="w-3 h-3 mr-1" />
-                        {t('aiVid.imageToVideoActive')}
-                      </Badge>
-                    </div>
-                  )}
-                  <AlbumImagePicker open={albumPickerOpen} onOpenChange={setAlbumPickerOpen} onSelectImage={(url) => { setReferenceImageUrl(url); setReferenceImage(null); toast.success(t('aiVid.albumImageSelected')); }} />
-                </div>
-
-                {/* Model Selection */}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">{t('aiVid.model')}</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {(Object.keys(AI_VIDEO_MODELS) as AIVideoModel[]).map((modelKey) => {
-                      const modelInfo = AI_VIDEO_MODELS[modelKey];
-                      return (
-                        <Card key={modelKey} className={`p-4 cursor-pointer transition-all ${model === modelKey ? 'ring-2 ring-primary' : 'hover:bg-accent'}`} onClick={() => setModel(modelKey)}>
-                          <div className="flex items-start justify-between mb-2">
-                            <h3 className="font-semibold">{modelInfo.name}</h3>
-                            <Badge variant={model === modelKey ? 'default' : 'secondary'}>{modelInfo.badge}</Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">{modelInfo.description}</p>
-                          <p className="text-xs font-medium">{formatPrice(modelInfo.costPerSecond[currency], currency)}{t('aiVid.perSec')}</p>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Duration */}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">{t('aiVid.videoDuration')}</label>
-                  <div className="flex gap-3">
-                    {([4, 8, 12] as const).map((seconds) => (
-                      <Button key={seconds} variant={duration === seconds ? 'default' : 'outline'} onClick={() => setDuration(seconds)} className="flex-1">
-                        <div className="text-center">
-                          <div className="font-semibold">{seconds}s</div>
-                          <div className="text-xs opacity-80">{formatPrice(seconds * costPerSecond, currency)}</div>
-                        </div>
-                      </Button>
-                    ))}
-                  </div>
-                  <div className="mt-2 p-3 bg-primary/5 border border-primary/20 rounded-md">
-                    <p className="text-xs text-muted-foreground">{t('aiVid.durationBetaNote')}</p>
-                  </div>
-                </div>
-
-                {/* Aspect Ratio */}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">{t('aiVid.aspectRatio')}</label>
-                  <div className="flex gap-2">
-                    {(['16:9', '9:16', '1:1'] as const).map((ratio) => (
-                      <Button key={ratio} variant={aspectRatio === ratio ? 'default' : 'outline'} onClick={() => setAspectRatio(ratio)} size="sm">{ratio}</Button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Cost Display */}
-                <Card className="p-4 bg-muted/50">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t('aiVid.cost')}</p>
-                      <p className="text-xl font-bold">{formatPrice(cost, currency)}</p>
-                    </div>
-                    <Badge variant={canAfford ? 'default' : 'destructive'}>
-                      {canAfford ? t('aiVid.sufficientCredits') : t('aiVid.insufficientCredits')}
-                    </Badge>
-                  </div>
-                </Card>
-
-                {/* Generate Button */}
-                <Button className="w-full" size="lg" onClick={handleGenerate} disabled={generating || !canAfford || !prompt.trim()}>
-                  {generating ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t('aiVid.generating')}</>) : (<><Sparkles className="w-4 h-4 mr-2" />{t('aiVid.generateVideo')}</>)}
-                </Button>
-              </div>
-            </Card>
+          {/* ── TAB: Legal / Disclaimer ── */}
+          <TabsContent value="legal" className="space-y-6">
+            <AIVideoDisclaimer />
           </TabsContent>
 
           {/* ── TAB: History (All Providers) ── */}
           <TabsContent value="history">
-            <VideoGenerationHistory onRetryGeneration={handleRetryGeneration} />
+            <VideoGenerationHistory />
           </TabsContent>
 
           {/* ── TAB: Credits ── */}
@@ -468,12 +322,6 @@ export default function AIVideoStudio() {
             <AIVideoCreditPurchase />
           </TabsContent>
         </Tabs>
-
-        <VideoPromptOptimizer
-          open={showPromptOptimizer}
-          onClose={() => setShowPromptOptimizer(false)}
-          onPromptGenerated={(optimizedPrompt) => { setPrompt(optimizedPrompt); setShowPromptOptimizer(false); }}
-        />
       </div>
     </>
   );
