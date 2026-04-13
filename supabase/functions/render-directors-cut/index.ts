@@ -361,6 +361,28 @@ serve(async (req) => {
       throw new Error('REMOTION_SERVE_URL not configured');
     }
 
+    // ✅ BUNDLE VERSION CHECK — fetch bundle-version.json to verify freshness
+    const EXPECTED_BUNDLE_VERSION = 'v2026-04-13c-fallback-fix';
+    let bundleVersionOk = false;
+    try {
+      const versionUrl = REMOTION_SERVE_URL.replace(/\/index\.html$/, '/bundle-version.json');
+      const versionRes = await fetch(versionUrl, { signal: AbortSignal.timeout(5000) });
+      if (versionRes.ok) {
+        const versionData = await versionRes.json();
+        console.log(`[RenderDirectorsCut] 🔖 Bundle version: ${versionData.version}, built: ${versionData.built_at}`);
+        if (versionData.version === EXPECTED_BUNDLE_VERSION) {
+          bundleVersionOk = true;
+        } else {
+          console.warn(`[RenderDirectorsCut] ⚠️ BUNDLE VERSION MISMATCH! Expected: ${EXPECTED_BUNDLE_VERSION}, Got: ${versionData.version}`);
+        }
+      } else {
+        console.warn(`[RenderDirectorsCut] ⚠️ Could not fetch bundle-version.json: ${versionRes.status}`);
+      }
+    } catch (e) {
+      console.warn(`[RenderDirectorsCut] ⚠️ Bundle version check failed:`, e);
+    }
+    console.log(`[RenderDirectorsCut] 🔖 Bundle version verified: ${bundleVersionOk} (expected: ${EXPECTED_BUNDLE_VERSION})`);
+
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
     const fps = 30;
     const durationInFrames = Math.ceil(duration * fps);
