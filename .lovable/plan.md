@@ -1,30 +1,51 @@
 
-## Plan: Ticker langsamer, mehr James Bond 2028 Stil, Ein/Aus-Toggle
 
-### Änderungen
+## Plan: Trend-Ticker mit Bildern — Futuristisches Hologramm-Design
 
-1. **Animation langsamer machen**
-   - `animate-[marquee_60s_...]` → `animate-[marquee_120s_...]` (doppelt so langsam)
+### Konzept
+Die bestehende NewsTicker-Leiste wird auf halbe Höhe (h-5/h-6 statt h-10) reduziert und zeigt statt statischer Tipps echte Trends aus dem Trend Radar. Jeder Trend erscheint als kompakte "Hologramm-Karte" mit kleinem Thumbnail-Bild, Trend-Name und Plattform-Icon — alles horizontal scrollend im Marquee-Stil.
 
-2. **Mehr James Bond 2028 Stil**
-   - Glow-Linien intensiver: `via-primary/60` statt `via-primary/40`, zusätzlicher `shadow`-Glow
-   - LIVE TIPS Badge: stärkerer Glow-Effekt, `font-display` (Playfair Display)
-   - Subtiler Gold-Schimmer-Gradient im Hintergrund
-   - Text mit leichtem `drop-shadow` für Premium-Feeling
-   - Separator ◆ in gedämpfterem Gold für elegantere Trennung
+### Design-Vision: "Holographic Intel Strip"
+- **Halbe Höhe**: Von `h-10` auf `h-6` (24px)
+- **Trend-Cards im Scroll**: Statt reiner Text-Zeile kleine "Micro-Cards" mit:
+  - Winziges Thumbnail (20x20px, abgerundete Ecken, Cyan-Glow-Border)
+  - Trend-Name in Gold (truncated, max ~120px)
+  - Plattform-Indikator als farbiger Dot (TikTok=cyan, Instagram=pink, YouTube=red)
+  - Popularity als Mini-Balken oder Pulse-Animation
+- **Separator**: Vertikale leuchtende Linie zwischen den Trend-Cards statt ◆
+- **Scan-Line-Effekt**: Ein subtiler horizontaler Lichtstreifen, der periodisch über die Leiste "scannt" (CSS animation)
+- **Label**: "TREND RADAR" statt "LIVE TIPS" mit Radar-Pulse-Animation
 
-3. **Ein/Aus-Toggle hinzufügen**
-   - Rechts im Ticker ein kleiner Toggle-Switch (Power-Icon oder X-Button)
-   - Zustand in `localStorage` persistieren (`newsticker-visible`)
-   - Wenn ausgeschaltet: Ticker verschwindet mit `AnimatePresence` Slide-Up-Animation
-   - Wenn ausgeschaltet: kleiner minimaler "TIPS"-Button am oberen Rand zum Wiedereinschalten
-   - Toggle-State als `useState` + `localStorage` in der Komponente selbst
+### Datenquelle
+- Trends kommen aus der `fetch-trends` Edge Function (gleiche wie TrendRadar-Seite)
+- Fallback: Wenn keine Trends geladen, statische Tipps als Placeholder
+- Bilder: Generierte Plattform-Icons/Gradient-Thumbnails (Trends haben keine echten Bilder), erzeugt per CSS-Gradient basierend auf Kategorie/Plattform
+- Refresh alle 60 Minuten (wie bisher)
+
+### Technische Umsetzung
+
+1. **NewsTicker.tsx komplett umbauen**
+   - Trends per `supabase.functions.invoke('fetch-trends')` laden
+   - `h-10` → `h-6`, Text/Badge/Switch proportional verkleinern
+   - Trend-Items als Inline-Flex-Cards mit generiertem Thumbnail rendern
+   - Scan-Line-Animation als zusätzliches CSS-Overlay
+   - Click auf Trend → Navigation zum TrendRadar
+
+2. **Generierte Thumbnails**
+   - Kein echtes Bild nötig — CSS-Gradient-Squares mit Plattform-Icon-Overlay
+   - Farbe basierend auf Plattform (TikTok=cyan, Instagram=gradient pink-orange, YouTube=red, LinkedIn=blue)
+   - Leichter Glow-Rand für Hologramm-Effekt
+
+3. **Scan-Line Keyframe** (in tailwind.config.ts)
+   - Neuer Keyframe `scanline`: horizontaler weißer Streifen bewegt sich von links nach rechts
 
 ### Betroffene Dateien
-- `src/components/dashboard/NewsTicker.tsx` — Styling, Speed, Toggle-Logik
-- `src/pages/Home.tsx` — minimal anpassen falls nötig für den minimierten Zustand
+- `src/components/dashboard/NewsTicker.tsx` — Kompletter Umbau
+- `tailwind.config.ts` — Scanline-Keyframe hinzufügen
 
 ### Ergebnis
-- Langsamerer, eleganterer Scroll
-- Intensivere Gold-Glow-Akzente im Bond-Stil
-- User kann Ticker ein-/ausschalten, Präferenz bleibt gespeichert
+- Halbe Höhe, doppelt so futuristisch
+- Echte Trend-Daten mit visuellen Mini-Cards statt nur Text
+- Hologramm-Scan-Line-Effekt für einzigartigen Sci-Fi-Look
+- Klickbar für direkten Sprung zum Trend Radar
+
