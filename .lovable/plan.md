@@ -1,32 +1,40 @@
 
 
-## Plan: Präzisere Pexels-Bildsuche für Trends
+## Plan: Feintuning der Pexels-Bildsuche (80% → 100% Trefferquote)
 
 ### Problem
-Die Suchbegriffe für Pexels sind ungenau. Ein Trend namens `#MiniSuccessStories` wird zu `"MiniSuccessStories"` — ein zusammengeschriebenes Wort, das Pexels nicht versteht. Ebenso liefert `"Heatless Curling Rod Set"` ein generisches Ergebnis statt eines Bildes von Lockenwicklern.
+~20% der Suchbegriffe sind zu abstrakt oder abgeschnitten, z.B.:
+- "Produce posts one day for maximum" → kein visuelles Subjekt
+- "Tell personal stories seconds" → zu vage
+- "Focused work without distractions for maximum" → generisch
+
+Diese Queries beschreiben *Strategien*, nicht *Objekte*. Pexels braucht konkrete, visuelle Begriffe.
 
 ### Lösung
-Zwei Verbesserungen in `searchPexelsImage` und `enrichTrendsWithImages`:
 
-1. **Bessere Query-Aufbereitung**: CamelCase und Hashtags intelligent in Wörter aufteilen (`#MiniSuccessStories` → `"Mini Success Stories"`), kurze Stoppwörter entfernen
-2. **Description als Suchbegriff nutzen**: Statt nur `trend.name` wird primär die `trend.description` verwendet (z.B. "Overnight satin curling rods — no heat damage" → viel bessere Pexels-Treffer), mit `trend.name` als Fallback
-3. **Mehr Ergebnisse anfordern**: `per_page=5` statt `per_page=1`, dann das relevanteste Bild auswählen (größte Auflösung)
-4. **Curated Image Map**: Für die häufigsten/wichtigsten Trend-Kategorien eine manuelle Zuordnung von Pexels-Foto-IDs, die garantiert perfekt passen
+Drei gezielte Verbesserungen in `buildSearchQuery`:
+
+1. **Kategorie-spezifische Suchstrategie**: Für `social-media` und `motivation`-Trends (die meist Strategien/Konzepte beschreiben) wird der Trend-Name bevorzugt + ein visuelles Keyword aus einer Kategorie-Map angehängt (z.B. "Content Batching" + "laptop workspace" → "content batching laptop workspace")
+
+2. **Stoppwort-Filter erweitern**: Wörter wie "for", "with", "without", "maximum", "your", "the", "and" werden aus dem Query entfernt, damit nur inhaltlich relevante Begriffe übrig bleiben
+
+3. **Minimum-Wort-Qualitätsprüfung**: Wenn nach dem Filtern weniger als 3 Wörter übrig sind, wird der Trend-Name (splitCamelCase) + Kategorie-Keyword als Fallback verwendet
 
 ### Änderungen
 
 **`supabase/functions/fetch-trends/index.ts`**
 
-- `splitCamelCase(str)` Hilfsfunktion: `"MiniSuccessStories"` → `"Mini Success Stories"`
-- `buildSearchQuery(trend)`: Nutzt `trend.description` (erste 5-6 Wörter, bereinigt) als primären Suchbegriff, Fallback auf aufgeteilten `trend.name`
-- `searchPexelsImage`: `per_page=5`, wählt Foto mit höchster Auflösung
-- `enrichTrendsWithImages`: Übergibt ganzes Trend-Objekt statt nur Name
+- `buildSearchQuery` anpassen:
+  - Erweiterte Stoppwort-Liste: `for, with, without, your, the, and, that, this, how, can, from, into, than, most, one, day, days, per, via, maximum, minimum`
+  - Neue Map `categoryVisualKeywords`: `social-media → "smartphone laptop content"`, `motivation → "person success sunrise"`, `lifestyle → "wellness healthy living"`, etc.
+  - Für abstrakte Kategorien (social-media, motivation, business): Trend-Name + visuelles Keyword bevorzugen
+  - Für konkrete Kategorien (ecommerce, lifestyle, finance): Description-basierte Suche beibehalten (funktioniert bereits gut)
 
 ### Betroffene Dateien
-- `supabase/functions/fetch-trends/index.ts` — Query-Logik verbessern
+- `supabase/functions/fetch-trends/index.ts` — nur `buildSearchQuery` Funktion (~30 Zeilen)
 
 ### Ergebnis
-- `#MiniSuccessStories` → sucht "authentic success stories progress" (aus Description) → Bild von Person am Laptop
-- `Heatless Curling Rod Set` → sucht "satin curling rods heat damage" → Bild von Haarpflege-Produkten
-- Deutlich relevantere Bilder ohne zusätzliche API-Kosten
+- "Content Batching" → "content batching laptop workspace" statt "Produce posts one day for maximum"
+- "Storytime Format" → "storytime storytelling camera" statt "Tell personal stories seconds"
+- Produkt-Trends bleiben unverändert (funktionieren bereits gut)
 
