@@ -1,50 +1,28 @@
 
-## Plan: Untertitel-Problem an der echten Ursache beheben
 
-### Was jetzt sicher ist
-- Die Preview rendert Untertitel korrekt.
-- Der Export-Request enthält die Untertitel korrekt.
-- `render-directors-cut` loggt die Untertitel korrekt (`clips: 3`, `visible: true`).
-- Der aktuelle Template-Code rendert Untertitel bereits in beiden Export-Pfaden.
-- In den Logs taucht aber **nicht** der aktuelle Canary `v2026-04-13c-fallback-fix` auf.
-- `REMOTION_SERVE_URL` zeigt auf ein festes Bundle:
-  `.../sites/adtool-remotion-bundle/index.html`
+## Plan: Untertitel zentriert positionieren statt links gequetscht
 
-Damit ist der wahrscheinlichste Fehler jetzt klar:
-**Der Renderer nutzt ein veraltetes Remotion-Bundle statt des aktuellen Repo-Codes.**
+### Ursache
+Das S3-Bundle enthält eine Zwischenversion des Subtitle-Codes, bei der die Zentrierung fehlt oder nicht korrekt greift. Die `AbsoluteFill`-Flexbox-Logik muss robuster gemacht werden.
 
 ### Umsetzung
-1. **Aktives Render-Bundle ersetzen**
-   - Das Remotion-Site-Bundle aus der aktuellen Codebasis neu veröffentlichen.
-   - `REMOTION_SERVE_URL` auf das frische Bundle umstellen oder das bestehende Bundle gezielt überschreiben.
 
-2. **Bundle-Version hart absichern**
-   - In den Render-Pfad eine erwartete Bundle-Version aufnehmen.
-   - Wenn das aktive Bundle nicht zur erwarteten Version passt, soll der Render **klar fehlschlagen** statt still mit altem Code weiterzulaufen.
+1. **Subtitle-Styling härten in `DirectorsCutVideo.tsx`**
+   - Explizit `width: '100%'` und `height: '100%'` auf den Subtitle-Container setzen (nicht auf `AbsoluteFill` vertrauen)
+   - `position: 'absolute'`, `left: 0`, `right: 0`, `bottom: 0` direkt setzen statt nur Flexbox
+   - `textAlign: 'center'` + `display: 'flex'` + `justifyContent: 'center'` doppelt absichern
+   - Änderung in **beiden** Render-Pfaden (no-scenes-Fallback UND TransitionSeries-Pfad)
 
-3. **Deploy-Prozess für Remotion stabilisieren**
-   - Einen reproduzierbaren Bundle-Deploy-Workflow ergänzen, damit Template-Änderungen nicht mehr lokal im Repo landen, aber im Render veralten.
-   - Ziel: Kein manueller Drift mehr zwischen Studio-Code und Lambda-Bundle.
+2. **Version bumpen** auf `v2026-04-13d-centered-fix`
+   - Damit nach Bundle-Sync verifizierbar ist, dass die neue Version aktiv ist
 
-4. **End-to-end verifizieren**
-   - Neuen Render starten.
-   - In den Logs prüfen, dass der aktuelle Canary erscheint.
-   - Finales MP4 prüfen, ob die Untertitel sichtbar eingebrannt sind.
+3. **Bundle neu deployen**
+   - Das Deploy-Script erneut ausführen, um das S3-Bundle mit der korrigierten Positionierung zu synchronisieren
 
-### Betroffene Bereiche
-- `supabase/functions/render-directors-cut/index.ts`
-- optional `supabase/functions/invoke-remotion-render/index.ts`
-- Remotion-Bundle-Deployment / `REMOTION_SERVE_URL`
-- optional neues Deploy-Script oder Doku für Bundle-Sync
-
-### Technische Details
-- Das ist sehr wahrscheinlich **kein weiterer Subtitle-Layoutfehler** mehr.
-- Der Datenpfad und das aktuelle Template sind stimmig.
-- Der entscheidende Fix ist jetzt die **Synchronisation des tatsächlich gerenderten Bundles**.
-- Ohne diesen Schritt bringen weitere Subtitle-Codeänderungen im Repo voraussichtlich nichts.
+### Betroffene Dateien
+- `src/remotion/templates/DirectorsCutVideo.tsx` — robusteres Subtitle-Layout
+- `src/remotion/utils/subtitleConstants.ts` — Version bump
 
 ### Ergebnis
-- Der Export rendert wieder mit dem aktuellen Director’s-Cut-Template.
-- Preview und finaler Render sind wieder konsistent.
-- Untertitel werden im finalen Video sichtbar.
-- Künftige Template-Fixes greifen zuverlässig auch im echten Renderpfad.
+- Untertitel erscheinen zentriert am unteren Bildrand, wie in der Studio-Vorschau
+
