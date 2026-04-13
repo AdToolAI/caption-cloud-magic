@@ -553,7 +553,7 @@ export default function TrendRadar() {
             <HeroCarousel trends={topTrends} onAnalyze={(trend) => analyzeTrend(trend)} t={t} />
           )}
 
-          {trends.length > 0 && <TrendTicker trends={trends} />}
+          <NewsRadarTicker />
 
           {/* Category Cards with images */}
           <motion.div className="mb-12" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
