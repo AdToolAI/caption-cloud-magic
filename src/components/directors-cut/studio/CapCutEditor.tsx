@@ -1634,6 +1634,32 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               exportSettings={exportSettings}
               onExportSettingsChange={onExportSettingsChange}
               onStartExport={handleExportVideo}
+              onVoiceOverGenerated={(url: string) => {
+                // Add voiceover clip to track
+                const newClip: AudioClip = {
+                  id: `vo-subtitle-${Date.now()}`,
+                  trackId: 'track-voiceover',
+                  name: 'Subtitle Voiceover',
+                  url,
+                  startTime: 0,
+                  duration: actualTotalDuration,
+                  trimStart: 0,
+                  trimEnd: actualTotalDuration,
+                  volume: 100,
+                  fadeIn: 0.2,
+                  fadeOut: 0.2,
+                  source: 'ai-generated',
+                  color: '#f59e0b',
+                };
+                handleAddClip('track-voiceover', newClip);
+                onVoiceOverGenerated?.(url);
+              }}
+              onVoiceoverVolumeChange={(vol) => {
+                setAudioTracks(prev => prev.map(t =>
+                  t.id === 'track-voiceover' ? { ...t, volume: vol } : t
+                ));
+              }}
+              voiceoverVolume={audioTracks.find(t => t.id === 'track-voiceover')?.volume ?? 100}
             />
             )}
           </div>
