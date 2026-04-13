@@ -566,8 +566,14 @@ export default function TrendRadar() {
             trendsCount={trends.length}
           />
 
+          {/* Hero Carousel — Top position */}
+          {viewMode === 'discover' && topTrends.length > 0 && (
+            <HeroCarousel trends={topTrends} onAnalyze={(trend) => analyzeTrend(trend)} t={t} />
+          )}
+
           {trends.length > 0 && <TrendTicker trends={trends} />}
 
+          {/* Category Cards with images */}
           <motion.div className="mb-12" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <div className="flex items-center gap-3 mb-6">
               <motion.div className="p-3 bg-gradient-to-br from-primary/20 to-cyan-500/20 rounded-xl border border-primary/20" whileHover={{ scale: 1.05, rotate: 5 }}>
@@ -582,62 +588,43 @@ export default function TrendRadar() {
                 return (
                   <motion.div key={cat.id} variants={itemVariants} whileHover={{ scale: 1.05, y: -5 }} whileTap={{ scale: 0.98 }}>
                     <Card
-                      className={`cursor-pointer transition-all duration-500 backdrop-blur-xl border overflow-hidden relative
-                        ${isActive ? 'bg-gradient-to-br ' + cat.color + ' border-primary/50 shadow-[0_0_40px_hsla(43,90%,68%,0.3)]' : 'bg-card/40 border-white/10 hover:border-primary/30 ' + cat.glowColor}`}
+                      className={`cursor-pointer transition-all duration-500 backdrop-blur-xl border overflow-hidden relative h-32
+                        ${isActive ? 'border-primary/50 shadow-[0_0_40px_hsla(43,90%,68%,0.3)]' : 'bg-card/40 border-white/10 hover:border-primary/30 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.15)]'}`}
                       onClick={() => setCategoryFilter(isActive ? 'all' : cat.id)}
                     >
+                      {/* Background image */}
+                      <img
+                        src={cat.image}
+                        alt={cat.name}
+                        loading="lazy"
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                      {/* Dark overlay */}
+                      <div className={`absolute inset-0 transition-all duration-500 ${
+                        isActive 
+                          ? 'bg-gradient-to-t from-black/70 via-black/40 to-primary/30' 
+                          : 'bg-gradient-to-t from-black/80 via-black/50 to-black/30 hover:from-black/60 hover:via-black/30'
+                      }`} />
+                      {/* Active glow ring */}
                       {isActive && (
-                        <motion.div className="absolute inset-0 rounded-2xl" animate={{ boxShadow: ['inset 0 0 20px hsla(43,90%,68%,0.1)', 'inset 0 0 30px hsla(43,90%,68%,0.2)', 'inset 0 0 20px hsla(43,90%,68%,0.1)'] }} transition={{ duration: 2, repeat: Infinity }} />
+                        <motion.div 
+                          className="absolute inset-0 rounded-xl border-2 border-primary/60" 
+                          animate={{ boxShadow: ['inset 0 0 15px hsla(43,90%,68%,0.15)', 'inset 0 0 25px hsla(43,90%,68%,0.3)', 'inset 0 0 15px hsla(43,90%,68%,0.15)'] }} 
+                          transition={{ duration: 2, repeat: Infinity }} 
+                        />
                       )}
-                      <CardContent className="p-5 text-center space-y-3 relative z-10">
-                        <motion.div
-                          className={`text-4xl mx-auto w-14 h-14 flex items-center justify-center rounded-xl ${isActive ? 'bg-primary/20 shadow-[0_0_25px_hsla(43,90%,68%,0.4)]' : 'bg-muted/20'} transition-all duration-300`}
-                          animate={isActive ? { scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] } : {}}
-                          transition={{ duration: 1.5, repeat: Infinity }}
-                          whileHover={{ scale: 1.2, rotate: 15 }}
-                        >
-                          {cat.icon}
-                        </motion.div>
-                        <p className={`font-semibold text-sm ${isActive ? 'text-primary' : ''}`}>{cat.name}</p>
-                      </CardContent>
+                      {/* Text centered */}
+                      <div className="absolute inset-0 flex items-center justify-center z-10">
+                        <p className={`font-semibold text-sm text-center px-2 drop-shadow-lg ${isActive ? 'text-primary' : 'text-white'}`}>
+                          {cat.name}
+                        </p>
+                      </div>
                     </Card>
                   </motion.div>
                 );
               })}
             </motion.div>
           </motion.div>
-
-          {categoryFilter === 'ecommerce' && (
-            <motion.div className="mb-12" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><span className="text-2xl">🛒</span>{t('trends.ecommerceCategories')}</h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                {ecommerceSubcategories.map((sub, index) => (
-                  <motion.div key={sub.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.05 }}>
-                    <Button variant="outline" className="h-auto py-3 w-full flex flex-col items-center gap-2 backdrop-blur-xl bg-card/60 border-white/10 hover:bg-card/80 hover:border-primary/50 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.15)] transition-all duration-300"
-                      onClick={async () => {
-                        setLoading(true);
-                        try {
-                          const { data, error } = await supabase.functions.invoke('fetch-trends', { body: { language: 'en', category: 'ecommerce' } });
-                          if (error) throw error;
-                          setTrends((data.trends || []).filter((t: any) => t.data_json?.subcategory === sub.id));
-                        } catch (error) { toast({ title: t('trends.error'), description: t('trends.loadError'), variant: "destructive" }); }
-                        finally { setLoading(false); }
-                      }}
-                    >
-                      <span className="text-2xl">{sub.icon}</span>
-                      <span className="text-xs text-center">{sub.name}</span>
-                    </Button>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {viewMode === 'discover' && topTrends.length > 0 && (
-            <HeroCarousel trends={topTrends} onAnalyze={(trend) => analyzeTrend(trend)} t={t} />
-          )}
-
-          {viewMode === 'discover' && trends.length > 0 && <FloatingStats trends={trends} t={t} />}
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
             <Card className="mb-8 backdrop-blur-xl bg-card/30 border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.15)] relative overflow-hidden">
