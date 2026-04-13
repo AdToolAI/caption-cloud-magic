@@ -27,6 +27,8 @@ type PitchAwareMediaElement = HTMLMediaElement & {
   webkitPreservesPitch?: boolean;
 };
 
+const clampVol = (v: number) => Math.min(1, Math.max(0, v));
+
 const configurePitchPreservation = (mediaElement: HTMLMediaElement | null, preservesPitch = true) => {
   if (!mediaElement) return;
 
@@ -165,7 +167,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       sourceAudioRef.current.pause();
       sourceAudioRef.current.volume = 0;
     } else if (!originalAudioMuted && sourceAudioRef.current && isPlayingRef.current && !isMutedRef.current) {
-      sourceAudioRef.current.volume = (audio.master_volume || 100) / 100;
+      sourceAudioRef.current.volume = clampVol((audio.master_volume || 100) / 100);
       sourceAudioRef.current.play().catch(() => {});
     }
   }, [originalAudioMuted, audio.master_volume]);
@@ -279,7 +281,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (videoUrl) {
       const src = new Audio(videoUrl);
       src.preload = 'auto';
-      src.volume = isMuted ? 0 : (audio.master_volume || 100) / 100;
+      src.volume = isMuted ? 0 : clampVol((audio.master_volume || 100) / 100);
       src.defaultPlaybackRate = 1;
       src.playbackRate = 1;
       configurePitchPreservation(src, true);
@@ -365,7 +367,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // Update source audio volume
   useEffect(() => {
     if (sourceAudioRef.current) {
-      sourceAudioRef.current.volume = (audio.master_volume || 100) / 100;
+      sourceAudioRef.current.volume = clampVol((audio.master_volume || 100) / 100);
     }
   }, [audio.master_volume]);
 
@@ -982,10 +984,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
               ? (0.5 - targetRate) * 4   // 0.5→0 = duck 0→1
               : (targetRate - 2) * 0.5;  // 2→4 = duck 0→1
             const duckFactor = Math.max(0, 1 - Math.min(1, extremeness));
-            sourceAudioRef.current.volume = masterVol * duckFactor;
+            sourceAudioRef.current.volume = clampVol(masterVol * duckFactor);
           } else {
             // Normal range (0.5x - 2x): full volume, pitch preserved by browser
-            sourceAudioRef.current.volume = masterVol;
+            sourceAudioRef.current.volume = clampVol(masterVol);
           }
         }
       }
@@ -1134,7 +1136,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       } catch {}
 
       setIsMuted(false);
-      if (sourceAudioRef.current) sourceAudioRef.current.volume = (audio.master_volume || 100) / 100;
+      if (sourceAudioRef.current) sourceAudioRef.current.volume = clampVol((audio.master_volume || 100) / 100);
       if (voiceoverAudioRef.current) voiceoverAudioRef.current.volume = 1.0;
       if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.volume = 0.3;
 
