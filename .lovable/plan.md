@@ -1,81 +1,51 @@
 
 
-## AI Video Studio — Unified Hub Redesign (James Bond 2028)
+## Plan: MiniMax Hailuo 2.3 + Luma Ray 2 Integration
 
-### Konzept
-Eine neue zentrale **Hub-Seite** (`/ai-video-studio`) im James Bond 2028 Stil, die als Einstiegspunkt für alle KI-Video-Anbieter dient. Die einzelnen Studios bleiben als separate Seiten bestehen, werden aber von der Hub aus navigiert.
+### Übersicht
+Zwei neue KI-Video-Anbieter werden nach dem bestehenden Muster (Wan/Seedance/Kling) integriert.
 
-### Struktur
+### Neue Anbieter
 
-```text
-/ai-video-studio (Hub)
-├── Hero-Header mit Titel, Wallet-Anzeige
-├── Haftungsausschluss (Disclaimer-Banner)
-├── 4 Provider-Karten im Bento-Grid:
-│   ├── Sora 2 (OpenAI) → /ai-video-studio/generate
-│   ├── Kling 3.0 (Kuaishou) → /kling-video-studio
-│   ├── Seedance 2.0 (ByteDance) → /seedance-video-studio
-│   └── Wan 2.5 (Wan Video) → /wan-video-studio
-├── Unified Bibliothek (alle Anbieter)
-└── Credits-Bereich
-```
+| Anbieter | Replicate-Modell | Dauer | Auflösung | Preis/Sek |
+|----------|-----------------|-------|-----------|-----------|
+| **MiniMax Hailuo 2.3** | `minimax/hailuo-2.3` | 6s / 10s | 768p / 1080p (1080p nur 6s) | Standard: €0.15, Pro: €0.20 |
+| **Luma Ray 2** | `luma/ray-2-720p` | 5s / 9s | 720p | Standard: €0.18, Pro: €0.25 |
 
-### Design (James Bond 2028)
-- Glassmorphism-Karten mit `backdrop-blur`, `border-gold/20`
-- Gold-Gradient-Akzente (#F5C76A → Cyan)
-- Floating Particles im Hero
-- Framer Motion Stagger-Animationen
-- Hover: 3D-Neon-Glow-Lift auf den Provider-Karten
+### API-Parameter
 
-### Provider-Karten — Inhalt pro Anbieter
-Jede Karte zeigt:
-- **Name & Logo-Badge** (z.B. "Sora 2" mit "OpenAI" Badge)
-- **Spezialisierung** (z.B. "Cinematic storytelling & artistic shots")
-- **Preise** (von–bis pro Sekunde)
-- **Max. Dauer** und **Qualität**
-- **Verfügbare Modi** (Text-to-Video, Image-to-Video)
-- CTA-Button → Link zum jeweiligen Studio
-
-### Haftungsausschluss
-Prominent platzierter Disclaimer mit Icon:
-- Keine Haftung für generierte Inhalte
-- KI-Videos müssen als solche gekennzeichnet werden
-- Hinweis auf Urheberrecht und Nutzungsverantwortung
-- Zweisprachig (DE/EN/ES)
-
-### Unified Bibliothek
-- Die `VideoGenerationHistory`-Komponente wird als Tab auf der Hub-Seite integriert
-- Zeigt Videos **aller Anbieter** zentral an (bereits so implementiert)
-- Filter nach Anbieter möglich
-
-### Tabs auf der Hub-Seite
-1. **Studios** — Die 4 Provider-Karten
-2. **Bibliothek** — Alle generierten Videos (alle Anbieter)
-3. **Credits** — Wallet & Credit-Pakete kaufen
-
-### Änderungen
-
-**1. `src/pages/AIVideoStudio.tsx`** — Komplett neu als Hub-Seite
-- Bisheriger Sora-2-Generator wird zu eigenem Tab/Bereich innerhalb der Seite
-- Hero-Header mit animiertem Titel "AI Video Studio"
-- Provider-Grid mit 4 Glassmorphism-Karten
-- Disclaimer-Sektion
-- Tabs: Studios | Bibliothek | Credits
-
-**2. `src/components/ai-video/AIVideoProviderCard.tsx`** — Neue Komponente
-- Wiederverwendbare Karte pro Provider
-- Props: name, provider, description, pricing, features, link, badge
-
-**3. `src/components/ai-video/AIVideoDisclaimer.tsx`** — Neue Komponente
-- Rechtlicher Hinweis mit Shield-Icon
-- Lokalisiert (DE/EN/ES)
-
-**4. Bestehende Studio-Seiten** (Kling, Seedance, Wan)
-- Erhalten einen einheitlichen "← Zurück zum AI Studio" Header
-- Behalten ihre volle Funktionalität
+**Hailuo 2.3**: `prompt`, `duration` (6|10), `resolution` ("768p"|"1080p"), `first_frame_image`, `prompt_optimizer`
+**Luma Ray 2**: `prompt`, `duration` (5|9), `aspect_ratio` ("16:9"|"9:16"|"1:1"), `start_image`, `end_image`, `loop`, `concepts`
 
 ### Dateien
-- **Neu**: `src/components/ai-video/AIVideoProviderCard.tsx`, `src/components/ai-video/AIVideoDisclaimer.tsx`
-- **Komplett neu**: `src/pages/AIVideoStudio.tsx` (wird zur Hub + behält Sora-2-Generator als Sub-View)
-- **Edit**: `src/pages/KlingVideoStudio.tsx`, `src/pages/SeedanceVideoStudio.tsx`, `src/pages/WanVideoStudio.tsx` (einheitlicher Back-Link)
+
+**Neu erstellen (6 Dateien):**
+1. `src/config/hailuoVideoCredits.ts` — Modell-Config, Preise, Typen
+2. `src/config/lumaVideoCredits.ts` — Modell-Config, Preise, Typen
+3. `src/pages/HailuoVideoStudio.tsx` — Studio-Seite (nach Wan-Pattern), Duration Toggle 6s/10s, Resolution-Auswahl
+4. `src/pages/LumaVideoStudio.tsx` — Studio-Seite, Duration Toggle 5s/9s, Kamera-Konzepte (Optional)
+5. `supabase/functions/generate-hailuo-video/index.ts` — Edge Function: Auth, Wallet, Replicate `minimax/hailuo-2.3`
+6. `supabase/functions/generate-luma-video/index.ts` — Edge Function: Auth, Wallet, Replicate `luma/ray-2-720p`
+
+**Editieren (3 Dateien):**
+7. `src/App.tsx` — Lazy-Import + Routes `/hailuo-video-studio`, `/luma-video-studio`
+8. `src/pages/AIVideoStudio.tsx` — Zwei neue Provider-Karten im Hub-Grid (6 Karten total, 3x2)
+9. `src/components/ai-video/VideoGenerationHistory.tsx` — `MODEL_DISPLAY_NAMES` erweitern
+
+### Hub-Karten (neu)
+
+```
+Hailuo 2.3 | MiniMax
+"Realistische Gesichter, Bewegung & Charaktere"
+Features: Text-to-Video, Image-to-Video, 1080p, Realistic Motion
+Preis: €0.15–0.20/s | Max: 10s | Qualität: 1080p
+
+Luma Ray 2 | Luma AI  
+"Cinematic Szenen, surreale & künstlerische Projekte"
+Features: Text-to-Video, Image-to-Video, Camera Concepts, Loop
+Preis: €0.18–0.25/s | Max: 9s | Qualität: 720p
+```
+
+### Keine DB-Änderungen nötig
+Bestehende `ai_video_generations`-Tabelle und Wallet werden wiederverwendet.
 
