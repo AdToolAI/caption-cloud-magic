@@ -197,8 +197,20 @@ export const DashboardVideoCarousel = ({ quickActions = [] }: { quickActions?: Q
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Video className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-bold text-foreground">{t("carousel.yourVideos")}</h2>
+          <Video className="h-4 w-4 text-primary" />
+          <h2 className="text-lg font-bold text-foreground">{t("carousel.yourVideos")}</h2>
+          {quickActions.length > 0 && (
+            <div className="flex items-center gap-1.5 ml-auto">
+              {quickActions.map((action, i) => (
+                <Button key={i} asChild variant={action.variant || 'outline'} size="sm" className="h-7 px-2.5 text-xs rounded-lg gap-1.5">
+                  <Link to={action.to}>
+                    <action.icon className="h-3.5 w-3.5" />
+                    <span className="hidden md:inline">{action.label}</span>
+                  </Link>
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex justify-center gap-4 py-8">
           {[0, 1, 2].map(i => (
