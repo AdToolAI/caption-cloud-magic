@@ -643,6 +643,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
   // If no scenes, render single video with global effects
   if (sortedScenes.length === 0) {
+    console.log(`[DirectorsCutVideo] ⚡ NO-SCENES FALLBACK BRANCH | subtitleClips=${subtitleTrack?.clips?.length ?? 0} | textOverlays=${textOverlays.length} | visible=${subtitleTrack?.visible}`);
     // Build filter string for fallback
     let filterStr = `brightness(${brightness / 100}) `;
     filterStr += `contrast(${contrast / 100}) `;
