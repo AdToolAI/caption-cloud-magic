@@ -47,7 +47,7 @@ export function TimelineVideoPreview({
       const effectiveVolume = isMuted ? 0 : 
         (masterVolume / 100) * (clip.trackVolume / 100) * (clip.volume / 100);
       
-      audio.volume = effectiveVolume;
+      audio.volume = Math.min(1, Math.max(0, effectiveVolume));
     });
     
     // Cleanup removed clips
