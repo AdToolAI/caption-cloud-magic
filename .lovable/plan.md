@@ -1,47 +1,47 @@
 
+## Plan: Exportierte Untertitel wirklich sichtbar machen
 
-## Plan: Untertitel-Daten für den Export bereinigen
+### Was ich bereits verifiziert habe
+- Der Editor sendet inzwischen korrekt `subtitle_track` mit den Untertiteln.
+- Der Render-Job speichert diese Untertitel auch korrekt in der Datenbank.
+- Die aktuelle `DirectorsCutVideo`-Composition im Code rendert Untertitel bereits im Export-Pfad.
+- Damit liegt der verbleibende Fehler sehr wahrscheinlich nicht mehr im Editor-Payload, sondern im serverseitigen Render-Bundle, das aktuell fürs finale Video verwendet wird.
+- Zusätzlich gibt es eine sichtbare Abweichung zwischen Studio und Export: Im Studio sitzen Untertitel deutlich höher, im Export aktuell zu nah am unteren Rand. Dadurch können sie in der Video-Vorschau hinter den nativen Player-Controls verschwinden.
 
-### Problem
-Die Untertitel sind in der Studio-Vorschau sichtbar, fehlen aber im exportierten Video. Die Ursache: Der Editor sendet das gesamte `subtitleTrack`-Objekt mit zusätzlichen Feldern (`style`, `source`, `maxLines`, `textStroke*`, `color`, `icon`), die nicht im Remotion Zod-Schema definiert sind. Je nach Remotion-Version kann die Schema-Validierung fehlschlagen und `subtitleTrack` komplett verwerfen, statt nur die unbekannten Felder zu entfernen.
+### Umsetzung
+1. **Render-Bundle synchronisieren**
+   - Sicherstellen, dass der Backend-Renderer wirklich die aktuelle `DirectorsCutVideo`-Version nutzt.
+   - Falls nötig das verwendete Remotion-/Render-Bundle neu veröffentlichen bzw. auf die aktuelle Version zeigen lassen.
+   - Optional einen kleinen Versionsmarker/Debug-Log einbauen, damit sofort klar ist, ob der neue Bundle aktiv ist.
 
-### Fix
-Die Untertitel-Daten beim Export auf genau die Felder reduzieren, die das Remotion-Schema erwartet.
+2. **Export-Renderer für Untertitel an die Studio-Vorschau angleichen**
+   - Datei: `src/remotion/templates/DirectorsCutVideo.tsx`
+   - Untertitel im Export genauso positionieren wie im Studio-Preview.
+   - Fehlende Stil-Details übernehmen: konsistente Bottom-Offset-Logik, `maxLines`, `textStroke`, gleiche Font-/Size-Mappings und Umbruch-Verhalten.
 
-**Datei: `src/components/directors-cut/studio/CapCutEditor.tsx`** (Export-Body, ca. Zeile 1136)
+3. **Preview und Export gegen erneute Abweichungen härten**
+   - Gemeinsame Subtitle-Konstanten oder Helper verwenden, damit Layout und Styling nicht in zwei Pfaden auseinanderlaufen.
 
-Statt:
-```ts
-subtitle_track: showSubtitles ? subtitleTrack : undefined,
-```
+4. **End-to-end verifizieren**
+   - Neues Director’s-Cut-Video exportieren.
+   - Prüfen in:
+     - Studio-Preview
+     - Export-Vorschau/Modal
+     - heruntergeladener MP4
+   - Speziell kontrollieren, dass alle Untertitel-Segmente sichtbar eingebrannt sind.
 
-Sanitized Version:
-```ts
-subtitle_track: showSubtitles && subtitleTrack.clips.length > 0 ? {
-  id: subtitleTrack.id,
-  name: subtitleTrack.name,
-  clips: subtitleTrack.clips
-    .filter(c => c.text?.trim())
-    .map(c => ({
-      id: c.id,
-      startTime: c.startTime,
-      endTime: c.endTime,
-      text: c.text,
-      position: c.position,
-      fontSize: c.fontSize,
-      color: c.color,
-      backgroundColor: c.backgroundColor,
-      fontFamily: c.fontFamily,
-    })),
-  visible: subtitleTrack.visible,
-} : undefined,
-```
+### Technische Details
+- Bestätigte Datenkette:
+  `CapCutEditor -> render-directors-cut -> director_cut_renders.render_config.subtitleTrack`
+- Der letzte Render-Job enthält bereits valide Untertitelclips mit `visible: true`.
+- Das spricht dafür, dass der offene Fehler **nach** dem Request entsteht.
+- Wahrscheinlich betroffene Dateien:
+  - `src/remotion/templates/DirectorsCutVideo.tsx`
+  - `supabase/functions/render-directors-cut/index.ts` (falls ich Versionsmarker/zusätzliche Logs ergänze)
+  - optional eine kleine gemeinsame Subtitle-Utility
+- Keine Datenbank- oder Auth-Änderungen nötig.
 
-Das stellt sicher:
-- Nur Schema-konforme Felder werden gesendet
-- Leere Clips (ohne Text) werden herausgefiltert
-- Keine Untertitel gesendet wenn keine Clips vorhanden
-
-### Betroffene Dateien
-- **Edit:** `src/components/directors-cut/studio/CapCutEditor.tsx` — Export-Body sanitizen
-
+### Ergebnis
+- Untertitel sind im final exportierten Video wieder sichtbar.
+- Export und Studio-Vorschau sehen gleich aus.
+- Künftige Subtitle-Fixes greifen nicht mehr nur in einem der beiden Render-Pfade.
