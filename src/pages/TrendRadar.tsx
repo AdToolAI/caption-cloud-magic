@@ -82,11 +82,41 @@ function Sparkline({ value, color }: { value: number; color: string }) {
   );
 }
 
-// --- Marquee Ticker ---
-function TrendTicker({ trends }: { trends: Trend[] }) {
-  if (trends.length === 0) return null;
-  const doubled = [...trends, ...trends];
-  
+// --- News Radar Ticker ---
+interface NewsItem {
+  headline: string;
+  category: string;
+  source: string;
+}
+
+function NewsRadarTicker() {
+  const [news, setNews] = useState<NewsItem[]>([]);
+
+  useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('fetch-news-radar', {
+          body: { language: 'en' }
+        });
+        if (error) throw error;
+        setNews(data?.news || []);
+      } catch (e) {
+        console.error('News Radar ticker: failed', e);
+      }
+    };
+    fetchNews();
+  }, []);
+
+  if (news.length === 0) return null;
+  const doubled = [...news, ...news];
+
+  const categoryColor: Record<string, string> = {
+    social: "text-cyan-400",
+    business: "text-amber-400",
+    creator: "text-pink-400",
+    analytics: "text-emerald-400",
+  };
+
   return (
     <div className="relative overflow-hidden py-3 mb-8">
       <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-background to-transparent z-10" />
@@ -94,20 +124,16 @@ function TrendTicker({ trends }: { trends: Trend[] }) {
       
       <motion.div
         className="flex gap-8 whitespace-nowrap"
-        animate={{ x: [0, -50 * trends.length] }}
-        transition={{ duration: trends.length * 3, repeat: Infinity, ease: "linear" }}
+        animate={{ x: [0, -300 * news.length] }}
+        transition={{ duration: news.length * 8, repeat: Infinity, ease: "linear" }}
       >
-        {doubled.map((trend, i) => (
-          <div key={`${trend.id}-${i}`} className="flex items-center gap-2 shrink-0">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60">
-              {trend.platform}
+        {doubled.map((item, i) => (
+          <div key={`news-${i}`} className="flex items-center gap-2 shrink-0">
+            <span className={`text-xs font-bold uppercase tracking-wider ${categoryColor[item.category] || 'text-muted-foreground/60'}`}>
+              {item.source}
             </span>
-            <span className="text-sm font-semibold bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              {trend.name}
-            </span>
-            <span className="text-primary/40">•</span>
-            <span className={`text-xs font-bold ${trend.popularity_index > 85 ? 'text-red-400' : 'text-muted-foreground/50'}`}>
-              🔥 {trend.popularity_index}
+            <span className="text-sm font-medium text-foreground/80">
+              {item.headline}
             </span>
             <span className="text-border/30 mx-2">|</span>
           </div>
