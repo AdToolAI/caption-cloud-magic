@@ -155,7 +155,7 @@ export function HeroMediaBackground({ category, platform, index, imageUrl }: { c
     <div className="absolute inset-0 overflow-hidden">
       {!error && (
         <motion.img
-          src={getImageUrl(category, index + 1000)}
+          src={imageUrl || getImageUrl(category, index + 1000)}
           alt=""
           loading="eager"
           onLoad={() => setLoaded(true)}
