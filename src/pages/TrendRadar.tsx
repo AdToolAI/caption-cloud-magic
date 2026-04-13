@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence, useInView } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useAICall } from "@/hooks/useAICall";
@@ -12,11 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Sparkles, Bookmark, BookmarkCheck, Loader2, Search, Tag, Lightbulb, Target, Zap, ExternalLink, ChevronLeft, ChevronRight, BarChart3, Globe, Flame, Users, Play } from "lucide-react";
+import { TrendingUp, Sparkles, Bookmark, BookmarkCheck, Loader2, Search, Tag, Lightbulb, Target, Zap, ExternalLink, ChevronLeft, ChevronRight, Flame, Play } from "lucide-react";
 import { TrendDetailModal } from "@/components/trends/TrendDetailModal";
 import { TrendRadarHeroHeader } from "@/components/trends/TrendRadarHeroHeader";
 import { TrendCardMedia, PopularityRing, HeroMediaBackground } from "@/components/trends/TrendCardMedia";
-import CountUp from "@/components/ui/count-up";
+
 
 interface Trend {
   id: string;
@@ -117,51 +117,7 @@ function TrendTicker({ trends }: { trends: Trend[] }) {
   );
 }
 
-// --- Floating Stats Section ---
-function FloatingStats({ trends, t }: { trends: Trend[]; t: (key: string) => string }) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-  
-  const platforms = new Set(trends.map(t => t.platform));
-  const hotTrends = trends.filter(t => t.popularity_index > 80).length;
-  
-  const stats = [
-    { label: t('trends.trendsAnalyzed'), value: trends.length, icon: BarChart3, color: "from-primary/20 to-amber-500/20", textColor: "text-primary" },
-    { label: t('trends.platforms'), value: platforms.size || 5, icon: Globe, color: "from-cyan-500/20 to-blue-500/20", textColor: "text-cyan-400" },
-    { label: t('trends.hotTrends'), value: hotTrends || 12, icon: Flame, color: "from-red-500/20 to-orange-500/20", textColor: "text-red-400" },
-    { label: t('trends.categories'), value: 6, icon: Users, color: "from-purple-500/20 to-pink-500/20", textColor: "text-purple-400" },
-  ];
 
-  return (
-    <div ref={ref} className="mb-12">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {stats.map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 30 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: i * 0.15, duration: 0.5 }}
-          >
-            <Card className="backdrop-blur-xl bg-card/30 border-white/10 hover:border-primary/30 transition-all duration-300 overflow-hidden relative group">
-              <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-              <CardContent className="p-5 flex flex-col items-center text-center relative z-10">
-                <stat.icon className={`w-6 h-6 mb-2 ${stat.textColor}`} />
-                <div className={`text-3xl font-bold ${stat.textColor}`}>
-                  {isInView ? (
-                    <CountUp end={stat.value} duration={2} />
-                  ) : (
-                    0
-                  )}
-                </div>
-                <span className="text-xs text-muted-foreground mt-1">{stat.label}</span>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // --- Hero Carousel ---
 function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t: Trend) => void; t: (key: string) => string }) {
