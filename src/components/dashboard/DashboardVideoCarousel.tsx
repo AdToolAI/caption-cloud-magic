@@ -225,11 +225,22 @@ export const DashboardVideoCarousel = ({ quickActions = [] }: { quickActions?: Q
     const demoVideoUrl = DEMO_VIDEO.output_url;
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-2">
         <div className="flex items-center gap-3">
-          <Video className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-bold text-foreground">{t("carousel.yourVideos")}</h2>
-        </div>
+          <Video className="h-4 w-4 text-primary" />
+          <h2 className="text-lg font-bold text-foreground">{t("carousel.yourVideos")}</h2>
+          {quickActions.length > 0 && (
+            <div className="flex items-center gap-1.5 ml-auto">
+              {quickActions.map((action, i) => (
+                <Button key={i} asChild variant={action.variant || 'outline'} size="sm" className="h-7 px-2.5 text-xs rounded-lg gap-1.5">
+                  <Link to={action.to}>
+                    <action.icon className="h-3.5 w-3.5" />
+                    <span className="hidden md:inline">{action.label}</span>
+                  </Link>
+                </Button>
+              ))}
+            </div>
+          )}
 
         <div className="flex justify-center" style={{ perspective: '1200px' }}>
           <div
@@ -317,19 +328,28 @@ export const DashboardVideoCarousel = ({ quickActions = [] }: { quickActions?: Q
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-2">
+      <div className="flex items-center justify-between py-1">
         <div className="flex items-center gap-3">
-          <Video className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-bold text-foreground">{t("carousel.yourVideos")}</h2>
+          <Video className="h-4 w-4 text-primary" />
+          <h2 className="text-lg font-bold text-foreground">{t("carousel.yourVideos")}</h2>
           <Badge variant="secondary" className="text-xs">{sortedVideos.length}</Badge>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={scrollPrev}>
-            <ChevronLeft className="h-4 w-4" />
+        <div className="flex items-center gap-1.5">
+          {quickActions.map((action, i) => (
+            <Button key={i} asChild variant={action.variant || 'outline'} size="sm" className="h-7 px-2.5 text-xs rounded-lg gap-1.5">
+              <Link to={action.to}>
+                <action.icon className="h-3.5 w-3.5" />
+                <span className="hidden md:inline">{action.label}</span>
+              </Link>
+            </Button>
+          ))}
+          <div className="w-px h-5 bg-border mx-1" />
+          <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={scrollPrev}>
+            <ChevronLeft className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={scrollNext}>
-            <ChevronRight className="h-4 w-4" />
+          <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={scrollNext}>
+            <ChevronRight className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
