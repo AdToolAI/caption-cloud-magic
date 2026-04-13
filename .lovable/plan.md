@@ -1,51 +1,46 @@
 
 
-## Plan: MiniMax Hailuo 2.3 + Luma Ray 2 Integration
+## Plan: Sora-2-Tab durch umfassenden Haftungsausschluss ersetzen
 
-### Übersicht
-Zwei neue KI-Video-Anbieter werden nach dem bestehenden Muster (Wan/Seedance/Kling) integriert.
+### Konzept
+Der "Sora 2"-Tab wird durch einen **"Rechtliches"**-Tab ersetzt, der einen vollständigen, rechtlich abgesicherten Haftungsausschluss für KI-generierte Videos enthält. Der Sora-2-Generator bleibt über die Provider-Karte im Studios-Tab erreichbar (Link auf `/ai-video-studio/generate` oder eigene Seite).
 
-### Neue Anbieter
+### Sora 2 Provider-Karte
+Die Sora-2-Karte im Studios-Grid wird von `tab: 'generate'` (interner Tab-Switch) auf eine eigene Route umgestellt — entweder eine neue `/sora-video-studio`-Seite (analog zu Kling/Wan/etc.) oder der bestehende Generator als separate Seite extrahiert.
 
-| Anbieter | Replicate-Modell | Dauer | Auflösung | Preis/Sek |
-|----------|-----------------|-------|-----------|-----------|
-| **MiniMax Hailuo 2.3** | `minimax/hailuo-2.3` | 6s / 10s | 768p / 1080p (1080p nur 6s) | Standard: €0.15, Pro: €0.20 |
-| **Luma Ray 2** | `luma/ray-2-720p` | 5s / 9s | 720p | Standard: €0.18, Pro: €0.25 |
+### Neuer "Rechtliches"-Tab — Inhalte
 
-### API-Parameter
+Der Tab zeigt eine umfassende, mehrsprachige (DE/EN/ES) Disclaimer-Seite mit folgenden Sektionen:
 
-**Hailuo 2.3**: `prompt`, `duration` (6|10), `resolution` ("768p"|"1080p"), `first_frame_image`, `prompt_optimizer`
-**Luma Ray 2**: `prompt`, `duration` (5|9), `aspect_ratio` ("16:9"|"9:16"|"1:1"), `start_image`, `end_image`, `loop`, `concepts`
+1. **Haftungsausschluss** — Keine Haftung für generierte Inhalte, Richtigkeit, Rechtmäßigkeit
+2. **Kennzeichnungspflicht** — KI-generierte Videos müssen als solche gekennzeichnet werden (EU AI Act, § 6 TMG)
+3. **Urheberrecht & geistiges Eigentum** — Nutzer ist allein verantwortlich für Verletzungen von Urheber-, Marken- oder Persönlichkeitsrechten
+4. **Nutzungsbedingungen** — Videos dürfen nicht für illegale, diskriminierende oder irreführende Zwecke verwendet werden
+5. **Datenschutz** — Hinweis, dass Prompts und Bilder an Drittanbieter-APIs (OpenAI, Replicate) übermittelt werden
+6. **Keine Garantie** — Kein Anspruch auf Verfügbarkeit, Qualität oder Ergebnis
+7. **Haftungsbeschränkung** — Maximale Haftung auf den bezahlten Betrag begrenzt
+
+### Änderungen
+
+**1. `src/components/ai-video/AIVideoDisclaimer.tsx`** — Erweitern
+- Vom kurzen 3-Punkt-Banner zu einer vollständigen Rechtsseite mit 7 Sektionen
+- Glassmorphism-Design passend zum James Bond 2028 Stil
+- Weiterhin mehrsprachig (DE/EN/ES)
+
+**2. `src/pages/AIVideoStudio.tsx`**
+- Tab "Sora 2" (`generate`) → "Rechtliches" (`legal`) mit ShieldAlert-Icon
+- Sora-2-Generator-Code aus dieser Datei entfernen
+- Sora-2-Provider-Karte: `link` auf `/sora-video-studio` statt interner Tab-Switch
+- TabsContent `legal` rendert die erweiterte `AIVideoDisclaimer`-Komponente
+
+**3. `src/pages/SoraVideoStudio.tsx`** — Neu erstellen
+- Eigenständige Sora-2-Studio-Seite (Generator-Code aus AIVideoStudio extrahiert)
+- Einheitlicher "← AI Video Studio" Back-Link wie bei Kling/Wan/etc.
+
+**4. `src/App.tsx`** — Route `/sora-video-studio` hinzufügen
 
 ### Dateien
-
-**Neu erstellen (6 Dateien):**
-1. `src/config/hailuoVideoCredits.ts` — Modell-Config, Preise, Typen
-2. `src/config/lumaVideoCredits.ts` — Modell-Config, Preise, Typen
-3. `src/pages/HailuoVideoStudio.tsx` — Studio-Seite (nach Wan-Pattern), Duration Toggle 6s/10s, Resolution-Auswahl
-4. `src/pages/LumaVideoStudio.tsx` — Studio-Seite, Duration Toggle 5s/9s, Kamera-Konzepte (Optional)
-5. `supabase/functions/generate-hailuo-video/index.ts` — Edge Function: Auth, Wallet, Replicate `minimax/hailuo-2.3`
-6. `supabase/functions/generate-luma-video/index.ts` — Edge Function: Auth, Wallet, Replicate `luma/ray-2-720p`
-
-**Editieren (3 Dateien):**
-7. `src/App.tsx` — Lazy-Import + Routes `/hailuo-video-studio`, `/luma-video-studio`
-8. `src/pages/AIVideoStudio.tsx` — Zwei neue Provider-Karten im Hub-Grid (6 Karten total, 3x2)
-9. `src/components/ai-video/VideoGenerationHistory.tsx` — `MODEL_DISPLAY_NAMES` erweitern
-
-### Hub-Karten (neu)
-
-```
-Hailuo 2.3 | MiniMax
-"Realistische Gesichter, Bewegung & Charaktere"
-Features: Text-to-Video, Image-to-Video, 1080p, Realistic Motion
-Preis: €0.15–0.20/s | Max: 10s | Qualität: 1080p
-
-Luma Ray 2 | Luma AI  
-"Cinematic Szenen, surreale & künstlerische Projekte"
-Features: Text-to-Video, Image-to-Video, Camera Concepts, Loop
-Preis: €0.18–0.25/s | Max: 9s | Qualität: 720p
-```
-
-### Keine DB-Änderungen nötig
-Bestehende `ai_video_generations`-Tabelle und Wallet werden wiederverwendet.
+- **Neu**: `src/pages/SoraVideoStudio.tsx`
+- **Umfassend editiert**: `src/components/ai-video/AIVideoDisclaimer.tsx`, `src/pages/AIVideoStudio.tsx`
+- **Edit**: `src/App.tsx` (neue Route)
 
