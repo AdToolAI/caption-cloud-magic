@@ -744,7 +744,7 @@ export default function TrendRadar() {
                     <motion.div key={trend.id} variants={itemVariants} whileHover={{ y: -8 }} style={{ perspective: 1000 }}>
                       <div
                         className="relative w-full cursor-pointer"
-                        style={{ transformStyle: 'preserve-3d', minHeight: '380px' }}
+                        style={{ transformStyle: 'preserve-3d', minHeight: '440px' }}
                       >
                         {/* FRONT */}
                         <motion.div
@@ -757,33 +757,46 @@ export default function TrendRadar() {
                             className="group relative overflow-hidden backdrop-blur-xl bg-card/40 border-white/10 hover:border-primary/50 hover:shadow-[0_0_35px_hsla(43,90%,68%,0.2)] transition-all duration-500 h-full"
                             onClick={() => analyzeTrend(trend)}
                           >
-                            <div className={`relative h-20 bg-gradient-to-br ${gradient} overflow-hidden`}>
-                              <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.4) 2px, rgba(0,0,0,0.4) 4px)' }} />
-                              <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" animate={{ x: ['-100%', '200%'] }} transition={{ duration: 3, repeat: Infinity, repeatDelay: 4, ease: 'easeInOut' }} />
-                              <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-xs font-semibold border border-white/20 uppercase tracking-wider">{trend.platform}</div>
+                            {/* Media-rich image header */}
+                            <div className="relative">
+                              <TrendCardMedia category={trend.category} platform={trend.platform} index={index} height="h-44" />
+                              
+                              {/* Platform badge */}
+                              <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md text-white text-xs font-semibold border border-white/20 uppercase tracking-wider">
+                                {trend.platform}
+                              </div>
                               
                               {isHot && (
                                 <motion.div
-                                  className="absolute top-3 right-3 flex items-center gap-1 px-3 py-1 rounded-full bg-red-500/30 backdrop-blur-sm border border-red-400/40"
-                                  animate={{ scale: [1, 1.08, 1], boxShadow: ['0 0 10px hsla(0,80%,50%,0.2)', '0 0 20px hsla(0,80%,50%,0.4)', '0 0 10px hsla(0,80%,50%,0.2)'] }}
+                                  className="absolute top-3 right-3 flex items-center gap-1 px-3 py-1 rounded-full border backdrop-blur-md"
+                                  style={{ 
+                                    background: 'linear-gradient(135deg, hsla(0,80%,50%,0.4), hsla(30,90%,50%,0.3))',
+                                    borderColor: 'hsla(0,80%,60%,0.5)' 
+                                  }}
+                                  animate={{ scale: [1, 1.08, 1], boxShadow: ['0 0 10px hsla(0,80%,50%,0.2)', '0 0 25px hsla(0,80%,50%,0.5)', '0 0 10px hsla(0,80%,50%,0.2)'] }}
                                   transition={{ duration: 1.5, repeat: Infinity }}
                                 >
-                                  <Flame className="w-3 h-3 text-red-400" />
-                                  <span className="text-[10px] font-bold text-red-300 uppercase tracking-wider">Hot</span>
+                                  <Flame className="w-3 h-3 text-red-300" />
+                                  <span className="text-[10px] font-bold text-white uppercase tracking-wider">Hot</span>
                                 </motion.div>
                               )}
                               
                               {!isHot && trend.data_json?.estimated_virality && (
-                                <motion.div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-xs font-bold border border-white/20" animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
+                                <motion.div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md text-white text-xs font-bold border border-white/20" animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
                                   🔥 {trend.data_json.estimated_virality}
                                 </motion.div>
                               )}
-                              <div className="absolute bottom-3 left-3 px-2 py-0.5 rounded bg-black/20 backdrop-blur-sm text-white/80 text-[10px] font-medium border border-white/10">{trend.trend_type}</div>
+
+                              {/* Category frosted tag */}
+                              <div className="absolute bottom-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/30 backdrop-blur-md text-white/90 text-[10px] font-medium border border-white/10">
+                                <Tag className="w-2.5 h-2.5" />
+                                {trend.trend_type}
+                              </div>
                             </div>
 
                             <CardContent className="p-5 space-y-4">
                               <div className="flex items-start justify-between gap-3">
-                                <h3 className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-2 flex-1">{trend.name}</h3>
+                                <h3 className="font-display font-bold text-lg group-hover:text-primary transition-colors line-clamp-2 flex-1">{trend.name}</h3>
                                 <Button variant={bookmarked.includes(trend.id) ? "default" : "outline"} size="icon"
                                   onClick={(e) => { e.stopPropagation(); toggleBookmark(trend.id); }}
                                   className={`shrink-0 h-8 w-8 transition-all ${bookmarked.includes(trend.id) ? 'bg-primary text-primary-foreground shadow-[0_0_15px_hsla(43,90%,68%,0.4)]' : 'border-white/10 hover:border-primary/50'}`}
@@ -796,19 +809,17 @@ export default function TrendRadar() {
 
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                  <Sparkline value={trend.popularity_index} color={getSparkColor(trend.platform)} />
-                                  <span className="text-sm font-bold text-primary">{trend.popularity_index}/100</span>
+                                  <PopularityRing value={trend.popularity_index} size={36} />
+                                  <div className="flex flex-col">
+                                    <span className="text-xs text-muted-foreground">Popularity</span>
+                                    <span className="text-sm font-bold text-primary">{trend.popularity_index}/100</span>
+                                  </div>
                                 </div>
                                 <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-primary"
                                   onClick={(e) => { e.stopPropagation(); toggleFlip(trend.id); }}
                                 >
                                   {t('trends.quickFacts')} →
                                 </Button>
-                              </div>
-
-                              <div className="w-full bg-muted/20 rounded-full h-1.5 overflow-hidden relative">
-                                <motion.div className={`bg-gradient-to-r ${gradient} h-1.5 rounded-full relative z-10`} initial={{ width: 0 }} animate={{ width: `${trend.popularity_index}%` }} transition={{ duration: 1, delay: index * 0.05 }} />
-                                <motion.div className={`absolute top-0 left-0 h-1.5 rounded-full bg-gradient-to-r ${gradient} blur-sm opacity-50`} initial={{ width: 0 }} animate={{ width: `${trend.popularity_index}%` }} transition={{ duration: 1, delay: index * 0.05 }} />
                               </div>
 
                               <div className="flex items-center gap-2 flex-wrap">
