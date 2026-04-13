@@ -703,6 +703,47 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         {!previewMode && voiceoverUrl && frame >= 15 && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} pauseWhenBuffering />}
         {/* Background Music - skip in preview mode */}
         {!previewMode && backgroundMusicUrl && frame >= 30 && <Audio src={backgroundMusicUrl} volume={(backgroundMusicVolume || 30) / 100} loop pauseWhenBuffering />}
+        {/* Text Overlays */}
+        {textOverlays.map((overlay) => {
+          const startFrame = Math.floor(overlay.startTime * fps);
+          const endFrame = overlay.endTime ? Math.floor(overlay.endTime * fps) : durationInFrames;
+          const overlayDuration = endFrame - startFrame;
+          return (
+            <Sequence key={overlay.id} from={startFrame} durationInFrames={overlayDuration}>
+              <TextOverlayRenderer overlay={overlay as TextOverlayProps} />
+            </Sequence>
+          );
+        })}
+        {/* Subtitles */}
+        {subtitleTrack?.visible !== false && subtitleTrack?.clips?.map((clip) => {
+          const startFrame = Math.floor(clip.startTime * fps);
+          const endFrame = Math.floor(clip.endTime * fps);
+          const clipDuration = Math.max(1, endFrame - startFrame);
+          return (
+            <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
+              <AbsoluteFill style={{
+                display: 'flex', justifyContent: 'center',
+                alignItems: clip.position === 'top' ? 'flex-start' : clip.position === 'center' ? 'center' : 'flex-end',
+                paddingTop: clip.position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
+                paddingBottom: clip.position !== 'top' && clip.position !== 'center' ? SUBTITLE_BOTTOM_PADDING : '5%',
+                paddingLeft: '5%', paddingRight: '5%',
+                pointerEvents: 'none', zIndex: SUBTITLE_Z_INDEX,
+              }}>
+                <div style={{
+                  backgroundColor: clip.backgroundColor || SUBTITLE_DEFAULT_BG,
+                  color: clip.color || SUBTITLE_DEFAULT_COLOR,
+                  padding: '14px 28px', borderRadius: '8px',
+                  fontSize: SUBTITLE_FONT_SIZE_MAP[clip.fontSize || SUBTITLE_DEFAULT_FONT_SIZE] || SUBTITLE_FONT_SIZE_MAP.medium,
+                  fontFamily: clip.fontFamily || SUBTITLE_DEFAULT_FONT_FAMILY, fontWeight: 'bold',
+                  textAlign: 'center', maxWidth: '90%', lineHeight: 1.4,
+                  textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                }}>
+                  {clip.text}
+                </div>
+              </AbsoluteFill>
+            </Sequence>
+          );
+        })}
       </AbsoluteFill>
     );
   }
