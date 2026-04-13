@@ -1,37 +1,64 @@
 
 
-## Plan: Fix Broken Images — Replace Deprecated Unsplash Source
+## Plan: Themenrelevante Stockbilder per Pexels/Pixabay in Trends
 
 ### Problem
-`source.unsplash.com` was shut down in 2023. All image URLs in `TrendCardMedia.tsx` return errors, triggering the gradient fallback every time. No real images ever appear.
+Picsum liefert zufällige Fotos ohne Bezug zum Trend. Ein Trend über "Crossbody Mini Bag" zeigt ein Bergsee-Foto. Das ist nicht professionell.
 
-### Solution
-Replace with **Picsum Photos** (`picsum.photos`) — a free, no-API-key image service that actually works. Use deterministic seed-based URLs so each card gets a consistent, unique image.
+### Beste Lösung
+Die `fetch-trends` Edge Function wird erweitert: Für jeden Trend wird per **Pexels API** (Key ist bereits konfiguriert) ein themenrelevantes Bild gesucht. Das Bild wird als `image_url` im Trend-Objekt mitgeliefert. Die UI zeigt dann echte, thematisch passende Stockfotos.
 
-### Changes in `src/components/trends/TrendCardMedia.tsx`
+### Warum das die beste Lösung ist
+- **Pexels API Key existiert bereits** als Secret — null Setup nötig
+- **Keyword-basierte Suche** — "Crossbody Mini Bag" liefert ein Bild einer Tasche, nicht eines Berges
+- **Hochwertige, lizenzfreie Fotos** — professionelle Qualität
+- **Kein AI-Bildgenerierungs-Budget** nötig (Replicate kostet pro Bild)
 
-Replace the `getImageUrl` function:
+### Technischer Ablauf
 
-```typescript
-// OLD (broken):
-// return `https://source.unsplash.com/600x400/?${keywords}&sig=${seed}`;
+```text
+fetch-trends Edge Function
+  ├─ Trends generieren (wie bisher)
+  ├─ NEU: Für jeden Trend → Pexels API Search
+  │   Suchbegriff: Trend-Name bereinigt (ohne # und Sonderzeichen)
+  │   Fallback: Kategorie-Keywords wenn nichts gefunden
+  ├─ image_url + photographer attribution anhängen
+  └─ Response mit angereicherten Trends
 
-// NEW (working):
-function getImageUrl(category: string, index: number): string {
-  const seed = index * 137 + (category?.length || 5) * 31;
-  return `https://picsum.photos/seed/${category}-${seed}/600/400`;
-}
+TrendCardMedia.tsx
+  ├─ Neue prop: imageUrl?: string
+  ├─ Wenn vorhanden → echtes Pexels-Bild
+  └─ Fallback → Picsum wie bisher
+
+TrendRadar.tsx
+  ├─ image_url aus Trend-Daten durchreichen
+  └─ Hero-Carousel ebenfalls mit echtem Bild
 ```
 
-This gives:
-- **Deterministic images** — same seed = same photo every time
-- **Category-varied** — different categories get different photos
-- **Reliable loading** — Picsum is actively maintained and fast
-- **No API key needed**
+### Änderungen
 
-### Files to Edit
-- `src/components/trends/TrendCardMedia.tsx` — Update `getImageUrl` function (2 lines changed)
+1. **`supabase/functions/fetch-trends/index.ts`**
+   - Neue Hilfsfunktion `searchPexelsImage(query)` — sucht ein einzelnes Bild per Pexels API
+   - Nach Trend-Generierung: Batch-Loop über alle Trends, jeweils ein Pexels-Bild suchen
+   - Suchbegriff: `trend.name.replace(/#/g, '').trim()` + ggf. Kategorie
+   - Ergebnis: `image_url` (medium-Auflösung ~350x230) und `image_photographer` pro Trend
+   - Rate-Limit-Schutz: Max 20 Trends parallel mit `Promise.allSettled`
+   - Fallback-Keywords pro Kategorie (social-media → "social media content creator", ecommerce → "online shopping product")
 
-### Result
-Real photographs will appear on all trend cards and the hero carousel immediately.
+2. **`src/components/trends/TrendCardMedia.tsx`**
+   - Neue prop `imageUrl?: string` akzeptieren
+   - Wenn vorhanden: echtes Bild laden statt Picsum-URL
+   - Alle visuellen Effekte (Glassmorphism, Scanlines, Glow) bleiben erhalten
+
+3. **`src/pages/TrendRadar.tsx`**
+   - `trend.data_json?.image_url` an `TrendCardMedia` durchreichen
+   - Hero-Carousel: `HeroMediaBackground` ebenfalls mit echtem Bild
+
+### Betroffene Dateien
+- `supabase/functions/fetch-trends/index.ts` — Pexels-Integration
+- `src/components/trends/TrendCardMedia.tsx` — imageUrl prop
+- `src/pages/TrendRadar.tsx` — Daten durchreichen
+
+### Kein API-Key-Setup nötig
+`PEXELS_API_KEY` ist bereits als Secret konfiguriert.
 
