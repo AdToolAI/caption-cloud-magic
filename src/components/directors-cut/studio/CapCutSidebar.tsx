@@ -213,6 +213,109 @@ const DraggableMusicItem: React.FC<{
   );
 };
 
+// AI Script for empty subtitles sub-component
+const AISubtitleScriptSection: React.FC<{
+  existingCaptions: SubtitleClip[];
+  captionLanguage: string;
+  captionStyle: string;
+  localStyle: Partial<SubtitleClip>;
+  onCaptionsGenerated?: (captions: SubtitleClip[]) => void;
+  t: (key: string, params?: Record<string, any>) => string;
+}> = ({ existingCaptions, captionLanguage, captionStyle, localStyle, onCaptionsGenerated, t }) => {
+  const [scriptIdea, setScriptIdea] = useState('');
+  const [scriptTone, setScriptTone] = useState('friendly');
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+
+  const handleGenerateScript = async () => {
+    if (!scriptIdea.trim()) return;
+
+    const emptySegments = existingCaptions
+      .filter(c => !c.text || c.text.trim() === '')
+      .map(c => ({ startTime: c.startTime, endTime: c.endTime }));
+
+    if (emptySegments.length === 0) return;
+
+    setIsGeneratingScript(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-subtitle-script', {
+        body: {
+          idea: scriptIdea.trim(),
+          segments: emptySegments,
+          tone: scriptTone,
+          language: captionLanguage,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const texts: string[] = data.texts || [];
+
+      // Fill empty captions with generated texts
+      let textIndex = 0;
+      const updatedCaptions = existingCaptions.map(caption => {
+        if ((!caption.text || caption.text.trim() === '') && textIndex < texts.length) {
+          const text = texts[textIndex++];
+          return { ...caption, text };
+        }
+        return caption;
+      });
+
+      onCaptionsGenerated?.(updatedCaptions);
+      toast.success(t('dc.subtitlesFilled', { count: textIndex }));
+      setScriptIdea('');
+    } catch (err: any) {
+      console.error('Script generation error:', err);
+      toast.error(err.message || 'Error generating script');
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  };
+
+  const emptyCount = existingCaptions.filter(c => !c.text || c.text.trim() === '').length;
+
+  return (
+    <div className="space-y-2 p-3 rounded-lg bg-[#1a1a2e]/50 border border-indigo-500/20">
+      <div className="flex items-center gap-2">
+        <Wand2 className="h-4 w-4 text-indigo-400" />
+        <h4 className="text-xs font-medium text-indigo-300">{t('dc.aiSubtitleScript')}</h4>
+      </div>
+      <p className="text-[10px] text-white/50">{t('dc.aiSubtitleScriptDesc')}</p>
+      
+      <Textarea
+        value={scriptIdea}
+        onChange={(e) => setScriptIdea(e.target.value)}
+        placeholder={t('dc.aiSubtitleScriptPlaceholder')}
+        className="min-h-[60px] text-xs bg-[#1a1a1a] border-[#3a3a3a] text-white placeholder:text-white/30 resize-none"
+        rows={3}
+      />
+
+      <Select value={scriptTone} onValueChange={setScriptTone}>
+        <SelectTrigger className="h-8 text-xs bg-[#1a1a1a] border-[#3a3a3a] text-white">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="friendly">{t('dc.toneFriendly')}</SelectItem>
+          <SelectItem value="professional">{t('dc.toneProfessional')}</SelectItem>
+          <SelectItem value="energetic">{t('dc.toneEnergetic')}</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Button
+        onClick={handleGenerateScript}
+        disabled={isGeneratingScript || !scriptIdea.trim()}
+        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-8"
+      >
+        {isGeneratingScript ? (
+          <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> {t('dc.generating')}</>
+        ) : (
+          <><Wand2 className="h-3.5 w-3.5 mr-1.5" /> {t('dc.generateSubtitleScript')} ({emptyCount})</>
+        )}
+      </Button>
+    </div>
+  );
+};
+
 export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   videoUrl = '',
   videoDuration = 30,
