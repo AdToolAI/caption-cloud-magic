@@ -241,6 +241,7 @@ export const DashboardVideoCarousel = ({ quickActions = [] }: { quickActions?: Q
               ))}
             </div>
           )}
+        </div>
 
         <div className="flex justify-center" style={{ perspective: '1200px' }}>
           <div
