@@ -1705,6 +1705,125 @@ const generateDynamicTrends = () => {
 };
 
 const FALLBACK_TRENDS = generateDynamicTrends();
+
+// Category fallback keywords for image search
+const categoryFallbackKeywords: Record<string, string> = {
+  'social-media': 'social media content creator smartphone',
+  'ecommerce': 'online shopping product ecommerce',
+  'lifestyle': 'lifestyle wellness healthy living',
+  'business': 'business office technology startup',
+  'finance': 'finance investment money trading',
+  'motivation': 'success motivation inspiration',
+};
+
+async function searchPexelsImage(query: string, fallbackCategory?: string): Promise<{ url: string; photographer: string } | null> {
+  try {
+    const pexelsApiKey = Deno.env.get('PEXELS_API_KEY');
+    if (!pexelsApiKey) {
+      console.log('No PEXELS_API_KEY configured');
+      return null;
+    }
+
+    // Clean query: remove hashtags, special chars
+    const cleanQuery = query.replace(/#/g, '').replace(/[^a-zA-Z0-9\s]/g, '').trim();
+    
+    const response = await fetch(
+      `https://api.pexels.com/v1/search?query=${encodeURIComponent(cleanQuery)}&per_page=1&page=1`,
+      { headers: { 'Authorization': pexelsApiKey } }
+    );
+
+    if (!response.ok) {
+      console.error('Pexels API error:', response.status);
+      // Try fallback category search
+      if (fallbackCategory && categoryFallbackKeywords[fallbackCategory]) {
+        const fbResponse = await fetch(
+          `https://api.pexels.com/v1/search?query=${encodeURIComponent(categoryFallbackKeywords[fallbackCategory])}&per_page=1&page=1`,
+          { headers: { 'Authorization': pexelsApiKey } }
+        );
+        if (fbResponse.ok) {
+          const fbData = await fbResponse.json();
+          if (fbData.photos?.length > 0) {
+            return { url: fbData.photos[0].src.medium, photographer: fbData.photos[0].photographer };
+          }
+        }
+      }
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.photos?.length > 0) {
+      return { url: data.photos[0].src.medium, photographer: data.photos[0].photographer };
+    }
+
+    // Fallback to category keywords if no results
+    if (fallbackCategory && categoryFallbackKeywords[fallbackCategory]) {
+      const fbResponse = await fetch(
+        `https://api.pexels.com/v1/search?query=${encodeURIComponent(categoryFallbackKeywords[fallbackCategory])}&per_page=1&page=1`,
+        { headers: { 'Authorization': pexelsApiKey } }
+      );
+      if (fbResponse.ok) {
+        const fbData = await fbResponse.json();
+        if (fbData.photos?.length > 0) {
+          return { url: fbData.photos[0].src.medium, photographer: fbData.photos[0].photographer };
+        }
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Pexels search error:', error);
+    return null;
+  }
+}
+
+async function enrichTrendsWithImages(trends: any[]): Promise<any[]> {
+  const pexelsApiKey = Deno.env.get('PEXELS_API_KEY');
+  if (!pexelsApiKey) {
+    console.log('No PEXELS_API_KEY, skipping image enrichment');
+    return trends;
+  }
+
+  console.log(`Enriching ${trends.length} trends with Pexels images...`);
+  
+  // Process in batches of 10 to respect rate limits
+  const batchSize = 10;
+  const enriched = [...trends];
+  
+  for (let i = 0; i < enriched.length; i += batchSize) {
+    const batch = enriched.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map(trend => {
+        const searchTerm = trend.name || trend.description?.substring(0, 50) || '';
+        return searchPexelsImage(searchTerm, trend.category);
+      })
+    );
+    
+    results.forEach((result, j) => {
+      const idx = i + j;
+      if (result.status === 'fulfilled' && result.value) {
+        enriched[idx] = {
+          ...enriched[idx],
+          data_json: {
+            ...enriched[idx].data_json,
+            image_url: result.value.url,
+            image_photographer: result.value.photographer,
+          }
+        };
+      }
+    });
+    
+    // Small delay between batches to avoid rate limits
+    if (i + batchSize < enriched.length) {
+      await new Promise(r => setTimeout(r, 200));
+    }
+  }
+  
+  const withImages = enriched.filter(t => t.data_json?.image_url).length;
+  console.log(`Enriched ${withImages}/${enriched.length} trends with images`);
+  
+  return enriched;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });

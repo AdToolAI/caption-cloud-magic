@@ -33,9 +33,10 @@ interface TrendCardMediaProps {
   index: number;
   className?: string;
   height?: string;
+  imageUrl?: string;
 }
 
-export function TrendCardMedia({ category, platform, index, className = '', height = 'h-44' }: TrendCardMediaProps) {
+export function TrendCardMedia({ category, platform, index, className = '', height = 'h-44', imageUrl }: TrendCardMediaProps) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const visuals = platformVisuals[platform] || platformVisuals.twitter;
