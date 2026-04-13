@@ -342,8 +342,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         // Calculate effective volume (track muted, solo, volume levels)
         const hasSoloTracks = audioTracks.some(t => t.solo);
         const shouldPlay = hasSoloTracks ? track.solo : !track.muted;
+        const masterVol = (audioEnhancements.master_volume || 100);
         const effectiveVolume = !shouldPlay ? 0 : 
-          (volume / 100) * (track.volume / 100) * (clip.volume / 100);
+          (masterVol / 100) * (track.volume / 100) * (clip.volume / 100);
         
         audio.volume = Math.min(1, Math.max(0, effectiveVolume));
         
