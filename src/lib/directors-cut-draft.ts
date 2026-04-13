@@ -1,5 +1,39 @@
 const DRAFT_KEY = 'directors-cut-draft';
 const DRAFT_VERSION = 1;
+const RELOAD_FLAG_KEY = 'directors-cut-reload-flag';
+
+/**
+ * Called once at module load time.
+ * If a reload flag was set during the previous beforeunload AND
+ * the current navigation is a reload, we should clear the draft on next mount.
+ */
+let _shouldResetOnNextMount: boolean = (() => {
+  try {
+    const flag = sessionStorage.getItem(RELOAD_FLAG_KEY);
+    sessionStorage.removeItem(RELOAD_FLAG_KEY);
+    if (!flag) return false;
+    const nav = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+    return nav.length > 0 && nav[0].type === 'reload';
+  } catch {
+    return false;
+  }
+})();
+
+/** Returns true exactly once after a real browser reload while DC was mounted. */
+export function consumeReloadReset(): boolean {
+  const val = _shouldResetOnNextMount;
+  _shouldResetOnNextMount = false;
+  return val;
+}
+
+/** Mark that DC is mounted — sets a beforeunload listener to flag reloads. */
+export function installReloadFlag(): () => void {
+  const handler = () => {
+    try { sessionStorage.setItem(RELOAD_FLAG_KEY, '1'); } catch {}
+  };
+  window.addEventListener('beforeunload', handler);
+  return () => window.removeEventListener('beforeunload', handler);
+}
 
 export interface SubtitleSafeZone {
   enabled: boolean;
