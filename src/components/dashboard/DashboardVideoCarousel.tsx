@@ -45,7 +45,7 @@ const resolveVideoUrl = (rawUrl: string): string => {
   return data.publicUrl;
 };
 
-export const DashboardVideoCarousel = () => {
+export const DashboardVideoCarousel = ({ quickActions = [] }: { quickActions?: QuickAction[] }) => {
   const { videos, isLoading } = useVideoHistory();
   const { t, language } = useTranslation();
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
