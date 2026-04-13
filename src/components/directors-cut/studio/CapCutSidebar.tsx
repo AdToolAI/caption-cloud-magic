@@ -320,7 +320,120 @@ const AISubtitleScriptSection: React.FC<{
   );
 };
 
-export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
+// Voice IDs matching the director-cut-voice-over edge function
+const VOICEOVER_VOICES = [
+  { id: 'sarah', name: 'Sarah', gender: '♀' },
+  { id: 'roger', name: 'Roger', gender: '♂' },
+  { id: 'aria', name: 'Aria', gender: '♀' },
+  { id: 'laura', name: 'Laura', gender: '♀' },
+  { id: 'charlie', name: 'Charlie', gender: '♂' },
+  { id: 'george', name: 'George', gender: '♂' },
+  { id: 'brian', name: 'Brian', gender: '♂' },
+];
+
+const SubtitleVoiceoverSection: React.FC<{
+  existingCaptions: SubtitleClip[];
+  captionLanguage: string;
+  onVoiceOverGenerated?: (url: string) => void;
+  voiceoverVolume: number;
+  onVoiceoverVolumeChange?: (volume: number) => void;
+  t: (key: string, params?: Record<string, any>) => string;
+}> = ({ existingCaptions, captionLanguage, onVoiceOverGenerated, voiceoverVolume, onVoiceoverVolumeChange, t }) => {
+  const [selectedVoice, setSelectedVoice] = useState('sarah');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [localVolume, setLocalVolume] = useState(voiceoverVolume);
+
+  const captionsWithText = existingCaptions.filter(c => c.text && c.text.trim() !== '');
+  const combinedText = captionsWithText.map(c => c.text).join(' ');
+
+  const handleGenerate = async () => {
+    if (!combinedText.trim()) return;
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('director-cut-voice-over', {
+        body: {
+          script_text: combinedText,
+          voice_id: selectedVoice,
+          language: captionLanguage === 'en' ? 'en-US' : captionLanguage === 'es' ? 'es-ES' : 'de-DE',
+          speed: 1,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.voiceover_url) {
+        onVoiceOverGenerated?.(data.voiceover_url);
+        toast.success(t('dc.voiceoverGenerated'));
+      }
+    } catch (err: any) {
+      console.error('Voiceover generation error:', err);
+      toast.error(err.message || 'Error generating voiceover');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 p-3 rounded-lg bg-[#1a1a2e]/50 border border-amber-500/20">
+      <div className="flex items-center gap-2">
+        <Mic className="h-4 w-4 text-amber-400" />
+        <h4 className="text-xs font-medium text-amber-300">{t('dc.subtitleVoiceover')}</h4>
+      </div>
+      <p className="text-[10px] text-white/50">{t('dc.subtitleVoiceoverDesc')}</p>
+      
+      {/* Voice Select */}
+      <div className="space-y-1">
+        <label className="text-[10px] text-white/40">{t('dc.voiceoverVoice')}</label>
+        <Select value={selectedVoice} onValueChange={setSelectedVoice}>
+          <SelectTrigger className="h-8 text-xs bg-[#1a1a1a] border-[#3a3a3a] text-white">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {VOICEOVER_VOICES.map(v => (
+              <SelectItem key={v.id} value={v.id}>
+                {v.gender} {v.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Volume Slider */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <label className="text-[10px] text-white/40">{t('dc.voiceoverVolume')}</label>
+          <span className="text-[10px] text-white/60">{localVolume}%</span>
+        </div>
+        <Slider
+          value={[localVolume]}
+          onValueChange={([v]) => {
+            setLocalVolume(v);
+            onVoiceoverVolumeChange?.(v);
+          }}
+          min={0}
+          max={100}
+          step={1}
+          className="w-full"
+        />
+      </div>
+
+      <Button
+        onClick={handleGenerate}
+        disabled={isGenerating || captionsWithText.length === 0}
+        className="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs h-8"
+      >
+        {isGenerating ? (
+          <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> {t('dc.voiceoverGenerating')}</>
+        ) : (
+          <><Mic className="h-3.5 w-3.5 mr-1.5" /> {t('dc.generateVoiceoverFromSubs')} ({captionsWithText.length})</>
+        )}
+      </Button>
+    </div>
+  );
+};
+
+
   videoUrl = '',
   videoDuration = 30,
   voiceOverUrl,
@@ -396,6 +509,9 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   exportSettings,
   onExportSettingsChange,
   onStartExport,
+  onVoiceOverGenerated,
+  onVoiceoverVolumeChange,
+  voiceoverVolume = 100,
 }) => {
   const { t } = useTranslation();
   // Tab state
