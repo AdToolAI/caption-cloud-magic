@@ -433,7 +433,7 @@ const SubtitleVoiceoverSection: React.FC<{
   );
 };
 
-
+export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   videoUrl = '',
   videoDuration = 30,
   voiceOverUrl,
