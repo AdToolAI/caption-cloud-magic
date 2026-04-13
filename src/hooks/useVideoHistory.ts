@@ -10,6 +10,8 @@ export const useVideoHistory = () => {
 
   const { data: videos, isLoading, error } = useQuery({
     queryKey: ['video-history'],
+    staleTime: 60_000,
+    placeholderData: (previousData: any) => previousData,
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
