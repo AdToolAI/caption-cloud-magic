@@ -1443,7 +1443,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           {/* Left Sidebar - Collapsible */}
            <div className={cn(
             "flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-all duration-200 flex-shrink-0",
-            sidebarCollapsed ? "w-12" : "w-80"
+            sidebarCollapsed ? "w-12" : "w-96"
           )}>
             {sidebarCollapsed ? (
               <div className="flex flex-col items-center gap-3 py-4">
@@ -1708,7 +1708,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           {/* Right Sidebar - Collapsible */}
           <div className={cn(
             "border-l border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-all duration-200 flex-shrink-0",
-            propertiesCollapsed ? "w-12" : "w-80"
+            propertiesCollapsed ? "w-12" : "w-64"
           )}>
             {propertiesCollapsed ? (
               <div className="flex flex-col items-center py-4">
