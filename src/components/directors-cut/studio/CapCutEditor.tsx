@@ -1648,7 +1648,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                   volume: 100,
                   fadeIn: 0.2,
                   fadeOut: 0.2,
-                  source: 'generated',
+                  source: 'ai-generated',
                   color: '#f59e0b',
                 };
                 handleAddClip('track-voiceover', newClip);
