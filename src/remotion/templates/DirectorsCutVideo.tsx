@@ -592,7 +592,12 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
   // Log render version once on first frame for bundle verification
   useEffect(() => {
-    console.log(`[DirectorsCutVideo] Bundle version: ${SUBTITLE_RENDER_VERSION}, subtitleTrack clips: ${subtitleTrack?.clips?.length ?? 0}, visible: ${subtitleTrack?.visible}`);
+    const clipCount = subtitleTrack?.clips?.length ?? 0;
+    const firstClip = subtitleTrack?.clips?.[0];
+    console.log(`[DirectorsCutVideo] 🎬 CANARY ${SUBTITLE_RENDER_VERSION} | clips=${clipCount} | visible=${subtitleTrack?.visible} | firstClipText="${firstClip?.text?.substring(0, 40) ?? 'NONE'}" | firstClipTime=${firstClip?.startTime ?? 'N/A'}-${firstClip?.endTime ?? 'N/A'}`);
+    if (clipCount === 0 && subtitleTrack) {
+      console.warn(`[DirectorsCutVideo] ⚠️ subtitleTrack present but NO clips! Raw keys: ${Object.keys(subtitleTrack).join(',')}`);
+    }
   }, []);
 
   // Load font using native FontFace API (same as UniversalVideo.tsx)
