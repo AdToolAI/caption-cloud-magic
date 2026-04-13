@@ -1,40 +1,48 @@
 
 
-## Plan: Feintuning der Pexels-Bildsuche (80% → 100% Trefferquote)
+## Plan: Trend Radar Layout-Umbau — Top Trends nach oben, Kategorien mit Bildern
 
-### Problem
-~20% der Suchbegriffe sind zu abstrakt oder abgeschnitten, z.B.:
-- "Produce posts one day for maximum" → kein visuelles Subjekt
-- "Tell personal stories seconds" → zu vage
-- "Focused work without distractions for maximum" → generisch
+### Aktuelles Layout (von oben nach unten)
+1. HeroHeader (Titel, Entdecken/Gespeichert/Neu laden)
+2. Ticker-Marquee
+3. "Entdecke deine Nische" — 6 Kategorie-Karten mit Emojis
+4. E-Commerce Subcategories (wenn aktiv)
+5. Hero Carousel (Top 5 Trends)
+6. Floating Stats
+7. Filter/Suche
+8. Trend-Grid
 
-Diese Queries beschreiben *Strategien*, nicht *Objekte*. Pexels braucht konkrete, visuelle Begriffe.
-
-### Lösung
-
-Drei gezielte Verbesserungen in `buildSearchQuery`:
-
-1. **Kategorie-spezifische Suchstrategie**: Für `social-media` und `motivation`-Trends (die meist Strategien/Konzepte beschreiben) wird der Trend-Name bevorzugt + ein visuelles Keyword aus einer Kategorie-Map angehängt (z.B. "Content Batching" + "laptop workspace" → "content batching laptop workspace")
-
-2. **Stoppwort-Filter erweitern**: Wörter wie "for", "with", "without", "maximum", "your", "the", "and" werden aus dem Query entfernt, damit nur inhaltlich relevante Begriffe übrig bleiben
-
-3. **Minimum-Wort-Qualitätsprüfung**: Wenn nach dem Filtern weniger als 3 Wörter übrig sind, wird der Trend-Name (splitCamelCase) + Kategorie-Keyword als Fallback verwendet
+### Neues Layout
+1. **Kompakter Header** — Nur Titel + "Gespeichert" + "Neu laden" Buttons (Entdecken-Button entfällt, da das der Default ist; Trend-Count-Badge bleibt)
+2. **Hero Carousel (Top Trends)** — direkt nach dem Header, prominenteste Position
+3. **Ticker-Marquee**
+4. **Kategorie-Karten mit Pexels-Bildern** — statt Emojis bekommen die 6 Karten ein Hintergrundbild (z.B. "social media smartphone" für Social-Media). Karten werden als horizontale Bildkarten mit Overlay-Text gestaltet, ähnlich Netflix-Kategorien
+5. E-Commerce Subcategories
+6. Filter/Suche
+7. Trend-Grid
 
 ### Änderungen
 
-**`supabase/functions/fetch-trends/index.ts`**
+**`src/pages/TrendRadar.tsx`**
+- Reihenfolge im JSX umstellen: HeroCarousel direkt nach Header
+- Kategorien-Array: `icon`-Emoji durch `image`-Pexels-URL ersetzen (statische, kuratierte URLs für konsistente Qualität)
+- Kategorie-Karten: Neues Design mit Hintergrundbild, dunklem Overlay und Text darüber
+- FloatingStats entfernen (redundant mit Ticker und Carousel)
 
-- `buildSearchQuery` anpassen:
-  - Erweiterte Stoppwort-Liste: `for, with, without, your, the, and, that, this, how, can, from, into, than, most, one, day, days, per, via, maximum, minimum`
-  - Neue Map `categoryVisualKeywords`: `social-media → "smartphone laptop content"`, `motivation → "person success sunrise"`, `lifestyle → "wellness healthy living"`, etc.
-  - Für abstrakte Kategorien (social-media, motivation, business): Trend-Name + visuelles Keyword bevorzugen
-  - Für konkrete Kategorien (ecommerce, lifestyle, finance): Description-basierte Suche beibehalten (funktioniert bereits gut)
+**`src/components/trends/TrendRadarHeroHeader.tsx`**
+- "Entdecken"-Button entfernen (Default-View braucht keinen Button)
+- Layout vereinfachen: Titel links, "Gespeichert" + "Neu laden" rechts
+
+### Kategorie-Bilder (kuratiert, statisch)
+Statt dynamischer Pexels-Suche verwenden wir feste, handverlesene Pexels-Bild-URLs pro Kategorie:
+- Social-Media → Smartphone/Content-Creator
+- E-Commerce → Shopping/Produkte  
+- Lifestyle → Wellness/Natur
+- Business → Office/Technologie
+- Motivation → Person/Erfolg
+- Finance → Geld/Investment
 
 ### Betroffene Dateien
-- `supabase/functions/fetch-trends/index.ts` — nur `buildSearchQuery` Funktion (~30 Zeilen)
-
-### Ergebnis
-- "Content Batching" → "content batching laptop workspace" statt "Produce posts one day for maximum"
-- "Storytime Format" → "storytime storytelling camera" statt "Tell personal stories seconds"
-- Produkt-Trends bleiben unverändert (funktionieren bereits gut)
+- `src/pages/TrendRadar.tsx` — Layout-Umbau, Kategorie-Bilder
+- `src/components/trends/TrendRadarHeroHeader.tsx` — Vereinfachung
 
