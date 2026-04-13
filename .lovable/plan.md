@@ -1,19 +1,13 @@
 
 
-## Plan: Gelben Playhead-Regler aus der Timeline entfernen
+## Plan: Linke Sidebar breiter, rechte Sidebar schmaler
 
-### Problem
-Der gelbe (Gold #F5C76A) Playhead-Regler in der CapCut-Timeline funktioniert nicht zuverlässig und stört die Bedienung. Das Seeking per Klick auf die Timeline funktioniert bereits korrekt ohne ihn.
+### Änderung
+In `src/components/directors-cut/studio/CapCutEditor.tsx`:
 
-### Lösung
-Den gesamten gelben Playhead-Indikator und seine Drag-Logik aus `CapCutTimeline.tsx` entfernen:
-
-- **Zeile 925–946**: Das goldene Playhead-Element (Linie + Dreieck-Handle) löschen
-- **Zeile 564–609**: Die `isDraggingPlayhead`-State-Variable und den zugehörigen `useEffect` für Maus-Drag entfernen
-- **Zeile 649**: `playheadPosition`-Variable entfernen (wird nicht mehr benötigt)
-
-Das Seeking funktioniert weiterhin über den Timeline-Klick (`handleTimelineClick`, Zeile 567–573).
+- **Linke Sidebar**: `w-80` (320px) → `w-96` (384px) — mehr Platz für Audio-Effekte, Musik-Liste etc., kein Scrollbar nötig
+- **Rechte Properties-Sidebar**: `w-80` (320px) → `w-64` (256px) — schmaler, da Properties weniger Platz brauchen
 
 ### Datei
-- **Edit**: `src/components/directors-cut/studio/CapCutTimeline.tsx`
+- **Edit**: `src/components/directors-cut/studio/CapCutEditor.tsx` (2 Stellen: Zeile 1446 und 1711)
 
