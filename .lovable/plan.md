@@ -1,41 +1,81 @@
 
 
-## Fix: Wan Video — Modell auf Wan 2.5 upgraden
+## AI Video Studio — Unified Hub Redesign (James Bond 2028)
 
-### Problem
-Das aktuelle Modell `wavespeedai/wan-2.1-t2v-720p` hat **keinen `duration`-Parameter**. Es produziert immer ~5s Videos, egal welche Dauer eingestellt wird. Der Parameter wird stillschweigend ignoriert.
+### Konzept
+Eine neue zentrale **Hub-Seite** (`/ai-video-studio`) im James Bond 2028 Stil, die als Einstiegspunkt für alle KI-Video-Anbieter dient. Die einzelnen Studios bleiben als separate Seiten bestehen, werden aber von der Hub aus navigiert.
 
-### Lösung
-Upgrade auf die offiziellen **Wan 2.5** Modelle (`wan-video/wan-2.5-t2v` und `wan-video/wan-2.5-i2v`), die einen echten `duration`-Parameter mit Werten **5 oder 10 Sekunden** unterstützen.
+### Struktur
 
-### Wichtige API-Unterschiede
+```text
+/ai-video-studio (Hub)
+├── Hero-Header mit Titel, Wallet-Anzeige
+├── Haftungsausschluss (Disclaimer-Banner)
+├── 4 Provider-Karten im Bento-Grid:
+│   ├── Sora 2 (OpenAI) → /ai-video-studio/generate
+│   ├── Kling 3.0 (Kuaishou) → /kling-video-studio
+│   ├── Seedance 2.0 (ByteDance) → /seedance-video-studio
+│   └── Wan 2.5 (Wan Video) → /wan-video-studio
+├── Unified Bibliothek (alle Anbieter)
+└── Credits-Bereich
+```
 
-| Parameter | WaveSpeed (alt) | Wan 2.5 (neu) |
-|-----------|----------------|---------------|
-| Duration | nicht vorhanden | `duration`: 5 oder 10 |
-| Aspect Ratio | `aspect_ratio`: "16:9" | T2V: `size`: "1280*720" / I2V: `resolution`: "720p" |
-| Max Duration | - | 10 Sekunden |
+### Design (James Bond 2028)
+- Glassmorphism-Karten mit `backdrop-blur`, `border-gold/20`
+- Gold-Gradient-Akzente (#F5C76A → Cyan)
+- Floating Particles im Hero
+- Framer Motion Stagger-Animationen
+- Hover: 3D-Neon-Glow-Lift auf den Provider-Karten
+
+### Provider-Karten — Inhalt pro Anbieter
+Jede Karte zeigt:
+- **Name & Logo-Badge** (z.B. "Sora 2" mit "OpenAI" Badge)
+- **Spezialisierung** (z.B. "Cinematic storytelling & artistic shots")
+- **Preise** (von–bis pro Sekunde)
+- **Max. Dauer** und **Qualität**
+- **Verfügbare Modi** (Text-to-Video, Image-to-Video)
+- CTA-Button → Link zum jeweiligen Studio
+
+### Haftungsausschluss
+Prominent platzierter Disclaimer mit Icon:
+- Keine Haftung für generierte Inhalte
+- KI-Videos müssen als solche gekennzeichnet werden
+- Hinweis auf Urheberrecht und Nutzungsverantwortung
+- Zweisprachig (DE/EN/ES)
+
+### Unified Bibliothek
+- Die `VideoGenerationHistory`-Komponente wird als Tab auf der Hub-Seite integriert
+- Zeigt Videos **aller Anbieter** zentral an (bereits so implementiert)
+- Filter nach Anbieter möglich
+
+### Tabs auf der Hub-Seite
+1. **Studios** — Die 4 Provider-Karten
+2. **Bibliothek** — Alle generierten Videos (alle Anbieter)
+3. **Credits** — Wallet & Credit-Pakete kaufen
 
 ### Änderungen
 
-**1. `src/config/wanVideoCredits.ts`**
-- `maxDuration` von 12 auf **10** ändern
-- Duration-Schritte auf 5 und 10 beschränken (Slider durch Toggle/Select ersetzen)
-- Beschreibung aktualisieren ("Wan 2.5")
+**1. `src/pages/AIVideoStudio.tsx`** — Komplett neu als Hub-Seite
+- Bisheriger Sora-2-Generator wird zu eigenem Tab/Bereich innerhalb der Seite
+- Hero-Header mit animiertem Titel "AI Video Studio"
+- Provider-Grid mit 4 Glassmorphism-Karten
+- Disclaimer-Sektion
+- Tabs: Studios | Bibliothek | Credits
 
-**2. `supabase/functions/generate-wan-video/index.ts`**
-- Modelle auf `wan-video/wan-2.5-t2v` (T2V) und `wan-video/wan-2.5-i2v` (I2V) ändern
-- `aspect_ratio` → `size` Mapping für T2V (z.B. "16:9" → "1280*720")
-- `aspect_ratio` → `resolution` für I2V (z.B. "720p")
-- Duration auf 5 oder 10 cappen (nächster gültiger Wert)
+**2. `src/components/ai-video/AIVideoProviderCard.tsx`** — Neue Komponente
+- Wiederverwendbare Karte pro Provider
+- Props: name, provider, description, pricing, features, link, badge
 
-**3. `src/pages/WanVideoStudio.tsx`**
-- Duration-Slider durch Auswahl von 5s oder 10s ersetzen
-- Labels und Beschreibungen auf "Wan 2.5" aktualisieren
+**3. `src/components/ai-video/AIVideoDisclaimer.tsx`** — Neue Komponente
+- Rechtlicher Hinweis mit Shield-Icon
+- Lokalisiert (DE/EN/ES)
 
-**4. `src/components/ai-video/VideoGenerationHistory.tsx`**
-- Model-Display-Names um Wan 2.5 ergänzen
+**4. Bestehende Studio-Seiten** (Kling, Seedance, Wan)
+- Erhalten einen einheitlichen "← Zurück zum AI Studio" Header
+- Behalten ihre volle Funktionalität
 
 ### Dateien
-- **Edit**: `src/config/wanVideoCredits.ts`, `supabase/functions/generate-wan-video/index.ts`, `src/pages/WanVideoStudio.tsx`, `src/components/ai-video/VideoGenerationHistory.tsx`
+- **Neu**: `src/components/ai-video/AIVideoProviderCard.tsx`, `src/components/ai-video/AIVideoDisclaimer.tsx`
+- **Komplett neu**: `src/pages/AIVideoStudio.tsx` (wird zur Hub + behält Sora-2-Generator als Sub-View)
+- **Edit**: `src/pages/KlingVideoStudio.tsx`, `src/pages/SeedanceVideoStudio.tsx`, `src/pages/WanVideoStudio.tsx` (einheitlicher Back-Link)
 
