@@ -553,6 +553,8 @@ const Home = () => {
         </section>
       )}
 
+      {user && <NewsTicker />}
+
       <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
         {/* Hero Banner */}
         {user && (
