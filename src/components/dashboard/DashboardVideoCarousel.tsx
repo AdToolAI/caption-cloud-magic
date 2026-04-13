@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { Play, ChevronLeft, ChevronRight, Video, Sparkles, Expand, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
