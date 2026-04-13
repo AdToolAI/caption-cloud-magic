@@ -81,118 +81,9 @@ export default function AIVideoStudio() {
     refetchInterval: 5000,
   });
 
-  useEffect(() => { setHasActiveGeneration((activeGenerations?.length ?? 0) > 0 || generating); }, [activeGenerations, generating]);
-
-  useEffect(() => {
-    if (!hasActiveGeneration) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [hasActiveGeneration]);
-
-  useEffect(() => {
-    return () => { if (hasActiveGeneration) toast.info(t('aiVid.bgGenerationToast'), { duration: 8000 }); };
-  }, [hasActiveGeneration]);
-
   const handleTabChange = useCallback((newTab: string) => {
-    if (hasActiveGeneration && activeTab === 'generate' && newTab !== 'generate') {
-      toast.info(t('aiVid.bgContinueToast'), { duration: 5000 });
-    }
     setActiveTab(newTab);
-  }, [hasActiveGeneration, activeTab]);
-
-  const handleRetryGeneration = (params: { prompt: string; model: string; duration: number }) => {
-    setPrompt(params.prompt);
-    setModel(params.model as AIVideoModel);
-    setDuration(params.duration as 4 | 8 | 12);
-    setActiveTab('generate');
-  };
-
-  // Image upload handler
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { toast.error(t('aiVid.imageFileOnly')); return; }
-    if (file.size > 10 * 1024 * 1024) { toast.error(t('aiVid.imageTooLarge')); return; }
-    setUploadingImage(true);
-    setReferenceImage(file);
-    try {
-      const previewUrl = URL.createObjectURL(file);
-      setReferenceImageUrl(previewUrl);
-      const fileName = `${user!.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-      const { data, error } = await supabase.storage.from('ai-video-reference').upload(fileName, file);
-      if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage.from('ai-video-reference').getPublicUrl(fileName);
-      URL.revokeObjectURL(previewUrl);
-      setReferenceImageUrl(publicUrl);
-      toast.success(t('aiVid.referenceUploaded'));
-    } catch (error: any) {
-      console.error('Image upload error:', error);
-      toast.error(t('aiVid.uploadError') + (error.message || t('aiVid.unknownError')));
-      setReferenceImage(null);
-      setReferenceImageUrl(null);
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
-  const handleRemoveImage = () => {
-    if (referenceImageUrl?.startsWith('blob:')) URL.revokeObjectURL(referenceImageUrl);
-    setReferenceImage(null);
-    setReferenceImageUrl(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleGenerate = async () => {
-    if (!prompt.trim()) { toast.error(t('aiVid.enterDescription')); return; }
-    if (!canAfford) { toast.error(t('aiVid.notEnoughCredits')); return; }
-    setGenerating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-ai-video', {
-        body: { prompt, model, duration, aspectRatio, resolution, imageUrl: referenceImageUrl }
-      });
-      if (error) throw error;
-      const modeLabel = referenceImageUrl ? 'Image-to-Video' : 'Text-to-Video';
-      toast.success(t('aiVid.generatingCost', { mode: modeLabel, cost: formatPrice(data.cost, currency) }));
-      setPrompt('');
-      sessionStorage.removeItem('ai-video-prompt');
-      handleRemoveImage();
-      refetchWallet();
-      setActiveTab('history');
-    } catch (error: any) {
-      console.error('Generation error:', error);
-      let status: number | undefined;
-      let serverError: string | undefined;
-      let code: string | undefined;
-      let needsPurchase = false;
-      if (error?.context && typeof error.context === 'object' && 'status' in error.context) {
-        const response = error.context as Response;
-        status = response.status;
-        try {
-          const responseData = await response.json();
-          serverError = responseData.error;
-          code = responseData.code;
-          needsPurchase = responseData.needsPurchase || false;
-        } catch { serverError = error?.message; }
-      } else {
-        status = error?.status;
-        serverError = error?.message;
-      }
-      if (status === 503) {
-        toast.error(code === 'SORA_PRO_UNAVAILABLE' ? (serverError ?? t('aiVid.soraProUnavailable')) : (serverError ?? t('aiVid.providerUnavailable')));
-      } else if (status === 402 && (needsPurchase || code === 'INSUFFICIENT_CREDITS' || code === 'NO_WALLET')) {
-        toast.error(serverError ?? t('aiVid.notEnoughCredits'));
-      } else if (status === 429) {
-        toast.error(serverError ?? t('aiVid.rateLimitExceeded'));
-      } else if (serverError) {
-        toast.error(serverError);
-      } else {
-        toast.error(t('aiVid.generationError'));
-      }
-    } finally {
-      setGenerating(false);
-    }
-  };
+  }, []);
 
   // Provider card data
   const currSymbol = currency === 'USD' ? '$' : '€';
@@ -205,9 +96,8 @@ export default function AIVideoStudio() {
       pricing: `${currSymbol}0.25–0.53/s`,
       maxDuration: '12s',
       quality: '1080p',
-      link: '#',
+      link: '/sora-video-studio',
       icon: Sparkles,
-      tab: 'generate',
     },
     {
       name: 'Kling 3.0',
