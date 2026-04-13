@@ -12,9 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Sparkles, Bookmark, BookmarkCheck, Loader2, Search, Tag, Lightbulb, Target, Zap, ExternalLink, ChevronLeft, ChevronRight, BarChart3, Globe, Flame, Users } from "lucide-react";
+import { TrendingUp, Sparkles, Bookmark, BookmarkCheck, Loader2, Search, Tag, Lightbulb, Target, Zap, ExternalLink, ChevronLeft, ChevronRight, BarChart3, Globe, Flame, Users, Play } from "lucide-react";
 import { TrendDetailModal } from "@/components/trends/TrendDetailModal";
 import { TrendRadarHeroHeader } from "@/components/trends/TrendRadarHeroHeader";
+import { TrendCardMedia, PopularityRing, HeroMediaBackground } from "@/components/trends/TrendCardMedia";
 import CountUp from "@/components/ui/count-up";
 
 interface Trend {
@@ -166,13 +167,24 @@ function FloatingStats({ trends, t }: { trends: Trend[]; t: (key: string) => str
 function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t: Trend) => void; t: (key: string) => string }) {
   const [current, setCurrent] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const [progress, setProgress] = useState(0);
 
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
+    setProgress(0);
     timerRef.current = setInterval(() => {
       setCurrent(prev => (prev + 1) % trends.length);
-    }, 6000);
+      setProgress(0);
+    }, 8000);
   }, [trends.length]);
+
+  // Progress bar animation
+  useEffect(() => {
+    const progressInterval = setInterval(() => {
+      setProgress(prev => Math.min(prev + 1.25, 100));
+    }, 100);
+    return () => clearInterval(progressInterval);
+  }, [current]);
 
   useEffect(() => {
     if (trends.length === 0) return;
@@ -183,11 +195,10 @@ function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t
   if (trends.length === 0) return null;
 
   const trend = trends[current];
-  const gradient = getPlatformGradientStatic(trend.platform);
   const facts = [
-    trend.platform && `📱 ${trend.platform.charAt(0).toUpperCase() + trend.platform.slice(1)}`,
-    trend.category && `🏷️ ${trend.category}`,
-    trend.popularity_index && `🔥 ${t('trends.popularityLabel')}: ${trend.popularity_index}/100`,
+    trend.platform && `${trend.platform.charAt(0).toUpperCase() + trend.platform.slice(1)}`,
+    trend.category && `${trend.category}`,
+    trend.popularity_index && `${t('trends.popularityLabel')}: ${trend.popularity_index}/100`,
   ].filter(Boolean);
 
   return (
@@ -195,14 +206,14 @@ function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <motion.div 
-            className="p-3 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-xl border border-orange-500/20"
-            animate={{ boxShadow: ['0 0 20px hsla(30, 80%, 50%, 0.2)', '0 0 40px hsla(30, 80%, 50%, 0.4)', '0 0 20px hsla(30, 80%, 50%, 0.2)'] }}
+            className="p-3 bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl border border-primary/20"
+            animate={{ boxShadow: ['0 0 20px hsla(43, 90%, 68%, 0.2)', '0 0 40px hsla(43, 90%, 68%, 0.4)', '0 0 20px hsla(43, 90%, 68%, 0.2)'] }}
             transition={{ duration: 2, repeat: Infinity }}
           >
-            <Zap className="w-6 h-6 text-orange-500" />
+            <Zap className="w-6 h-6 text-primary" />
           </motion.div>
           <div>
-            <h2 className="text-2xl font-bold">{t('trends.topTrends')}</h2>
+            <h2 className="text-2xl font-display font-bold">{t('trends.topTrends')}</h2>
             <p className="text-sm text-muted-foreground">{t('trends.topTrendsSubtitleAlt')}</p>
           </div>
         </div>
@@ -226,50 +237,61 @@ function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t
         </div>
       </div>
 
-      <div className="relative overflow-hidden rounded-2xl min-h-[280px]">
+      <div className="relative overflow-hidden rounded-2xl min-h-[340px]">
         <AnimatePresence mode="wait">
           <motion.div
             key={trend.id + current}
-            initial={{ opacity: 0, x: 60 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -60 }}
-            transition={{ duration: 0.5 }}
-            className={`relative w-full bg-gradient-to-br ${gradient} rounded-2xl overflow-hidden`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+            className="relative w-full rounded-2xl overflow-hidden"
           >
-            <div className="absolute inset-0 opacity-[0.06]" style={{
-              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.4) 2px, rgba(0,0,0,0.4) 4px)',
-            }} />
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-              animate={{ x: ['-100%', '200%'] }}
-              transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+            {/* Real image background with Ken Burns */}
+            <HeroMediaBackground category={trend.category} platform={trend.platform} index={current} />
             
-            <div className="relative z-10 p-8 md:p-12 flex flex-col justify-end min-h-[280px]">
-              <motion.div
-                className="absolute top-6 left-6 flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-md rounded-full border border-white/20"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3 }}
-              >
-                <span className="text-white font-bold text-lg">#{current + 1}</span>
-                <span className="text-white/60 text-sm">{t('trends.ofCount')} {trends.length}</span>
-              </motion.div>
-
-              {trend.popularity_index > 85 && (
+            <div className="relative z-10 p-8 md:p-12 flex flex-col justify-end min-h-[340px]">
+              {/* Top bar */}
+              <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
                 <motion.div
-                  className="absolute top-6 right-6 flex items-center gap-2 px-4 py-2 bg-red-500/30 backdrop-blur-md rounded-full border border-red-400/40"
-                  animate={{ scale: [1, 1.05, 1], boxShadow: ['0 0 15px hsla(0,80%,50%,0.3)', '0 0 30px hsla(0,80%,50%,0.5)', '0 0 15px hsla(0,80%,50%,0.3)'] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
+                  className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-md rounded-full border border-white/20"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.3 }}
                 >
-                  <Flame className="w-4 h-4 text-red-400" />
-                  <span className="text-red-300 font-bold text-xs uppercase tracking-wider">Trending Now</span>
+                  <span className="text-white font-bold text-lg">#{current + 1}</span>
+                  <span className="text-white/60 text-sm">{t('trends.ofCount')} {trends.length}</span>
                 </motion.div>
-              )}
 
+                <div className="flex items-center gap-3">
+                  {trend.data_json?.content_ideas && (
+                    <motion.div
+                      className="flex items-center gap-2 px-3 py-2 bg-black/40 backdrop-blur-md rounded-full border border-white/20"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <Play className="w-3 h-3 text-white" />
+                      <span className="text-white/80 text-xs">{trend.data_json.content_ideas.length} Ideas</span>
+                    </motion.div>
+                  )}
+                  
+                  {trend.popularity_index > 85 && (
+                    <motion.div
+                      className="flex items-center gap-2 px-4 py-2 bg-red-500/30 backdrop-blur-md rounded-full border border-red-400/40"
+                      animate={{ scale: [1, 1.05, 1], boxShadow: ['0 0 15px hsla(0,80%,50%,0.3)', '0 0 30px hsla(0,80%,50%,0.5)', '0 0 15px hsla(0,80%,50%,0.3)'] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <Flame className="w-4 h-4 text-red-400" />
+                      <span className="text-red-300 font-bold text-xs uppercase tracking-wider">Trending Now</span>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+
+              {/* Content */}
               <motion.h3
-                className="text-3xl md:text-4xl font-bold text-white mb-4 max-w-2xl"
+                className="text-3xl md:text-4xl font-display font-bold text-white mb-4 max-w-2xl"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
@@ -298,6 +320,13 @@ function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t
                     {fact}
                   </motion.span>
                 ))}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.8 }}
+                >
+                  <PopularityRing value={trend.popularity_index} size={40} />
+                </motion.div>
               </div>
 
               <motion.div
@@ -321,20 +350,23 @@ function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t
             </div>
           </motion.div>
         </AnimatePresence>
-      </div>
 
-      <div className="flex justify-center gap-2 mt-4">
-        {trends.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => { setCurrent(i); resetTimer(); }}
-            className={`h-2 rounded-full transition-all duration-300 ${
-              i === current 
-                ? 'w-8 bg-primary shadow-[0_0_10px_hsla(43,90%,68%,0.5)]' 
-                : 'w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50'
-            }`}
-          />
-        ))}
+        {/* Instagram Stories-style progress bar */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20 z-20">
+          <div className="flex gap-0.5 h-full px-1">
+            {trends.map((_, i) => (
+              <div key={i} className="flex-1 rounded-full overflow-hidden bg-white/20">
+                <motion.div
+                  className="h-full bg-primary"
+                  style={{ 
+                    width: i < current ? '100%' : i === current ? `${progress}%` : '0%',
+                    boxShadow: i === current ? '0 0 8px hsla(43,90%,68%,0.6)' : 'none'
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -712,7 +744,7 @@ export default function TrendRadar() {
                     <motion.div key={trend.id} variants={itemVariants} whileHover={{ y: -8 }} style={{ perspective: 1000 }}>
                       <div
                         className="relative w-full cursor-pointer"
-                        style={{ transformStyle: 'preserve-3d', minHeight: '380px' }}
+                        style={{ transformStyle: 'preserve-3d', minHeight: '440px' }}
                       >
                         {/* FRONT */}
                         <motion.div
@@ -725,33 +757,46 @@ export default function TrendRadar() {
                             className="group relative overflow-hidden backdrop-blur-xl bg-card/40 border-white/10 hover:border-primary/50 hover:shadow-[0_0_35px_hsla(43,90%,68%,0.2)] transition-all duration-500 h-full"
                             onClick={() => analyzeTrend(trend)}
                           >
-                            <div className={`relative h-20 bg-gradient-to-br ${gradient} overflow-hidden`}>
-                              <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.4) 2px, rgba(0,0,0,0.4) 4px)' }} />
-                              <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" animate={{ x: ['-100%', '200%'] }} transition={{ duration: 3, repeat: Infinity, repeatDelay: 4, ease: 'easeInOut' }} />
-                              <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-xs font-semibold border border-white/20 uppercase tracking-wider">{trend.platform}</div>
+                            {/* Media-rich image header */}
+                            <div className="relative">
+                              <TrendCardMedia category={trend.category} platform={trend.platform} index={index} height="h-44" />
+                              
+                              {/* Platform badge */}
+                              <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md text-white text-xs font-semibold border border-white/20 uppercase tracking-wider">
+                                {trend.platform}
+                              </div>
                               
                               {isHot && (
                                 <motion.div
-                                  className="absolute top-3 right-3 flex items-center gap-1 px-3 py-1 rounded-full bg-red-500/30 backdrop-blur-sm border border-red-400/40"
-                                  animate={{ scale: [1, 1.08, 1], boxShadow: ['0 0 10px hsla(0,80%,50%,0.2)', '0 0 20px hsla(0,80%,50%,0.4)', '0 0 10px hsla(0,80%,50%,0.2)'] }}
+                                  className="absolute top-3 right-3 flex items-center gap-1 px-3 py-1 rounded-full border backdrop-blur-md"
+                                  style={{ 
+                                    background: 'linear-gradient(135deg, hsla(0,80%,50%,0.4), hsla(30,90%,50%,0.3))',
+                                    borderColor: 'hsla(0,80%,60%,0.5)' 
+                                  }}
+                                  animate={{ scale: [1, 1.08, 1], boxShadow: ['0 0 10px hsla(0,80%,50%,0.2)', '0 0 25px hsla(0,80%,50%,0.5)', '0 0 10px hsla(0,80%,50%,0.2)'] }}
                                   transition={{ duration: 1.5, repeat: Infinity }}
                                 >
-                                  <Flame className="w-3 h-3 text-red-400" />
-                                  <span className="text-[10px] font-bold text-red-300 uppercase tracking-wider">Hot</span>
+                                  <Flame className="w-3 h-3 text-red-300" />
+                                  <span className="text-[10px] font-bold text-white uppercase tracking-wider">Hot</span>
                                 </motion.div>
                               )}
                               
                               {!isHot && trend.data_json?.estimated_virality && (
-                                <motion.div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-xs font-bold border border-white/20" animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
+                                <motion.div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md text-white text-xs font-bold border border-white/20" animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
                                   🔥 {trend.data_json.estimated_virality}
                                 </motion.div>
                               )}
-                              <div className="absolute bottom-3 left-3 px-2 py-0.5 rounded bg-black/20 backdrop-blur-sm text-white/80 text-[10px] font-medium border border-white/10">{trend.trend_type}</div>
+
+                              {/* Category frosted tag */}
+                              <div className="absolute bottom-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/30 backdrop-blur-md text-white/90 text-[10px] font-medium border border-white/10">
+                                <Tag className="w-2.5 h-2.5" />
+                                {trend.trend_type}
+                              </div>
                             </div>
 
                             <CardContent className="p-5 space-y-4">
                               <div className="flex items-start justify-between gap-3">
-                                <h3 className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-2 flex-1">{trend.name}</h3>
+                                <h3 className="font-display font-bold text-lg group-hover:text-primary transition-colors line-clamp-2 flex-1">{trend.name}</h3>
                                 <Button variant={bookmarked.includes(trend.id) ? "default" : "outline"} size="icon"
                                   onClick={(e) => { e.stopPropagation(); toggleBookmark(trend.id); }}
                                   className={`shrink-0 h-8 w-8 transition-all ${bookmarked.includes(trend.id) ? 'bg-primary text-primary-foreground shadow-[0_0_15px_hsla(43,90%,68%,0.4)]' : 'border-white/10 hover:border-primary/50'}`}
@@ -764,19 +809,17 @@ export default function TrendRadar() {
 
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                  <Sparkline value={trend.popularity_index} color={getSparkColor(trend.platform)} />
-                                  <span className="text-sm font-bold text-primary">{trend.popularity_index}/100</span>
+                                  <PopularityRing value={trend.popularity_index} size={36} />
+                                  <div className="flex flex-col">
+                                    <span className="text-xs text-muted-foreground">Popularity</span>
+                                    <span className="text-sm font-bold text-primary">{trend.popularity_index}/100</span>
+                                  </div>
                                 </div>
                                 <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-primary"
                                   onClick={(e) => { e.stopPropagation(); toggleFlip(trend.id); }}
                                 >
                                   {t('trends.quickFacts')} →
                                 </Button>
-                              </div>
-
-                              <div className="w-full bg-muted/20 rounded-full h-1.5 overflow-hidden relative">
-                                <motion.div className={`bg-gradient-to-r ${gradient} h-1.5 rounded-full relative z-10`} initial={{ width: 0 }} animate={{ width: `${trend.popularity_index}%` }} transition={{ duration: 1, delay: index * 0.05 }} />
-                                <motion.div className={`absolute top-0 left-0 h-1.5 rounded-full bg-gradient-to-r ${gradient} blur-sm opacity-50`} initial={{ width: 0 }} animate={{ width: `${trend.popularity_index}%` }} transition={{ duration: 1, delay: index * 0.05 }} />
                               </div>
 
                               <div className="flex items-center gap-2 flex-wrap">
