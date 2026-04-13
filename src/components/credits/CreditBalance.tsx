@@ -62,7 +62,11 @@ export const CreditBalance = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Card className="relative overflow-hidden backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl hover:shadow-[0_0_30px_hsla(43,90%,68%,0.15)] transition-all duration-300">
+        <Card className="relative overflow-hidden backdrop-blur-xl bg-card/60 border-0 rounded-2xl hover:shadow-[0_0_30px_hsla(43,90%,68%,0.15)] transition-all duration-300">
+          {/* Left Glow Line */}
+          <div className="absolute left-0 top-4 bottom-4 w-px bg-gradient-to-b from-transparent via-primary/60 to-transparent shadow-[0_0_8px_hsla(43,90%,68%,0.5)]" />
+          {/* Right Glow Line */}
+          <div className="absolute right-0 top-4 bottom-4 w-px bg-gradient-to-b from-transparent via-primary/60 to-transparent shadow-[0_0_8px_hsla(43,90%,68%,0.5)]" />
           {/* Background Glow */}
           <motion.div 
             className="absolute top-0 right-0 w-40 h-40 bg-primary/10 rounded-full blur-3xl -translate-y-20 translate-x-20"
@@ -91,7 +95,7 @@ export const CreditBalance = () => {
           </CardHeader>
           <CardContent className="relative">
             {isEnterprise ? (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center justify-end gap-4">
                 <motion.div
                   animate={{
                     scale: [1, 1.1, 1],
