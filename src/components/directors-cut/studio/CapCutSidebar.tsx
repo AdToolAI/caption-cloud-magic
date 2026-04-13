@@ -1259,6 +1259,18 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               {t('dc.addNewSubtitle')}
             </Button>
 
+            {/* AI Script for Empty Subtitles */}
+            {existingCaptions.length > 0 && existingCaptions.some(c => !c.text || c.text.trim() === '') && (
+              <AISubtitleScriptSection
+                existingCaptions={existingCaptions}
+                captionLanguage={captionLanguage}
+                captionStyle={captionStyle}
+                localStyle={localStyle}
+                onCaptionsGenerated={onCaptionsGenerated}
+                t={t}
+              />
+            )}
+
             {/* Generated Captions Preview */}
             {existingCaptions.length > 0 && (
               <div className="space-y-2">
