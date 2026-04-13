@@ -9,6 +9,17 @@ import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInter
 import { z } from 'zod';
 import { SVGFilters, SVG_FILTER_IDS, isSVGFilter, VHSScanlines, VignetteOverlay } from '../components/SVGFilters';
 import { TextOverlayRenderer, TextOverlayProps } from '../components/TextOverlayRenderer';
+import {
+  SUBTITLE_FONT_SIZE_MAP,
+  SUBTITLE_DEFAULT_BG,
+  SUBTITLE_DEFAULT_COLOR,
+  SUBTITLE_DEFAULT_FONT_FAMILY,
+  SUBTITLE_DEFAULT_FONT_SIZE,
+  SUBTITLE_BOTTOM_PADDING,
+  SUBTITLE_TOP_PADDING,
+  SUBTITLE_Z_INDEX,
+  SUBTITLE_RENDER_VERSION,
+} from '../utils/subtitleConstants';
 
 // Font: Inter loaded via native FontFace API
 const fontFamily = 'Inter';
