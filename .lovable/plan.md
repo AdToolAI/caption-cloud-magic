@@ -1,36 +1,28 @@
 
 
-## Plan: Quick Actions in die Carousel-Headerleiste integrieren
-
-### Aktuelle Struktur
-- Die Carousel-Headerleiste (`"Deine Videos" + Badge + Prev/Next`) ist ein eigener Bereich über dem Player
-- Die 4 QuickAction-Buttons sind ein separater sticky Block darunter, mit großen Kacheln (py-6, Icons + Text)
+## Plan: Enterprise-Credits nach rechts mit leuchtenden Linien
 
 ### Änderungen
 
-1. **QuickActions aus Home.tsx entfernen**
-   - Den separaten sticky QuickActions-Block (Zeilen ~561-566) entfernen
+1. **Enterprise-Bereich nach rechts ausrichten**
+   - In `CreditBalance.tsx` Zeile 94: `flex items-center gap-4` → `flex items-center justify-end gap-4`
+   - Dadurch rutscht der Infinity-Icon + Text-Block an den rechten Rand des Cards
 
-2. **QuickActions in die Carousel-Headerleiste einbauen**
-   - In `DashboardVideoCarousel.tsx` die Headerleiste erweitern: links Titel+Badge, Mitte die 4 Buttons, rechts Prev/Next-Pfeile
-   - Die Buttons werden kompakt: kleine Icons + kurzer Text nebeneinander (nicht untereinander), ohne die großen Kacheln
-   - Buttonhöhe ca. h-8, schmaler (px-3), nur Icon + Label inline
+2. **Komplette Umrandung entfernen, leuchtende Linien hinzufügen**
+   - Card-Border `border border-white/10` entfernen oder auf `border-0` setzen
+   - Zwei vertikale leuchtende Linien als Pseudo-Elemente oder separate Divs:
+     - Links: `absolute left-0 top-4 bottom-4 w-px bg-gradient-to-b from-transparent via-primary/60 to-transparent`
+     - Rechts: `absolute right-0 top-4 bottom-4 w-px bg-gradient-to-b from-transparent via-primary/60 to-transparent`
+   - Optional: Glow-Effekt auf den Linien mit `shadow-[0_0_8px_hsla(43,90%,68%,0.5)]`
 
-3. **Headerleiste insgesamt schmaler machen**
-   - Padding reduzieren (py-1 statt py-3)
-   - Titel kleiner (text-lg statt text-xl)
-   - Gesamte Leiste als eine kompakte Zeile
+3. **Card-Padding anpassen**
+   - Bei rechtsbündiger Ausrichtung ggf. `pr-6` beibehalten, aber `pl-6` reduzieren oder anpassen für Symmetrie
 
-4. **QuickActions Props durchreichen**
-   - `DashboardVideoCarousel` erhält die `quickActions` als Prop aus `Home.tsx`
-   - Buttons werden als kompakte Link-Buttons gerendert
-
-### Betroffene Dateien
-- `src/pages/Home.tsx` — QuickActions-Block entfernen, Actions als Prop an Carousel übergeben
-- `src/components/dashboard/DashboardVideoCarousel.tsx` — Headerleiste umbauen mit integrierten kompakten Buttons
-- `src/components/dashboard/QuickActions.tsx` — bleibt bestehen für andere Verwendungen, wird hier aber nicht mehr genutzt
+### Betroffene Datei
+- `src/components/credits/CreditBalance.tsx`
 
 ### Ergebnis
-- Eine einzelne, schlanke Leiste über dem Player mit Titel, 4 kompakten Buttons und Navigation
-- Mehr Platz für den Video-Player beim ersten Seitenaufruf
+- Enterprise-Plan-Anzeige (Infinity-Icon + "Unbegrenzte Credits") sitzt rechts im Card
+- Keine sichtbare Box-Umrandung mehr, stattdessen zwei elegante, leuchtende vertikale Linien links und rechts
+- Modernes, aufgeräumtes Erscheinungsbild im James-Bond-Design (Gold/Cyan-Glow)
 
