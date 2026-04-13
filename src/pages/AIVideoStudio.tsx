@@ -388,7 +388,7 @@ export default function AIVideoStudio() {
                 AI Video Studio
               </h1>
               <p className="text-muted-foreground mt-1 text-sm md:text-base">
-                {language === 'de' ? '4 KI-Modelle. Endlose kreative Möglichkeiten.' : language === 'es' ? '4 modelos de IA. Posibilidades creativas infinitas.' : '4 AI models. Endless creative possibilities.'}
+                {language === 'de' ? '6 KI-Modelle. Endlose kreative Möglichkeiten.' : language === 'es' ? '6 modelos de IA. Posibilidades creativas infinitas.' : '6 AI models. Endless creative possibilities.'}
               </p>
             </div>
             {/* Wallet Badge */}
@@ -440,7 +440,7 @@ export default function AIVideoStudio() {
             <AIVideoDisclaimer />
 
             {/* Provider Grid */}
-            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {providers.map((p, idx) => {
                 const cardLink = p.tab === 'generate' ? '#' : p.link;
                 return (
