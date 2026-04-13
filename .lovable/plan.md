@@ -1,53 +1,36 @@
 
-## Plan: Echten No-Scenes-Subtitle-Layoutfehler beheben
 
-### Was ich im Code konkret gefunden habe
-- In `src/remotion/templates/DirectorsCutVideo.tsx` gibt es aktuell drei Subtitle-Renderpfade.
-- Der normale Exportpfad (`~1195`) und der interne Preview-Mode (`~969`) nutzen den neueren absoluten Container.
-- Der **No-Scenes-Fallback** (`~724`) nutzt aber immer noch das alte `AbsoluteFill`-Layout.
-- Das erklärt sehr gut, warum sich im Render “nichts geändert” hat: Wenn dein Projekt ohne aktive Szenensegmentierung exportiert, läuft es weiter durch den alten Subtitle-Pfad.
+## Plan: Quick Actions in die Carousel-Headerleiste integrieren
 
-### Umsetzung
-1. **No-Scenes-Fallback wirklich auf den neuen Subtitle-Container umstellen**
-   - altes `AbsoluteFill`-Subtitle-Layout im Fallback entfernen
-   - denselben robusten Container wie im funktionierenden Exportpfad verwenden
-   - horizontale Positionierung zusätzlich deterministisch absichern:
-     - `position: 'absolute'`
-     - `left: '50%'`
-     - `transform: 'translateX(-50%)'`
-     - feste `maxWidth`
-     - klare `bottom`-/`top`-Offsets statt nur Flex-Verteilung
+### Aktuelle Struktur
+- Die Carousel-Headerleiste (`"Deine Videos" + Badge + Prev/Next`) ist ein eigener Bereich über dem Player
+- Die 4 QuickAction-Buttons sind ein separater sticky Block darunter, mit großen Kacheln (py-6, Icons + Text)
 
-2. **Doppelte Subtitle-Logik in `DirectorsCutVideo.tsx` zusammenziehen**
-   - gemeinsame Render-Helferfunktion/Komponente für Subtitle-Clips anlegen
-   - alle drei Pfade daraus rendern
-   - so kann nicht wieder nur ein Branch gefixt sein und der andere alt bleiben
+### Änderungen
 
-3. **Export-Geometrie auf Preview-Parität bringen**
-   - Bottom-Offset, Seitenabstand und Max-Breite an den Preview-Player angleichen
-   - Ziel ist nicht nur “sichtbar”, sondern identische Position wie in der Vorschau
+1. **QuickActions aus Home.tsx entfernen**
+   - Den separaten sticky QuickActions-Block (Zeilen ~561-566) entfernen
 
-4. **Version erneut bumpen und Render-Version mitziehen**
-   - `SUBTITLE_RENDER_VERSION` auf eine neue Canary-Version erhöhen
-   - `render-directors-cut` auf diese neue erwartete Version aktualisieren
-   - Bundle danach erneut synchronisieren
+2. **QuickActions in die Carousel-Headerleiste einbauen**
+   - In `DashboardVideoCarousel.tsx` die Headerleiste erweitern: links Titel+Badge, Mitte die 4 Buttons, rechts Prev/Next-Pfeile
+   - Die Buttons werden kompakt: kleine Icons + kurzer Text nebeneinander (nicht untereinander), ohne die großen Kacheln
+   - Buttonhöhe ca. h-8, schmaler (px-3), nur Icon + Label inline
 
-5. **Gezielt verifizieren**
-   - Testfall mit `scenes.length === 0`
-   - Logs prüfen, dass wirklich der No-Scenes-Branch und die neue Canary laufen
-   - neuen Export direkt gegen Preview vergleichen
+3. **Headerleiste insgesamt schmaler machen**
+   - Padding reduzieren (py-1 statt py-3)
+   - Titel kleiner (text-lg statt text-xl)
+   - Gesamte Leiste als eine kompakte Zeile
+
+4. **QuickActions Props durchreichen**
+   - `DashboardVideoCarousel` erhält die `quickActions` als Prop aus `Home.tsx`
+   - Buttons werden als kompakte Link-Buttons gerendert
 
 ### Betroffene Dateien
-- `src/remotion/templates/DirectorsCutVideo.tsx`
-- `src/remotion/utils/subtitleConstants.ts`
-- `supabase/functions/render-directors-cut/index.ts`
-
-### Technische Details
-- Das Problem ist sehr wahrscheinlich nicht mehr Payload oder Untertitel-Datenfluss.
-- Im aktuellen Code ist noch ein echter Restfehler sichtbar: Der Zentrierungs-Fix wurde **nicht konsistent in allen Export-Branches umgesetzt**.
-- Solange der No-Scenes-Fallback den alten Subtitle-Container behält, kann der Export weiter rechts erscheinen, obwohl andere Pfade schon korrigiert sind.
+- `src/pages/Home.tsx` — QuickActions-Block entfernen, Actions als Prop an Carousel übergeben
+- `src/components/dashboard/DashboardVideoCarousel.tsx` — Headerleiste umbauen mit integrierten kompakten Buttons
+- `src/components/dashboard/QuickActions.tsx` — bleibt bestehen für andere Verwendungen, wird hier aber nicht mehr genutzt
 
 ### Ergebnis
-- Untertitel werden auch ohne Szenensegmentierung sauber mittig unten gerendert
-- Preview und Export nutzen wieder dieselbe Subtitle-Logik
-- künftige Subtitle-Fixes müssen nur noch an einer Stelle gemacht werden
+- Eine einzelne, schlanke Leiste über dem Player mit Titel, 4 kompakten Buttons und Navigation
+- Mehr Platz für den Video-Player beim ersten Seitenaufruf
+
