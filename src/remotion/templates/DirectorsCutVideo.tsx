@@ -590,6 +590,11 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   const { fps, durationInFrames } = useVideoConfig();
   const currentTimeSeconds = frame / fps;
 
+  // Log render version once on first frame for bundle verification
+  useEffect(() => {
+    console.log(`[DirectorsCutVideo] Bundle version: ${SUBTITLE_RENDER_VERSION}, subtitleTrack clips: ${subtitleTrack?.clips?.length ?? 0}, visible: ${subtitleTrack?.visible}`);
+  }, []);
+
   // Load font using native FontFace API (same as UniversalVideo.tsx)
   useEffect(() => {
     const handle = delayRender('Loading Inter font for Director\'s Cut...');
