@@ -84,6 +84,8 @@ export function AudioClipComponent({
     <motion.div
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
       className={cn(
         "absolute top-1 bottom-1 rounded-md overflow-hidden cursor-grab active:cursor-grabbing",
         "group transition-shadow",
@@ -117,13 +119,11 @@ export function AudioClipComponent({
       </div>
       
       {/* Content */}
-      <div className="relative h-full flex flex-col justify-between p-1">
+      <div className="relative h-full flex flex-col justify-between p-1 pointer-events-none">
         {/* Header */}
         <div className="flex items-center justify-between">
-          {/* Drag Handle */}
-          <div {...attributes} {...listeners} className="cursor-grab">
-            <GripVertical className="h-3 w-3 text-white/70" />
-          </div>
+          {/* Drag Handle indicator */}
+          <GripVertical className="h-3 w-3 text-white/70 flex-shrink-0" />
           
           {/* Clip Name */}
           <div className="flex-1 text-[10px] text-white font-medium truncate px-1">
@@ -136,7 +136,7 @@ export function AudioClipComponent({
               e.stopPropagation();
               onDelete();
             }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-white/20 rounded"
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-white/20 rounded pointer-events-auto"
           >
             <X className="h-3 w-3 text-white" />
           </button>
@@ -151,19 +151,21 @@ export function AudioClipComponent({
       {/* Resize Handles */}
       <div
         className={cn(
-          "absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize",
-          "hover:bg-white/30 transition-colors",
-          isResizing === 'start' && "bg-white/40"
+          "absolute left-0 top-0 bottom-0 w-[6px] cursor-ew-resize z-10",
+          "hover:bg-white/40 transition-colors",
+          isResizing === 'start' && "bg-white/50"
         )}
         onMouseDown={(e) => handleResizeStart(e, 'start')}
+        onPointerDown={(e) => e.stopPropagation()}
       />
       <div
         className={cn(
-          "absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize",
-          "hover:bg-white/30 transition-colors",
-          isResizing === 'end' && "bg-white/40"
+          "absolute right-0 top-0 bottom-0 w-[6px] cursor-ew-resize z-10",
+          "hover:bg-white/40 transition-colors",
+          isResizing === 'end' && "bg-white/50"
         )}
         onMouseDown={(e) => handleResizeStart(e, 'end')}
+        onPointerDown={(e) => e.stopPropagation()}
       />
       
       {/* Fade Indicators */}
