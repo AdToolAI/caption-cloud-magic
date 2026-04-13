@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence, useInView } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useAICall } from "@/hooks/useAICall";
@@ -12,11 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Sparkles, Bookmark, BookmarkCheck, Loader2, Search, Tag, Lightbulb, Target, Zap, ExternalLink, ChevronLeft, ChevronRight, BarChart3, Globe, Flame, Users, Play } from "lucide-react";
+import { TrendingUp, Sparkles, Bookmark, BookmarkCheck, Loader2, Search, Tag, Lightbulb, Target, Zap, ExternalLink, ChevronLeft, ChevronRight, Flame, Play } from "lucide-react";
 import { TrendDetailModal } from "@/components/trends/TrendDetailModal";
 import { TrendRadarHeroHeader } from "@/components/trends/TrendRadarHeroHeader";
 import { TrendCardMedia, PopularityRing, HeroMediaBackground } from "@/components/trends/TrendCardMedia";
-import CountUp from "@/components/ui/count-up";
+
 
 interface Trend {
   id: string;
@@ -117,51 +117,7 @@ function TrendTicker({ trends }: { trends: Trend[] }) {
   );
 }
 
-// --- Floating Stats Section ---
-function FloatingStats({ trends, t }: { trends: Trend[]; t: (key: string) => string }) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-  
-  const platforms = new Set(trends.map(t => t.platform));
-  const hotTrends = trends.filter(t => t.popularity_index > 80).length;
-  
-  const stats = [
-    { label: t('trends.trendsAnalyzed'), value: trends.length, icon: BarChart3, color: "from-primary/20 to-amber-500/20", textColor: "text-primary" },
-    { label: t('trends.platforms'), value: platforms.size || 5, icon: Globe, color: "from-cyan-500/20 to-blue-500/20", textColor: "text-cyan-400" },
-    { label: t('trends.hotTrends'), value: hotTrends || 12, icon: Flame, color: "from-red-500/20 to-orange-500/20", textColor: "text-red-400" },
-    { label: t('trends.categories'), value: 6, icon: Users, color: "from-purple-500/20 to-pink-500/20", textColor: "text-purple-400" },
-  ];
 
-  return (
-    <div ref={ref} className="mb-12">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {stats.map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 30 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: i * 0.15, duration: 0.5 }}
-          >
-            <Card className="backdrop-blur-xl bg-card/30 border-white/10 hover:border-primary/30 transition-all duration-300 overflow-hidden relative group">
-              <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-              <CardContent className="p-5 flex flex-col items-center text-center relative z-10">
-                <stat.icon className={`w-6 h-6 mb-2 ${stat.textColor}`} />
-                <div className={`text-3xl font-bold ${stat.textColor}`}>
-                  {isInView ? (
-                    <CountUp end={stat.value} duration={2} />
-                  ) : (
-                    0
-                  )}
-                </div>
-                <span className="text-xs text-muted-foreground mt-1">{stat.label}</span>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // --- Hero Carousel ---
 function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t: Trend) => void; t: (key: string) => string }) {
@@ -521,12 +477,12 @@ export default function TrendRadar() {
   const topTrends = [...trends].sort((a, b) => b.popularity_index - a.popularity_index).slice(0, 5);
 
   const categories = [
-    { id: 'social-media', name: t('trends.niches.socialMedia'), icon: '💡', color: 'from-blue-500/20 to-purple-500/20', glowColor: 'hover:shadow-[0_0_30px_hsla(220,80%,60%,0.25)]', animation: 'animate-bounce' },
-    { id: 'ecommerce', name: t('trends.niches.ecommerce'), icon: '🛒', color: 'from-green-500/20 to-emerald-500/20', glowColor: 'hover:shadow-[0_0_30px_hsla(140,60%,50%,0.25)]', animation: 'animate-pulse' },
-    { id: 'lifestyle', name: t('trends.niches.lifestyle'), icon: '🌟', color: 'from-pink-500/20 to-rose-500/20', glowColor: 'hover:shadow-[0_0_30px_hsla(340,80%,60%,0.25)]', animation: 'animate-spin' },
-    { id: 'business', name: t('trends.niches.business'), icon: '🤖', color: 'from-indigo-500/20 to-blue-500/20', glowColor: 'hover:shadow-[0_0_30px_hsla(230,80%,60%,0.25)]', animation: 'animate-pulse' },
-    { id: 'motivation', name: t('trends.niches.motivation'), icon: '🚀', color: 'from-orange-500/20 to-red-500/20', glowColor: 'hover:shadow-[0_0_30px_hsla(20,80%,60%,0.25)]', animation: 'animate-bounce' },
-    { id: 'finance', name: t('trends.niches.finance'), icon: '💰', color: 'from-yellow-500/20 to-amber-500/20', glowColor: 'hover:shadow-[0_0_30px_hsla(43,90%,68%,0.25)]', animation: 'animate-pulse' },
+    { id: 'social-media', name: t('trends.niches.socialMedia'), image: 'https://images.pexels.com/photos/607812/pexels-photo-607812.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop', color: 'from-blue-500/20 to-purple-500/20' },
+    { id: 'ecommerce', name: t('trends.niches.ecommerce'), image: 'https://images.pexels.com/photos/5632399/pexels-photo-5632399.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop', color: 'from-green-500/20 to-emerald-500/20' },
+    { id: 'lifestyle', name: t('trends.niches.lifestyle'), image: 'https://images.pexels.com/photos/3771836/pexels-photo-3771836.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop', color: 'from-pink-500/20 to-rose-500/20' },
+    { id: 'business', name: t('trends.niches.business'), image: 'https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop', color: 'from-indigo-500/20 to-blue-500/20' },
+    { id: 'motivation', name: t('trends.niches.motivation'), image: 'https://images.pexels.com/photos/3756681/pexels-photo-3756681.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop', color: 'from-orange-500/20 to-red-500/20' },
+    { id: 'finance', name: t('trends.niches.finance'), image: 'https://images.pexels.com/photos/7567443/pexels-photo-7567443.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop', color: 'from-yellow-500/20 to-amber-500/20' },
   ];
 
   const ecommerceSubcategories = [
@@ -566,8 +522,14 @@ export default function TrendRadar() {
             trendsCount={trends.length}
           />
 
+          {/* Hero Carousel — Top position */}
+          {viewMode === 'discover' && topTrends.length > 0 && (
+            <HeroCarousel trends={topTrends} onAnalyze={(trend) => analyzeTrend(trend)} t={t} />
+          )}
+
           {trends.length > 0 && <TrendTicker trends={trends} />}
 
+          {/* Category Cards with images */}
           <motion.div className="mb-12" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <div className="flex items-center gap-3 mb-6">
               <motion.div className="p-3 bg-gradient-to-br from-primary/20 to-cyan-500/20 rounded-xl border border-primary/20" whileHover={{ scale: 1.05, rotate: 5 }}>
@@ -582,62 +544,43 @@ export default function TrendRadar() {
                 return (
                   <motion.div key={cat.id} variants={itemVariants} whileHover={{ scale: 1.05, y: -5 }} whileTap={{ scale: 0.98 }}>
                     <Card
-                      className={`cursor-pointer transition-all duration-500 backdrop-blur-xl border overflow-hidden relative
-                        ${isActive ? 'bg-gradient-to-br ' + cat.color + ' border-primary/50 shadow-[0_0_40px_hsla(43,90%,68%,0.3)]' : 'bg-card/40 border-white/10 hover:border-primary/30 ' + cat.glowColor}`}
+                      className={`cursor-pointer transition-all duration-500 backdrop-blur-xl border overflow-hidden relative h-32
+                        ${isActive ? 'border-primary/50 shadow-[0_0_40px_hsla(43,90%,68%,0.3)]' : 'bg-card/40 border-white/10 hover:border-primary/30 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.15)]'}`}
                       onClick={() => setCategoryFilter(isActive ? 'all' : cat.id)}
                     >
+                      {/* Background image */}
+                      <img
+                        src={cat.image}
+                        alt={cat.name}
+                        loading="lazy"
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                      {/* Dark overlay */}
+                      <div className={`absolute inset-0 transition-all duration-500 ${
+                        isActive 
+                          ? 'bg-gradient-to-t from-black/70 via-black/40 to-primary/30' 
+                          : 'bg-gradient-to-t from-black/80 via-black/50 to-black/30 hover:from-black/60 hover:via-black/30'
+                      }`} />
+                      {/* Active glow ring */}
                       {isActive && (
-                        <motion.div className="absolute inset-0 rounded-2xl" animate={{ boxShadow: ['inset 0 0 20px hsla(43,90%,68%,0.1)', 'inset 0 0 30px hsla(43,90%,68%,0.2)', 'inset 0 0 20px hsla(43,90%,68%,0.1)'] }} transition={{ duration: 2, repeat: Infinity }} />
+                        <motion.div 
+                          className="absolute inset-0 rounded-xl border-2 border-primary/60" 
+                          animate={{ boxShadow: ['inset 0 0 15px hsla(43,90%,68%,0.15)', 'inset 0 0 25px hsla(43,90%,68%,0.3)', 'inset 0 0 15px hsla(43,90%,68%,0.15)'] }} 
+                          transition={{ duration: 2, repeat: Infinity }} 
+                        />
                       )}
-                      <CardContent className="p-5 text-center space-y-3 relative z-10">
-                        <motion.div
-                          className={`text-4xl mx-auto w-14 h-14 flex items-center justify-center rounded-xl ${isActive ? 'bg-primary/20 shadow-[0_0_25px_hsla(43,90%,68%,0.4)]' : 'bg-muted/20'} transition-all duration-300`}
-                          animate={isActive ? { scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] } : {}}
-                          transition={{ duration: 1.5, repeat: Infinity }}
-                          whileHover={{ scale: 1.2, rotate: 15 }}
-                        >
-                          {cat.icon}
-                        </motion.div>
-                        <p className={`font-semibold text-sm ${isActive ? 'text-primary' : ''}`}>{cat.name}</p>
-                      </CardContent>
+                      {/* Text centered */}
+                      <div className="absolute inset-0 flex items-center justify-center z-10">
+                        <p className={`font-semibold text-sm text-center px-2 drop-shadow-lg ${isActive ? 'text-primary' : 'text-white'}`}>
+                          {cat.name}
+                        </p>
+                      </div>
                     </Card>
                   </motion.div>
                 );
               })}
             </motion.div>
           </motion.div>
-
-          {categoryFilter === 'ecommerce' && (
-            <motion.div className="mb-12" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><span className="text-2xl">🛒</span>{t('trends.ecommerceCategories')}</h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                {ecommerceSubcategories.map((sub, index) => (
-                  <motion.div key={sub.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.05 }}>
-                    <Button variant="outline" className="h-auto py-3 w-full flex flex-col items-center gap-2 backdrop-blur-xl bg-card/60 border-white/10 hover:bg-card/80 hover:border-primary/50 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.15)] transition-all duration-300"
-                      onClick={async () => {
-                        setLoading(true);
-                        try {
-                          const { data, error } = await supabase.functions.invoke('fetch-trends', { body: { language: 'en', category: 'ecommerce' } });
-                          if (error) throw error;
-                          setTrends((data.trends || []).filter((t: any) => t.data_json?.subcategory === sub.id));
-                        } catch (error) { toast({ title: t('trends.error'), description: t('trends.loadError'), variant: "destructive" }); }
-                        finally { setLoading(false); }
-                      }}
-                    >
-                      <span className="text-2xl">{sub.icon}</span>
-                      <span className="text-xs text-center">{sub.name}</span>
-                    </Button>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {viewMode === 'discover' && topTrends.length > 0 && (
-            <HeroCarousel trends={topTrends} onAnalyze={(trend) => analyzeTrend(trend)} t={t} />
-          )}
-
-          {viewMode === 'discover' && trends.length > 0 && <FloatingStats trends={trends} t={t} />}
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
             <Card className="mb-8 backdrop-blur-xl bg-card/30 border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.15)] relative overflow-hidden">
