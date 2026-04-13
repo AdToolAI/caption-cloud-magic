@@ -1,20 +1,16 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, FolderOpen, Video, Film, Wand2, Clapperboard, Eye, Camera } from 'lucide-react';
-import { AlbumImagePicker } from '@/components/media-library/AlbumImagePicker';
+import { Sparkles, CreditCard, History, Video, Film, Wand2, Clapperboard, Eye, Camera, ShieldAlert } from 'lucide-react';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
-import { VideoPromptOptimizer } from '@/components/ai-video/VideoPromptOptimizer';
 import { AIVideoProviderCard } from '@/components/ai-video/AIVideoProviderCard';
 import { AIVideoDisclaimer } from '@/components/ai-video/AIVideoDisclaimer';
-import { AI_VIDEO_PRICING, AI_VIDEO_MODELS, AIVideoModel } from '@/config/aiVideoCredits';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { canUseAIVideoGeneration } from '@/lib/entitlements';
@@ -22,7 +18,7 @@ import { PlanId, Currency } from '@/config/pricing';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, Link } from 'react-router-dom';
-import { detectUserCurrency, formatPrice, getCurrencyForLanguage } from '@/lib/currency';
+import { formatPrice, getCurrencyForLanguage } from '@/lib/currency';
 import { useTranslation } from '@/hooks/useTranslation';
 
 /* ── Floating particles (James Bond 2028) ── */
@@ -44,37 +40,10 @@ export default function AIVideoStudio() {
   const { user } = useAuth();
   const { language, t } = useTranslation();
   const { wallet, loading: walletLoading, refetch: refetchWallet } = useAIVideoWallet();
-  const [generating, setGenerating] = useState(false);
-  const [hasActiveGeneration, setHasActiveGeneration] = useState(false);
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('studios');
-  const [showPromptOptimizer, setShowPromptOptimizer] = useState(false);
-
-  // Generation parameters — persisted via sessionStorage
-  const [prompt, setPrompt] = useState(() => sessionStorage.getItem('ai-video-prompt') || '');
-  const [model, setModel] = useState<AIVideoModel>(() => (sessionStorage.getItem('ai-video-model') as AIVideoModel) || 'sora-2-standard');
-  const [duration, setDuration] = useState<4 | 8 | 12>(() => (Number(sessionStorage.getItem('ai-video-duration')) || 4) as 4 | 8 | 12);
-  const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>(() => (sessionStorage.getItem('ai-video-aspect') as '16:9' | '9:16' | '1:1') || '16:9');
-  const [resolution, setResolution] = useState<'1080p' | '720p'>(() => (sessionStorage.getItem('ai-video-resolution') as '1080p' | '720p') || '1080p');
-
-  // Sync to sessionStorage
-  useEffect(() => { sessionStorage.setItem('ai-video-prompt', prompt); }, [prompt]);
-  useEffect(() => { sessionStorage.setItem('ai-video-model', model); }, [model]);
-  useEffect(() => { sessionStorage.setItem('ai-video-duration', String(duration)); }, [duration]);
-  useEffect(() => { sessionStorage.setItem('ai-video-aspect', aspectRatio); }, [aspectRatio]);
-  useEffect(() => { sessionStorage.setItem('ai-video-resolution', resolution); }, [resolution]);
-
-  // Image-to-Video state
-  const [referenceImage, setReferenceImage] = useState<File | null>(null);
-  const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
-  const [albumPickerOpen, setAlbumPickerOpen] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currency: Currency = getCurrencyForLanguage(language);
-  const costPerSecond = AI_VIDEO_MODELS[model].costPerSecond[currency];
-  const cost = duration * costPerSecond;
-  const canAfford = wallet && wallet.balance_euros >= cost;
 
   // Check entitlement
   const { data: userWallet } = useQuery({
