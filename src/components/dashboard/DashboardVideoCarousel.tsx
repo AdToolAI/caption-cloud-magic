@@ -50,13 +50,22 @@ export const DashboardVideoCarousel = () => {
   const wheelTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Strict newest-first sorting — no download_count/share_count ranking
-  const sortedVideos = [...videos]
-    .filter((v: any) => v.status === 'completed' && v.output_url)
-    .sort((a: any, b: any) => {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    })
-    .slice(0, 10);
+  const sortedVideos = useMemo(() =>
+    [...videos]
+      .filter((v: any) => v.status === 'completed' && v.output_url)
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 10),
+    [videos]
+  );
+
+  // Memoize resolved URLs so <video> src stays stable across refetches
+  const resolvedUrls = useMemo(() => {
+    const map = new Map<string, string>();
+    sortedVideos.forEach((v: any) => {
+      map.set(v.id, resolveVideoUrl(v.output_url));
+    });
+    return map;
+  }, [sortedVideos]);
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: sortedVideos.length > 2,
@@ -319,7 +328,7 @@ export const DashboardVideoCarousel = () => {
               const signedDist = getSignedDist(index);
               const absDist = Math.abs(signedDist);
               const title = getVideoTitle(video);
-              const videoUrl = resolveVideoUrl(video.output_url);
+              const videoUrl = resolvedUrls.get(video.id) || resolveVideoUrl(video.output_url);
               const videoId = video.id;
 
               // 3D transforms
