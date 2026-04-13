@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card } from '@/components/ui/card';
-import { saveDraft, clearDraft, SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE } from '@/lib/directors-cut-draft';
+import { saveDraft, loadDraft, clearDraft, SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE } from '@/lib/directors-cut-draft';
 import { extractTimestampedFrames, extractRefinementFrames, detectBoundariesAsync, type TimestampedFrame, type DetectedBoundary } from '@/lib/directors-cut-scene-detection';
 import { Button } from '@/components/ui/button';
 import { 
@@ -141,12 +141,46 @@ export function DirectorsCut() {
   const [subtitleSafeZone, setSubtitleSafeZone] = useState<SubtitleSafeZone>(DEFAULT_SUBTITLE_SAFE_ZONE);
   const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | undefined>(undefined);
 
-  // --- Clear draft on mount so F5 always resets to video selection ---
+  // --- On mount: F5 (reload) → reset; SPA navigation → restore draft ---
   const draftLoadedRef = useRef(false);
   useEffect(() => {
     if (draftLoadedRef.current) return;
     draftLoadedRef.current = true;
-    clearDraft();
+
+    const navEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+    const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
+
+    if (isReload) {
+      clearDraft();
+      return;
+    }
+
+    const draft = loadDraft();
+    if (draft && draft.selectedVideo) {
+      setSelectedVideo(draft.selectedVideo);
+      setScenes(draft.scenes || []);
+      setTransitions(draft.transitions || []);
+      setAppliedEffects(draft.appliedEffects || appliedEffects);
+      setAudioEnhancements(draft.audioEnhancements || audioEnhancements);
+      setExportSettings(draft.exportSettings || exportSettings);
+      setStyleTransfer(draft.styleTransfer || styleTransfer);
+      setColorGrading(draft.colorGrading || colorGrading);
+      setSceneColorGrading(draft.sceneColorGrading || {});
+      setSpeedKeyframes(draft.speedKeyframes || []);
+      setKenBurnsKeyframes(draft.kenBurnsKeyframes || []);
+      setChromaKey(draft.chromaKey || chromaKey);
+      setUpscaling(draft.upscaling || upscaling);
+      setInterpolation(draft.interpolation || interpolation);
+      setRestoration(draft.restoration || restoration);
+      setObjectRemoval(draft.objectRemoval || objectRemoval);
+      setTextOverlays(draft.textOverlays || []);
+      setVoiceOverUrl(draft.voiceOverUrl);
+      setBackgroundMusicUrl(draft.backgroundMusicUrl);
+      setCapCutAudioTracks(draft.capCutAudioTracks || []);
+      setCapCutSubtitleTrack(draft.capCutSubtitleTrack);
+      setSubtitleSafeZone(draft.subtitleSafeZone || DEFAULT_SUBTITLE_SAFE_ZONE);
+      setCleanedVideoUrl(draft.cleanedVideoUrl);
+    }
   }, []);
 
   // --- Auto-save draft on state changes (debounced) ---
