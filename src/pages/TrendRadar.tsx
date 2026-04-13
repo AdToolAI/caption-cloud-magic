@@ -12,9 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Sparkles, Bookmark, BookmarkCheck, Loader2, Search, Tag, Lightbulb, Target, Zap, ExternalLink, ChevronLeft, ChevronRight, BarChart3, Globe, Flame, Users } from "lucide-react";
+import { TrendingUp, Sparkles, Bookmark, BookmarkCheck, Loader2, Search, Tag, Lightbulb, Target, Zap, ExternalLink, ChevronLeft, ChevronRight, BarChart3, Globe, Flame, Users, Play } from "lucide-react";
 import { TrendDetailModal } from "@/components/trends/TrendDetailModal";
 import { TrendRadarHeroHeader } from "@/components/trends/TrendRadarHeroHeader";
+import { TrendCardMedia, PopularityRing, HeroMediaBackground } from "@/components/trends/TrendCardMedia";
 import CountUp from "@/components/ui/count-up";
 
 interface Trend {
