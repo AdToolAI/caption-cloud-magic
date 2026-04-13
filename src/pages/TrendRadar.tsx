@@ -167,13 +167,24 @@ function FloatingStats({ trends, t }: { trends: Trend[]; t: (key: string) => str
 function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t: Trend) => void; t: (key: string) => string }) {
   const [current, setCurrent] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const [progress, setProgress] = useState(0);
 
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
+    setProgress(0);
     timerRef.current = setInterval(() => {
       setCurrent(prev => (prev + 1) % trends.length);
-    }, 6000);
+      setProgress(0);
+    }, 8000);
   }, [trends.length]);
+
+  // Progress bar animation
+  useEffect(() => {
+    const progressInterval = setInterval(() => {
+      setProgress(prev => Math.min(prev + 1.25, 100));
+    }, 100);
+    return () => clearInterval(progressInterval);
+  }, [current]);
 
   useEffect(() => {
     if (trends.length === 0) return;
@@ -184,11 +195,10 @@ function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t
   if (trends.length === 0) return null;
 
   const trend = trends[current];
-  const gradient = getPlatformGradientStatic(trend.platform);
   const facts = [
-    trend.platform && `📱 ${trend.platform.charAt(0).toUpperCase() + trend.platform.slice(1)}`,
-    trend.category && `🏷️ ${trend.category}`,
-    trend.popularity_index && `🔥 ${t('trends.popularityLabel')}: ${trend.popularity_index}/100`,
+    trend.platform && `${trend.platform.charAt(0).toUpperCase() + trend.platform.slice(1)}`,
+    trend.category && `${trend.category}`,
+    trend.popularity_index && `${t('trends.popularityLabel')}: ${trend.popularity_index}/100`,
   ].filter(Boolean);
 
   return (
@@ -196,14 +206,14 @@ function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <motion.div 
-            className="p-3 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-xl border border-orange-500/20"
-            animate={{ boxShadow: ['0 0 20px hsla(30, 80%, 50%, 0.2)', '0 0 40px hsla(30, 80%, 50%, 0.4)', '0 0 20px hsla(30, 80%, 50%, 0.2)'] }}
+            className="p-3 bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl border border-primary/20"
+            animate={{ boxShadow: ['0 0 20px hsla(43, 90%, 68%, 0.2)', '0 0 40px hsla(43, 90%, 68%, 0.4)', '0 0 20px hsla(43, 90%, 68%, 0.2)'] }}
             transition={{ duration: 2, repeat: Infinity }}
           >
-            <Zap className="w-6 h-6 text-orange-500" />
+            <Zap className="w-6 h-6 text-primary" />
           </motion.div>
           <div>
-            <h2 className="text-2xl font-bold">{t('trends.topTrends')}</h2>
+            <h2 className="text-2xl font-display font-bold">{t('trends.topTrends')}</h2>
             <p className="text-sm text-muted-foreground">{t('trends.topTrendsSubtitleAlt')}</p>
           </div>
         </div>
@@ -227,50 +237,61 @@ function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t
         </div>
       </div>
 
-      <div className="relative overflow-hidden rounded-2xl min-h-[280px]">
+      <div className="relative overflow-hidden rounded-2xl min-h-[340px]">
         <AnimatePresence mode="wait">
           <motion.div
             key={trend.id + current}
-            initial={{ opacity: 0, x: 60 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -60 }}
-            transition={{ duration: 0.5 }}
-            className={`relative w-full bg-gradient-to-br ${gradient} rounded-2xl overflow-hidden`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+            className="relative w-full rounded-2xl overflow-hidden"
           >
-            <div className="absolute inset-0 opacity-[0.06]" style={{
-              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.4) 2px, rgba(0,0,0,0.4) 4px)',
-            }} />
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-              animate={{ x: ['-100%', '200%'] }}
-              transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+            {/* Real image background with Ken Burns */}
+            <HeroMediaBackground category={trend.category} platform={trend.platform} index={current} />
             
-            <div className="relative z-10 p-8 md:p-12 flex flex-col justify-end min-h-[280px]">
-              <motion.div
-                className="absolute top-6 left-6 flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-md rounded-full border border-white/20"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3 }}
-              >
-                <span className="text-white font-bold text-lg">#{current + 1}</span>
-                <span className="text-white/60 text-sm">{t('trends.ofCount')} {trends.length}</span>
-              </motion.div>
-
-              {trend.popularity_index > 85 && (
+            <div className="relative z-10 p-8 md:p-12 flex flex-col justify-end min-h-[340px]">
+              {/* Top bar */}
+              <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
                 <motion.div
-                  className="absolute top-6 right-6 flex items-center gap-2 px-4 py-2 bg-red-500/30 backdrop-blur-md rounded-full border border-red-400/40"
-                  animate={{ scale: [1, 1.05, 1], boxShadow: ['0 0 15px hsla(0,80%,50%,0.3)', '0 0 30px hsla(0,80%,50%,0.5)', '0 0 15px hsla(0,80%,50%,0.3)'] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
+                  className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-md rounded-full border border-white/20"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.3 }}
                 >
-                  <Flame className="w-4 h-4 text-red-400" />
-                  <span className="text-red-300 font-bold text-xs uppercase tracking-wider">Trending Now</span>
+                  <span className="text-white font-bold text-lg">#{current + 1}</span>
+                  <span className="text-white/60 text-sm">{t('trends.ofCount')} {trends.length}</span>
                 </motion.div>
-              )}
 
+                <div className="flex items-center gap-3">
+                  {trend.data_json?.content_ideas && (
+                    <motion.div
+                      className="flex items-center gap-2 px-3 py-2 bg-black/40 backdrop-blur-md rounded-full border border-white/20"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <Play className="w-3 h-3 text-white" />
+                      <span className="text-white/80 text-xs">{trend.data_json.content_ideas.length} Ideas</span>
+                    </motion.div>
+                  )}
+                  
+                  {trend.popularity_index > 85 && (
+                    <motion.div
+                      className="flex items-center gap-2 px-4 py-2 bg-red-500/30 backdrop-blur-md rounded-full border border-red-400/40"
+                      animate={{ scale: [1, 1.05, 1], boxShadow: ['0 0 15px hsla(0,80%,50%,0.3)', '0 0 30px hsla(0,80%,50%,0.5)', '0 0 15px hsla(0,80%,50%,0.3)'] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <Flame className="w-4 h-4 text-red-400" />
+                      <span className="text-red-300 font-bold text-xs uppercase tracking-wider">Trending Now</span>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+
+              {/* Content */}
               <motion.h3
-                className="text-3xl md:text-4xl font-bold text-white mb-4 max-w-2xl"
+                className="text-3xl md:text-4xl font-display font-bold text-white mb-4 max-w-2xl"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
@@ -299,6 +320,13 @@ function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t
                     {fact}
                   </motion.span>
                 ))}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.8 }}
+                >
+                  <PopularityRing value={trend.popularity_index} size={40} />
+                </motion.div>
               </div>
 
               <motion.div
@@ -322,20 +350,23 @@ function HeroCarousel({ trends, onAnalyze, t }: { trends: Trend[]; onAnalyze: (t
             </div>
           </motion.div>
         </AnimatePresence>
-      </div>
 
-      <div className="flex justify-center gap-2 mt-4">
-        {trends.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => { setCurrent(i); resetTimer(); }}
-            className={`h-2 rounded-full transition-all duration-300 ${
-              i === current 
-                ? 'w-8 bg-primary shadow-[0_0_10px_hsla(43,90%,68%,0.5)]' 
-                : 'w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50'
-            }`}
-          />
-        ))}
+        {/* Instagram Stories-style progress bar */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20 z-20">
+          <div className="flex gap-0.5 h-full px-1">
+            {trends.map((_, i) => (
+              <div key={i} className="flex-1 rounded-full overflow-hidden bg-white/20">
+                <motion.div
+                  className="h-full bg-primary"
+                  style={{ 
+                    width: i < current ? '100%' : i === current ? `${progress}%` : '0%',
+                    boxShadow: i === current ? '0 0 8px hsla(43,90%,68%,0.6)' : 'none'
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
