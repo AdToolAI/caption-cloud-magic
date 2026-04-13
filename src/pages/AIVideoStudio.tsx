@@ -419,19 +419,19 @@ export default function AIVideoStudio() {
 
             {/* Provider Grid */}
             <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              {providers.map((p, idx) => (
-                <AIVideoProviderCard
-                  key={p.name}
-                  {...p}
-                  index={idx}
-                  link={p.tab === 'generate' ? '#'}
-                  // Override Sora2 click to switch tab
-                />
-              ))}
+              {providers.map((p, idx) => {
+                const cardLink = p.tab === 'generate' ? '#' : p.link;
+                return (
+                  <div key={p.name} onClick={() => { if (p.tab === 'generate') setActiveTab('generate'); }}>
+                    <AIVideoProviderCard
+                      {...p}
+                      index={idx}
+                      link={cardLink}
+                    />
+                  </div>
+                );
+              })}
             </motion.div>
-
-            {/* Override Sora 2 card click */}
-            {/* Handled via link="#" and onClick below */}
           </TabsContent>
 
           {/* ── TAB: Sora 2 Generate ── */}
