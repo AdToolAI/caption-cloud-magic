@@ -50,6 +50,20 @@ serve(async (req) => {
       );
     }
 
+    // Gather recent headlines to avoid repetition
+    let recentHeadlines: string[] = [];
+    const { data: recentCache } = await supabase
+      .from('news_radar_cache')
+      .select('news_json')
+      .eq('language', language)
+      .order('fetched_at', { ascending: false })
+      .limit(3);
+    if (recentCache) {
+      recentHeadlines = recentCache.flatMap((r: any) =>
+        (r.news_json || []).map((n: any) => n.headline)
+      ).slice(0, 20);
+    }
+
     // Fetch fresh news via Perplexity
     const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
     if (!PERPLEXITY_API_KEY) {
@@ -66,6 +80,10 @@ serve(async (req) => {
         ? 'Responde en español.'
         : 'Respond in English.';
 
+    const avoidClause = recentHeadlines.length > 0
+      ? `IMPORTANT: Do NOT repeat or rephrase any of these recent headlines: ${recentHeadlines.slice(0, 10).map(h => `"${h}"`).join(', ')}. Find completely different topics and angles.`
+      : '';
+
     const perplexityRes = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
@@ -77,15 +95,15 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a social media industry news analyst. Return ONLY a JSON array of 8-10 news items. Each item: { "headline": "string (emoji prefix + concise headline, max 80 chars)", "category": "social|business|creator|analytics", "source": "string (publication name)" }. ${langInstruction} Use these emoji prefixes: 📱 for Social, 💰 for Business, 🎨 for Creator, 📊 for Analytics. Focus on actionable, important news that social media managers and content creators need to know.`
+            content: `You are a social media industry news analyst. Current time: ${new Date().toISOString()}. Return ONLY a JSON array of 8-10 news items. Each item: { "headline": "string (emoji prefix + concise headline, max 80 chars)", "category": "social|business|creator|analytics", "source": "string (publication name)" }. ${langInstruction} Use these emoji prefixes: 📱 for Social, 💰 for Business, 🎨 for Creator, 📊 for Analytics. Focus on actionable, important news that social media managers and content creators need to know. ${avoidClause}`
           },
           {
             role: 'user',
-            content: `What are the 8-10 most important social media, creator economy, and digital marketing news from the last 7 days? Include platform updates, algorithm changes, new features, monetization news, and industry trends. Only include verified, real news — no speculation.`
+            content: `What are the 8-10 most important social media, creator economy, and digital marketing news from the last 24 hours? Include platform updates, algorithm changes, new features, monetization news, and industry trends. Only include verified, real news — no speculation. Prioritize breaking news and fresh developments.`
           }
         ],
-        temperature: 0.2,
-        search_recency_filter: 'week',
+        temperature: 0.6,
+        search_recency_filter: 'day',
       }),
     });
 
