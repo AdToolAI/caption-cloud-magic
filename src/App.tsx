@@ -103,6 +103,7 @@ const SeedanceVideoStudio = lazy(() => import("./pages/SeedanceVideoStudio"));
 const WanVideoStudio = lazy(() => import("./pages/WanVideoStudio"));
 const HailuoVideoStudio = lazy(() => import("./pages/HailuoVideoStudio"));
 const LumaVideoStudio = lazy(() => import("./pages/LumaVideoStudio"));
+const SoraVideoStudio = lazy(() => import("./pages/SoraVideoStudio"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
@@ -223,7 +224,8 @@ function AppLayout() {
          <Route path="/seedance-video-studio" element={<SeedanceVideoStudio />} />
          <Route path="/wan-video-studio" element={<WanVideoStudio />} />
          <Route path="/hailuo-video-studio" element={<HailuoVideoStudio />} />
-         <Route path="/luma-video-studio" element={<LumaVideoStudio />} />
+          <Route path="/luma-video-studio" element={<LumaVideoStudio />} />
+          <Route path="/sora-video-studio" element={<SoraVideoStudio />} />
           <Route path="/audio-studio" element={<AudioStudio />} />
           <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
           <Route path="/video-translator" element={<VideoTranslator />} />
