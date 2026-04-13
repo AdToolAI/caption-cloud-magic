@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, FolderOpen, Video, Film, Wand2, Clapperboard } from 'lucide-react';
+import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, FolderOpen, Video, Film, Wand2, Clapperboard, Eye, Camera } from 'lucide-react';
 import { AlbumImagePicker } from '@/components/media-library/AlbumImagePicker';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
@@ -272,6 +272,28 @@ export default function AIVideoStudio() {
       quality: '720p',
       link: '/wan-video-studio',
       icon: Wand2,
+    },
+    {
+      name: 'Hailuo 2.3',
+      provider: 'MiniMax',
+      description: language === 'de' ? 'Realistische Gesichter, Bewegung & Charaktere' : 'Realistic faces, motion & characters',
+      features: ['Text-to-Video', 'Image-to-Video', '1080p', 'Realistic Motion'],
+      pricing: `${currSymbol}0.15–0.20/s`,
+      maxDuration: '10s',
+      quality: '1080p',
+      link: '/hailuo-video-studio',
+      icon: Eye,
+    },
+    {
+      name: 'Luma Ray 2',
+      provider: 'Luma AI',
+      description: language === 'de' ? 'Cinematic Szenen, surreale & künstlerische Projekte' : 'Cinematic scenes, surreal & artistic projects',
+      features: ['Text-to-Video', 'Image-to-Video', 'Camera Concepts', 'Loop'],
+      pricing: `${currSymbol}0.18–0.25/s`,
+      maxDuration: '9s',
+      quality: '720p',
+      link: '/luma-video-studio',
+      icon: Camera,
     },
   ];
 
