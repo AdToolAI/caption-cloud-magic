@@ -164,17 +164,7 @@ export default function KlingVideoStudio() {
             <Link to="/ai-video-studio">
               <Button variant="outline" size="sm">
                 <ArrowLeft className="h-4 w-4 mr-1" />
-                Sora 2
-              </Button>
-            </Link>
-            <Link to="/seedance-video-studio">
-              <Button variant="outline" size="sm">
-                Seedance 2.0
-              </Button>
-            </Link>
-            <Link to="/wan-video-studio">
-              <Button variant="outline" size="sm">
-                Wan 2.1
+                AI Video Studio
               </Button>
             </Link>
             {wallet && (
