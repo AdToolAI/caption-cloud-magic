@@ -1,40 +1,50 @@
-<final-text>## Plan: Fehlende Untertitel im Exportpfad wirklich beheben
 
-### Was ich jetzt sicher gefunden habe
-- Der Export-Request enthält Untertitel korrekt:
-  - `render-directors-cut` loggt `clips: 3, visible: true`
-  - also ist der Editor-/Payload-Pfad nicht mehr das Problem
-- Ich habe in `DirectorsCutVideo.tsx` einen echten Logikfehler gefunden:
-  - Wenn `scenes.length === 0`, geht der Export in den Fallback-Branch
-  - genau dieser Branch rendert aktuell **weder Untertitel noch Text-Overlays**
-- Das erklärt das Verhalten sehr gut:
-  - Studio-Preview zeigt Untertitel
-  - finaler Export nicht
-  - besonders bei Projekten ohne aktive Szenensegmentierung
+## Plan: Untertitel-Problem an der echten Ursache beheben
+
+### Was jetzt sicher ist
+- Die Preview rendert Untertitel korrekt.
+- Der Export-Request enthält die Untertitel korrekt.
+- `render-directors-cut` loggt die Untertitel korrekt (`clips: 3`, `visible: true`).
+- Der aktuelle Template-Code rendert Untertitel bereits in beiden Export-Pfaden.
+- In den Logs taucht aber **nicht** der aktuelle Canary `v2026-04-13c-fallback-fix` auf.
+- `REMOTION_SERVE_URL` zeigt auf ein festes Bundle:
+  `.../sites/adtool-remotion-bundle/index.html`
+
+Damit ist der wahrscheinlichste Fehler jetzt klar:
+**Der Renderer nutzt ein veraltetes Remotion-Bundle statt des aktuellen Repo-Codes.**
 
 ### Umsetzung
-1. **Fallback-Renderpfad in `DirectorsCutVideo.tsx` korrigieren**
-   - Im `sortedScenes.length === 0`-Branch dieselbe Subtitle- und Text-Overlay-Logik rendern wie im normalen Exportpfad
-   - gleiche Positionierung, Font-Größen, Farben und z-index verwenden
+1. **Aktives Render-Bundle ersetzen**
+   - Das Remotion-Site-Bundle aus der aktuellen Codebasis neu veröffentlichen.
+   - `REMOTION_SERVE_URL` auf das frische Bundle umstellen oder das bestehende Bundle gezielt überschreiben.
 
-2. **Branch-Diagnostik ergänzen**
-   - Klar loggen, ob der Render im `no-scenes`-Fallback oder im normalen Szenenpfad läuft
-   - Subtitle-Clip-Anzahl direkt dort mitloggen
+2. **Bundle-Version hart absichern**
+   - In den Render-Pfad eine erwartete Bundle-Version aufnehmen.
+   - Wenn das aktive Bundle nicht zur erwarteten Version passt, soll der Render **klar fehlschlagen** statt still mit altem Code weiterzulaufen.
 
-3. **Export gegen stille Fehlkonfiguration härten**
-   - Falls `showSubtitles` nur als Preview-Toggle gedacht ist, Export davon entkoppeln bzw. klarer absichern
-   - so verhindern wir, dass ein “nur Vorschau ausblenden” versehentlich auch den Export killt
+3. **Deploy-Prozess für Remotion stabilisieren**
+   - Einen reproduzierbaren Bundle-Deploy-Workflow ergänzen, damit Template-Änderungen nicht mehr lokal im Repo landen, aber im Render veralten.
+   - Ziel: Kein manueller Drift mehr zwischen Studio-Code und Lambda-Bundle.
 
-4. **Bundle nur noch als sekundären Check behandeln**
-   - Falls Untertitel nach dem Fallback-Fix immer noch fehlen, prüfe ich anschließend gezielt das aktive Render-Bundle
-   - aber der erste konkrete Codefehler sitzt jetzt im Template selbst
+4. **End-to-end verifizieren**
+   - Neuen Render starten.
+   - In den Logs prüfen, dass der aktuelle Canary erscheint.
+   - Finales MP4 prüfen, ob die Untertitel sichtbar eingebrannt sind.
 
-### Betroffene Dateien
-- **Edit:** `src/remotion/templates/DirectorsCutVideo.tsx`
-- **Optional Edit:** `src/components/directors-cut/studio/CapCutEditor.tsx`
-- **Optional Edit:** `supabase/functions/render-directors-cut/index.ts`
+### Betroffene Bereiche
+- `supabase/functions/render-directors-cut/index.ts`
+- optional `supabase/functions/invoke-remotion-render/index.ts`
+- Remotion-Bundle-Deployment / `REMOTION_SERVE_URL`
+- optional neues Deploy-Script oder Doku für Bundle-Sync
+
+### Technische Details
+- Das ist sehr wahrscheinlich **kein weiterer Subtitle-Layoutfehler** mehr.
+- Der Datenpfad und das aktuelle Template sind stimmig.
+- Der entscheidende Fix ist jetzt die **Synchronisation des tatsächlich gerenderten Bundles**.
+- Ohne diesen Schritt bringen weitere Subtitle-Codeänderungen im Repo voraussichtlich nichts.
 
 ### Ergebnis
-- Untertitel erscheinen auch dann im finalen Video, wenn keine Szenen im Export aktiv sind
-- Preview und Export verhalten sich wieder konsistent
-- Der Fehler wird an der tatsächlich fehlenden Render-Stelle behoben statt weiter nur am Payload zu suchen</final-text>
+- Der Export rendert wieder mit dem aktuellen Director’s-Cut-Template.
+- Preview und finaler Render sind wieder konsistent.
+- Untertitel werden im finalen Video sichtbar.
+- Künftige Template-Fixes greifen zuverlässig auch im echten Renderpfad.
