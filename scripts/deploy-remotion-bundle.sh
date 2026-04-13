@@ -24,7 +24,7 @@ S3_BUCKET="remotionlambda-eucentral1-13gm4o6s90"
 S3_SITE_PATH="sites/adtool-remotion-bundle"
 AWS_REGION="eu-central-1"
 
-BUNDLE_DIR="$PROJECT_ROOT/remotion-bundle-out"
+BUNDLE_DIR="$PROJECT_ROOT/build"
 
 echo "🔧 Building Remotion bundle from $PROJECT_ROOT/src/remotion ..."
 
