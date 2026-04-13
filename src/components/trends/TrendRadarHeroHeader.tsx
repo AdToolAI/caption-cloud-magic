@@ -77,8 +77,8 @@ export function TrendRadarHeroHeader({
           </motion.div>
 
           {/* Main Headline */}
-          <h1 className="text-4xl md:text-5xl font-bold">
-            <span className="bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent">
+          <h1 className="text-4xl md:text-5xl font-display font-bold">
+            <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
               {t('trends.title')}
             </span>
           </h1>
