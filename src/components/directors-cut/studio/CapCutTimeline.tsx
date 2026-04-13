@@ -607,7 +607,6 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
     setResizingClip({ id: clipId, side, startX: 0, originalClip: clip });
   }, [tracks, zoom, onClipResize]);
 
-  const playheadPosition = currentTime * zoom;
   const timelineWidth = duration * zoom + 100; // Extra space at the end
 
   return (
