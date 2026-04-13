@@ -111,6 +111,10 @@ interface CapCutSidebarProps {
   exportSettings?: import('@/types/directors-cut').ExportSettings;
   onExportSettingsChange?: (settings: import('@/types/directors-cut').ExportSettings) => void;
   onStartExport?: () => void;
+  // Voiceover from subtitles
+  onVoiceOverGenerated?: (url: string) => void;
+  onVoiceoverVolumeChange?: (volume: number) => void;
+  voiceoverVolume?: number;
 }
 
 interface Caption {
