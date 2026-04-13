@@ -521,12 +521,12 @@ export default function TrendRadar() {
   const topTrends = [...trends].sort((a, b) => b.popularity_index - a.popularity_index).slice(0, 5);
 
   const categories = [
-    { id: 'social-media', name: t('trends.niches.socialMedia'), icon: '💡', color: 'from-blue-500/20 to-purple-500/20', glowColor: 'hover:shadow-[0_0_30px_hsla(220,80%,60%,0.25)]', animation: 'animate-bounce' },
-    { id: 'ecommerce', name: t('trends.niches.ecommerce'), icon: '🛒', color: 'from-green-500/20 to-emerald-500/20', glowColor: 'hover:shadow-[0_0_30px_hsla(140,60%,50%,0.25)]', animation: 'animate-pulse' },
-    { id: 'lifestyle', name: t('trends.niches.lifestyle'), icon: '🌟', color: 'from-pink-500/20 to-rose-500/20', glowColor: 'hover:shadow-[0_0_30px_hsla(340,80%,60%,0.25)]', animation: 'animate-spin' },
-    { id: 'business', name: t('trends.niches.business'), icon: '🤖', color: 'from-indigo-500/20 to-blue-500/20', glowColor: 'hover:shadow-[0_0_30px_hsla(230,80%,60%,0.25)]', animation: 'animate-pulse' },
-    { id: 'motivation', name: t('trends.niches.motivation'), icon: '🚀', color: 'from-orange-500/20 to-red-500/20', glowColor: 'hover:shadow-[0_0_30px_hsla(20,80%,60%,0.25)]', animation: 'animate-bounce' },
-    { id: 'finance', name: t('trends.niches.finance'), icon: '💰', color: 'from-yellow-500/20 to-amber-500/20', glowColor: 'hover:shadow-[0_0_30px_hsla(43,90%,68%,0.25)]', animation: 'animate-pulse' },
+    { id: 'social-media', name: t('trends.niches.socialMedia'), image: 'https://images.pexels.com/photos/607812/pexels-photo-607812.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop', color: 'from-blue-500/20 to-purple-500/20' },
+    { id: 'ecommerce', name: t('trends.niches.ecommerce'), image: 'https://images.pexels.com/photos/5632399/pexels-photo-5632399.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop', color: 'from-green-500/20 to-emerald-500/20' },
+    { id: 'lifestyle', name: t('trends.niches.lifestyle'), image: 'https://images.pexels.com/photos/3771836/pexels-photo-3771836.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop', color: 'from-pink-500/20 to-rose-500/20' },
+    { id: 'business', name: t('trends.niches.business'), image: 'https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop', color: 'from-indigo-500/20 to-blue-500/20' },
+    { id: 'motivation', name: t('trends.niches.motivation'), image: 'https://images.pexels.com/photos/3756681/pexels-photo-3756681.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop', color: 'from-orange-500/20 to-red-500/20' },
+    { id: 'finance', name: t('trends.niches.finance'), image: 'https://images.pexels.com/photos/7567443/pexels-photo-7567443.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop', color: 'from-yellow-500/20 to-amber-500/20' },
   ];
 
   const ecommerceSubcategories = [
