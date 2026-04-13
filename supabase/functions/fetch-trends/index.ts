@@ -1709,12 +1709,49 @@ const FALLBACK_TRENDS = generateDynamicTrends();
 // Category fallback keywords for image search
 const categoryFallbackKeywords: Record<string, string> = {
   'social-media': 'social media content creator smartphone',
-  'ecommerce': 'online shopping product ecommerce',
+  'ecommerce': 'online shopping product lifestyle',
   'lifestyle': 'lifestyle wellness healthy living',
   'business': 'business office technology startup',
   'finance': 'finance investment money trading',
   'motivation': 'success motivation inspiration',
 };
+
+// Split CamelCase/PascalCase into separate words
+function splitCamelCase(str: string): string {
+  return str
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .trim();
+}
+
+// Build an optimal Pexels search query from trend data
+function buildSearchQuery(trend: any): string {
+  // 1. Try description first — it's the most descriptive
+  const description = trend.description || trend.data_json?.description || '';
+  if (description.length > 10) {
+    // Take first 6 meaningful words from description
+    const descWords = description
+      .replace(/[^a-zA-Z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w: string) => w.length > 2) // skip short words
+      .slice(0, 6)
+      .join(' ')
+      .trim();
+    if (descWords.length > 5) {
+      console.log(`  Query from description: "${descWords}"`);
+      return descWords;
+    }
+  }
+
+  // 2. Fallback: clean and split the trend name
+  const name = (trend.name || '')
+    .replace(/#/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .trim();
+  const splitName = splitCamelCase(name);
+  console.log(`  Query from name: "${splitName}"`);
+  return splitName;
+}
 
 async function searchPexelsImage(query: string, fallbackCategory?: string): Promise<{ url: string; photographer: string } | null> {
   try {
@@ -1724,41 +1761,32 @@ async function searchPexelsImage(query: string, fallbackCategory?: string): Prom
       return null;
     }
 
-    // Clean query: remove hashtags, special chars
-    const cleanQuery = query.replace(/#/g, '').replace(/[^a-zA-Z0-9\s]/g, '').trim();
+    const cleanQuery = query.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+    if (!cleanQuery) return null;
     
+    // Request 5 results and pick best one
     const response = await fetch(
-      `https://api.pexels.com/v1/search?query=${encodeURIComponent(cleanQuery)}&per_page=1&page=1`,
+      `https://api.pexels.com/v1/search?query=${encodeURIComponent(cleanQuery)}&per_page=5&page=1`,
       { headers: { 'Authorization': pexelsApiKey } }
     );
 
-    if (!response.ok) {
-      console.error('Pexels API error:', response.status);
-      // Try fallback category search
-      if (fallbackCategory && categoryFallbackKeywords[fallbackCategory]) {
-        const fbResponse = await fetch(
-          `https://api.pexels.com/v1/search?query=${encodeURIComponent(categoryFallbackKeywords[fallbackCategory])}&per_page=1&page=1`,
-          { headers: { 'Authorization': pexelsApiKey } }
-        );
-        if (fbResponse.ok) {
-          const fbData = await fbResponse.json();
-          if (fbData.photos?.length > 0) {
-            return { url: fbData.photos[0].src.medium, photographer: fbData.photos[0].photographer };
-          }
-        }
+    if (response.ok) {
+      const data = await response.json();
+      if (data.photos?.length > 0) {
+        // Pick the photo with highest resolution (landscape preferred)
+        const best = data.photos.reduce((a: any, b: any) => {
+          const aScore = a.width * a.height;
+          const bScore = b.width * b.height;
+          return bScore > aScore ? b : a;
+        });
+        return { url: best.src.medium, photographer: best.photographer };
       }
-      return null;
     }
 
-    const data = await response.json();
-    if (data.photos?.length > 0) {
-      return { url: data.photos[0].src.medium, photographer: data.photos[0].photographer };
-    }
-
-    // Fallback to category keywords if no results
+    // Fallback to category keywords
     if (fallbackCategory && categoryFallbackKeywords[fallbackCategory]) {
       const fbResponse = await fetch(
-        `https://api.pexels.com/v1/search?query=${encodeURIComponent(categoryFallbackKeywords[fallbackCategory])}&per_page=1&page=1`,
+        `https://api.pexels.com/v1/search?query=${encodeURIComponent(categoryFallbackKeywords[fallbackCategory])}&per_page=3&page=1`,
         { headers: { 'Authorization': pexelsApiKey } }
       );
       if (fbResponse.ok) {
@@ -1785,7 +1813,6 @@ async function enrichTrendsWithImages(trends: any[]): Promise<any[]> {
 
   console.log(`Enriching ${trends.length} trends with Pexels images...`);
   
-  // Process in batches of 10 to respect rate limits
   const batchSize = 10;
   const enriched = [...trends];
   
@@ -1793,8 +1820,8 @@ async function enrichTrendsWithImages(trends: any[]): Promise<any[]> {
     const batch = enriched.slice(i, i + batchSize);
     const results = await Promise.allSettled(
       batch.map(trend => {
-        const searchTerm = trend.name || trend.description?.substring(0, 50) || '';
-        return searchPexelsImage(searchTerm, trend.category);
+        const searchQuery = buildSearchQuery(trend);
+        return searchPexelsImage(searchQuery, trend.category);
       })
     );
     
@@ -1812,7 +1839,6 @@ async function enrichTrendsWithImages(trends: any[]): Promise<any[]> {
       }
     });
     
-    // Small delay between batches to avoid rate limits
     if (i + batchSize < enriched.length) {
       await new Promise(r => setTimeout(r, 200));
     }
