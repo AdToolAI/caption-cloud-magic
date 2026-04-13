@@ -1975,13 +1975,17 @@ serve(async (req) => {
       }
 
       console.log('Returning fallback:', fallbackFiltered.length, 'filtered trends');
-      return new Response(JSON.stringify({ trends: fallbackFiltered }), {
+      const enrichedFallback = await enrichTrendsWithImages(fallbackFiltered);
+      return new Response(JSON.stringify({ trends: enrichedFallback }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Return filtered trends from database
-    return new Response(JSON.stringify({ trends: filteredTrends }), {
+    // Enrich trends with Pexels images
+    const enrichedTrends = await enrichTrendsWithImages(filteredTrends);
+
+    // Return enriched trends
+    return new Response(JSON.stringify({ trends: enrichedTrends }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
