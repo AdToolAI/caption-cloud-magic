@@ -1,43 +1,30 @@
 
+## Plan: Ticker langsamer, mehr James Bond 2028 Stil, Ein/Aus-Toggle
 
-## Plan: Ticker-Tipps automatisch jede Stunde neu mischen
+### Änderungen
 
-### Änderung
+1. **Animation langsamer machen**
+   - `animate-[marquee_60s_...]` → `animate-[marquee_120s_...]` (doppelt so langsam)
 
-In `src/components/dashboard/NewsTicker.tsx`:
-- `shuffledTips` von `useState` (einmalig) auf `useState` + `useEffect` mit `setInterval` umstellen
-- Alle 60 Minuten (3.600.000 ms) wird das Array neu gemischt und per `setShuffledTips` aktualisiert
-- Shuffle-Logik in eine eigene Funktion extrahieren für Wiederverwendung
+2. **Mehr James Bond 2028 Stil**
+   - Glow-Linien intensiver: `via-primary/60` statt `via-primary/40`, zusätzlicher `shadow`-Glow
+   - LIVE TIPS Badge: stärkerer Glow-Effekt, `font-display` (Playfair Display)
+   - Subtiler Gold-Schimmer-Gradient im Hintergrund
+   - Text mit leichtem `drop-shadow` für Premium-Feeling
+   - Separator ◆ in gedämpfterem Gold für elegantere Trennung
 
-### Code-Änderung
+3. **Ein/Aus-Toggle hinzufügen**
+   - Rechts im Ticker ein kleiner Toggle-Switch (Power-Icon oder X-Button)
+   - Zustand in `localStorage` persistieren (`newsticker-visible`)
+   - Wenn ausgeschaltet: Ticker verschwindet mit `AnimatePresence` Slide-Up-Animation
+   - Wenn ausgeschaltet: kleiner minimaler "TIPS"-Button am oberen Rand zum Wiedereinschalten
+   - Toggle-State als `useState` + `localStorage` in der Komponente selbst
 
-```tsx
-const shuffle = (arr: string[]) => {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-};
-
-export const NewsTicker = () => {
-  const [shuffledTips, setShuffledTips] = useState(() => shuffle(TIPS));
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setShuffledTips(shuffle(TIPS));
-    }, 60 * 60 * 1000); // 1 Stunde
-    return () => clearInterval(interval);
-  }, []);
-  // ...rest bleibt gleich
-};
-```
-
-### Betroffene Datei
-- `src/components/dashboard/NewsTicker.tsx`
+### Betroffene Dateien
+- `src/components/dashboard/NewsTicker.tsx` — Styling, Speed, Toggle-Logik
+- `src/pages/Home.tsx` — minimal anpassen falls nötig für den minimierten Zustand
 
 ### Ergebnis
-- Tipps werden bei jedem Laden zufällig gemischt
-- Jede Stunde automatisch neu gemischt, sodass der User frische Tipps sieht
-
+- Langsamerer, eleganterer Scroll
+- Intensivere Gold-Glow-Akzente im Bond-Stil
+- User kann Ticker ein-/ausschalten, Präferenz bleibt gespeichert
