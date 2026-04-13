@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
 const TIPS = [
@@ -26,15 +26,24 @@ const TIPS = [
 
 const SEPARATOR = " ◆ ";
 
+const shuffle = (arr: string[]) => {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
 export const NewsTicker = () => {
-  const [shuffledTips] = useState(() => {
-    const arr = [...TIPS];
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  });
+  const [shuffledTips, setShuffledTips] = useState(() => shuffle(TIPS));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setShuffledTips(shuffle(TIPS));
+    }, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const tickerText = shuffledTips.join(SEPARATOR) + SEPARATOR;
 
