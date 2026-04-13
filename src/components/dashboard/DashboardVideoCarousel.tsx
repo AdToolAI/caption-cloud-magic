@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
-import { Play, ChevronLeft, ChevronRight, Video, Sparkles, Expand, Volume2, VolumeX } from 'lucide-react';
+import { Play, ChevronLeft, ChevronRight, Video, Sparkles, Expand, Volume2, VolumeX, LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoHistory } from '@/hooks/useVideoHistory';
 import { VideoPreviewPlayer } from '@/components/video/VideoPreviewPlayer';
@@ -11,6 +11,13 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { DEMO_VIDEO, isDemoVideo } from '@/constants/demo-video';
 import { useTranslation } from '@/hooks/useTranslation';
+
+interface QuickAction {
+  label: string;
+  icon: LucideIcon;
+  to: string;
+  variant?: 'default' | 'outline';
+}
 
 /** Resolve a possibly-relative storage path to a full public URL */
 const resolveVideoUrl = (rawUrl: string): string => {
