@@ -965,9 +965,13 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           const endFrame = Math.floor(clip.endTime * fps);
           const clipDuration = Math.max(1, endFrame - startFrame);
           return (
-            <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
-              <AbsoluteFill style={{
-                display: 'flex', justifyContent: 'center',
+             <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
+              <div style={{
+                position: 'absolute',
+                left: 0, right: 0, top: 0, bottom: 0,
+                width: '100%', height: '100%',
+                display: 'flex',
+                justifyContent: 'center',
                 alignItems: clip.position === 'top' ? 'flex-start' : clip.position === 'center' ? 'center' : 'flex-end',
                 paddingTop: clip.position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
                 paddingBottom: clip.position !== 'top' && clip.position !== 'center' ? SUBTITLE_BOTTOM_PADDING : '5%',
@@ -985,7 +989,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                 }}>
                   {clip.text}
                 </div>
-              </AbsoluteFill>
+              </div>
             </Sequence>
           );
         })}
@@ -1188,7 +1192,10 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         
         return (
           <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
-            <AbsoluteFill style={{
+            <div style={{
+              position: 'absolute',
+              left: 0, right: 0, top: 0, bottom: 0,
+              width: '100%', height: '100%',
               display: 'flex',
               justifyContent: 'center',
               alignItems: clip.position === 'top' ? 'flex-start' : 
@@ -1215,7 +1222,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
               }}>
                 {clip.text}
               </div>
-            </AbsoluteFill>
+            </div>
           </Sequence>
         );
       })}

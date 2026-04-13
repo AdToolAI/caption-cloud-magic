@@ -24,18 +24,14 @@ S3_BUCKET="remotionlambda-eucentral1-13gm4o6s90"
 S3_SITE_PATH="sites/adtool-remotion-bundle"
 AWS_REGION="eu-central-1"
 
-BUNDLE_DIR="$PROJECT_ROOT/remotion-bundle-out"
+BUNDLE_DIR="$PROJECT_ROOT/build"
 
 echo "🔧 Building Remotion bundle from $PROJECT_ROOT/src/remotion ..."
 
-# Clean previous bundle
-rm -rf "$BUNDLE_DIR"
-
-# Bundle the Remotion site
+# Bundle the Remotion site (output goes to $PROJECT_ROOT/build by default)
 cd "$PROJECT_ROOT"
 npx remotion bundle \
   --entry-point src/remotion/index.ts \
-  --output "$BUNDLE_DIR" \
   --log=verbose
 
 if [ ! -f "$BUNDLE_DIR/index.html" ]; then
