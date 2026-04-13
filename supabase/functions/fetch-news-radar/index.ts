@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const CACHE_TTL_HOURS = 6;
+const CACHE_TTL_HOURS = 1;
 
 const FALLBACK_NEWS = [
   { headline: "📱 Instagram expands Reels to 3 minutes for all creators", category: "social", source: "Instagram" },
