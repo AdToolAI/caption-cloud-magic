@@ -1716,6 +1716,31 @@ const categoryFallbackKeywords: Record<string, string> = {
   'motivation': 'success motivation inspiration',
 };
 
+// Visual keywords to append for abstract/strategy categories
+const categoryVisualKeywords: Record<string, string> = {
+  'social-media': 'smartphone laptop content creator',
+  'motivation': 'person success sunrise determination',
+  'business': 'modern office professional workspace',
+  'finance': 'charts money investment desk',
+  'lifestyle': 'wellness healthy living aesthetic',
+  'ecommerce': 'product shopping packaging',
+};
+
+// Abstract categories where description-based search tends to be too vague
+const abstractCategories = new Set(['social-media', 'motivation', 'business']);
+
+// Extended stopwords that produce vague/non-visual queries
+const STOPWORDS = new Set([
+  'for', 'with', 'without', 'your', 'the', 'and', 'that', 'this', 'how',
+  'can', 'from', 'into', 'than', 'most', 'one', 'day', 'days', 'per',
+  'via', 'maximum', 'minimum', 'using', 'about', 'more', 'their', 'they',
+  'what', 'when', 'where', 'which', 'who', 'will', 'not', 'are', 'but',
+  'have', 'has', 'had', 'been', 'being', 'does', 'did', 'doing', 'would',
+  'could', 'should', 'shall', 'may', 'might', 'must', 'need', 'also',
+  'just', 'only', 'very', 'really', 'actually', 'every', 'each', 'all',
+  'new', 'show', 'tell', 'make', 'get', 'use', 'produce', 'create',
+]);
+
 // Split CamelCase/PascalCase into separate words
 function splitCamelCase(str: string): string {
   return str
@@ -1724,33 +1749,57 @@ function splitCamelCase(str: string): string {
     .trim();
 }
 
+function filterStopwords(text: string): string {
+  return text
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !STOPWORDS.has(w.toLowerCase()))
+    .join(' ');
+}
+
 // Build an optimal Pexels search query from trend data
 function buildSearchQuery(trend: any): string {
-  // 1. Try description first — it's the most descriptive
-  const description = trend.description || trend.data_json?.description || '';
-  if (description.length > 10) {
-    // Take first 6 meaningful words from description
-    const descWords = description
-      .replace(/[^a-zA-Z0-9\s]/g, ' ')
-      .split(/\s+/)
-      .filter((w: string) => w.length > 2) // skip short words
-      .slice(0, 6)
-      .join(' ')
-      .trim();
-    if (descWords.length > 5) {
-      console.log(`  Query from description: "${descWords}"`);
-      return descWords;
+  const category = trend.category || '';
+  const name = (trend.name || '').replace(/#/g, '').replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
+  const splitName = splitCamelCase(name);
+  const cleanName = filterStopwords(splitName);
+
+  // For abstract categories: prefer cleaned name + visual keyword
+  if (abstractCategories.has(category)) {
+    const visualKw = categoryVisualKeywords[category] || '';
+    const nameWords = cleanName.split(/\s+/).filter(w => w.length > 2);
+    if (nameWords.length >= 2) {
+      // Take first 2-3 name words + first 2 visual keywords
+      const visualParts = visualKw.split(/\s+/).slice(0, 2).join(' ');
+      const query = `${nameWords.slice(0, 3).join(' ')} ${visualParts}`.trim();
+      console.log(`  Query (abstract+visual): "${query}"`);
+      return query;
     }
   }
 
-  // 2. Fallback: clean and split the trend name
-  const name = (trend.name || '')
-    .replace(/#/g, '')
-    .replace(/[^a-zA-Z0-9\s]/g, ' ')
-    .trim();
-  const splitName = splitCamelCase(name);
-  console.log(`  Query from name: "${splitName}"`);
-  return splitName;
+  // For concrete categories: try description first
+  const description = trend.description || trend.data_json?.description || '';
+  if (description.length > 10) {
+    const descFiltered = filterStopwords(
+      description.replace(/[^a-zA-Z0-9\s]/g, ' ')
+    );
+    const descWords = descFiltered.split(/\s+/).filter((w: string) => w.length > 2);
+    if (descWords.length >= 3) {
+      const query = descWords.slice(0, 6).join(' ');
+      console.log(`  Query from description: "${query}"`);
+      return query;
+    }
+  }
+
+  // Fallback: cleaned name + optional visual keyword
+  if (cleanName.split(/\s+/).filter(w => w.length > 2).length < 3 && categoryVisualKeywords[category]) {
+    const visualKw = categoryVisualKeywords[category].split(/\s+/).slice(0, 2).join(' ');
+    const query = `${cleanName} ${visualKw}`.trim();
+    console.log(`  Query (name+visual fallback): "${query}"`);
+    return query;
+  }
+
+  console.log(`  Query from name: "${cleanName || splitName}"`);
+  return cleanName || splitName;
 }
 
 async function searchPexelsImage(query: string, fallbackCategory?: string): Promise<{ url: string; photographer: string } | null> {
