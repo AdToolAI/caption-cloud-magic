@@ -362,7 +362,7 @@ serve(async (req) => {
     }
 
     // ✅ BUNDLE VERSION CHECK — fetch bundle-version.json to verify freshness
-    const EXPECTED_BUNDLE_VERSION = 'v2026-04-13d-centered-fix';
+    const EXPECTED_BUNDLE_VERSION = 'v2026-04-13e-unified-subtitle-renderer';
     let bundleVersionOk = false;
     try {
       const versionUrl = REMOTION_SERVE_URL.replace(/\/index\.html$/, '/bundle-version.json');

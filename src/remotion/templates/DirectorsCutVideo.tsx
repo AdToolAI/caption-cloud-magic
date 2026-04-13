@@ -109,6 +109,37 @@ const SubtitleClipSchema = z.object({
   fontFamily: z.string().optional(),
 });
 
+// ========== SHARED SUBTITLE RENDERER — single source of truth for all paths ==========
+const SubtitleClipRenderer: React.FC<{ clip: z.infer<typeof SubtitleClipSchema> }> = ({ clip }) => (
+  <div style={{
+    position: 'absolute',
+    left: 0, right: 0, top: 0, bottom: 0,
+    width: '100%', height: '100%',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: clip.position === 'top' ? 'flex-start' : clip.position === 'center' ? 'center' : 'flex-end',
+    paddingTop: clip.position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
+    paddingBottom: clip.position !== 'top' && clip.position !== 'center' ? SUBTITLE_BOTTOM_PADDING : '5%',
+    paddingLeft: '5%', paddingRight: '5%',
+    pointerEvents: 'none',
+    zIndex: SUBTITLE_Z_INDEX,
+  }}>
+    <div style={{
+      backgroundColor: clip.backgroundColor || SUBTITLE_DEFAULT_BG,
+      color: clip.color || SUBTITLE_DEFAULT_COLOR,
+      padding: '14px 28px', borderRadius: '8px',
+      fontSize: SUBTITLE_FONT_SIZE_MAP[clip.fontSize || SUBTITLE_DEFAULT_FONT_SIZE] || SUBTITLE_FONT_SIZE_MAP.medium,
+      fontFamily: clip.fontFamily || SUBTITLE_DEFAULT_FONT_FAMILY,
+      fontWeight: 'bold',
+      textAlign: 'center' as const,
+      maxWidth: '90%', lineHeight: 1.4,
+      textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+    }}>
+      {clip.text}
+    </div>
+  </div>
+);
+
 // SubtitleTrack Schema
 const SubtitleTrackSchema = z.object({
   id: z.string(),
@@ -722,26 +753,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           const clipDuration = Math.max(1, endFrame - startFrame);
           return (
             <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
-              <AbsoluteFill style={{
-                display: 'flex', justifyContent: 'center',
-                alignItems: clip.position === 'top' ? 'flex-start' : clip.position === 'center' ? 'center' : 'flex-end',
-                paddingTop: clip.position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
-                paddingBottom: clip.position !== 'top' && clip.position !== 'center' ? SUBTITLE_BOTTOM_PADDING : '5%',
-                paddingLeft: '5%', paddingRight: '5%',
-                pointerEvents: 'none', zIndex: SUBTITLE_Z_INDEX,
-              }}>
-                <div style={{
-                  backgroundColor: clip.backgroundColor || SUBTITLE_DEFAULT_BG,
-                  color: clip.color || SUBTITLE_DEFAULT_COLOR,
-                  padding: '14px 28px', borderRadius: '8px',
-                  fontSize: SUBTITLE_FONT_SIZE_MAP[clip.fontSize || SUBTITLE_DEFAULT_FONT_SIZE] || SUBTITLE_FONT_SIZE_MAP.medium,
-                  fontFamily: clip.fontFamily || SUBTITLE_DEFAULT_FONT_FAMILY, fontWeight: 'bold',
-                  textAlign: 'center', maxWidth: '90%', lineHeight: 1.4,
-                  textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                }}>
-                  {clip.text}
-                </div>
-              </AbsoluteFill>
+              <SubtitleClipRenderer clip={clip} />
             </Sequence>
           );
         })}
@@ -965,31 +977,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           const endFrame = Math.floor(clip.endTime * fps);
           const clipDuration = Math.max(1, endFrame - startFrame);
           return (
-             <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
-              <div style={{
-                position: 'absolute',
-                left: 0, right: 0, top: 0, bottom: 0,
-                width: '100%', height: '100%',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: clip.position === 'top' ? 'flex-start' : clip.position === 'center' ? 'center' : 'flex-end',
-                paddingTop: clip.position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
-                paddingBottom: clip.position !== 'top' && clip.position !== 'center' ? SUBTITLE_BOTTOM_PADDING : '5%',
-                paddingLeft: '5%', paddingRight: '5%',
-                pointerEvents: 'none', zIndex: SUBTITLE_Z_INDEX,
-              }}>
-                <div style={{
-                  backgroundColor: clip.backgroundColor || SUBTITLE_DEFAULT_BG,
-                  color: clip.color || SUBTITLE_DEFAULT_COLOR,
-                  padding: '14px 28px', borderRadius: '8px',
-                  fontSize: SUBTITLE_FONT_SIZE_MAP[clip.fontSize || SUBTITLE_DEFAULT_FONT_SIZE] || SUBTITLE_FONT_SIZE_MAP.medium,
-                  fontFamily: clip.fontFamily || SUBTITLE_DEFAULT_FONT_FAMILY, fontWeight: 'bold',
-                  textAlign: 'center', maxWidth: '90%', lineHeight: 1.4,
-                  textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                }}>
-                  {clip.text}
-                </div>
-              </div>
+            <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
+              <SubtitleClipRenderer clip={clip} />
             </Sequence>
           );
         })}
@@ -1189,40 +1178,9 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         const startFrame = Math.floor(clip.startTime * fps);
         const endFrame = Math.floor(clip.endTime * fps);
         const clipDuration = Math.max(1, endFrame - startFrame);
-        
         return (
           <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
-            <div style={{
-              position: 'absolute',
-              left: 0, right: 0, top: 0, bottom: 0,
-              width: '100%', height: '100%',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: clip.position === 'top' ? 'flex-start' : 
-                         clip.position === 'center' ? 'center' : 'flex-end',
-              paddingTop: clip.position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
-              paddingBottom: clip.position !== 'top' && clip.position !== 'center' ? SUBTITLE_BOTTOM_PADDING : '5%',
-              paddingLeft: '5%',
-              paddingRight: '5%',
-              pointerEvents: 'none',
-              zIndex: SUBTITLE_Z_INDEX,
-            }}>
-              <div style={{
-                backgroundColor: clip.backgroundColor || SUBTITLE_DEFAULT_BG,
-                color: clip.color || SUBTITLE_DEFAULT_COLOR,
-                padding: '14px 28px',
-                borderRadius: '8px',
-                fontSize: SUBTITLE_FONT_SIZE_MAP[clip.fontSize || SUBTITLE_DEFAULT_FONT_SIZE] || SUBTITLE_FONT_SIZE_MAP.medium,
-                fontFamily: clip.fontFamily || SUBTITLE_DEFAULT_FONT_FAMILY,
-                fontWeight: 'bold',
-                textAlign: 'center',
-                maxWidth: '90%',
-                lineHeight: 1.4,
-                textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-              }}>
-                {clip.text}
-              </div>
-            </div>
+            <SubtitleClipRenderer clip={clip} />
           </Sequence>
         );
       })}
