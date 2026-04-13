@@ -1494,6 +1494,18 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               />
             )}
 
+            {/* Voiceover from Subtitles */}
+            {existingCaptions.length > 0 && existingCaptions.some(c => c.text && c.text.trim() !== '') && (
+              <SubtitleVoiceoverSection
+                existingCaptions={existingCaptions}
+                captionLanguage={captionLanguage}
+                onVoiceOverGenerated={onVoiceOverGenerated}
+                voiceoverVolume={voiceoverVolume}
+                onVoiceoverVolumeChange={onVoiceoverVolumeChange}
+                t={t}
+              />
+            )}
+
             {/* Generated Captions Preview */}
             {existingCaptions.length > 0 && (
               <div className="space-y-2">
