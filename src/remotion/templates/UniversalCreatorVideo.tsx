@@ -1664,6 +1664,7 @@ function getCategoryContrastType(category?: string): ContrastOverlayType {
     'behind-scenes': 'cinematic',
     'comparison': 'clean',
     'showcase': 'dramatic',
+    'storytelling': 'cinematic',
   };
   return map[category || ''] || 'subtle';
 }
@@ -1694,6 +1695,7 @@ function getCinematicProfile(category?: string): CinematicProfile {
     'behind-scenes': { mood: 'warm', grain: 'heavy', vignette: 'cinematic' },
     'comparison': { mood: 'neutral', grain: 'none', vignette: 'subtle' },
     'showcase': { mood: 'dramatic', grain: 'light', vignette: 'dramatic' },
+    'storytelling': { mood: 'warm', grain: 'medium', vignette: 'cinematic' },
   };
   return profiles[category || ''] || { mood: 'neutral', grain: 'none', vignette: 'subtle' };
 }
