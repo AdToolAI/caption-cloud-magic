@@ -1,27 +1,30 @@
 
 
-## Plan: Horizontalen Overflow auf der Startseite beheben
+## Plan: News Radar über den Header verschieben und kompakter machen
 
-### Problem
-Die Seite kann horizontal gescrollt werden. Mehrere Ursachen:
+### Änderungen
 
-1. **Kein `overflow-x-hidden` auf dem Root-Container** — der äußere `div` in Home.tsx hat nur `min-h-screen bg-background`, lässt aber seitliches Überlaufen zu.
-2. **Video-Carousel mit negativen Margins** — die 3D-Karussell-Karten nutzen `marginLeft: '-32px'` und `marginRight: '-32px'`, was über den Container hinausragen kann.
-3. **News-Ticker Marquee** — die doppelte Scroll-Animation mit `whitespace-nowrap` kann über die Seitenbreite hinausreichen, ist aber in `overflow-hidden` — sollte ok sein.
-4. **CreditBalance-Karte** — wird als vollständige Card im Status-Bar gerendert, was unnötig breit ist (das ist eher ein Platzproblem als Overflow, aber trägt zur Gesamtbreite bei).
+**`src/App.tsx`** (Zeilen ~130-136):
+- NewsTicker-Import hinzufügen
+- Den `<NewsTicker />` direkt **vor** dem Header rendern (sowohl vor `<Header />` als auch vor `<AppHeader />`), nur für eingeloggte User
+- Die Logik bleibt: nur anzeigen wenn `user` existiert
 
-### Lösung
+**`src/pages/Home.tsx`** (Zeile 558):
+- `{user && <NewsTicker />}` entfernen — wird jetzt global in App.tsx gerendert
 
-**`src/pages/Home.tsx`** (Zeile 491):
-- `overflow-x-hidden` zum Root-Container hinzufügen: `<div className="min-h-screen bg-background overflow-x-hidden">`
-
-**`src/components/dashboard/DashboardVideoCarousel.tsx`**:
-- Den äußeren Carousel-Container ebenfalls mit `overflow-hidden` absichern, damit die negativen Margins nicht über den Seitenrand ragen.
+**`src/components/dashboard/NewsTicker.tsx`**:
+- Höhe von `h-6` auf `h-5` reduzieren (ca. 4px weniger)
+- Schriftgrößen leicht verkleinern: `text-[10px]` → `text-[9px]`
+- Badge-Text `text-[8px]` → `text-[7px]`
+- Insgesamt wird der Ticker ~2-3cm schmaler/kompakter
 
 ### Betroffene Dateien
-- `src/pages/Home.tsx` — 1 Zeile ändern
-- `src/components/dashboard/DashboardVideoCarousel.tsx` — `overflow-hidden` auf den Perspective-Container
+- `src/App.tsx` — NewsTicker global einbinden
+- `src/pages/Home.tsx` — NewsTicker-Zeile entfernen
+- `src/components/dashboard/NewsTicker.tsx` — Höhe und Schriftgrößen reduzieren
 
 ### Was sich nicht ändert
-- Keine funktionalen Änderungen, keine DB-Migration, kein Redesign
+- Keine funktionalen Änderungen, keine DB-Migration
+- Toggle-Logik bleibt erhalten
+- Scroll-Animation bleibt identisch
 
