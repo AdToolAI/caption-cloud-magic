@@ -117,6 +117,9 @@ export interface UniversalConsultationResult {
   // Mood Preset (set before consultation)
   moodConfig?: MoodConfig;
   
+  // Product Images (min 4 for product-video)
+  productImages?: string[];
+  
   // Basic Info
   companyName: string;
   productName: string;
