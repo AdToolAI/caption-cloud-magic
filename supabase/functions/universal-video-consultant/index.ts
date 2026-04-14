@@ -1830,13 +1830,29 @@ const getCategorySystemPrompt = (category: string, mode: string, currentPhase: n
     },
   };
 
-  const defaultRole: Record<Lang, string> = {
-    de: 'Du bist Max, ein erfahrener Video-Stratege und Kreativdirektor.',
-    en: 'You are Max, an experienced video strategist and creative director.',
-    es: 'Eres Max, un experimentado estratega de video y director creativo.',
-  };
-
-  const role = categoryRoles[category]?.[lang] || defaultRole[lang];
+  // For storytelling, enhance role based on sub-mode
+  let role = categoryRoles[category]?.[lang] || defaultRole[lang];
+  if (category === 'storytelling' && messages) {
+    const subMode = detectStorytellingSubMode(messages);
+    const subModeRoles: Record<StorytellingSubMode, Record<Lang, string>> = {
+      'invented': {
+        de: 'Du bist Max, ein visionärer Autor und kreativer Drehbuchschreiber. Deine Aufgabe: Entwickle eine fesselnde FIKTIVE STORY basierend auf den Vorgaben des Nutzers. Sei kreativ, überraschend und filmisch. KEINE Werbung — du schreibst eine GESCHICHTE.',
+        en: 'You are Max, a visionary author and creative screenwriter. Your job: Develop a captivating FICTIONAL STORY based on the user\'s input. Be creative, surprising and cinematic. NO advertising — you are writing a STORY.',
+        es: 'Eres Max, un autor visionario y guionista creativo. Tu trabajo: Desarrollar una HISTORIA FICTICIA cautivadora basada en las indicaciones del usuario. Sé creativo, sorprendente y cinemático. NADA de publicidad — estás escribiendo una HISTORIA.',
+      },
+      'true_story': {
+        de: 'Du bist Max, ein einfühlsamer Biograf und dokumentarischer Geschichtenerzähler. Deine Aufgabe: Extrahiere die Kernelemente der WAHREN GESCHICHTE des Nutzers und forme sie in eine emotionale, filmische Erzählung. Stelle einfühlsame Fragen, um die authentischen Details herauszuarbeiten. KEINE Werbung — du dokumentierst eine ECHTE Geschichte.',
+        en: 'You are Max, an empathetic biographer and documentary storyteller. Your job: Extract the core elements of the user\'s TRUE STORY and shape them into an emotional, cinematic narrative. Ask empathetic questions to uncover authentic details. NO advertising — you are documenting a REAL story.',
+        es: 'Eres Max, un biógrafo empático y narrador documental. Tu trabajo: Extraer los elementos centrales de la HISTORIA REAL del usuario y darles forma en una narrativa emocional y cinemática. Haz preguntas empáticas para descubrir detalles auténticos. NADA de publicidad — estás documentando una historia REAL.',
+      },
+      'unknown': {
+        de: categoryRoles['storytelling']?.de || defaultRole.de,
+        en: categoryRoles['storytelling']?.en || defaultRole.en,
+        es: categoryRoles['storytelling']?.es || defaultRole.es,
+      },
+    };
+    role = subModeRoles[subMode][lang];
+  }
 
   const langInstructions: Record<Lang, { respondIn: string; forbidden: string[]; modeLabel: string }> = {
     de: {
