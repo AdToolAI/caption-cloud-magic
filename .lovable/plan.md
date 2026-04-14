@@ -1,56 +1,41 @@
 
-Ziel: Der News Radar soll nicht mehr wie ein einzelner SocialBee-Feed wirken, sondern jede Stunde breit gefächerte, neue und wirklich nützliche News rund um Social-Media-Management liefern. Außerdem soll der obere “Tipp des Tages” live statt statisch sein.
 
-Was ich bestätigt habe
-- Der aktuell gecachte Feed ist tatsächlich einseitig: 8 Meldungen, davon 7 mit Quelle `SocialBee`, fast alles Kategorie `social`.
-- `fetch-news-radar` erzwingt aktuell keine Quellen- oder Themenvielfalt und übernimmt `source` direkt aus dem Modell-Output.
-- Dashboard-Ticker und Trend-Radar rufen den Feed immer mit `language: 'en'` ab.
-- Der Bereich `Tipp des Tages` auf der Startseite ist kein Live-Feed, sondern ein fixer Übersetzungsstring.
+## Plan: Meta-Metriken auf neue API umstellen (Deprecation Juni 2026)
 
-Umsetzung
-1. Backend für Vielfalt und Relevanz umbauen
-- `supabase/functions/fetch-news-radar/index.ts` auf strukturierte Ausgabe erweitern: `headline`, `category`, `source`, `url`, `platform`, `takeaway`.
-- Prompt auf feste News-Buckets umstellen: Plattform-Updates, AI/Tools, Analytics, Monetarisierung/E-Commerce, Community/Customer Care.
-- Harte Regeln einbauen: max. 2 Meldungen pro Quelle, max. 2 pro Plattform, mehrere Kategorien verpflichtend.
-- Quellen aus echten URLs/Citations ableiten statt blind dem Textfeld `source` zu vertrauen.
-- Wenn die Antwort zu einseitig ist, automatisch einmal mit Korrekturprompt neu anfragen und nur gute Ergebnisse cachen.
+### Was passiert
+Meta entfernt bis 30. Juni 2026 die Metriken `post_impressions`, `post_impressions_unique`, `page_impressions` und `impressions` (Instagram). Diese werden durch `post_total_media_view`, `post_total_media_view_unique`, `page_media_view` etc. ersetzt.
 
-2. Stündliche Erneuerung sauber machen
-- Cache nicht mehr als rollende 60-Minuten-Frist behandeln, sondern pro Stundenfenster neu erzeugen.
-- Zusätzlich zuletzt überrepräsentierte Quellen/Domains als “avoid overuse” in die nächste Stunde mitgeben, damit nicht wieder dieselben Seiten dominieren.
+### Betroffene Dateien (5 Edge Functions)
 
-3. UI auf einen gemeinsamen Live-Feed umstellen
-- Gemeinsamen Fetch-Helfer/Hook für News Radar anlegen, damit Home, Dashboard-Ticker und Trend-Radar dieselbe Logik nutzen.
-- Die aktuelle App-Sprache statt festem `'en'` an die Funktion übergeben.
-- Im Ticker echte Quellen anzeigen und optional auf Originalartikel verlinken.
+| Datei | Alte Metrik | Neue Metrik |
+|-------|------------|-------------|
+| `facebook-page-sync/index.ts` | `post_impressions`, `post_impressions_unique`, `page_impressions` | `post_total_media_view`, `post_total_media_view_unique`, `page_media_view` |
+| `sync-posts-history/index.ts` | `post_impressions`, `post_impressions_unique` (FB), `impressions` (IG) | `post_total_media_view`, `post_total_media_view_unique` (FB), `ig_reels_aggregated_all_plays_count` oder `views` (IG) |
+| `fetch-analytics/index.ts` | `post_impressions`, `impressions` | `post_total_media_view`, neue IG-Metriken |
+| `sync-social-posts/index.ts` | `post_impressions`, `post_impressions_unique` | `post_total_media_view`, `post_total_media_view_unique` |
+| `sync-social-posts-v2/index.ts` | `impressions`, `reach` (IG) | neue IG-Metriken |
 
-4. “Tipp des Tages” live machen
-- In `src/pages/Home.tsx` den statischen Text durch ein Live-Element aus dem News-Feed ersetzen:
-  - entweder als “Top Insight des Tages” aus `takeaway`
-  - oder als wichtigste Headline mit Quelle.
-- So wird auch dieser Bereich breitgefächert, innovativ und aktuell.
+### Ansatz: Fallback-Strategie (keine Verbindungen stören)
 
-Fallback
-- Wenn die externe News-Antwort wieder zu generisch oder zu einseitig ist, nicht mehr stumpf cachen.
-- Stattdessen ein kuratierter Multi-Source-Fallback mit gemischten Kategorien.
+Statt hart umzuschalten, wird jede Funktion **zuerst die neue Metrik** abfragen. Falls die API einen Fehler zurückgibt (z.B. weil Meta die neuen Metriken noch nicht für alle Seiten aktiviert hat), fällt sie **automatisch auf die alte Metrik zurück**. So funktioniert alles sofort und bricht nichts.
 
-Betroffene Dateien
-- `supabase/functions/fetch-news-radar/index.ts`
-- `src/components/dashboard/NewsTicker.tsx`
-- `src/pages/TrendRadar.tsx`
-- `src/pages/Home.tsx`
-- neu: gemeinsamer Helfer wie `src/hooks/useNewsRadar.ts` oder `src/lib/newsRadar.ts`
+```text
+try neue Metrik (post_total_media_view)
+  → Erfolg → verwenden
+catch
+  → try alte Metrik (post_impressions)
+    → Erfolg → verwenden
+    → Fehler → 0
+```
 
-Technische Details
-- Keine DB-Migration nötig: `news_radar_cache.news_json` ist bereits `jsonb` und kann reichere News-Objekte speichern.
-- Qualitätschecks vor dem Cachen:
-  - mindestens 5 unterschiedliche Quellen
-  - mindestens 3 Kategorien
-  - keine Quelle öfter als 2x
-  - keine Plattform öfter als 2x
+### Was sich NICHT ändert
+- Keine DB-Migration nötig — die Spalten `impressions` und `reach` in `post_metrics` / `fb_page_daily` bleiben gleich, nur die Datenquelle ändert sich
+- Keine OAuth-Änderungen — die bestehenden Permissions reichen für die neuen Metriken
+- Keine UI-Änderungen — die Anzeige bleibt identisch
+- Graph API Version wird auf `v24.0` vereinheitlicht (einige nutzen noch v18.0/v21.0)
 
-Abnahme
-- Der Ticker zeigt nicht mehr fast nur `SocialBee`, sondern mehrere echte Quellen.
-- Der Feed enthält gemischte Themen rund um Social-Media-Management, nicht nur Instagram/UI-News.
-- Der obere “Tipp des Tages” ist live und wechselt mit dem News-Feed.
-- Die Inhalte erneuern sich pro Stunde nachvollziehbar.
+### Technische Details
+- Alle `graphGet`/`fetch`-Aufrufe werden auf die neuen Metrik-Namen umgestellt
+- Jeder Insights-Abruf bekommt einen try/catch-Fallback auf die alten Namen
+- API-Version wird konsistent auf v24.0 gesetzt
+
