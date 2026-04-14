@@ -20,110 +20,6 @@ const CATEGORIES = [
   { key: "strategy", label: "Digital Marketing Strategy & Growth Tactics" },
 ];
 
-// ──────────────────────────────────────────────────────────────
-// STEP 1: Generate article content (no URLs — AI hallucinates them)
-// ──────────────────────────────────────────────────────────────
-
-function getContentPrompt(lang: string) {
-  const categoryList = CATEGORIES.map((c) => `- ${c.key}: ${c.label}`).join("\n");
-
-  if (lang === "de") {
-    return {
-      systemPrompt: `Du bist ein professioneller Nachrichten-Kurator für Social Media Marketing im DACH-Raum.
-
-REGELN:
-- Antworte AUSSCHLIESSLICH mit einem gültigen JSON-Array
-- KEIN Markdown, KEINE Erklärungen, NUR das JSON-Array
-- Alle Inhalte MÜSSEN auf Deutsch sein
-- Jeder Artikel MUSS eine ANDERE, EINZIGARTIGE Quelle haben
-- Verwende NUR echte, heute tatsächlich erschienene Nachrichtenartikel
-- Erfinde KEINE Artikel oder Überschriften`,
-      userPrompt: `Recherchiere ${BATCH_SIZE} aktuelle deutschsprachige Nachrichten von HEUTE aus diesen Kategorien:
-
-${categoryList}
-
-QUELLEN (verwende VERSCHIEDENE Quellen für jeden Artikel):
-t3n, OMR, Horizont, W&V, OnlineMarketing.de, AllFacebook.de, Meedia, Absatzwirtschaft, Internet World Business, Golem.de, Heise, CHIP, Gründerszene
-
-Für jeden Artikel:
-- headline: Deutsche Überschrift (max 120 Zeichen) — muss eine ECHTE Überschrift sein, die heute publiziert wurde
-- summary: Deutsche Zusammenfassung (2-3 Sätze)
-- category: Kategorie-Key von oben
-- source: Name der Quelle (z.B. "t3n", "OMR") — JEDER Artikel braucht eine ANDERE Quelle
-
-WICHTIG: Generiere KEINE source_url. Erfinde KEINE URLs. Gib NUR headline, summary, category und source zurück.
-
-Antworte NUR mit dem JSON-Array:
-[{"headline":"...","summary":"...","category":"...","source":"..."}]`,
-    };
-  }
-
-  if (lang === "es") {
-    return {
-      systemPrompt: `Eres un curador profesional de noticias de marketing en redes sociales para el mercado hispanohablante.
-
-REGLAS:
-- Responde EXCLUSIVAMENTE con un array JSON válido
-- SIN markdown, SIN explicaciones, SOLO el array JSON
-- Todo el contenido DEBE estar en español
-- Cada artículo DEBE tener una fuente DIFERENTE y ÚNICA
-- Usa SOLO artículos reales publicados hoy
-- NO inventes artículos ni titulares`,
-      userPrompt: `Investiga ${BATCH_SIZE} noticias actuales en español de HOY sobre estas categorías:
-
-${categoryList}
-
-FUENTES (usa fuentes DIFERENTES para cada artículo):
-Marketing4eCommerce, Reason Why, PuroMarketing, MarketingDirecto, TreceBits, Merca2.0, Genbeta, Xataka, Hipertextual, El Publicista, IPMARK, Brandemia
-
-Para cada artículo:
-- headline: Titular en español (máx 120 caracteres) — debe ser un titular REAL publicado hoy
-- summary: Resumen en español (2-3 frases)
-- category: Clave de categoría de arriba
-- source: Nombre de la fuente (ej. "Xataka") — cada artículo necesita una fuente DIFERENTE
-
-IMPORTANTE: NO generes source_url. NO inventes URLs. Devuelve SOLO headline, summary, category y source.
-
-Responde SOLO con el array JSON:
-[{"headline":"...","summary":"...","category":"...","source":"..."}]`,
-    };
-  }
-
-  // English
-  return {
-    systemPrompt: `You are a professional social media marketing news curator.
-
-RULES:
-- Respond EXCLUSIVELY with a valid JSON array
-- NO markdown, NO explanations, ONLY the JSON array
-- All content MUST be in English
-- Each article MUST have a DIFFERENT, UNIQUE source
-- Use ONLY real news articles actually published today
-- Do NOT invent articles or headlines`,
-    userPrompt: `Research ${BATCH_SIZE} current English-language news articles from TODAY covering these categories:
-
-${categoryList}
-
-SOURCES (use DIFFERENT sources for each article):
-TechCrunch, Social Media Today, The Verge, Adweek, Marketing Land, Search Engine Journal, HubSpot Blog, Buffer Blog, Sprout Social Insights, Hootsuite Blog, Later Blog, Mashable, Digiday, AdAge
-
-For each article:
-- headline: Concise headline (max 120 chars) — must be a REAL headline published today
-- summary: Detailed summary (2-3 sentences)
-- category: Category key from above
-- source: Source name (e.g. "TechCrunch") — each article needs a DIFFERENT source
-
-IMPORTANT: Do NOT generate source_url. Do NOT invent URLs. Return ONLY headline, summary, category, and source.
-
-Return ONLY the JSON array:
-[{"headline":"...","summary":"...","category":"...","source":"..."}]`,
-  };
-}
-
-// ──────────────────────────────────────────────────────────────
-// STEP 2: Find real URLs via Perplexity Search API
-// ──────────────────────────────────────────────────────────────
-
 // Source name → domain mapping for validation
 const SOURCE_DOMAINS: Record<string, string[]> = {
   "t3n": ["t3n.de"],
@@ -141,7 +37,6 @@ const SOURCE_DOMAINS: Record<string, string[]> = {
   "gründerszene": ["gruenderszene.de"],
   "gruenderszene": ["gruenderszene.de"],
   "absatzwirtschaft": ["absatzwirtschaft.de"],
-  "internetworldbusiness": ["internetworld.de"],
   "techcrunch": ["techcrunch.com"],
   "socialmediatoday": ["socialmediatoday.com"],
   "social media today": ["socialmediatoday.com"],
@@ -194,99 +89,107 @@ function domainMatchesSource(url: string, sourceName: string): boolean {
   const sourceLC = sourceName.toLowerCase().trim();
   const domains = SOURCE_DOMAINS[sourceLC];
   if (!domains) {
-    // Fallback: check if source name appears in URL
     return url.toLowerCase().includes(sourceLC.replace(/\s+/g, "").replace(/\./g, ""));
   }
-  const urlLC = url.toLowerCase();
-  return domains.some((d) => urlLC.includes(d));
+  return domains.some((d) => url.toLowerCase().includes(d));
 }
 
-async function findRealUrl(
-  headline: string,
-  sourceName: string,
-  apiKey: string
-): Promise<string | null> {
-  try {
-    // Build a targeted search query
-    const sourceLC = sourceName.toLowerCase().trim();
-    const domains = SOURCE_DOMAINS[sourceLC];
-    
-    // Use site: filter if we know the domain
-    let searchQuery: string;
-    if (domains && domains.length > 0) {
-      searchQuery = `site:${domains[0]} ${headline}`;
-    } else {
-      searchQuery = `${sourceName} ${headline}`;
-    }
+function getPrompt(lang: string) {
+  const categoryList = CATEGORIES.map((c) => `- ${c.key}: ${c.label}`).join("\n");
 
-    const response = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "sonar",
-        messages: [
-          {
-            role: "system",
-            content: "You are a URL finder. Given a headline and source, find the exact article URL. Return ONLY the URL, nothing else. If you cannot find the exact article, return 'NOT_FOUND'.",
-          },
-          {
-            role: "user",
-            content: `Find the exact URL for this article:\nSource: ${sourceName}\nHeadline: ${headline}\n\nReturn ONLY the direct article URL (not the homepage).`,
-          },
-        ],
-        temperature: 0.1,
-        max_tokens: 200,
-        search_recency_filter: "week",
-        search_domain_filter: domains && domains.length > 0 ? domains.slice(0, 3) : undefined,
-      }),
-    });
+  // The key insight: we ask Perplexity to embed citation references [1], [2] in its text.
+  // Perplexity's citations array contains the REAL URLs it found during search.
+  // We map [N] references to citations[N-1] and validate domain matches.
 
-    if (!response.ok) {
-      console.warn(`URL search failed for "${headline}": ${response.status}`);
-      return null;
-    }
+  if (lang === "de") {
+    return {
+      systemPrompt: `Du bist ein Nachrichten-Kurator für Social Media Marketing. Deine Aufgabe: ECHTE, AKTUELLE Nachrichten von heute als JSON liefern.
 
-    const data = await response.json();
-    const content = (data.choices?.[0]?.message?.content || "").trim();
-    const citations: string[] = data.citations || [];
+REGELN:
+- Antworte AUSSCHLIESSLICH mit einem gültigen JSON-Array
+- KEIN Markdown, KEINE Erklärungen, NUR JSON
+- Alle Inhalte auf DEUTSCH
+- Jeder Artikel braucht eine ANDERE Quelle
+- Verwende Quellenreferenzen [1], [2] etc. im Summary — diese werden den echten Quellen-URLs zugeordnet`,
+      userPrompt: `Finde ${BATCH_SIZE} aktuelle deutschsprachige Nachrichten von HEUTE:
 
-    // Strategy 1: Check if the response content is a valid URL
-    if (content && content.startsWith("http") && !content.includes(" ") && content !== "NOT_FOUND") {
-      const url = content.split("\n")[0].trim();
-      if (!isRootUrl(url) && domainMatchesSource(url, sourceName)) {
-        return url;
-      }
-    }
+Kategorien:
+${categoryList}
 
-    // Strategy 2: Check citations for a matching domain
-    for (const citation of citations) {
-      if (!isRootUrl(citation) && domainMatchesSource(citation, sourceName)) {
-        return citation;
-      }
-    }
+Quellen (VERSCHIEDENE pro Artikel): t3n, OMR, Horizont, W&V, OnlineMarketing.de, AllFacebook.de, Meedia, Golem.de, Heise, CHIP, Gründerszene
 
-    // Strategy 3: Return the first non-root citation even if domain doesn't match source
-    // (better than nothing, but only if it's a real article page)
-    for (const citation of citations) {
-      if (!isRootUrl(citation)) {
-        console.warn(`Using non-matching citation for "${sourceName}": ${citation}`);
-        return citation;
-      }
-    }
+Für jeden Artikel:
+- headline: Deutsche Überschrift (max 120 Zeichen)
+- summary: 2-3 Sätze, mit Quellenreferenz [N] am Ende (z.B. "... berichtet t3n. [1]")
+- category: Key von oben
+- source: Quellenname (z.B. "t3n")
 
-    return null;
-  } catch (err) {
-    console.warn(`Error finding URL for "${headline}":`, err);
-    return null;
+WICHTIG: Die [N]-Referenzen im Summary MÜSSEN den echten Quellen entsprechen, von denen du die Info hast. Verwende für jeden Artikel eine ANDERE Referenznummer.
+
+JSON-Array:
+[{"headline":"...","summary":"... [1]","category":"...","source":"..."}]`,
+    };
   }
-}
 
-// ──────────────────────────────────────────────────────────────
-// Pexels image fetching
-// ──────────────────────────────────────────────────────────────
+  if (lang === "es") {
+    return {
+      systemPrompt: `Eres un curador de noticias de marketing en redes sociales. Tu tarea: entregar noticias REALES y ACTUALES de hoy como JSON.
+
+REGLAS:
+- Responde EXCLUSIVAMENTE con un array JSON válido
+- SIN markdown, SIN explicaciones, SOLO JSON
+- Todo en ESPAÑOL
+- Cada artículo necesita una fuente DIFERENTE
+- Usa referencias [1], [2] etc. en el resumen — estas se mapean a las URLs reales`,
+      userPrompt: `Encuentra ${BATCH_SIZE} noticias actuales en español de HOY:
+
+Categorías:
+${categoryList}
+
+Fuentes (DIFERENTES por artículo): Marketing4eCommerce, Reason Why, PuroMarketing, MarketingDirecto, TreceBits, Merca2.0, Genbeta, Xataka, Hipertextual, El Publicista, IPMARK, Brandemia
+
+Para cada artículo:
+- headline: Titular en español (máx 120 caracteres)
+- summary: 2-3 frases, con referencia [N] al final (ej. "... según Xataka. [1]")
+- category: Clave de arriba
+- source: Nombre de la fuente (ej. "Xataka")
+
+IMPORTANTE: Las referencias [N] DEBEN corresponder a las fuentes reales. Usa un número DIFERENTE para cada artículo.
+
+Array JSON:
+[{"headline":"...","summary":"... [1]","category":"...","source":"..."}]`,
+    };
+  }
+
+  // English
+  return {
+    systemPrompt: `You are a social media marketing news curator. Your task: deliver REAL, CURRENT news from today as JSON.
+
+RULES:
+- Respond EXCLUSIVELY with a valid JSON array
+- NO markdown, NO explanations, ONLY JSON
+- All content in ENGLISH
+- Each article needs a DIFFERENT source
+- Use source references [1], [2] etc. in the summary — these map to real source URLs`,
+    userPrompt: `Find ${BATCH_SIZE} current English-language news from TODAY:
+
+Categories:
+${categoryList}
+
+Sources (DIFFERENT per article): TechCrunch, Social Media Today, The Verge, Adweek, Search Engine Journal, HubSpot Blog, Buffer Blog, Sprout Social, Hootsuite Blog, Later Blog, Mashable, Digiday, AdAge
+
+For each article:
+- headline: Concise headline (max 120 chars)
+- summary: 2-3 sentences, with source reference [N] at the end (e.g. "... reports TechCrunch. [1]")
+- category: Key from above
+- source: Source name (e.g. "TechCrunch")
+
+IMPORTANT: The [N] references MUST correspond to the real sources. Use a DIFFERENT reference number for each article.
+
+JSON array:
+[{"headline":"...","summary":"... [1]","category":"...","source":"..."}]`,
+  };
+}
 
 async function fetchPexelsImage(query: string, apiKey: string): Promise<string | null> {
   try {
@@ -310,9 +213,57 @@ async function fetchPexelsImage(query: string, apiKey: string): Promise<string |
   }
 }
 
-// ──────────────────────────────────────────────────────────────
-// Main handler
-// ──────────────────────────────────────────────────────────────
+/**
+ * Resolve the best URL for an article using citations from Perplexity.
+ * 
+ * Strategy (in order of preference):
+ * 1. Extract [N] reference from summary → use citations[N-1] if domain matches source
+ * 2. Find any citation whose domain matches the source name
+ * 3. Extract [N] reference → use citations[N-1] even without domain match (it's from Perplexity's search)
+ * 4. null (no URL rather than a wrong one)
+ */
+function resolveUrl(
+  article: { summary?: string; source?: string },
+  citations: string[],
+  usedUrls: Set<string>
+): string | null {
+  const sourceName = (article.source || "").toLowerCase().trim();
+  
+  // Extract reference numbers from summary
+  const refMatches = (article.summary || "").match(/\[(\d+)\]/g);
+  const refIndices = (refMatches || [])
+    .map((r) => parseInt(r.replace(/[\[\]]/g, ""), 10) - 1)
+    .filter((i) => i >= 0 && i < citations.length);
+
+  // Strategy 1: Referenced citation with matching domain
+  for (const idx of refIndices) {
+    const url = citations[idx];
+    if (url && !isRootUrl(url) && !usedUrls.has(url) && domainMatchesSource(url, sourceName)) {
+      usedUrls.add(url);
+      return url;
+    }
+  }
+
+  // Strategy 2: Any citation matching the source domain
+  for (const url of citations) {
+    if (!isRootUrl(url) && !usedUrls.has(url) && domainMatchesSource(url, sourceName)) {
+      usedUrls.add(url);
+      return url;
+    }
+  }
+
+  // Strategy 3: Referenced citation (even without domain match — Perplexity found it via search)
+  for (const idx of refIndices) {
+    const url = citations[idx];
+    if (url && !isRootUrl(url) && !usedUrls.has(url)) {
+      usedUrls.add(url);
+      return url;
+    }
+  }
+
+  // No reliable URL found — return null instead of a wrong link
+  return null;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -329,7 +280,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Parse body
     let language = "de";
     let forceRefresh = false;
     try {
@@ -341,12 +291,12 @@ serve(async (req) => {
         forceRefresh = true;
       }
     } catch {
-      // No body or invalid JSON
+      // defaults
     }
 
-    console.log(`Fetching news for language: ${language}, force: ${forceRefresh}`);
+    console.log(`[news-hub] lang=${language} force=${forceRefresh}`);
 
-    // Check cache PER LANGUAGE (skip if force refresh)
+    // Cache check (skip if force)
     if (!forceRefresh) {
       const { data: latestArticle } = await supabase
         .from("news_hub_articles")
@@ -359,7 +309,7 @@ serve(async (req) => {
       if (latestArticle) {
         const hoursSince = (Date.now() - new Date(latestArticle.created_at).getTime()) / (1000 * 60 * 60);
         if (hoursSince < CACHE_TTL_HOURS) {
-          // Backfill missing images
+          // Backfill images
           if (PEXELS_API_KEY) {
             const { data: noImage } = await supabase
               .from("news_hub_articles")
@@ -379,14 +329,14 @@ serve(async (req) => {
           }
 
           return new Response(
-            JSON.stringify({ status: "cached", language, message: `Last fetch was ${hoursSince.toFixed(1)}h ago.` }),
+            JSON.stringify({ status: "cached", language, message: `Cache valid (${hoursSince.toFixed(1)}h)` }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
       }
     }
 
-    // Dedup against existing headlines
+    // Dedup
     const { data: recentArticles } = await supabase
       .from("news_hub_articles")
       .select("headline")
@@ -396,10 +346,9 @@ serve(async (req) => {
 
     const existingHeadlines = (recentArticles || []).map((a) => a.headline.toLowerCase());
 
-    // ─── STEP 1: Generate article content (no URLs) ───
-    const { systemPrompt, userPrompt } = getContentPrompt(language);
+    // Single Perplexity call for content + citations
+    const { systemPrompt, userPrompt } = getPrompt(language);
 
-    console.log("Step 1: Generating article content...");
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
       headers: {
@@ -420,74 +369,57 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Perplexity API error [${response.status}]: ${errorText}`);
+      throw new Error(`Perplexity error [${response.status}]: ${errorText}`);
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
+    const citations: string[] = data.citations || [];
+
+    console.log(`[news-hub] ${citations.length} citations received`);
+    console.log(`[news-hub] citations:`, JSON.stringify(citations.slice(0, 10)));
 
     // Parse JSON
     let articles: any[];
     try {
       const jsonMatch = content.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) throw new Error("No JSON array found");
+      if (!jsonMatch) throw new Error("No JSON array found in response");
       articles = JSON.parse(jsonMatch[0]);
     } catch (e) {
-      console.error("Failed to parse response:", content);
-      throw new Error("Failed to parse Perplexity response as JSON");
+      console.error("[news-hub] Parse error. Content:", content.slice(0, 500));
+      throw new Error("Failed to parse response as JSON");
     }
 
     const batchId = crypto.randomUUID();
     const validCategories = CATEGORIES.map((c) => c.key);
 
-    // Filter duplicates and invalid
-    const filteredArticles = articles.filter((a: any) => {
+    // Filter
+    const filtered = articles.filter((a: any) => {
       if (!a.headline || !a.category) return false;
       if (!validCategories.includes(a.category)) return false;
       if (existingHeadlines.includes(a.headline.toLowerCase())) return false;
       return true;
     });
 
-    console.log(`Step 1 complete: ${filteredArticles.length} valid articles from ${articles.length} total`);
+    console.log(`[news-hub] ${filtered.length}/${articles.length} articles pass filter`);
 
-    // ─── STEP 2: Find real URLs for each article ───
-    console.log("Step 2: Resolving real URLs...");
+    // Resolve URLs and enrich
     const usedUrls = new Set<string>();
     const newArticles = [];
 
-    for (const a of filteredArticles) {
-      // Find real URL via separate Perplexity search
-      let sourceUrl: string | null = null;
-      
-      try {
-        sourceUrl = await findRealUrl(a.headline, a.source || "", PERPLEXITY_API_KEY);
-      } catch (err) {
-        console.warn(`URL resolution failed for "${a.headline}":`, err);
-      }
+    for (const a of filtered) {
+      const sourceUrl = resolveUrl(a, citations, usedUrls);
 
-      // Validate: no duplicates, no root URLs, domain must match
-      if (sourceUrl) {
-        if (usedUrls.has(sourceUrl)) {
-          console.warn(`Duplicate URL detected, discarding: ${sourceUrl}`);
-          sourceUrl = null;
-        } else if (isRootUrl(sourceUrl)) {
-          console.warn(`Root URL detected, discarding: ${sourceUrl}`);
-          sourceUrl = null;
-        } else {
-          usedUrls.add(sourceUrl);
-        }
-      }
-
-      // Fetch Pexels image
+      // Pexels image
       let imageUrl: string | null = null;
       if (PEXELS_API_KEY) {
         imageUrl = await fetchPexelsImage(a.headline, PEXELS_API_KEY);
       }
 
-      // YouTube search link
+      // YouTube search
       const videoUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(a.headline)}`;
 
-      // Clean summary of any citation brackets
+      // Clean summary
       const cleanSummary = a.summary?.replace(/\s*\[\d+\]/g, "").trim() || null;
 
       newArticles.push({
@@ -504,17 +436,18 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Step 2 complete: ${newArticles.filter(a => a.source_url).length}/${newArticles.length} articles have verified URLs`);
+    const withUrls = newArticles.filter((a) => a.source_url).length;
+    console.log(`[news-hub] ${withUrls}/${newArticles.length} have verified URLs`);
 
     if (newArticles.length > 0) {
       const { error: insertError } = await supabase
         .from("news_hub_articles")
         .insert(newArticles);
 
-      if (insertError) throw new Error(`Insert error: ${insertError.message}`);
+      if (insertError) throw new Error(`Insert: ${insertError.message}`);
     }
 
-    // Cleanup old articles PER LANGUAGE
+    // Cleanup old
     const { data: allArticles } = await supabase
       .from("news_hub_articles")
       .select("id")
@@ -526,14 +459,14 @@ serve(async (req) => {
       await supabase.from("news_hub_articles").delete().in("id", idsToDelete);
     }
 
-    console.log(`Successfully inserted ${newArticles.length} articles for ${language}`);
+    console.log(`[news-hub] Done: ${newArticles.length} inserted for ${language}`);
 
     return new Response(
-      JSON.stringify({ status: "success", language, inserted: newArticles.length, batch_id: batchId }),
+      JSON.stringify({ status: "success", language, inserted: newArticles.length, withUrls, batch_id: batchId }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("fetch-news-hub error:", error);
+    console.error("[news-hub] Error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
