@@ -557,68 +557,11 @@ const Home = () => {
 
       {user && <NewsTicker />}
 
-      <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
+      <div className="container mx-auto px-4 py-4 max-w-7xl space-y-4">
         {/* Hero Banner */}
         {user && (
           <DashboardVideoCarousel quickActions={quickActions} />
         )}
-
-        {/* Nächster Post Section */}
-        {user && (() => {
-          const next = getNextPost();
-          return (
-            <Section title={t("homePage.nextPost")} description={t("homePage.nextScheduledPost")} bg="muted">
-              <Card className="rounded-2xl shadow-soft">
-                <CardContent className="p-6">
-                  {!next ? (
-                    <div className="text-center py-12">
-                      <CalendarIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">{t("dashboard.emptyState.noPosts")}</h3>
-                      <p className="text-sm text-muted-foreground mb-4">{t("dashboard.emptyState.createNow")}</p>
-                      <Button asChild>
-                        <Link to="/calendar">
-                          <Plus className="h-4 w-4 mr-2" />
-                          {t("homePage.scheduleNewPost")}
-                        </Link>
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex items-start gap-4 p-4 bg-background rounded-xl border border-border">
-                      <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                        {next.post.mediaUrl ? (
-                          <img src={next.post.mediaUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <StatusPill status={(next.post.status as any) || "draft"} />
-                          {next.post.platform && (
-                            <PlatformBadge platform={next.post.platform as any} />
-                          )}
-                        </div>
-                        <p className="text-sm font-medium line-clamp-3">{next.post.contentIdea || next.post.caption || t("homePage.noDescription")}</p>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          <Clock className="h-3 w-3 inline mr-1" />
-                          {(() => {
-                            const d = new Date(next.date);
-                            const dd = String(d.getDate()).padStart(2, '0');
-                            const mm = String(d.getMonth() + 1).padStart(2, '0');
-                            const yyyy = d.getFullYear();
-                            return `${dd}.${mm}.${yyyy} ${next.post.suggestedTime || "12:00"}`;
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </Section>
-          );
-        })()}
 
         {/* Week Calendar */}
         {user && (
@@ -633,7 +576,7 @@ const Home = () => {
               </Button>
             }
           >
-            <div className="flex items-start gap-2 overflow-x-auto pb-4 justify-between">
+            <div className="flex items-start gap-2 overflow-x-auto pb-2 justify-between">
               {weekDays.map(day => (
                 <WeekTimelineDay
                   key={day.date}
