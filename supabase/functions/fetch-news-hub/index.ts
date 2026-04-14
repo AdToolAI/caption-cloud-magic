@@ -220,21 +220,14 @@ function resolveUrl(
     }
   }
 
-  // Strategy 3: Referenced citation even without domain match
-  for (const idx of refIndices) {
-    const url = citations[idx];
-    if (url && !isRootUrl(url) && !usedUrls.has(url)) {
-      usedUrls.add(url);
-      return url;
-    }
-  }
-
-  // Strategy 4: Any unused non-root citation
-  for (const url of citations) {
-    if (!isRootUrl(url) && !usedUrls.has(url)) {
-      usedUrls.add(url);
-      return url;
-    }
+  // Fallback: Google search link targeting the source domain
+  const sourceLC = sourceName.replace(/\s+/g, "").replace(/\./g, "");
+  const domains = SOURCE_DOMAINS[sourceName];
+  const domain = domains?.[0] || (sourceLC.length > 2 ? `${sourceLC}.com` : null);
+  if (domain && article.summary) {
+    const headlineWords = (article.summary || "").replace(/\[.*?\]/g, "").trim().split(/\s+/).slice(0, 6).join(" ");
+    const fallback = `https://www.google.com/search?q=site:${domain}+${encodeURIComponent(headlineWords)}`;
+    return fallback;
   }
 
   return null;
