@@ -1,41 +1,27 @@
 
 
-## Plan: Meta-Metriken auf neue API umstellen (Deprecation Juni 2026)
+## Plan: Horizontalen Overflow auf der Startseite beheben
 
-### Was passiert
-Meta entfernt bis 30. Juni 2026 die Metriken `post_impressions`, `post_impressions_unique`, `page_impressions` und `impressions` (Instagram). Diese werden durch `post_total_media_view`, `post_total_media_view_unique`, `page_media_view` etc. ersetzt.
+### Problem
+Die Seite kann horizontal gescrollt werden. Mehrere Ursachen:
 
-### Betroffene Dateien (5 Edge Functions)
+1. **Kein `overflow-x-hidden` auf dem Root-Container** — der äußere `div` in Home.tsx hat nur `min-h-screen bg-background`, lässt aber seitliches Überlaufen zu.
+2. **Video-Carousel mit negativen Margins** — die 3D-Karussell-Karten nutzen `marginLeft: '-32px'` und `marginRight: '-32px'`, was über den Container hinausragen kann.
+3. **News-Ticker Marquee** — die doppelte Scroll-Animation mit `whitespace-nowrap` kann über die Seitenbreite hinausreichen, ist aber in `overflow-hidden` — sollte ok sein.
+4. **CreditBalance-Karte** — wird als vollständige Card im Status-Bar gerendert, was unnötig breit ist (das ist eher ein Platzproblem als Overflow, aber trägt zur Gesamtbreite bei).
 
-| Datei | Alte Metrik | Neue Metrik |
-|-------|------------|-------------|
-| `facebook-page-sync/index.ts` | `post_impressions`, `post_impressions_unique`, `page_impressions` | `post_total_media_view`, `post_total_media_view_unique`, `page_media_view` |
-| `sync-posts-history/index.ts` | `post_impressions`, `post_impressions_unique` (FB), `impressions` (IG) | `post_total_media_view`, `post_total_media_view_unique` (FB), `ig_reels_aggregated_all_plays_count` oder `views` (IG) |
-| `fetch-analytics/index.ts` | `post_impressions`, `impressions` | `post_total_media_view`, neue IG-Metriken |
-| `sync-social-posts/index.ts` | `post_impressions`, `post_impressions_unique` | `post_total_media_view`, `post_total_media_view_unique` |
-| `sync-social-posts-v2/index.ts` | `impressions`, `reach` (IG) | neue IG-Metriken |
+### Lösung
 
-### Ansatz: Fallback-Strategie (keine Verbindungen stören)
+**`src/pages/Home.tsx`** (Zeile 491):
+- `overflow-x-hidden` zum Root-Container hinzufügen: `<div className="min-h-screen bg-background overflow-x-hidden">`
 
-Statt hart umzuschalten, wird jede Funktion **zuerst die neue Metrik** abfragen. Falls die API einen Fehler zurückgibt (z.B. weil Meta die neuen Metriken noch nicht für alle Seiten aktiviert hat), fällt sie **automatisch auf die alte Metrik zurück**. So funktioniert alles sofort und bricht nichts.
+**`src/components/dashboard/DashboardVideoCarousel.tsx`**:
+- Den äußeren Carousel-Container ebenfalls mit `overflow-hidden` absichern, damit die negativen Margins nicht über den Seitenrand ragen.
 
-```text
-try neue Metrik (post_total_media_view)
-  → Erfolg → verwenden
-catch
-  → try alte Metrik (post_impressions)
-    → Erfolg → verwenden
-    → Fehler → 0
-```
+### Betroffene Dateien
+- `src/pages/Home.tsx` — 1 Zeile ändern
+- `src/components/dashboard/DashboardVideoCarousel.tsx` — `overflow-hidden` auf den Perspective-Container
 
-### Was sich NICHT ändert
-- Keine DB-Migration nötig — die Spalten `impressions` und `reach` in `post_metrics` / `fb_page_daily` bleiben gleich, nur die Datenquelle ändert sich
-- Keine OAuth-Änderungen — die bestehenden Permissions reichen für die neuen Metriken
-- Keine UI-Änderungen — die Anzeige bleibt identisch
-- Graph API Version wird auf `v24.0` vereinheitlicht (einige nutzen noch v18.0/v21.0)
-
-### Technische Details
-- Alle `graphGet`/`fetch`-Aufrufe werden auf die neuen Metrik-Namen umgestellt
-- Jeder Insights-Abruf bekommt einen try/catch-Fallback auf die alten Namen
-- API-Version wird konsistent auf v24.0 gesetzt
+### Was sich nicht ändert
+- Keine funktionalen Änderungen, keine DB-Migration, kein Redesign
 
