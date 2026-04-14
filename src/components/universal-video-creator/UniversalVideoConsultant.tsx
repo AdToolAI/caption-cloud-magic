@@ -52,11 +52,11 @@ export function UniversalVideoConsultant({
       ? t('uvc.consultantWelcomeFS', { 
           category: categoryInfo?.name || '', 
           phases: String(totalPhases), 
-          question: localizedFirstQuestion 
+          question: firstQuestion 
         })
       : t('uvc.consultantWelcomeManual', { 
           category: categoryInfo?.name || '', 
-          question: localizedFirstQuestion 
+          question: firstQuestion 
         }),
     quickReplies: undefined
   };
