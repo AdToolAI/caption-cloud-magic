@@ -11,17 +11,9 @@ export function useLocalizedVideoCategories(): VideoCategoryInfo[] {
 
   return useMemo(() => {
     const catKeyMap: Record<VideoCategory, string> = {
-      advertisement: 'cat_advertisement',
+      'corporate-ad': 'cat_corporate_ad',
+      'product-ad': 'cat_product_ad',
       storytelling: 'cat_storytelling',
-      tutorial: 'cat_tutorial',
-      'product-video': 'cat_product',
-      corporate: 'cat_corporate',
-      'social-content': 'cat_social',
-      testimonial: 'cat_testimonial',
-      explainer: 'cat_explainer',
-      event: 'cat_event',
-      promo: 'cat_promo',
-      presentation: 'cat_presentation',
       custom: 'cat_custom',
     };
 
