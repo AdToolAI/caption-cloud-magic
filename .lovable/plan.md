@@ -1,46 +1,48 @@
 
 
-## Plan: News Hub auf das nächste Level — Bilder, Videos, Suchleiste
+## Plan: News Hub Quellenlinks, Medien & Design-Upgrade
 
-### Was sich ändert
+### Probleme identifiziert
 
-**1. DB-Migration: `news_hub_articles` erweitern**
-- Neue Spalten: `image_url TEXT`, `video_url TEXT`, `video_embed_url TEXT`
-- Diese werden von der Edge Function beim Fetch befüllt
+1. **Quellenlinks**: Perplexity liefert nur Domain-Root-URLs (`socialmediatoday.com`) statt echte Artikel-URLs. Alle "Quelle"-Links führen zur gleichen Seite.
+2. **Bilder/Videos**: Alle `image_url` und `video_url` in der Datenbank sind `null` — Perplexity liefert diese Felder nicht zuverlässig.
+3. **Design**: Ohne Medien wirken die Cards flach und unprofessionell.
 
-**2. Edge Function `fetch-news-hub` erweitern**
-- Perplexity-Prompt anpassen: zusätzlich `image_url` und `video_url` pro Artikel anfordern (Perplexity liefert oft Bild-URLs aus den Quellen mit)
-- Fallback: wenn kein Bild geliefert wird, bleibt `image_url` null — die Card zeigt dann kein Bild (kein Platzhalter)
-- JSON-Schema um die neuen Felder erweitern
+### Lösung
 
-**3. `useNewsHub.ts` — Suchfunktion hinzufügen**
-- Neues State `searchQuery` + `setSearchQuery`
-- Suche nutzt Supabase `ilike` auf `headline` und `summary` Felder
-- Suchbegriff wird mit Kategorie-Filter kombiniert
-- Debounced (300ms) um DB nicht zu überlasten
-- Interface `NewsArticle` um `image_url`, `video_url`, `video_embed_url` erweitern
+**1. Edge Function `fetch-news-hub` — Prompt & Quellen verbessern**
+- Perplexity-Prompt verschärfen: explizit nach **vollständigen Artikel-URLs** verlangen (nicht Domains)
+- Die `citations`-Response von Perplexity nutzen — diese enthalten die echten Quell-URLs und können als Fallback für `source_url` dienen
+- Für Bilder: Nach dem Perplexity-Call einen zweiten Schritt hinzufügen — pro Artikel ein thematisch passendes Bild via **Pexels API** abrufen (kostenlos, hochwertig, passt zum "James Bond 2028"-Stil)
+- Video-URLs: YouTube-Such-Links generieren basierend auf der Headline (`https://www.youtube.com/results?search_query=...`)
 
-**4. `NewsHub.tsx` — Komplett-Redesign der Seite**
+**2. Pexels API für Artikelbilder**
+- Neues Secret: `PEXELS_API_KEY` (kostenlos, https://www.pexels.com/api/)
+- Pro Artikel: `GET https://api.pexels.com/v1/search?query={headline_keywords}&per_page=1`
+- Liefert hochwertige, lizenzfreie Bilder als `image_url`
 
-| Feature | Details |
-|---------|---------|
-| **Suchleiste** | Prominente Suchbar im Header mit Such-Icon, Eingabefeld, Clear-Button. Sucht in Echtzeit über Headlines und Summaries |
-| **Artikelbilder** | Wenn `image_url` vorhanden: Bild oben in der Card als Cover (aspect-ratio 16:9, object-cover). Graceful fallback bei Ladefehlern |
-| **Video-Einbettung** | Wenn `video_url` vorhanden: Play-Button-Overlay auf dem Bild. Klick öffnet Video in einem Modal/Dialog (eingebetteter Player oder externer Link) |
-| **Verbesserte Cards** | Größere Cards mit Bild-Header, reichhaltigerer Darstellung, hover-Effekte |
-| **Hero-Header** | Suchleiste integriert neben dem Aktualisieren-Button |
+**3. Bestehende Artikel aktualisieren**
+- Ein einmaliger Re-Fetch-Mechanismus: beim nächsten Aktualisieren werden Artikel ohne `image_url` nachträglich mit Pexels-Bildern angereichert
+
+**4. NewsHub.tsx — Visuelles Upgrade**
+- **Featured Article**: Der neueste Artikel wird als großer Hero-Card mit Vollbild-Hintergrund dargestellt
+- **Cards mit Gradient-Overlay**: Bilder bekommen ein cineastisches Gradient-Overlay (dunkel nach unten) mit Text darüber
+- **Glassmorphismus-Header**: Der Hero-Bereich bekommt subtile Scanline-Effekte und Glow
+- **Hover-Effekte**: Scale-Transform, Border-Glow, sanftes Bild-Zoom
+- **Video-Badge**: Statt Play-Button ein elegantes "▶ Video" Badge auf der Card
+- **Source-Link-Styling**: Deutlicher als klickbarer Link mit Pfeil-Icon
 
 ### Betroffene Dateien
 
 | Aktion | Datei |
 |--------|-------|
-| Migration | `news_hub_articles` + `image_url`, `video_url`, `video_embed_url` |
-| Edit | `supabase/functions/fetch-news-hub/index.ts` — Prompt + Felder erweitern |
-| Edit | `src/hooks/useNewsHub.ts` — Suchlogik + neue Felder |
-| Edit | `src/pages/NewsHub.tsx` — Suchleiste, Bilder, Video-Modal |
+| Edit | `supabase/functions/fetch-news-hub/index.ts` — Citations nutzen, Pexels-Integration, YouTube-Links |
+| Edit | `src/pages/NewsHub.tsx` — Featured Hero, Glassmorphismus, bessere Cards |
+| Secret | `PEXELS_API_KEY` — muss vom User eingegeben werden |
 
 ### Was sich nicht ändert
-- Kategorie-Filter, Paginierung, Deep-Linking vom Ticker — alles bleibt
+- DB-Schema bleibt (Spalten `image_url`, `video_url` existieren bereits)
+- Hook `useNewsHub.ts` bleibt unverändert
+- Kategorie-Filter, Suche, Deep-Linking bleiben erhalten
 - News Radar Ticker unverändert
-- Keine neuen API-Keys nötig (Perplexity liefert Bild-URLs aus Suchergebnissen)
 
