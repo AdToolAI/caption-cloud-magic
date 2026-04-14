@@ -79,6 +79,7 @@ export function CommandBar({ inline = false }: CommandBarProps) {
     { name: t("nav.integrations"), path: "/instagram-publishing", icon: Share2, category: t("hubs.automatisieren") },
     
     // Andere
+    { name: "News Hub", path: "/news-hub", icon: Newspaper, category: t("commandBar.other") },
     { name: t("header.account"), path: "/account", icon: Settings, category: t("commandBar.other") },
   ];
 
