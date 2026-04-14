@@ -92,12 +92,12 @@ export function useNewsHub() {
     }
   }, [page]);
 
-  // Trigger edge function to refresh news with language
+  // Trigger edge function to refresh news with language + force bypass cache
   const refreshNews = useCallback(async () => {
     setRefreshing(true);
     try {
       await supabase.functions.invoke("fetch-news-hub", {
-        body: { language },
+        body: { language, force: true },
       });
       setPage(0);
       await fetchArticles(true);
