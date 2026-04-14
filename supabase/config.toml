@@ -672,3 +672,7 @@ timeout_sec = 300
 
 [functions.director-cut-burned-subtitles-webhook]
 verify_jwt = false
+
+[functions.fetch-news-hub]
+verify_jwt = false
+timeout_sec = 120
