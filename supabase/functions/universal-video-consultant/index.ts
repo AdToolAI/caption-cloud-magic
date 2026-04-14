@@ -237,8 +237,183 @@ const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
   },
 };
 
-function getBlock1Phases(category: string, lang: Lang): string[] {
+// ═══════════════════════════════════════════════════════════════
+// STORYTELLING SUB-MODE DETECTION & DYNAMIC PHASES
+// ═══════════════════════════════════════════════════════════════
+
+type StorytellingSubMode = 'invented' | 'true_story' | 'unknown';
+
+function detectStorytellingSubMode(messages: any[]): StorytellingSubMode {
+  const allText = messages.map((m: any) => (m.content || '').toLowerCase()).join(' ');
+  
+  const inventKeywords = ['erfind', 'invent', 'inventa', 'ki erfindet', 'ai invents', 'ia inventa', 'fiktiv', 'fiction', 'ficti', 'ausdenken', 'kreiere', 'fantasie', 'fantasy'];
+  const trueKeywords = ['wahr', 'true story', 'real', 'historia real', 'verdadera', 'echt', 'tatsächlich', 'wirklich passiert', 'erlebt', 'experienced', 'happened', 'autobio', 'persönlich', 'personal'];
+  
+  const hasInvent = inventKeywords.some(k => allText.includes(k));
+  const hasTrue = trueKeywords.some(k => allText.includes(k));
+  
+  if (hasInvent && !hasTrue) return 'invented';
+  if (hasTrue && !hasInvent) return 'true_story';
+  if (hasInvent && hasTrue) {
+    // Check last user message for most recent choice
+    const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
+    if (lastUser) {
+      const lastText = lastUser.content.toLowerCase();
+      if (inventKeywords.some(k => lastText.includes(k))) return 'invented';
+      if (trueKeywords.some(k => lastText.includes(k))) return 'true_story';
+    }
+  }
+  return 'unknown';
+}
+
+const STORYTELLING_INVENTED_BLOCK1: Record<Lang, string[]> = {
+  de: [
+    'Möchtest du, dass die KI eine Geschichte für dich ERFINDET, oder hast du bereits eine WAHRE GESCHICHTE die wir filmisch aufbereiten sollen?',
+    'Welches GENRE soll die fiktive Story haben? (Sci-Fi, Drama, Comedy, Thriller, Abenteuer, Romantik, Fantasy)',
+    'Welche ZIELGRUPPE soll die Geschichte ansprechen? (Alter, Interessen, Branche)',
+    'Welche GRUNDSTIMMUNG und EMOTION soll die Story transportieren? (Hoffnung, Spannung, Nostalgie, Humor, Gänsehaut)',
+  ],
+  en: [
+    'Do you want the AI to INVENT a story for you, or do you already have a TRUE STORY that we should develop for film?',
+    'What GENRE should the fictional story have? (Sci-Fi, Drama, Comedy, Thriller, Adventure, Romance, Fantasy)',
+    'What TARGET AUDIENCE should the story appeal to? (Age, interests, industry)',
+    'What MOOD and EMOTION should the story convey? (Hope, suspense, nostalgia, humor, goosebumps)',
+  ],
+  es: [
+    '¿Quieres que la IA INVENTE una historia para ti, o ya tienes una HISTORIA REAL que debamos desarrollar para video?',
+    '¿Qué GÉNERO debe tener la historia ficticia? (Sci-Fi, Drama, Comedia, Thriller, Aventura, Romance, Fantasía)',
+    '¿A qué PÚBLICO OBJETIVO debe atraer la historia? (Edad, intereses, industria)',
+    '¿Qué AMBIENTE y EMOCIÓN debe transmitir la historia? (Esperanza, suspense, nostalgia, humor, escalofríos)',
+  ],
+};
+
+const STORYTELLING_TRUE_BLOCK1: Record<Lang, string[]> = {
+  de: [
+    'Möchtest du, dass die KI eine Geschichte für dich ERFINDET, oder hast du bereits eine WAHRE GESCHICHTE die wir filmisch aufbereiten sollen?',
+    'Erzähl mir KURZ: Was ist passiert? Was ist der Kern deiner wahren Geschichte?',
+    'WER sind die HAUPTPERSONEN in deiner Geschichte? (Name, Rolle, Beziehung)',
+    'Was war der WENDEPUNKT oder der emotionalste Moment in der Geschichte?',
+  ],
+  en: [
+    'Do you want the AI to INVENT a story for you, or do you already have a TRUE STORY that we should develop for film?',
+    'Tell me BRIEFLY: What happened? What is the core of your true story?',
+    'WHO are the MAIN CHARACTERS in your story? (Name, role, relationship)',
+    'What was the TURNING POINT or most emotional moment in the story?',
+  ],
+  es: [
+    '¿Quieres que la IA INVENTE una historia para ti, o ya tienes una HISTORIA REAL que debamos desarrollar para video?',
+    'Cuéntame BREVEMENTE: ¿Qué pasó? ¿Cuál es la esencia de tu historia real?',
+    '¿QUIÉNES son los PERSONAJES PRINCIPALES de tu historia? (Nombre, rol, relación)',
+    '¿Cuál fue el PUNTO DE INFLEXIÓN o el momento más emocional de la historia?',
+  ],
+};
+
+const STORYTELLING_INVENTED_BLOCK2: Record<Lang, string[]> = {
+  de: [
+    'In welcher WELT / welchem SETTING spielt die Geschichte? (Modern, historisch, futuristisch, Fantasie-Welt)',
+    'Wer ist der PROTAGONIST? Beschreibe die Figur (Name, Alter, Charakter, Motivation)',
+    'Wer oder was ist der ANTAGONIST oder das Hindernis? (Person, innerer Konflikt, System, Naturgewalt)',
+    'WIE BEGINNT die Geschichte? Was ist der Aufhänger in den ersten Sekunden?',
+    'Welche ÜBERRASCHENDE WENDUNG oder welchen PLOT-TWIST soll die Story haben?',
+    'Wie soll die VISUELLE ÄSTHETIK aussehen? (Cinematic, Anime-Style, Dokumentarisch, Surreal)',
+    'Aus welcher ERZÄHLPERSPEKTIVE? (Ich-Erzähler, allwissend, Beobachter, Protagonist spricht direkt)',
+    'Soll die Story DIALOG enthalten oder nur Voice-Over / Narration?',
+    'Welche SYMBOLE oder WIEDERKEHRENDE MOTIVE sollen die Story verstärken?',
+    'Wie LANG soll die Geschichte sein? (30s Kurzfilm, 60s, 2-3 Min, episch)',
+    'Gibt es eine MORAL oder BOTSCHAFT die der Zuschauer mitnehmen soll?',
+    'Wie endet die Geschichte? (Happy End, offen, Cliffhanger, überraschender Twist, bitter-süß)',
+  ],
+  en: [
+    'In what WORLD / SETTING does the story take place? (Modern, historical, futuristic, fantasy world)',
+    'Who is the PROTAGONIST? Describe the character (name, age, personality, motivation)',
+    'Who or what is the ANTAGONIST or obstacle? (Person, inner conflict, system, force of nature)',
+    'HOW DOES the story BEGIN? What hooks the viewer in the first seconds?',
+    'What SURPRISING TWIST or PLOT TWIST should the story have?',
+    'What should the VISUAL AESTHETIC look like? (Cinematic, anime-style, documentary, surreal)',
+    'From what NARRATIVE PERSPECTIVE? (First person, omniscient, observer, protagonist speaks directly)',
+    'Should the story contain DIALOGUE or only voice-over / narration?',
+    'What SYMBOLS or RECURRING MOTIFS should reinforce the story?',
+    'How LONG should the story be? (30s short film, 60s, 2-3 min, epic)',
+    'Is there a MORAL or MESSAGE the viewer should take away?',
+    'How does the story end? (Happy ending, open, cliffhanger, surprising twist, bittersweet)',
+  ],
+  es: [
+    '¿En qué MUNDO / ESCENARIO se desarrolla la historia? (Moderno, histórico, futurista, mundo de fantasía)',
+    '¿Quién es el PROTAGONISTA? Describe al personaje (nombre, edad, personalidad, motivación)',
+    '¿Quién o qué es el ANTAGONISTA u obstáculo? (Persona, conflicto interno, sistema, fuerza natural)',
+    '¿CÓMO EMPIEZA la historia? ¿Qué engancha al espectador en los primeros segundos?',
+    '¿Qué GIRO SORPRENDENTE o PLOT TWIST debe tener la historia?',
+    '¿Cómo debe verse la ESTÉTICA VISUAL? (Cinemático, estilo anime, documental, surrealista)',
+    '¿Desde qué PERSPECTIVA NARRATIVA? (Primera persona, omnisciente, observador, protagonista habla directo)',
+    '¿La historia debe contener DIÁLOGOS o solo voz en off / narración?',
+    '¿Qué SÍMBOLOS o MOTIVOS RECURRENTES deben reforzar la historia?',
+    '¿Qué tan LARGA debe ser la historia? (30s cortometraje, 60s, 2-3 min, épica)',
+    '¿Hay una MORAL o MENSAJE que el espectador debe llevarse?',
+    '¿Cómo termina la historia? (Final feliz, abierto, cliffhanger, giro sorprendente, agridulce)',
+  ],
+};
+
+const STORYTELLING_TRUE_BLOCK2: Record<Lang, string[]> = {
+  de: [
+    'CHRONOLOGIE: Wann hat die Geschichte stattgefunden? In welchem Zeitraum?',
+    'WO hat die Geschichte stattgefunden? Beschreibe den Ort / die Orte',
+    'Was war die AUSGANGSSITUATION bevor alles begann? Der "normale" Alltag?',
+    'Was war der AUSLÖSER? Was hat die Geschichte ins Rollen gebracht?',
+    'Was war der SCHWIERIGSTE MOMENT? Der Tiefpunkt?',
+    'Welche DETAILS machen die Geschichte authentisch? (Zitate, Geräusche, Gerüche, Bilder)',
+    'Wie haben sich die BETEILIGTEN PERSONEN verändert?',
+    'Was ist die LEKTION oder ERKENNTNIS aus der Geschichte?',
+    'Wie NAH an der Realität soll das Video bleiben? (100% dokumentarisch vs. dramatisiert)',
+    'Gibt es FOTOS, VIDEOS oder DOKUMENTE die wir einbauen können?',
+    'Wie soll die ERZÄHLSTIMME klingen? (Persönlich/intim, professionell, emotional, nüchtern)',
+    'Wie endet die Geschichte HEUTE? Was ist der aktuelle Stand?',
+  ],
+  en: [
+    'CHRONOLOGY: When did the story take place? Over what time period?',
+    'WHERE did the story happen? Describe the location(s)',
+    'What was the STARTING SITUATION before everything began? The "normal" everyday life?',
+    'What was the TRIGGER? What set the story in motion?',
+    'What was the HARDEST MOMENT? The low point?',
+    'What DETAILS make the story authentic? (Quotes, sounds, smells, images)',
+    'How did the PEOPLE INVOLVED change?',
+    'What is the LESSON or INSIGHT from the story?',
+    'How CLOSE to reality should the video stay? (100% documentary vs. dramatized)',
+    'Are there PHOTOS, VIDEOS or DOCUMENTS we can include?',
+    'How should the NARRATOR VOICE sound? (Personal/intimate, professional, emotional, matter-of-fact)',
+    'How does the story end TODAY? What is the current state?',
+  ],
+  es: [
+    'CRONOLOGÍA: ¿Cuándo ocurrió la historia? ¿En qué período de tiempo?',
+    '¿DÓNDE ocurrió la historia? Describe el lugar o lugares',
+    '¿Cuál era la SITUACIÓN INICIAL antes de que todo comenzara? ¿El día a día "normal"?',
+    '¿Cuál fue el DETONANTE? ¿Qué puso la historia en marcha?',
+    '¿Cuál fue el MOMENTO MÁS DIFÍCIL? ¿El punto más bajo?',
+    '¿Qué DETALLES hacen la historia auténtica? (Citas, sonidos, olores, imágenes)',
+    '¿Cómo cambiaron las PERSONAS INVOLUCRADAS?',
+    '¿Cuál es la LECCIÓN o APRENDIZAJE de la historia?',
+    '¿Qué tan CERCA de la realidad debe quedarse el video? (100% documental vs. dramatizado)',
+    '¿Hay FOTOS, VIDEOS o DOCUMENTOS que podamos incluir?',
+    '¿Cómo debe sonar la VOZ NARRADORA? (Personal/íntima, profesional, emocional, sobria)',
+    '¿Cómo termina la historia HOY? ¿Cuál es el estado actual?',
+  ],
+};
+
+function getBlock1Phases(category: string, lang: Lang, messages?: any[]): string[] {
+  if (category === 'storytelling' && messages && messages.length > 0) {
+    const subMode = detectStorytellingSubMode(messages);
+    if (subMode === 'invented') return STORYTELLING_INVENTED_BLOCK1[lang];
+    if (subMode === 'true_story') return STORYTELLING_TRUE_BLOCK1[lang];
+  }
   return CATEGORY_PHASES_BLOCK1[lang][category] || CATEGORY_PHASES_BLOCK1[lang]['custom'];
+}
+
+function getBlock2Phases(category: string, lang: Lang, messages?: any[]): string[] {
+  if (category === 'storytelling' && messages) {
+    const subMode = detectStorytellingSubMode(messages);
+    if (subMode === 'invented') return STORYTELLING_INVENTED_BLOCK2[lang];
+    if (subMode === 'true_story') return STORYTELLING_TRUE_BLOCK2[lang];
+  }
+  return CATEGORY_SPECIFIC_PHASES[lang][category] || CATEGORY_SPECIFIC_PHASES[lang]['custom'];
 }
 
 const UNIVERSAL_PHASES_BLOCK3: Record<Lang, string[]> = {
