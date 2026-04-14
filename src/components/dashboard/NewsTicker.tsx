@@ -57,7 +57,7 @@ export const NewsTicker = () => {
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.4, ease: "easeInOut" }}
-          className="relative overflow-hidden bg-gradient-to-r from-[hsl(220,50%,3%)] via-[hsl(var(--background))]/80 to-[hsl(220,50%,3%)] backdrop-blur-md group"
+          className="relative w-full max-w-full overflow-hidden bg-gradient-to-r from-[hsl(220,50%,3%)] via-[hsl(var(--background))]/80 to-[hsl(220,50%,3%)] backdrop-blur-md group"
         >
           {/* Top glow line */}
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent shadow-[0_0_12px_hsl(var(--primary)/0.4)]" />
@@ -82,7 +82,7 @@ export const NewsTicker = () => {
             </div>
 
             {/* Scrolling news */}
-            <div className="overflow-hidden flex-1 h-full flex items-center">
+            <div className="overflow-hidden flex-1 min-w-0 h-full flex items-center">
               <div className="flex whitespace-nowrap animate-[marquee_120s_linear_infinite] group-hover:[animation-play-state:paused]">
                 <div className="flex items-center">
                   {renderScrollContent()}
