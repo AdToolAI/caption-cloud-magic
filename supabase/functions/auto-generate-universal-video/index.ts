@@ -23,7 +23,7 @@ const VALID_STORYTELLING = [
   'before-after', 'three-act', 'listicle', 'day-in-life',
   'challenge', 'transformation',
 ] as const;
-const VALID_SCENE_TYPES = ['hook', 'problem', 'solution', 'feature', 'proof', 'cta', 'intro', 'outro', 'transition'] as const;
+const VALID_SCENE_TYPES = ['hook', 'problem', 'solution', 'feature', 'proof', 'cta', 'intro', 'outro', 'transition', 'opening', 'rising_action', 'climax', 'falling_action', 'resolution', 'epilogue'] as const;
 const VALID_ANIMATIONS = ['fadeIn', 'slideUp', 'slideLeft', 'slideRight', 'zoomIn', 'zoomOut', 'bounce', 'none', 'kenBurns', 'parallax', 'popIn', 'flyIn', 'morphIn'] as const;
 const VALID_KEN_BURNS = ['in', 'out', 'left', 'right', 'up', 'down'] as const;
 const VALID_TEXT_ANIMATIONS = ['typewriter', 'fadeWords', 'highlight', 'splitReveal', 'glowPulse', 'bounceIn', 'waveIn', 'none'] as const;
