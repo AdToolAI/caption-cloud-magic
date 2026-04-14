@@ -16706,6 +16706,91 @@ Object.assign(translations.es, {
 });
 
 
+// ─── News Hub Translations ───
+Object.assign(translations.en, {
+  newsHub: {
+    title: 'News Hub',
+    subtitle: 'Daily news for Social Media Professionals',
+    searchPlaceholder: 'Search news...',
+    refresh: 'Refresh',
+    loading: 'Loading...',
+    loadMore: 'Load more',
+    loadNow: 'Load news now',
+    all: 'All',
+    readArticle: 'Read article',
+    read: 'Read',
+    noSearchResults: 'No news found for this search.',
+    noNews: 'No news available yet.',
+    findVideos: 'Find videos on this topic on YouTube',
+    searchYouTube: 'Search on YouTube',
+    categories: {
+      platform: 'Platforms',
+      ai_tools: 'AI Tools',
+      analytics: 'Analytics',
+      monetization: 'Monetization',
+      community: 'Community',
+      business_finance: 'Business & Finance',
+      strategy: 'Strategy',
+    },
+  },
+});
+
+Object.assign(translations.de, {
+  newsHub: {
+    title: 'News Hub',
+    subtitle: 'Tagesaktuelle Nachrichten für Social Media Professionals',
+    searchPlaceholder: 'News durchsuchen...',
+    refresh: 'Aktualisieren',
+    loading: 'Lädt...',
+    loadMore: 'Mehr laden',
+    loadNow: 'Jetzt News laden',
+    all: 'Alle',
+    readArticle: 'Artikel lesen',
+    read: 'Lesen',
+    noSearchResults: 'Keine News für diese Suche gefunden.',
+    noNews: 'Noch keine News vorhanden.',
+    findVideos: 'Videos zu diesem Thema auf YouTube finden',
+    searchYouTube: 'Auf YouTube suchen',
+    categories: {
+      platform: 'Plattformen',
+      ai_tools: 'KI-Tools',
+      analytics: 'Analytics',
+      monetization: 'Monetarisierung',
+      community: 'Community',
+      business_finance: 'Business & Finanzen',
+      strategy: 'Strategie',
+    },
+  },
+});
+
+Object.assign(translations.es, {
+  newsHub: {
+    title: 'News Hub',
+    subtitle: 'Noticias diarias para profesionales de redes sociales',
+    searchPlaceholder: 'Buscar noticias...',
+    refresh: 'Actualizar',
+    loading: 'Cargando...',
+    loadMore: 'Cargar más',
+    loadNow: 'Cargar noticias ahora',
+    all: 'Todas',
+    readArticle: 'Leer artículo',
+    read: 'Leer',
+    noSearchResults: 'No se encontraron noticias para esta búsqueda.',
+    noNews: 'Aún no hay noticias disponibles.',
+    findVideos: 'Buscar videos sobre este tema en YouTube',
+    searchYouTube: 'Buscar en YouTube',
+    categories: {
+      platform: 'Plataformas',
+      ai_tools: 'Herramientas IA',
+      analytics: 'Analítica',
+      monetization: 'Monetización',
+      community: 'Comunidad',
+      business_finance: 'Negocios y Finanzas',
+      strategy: 'Estrategia',
+    },
+  },
+});
+
 export const detectBrowserLanguage = (): Language => {
   const browserLang = navigator.language.toLowerCase();
   if (browserLang.startsWith('de')) return 'de';
