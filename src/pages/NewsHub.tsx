@@ -9,7 +9,8 @@ import {
   ChevronDown
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { useTranslation } from "@/hooks/useTranslation";
+import { useSearchParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 
 const CATEGORIES = [
   { key: null, label: "Alle", icon: Newspaper },
@@ -44,17 +45,20 @@ function timeAgo(dateStr: string): string {
   return `vor ${diffD} Tag${diffD > 1 ? "en" : ""}`;
 }
 
-function ArticleCard({ article, index }: { article: NewsArticle; index: number }) {
+function ArticleCard({ article, index, highlighted }: { article: NewsArticle; index: number; highlighted?: boolean }) {
   const colorClass = CATEGORY_COLORS[article.category] || "bg-muted text-muted-foreground";
   const catLabel = CATEGORIES.find((c) => c.key === article.category)?.label || article.category;
 
   return (
     <motion.div
+      id={`article-${article.id}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
     >
-      <Card className="p-5 bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/30 transition-all group">
+      <Card className={`p-5 bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/30 transition-all group ${
+        highlighted ? "ring-2 ring-primary/60 border-primary/40 shadow-[0_0_20px_hsl(var(--primary)/0.2)] animate-pulse" : ""
+      }`}>
         <div className="flex items-start justify-between gap-3 mb-3">
           <Badge className={`text-[10px] font-medium border ${colorClass}`}>
             {catLabel}
@@ -99,6 +103,38 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
 
 export default function NewsHub() {
   const { articles, loading, refreshing, category, setCategory, loadMore, hasMore, refreshNews } = useNewsHub();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const targetHeadline = searchParams.get("headline");
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const scrolledRef = useRef(false);
+
+  // Find and scroll to the target article
+  useEffect(() => {
+    if (!targetHeadline || articles.length === 0 || scrolledRef.current) return;
+
+    const match = articles.find((a) =>
+      a.headline.toLowerCase().includes(targetHeadline.toLowerCase()) ||
+      targetHeadline.toLowerCase().includes(a.headline.toLowerCase())
+    );
+
+    if (match) {
+      scrolledRef.current = true;
+      setHighlightedId(match.id);
+
+      // Small delay to let DOM render
+      setTimeout(() => {
+        const el = document.getElementById(`article-${match.id}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+
+      // Remove highlight after 3s
+      setTimeout(() => setHighlightedId(null), 3500);
+
+      // Clean URL
+      searchParams.delete("headline");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [targetHeadline, articles]);
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
@@ -189,7 +225,12 @@ export default function NewsHub() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {articles.map((article, i) => (
-                <ArticleCard key={article.id} article={article} index={i} />
+                <ArticleCard
+                  key={article.id}
+                  article={article}
+                  index={i}
+                  highlighted={highlightedId === article.id}
+                />
               ))}
             </div>
 

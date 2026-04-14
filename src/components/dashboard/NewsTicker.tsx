@@ -31,7 +31,7 @@ export const NewsTicker = () => {
     return news.map((item, i) => (
       <div key={`news-${i}`} className="flex items-center">
         <button
-          onClick={() => navigate('/trend-radar')}
+          onClick={() => navigate(`/news-hub?headline=${encodeURIComponent(item.headline)}`)}
           className="flex-shrink-0 flex items-center gap-2 px-3 py-0.5 group/card cursor-pointer"
         >
           <span className={`text-[9px] font-bold uppercase tracking-wider ${CATEGORY_STYLES[item.category] || 'text-primary/60'}`}>
