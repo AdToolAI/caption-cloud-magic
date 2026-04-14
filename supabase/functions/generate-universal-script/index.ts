@@ -791,8 +791,9 @@ function getDefaultAnimation(sceneType: string, category: string): string {
       'feature': 'popIn', 'benefit': 'flyIn', 'proof': 'slideUp', 'cta': 'bounce',
     },
     'storytelling': {
-      'hook': 'kenBurns', 'intro': 'fadeIn', 'problem': 'kenBurns', 'solution': 'fadeIn',
-      'feature': 'parallax', 'benefit': 'kenBurns', 'proof': 'fadeIn', 'cta': 'fadeIn',
+      'hook': 'kenBurns', 'intro': 'fadeIn', 'opening': 'kenBurns', 'rising_action': 'fadeIn',
+      'climax': 'parallax', 'falling_action': 'kenBurns', 'resolution': 'fadeIn', 'epilogue': 'fadeIn',
+      'problem': 'kenBurns', 'solution': 'fadeIn', 'feature': 'parallax', 'benefit': 'kenBurns', 'proof': 'fadeIn', 'cta': 'fadeIn',
     },
     'tutorial': {
       'hook': 'slideUp', 'intro': 'fadeIn', 'problem': 'slideUp', 'solution': 'flyIn',
@@ -849,8 +850,9 @@ function getDefaultTextAnimation(sceneType: string, category: string): string {
       'feature': 'bounceIn', 'cta': 'glowPulse',
     },
     'storytelling': {
-      'hook': 'fadeWords', 'problem': 'typewriter', 'solution': 'fadeWords',
-      'feature': 'fadeWords', 'cta': 'fadeWords',
+      'hook': 'fadeWords', 'opening': 'fadeWords', 'rising_action': 'typewriter',
+      'climax': 'fadeWords', 'falling_action': 'fadeWords', 'resolution': 'typewriter', 'epilogue': 'fadeWords',
+      'problem': 'typewriter', 'solution': 'fadeWords', 'feature': 'fadeWords', 'cta': 'fadeWords',
     },
     'tutorial': {
       'hook': 'splitReveal', 'problem': 'typewriter', 'solution': 'highlight',
