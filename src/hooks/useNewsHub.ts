@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export interface NewsArticle {
   id: string;
@@ -14,11 +15,13 @@ export interface NewsArticle {
   video_embed_url: string | null;
   published_at: string;
   created_at: string;
+  language?: string;
 }
 
 const PAGE_SIZE = 10;
 
 export function useNewsHub() {
+  const { language } = useTranslation();
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -36,6 +39,7 @@ export function useNewsHub() {
     let query = supabase
       .from("news_hub_articles")
       .select("*")
+      .eq("language", language)
       .order("published_at", { ascending: false })
       .range(from, to);
 
@@ -66,16 +70,16 @@ export function useNewsHub() {
       setArticles((prev) => [...prev, ...fetched]);
     }
     setLoading(false);
-  }, [category, page, debouncedSearch]);
+  }, [category, page, debouncedSearch, language]);
 
-  // Initial load + category/search change
+  // Initial load + category/search/language change
   useEffect(() => {
     setLoading(true);
     setArticles([]);
     setPage(0);
     setHasMore(true);
     fetchArticles(true);
-  }, [category, debouncedSearch]);
+  }, [category, debouncedSearch, language]);
 
   // Load more
   const loadMore = useCallback(() => {
@@ -88,11 +92,13 @@ export function useNewsHub() {
     }
   }, [page]);
 
-  // Trigger edge function to refresh news
+  // Trigger edge function to refresh news with language
   const refreshNews = useCallback(async () => {
     setRefreshing(true);
     try {
-      await supabase.functions.invoke("fetch-news-hub");
+      await supabase.functions.invoke("fetch-news-hub", {
+        body: { language },
+      });
       setPage(0);
       await fetchArticles(true);
     } catch (e) {
@@ -100,7 +106,7 @@ export function useNewsHub() {
     } finally {
       setRefreshing(false);
     }
-  }, [category, debouncedSearch]);
+  }, [category, debouncedSearch, language]);
 
   return {
     articles,
