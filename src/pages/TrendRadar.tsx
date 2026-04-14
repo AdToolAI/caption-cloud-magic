@@ -631,7 +631,7 @@ export default function TrendRadar() {
                         <TrendingUp className="w-16 h-16 text-muted-foreground/50 mx-auto" />
                       </motion.div>
                       <p className="text-muted-foreground text-lg">{t('trends.noTrendsFound')}</p>
-                      <Button onClick={fetchTrends} className="bg-gradient-to-r from-primary to-primary/80"><Sparkles className="w-4 h-4 mr-2" />{t('trends.reloadTrends')}</Button>
+                      <Button onClick={() => fetchTrends()} className="bg-gradient-to-r from-primary to-primary/80"><Sparkles className="w-4 h-4 mr-2" />{t('trends.reloadTrends')}</Button>
                     </>
                   )}
                 </CardContent>
