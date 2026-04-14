@@ -1,30 +1,60 @@
 
 
-## Plan: News Radar über den Header verschieben und kompakter machen
+## Plan: News Hub als eigenständiges Feature
 
-### Änderungen
+### Was gebaut wird
+Eine eigene **News Hub Seite** (`/news-hub`) — ein vollwertiger Nachrichten-Feed mit Karten-Layout, getrennt vom Trend Radar. Liefert tagesaktuelle News aus:
+- Social Media Management & Plattform-Updates
+- KI-Tools & Marketing-Automation
+- Creator Economy & Monetization
+- Unternehmens-Prognosen & Börsenkurse (Meta, Alphabet, Snap etc.)
+- Digitales Marketing & Strategie-Insights
 
-**`src/App.tsx`** (Zeilen ~130-136):
-- NewsTicker-Import hinzufügen
-- Den `<NewsTicker />` direkt **vor** dem Header rendern (sowohl vor `<Header />` als auch vor `<AppHeader />`), nur für eingeloggte User
-- Die Logik bleibt: nur anzeigen wenn `user` existiert
+News aktualisieren sich alle 4-5 Stunden. Ältere News bleiben bestehen, rutschen nach hinten.
 
-**`src/pages/Home.tsx`** (Zeile 558):
-- `{user && <NewsTicker />}` entfernen — wird jetzt global in App.tsx gerendert
+### Umsetzung
 
-**`src/components/dashboard/NewsTicker.tsx`**:
-- Höhe von `h-6` auf `h-5` reduzieren (ca. 4px weniger)
-- Schriftgrößen leicht verkleinern: `text-[10px]` → `text-[9px]`
-- Badge-Text `text-[8px]` → `text-[7px]`
-- Insgesamt wird der Ticker ~2-3cm schmaler/kompakter
+**1. DB-Tabelle `news_hub_articles`**
+- Spalten: `id`, `headline`, `summary` (2-3 Sätze), `category`, `source`, `source_url`, `language`, `batch_id`, `published_at`, `created_at`
+- 7 Kategorien: `platform`, `ai_tools`, `analytics`, `monetization`, `community`, `business_finance`, `strategy`
+- RLS: öffentlich lesbar für authentifizierte User, Service-Role schreibbar
+- Max 200 Artikel behalten, ältere werden beim Fetch gelöscht
 
-### Betroffene Dateien
-- `src/App.tsx` — NewsTicker global einbinden
-- `src/pages/Home.tsx` — NewsTicker-Zeile entfernen
-- `src/components/dashboard/NewsTicker.tsx` — Höhe und Schriftgrößen reduzieren
+**2. Edge Function `fetch-news-hub`**
+- Nutzt Perplexity API (sonar) — Key ist bereits konfiguriert
+- Holt 12-15 Artikel pro Batch mit ausführlichen Summaries über alle 7 Kategorien
+- 4-Stunden-Cache: prüft ob letzter Batch < 4h alt, sonst Skip
+- Duplikat-Check gegen letzte 50 Headlines
+- Cleanup: behält max 200 Artikel
+
+**3. Frontend**
+
+| Datei | Beschreibung |
+|-------|-------------|
+| `src/pages/NewsHub.tsx` | Eigenständige Seite mit Hero-Header, Kategorie-Filter-Chips, Karten-Grid (1 Spalte mobil, 2 Desktop), "Mehr laden"-Button |
+| `src/hooks/useNewsHub.ts` | Lädt Artikel aus DB, Paginierung (10/Seite), Kategorie-Filter, triggert Edge Function bei Bedarf |
+| `src/App.tsx` | Route `/news-hub` hinzufügen |
+| `src/components/ui/CommandBar.tsx` | News Hub in Suche aufnehmen |
+
+**4. Karten-Design**
+- Farbcodierte Kategorie-Badges (cyan=Platform, violet=AI, green=Analytics etc.)
+- Headline + Summary (2-3 Zeilen)
+- Quelle + relative Zeitangabe ("vor 2 Stunden")
+- Link zur Originalquelle
+- James Bond 2028 Sci-Fi Stil passend zum Rest der App
 
 ### Was sich nicht ändert
-- Keine funktionalen Änderungen, keine DB-Migration
-- Toggle-Logik bleibt erhalten
-- Scroll-Animation bleibt identisch
+- Trend Radar bleibt unverändert
+- News Radar Ticker (im Header) bleibt unverändert
+- Keine Änderungen an bestehenden Features
+
+### Betroffene Dateien
+| Aktion | Datei |
+|--------|-------|
+| Neu (Migration) | `news_hub_articles` Tabelle + RLS |
+| Neu | `supabase/functions/fetch-news-hub/index.ts` |
+| Neu | `src/pages/NewsHub.tsx` |
+| Neu | `src/hooks/useNewsHub.ts` |
+| Edit | `src/App.tsx` — Route hinzufügen |
+| Edit | `src/components/ui/CommandBar.tsx` — Suchlink |
 
