@@ -1,76 +1,61 @@
-<final-text>
-## Plan: Storytelling-Ausgabe vollständig ent-werblichen und storygenau machen
 
-### Kernprobleme
-- Die eigentliche Auto-Generierung nutzt noch eine alte Inline-Skriptlogik, die Storytelling intern weiter wie Werbung behandelt.
-- Die Render-Pipeline fällt bei Storytelling aktuell auf falsche Kategorie-/Szenentypen zurück; dadurch landen Story-Szenen wieder in Werbe-/Social-Layouts.
-- Das Render-Template zeigt noch Werbeelemente wie „JETZT HANDELN“, CTA-UI und ad-typische Badges.
-- Die Interview-Ergebnisse werden noch zu stark in Produkt/USP/CTA-Felder gepresst, statt echte Story-Details sauber weiterzugeben.
-- Die Bildprompts sind zu generisch/business-lastig und dadurch oft nicht präzise genug für die eigentliche Handlung.
+## Plan: Produkt-Werbung mit Pflicht-Bildupload, kreativeren Drehbüchern & KI-Bildbearbeitung
+
+### Kernidee
+Der Produkt-Ad-Modus bekommt einen Pflicht-Bildupload (min. 4 Produktfotos), gezieltere Interview-Fragen, kreativere Skript-Generierung und KI-gestützte Bildbearbeitung, damit die Produktfotos zum jeweiligen Szenen-Drehbuch passen.
 
 ### Umsetzung
-1. **Storytelling-Logik vereinheitlichen**
-- Die verwendete Inline-Skriptlogik auf denselben Storytelling-Stand bringen wie die neuere Storytelling-Funktion.
-- Für Storytelling ausschließlich narrative Szenentypen verwenden: `opening`, `rising_action`, `climax`, `falling_action`, `resolution`, `epilogue`.
-- CTA-, URL-, USP- und Verkaufsregeln im Storytelling-Pfad komplett entfernen.
-- Storytelling-Defaults auf cineastische Werte setzen statt auf Werbe-Defaults.
 
-2. **Interview-Daten als echte Story weitergeben**
-- Die Consultant-Auswertung für Storytelling getrennt behandeln.
-- Story-Felder sauber extrahieren und weiterreichen, z. B.:
-  - Story-Modus
-  - Protagonist
-  - Konflikt
-  - Setting
-  - Wendepunkt
-  - Moral/Botschaft
-  - Erzählperspektive
-  - visuelle Ästhetik
-  - Motive/Symbole
-- Frontend-Validierung/Fallbacks so anpassen, dass Storytelling nicht mehr künstlich Produktbeschreibung, CTA oder Werbestruktur erzwingt.
+**1. Bildupload-Schritt im Wizard** (`UniversalVideoWizard.tsx`)
+- Neuen Schritt "Produktbilder" vor dem Consultation-Schritt einfügen (nur wenn Kategorie `product-video` oder `advertisement`)
+- `MultiImageUpload`-Komponente nutzen mit `minFiles=4`, `maxFiles=10`
+- Bilder werden in den Supabase Storage Bucket `media-assets` hochgeladen
+- Upload-URLs werden als `productImages: string[]` in `UniversalConsultationResult` gespeichert
 
-3. **Kategorie- und Szenentyp-Mapping reparieren**
-- In der Render-Pipeline ein sauberes Mapping von App-Kategorien zu Render-Kategorien einführen, damit `storytelling` nicht mehr auf Social-/Werbe-Fallbacks fällt.
-- Storytelling sauber auf das cineastische Story-Profil mappen.
-- Narrative Strukturen und narrative Szenentypen in der Pipeline vollständig unterstützen, statt sie auf `feature`/`cta` zurückzusetzen.
-- Dasselbe Mapping auch in der Preview anwenden, damit Vorschau und finaler Export gleich aussehen.
+**2. Type-Erweiterung** (`src/types/universal-video-creator.ts`)
+- `UniversalConsultationResult` um `productImages?: string[]` erweitern
 
-4. **Render-Template von Werbeoptik befreien**
-- Für Storytelling keine CTA-Badges, kein „JETZT HANDELN“, keine CTA-Buttons und keine URL-Einblendung mehr anzeigen.
-- Eigene Storytelling-Labels bzw. komplett badge-freie Darstellung verwenden.
-- Textboxen, Gesten, Effekte und Layouts für Storytelling subtiler und filmischer machen.
-- Storytelling-Szenentypen auch in Effekten, Gesten und Fallback-Stilen ergänzen, damit keine Werbe-Animationen mehr greifen.
+**3. Interview-Fragen verschärfen** (`universal-video-consultant/index.ts`)
+- `product-video` Block 1 + Block 2 Fragen komplett überarbeiten:
+  - Block 1: Produktname & USP, Zielgruppe mit Pain Points, emotionale Transformation, Wettbewerbs-Vorteil
+  - Block 2: Neue kreative Fragen wie:
+    - "Welche EMOTIONALE REAKTION soll der Zuschauer beim Anblick deines Produkts haben?"
+    - "Beschreibe eine ALLTAGSSZENE in der dein Produkt den entscheidenden Unterschied macht"
+    - "Was würde ein BEGEISTERTER KUNDE über dein Produkt in 10 Sekunden sagen?"
+    - "Welchen FILMISCHEN STIL stellst du dir vor? (Apple-like minimal, Nike-energetisch, Luxury-elegant)"
+    - "Gibt es ein UNBOXING- oder REVEAL-MOMENT den wir dramatisch inszenieren können?"
 
-5. **Bilder deutlich präziser auf die Story ausrichten**
-- Für Storytelling eigene Bildprompt-Logik bauen:
-  - Szene
-  - Konflikt
-  - Ort/Setting
-  - Stimmung
-  - wiederkehrende Motive
-  - Tageszeit/Licht
-  - cineastische Bildwirkung
-- Business-/Produkt-Kontext im Storytelling-Pfad komplett entfernen.
-- Retry-Prompts nicht mehr auf generische „business scene“-Formulierungen zurückfallen lassen.
-- Optional pro Szene ein zusätzliches visuelles Ankerfeld erzeugen, damit Bilder konsistenter zur Erzählung passen.
+**4. Kreativere Skript-Generierung** (`_shared/generate-script-inline.ts`)
+- Für `product-video`: System-Prompt mit expliziter Anweisung zur Kreativität:
+  - "Generiere NIEMALS zweimal das gleiche Drehbuch-Schema. Variiere zwischen: Unboxing-Reveal, Lifestyle-Montage, Problem-Lösung-Transformation, Mini-Story, Vorher-Nachher, Slow-Motion-Showcase, POV-Perspektive"
+  - Kreative Szenentypen: `reveal`, `lifestyle`, `detail-closeup`, `transformation`, `testimonial-quote`, `feature-showcase`
+  - Produktbilder-URLs in den Prompt einbauen mit Anweisung: "Nutze die hochgeladenen Produktfotos als Basis für die Szenen"
 
-### Technische Details
-- **Keine Datenbankänderung nötig**
-- Hauptdateien:
-  - `supabase/functions/_shared/generate-script-inline.ts`
-  - `supabase/functions/auto-generate-universal-video/index.ts`
-  - `supabase/functions/universal-video-consultant/index.ts`
-  - `src/components/universal-video-creator/UniversalVideoConsultant.tsx`
-  - `src/components/universal-video-creator/UniversalVideoWizard.tsx`
-  - `src/components/universal-video-creator/UniversalPreviewPlayer.tsx`
-  - `src/remotion/templates/UniversalCreatorVideo.tsx`
-  - `src/utils/phonemeMapping.ts`
-  - ggf. `src/types/universal-video-creator.ts`
+**5. KI-Bildbearbeitung für Produktfotos** (`auto-generate-universal-video/index.ts`)
+- Neuer Pipeline-Schritt nach Script-Generierung: "Produktbilder anpassen"
+- Für jede Szene die ein Produktbild nutzt:
+  - `generate-premium-visual` mit dem Produktbild als Referenz aufrufen (Image-Editing-Modus via Lovable AI Gemini Image Model)
+  - Prompt: "Platziere dieses Produkt in folgendem Setting: [visualDescription der Szene]. Stil: [visualStyle]. Beleuchtung: [szenen-spezifisch]"
+- Fallback: Wenn Bildbearbeitung fehlschlägt, Originalbild verwenden
+
+**6. Szenen-zu-Bild-Zuordnung** (`auto-generate-universal-video/index.ts`)
+- Script-Generator bekommt `availableProductImages: number` als Info
+- Jede Szene bekommt ein `sourceProductImageIndex` Feld (0-basiert)
+- Pipeline nutzt das Originalbild + KI-Enhancement statt komplett generierter Bilder
+
+### Betroffene Dateien
+
+| Datei | Änderung |
+|-------|----------|
+| `src/types/universal-video-creator.ts` | `productImages?: string[]` zu ConsultationResult |
+| `src/components/universal-video-creator/UniversalVideoWizard.tsx` | Bildupload-Schritt, Upload-Logik, Validierung min 4 |
+| `supabase/functions/universal-video-consultant/index.ts` | Product-Video Fragen überarbeiten |
+| `supabase/functions/_shared/generate-script-inline.ts` | Kreativere Prompts, Szenen-Variation, Produktbild-Referenzen |
+| `supabase/functions/auto-generate-universal-video/index.ts` | KI-Bildbearbeitung Pipeline-Schritt, Bild-Zuordnung |
 
 ### Ergebnis
-- Storytelling fühlt sich nicht mehr wie ein Werbevideo an
-- keine CTA-/Ad-Elemente mehr im Story-Modus
-- Bilder passen genauer zur Handlung und Stimmung
-- die im Interview gesammelten Story-Infos gehen nicht mehr unterwegs verloren
-- Preview und finaler Export sehen im Storytelling-Modus konsistent cineastisch aus
-</final-text>
+- Nutzer laden mindestens 4 Produktfotos hoch
+- Interview-Fragen sind gezielter und holen mehr kreative Infos
+- Jedes generierte Video hat ein einzigartiges Drehbuch (nicht immer gleicher Ablauf)
+- Produktfotos werden per KI in die passende Szene eingebettet (richtiges Setting, Beleuchtung, Stimmung)
+- Bilder passen genau zum Drehbuch statt generische Stock-Bilder
