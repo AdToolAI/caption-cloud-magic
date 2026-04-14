@@ -1349,8 +1349,9 @@ const CATEGORY_QUICK_REPLIES: Record<Lang, Record<string, Record<number, string[
 // ═══════════════════════════════════════════════════════════════
 
 function buildCategoryPhases(category: string, lang: Lang): string[] {
+  const block1 = getBlock1Phases(category, lang);
   const specific = CATEGORY_SPECIFIC_PHASES[lang][category] || CATEGORY_SPECIFIC_PHASES[lang]['custom'];
-  return [...UNIVERSAL_PHASES_BLOCK1[lang], ...specific, ...UNIVERSAL_PHASES_BLOCK3[lang]];
+  return [...block1, ...specific, ...UNIVERSAL_PHASES_BLOCK3[lang]];
 }
 
 // Category display names per language
