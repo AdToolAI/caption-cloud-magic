@@ -84,7 +84,9 @@ export function UniversalVideoWizard() {
   const validateConsultationResult = (result: UniversalConsultationResult): { valid: boolean; errors: string[] } => {
     const errors: string[] = [];
     if (!result.category) errors.push(t('uvc.valCategoryMissing'));
-    if (!result.productDescription && !result.productName) errors.push(t('uvc.valProductMissing'));
+    // Storytelling doesn't need product info — only ad categories do
+    const isStoryCategory = result.category === 'storytelling' || result.category === 'brand-story' || result.category === 'behind-scenes';
+    if (!isStoryCategory && !result.productDescription && !result.productName) errors.push(t('uvc.valProductMissing'));
     if (!result.storytellingStructure) errors.push(t('uvc.valStructureMissing'));
     return { valid: errors.length === 0, errors };
   };
