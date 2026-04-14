@@ -43,6 +43,7 @@ const Home = () => {
   const { t, language } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { topInsight } = useNewsRadar();
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
   const [weekDays, setWeekDays] = useState<{ date: string; name: string; day: number; isToday: boolean; posts: WeekPost[] }[]>([]);
   const [loading, setLoading] = useState(false);
