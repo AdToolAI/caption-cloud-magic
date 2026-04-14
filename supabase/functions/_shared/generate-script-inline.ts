@@ -500,6 +500,24 @@ Duration: ${effectiveDuration}s | Format: ${briefing.aspectRatio || '16:9'}
 ${briefing.hasCharacter ? `Narrator Character: ${briefing.characterName || 'Narrator'} - acts as storyteller, NOT salesperson` : ''}
 IMPORTANT: This is a STORY. No CTA, no URL, no sales pitch. Tell a compelling narrative!
 IMPORTANT: Write ALL voiceover text in ${voiceoverLangMap[lang]}!`
+    : isProductVideo
+    ? `Create a CREATIVE PRODUCT VIDEO script — make it visually stunning and unique:
+${moodInstructions}
+Product: ${briefing.productName || '-'} | Description: ${briefing.productDescription || '-'}
+Company: ${briefing.companyName || '-'} | Audience: ${briefing.targetAudience || 'General'}
+Problem it solves: ${briefing.coreProblem || '-'} | USPs: ${Array.isArray(briefing.uniqueSellingPoints) ? briefing.uniqueSellingPoints.join(', ') : (briefing.uniqueSellingPoints || '-')}
+Available product photos: ${briefing.productImages?.length || 0} uploaded images (assign sourceProductImageIndex 0-${(briefing.productImages?.length || 1) - 1} to scenes)
+Cinematic style requested: ${briefing.categorySpecific?.cinematicStyle || 'premium showcase'}
+Emotional reaction: ${briefing.categorySpecific?.emotionalReaction || 'desire and amazement'}
+Key message: ${briefing.keyMessage || '-'} | CTA: ${briefing.ctaText || '-'}
+Visual style: ${briefing.visualStyle || 'modern-3d'} | Tone: ${briefing.emotionalTone || 'professional'}
+Colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'Default')}
+Duration: ${effectiveDuration}s | Format: ${briefing.aspectRatio || '16:9'} | URL: ${briefing.websiteUrl || '-'}
+${briefing.hasCharacter ? `Character: ${briefing.characterName || 'Protagonist'} - ${briefing.characterDescription || 'Likeable'}` : ''}
+Extra: ${JSON.stringify(briefing.categorySpecific || {})}
+IMPORTANT: Each visualDescription must describe the SETTING and MOOD for the product photo placement — NOT generate a new product from scratch.
+IMPORTANT: NEVER use the same script schema twice. Be CREATIVE and SURPRISING!
+IMPORTANT: Write ALL voiceover text in ${voiceoverLangMap[lang]}!`
     : `Create a ${briefing.category} video script ("${categoryKey}" style):
 ${moodInstructions}
 Project: ${briefing.projectName || '-'} | Company: ${briefing.companyName || '-'}
