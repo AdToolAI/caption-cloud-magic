@@ -358,6 +358,7 @@ export const DashboardVideoCarousel = ({ quickActions = [] }: { quickActions?: Q
       {/* 3D Perspective Carousel — onWheelCapture on outer container */}
       <div
         ref={containerRef}
+        className="overflow-hidden"
         style={{ perspective: '1200px' }}
         onWheelCapture={handleWheelCapture}
       >
