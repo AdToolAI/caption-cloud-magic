@@ -1,43 +1,49 @@
 
 
-## Plan: Trend Radar komplett überarbeiten — KI-generiert, lokalisiert, dynamisch
+## Plan: Kategorie-spezifische Interview-Fragen + Storytelling-Inhaltstreue
 
-### Probleme
+### Probleme identifiziert
 
-1. **Immer auf Englisch**: `TrendRadar.tsx` sendet hardcoded `language: 'en'` statt der UI-Sprache
-2. **Immer gleiche Inhalte**: Die Edge Function nutzt ~100 statische, hardcodierte Trends — keine KI-Generierung, kein Refresh
-3. **Unprofessionelle Bilder**: Pexels-Suche mit vagen Descriptions liefert generische Stockfotos
+1. **Gleiche Einstiegsfragen für alle Modi**: Block 1 (Phasen 1-4) und Block 3 (Phasen 17-22) sind für ALLE 12 Kategorien identisch. Die erste Frage ist immer "Was ist der Hauptzweck deines Videos?" — egal ob Werbung oder Storytelling.
+
+2. **System-Prompt nicht kategorie-sensitiv genug**: Die KI-Rolle ist immer "Video-Marketing-Berater und Kreativdirektor bei AdTool" — das lenkt die KI in Richtung Werbung, auch im Storytelling-Modus. Es fehlt eine kategorie-spezifische Rollenidentität.
+
+3. **Frontend-Begrüßung identisch**: `consultantFirstQuestion` in translations.ts ist ein einzelner Key für alle Kategorien.
 
 ### Lösung
 
-**1. Edge Function `fetch-trends/index.ts` — kompletter Umbau**
-- Den gesamten hardcodierten `generateDynamicTrends()`-Block (1700+ Zeilen) durch Perplexity-API-Generierung ersetzen — analog zum News Hub
-- **Cache-Logik**: Prüfe in `trend_entries` ob für die angefragte Sprache Trends existieren die jünger als 5 Stunden sind. Wenn ja → aus DB laden. Wenn nein → neue via Perplexity generieren
-- **Lokalisierte Prompts**: DE/EN/ES-spezifische Prompts, die aktuelle Trends in der jeweiligen Sprache und mit regionalen Quellen generieren
-- **Pro Kategorie mindestens 5 Trends** (social-media, ecommerce, lifestyle, business, finance, motivation) = ~35 Trends pro Batch
-- **Bessere Pexels-Bilder**: Zusätzliches Feld `image_keywords` im KI-Output, das visuell optimierte Suchbegriffe für Pexels enthält (z.B. "satin curling rods hair woman" statt "overnight satin curling rods no heat damage")
-- Hardcoded Trends als reine Fallback-Daten behalten (stark gekürzt auf ~10), nur wenn API fehlschlägt
-- `search_recency_filter: "week"` für aktuelle Trends
+**1. Edge Function `universal-video-consultant/index.ts`**
 
-**2. Frontend `TrendRadar.tsx`**
-- `language: 'en'` → `language` aus `useTranslation()` verwenden
-- Refresh-Button soll `force: true` senden können, um Cache zu umgehen
+- **Block 1 kategorie-spezifisch machen**: Statt universeller Fragen wie "Was ist der ZWECK?" bekommt jede Kategorie eigene Einstiegsfragen:
+  - **Storytelling**: "Welche Geschichte möchtest du erzählen?", "Wer ist der Held?", "Welche Emotion soll der Zuschauer fühlen?"
+  - **Advertisement**: "Welches Produkt/Service bewirbst du?", "Wer ist deine Zielgruppe?", "Was ist dein USP?"
+  - **Tutorial**: "Was möchtest du deinen Zuschauern beibringen?", usw.
 
-**3. Datenbereinigung**
-- Bestehende statische `trend_entries` per Migration löschen
-- Beim nächsten Laden werden frische, lokalisierte Trends generiert
+- **Kategorie-spezifische KI-Rolle** im System-Prompt:
+  - Storytelling → "Du bist Max, ein erfahrener Geschichtenerzähler und Drehbuchautor"
+  - Advertisement → "Du bist Max, ein erfahrener Werbe-Stratege"
+  - Tutorial → "Du bist Max, ein erfahrener Bildungs-Content-Experte"
+  - usw. für alle 12 Kategorien
+
+- **Kategorie-Kontext im Prompt verstärken**: Explizite Anweisung, dass der Inhalt zur gewählten Kategorie passen MUSS (z.B. "Du erstellst eine GESCHICHTE, KEINE Werbung")
+
+**2. Frontend `translations.ts`**
+- Neue Translation-Keys pro Kategorie für die erste Frage: `uvc.consultantFirstQuestion_storytelling`, `uvc.consultantFirstQuestion_advertisement`, usw.
+
+**3. Frontend `UniversalVideoConsultant.tsx`**
+- Kategorie-spezifische erste Frage aus Translations laden statt generischem Key
 
 ### Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `supabase/functions/fetch-trends/index.ts` | Komplett-Umbau: Perplexity-Generierung, Cache, lokalisierte Prompts, image_keywords |
-| `src/pages/TrendRadar.tsx` | `language` aus Translation-Hook, force-refresh |
-| Migration | DELETE FROM trend_entries |
+| `supabase/functions/universal-video-consultant/index.ts` | Block 1 kategorie-spezifisch, KI-Rolle pro Kategorie, Prompt-Verstärkung |
+| `src/lib/translations.ts` | Neue Keys für kategorie-spezifische Einstiegsfragen (DE/EN/ES) |
+| `src/components/universal-video-creator/UniversalVideoConsultant.tsx` | Kategorie-spezifische erste Frage laden |
 
 ### Ergebnis
-- Deutsche UI → deutsche Trends mit aktuellen Themen
-- Trends ändern sich alle 5 Stunden automatisch
-- Professionelle, kontextbezogene Bilder durch KI-optimierte Suchbegriffe
-- Gleiches Qualitätsniveau wie der News Hub
+- Storytelling-Modus stellt Geschichte-bezogene Fragen von Anfang an
+- KI verhält sich wie ein Drehbuchautor, nicht wie ein Werbetexter
+- Jeder Modus hat ein eigenes, passendes Interview-Erlebnis
+- Alle 12 Kategorien bekommen individuelle Einstiegsfragen
 
