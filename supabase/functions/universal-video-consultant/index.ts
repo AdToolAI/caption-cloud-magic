@@ -1755,8 +1755,8 @@ const CATEGORY_NAMES: Record<Lang, Record<string, string>> = {
   },
 };
 
-const getCategoryConfig = (category: string, lang: Lang) => {
-  const phases = buildCategoryPhases(category, lang);
+const getCategoryConfig = (category: string, lang: Lang, messages?: any[]) => {
+  const phases = buildCategoryPhases(category, lang, messages);
   const name = CATEGORY_NAMES[lang][category] || 'Custom Video';
   return { name, phases };
 };
