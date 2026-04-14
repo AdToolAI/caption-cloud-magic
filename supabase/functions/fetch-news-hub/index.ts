@@ -6,9 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const CACHE_TTL_HOURS = 4;
+const CACHE_TTL_HOURS = 5;
 const MAX_ARTICLES_PER_LANG = 200;
-const BATCH_SIZE = 14;
+const BATCH_SIZE = 40;
 
 const CATEGORIES = [
   { key: "platform", label: "Social Media Platform Updates" },
@@ -101,7 +101,7 @@ REGELN:
 Kategorien:
 ${categoryList}
 
-Durchsuche deutschsprachige und internationale Tech/Marketing-Quellen. Jeder Artikel muss eine andere Quelle haben. 
+WICHTIG: Stelle sicher, dass JEDE der 7 Kategorien mit MINDESTENS 5 Artikeln vertreten ist. Verteile die Artikel gleichmäßig über alle Kategorien. Durchsuche deutschsprachige und internationale Tech/Marketing-Quellen. Jeder Artikel muss eine andere Quelle haben. 
 
 Pro Artikel:
 - headline: Deutsche Überschrift (max 120 Zeichen)
@@ -127,7 +127,7 @@ REGLAS:
 Categorías:
 ${categoryList}
 
-Busca en fuentes de tecnología y marketing en español e internacionales. Cada artículo debe tener una fuente diferente.
+IMPORTANTE: Asegúrate de que CADA una de las 7 categorías tenga AL MENOS 5 artículos. Distribuye los artículos equitativamente entre todas las categorías. Busca en fuentes de tecnología y marketing en español e internacionales. Cada artículo debe tener una fuente diferente.
 
 Por artículo:
 - headline: Titular en español (máx 120 caracteres)
@@ -153,7 +153,7 @@ RULES:
 Categories:
 ${categoryList}
 
-Search English-language tech and marketing sources. Each article must have a different source.
+IMPORTANT: Ensure EACH of the 7 categories has AT LEAST 5 articles. Distribute articles evenly across all categories. Search English-language tech and marketing sources. Each article must have a different source.
 
 Per article:
 - headline: Concise headline (max 120 chars)
@@ -323,7 +323,7 @@ serve(async (req) => {
           { role: "user", content: userPrompt },
         ],
         temperature: 0.3,
-        max_tokens: 5000,
+        max_tokens: 12000,
         search_recency_filter: "week",
       }),
     });
