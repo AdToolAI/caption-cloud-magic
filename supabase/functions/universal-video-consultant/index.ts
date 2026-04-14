@@ -21,10 +21,10 @@ const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
       'Welches ZIEL hat die Werbung? (Mehr Verkäufe, Leads, Brand Awareness, App-Downloads)',
     ],
     'storytelling': [
-      'Welche GESCHICHTE möchtest du erzählen? (Gründerstory, Kundenerlebnis, Markenreise, fiktive Erzählung)',
-      'Wer ist der HELD deiner Geschichte? (Gründer, Kunde, Mitarbeiter, fiktive Figur — beschreibe die Person)',
-      'Was ist der ZENTRALE KONFLIKT oder die Herausforderung in der Story?',
-      'Welche EMOTION soll der Zuschauer am Ende fühlen? (Inspiration, Hoffnung, Staunen, Mitgefühl)',
+      'Möchtest du, dass die KI eine Geschichte für dich ERFINDET, oder hast du bereits eine WAHRE GESCHICHTE die wir filmisch aufbereiten sollen?',
+      'PLACEHOLDER_STORYTELLING_P2',
+      'PLACEHOLDER_STORYTELLING_P3',
+      'PLACEHOLDER_STORYTELLING_P4',
     ],
     'tutorial': [
       'Was genau möchtest du deinen Zuschauern BEIBRINGEN? (Konkretes Thema oder Fähigkeit)',
@@ -95,10 +95,10 @@ const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
       'What is the GOAL of the ad? (More sales, leads, brand awareness, app downloads)',
     ],
     'storytelling': [
-      'What STORY do you want to tell? (Founder story, customer experience, brand journey, fictional tale)',
-      'Who is the HERO of your story? (Founder, customer, employee, fictional character — describe them)',
-      'What is the CENTRAL CONFLICT or challenge in the story?',
-      'What EMOTION should the viewer feel at the end? (Inspiration, hope, wonder, empathy)',
+      'Do you want the AI to INVENT a story for you, or do you already have a TRUE STORY that we should develop for film?',
+      'PLACEHOLDER_STORYTELLING_P2',
+      'PLACEHOLDER_STORYTELLING_P3',
+      'PLACEHOLDER_STORYTELLING_P4',
     ],
     'tutorial': [
       'What exactly do you want to TEACH your viewers? (Specific topic or skill)',
@@ -169,10 +169,10 @@ const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
       '¿Cuál es el OBJETIVO del anuncio? (Más ventas, leads, brand awareness, descargas)',
     ],
     'storytelling': [
-      '¿Qué HISTORIA quieres contar? (Historia del fundador, experiencia del cliente, viaje de marca, relato ficticio)',
-      '¿Quién es el HÉROE de tu historia? (Fundador, cliente, empleado, personaje ficticio — descríbelo)',
-      '¿Cuál es el CONFLICTO CENTRAL o desafío en la historia?',
-      '¿Qué EMOCIÓN debe sentir el espectador al final? (Inspiración, esperanza, asombro, empatía)',
+      '¿Quieres que la IA INVENTE una historia para ti, o ya tienes una HISTORIA REAL que debamos desarrollar para video?',
+      'PLACEHOLDER_STORYTELLING_P2',
+      'PLACEHOLDER_STORYTELLING_P3',
+      'PLACEHOLDER_STORYTELLING_P4',
     ],
     'tutorial': [
       '¿Qué exactamente quieres ENSEÑAR a tus espectadores? (Tema o habilidad concreta)',
@@ -237,8 +237,183 @@ const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
   },
 };
 
-function getBlock1Phases(category: string, lang: Lang): string[] {
+// ═══════════════════════════════════════════════════════════════
+// STORYTELLING SUB-MODE DETECTION & DYNAMIC PHASES
+// ═══════════════════════════════════════════════════════════════
+
+type StorytellingSubMode = 'invented' | 'true_story' | 'unknown';
+
+function detectStorytellingSubMode(messages: any[]): StorytellingSubMode {
+  const allText = messages.map((m: any) => (m.content || '').toLowerCase()).join(' ');
+  
+  const inventKeywords = ['erfind', 'invent', 'inventa', 'ki erfindet', 'ai invents', 'ia inventa', 'fiktiv', 'fiction', 'ficti', 'ausdenken', 'kreiere', 'fantasie', 'fantasy'];
+  const trueKeywords = ['wahr', 'true story', 'real', 'historia real', 'verdadera', 'echt', 'tatsächlich', 'wirklich passiert', 'erlebt', 'experienced', 'happened', 'autobio', 'persönlich', 'personal'];
+  
+  const hasInvent = inventKeywords.some(k => allText.includes(k));
+  const hasTrue = trueKeywords.some(k => allText.includes(k));
+  
+  if (hasInvent && !hasTrue) return 'invented';
+  if (hasTrue && !hasInvent) return 'true_story';
+  if (hasInvent && hasTrue) {
+    // Check last user message for most recent choice
+    const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
+    if (lastUser) {
+      const lastText = lastUser.content.toLowerCase();
+      if (inventKeywords.some(k => lastText.includes(k))) return 'invented';
+      if (trueKeywords.some(k => lastText.includes(k))) return 'true_story';
+    }
+  }
+  return 'unknown';
+}
+
+const STORYTELLING_INVENTED_BLOCK1: Record<Lang, string[]> = {
+  de: [
+    'Möchtest du, dass die KI eine Geschichte für dich ERFINDET, oder hast du bereits eine WAHRE GESCHICHTE die wir filmisch aufbereiten sollen?',
+    'Welches GENRE soll die fiktive Story haben? (Sci-Fi, Drama, Comedy, Thriller, Abenteuer, Romantik, Fantasy)',
+    'Welche ZIELGRUPPE soll die Geschichte ansprechen? (Alter, Interessen, Branche)',
+    'Welche GRUNDSTIMMUNG und EMOTION soll die Story transportieren? (Hoffnung, Spannung, Nostalgie, Humor, Gänsehaut)',
+  ],
+  en: [
+    'Do you want the AI to INVENT a story for you, or do you already have a TRUE STORY that we should develop for film?',
+    'What GENRE should the fictional story have? (Sci-Fi, Drama, Comedy, Thriller, Adventure, Romance, Fantasy)',
+    'What TARGET AUDIENCE should the story appeal to? (Age, interests, industry)',
+    'What MOOD and EMOTION should the story convey? (Hope, suspense, nostalgia, humor, goosebumps)',
+  ],
+  es: [
+    '¿Quieres que la IA INVENTE una historia para ti, o ya tienes una HISTORIA REAL que debamos desarrollar para video?',
+    '¿Qué GÉNERO debe tener la historia ficticia? (Sci-Fi, Drama, Comedia, Thriller, Aventura, Romance, Fantasía)',
+    '¿A qué PÚBLICO OBJETIVO debe atraer la historia? (Edad, intereses, industria)',
+    '¿Qué AMBIENTE y EMOCIÓN debe transmitir la historia? (Esperanza, suspense, nostalgia, humor, escalofríos)',
+  ],
+};
+
+const STORYTELLING_TRUE_BLOCK1: Record<Lang, string[]> = {
+  de: [
+    'Möchtest du, dass die KI eine Geschichte für dich ERFINDET, oder hast du bereits eine WAHRE GESCHICHTE die wir filmisch aufbereiten sollen?',
+    'Erzähl mir KURZ: Was ist passiert? Was ist der Kern deiner wahren Geschichte?',
+    'WER sind die HAUPTPERSONEN in deiner Geschichte? (Name, Rolle, Beziehung)',
+    'Was war der WENDEPUNKT oder der emotionalste Moment in der Geschichte?',
+  ],
+  en: [
+    'Do you want the AI to INVENT a story for you, or do you already have a TRUE STORY that we should develop for film?',
+    'Tell me BRIEFLY: What happened? What is the core of your true story?',
+    'WHO are the MAIN CHARACTERS in your story? (Name, role, relationship)',
+    'What was the TURNING POINT or most emotional moment in the story?',
+  ],
+  es: [
+    '¿Quieres que la IA INVENTE una historia para ti, o ya tienes una HISTORIA REAL que debamos desarrollar para video?',
+    'Cuéntame BREVEMENTE: ¿Qué pasó? ¿Cuál es la esencia de tu historia real?',
+    '¿QUIÉNES son los PERSONAJES PRINCIPALES de tu historia? (Nombre, rol, relación)',
+    '¿Cuál fue el PUNTO DE INFLEXIÓN o el momento más emocional de la historia?',
+  ],
+};
+
+const STORYTELLING_INVENTED_BLOCK2: Record<Lang, string[]> = {
+  de: [
+    'In welcher WELT / welchem SETTING spielt die Geschichte? (Modern, historisch, futuristisch, Fantasie-Welt)',
+    'Wer ist der PROTAGONIST? Beschreibe die Figur (Name, Alter, Charakter, Motivation)',
+    'Wer oder was ist der ANTAGONIST oder das Hindernis? (Person, innerer Konflikt, System, Naturgewalt)',
+    'WIE BEGINNT die Geschichte? Was ist der Aufhänger in den ersten Sekunden?',
+    'Welche ÜBERRASCHENDE WENDUNG oder welchen PLOT-TWIST soll die Story haben?',
+    'Wie soll die VISUELLE ÄSTHETIK aussehen? (Cinematic, Anime-Style, Dokumentarisch, Surreal)',
+    'Aus welcher ERZÄHLPERSPEKTIVE? (Ich-Erzähler, allwissend, Beobachter, Protagonist spricht direkt)',
+    'Soll die Story DIALOG enthalten oder nur Voice-Over / Narration?',
+    'Welche SYMBOLE oder WIEDERKEHRENDE MOTIVE sollen die Story verstärken?',
+    'Wie LANG soll die Geschichte sein? (30s Kurzfilm, 60s, 2-3 Min, episch)',
+    'Gibt es eine MORAL oder BOTSCHAFT die der Zuschauer mitnehmen soll?',
+    'Wie endet die Geschichte? (Happy End, offen, Cliffhanger, überraschender Twist, bitter-süß)',
+  ],
+  en: [
+    'In what WORLD / SETTING does the story take place? (Modern, historical, futuristic, fantasy world)',
+    'Who is the PROTAGONIST? Describe the character (name, age, personality, motivation)',
+    'Who or what is the ANTAGONIST or obstacle? (Person, inner conflict, system, force of nature)',
+    'HOW DOES the story BEGIN? What hooks the viewer in the first seconds?',
+    'What SURPRISING TWIST or PLOT TWIST should the story have?',
+    'What should the VISUAL AESTHETIC look like? (Cinematic, anime-style, documentary, surreal)',
+    'From what NARRATIVE PERSPECTIVE? (First person, omniscient, observer, protagonist speaks directly)',
+    'Should the story contain DIALOGUE or only voice-over / narration?',
+    'What SYMBOLS or RECURRING MOTIFS should reinforce the story?',
+    'How LONG should the story be? (30s short film, 60s, 2-3 min, epic)',
+    'Is there a MORAL or MESSAGE the viewer should take away?',
+    'How does the story end? (Happy ending, open, cliffhanger, surprising twist, bittersweet)',
+  ],
+  es: [
+    '¿En qué MUNDO / ESCENARIO se desarrolla la historia? (Moderno, histórico, futurista, mundo de fantasía)',
+    '¿Quién es el PROTAGONISTA? Describe al personaje (nombre, edad, personalidad, motivación)',
+    '¿Quién o qué es el ANTAGONISTA u obstáculo? (Persona, conflicto interno, sistema, fuerza natural)',
+    '¿CÓMO EMPIEZA la historia? ¿Qué engancha al espectador en los primeros segundos?',
+    '¿Qué GIRO SORPRENDENTE o PLOT TWIST debe tener la historia?',
+    '¿Cómo debe verse la ESTÉTICA VISUAL? (Cinemático, estilo anime, documental, surrealista)',
+    '¿Desde qué PERSPECTIVA NARRATIVA? (Primera persona, omnisciente, observador, protagonista habla directo)',
+    '¿La historia debe contener DIÁLOGOS o solo voz en off / narración?',
+    '¿Qué SÍMBOLOS o MOTIVOS RECURRENTES deben reforzar la historia?',
+    '¿Qué tan LARGA debe ser la historia? (30s cortometraje, 60s, 2-3 min, épica)',
+    '¿Hay una MORAL o MENSAJE que el espectador debe llevarse?',
+    '¿Cómo termina la historia? (Final feliz, abierto, cliffhanger, giro sorprendente, agridulce)',
+  ],
+};
+
+const STORYTELLING_TRUE_BLOCK2: Record<Lang, string[]> = {
+  de: [
+    'CHRONOLOGIE: Wann hat die Geschichte stattgefunden? In welchem Zeitraum?',
+    'WO hat die Geschichte stattgefunden? Beschreibe den Ort / die Orte',
+    'Was war die AUSGANGSSITUATION bevor alles begann? Der "normale" Alltag?',
+    'Was war der AUSLÖSER? Was hat die Geschichte ins Rollen gebracht?',
+    'Was war der SCHWIERIGSTE MOMENT? Der Tiefpunkt?',
+    'Welche DETAILS machen die Geschichte authentisch? (Zitate, Geräusche, Gerüche, Bilder)',
+    'Wie haben sich die BETEILIGTEN PERSONEN verändert?',
+    'Was ist die LEKTION oder ERKENNTNIS aus der Geschichte?',
+    'Wie NAH an der Realität soll das Video bleiben? (100% dokumentarisch vs. dramatisiert)',
+    'Gibt es FOTOS, VIDEOS oder DOKUMENTE die wir einbauen können?',
+    'Wie soll die ERZÄHLSTIMME klingen? (Persönlich/intim, professionell, emotional, nüchtern)',
+    'Wie endet die Geschichte HEUTE? Was ist der aktuelle Stand?',
+  ],
+  en: [
+    'CHRONOLOGY: When did the story take place? Over what time period?',
+    'WHERE did the story happen? Describe the location(s)',
+    'What was the STARTING SITUATION before everything began? The "normal" everyday life?',
+    'What was the TRIGGER? What set the story in motion?',
+    'What was the HARDEST MOMENT? The low point?',
+    'What DETAILS make the story authentic? (Quotes, sounds, smells, images)',
+    'How did the PEOPLE INVOLVED change?',
+    'What is the LESSON or INSIGHT from the story?',
+    'How CLOSE to reality should the video stay? (100% documentary vs. dramatized)',
+    'Are there PHOTOS, VIDEOS or DOCUMENTS we can include?',
+    'How should the NARRATOR VOICE sound? (Personal/intimate, professional, emotional, matter-of-fact)',
+    'How does the story end TODAY? What is the current state?',
+  ],
+  es: [
+    'CRONOLOGÍA: ¿Cuándo ocurrió la historia? ¿En qué período de tiempo?',
+    '¿DÓNDE ocurrió la historia? Describe el lugar o lugares',
+    '¿Cuál era la SITUACIÓN INICIAL antes de que todo comenzara? ¿El día a día "normal"?',
+    '¿Cuál fue el DETONANTE? ¿Qué puso la historia en marcha?',
+    '¿Cuál fue el MOMENTO MÁS DIFÍCIL? ¿El punto más bajo?',
+    '¿Qué DETALLES hacen la historia auténtica? (Citas, sonidos, olores, imágenes)',
+    '¿Cómo cambiaron las PERSONAS INVOLUCRADAS?',
+    '¿Cuál es la LECCIÓN o APRENDIZAJE de la historia?',
+    '¿Qué tan CERCA de la realidad debe quedarse el video? (100% documental vs. dramatizado)',
+    '¿Hay FOTOS, VIDEOS o DOCUMENTOS que podamos incluir?',
+    '¿Cómo debe sonar la VOZ NARRADORA? (Personal/íntima, profesional, emocional, sobria)',
+    '¿Cómo termina la historia HOY? ¿Cuál es el estado actual?',
+  ],
+};
+
+function getBlock1Phases(category: string, lang: Lang, messages?: any[]): string[] {
+  if (category === 'storytelling' && messages && messages.length > 0) {
+    const subMode = detectStorytellingSubMode(messages);
+    if (subMode === 'invented') return STORYTELLING_INVENTED_BLOCK1[lang];
+    if (subMode === 'true_story') return STORYTELLING_TRUE_BLOCK1[lang];
+  }
   return CATEGORY_PHASES_BLOCK1[lang][category] || CATEGORY_PHASES_BLOCK1[lang]['custom'];
+}
+
+function getBlock2Phases(category: string, lang: Lang, messages?: any[]): string[] {
+  if (category === 'storytelling' && messages) {
+    const subMode = detectStorytellingSubMode(messages);
+    if (subMode === 'invented') return STORYTELLING_INVENTED_BLOCK2[lang];
+    if (subMode === 'true_story') return STORYTELLING_TRUE_BLOCK2[lang];
+  }
+  return CATEGORY_SPECIFIC_PHASES[lang][category] || CATEGORY_SPECIFIC_PHASES[lang]['custom'];
 }
 
 const UNIVERSAL_PHASES_BLOCK3: Record<Lang, string[]> = {
@@ -285,18 +460,18 @@ const CATEGORY_SPECIFIC_PHASES: Record<Lang, Record<string, string[]>> = {
       'Exakter CTA-Text und URL: Was sollen Zuschauer am Ende tun?',
     ],
     'storytelling': [
-      'Welches GENRE passt zu deiner Story? (Horror/Thriller, Romantik/Drama, Abenteuer, Dokumentarisch, Comedy)',
-      'Wer ist der HELD der Geschichte? (Gründer, Kunde, Team, fiktive Figur)',
-      'AUSGANGSSITUATION: Wie beginnt die Welt des Helden? Was ist der Alltag?',
-      'DAS PROBLEM / DER KONFLIKT: Was stört die Ordnung? Was geht schief?',
-      'DER TIEFPUNKT: Was ist der dunkelste/schwierigste Moment?',
-      'DER WENDEPUNKT: Was ändert alles? Was ist der Aha-Moment?',
-      'DIE TRANSFORMATION: Vorher vs. Nachher — wie verändert sich die Situation?',
-      'Welche EMOTION soll dominieren? (Angst, Hoffnung, Freude, Nostalgie, Staunen)',
-      'VISUELLE METAPHERN: Welche Bilder, Symbole oder Szenen erzählen die Story?',
-      'TEMPO & RHYTHMUS: Langsamer Aufbau mit Klimax oder sofort Action?',
-      'AUTHENTISCHE DETAILS: Was macht die Story glaubwürdig und echt?',
-      'DAS FINALE: Wie endet die Geschichte? (Happy End, Open End, Cliffhanger, Twist)',
+      'PLACEHOLDER_STORYTELLING_B2_1',
+      'PLACEHOLDER_STORYTELLING_B2_2',
+      'PLACEHOLDER_STORYTELLING_B2_3',
+      'PLACEHOLDER_STORYTELLING_B2_4',
+      'PLACEHOLDER_STORYTELLING_B2_5',
+      'PLACEHOLDER_STORYTELLING_B2_6',
+      'PLACEHOLDER_STORYTELLING_B2_7',
+      'PLACEHOLDER_STORYTELLING_B2_8',
+      'PLACEHOLDER_STORYTELLING_B2_9',
+      'PLACEHOLDER_STORYTELLING_B2_10',
+      'PLACEHOLDER_STORYTELLING_B2_11',
+      'PLACEHOLDER_STORYTELLING_B2_12',
     ],
     'tutorial': [
       'Was genau soll ERKLÄRT oder GEZEIGT werden? (Konkretes Thema)',
@@ -455,18 +630,18 @@ const CATEGORY_SPECIFIC_PHASES: Record<Lang, Record<string, string[]>> = {
       'Exact CTA text and URL: What should viewers do at the end?',
     ],
     'storytelling': [
-      'Which GENRE fits your story? (Horror/Thriller, Romance/Drama, Adventure, Documentary, Comedy)',
-      'Who is the HERO of the story? (Founder, customer, team, fictional character)',
-      'STARTING SITUATION: How does the hero\'s world begin? What is everyday life like?',
-      'THE PROBLEM / CONFLICT: What disrupts the order? What goes wrong?',
-      'THE LOW POINT: What is the darkest/most difficult moment?',
-      'THE TURNING POINT: What changes everything? What is the aha moment?',
-      'THE TRANSFORMATION: Before vs. after — how does the situation change?',
-      'Which EMOTION should dominate? (Fear, hope, joy, nostalgia, wonder)',
-      'VISUAL METAPHORS: What images, symbols or scenes tell the story?',
-      'PACE & RHYTHM: Slow build-up with climax or immediate action?',
-      'AUTHENTIC DETAILS: What makes the story credible and real?',
-      'THE FINALE: How does the story end? (Happy end, open end, cliffhanger, twist)',
+      'PLACEHOLDER_STORYTELLING_B2_1',
+      'PLACEHOLDER_STORYTELLING_B2_2',
+      'PLACEHOLDER_STORYTELLING_B2_3',
+      'PLACEHOLDER_STORYTELLING_B2_4',
+      'PLACEHOLDER_STORYTELLING_B2_5',
+      'PLACEHOLDER_STORYTELLING_B2_6',
+      'PLACEHOLDER_STORYTELLING_B2_7',
+      'PLACEHOLDER_STORYTELLING_B2_8',
+      'PLACEHOLDER_STORYTELLING_B2_9',
+      'PLACEHOLDER_STORYTELLING_B2_10',
+      'PLACEHOLDER_STORYTELLING_B2_11',
+      'PLACEHOLDER_STORYTELLING_B2_12',
     ],
     'tutorial': [
       'What exactly should be EXPLAINED or SHOWN? (Specific topic)',
@@ -625,18 +800,18 @@ const CATEGORY_SPECIFIC_PHASES: Record<Lang, Record<string, string[]>> = {
       'Texto CTA exacto y URL: ¿Qué deben hacer los espectadores al final?',
     ],
     'storytelling': [
-      '¿Qué GÉNERO encaja con tu historia? (Terror/Thriller, Romance/Drama, Aventura, Documental, Comedia)',
-      '¿Quién es el HÉROE de la historia? (Fundador, cliente, equipo, personaje ficticio)',
-      'SITUACIÓN INICIAL: ¿Cómo empieza el mundo del héroe? ¿Cuál es el día a día?',
-      'EL PROBLEMA / CONFLICTO: ¿Qué altera el orden? ¿Qué sale mal?',
-      'EL PUNTO MÁS BAJO: ¿Cuál es el momento más oscuro/difícil?',
-      'EL PUNTO DE INFLEXIÓN: ¿Qué cambia todo? ¿Cuál es el momento revelador?',
-      'LA TRANSFORMACIÓN: Antes vs. después — ¿cómo cambia la situación?',
-      '¿Qué EMOCIÓN debe dominar? (Miedo, esperanza, alegría, nostalgia, asombro)',
-      'METÁFORAS VISUALES: ¿Qué imágenes, símbolos o escenas cuentan la historia?',
-      'RITMO Y TEMPO: ¿Construcción lenta con clímax o acción inmediata?',
-      'DETALLES AUTÉNTICOS: ¿Qué hace la historia creíble y real?',
-      'EL FINAL: ¿Cómo termina la historia? (Final feliz, abierto, cliffhanger, giro)',
+      'PLACEHOLDER_STORYTELLING_B2_1',
+      'PLACEHOLDER_STORYTELLING_B2_2',
+      'PLACEHOLDER_STORYTELLING_B2_3',
+      'PLACEHOLDER_STORYTELLING_B2_4',
+      'PLACEHOLDER_STORYTELLING_B2_5',
+      'PLACEHOLDER_STORYTELLING_B2_6',
+      'PLACEHOLDER_STORYTELLING_B2_7',
+      'PLACEHOLDER_STORYTELLING_B2_8',
+      'PLACEHOLDER_STORYTELLING_B2_9',
+      'PLACEHOLDER_STORYTELLING_B2_10',
+      'PLACEHOLDER_STORYTELLING_B2_11',
+      'PLACEHOLDER_STORYTELLING_B2_12',
     ],
     'tutorial': [
       '¿Qué exactamente se debe EXPLICAR o MOSTRAR? (Tema concreto)',
@@ -791,10 +966,10 @@ const CATEGORY_QUICK_REPLIES_BLOCK1: Record<Lang, Record<string, Record<number, 
       4: ['Mehr Verkäufe erzielen', 'Leads generieren', 'Brand Awareness steigern', 'Lass mich erklären...'],
     },
     'storytelling': {
-      1: ['Gründerstory', 'Kundenerlebnis', 'Markenreise', 'Eine fiktive Erzählung'],
-      2: ['Der Gründer selbst', 'Ein Kunde / Nutzer', 'Das Team als Ganzes', 'Eine fiktive Figur'],
-      3: ['Existenzielle Krise überwinden', 'Einen Traum verwirklichen', 'Gegen alle Widerstände kämpfen', 'Lass mich erzählen...'],
-      4: ['Inspiration & Hoffnung', 'Staunen & Ehrfurcht', 'Mitgefühl & Verbundenheit', 'Lass mich beschreiben...'],
+      1: ['KI erfindet eine Story ✨', 'Ich habe eine wahre Geschichte 📖'],
+      2: ['Lass mich erzählen...'],
+      3: ['Lass mich erzählen...'],
+      4: ['Lass mich beschreiben...'],
     },
     'tutorial': {
       1: ['Ein Software-Feature erklären', 'Handwerkliche Anleitung', 'Konzept / Theorie', 'Lass mich beschreiben...'],
@@ -865,10 +1040,10 @@ const CATEGORY_QUICK_REPLIES_BLOCK1: Record<Lang, Record<string, Record<number, 
       4: ['Increase sales', 'Generate leads', 'Build brand awareness', 'Let me explain...'],
     },
     'storytelling': {
-      1: ['Founder story', 'Customer experience', 'Brand journey', 'A fictional tale'],
-      2: ['The founder', 'A customer / user', 'The team', 'A fictional character'],
-      3: ['Overcoming a crisis', 'Pursuing a dream', 'Fighting against odds', 'Let me tell...'],
-      4: ['Inspiration & hope', 'Wonder & awe', 'Empathy & connection', 'Let me describe...'],
+      1: ['AI invents a story ✨', 'I have a true story 📖'],
+      2: ['Let me tell...'],
+      3: ['Let me tell...'],
+      4: ['Let me describe...'],
     },
     'tutorial': {
       1: ['Explain a software feature', 'Hands-on guide', 'Concept / theory', 'Let me describe...'],
@@ -939,10 +1114,10 @@ const CATEGORY_QUICK_REPLIES_BLOCK1: Record<Lang, Record<string, Record<number, 
       4: ['Aumentar ventas', 'Generar leads', 'Aumentar brand awareness', 'Déjame explicar...'],
     },
     'storytelling': {
-      1: ['Historia del fundador', 'Experiencia del cliente', 'Viaje de marca', 'Un relato ficticio'],
-      2: ['El fundador', 'Un cliente / usuario', 'El equipo', 'Un personaje ficticio'],
-      3: ['Superar una crisis', 'Perseguir un sueño', 'Luchar contra todo', 'Déjame contar...'],
-      4: ['Inspiración y esperanza', 'Asombro y admiración', 'Empatía y conexión', 'Déjame describir...'],
+      1: ['La IA inventa una historia ✨', 'Tengo una historia real 📖'],
+      2: ['Déjame contar...'],
+      3: ['Déjame contar...'],
+      4: ['Déjame describir...'],
     },
     'tutorial': {
       1: ['Explicar una función de software', 'Guía práctica', 'Concepto / teoría', 'Déjame describir...'],
@@ -1552,9 +1727,9 @@ const CATEGORY_QUICK_REPLIES: Record<Lang, Record<string, Record<number, string[
 // Build full 22-phase array for a category
 // ═══════════════════════════════════════════════════════════════
 
-function buildCategoryPhases(category: string, lang: Lang): string[] {
-  const block1 = getBlock1Phases(category, lang);
-  const specific = CATEGORY_SPECIFIC_PHASES[lang][category] || CATEGORY_SPECIFIC_PHASES[lang]['custom'];
+function buildCategoryPhases(category: string, lang: Lang, messages?: any[]): string[] {
+  const block1 = getBlock1Phases(category, lang, messages);
+  const specific = getBlock2Phases(category, lang, messages);
   return [...block1, ...specific, ...UNIVERSAL_PHASES_BLOCK3[lang]];
 }
 
@@ -1580,15 +1755,15 @@ const CATEGORY_NAMES: Record<Lang, Record<string, string>> = {
   },
 };
 
-const getCategoryConfig = (category: string, lang: Lang) => {
-  const phases = buildCategoryPhases(category, lang);
+const getCategoryConfig = (category: string, lang: Lang, messages?: any[]) => {
+  const phases = buildCategoryPhases(category, lang, messages);
   const name = CATEGORY_NAMES[lang][category] || 'Custom Video';
   return { name, phases };
 };
 
 // Localized system prompt
-const getCategorySystemPrompt = (category: string, mode: string, currentPhase: number, lang: Lang): string => {
-  const cat = getCategoryConfig(category, lang);
+const getCategorySystemPrompt = (category: string, mode: string, currentPhase: number, lang: Lang, messages?: any[]): string => {
+  const cat = getCategoryConfig(category, lang, messages);
   const totalPhases = 22;
 
   const blockLabels: Record<Lang, [string, string, string]> = {
@@ -1655,13 +1830,29 @@ const getCategorySystemPrompt = (category: string, mode: string, currentPhase: n
     },
   };
 
-  const defaultRole: Record<Lang, string> = {
-    de: 'Du bist Max, ein erfahrener Video-Stratege und Kreativdirektor.',
-    en: 'You are Max, an experienced video strategist and creative director.',
-    es: 'Eres Max, un experimentado estratega de video y director creativo.',
-  };
-
-  const role = categoryRoles[category]?.[lang] || defaultRole[lang];
+  // For storytelling, enhance role based on sub-mode
+  let role = categoryRoles[category]?.[lang] || defaultRole[lang];
+  if (category === 'storytelling' && messages) {
+    const subMode = detectStorytellingSubMode(messages);
+    const subModeRoles: Record<StorytellingSubMode, Record<Lang, string>> = {
+      'invented': {
+        de: 'Du bist Max, ein visionärer Autor und kreativer Drehbuchschreiber. Deine Aufgabe: Entwickle eine fesselnde FIKTIVE STORY basierend auf den Vorgaben des Nutzers. Sei kreativ, überraschend und filmisch. KEINE Werbung — du schreibst eine GESCHICHTE.',
+        en: 'You are Max, a visionary author and creative screenwriter. Your job: Develop a captivating FICTIONAL STORY based on the user\'s input. Be creative, surprising and cinematic. NO advertising — you are writing a STORY.',
+        es: 'Eres Max, un autor visionario y guionista creativo. Tu trabajo: Desarrollar una HISTORIA FICTICIA cautivadora basada en las indicaciones del usuario. Sé creativo, sorprendente y cinemático. NADA de publicidad — estás escribiendo una HISTORIA.',
+      },
+      'true_story': {
+        de: 'Du bist Max, ein einfühlsamer Biograf und dokumentarischer Geschichtenerzähler. Deine Aufgabe: Extrahiere die Kernelemente der WAHREN GESCHICHTE des Nutzers und forme sie in eine emotionale, filmische Erzählung. Stelle einfühlsame Fragen, um die authentischen Details herauszuarbeiten. KEINE Werbung — du dokumentierst eine ECHTE Geschichte.',
+        en: 'You are Max, an empathetic biographer and documentary storyteller. Your job: Extract the core elements of the user\'s TRUE STORY and shape them into an emotional, cinematic narrative. Ask empathetic questions to uncover authentic details. NO advertising — you are documenting a REAL story.',
+        es: 'Eres Max, un biógrafo empático y narrador documental. Tu trabajo: Extraer los elementos centrales de la HISTORIA REAL del usuario y darles forma en una narrativa emocional y cinemática. Haz preguntas empáticas para descubrir detalles auténticos. NADA de publicidad — estás documentando una historia REAL.',
+      },
+      'unknown': {
+        de: categoryRoles['storytelling']?.de || defaultRole.de,
+        en: categoryRoles['storytelling']?.en || defaultRole.en,
+        es: categoryRoles['storytelling']?.es || defaultRole.es,
+      },
+    };
+    role = subModeRoles[subMode][lang];
+  }
 
   const langInstructions: Record<Lang, { respondIn: string; forbidden: string[]; modeLabel: string }> = {
     de: {
@@ -1974,7 +2165,7 @@ serve(async (req) => {
     
     console.log(`[universal-video-consultant] Category: ${category}, Mode: ${mode}, Phase: ${currentPhase}/22, Progress: ${progress}%, Messages: ${messages.length}, Lang: ${lang}`);
 
-    const systemPrompt = getCategorySystemPrompt(category, mode, currentPhase, lang);
+    const systemPrompt = getCategorySystemPrompt(category, mode, currentPhase, lang, messages);
     
     const compressedMessages = compressContext(messages, currentPhase);
     
