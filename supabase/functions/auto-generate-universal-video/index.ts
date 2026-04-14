@@ -125,9 +125,33 @@ serve(async (req) => {
     const { briefing, consultationResult, userId, diagnosticProfile, debugMode, renderOnly, existingProgressId, language } = await req.json();
     const lang = (language === 'en' || language === 'es') ? language : 'de';
     
-    const actualBriefing = briefing || consultationResult;
-    console.log(`[auto-generate] visualStyle from briefing: "${actualBriefing?.visualStyle}"`);
+    // Map new UI categories to internal pipeline keys
+    const UI_TO_INTERNAL_CATEGORY: Record<string, string> = {
+      'corporate-ad': 'advertisement',
+      'product-ad': 'product-video',
+      'storytelling': 'storytelling',
+      'custom': 'custom',
+    };
+    // Map new UI category → render-compatible category for inputProps
+    const UI_TO_RENDER_CATEGORY: Record<string, string> = {
+      'corporate-ad': 'brand-story',
+      'product-ad': 'product-ad',
+      'storytelling': 'storytelling',
+      'custom': 'social-reel',
+    };
     
+    const actualBriefing = briefing || consultationResult;
+    
+    // Remap category if it's one of the new UI categories
+    if (actualBriefing?.category && UI_TO_INTERNAL_CATEGORY[actualBriefing.category]) {
+      const originalCategory = actualBriefing.category;
+      actualBriefing._renderCategory = UI_TO_RENDER_CATEGORY[originalCategory] || 'social-reel';
+      actualBriefing.category = UI_TO_INTERNAL_CATEGORY[originalCategory];
+      console.log(`[auto-generate] Category mapped: ${originalCategory} → internal: ${actualBriefing.category}, render: ${actualBriefing._renderCategory}`);
+    }
+    
+    console.log(`[auto-generate] visualStyle from briefing: "${actualBriefing?.visualStyle}"`);
+
     if (!userId) {
       throw new Error('userId is required');
     }

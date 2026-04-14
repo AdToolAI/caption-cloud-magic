@@ -2157,9 +2157,18 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const { messages, category, mode, language } = await req.json();
+    const { messages, category: rawCategory, mode, language } = await req.json();
     const lang: Lang = (language === 'en' || language === 'es') ? language : 'de';
     const errors = ERROR_MESSAGES[lang];
+    
+    // Map new UI categories to internal pipeline keys
+    const UI_TO_INTERNAL_CATEGORY: Record<string, string> = {
+      'corporate-ad': 'advertisement',
+      'product-ad': 'product-video',
+      'storytelling': 'storytelling',
+      'custom': 'custom',
+    };
+    const category = UI_TO_INTERNAL_CATEGORY[rawCategory] || rawCategory;
     
     const { currentPhase, progress } = calculatePhaseInfo(messages);
     

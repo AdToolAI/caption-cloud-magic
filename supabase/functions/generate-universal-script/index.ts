@@ -304,7 +304,8 @@ const CATEGORY_STYLE_PROFILES: Record<string, CategoryStyleProfile> = {
 function getCategoryKey(category: string): string {
   const categoryMap: Record<string, string> = {
     'advertisement': 'advertisement',
-    'product-ad': 'advertisement',
+    'corporate-ad': 'corporate',
+    'product-ad': 'product-video',
     'storytelling': 'storytelling',
     'brand-story': 'storytelling',
     'tutorial': 'tutorial',
