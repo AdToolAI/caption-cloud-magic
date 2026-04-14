@@ -285,7 +285,7 @@ function getDefaultAnimation(sceneType: string, category: string): string {
   if (!profile) return 'fadeIn';
   const categoryMaps: Record<string, Record<string, string>> = {
     'advertisement': { 'hook': 'popIn', 'intro': 'flyIn', 'problem': 'slideUp', 'solution': 'bounce', 'feature': 'popIn', 'benefit': 'flyIn', 'proof': 'slideUp', 'cta': 'bounce' },
-    'storytelling': { 'hook': 'kenBurns', 'intro': 'fadeIn', 'problem': 'kenBurns', 'solution': 'fadeIn', 'feature': 'parallax', 'benefit': 'kenBurns', 'proof': 'fadeIn', 'cta': 'fadeIn' },
+    'storytelling': { 'hook': 'kenBurns', 'intro': 'fadeIn', 'problem': 'kenBurns', 'solution': 'fadeIn', 'feature': 'parallax', 'benefit': 'kenBurns', 'proof': 'fadeIn', 'cta': 'fadeIn', 'opening': 'kenBurns', 'rising_action': 'kenBurns', 'climax': 'parallax', 'falling_action': 'fadeIn', 'resolution': 'kenBurns', 'epilogue': 'fadeIn' },
     'tutorial': { 'hook': 'slideUp', 'intro': 'fadeIn', 'problem': 'slideUp', 'solution': 'flyIn', 'feature': 'slideUp', 'benefit': 'slideUp', 'proof': 'fadeIn', 'cta': 'slideUp' },
     'product-video': { 'hook': 'morphIn', 'intro': 'fadeIn', 'problem': 'kenBurns', 'solution': 'parallax', 'feature': 'parallax', 'benefit': 'morphIn', 'proof': 'fadeIn', 'cta': 'morphIn' },
     'corporate': { 'hook': 'fadeIn', 'intro': 'fadeIn', 'problem': 'fadeIn', 'solution': 'slideUp', 'feature': 'slideUp', 'benefit': 'fadeIn', 'proof': 'fadeIn', 'cta': 'slideUp' },
@@ -306,7 +306,7 @@ function getDefaultTextAnimation(sceneType: string, category: string): string {
   if (!profile) return 'fadeWords';
   const categoryMaps: Record<string, Record<string, string>> = {
     'advertisement': { 'hook': 'bounceIn', 'problem': 'splitReveal', 'solution': 'glowPulse', 'feature': 'bounceIn', 'cta': 'glowPulse' },
-    'storytelling': { 'hook': 'fadeWords', 'problem': 'typewriter', 'solution': 'fadeWords', 'feature': 'fadeWords', 'cta': 'fadeWords' },
+    'storytelling': { 'hook': 'fadeWords', 'problem': 'typewriter', 'solution': 'fadeWords', 'feature': 'fadeWords', 'cta': 'fadeWords', 'opening': 'fadeWords', 'rising_action': 'typewriter', 'climax': 'fadeWords', 'falling_action': 'fadeWords', 'resolution': 'typewriter', 'epilogue': 'fadeWords' },
     'tutorial': { 'hook': 'splitReveal', 'problem': 'typewriter', 'solution': 'highlight', 'feature': 'highlight', 'cta': 'splitReveal' },
     'product-video': { 'hook': 'splitReveal', 'problem': 'fadeWords', 'solution': 'glowPulse', 'feature': 'splitReveal', 'cta': 'glowPulse' },
     'corporate': { 'hook': 'fadeWords', 'problem': 'fadeWords', 'solution': 'highlight', 'feature': 'highlight', 'cta': 'fadeWords' },
@@ -325,6 +325,8 @@ function getDefaultTextAnimation(sceneType: string, category: string): string {
 function getDefaultSoundEffect(sceneType: string, category: string): string {
   const quietCategories = ['storytelling', 'corporate', 'testimonial', 'presentation'];
   if (quietCategories.includes(category)) {
+    // Storytelling: almost no SFX — music carries emotion
+    if (category === 'storytelling') return 'none';
     if (sceneType === 'cta') return 'success';
     if (sceneType === 'hook' && category !== 'storytelling') return 'whoosh';
     return 'none';
@@ -350,6 +352,11 @@ function getDefaultCharacterPosition(sceneType: string): string {
 }
 
 function getDefaultCharacterGesture(sceneType: string, category: string): string {
+  // Storytelling: narrator gestures only — no pointing, no celebrating
+  if (category === 'storytelling') {
+    const map: Record<string, string> = { 'opening': 'idle', 'rising_action': 'explaining', 'climax': 'thinking', 'falling_action': 'explaining', 'resolution': 'idle', 'epilogue': 'idle', 'hook': 'idle', 'intro': 'idle', 'problem': 'thinking', 'solution': 'explaining', 'cta': 'idle' };
+    return map[sceneType] || 'idle';
+  }
   if (category === 'corporate') {
     const map: Record<string, string> = { 'hook': 'idle', 'intro': 'idle', 'problem': 'thinking', 'solution': 'explaining', 'cta': 'explaining' };
     return map[sceneType] || 'idle';
@@ -408,7 +415,25 @@ cta: animation="${getDefaultAnimation('cta', categoryKey)}" textAnimation="${get
 
   const voiceoverLangMap: Record<Lang, string> = { de: 'DEUTSCH', en: 'ENGLISH', es: 'ESPAÑOL' };
 
-  const coreRules = `
+  // Storytelling-specific scene types and rules
+  const isStorytelling = categoryKey === 'storytelling';
+  
+  const storytellingSceneTypes = 'opening|rising_action|climax|falling_action|resolution|epilogue';
+  const adSceneTypes = 'hook|problem|solution|feature|proof|cta|intro|benefit';
+  const activeSceneTypes = isStorytelling ? storytellingSceneTypes : adSceneTypes;
+
+  const coreRules = isStorytelling
+    ? `
+- visualDescription MUST be in ENGLISH (image generation)
+- NOT allowed in visualDescription: "A person", "A man", "A woman", "hand", "finger", "Digital world", "Abstract shapes"
+- Adapt EVERY visualDescription to visual style "${briefing.visualStyle || 'cinematic'}"
+- NEVER describe objects with text/numbers (no dashboards, charts, monitors)
+- Use ONLY animations from the allowed set for "${categoryKey}"!
+- This is a STORYTELLING video. NO marketing language, NO sales pitch, NO CTA, NO website URL.
+- Each scene builds emotional tension. Focus on characters, conflict, setting, mood.
+- visualDescriptions should be CINEMATIC: atmospheric lighting, symbolic imagery, emotional landscapes.
+- Show the STORY environment, not products or business contexts.`
+    : `
 - visualDescription MUST be in ENGLISH (image generation)
 - NOT allowed in visualDescription: "A person", "A man", "A woman", "hand", "finger", "Digital world", "Abstract shapes"
 - Adapt EVERY visualDescription to visual style "${briefing.visualStyle || 'modern-3d'}"
@@ -416,14 +441,17 @@ cta: animation="${getDefaultAnimation('cta', categoryKey)}" textAnimation="${get
 - NEVER describe objects with text/numbers (no dashboards, charts, monitors)
 - Use ONLY animations from the allowed set for "${categoryKey}"!`;
 
+  const storytellingGestures = 'thinking|explaining|idle|waving';
+  const adGestures = 'pointing|thinking|celebrating|waving|idle|explaining';
+
   const jsonSchema = `{
   "title": "...", "totalDuration": ${effectiveDuration}, "category": "${categoryKey}",
-  "scenes": [{ "sceneNumber": 1, "sceneType": "hook|problem|solution|feature|proof|cta|intro|benefit",
+  "scenes": [{ "sceneNumber": 1, "sceneType": "${activeSceneTypes}",
     "title": "...", "voiceover": "spoken text in ${voiceoverLangMap[lang]}...",
     "visualDescription": "ENGLISH image prompt...", "durationSeconds": ${sceneDuration},
     "animation": "from set", "kenBurnsDirection": "in|out|left|right", "textAnimation": "from set",
-    "soundEffect": "whoosh|pop|success|alert|none", "showCharacter": true|false,
-    "characterPosition": "left|right", "characterGesture": "pointing|thinking|celebrating|waving|idle|explaining",
+    "soundEffect": "${isStorytelling ? 'none' : 'whoosh|pop|success|alert|none'}", "showCharacter": true|false,
+    "characterPosition": "left|right", "characterGesture": "${isStorytelling ? storytellingGestures : adGestures}",
     "statsOverlay": null, "beatAligned": false,
     "transitionIn": "fade|slide|zoom|morph|dissolve", "transitionOut": "fade|slide|zoom|morph|dissolve" }],
   "summary": "..." }`;
@@ -438,7 +466,26 @@ cta: animation="${getDefaultAnimation('cta', categoryKey)}" textAnimation="${get
   const moodConfig = briefing.moodConfig;
   const moodInstructions = moodConfig ? `MOOD: "${moodConfig.preset}" | textDensity=${moodConfig.textDensity} | animIntensity=${moodConfig.animationIntensity}` : '';
 
-  const userPrompt = `Create a ${briefing.category} video script ("${categoryKey}" style):
+  // Build user prompt — storytelling gets story-specific fields, others get marketing fields
+  const storyFields = briefing.categorySpecific || {};
+  const userPrompt = isStorytelling
+    ? `Create a STORYTELLING video script — a cinematic narrative, NOT an advertisement:
+${moodInstructions}
+Story Mode: ${storyFields.storyMode || storyFields.storytellingSubMode || 'invented'}
+Protagonist: ${storyFields.protagonist || briefing.productName || 'a person facing a challenge'}
+Conflict: ${storyFields.conflict || briefing.coreProblem || 'an inner struggle'}
+Setting: ${storyFields.setting || 'modern everyday environment'}
+Turning Point: ${storyFields.turningPoint || storyFields.wendepunkt || 'a moment of realization'}
+Moral/Message: ${storyFields.moral || storyFields.botschaft || briefing.keyMessage || 'transformation through courage'}
+Emotional Tone: ${briefing.emotionalTone || 'emotional, cinematic'}
+Visual Aesthetic: ${briefing.visualStyle || 'cinematic'} | Narrative Perspective: ${storyFields.perspective || 'third person'}
+Motifs/Symbols: ${storyFields.motifs || storyFields.motive || '-'}
+Colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'warm cinematic tones')}
+Duration: ${effectiveDuration}s | Format: ${briefing.aspectRatio || '16:9'}
+${briefing.hasCharacter ? `Narrator Character: ${briefing.characterName || 'Narrator'} - acts as storyteller, NOT salesperson` : ''}
+IMPORTANT: This is a STORY. No CTA, no URL, no sales pitch. Tell a compelling narrative!
+IMPORTANT: Write ALL voiceover text in ${voiceoverLangMap[lang]}!`
+    : `Create a ${briefing.category} video script ("${categoryKey}" style):
 ${moodInstructions}
 Project: ${briefing.projectName || '-'} | Company: ${briefing.companyName || '-'}
 Product: ${briefing.productName || '-'} | Description: ${briefing.productDescription || '-'}
