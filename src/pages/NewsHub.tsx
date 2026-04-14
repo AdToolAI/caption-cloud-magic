@@ -12,17 +12,18 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { useTranslation } from "@/hooks/useTranslation";
 
-const CATEGORIES = [
-  { key: null, label: "Alle", icon: Newspaper },
-  { key: "platform", label: "Plattformen", icon: Smartphone },
-  { key: "ai_tools", label: "KI-Tools", icon: Bot },
-  { key: "analytics", label: "Analytics", icon: BarChart3 },
-  { key: "monetization", label: "Monetarisierung", icon: DollarSign },
-  { key: "community", label: "Community", icon: Users },
-  { key: "business_finance", label: "Business & Finanzen", icon: TrendingUp },
-  { key: "strategy", label: "Strategie", icon: Target },
+const CATEGORY_KEYS = [
+  { key: null, icon: Newspaper },
+  { key: "platform", icon: Smartphone },
+  { key: "ai_tools", icon: Bot },
+  { key: "analytics", icon: BarChart3 },
+  { key: "monetization", icon: DollarSign },
+  { key: "community", icon: Users },
+  { key: "business_finance", icon: TrendingUp },
+  { key: "strategy", icon: Target },
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -35,16 +36,41 @@ const CATEGORY_COLORS: Record<string, string> = {
   strategy: "bg-orange-500/20 text-orange-300 border-orange-500/30",
 };
 
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMs = now - then;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 60) return `vor ${diffMin} Min.`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `vor ${diffH} Std.`;
-  const diffD = Math.floor(diffH / 24);
-  return `vor ${diffD} Tag${diffD > 1 ? "en" : ""}`;
+function useLocalizedTimeAgo() {
+  const { language } = useTranslation();
+  
+  return (dateStr: string): string => {
+    const now = Date.now();
+    const then = new Date(dateStr).getTime();
+    const diffMs = now - then;
+    const diffMin = Math.floor(diffMs / 60000);
+    
+    if (language === "de") {
+      if (diffMin < 1) return "gerade eben";
+      if (diffMin < 60) return `vor ${diffMin} Min.`;
+      const diffH = Math.floor(diffMin / 60);
+      if (diffH < 24) return `vor ${diffH} Std.`;
+      const diffD = Math.floor(diffH / 24);
+      return `vor ${diffD} Tag${diffD > 1 ? "en" : ""}`;
+    }
+    
+    if (language === "es") {
+      if (diffMin < 1) return "justo ahora";
+      if (diffMin < 60) return `hace ${diffMin} min`;
+      const diffH = Math.floor(diffMin / 60);
+      if (diffH < 24) return `hace ${diffH}h`;
+      const diffD = Math.floor(diffH / 24);
+      return `hace ${diffD} día${diffD > 1 ? "s" : ""}`;
+    }
+    
+    // English
+    if (diffMin < 1) return "just now";
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${diffH}h ago`;
+    const diffD = Math.floor(diffH / 24);
+    return `${diffD}d ago`;
+  };
 }
 
 function getYouTubeEmbedUrl(url: string): string | null {
@@ -63,11 +89,16 @@ function getYouTubeEmbedUrl(url: string): string | null {
 }
 
 /* ─── Hero Featured Card ─── */
-function FeaturedArticle({ article, onPlayVideo }: { article: NewsArticle; onPlayVideo: (a: NewsArticle) => void }) {
+function FeaturedArticle({ article, onPlayVideo, timeAgo, t }: { 
+  article: NewsArticle; 
+  onPlayVideo: (a: NewsArticle) => void;
+  timeAgo: (d: string) => string;
+  t: (key: string) => any;
+}) {
   const [imgError, setImgError] = useState(false);
   const hasImage = article.image_url && !imgError;
   const colorClass = CATEGORY_COLORS[article.category] || "bg-muted text-muted-foreground";
-  const catLabel = CATEGORIES.find((c) => c.key === article.category)?.label || article.category;
+  const catLabel = t(`newsHub.categories.${article.category}`) || article.category;
 
   return (
     <motion.div
@@ -77,7 +108,6 @@ function FeaturedArticle({ article, onPlayVideo }: { article: NewsArticle; onPla
       className="relative rounded-2xl overflow-hidden group cursor-pointer mb-8"
       style={{ minHeight: 360 }}
     >
-      {/* Background image */}
       {hasImage ? (
         <img
           src={article.image_url!}
@@ -89,15 +119,12 @@ function FeaturedArticle({ article, onPlayVideo }: { article: NewsArticle; onPla
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-cyan-900/20" />
       )}
 
-      {/* Cinematic gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10" />
       
-      {/* Scanline effect */}
       <div className="absolute inset-0 opacity-[0.03]" style={{
         backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px)"
       }} />
 
-      {/* Content */}
       <div className="relative z-10 flex flex-col justify-end h-full p-6 sm:p-8" style={{ minHeight: 360 }}>
         <div className="flex items-center gap-3 mb-3">
           <Badge className={`text-[10px] font-semibold border ${colorClass}`}>
@@ -140,27 +167,28 @@ function FeaturedArticle({ article, onPlayVideo }: { article: NewsArticle; onPla
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
             >
-              Artikel lesen <ArrowUpRight className="w-3.5 h-3.5" />
+              {t("newsHub.readArticle")} <ArrowUpRight className="w-3.5 h-3.5" />
             </a>
           )}
         </div>
       </div>
 
-      {/* Glow border */}
       <div className="absolute inset-0 rounded-2xl border border-white/10 group-hover:border-primary/30 transition-colors pointer-events-none" />
     </motion.div>
   );
 }
 
 /* ─── Standard Card ─── */
-function ArticleCard({ article, index, highlighted, onPlayVideo }: { 
+function ArticleCard({ article, index, highlighted, onPlayVideo, timeAgo, t }: { 
   article: NewsArticle; 
   index: number; 
   highlighted?: boolean;
   onPlayVideo: (article: NewsArticle) => void;
+  timeAgo: (d: string) => string;
+  t: (key: string) => any;
 }) {
   const colorClass = CATEGORY_COLORS[article.category] || "bg-muted text-muted-foreground";
-  const catLabel = CATEGORIES.find((c) => c.key === article.category)?.label || article.category;
+  const catLabel = t(`newsHub.categories.${article.category}`) || article.category;
   const [imgError, setImgError] = useState(false);
   const hasImage = article.image_url && !imgError;
   const hasVideo = !!article.video_url;
@@ -175,7 +203,6 @@ function ArticleCard({ article, index, highlighted, onPlayVideo }: {
       <Card className={`overflow-hidden bg-card/40 backdrop-blur-sm border-border/40 hover:border-primary/30 transition-all duration-300 group h-full ${
         highlighted ? "ring-2 ring-primary/60 border-primary/40 shadow-[0_0_24px_hsl(var(--primary)/0.25)]" : "hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)]"
       }`}>
-        {/* Image with gradient overlay */}
         {hasImage && (
           <div className="relative aspect-[16/9] overflow-hidden bg-muted">
             <img
@@ -185,10 +212,8 @@ function ArticleCard({ article, index, highlighted, onPlayVideo }: {
               onError={() => setImgError(true)}
               loading="lazy"
             />
-            {/* Bottom gradient for text readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
             
-            {/* Video badge */}
             {hasVideo && (
               <button
                 onClick={() => onPlayVideo(article)}
@@ -198,7 +223,6 @@ function ArticleCard({ article, index, highlighted, onPlayVideo }: {
               </button>
             )}
 
-            {/* Category on image */}
             <div className="absolute bottom-3 left-3">
               <Badge className={`text-[9px] font-semibold border backdrop-blur-sm ${colorClass}`}>
                 {catLabel}
@@ -207,7 +231,6 @@ function ArticleCard({ article, index, highlighted, onPlayVideo }: {
           </div>
         )}
 
-        {/* No image header */}
         {!hasImage && (
           <div className="px-5 pt-5 flex items-center gap-2">
             <Badge className={`text-[9px] font-semibold border ${colorClass}`}>
@@ -225,23 +248,12 @@ function ArticleCard({ article, index, highlighted, onPlayVideo }: {
         )}
 
         <div className="p-5">
-          {hasImage && (
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {timeAgo(article.published_at)}
-              </span>
-            </div>
-          )}
-
-          {!hasImage && (
-            <div className="flex items-center justify-between mt-2 mb-2">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {timeAgo(article.published_at)}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center justify-between mb-2 mt-0">
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {timeAgo(article.published_at)}
+            </span>
+          </div>
 
           <h3 className="font-semibold text-sm leading-snug mb-2 text-foreground group-hover:text-primary transition-colors line-clamp-2">
             {article.headline}
@@ -253,7 +265,6 @@ function ArticleCard({ article, index, highlighted, onPlayVideo }: {
             </p>
           )}
 
-          {/* Footer */}
           <div className="flex items-center justify-between pt-3 border-t border-border/30">
             {article.source && (
               <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[120px]">
@@ -268,7 +279,7 @@ function ArticleCard({ article, index, highlighted, onPlayVideo }: {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-[10px] font-medium text-primary hover:text-primary/80 transition-colors"
                 >
-                  Lesen <ArrowUpRight className="w-3 h-3" />
+                  {t("newsHub.read")} <ArrowUpRight className="w-3 h-3" />
                 </a>
               )}
             </div>
@@ -280,12 +291,19 @@ function ArticleCard({ article, index, highlighted, onPlayVideo }: {
 }
 
 export default function NewsHub() {
+  const { t } = useTranslation();
+  const timeAgo = useLocalizedTimeAgo();
   const { articles, loading, refreshing, category, setCategory, loadMore, hasMore, refreshNews, searchQuery, setSearchQuery } = useNewsHub();
   const [searchParams, setSearchParams] = useSearchParams();
   const targetHeadline = searchParams.get("headline");
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const scrolledRef = useRef(false);
   const [videoArticle, setVideoArticle] = useState<NewsArticle | null>(null);
+
+  const categories = useMemo(() => CATEGORY_KEYS.map((cat) => ({
+    ...cat,
+    label: cat.key ? t(`newsHub.categories.${cat.key}`) : t("newsHub.all"),
+  })), [t]);
 
   // Find and scroll to target article
   useEffect(() => {
@@ -318,7 +336,6 @@ export default function NewsHub() {
       {/* Hero Header */}
       <div className="relative overflow-hidden border-b border-border/30">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-cyan-500/5" />
-        {/* Subtle scanlines */}
         <div className="absolute inset-0 opacity-[0.02]" style={{
           backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px)"
         }} />
@@ -335,20 +352,19 @@ export default function NewsHub() {
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-                  News Hub
+                  {t("newsHub.title")}
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Tagesaktuelle Nachrichten für Social Media Professionals
+                  {t("newsHub.subtitle")}
                 </p>
               </div>
             </div>
 
-            {/* Search + Refresh */}
             <div className="flex items-center gap-2">
               <div className="relative w-full sm:w-72">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
                 <Input
-                  placeholder="News durchsuchen..."
+                  placeholder={t("newsHub.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 pr-9 bg-card/40 backdrop-blur-sm border-border/40 focus:border-primary/50"
@@ -370,7 +386,7 @@ export default function NewsHub() {
                 className="gap-2 shrink-0 bg-card/40 backdrop-blur-sm border-border/40"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-                <span className="hidden sm:inline">{refreshing ? "Lädt..." : "Aktualisieren"}</span>
+                <span className="hidden sm:inline">{refreshing ? t("newsHub.loading") : t("newsHub.refresh")}</span>
               </Button>
             </div>
           </motion.div>
@@ -380,7 +396,7 @@ export default function NewsHub() {
       {/* Category Filter */}
       <div className="max-w-6xl mx-auto px-4 py-3 border-b border-border/20">
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {CATEGORIES.map((cat) => {
+          {categories.map((cat) => {
             const Icon = cat.icon;
             const isActive = category === cat.key;
             return (
@@ -405,7 +421,6 @@ export default function NewsHub() {
       <div className="max-w-6xl mx-auto px-4 py-6">
         {loading && articles.length === 0 ? (
           <div className="space-y-6">
-            {/* Featured skeleton */}
             <Skeleton className="h-[360px] w-full rounded-2xl" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -427,23 +442,21 @@ export default function NewsHub() {
               <Newspaper className="w-12 h-12 text-muted-foreground/30" />
             </div>
             <p className="text-muted-foreground mb-4">
-              {searchQuery ? "Keine News für diese Suche gefunden." : "Noch keine News vorhanden."}
+              {searchQuery ? t("newsHub.noSearchResults") : t("newsHub.noNews")}
             </p>
             {!searchQuery && (
               <Button onClick={refreshNews} disabled={refreshing} className="gap-2">
                 <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-                Jetzt News laden
+                {t("newsHub.loadNow")}
               </Button>
             )}
           </div>
         ) : (
           <>
-            {/* Featured Article */}
             {featuredArticle && (
-              <FeaturedArticle article={featuredArticle} onPlayVideo={handlePlayVideo} />
+              <FeaturedArticle article={featuredArticle} onPlayVideo={handlePlayVideo} timeAgo={timeAgo} t={t} />
             )}
 
-            {/* Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {gridArticles.map((article, i) => (
                 <ArticleCard
@@ -452,6 +465,8 @@ export default function NewsHub() {
                   index={i}
                   highlighted={highlightedId === article.id}
                   onPlayVideo={handlePlayVideo}
+                  timeAgo={timeAgo}
+                  t={t}
                 />
               ))}
             </div>
@@ -460,7 +475,7 @@ export default function NewsHub() {
               <div className="text-center mt-8">
                 <Button variant="outline" onClick={loadMore} className="gap-2 bg-card/40 backdrop-blur-sm">
                   <ChevronDown className="w-4 h-4" />
-                  Mehr laden
+                  {t("newsHub.loadMore")}
                 </Button>
               </div>
             )}
@@ -492,13 +507,12 @@ export default function NewsHub() {
                   </div>
                 );
               }
-              // YouTube search link — open externally
               return (
                 <div className="text-center py-10">
                   <div className="p-3 rounded-full bg-primary/10 inline-block mb-4">
                     <Play className="w-8 h-8 text-primary" />
                   </div>
-                  <p className="text-sm text-muted-foreground mb-4">Videos zu diesem Thema auf YouTube finden</p>
+                  <p className="text-sm text-muted-foreground mb-4">{t("newsHub.findVideos")}</p>
                   <a
                     href={videoArticle.video_url}
                     target="_blank"
@@ -506,7 +520,7 @@ export default function NewsHub() {
                     className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium transition-colors"
                   >
                     <Play className="w-4 h-4" />
-                    Auf YouTube suchen
+                    {t("newsHub.searchYouTube")}
                     <ExternalLink className="w-4 h-4" />
                   </a>
                 </div>

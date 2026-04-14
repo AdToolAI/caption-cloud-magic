@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const CACHE_TTL_HOURS = 4;
-const MAX_ARTICLES = 200;
+const MAX_ARTICLES_PER_LANG = 200;
 const BATCH_SIZE = 14;
 
 const CATEGORIES = [
@@ -16,15 +16,39 @@ const CATEGORIES = [
   { key: "analytics", label: "Analytics & Data Insights" },
   { key: "monetization", label: "Creator Economy & Monetization" },
   { key: "community", label: "Community Management & Engagement" },
-  { key: "business_finance", label: "Tech Company Financials, Stock Forecasts & Market Analysis (Meta, Alphabet, Snap, Pinterest, TikTok/ByteDance)" },
+  { key: "business_finance", label: "Tech Company Financials, Stock Forecasts & Market Analysis" },
   { key: "strategy", label: "Digital Marketing Strategy & Growth Tactics" },
 ];
 
+// Language-specific source recommendations & prompts
+function getLocalizedPromptConfig(lang: string) {
+  const categoryList = CATEGORIES.map((c) => `- ${c.key}: ${c.label}`).join("\n");
+
+  if (lang === "de") {
+    return {
+      systemPrompt: `Du bist ein professioneller Nachrichten-Analyst für Social Media Marketing im deutschsprachigen Raum. Antworte NUR mit einem gültigen JSON-Array. Keine Erklärungen, kein Markdown. source_url MUSS eine vollständige Artikel-URL sein, NIEMALS eine Domain-Root-Seite.`,
+      userPrompt: `Finde ${BATCH_SIZE} der wichtigsten und aktuellsten deutschsprachigen Nachrichten-Artikel von HEUTE oder den letzten 24 Stunden zu diesen Kategorien:\n\n${categoryList}\n\nBevorzuge deutschsprachige Quellen wie: t3n, OMR, Horizont, W&V (Werben & Verkaufen), OnlineMarketing.de, AllFacebook.de, Meedia, Absatzwirtschaft, Internet World Business, Golem.de, Heise, CHIP, Gründerszene, deutsche Nachrichtenagenturen.\n\nFür jeden Artikel liefere:\n1. Eine prägnante DEUTSCHE Überschrift (max 120 Zeichen)\n2. Eine detaillierte DEUTSCHE Zusammenfassung (2-3 Sätze mit Fakten, Zahlen, Auswirkungen)\n3. Den category key aus der obigen Liste\n4. Den Quellennamen (z.B. "t3n", "OMR")\n5. Die VOLLSTÄNDIGE Quell-URL — muss eine komplette, funktionierende Artikel-URL sein (z.B. "https://t3n.de/news/artikel-titel-12345/"), NICHT nur die Domain\n\nWICHTIG: Alle Inhalte MÜSSEN auf Deutsch sein. source_url MUSS die direkte URL zum vollständigen Artikel sein.\n\nReturn ONLY valid JSON array:\n[{"headline":"...","summary":"...","category":"...","source":"...","source_url":"https://full-url.de/path/to/article"}]`,
+    };
+  }
+
+  if (lang === "es") {
+    return {
+      systemPrompt: `Eres un analista profesional de noticias de marketing en redes sociales para el mercado hispanohablante. Responde SOLO con un array JSON válido. Sin explicaciones, sin markdown. source_url DEBE ser una URL completa del artículo, NUNCA una raíz de dominio.`,
+      userPrompt: `Encuentra ${BATCH_SIZE} de las noticias más importantes y recientes en español de HOY o las últimas 24 horas sobre estas categorías:\n\n${categoryList}\n\nPrefiere fuentes en español como: Marketing4eCommerce, Reason Why, PuroMarketing, MarketingDirecto, TreceBits, Merca2.0, Genbeta, Xataka, Hipertextual, El Publicista, IPMARK, Brandemia.\n\nPara cada artículo proporciona:\n1. Un titular conciso EN ESPAÑOL (máx 120 caracteres)\n2. Un resumen detallado EN ESPAÑOL (2-3 frases con datos clave, cifras, implicaciones)\n3. La clave de categoría de la lista anterior\n4. El nombre de la fuente (ej. "Marketing4eCommerce", "Reason Why")\n5. La URL COMPLETA de la fuente — debe ser un enlace directo y funcional al artículo (ej. "https://marketing4ecommerce.net/articulo/"), NO solo el dominio\n\nIMPORTANTE: Todo el contenido DEBE estar en español. source_url DEBE ser el enlace directo al artículo completo.\n\nReturn ONLY valid JSON array:\n[{"headline":"...","summary":"...","category":"...","source":"...","source_url":"https://full-url.es/path/to/article"}]`,
+    };
+  }
+
+  // English (default)
+  return {
+    systemPrompt: `You are a professional social media marketing news analyst. Return ONLY valid JSON arrays. No markdown, no explanations. source_url MUST be full article URLs, never domain roots.`,
+    userPrompt: `Find ${BATCH_SIZE} of the most important and recent English-language news articles from TODAY or the last 24 hours covering these categories:\n\n${categoryList}\n\nPrefer English-language sources like: TechCrunch, Social Media Today, The Verge, Adweek, Marketing Land, Search Engine Journal, HubSpot Blog, Buffer Blog, Sprout Social Insights, Hootsuite Blog, Later Blog, Mashable, Digiday, AdAge.\n\nFor each article provide:\n1. A concise headline (max 120 chars)\n2. A detailed summary (2-3 sentences with key facts, numbers, implications)\n3. The category key from the list above\n4. The source name (e.g. "TechCrunch", "Social Media Today")\n5. The FULL source URL — must be a complete, working article URL (e.g. "https://techcrunch.com/2026/04/14/article-title"), NOT just a domain root\n\nIMPORTANT: All content MUST be in English. source_url MUST be the direct link to the full article.\n\nReturn ONLY valid JSON array:\n[{"headline":"...","summary":"...","category":"...","source":"...","source_url":"https://full-article-url.com/path/to/article"}]`,
+  };
+}
+
 async function fetchPexelsImage(query: string, apiKey: string): Promise<string | null> {
   try {
-    // Extract 2-3 key visual words from headline
     const keywords = query
-      .replace(/[^a-zA-Z0-9\s]/g, "")
+      .replace(/[^a-zA-ZäöüÄÖÜñáéíóú0-9\s]/g, "")
       .split(/\s+/)
       .filter((w) => w.length > 3)
       .slice(0, 3)
@@ -58,10 +82,24 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check cache
+    // Parse language from body
+    let language = "de";
+    try {
+      const body = await req.json();
+      if (body?.language && ["de", "en", "es"].includes(body.language)) {
+        language = body.language;
+      }
+    } catch {
+      // No body or invalid JSON — use default
+    }
+
+    console.log(`Fetching news for language: ${language}`);
+
+    // Check cache PER LANGUAGE
     const { data: latestArticle } = await supabase
       .from("news_hub_articles")
       .select("created_at")
+      .eq("language", language)
       .order("created_at", { ascending: false })
       .limit(1)
       .single();
@@ -69,11 +107,12 @@ serve(async (req) => {
     if (latestArticle) {
       const hoursSince = (Date.now() - new Date(latestArticle.created_at).getTime()) / (1000 * 60 * 60);
       if (hoursSince < CACHE_TTL_HOURS) {
-        // Even if cached, backfill images for articles missing them
+        // Backfill images for articles missing them (language-scoped)
         if (PEXELS_API_KEY) {
           const { data: noImage } = await supabase
             .from("news_hub_articles")
             .select("id, headline")
+            .eq("language", language)
             .is("image_url", null)
             .order("published_at", { ascending: false })
             .limit(10);
@@ -89,24 +128,24 @@ serve(async (req) => {
         }
 
         return new Response(
-          JSON.stringify({ status: "cached", message: `Last fetch was ${hoursSince.toFixed(1)}h ago, skipping.` }),
+          JSON.stringify({ status: "cached", language, message: `Last fetch was ${hoursSince.toFixed(1)}h ago, skipping.` }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }
 
-    // Dedup
+    // Dedup PER LANGUAGE
     const { data: recentArticles } = await supabase
       .from("news_hub_articles")
       .select("headline")
+      .eq("language", language)
       .order("created_at", { ascending: false })
       .limit(50);
 
     const existingHeadlines = (recentArticles || []).map((a) => a.headline.toLowerCase());
 
-    const categoryList = CATEGORIES.map((c) => `- ${c.key}: ${c.label}`).join("\n");
-
-    const prompt = `You are a social media industry news analyst. Find ${BATCH_SIZE} of the most important and recent news articles from TODAY or the last 24 hours covering these categories:\n\n${categoryList}\n\nFor each article provide:\n1. A concise headline (max 120 chars)\n2. A detailed summary (2-3 sentences with key facts, numbers, implications)\n3. The category key from the list above\n4. The source name (e.g. "TechCrunch", "Social Media Today")\n5. The FULL source URL — must be a complete, working article URL (e.g. "https://techcrunch.com/2026/04/14/article-title"), NOT just a domain root\n\nIMPORTANT: source_url MUST be full article URLs, not domain homepages. If you cannot find the exact URL, use the citation URL from your sources.\n\nFocus on:\n- Platform algorithm changes, new features, policy updates\n- AI tool launches and updates relevant to marketers\n- Creator monetization news\n- Stock price movements and earnings of Meta, Alphabet, Snap, Pinterest, ByteDance\n- Marketing strategy insights and data-driven trends\n\nReturn ONLY valid JSON array:\n[{"headline":"...","summary":"...","category":"...","source":"...","source_url":"https://full-article-url.com/path/to/article"}]`;
+    // Get localized prompt
+    const { systemPrompt, userPrompt } = getLocalizedPromptConfig(language);
 
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
@@ -117,8 +156,8 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "sonar",
         messages: [
-          { role: "system", content: "You are a professional news analyst. Return only valid JSON arrays. No markdown, no explanations. source_url MUST be full article URLs, never domain roots." },
-          { role: "user", content: prompt },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
         ],
         temperature: 0.3,
         max_tokens: 5000,
@@ -133,6 +172,8 @@ serve(async (req) => {
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
     const citations: string[] = data.citations || [];
+
+    console.log(`Perplexity returned ${citations.length} citations for ${language}`);
 
     // Parse JSON
     let articles: any[];
@@ -161,20 +202,29 @@ serve(async (req) => {
     for (let i = 0; i < filteredArticles.length; i++) {
       const a = filteredArticles[i];
 
-      // Fix source_url: use citations as fallback if URL looks like a domain root
+      // Fix source_url: use citations as primary source for real URLs
       let sourceUrl = a.source_url || null;
+
+      // Check if the provided URL is just a domain root
       if (sourceUrl) {
         try {
           const parsed = new URL(sourceUrl);
-          // If it's just a domain root (path is "/" or empty), try citations
-          if (parsed.pathname === "/" || parsed.pathname === "") {
-            if (citations[i]) sourceUrl = citations[i];
+          const isRoot = parsed.pathname === "/" || parsed.pathname === "";
+          if (isRoot) {
+            // Try citation first
+            sourceUrl = citations[i] || null;
           }
         } catch {
-          if (citations[i]) sourceUrl = citations[i];
+          sourceUrl = citations[i] || null;
         }
-      } else if (citations[i]) {
-        sourceUrl = citations[i];
+      } else {
+        sourceUrl = citations[i] || null;
+      }
+
+      // Second pass: if we still have no URL or a root, try keyword-matching citations
+      if (!sourceUrl || isRootUrl(sourceUrl)) {
+        const matched = findBestCitation(a.headline, citations);
+        if (matched) sourceUrl = matched;
       }
 
       // Fetch Pexels image
@@ -194,7 +244,7 @@ serve(async (req) => {
         source_url: sourceUrl,
         image_url: imageUrl,
         video_url: videoUrl,
-        language: "de",
+        language,
         batch_id: batchId,
         published_at: new Date().toISOString(),
       });
@@ -208,19 +258,20 @@ serve(async (req) => {
       if (insertError) throw new Error(`Insert error: ${insertError.message}`);
     }
 
-    // Cleanup
+    // Cleanup PER LANGUAGE
     const { data: allArticles } = await supabase
       .from("news_hub_articles")
       .select("id")
+      .eq("language", language)
       .order("published_at", { ascending: false });
 
-    if (allArticles && allArticles.length > MAX_ARTICLES) {
-      const idsToDelete = allArticles.slice(MAX_ARTICLES).map((a) => a.id);
+    if (allArticles && allArticles.length > MAX_ARTICLES_PER_LANG) {
+      const idsToDelete = allArticles.slice(MAX_ARTICLES_PER_LANG).map((a) => a.id);
       await supabase.from("news_hub_articles").delete().in("id", idsToDelete);
     }
 
     return new Response(
-      JSON.stringify({ status: "success", inserted: newArticles.length, batch_id: batchId }),
+      JSON.stringify({ status: "success", language, inserted: newArticles.length, batch_id: batchId }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
@@ -231,3 +282,47 @@ serve(async (req) => {
     );
   }
 });
+
+function isRootUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname === "/" || parsed.pathname === "";
+  } catch {
+    return true;
+  }
+}
+
+function findBestCitation(headline: string, citations: string[]): string | null {
+  if (!citations || citations.length === 0) return null;
+
+  const words = headline
+    .toLowerCase()
+    .replace(/[^a-zA-ZäöüÄÖÜñáéíóú0-9\s]/g, "")
+    .split(/\s+/)
+    .filter((w) => w.length > 3);
+
+  let bestUrl: string | null = null;
+  let bestScore = 0;
+
+  for (const citation of citations) {
+    if (isRootUrl(citation)) continue;
+
+    const urlLower = citation.toLowerCase();
+    let score = 0;
+    for (const word of words) {
+      if (urlLower.includes(word)) score++;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestUrl = citation;
+    }
+  }
+
+  // If no keyword match, just use first non-root citation
+  if (!bestUrl) {
+    bestUrl = citations.find((c) => !isRootUrl(c)) || null;
+  }
+
+  return bestUrl;
+}
