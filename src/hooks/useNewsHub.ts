@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useDebounce } from "@/hooks/useDebounce";
 
 export interface NewsArticle {
   id: string;
@@ -8,6 +9,9 @@ export interface NewsArticle {
   category: string;
   source: string | null;
   source_url: string | null;
+  image_url: string | null;
+  video_url: string | null;
+  video_embed_url: string | null;
   published_at: string;
   created_at: string;
 }
@@ -21,6 +25,8 @@ export function useNewsHub() {
   const [category, setCategory] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 300);
 
   const fetchArticles = useCallback(async (reset = false) => {
     const currentPage = reset ? 0 : page;
@@ -35,6 +41,11 @@ export function useNewsHub() {
 
     if (category) {
       query = query.eq("category", category);
+    }
+
+    if (debouncedSearch.trim()) {
+      const term = `%${debouncedSearch.trim()}%`;
+      query = query.or(`headline.ilike.${term},summary.ilike.${term}`);
     }
 
     const { data, error } = await query;
@@ -55,16 +66,16 @@ export function useNewsHub() {
       setArticles((prev) => [...prev, ...fetched]);
     }
     setLoading(false);
-  }, [category, page]);
+  }, [category, page, debouncedSearch]);
 
-  // Initial load + category change
+  // Initial load + category/search change
   useEffect(() => {
     setLoading(true);
     setArticles([]);
     setPage(0);
     setHasMore(true);
     fetchArticles(true);
-  }, [category]);
+  }, [category, debouncedSearch]);
 
   // Load more
   const loadMore = useCallback(() => {
@@ -82,7 +93,6 @@ export function useNewsHub() {
     setRefreshing(true);
     try {
       await supabase.functions.invoke("fetch-news-hub");
-      // Reload articles
       setPage(0);
       await fetchArticles(true);
     } catch (e) {
@@ -90,7 +100,7 @@ export function useNewsHub() {
     } finally {
       setRefreshing(false);
     }
-  }, [category]);
+  }, [category, debouncedSearch]);
 
   return {
     articles,
@@ -101,5 +111,7 @@ export function useNewsHub() {
     loadMore,
     hasMore,
     refreshNews,
+    searchQuery,
+    setSearchQuery,
   };
 }

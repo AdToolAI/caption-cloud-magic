@@ -65,7 +65,7 @@ serve(async (req) => {
 
     const categoryList = CATEGORIES.map((c) => `- ${c.key}: ${c.label}`).join("\n");
 
-    const prompt = `You are a social media industry news analyst. Find ${BATCH_SIZE} of the most important and recent news articles from TODAY or the last 24 hours covering these categories:\n\n${categoryList}\n\nFor each article provide:\n1. A concise headline (max 120 chars)\n2. A detailed summary (2-3 sentences with key facts, numbers, implications)\n3. The category key from the list above\n4. The source name (e.g. "TechCrunch", "Social Media Today")\n5. A source URL if available\n\nFocus on:\n- Platform algorithm changes, new features, policy updates\n- AI tool launches and updates relevant to marketers\n- Creator monetization news\n- Stock price movements and earnings of Meta, Alphabet, Snap, Pinterest, ByteDance\n- Marketing strategy insights and data-driven trends\n\nReturn ONLY valid JSON array:\n[{"headline":"...","summary":"...","category":"...","source":"...","source_url":"..."}]`;
+    const prompt = `You are a social media industry news analyst. Find ${BATCH_SIZE} of the most important and recent news articles from TODAY or the last 24 hours covering these categories:\n\n${categoryList}\n\nFor each article provide:\n1. A concise headline (max 120 chars)\n2. A detailed summary (2-3 sentences with key facts, numbers, implications)\n3. The category key from the list above\n4. The source name (e.g. "TechCrunch", "Social Media Today")\n5. A source URL if available\n6. An image URL if available (a relevant thumbnail or header image from the article source)\n7. A video URL if available (a relevant YouTube or video link related to the article)\n\nFocus on:\n- Platform algorithm changes, new features, policy updates\n- AI tool launches and updates relevant to marketers\n- Creator monetization news\n- Stock price movements and earnings of Meta, Alphabet, Snap, Pinterest, ByteDance\n- Marketing strategy insights and data-driven trends\n\nReturn ONLY valid JSON array:\n[{"headline":"...","summary":"...","category":"...","source":"...","source_url":"...","image_url":"...or null","video_url":"...or null"}]`;
 
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
@@ -76,11 +76,11 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "sonar",
         messages: [
-          { role: "system", content: "You are a professional news analyst. Return only valid JSON arrays. No markdown, no explanations." },
+          { role: "system", content: "You are a professional news analyst. Return only valid JSON arrays. No markdown, no explanations. For image_url and video_url, return null if not available." },
           { role: "user", content: prompt },
         ],
         temperature: 0.3,
-        max_tokens: 4000,
+        max_tokens: 5000,
       }),
     });
 
@@ -120,6 +120,8 @@ serve(async (req) => {
         category: a.category,
         source: a.source || null,
         source_url: a.source_url || null,
+        image_url: a.image_url && a.image_url !== "null" ? a.image_url : null,
+        video_url: a.video_url && a.video_url !== "null" ? a.video_url : null,
         language: "de",
         batch_id: batchId,
         published_at: new Date().toISOString(),
