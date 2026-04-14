@@ -285,7 +285,7 @@ function getDefaultAnimation(sceneType: string, category: string): string {
   if (!profile) return 'fadeIn';
   const categoryMaps: Record<string, Record<string, string>> = {
     'advertisement': { 'hook': 'popIn', 'intro': 'flyIn', 'problem': 'slideUp', 'solution': 'bounce', 'feature': 'popIn', 'benefit': 'flyIn', 'proof': 'slideUp', 'cta': 'bounce' },
-    'storytelling': { 'hook': 'kenBurns', 'intro': 'fadeIn', 'problem': 'kenBurns', 'solution': 'fadeIn', 'feature': 'parallax', 'benefit': 'kenBurns', 'proof': 'fadeIn', 'cta': 'fadeIn' },
+    'storytelling': { 'hook': 'kenBurns', 'intro': 'fadeIn', 'problem': 'kenBurns', 'solution': 'fadeIn', 'feature': 'parallax', 'benefit': 'kenBurns', 'proof': 'fadeIn', 'cta': 'fadeIn', 'opening': 'kenBurns', 'rising_action': 'kenBurns', 'climax': 'parallax', 'falling_action': 'fadeIn', 'resolution': 'kenBurns', 'epilogue': 'fadeIn' },
     'tutorial': { 'hook': 'slideUp', 'intro': 'fadeIn', 'problem': 'slideUp', 'solution': 'flyIn', 'feature': 'slideUp', 'benefit': 'slideUp', 'proof': 'fadeIn', 'cta': 'slideUp' },
     'product-video': { 'hook': 'morphIn', 'intro': 'fadeIn', 'problem': 'kenBurns', 'solution': 'parallax', 'feature': 'parallax', 'benefit': 'morphIn', 'proof': 'fadeIn', 'cta': 'morphIn' },
     'corporate': { 'hook': 'fadeIn', 'intro': 'fadeIn', 'problem': 'fadeIn', 'solution': 'slideUp', 'feature': 'slideUp', 'benefit': 'fadeIn', 'proof': 'fadeIn', 'cta': 'slideUp' },
@@ -306,7 +306,7 @@ function getDefaultTextAnimation(sceneType: string, category: string): string {
   if (!profile) return 'fadeWords';
   const categoryMaps: Record<string, Record<string, string>> = {
     'advertisement': { 'hook': 'bounceIn', 'problem': 'splitReveal', 'solution': 'glowPulse', 'feature': 'bounceIn', 'cta': 'glowPulse' },
-    'storytelling': { 'hook': 'fadeWords', 'problem': 'typewriter', 'solution': 'fadeWords', 'feature': 'fadeWords', 'cta': 'fadeWords' },
+    'storytelling': { 'hook': 'fadeWords', 'problem': 'typewriter', 'solution': 'fadeWords', 'feature': 'fadeWords', 'cta': 'fadeWords', 'opening': 'fadeWords', 'rising_action': 'typewriter', 'climax': 'fadeWords', 'falling_action': 'fadeWords', 'resolution': 'typewriter', 'epilogue': 'fadeWords' },
     'tutorial': { 'hook': 'splitReveal', 'problem': 'typewriter', 'solution': 'highlight', 'feature': 'highlight', 'cta': 'splitReveal' },
     'product-video': { 'hook': 'splitReveal', 'problem': 'fadeWords', 'solution': 'glowPulse', 'feature': 'splitReveal', 'cta': 'glowPulse' },
     'corporate': { 'hook': 'fadeWords', 'problem': 'fadeWords', 'solution': 'highlight', 'feature': 'highlight', 'cta': 'fadeWords' },
@@ -325,6 +325,8 @@ function getDefaultTextAnimation(sceneType: string, category: string): string {
 function getDefaultSoundEffect(sceneType: string, category: string): string {
   const quietCategories = ['storytelling', 'corporate', 'testimonial', 'presentation'];
   if (quietCategories.includes(category)) {
+    // Storytelling: almost no SFX — music carries emotion
+    if (category === 'storytelling') return 'none';
     if (sceneType === 'cta') return 'success';
     if (sceneType === 'hook' && category !== 'storytelling') return 'whoosh';
     return 'none';
@@ -350,6 +352,11 @@ function getDefaultCharacterPosition(sceneType: string): string {
 }
 
 function getDefaultCharacterGesture(sceneType: string, category: string): string {
+  // Storytelling: narrator gestures only — no pointing, no celebrating
+  if (category === 'storytelling') {
+    const map: Record<string, string> = { 'opening': 'idle', 'rising_action': 'explaining', 'climax': 'thinking', 'falling_action': 'explaining', 'resolution': 'idle', 'epilogue': 'idle', 'hook': 'idle', 'intro': 'idle', 'problem': 'thinking', 'solution': 'explaining', 'cta': 'idle' };
+    return map[sceneType] || 'idle';
+  }
   if (category === 'corporate') {
     const map: Record<string, string> = { 'hook': 'idle', 'intro': 'idle', 'problem': 'thinking', 'solution': 'explaining', 'cta': 'explaining' };
     return map[sceneType] || 'idle';
