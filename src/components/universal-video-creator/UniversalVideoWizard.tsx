@@ -205,10 +205,13 @@ export function UniversalVideoWizard() {
                 generationMode === 'manual' ? STEPS_MANUAL :
                 [
                   { id: 'category', label: t('uvc.stepCategory'), icon: Video, description: t('uvc.stepCategoryDesc') },
+                  ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || 'Lade mindestens 4 Produktbilder hoch' }] : []),
                   { id: 'mood', label: t('uvc.stepMood'), icon: Palette, description: t('uvc.stepMoodDesc') },
                   { id: 'visual-style', label: t('uvc.stepVisualStyle'), icon: Film, description: t('uvc.stepVisualStyleDesc') },
                   { id: 'mode-select', label: t('uvc.stepMode'), icon: Sparkles, description: t('uvc.stepModeDesc') }
                 ];
+
+  const currentStepId = STEPS[currentStep]?.id;
 
   const handleCategorySelect = (category: VideoCategory) => {
     setSelectedCategory(category);
@@ -499,7 +502,8 @@ export function UniversalVideoWizard() {
   };
 
   const handleBackToConsultation = () => {
-    setCurrentStep(4);
+    const consultIdx = STEPS.findIndex(s => s.id === 'consultation');
+    setCurrentStep(consultIdx >= 0 ? consultIdx : 4);
     setIsAutoGenerating(false);
     setError(null);
   };
@@ -511,7 +515,6 @@ export function UniversalVideoWizard() {
     }
   };
 
-  const currentStepId = STEPS[currentStep]?.id;
   const categoryName = getCategoryName(selectedCategory);
 
   // Auth check
