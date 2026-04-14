@@ -790,8 +790,10 @@ async function runGenerationPipeline(
         
         try {
           // Enhanced prompt engineering for Loft-Film quality
+          const isStorytelling = (briefing.category || '').includes('storytelling') || (briefing.category || '').includes('brand-story') || (briefing.category || '').includes('behind-scenes');
+          
           const categoryStyleHints: Record<string, string> = {
-            'storytelling': 'cinematic, warm lighting, shallow depth of field, dramatic composition',
+            'storytelling': 'cinematic, warm lighting, shallow depth of field, dramatic composition, narrative mood',
             'corporate': 'clean, professional, modern office environment, business atmosphere',
             'tutorial': 'bright, clear, well-organized, educational diagram style',
             'advertisement': 'bold, vibrant, eye-catching, product-focused, high contrast',
@@ -802,7 +804,17 @@ async function runGenerationPipeline(
           };
           const categoryHint = categoryStyleHints[briefing.category || ''] || 'professional, high quality';
           
-          const sceneStyleHints: Record<string, string> = {
+          // Storytelling gets narrative scene hints, not ad scene hints
+          const storySceneHints: Record<string, string> = {
+            'opening': 'establishing shot, wide angle, setting the scene, atmospheric, quiet moment',
+            'rising_action': 'building tension, movement, dramatic angles, increasing intensity',
+            'climax': 'peak moment, dramatic lighting, intense composition, emotional peak',
+            'falling_action': 'aftermath, reflection, softer light, contemplative mood',
+            'resolution': 'peaceful, resolved, warm light, hopeful atmosphere, new beginning',
+            'epilogue': 'wide shot, reflective, golden hour, sense of closure and peace',
+          };
+          
+          const adSceneHints: Record<string, string> = {
             'hook': 'dramatic, attention-grabbing, bold composition, central focal point',
             'problem': 'moody, tense atmosphere, visual tension, dark undertones',
             'solution': 'bright, optimistic, open space, positive energy, uplifting',
@@ -810,13 +822,18 @@ async function runGenerationPipeline(
             'proof': 'trustworthy, data-driven, charts, statistics visualization',
             'cta': 'clean minimal abstract background, soft gradient or bokeh effect, NO people, NO silhouettes, NO human figures, NO busy illustrations, calm and focused',
           };
-          const sceneHint = sceneStyleHints[sceneType] || 'professional, well-composed';
+          const sceneHintMap = isStorytelling ? { ...adSceneHints, ...storySceneHints } : adSceneHints;
+          const sceneHint = sceneHintMap[sceneType] || 'professional, well-composed';
 
           const aspectHint = briefing.aspectRatio === '9:16' ? 'vertical portrait composition (9:16)' : 'wide landscape composition (16:9)';
-          // ✅ Phase 11: Product context injection + anti-text as SHORT suffix
-          const productContext = briefing.productDescription
-            ? `Context: "${briefing.companyName || briefing.productName || 'digital product'}" - ${(briefing.productDescription || '').slice(0, 120)}. `
-            : '';
+          
+          // Storytelling: NO product context, focus on story environment
+          const productContext = isStorytelling
+            ? '' // No product context for storytelling
+            : (briefing.productDescription
+              ? `Context: "${briefing.companyName || briefing.productName || 'digital product'}" - ${(briefing.productDescription || '').slice(0, 120)}. `
+              : '');
+          
           const antiTextSuffix = 'STRICT: This image must contain ZERO text, ZERO numbers, ZERO digits, ZERO percentages, ZERO labels, ZERO letters, ZERO words. No dashboard numbers, no analytics data, no statistics, no charts with values, no data visualizations. No QR codes, no logos, no UI mockups, no screenshots, no watermarks. ABSOLUTELY NO human figures, people, silhouettes, hands, fingers, or body parts — replace any human subjects with empty furniture, equipment, or open space. Show ONLY the environment and objects.';
           
           // Phase 15: Keyword sanitizer — replace text-bearing objects before prompt construction
@@ -841,10 +858,15 @@ async function runGenerationPipeline(
           
           const sanitizedVisualDesc = sanitizeVisualDescription(scene.visualDescription || '');
           
-          // Phase 14: visualStyle as dominant signal, sceneStyleHints as subtle mood only
-          const prompt = attempt === 0
-            ? `ART STYLE: ${briefing.visualStyle}. ${productContext}${sanitizedVisualDesc}. Subtle mood: ${sceneHint}. ${categoryHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. IMPORTANT: Maintain exact same visual art style across all scenes. ${antiTextSuffix}`
-            : `ART STYLE: ${briefing.visualStyle}. ${productContext}Professional ${sceneType} scene for ${briefing.companyName || briefing.productName || 'business'}. ${categoryHint}. ${aspectHint}. IMPORTANT: Maintain exact same visual art style across all scenes. ${antiTextSuffix}`;
+          // Storytelling: cinematic prompts without product context
+          // Ad categories: product-focused prompts
+          const prompt = isStorytelling
+            ? (attempt === 0
+              ? `ART STYLE: ${briefing.visualStyle || 'cinematic'}. NARRATIVE SCENE: ${sanitizedVisualDesc}. Scene mood: ${sceneHint}. ${categoryHint}. ${aspectHint}. Cinematic quality, ${briefing.emotionalTone || 'emotional'} atmosphere. Color palette: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : 'warm cinematic tones'}. IMPORTANT: This is a STORY — show environments, settings, symbolic objects. NO products, NO business context. ${antiTextSuffix}`
+              : `ART STYLE: ${briefing.visualStyle || 'cinematic'}. Cinematic ${sceneType} scene for a narrative story. ${sceneHint}. ${categoryHint}. ${aspectHint}. Atmospheric, emotional. ${antiTextSuffix}`)
+            : (attempt === 0
+              ? `ART STYLE: ${briefing.visualStyle}. ${productContext}${sanitizedVisualDesc}. Subtle mood: ${sceneHint}. ${categoryHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'professional palette')}. IMPORTANT: Maintain exact same visual art style across all scenes. ${antiTextSuffix}`
+              : `ART STYLE: ${briefing.visualStyle}. ${productContext}Professional ${sceneType} scene for ${briefing.companyName || briefing.productName || 'business'}. ${categoryHint}. ${aspectHint}. IMPORTANT: Maintain exact same visual art style across all scenes. ${antiTextSuffix}`);
 
           const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
             method: 'POST',
