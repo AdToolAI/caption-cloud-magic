@@ -27,6 +27,7 @@ import {
   Workflow,
   Share2,
   Settings,
+  Newspaper,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 
