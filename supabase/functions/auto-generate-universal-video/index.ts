@@ -1488,7 +1488,7 @@ async function runGenerationPipeline(
     };
 
     const inputProps = deepStripNulls({
-      category: validateEnum(briefing.category, VALID_CATEGORIES, 'social-reel'),
+      category: validateEnum(briefing._renderCategory || briefing.category, VALID_CATEGORIES, 'social-reel'),
       storytellingStructure: validateEnum(briefing.storytellingStructure, VALID_STORYTELLING, 'hook-problem-solution'),
       scenes: finalScenes,
       primaryColor: briefing.brandColors?.[0] || '#3b82f6',
