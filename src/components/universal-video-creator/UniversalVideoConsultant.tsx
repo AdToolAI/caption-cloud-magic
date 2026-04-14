@@ -39,7 +39,11 @@ export function UniversalVideoConsultant({
   const categoryInfo = localizedCategories.find(c => c.category === category);
   const interview = ALL_CATEGORY_INTERVIEWS[category];
   const totalPhases = interview?.phases?.length || 10;
-  const localizedFirstQuestion = t('uvc.consultantFirstQuestion');
+  const categoryKey = category.replace(/-/g, '_');
+  const localizedFirstQuestion = t(`uvc.consultantFirstQuestion_${categoryKey}`) as string;
+  const firstQuestion = (typeof localizedFirstQuestion === 'string' && !localizedFirstQuestion.startsWith('uvc.'))
+    ? localizedFirstQuestion
+    : t('uvc.consultantFirstQuestion');
 
   const initialMessage: Message = {
     id: '1',
@@ -48,11 +52,11 @@ export function UniversalVideoConsultant({
       ? t('uvc.consultantWelcomeFS', { 
           category: categoryInfo?.name || '', 
           phases: String(totalPhases), 
-          question: localizedFirstQuestion 
+          question: firstQuestion 
         })
       : t('uvc.consultantWelcomeManual', { 
           category: categoryInfo?.name || '', 
-          question: localizedFirstQuestion 
+          question: firstQuestion 
         }),
     quickReplies: undefined
   };

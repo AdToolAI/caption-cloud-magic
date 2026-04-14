@@ -12,26 +12,234 @@ const corsHeaders = {
 
 type Lang = 'de' | 'en' | 'es';
 
-const UNIVERSAL_PHASES_BLOCK1: Record<Lang, string[]> = {
-  de: [
-    'Was ist der ZWECK dieses Videos? (Verkaufen, Informieren, Emotionalisieren, Rekrutieren, Unterhalten)',
-    'Wer ist deine ZIELGRUPPE? (Alter, Beruf, Branche, Interessen, Schmerzpunkte)',
-    'Was ist dein PRODUKT oder UNTERNEHMEN? (Name, Branche, 2-3 Sätze Beschreibung)',
-    'Was macht dich EINZIGARTIG? (Dein USP in einem Satz)',
-  ],
-  en: [
-    'What is the PURPOSE of this video? (Sell, Inform, Emotionalize, Recruit, Entertain)',
-    'Who is your TARGET AUDIENCE? (Age, profession, industry, interests, pain points)',
-    'What is your PRODUCT or COMPANY? (Name, industry, 2-3 sentence description)',
-    'What makes you UNIQUE? (Your USP in one sentence)',
-  ],
-  es: [
-    '¿Cuál es el PROPÓSITO de este video? (Vender, Informar, Emocionar, Reclutar, Entretener)',
-    '¿Quién es tu PÚBLICO OBJETIVO? (Edad, profesión, industria, intereses, puntos de dolor)',
-    '¿Cuál es tu PRODUCTO o EMPRESA? (Nombre, industria, descripción de 2-3 frases)',
-    '¿Qué te hace ÚNICO? (Tu propuesta de valor en una frase)',
-  ],
+const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
+  de: {
+    'advertisement': [
+      'Welches PRODUKT oder welche DIENSTLEISTUNG möchtest du bewerben? (Name, Branche, kurze Beschreibung)',
+      'Wer ist deine ZIELGRUPPE? (Alter, Beruf, Branche, Interessen, Schmerzpunkte)',
+      'Was ist dein USP — was unterscheidet dich von der Konkurrenz?',
+      'Welches ZIEL hat die Werbung? (Mehr Verkäufe, Leads, Brand Awareness, App-Downloads)',
+    ],
+    'storytelling': [
+      'Welche GESCHICHTE möchtest du erzählen? (Gründerstory, Kundenerlebnis, Markenreise, fiktive Erzählung)',
+      'Wer ist der HELD deiner Geschichte? (Gründer, Kunde, Mitarbeiter, fiktive Figur — beschreibe die Person)',
+      'Was ist der ZENTRALE KONFLIKT oder die Herausforderung in der Story?',
+      'Welche EMOTION soll der Zuschauer am Ende fühlen? (Inspiration, Hoffnung, Staunen, Mitgefühl)',
+    ],
+    'tutorial': [
+      'Was genau möchtest du deinen Zuschauern BEIBRINGEN? (Konkretes Thema oder Fähigkeit)',
+      'Für wen ist das Tutorial? (Anfänger, Fortgeschrittene, Experten — beschreibe dein Publikum)',
+      'Was können Zuschauer NACH dem Tutorial, was sie vorher nicht konnten?',
+      'Welche TOOLS oder MATERIALIEN werden benötigt, um mitzumachen?',
+    ],
+    'product-video': [
+      'Welches PRODUKT stellst du vor? (Name, Kategorie, kurze Beschreibung)',
+      'Welches PROBLEM löst dein Produkt für den Kunden?',
+      'Was sind die Top 3 FEATURES oder Vorteile deines Produkts?',
+      'Wer kauft dein Produkt? (Zielgruppe, Alter, Kaufmotivation)',
+    ],
+    'corporate': [
+      'Was ist der HAUPTZWECK des Unternehmensfilms? (Recruiting, Imagefilm, Investoren-Pitch, Employer Branding)',
+      'Erzähl mir von deinem UNTERNEHMEN — Name, Branche, Gründungsjahr, was ihr macht',
+      'Was ist eure MISSION und VISION? Warum existiert euer Unternehmen?',
+      'Was macht eure UNTERNEHMENSKULTUR besonders? Was sollen Zuschauer über euch erfahren?',
+    ],
+    'social-content': [
+      'Für welche PLATTFORM ist der Content? (TikTok, Instagram Reels, YouTube Shorts, mehrere)',
+      'Welche ART von Content willst du erstellen? (Trend, Educational, Entertainment, Behind-the-Scenes)',
+      'Wer ist deine COMMUNITY? Beschreibe deine Follower und deren Interessen',
+      'Was soll der SCROLL-STOPPER sein? Was fesselt in den ersten 2 Sekunden?',
+    ],
+    'testimonial': [
+      'WER gibt das Testimonial? (Name, Position, Unternehmen, Beziehung zu dir)',
+      'Welches PROBLEM hatte die Person BEVOR sie dein Produkt/Service genutzt hat?',
+      'Was ist das KONKRETE ERGEBNIS nach der Nutzung? (Zahlen, Zeitersparnis, Transformation)',
+      'Welche EMOTIONALE Veränderung hat die Person erlebt?',
+    ],
+    'explainer': [
+      'Was genau soll ERKLÄRT werden? (Produkt, Prozess, Konzept, Service)',
+      'Wie KOMPLEX ist das Thema für deine Zielgruppe? (Einfach, mittel, sehr komplex)',
+      'Welches PROBLEM löst deine Erklärung? Was verstehen die Leute aktuell nicht?',
+      'Wer ist die ZIELGRUPPE des Erklärvideos? (Kunden, Mitarbeiter, Partner, Investoren)',
+    ],
+    'event': [
+      'Was für ein EVENT ist es? (Konferenz, Launch, Feier, Messe, Workshop)',
+      'Was ist der ZWECK des Videos? (Recap, Teaser fürs nächste Mal, Dokumentation, Promotion)',
+      'Was sind die HIGHLIGHTS die unbedingt gezeigt werden müssen?',
+      'Welche ATMOSPHÄRE soll das Video transportieren? (Energie, Professionalität, Party, Inspiration)',
+    ],
+    'promo': [
+      'Was wird BEWORBEN? (Produkt-Launch, Sale, Event, neues Feature, Ankündigung)',
+      'Was ist das EINE Hauptversprechen in einem Satz?',
+      'Gibt es eine DEADLINE oder ein LAUNCH-DATUM?',
+      'Welche EMOTION soll geweckt werden? (FOMO, Vorfreude, Neugier, Aufregung)',
+    ],
+    'presentation': [
+      'Was ist das THEMA und der TITEL deiner Präsentation?',
+      'Wer ist das PUBLIKUM? (Investoren, Kunden, Konferenz, internes Team)',
+      'Was ist deine KERNTHESE — die eine Hauptaussage die ankommen muss?',
+      'Was soll das Publikum nach der Präsentation TUN? (Investieren, kaufen, verstehen, handeln)',
+    ],
+    'custom': [
+      'Beschreibe deine VIDEO-IDEE in 2-3 Sätzen — was schwebt dir vor?',
+      'Welches ZIEL soll das Video erreichen? Was ist der gewünschte Effekt?',
+      'Wer ist die ZIELGRUPPE für dieses Video?',
+      'Gibt es REFERENZEN oder Inspirationen? Welcher Stil gefällt dir?',
+    ],
+  },
+  en: {
+    'advertisement': [
+      'What PRODUCT or SERVICE do you want to advertise? (Name, industry, brief description)',
+      'Who is your TARGET AUDIENCE? (Age, profession, industry, interests, pain points)',
+      'What is your USP — what sets you apart from competitors?',
+      'What is the GOAL of the ad? (More sales, leads, brand awareness, app downloads)',
+    ],
+    'storytelling': [
+      'What STORY do you want to tell? (Founder story, customer experience, brand journey, fictional tale)',
+      'Who is the HERO of your story? (Founder, customer, employee, fictional character — describe them)',
+      'What is the CENTRAL CONFLICT or challenge in the story?',
+      'What EMOTION should the viewer feel at the end? (Inspiration, hope, wonder, empathy)',
+    ],
+    'tutorial': [
+      'What exactly do you want to TEACH your viewers? (Specific topic or skill)',
+      'Who is the tutorial for? (Beginners, intermediate, experts — describe your audience)',
+      'What can viewers DO after the tutorial that they couldn\'t before?',
+      'What TOOLS or MATERIALS are needed to follow along?',
+    ],
+    'product-video': [
+      'Which PRODUCT are you presenting? (Name, category, brief description)',
+      'What PROBLEM does your product solve for the customer?',
+      'What are the top 3 FEATURES or benefits of your product?',
+      'Who buys your product? (Target audience, age, buying motivation)',
+    ],
+    'corporate': [
+      'What is the MAIN PURPOSE of the corporate film? (Recruiting, image film, investor pitch, employer branding)',
+      'Tell me about your COMPANY — name, industry, founding year, what you do',
+      'What is your MISSION and VISION? Why does your company exist?',
+      'What makes your COMPANY CULTURE special? What should viewers learn about you?',
+    ],
+    'social-content': [
+      'Which PLATFORM is the content for? (TikTok, Instagram Reels, YouTube Shorts, multiple)',
+      'What TYPE of content do you want to create? (Trend, Educational, Entertainment, Behind-the-Scenes)',
+      'Who is your COMMUNITY? Describe your followers and their interests',
+      'What should the SCROLL STOPPER be? What grabs attention in the first 2 seconds?',
+    ],
+    'testimonial': [
+      'WHO gives the testimonial? (Name, position, company, relationship to you)',
+      'What PROBLEM did the person have BEFORE using your product/service?',
+      'What is the CONCRETE RESULT after using it? (Numbers, time savings, transformation)',
+      'What EMOTIONAL change did the person experience?',
+    ],
+    'explainer': [
+      'What exactly should be EXPLAINED? (Product, process, concept, service)',
+      'How COMPLEX is the topic for your target audience? (Simple, medium, very complex)',
+      'What PROBLEM does your explanation solve? What don\'t people currently understand?',
+      'Who is the TARGET AUDIENCE for the explainer video? (Customers, employees, partners, investors)',
+    ],
+    'event': [
+      'What type of EVENT is it? (Conference, launch, celebration, trade show, workshop)',
+      'What is the PURPOSE of the video? (Recap, teaser for next time, documentation, promotion)',
+      'What are the HIGHLIGHTS that absolutely must be shown?',
+      'What ATMOSPHERE should the video convey? (Energy, professionalism, party, inspiration)',
+    ],
+    'promo': [
+      'What is being PROMOTED? (Product launch, sale, event, new feature, announcement)',
+      'What is the ONE main promise in one sentence?',
+      'Is there a DEADLINE or LAUNCH DATE?',
+      'What EMOTION should be evoked? (FOMO, anticipation, curiosity, excitement)',
+    ],
+    'presentation': [
+      'What is the TOPIC and TITLE of your presentation?',
+      'Who is the AUDIENCE? (Investors, clients, conference, internal team)',
+      'What is your CORE THESIS — the one main message that must land?',
+      'What should the audience DO after the presentation? (Invest, buy, understand, act)',
+    ],
+    'custom': [
+      'Describe your VIDEO IDEA in 2-3 sentences — what do you have in mind?',
+      'What GOAL should the video achieve? What is the desired effect?',
+      'Who is the TARGET AUDIENCE for this video?',
+      'Are there REFERENCES or inspirations? What style do you like?',
+    ],
+  },
+  es: {
+    'advertisement': [
+      '¿Qué PRODUCTO o SERVICIO quieres anunciar? (Nombre, industria, breve descripción)',
+      '¿Quién es tu PÚBLICO OBJETIVO? (Edad, profesión, industria, intereses, puntos de dolor)',
+      '¿Cuál es tu USP — qué te diferencia de la competencia?',
+      '¿Cuál es el OBJETIVO del anuncio? (Más ventas, leads, brand awareness, descargas)',
+    ],
+    'storytelling': [
+      '¿Qué HISTORIA quieres contar? (Historia del fundador, experiencia del cliente, viaje de marca, relato ficticio)',
+      '¿Quién es el HÉROE de tu historia? (Fundador, cliente, empleado, personaje ficticio — descríbelo)',
+      '¿Cuál es el CONFLICTO CENTRAL o desafío en la historia?',
+      '¿Qué EMOCIÓN debe sentir el espectador al final? (Inspiración, esperanza, asombro, empatía)',
+    ],
+    'tutorial': [
+      '¿Qué exactamente quieres ENSEÑAR a tus espectadores? (Tema o habilidad concreta)',
+      '¿Para quién es el tutorial? (Principiantes, intermedios, expertos — describe tu audiencia)',
+      '¿Qué podrán HACER los espectadores después del tutorial que no podían antes?',
+      '¿Qué HERRAMIENTAS o MATERIALES se necesitan para seguirlo?',
+    ],
+    'product-video': [
+      '¿Qué PRODUCTO presentas? (Nombre, categoría, breve descripción)',
+      '¿Qué PROBLEMA resuelve tu producto para el cliente?',
+      '¿Cuáles son los 3 principales FEATURES o beneficios de tu producto?',
+      '¿Quién compra tu producto? (Público objetivo, edad, motivación de compra)',
+    ],
+    'corporate': [
+      '¿Cuál es el PROPÓSITO PRINCIPAL del video corporativo? (Reclutamiento, imagen, pitch para inversores, employer branding)',
+      'Cuéntame sobre tu EMPRESA — nombre, industria, año de fundación, qué hacen',
+      '¿Cuál es su MISIÓN y VISIÓN? ¿Por qué existe su empresa?',
+      '¿Qué hace especial su CULTURA EMPRESARIAL? ¿Qué deben aprender los espectadores sobre ustedes?',
+    ],
+    'social-content': [
+      '¿Para qué PLATAFORMA es el contenido? (TikTok, Instagram Reels, YouTube Shorts, varias)',
+      '¿Qué TIPO de contenido quieres crear? (Tendencia, Educativo, Entretenimiento, Behind-the-Scenes)',
+      '¿Quién es tu COMUNIDAD? Describe a tus seguidores y sus intereses',
+      '¿Qué debe ser el SCROLL STOPPER? ¿Qué captura atención en los primeros 2 segundos?',
+    ],
+    'testimonial': [
+      '¿QUIÉN da el testimonio? (Nombre, cargo, empresa, relación contigo)',
+      '¿Qué PROBLEMA tenía la persona ANTES de usar tu producto/servicio?',
+      '¿Cuál es el RESULTADO CONCRETO después de usarlo? (Números, ahorro de tiempo, transformación)',
+      '¿Qué cambio EMOCIONAL experimentó la persona?',
+    ],
+    'explainer': [
+      '¿Qué exactamente debe EXPLICARSE? (Producto, proceso, concepto, servicio)',
+      '¿Qué tan COMPLEJO es el tema para tu público? (Simple, medio, muy complejo)',
+      '¿Qué PROBLEMA resuelve tu explicación? ¿Qué no entiende la gente actualmente?',
+      '¿Quién es el PÚBLICO OBJETIVO del video explicativo? (Clientes, empleados, socios, inversores)',
+    ],
+    'event': [
+      '¿Qué tipo de EVENTO es? (Conferencia, lanzamiento, celebración, feria, taller)',
+      '¿Cuál es el PROPÓSITO del video? (Recap, teaser para la próxima vez, documentación, promoción)',
+      '¿Cuáles son los HIGHLIGHTS que absolutamente deben mostrarse?',
+      '¿Qué ATMÓSFERA debe transmitir el video? (Energía, profesionalismo, fiesta, inspiración)',
+    ],
+    'promo': [
+      '¿Qué se PROMOCIONA? (Lanzamiento de producto, sale, evento, nueva función, anuncio)',
+      '¿Cuál es la UNA promesa principal en una frase?',
+      '¿Hay una FECHA LÍMITE o de LANZAMIENTO?',
+      '¿Qué EMOCIÓN debe evocarse? (FOMO, anticipación, curiosidad, emoción)',
+    ],
+    'presentation': [
+      '¿Cuál es el TEMA y TÍTULO de tu presentación?',
+      '¿Quién es el PÚBLICO? (Inversores, clientes, conferencia, equipo interno)',
+      '¿Cuál es tu TESIS CENTRAL — el mensaje principal que debe llegar?',
+      '¿Qué debe HACER el público después de la presentación? (Invertir, comprar, entender, actuar)',
+    ],
+    'custom': [
+      'Describe tu IDEA DE VIDEO en 2-3 frases — ¿qué tienes en mente?',
+      '¿Qué OBJETIVO debe lograr el video? ¿Cuál es el efecto deseado?',
+      '¿Quién es el PÚBLICO OBJETIVO de este video?',
+      '¿Hay REFERENCIAS o inspiraciones? ¿Qué estilo te gusta?',
+    ],
+  },
 };
+
+function getBlock1Phases(category: string, lang: Lang): string[] {
+  return CATEGORY_PHASES_BLOCK1[lang][category] || CATEGORY_PHASES_BLOCK1[lang]['custom'];
+}
 
 const UNIVERSAL_PHASES_BLOCK3: Record<Lang, string[]> = {
   de: [
@@ -574,24 +782,228 @@ const CATEGORY_SPECIFIC_PHASES: Record<Lang, Record<string, string[]>> = {
 };
 
 // Quick replies per language
-const UNIVERSAL_QUICK_REPLIES_BLOCK1: Record<Lang, Record<number, string[]>> = {
+const CATEGORY_QUICK_REPLIES_BLOCK1: Record<Lang, Record<string, Record<number, string[]>>> = {
   de: {
-    1: ['Mehr Verkäufe erzielen', 'Informieren & erklären', 'Emotionalisieren & inspirieren', 'Lass mich erklären...'],
-    2: ['B2B Entscheider 30-55', 'Endkonsumenten 25-45', 'Junge Zielgruppe 18-30', 'Lass mich beschreiben...'],
-    3: ['Software / SaaS', 'Physisches Produkt', 'Dienstleistung / Agentur', 'Lass mich beschreiben...'],
-    4: ['Einzigartige Technologie', 'Bester Service / Support', 'Bestes Preis-Leistungs-Verhältnis', 'Lass mich erklären...'],
+    'advertisement': {
+      1: ['Software / SaaS', 'Physisches Produkt', 'Dienstleistung / Agentur', 'Lass mich beschreiben...'],
+      2: ['B2B Entscheider 30-55', 'Endkonsumenten 25-45', 'Junge Zielgruppe 18-30', 'Lass mich beschreiben...'],
+      3: ['Einzigartige Technologie', 'Bester Service / Support', 'Bestes Preis-Leistungs-Verhältnis', 'Lass mich erklären...'],
+      4: ['Mehr Verkäufe erzielen', 'Leads generieren', 'Brand Awareness steigern', 'Lass mich erklären...'],
+    },
+    'storytelling': {
+      1: ['Gründerstory', 'Kundenerlebnis', 'Markenreise', 'Eine fiktive Erzählung'],
+      2: ['Der Gründer selbst', 'Ein Kunde / Nutzer', 'Das Team als Ganzes', 'Eine fiktive Figur'],
+      3: ['Existenzielle Krise überwinden', 'Einen Traum verwirklichen', 'Gegen alle Widerstände kämpfen', 'Lass mich erzählen...'],
+      4: ['Inspiration & Hoffnung', 'Staunen & Ehrfurcht', 'Mitgefühl & Verbundenheit', 'Lass mich beschreiben...'],
+    },
+    'tutorial': {
+      1: ['Ein Software-Feature erklären', 'Handwerkliche Anleitung', 'Konzept / Theorie', 'Lass mich beschreiben...'],
+      2: ['Anfänger (keine Vorkenntnisse)', 'Fortgeschrittene', 'Experten', 'Gemischtes Publikum'],
+      3: ['Konkrete Fähigkeit beherrschen', 'Prozess selbst ausführen', 'Konzept vollständig verstehen', 'Lass mich erklären...'],
+      4: ['Software / App', 'Werkzeuge / Material', 'Nur Wissen nötig', 'Lass mich auflisten...'],
+    },
+    'product-video': {
+      1: ['Physisches Produkt', 'Software / App', 'Hardware / Gerät', 'Lass mich beschreiben...'],
+      2: ['Zeitersparnis', 'Kostenreduktion', 'Qualitätsverbesserung', 'Lass mich erklären...'],
+      3: ['3 starke Features', 'Ein Killer-Feature', 'Technische Specs', 'Lass mich auflisten...'],
+      4: ['B2B Entscheider', 'Endkonsumenten', 'Tech-Enthusiasten', 'Lass mich beschreiben...'],
+    },
+    'corporate': {
+      1: ['Recruiting / Employer Branding', 'Imagefilm', 'Investoren-Pitch', 'Allgemeine Vorstellung'],
+      2: ['Lange Tradition (10+ Jahre)', 'Startup / jung & dynamisch', 'Familienbetrieb', 'Lass mich erzählen...'],
+      3: ['Welt verbessern', 'Branche revolutionieren', 'Kunden glücklich machen', 'Lass mich erklären...'],
+      4: ['Familiäre Atmosphäre', 'Innovation & Fortschritt', 'Qualität & Zuverlässigkeit', 'Lass mich beschreiben...'],
+    },
+    'social-content': {
+      1: ['TikTok', 'Instagram Reels', 'YouTube Shorts', 'Mehrere Plattformen'],
+      2: ['Trend / Viral', 'Educational / Tipps', 'Entertainment / Spaß', 'Behind-the-Scenes'],
+      3: ['Junge Kreative 18-30', 'Business-Audience', 'Breites Publikum', 'Lass mich beschreiben...'],
+      4: ['Provokante Frage', 'Unerwarteter Fakt', 'Visueller Wow-Effekt', 'Ich hab eine Idee...'],
+    },
+    'testimonial': {
+      1: ['Langjähriger Kunde', 'Neuer Kunde mit Wow-Erlebnis', 'Business-Partner', 'Lass mich beschreiben...'],
+      2: ['Frustriert mit alten Lösungen', 'Auf der Suche nach Besserem', 'Skeptisch gegenüber Neuem', 'Lass mich erzählen...'],
+      3: ['50%+ Zeitersparnis', 'Deutliche Kostensenkung', 'Qualitativ bessere Ergebnisse', 'Lass mich Zahlen nennen...'],
+      4: ['Erleichtert & glücklich', 'Begeistert & stolz', 'Sicher & entspannt', 'Lass mich beschreiben...'],
+    },
+    'explainer': {
+      1: ['Ein Produkt / eine App', 'Einen Prozess / Workflow', 'Ein Konzept / eine Idee', 'Lass mich beschreiben...'],
+      2: ['Sehr komplex', 'Mittelschwer', 'Eigentlich einfach', 'Lass mich einschätzen...'],
+      3: ['Fehlendes Verständnis', 'Komplizierter Prozess', 'Zeitverlust / Ineffizienz', 'Lass mich erklären...'],
+      4: ['Kunden', 'Mitarbeiter', 'Investoren / Partner', 'Lass mich beschreiben...'],
+    },
+    'event': {
+      1: ['Konferenz / Summit', 'Produkt-Launch', 'Firmenfeier / Gala', 'Messe / Expo'],
+      2: ['Recap / Zusammenfassung', 'Teaser für nächstes Jahr', 'Dokumentation', 'Promotion / Werbung'],
+      3: ['Keynote / Speaker', 'Networking-Momente', 'Produkt-Enthüllung', 'Lass mich beschreiben...'],
+      4: ['Begeisterung & Energie', 'Professionalität', 'Party & Spaß', 'Inspiration'],
+    },
+    'promo': {
+      1: ['Produkt-Launch', 'Sale / Rabatt-Aktion', 'Event-Ankündigung', 'Feature-Release'],
+      2: ['Revolutionär neu', 'Bestes Angebot ever', 'Exklusiver Zugang', 'Lass mich formulieren...'],
+      3: ['In den nächsten Tagen', 'In 2-4 Wochen', 'Kein festes Datum', 'Lass mich beschreiben...'],
+      4: ['FOMO erzeugen', 'Vorfreude aufbauen', 'Neugier wecken', 'Aufregung entfachen'],
+    },
+    'presentation': {
+      1: ['Business-Pitch', 'Konferenz-Talk', 'Schulung / Workshop', 'Lass mich beschreiben...'],
+      2: ['Investoren', 'Kunden', 'Internes Team', 'Konferenz-Publikum'],
+      3: ['Eine klare Hauptaussage', 'Lass mich formulieren...', 'Noch unsicher', 'Mehrere Kernpunkte'],
+      4: ['Investieren / Kaufen', 'Verstehen / Lernen', 'Handeln / Umsetzen', 'Lass mich erklären...'],
+    },
+    'custom': {
+      1: ['Lass mich beschreiben...', 'Ähnlich wie eine Werbung', 'Eher dokumentarisch', 'Komplett frei & kreativ'],
+      2: ['Verkaufen / Konvertieren', 'Informieren / Erklären', 'Unterhalten / Begeistern', 'Lass mich erklären...'],
+      3: ['B2B Unternehmen', 'Endkonsumenten', 'Breites Publikum', 'Lass mich beschreiben...'],
+      4: ['Ja, ich habe Referenzen', 'Nein, komplett neu', 'Ähnlich wie Apple/Nike', 'Lass mich beschreiben...'],
+    },
   },
   en: {
-    1: ['Increase sales', 'Inform & explain', 'Emotionalize & inspire', 'Let me explain...'],
-    2: ['B2B decision makers 30-55', 'Consumers 25-45', 'Young audience 18-30', 'Let me describe...'],
-    3: ['Software / SaaS', 'Physical product', 'Service / Agency', 'Let me describe...'],
-    4: ['Unique technology', 'Best service / support', 'Best value for money', 'Let me explain...'],
+    'advertisement': {
+      1: ['Software / SaaS', 'Physical product', 'Service / Agency', 'Let me describe...'],
+      2: ['B2B decision makers 30-55', 'Consumers 25-45', 'Young audience 18-30', 'Let me describe...'],
+      3: ['Unique technology', 'Best service / support', 'Best value for money', 'Let me explain...'],
+      4: ['Increase sales', 'Generate leads', 'Build brand awareness', 'Let me explain...'],
+    },
+    'storytelling': {
+      1: ['Founder story', 'Customer experience', 'Brand journey', 'A fictional tale'],
+      2: ['The founder', 'A customer / user', 'The team', 'A fictional character'],
+      3: ['Overcoming a crisis', 'Pursuing a dream', 'Fighting against odds', 'Let me tell...'],
+      4: ['Inspiration & hope', 'Wonder & awe', 'Empathy & connection', 'Let me describe...'],
+    },
+    'tutorial': {
+      1: ['Explain a software feature', 'Hands-on guide', 'Concept / theory', 'Let me describe...'],
+      2: ['Beginners (no experience)', 'Intermediate', 'Experts', 'Mixed audience'],
+      3: ['Master a specific skill', 'Execute process independently', 'Fully understand concept', 'Let me explain...'],
+      4: ['Software / App', 'Tools / Materials', 'Knowledge only', 'Let me list...'],
+    },
+    'product-video': {
+      1: ['Physical product', 'Software / App', 'Hardware / Device', 'Let me describe...'],
+      2: ['Time savings', 'Cost reduction', 'Quality improvement', 'Let me explain...'],
+      3: ['3 strong features', 'One killer feature', 'Technical specs', 'Let me list...'],
+      4: ['B2B decision makers', 'Consumers', 'Tech enthusiasts', 'Let me describe...'],
+    },
+    'corporate': {
+      1: ['Recruiting / Employer branding', 'Image film', 'Investor pitch', 'General introduction'],
+      2: ['Long tradition (10+ years)', 'Startup / young & dynamic', 'Family business', 'Let me tell...'],
+      3: ['Improve the world', 'Revolutionize industry', 'Make customers happy', 'Let me explain...'],
+      4: ['Family atmosphere', 'Innovation & progress', 'Quality & reliability', 'Let me describe...'],
+    },
+    'social-content': {
+      1: ['TikTok', 'Instagram Reels', 'YouTube Shorts', 'Multiple platforms'],
+      2: ['Trend / Viral', 'Educational / Tips', 'Entertainment / Fun', 'Behind-the-Scenes'],
+      3: ['Young creatives 18-30', 'Business audience', 'Broad audience', 'Let me describe...'],
+      4: ['Provocative question', 'Unexpected fact', 'Visual wow effect', 'I have an idea...'],
+    },
+    'testimonial': {
+      1: ['Long-term customer', 'New customer with wow experience', 'Business partner', 'Let me describe...'],
+      2: ['Frustrated with old solutions', 'Looking for better', 'Skeptical about new things', 'Let me tell...'],
+      3: ['50%+ time savings', 'Significant cost reduction', 'Better quality results', 'Let me share numbers...'],
+      4: ['Relieved & happy', 'Excited & proud', 'Secure & relaxed', 'Let me describe...'],
+    },
+    'explainer': {
+      1: ['A product / an app', 'A process / workflow', 'A concept / idea', 'Let me describe...'],
+      2: ['Very complex', 'Medium difficulty', 'Actually simple', 'Let me assess...'],
+      3: ['Lack of understanding', 'Complicated process', 'Time loss / inefficiency', 'Let me explain...'],
+      4: ['Customers', 'Employees', 'Investors / Partners', 'Let me describe...'],
+    },
+    'event': {
+      1: ['Conference / Summit', 'Product launch', 'Company party / Gala', 'Trade show / Expo'],
+      2: ['Recap / Summary', 'Teaser for next year', 'Documentation', 'Promotion / Advertising'],
+      3: ['Keynote / Speaker', 'Networking moments', 'Product reveal', 'Let me describe...'],
+      4: ['Excitement & energy', 'Professionalism', 'Party & fun', 'Inspiration'],
+    },
+    'promo': {
+      1: ['Product launch', 'Sale / Discount', 'Event announcement', 'Feature release'],
+      2: ['Revolutionary new', 'Best deal ever', 'Exclusive access', 'Let me formulate...'],
+      3: ['In the next few days', 'In 2-4 weeks', 'No fixed date', 'Let me describe...'],
+      4: ['Create FOMO', 'Build anticipation', 'Spark curiosity', 'Ignite excitement'],
+    },
+    'presentation': {
+      1: ['Business pitch', 'Conference talk', 'Training / Workshop', 'Let me describe...'],
+      2: ['Investors', 'Clients', 'Internal team', 'Conference audience'],
+      3: ['One clear main point', 'Let me formulate...', 'Not sure yet', 'Multiple key messages'],
+      4: ['Invest / Buy', 'Understand / Learn', 'Act / Implement', 'Let me explain...'],
+    },
+    'custom': {
+      1: ['Let me describe...', 'Similar to an ad', 'Rather documentary', 'Completely free & creative'],
+      2: ['Sell / Convert', 'Inform / Explain', 'Entertain / Excite', 'Let me explain...'],
+      3: ['B2B companies', 'Consumers', 'Broad audience', 'Let me describe...'],
+      4: ['Yes, I have references', 'No, completely new', 'Similar to Apple/Nike', 'Let me describe...'],
+    },
   },
   es: {
-    1: ['Aumentar ventas', 'Informar y explicar', 'Emocionar e inspirar', 'Déjame explicar...'],
-    2: ['Decisores B2B 30-55', 'Consumidores 25-45', 'Audiencia joven 18-30', 'Déjame describir...'],
-    3: ['Software / SaaS', 'Producto físico', 'Servicio / Agencia', 'Déjame describir...'],
-    4: ['Tecnología única', 'Mejor servicio / soporte', 'Mejor relación calidad-precio', 'Déjame explicar...'],
+    'advertisement': {
+      1: ['Software / SaaS', 'Producto físico', 'Servicio / Agencia', 'Déjame describir...'],
+      2: ['Decisores B2B 30-55', 'Consumidores 25-45', 'Audiencia joven 18-30', 'Déjame describir...'],
+      3: ['Tecnología única', 'Mejor servicio', 'Mejor relación calidad-precio', 'Déjame explicar...'],
+      4: ['Aumentar ventas', 'Generar leads', 'Aumentar brand awareness', 'Déjame explicar...'],
+    },
+    'storytelling': {
+      1: ['Historia del fundador', 'Experiencia del cliente', 'Viaje de marca', 'Un relato ficticio'],
+      2: ['El fundador', 'Un cliente / usuario', 'El equipo', 'Un personaje ficticio'],
+      3: ['Superar una crisis', 'Perseguir un sueño', 'Luchar contra todo', 'Déjame contar...'],
+      4: ['Inspiración y esperanza', 'Asombro y admiración', 'Empatía y conexión', 'Déjame describir...'],
+    },
+    'tutorial': {
+      1: ['Explicar una función de software', 'Guía práctica', 'Concepto / teoría', 'Déjame describir...'],
+      2: ['Principiantes', 'Intermedios', 'Expertos', 'Audiencia mixta'],
+      3: ['Dominar habilidad específica', 'Ejecutar proceso', 'Entender concepto', 'Déjame explicar...'],
+      4: ['Software / App', 'Herramientas / Material', 'Solo conocimiento', 'Déjame listar...'],
+    },
+    'product-video': {
+      1: ['Producto físico', 'Software / App', 'Hardware / Dispositivo', 'Déjame describir...'],
+      2: ['Ahorro de tiempo', 'Reducción de costos', 'Mejora de calidad', 'Déjame explicar...'],
+      3: ['3 características fuertes', 'Una característica estrella', 'Specs técnicos', 'Déjame listar...'],
+      4: ['Decisores B2B', 'Consumidores', 'Entusiastas tech', 'Déjame describir...'],
+    },
+    'corporate': {
+      1: ['Reclutamiento / Employer branding', 'Video institucional', 'Pitch para inversores', 'Presentación general'],
+      2: ['Larga tradición (10+ años)', 'Startup / joven y dinámico', 'Empresa familiar', 'Déjame contar...'],
+      3: ['Mejorar el mundo', 'Revolucionar la industria', 'Hacer felices a los clientes', 'Déjame explicar...'],
+      4: ['Atmósfera familiar', 'Innovación y progreso', 'Calidad y confianza', 'Déjame describir...'],
+    },
+    'social-content': {
+      1: ['TikTok', 'Instagram Reels', 'YouTube Shorts', 'Varias plataformas'],
+      2: ['Tendencia / Viral', 'Educativo / Tips', 'Entretenimiento', 'Behind-the-Scenes'],
+      3: ['Jóvenes creativos 18-30', 'Audiencia business', 'Público amplio', 'Déjame describir...'],
+      4: ['Pregunta provocadora', 'Hecho inesperado', 'Efecto visual wow', 'Tengo una idea...'],
+    },
+    'testimonial': {
+      1: ['Cliente de largo plazo', 'Nuevo cliente con wow', 'Socio comercial', 'Déjame describir...'],
+      2: ['Frustrado con soluciones viejas', 'Buscando algo mejor', 'Escéptico', 'Déjame contar...'],
+      3: ['50%+ ahorro de tiempo', 'Reducción de costos', 'Mejores resultados', 'Déjame dar números...'],
+      4: ['Aliviado y feliz', 'Emocionado y orgulloso', 'Seguro y relajado', 'Déjame describir...'],
+    },
+    'explainer': {
+      1: ['Un producto / una app', 'Un proceso / workflow', 'Un concepto / idea', 'Déjame describir...'],
+      2: ['Muy complejo', 'Dificultad media', 'En realidad simple', 'Déjame evaluar...'],
+      3: ['Falta de comprensión', 'Proceso complicado', 'Pérdida de tiempo', 'Déjame explicar...'],
+      4: ['Clientes', 'Empleados', 'Inversores / Socios', 'Déjame describir...'],
+    },
+    'event': {
+      1: ['Conferencia / Summit', 'Lanzamiento de producto', 'Fiesta / Gala', 'Feria / Expo'],
+      2: ['Recap / Resumen', 'Teaser para próxima vez', 'Documentación', 'Promoción'],
+      3: ['Keynote / Speaker', 'Momentos networking', 'Revelación de producto', 'Déjame describir...'],
+      4: ['Emoción y energía', 'Profesionalismo', 'Fiesta y diversión', 'Inspiración'],
+    },
+    'promo': {
+      1: ['Lanzamiento de producto', 'Sale / Descuento', 'Anuncio de evento', 'Release de función'],
+      2: ['Revolucionariamente nuevo', 'Mejor oferta ever', 'Acceso exclusivo', 'Déjame formular...'],
+      3: ['En los próximos días', 'En 2-4 semanas', 'Sin fecha fija', 'Déjame describir...'],
+      4: ['Crear FOMO', 'Construir anticipación', 'Despertar curiosidad', 'Encender emoción'],
+    },
+    'presentation': {
+      1: ['Pitch de negocio', 'Charla de conferencia', 'Capacitación / Taller', 'Déjame describir...'],
+      2: ['Inversores', 'Clientes', 'Equipo interno', 'Público de conferencia'],
+      3: ['Un punto principal claro', 'Déjame formular...', 'Aún no seguro', 'Varios mensajes clave'],
+      4: ['Invertir / Comprar', 'Entender / Aprender', 'Actuar / Implementar', 'Déjame explicar...'],
+    },
+    'custom': {
+      1: ['Déjame describir...', 'Similar a un anuncio', 'Más documental', 'Completamente libre'],
+      2: ['Vender / Convertir', 'Informar / Explicar', 'Entretener / Emocionar', 'Déjame explicar...'],
+      3: ['Empresas B2B', 'Consumidores', 'Público amplio', 'Déjame describir...'],
+      4: ['Sí, tengo referencias', 'No, completamente nuevo', 'Similar a Apple/Nike', 'Déjame describir...'],
+    },
   },
 };
 
@@ -1141,8 +1553,9 @@ const CATEGORY_QUICK_REPLIES: Record<Lang, Record<string, Record<number, string[
 // ═══════════════════════════════════════════════════════════════
 
 function buildCategoryPhases(category: string, lang: Lang): string[] {
+  const block1 = getBlock1Phases(category, lang);
   const specific = CATEGORY_SPECIFIC_PHASES[lang][category] || CATEGORY_SPECIFIC_PHASES[lang]['custom'];
-  return [...UNIVERSAL_PHASES_BLOCK1[lang], ...specific, ...UNIVERSAL_PHASES_BLOCK3[lang]];
+  return [...block1, ...specific, ...UNIVERSAL_PHASES_BLOCK3[lang]];
 }
 
 // Category display names per language
@@ -1194,22 +1607,75 @@ const getCategorySystemPrompt = (category: string, mode: string, currentPhase: n
     blockInfo = `BLOCK 3: ${labels[2]}`;
   }
 
-  const langInstructions: Record<Lang, { respondIn: string; role: string; forbidden: string[]; modeLabel: string }> = {
+  const categoryRoles: Record<string, Record<Lang, string>> = {
+    'storytelling': {
+      de: 'Du bist Max, ein erfahrener Geschichtenerzähler, Drehbuchautor und Kreativdirektor. Du erstellst eine GESCHICHTE — KEINE Werbung, keinen Marketing-Content.',
+      en: 'You are Max, an experienced storyteller, screenwriter and creative director. You are creating a STORY — NOT an advertisement, not marketing content.',
+      es: 'Eres Max, un experimentado narrador, guionista y director creativo. Estás creando una HISTORIA — NO un anuncio, no contenido de marketing.',
+    },
+    'tutorial': {
+      de: 'Du bist Max, ein erfahrener Bildungs-Content-Experte und Tutorial-Spezialist. Du erstellst ein TUTORIAL — konzentriere dich auf Wissensvermittlung und Lernziele.',
+      en: 'You are Max, an experienced educational content expert and tutorial specialist. You are creating a TUTORIAL — focus on knowledge transfer and learning goals.',
+      es: 'Eres Max, un experimentado experto en contenido educativo y especialista en tutoriales. Estás creando un TUTORIAL — enfócate en transmitir conocimiento y objetivos de aprendizaje.',
+    },
+    'corporate': {
+      de: 'Du bist Max, ein erfahrener Corporate-Film-Regisseur und Unternehmenskommunikations-Experte. Du erstellst einen UNTERNEHMENSFILM — fokussiere auf Werte, Kultur und Authentizität.',
+      en: 'You are Max, an experienced corporate film director and communications expert. You are creating a CORPORATE FILM — focus on values, culture and authenticity.',
+      es: 'Eres Max, un experimentado director de cine corporativo y experto en comunicación empresarial. Estás creando un VIDEO CORPORATIVO — enfócate en valores, cultura y autenticidad.',
+    },
+    'testimonial': {
+      de: 'Du bist Max, ein erfahrener Testimonial-Produzent und Interview-Spezialist. Du erstellst ein TESTIMONIAL-VIDEO — fokussiere auf die authentische Erfahrung und emotionale Transformation.',
+      en: 'You are Max, an experienced testimonial producer and interview specialist. You are creating a TESTIMONIAL VIDEO — focus on authentic experience and emotional transformation.',
+      es: 'Eres Max, un experimentado productor de testimonios y especialista en entrevistas. Estás creando un VIDEO TESTIMONIAL — enfócate en la experiencia auténtica y la transformación emocional.',
+    },
+    'explainer': {
+      de: 'Du bist Max, ein erfahrener Erklärvideo-Experte und visueller Kommunikator. Du erstellst ein ERKLÄRVIDEO — fokussiere auf Klarheit, Vereinfachung und visuelle Metaphern.',
+      en: 'You are Max, an experienced explainer video expert and visual communicator. You are creating an EXPLAINER VIDEO — focus on clarity, simplification and visual metaphors.',
+      es: 'Eres Max, un experimentado experto en videos explicativos y comunicador visual. Estás creando un VIDEO EXPLICATIVO — enfócate en claridad, simplificación y metáforas visuales.',
+    },
+    'event': {
+      de: 'Du bist Max, ein erfahrener Event-Filmer und Atmosphäre-Spezialist. Du erstellst ein EVENT-VIDEO — fokussiere auf Highlights, Stimmung und besondere Momente.',
+      en: 'You are Max, an experienced event filmmaker and atmosphere specialist. You are creating an EVENT VIDEO — focus on highlights, mood and special moments.',
+      es: 'Eres Max, un experimentado cineasta de eventos y especialista en atmósfera. Estás creando un VIDEO DE EVENTO — enfócate en highlights, ambiente y momentos especiales.',
+    },
+    'social-content': {
+      de: 'Du bist Max, ein erfahrener Social-Media-Content-Creator und Trend-Experte. Du erstellst SOCIAL MEDIA CONTENT — fokussiere auf Scroll-Stopper, Plattform-Trends und Community-Engagement.',
+      en: 'You are Max, an experienced social media content creator and trend expert. You are creating SOCIAL MEDIA CONTENT — focus on scroll stoppers, platform trends and community engagement.',
+      es: 'Eres Max, un experimentado creador de contenido social media y experto en tendencias. Estás creando CONTENIDO SOCIAL MEDIA — enfócate en scroll stoppers, tendencias de plataforma y engagement.',
+    },
+    'promo': {
+      de: 'Du bist Max, ein erfahrener Promo-Spezialist und Launch-Stratege. Du erstellst ein PROMO/TEASER-VIDEO — fokussiere auf Spannung, Reveal und Dringlichkeit.',
+      en: 'You are Max, an experienced promo specialist and launch strategist. You are creating a PROMO/TEASER VIDEO — focus on suspense, reveal and urgency.',
+      es: 'Eres Max, un experimentado especialista en promos y estratega de lanzamientos. Estás creando un VIDEO PROMO/TEASER — enfócate en suspense, revelación y urgencia.',
+    },
+    'presentation': {
+      de: 'Du bist Max, ein erfahrener Präsentations-Coach und Pitch-Experte. Du erstellst ein PRÄSENTATIONSVIDEO — fokussiere auf überzeugende Argumente, Datenvisualisierung und klare Struktur.',
+      en: 'You are Max, an experienced presentation coach and pitch expert. You are creating a PRESENTATION VIDEO — focus on compelling arguments, data visualization and clear structure.',
+      es: 'Eres Max, un experimentado coach de presentaciones y experto en pitch. Estás creando un VIDEO DE PRESENTACIÓN — enfócate en argumentos convincentes, visualización de datos y estructura clara.',
+    },
+  };
+
+  const defaultRole: Record<Lang, string> = {
+    de: 'Du bist Max, ein erfahrener Video-Stratege und Kreativdirektor.',
+    en: 'You are Max, an experienced video strategist and creative director.',
+    es: 'Eres Max, un experimentado estratega de video y director creativo.',
+  };
+
+  const role = categoryRoles[category]?.[lang] || defaultRole[lang];
+
+  const langInstructions: Record<Lang, { respondIn: string; forbidden: string[]; modeLabel: string }> = {
     de: {
       respondIn: 'Antworte IMMER auf Deutsch',
-      role: 'Du bist Max, ein erfahrener Video-Marketing-Berater und Kreativdirektor bei AdTool.',
       forbidden: ['Also ich habe', 'Ich habe', 'Also...'],
       modeLabel: mode === 'full-service' ? 'Full-Service (KI erstellt alles automatisch nach Briefing)' : 'Manuell (Nutzer hat volle Kontrolle)',
     },
     en: {
       respondIn: 'ALWAYS respond in English',
-      role: 'You are Max, an experienced video marketing consultant and creative director at AdTool.',
       forbidden: ['So I have', 'I have', 'So...'],
       modeLabel: mode === 'full-service' ? 'Full-Service (AI creates everything automatically from briefing)' : 'Manual (user has full control)',
     },
     es: {
       respondIn: 'Responde SIEMPRE en español',
-      role: 'Eres Max, un experimentado consultor de video marketing y director creativo en AdTool.',
       forbidden: ['Entonces yo tengo', 'Yo tengo', 'Entonces...'],
       modeLabel: mode === 'full-service' ? 'Full-Service (La IA crea todo automáticamente del briefing)' : 'Manual (usuario tiene control total)',
     },
@@ -1229,7 +1695,7 @@ const getCategorySystemPrompt = (category: string, mode: string, currentPhase: n
       : 'Phase 22/22 - FINAL SUMMARY! Summarize ALL collected information.';
   }
 
-  return `${li.role}
+  return `${role}
 ${li.respondIn}
 
 INTERVIEW STRUCTURE (3 Blocks):
@@ -1278,7 +1744,11 @@ function generateQuickReplies(phase: number, category: string, lang: Lang): stri
   };
 
   if (phase >= 1 && phase <= 4) {
-    return UNIVERSAL_QUICK_REPLIES_BLOCK1[lang][phase] || fallback[lang];
+    const catBlock1 = CATEGORY_QUICK_REPLIES_BLOCK1[lang][category];
+    if (catBlock1 && catBlock1[phase]) {
+      return catBlock1[phase];
+    }
+    return CATEGORY_QUICK_REPLIES_BLOCK1[lang]['custom']?.[phase] || fallback[lang];
   }
   
   if (phase >= 5 && phase <= 16) {
