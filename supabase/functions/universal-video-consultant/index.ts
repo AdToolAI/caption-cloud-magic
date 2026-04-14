@@ -1762,8 +1762,8 @@ const getCategoryConfig = (category: string, lang: Lang, messages?: any[]) => {
 };
 
 // Localized system prompt
-const getCategorySystemPrompt = (category: string, mode: string, currentPhase: number, lang: Lang): string => {
-  const cat = getCategoryConfig(category, lang);
+const getCategorySystemPrompt = (category: string, mode: string, currentPhase: number, lang: Lang, messages?: any[]): string => {
+  const cat = getCategoryConfig(category, lang, messages);
   const totalPhases = 22;
 
   const blockLabels: Record<Lang, [string, string, string]> = {
