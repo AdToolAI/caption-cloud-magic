@@ -12,26 +12,234 @@ const corsHeaders = {
 
 type Lang = 'de' | 'en' | 'es';
 
-const UNIVERSAL_PHASES_BLOCK1: Record<Lang, string[]> = {
-  de: [
-    'Was ist der ZWECK dieses Videos? (Verkaufen, Informieren, Emotionalisieren, Rekrutieren, Unterhalten)',
-    'Wer ist deine ZIELGRUPPE? (Alter, Beruf, Branche, Interessen, Schmerzpunkte)',
-    'Was ist dein PRODUKT oder UNTERNEHMEN? (Name, Branche, 2-3 Sätze Beschreibung)',
-    'Was macht dich EINZIGARTIG? (Dein USP in einem Satz)',
-  ],
-  en: [
-    'What is the PURPOSE of this video? (Sell, Inform, Emotionalize, Recruit, Entertain)',
-    'Who is your TARGET AUDIENCE? (Age, profession, industry, interests, pain points)',
-    'What is your PRODUCT or COMPANY? (Name, industry, 2-3 sentence description)',
-    'What makes you UNIQUE? (Your USP in one sentence)',
-  ],
-  es: [
-    '¿Cuál es el PROPÓSITO de este video? (Vender, Informar, Emocionar, Reclutar, Entretener)',
-    '¿Quién es tu PÚBLICO OBJETIVO? (Edad, profesión, industria, intereses, puntos de dolor)',
-    '¿Cuál es tu PRODUCTO o EMPRESA? (Nombre, industria, descripción de 2-3 frases)',
-    '¿Qué te hace ÚNICO? (Tu propuesta de valor en una frase)',
-  ],
+const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
+  de: {
+    'advertisement': [
+      'Welches PRODUKT oder welche DIENSTLEISTUNG möchtest du bewerben? (Name, Branche, kurze Beschreibung)',
+      'Wer ist deine ZIELGRUPPE? (Alter, Beruf, Branche, Interessen, Schmerzpunkte)',
+      'Was ist dein USP — was unterscheidet dich von der Konkurrenz?',
+      'Welches ZIEL hat die Werbung? (Mehr Verkäufe, Leads, Brand Awareness, App-Downloads)',
+    ],
+    'storytelling': [
+      'Welche GESCHICHTE möchtest du erzählen? (Gründerstory, Kundenerlebnis, Markenreise, fiktive Erzählung)',
+      'Wer ist der HELD deiner Geschichte? (Gründer, Kunde, Mitarbeiter, fiktive Figur — beschreibe die Person)',
+      'Was ist der ZENTRALE KONFLIKT oder die Herausforderung in der Story?',
+      'Welche EMOTION soll der Zuschauer am Ende fühlen? (Inspiration, Hoffnung, Staunen, Mitgefühl)',
+    ],
+    'tutorial': [
+      'Was genau möchtest du deinen Zuschauern BEIBRINGEN? (Konkretes Thema oder Fähigkeit)',
+      'Für wen ist das Tutorial? (Anfänger, Fortgeschrittene, Experten — beschreibe dein Publikum)',
+      'Was können Zuschauer NACH dem Tutorial, was sie vorher nicht konnten?',
+      'Welche TOOLS oder MATERIALIEN werden benötigt, um mitzumachen?',
+    ],
+    'product-video': [
+      'Welches PRODUKT stellst du vor? (Name, Kategorie, kurze Beschreibung)',
+      'Welches PROBLEM löst dein Produkt für den Kunden?',
+      'Was sind die Top 3 FEATURES oder Vorteile deines Produkts?',
+      'Wer kauft dein Produkt? (Zielgruppe, Alter, Kaufmotivation)',
+    ],
+    'corporate': [
+      'Was ist der HAUPTZWECK des Unternehmensfilms? (Recruiting, Imagefilm, Investoren-Pitch, Employer Branding)',
+      'Erzähl mir von deinem UNTERNEHMEN — Name, Branche, Gründungsjahr, was ihr macht',
+      'Was ist eure MISSION und VISION? Warum existiert euer Unternehmen?',
+      'Was macht eure UNTERNEHMENSKULTUR besonders? Was sollen Zuschauer über euch erfahren?',
+    ],
+    'social-content': [
+      'Für welche PLATTFORM ist der Content? (TikTok, Instagram Reels, YouTube Shorts, mehrere)',
+      'Welche ART von Content willst du erstellen? (Trend, Educational, Entertainment, Behind-the-Scenes)',
+      'Wer ist deine COMMUNITY? Beschreibe deine Follower und deren Interessen',
+      'Was soll der SCROLL-STOPPER sein? Was fesselt in den ersten 2 Sekunden?',
+    ],
+    'testimonial': [
+      'WER gibt das Testimonial? (Name, Position, Unternehmen, Beziehung zu dir)',
+      'Welches PROBLEM hatte die Person BEVOR sie dein Produkt/Service genutzt hat?',
+      'Was ist das KONKRETE ERGEBNIS nach der Nutzung? (Zahlen, Zeitersparnis, Transformation)',
+      'Welche EMOTIONALE Veränderung hat die Person erlebt?',
+    ],
+    'explainer': [
+      'Was genau soll ERKLÄRT werden? (Produkt, Prozess, Konzept, Service)',
+      'Wie KOMPLEX ist das Thema für deine Zielgruppe? (Einfach, mittel, sehr komplex)',
+      'Welches PROBLEM löst deine Erklärung? Was verstehen die Leute aktuell nicht?',
+      'Wer ist die ZIELGRUPPE des Erklärvideos? (Kunden, Mitarbeiter, Partner, Investoren)',
+    ],
+    'event': [
+      'Was für ein EVENT ist es? (Konferenz, Launch, Feier, Messe, Workshop)',
+      'Was ist der ZWECK des Videos? (Recap, Teaser fürs nächste Mal, Dokumentation, Promotion)',
+      'Was sind die HIGHLIGHTS die unbedingt gezeigt werden müssen?',
+      'Welche ATMOSPHÄRE soll das Video transportieren? (Energie, Professionalität, Party, Inspiration)',
+    ],
+    'promo': [
+      'Was wird BEWORBEN? (Produkt-Launch, Sale, Event, neues Feature, Ankündigung)',
+      'Was ist das EINE Hauptversprechen in einem Satz?',
+      'Gibt es eine DEADLINE oder ein LAUNCH-DATUM?',
+      'Welche EMOTION soll geweckt werden? (FOMO, Vorfreude, Neugier, Aufregung)',
+    ],
+    'presentation': [
+      'Was ist das THEMA und der TITEL deiner Präsentation?',
+      'Wer ist das PUBLIKUM? (Investoren, Kunden, Konferenz, internes Team)',
+      'Was ist deine KERNTHESE — die eine Hauptaussage die ankommen muss?',
+      'Was soll das Publikum nach der Präsentation TUN? (Investieren, kaufen, verstehen, handeln)',
+    ],
+    'custom': [
+      'Beschreibe deine VIDEO-IDEE in 2-3 Sätzen — was schwebt dir vor?',
+      'Welches ZIEL soll das Video erreichen? Was ist der gewünschte Effekt?',
+      'Wer ist die ZIELGRUPPE für dieses Video?',
+      'Gibt es REFERENZEN oder Inspirationen? Welcher Stil gefällt dir?',
+    ],
+  },
+  en: {
+    'advertisement': [
+      'What PRODUCT or SERVICE do you want to advertise? (Name, industry, brief description)',
+      'Who is your TARGET AUDIENCE? (Age, profession, industry, interests, pain points)',
+      'What is your USP — what sets you apart from competitors?',
+      'What is the GOAL of the ad? (More sales, leads, brand awareness, app downloads)',
+    ],
+    'storytelling': [
+      'What STORY do you want to tell? (Founder story, customer experience, brand journey, fictional tale)',
+      'Who is the HERO of your story? (Founder, customer, employee, fictional character — describe them)',
+      'What is the CENTRAL CONFLICT or challenge in the story?',
+      'What EMOTION should the viewer feel at the end? (Inspiration, hope, wonder, empathy)',
+    ],
+    'tutorial': [
+      'What exactly do you want to TEACH your viewers? (Specific topic or skill)',
+      'Who is the tutorial for? (Beginners, intermediate, experts — describe your audience)',
+      'What can viewers DO after the tutorial that they couldn\'t before?',
+      'What TOOLS or MATERIALS are needed to follow along?',
+    ],
+    'product-video': [
+      'Which PRODUCT are you presenting? (Name, category, brief description)',
+      'What PROBLEM does your product solve for the customer?',
+      'What are the top 3 FEATURES or benefits of your product?',
+      'Who buys your product? (Target audience, age, buying motivation)',
+    ],
+    'corporate': [
+      'What is the MAIN PURPOSE of the corporate film? (Recruiting, image film, investor pitch, employer branding)',
+      'Tell me about your COMPANY — name, industry, founding year, what you do',
+      'What is your MISSION and VISION? Why does your company exist?',
+      'What makes your COMPANY CULTURE special? What should viewers learn about you?',
+    ],
+    'social-content': [
+      'Which PLATFORM is the content for? (TikTok, Instagram Reels, YouTube Shorts, multiple)',
+      'What TYPE of content do you want to create? (Trend, Educational, Entertainment, Behind-the-Scenes)',
+      'Who is your COMMUNITY? Describe your followers and their interests',
+      'What should the SCROLL STOPPER be? What grabs attention in the first 2 seconds?',
+    ],
+    'testimonial': [
+      'WHO gives the testimonial? (Name, position, company, relationship to you)',
+      'What PROBLEM did the person have BEFORE using your product/service?',
+      'What is the CONCRETE RESULT after using it? (Numbers, time savings, transformation)',
+      'What EMOTIONAL change did the person experience?',
+    ],
+    'explainer': [
+      'What exactly should be EXPLAINED? (Product, process, concept, service)',
+      'How COMPLEX is the topic for your target audience? (Simple, medium, very complex)',
+      'What PROBLEM does your explanation solve? What don\'t people currently understand?',
+      'Who is the TARGET AUDIENCE for the explainer video? (Customers, employees, partners, investors)',
+    ],
+    'event': [
+      'What type of EVENT is it? (Conference, launch, celebration, trade show, workshop)',
+      'What is the PURPOSE of the video? (Recap, teaser for next time, documentation, promotion)',
+      'What are the HIGHLIGHTS that absolutely must be shown?',
+      'What ATMOSPHERE should the video convey? (Energy, professionalism, party, inspiration)',
+    ],
+    'promo': [
+      'What is being PROMOTED? (Product launch, sale, event, new feature, announcement)',
+      'What is the ONE main promise in one sentence?',
+      'Is there a DEADLINE or LAUNCH DATE?',
+      'What EMOTION should be evoked? (FOMO, anticipation, curiosity, excitement)',
+    ],
+    'presentation': [
+      'What is the TOPIC and TITLE of your presentation?',
+      'Who is the AUDIENCE? (Investors, clients, conference, internal team)',
+      'What is your CORE THESIS — the one main message that must land?',
+      'What should the audience DO after the presentation? (Invest, buy, understand, act)',
+    ],
+    'custom': [
+      'Describe your VIDEO IDEA in 2-3 sentences — what do you have in mind?',
+      'What GOAL should the video achieve? What is the desired effect?',
+      'Who is the TARGET AUDIENCE for this video?',
+      'Are there REFERENCES or inspirations? What style do you like?',
+    ],
+  },
+  es: {
+    'advertisement': [
+      '¿Qué PRODUCTO o SERVICIO quieres anunciar? (Nombre, industria, breve descripción)',
+      '¿Quién es tu PÚBLICO OBJETIVO? (Edad, profesión, industria, intereses, puntos de dolor)',
+      '¿Cuál es tu USP — qué te diferencia de la competencia?',
+      '¿Cuál es el OBJETIVO del anuncio? (Más ventas, leads, brand awareness, descargas)',
+    ],
+    'storytelling': [
+      '¿Qué HISTORIA quieres contar? (Historia del fundador, experiencia del cliente, viaje de marca, relato ficticio)',
+      '¿Quién es el HÉROE de tu historia? (Fundador, cliente, empleado, personaje ficticio — descríbelo)',
+      '¿Cuál es el CONFLICTO CENTRAL o desafío en la historia?',
+      '¿Qué EMOCIÓN debe sentir el espectador al final? (Inspiración, esperanza, asombro, empatía)',
+    ],
+    'tutorial': [
+      '¿Qué exactamente quieres ENSEÑAR a tus espectadores? (Tema o habilidad concreta)',
+      '¿Para quién es el tutorial? (Principiantes, intermedios, expertos — describe tu audiencia)',
+      '¿Qué podrán HACER los espectadores después del tutorial que no podían antes?',
+      '¿Qué HERRAMIENTAS o MATERIALES se necesitan para seguirlo?',
+    ],
+    'product-video': [
+      '¿Qué PRODUCTO presentas? (Nombre, categoría, breve descripción)',
+      '¿Qué PROBLEMA resuelve tu producto para el cliente?',
+      '¿Cuáles son los 3 principales FEATURES o beneficios de tu producto?',
+      '¿Quién compra tu producto? (Público objetivo, edad, motivación de compra)',
+    ],
+    'corporate': [
+      '¿Cuál es el PROPÓSITO PRINCIPAL del video corporativo? (Reclutamiento, imagen, pitch para inversores, employer branding)',
+      'Cuéntame sobre tu EMPRESA — nombre, industria, año de fundación, qué hacen',
+      '¿Cuál es su MISIÓN y VISIÓN? ¿Por qué existe su empresa?',
+      '¿Qué hace especial su CULTURA EMPRESARIAL? ¿Qué deben aprender los espectadores sobre ustedes?',
+    ],
+    'social-content': [
+      '¿Para qué PLATAFORMA es el contenido? (TikTok, Instagram Reels, YouTube Shorts, varias)',
+      '¿Qué TIPO de contenido quieres crear? (Tendencia, Educativo, Entretenimiento, Behind-the-Scenes)',
+      '¿Quién es tu COMUNIDAD? Describe a tus seguidores y sus intereses',
+      '¿Qué debe ser el SCROLL STOPPER? ¿Qué captura atención en los primeros 2 segundos?',
+    ],
+    'testimonial': [
+      '¿QUIÉN da el testimonio? (Nombre, cargo, empresa, relación contigo)',
+      '¿Qué PROBLEMA tenía la persona ANTES de usar tu producto/servicio?',
+      '¿Cuál es el RESULTADO CONCRETO después de usarlo? (Números, ahorro de tiempo, transformación)',
+      '¿Qué cambio EMOCIONAL experimentó la persona?',
+    ],
+    'explainer': [
+      '¿Qué exactamente debe EXPLICARSE? (Producto, proceso, concepto, servicio)',
+      '¿Qué tan COMPLEJO es el tema para tu público? (Simple, medio, muy complejo)',
+      '¿Qué PROBLEMA resuelve tu explicación? ¿Qué no entiende la gente actualmente?',
+      '¿Quién es el PÚBLICO OBJETIVO del video explicativo? (Clientes, empleados, socios, inversores)',
+    ],
+    'event': [
+      '¿Qué tipo de EVENTO es? (Conferencia, lanzamiento, celebración, feria, taller)',
+      '¿Cuál es el PROPÓSITO del video? (Recap, teaser para la próxima vez, documentación, promoción)',
+      '¿Cuáles son los HIGHLIGHTS que absolutamente deben mostrarse?',
+      '¿Qué ATMÓSFERA debe transmitir el video? (Energía, profesionalismo, fiesta, inspiración)',
+    ],
+    'promo': [
+      '¿Qué se PROMOCIONA? (Lanzamiento de producto, sale, evento, nueva función, anuncio)',
+      '¿Cuál es la UNA promesa principal en una frase?',
+      '¿Hay una FECHA LÍMITE o de LANZAMIENTO?',
+      '¿Qué EMOCIÓN debe evocarse? (FOMO, anticipación, curiosidad, emoción)',
+    ],
+    'presentation': [
+      '¿Cuál es el TEMA y TÍTULO de tu presentación?',
+      '¿Quién es el PÚBLICO? (Inversores, clientes, conferencia, equipo interno)',
+      '¿Cuál es tu TESIS CENTRAL — el mensaje principal que debe llegar?',
+      '¿Qué debe HACER el público después de la presentación? (Invertir, comprar, entender, actuar)',
+    ],
+    'custom': [
+      'Describe tu IDEA DE VIDEO en 2-3 frases — ¿qué tienes en mente?',
+      '¿Qué OBJETIVO debe lograr el video? ¿Cuál es el efecto deseado?',
+      '¿Quién es el PÚBLICO OBJETIVO de este video?',
+      '¿Hay REFERENCIAS o inspiraciones? ¿Qué estilo te gusta?',
+    ],
+  },
 };
+
+function getBlock1Phases(category: string, lang: Lang): string[] {
+  return CATEGORY_PHASES_BLOCK1[lang][category] || CATEGORY_PHASES_BLOCK1[lang]['custom'];
+}
 
 const UNIVERSAL_PHASES_BLOCK3: Record<Lang, string[]> = {
   de: [
