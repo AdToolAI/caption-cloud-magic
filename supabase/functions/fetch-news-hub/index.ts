@@ -379,6 +379,8 @@ serve(async (req) => {
     console.log(`[news-hub] ${citations.length} citations received`);
     console.log(`[news-hub] citations:`, JSON.stringify(citations.slice(0, 10)));
 
+    console.log(`[news-hub] Raw content (first 800):`, content.slice(0, 800));
+
     // Parse JSON
     let articles: any[];
     try {
@@ -386,7 +388,7 @@ serve(async (req) => {
       if (!jsonMatch) throw new Error("No JSON array found in response");
       articles = JSON.parse(jsonMatch[0]);
     } catch (e) {
-      console.error("[news-hub] Parse error. Content:", content.slice(0, 500));
+      console.error("[news-hub] Parse error. Content:", content.slice(0, 1000));
       throw new Error("Failed to parse response as JSON");
     }
 
