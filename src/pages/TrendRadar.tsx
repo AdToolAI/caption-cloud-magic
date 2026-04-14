@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useAICall } from "@/hooks/useAICall";
+import { useNewsRadar } from "@/hooks/useNewsRadar";
 import { FEATURE_COSTS } from "@/lib/featureCosts";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
