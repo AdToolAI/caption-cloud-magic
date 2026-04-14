@@ -81,16 +81,30 @@ Deno.serve(async (req) => {
       let impressions = 0;
       let reach = 0;
 
+      // Try new metrics first (post_total_media_view), fallback to legacy (post_impressions)
       try {
         const insights = await graphGet(`/${post.id}/insights`, {
-          metric: 'post_impressions,post_impressions_unique',
+          metric: 'post_total_media_view,post_total_media_view_unique',
         }, pageToken);
         for (const m of insights?.data || []) {
-          if (m.name === 'post_impressions') impressions = m.values?.[0]?.value || 0;
-          if (m.name === 'post_impressions_unique') reach = m.values?.[0]?.value || 0;
+          if (m.name === 'post_total_media_view') impressions = m.values?.[0]?.value || 0;
+          if (m.name === 'post_total_media_view_unique') reach = m.values?.[0]?.value || 0;
         }
+        console.log(`[FB Sync] Used new metrics for ${post.id}`);
       } catch {
-        // Some posts (shared, etc.) may not have insights
+        // Fallback to legacy metrics
+        try {
+          const insights = await graphGet(`/${post.id}/insights`, {
+            metric: 'post_impressions,post_impressions_unique',
+          }, pageToken);
+          for (const m of insights?.data || []) {
+            if (m.name === 'post_impressions') impressions = m.values?.[0]?.value || 0;
+            if (m.name === 'post_impressions_unique') reach = m.values?.[0]?.value || 0;
+          }
+          console.log(`[FB Sync] Used legacy metrics for ${post.id}`);
+        } catch {
+          // Some posts (shared, etc.) may not have insights
+        }
       }
 
       const likes = post.reactions?.summary?.total_count || 0;
@@ -134,13 +148,22 @@ Deno.serve(async (req) => {
     let pageImpressions = 0;
     let pageFollows = 0;
 
+    // Try new page_media_view first, fallback to legacy page_impressions
     try {
       const daily = await graphGet(`/${pageId}/insights`, {
-        metric: 'page_impressions',
+        metric: 'page_media_view',
         period: 'day',
       }, pageToken);
       pageImpressions = daily?.data?.[0]?.values?.[0]?.value || 0;
-    } catch { /* metric may not be available */ }
+    } catch {
+      try {
+        const daily = await graphGet(`/${pageId}/insights`, {
+          metric: 'page_impressions',
+          period: 'day',
+        }, pageToken);
+        pageImpressions = daily?.data?.[0]?.values?.[0]?.value || 0;
+      } catch { /* metric may not be available */ }
+    }
 
     try {
       const follows = await graphGet(`/${pageId}/insights`, {

@@ -85,11 +85,17 @@ Deno.serve(async (req) => {
           try {
             switch (conn.provider) {
               case "instagram": {
-                const res = await fetch(
-                  `https://graph.facebook.com/v21.0/${postId}?fields=like_count,comments_count,insights.metric(impressions,reach,saved,engagement)&access_token=${conn.access_token}`
+                // Try new IG metrics first, fallback to legacy
+                let igRes = await fetch(
+                  `https://graph.facebook.com/v24.0/${postId}?fields=like_count,comments_count,insights.metric(ig_reels_aggregated_all_plays_count,reach,saved)&access_token=${conn.access_token}`
                 );
-                if (res.ok) {
-                  const data = await res.json();
+                if (!igRes.ok) {
+                  igRes = await fetch(
+                    `https://graph.facebook.com/v24.0/${postId}?fields=like_count,comments_count,insights.metric(impressions,reach,saved)&access_token=${conn.access_token}`
+                  );
+                }
+                if (igRes.ok) {
+                  const data = await igRes.json();
                   const insights = data.insights?.data || [];
                   const getMetric = (name: string) => insights.find((i: any) => i.name === name)?.values?.[0]?.value || 0;
                   
@@ -98,18 +104,24 @@ Deno.serve(async (req) => {
                     comments: data.comments_count || 0,
                     shares: 0,
                     views: getMetric("reach"),
-                    impressions: getMetric("impressions"),
+                    impressions: getMetric("ig_reels_aggregated_all_plays_count") || getMetric("impressions"),
                   };
                 }
                 break;
               }
 
               case "facebook": {
-                const res = await fetch(
-                  `https://graph.facebook.com/v21.0/${postId}?fields=likes.summary(true),comments.summary(true),shares,insights.metric(post_impressions,post_engaged_users)&access_token=${conn.access_token}`
+                // Try new FB metrics first, fallback to legacy
+                let fbRes = await fetch(
+                  `https://graph.facebook.com/v24.0/${postId}?fields=likes.summary(true),comments.summary(true),shares,insights.metric(post_total_media_view,post_engaged_users)&access_token=${conn.access_token}`
                 );
-                if (res.ok) {
-                  const data = await res.json();
+                if (!fbRes.ok) {
+                  fbRes = await fetch(
+                    `https://graph.facebook.com/v24.0/${postId}?fields=likes.summary(true),comments.summary(true),shares,insights.metric(post_impressions,post_engaged_users)&access_token=${conn.access_token}`
+                  );
+                }
+                if (fbRes.ok) {
+                  const data = await fbRes.json();
                   const insights = data.insights?.data || [];
                   const getMetric = (name: string) => insights.find((i: any) => i.name === name)?.values?.[0]?.value || 0;
                   
@@ -118,7 +130,7 @@ Deno.serve(async (req) => {
                     comments: data.comments?.summary?.total_count || 0,
                     shares: data.shares?.count || 0,
                     views: 0,
-                    impressions: getMetric("post_impressions"),
+                    impressions: getMetric("post_total_media_view") || getMetric("post_impressions"),
                   };
                 }
                 break;

@@ -264,29 +264,42 @@ async function fetchInstagramPosts(accessToken: string, accountId: string, accou
 }
 
 async function fetchFacebookPosts(accessToken: string, pageId: string) {
-  const response = await fetch(
-    `https://graph.facebook.com/v18.0/${pageId}/posts?fields=id,message,created_time,permalink_url,shares,reactions.summary(true),comments.summary(true),insights.metric(post_impressions,post_impressions_unique)&limit=100`,
+  // Try new metrics first, fallback to legacy
+  let response = await fetch(
+    `https://graph.facebook.com/v24.0/${pageId}/posts?fields=id,message,created_time,permalink_url,shares,reactions.summary(true),comments.summary(true),insights.metric(post_total_media_view,post_total_media_view_unique)&limit=100`,
     { headers: { 'Authorization': `Bearer ${accessToken}` } }
   );
 
-  if (!response.ok) throw new Error('Failed to fetch Facebook posts');
+  let useNewMetrics = response.ok;
+  if (!response.ok) {
+    // Fallback to legacy metrics
+    response = await fetch(
+      `https://graph.facebook.com/v24.0/${pageId}/posts?fields=id,message,created_time,permalink_url,shares,reactions.summary(true),comments.summary(true),insights.metric(post_impressions,post_impressions_unique)&limit=100`,
+      { headers: { 'Authorization': `Bearer ${accessToken}` } }
+    );
+    if (!response.ok) throw new Error('Failed to fetch Facebook posts');
+  }
 
   const data = await response.json();
   
-  return data.data.map((post: any) => ({
-    id: post.id,
-    caption: post.message || '',
-    mediaType: 'photo',
-    url: post.permalink_url,
-    postedAt: post.created_time,
-    likes: post.reactions?.summary?.total_count || 0,
-    comments: post.comments?.summary?.total_count || 0,
-    shares: post.shares?.count || 0,
-    saves: 0,
-    reach: post.insights?.data?.find((i: any) => i.name === 'post_impressions_unique')?.values[0]?.value || 0,
-    impressions: post.insights?.data?.find((i: any) => i.name === 'post_impressions')?.values[0]?.value || 0,
-    videoViews: 0
-  }));
+  return data.data.map((post: any) => {
+    const reachMetric = useNewMetrics ? 'post_total_media_view_unique' : 'post_impressions_unique';
+    const impressionsMetric = useNewMetrics ? 'post_total_media_view' : 'post_impressions';
+    return {
+      id: post.id,
+      caption: post.message || '',
+      mediaType: 'photo',
+      url: post.permalink_url,
+      postedAt: post.created_time,
+      likes: post.reactions?.summary?.total_count || 0,
+      comments: post.comments?.summary?.total_count || 0,
+      shares: post.shares?.count || 0,
+      saves: 0,
+      reach: post.insights?.data?.find((i: any) => i.name === reachMetric)?.values?.[0]?.value || 0,
+      impressions: post.insights?.data?.find((i: any) => i.name === impressionsMetric)?.values?.[0]?.value || 0,
+      videoViews: 0
+    };
+  });
 }
 
 async function fetchTikTokPosts(accessToken: string) {

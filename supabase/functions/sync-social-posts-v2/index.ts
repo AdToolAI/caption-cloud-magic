@@ -215,18 +215,29 @@ serve(async (req) => {
 async function fetchInstagramPosts(userId: string, accountId: string, accessToken: string, accountType: string): Promise<any[]> {
   try {
     const endpoint = accountType === 'creator'
-      ? `https://graph.instagram.com/v21.0/${accountId}/media`
-      : `https://graph.facebook.com/v21.0/${accountId}/media`;
+      ? `https://graph.instagram.com/v24.0/${accountId}/media`
+      : `https://graph.facebook.com/v24.0/${accountId}/media`;
 
-    const fields = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,insights.metric(impressions,reach,saved,engagement)';
+    // Try new IG metrics first, fallback to legacy
+    let fields = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,insights.metric(ig_reels_aggregated_all_plays_count,reach,saved)';
+    let useNewMetrics = true;
     
-    const response = await fetch(
+    let response = await fetch(
       `${endpoint}?fields=${fields}&access_token=${accessToken}&limit=25`
     );
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Instagram API error: ${JSON.stringify(errorData)}`);
+      // Fallback to legacy metrics
+      console.log('[IG v2] New metrics failed, falling back to legacy');
+      fields = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,insights.metric(impressions,reach,saved)';
+      useNewMetrics = false;
+      response = await fetch(
+        `${endpoint}?fields=${fields}&access_token=${accessToken}&limit=25`
+      );
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Instagram API error: ${JSON.stringify(errorData)}`);
+      }
     }
 
     const data = await response.json();
@@ -243,7 +254,9 @@ async function fetchInstagramPosts(userId: string, accountId: string, accessToke
       comments: post.comments_count || 0,
       shares: 0,
       saves: post.insights?.data?.find((i: any) => i.name === 'saved')?.values?.[0]?.value || 0,
-      impressions: post.insights?.data?.find((i: any) => i.name === 'impressions')?.values?.[0]?.value || 0,
+      impressions: useNewMetrics
+        ? (post.insights?.data?.find((i: any) => i.name === 'ig_reels_aggregated_all_plays_count')?.values?.[0]?.value || 0)
+        : (post.insights?.data?.find((i: any) => i.name === 'impressions')?.values?.[0]?.value || 0),
       reach: post.insights?.data?.find((i: any) => i.name === 'reach')?.values?.[0]?.value || 0,
     }));
   } catch (error) {
@@ -258,7 +271,7 @@ async function fetchFacebookPosts(userId: string, accountId: string, accessToken
     const fields = 'id,message,created_time,permalink_url,full_picture,likes.summary(true),comments.summary(true),shares';
     
     const response = await fetch(
-      `https://graph.facebook.com/v21.0/${accountId}/posts?fields=${fields}&access_token=${accessToken}&limit=25`
+      `https://graph.facebook.com/v24.0/${accountId}/posts?fields=${fields}&access_token=${accessToken}&limit=25`
     );
 
     if (!response.ok) {

@@ -50,21 +50,34 @@ async function syncInstagram(supabase: any, userId: string, connection: SocialCo
     let syncedCount = 0;
 
     for (const post of posts) {
-      // Get insights for each post
-      const insightsUrl = `https://graph.instagram.com/${post.id}/insights?metric=reach,impressions,saved&access_token=${accessToken}`;
-      const insightsResponse = await fetch(insightsUrl);
-      
       let reach = 1;
       let impressions = 0;
       let saves = 0;
 
-      if (insightsResponse.ok) {
-        const insightsData = await insightsResponse.json();
-        const insights = insightsData.data || [];
-        
-        reach = insights.find((m: any) => m.name === 'reach')?.values?.[0]?.value || 1;
-        impressions = insights.find((m: any) => m.name === 'impressions')?.values?.[0]?.value || 0;
-        saves = insights.find((m: any) => m.name === 'saved')?.values?.[0]?.value || 0;
+      // Try new IG metrics first, fallback to legacy
+      try {
+        const insightsUrl = `https://graph.facebook.com/v24.0/${post.id}/insights?metric=ig_reels_aggregated_all_plays_count,reach,saved&access_token=${accessToken}`;
+        const insightsResponse = await fetch(insightsUrl);
+        if (insightsResponse.ok) {
+          const insightsData = await insightsResponse.json();
+          const insights = insightsData.data || [];
+          reach = insights.find((m: any) => m.name === 'reach')?.values?.[0]?.value || 1;
+          impressions = insights.find((m: any) => m.name === 'ig_reels_aggregated_all_plays_count')?.values?.[0]?.value || 0;
+          saves = insights.find((m: any) => m.name === 'saved')?.values?.[0]?.value || 0;
+        } else {
+          throw new Error('New metrics failed');
+        }
+      } catch {
+        // Fallback to legacy metrics
+        const insightsUrl = `https://graph.facebook.com/v24.0/${post.id}/insights?metric=reach,impressions,saved&access_token=${accessToken}`;
+        const insightsResponse = await fetch(insightsUrl);
+        if (insightsResponse.ok) {
+          const insightsData = await insightsResponse.json();
+          const insights = insightsData.data || [];
+          reach = insights.find((m: any) => m.name === 'reach')?.values?.[0]?.value || 1;
+          impressions = insights.find((m: any) => m.name === 'impressions')?.values?.[0]?.value || 0;
+          saves = insights.find((m: any) => m.name === 'saved')?.values?.[0]?.value || 0;
+        }
       }
 
       const likes = post.like_count || 0;
@@ -354,7 +367,7 @@ async function syncFacebook(supabase: any, userId: string, connection: SocialCon
 
     // Get posts from page
     const since = Math.floor((Date.now() - 90 * 24 * 60 * 60 * 1000) / 1000);
-    const postsUrl = `https://graph.facebook.com/v18.0/${pageId}/posts?fields=id,message,created_time,permalink_url,likes.summary(true),comments.summary(true),shares&since=${since}&access_token=${accessToken}`;
+    const postsUrl = `https://graph.facebook.com/v24.0/${pageId}/posts?fields=id,message,created_time,permalink_url,likes.summary(true),comments.summary(true),shares&since=${since}&access_token=${accessToken}`;
     
     const postsResponse = await fetch(postsUrl);
 
@@ -369,19 +382,30 @@ async function syncFacebook(supabase: any, userId: string, connection: SocialCon
     let syncedCount = 0;
 
     for (const post of posts) {
-      // Get insights for reach
-      const insightsUrl = `https://graph.facebook.com/v18.0/${post.id}/insights?metric=post_impressions,post_impressions_unique&access_token=${accessToken}`;
-      const insightsResponse = await fetch(insightsUrl);
-      
       let reach = 1;
       let impressions = 0;
 
-      if (insightsResponse.ok) {
-        const insightsData = await insightsResponse.json();
-        const insights = insightsData.data || [];
-        
-        reach = insights.find((m: any) => m.name === 'post_impressions_unique')?.values?.[0]?.value || 1;
-        impressions = insights.find((m: any) => m.name === 'post_impressions')?.values?.[0]?.value || 0;
+      // Try new metrics first, fallback to legacy
+      try {
+        const insightsUrl = `https://graph.facebook.com/v24.0/${post.id}/insights?metric=post_total_media_view,post_total_media_view_unique&access_token=${accessToken}`;
+        const insightsResponse = await fetch(insightsUrl);
+        if (insightsResponse.ok) {
+          const insightsData = await insightsResponse.json();
+          const insights = insightsData.data || [];
+          reach = insights.find((m: any) => m.name === 'post_total_media_view_unique')?.values?.[0]?.value || 1;
+          impressions = insights.find((m: any) => m.name === 'post_total_media_view')?.values?.[0]?.value || 0;
+        } else {
+          throw new Error('New metrics failed');
+        }
+      } catch {
+        const insightsUrl = `https://graph.facebook.com/v24.0/${post.id}/insights?metric=post_impressions,post_impressions_unique&access_token=${accessToken}`;
+        const insightsResponse = await fetch(insightsUrl);
+        if (insightsResponse.ok) {
+          const insightsData = await insightsResponse.json();
+          const insights = insightsData.data || [];
+          reach = insights.find((m: any) => m.name === 'post_impressions_unique')?.values?.[0]?.value || 1;
+          impressions = insights.find((m: any) => m.name === 'post_impressions')?.values?.[0]?.value || 0;
+        }
       }
 
       const likes = post.likes?.summary?.total_count || 0;
