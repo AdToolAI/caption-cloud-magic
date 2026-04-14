@@ -54,7 +54,7 @@ export function UniversalVideoWizard() {
   const [isUploadingImages, setIsUploadingImages] = useState(false);
 
   // Check if category needs product images
-  const needsProductImages = selectedCategory === 'product-video' || selectedCategory === 'advertisement';
+  const needsProductImages = selectedCategory === 'product-ad';
 
   // Helper to get localized category name
   const getCategoryName = (cat: VideoCategory | null): string => {
@@ -97,7 +97,7 @@ export function UniversalVideoWizard() {
     const errors: string[] = [];
     if (!result.category) errors.push(t('uvc.valCategoryMissing'));
     // Storytelling doesn't need product info — only ad categories do
-    const isStoryCategory = result.category === 'storytelling' || (result.category as string) === 'brand-story' || (result.category as string) === 'behind-scenes';
+    const isStoryCategory = result.category === 'storytelling';
     if (!isStoryCategory && !result.productDescription && !result.productName) errors.push(t('uvc.valProductMissing'));
     if (!result.storytellingStructure) errors.push(t('uvc.valStructureMissing'));
     return { valid: errors.length === 0, errors };
