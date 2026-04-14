@@ -417,10 +417,12 @@ cta: animation="${getDefaultAnimation('cta', categoryKey)}" textAnimation="${get
 
   // Storytelling-specific scene types and rules
   const isStorytelling = categoryKey === 'storytelling';
+  const isProductVideo = categoryKey === 'product-video';
   
   const storytellingSceneTypes = 'opening|rising_action|climax|falling_action|resolution|epilogue';
+  const productSceneTypes = 'reveal|lifestyle|detail-closeup|transformation|feature-showcase|hook|cta';
   const adSceneTypes = 'hook|problem|solution|feature|proof|cta|intro|benefit';
-  const activeSceneTypes = isStorytelling ? storytellingSceneTypes : adSceneTypes;
+  const activeSceneTypes = isStorytelling ? storytellingSceneTypes : isProductVideo ? productSceneTypes : adSceneTypes;
 
   const coreRules = isStorytelling
     ? `
@@ -433,6 +435,19 @@ cta: animation="${getDefaultAnimation('cta', categoryKey)}" textAnimation="${get
 - Each scene builds emotional tension. Focus on characters, conflict, setting, mood.
 - visualDescriptions should be CINEMATIC: atmospheric lighting, symbolic imagery, emotional landscapes.
 - Show the STORY environment, not products or business contexts.`
+    : isProductVideo
+    ? `
+- visualDescription MUST be in ENGLISH (image generation)
+- NOT allowed in visualDescription: "A person", "A man", "A woman", "hand", "finger", "Digital world", "Abstract shapes"
+- Adapt EVERY visualDescription to visual style "${briefing.visualStyle || 'modern-3d'}"
+- NEVER describe objects with text/numbers (no dashboards, charts, monitors)
+- Use ONLY animations from the allowed set for "${categoryKey}"!
+- This is a PRODUCT VIDEO. The uploaded product photos are the STAR.
+- NEVER generate the same script structure twice. RANDOMLY choose ONE of these schemas: Unboxing-Reveal, Lifestyle-Montage, Problem-Solution-Transformation, Mini-Story, Before-After, Slow-Motion-Showcase, POV-Perspective, Detail-Macro-Tour.
+- Each visualDescription should describe HOW the product photo should be placed: the setting, lighting, angle, and mood.
+- Include a "sourceProductImageIndex" field (0-based) for scenes that should use an uploaded product photo.
+- CTA scene MUST include website URL "${briefing.websiteUrl || ''}" in voiceover
+- Make the video CREATIVE and UNIQUE — surprise the viewer!`
     : `
 - visualDescription MUST be in ENGLISH (image generation)
 - NOT allowed in visualDescription: "A person", "A man", "A woman", "hand", "finger", "Digital world", "Abstract shapes"
@@ -484,6 +499,24 @@ Colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') 
 Duration: ${effectiveDuration}s | Format: ${briefing.aspectRatio || '16:9'}
 ${briefing.hasCharacter ? `Narrator Character: ${briefing.characterName || 'Narrator'} - acts as storyteller, NOT salesperson` : ''}
 IMPORTANT: This is a STORY. No CTA, no URL, no sales pitch. Tell a compelling narrative!
+IMPORTANT: Write ALL voiceover text in ${voiceoverLangMap[lang]}!`
+    : isProductVideo
+    ? `Create a CREATIVE PRODUCT VIDEO script — make it visually stunning and unique:
+${moodInstructions}
+Product: ${briefing.productName || '-'} | Description: ${briefing.productDescription || '-'}
+Company: ${briefing.companyName || '-'} | Audience: ${briefing.targetAudience || 'General'}
+Problem it solves: ${briefing.coreProblem || '-'} | USPs: ${Array.isArray(briefing.uniqueSellingPoints) ? briefing.uniqueSellingPoints.join(', ') : (briefing.uniqueSellingPoints || '-')}
+Available product photos: ${briefing.productImages?.length || 0} uploaded images (assign sourceProductImageIndex 0-${(briefing.productImages?.length || 1) - 1} to scenes)
+Cinematic style requested: ${briefing.categorySpecific?.cinematicStyle || 'premium showcase'}
+Emotional reaction: ${briefing.categorySpecific?.emotionalReaction || 'desire and amazement'}
+Key message: ${briefing.keyMessage || '-'} | CTA: ${briefing.ctaText || '-'}
+Visual style: ${briefing.visualStyle || 'modern-3d'} | Tone: ${briefing.emotionalTone || 'professional'}
+Colors: ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'Default')}
+Duration: ${effectiveDuration}s | Format: ${briefing.aspectRatio || '16:9'} | URL: ${briefing.websiteUrl || '-'}
+${briefing.hasCharacter ? `Character: ${briefing.characterName || 'Protagonist'} - ${briefing.characterDescription || 'Likeable'}` : ''}
+Extra: ${JSON.stringify(briefing.categorySpecific || {})}
+IMPORTANT: Each visualDescription must describe the SETTING and MOOD for the product photo placement — NOT generate a new product from scratch.
+IMPORTANT: NEVER use the same script schema twice. Be CREATIVE and SURPRISING!
 IMPORTANT: Write ALL voiceover text in ${voiceoverLangMap[lang]}!`
     : `Create a ${briefing.category} video script ("${categoryKey}" style):
 ${moodInstructions}
