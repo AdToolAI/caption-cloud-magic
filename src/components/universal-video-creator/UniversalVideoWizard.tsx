@@ -716,7 +716,43 @@ export function UniversalVideoWizard() {
             </div>
           )}
 
-          {/* Mood Selection */}
+          {/* Product Images Upload Step */}
+          {currentStepId === 'product-images' && selectedCategory && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold mb-2 text-[#F5C76A]">
+                  {language === 'de' ? 'Produktbilder hochladen' : language === 'es' ? 'Subir imágenes del producto' : 'Upload Product Images'}
+                </h2>
+                <p className="text-muted-foreground">
+                  {language === 'de' 
+                    ? 'Lade mindestens 4 Fotos deines Produkts hoch. Diese werden per KI in die passenden Szenen eingebettet.'
+                    : language === 'es'
+                    ? 'Sube al menos 4 fotos de tu producto. Serán integradas en las escenas por IA.'
+                    : 'Upload at least 4 photos of your product. They will be AI-enhanced to fit each scene.'}
+                </p>
+              </div>
+              <MultiImageUpload
+                value={productImages}
+                onChange={setProductImages}
+                minFiles={4}
+                maxFiles={10}
+                label={language === 'de' ? 'Produktbilder' : language === 'es' ? 'Imágenes del producto' : 'Product Images'}
+              />
+              <div className="flex justify-center">
+                <Button
+                  onClick={handleUploadProductImages}
+                  disabled={productImages.length < 4 || isUploadingImages}
+                  className="px-8 py-3 rounded-xl font-semibold text-black bg-gradient-to-r from-[#F5C76A] to-amber-500 hover:shadow-[0_0_30px_rgba(245,199,106,0.4)] transition-all duration-300 disabled:opacity-50"
+                >
+                  {isUploadingImages 
+                    ? (language === 'de' ? 'Wird hochgeladen...' : 'Uploading...') 
+                    : (language === 'de' ? `Weiter mit ${productImages.length} Bildern` : `Continue with ${productImages.length} images`)}
+                </Button>
+              </div>
+            </div>
+          )}
+
+
           {currentStepId === 'mood' && selectedCategory && (
             <MoodPresetSelector onConfirm={handleMoodConfirm} />
           )}
