@@ -33,10 +33,10 @@ const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
       'Welche TOOLS oder MATERIALIEN werden benötigt, um mitzumachen?',
     ],
     'product-video': [
-      'Welches PRODUKT stellst du vor? (Name, Kategorie, kurze Beschreibung)',
-      'Welches PROBLEM löst dein Produkt für den Kunden?',
-      'Was sind die Top 3 FEATURES oder Vorteile deines Produkts?',
-      'Wer kauft dein Produkt? (Zielgruppe, Alter, Kaufmotivation)',
+      'Welches PRODUKT stellst du vor? (Name, Kategorie, kurze Beschreibung — du hast ja bereits Bilder hochgeladen!)',
+      'Welches PROBLEM löst dein Produkt und welche EMOTIONALE REAKTION soll der Zuschauer beim Anblick haben?',
+      'Was sind die Top 3 FEATURES und was unterscheidet dein Produkt vom Wettbewerb?',
+      'Beschreibe eine ALLTAGSSZENE in der dein Produkt den entscheidenden Unterschied macht',
     ],
     'corporate': [
       'Was ist der HAUPTZWECK des Unternehmensfilms? (Recruiting, Imagefilm, Investoren-Pitch, Employer Branding)',
@@ -107,10 +107,10 @@ const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
       'What TOOLS or MATERIALS are needed to follow along?',
     ],
     'product-video': [
-      'Which PRODUCT are you presenting? (Name, category, brief description)',
-      'What PROBLEM does your product solve for the customer?',
-      'What are the top 3 FEATURES or benefits of your product?',
-      'Who buys your product? (Target audience, age, buying motivation)',
+      'Which PRODUCT are you presenting? (Name, category, brief description — you already uploaded images!)',
+      'What PROBLEM does your product solve and what EMOTIONAL REACTION should viewers have when seeing it?',
+      'What are the top 3 FEATURES and what sets your product apart from competitors?',
+      'Describe an EVERYDAY SCENE where your product makes the decisive difference',
     ],
     'corporate': [
       'What is the MAIN PURPOSE of the corporate film? (Recruiting, image film, investor pitch, employer branding)',
@@ -181,10 +181,10 @@ const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
       '¿Qué HERRAMIENTAS o MATERIALES se necesitan para seguirlo?',
     ],
     'product-video': [
-      '¿Qué PRODUCTO presentas? (Nombre, categoría, breve descripción)',
-      '¿Qué PROBLEMA resuelve tu producto para el cliente?',
-      '¿Cuáles son los 3 principales FEATURES o beneficios de tu producto?',
-      '¿Quién compra tu producto? (Público objetivo, edad, motivación de compra)',
+      '¿Qué PRODUCTO presentas? (Nombre, categoría, breve descripción — ¡ya has subido las imágenes!)',
+      '¿Qué PROBLEMA resuelve tu producto y qué REACCIÓN EMOCIONAL debe tener el espectador al verlo?',
+      '¿Cuáles son las 3 principales CARACTERÍSTICAS y qué diferencia a tu producto de la competencia?',
+      'Describe una ESCENA COTIDIANA donde tu producto marca la diferencia decisiva',
     ],
     'corporate': [
       '¿Cuál es el PROPÓSITO PRINCIPAL del video corporativo? (Reclutamiento, imagen, pitch para inversores, employer branding)',
