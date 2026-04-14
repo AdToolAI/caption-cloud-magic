@@ -608,70 +608,65 @@ const Home = () => {
           <FeatureGrid />
         )}
 
-        {/* Performance KPIs */}
+        {/* Performance + KI-Empfehlungen side by side */}
         {user && (
-          <Section title={t("dashboard.sections.performance")} description={t("dashboard.sections.performanceDescription")} bg="muted">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <MetricCard
-                label={t("dashboard.metrics.reach7d")}
-                value={performanceKPIs.reach >= 1000 ? `${(performanceKPIs.reach / 1000).toFixed(1)}K` : String(performanceKPIs.reach)}
-                subtitle={t("dashboard.metrics.vsLastWeek")}
-                icon={<TrendingUp className="h-5 w-5" />}
-                trend={{ value: Math.abs(performanceKPIs.reachTrend), isPositive: performanceKPIs.reachTrend >= 0 }}
-              />
-              <MetricCard
-                label={t("dashboard.metrics.engagementRate")}
-                value={`${performanceKPIs.engagementRate}%`}
-                subtitle={t("dashboard.metrics.avgAllPosts")}
-                icon={<TrendingUp className="h-5 w-5" />}
-                trend={{ value: Math.abs(performanceKPIs.engagementTrend), isPositive: performanceKPIs.engagementTrend >= 0 }}
-              />
-              <MetricCard
-                label={t("dashboard.metrics.publishedPosts")}
-                value={String(performanceKPIs.publishedPosts)}
-                subtitle={t("dashboard.metrics.thisMonth")}
-                icon={<Send className="h-5 w-5" />}
-                trend={{ value: Math.abs(performanceKPIs.postsTrend), isPositive: performanceKPIs.postsTrend >= 0 }}
-              />
-            </div>
-          </Section>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Section title={t("dashboard.sections.performance")} bg="muted">
+              <div className="grid grid-cols-3 gap-3">
+                <MetricCard
+                  label={t("dashboard.metrics.reach7d")}
+                  value={performanceKPIs.reach >= 1000 ? `${(performanceKPIs.reach / 1000).toFixed(1)}K` : String(performanceKPIs.reach)}
+                  subtitle={t("dashboard.metrics.vsLastWeek")}
+                  icon={<TrendingUp className="h-4 w-4" />}
+                  trend={{ value: Math.abs(performanceKPIs.reachTrend), isPositive: performanceKPIs.reachTrend >= 0 }}
+                />
+                <MetricCard
+                  label={t("dashboard.metrics.engagementRate")}
+                  value={`${performanceKPIs.engagementRate}%`}
+                  subtitle={t("dashboard.metrics.avgAllPosts")}
+                  icon={<TrendingUp className="h-4 w-4" />}
+                  trend={{ value: Math.abs(performanceKPIs.engagementTrend), isPositive: performanceKPIs.engagementTrend >= 0 }}
+                />
+                <MetricCard
+                  label={t("dashboard.metrics.publishedPosts")}
+                  value={String(performanceKPIs.publishedPosts)}
+                  subtitle={t("dashboard.metrics.thisMonth")}
+                  icon={<Send className="h-4 w-4" />}
+                  trend={{ value: Math.abs(performanceKPIs.postsTrend), isPositive: performanceKPIs.postsTrend >= 0 }}
+                />
+              </div>
+            </Section>
+            <Section 
+              title={t("reco.title")}
+              action={
+                <Button asChild variant="link">
+                  <Link to="/personalized-dashboard">
+                    {t("homePage.personalizedDashboard")} →
+                  </Link>
+                </Button>
+              }
+            >
+              <RecoCard />
+            </Section>
+          </div>
         )}
 
-        {/* KI-Empfehlungen */}
+        {/* Heatmap + Recent Activity side by side */}
         {user && (
-          <Section 
-            title={t("reco.title")}
-            action={
-              <Button asChild variant="link">
-                <Link to="/personalized-dashboard">
-                  {t("homePage.personalizedDashboard")} →
-                </Link>
-              </Button>
-            }
-          >
-            <RecoCard />
-          </Section>
-        )}
-
-        {/* Heatmap */}
-        {user && (
-          <Section 
-            title={t("dashboard.sections.bestTimes")}
-            description={t("dashboard.sections.bestTimesDescription")}
-          >
-            <BestTimeHeatmap 
-              heatmap={heatmapData} 
-              loading={postingTimesLoading}
-              onViewDetails={() => navigate('/posting-times')}
-            />
-          </Section>
-        )}
-
-        {/* Recent Activity */}
-        {user && (
-          <Section title={t("dashboard.sections.recentActivity")} description={t("dashboard.sections.recentActivityDescription")} bg="muted">
-            <RecentActivityFeed />
-          </Section>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Section 
+              title={t("dashboard.sections.bestTimes")}
+            >
+              <BestTimeHeatmap 
+                heatmap={heatmapData} 
+                loading={postingTimesLoading}
+                onViewDetails={() => navigate('/posting-times')}
+              />
+            </Section>
+            <Section title={t("dashboard.sections.recentActivity")} bg="muted">
+              <RecentActivityFeed />
+            </Section>
+          </div>
         )}
 
       </div>
