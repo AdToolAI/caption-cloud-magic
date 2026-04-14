@@ -1,60 +1,35 @@
 
+Ziel: das horizontale Scrollen endgültig entfernen. Die News-Leiste wirkt zwar „zu lang“, aber im Code sind aktuell drei eigentliche Ursachen sichtbar:
 
-## Plan: News Hub als eigenständiges Feature
+1. `src/App.tsx`: Der Haupt-Content läuft neben der Sidebar mit `flex-1 w-full`. Das kann den Bereich breiter als den Viewport machen.
+2. `src/components/dashboard/NewsTicker.tsx`: Der Marquee-/Flex-Bereich ist nicht überall sauber mit `min-w-0` begrenzt.
+3. `src/pages/TrendRadar.tsx`: Dort existiert zusätzlich noch ein zweiter, alter `NewsRadarTicker` im Seiteninhalt, obwohl der globale Ticker schon über dem Header sitzt.
 
-### Was gebaut wird
-Eine eigene **News Hub Seite** (`/news-hub`) — ein vollwertiger Nachrichten-Feed mit Karten-Layout, getrennt vom Trend Radar. Liefert tagesaktuelle News aus:
-- Social Media Management & Plattform-Updates
-- KI-Tools & Marketing-Automation
-- Creator Economy & Monetization
-- Unternehmens-Prognosen & Börsenkurse (Meta, Alphabet, Snap etc.)
-- Digitales Marketing & Strategie-Insights
+Umsetzung:
 
-News aktualisieren sich alle 4-5 Stunden. Ältere News bleiben bestehen, rutschen nach hinten.
+1. `src/App.tsx`
+- Den App-Content von `flex-1 w-full flex flex-col` auf `min-w-0 flex-1 flex flex-col overflow-x-hidden` umstellen.
+- Den äußeren Layout-Wrapper ebenfalls gegen seitliches Overflow absichern.
 
-### Umsetzung
+2. `src/components/dashboard/NewsTicker.tsx`
+- Dem äußeren Ticker `w-full max-w-full overflow-hidden` geben.
+- In der inneren Leiste und im Scroll-Container `min-w-0` ergänzen, damit das Marquee nie die Seitenbreite mitbestimmt.
+- Die sichtbare Meldungsbreite etwas reduzieren, damit die Leiste kompakter bleibt.
 
-**1. DB-Tabelle `news_hub_articles`**
-- Spalten: `id`, `headline`, `summary` (2-3 Sätze), `category`, `source`, `source_url`, `language`, `batch_id`, `published_at`, `created_at`
-- 7 Kategorien: `platform`, `ai_tools`, `analytics`, `monetization`, `community`, `business_finance`, `strategy`
-- RLS: öffentlich lesbar für authentifizierte User, Service-Role schreibbar
-- Max 200 Artikel behalten, ältere werden beim Fetch gelöscht
+3. `src/pages/TrendRadar.tsx`
+- Den lokalen `NewsRadarTicker` entfernen, weil der globale Header-Ticker bereits vorhanden ist.
+- Die Seite zusätzlich mit `overflow-x-hidden` absichern.
 
-**2. Edge Function `fetch-news-hub`**
-- Nutzt Perplexity API (sonar) — Key ist bereits konfiguriert
-- Holt 12-15 Artikel pro Batch mit ausführlichen Summaries über alle 7 Kategorien
-- 4-Stunden-Cache: prüft ob letzter Batch < 4h alt, sonst Skip
-- Duplikat-Check gegen letzte 50 Headlines
-- Cleanup: behält max 200 Artikel
+Betroffene Dateien:
+- `src/App.tsx`
+- `src/components/dashboard/NewsTicker.tsx`
+- `src/pages/TrendRadar.tsx`
 
-**3. Frontend**
+Ergebnis:
+- Keine horizontale Scrollbar mehr durch die News-Leiste
+- Kein doppelter News Radar mehr auf Trend Radar
+- Keine Änderung an News-Logik, Aktualisierung, API-Anbindung oder bestehenden Verbindungen
 
-| Datei | Beschreibung |
-|-------|-------------|
-| `src/pages/NewsHub.tsx` | Eigenständige Seite mit Hero-Header, Kategorie-Filter-Chips, Karten-Grid (1 Spalte mobil, 2 Desktop), "Mehr laden"-Button |
-| `src/hooks/useNewsHub.ts` | Lädt Artikel aus DB, Paginierung (10/Seite), Kategorie-Filter, triggert Edge Function bei Bedarf |
-| `src/App.tsx` | Route `/news-hub` hinzufügen |
-| `src/components/ui/CommandBar.tsx` | News Hub in Suche aufnehmen |
-
-**4. Karten-Design**
-- Farbcodierte Kategorie-Badges (cyan=Platform, violet=AI, green=Analytics etc.)
-- Headline + Summary (2-3 Zeilen)
-- Quelle + relative Zeitangabe ("vor 2 Stunden")
-- Link zur Originalquelle
-- James Bond 2028 Sci-Fi Stil passend zum Rest der App
-
-### Was sich nicht ändert
-- Trend Radar bleibt unverändert
-- News Radar Ticker (im Header) bleibt unverändert
-- Keine Änderungen an bestehenden Features
-
-### Betroffene Dateien
-| Aktion | Datei |
-|--------|-------|
-| Neu (Migration) | `news_hub_articles` Tabelle + RLS |
-| Neu | `supabase/functions/fetch-news-hub/index.ts` |
-| Neu | `src/pages/NewsHub.tsx` |
-| Neu | `src/hooks/useNewsHub.ts` |
-| Edit | `src/App.tsx` — Route hinzufügen |
-| Edit | `src/components/ui/CommandBar.tsx` — Suchlink |
-
+Technische Details:
+- Der wichtigste globale Fix ist: neben der fixen Sidebar kein `w-full` mehr auf dem flexenden Content-Panel, sondern `min-w-0`.
+- Beim Ticker ist `min-w-0` entscheidend, weil Flex-Children sonst trotz `overflow-hidden` das Layout seitlich verbreitern können.
