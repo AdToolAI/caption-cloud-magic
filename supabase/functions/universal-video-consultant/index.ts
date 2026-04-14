@@ -2165,7 +2165,7 @@ serve(async (req) => {
     
     console.log(`[universal-video-consultant] Category: ${category}, Mode: ${mode}, Phase: ${currentPhase}/22, Progress: ${progress}%, Messages: ${messages.length}, Lang: ${lang}`);
 
-    const systemPrompt = getCategorySystemPrompt(category, mode, currentPhase, lang);
+    const systemPrompt = getCategorySystemPrompt(category, mode, currentPhase, lang, messages);
     
     const compressedMessages = compressContext(messages, currentPhase);
     
