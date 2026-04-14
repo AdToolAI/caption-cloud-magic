@@ -320,7 +320,7 @@ function getSparkColor(platform: string) {
 }
 
 export default function TrendRadar() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -342,15 +342,17 @@ export default function TrendRadar() {
   const [viewMode, setViewMode] = useState<'discover' | 'saved'>('discover');
   const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
 
-  useEffect(() => { fetchTrends(); }, [platformFilter, categoryFilter]);
+  useEffect(() => { fetchTrends(); }, [platformFilter, categoryFilter, language]);
   useEffect(() => {
     if (user) { fetchBookmarks(); } else { setBookmarked([]); }
   }, [user]);
 
-  const fetchTrends = async () => {
+  
+
+  const fetchTrends = async (forceRefresh = false) => {
     setLoading(true);
     try {
-      const body: any = { language: 'en' };
+      const body: any = { language, force: forceRefresh };
       if (platformFilter !== 'all') body.platform = platformFilter;
       if (categoryFilter !== 'all') body.category = categoryFilter;
       const { data, error } = await supabase.functions.invoke('fetch-trends', { body });
@@ -358,7 +360,7 @@ export default function TrendRadar() {
       setTrends(data.trends || []);
     } catch (error) {
       console.error('Error fetching trends:', error);
-      toast({ title: "Error loading trends", description: error instanceof Error ? error.message : t('trends.unknownError'), variant: "destructive" });
+      toast({ title: t('trends.analysisFailed'), description: error instanceof Error ? error.message : t('trends.unknownError'), variant: "destructive" });
     } finally { setLoading(false); }
   };
 
@@ -484,7 +486,7 @@ export default function TrendRadar() {
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             bookmarkedCount={bookmarked.length}
-            onRefresh={() => { setTrends([]); fetchTrends(); }}
+            onRefresh={() => { setTrends([]); fetchTrends(true); }}
             loading={loading}
             trendsCount={trends.length}
           />
@@ -629,7 +631,7 @@ export default function TrendRadar() {
                         <TrendingUp className="w-16 h-16 text-muted-foreground/50 mx-auto" />
                       </motion.div>
                       <p className="text-muted-foreground text-lg">{t('trends.noTrendsFound')}</p>
-                      <Button onClick={fetchTrends} className="bg-gradient-to-r from-primary to-primary/80"><Sparkles className="w-4 h-4 mr-2" />{t('trends.reloadTrends')}</Button>
+                      <Button onClick={() => fetchTrends()} className="bg-gradient-to-r from-primary to-primary/80"><Sparkles className="w-4 h-4 mr-2" />{t('trends.reloadTrends')}</Button>
                     </>
                   )}
                 </CardContent>
