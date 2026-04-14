@@ -1,46 +1,48 @@
 
 
-## Plan: Storytelling Sub-Modi — "KI erfindet" vs. "Wahre Geschichte"
+## Plan: Storytelling-Modus von Werbe-Logik befreien
 
-### Idee
-Die allererste Frage im Storytelling-Modus wird eine Weichenstellung: **"Soll die KI eine Geschichte erfinden oder hast du bereits eine wahre Geschichte?"** Danach passen sich alle Folgefragen an den gewählten Sub-Modus an.
+### Problem
+Der `generate-universal-script` Prompt ist für ALLE Kategorien identisch und enthält:
+- **Szenentypen** wie `hook|problem|solution|feature|proof|cta` — reine Werbe-Terminologie
+- **Regel 14**: "Die CTA-Szene MUSS die Website-URL enthalten" — auch für Geschichten
+- **User-Prompt** enthält immer USPs, Kernproblem, Lösung, CTA-Text, gewünschte Aktion
+- **Storytelling-Strukturen** wie "3-Akt" oder "Heldenreise" existieren, aber die Szenentypen bleiben `hook/cta`
 
-### Umsetzung
+### Lösung
 
-**1. Edge Function `universal-video-consultant/index.ts`**
+**1. Edge Function `generate-universal-script/index.ts`**
 
-- **Block 1 Storytelling-Fragen anpassen**: Die erste Frage wird zur Sub-Modus-Wahl:
-  - DE: "Möchtest du, dass die KI eine Geschichte für dich **erfindet**, oder hast du bereits eine **wahre Geschichte** die wir aufbereiten sollen?"
-  - EN/ES analog
-- Die Folgefragen (Phase 2-4) werden je nach Antwort dynamisch:
-  - **"KI erfindet"**: Genre, Zielgruppe, gewünschte Emotion, Setting/Welt
-  - **"Wahre Geschichte"**: Erzähl mir was passiert ist, wer war beteiligt, was war der Wendepunkt, was ist die Botschaft
-- Im **System-Prompt** wird der Sub-Modus erkannt (via Keyword-Matching in der Konversation: "erfinden/invent/inventar" vs. "wahr/true/real/verdadera") und die KI-Rolle entsprechend angepasst:
-  - Erfinden → "Du bist ein kreativer Autor, entwickle eine fesselnde fiktive Story basierend auf den Vorgaben"
-  - Wahre Geschichte → "Du bist ein einfühlsamer Interviewer, extrahiere die Kernelemente der wahren Geschichte und forme sie in eine emotionale Erzählung"
+- **Storytelling-spezifische Szenentypen** einführen: Statt `hook|problem|solution|feature|proof|cta` → `opening|rising_action|climax|falling_action|resolution|epilogue` (oder passend zur gewählten Struktur wie Heldenreise)
+- **System-Prompt verzweigen**: Wenn `categoryKey === 'storytelling'`:
+  - Regel 14 (CTA mit URL) entfernen
+  - Keine USPs, kein "Produkt im Fokus"
+  - Stattdessen: "Erzähle eine fesselnde Geschichte. Jede Szene baut emotionale Spannung auf. Kein Verkauf, keine Werbung."
+  - Szenen-Badges werden erzählerisch: "Kapitel 1", "Der Wendepunkt" statt "HOOK"
+- **User-Prompt verzweigen**: Für Storytelling die Marketing-Felder (USPs, CTA, gewünschte Aktion) weglassen und stattdessen Story-Felder nutzen: Protagonist, Konflikt, Setting, Botschaft, emotionaler Ton
+- **Character-Logik anpassen**: Im Storytelling-Modus den Charakter als "Erzähler" positionieren, nicht als "Verkäufer mit Pointing-Geste"
+- **Regel 12 (visualDescription)** beibehalten, aber den Kontext anpassen: cineastische Stimmungsbilder statt Produktumgebungen
 
-- **Block 2 Storytelling-Phasen anpassen** (`CATEGORY_SPECIFIC_PHASES`):
-  - **Erfinden**: Genre, Welt/Setting, Protagonist-Details, Plot-Twist, visueller Stil, Erzählperspektive
-  - **Wahre Geschichte**: Chronologie, beteiligte Personen, emotionaler Höhepunkt, authentische Details, Lektion/Moral, wie nah an der Realität
+**2. Betroffene Stellen im Detail**
 
-- **Quick Replies** für die erste Frage anpassen: "KI erfindet eine Story" / "Ich habe eine wahre Geschichte"
-
-**2. Frontend `translations.ts`**
-- `consultantFirstQuestion_storytelling` aktualisieren auf die Sub-Modus-Frage (DE/EN/ES)
-
-**3. Quick Replies `CATEGORY_QUICK_REPLIES_BLOCK1`**
-- Storytelling Phase 1: `["KI erfindet eine Story", "Ich habe eine wahre Geschichte"]` (DE/EN/ES)
+| Bereich | Jetzt (Werbung) | Neu (Storytelling) |
+|---------|-----------------|-------------------|
+| Szenentypen | `hook, problem, solution, feature, proof, cta` | `opening, rising_action, climax, falling_action, resolution, epilogue` |
+| Regel 14 | "CTA MUSS Website-URL enthalten" | Entfällt für Storytelling |
+| Regel 11 | "Produkt in Szenen einbeziehen" | "Geschichte und Emotionen in Szenen einbeziehen" |
+| Character-Geste | `pointing`, `celebrating` | `thinking`, `explaining`, `idle` |
+| Szenen-Badge | "HOOK" | "Kapitel 1" / "Der Anfang" |
+| User-Prompt | USPs, CTA-Text, gewünschte Aktion | Protagonist, Konflikt, Wendepunkt, Moral |
 
 ### Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `supabase/functions/universal-video-consultant/index.ts` | Block 1 + Block 2 Storytelling-Phasen, Prompt-Logik für Sub-Modus-Erkennung, Quick Replies |
-| `src/lib/translations.ts` | Erste Frage für Storytelling aktualisieren |
+| `supabase/functions/generate-universal-script/index.ts` | System-Prompt + User-Prompt Verzweigung für Storytelling, eigene Szenentypen, keine CTA-Pflicht |
 
 ### Ergebnis
-- Storytelling startet mit klarer Weichenstellung
-- "KI erfindet" → KI fragt nach Genre, Setting, Stimmung und baut eine komplette Story
-- "Wahre Geschichte" → KI interviewt einfühlsam, extrahiert Details und formt daraus ein Video-Skript
-- Alle Folgefragen sind auf den Sub-Modus zugeschnitten
+- Storytelling-Videos erzählen tatsächlich eine Geschichte
+- Keine "HOOK"-Badges, keine CTA-Szene mit URL
+- Cineastische, emotionale Szenenfolge statt Verkaufs-Trichter
+- Charakter agiert als Erzähler, nicht als Werbe-Figur
 
