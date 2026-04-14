@@ -1,4 +1,4 @@
-const CACHE_NAME = 'caption-genie-v2';
+const CACHE_NAME = 'caption-genie-v3';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -7,6 +7,7 @@ const urlsToCache = [
 
 // Install service worker
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(urlsToCache))
