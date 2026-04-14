@@ -504,10 +504,10 @@ const Home = () => {
       {user && (
         <div className="bg-card border-b border-border py-3 px-4">
           <div className="container max-w-7xl mx-auto flex items-center justify-between gap-4 text-sm flex-wrap">
-            <div className="flex items-center gap-2 text-muted-foreground">
+             <div className="flex items-center gap-2 text-muted-foreground">
               <Lightbulb className="h-4 w-4 text-primary" />
               <span className="font-medium">{t("dashboard.statusBar.tipOfTheDay")}:</span>
-              <span>{t("dashboard.statusBar.tipContent")}</span>
+              <span>{topInsight ? topInsight.headline : t("dashboard.statusBar.tipContent")}</span>
             </div>
             <div className="flex items-center gap-6">
               <div className="text-xs"><CreditBalance /></div>
