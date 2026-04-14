@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
 
     // Call Facebook Graph API to list pages
     const fbResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,category,picture{url},access_token&access_token=${accessToken}`
+      `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,category,picture{url},access_token&access_token=${accessToken}`
     );
 
     if (!fbResponse.ok) {

@@ -104,9 +104,10 @@ Deno.serve(async (req) => {
       let impressions = 0;
 
       // Get per-media insights
+      // Try new IG metrics first, fallback to legacy
       try {
         const metrics = media.media_type === 'VIDEO' || media.media_type === 'REEL'
-          ? ['reach', 'saved', 'plays']
+          ? ['reach', 'saved', 'ig_reels_aggregated_all_plays_count']
           : ['reach', 'saved'];
 
         const insightsData = await graphGet(`/${media.id}/insights`, {
@@ -116,11 +117,29 @@ Deno.serve(async (req) => {
         for (const m of insightsData?.data || []) {
           if (m.name === 'reach') reach = m.values?.[0]?.value || 0;
           if (m.name === 'saved') saved = m.values?.[0]?.value || 0;
-          if (m.name === 'plays') plays = m.values?.[0]?.value || 0;
+          if (m.name === 'ig_reels_aggregated_all_plays_count') plays = m.values?.[0]?.value || 0;
         }
-        impressions = reach; // IG reach ≈ impressions for our purposes
+        impressions = plays || reach;
       } catch {
-        // Some media may not have insights (stories, etc.)
+        // Fallback to legacy metrics
+        try {
+          const metrics = media.media_type === 'VIDEO' || media.media_type === 'REEL'
+            ? ['reach', 'saved', 'plays']
+            : ['reach', 'saved'];
+
+          const insightsData = await graphGet(`/${media.id}/insights`, {
+            metric: metrics.join(','),
+          }, pageToken);
+
+          for (const m of insightsData?.data || []) {
+            if (m.name === 'reach') reach = m.values?.[0]?.value || 0;
+            if (m.name === 'saved') saved = m.values?.[0]?.value || 0;
+            if (m.name === 'plays') plays = m.values?.[0]?.value || 0;
+          }
+          impressions = reach;
+        } catch {
+          // Some media may not have insights (stories, etc.)
+        }
       }
 
       const likes = media.like_count || 0;
