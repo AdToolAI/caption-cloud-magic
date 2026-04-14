@@ -264,7 +264,11 @@ const CATEGORY_STYLE_PROFILES: Record<string, CategoryStyleProfile> = {
 
 function getCategoryKey(category: string): string {
   const categoryMap: Record<string, string> = {
-    'advertisement': 'advertisement', 'product-ad': 'advertisement',
+    // New 4 templates → internal pipeline categories
+    'corporate-ad': 'advertisement',
+    'product-ad': 'product-video',
+    // Legacy mappings (keep for backward compatibility)
+    'advertisement': 'advertisement',
     'storytelling': 'storytelling', 'brand-story': 'storytelling', 'behind-scenes': 'storytelling',
     'tutorial': 'tutorial', 'educational': 'tutorial',
     'product-video': 'product-video', 'showcase': 'product-video',

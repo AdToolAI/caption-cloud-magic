@@ -2,20 +2,12 @@
 // Universal Video Creator - Type Definitions
 // ==========================================
 
-// Video Categories (12 total)
+// Video Categories (4 templates)
 export type VideoCategory = 
-  | 'advertisement'    // Werbevideo
-  | 'storytelling'     // Storytelling / Brand Story
-  | 'tutorial'         // Tutorial / How-To
-  | 'product-video'    // Produktvideo / Demo
-  | 'corporate'        // Unternehmensfilm
-  | 'social-content'   // Social Media Content
-  | 'testimonial'      // Kundenstimmen / Testimonial
-  | 'explainer'        // Erklärvideo (wie bestehendes Studio)
-  | 'event'            // Event / Veranstaltung
-  | 'promo'            // Promo / Teaser
-  | 'presentation'     // Präsentation / Pitch
-  | 'custom';          // Benutzerdefiniert
+  | 'corporate-ad'     // Unternehmenswerbung
+  | 'product-ad'       // Produktwerbung (mit Pflicht-Bildupload)
+  | 'storytelling'     // Storytelling (erfunden oder wahr)
+  | 'custom';          // Freier Editor
 
 // Visual Styles
 export type UniversalVideoStyle = 
@@ -117,7 +109,7 @@ export interface UniversalConsultationResult {
   // Mood Preset (set before consultation)
   moodConfig?: MoodConfig;
   
-  // Product Images (min 4 for product-video)
+  // Product Images (min 4 for product-ad)
   productImages?: string[];
   
   // Basic Info
@@ -324,123 +316,43 @@ export interface VideoCategoryInfo {
 // Export all category info for UI
 export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
   {
-    category: 'advertisement',
-    name: 'Werbevideo',
-    description: 'Professionelle Werbevideos für Produkte und Dienstleistungen',
-    icon: '📺',
-    color: 'from-red-500 to-orange-500',
-    recommendedDuration: '15-60 Sekunden',
-    exampleUseCase: 'TV-Spot, Online-Werbung, Social Media Ads',
-    features: ['AIDA-Struktur', 'Starke CTAs', 'Emotionale Hooks']
+    category: 'corporate-ad',
+    name: 'Unternehmenswerbung',
+    description: 'Professionelle Werbevideos für Unternehmen und Dienstleistungen',
+    icon: '🏢',
+    color: 'from-blue-500 to-indigo-500',
+    recommendedDuration: '15-90 Sekunden',
+    exampleUseCase: 'TV-Spot, Online-Werbung, Social Media Ads, Imagefilm',
+    features: ['AIDA-Struktur', 'Starke CTAs', 'Professioneller Ton']
+  },
+  {
+    category: 'product-ad',
+    name: 'Produktwerbung',
+    description: 'Kreative Produktvideos mit deinen eigenen Produktfotos',
+    icon: '📦',
+    color: 'from-green-500 to-emerald-500',
+    recommendedDuration: '15-90 Sekunden',
+    exampleUseCase: 'Produktlaunch, E-Commerce, Unboxing, Feature-Demo',
+    features: ['Produktbilder-Upload', 'KI-Bildbearbeitung', 'Kreative Drehbücher']
   },
   {
     category: 'storytelling',
-    name: 'Storytelling / Brand Story',
-    description: 'Emotionale Geschichten, die Ihre Marke zum Leben erwecken',
+    name: 'Storytelling',
+    description: 'Emotionale Geschichten — erfunden oder wahr, filmisch erzählt',
     icon: '📖',
     color: 'from-purple-500 to-pink-500',
     recommendedDuration: '60-180 Sekunden',
-    exampleUseCase: 'Markenfilm, Imagefilm, Gründergeschichte',
-    features: ["Hero's Journey", 'Emotionale Bögen', 'Charakterentwicklung']
-  },
-  {
-    category: 'tutorial',
-    name: 'Tutorial / How-To',
-    description: 'Schritt-für-Schritt Anleitungen und Lernvideos',
-    icon: '🎓',
-    color: 'from-blue-500 to-cyan-500',
-    recommendedDuration: '60-300 Sekunden',
-    exampleUseCase: 'Produktanleitung, Software-Tutorial, DIY-Video',
-    features: ['Klare Schritte', 'Visuelle Demonstrationen', 'Zusammenfassungen']
-  },
-  {
-    category: 'product-video',
-    name: 'Produktvideo / Demo',
-    description: 'Zeigen Sie Ihr Produkt in Aktion',
-    icon: '📦',
-    color: 'from-green-500 to-emerald-500',
-    recommendedDuration: '30-90 Sekunden',
-    exampleUseCase: 'Produktlaunch, E-Commerce, Feature-Demo',
-    features: ['Feature-Showcase', '360° Ansichten', 'Benefit-Fokus']
-  },
-  {
-    category: 'corporate',
-    name: 'Unternehmensfilm',
-    description: 'Professionelle Unternehmensdarstellung',
-    icon: '🏢',
-    color: 'from-slate-500 to-gray-600',
-    recommendedDuration: '60-180 Sekunden',
-    exampleUseCase: 'Unternehmenspräsentation, Investor-Pitch, Recruiting',
-    features: ['Professioneller Ton', 'Unternehmenswerte', 'Team-Vorstellung']
-  },
-  {
-    category: 'social-content',
-    name: 'Social Media Content',
-    description: 'Virale Inhalte für TikTok, Instagram, YouTube Shorts',
-    icon: '📱',
-    color: 'from-pink-500 to-rose-500',
-    recommendedDuration: '15-60 Sekunden',
-    exampleUseCase: 'TikTok, Instagram Reels, YouTube Shorts',
-    features: ['Trend-Hooks', 'Schnelle Schnitte', 'Engagement-Prompts']
-  },
-  {
-    category: 'testimonial',
-    name: 'Testimonial / Kundenstimmen',
-    description: 'Authentische Kundenerfahrungen und Erfolgsgeschichten',
-    icon: '💬',
-    color: 'from-amber-500 to-yellow-500',
-    recommendedDuration: '60-120 Sekunden',
-    exampleUseCase: 'Kundenreferenz, Case Study, Erfolgsgeschichte',
-    features: ['Authentizität', 'Vorher/Nachher', 'Emotionale Verbindung']
-  },
-  {
-    category: 'explainer',
-    name: 'Erklärvideo',
-    description: 'Komplexe Themen einfach erklärt',
-    icon: '💡',
-    color: 'from-indigo-500 to-violet-500',
-    recommendedDuration: '60-180 Sekunden',
-    exampleUseCase: 'Produkterklärung, Service-Vorstellung, Konzept-Erklärung',
-    features: ['Problem-Lösung', 'Visuelle Metaphern', 'Klare Struktur']
-  },
-  {
-    category: 'event',
-    name: 'Event / Veranstaltung',
-    description: 'Eventankündigungen und Rückblicke',
-    icon: '🎉',
-    color: 'from-teal-500 to-cyan-500',
-    recommendedDuration: '30-120 Sekunden',
-    exampleUseCase: 'Eventankündigung, Konferenz-Teaser, Rückblick',
-    features: ['Highlights', 'Speaker-Vorstellung', 'Registrierung-CTA']
-  },
-  {
-    category: 'promo',
-    name: 'Promo / Teaser',
-    description: 'Kurze Teaser und Ankündigungen',
-    icon: '🎬',
-    color: 'from-orange-500 to-red-500',
-    recommendedDuration: '15-45 Sekunden',
-    exampleUseCase: 'Produkt-Teaser, Launch-Ankündigung, Coming Soon',
-    features: ['Spannung aufbauen', 'Mystery-Elemente', 'Countdown']
-  },
-  {
-    category: 'presentation',
-    name: 'Präsentation / Pitch',
-    description: 'Überzeugende Präsentationen und Pitches',
-    icon: '📊',
-    color: 'from-blue-600 to-indigo-600',
-    recommendedDuration: '60-180 Sekunden',
-    exampleUseCase: 'Investor-Pitch, Sales-Präsentation, Konzept-Pitch',
-    features: ['Daten-Visualisierung', 'Überzeugende Argumente', 'Klare Struktur']
+    exampleUseCase: 'Markenfilm, Kurzfilm, Gründergeschichte, fiktive Story',
+    features: ["Hero's Journey", 'Emotionale Bögen', 'Cinematic Stil']
   },
   {
     category: 'custom',
-    name: 'Benutzerdefiniert',
-    description: 'Erstellen Sie ein individuelles Video nach Ihren Wünschen',
+    name: 'Freier Editor',
+    description: 'Volle Kontrolle — erstelle jedes beliebige Video',
     icon: '✨',
     color: 'from-violet-500 to-purple-600',
     recommendedDuration: 'Flexibel',
-    exampleUseCase: 'Individuelles Projekt, Sonderformat, Kreatives Experiment',
+    exampleUseCase: 'Tutorial, Erklärvideo, Social Content, Event, Promo',
     features: ['Volle Flexibilität', 'Individuelle Struktur', 'Kreative Freiheit']
   }
 ];
@@ -464,4 +376,15 @@ export const DEFAULT_CONSULTATION_RESULT: Partial<UniversalConsultationResult> =
   outputFormats: ['16:9'],
   videoDuration: 60,
   hasCharacter: true,
+};
+
+// ==========================================
+// Pipeline Mapping: New 4 categories → old internal categories
+// Used by edge functions to maintain pipeline compatibility
+// ==========================================
+export const CATEGORY_PIPELINE_MAP: Record<VideoCategory, string> = {
+  'corporate-ad': 'advertisement',
+  'product-ad': 'product-video',
+  'storytelling': 'storytelling',
+  'custom': 'custom',
 };
