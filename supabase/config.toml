@@ -27,6 +27,8 @@ verify_jwt = true
 
 [functions.fetch-trends]
 verify_jwt = true
+max_body_size = 2097152
+execution_timeout = 180
 
 [functions.analyze-trend]
 verify_jwt = true
