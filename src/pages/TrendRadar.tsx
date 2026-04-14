@@ -320,7 +320,7 @@ function getSparkColor(platform: string) {
 }
 
 export default function TrendRadar() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -347,7 +347,7 @@ export default function TrendRadar() {
     if (user) { fetchBookmarks(); } else { setBookmarked([]); }
   }, [user]);
 
-  const { language } = useTranslation();
+  
 
   const fetchTrends = async (forceRefresh = false) => {
     setLoading(true);
