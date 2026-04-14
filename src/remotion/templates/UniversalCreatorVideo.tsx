@@ -49,6 +49,13 @@ const SCENE_FALLBACK_PALETTES: Record<string, { gradient: string; accent: string
   intro: { gradient: 'linear-gradient(135deg, #0f0a1e 0%, #1a1535 40%, #2a204e 100%)', accent: '#6366F1', pattern: 'radial' },
   outro: { gradient: 'linear-gradient(135deg, #1a0a18 0%, #251228 40%, #3a1a3e 100%)', accent: '#EC4899', pattern: 'circles' },
   transition: { gradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', accent: '#64748B', pattern: 'none' },
+  // Storytelling narrative scene types
+  opening: { gradient: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%)', accent: '#F59E0B', pattern: 'radial' },
+  rising_action: { gradient: 'linear-gradient(135deg, #1a0f05 0%, #2d1b0a 40%, #4a2c10 100%)', accent: '#F97316', pattern: 'diagonal' },
+  climax: { gradient: 'linear-gradient(135deg, #1a0a0a 0%, #2d1117 40%, #3b1520 100%)', accent: '#EF4444', pattern: 'radial' },
+  falling_action: { gradient: 'linear-gradient(135deg, #0a1a14 0%, #0d2818 40%, #134e2a 100%)', accent: '#10B981', pattern: 'circles' },
+  resolution: { gradient: 'linear-gradient(135deg, #0f0a1e 0%, #1a1535 40%, #2a204e 100%)', accent: '#6366F1', pattern: 'dots' },
+  epilogue: { gradient: 'linear-gradient(135deg, #150a1e 0%, #1e1133 40%, #2d1b4e 100%)', accent: '#8B5CF6', pattern: 'waves' },
 };
 
 /** Professional CSS gradient fallback with geometric patterns */
@@ -116,7 +123,7 @@ const GradientFallback: React.FC<{
 const UniversalCreatorSceneSchema = z.object({
   id: z.string(),
   order: z.number(),
-  type: z.enum(['hook', 'problem', 'solution', 'feature', 'proof', 'cta', 'intro', 'outro', 'transition']).default('hook'),
+  type: z.enum(['hook', 'problem', 'solution', 'feature', 'proof', 'cta', 'intro', 'outro', 'transition', 'opening', 'rising_action', 'climax', 'falling_action', 'resolution', 'epilogue']).default('hook'),
   title: z.string().optional(),
   spokenText: z.string().optional(),
   visualDescription: z.string().optional(),
@@ -242,7 +249,8 @@ export const UniversalCreatorVideoSchema = z.object({
   category: z.enum([
     'product-ad', 'social-reel', 'explainer', 'testimonial', 
     'tutorial', 'event-promo', 'brand-story', 'educational',
-    'announcement', 'behind-scenes', 'comparison', 'showcase'
+    'announcement', 'behind-scenes', 'comparison', 'showcase',
+    'storytelling'
   ]).default('social-reel'),
   
   storytellingStructure: z.enum([
@@ -2084,6 +2092,13 @@ const SCENE_TYPE_LABELS: Record<string, string> = {
   intro: 'INTRO',
   outro: 'OUTRO',
   transition: '',
+  // Storytelling: narrative labels (or empty for cleaner cinematic look)
+  opening: '',
+  rising_action: '',
+  climax: '',
+  falling_action: '',
+  resolution: '',
+  epilogue: '',
 };
 
 const SCENE_TYPE_COLORS: Record<string, string> = {
@@ -2096,6 +2111,13 @@ const SCENE_TYPE_COLORS: Record<string, string> = {
   intro: '#6366F1',
   outro: '#EC4899',
   transition: '#64748B',
+  // Storytelling: warm cinematic tones
+  opening: '#F59E0B',
+  rising_action: '#F97316',
+  climax: '#EF4444',
+  falling_action: '#10B981',
+  resolution: '#6366F1',
+  epilogue: '#8B5CF6',
 };
 
 // Scene-Type Badge
