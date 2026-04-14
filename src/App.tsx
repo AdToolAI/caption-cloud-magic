@@ -48,6 +48,7 @@ const Planner = lazy(() => import("./pages/Planner"));
 const BackgroundReplacer = lazy(() => import("./pages/BackgroundReplacer"));
 const PictureStudio = lazy(() => import("./pages/PictureStudio"));
 const TrendRadar = lazy(() => import("./pages/TrendRadar"));
+const NewsHub = lazy(() => import("./pages/NewsHub"));
 
 const CommentManager = lazy(() => import("./pages/CommentManager"));
 const AllComments = lazy(() => import("./pages/AllComments"));
@@ -202,6 +203,7 @@ function AppLayout() {
            <Route path="/background-replacer" element={<Navigate to="/picture-studio?tab=background" replace />} />
            <Route path="/picture-studio" element={<PictureStudio />} />
           <Route path="/trend-radar" element={<TrendRadar />} />
+          <Route path="/news-hub" element={<NewsHub />} />
           
                     <Route path="/comment-manager" element={<CommentManager />} />
           <Route path="/all-comments" element={<AllComments />} />

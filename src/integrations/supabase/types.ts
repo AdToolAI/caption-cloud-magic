@@ -5198,6 +5198,45 @@ export type Database = {
           },
         ]
       }
+      news_hub_articles: {
+        Row: {
+          batch_id: string | null
+          category: string
+          created_at: string
+          headline: string
+          id: string
+          language: string
+          published_at: string
+          source: string | null
+          source_url: string | null
+          summary: string | null
+        }
+        Insert: {
+          batch_id?: string | null
+          category?: string
+          created_at?: string
+          headline: string
+          id?: string
+          language?: string
+          published_at?: string
+          source?: string | null
+          source_url?: string | null
+          summary?: string | null
+        }
+        Update: {
+          batch_id?: string | null
+          category?: string
+          created_at?: string
+          headline?: string
+          id?: string
+          language?: string
+          published_at?: string
+          source?: string | null
+          source_url?: string | null
+          summary?: string | null
+        }
+        Relationships: []
+      }
       news_radar_cache: {
         Row: {
           fetched_at: string
