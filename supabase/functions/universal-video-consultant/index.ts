@@ -1727,9 +1727,9 @@ const CATEGORY_QUICK_REPLIES: Record<Lang, Record<string, Record<number, string[
 // Build full 22-phase array for a category
 // ═══════════════════════════════════════════════════════════════
 
-function buildCategoryPhases(category: string, lang: Lang): string[] {
-  const block1 = getBlock1Phases(category, lang);
-  const specific = CATEGORY_SPECIFIC_PHASES[lang][category] || CATEGORY_SPECIFIC_PHASES[lang]['custom'];
+function buildCategoryPhases(category: string, lang: Lang, messages?: any[]): string[] {
+  const block1 = getBlock1Phases(category, lang, messages);
+  const specific = getBlock2Phases(category, lang, messages);
   return [...block1, ...specific, ...UNIVERSAL_PHASES_BLOCK3[lang]];
 }
 
