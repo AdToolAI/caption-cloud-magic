@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useAICall } from "@/hooks/useAICall";
+import { useNewsRadar } from "@/hooks/useNewsRadar";
 import { FEATURE_COSTS } from "@/lib/featureCosts";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -83,38 +84,21 @@ function Sparkline({ value, color }: { value: number; color: string }) {
 }
 
 // --- News Radar Ticker ---
-interface NewsItem {
-  headline: string;
-  category: string;
-  source: string;
-}
-
 function NewsRadarTicker() {
-  const [news, setNews] = useState<NewsItem[]>([]);
-
-  useEffect(() => {
-    const fetchNews = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('fetch-news-radar', {
-          body: { language: 'en' }
-        });
-        if (error) throw error;
-        setNews(data?.news || []);
-      } catch (e) {
-        console.error('News Radar ticker: failed', e);
-      }
-    };
-    fetchNews();
-  }, []);
+  const { news } = useNewsRadar();
 
   if (news.length === 0) return null;
   const doubled = [...news, ...news];
 
   const categoryColor: Record<string, string> = {
+    platform: "text-cyan-400",
+    ai_tools: "text-violet-400",
+    analytics: "text-emerald-400",
+    monetization: "text-amber-400",
+    community: "text-pink-400",
     social: "text-cyan-400",
     business: "text-amber-400",
     creator: "text-pink-400",
-    analytics: "text-emerald-400",
   };
 
   return (

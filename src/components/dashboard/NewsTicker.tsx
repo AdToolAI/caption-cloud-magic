@@ -2,57 +2,26 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Switch } from "@/components/ui/switch";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-
-interface NewsItem {
-  headline: string;
-  category: string;
-  source: string;
-}
-
-const FALLBACK_NEWS: NewsItem[] = [
-  { headline: "📱 Instagram expands Reels to 3 minutes for all creators", category: "social", source: "Instagram" },
-  { headline: "💰 TikTok Shop expanding to new European markets", category: "business", source: "TikTok" },
-  { headline: "📊 LinkedIn algorithm now prioritizes comments over reactions", category: "analytics", source: "LinkedIn" },
-  { headline: "🎨 AI-powered video editing tools see 300% adoption increase", category: "creator", source: "Industry Report" },
-];
+import { useNewsRadar, type NewsItem } from "@/hooks/useNewsRadar";
 
 const CATEGORY_STYLES: Record<string, string> = {
+  platform: "text-cyan-400",
+  ai_tools: "text-violet-400",
+  analytics: "text-emerald-400",
+  monetization: "text-amber-400",
+  community: "text-pink-400",
   social: "text-cyan-400",
   business: "text-amber-400",
   creator: "text-pink-400",
-  analytics: "text-emerald-400",
 };
 
 export const NewsTicker = () => {
   const navigate = useNavigate();
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { news, loading } = useNewsRadar();
   const [isVisible, setIsVisible] = useState(() => {
     const stored = localStorage.getItem("newsticker-visible");
     return stored !== "false";
   });
-
-  const fetchNews = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('fetch-news-radar', {
-        body: { language: 'en' }
-      });
-      if (error) throw error;
-      setNews(data?.news || FALLBACK_NEWS);
-    } catch (e) {
-      console.error('News Radar: failed to fetch', e);
-      setNews(FALLBACK_NEWS);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchNews();
-    const interval = setInterval(fetchNews, 60 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     localStorage.setItem("newsticker-visible", String(isVisible));

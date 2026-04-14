@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { FeatureGrid } from "@/components/home/FeatureGrid";
 import { DashboardVideoCarousel } from "@/components/dashboard/DashboardVideoCarousel";
 import { NewsTicker } from "@/components/dashboard/NewsTicker";
+import { useNewsRadar } from "@/hooks/useNewsRadar";
 import { RecoCard } from "@/features/recommendations/RecoCard";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
@@ -42,6 +43,7 @@ const Home = () => {
   const { t, language } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { topInsight } = useNewsRadar();
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
   const [weekDays, setWeekDays] = useState<{ date: string; name: string; day: number; isToday: boolean; posts: WeekPost[] }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -504,10 +506,10 @@ const Home = () => {
       {user && (
         <div className="bg-card border-b border-border py-3 px-4">
           <div className="container max-w-7xl mx-auto flex items-center justify-between gap-4 text-sm flex-wrap">
-            <div className="flex items-center gap-2 text-muted-foreground">
+             <div className="flex items-center gap-2 text-muted-foreground">
               <Lightbulb className="h-4 w-4 text-primary" />
               <span className="font-medium">{t("dashboard.statusBar.tipOfTheDay")}:</span>
-              <span>{t("dashboard.statusBar.tipContent")}</span>
+              <span>{topInsight ? topInsight.headline : t("dashboard.statusBar.tipContent")}</span>
             </div>
             <div className="flex items-center gap-6">
               <div className="text-xs"><CreditBalance /></div>
