@@ -21,10 +21,10 @@ const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
       'Welches ZIEL hat die Werbung? (Mehr Verkäufe, Leads, Brand Awareness, App-Downloads)',
     ],
     'storytelling': [
-      'Welche GESCHICHTE möchtest du erzählen? (Gründerstory, Kundenerlebnis, Markenreise, fiktive Erzählung)',
-      'Wer ist der HELD deiner Geschichte? (Gründer, Kunde, Mitarbeiter, fiktive Figur — beschreibe die Person)',
-      'Was ist der ZENTRALE KONFLIKT oder die Herausforderung in der Story?',
-      'Welche EMOTION soll der Zuschauer am Ende fühlen? (Inspiration, Hoffnung, Staunen, Mitgefühl)',
+      'Möchtest du, dass die KI eine Geschichte für dich ERFINDET, oder hast du bereits eine WAHRE GESCHICHTE die wir filmisch aufbereiten sollen?',
+      'PLACEHOLDER_STORYTELLING_P2',
+      'PLACEHOLDER_STORYTELLING_P3',
+      'PLACEHOLDER_STORYTELLING_P4',
     ],
     'tutorial': [
       'Was genau möchtest du deinen Zuschauern BEIBRINGEN? (Konkretes Thema oder Fähigkeit)',
@@ -95,10 +95,10 @@ const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
       'What is the GOAL of the ad? (More sales, leads, brand awareness, app downloads)',
     ],
     'storytelling': [
-      'What STORY do you want to tell? (Founder story, customer experience, brand journey, fictional tale)',
-      'Who is the HERO of your story? (Founder, customer, employee, fictional character — describe them)',
-      'What is the CENTRAL CONFLICT or challenge in the story?',
-      'What EMOTION should the viewer feel at the end? (Inspiration, hope, wonder, empathy)',
+      'Do you want the AI to INVENT a story for you, or do you already have a TRUE STORY that we should develop for film?',
+      'PLACEHOLDER_STORYTELLING_P2',
+      'PLACEHOLDER_STORYTELLING_P3',
+      'PLACEHOLDER_STORYTELLING_P4',
     ],
     'tutorial': [
       'What exactly do you want to TEACH your viewers? (Specific topic or skill)',
@@ -169,10 +169,10 @@ const CATEGORY_PHASES_BLOCK1: Record<Lang, Record<string, string[]>> = {
       '¿Cuál es el OBJETIVO del anuncio? (Más ventas, leads, brand awareness, descargas)',
     ],
     'storytelling': [
-      '¿Qué HISTORIA quieres contar? (Historia del fundador, experiencia del cliente, viaje de marca, relato ficticio)',
-      '¿Quién es el HÉROE de tu historia? (Fundador, cliente, empleado, personaje ficticio — descríbelo)',
-      '¿Cuál es el CONFLICTO CENTRAL o desafío en la historia?',
-      '¿Qué EMOCIÓN debe sentir el espectador al final? (Inspiración, esperanza, asombro, empatía)',
+      '¿Quieres que la IA INVENTE una historia para ti, o ya tienes una HISTORIA REAL que debamos desarrollar para video?',
+      'PLACEHOLDER_STORYTELLING_P2',
+      'PLACEHOLDER_STORYTELLING_P3',
+      'PLACEHOLDER_STORYTELLING_P4',
     ],
     'tutorial': [
       '¿Qué exactamente quieres ENSEÑAR a tus espectadores? (Tema o habilidad concreta)',
