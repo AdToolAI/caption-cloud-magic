@@ -17,6 +17,7 @@ const VALID_CATEGORIES = [
   'product-ad', 'social-reel', 'explainer', 'testimonial',
   'tutorial', 'event-promo', 'brand-story', 'educational',
   'announcement', 'behind-scenes', 'comparison', 'showcase',
+  'storytelling',
 ] as const;
 const VALID_STORYTELLING = [
   'hook-problem-solution', 'aida', 'pas', 'hero-journey',
