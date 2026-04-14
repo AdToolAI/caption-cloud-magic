@@ -355,32 +355,58 @@ serve(async (req) => {
     const effectiveDuration = briefing.videoDuration || briefing.duration || 60;
     const sceneDuration = Math.floor(effectiveDuration / scenesCount);
 
+    const isStorytelling = categoryKey === 'storytelling';
+
     // Build category-specific animation guide
-    const categoryAnimationGuide = `
-FORMAT-SPEZIFISCHES DESIGN-SYSTEM FÜR "${categoryKey.toUpperCase()}":
+    const storySceneGuide = isStorytelling ? `
+STORYTELLING-SZENENTYPEN (NUR diese verwenden!):
+- "opening" — Eröffnung: Die Welt vorstellen, Stimmung setzen
+- "rising_action" — Steigende Handlung: Spannung aufbauen, Konflikte einführen
+- "climax" — Höhepunkt: Der emotionale Wendepunkt
+- "falling_action" — Fallende Handlung: Konsequenzen, Reflexion
+- "resolution" — Auflösung: Die Botschaft, das Ende der Geschichte
+- "epilogue" — Epilog (optional): Nachgedanke, offene Frage
 
-VISUELLER STIL:
-${styleProfile.visualDirection}
+ANIMATIONS PRO STORYTELLING-SZENENTYP:
 
-TEMPO & PACING:
-${styleProfile.pacingGuide}
+opening Szene:
+- animation: "kenBurns"
+- textAnimation: "fadeWords"
+- soundEffect: "none"
+- showCharacter: true, characterPosition: "right", characterGesture: "idle"
 
-ERLAUBTE ANIMATIONEN (NUR diese verwenden!):
-- animation: ${styleProfile.animationSet.map(a => `"${a}"`).join(' | ')}
-- textAnimation: ${styleProfile.textAnimationSet.map(a => `"${a}"`).join(' | ')}
+rising_action Szene:
+- animation: "fadeIn"
+- textAnimation: "typewriter"
+- soundEffect: "none"
+- showCharacter: true, characterPosition: "left", characterGesture: "explaining"
 
-CHARACTER-EINSATZ:
-${styleProfile.characterUsage}
+climax Szene:
+- animation: "parallax"
+- textAnimation: "fadeWords"
+- soundEffect: "none"
+- showCharacter: true, characterPosition: "right", characterGesture: "thinking"
 
-EFFEKTE:
-${styleProfile.effectsProfile}
+falling_action Szene:
+- animation: "kenBurns"
+- textAnimation: "fadeWords"
+- soundEffect: "none"
+- showCharacter: true, characterPosition: "left", characterGesture: "idle"
 
-ÜBERGÄNGE:
-${styleProfile.transitionStyle}
+resolution Szene:
+- animation: "fadeIn"
+- textAnimation: "typewriter"
+- soundEffect: "none"
+- showCharacter: true, characterPosition: "right", characterGesture: "celebrating"
 
-SOUND-DESIGN:
-${styleProfile.soundDesign}
+epilogue Szene:
+- animation: "fadeIn"
+- textAnimation: "fadeWords"
+- soundEffect: "none"
+- showCharacter: true, characterPosition: "right", characterGesture: "idle"
+` : '';
 
+    const adSceneGuide = !isStorytelling ? `
 ANIMATIONS PRO SZENEN-TYP (angepasst an ${categoryKey}):
 
 hook/intro Szene:
@@ -420,9 +446,104 @@ cta Szene:
 - soundEffect: "${getDefaultSoundEffect('cta', categoryKey)}"
 - showCharacter: ${shouldShowCharacter('cta', categoryKey)}, characterPosition: "right", characterGesture: "pointing"
 - beatAligned: true
+` : '';
+
+    const categoryAnimationGuide = `
+FORMAT-SPEZIFISCHES DESIGN-SYSTEM FÜR "${categoryKey.toUpperCase()}":
+
+VISUELLER STIL:
+${styleProfile.visualDirection}
+
+TEMPO & PACING:
+${styleProfile.pacingGuide}
+
+ERLAUBTE ANIMATIONEN (NUR diese verwenden!):
+- animation: ${styleProfile.animationSet.map(a => `"${a}"`).join(' | ')}
+- textAnimation: ${styleProfile.textAnimationSet.map(a => `"${a}"`).join(' | ')}
+
+CHARACTER-EINSATZ:
+${styleProfile.characterUsage}
+
+EFFEKTE:
+${styleProfile.effectsProfile}
+
+ÜBERGÄNGE:
+${styleProfile.transitionStyle}
+
+SOUND-DESIGN:
+${styleProfile.soundDesign}
+
+${isStorytelling ? storySceneGuide : adSceneGuide}
 `;
 
-    const systemPrompt = `Du bist ein erfahrener Drehbuchautor für professionelle, animierte Videos im Stil von Loft-Film.
+    // ============================================================
+    // Build SYSTEM PROMPT — branching for storytelling vs. other
+    // ============================================================
+
+    const storytellingSystemPrompt = `Du bist ein erfahrener Drehbuchautor und Geschichtenerzähler für cineastische, animierte Kurzfilme.
+
+WICHTIG: Du erstellst ein STORYTELLING-Video. Dies ist KEIN Werbespot, KEINE Produktwerbung, KEIN Marketing-Video!
+Du erzählst eine GESCHICHTE — emotional, fesselnd, cineastisch. Wie ein Kurzfilm.
+
+STORYTELLING-STRUKTUR: ${structure.name}
+SZENEN: ${structure.structure.join(' → ')}
+
+${categoryAnimationGuide}
+
+REGELN FÜR STORYTELLING:
+1. Erstelle genau ${scenesCount} Szenen entsprechend der Struktur
+2. Jede Szene hat ~${sceneDuration} Sekunden
+3. Schreibe den Erzählertext (voiceover) — NICHT Werbetexte, sondern eine erzählende Stimme
+4. Die visualDescription MUSS auf ENGLISCH sein (wird als KI-Bildgenerator-Prompt verwendet)
+5. Der Text muss wie eine Geschichte klingen — erzählend, emotional, atmosphärisch
+6. VERBOTEN: Werbebotschaften, Call-to-Actions, "Besuche unsere Website", USPs, Produktverkauf, Marketing-Sprache
+7. VERBOTEN: "Jetzt kaufen", "Erfahre mehr", "Klick den Link", "Abonniere", Preise, Angebote, Rabatte
+8. Der Charakter ist ein ERZÄHLER, kein Verkäufer. Er reflektiert, denkt nach, erklärt die Geschichte
+9. Verwende NUR Animationen aus dem erlaubten Set für "storytelling"!
+10. Jede Szene braucht einen KONTRAST-OVERLAY-freundlichen Text (weiß auf dunklem Hintergrund)
+11. Die visualDescription MUSS eine KONKRETE, CINEASTISCHE Szene beschreiben — atmosphärisch, wie ein Filmstill
+12. Jede visualDescription folgt dem Schema: [OBJEKT/SZENE] + [ZUSTAND/DETAIL] + [UMGEBUNG] + [BELEUCHTUNG] — NIEMALS Menschen, Personen, Silhouetten, Hände, Finger oder Körperteile beschreiben! Die Szene zeigt NUR die Umgebung, Möbel, Geräte und Objekte
+13. NICHT erlaubt in visualDescription: "Digital world", "Social media icons flying", "Abstract shapes", "A person", "A man", "A woman", "someone", "hand", "finger" — stattdessen KONKRETE atmosphärische Umgebungen OHNE Menschen
+14. NIEMALS Objekte beschreiben die inhärent Text oder Zahlen anzeigen: Keine Dashboards, Charts, Monitore mit UI. Stattdessen die PHYSISCHE Umgebung: Möbel, Natur, Architektur, Beleuchtung, Texturen
+15. Die letzte Szene soll die Geschichte ABSCHLIESSEN — mit einer Botschaft, Moral oder einem offenen Gedanken. KEINE Website-URL, KEIN CTA!
+16. Szenentypen MÜSSEN aus dem Storytelling-Set kommen: opening|rising_action|climax|falling_action|resolution|epilogue
+
+AUSGABEFORMAT (JSON):
+{
+  "title": "Titel der Geschichte",
+  "totalDuration": ${briefing.videoDuration},
+  "category": "storytelling",
+  "scenes": [
+    {
+      "sceneNumber": 1,
+      "sceneType": "opening|rising_action|climax|falling_action|resolution|epilogue",
+      "title": "Kapitel-Titel (erzählerisch, z.B. 'Der Anfang', 'Der Wendepunkt')",
+      "voiceover": "Der erzählende Text für diese Szene...",
+      "visualDescription": "ENGLISH cinematic image prompt: [Scene] + [Atmosphere] + [Lighting]. Moody, emotional, like a film still. NEVER describe humans.",
+      "durationSeconds": ${sceneDuration},
+      
+      "animation": "NUR aus erlaubtem Set",
+      "kenBurnsDirection": "in|out|left|right",
+      "textAnimation": "NUR aus erlaubtem Set",
+      "soundEffect": "none",
+      
+      "showCharacter": true,
+      "characterPosition": "left|right",
+      "characterGesture": "thinking|explaining|idle|celebrating",
+      
+      "statsOverlay": null,
+      "beatAligned": false,
+      
+      "transitionIn": "fade|dissolve",
+      "transitionOut": "fade|dissolve"
+    }
+  ],
+  "summary": "Kurze Zusammenfassung der Geschichte"
+}
+
+WICHTIG: Jede Szene MUSS die Animations-Parameter enthalten! Szenentypen MÜSSEN aus dem Storytelling-Set kommen!`;
+
+    const defaultSystemPrompt = `Du bist ein erfahrener Drehbuchautor für professionelle, animierte Videos im Stil von Loft-Film.
 
 WICHTIG: Du erstellst ein "${categoryKey}"-Video. Halte dich STRIKT an das Design-System für diese Kategorie!
 
@@ -483,6 +604,8 @@ AUSGABEFORMAT (JSON):
 
 WICHTIG: Jede Szene MUSS die Animations-Parameter enthalten! Verwende NUR Animationen aus dem erlaubten Set für "${categoryKey}".`;
 
+    const systemPrompt = isStorytelling ? storytellingSystemPrompt : defaultSystemPrompt;
+
     // Build mood config instructions if provided
     const moodConfig = briefing.moodConfig;
     const moodInstructions = moodConfig ? `
@@ -492,7 +615,36 @@ STIMMUNGS-PRESET: "${moodConfig.preset}"
 - Szenen-Badges: ${moodConfig.showSceneBadges ? 'JA — verwende prägnante Szenen-Titel' : 'NEIN — keine expliziten Szenen-Label'}
 ` : '';
 
-    const userPrompt = `Erstelle ein ${briefing.category}-Video-Drehbuch im "${categoryKey}"-Stil mit VOLLSTÄNDIGEN ANIMATIONS-ANWEISUNGEN:
+    // ============================================================
+    // Build USER PROMPT — branching for storytelling vs. other
+    // ============================================================
+
+    const storytellingUserPrompt = `Erstelle ein STORYTELLING-Video-Drehbuch — eine emotionale, cineastische Geschichte:
+${moodInstructions}
+**Projekt:** ${briefing.projectName || 'Geschichte'}
+**Thema/Titel:** ${briefing.companyName || briefing.productName || briefing.projectName || 'Eine Geschichte'}
+**Beschreibung:** ${briefing.productDescription || '-'}
+
+**Protagonist/Hauptfigur:** ${briefing.categorySpecific?.protagonist || briefing.targetAudience || 'Wird aus der Geschichte abgeleitet'}
+**Konflikt/Herausforderung:** ${briefing.coreProblem || briefing.categorySpecific?.conflict || '-'}
+**Wendepunkt:** ${briefing.categorySpecific?.turningPoint || briefing.solution || '-'}
+**Botschaft/Moral:** ${briefing.keyMessage || briefing.categorySpecific?.moral || '-'}
+**Emotionaler Ton:** ${briefing.emotionalTone || 'emotional, nachdenklich'}
+**Setting/Welt:** ${briefing.categorySpecific?.setting || '-'}
+
+**Visueller Stil:** ${briefing.visualStyle || 'cinematic'}
+**Markenfarben:** ${Array.isArray(briefing.brandColors) ? briefing.brandColors.join(', ') : (briefing.brandColors || 'Standard')}
+
+**Videolänge:** ${briefing.videoDuration} Sekunden
+**Format:** ${briefing.aspectRatio || '16:9'}
+
+${briefing.hasCharacter ? `**Erzähler-Charakter:** ${briefing.characterName || 'Erzähler'} - ${briefing.characterDescription || 'Nachdenkliche, erzählende Figur'}` : `**Charakter:** Durchgehend als Erzähler sichtbar`}
+
+**Story-Details:** ${JSON.stringify(briefing.categorySpecific || {})}
+
+ERINNERUNG: Dies ist eine GESCHICHTE, kein Werbespot! Erzähle emotional und cineastisch. KEINE CTAs, KEINE Website-URLs, KEIN Marketing!`;
+
+    const defaultUserPrompt = `Erstelle ein ${briefing.category}-Video-Drehbuch im "${categoryKey}"-Stil mit VOLLSTÄNDIGEN ANIMATIONS-ANWEISUNGEN:
 ${moodInstructions}
 **Projekt:** ${briefing.projectName || 'Video-Projekt'}
 **Unternehmen:** ${briefing.companyName || '-'}
@@ -521,6 +673,8 @@ ${briefing.hasCharacter ? `**Charakter:** ${briefing.characterName || 'Protagoni
 **Zusätzliche Infos:** ${JSON.stringify(briefing.categorySpecific || {})}
 
 ERINNERUNG: Verwende NUR Animationen/Effekte aus dem "${categoryKey}"-Design-System! Halte das Tempo/Pacing gemäß Profil ein!`;
+
+    const userPrompt = isStorytelling ? storytellingUserPrompt : defaultUserPrompt;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -637,8 +791,9 @@ function getDefaultAnimation(sceneType: string, category: string): string {
       'feature': 'popIn', 'benefit': 'flyIn', 'proof': 'slideUp', 'cta': 'bounce',
     },
     'storytelling': {
-      'hook': 'kenBurns', 'intro': 'fadeIn', 'problem': 'kenBurns', 'solution': 'fadeIn',
-      'feature': 'parallax', 'benefit': 'kenBurns', 'proof': 'fadeIn', 'cta': 'fadeIn',
+      'hook': 'kenBurns', 'intro': 'fadeIn', 'opening': 'kenBurns', 'rising_action': 'fadeIn',
+      'climax': 'parallax', 'falling_action': 'kenBurns', 'resolution': 'fadeIn', 'epilogue': 'fadeIn',
+      'problem': 'kenBurns', 'solution': 'fadeIn', 'feature': 'parallax', 'benefit': 'kenBurns', 'proof': 'fadeIn', 'cta': 'fadeIn',
     },
     'tutorial': {
       'hook': 'slideUp', 'intro': 'fadeIn', 'problem': 'slideUp', 'solution': 'flyIn',
@@ -695,8 +850,9 @@ function getDefaultTextAnimation(sceneType: string, category: string): string {
       'feature': 'bounceIn', 'cta': 'glowPulse',
     },
     'storytelling': {
-      'hook': 'fadeWords', 'problem': 'typewriter', 'solution': 'fadeWords',
-      'feature': 'fadeWords', 'cta': 'fadeWords',
+      'hook': 'fadeWords', 'opening': 'fadeWords', 'rising_action': 'typewriter',
+      'climax': 'fadeWords', 'falling_action': 'fadeWords', 'resolution': 'typewriter', 'epilogue': 'fadeWords',
+      'problem': 'typewriter', 'solution': 'fadeWords', 'feature': 'fadeWords', 'cta': 'fadeWords',
     },
     'tutorial': {
       'hook': 'splitReveal', 'problem': 'typewriter', 'solution': 'highlight',
@@ -790,10 +946,22 @@ function shouldShowCharacter(sceneType: string, category: string): boolean {
 }
 
 function getDefaultCharacterPosition(sceneType: string, _category: string): string {
-  return sceneType === 'problem' ? 'left' : 'right';
+  if (['problem', 'rising_action', 'falling_action'].includes(sceneType)) return 'left';
+  return 'right';
 }
 
 function getDefaultCharacterGesture(sceneType: string, category: string): string {
+  // Storytelling: narrator gestures — thoughtful, not salesy
+  if (category === 'storytelling') {
+    const map: Record<string, string> = {
+      'opening': 'idle', 'rising_action': 'explaining', 'climax': 'thinking',
+      'falling_action': 'idle', 'resolution': 'celebrating', 'epilogue': 'idle',
+      'hook': 'idle', 'intro': 'idle', 'problem': 'thinking',
+      'solution': 'explaining', 'cta': 'idle',
+    };
+    return map[sceneType] || 'idle';
+  }
+
   // Corporate: more formal gestures
   if (category === 'corporate') {
     const map: Record<string, string> = {
