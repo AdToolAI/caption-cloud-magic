@@ -417,10 +417,12 @@ cta: animation="${getDefaultAnimation('cta', categoryKey)}" textAnimation="${get
 
   // Storytelling-specific scene types and rules
   const isStorytelling = categoryKey === 'storytelling';
+  const isProductVideo = categoryKey === 'product-video';
   
   const storytellingSceneTypes = 'opening|rising_action|climax|falling_action|resolution|epilogue';
+  const productSceneTypes = 'reveal|lifestyle|detail-closeup|transformation|feature-showcase|hook|cta';
   const adSceneTypes = 'hook|problem|solution|feature|proof|cta|intro|benefit';
-  const activeSceneTypes = isStorytelling ? storytellingSceneTypes : adSceneTypes;
+  const activeSceneTypes = isStorytelling ? storytellingSceneTypes : isProductVideo ? productSceneTypes : adSceneTypes;
 
   const coreRules = isStorytelling
     ? `
@@ -433,6 +435,19 @@ cta: animation="${getDefaultAnimation('cta', categoryKey)}" textAnimation="${get
 - Each scene builds emotional tension. Focus on characters, conflict, setting, mood.
 - visualDescriptions should be CINEMATIC: atmospheric lighting, symbolic imagery, emotional landscapes.
 - Show the STORY environment, not products or business contexts.`
+    : isProductVideo
+    ? `
+- visualDescription MUST be in ENGLISH (image generation)
+- NOT allowed in visualDescription: "A person", "A man", "A woman", "hand", "finger", "Digital world", "Abstract shapes"
+- Adapt EVERY visualDescription to visual style "${briefing.visualStyle || 'modern-3d'}"
+- NEVER describe objects with text/numbers (no dashboards, charts, monitors)
+- Use ONLY animations from the allowed set for "${categoryKey}"!
+- This is a PRODUCT VIDEO. The uploaded product photos are the STAR.
+- NEVER generate the same script structure twice. RANDOMLY choose ONE of these schemas: Unboxing-Reveal, Lifestyle-Montage, Problem-Solution-Transformation, Mini-Story, Before-After, Slow-Motion-Showcase, POV-Perspective, Detail-Macro-Tour.
+- Each visualDescription should describe HOW the product photo should be placed: the setting, lighting, angle, and mood.
+- Include a "sourceProductImageIndex" field (0-based) for scenes that should use an uploaded product photo.
+- CTA scene MUST include website URL "${briefing.websiteUrl || ''}" in voiceover
+- Make the video CREATIVE and UNIQUE — surprise the viewer!`
     : `
 - visualDescription MUST be in ENGLISH (image generation)
 - NOT allowed in visualDescription: "A person", "A man", "A woman", "hand", "finger", "Digital world", "Abstract shapes"
