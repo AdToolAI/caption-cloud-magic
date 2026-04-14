@@ -555,8 +555,6 @@ const Home = () => {
         </section>
       )}
 
-      {user && <NewsTicker />}
-
       <div className="container mx-auto px-4 py-4 max-w-7xl space-y-4">
         {/* Hero Banner */}
         {user && (

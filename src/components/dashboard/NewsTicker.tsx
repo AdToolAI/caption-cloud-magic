@@ -34,10 +34,10 @@ export const NewsTicker = () => {
           onClick={() => navigate('/trend-radar')}
           className="flex-shrink-0 flex items-center gap-2 px-3 py-0.5 group/card cursor-pointer"
         >
-          <span className={`text-[10px] font-bold uppercase tracking-wider ${CATEGORY_STYLES[item.category] || 'text-primary/60'}`}>
+          <span className={`text-[9px] font-bold uppercase tracking-wider ${CATEGORY_STYLES[item.category] || 'text-primary/60'}`}>
             {item.source}
           </span>
-          <span className="text-[10px] font-medium text-primary/90 max-w-[280px] truncate tracking-wide group-hover/card:text-primary transition-colors">
+          <span className="text-[9px] font-medium text-primary/90 max-w-[280px] truncate tracking-wide group-hover/card:text-primary transition-colors">
             {item.headline}
           </span>
         </button>
@@ -69,10 +69,10 @@ export const NewsTicker = () => {
             <div className="absolute top-0 bottom-0 w-24 bg-gradient-to-r from-transparent via-primary/[0.06] to-transparent animate-[scanline_4s_linear_infinite]" />
           </div>
 
-          <div className="flex items-center h-6">
+          <div className="flex items-center h-5">
             {/* Label badge */}
-            <div className="relative z-10 flex-shrink-0 flex items-center gap-1 px-3 h-full bg-gradient-to-r from-[hsl(220,50%,3%)] to-transparent border-r border-primary/20">
-              <span className="relative inline-flex items-center gap-1 px-2 py-px rounded text-[8px] font-display font-bold tracking-[0.2em] uppercase text-primary border border-primary/40 shadow-[0_0_14px_hsl(var(--primary)/0.35)]">
+            <div className="relative z-10 flex-shrink-0 flex items-center gap-1 px-2 h-full bg-gradient-to-r from-[hsl(220,50%,3%)] to-transparent border-r border-primary/20">
+              <span className="relative inline-flex items-center gap-1 px-1.5 py-px rounded text-[7px] font-display font-bold tracking-[0.2em] uppercase text-primary border border-primary/40 shadow-[0_0_14px_hsl(var(--primary)/0.35)]">
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/60" />
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
