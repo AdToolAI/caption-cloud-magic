@@ -946,10 +946,22 @@ function shouldShowCharacter(sceneType: string, category: string): boolean {
 }
 
 function getDefaultCharacterPosition(sceneType: string, _category: string): string {
-  return sceneType === 'problem' ? 'left' : 'right';
+  if (['problem', 'rising_action', 'falling_action'].includes(sceneType)) return 'left';
+  return 'right';
 }
 
 function getDefaultCharacterGesture(sceneType: string, category: string): string {
+  // Storytelling: narrator gestures — thoughtful, not salesy
+  if (category === 'storytelling') {
+    const map: Record<string, string> = {
+      'opening': 'idle', 'rising_action': 'explaining', 'climax': 'thinking',
+      'falling_action': 'idle', 'resolution': 'celebrating', 'epilogue': 'idle',
+      'hook': 'idle', 'intro': 'idle', 'problem': 'thinking',
+      'solution': 'explaining', 'cta': 'idle',
+    };
+    return map[sceneType] || 'idle';
+  }
+
   // Corporate: more formal gestures
   if (category === 'corporate') {
     const map: Record<string, string> = {
