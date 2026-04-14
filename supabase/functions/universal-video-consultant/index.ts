@@ -1491,7 +1491,7 @@ const getCategorySystemPrompt = (category: string, mode: string, currentPhase: n
       : 'Phase 22/22 - FINAL SUMMARY! Summarize ALL collected information.';
   }
 
-  return `${li.role}
+  return `${role}
 ${li.respondIn}
 
 INTERVIEW STRUCTURE (3 Blocks):
