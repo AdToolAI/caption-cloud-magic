@@ -1744,7 +1744,11 @@ function generateQuickReplies(phase: number, category: string, lang: Lang): stri
   };
 
   if (phase >= 1 && phase <= 4) {
-    return UNIVERSAL_QUICK_REPLIES_BLOCK1[lang][phase] || fallback[lang];
+    const catBlock1 = CATEGORY_QUICK_REPLIES_BLOCK1[lang][category];
+    if (catBlock1 && catBlock1[phase]) {
+      return catBlock1[phase];
+    }
+    return CATEGORY_QUICK_REPLIES_BLOCK1[lang]['custom']?.[phase] || fallback[lang];
   }
   
   if (phase >= 5 && phase <= 16) {
