@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, FileText, Image, Play, Music, Download, Sparkles, Layout, MessageCircle, Loader2, Video, AlertTriangle, RefreshCw, ArrowLeft, RotateCcw, Palette, Film } from 'lucide-react';
+import { Check, FileText, Image, Play, Music, Download, Sparkles, Layout, MessageCircle, Loader2, Video, AlertTriangle, RefreshCw, ArrowLeft, RotateCcw, Palette, Film, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -14,12 +14,14 @@ import { UniversalVideoConsultant } from './UniversalVideoConsultant';
 import { UniversalAutoGenerationProgress } from './UniversalAutoGenerationProgress';
 import { UniversalPreviewPlayer } from './UniversalPreviewPlayer';
 import { UniversalExportStep } from './UniversalExportStep';
+import { MultiImageUpload } from '@/components/video/MultiImageUpload';
 import { toast } from 'sonner';
 import { VIDEO_CATEGORIES, type VideoCategory, type UniversalConsultationResult, type UniversalVideoStyle } from '@/types/universal-video-creator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { getWizardDraft, saveWizardDraft, clearAllDrafts, hasMeaningfulDraft } from '@/lib/universal-video-draft';
 import { useNavigate } from 'react-router-dom';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { supabase } from '@/integrations/supabase/client';
 
 export function UniversalVideoWizard() {
   const { user } = useAuth();
@@ -45,6 +47,14 @@ export function UniversalVideoWizard() {
   const [retryCount, setRetryCount] = useState(0);
   const [rateLimitRetryKey, setRateLimitRetryKey] = useState(0);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  
+  // Product image upload state
+  const [productImages, setProductImages] = useState<Array<{ id: string; url: string; file: File; uploading?: boolean; progress?: number }>>([]);
+  const [uploadedProductImageUrls, setUploadedProductImageUrls] = useState<string[]>([]);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+
+  // Check if category needs product images
+  const needsProductImages = selectedCategory === 'product-video' || selectedCategory === 'advertisement';
 
   // Helper to get localized category name
   const getCategoryName = (cat: VideoCategory | null): string => {
@@ -55,6 +65,7 @@ export function UniversalVideoWizard() {
   // Steps for manual mode
   const STEPS_MANUAL = [
     { id: 'category', label: t('uvc.stepCategory'), icon: Video, description: t('uvc.stepCategoryDesc') },
+    ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || 'Lade mindestens 4 Produktbilder hoch' }] : []),
     { id: 'mood', label: t('uvc.stepMood'), icon: Palette, description: t('uvc.stepMoodDesc') },
     { id: 'visual-style', label: t('uvc.stepVisualStyle'), icon: Film, description: t('uvc.stepVisualStyleDesc') },
     { id: 'mode-select', label: t('uvc.stepMode'), icon: Sparkles, description: t('uvc.stepModeDesc') },
@@ -71,6 +82,7 @@ export function UniversalVideoWizard() {
   // Steps for full-service mode  
   const STEPS_FULL_SERVICE = [
     { id: 'category', label: t('uvc.stepCategory'), icon: Video, description: t('uvc.stepCategoryDesc') },
+    ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || 'Lade mindestens 4 Produktbilder hoch' }] : []),
     { id: 'mood', label: t('uvc.stepMood'), icon: Palette, description: t('uvc.stepMoodDesc') },
     { id: 'visual-style', label: t('uvc.stepVisualStyle'), icon: Film, description: t('uvc.stepVisualStyleDesc') },
     { id: 'mode-select', label: t('uvc.stepMode'), icon: Sparkles, description: t('uvc.stepModeDesc') },
@@ -204,23 +216,81 @@ export function UniversalVideoWizard() {
 
   const handleCategoryConfirm = () => {
     if (selectedCategory) {
+      // If product category, go to image upload step; otherwise skip to mood
       setCurrentStep(1);
+    }
+  };
+
+  // Upload product images to Supabase storage
+  const handleUploadProductImages = async () => {
+    if (!user || productImages.length < 4) {
+      toast.error(language === 'de' ? 'Mindestens 4 Produktbilder erforderlich' : 'At least 4 product images required');
+      return;
+    }
+    
+    setIsUploadingImages(true);
+    const urls: string[] = [];
+    
+    try {
+      for (const img of productImages) {
+        const fileExt = img.file.name.split('.').pop();
+        const fileName = `${user.id}/product-images/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { data, error: uploadError } = await supabase.storage
+          .from('media-assets')
+          .upload(fileName, img.file, { cacheControl: '3600', upsert: false });
+        
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('media-assets')
+          .getPublicUrl(data.path);
+        
+        urls.push(publicUrl);
+      }
+      
+      setUploadedProductImageUrls(urls);
+      toast.success(language === 'de' ? `${urls.length} Bilder hochgeladen` : `${urls.length} images uploaded`);
+      
+      // Find the index of the next step after product-images
+      const currentSteps = generationMode === 'full-service' ? STEPS_FULL_SERVICE : 
+                          generationMode === 'manual' ? STEPS_MANUAL :
+                          STEPS;
+      const currentIdx = currentSteps.findIndex(s => s.id === 'product-images');
+      if (currentIdx !== -1) {
+        setCurrentStep(currentIdx + 1);
+      }
+    } catch (err: any) {
+      console.error('Product image upload error:', err);
+      toast.error(language === 'de' ? 'Fehler beim Hochladen' : 'Upload failed');
+    } finally {
+      setIsUploadingImages(false);
     }
   };
 
   const handleMoodConfirm = (config: MoodConfig) => {
     setMoodConfig(config);
-    setCurrentStep(2);
+    // Find next step after mood
+    const currentSteps = generationMode === 'full-service' ? STEPS_FULL_SERVICE : 
+                        generationMode === 'manual' ? STEPS_MANUAL : STEPS;
+    const moodIdx = currentSteps.findIndex(s => s.id === 'mood');
+    setCurrentStep(moodIdx + 1);
   };
 
   const handleVisualStyleConfirm = (style: UniversalVideoStyle) => {
     setSelectedVisualStyle(style);
-    setCurrentStep(3);
+    const currentSteps = generationMode === 'full-service' ? STEPS_FULL_SERVICE : 
+                        generationMode === 'manual' ? STEPS_MANUAL : STEPS;
+    const vsIdx = currentSteps.findIndex(s => s.id === 'visual-style');
+    setCurrentStep(vsIdx + 1);
   };
 
   const handleModeSelect = (mode: UniversalGenerationMode) => {
     setGenerationMode(mode);
-    setCurrentStep(4);
+    // After mode selection the steps array changes, find consultation step
+    const nextSteps = mode === 'full-service' ? STEPS_FULL_SERVICE : STEPS_MANUAL;
+    const consultIdx = nextSteps.findIndex(s => s.id === 'consultation');
+    setCurrentStep(consultIdx);
   };
 
   const handleBackToCategory = () => {
@@ -272,6 +342,11 @@ export function UniversalVideoWizard() {
       result.moodConfig = moodConfig;
     }
 
+    // Inject uploaded product images
+    if (uploadedProductImageUrls.length > 0) {
+      result.productImages = uploadedProductImageUrls;
+    }
+
     if (selectedVisualStyle) {
       result.visualStyle = selectedVisualStyle;
       console.log('[Wizard] Injected selectedVisualStyle into consultation result:', selectedVisualStyle);
@@ -288,10 +363,14 @@ export function UniversalVideoWizard() {
       dbFallbackAttempted.current = false;
       
       setIsAutoGenerating(true);
-      setCurrentStep(5);
+      // Find the generating step
+      const genIdx = STEPS_FULL_SERVICE.findIndex(s => s.id === 'generating');
+      setCurrentStep(genIdx);
       toast.info(t('uvc.toastVideoStarted'));
     } else {
-      setCurrentStep(5);
+      // Manual mode next step after consultation
+      const nextIdx = STEPS_MANUAL.findIndex(s => s.id === 'consultation') + 1;
+      setCurrentStep(nextIdx);
     }
   };
 
