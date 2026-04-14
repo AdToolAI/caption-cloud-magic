@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useAICall } from "@/hooks/useAICall";
-import { useNewsRadar } from "@/hooks/useNewsRadar";
+
 import { FEATURE_COSTS } from "@/lib/featureCosts";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -83,49 +83,6 @@ function Sparkline({ value, color }: { value: number; color: string }) {
   );
 }
 
-// --- News Radar Ticker ---
-function NewsRadarTicker() {
-  const { news } = useNewsRadar();
-
-  if (news.length === 0) return null;
-  const doubled = [...news, ...news];
-
-  const categoryColor: Record<string, string> = {
-    platform: "text-cyan-400",
-    ai_tools: "text-violet-400",
-    analytics: "text-emerald-400",
-    monetization: "text-amber-400",
-    community: "text-pink-400",
-    social: "text-cyan-400",
-    business: "text-amber-400",
-    creator: "text-pink-400",
-  };
-
-  return (
-    <div className="relative overflow-hidden py-3 mb-8">
-      <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-background to-transparent z-10" />
-      <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-background to-transparent z-10" />
-      
-      <motion.div
-        className="flex gap-8 whitespace-nowrap"
-        animate={{ x: [0, -300 * news.length] }}
-        transition={{ duration: news.length * 8, repeat: Infinity, ease: "linear" }}
-      >
-        {doubled.map((item, i) => (
-          <div key={`news-${i}`} className="flex items-center gap-2 shrink-0">
-            <span className={`text-xs font-bold uppercase tracking-wider ${categoryColor[item.category] || 'text-muted-foreground/60'}`}>
-              {item.source}
-            </span>
-            <span className="text-sm font-medium text-foreground/80">
-              {item.headline}
-            </span>
-            <span className="text-border/30 mx-2">|</span>
-          </div>
-        ))}
-      </motion.div>
-    </div>
-  );
-}
 
 
 
@@ -537,7 +494,7 @@ export default function TrendRadar() {
             <HeroCarousel trends={topTrends} onAnalyze={(trend) => analyzeTrend(trend)} t={t} />
           )}
 
-          <NewsRadarTicker />
+          
 
           {/* Category Cards with images */}
           <motion.div className="mb-12" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
