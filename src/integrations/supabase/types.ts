@@ -5205,11 +5205,14 @@ export type Database = {
           created_at: string
           headline: string
           id: string
+          image_url: string | null
           language: string
           published_at: string
           source: string | null
           source_url: string | null
           summary: string | null
+          video_embed_url: string | null
+          video_url: string | null
         }
         Insert: {
           batch_id?: string | null
@@ -5217,11 +5220,14 @@ export type Database = {
           created_at?: string
           headline: string
           id?: string
+          image_url?: string | null
           language?: string
           published_at?: string
           source?: string | null
           source_url?: string | null
           summary?: string | null
+          video_embed_url?: string | null
+          video_url?: string | null
         }
         Update: {
           batch_id?: string | null
@@ -5229,11 +5235,14 @@ export type Database = {
           created_at?: string
           headline?: string
           id?: string
+          image_url?: string | null
           language?: string
           published_at?: string
           source?: string | null
           source_url?: string | null
           summary?: string | null
+          video_embed_url?: string | null
+          video_url?: string | null
         }
         Relationships: []
       }
