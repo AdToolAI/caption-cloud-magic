@@ -13,6 +13,7 @@ import ReactMarkdown from 'react-markdown';
 import { getConsultantDraft, saveConsultantDraft } from '@/lib/universal-video-draft';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLocalizedVideoCategories } from '@/hooks/useLocalizedVideoCategories';
+import { ConceptReviewEditor } from './ConceptReviewEditor';
 
 interface Message {
   id: string;
@@ -84,6 +85,8 @@ export function UniversalVideoConsultant({
     return null;
   });
   const [quickReplyLocked, setQuickReplyLocked] = useState(false);
+  const [reviewMode, setReviewMode] = useState(false);
+  const [editableRecommendation, setEditableRecommendation] = useState<UniversalConsultationResult | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageIdsRef = useRef<Set<string>>(new Set(['1']));
 
@@ -251,13 +254,14 @@ export function UniversalVideoConsultant({
     if (showModeChoice) {
       if (reply === t('uvc.consultantCreateVideo')) {
         if (lastRecommendation) {
-          console.log('[Consultant] Using lastRecommendation with interview data:', Object.keys(lastRecommendation));
-          onConsultationComplete({
+          console.log('[Consultant] Opening review editor with recommendation');
+          setEditableRecommendation({
             ...lastRecommendation,
             category,
             completedAt: new Date().toISOString(),
-            modeChoice: 'full-service',
           });
+          setReviewMode(true);
+          setQuickReplyLocked(false);
           return;
         }
         
