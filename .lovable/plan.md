@@ -1,37 +1,55 @@
 
 
-## Plan: Auto-Recherche bekannter Produkte/Marken im Interview
+## Plan: Wizard-Stepper vereinfachen und Fehler beheben
 
-### Problem
-Wenn der Nutzer sagt "Ich möchte ein Werbevideo für Calvin Klein U2 erstellen", kennt die KI das Produkt bereits — stellt aber trotzdem Fragen wie "Was ist das Produkt?", "Beschreibe es", "Was ist die Zielgruppe?" etc. Bei bekannten Marken/Produkten ist das Zeitverschwendung. Die KI sollte ihr Wissen nutzen und diese Slots automatisch füllen.
-
-### Lösung
-Eine **Product Intelligence**-Schicht im System-Prompt, die die KI anweist, bei erkennbaren Produkten/Marken ihr Wissen einzusetzen und die Infos direkt zusammenzufassen, statt den Nutzer auszufragen.
+### Probleme
+1. **Zu viele Stufen** — Manual-Modus hat 13 Steps, Full-Service 9. Das überflutet die Stepper-Leiste und ist auf dem Bildschirm nicht mehr lesbar.
+2. **Fehlende Übersetzungen** — `uvc.stepProductImages` und `uvc.stepProductImagesDesc` existieren nicht in `src/lib/translations.ts`, daher werden die rohen Keys angezeigt.
+3. **Leere Seite nach Beratung** — Die Consultation-Validation-Warnung ist nicht kritisch, aber die Seite zeigt keinen Content.
+4. **Service-Worker Cache-Fehler** — `PUT`/`PATCH` Methoden werden vom SW-Cache versucht.
 
 ### Änderungen
 
-**`supabase/functions/universal-video-consultant/index.ts`**
+**1. Stepper zu kompakten Punkten zusammenfassen (`UniversalVideoWizard.tsx`)**
 
-1. **Product/Brand Detection vor dem AI-Call**: Neue Funktion `detectKnownEntity(messages)` die in den User-Nachrichten nach bekannten Marken/Produktnamen sucht (Calvin Klein, Nike, Apple, BMW, etc. — aber auch generische Muster wie "XY Parfüm", "XY App"). Wenn ein bekanntes Produkt erkannt wird, wird ein Flag + der Name an den System-Prompt übergeben.
+Statt jeden einzelnen Step als breiten Button mit Label anzuzeigen, werden die Steps zu **Phasen-Gruppen** zusammengefasst:
 
-2. **System-Prompt erweitern** — neuer Abschnitt `PRODUCT INTELLIGENCE`:
-   - Wenn ein bekanntes Produkt/eine Marke erkannt wird: "Der Nutzer hat '[Produktname]' erwähnt. Du KENNST dieses Produkt. Fasse dein Wissen zusammen (Zielgruppe, USP, Markenidentität, Stil) und präsentiere es dem Nutzer zur Bestätigung. Stelle KEINE Fragen zu Informationen die du bereits weißt. Frage stattdessen: 'Ich kenne [Produkt] — stimmt das so? [Zusammenfassung]. Gibt es etwas das ich anpassen soll?'"
-   - Dadurch werden mehrere Slots auf einmal als "vorgeschlagen" markiert
-   - Der Nutzer muss nur bestätigen oder korrigieren statt alles selbst einzugeben
+- **Full-Service** (aktuell 9 → 5 Punkte):
+  - Vorbereitung (Kategorie + Bilder + Stimmung + Stil + Modus)
+  - Beratung
+  - Generierung
+  - Vorschau
+  - Export
 
-3. **Slot-Extraction verbessern**: Wenn die KI in ihrer Antwort selbst Informationen über das Produkt zusammenfasst (und der Nutzer bestätigt), zählen diese als gefüllte Slots. Dafür auch die AI-Nachrichten in `extractFilledSlots` einbeziehen (aktuell werden nur User-Nachrichten gescannt).
+- **Manual** (aktuell 13 → 6 Punkte):
+  - Vorbereitung (Kategorie + Bilder + Stimmung + Stil + Modus)
+  - Beratung
+  - Konzept (Briefing + Script + Storyboard)
+  - Produktion (Visuals + Animation)
+  - Audio
+  - Export
 
-4. **Phase-Instruction anpassen**: Bei `userMessageCount === 0` (erste Nachricht) den Hinweis hinzufügen, dass die KI auch die bisherige System-Nachricht (mit Kategorie-Info) berücksichtigen soll — wenn der Nutzer schon in der ersten Nachricht ein konkretes Produkt nennt, soll die KI sofort recherchieren statt generisch zu begrüßen.
+Der Stepper zeigt nur **kleine Kreise/Punkte** mit kurzen Labels statt der aktuellen breiten Buttons. Auf Mobile wird nur der aktuelle Punkt + Nummer angezeigt.
+
+**2. Fehlende Übersetzungen in `src/lib/translations.ts` hinzufügen**
+
+Neue Keys für EN, DE, ES:
+- `stepProductImages` / `stepProductImagesDesc`
+
+**3. Service-Worker Cache-Fix (`sw.js` oder relevante SW-Datei)**
+
+Die `PUT`/`PATCH`-Fehler kommen daher, dass der Service Worker versucht, nicht-GET-Requests zu cachen. Einen Check hinzufügen der nur `GET`-Requests cached.
 
 ### Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `supabase/functions/universal-video-consultant/index.ts` | Product Intelligence im Prompt, Slot-Extraction auf AI+User erweitern |
+| `src/components/universal-video-creator/UniversalVideoWizard.tsx` | Stepper zu Phasen-Gruppen zusammenfassen, kompaktere Punkt-Darstellung |
+| `src/lib/translations.ts` | Fehlende `stepProductImages`-Keys für EN/DE/ES |
+| Service-Worker Datei | GET-only Cache-Check |
 
 ### Ergebnis
-- Bei "Calvin Klein U2 Parfüm" fasst die KI sofort zusammen: Zielgruppe, USP, Markenwerte, visueller Stil
-- Nutzer bestätigt nur noch und ergänzt individuelle Wünsche
-- Interview verkürzt sich bei bekannten Produkten auf 4-8 Nachrichten statt 10-15
-- Bei unbekannten Produkten funktioniert das Interview wie bisher
+- Stepper hat 5-6 übersichtliche Punkte statt 9-13 überladene Buttons
+- Keine rohen Translation-Keys mehr sichtbar
+- Keine Cache-Fehler mehr im Console-Log
 
