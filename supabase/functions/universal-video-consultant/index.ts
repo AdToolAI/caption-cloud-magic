@@ -1902,18 +1902,22 @@ const getCategorySystemPrompt = (category: string, mode: string, currentPhase: n
       : 'Phase 22/22 - FINAL SUMMARY! Summarize ALL collected information.';
   }
 
+  // Only show the current block's phases to keep the AI focused
+  let blockPhases = '';
+  if (currentPhase <= 4) {
+    blockPhases = `CURRENT BLOCK 1 — ${labels[0]} (Phase 1-4):\n${cat.phases.slice(0, 4).map((p: string, i: number) => `  ${i + 1}. ${p}`).join('\n')}`;
+  } else if (currentPhase <= 16) {
+    blockPhases = `CURRENT BLOCK 2 — ${labels[1]} ${cat.name.toUpperCase()} (Phase 5-16):\n${cat.phases.slice(4, 16).map((p: string, i: number) => `  ${i + 5}. ${p}`).join('\n')}`;
+  } else {
+    blockPhases = `CURRENT BLOCK 3 — ${labels[2]} (Phase 17-22):\n${cat.phases.slice(16).map((p: string, i: number) => `  ${i + 17}. ${p}`).join('\n')}`;
+  }
+
   return `${role}
 ${li.respondIn}
 
-INTERVIEW STRUCTURE (3 Blocks):
-BLOCK 1 — ${labels[0]} (Phase 1-4):
-${cat.phases.slice(0, 4).map((p: string, i: number) => `  ${i + 1}. ${p}`).join('\n')}
+INTERVIEW: 22 phases in 3 blocks. You are in ${blockInfo}.
 
-BLOCK 2 — ${labels[1]} ${cat.name.toUpperCase()} (Phase 5-16):
-${cat.phases.slice(4, 16).map((p: string, i: number) => `  ${i + 5}. ${p}`).join('\n')}
-
-BLOCK 3 — ${labels[2]} (Phase 17-22):
-${cat.phases.slice(16).map((p: string, i: number) => `  ${i + 17}. ${p}`).join('\n')}
+${blockPhases}
 
 ${phaseInstructions}
 
@@ -1921,6 +1925,7 @@ RULES:
 - Complete ALL 22 phases — NO exceptions
 - Ask only ONE question per message
 - Move to next phase only when current one is answered
+- Stay focused on the CURRENT phase — do not reference other blocks
 - Use emojis sparingly (🎬 🎯 🎨 💡)
 
 RESPONSE FORMAT (ALWAYS JSON):
@@ -2303,7 +2308,7 @@ serve(async (req) => {
     }
     
     // Phase-based quick replies as PRIMARY (category-aware, language-aware)
-    const phaseBasedReplies = generateQuickReplies(Math.max(1, currentPhase - 1), category, lang);
+    const phaseBasedReplies = generateQuickReplies(currentPhase, category, lang);
     
     const aiReplies = parsedResponse?.quickReplies;
     const useAiReplies = aiReplies && 
