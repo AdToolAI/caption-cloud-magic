@@ -185,7 +185,7 @@ export function UniversalVideoConsultant({
 
       addMessageSafely(assistantMessage);
 
-      if (data.isComplete && data.recommendation && data.progress >= 100) {
+      if (data.isComplete && data.recommendation) {
         setLastRecommendation(data.recommendation);
         if (mode === 'full-service') {
           setTimeout(() => {
