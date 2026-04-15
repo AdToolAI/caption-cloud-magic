@@ -146,6 +146,84 @@ const CATEGORY_SLOTS: Record<string, InfoSlot[]> = {
 };
 
 // ═══════════════════════════════════════════════════════════════
+// PRODUCT/BRAND INTELLIGENCE — Detect known entities
+// ═══════════════════════════════════════════════════════════════
+
+function detectKnownEntity(messages: any[]): { detected: boolean; entityName: string; entityType: string } {
+  const userMessages = messages.filter((m: any) => m.role === 'user');
+  const allUserText = userMessages.map((m: any) => (m.content || '')).join(' ');
+  const allUserTextLower = allUserText.toLowerCase();
+
+  // Well-known global brands
+  const knownBrands = [
+    'calvin klein', 'nike', 'adidas', 'apple', 'samsung', 'google', 'microsoft', 'amazon',
+    'bmw', 'mercedes', 'audi', 'porsche', 'tesla', 'ferrari', 'lamborghini',
+    'gucci', 'louis vuitton', 'prada', 'chanel', 'dior', 'versace', 'armani', 'hermes', 'hermès',
+    'coca-cola', 'pepsi', 'red bull', 'monster energy',
+    'netflix', 'spotify', 'disney', 'youtube', 'tiktok', 'instagram',
+    'rolex', 'omega', 'tag heuer', 'cartier', 'tiffany',
+    'sony', 'playstation', 'xbox', 'nintendo',
+    'ikea', 'zara', 'h&m', 'uniqlo',
+    'mcdonald', 'starbucks', 'burger king', 'subway',
+    'l\'oréal', 'loreal', 'maybelline', 'nyx', 'mac cosmetics', 'estée lauder', 'estee lauder',
+    'dove', 'nivea', 'neutrogena', 'clinique',
+    'airbnb', 'uber', 'lyft', 'booking.com',
+    'shopify', 'stripe', 'paypal', 'visa', 'mastercard',
+    'openai', 'chatgpt', 'midjourney', 'figma', 'canva', 'notion', 'slack',
+    'hugo boss', 'ralph lauren', 'tommy hilfiger', 'lacoste',
+    'dyson', 'bose', 'bang & olufsen', 'sonos',
+    'gopro', 'dji', 'canon', 'nikon',
+    'lego', 'barbie', 'mattel',
+    'patagonia', 'the north face', 'columbia',
+    'sephora', 'douglas',
+  ];
+
+  // Product type indicators (multilingual)
+  const productIndicators = [
+    'parfüm', 'parfum', 'perfume', 'fragrance', 'duft',
+    'app', 'software', 'plattform', 'platform', 'tool',
+    'auto', 'car', 'coche', 'fahrzeug', 'vehicle',
+    'uhr', 'watch', 'reloj',
+    'schuh', 'shoe', 'sneaker', 'zapato',
+    'getränk', 'drink', 'bebida',
+    'kosmetik', 'cosmetic', 'cosmético', 'makeup', 'skincare',
+    'kleidung', 'clothing', 'ropa', 'fashion', 'mode',
+    'möbel', 'furniture', 'mueble',
+    'schmuck', 'jewelry', 'joyería',
+    'kamera', 'camera', 'cámara',
+    'kopfhörer', 'headphone', 'auricular',
+    'smartphone', 'tablet', 'laptop', 'computer',
+  ];
+
+  // Check for known brands
+  for (const brand of knownBrands) {
+    if (allUserTextLower.includes(brand)) {
+      // Try to extract the full product name (brand + product line)
+      const brandIndex = allUserTextLower.indexOf(brand);
+      const surroundingText = allUserText.substring(Math.max(0, brandIndex - 10), brandIndex + brand.length + 40).trim();
+      return { detected: true, entityName: surroundingText, entityType: 'brand' };
+    }
+  }
+
+  // Check for generic product patterns: "[Name] + product indicator"
+  for (const indicator of productIndicators) {
+    const regex = new RegExp(`([A-ZÀ-ÖÙ-Ü][\\w\\s-]{1,30})\\s+${indicator}`, 'i');
+    const match = allUserText.match(regex);
+    if (match) {
+      return { detected: true, entityName: match[0].trim(), entityType: 'product' };
+    }
+    // Also check "indicator + Name"  
+    const regex2 = new RegExp(`${indicator}\\s+([A-ZÀ-ÖÙ-Ü][\\w\\s-]{1,30})`, 'i');
+    const match2 = allUserText.match(regex2);
+    if (match2) {
+      return { detected: true, entityName: match2[0].trim(), entityType: 'product' };
+    }
+  }
+
+  return { detected: false, entityName: '', entityType: '' };
+}
+
+// ═══════════════════════════════════════════════════════════════
 // STORYTELLING SUB-MODE DETECTION
 // ═══════════════════════════════════════════════════════════════
 
@@ -197,16 +275,18 @@ function extractFilledSlots(messages: any[], category: string, lang: Lang): {
   const categorySlots = CATEGORY_SLOTS[category] || CATEGORY_SLOTS['custom'];
   const allSlots = [...categorySlots, ...UNIVERSAL_SLOTS];
   
-  const userMessages = messages.filter((m: any) => m.role === 'user');
-  const allUserText = userMessages.map((m: any) => (m.content || '').toLowerCase()).join(' ');
+  // Include BOTH user AND assistant messages for slot detection
+  // This ensures that when the AI summarizes product info and the user confirms, slots count as filled
+  const relevantMessages = messages.filter((m: any) => m.role === 'user' || m.role === 'assistant');
+  const allText = relevantMessages.map((m: any) => (m.content || '').toLowerCase()).join(' ');
   
   const slots: SlotStatus[] = allSlots.map(slot => {
-    const filled = slot.keywords.some(keyword => allUserText.includes(keyword.toLowerCase()));
+    const filled = slot.keywords.some(keyword => allText.includes(keyword.toLowerCase()));
     
     let snippet = '';
     if (filled) {
-      // Find the message that contains the keyword
-      for (const msg of userMessages) {
+      // Find the message that contains the keyword (prefer user messages)
+      for (const msg of relevantMessages) {
         const msgLower = (msg.content || '').toLowerCase();
         if (slot.keywords.some(k => msgLower.includes(k.toLowerCase()))) {
           snippet = msg.content.substring(0, 80);
@@ -347,6 +427,7 @@ function buildAdaptiveSystemPrompt(
   messages: any[],
   slotInfo: ReturnType<typeof extractFilledSlots>,
   userMessageCount: number,
+  knownEntity: { detected: boolean; entityName: string; entityType: string },
 ): string {
   const categoryName = CATEGORY_NAMES[lang][category] || 'Custom Video';
   
@@ -399,12 +480,20 @@ function buildAdaptiveSystemPrompt(
   // Adaptive instruction based on progress
   let phaseInstruction: string;
   if (userMessageCount === 0) {
-    // First message — greeting + first question
-    phaseInstruction = lang === 'de' 
-      ? `Dies ist der START des Interviews. Begrüße den Kunden warmherzig und professionell, stelle dich als Max vor, und stelle dann deine ERSTE Frage. Wähle die relevanteste offene Pflicht-Information aus der Liste unten.`
-      : lang === 'es'
-      ? `Este es el INICIO de la entrevista. Saluda al cliente con calidez y profesionalismo, preséntate como Max, y haz tu PRIMERA pregunta. Elige la información obligatoria más relevante de la lista.`
-      : `This is the START of the interview. Greet the client warmly and professionally, introduce yourself as Max, and ask your FIRST question. Choose the most relevant required info from the list below.`;
+    // First message — greeting + first question (or product research if entity detected)
+    if (knownEntity.detected) {
+      phaseInstruction = lang === 'de'
+        ? `Dies ist der START des Interviews. Der Nutzer hat bereits ein konkretes Produkt/eine Marke genannt: "${knownEntity.entityName}". Begrüße kurz, stelle dich als Max vor, und nutze dann SOFORT dein Wissen über dieses Produkt/diese Marke. Fasse zusammen was du weißt (Zielgruppe, USP, Markenwerte, typischer Stil) und frage den Nutzer ob das so stimmt. Stelle KEINE Fragen zu Informationen die du bereits kennst.`
+        : lang === 'es'
+        ? `Este es el INICIO. El usuario ya mencionó un producto/marca específico: "${knownEntity.entityName}". Saluda brevemente, preséntate como Max, y usa INMEDIATAMENTE tu conocimiento sobre este producto/marca. Resume lo que sabes (público, USP, valores de marca, estilo típico) y pregunta si es correcto.`
+        : `This is the START. The user already mentioned a specific product/brand: "${knownEntity.entityName}". Greet briefly, introduce yourself as Max, then IMMEDIATELY use your knowledge about this product/brand. Summarize what you know (target audience, USP, brand values, typical style) and ask if that's correct.`;
+    } else {
+      phaseInstruction = lang === 'de' 
+        ? `Dies ist der START des Interviews. Begrüße den Kunden warmherzig und professionell, stelle dich als Max vor, und stelle dann deine ERSTE Frage. Wähle die relevanteste offene Pflicht-Information aus der Liste unten.`
+        : lang === 'es'
+        ? `Este es el INICIO de la entrevista. Saluda al cliente con calidez y profesionalismo, preséntate como Max, y haz tu PRIMERA pregunta. Elige la información obligatoria más relevante de la lista.`
+        : `This is the START of the interview. Greet the client warmly and professionally, introduce yourself as Max, and ask your FIRST question. Choose the most relevant required info from the list below.`;
+    }
   } else if (isNearComplete) {
     phaseInstruction = lang === 'de'
       ? `Alle Pflichtinformationen sind gesammelt! Du kannst jetzt:\n- Optionale Details erfragen (${optionalMissing.slice(0, 3).join(', ')})\n- Oder eine ZUSAMMENFASSUNG aller gesammelten Infos geben und fragen ob alles passt\n- Setze "isComplete": true wenn der Nutzer bestätigt oder du genug Infos hast`
@@ -515,6 +604,27 @@ PROGRESS: ${slotInfo.progress}%
 USER MESSAGES SO FAR: ${userMessageCount}
 
 ${phaseInstruction}
+
+${knownEntity.detected ? `
+PRODUCT INTELLIGENCE:
+${lang === 'de' ? `Der Nutzer hat "${knownEntity.entityName}" erwähnt. Du KENNST dieses Produkt/diese Marke. Nutze dein internes Wissen:
+- Fasse zusammen: Zielgruppe, USP, Markenidentität, typischer visueller Stil, Kernbotschaft
+- Präsentiere diese Zusammenfassung dem Nutzer zur Bestätigung
+- Stelle KEINE Fragen zu Dingen die du bereits über das Produkt weißt
+- Frage stattdessen: "Stimmt das so? Gibt es etwas das ich anpassen soll?"
+- Fokussiere die verbleibenden Fragen auf INDIVIDUELLE Wünsche (Dauer, Format, spezifische Szenen, CTA)
+- Dadurch verkürzt sich das Interview erheblich`
+: lang === 'es' ? `El usuario mencionó "${knownEntity.entityName}". CONOCES este producto/marca. Usa tu conocimiento interno:
+- Resume: público objetivo, USP, identidad de marca, estilo visual típico
+- Presenta este resumen para confirmación
+- NO preguntes por información que ya conoces
+- Enfoca las preguntas restantes en deseos INDIVIDUALES (duración, formato, escenas, CTA)`
+: `The user mentioned "${knownEntity.entityName}". You KNOW this product/brand. Use your internal knowledge:
+- Summarize: target audience, USP, brand identity, typical visual style
+- Present this summary for confirmation
+- Do NOT ask about information you already know
+- Focus remaining questions on INDIVIDUAL preferences (duration, format, specific scenes, CTA)`}
+` : ''}
 
 ${pp.adaptiveRules}
 
@@ -770,10 +880,16 @@ Deno.serve(async (req) => {
     // Extract filled slots from conversation
     const slotInfo = extractFilledSlots(messages, category, lang);
     
+    // Detect known products/brands in user messages
+    const knownEntity = detectKnownEntity(messages);
+    if (knownEntity.detected) {
+      console.log(`[universal-video-consultant] Known entity detected: "${knownEntity.entityName}" (${knownEntity.entityType})`);
+    }
+    
     console.log(`[universal-video-consultant] Category: ${category}, Mode: ${mode}, UserMsgs: ${userMessageCount}, Progress: ${slotInfo.progress}%, FilledRequired: ${slotInfo.filledRequired}/${slotInfo.totalRequired}, Lang: ${lang}`);
 
     // Build adaptive system prompt
-    const systemPrompt = buildAdaptiveSystemPrompt(category, mode, lang, messages, slotInfo, userMessageCount);
+    const systemPrompt = buildAdaptiveSystemPrompt(category, mode, lang, messages, slotInfo, userMessageCount, knownEntity);
     
     // Compress context for long conversations
     const compressedMessages = compressContext(messages, userMessageCount);
