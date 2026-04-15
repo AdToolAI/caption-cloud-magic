@@ -3325,6 +3325,131 @@ export type Database = {
         }
         Relationships: []
       }
+      composer_projects: {
+        Row: {
+          assembly_config: Json
+          briefing: Json
+          category: string
+          created_at: string
+          id: string
+          language: string
+          output_url: string | null
+          status: string
+          storyboard: Json
+          thumbnail_url: string | null
+          title: string
+          total_cost_euros: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assembly_config?: Json
+          briefing?: Json
+          category?: string
+          created_at?: string
+          id?: string
+          language?: string
+          output_url?: string | null
+          status?: string
+          storyboard?: Json
+          thumbnail_url?: string | null
+          title?: string
+          total_cost_euros?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assembly_config?: Json
+          briefing?: Json
+          category?: string
+          created_at?: string
+          id?: string
+          language?: string
+          output_url?: string | null
+          status?: string
+          storyboard?: Json
+          thumbnail_url?: string | null
+          title?: string
+          total_cost_euros?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      composer_scenes: {
+        Row: {
+          ai_prompt: string | null
+          clip_source: string
+          clip_status: string
+          clip_url: string | null
+          cost_euros: number
+          created_at: string
+          duration_seconds: number
+          id: string
+          order_index: number
+          project_id: string
+          replicate_prediction_id: string | null
+          retry_count: number
+          scene_type: string
+          stock_keywords: string | null
+          text_overlay: Json
+          transition_duration: number
+          transition_type: string
+          updated_at: string
+          upload_url: string | null
+        }
+        Insert: {
+          ai_prompt?: string | null
+          clip_source?: string
+          clip_status?: string
+          clip_url?: string | null
+          cost_euros?: number
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          order_index?: number
+          project_id: string
+          replicate_prediction_id?: string | null
+          retry_count?: number
+          scene_type?: string
+          stock_keywords?: string | null
+          text_overlay?: Json
+          transition_duration?: number
+          transition_type?: string
+          updated_at?: string
+          upload_url?: string | null
+        }
+        Update: {
+          ai_prompt?: string | null
+          clip_source?: string
+          clip_status?: string
+          clip_url?: string | null
+          cost_euros?: number
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          order_index?: number
+          project_id?: string
+          replicate_prediction_id?: string | null
+          retry_count?: number
+          scene_type?: string
+          stock_keywords?: string | null
+          text_overlay?: Json
+          transition_duration?: number
+          transition_type?: string
+          updated_at?: string
+          upload_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composer_scenes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_approvals: {
         Row: {
           content_id: string
@@ -11086,6 +11211,7 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
+      owns_composer_project: { Args: { _project_id: string }; Returns: boolean }
       refund_ai_video_credits: {
         Args: {
           p_amount_euros: number
