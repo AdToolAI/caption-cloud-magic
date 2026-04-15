@@ -1,53 +1,31 @@
-const CACHE_NAME = 'caption-genie-v3';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json'
-];
+const CACHE_NAME = 'caption-genie-v5';
 
-// Install service worker
+// Install — skip waiting immediately
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(urlsToCache))
-  );
 });
 
-// Fetch with network-first strategy (GET only)
-self.addEventListener('fetch', (event) => {
-  // Only cache GET requests — skip PUT, PATCH, POST, DELETE
-  if (event.request.method !== 'GET') return;
-
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME)
-          .then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        return response;
-      })
-      .catch(() => {
-        return caches.match(event.request);
-      })
-  );
-});
-
-// Activate and clean up old caches
+// Activate — delete ALL old caches, then claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
+        cacheNames.map((name) => {
+          if (name !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', name);
+            return caches.delete(name);
           }
         })
       );
     }).then(() => clients.claim())
   );
+});
+
+// Fetch — NO caching at all. Let the browser/CDN handle it.
+// This eliminates all Cache.put errors for non-GET requests.
+self.addEventListener('fetch', () => {
+  // Intentionally empty — do not intercept any requests.
+  // The browser will handle all fetches normally.
 });
 
 // Push notification received
