@@ -880,10 +880,16 @@ Deno.serve(async (req) => {
     // Extract filled slots from conversation
     const slotInfo = extractFilledSlots(messages, category, lang);
     
+    // Detect known products/brands in user messages
+    const knownEntity = detectKnownEntity(messages);
+    if (knownEntity.detected) {
+      console.log(`[universal-video-consultant] Known entity detected: "${knownEntity.entityName}" (${knownEntity.entityType})`);
+    }
+    
     console.log(`[universal-video-consultant] Category: ${category}, Mode: ${mode}, UserMsgs: ${userMessageCount}, Progress: ${slotInfo.progress}%, FilledRequired: ${slotInfo.filledRequired}/${slotInfo.totalRequired}, Lang: ${lang}`);
 
     // Build adaptive system prompt
-    const systemPrompt = buildAdaptiveSystemPrompt(category, mode, lang, messages, slotInfo, userMessageCount);
+    const systemPrompt = buildAdaptiveSystemPrompt(category, mode, lang, messages, slotInfo, userMessageCount, knownEntity);
     
     // Compress context for long conversations
     const compressedMessages = compressContext(messages, userMessageCount);
