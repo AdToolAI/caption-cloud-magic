@@ -1,0 +1,177 @@
+// AI Video Composer — Scene-Based Video Assembly Types
+
+export type ComposerCategory = 'product-ad' | 'corporate-ad' | 'storytelling' | 'custom';
+
+export type ComposerStatus = 'draft' | 'storyboard' | 'generating' | 'assembling' | 'preview' | 'completed' | 'failed';
+
+export type SceneType = 'hook' | 'problem' | 'solution' | 'demo' | 'social-proof' | 'cta' | 'custom';
+
+export type ClipSource = 'ai-hailuo' | 'ai-kling' | 'ai-sora' | 'stock' | 'upload';
+
+export type ClipStatus = 'pending' | 'generating' | 'ready' | 'failed';
+
+export type TransitionStyle = 'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom';
+
+export type ColorGradingPreset = 'none' | 'cinematic-warm' | 'cool-blue' | 'vintage-film' | 'high-contrast' | 'moody-dark';
+
+export type TextPosition = 'top' | 'center' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+export type TextAnimation = 'none' | 'fade-in' | 'scale-bounce' | 'slide-left' | 'slide-right' | 'word-by-word' | 'glow-pulse';
+
+export type ComposerMode = 'ai' | 'manual';
+
+export type AspectRatio = '16:9' | '9:16' | '1:1' | '4:5';
+
+export type EmotionalTone = 'professional' | 'energetic' | 'emotional' | 'funny' | 'luxury' | 'minimal' | 'dramatic' | 'friendly';
+
+export interface TextOverlayConfig {
+  text: string;
+  position: TextPosition;
+  animation: TextAnimation;
+  fontSize: number;
+  color: string;
+  fontFamily?: string;
+}
+
+export interface ComposerBriefing {
+  mode: ComposerMode;
+  productName: string;
+  productDescription: string;
+  usps: string[];
+  targetAudience: string;
+  tone: EmotionalTone;
+  duration: number; // 15-90 seconds
+  aspectRatio: AspectRatio;
+  brandColors: string[];
+  logoUrl?: string;
+}
+
+export interface ComposerScene {
+  id: string;
+  projectId: string;
+  orderIndex: number;
+  sceneType: SceneType;
+  durationSeconds: number;
+  clipSource: ClipSource;
+  aiPrompt?: string;
+  stockKeywords?: string;
+  uploadUrl?: string;
+  clipUrl?: string;
+  clipStatus: ClipStatus;
+  textOverlay: TextOverlayConfig;
+  transitionType: TransitionStyle;
+  transitionDuration: number;
+  replicatePredictionId?: string;
+  retryCount: number;
+  costEuros: number;
+}
+
+export interface AssemblyConfig {
+  colorGrading: ColorGradingPreset;
+  transitionStyle: TransitionStyle;
+  kineticText: boolean;
+  voiceover: VoiceoverConfig | null;
+  music: MusicConfig | null;
+  beatSync: boolean;
+}
+
+export interface VoiceoverConfig {
+  enabled: boolean;
+  voiceId: string;
+  voiceName: string;
+  script: string;
+  audioUrl?: string;
+}
+
+export interface MusicConfig {
+  enabled: boolean;
+  trackUrl: string;
+  trackName: string;
+  genre: string;
+  mood: string;
+  volume: number; // 0-100
+  isUpload: boolean;
+}
+
+export interface ComposerProject {
+  id: string;
+  userId: string;
+  title: string;
+  category: ComposerCategory;
+  briefing: ComposerBriefing;
+  status: ComposerStatus;
+  storyboard: ComposerScene[];
+  assemblyConfig: AssemblyConfig;
+  outputUrl?: string;
+  thumbnailUrl?: string;
+  totalCostEuros: number;
+  language: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Default values
+export const DEFAULT_BRIEFING: ComposerBriefing = {
+  mode: 'ai',
+  productName: '',
+  productDescription: '',
+  usps: [],
+  targetAudience: '',
+  tone: 'professional',
+  duration: 30,
+  aspectRatio: '16:9',
+  brandColors: [],
+};
+
+export const DEFAULT_ASSEMBLY_CONFIG: AssemblyConfig = {
+  colorGrading: 'none',
+  transitionStyle: 'fade',
+  kineticText: false,
+  voiceover: null,
+  music: null,
+  beatSync: false,
+};
+
+export const DEFAULT_TEXT_OVERLAY: TextOverlayConfig = {
+  text: '',
+  position: 'bottom',
+  animation: 'fade-in',
+  fontSize: 48,
+  color: '#FFFFFF',
+};
+
+// Scene type labels
+export const SCENE_TYPE_LABELS: Record<SceneType, { de: string; en: string; es: string }> = {
+  hook: { de: 'Hook', en: 'Hook', es: 'Gancho' },
+  problem: { de: 'Problem', en: 'Problem', es: 'Problema' },
+  solution: { de: 'Lösung', en: 'Solution', es: 'Solución' },
+  demo: { de: 'Demo', en: 'Demo', es: 'Demo' },
+  'social-proof': { de: 'Social Proof', en: 'Social Proof', es: 'Prueba Social' },
+  cta: { de: 'Call to Action', en: 'Call to Action', es: 'Llamada a la Acción' },
+  custom: { de: 'Eigene Szene', en: 'Custom Scene', es: 'Escena Personalizada' },
+};
+
+// Clip source labels
+export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> = {
+  'ai-hailuo': { de: 'KI (Hailuo)', en: 'AI (Hailuo)' },
+  'ai-kling': { de: 'KI (Kling)', en: 'AI (Kling)' },
+  'ai-sora': { de: 'KI (Sora)', en: 'AI (Sora)' },
+  stock: { de: 'Stock Video', en: 'Stock Video' },
+  upload: { de: 'Eigener Upload', en: 'Own Upload' },
+};
+
+// Estimated costs per clip source
+export const CLIP_SOURCE_COSTS: Record<ClipSource, number> = {
+  'ai-hailuo': 1.20,
+  'ai-kling': 1.50,
+  'ai-sora': 2.00,
+  stock: 0,
+  upload: 0,
+};
+
+export const CATEGORY_LABELS: Record<ComposerCategory, { de: string; en: string; es: string }> = {
+  'product-ad': { de: 'Produktvideo', en: 'Product Ad', es: 'Anuncio de Producto' },
+  'corporate-ad': { de: 'Unternehmenswerbung', en: 'Corporate Ad', es: 'Anuncio Corporativo' },
+  storytelling: { de: 'Storytelling', en: 'Storytelling', es: 'Storytelling' },
+  custom: { de: 'Allgemeiner Editor', en: 'General Editor', es: 'Editor General' },
+};
