@@ -1,42 +1,31 @@
 
 
-## Plan: Fix `defaultRole is not defined` Fehler in universal-video-consultant
+## Plan: Interview-Logik reparieren — Quick-Reply-Offset und Prompt-Fokussierung
 
-### Problem
-Die Edge Function `universal-video-consultant` crasht mit `ReferenceError: defaultRole is not defined` (Zeile 1834). 
+### Problem 1: Quick Replies sind um eine Phase verschoben
+In Zeile 2306 wird `generateQuickReplies(currentPhase - 1, ...)` aufgerufen. Wenn der Interviewer bei Phase 19 (MUSIK) ist, zeigt er die Quick Replies von Phase 18 (VOICE-OVER: "Männliche Stimme, professionell" etc.). Die Antwortmöglichkeiten passen nicht zur Frage.
 
-**Ursache**: Das Category-Mapping wandelt `product-ad` → `product-video` und `corporate-ad` → `advertisement` um, aber `categoryRoles` hat keine Einträge für diese internen Keys. Der Fallback `defaultRole` wurde nie definiert.
+### Problem 2: System-Prompt enthält alle 12 alten Kategorien
+Der System-Prompt listet ALLE 22 Phasen inklusive der Phasen für `tutorial`, `corporate`, `social-content`, `testimonial`, `explainer`, `event`, `promo`, `presentation` auf — obwohl nur `product-video` relevant ist. Dieses Prompt-Bloating verwirrt die KI und führt zu inkohärenten Antworten.
 
-### Lösung
+### Änderungen
 
-**`supabase/functions/universal-video-consultant/index.ts`** — zwei Änderungen:
+**1. `supabase/functions/universal-video-consultant/index.ts`**
 
-1. **`defaultRole` definieren** (vor Zeile 1834):
-```typescript
-const defaultRole: Record<Lang, string> = {
-  de: 'Du bist Max, dein Video-Marketing-Stratege. Du hilfst beim Erstellen eines professionellen Videos.',
-  en: 'You are Max, a video marketing strategist. You help create a professional video.',
-  es: 'Eres Max, un estratega de video marketing. Ayudas a crear un video profesional.',
-};
-```
+- **Quick-Reply-Offset fixen** (Zeile 2306):
+  - Von `generateQuickReplies(Math.max(1, currentPhase - 1), ...)` 
+  - Zu `generateQuickReplies(currentPhase, ...)`
+  - Damit passen Quick Replies zur aktuellen Phase
 
-2. **`categoryRoles` um die gemappten Keys ergänzen** (nach den bestehenden Einträgen):
-```typescript
-'advertisement': {
-  de: 'Du bist Max, ein erfahrener Werbefilm-Regisseur und Marketing-Stratege. Du erstellst eine UNTERNEHMENSWERBUNG — fokussiere auf Markenpositionierung, USPs und emotionale Wirkung.',
-  en: 'You are Max, an experienced advertising director and marketing strategist. You are creating a CORPORATE AD — focus on brand positioning, USPs and emotional impact.',
-  es: 'Eres Max, un experimentado director publicitario y estratega de marketing. Estás creando un ANUNCIO CORPORATIVO — enfócate en posicionamiento de marca, USPs e impacto emocional.',
-},
-'product-video': {
-  de: 'Du bist Max, ein erfahrener Produkt-Werbefilm-Regisseur und Verkaufspsychologie-Experte. Du erstellst eine PRODUKTWERBUNG — fokussiere auf Produktvorteile, Zielgruppe und Kaufmotivation.',
-  en: 'You are Max, an experienced product advertising director and sales psychology expert. You are creating a PRODUCT AD — focus on product benefits, target audience and purchase motivation.',
-  es: 'Eres Max, un experimentado director de publicidad de productos y experto en psicología de ventas. Estás creando un ANUNCIO DE PRODUCTO — enfócate en beneficios del producto, audiencia objetivo y motivación de compra.',
-},
-```
+- **System-Prompt straffen**: Im `getCategorySystemPrompt` nur die relevante Kategorie und die aktuelle Block-Phase ausgeben, nicht alle 22 Phasen auf einmal. Stattdessen nur:
+  - Den aktuellen Block (1, 2 oder 3)
+  - Die aktuelle Phase + 2-3 Folgephasen
+  - Keine Phasen die bereits abgearbeitet sind
 
-3. **Edge Function deployen**
+**2. Edge Function deployen und testen**
 
 ### Ergebnis
-- Produktwerbung-Interview funktioniert ohne Fehler
-- Jede Kategorie bekommt den richtigen Persona-Prompt
+- Quick Replies passen immer exakt zur aktuellen Frage
+- KI bleibt fokussiert auf den relevanten Interviewabschnitt
+- Keine Verwechslung zwischen Produkt-Fragen und Produktions-Fragen
 
