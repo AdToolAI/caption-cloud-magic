@@ -30,6 +30,7 @@ const TABS = [
 type TabId = typeof TABS[number]['id'];
 
 interface LocalProject {
+  id?: string;
   title: string;
   category: ComposerCategory;
   briefing: ComposerBriefing;
