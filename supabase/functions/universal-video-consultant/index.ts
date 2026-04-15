@@ -480,12 +480,20 @@ function buildAdaptiveSystemPrompt(
   // Adaptive instruction based on progress
   let phaseInstruction: string;
   if (userMessageCount === 0) {
-    // First message — greeting + first question
-    phaseInstruction = lang === 'de' 
-      ? `Dies ist der START des Interviews. Begrüße den Kunden warmherzig und professionell, stelle dich als Max vor, und stelle dann deine ERSTE Frage. Wähle die relevanteste offene Pflicht-Information aus der Liste unten.`
-      : lang === 'es'
-      ? `Este es el INICIO de la entrevista. Saluda al cliente con calidez y profesionalismo, preséntate como Max, y haz tu PRIMERA pregunta. Elige la información obligatoria más relevante de la lista.`
-      : `This is the START of the interview. Greet the client warmly and professionally, introduce yourself as Max, and ask your FIRST question. Choose the most relevant required info from the list below.`;
+    // First message — greeting + first question (or product research if entity detected)
+    if (knownEntity.detected) {
+      phaseInstruction = lang === 'de'
+        ? `Dies ist der START des Interviews. Der Nutzer hat bereits ein konkretes Produkt/eine Marke genannt: "${knownEntity.entityName}". Begrüße kurz, stelle dich als Max vor, und nutze dann SOFORT dein Wissen über dieses Produkt/diese Marke. Fasse zusammen was du weißt (Zielgruppe, USP, Markenwerte, typischer Stil) und frage den Nutzer ob das so stimmt. Stelle KEINE Fragen zu Informationen die du bereits kennst.`
+        : lang === 'es'
+        ? `Este es el INICIO. El usuario ya mencionó un producto/marca específico: "${knownEntity.entityName}". Saluda brevemente, preséntate como Max, y usa INMEDIATAMENTE tu conocimiento sobre este producto/marca. Resume lo que sabes (público, USP, valores de marca, estilo típico) y pregunta si es correcto.`
+        : `This is the START. The user already mentioned a specific product/brand: "${knownEntity.entityName}". Greet briefly, introduce yourself as Max, then IMMEDIATELY use your knowledge about this product/brand. Summarize what you know (target audience, USP, brand values, typical style) and ask if that's correct.`;
+    } else {
+      phaseInstruction = lang === 'de' 
+        ? `Dies ist der START des Interviews. Begrüße den Kunden warmherzig und professionell, stelle dich als Max vor, und stelle dann deine ERSTE Frage. Wähle die relevanteste offene Pflicht-Information aus der Liste unten.`
+        : lang === 'es'
+        ? `Este es el INICIO de la entrevista. Saluda al cliente con calidez y profesionalismo, preséntate como Max, y haz tu PRIMERA pregunta. Elige la información obligatoria más relevante de la lista.`
+        : `This is the START of the interview. Greet the client warmly and professionally, introduce yourself as Max, and ask your FIRST question. Choose the most relevant required info from the list below.`;
+    }
   } else if (isNearComplete) {
     phaseInstruction = lang === 'de'
       ? `Alle Pflichtinformationen sind gesammelt! Du kannst jetzt:\n- Optionale Details erfragen (${optionalMissing.slice(0, 3).join(', ')})\n- Oder eine ZUSAMMENFASSUNG aller gesammelten Infos geben und fragen ob alles passt\n- Setze "isComplete": true wenn der Nutzer bestätigt oder du genug Infos hast`
@@ -596,6 +604,27 @@ PROGRESS: ${slotInfo.progress}%
 USER MESSAGES SO FAR: ${userMessageCount}
 
 ${phaseInstruction}
+
+${knownEntity.detected ? `
+PRODUCT INTELLIGENCE:
+${lang === 'de' ? `Der Nutzer hat "${knownEntity.entityName}" erwähnt. Du KENNST dieses Produkt/diese Marke. Nutze dein internes Wissen:
+- Fasse zusammen: Zielgruppe, USP, Markenidentität, typischer visueller Stil, Kernbotschaft
+- Präsentiere diese Zusammenfassung dem Nutzer zur Bestätigung
+- Stelle KEINE Fragen zu Dingen die du bereits über das Produkt weißt
+- Frage stattdessen: "Stimmt das so? Gibt es etwas das ich anpassen soll?"
+- Fokussiere die verbleibenden Fragen auf INDIVIDUELLE Wünsche (Dauer, Format, spezifische Szenen, CTA)
+- Dadurch verkürzt sich das Interview erheblich`
+: lang === 'es' ? `El usuario mencionó "${knownEntity.entityName}". CONOCES este producto/marca. Usa tu conocimiento interno:
+- Resume: público objetivo, USP, identidad de marca, estilo visual típico
+- Presenta este resumen para confirmación
+- NO preguntes por información que ya conoces
+- Enfoca las preguntas restantes en deseos INDIVIDUALES (duración, formato, escenas, CTA)`
+: `The user mentioned "${knownEntity.entityName}". You KNOW this product/brand. Use your internal knowledge:
+- Summarize: target audience, USP, brand identity, typical visual style
+- Present this summary for confirmation
+- Do NOT ask about information you already know
+- Focus remaining questions on INDIVIDUAL preferences (duration, format, specific scenes, CTA)`}
+` : ''}
 
 ${pp.adaptiveRules}
 
