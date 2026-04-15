@@ -206,6 +206,7 @@ export default function VideoComposerDashboard() {
           <TabsContent value="clips">
             <ClipsTab
               scenes={project.scenes}
+              projectId={project.id}
               onUpdateScenes={setScenes}
               onGoToAudio={() => setActiveTab('audio')}
             />
