@@ -63,6 +63,10 @@ export const ESTIMATED_COSTS: Record<string, number> = {
   explainer_character_animate: 35,
   // KI Picture Studio
   studio_image_generate: 5,
+  // AI Video Composer
+  composer_storyboard: 1,
+  composer_clip_ai: 30, // ~€0.30 per AI clip = 30 credits
+  composer_render: 10,
 };
 
 // Calculate Sora 2 Long-Form cost based on total duration
