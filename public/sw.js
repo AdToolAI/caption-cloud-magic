@@ -14,8 +14,11 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Fetch with network-first strategy
+// Fetch with network-first strategy (GET only)
 self.addEventListener('fetch', (event) => {
+  // Only cache GET requests — skip PUT, PATCH, POST, DELETE
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
