@@ -275,16 +275,18 @@ function extractFilledSlots(messages: any[], category: string, lang: Lang): {
   const categorySlots = CATEGORY_SLOTS[category] || CATEGORY_SLOTS['custom'];
   const allSlots = [...categorySlots, ...UNIVERSAL_SLOTS];
   
-  const userMessages = messages.filter((m: any) => m.role === 'user');
-  const allUserText = userMessages.map((m: any) => (m.content || '').toLowerCase()).join(' ');
+  // Include BOTH user AND assistant messages for slot detection
+  // This ensures that when the AI summarizes product info and the user confirms, slots count as filled
+  const relevantMessages = messages.filter((m: any) => m.role === 'user' || m.role === 'assistant');
+  const allText = relevantMessages.map((m: any) => (m.content || '').toLowerCase()).join(' ');
   
   const slots: SlotStatus[] = allSlots.map(slot => {
-    const filled = slot.keywords.some(keyword => allUserText.includes(keyword.toLowerCase()));
+    const filled = slot.keywords.some(keyword => allText.includes(keyword.toLowerCase()));
     
     let snippet = '';
     if (filled) {
-      // Find the message that contains the keyword
-      for (const msg of userMessages) {
+      // Find the message that contains the keyword (prefer user messages)
+      for (const msg of relevantMessages) {
         const msgLower = (msg.content || '').toLowerCase();
         if (slot.keywords.some(k => msgLower.includes(k.toLowerCase()))) {
           snippet = msg.content.substring(0, 80);
