@@ -1,25 +1,42 @@
 
 
-## Plan: Service Worker Cache-Version bumpen + Cache-Invalidierung
+## Plan: Fix `defaultRole is not defined` Fehler in universal-video-consultant
 
 ### Problem
-Die Published-Seite zeigt noch die alten 12 Templates, obwohl der Code korrekt auf 4 Templates umgebaut ist. 
+Die Edge Function `universal-video-consultant` crasht mit `ReferenceError: defaultRole is not defined` (Zeile 1834). 
 
-**Ursache**: Die Service Worker Datei `public/sw.js` cached `/`, `/index.html` und alle Fetch-Responses unter dem Cache-Namen `caption-genie-v2`. Da sich dieser Cache-Name zwischen Deployments nie ändert, wird der alte SW nicht als "neu" erkannt und alte Caches werden nicht bereinigt.
+**Ursache**: Das Category-Mapping wandelt `product-ad` → `product-video` und `corporate-ad` → `advertisement` um, aber `categoryRoles` hat keine Einträge für diese internen Keys. Der Fallback `defaultRole` wurde nie definiert.
 
-### Änderungen
+### Lösung
 
-**1. `public/sw.js`**
-- Cache-Namen von `caption-genie-v2` auf `caption-genie-v3` bumpen
-- Das bewirkt, dass der SW beim nächsten Laden als "geändert" erkannt wird und im `activate`-Event alle alten Caches löscht
-- Optional: `self.skipWaiting()` im `install`-Event hinzufügen, damit der neue SW sofort aktiv wird (nicht erst beim nächsten Tab-Reload)
-- Optional: `clients.claim()` im `activate`-Event, damit der neue SW sofort alle offenen Tabs übernimmt
+**`supabase/functions/universal-video-consultant/index.ts`** — zwei Änderungen:
 
-**2. Publish**
-- Nach dem Cache-Bump die Seite erneut publishen
+1. **`defaultRole` definieren** (vor Zeile 1834):
+```typescript
+const defaultRole: Record<Lang, string> = {
+  de: 'Du bist Max, dein Video-Marketing-Stratege. Du hilfst beim Erstellen eines professionellen Videos.',
+  en: 'You are Max, a video marketing strategist. You help create a professional video.',
+  es: 'Eres Max, un estratega de video marketing. Ayudas a crear un video profesional.',
+};
+```
+
+2. **`categoryRoles` um die gemappten Keys ergänzen** (nach den bestehenden Einträgen):
+```typescript
+'advertisement': {
+  de: 'Du bist Max, ein erfahrener Werbefilm-Regisseur und Marketing-Stratege. Du erstellst eine UNTERNEHMENSWERBUNG — fokussiere auf Markenpositionierung, USPs und emotionale Wirkung.',
+  en: 'You are Max, an experienced advertising director and marketing strategist. You are creating a CORPORATE AD — focus on brand positioning, USPs and emotional impact.',
+  es: 'Eres Max, un experimentado director publicitario y estratega de marketing. Estás creando un ANUNCIO CORPORATIVO — enfócate en posicionamiento de marca, USPs e impacto emocional.',
+},
+'product-video': {
+  de: 'Du bist Max, ein erfahrener Produkt-Werbefilm-Regisseur und Verkaufspsychologie-Experte. Du erstellst eine PRODUKTWERBUNG — fokussiere auf Produktvorteile, Zielgruppe und Kaufmotivation.',
+  en: 'You are Max, an experienced product advertising director and sales psychology expert. You are creating a PRODUCT AD — focus on product benefits, target audience and purchase motivation.',
+  es: 'Eres Max, un experimentado director de publicidad de productos y experto en psicología de ventas. Estás creando un ANUNCIO DE PRODUCTO — enfócate en beneficios del producto, audiencia objetivo y motivación de compra.',
+},
+```
+
+3. **Edge Function deployen**
 
 ### Ergebnis
-- Beim nächsten Besuch der Published-Seite erkennt der Browser die geänderte `sw.js`
-- Der neue SW installiert sich, löscht den alten `caption-genie-v2` Cache
-- Die neuen 4 Templates werden korrekt geladen
+- Produktwerbung-Interview funktioniert ohne Fehler
+- Jede Kategorie bekommt den richtigen Persona-Prompt
 
