@@ -5,6 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2, Download, Palette, Film, Type, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useTranslation } from '@/hooks/useTranslation';
 import ColorGradingSelector from './ColorGradingSelector';
 import type { AssemblyConfig, ComposerScene, TransitionStyle } from '@/types/video-composer';
 import { CLIP_SOURCE_COSTS } from '@/types/video-composer';
@@ -17,6 +18,7 @@ interface AssemblyTabProps {
 }
 
 export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly, scenes }: AssemblyTabProps) {
+  const { t } = useTranslation();
   const [isRendering, setIsRendering] = useState(false);
   const [renderResult, setRenderResult] = useState<{ renderId?: string; error?: string } | null>(null);
 
@@ -30,7 +32,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
 
   const handleRender = async () => {
     if (!allReady) {
-      toast({ title: 'Clips nicht bereit', description: 'Bitte generiere zuerst alle Clips im Clips-Tab.', variant: 'destructive' });
+      toast({ title: t('videoComposer.clipsNotReady'), description: t('videoComposer.generateClipsFirst'), variant: 'destructive' });
       return;
     }
 
@@ -43,16 +45,16 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
       });
 
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Assembly fehlgeschlagen');
+      if (!data?.success) throw new Error(data?.error || t('videoComposer.renderFailed'));
 
       setRenderResult({ renderId: data.renderId });
       toast({
-        title: 'Video-Rendering gestartet! 🎬',
-        description: `${data.scenesCount} Szenen · ${Math.round(data.totalDuration)}s Gesamtdauer`,
+        title: t('videoComposer.renderStarted'),
+        description: `${data.scenesCount} ${t('videoComposer.scenes')} · ${Math.round(data.totalDuration)}s`,
       });
     } catch (err: any) {
       setRenderResult({ error: err.message });
-      toast({ title: 'Rendering fehlgeschlagen', description: err.message, variant: 'destructive' });
+      toast({ title: t('videoComposer.renderFailed'), description: err.message, variant: 'destructive' });
     } finally {
       setIsRendering(false);
     }
@@ -64,7 +66,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
       <Card className="border-border/40 bg-card/80">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Palette className="h-4 w-4 text-primary" /> Color Grading
+            <Palette className="h-4 w-4 text-primary" /> {t('videoComposer.colorGrading')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -79,22 +81,22 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
       <Card className="border-border/40 bg-card/80">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Film className="h-4 w-4 text-primary" /> Übergangs-Stil
+            <Film className="h-4 w-4 text-primary" /> {t('videoComposer.transitionStyle')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            {(['fade', 'crossfade', 'wipe', 'slide', 'zoom', 'none'] as TransitionStyle[]).map((t) => (
+            {(['fade', 'crossfade', 'wipe', 'slide', 'zoom', 'none'] as TransitionStyle[]).map((tr) => (
               <button
-                key={t}
-                onClick={() => onUpdateAssembly({ transitionStyle: t })}
+                key={tr}
+                onClick={() => onUpdateAssembly({ transitionStyle: tr })}
                 className={`p-2 rounded-lg border text-center transition-all ${
-                  assemblyConfig.transitionStyle === t
+                  assemblyConfig.transitionStyle === tr
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-border/40 hover:border-border text-muted-foreground'
                 }`}
               >
-                <p className="text-xs font-medium capitalize">{t}</p>
+                <p className="text-xs font-medium capitalize">{tr}</p>
               </button>
             ))}
           </div>
@@ -108,8 +110,8 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
             <div className="flex items-center gap-2">
               <Type className="h-4 w-4 text-primary" />
               <div>
-                <p className="text-sm font-medium">Kinetic Typography</p>
-                <p className="text-[10px] text-muted-foreground">Spring-animierte Texteinblendungen statt statischem Text</p>
+                <p className="text-sm font-medium">{t('videoComposer.kineticTypography')}</p>
+                <p className="text-[10px] text-muted-foreground">{t('videoComposer.kineticDesc')}</p>
               </div>
             </div>
             <Switch
@@ -123,24 +125,24 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
       {/* Cost Summary */}
       <Card className="border-primary/30 bg-primary/5">
         <CardContent className="py-4">
-          <h3 className="text-sm font-semibold mb-3">Kosten-Zusammenfassung</h3>
+          <h3 className="text-sm font-semibold mb-3">{t('videoComposer.costSummary')}</h3>
           <div className="space-y-1.5 text-xs">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{scenes.length} Clips ({readyClips.length} bereit)</span>
+              <span className="text-muted-foreground">{scenes.length} {t('videoComposer.clips')} ({readyClips.length} {t('videoComposer.clipsReady')})</span>
               <span>€{clipCost.toFixed(2)}</span>
             </div>
             {assemblyConfig.voiceover?.enabled && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Voiceover</span>
+                <span className="text-muted-foreground">{t('videoComposer.voiceover')}</span>
                 <span>€{voCost.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Rendering</span>
+              <span className="text-muted-foreground">{t('videoComposer.rendering')}</span>
               <span>€{renderCost.toFixed(2)}</span>
             </div>
             <div className="border-t border-border/40 pt-1.5 flex justify-between font-semibold text-sm">
-              <span>Gesamt</span>
+              <span>{t('videoComposer.total')}</span>
               <span className="text-primary">€{totalCost.toFixed(2)}</span>
             </div>
           </div>
@@ -153,8 +155,8 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
           <CardContent className="py-4 flex items-center gap-3">
             <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
             <div>
-              <p className="text-sm font-medium">Rendering läuft</p>
-              <p className="text-[10px] text-muted-foreground">Render-ID: {renderResult.renderId.slice(0, 8)}... — Das Video wird in wenigen Minuten bereit sein.</p>
+              <p className="text-sm font-medium">{t('videoComposer.renderRunning')}</p>
+              <p className="text-[10px] text-muted-foreground">{t('videoComposer.renderIdShort')}: {renderResult.renderId.slice(0, 8)}... — {t('videoComposer.videoReadySoon')}</p>
             </div>
           </CardContent>
         </Card>
@@ -164,7 +166,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
           <CardContent className="py-4 flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
             <div>
-              <p className="text-sm font-medium">Fehler</p>
+              <p className="text-sm font-medium">{t('videoComposer.error')}</p>
               <p className="text-[10px] text-muted-foreground">{renderResult.error}</p>
             </div>
           </CardContent>
@@ -181,18 +183,18 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         >
           {isRendering ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Video wird gerendert...
+              <Loader2 className="h-4 w-4 animate-spin" /> {t('videoComposer.renderingVideo')}
             </>
           ) : (
             <>
-              <Download className="h-4 w-4" /> Video rendern (€{totalCost.toFixed(2)})
+              <Download className="h-4 w-4" /> {t('videoComposer.renderVideo')} (€{totalCost.toFixed(2)})
             </>
           )}
         </Button>
       </div>
       {!allReady && scenes.length > 0 && (
         <p className="text-[10px] text-muted-foreground text-right">
-          {readyClips.length}/{scenes.length} Clips bereit — alle Clips müssen generiert sein
+          {readyClips.length}/{scenes.length} {t('videoComposer.clipsReady')} — {t('videoComposer.allClipsMustBeReady')}
         </p>
       )}
     </div>

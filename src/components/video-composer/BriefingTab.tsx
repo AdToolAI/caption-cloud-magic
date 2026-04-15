@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useTranslation } from '@/hooks/useTranslation';
 import type {
   ComposerBriefing,
   ComposerCategory,
@@ -27,24 +28,6 @@ import type {
   AspectRatio,
   EmotionalTone,
 } from '@/types/video-composer';
-
-const CATEGORIES: { id: ComposerCategory; label: string; icon: React.ElementType; desc: string }[] = [
-  { id: 'product-ad', label: 'Produktvideo', icon: ShoppingBag, desc: 'Produkte & Kurse bewerben' },
-  { id: 'corporate-ad', label: 'Unternehmen', icon: Building2, desc: 'Firmenwerbung & Branding' },
-  { id: 'storytelling', label: 'Storytelling', icon: BookOpen, desc: 'Emotionale Geschichten' },
-  { id: 'custom', label: 'Editor', icon: Palette, desc: 'Freie Gestaltung' },
-];
-
-const TONES: { value: EmotionalTone; label: string }[] = [
-  { value: 'professional', label: 'Professionell' },
-  { value: 'energetic', label: 'Energisch' },
-  { value: 'emotional', label: 'Emotional' },
-  { value: 'funny', label: 'Humorvoll' },
-  { value: 'luxury', label: 'Luxuriös' },
-  { value: 'minimal', label: 'Minimalistisch' },
-  { value: 'dramatic', label: 'Dramatisch' },
-  { value: 'friendly', label: 'Freundlich' },
-];
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string; desc: string }[] = [
   { value: '16:9', label: '16:9', desc: 'YouTube / Landscape' },
@@ -74,8 +57,27 @@ export default function BriefingTab({
   onGoToStoryboard,
   onScenesGenerated,
 }: BriefingTabProps) {
+  const { t } = useTranslation();
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const CATEGORIES: { id: ComposerCategory; label: string; icon: React.ElementType; desc: string }[] = [
+    { id: 'product-ad', label: t('videoComposer.productVideo'), icon: ShoppingBag, desc: t('videoComposer.productVideoDesc') },
+    { id: 'corporate-ad', label: t('videoComposer.corporate'), icon: Building2, desc: t('videoComposer.corporateDesc') },
+    { id: 'storytelling', label: t('videoComposer.storytelling'), icon: BookOpen, desc: t('videoComposer.storytellingDesc') },
+    { id: 'custom', label: t('videoComposer.editor'), icon: Palette, desc: t('videoComposer.editorDesc') },
+  ];
+
+  const TONES: { value: EmotionalTone; label: string }[] = [
+    { value: 'professional', label: t('videoComposer.tones.professional') },
+    { value: 'energetic', label: t('videoComposer.tones.energetic') },
+    { value: 'emotional', label: t('videoComposer.tones.emotional') },
+    { value: 'funny', label: t('videoComposer.tones.funny') },
+    { value: 'luxury', label: t('videoComposer.tones.luxury') },
+    { value: 'minimal', label: t('videoComposer.tones.minimal') },
+    { value: 'dramatic', label: t('videoComposer.tones.dramatic') },
+    { value: 'friendly', label: t('videoComposer.tones.friendly') },
+  ];
 
   const addUsp = () => {
     if (uspInput.trim()) {
@@ -90,12 +92,11 @@ export default function BriefingTab({
 
   const handleGenerateStoryboard = async () => {
     if (!briefing.productName.trim()) {
-      toast({ title: 'Bitte gib einen Produkt-/Service-Namen ein', variant: 'destructive' });
+      toast({ title: t('videoComposer.enterProductName'), variant: 'destructive' });
       return;
     }
 
     if (briefing.mode === 'manual') {
-      // For manual mode, create empty storyboard and go to next tab
       onUpdateProject({ status: 'storyboard' });
       onGoToStoryboard();
       return;
@@ -104,25 +105,20 @@ export default function BriefingTab({
     setIsGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('compose-video-storyboard', {
-        body: {
-          briefing,
-          category,
-          language,
-        },
+        body: { briefing, category, language },
       });
 
       if (error) throw error;
-
       if (data?.scenes) {
         onScenesGenerated(data.scenes);
         onUpdateProject({ status: 'storyboard' });
-        toast({ title: 'Storyboard generiert!', description: `${data.scenes.length} Szenen erstellt` });
+        toast({ title: t('videoComposer.storyboardGenerated'), description: `${data.scenes.length} ${t('videoComposer.scenesCreated')}` });
       }
     } catch (err: any) {
       console.error('Storyboard generation error:', err);
       toast({
-        title: 'Fehler bei der Storyboard-Generierung',
-        description: err.message || 'Bitte versuche es erneut',
+        title: t('videoComposer.storyboardError'),
+        description: err.message || t('videoComposer.tryAgain'),
         variant: 'destructive',
       });
     } finally {
@@ -137,13 +133,13 @@ export default function BriefingTab({
       {/* Mode Selection */}
       <Card className="border-border/40 bg-card/80">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Modus</CardTitle>
+          <CardTitle className="text-base">{t('videoComposer.mode')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-3">
             {([
-              { mode: 'ai' as ComposerMode, icon: Wand2, label: 'KI-gestützt', desc: 'KI erstellt das Storyboard automatisch' },
-              { mode: 'manual' as ComposerMode, icon: Hand, label: 'Manuell', desc: 'Du baust das Storyboard selbst' },
+              { mode: 'ai' as ComposerMode, icon: Wand2, label: t('videoComposer.aiAssisted'), desc: t('videoComposer.aiAssistedDesc') },
+              { mode: 'manual' as ComposerMode, icon: Hand, label: t('videoComposer.manual'), desc: t('videoComposer.manualDesc') },
             ]).map(({ mode, icon: Icon, label, desc }) => (
               <button
                 key={mode}
@@ -166,7 +162,7 @@ export default function BriefingTab({
       {/* Category Selection */}
       <Card className="border-border/40 bg-card/80">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Kategorie</CardTitle>
+          <CardTitle className="text-base">{t('videoComposer.category')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -192,36 +188,36 @@ export default function BriefingTab({
       {/* Project Basics */}
       <Card className="border-border/40 bg-card/80">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Produkt / Service</CardTitle>
+          <CardTitle className="text-base">{t('videoComposer.productService')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label className="text-xs">Projektname</Label>
+              <Label className="text-xs">{t('videoComposer.projectName')}</Label>
               <Input
                 value={title}
                 onChange={(e) => onUpdateProject({ title: e.target.value })}
-                placeholder="z.B. Sommer-Kampagne 2026"
+                placeholder={t('videoComposer.projectNamePlaceholder')}
                 className="bg-background/50"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Produkt-/Servicename *</Label>
+              <Label className="text-xs">{t('videoComposer.productNameLabel')}</Label>
               <Input
                 value={briefing.productName}
                 onChange={(e) => onUpdateBriefing({ productName: e.target.value })}
-                placeholder="z.B. FitPro App"
+                placeholder={t('videoComposer.productNamePlaceholder')}
                 className="bg-background/50"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Beschreibung</Label>
+            <Label className="text-xs">{t('videoComposer.description')}</Label>
             <Textarea
               value={briefing.productDescription}
               onChange={(e) => onUpdateBriefing({ productDescription: e.target.value })}
-              placeholder="Was ist dein Produkt / deine Dienstleistung? Was macht es besonders?"
+              placeholder={t('videoComposer.descriptionPlaceholder')}
               rows={3}
               className="bg-background/50 resize-none"
             />
@@ -229,12 +225,12 @@ export default function BriefingTab({
 
           {/* USPs */}
           <div className="space-y-1.5">
-            <Label className="text-xs">USPs / Vorteile</Label>
+            <Label className="text-xs">{t('videoComposer.usps')}</Label>
             <div className="flex gap-2">
               <Input
                 value={uspInput}
                 onChange={(e) => setUspInput(e.target.value)}
-                placeholder="z.B. 30% schneller als die Konkurrenz"
+                placeholder={t('videoComposer.uspPlaceholder')}
                 className="bg-background/50"
                 onKeyDown={(e) => e.key === 'Enter' && addUsp()}
               />
@@ -255,11 +251,11 @@ export default function BriefingTab({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Zielgruppe</Label>
+            <Label className="text-xs">{t('videoComposer.targetAudience')}</Label>
             <Input
               value={briefing.targetAudience}
               onChange={(e) => onUpdateBriefing({ targetAudience: e.target.value })}
-              placeholder="z.B. Fitness-begeisterte 25-35 Jährige"
+              placeholder={t('videoComposer.targetAudiencePlaceholder')}
               className="bg-background/50"
             />
           </div>
@@ -269,12 +265,12 @@ export default function BriefingTab({
       {/* Style & Format */}
       <Card className="border-border/40 bg-card/80">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Stil & Format</CardTitle>
+          <CardTitle className="text-base">{t('videoComposer.styleFormat')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label className="text-xs">Emotionaler Ton</Label>
+              <Label className="text-xs">{t('videoComposer.emotionalTone')}</Label>
               <Select
                 value={briefing.tone}
                 onValueChange={(v) => onUpdateBriefing({ tone: v as EmotionalTone })}
@@ -283,14 +279,14 @@ export default function BriefingTab({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TONES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  {TONES.map((tone) => (
+                    <SelectItem key={tone.value} value={tone.value}>{tone.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Sprache</Label>
+              <Label className="text-xs">{t('videoComposer.language')}</Label>
               <Select
                 value={language}
                 onValueChange={(v) => onUpdateProject({ language: v })}
@@ -310,7 +306,7 @@ export default function BriefingTab({
           {/* Duration Slider */}
           <div className="space-y-2">
             <div className="flex justify-between">
-              <Label className="text-xs">Videodauer</Label>
+              <Label className="text-xs">{t('videoComposer.videoDuration')}</Label>
               <span className="text-xs font-medium text-primary">{briefing.duration}s</span>
             </div>
             <Slider
@@ -329,7 +325,7 @@ export default function BriefingTab({
 
           {/* Aspect Ratio */}
           <div className="space-y-1.5">
-            <Label className="text-xs">Seitenverhältnis</Label>
+            <Label className="text-xs">{t('videoComposer.aspectRatio')}</Label>
             <div className="grid grid-cols-4 gap-2">
               {ASPECT_RATIOS.map(({ value, label, desc }) => (
                 <button
@@ -361,17 +357,17 @@ export default function BriefingTab({
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Storyboard wird generiert...
+              {t('videoComposer.generatingStoryboard')}
             </>
           ) : briefing.mode === 'ai' ? (
             <>
               <Sparkles className="h-4 w-4" />
-              Storyboard generieren
+              {t('videoComposer.generateStoryboard')}
             </>
           ) : (
             <>
               <ArrowRight className="h-4 w-4" />
-              Weiter zum Storyboard
+              {t('videoComposer.continueToStoryboard')}
             </>
           )}
         </Button>
