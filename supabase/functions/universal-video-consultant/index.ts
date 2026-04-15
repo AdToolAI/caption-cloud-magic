@@ -146,6 +146,84 @@ const CATEGORY_SLOTS: Record<string, InfoSlot[]> = {
 };
 
 // ═══════════════════════════════════════════════════════════════
+// PRODUCT/BRAND INTELLIGENCE — Detect known entities
+// ═══════════════════════════════════════════════════════════════
+
+function detectKnownEntity(messages: any[]): { detected: boolean; entityName: string; entityType: string } {
+  const userMessages = messages.filter((m: any) => m.role === 'user');
+  const allUserText = userMessages.map((m: any) => (m.content || '')).join(' ');
+  const allUserTextLower = allUserText.toLowerCase();
+
+  // Well-known global brands
+  const knownBrands = [
+    'calvin klein', 'nike', 'adidas', 'apple', 'samsung', 'google', 'microsoft', 'amazon',
+    'bmw', 'mercedes', 'audi', 'porsche', 'tesla', 'ferrari', 'lamborghini',
+    'gucci', 'louis vuitton', 'prada', 'chanel', 'dior', 'versace', 'armani', 'hermes', 'hermès',
+    'coca-cola', 'pepsi', 'red bull', 'monster energy',
+    'netflix', 'spotify', 'disney', 'youtube', 'tiktok', 'instagram',
+    'rolex', 'omega', 'tag heuer', 'cartier', 'tiffany',
+    'sony', 'playstation', 'xbox', 'nintendo',
+    'ikea', 'zara', 'h&m', 'uniqlo',
+    'mcdonald', 'starbucks', 'burger king', 'subway',
+    'l\'oréal', 'loreal', 'maybelline', 'nyx', 'mac cosmetics', 'estée lauder', 'estee lauder',
+    'dove', 'nivea', 'neutrogena', 'clinique',
+    'airbnb', 'uber', 'lyft', 'booking.com',
+    'shopify', 'stripe', 'paypal', 'visa', 'mastercard',
+    'openai', 'chatgpt', 'midjourney', 'figma', 'canva', 'notion', 'slack',
+    'hugo boss', 'ralph lauren', 'tommy hilfiger', 'lacoste',
+    'dyson', 'bose', 'bang & olufsen', 'sonos',
+    'gopro', 'dji', 'canon', 'nikon',
+    'lego', 'barbie', 'mattel',
+    'patagonia', 'the north face', 'columbia',
+    'sephora', 'douglas',
+  ];
+
+  // Product type indicators (multilingual)
+  const productIndicators = [
+    'parfüm', 'parfum', 'perfume', 'fragrance', 'duft',
+    'app', 'software', 'plattform', 'platform', 'tool',
+    'auto', 'car', 'coche', 'fahrzeug', 'vehicle',
+    'uhr', 'watch', 'reloj',
+    'schuh', 'shoe', 'sneaker', 'zapato',
+    'getränk', 'drink', 'bebida',
+    'kosmetik', 'cosmetic', 'cosmético', 'makeup', 'skincare',
+    'kleidung', 'clothing', 'ropa', 'fashion', 'mode',
+    'möbel', 'furniture', 'mueble',
+    'schmuck', 'jewelry', 'joyería',
+    'kamera', 'camera', 'cámara',
+    'kopfhörer', 'headphone', 'auricular',
+    'smartphone', 'tablet', 'laptop', 'computer',
+  ];
+
+  // Check for known brands
+  for (const brand of knownBrands) {
+    if (allUserTextLower.includes(brand)) {
+      // Try to extract the full product name (brand + product line)
+      const brandIndex = allUserTextLower.indexOf(brand);
+      const surroundingText = allUserText.substring(Math.max(0, brandIndex - 10), brandIndex + brand.length + 40).trim();
+      return { detected: true, entityName: surroundingText, entityType: 'brand' };
+    }
+  }
+
+  // Check for generic product patterns: "[Name] + product indicator"
+  for (const indicator of productIndicators) {
+    const regex = new RegExp(`([A-ZÀ-ÖÙ-Ü][\\w\\s-]{1,30})\\s+${indicator}`, 'i');
+    const match = allUserText.match(regex);
+    if (match) {
+      return { detected: true, entityName: match[0].trim(), entityType: 'product' };
+    }
+    // Also check "indicator + Name"  
+    const regex2 = new RegExp(`${indicator}\\s+([A-ZÀ-ÖÙ-Ü][\\w\\s-]{1,30})`, 'i');
+    const match2 = allUserText.match(regex2);
+    if (match2) {
+      return { detected: true, entityName: match2[0].trim(), entityType: 'product' };
+    }
+  }
+
+  return { detected: false, entityName: '', entityType: '' };
+}
+
+// ═══════════════════════════════════════════════════════════════
 // STORYTELLING SUB-MODE DETECTION
 // ═══════════════════════════════════════════════════════════════
 
