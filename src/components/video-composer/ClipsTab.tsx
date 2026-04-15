@@ -59,7 +59,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
           const dbScene = data.find((d: any) => d.id === scene.id);
           if (dbScene && (dbScene.clip_status !== scene.clipStatus || dbScene.clip_url !== scene.clipUrl)) {
             changed = true;
-            return { ...scene, clipStatus: dbScene.clip_status, clipUrl: dbScene.clip_url };
+            return { ...scene, clipStatus: dbScene.clip_status as ComposerScene['clipStatus'], clipUrl: dbScene.clip_url || scene.clipUrl };
           }
           return scene;
         });
