@@ -1,5 +1,4 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -741,7 +740,7 @@ const ERROR_MESSAGES: Record<Lang, { rateLimited: string; creditsExhausted: stri
 // MAIN HANDLER
 // ═══════════════════════════════════════════════════════════════
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
