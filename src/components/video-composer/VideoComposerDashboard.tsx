@@ -30,6 +30,7 @@ const TABS = [
 type TabId = typeof TABS[number]['id'];
 
 interface LocalProject {
+  id?: string;
   title: string;
   category: ComposerCategory;
   briefing: ComposerBriefing;
@@ -206,6 +207,7 @@ export default function VideoComposerDashboard() {
           <TabsContent value="clips">
             <ClipsTab
               scenes={project.scenes}
+              projectId={project.id}
               onUpdateScenes={setScenes}
               onGoToAudio={() => setActiveTab('audio')}
             />
