@@ -8,3 +8,4 @@ export { UniversalPreviewPlayer } from './UniversalPreviewPlayer';
 export { UniversalExportStep } from './UniversalExportStep';
 export { ConsultantAvatar } from './ConsultantAvatar';
 export { ConsultantQuickReplies } from './ConsultantQuickReplies';
+export { ConceptReviewEditor } from './ConceptReviewEditor';

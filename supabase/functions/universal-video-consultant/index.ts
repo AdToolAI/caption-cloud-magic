@@ -900,7 +900,7 @@ Deno.serve(async (req) => {
     const responseData = {
       message: cleanedMessage,
       quickReplies: smartQuickReplies,
-      progress: slotInfo.progress,
+      progress: isComplete ? 100 : slotInfo.progress,
       currentPhase: userMessageCount + 1, // backward compat
       isComplete,
       recommendation: isComplete ? extractRecommendation(messages, category) : null,
