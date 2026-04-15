@@ -11,6 +11,7 @@ import { ExplainerVideo, ExplainerVideoSchema } from './templates/ExplainerVideo
 import { UniversalCreatorVideo, UniversalCreatorVideoSchema } from './templates/UniversalCreatorVideo';
 import { SmokeTestVideo } from './templates/SmokeTestVideo';
 import { AudioSmokeTest, AudioSmokeTestSchema } from './templates/AudioSmokeTest';
+import { ComposedAdVideo, ComposedAdVideoSchema } from './templates/ComposedAdVideo';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -414,6 +415,40 @@ export const RemotionRoot: React.FC = () => {
         schema={AudioSmokeTestSchema}
         defaultProps={{
           audioUrl: '',
+        }}
+      />
+      <Composition
+        id="ComposedAdVideo"
+        component={ComposedAdVideo}
+        durationInFrames={900}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={ComposedAdVideoSchema}
+        calculateMetadata={async ({ props }) => {
+          try {
+            const scenes = Array.isArray(props.scenes) ? props.scenes : [];
+            const fps = 30;
+            const totalDuration = scenes.reduce((sum, s) => sum + (Number(s?.durationSeconds) || 5), 0) || 30;
+            const durationInFrames = Math.max(30, Math.ceil(totalDuration * fps));
+            const ar = (props as any).aspectRatio || '16:9';
+            let width = 1920, height = 1080;
+            if (ar === '9:16') { width = 1080; height = 1920; }
+            else if (ar === '1:1') { width = 1080; height = 1080; }
+            else if (ar === '4:5') { width = 1080; height = 1350; }
+            return { durationInFrames, fps, width, height };
+          } catch {
+            return { durationInFrames: 900, fps: 30, width: 1920, height: 1080 };
+          }
+        }}
+        defaultProps={{
+          scenes: [],
+          colorGrading: 'none',
+          kineticText: false,
+          voiceoverUrl: '',
+          backgroundMusicUrl: '',
+          backgroundMusicVolume: 0.3,
+          aspectRatio: '16:9',
         }}
       />
     </>
