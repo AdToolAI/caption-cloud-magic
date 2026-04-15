@@ -1,33 +1,23 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft } from 'lucide-react';
+import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '@/hooks/useTranslation';
 import BriefingTab from './BriefingTab';
 import StoryboardTab from './StoryboardTab';
 import ClipsTab from './ClipsTab';
 import AudioTab from './AudioTab';
 import AssemblyTab from './AssemblyTab';
 import type {
-  ComposerProject,
   ComposerBriefing,
   ComposerScene,
   AssemblyConfig,
   ComposerCategory,
   ComposerStatus,
-  DEFAULT_BRIEFING,
-  DEFAULT_ASSEMBLY_CONFIG,
 } from '@/types/video-composer';
 
-const TABS = [
-  { id: 'briefing', label: 'Briefing', icon: FileText },
-  { id: 'storyboard', label: 'Storyboard', icon: LayoutGrid },
-  { id: 'clips', label: 'Clips', icon: Film },
-  { id: 'audio', label: 'Audio', icon: Music },
-  { id: 'export', label: 'Export', icon: Download },
-] as const;
-
-type TabId = typeof TABS[number]['id'];
+type TabId = 'briefing' | 'storyboard' | 'clips' | 'audio' | 'export';
 
 interface LocalProject {
   id?: string;
@@ -87,10 +77,19 @@ const defaultProject: LocalProject = {
 
 export default function VideoComposerDashboard() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>('briefing');
   const [project, setProject] = useState<LocalProject>(() => loadDraft() || defaultProject);
+  const [error, setError] = useState<string | null>(null);
 
-  // Persist to localStorage on change
+  const TABS = [
+    { id: 'briefing' as TabId, label: t('videoComposer.briefing'), icon: FileText },
+    { id: 'storyboard' as TabId, label: t('videoComposer.storyboard'), icon: LayoutGrid },
+    { id: 'clips' as TabId, label: t('videoComposer.clips'), icon: Film },
+    { id: 'audio' as TabId, label: t('videoComposer.audio'), icon: Music },
+    { id: 'export' as TabId, label: t('videoComposer.export'), icon: Download },
+  ];
+
   useEffect(() => {
     saveDraft(project);
   }, [project]);
@@ -136,18 +135,17 @@ export default function VideoComposerDashboard() {
             <div>
               <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
                 <Film className="h-5 w-5 text-primary" />
-                AI Video Composer
+                {t('videoComposer.title')}
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Scene-Based Video Assembly • {project.scenes.length} Szenen • {totalDuration}s
+                {t('videoComposer.subtitle')} • {project.scenes.length} {t('videoComposer.scenes')} • {totalDuration}s
               </p>
             </div>
           </div>
 
-          {/* Cost indicator */}
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-xs text-muted-foreground">Geschätzte Kosten</p>
+              <p className="text-xs text-muted-foreground">{t('videoComposer.estimatedCost')}</p>
               <p className="text-sm font-semibold text-primary">
                 €{project.totalCostEuros.toFixed(2)}
               </p>
@@ -155,6 +153,19 @@ export default function VideoComposerDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Global Error Banner */}
+      {error && (
+        <div className="max-w-7xl mx-auto px-4 mt-4">
+          <div className="flex items-center gap-3 p-3 rounded-lg border border-destructive/30 bg-destructive/5 text-sm">
+            <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+            <p className="text-destructive flex-1">{error}</p>
+            <Button variant="ghost" size="sm" onClick={() => setError(null)} className="text-destructive hover:text-destructive">
+              ✕
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-6">
