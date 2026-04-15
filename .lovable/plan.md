@@ -1,57 +1,37 @@
 
 
-## Plan: Konzept-Bearbeitung vor Video-Generierung
+## Plan: Auto-Recherche bekannter Produkte/Marken im Interview
 
 ### Problem
-Wenn das Interview abgeschlossen ist, zeigt der Consultant eine kurze Zusammenfassung und bietet nur "Video erstellen" oder "Manuell bearbeiten" an. Der Nutzer kann das Konzept nicht anpassen, bevor die Video-Generierung startet. Wenn z.B. der Stil, die Zielgruppe oder der CTA nicht stimmen, muss man das komplette Interview wiederholen.
+Wenn der Nutzer sagt "Ich möchte ein Werbevideo für Calvin Klein U2 erstellen", kennt die KI das Produkt bereits — stellt aber trotzdem Fragen wie "Was ist das Produkt?", "Beschreibe es", "Was ist die Zielgruppe?" etc. Bei bekannten Marken/Produkten ist das Zeitverschwendung. Die KI sollte ihr Wissen nutzen und diese Slots automatisch füllen.
 
 ### Lösung
-Ein neuer **Konzept-Review-Step** zwischen Interview-Ende und Video-Generierung. Der Nutzer sieht alle gesammelten Informationen in editierbaren Feldern und kann Anpassungen vornehmen, bevor er die Generierung startet.
+Eine **Product Intelligence**-Schicht im System-Prompt, die die KI anweist, bei erkennbaren Produkten/Marken ihr Wissen einzusetzen und die Infos direkt zusammenzufassen, statt den Nutzer auszufragen.
 
 ### Änderungen
 
-**1. Neue Komponente `src/components/universal-video-creator/ConceptReviewEditor.tsx`**
+**`supabase/functions/universal-video-consultant/index.ts`**
 
-Ein übersichtliches, editierbares Formular das die `UniversalConsultationResult`-Felder in Sektionen gruppiert:
+1. **Product/Brand Detection vor dem AI-Call**: Neue Funktion `detectKnownEntity(messages)` die in den User-Nachrichten nach bekannten Marken/Produktnamen sucht (Calvin Klein, Nike, Apple, BMW, etc. — aber auch generische Muster wie "XY Parfüm", "XY App"). Wenn ein bekanntes Produkt erkannt wird, wird ein Flag + der Name an den System-Prompt übergeben.
 
-- **Grundinfo**: Projektname, Firma, Produkt, Produktbeschreibung
-- **Zielgruppe**: Zielgruppe, Alter, Geschlecht, Interessen
-- **Storytelling**: Struktur, emotionaler Ton, Kernbotschaft, CTA
-- **Visueller Stil**: Stil-Auswahl (Dropdown), Markenfarben, Referenz-URLs
-- **Charakter**: An/Aus, Name, Beschreibung, Geschlecht
-- **Audio**: Stimme (Geschlecht, Sprache, Ton), Musikstil, Musik-Stimmung
-- **Technisch**: Dauer (Slider), Seitenverhältnis, Ausgabeformate
+2. **System-Prompt erweitern** — neuer Abschnitt `PRODUCT INTELLIGENCE`:
+   - Wenn ein bekanntes Produkt/eine Marke erkannt wird: "Der Nutzer hat '[Produktname]' erwähnt. Du KENNST dieses Produkt. Fasse dein Wissen zusammen (Zielgruppe, USP, Markenidentität, Stil) und präsentiere es dem Nutzer zur Bestätigung. Stelle KEINE Fragen zu Informationen die du bereits weißt. Frage stattdessen: 'Ich kenne [Produkt] — stimmt das so? [Zusammenfassung]. Gibt es etwas das ich anpassen soll?'"
+   - Dadurch werden mehrere Slots auf einmal als "vorgeschlagen" markiert
+   - Der Nutzer muss nur bestätigen oder korrigieren statt alles selbst einzugeben
 
-Design im James-Bond-2028-Stil (Glassmorphism, Gold-Akzente). Jede Sektion ist collapsible. Felder die von der KI gefüllt wurden sind vorausgefüllt aber editierbar.
+3. **Slot-Extraction verbessern**: Wenn die KI in ihrer Antwort selbst Informationen über das Produkt zusammenfasst (und der Nutzer bestätigt), zählen diese als gefüllte Slots. Dafür auch die AI-Nachrichten in `extractFilledSlots` einbeziehen (aktuell werden nur User-Nachrichten gescannt).
 
-Zwei Buttons unten:
-- "Zurück zum Interview" — geht zurück zum Chat
-- "Video generieren" — übergibt das bearbeitete Konzept an `onConsultationComplete`
-
-**2. `src/components/universal-video-creator/UniversalVideoConsultant.tsx`**
-
-- Neuer State: `reviewMode: boolean` und `editableRecommendation: UniversalConsultationResult | null`
-- Wenn der Nutzer "Video erstellen" klickt → statt direkt `onConsultationComplete` aufzurufen, `reviewMode = true` setzen und `ConceptReviewEditor` anzeigen
-- Neue Quick Reply Option: "Video erstellen" → "Konzept prüfen & anpassen"
-- Wenn `reviewMode === true`: Chat ausblenden, `ConceptReviewEditor` einblenden
-- "Zurück"-Button setzt `reviewMode = false`
-
-**3. Lokalisierung**
-
-Neue Übersetzungsschlüssel für die Sektions-Labels und Buttons (DE/EN/ES) in den bestehenden Translation-Dateien.
+4. **Phase-Instruction anpassen**: Bei `userMessageCount === 0` (erste Nachricht) den Hinweis hinzufügen, dass die KI auch die bisherige System-Nachricht (mit Kategorie-Info) berücksichtigen soll — wenn der Nutzer schon in der ersten Nachricht ein konkretes Produkt nennt, soll die KI sofort recherchieren statt generisch zu begrüßen.
 
 ### Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `src/components/universal-video-creator/ConceptReviewEditor.tsx` | **Neu** — Editierbares Konzept-Formular |
-| `src/components/universal-video-creator/UniversalVideoConsultant.tsx` | Review-Mode State, Routing zwischen Chat und Editor |
-| `src/components/universal-video-creator/index.ts` | Export der neuen Komponente |
-| Translation-Dateien | Neue Schlüssel für Sektions-Labels |
+| `supabase/functions/universal-video-consultant/index.ts` | Product Intelligence im Prompt, Slot-Extraction auf AI+User erweitern |
 
 ### Ergebnis
-- Nach dem Interview sieht der Nutzer alle gesammelten Daten übersichtlich aufbereitet
-- Jedes Feld ist editierbar — Stil, Ton, Dauer, CTA, alles anpassbar
-- Erst nach dem Review startet die Video-Generierung
-- Kein erneutes Interview nötig bei kleinen Korrekturen
+- Bei "Calvin Klein U2 Parfüm" fasst die KI sofort zusammen: Zielgruppe, USP, Markenwerte, visueller Stil
+- Nutzer bestätigt nur noch und ergänzt individuelle Wünsche
+- Interview verkürzt sich bei bekannten Produkten auf 4-8 Nachrichten statt 10-15
+- Bei unbekannten Produkten funktioniert das Interview wie bisher
 
