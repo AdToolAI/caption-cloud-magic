@@ -740,7 +740,7 @@ const ERROR_MESSAGES: Record<Lang, { rateLimited: string; creditsExhausted: stri
 // MAIN HANDLER
 // ═══════════════════════════════════════════════════════════════
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
