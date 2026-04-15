@@ -324,10 +324,7 @@ export function UniversalVideoConsultant({
       <ConceptReviewEditor
         recommendation={editableRecommendation}
         onConfirm={(edited) => {
-          onConsultationComplete({
-            ...edited,
-            modeChoice: 'full-service',
-          });
+          onConsultationComplete(edited);
         }}
         onBack={() => setReviewMode(false)}
       />
