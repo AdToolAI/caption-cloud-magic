@@ -107,6 +107,7 @@ const HailuoVideoStudio = lazy(() => import("./pages/HailuoVideoStudio"));
 const LumaVideoStudio = lazy(() => import("./pages/LumaVideoStudio"));
 const SoraVideoStudio = lazy(() => import("./pages/SoraVideoStudio"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
+const VideoComposer = lazy(() => import("./pages/VideoComposer"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const VideoTranslator = lazy(() => import("./pages/VideoTranslator"));
