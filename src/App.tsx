@@ -232,8 +232,9 @@ function AppLayout() {
           <Route path="/luma-video-studio" element={<LumaVideoStudio />} />
           <Route path="/sora-video-studio" element={<SoraVideoStudio />} />
           <Route path="/audio-studio" element={<AudioStudio />} />
-          <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
-          <Route path="/video-translator" element={<VideoTranslator />} />
+           <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
+           <Route path="/video-composer" element={<VideoComposer />} />
+           <Route path="/video-translator" element={<VideoTranslator />} />
            <Route path="/community" element={<Community />} />
            <Route path="/gaming" element={<GamingHub />} />
           <Route path="/explainer-studio" element={<Navigate to="/home" replace />} />

@@ -32,6 +32,11 @@ export const FEATURE_COSTS = {
   
   // KI Picture Studio
   STUDIO_IMAGE_GENERATE: 'studio_image_generate',
+  
+  // AI Video Composer
+  COMPOSER_STORYBOARD: 'composer_storyboard',
+  COMPOSER_CLIP_AI: 'composer_clip_ai',
+  COMPOSER_RENDER: 'composer_render',
 } as const;
 
 export type FeatureCost = typeof FEATURE_COSTS[keyof typeof FEATURE_COSTS];
