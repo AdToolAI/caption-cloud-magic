@@ -106,36 +106,18 @@ const ErrorFallback = ({ error }: { error?: unknown }) => {
   );
 };
 
-// Register Service Worker for Push Notifications (production only)
-const isInIframe = (() => { try { return window.self !== window.top; } catch { return true; } })();
-const isPreviewHost = window.location.hostname.includes("id-preview--") || window.location.hostname.includes("lovableproject.com");
+// Service Worker: Do NOT register globally. SW is only registered on-demand
+// when the user enables Push Notifications (see usePushNotifications.ts).
+// This prevents stale caching of old frontend bundles.
 
-if (!isInIframe && !isPreviewHost && "serviceWorker" in navigator) {
-  // Force update: register with updateViaCache 'none' so the browser always fetches a fresh SW
-  navigator.serviceWorker.register("/sw.js", { updateViaCache: 'none' }).then((reg) => {
-    // Immediately check for updates
-    reg.update().catch(() => {});
-  }).catch((err) => {
-    console.warn("SW registration failed:", err);
-  });
-
-  // Also proactively clear old caches from the main thread
-  if ('caches' in window) {
-    caches.keys().then((names) => {
-      names.forEach((name) => {
-        if (name.startsWith('caption-genie-') && name !== 'caption-genie-v5') {
-          caches.delete(name);
-        }
-      });
-    });
-  }
-} else if (isPreviewHost || isInIframe) {
-  navigator.serviceWorker?.getRegistrations().then((registrations) => {
+// Proactively unregister any old SW and clear caches
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
     registrations.forEach((r) => r.unregister());
   });
-  if ('caches' in window) {
-    caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
-  }
+}
+if ('caches' in window) {
+  caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
 }
 
 createRoot(document.getElementById("root")!).render(
