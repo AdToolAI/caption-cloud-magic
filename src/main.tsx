@@ -111,13 +111,31 @@ const isInIframe = (() => { try { return window.self !== window.top; } catch { r
 const isPreviewHost = window.location.hostname.includes("id-preview--") || window.location.hostname.includes("lovableproject.com");
 
 if (!isInIframe && !isPreviewHost && "serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js").catch((err) => {
+  // Force update: register with updateViaCache 'none' so the browser always fetches a fresh SW
+  navigator.serviceWorker.register("/sw.js", { updateViaCache: 'none' }).then((reg) => {
+    // Immediately check for updates
+    reg.update().catch(() => {});
+  }).catch((err) => {
     console.warn("SW registration failed:", err);
   });
+
+  // Also proactively clear old caches from the main thread
+  if ('caches' in window) {
+    caches.keys().then((names) => {
+      names.forEach((name) => {
+        if (name.startsWith('caption-genie-') && name !== 'caption-genie-v5') {
+          caches.delete(name);
+        }
+      });
+    });
+  }
 } else if (isPreviewHost || isInIframe) {
   navigator.serviceWorker?.getRegistrations().then((registrations) => {
     registrations.forEach((r) => r.unregister());
   });
+  if ('caches' in window) {
+    caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
+  }
 }
 
 createRoot(document.getElementById("root")!).render(
