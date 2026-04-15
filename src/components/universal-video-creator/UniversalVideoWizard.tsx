@@ -622,59 +622,85 @@ export function UniversalVideoWizard() {
         </motion.div>
       )}
 
-      {/* Stepper - show after category selection */}
+      {/* Phase Stepper - compact dots grouped by phase */}
       {selectedCategory && generationMode && (
-        <div className="mb-8 overflow-x-auto pb-2">
-          <div className="flex items-center justify-between min-w-max gap-2">
-            {STEPS.map((step, index) => {
-              const Icon = step.icon;
-              const isActive = index === currentStep;
-              const isCompleted = index < currentStep;
+        <div className="mb-8">
+          {(() => {
+            // Define phase groups based on mode
+            const phases = generationMode === 'full-service' 
+              ? [
+                  { label: t('uvc.stepPhasePreparation'), stepIds: ['category', 'product-images', 'mood', 'visual-style', 'mode-select'] },
+                  { label: t('uvc.stepPhaseConsultation'), stepIds: ['consultation'] },
+                  { label: t('uvc.stepPhaseGeneration'), stepIds: ['generating'] },
+                  { label: t('uvc.stepPhasePreview'), stepIds: ['preview'] },
+                  { label: t('uvc.stepPhaseExport'), stepIds: ['export'] },
+                ]
+              : [
+                  { label: t('uvc.stepPhasePreparation'), stepIds: ['category', 'product-images', 'mood', 'visual-style', 'mode-select'] },
+                  { label: t('uvc.stepPhaseConsultation'), stepIds: ['consultation'] },
+                  { label: t('uvc.stepPhaseConcept'), stepIds: ['briefing', 'script', 'storyboard'] },
+                  { label: t('uvc.stepPhaseProduction'), stepIds: ['visuals', 'animation'] },
+                  { label: t('uvc.stepPhaseAudio'), stepIds: ['audio'] },
+                  { label: t('uvc.stepPhaseExport'), stepIds: ['export'] },
+                ];
 
-              return (
-                <div key={step.id} className="flex items-center">
-                  <motion.button
-                    onClick={() => index < currentStep && setCurrentStep(index)}
-                    disabled={index > currentStep}
-                    className={cn(
-                      'flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-300',
-                      'border backdrop-blur-sm',
-                      isActive && 'bg-[#F5C76A]/20 border-[#F5C76A]/50 text-[#F5C76A] shadow-[0_0_20px_rgba(245,199,106,0.3)]',
-                      isCompleted && 'bg-[#F5C76A]/10 border-[#F5C76A]/30 text-[#F5C76A] cursor-pointer hover:bg-[#F5C76A]/20',
-                      !isActive && !isCompleted && 'bg-muted/20 border-white/10 text-muted-foreground'
-                    )}
-                    whileHover={isCompleted ? { scale: 1.02 } : {}}
-                    whileTap={isCompleted ? { scale: 0.98 } : {}}
-                  >
-                    <div className={cn(
-                      'w-8 h-8 rounded-lg flex items-center justify-center',
-                      isActive && 'bg-[#F5C76A] text-black',
-                      isCompleted && 'bg-[#F5C76A]/30 text-[#F5C76A]',
-                      !isActive && !isCompleted && 'bg-muted/30 text-muted-foreground'
-                    )}>
-                      {isCompleted ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        <Icon className={cn("h-4 w-4", step.id === 'generating' && isActive && "animate-spin")} />
+            // Filter phases to only include step IDs that actually exist in STEPS
+            const existingStepIds = new Set(STEPS.map(s => s.id));
+            const filteredPhases = phases
+              .map(p => ({ ...p, stepIds: p.stepIds.filter(id => existingStepIds.has(id)) }))
+              .filter(p => p.stepIds.length > 0);
+
+            return (
+              <div className="flex items-center justify-center gap-3 sm:gap-4">
+                {filteredPhases.map((phase, phaseIdx) => {
+                  const phaseStepIndices = phase.stepIds.map(id => STEPS.findIndex(s => s.id === id)).filter(i => i !== -1);
+                  const minIdx = Math.min(...phaseStepIndices);
+                  const maxIdx = Math.max(...phaseStepIndices);
+                  const isActive = currentStep >= minIdx && currentStep <= maxIdx;
+                  const isCompleted = currentStep > maxIdx;
+
+                  return (
+                    <div key={phaseIdx} className="flex items-center">
+                      <motion.button
+                        onClick={() => isCompleted && setCurrentStep(minIdx)}
+                        disabled={!isCompleted}
+                        className="flex flex-col items-center gap-1.5 group"
+                        whileHover={isCompleted ? { scale: 1.05 } : {}}
+                        whileTap={isCompleted ? { scale: 0.95 } : {}}
+                      >
+                        <div className={cn(
+                          'w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 border-2',
+                          isActive && 'bg-[#F5C76A] border-[#F5C76A] text-black shadow-[0_0_20px_rgba(245,199,106,0.4)]',
+                          isCompleted && 'bg-[#F5C76A]/20 border-[#F5C76A] text-[#F5C76A] cursor-pointer hover:bg-[#F5C76A]/30',
+                          !isActive && !isCompleted && 'bg-muted/20 border-white/10 text-muted-foreground'
+                        )}>
+                          {isCompleted ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <span className="text-xs font-bold">{phaseIdx + 1}</span>
+                          )}
+                        </div>
+                        <span className={cn(
+                          'text-[10px] sm:text-xs font-medium max-w-[70px] text-center leading-tight',
+                          isActive && 'text-[#F5C76A]',
+                          isCompleted && 'text-[#F5C76A]/70',
+                          !isActive && !isCompleted && 'text-muted-foreground'
+                        )}>
+                          {phase.label}
+                        </span>
+                      </motion.button>
+                      {phaseIdx < filteredPhases.length - 1 && (
+                        <div className={cn(
+                          'h-px w-6 sm:w-10 ml-3 sm:ml-4',
+                          isCompleted ? 'bg-[#F5C76A]' : 'bg-border'
+                        )} />
                       )}
                     </div>
-                    <div className="hidden lg:block text-left">
-                      <div className="text-sm font-medium">{step.label}</div>
-                      <div className="text-xs text-muted-foreground">{step.description}</div>
-                    </div>
-                  </motion.button>
-                  {index < STEPS.length - 1 && (
-                    <div
-                      className={cn(
-                        'h-px w-6 lg:w-10 mx-1',
-                        isCompleted ? 'bg-[#F5C76A]' : 'bg-border'
-                      )}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
