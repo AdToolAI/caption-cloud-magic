@@ -1,55 +1,52 @@
+<final-text>Kurzbefund
 
+- Du hast recht: Der reine Deploy ist hier nicht das Kernproblem. Im aktuellen Code sind der kompakte Phasen-Stepper und der GET-Check im Service Worker bereits vorhanden.
+- Dass du trotzdem noch den alten Balken plus `Cache.put ... POST/PATCH unsupported` siehst, spricht sehr stark für einen alten aktiven Service Worker bzw. ein altes gecachtes Frontend-Bundle.
+- Zusätzlich gibt es im Wizard einen echten Logikfehler: Mehrere Step-Wechsel sind hart auf `4/5/6` codiert. Sobald der optionale Schritt `product-images` aktiv ist, landet der Flow auf dem falschen Screen. Das erklärt die unfertige/leere zweite Ansicht.
 
-## Plan: Wizard-Stepper vereinfachen und Fehler beheben
+Plan
 
-### Probleme
-1. **Zu viele Stufen** — Manual-Modus hat 13 Steps, Full-Service 9. Das überflutet die Stepper-Leiste und ist auf dem Bildschirm nicht mehr lesbar.
-2. **Fehlende Übersetzungen** — `uvc.stepProductImages` und `uvc.stepProductImagesDesc` existieren nicht in `src/lib/translations.ts`, daher werden die rohen Keys angezeigt.
-3. **Leere Seite nach Beratung** — Die Consultation-Validation-Warnung ist nicht kritisch, aber die Seite zeigt keinen Content.
-4. **Service-Worker Cache-Fehler** — `PUT`/`PATCH` Methoden werden vom SW-Cache versucht.
+1. Service Worker hart entschärfen
+- `public/sw.js` so umbauen, dass er nicht mehr pauschal alle GET-Requests cached.
+- Den Worker auf Push-Benachrichtigungen und höchstens minimale App-Shell-Dateien begrenzen.
+- Cache-Version erhöhen und beim Aktivieren alte `caption-genie-*` Caches konsequent löschen.
+- Dadurch werden alte Bundles nicht mehr weiter ausgeliefert und die `Cache.put`-Fehler verschwinden zuverlässig.
 
-### Änderungen
+2. Service-Worker-Registrierung bereinigen
+- In `src/main.tsx` die Registrierung so anpassen, dass sicher ein frischer Worker gezogen wird.
+- Alte Registrierungen/Caches beim Wechsel sauber entfernen.
+- `src/hooks/usePushNotifications.ts` an dieselben Guards koppeln, damit kein Fallback versehentlich wieder einen problematischen Worker registriert.
 
-**1. Stepper zu kompakten Punkten zusammenfassen (`UniversalVideoWizard.tsx`)**
+3. Wizard-Logik von harten Indizes auf Step-IDs umstellen
+- In `src/components/universal-video-creator/UniversalVideoWizard.tsx` einen Helper wie `goToStep('consultation' | 'generating' | 'preview' | 'export')` einführen.
+- Alle harten Sprünge (`setCurrentStep(4/5/6)`) ersetzen, besonders in:
+  - `handleConsultationSkip`
+  - `handleAutoGenerationComplete`
+  - `handleSwitchToManual`
+  - `handleRetry`
+  - `handleRateLimitRetry`
+- So funktioniert der Flow auch korrekt, wenn `product-images` eingeschoben ist.
 
-Statt jeden einzelnen Step als breiten Button mit Label anzuzeigen, werden die Steps zu **Phasen-Gruppen** zusammengefasst:
+4. Leere/unfertige Ansicht absichern
+- Wenn ein Projekt schon vorhanden ist, der Wizard aber noch auf `generating` steht, automatisch auf `preview` weiterleiten.
+- Für ungültige Zustandskombinationen eine defensive Fallback-UI ergänzen, damit nie wieder nur ein leerer schwarzer Bereich sichtbar ist.
 
-- **Full-Service** (aktuell 9 → 5 Punkte):
-  - Vorbereitung (Kategorie + Bilder + Stimmung + Stil + Modus)
-  - Beratung
-  - Generierung
-  - Vorschau
-  - Export
+5. Sichtbare Phasenleiste final verifizieren
+- Nach dem Cache-Break sollte der bereits vorhandene kompakte Phasen-Stepper tatsächlich live erscheinen.
+- Falls nötig, danach noch Feintuning an Abstand/Labelbreite, aber erst nachdem wirklich der frische Bundle geladen wird.
 
-- **Manual** (aktuell 13 → 6 Punkte):
-  - Vorbereitung (Kategorie + Bilder + Stimmung + Stil + Modus)
-  - Beratung
-  - Konzept (Briefing + Script + Storyboard)
-  - Produktion (Visuals + Animation)
-  - Audio
-  - Export
+Technische Details
 
-Der Stepper zeigt nur **kleine Kreise/Punkte** mit kurzen Labels statt der aktuellen breiten Buttons. Auf Mobile wird nur der aktuelle Punkt + Nummer angezeigt.
-
-**2. Fehlende Übersetzungen in `src/lib/translations.ts` hinzufügen**
-
-Neue Keys für EN, DE, ES:
-- `stepProductImages` / `stepProductImagesDesc`
-
-**3. Service-Worker Cache-Fix (`sw.js` oder relevante SW-Datei)**
-
-Die `PUT`/`PATCH`-Fehler kommen daher, dass der Service Worker versucht, nicht-GET-Requests zu cachen. Einen Check hinzufügen der nur `GET`-Requests cached.
-
-### Betroffene Dateien
-
-| Datei | Änderung |
-|-------|----------|
-| `src/components/universal-video-creator/UniversalVideoWizard.tsx` | Stepper zu Phasen-Gruppen zusammenfassen, kompaktere Punkt-Darstellung |
-| `src/lib/translations.ts` | Fehlende `stepProductImages`-Keys für EN/DE/ES |
-| Service-Worker Datei | GET-only Cache-Check |
-
-### Ergebnis
-- Stepper hat 5-6 übersichtliche Punkte statt 9-13 überladene Buttons
-- Keine rohen Translation-Keys mehr sichtbar
-- Keine Cache-Fehler mehr im Console-Log
-
+- Betroffene Dateien:
+  - `public/sw.js`
+  - `src/main.tsx`
+  - `src/hooks/usePushNotifications.ts`
+  - `src/components/universal-video-creator/UniversalVideoWizard.tsx`
+- Hauptursachen:
+  - alter aktiver Service Worker bzw. altes gecachtes Frontend
+  - harte Step-Indizes trotz optionalem `product-images`-Schritt
+- Erwartetes Ergebnis:
+  - kein `Cache.put`-Fehler mehr
+  - der neue kompakte Stepper wird wirklich angezeigt
+  - kein leerer/unfertiger Screen mehr nach Beratung oder Generierung
+  - Produkt-Ads mit Bild-Upload springen sauber zu Generierung, Preview und Export</final-text>
