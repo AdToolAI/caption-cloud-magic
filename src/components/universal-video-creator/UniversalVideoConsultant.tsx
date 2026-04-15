@@ -319,6 +319,21 @@ export function UniversalVideoConsultant({
 
   const currentPhase = Math.ceil((consultationProgress / 100) * totalPhases) || 1;
 
+  if (reviewMode && editableRecommendation) {
+    return (
+      <ConceptReviewEditor
+        recommendation={editableRecommendation}
+        onConfirm={(edited) => {
+          onConsultationComplete({
+            ...edited,
+            modeChoice: 'full-service',
+          });
+        }}
+        onBack={() => setReviewMode(false)}
+      />
+    );
+  }
+
   return (
     <div className="max-w-3xl mx-auto">
       {/* Header */}
