@@ -427,6 +427,7 @@ function buildAdaptiveSystemPrompt(
   messages: any[],
   slotInfo: ReturnType<typeof extractFilledSlots>,
   userMessageCount: number,
+  knownEntity: { detected: boolean; entityName: string; entityType: string },
 ): string {
   const categoryName = CATEGORY_NAMES[lang][category] || 'Custom Video';
   
