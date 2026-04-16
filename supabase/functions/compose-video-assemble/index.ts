@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -68,8 +69,8 @@ serve(async (req) => {
     }
 
     // 4. Parse assembly config
-    const assemblyConfig = project.assembly_config || {};
-    const briefing = project.briefing || {};
+    const assemblyConfig = (project.assembly_config as any) || {};
+    const briefing = (project.briefing as any) || {};
 
     // 5. Determine dimensions from aspect ratio
     const aspectRatio = briefing.aspectRatio || '16:9';
@@ -96,7 +97,7 @@ serve(async (req) => {
 
     const totalDuration = remotionScenes.reduce((sum: number, s: any) => sum + s.durationSeconds, 0);
     const fps = 30;
-    const durationInFrames = Math.ceil(totalDuration * fps);
+    const durationInFrames = Math.max(1, Math.ceil(totalDuration * fps));
 
     const inputProps = {
       scenes: remotionScenes,
@@ -108,28 +109,44 @@ serve(async (req) => {
       aspectRatio,
     };
 
-    // 7. Create video_renders entry
+    // 7. Create video_renders entry — match real schema (no template_id!)
     const renderId = crypto.randomUUID();
+    const outName = `composer-${projectId}-${Date.now()}.mp4`;
+    const bucketName = DEFAULT_BUCKET_NAME;
+
     const { error: renderInsertError } = await supabase
       .from('video_renders')
       .insert({
         render_id: renderId,
+        project_id: projectId,
         user_id: user.id,
-        template_id: 'ComposedAdVideo',
+        bucket_name: bucketName,
+        source: 'composer',
         status: 'pending',
-        content_config: {
-          composerProjectId: projectId,
-          inputProps,
-          targetWidth: width,
-          targetHeight: height,
-          durationInFrames,
+        started_at: new Date().toISOString(),
+        format_config: {
+          format: 'mp4',
+          aspect_ratio: aspectRatio,
+          width,
+          height,
           fps,
         },
+        content_config: {
+          composerProjectId: projectId,
+          out_name: outName,
+          durationInFrames,
+          fps,
+          width,
+          height,
+          scenesCount: remotionScenes.length,
+          totalDuration,
+        },
+        subtitle_config: {},
       });
 
     if (renderInsertError) {
       console.error('[compose-video-assemble] Failed to create render entry:', renderInsertError);
-      throw new Error('Failed to create render entry');
+      throw new Error(`Failed to create render entry: ${renderInsertError.message}`);
     }
 
     // 8. Update project status
@@ -138,8 +155,25 @@ serve(async (req) => {
       .update({ status: 'assembling', updated_at: new Date().toISOString() })
       .eq('id', projectId);
 
-    // 9. Build Lambda payload (matches invoke-remotion-render expectations)
-    const lambdaPayload = {
+    // 9. Build webhook with customData so remotion-webhook can match it
+    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+    const webhookData = {
+      url: webhookUrl,
+      secret: null,
+      customData: {
+        pending_render_id: renderId,
+        out_name: outName,
+        user_id: user.id,
+        project_id: projectId,
+        composer_project_id: projectId,
+        source: 'composer',
+      },
+    };
+
+    const hasAudio = !!inputProps.voiceoverUrl || !!inputProps.backgroundMusicUrl;
+
+    // 10. Build complete Lambda payload
+    const lambdaPayload: Record<string, unknown> = {
       type: 'start',
       serveUrl: Deno.env.get('REMOTION_SERVE_URL') || '',
       composition: 'ComposedAdVideo',
@@ -149,17 +183,25 @@ serve(async (req) => {
       maxRetries: 2,
       privacy: 'public',
       logLevel: 'warn',
-      outName: `composer-${projectId}.mp4`,
-      frameRange: null,
+      outName,
+      bucketName,
+      width,
+      height,
+      fps,
+      durationInFrames,
+      frameRange: [0, durationInFrames - 1],
+      muted: !hasAudio,
+      audioCodec: 'aac',
       scale: 1,
       envVariables: {},
       chromiumOptions: {},
       timeoutInMilliseconds: 600000,
       concurrencyPerLambda: 10,
       downloadBehavior: { type: 'play-in-browser' },
+      webhook: webhookData,
     };
 
-    // 10. Invoke Lambda render
+    // 11. Invoke Lambda render via shared invoker
     const { data: renderResult, error: renderError } = await supabase.functions.invoke('invoke-remotion-render', {
       body: {
         lambdaPayload,
@@ -174,12 +216,16 @@ serve(async (req) => {
         .from('composer_projects')
         .update({ status: 'failed', updated_at: new Date().toISOString() })
         .eq('id', projectId);
-      throw new Error('Render invocation failed');
+      await supabase
+        .from('video_renders')
+        .update({ status: 'failed', error_message: `Invocation failed: ${renderError.message}`, completed_at: new Date().toISOString() })
+        .eq('render_id', renderId);
+      throw new Error(`Render invocation failed: ${renderError.message}`);
     }
 
     console.log('[compose-video-assemble] Render started:', renderResult);
 
-    // 11. Deduct credits
+    // 12. Deduct credits (non-blocking)
     try {
       const totalCost = (scenes || []).reduce((sum: number, s: any) => sum + (s.cost_euros || 0), 0) + 0.10;
       if (totalCost > 0) {
@@ -197,7 +243,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         renderId,
-        lambdaRenderId: renderResult?.lambdaRenderId,
+        lambdaRenderId: (renderResult as any)?.lambdaRenderId || (renderResult as any)?.real_render_id,
         projectId,
         totalDuration,
         scenesCount: remotionScenes.length,
