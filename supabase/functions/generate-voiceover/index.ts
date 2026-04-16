@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { getPremiumVoiceById, getDefaultSettingsForVoice, getDefaultModelForVoice } from "../_shared/premium-voices.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,8 @@ interface VoiceoverRequest {
   modelId?: string;
   stability?: number;
   similarityBoost?: number;
+  style?: number;
+  useSpeakerBoost?: boolean;
   speed?: number;
   projectId: string;
 }
@@ -25,59 +28,47 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const elevenlabsApiKey = Deno.env.get('ELEVENLABS_API_KEY');
-
-    if (!elevenlabsApiKey) {
-      throw new Error('ELEVENLABS_API_KEY not configured');
-    }
+    if (!elevenlabsApiKey) throw new Error('ELEVENLABS_API_KEY not configured');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify authentication
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
-
+    if (!authHeader) throw new Error('No authorization header');
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      throw new Error('Unauthorized');
-    }
+    if (authError || !user) throw new Error('Unauthorized');
 
     const requestBody: VoiceoverRequest = await req.json();
-    
-    // Validate and clamp speed to ElevenLabs API limits (0.7 - 1.2)
+
     let validatedSpeed = requestBody.speed || 1.0;
     if (validatedSpeed < 0.7 || validatedSpeed > 1.2) {
-      console.warn(`Speed ${validatedSpeed} out of range, clamping to 0.7-1.2`);
       validatedSpeed = Math.max(0.7, Math.min(1.2, validatedSpeed));
     }
 
     const {
       text,
-      voiceId = '9BWtsMINqrJLrRacOk9x', // Default: Aria
-      modelId = 'eleven_turbo_v2_5',
-      stability = 0.5,
-      similarityBoost = 0.75,
-      projectId
+      voiceId = '9BWtsMINqrJLrRacOk9x',
+      projectId,
     } = requestBody;
-    
     const speed = validatedSpeed;
 
-    console.log('Generating voiceover:', { 
-      textLength: text.length, 
-      voiceId, 
-      modelId,
-      speed,
-      stability,
-      similarityBoost,
-      projectId 
+    // Pull premium defaults if known
+    const premium = getPremiumVoiceById(voiceId);
+    const defaultSettings = getDefaultSettingsForVoice(voiceId);
+    const modelId = requestBody.modelId || getDefaultModelForVoice(voiceId);
+
+    const stability = requestBody.stability ?? defaultSettings.stability;
+    const similarityBoost = requestBody.similarityBoost ?? defaultSettings.similarity_boost;
+    const style = requestBody.style ?? defaultSettings.style;
+    const useSpeakerBoost = requestBody.useSpeakerBoost ?? defaultSettings.use_speaker_boost;
+
+    console.log('Generating voiceover:', {
+      textLength: text.length, voiceId, premium: !!premium, modelId,
+      speed, stability, similarityBoost, style, useSpeakerBoost, projectId,
     });
 
-    // Call ElevenLabs API
-    const elevenlabsUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?optimize_streaming_latency=2`;
-    
+    const elevenlabsUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128&optimize_streaming_latency=2`;
+
     const elevenlabsResponse = await fetch(elevenlabsUrl, {
       method: 'POST',
       headers: {
@@ -91,6 +82,8 @@ serve(async (req) => {
         voice_settings: {
           stability,
           similarity_boost: similarityBoost,
+          style,
+          use_speaker_boost: useSpeakerBoost,
           speed,
         },
       }),
@@ -102,48 +95,24 @@ serve(async (req) => {
       throw new Error(`ElevenLabs API error: ${elevenlabsResponse.status}`);
     }
 
-    // Get audio as blob
     const audioBlob = await elevenlabsResponse.blob();
     const audioBuffer = await audioBlob.arrayBuffer();
     const audioUint8Array = new Uint8Array(audioBuffer);
 
-    // Upload to Supabase Storage
     const fileName = `${projectId}_voiceover.mp3`;
     const filePath = `${user.id}/${fileName}`;
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('voiceover-audio')
-      .upload(filePath, audioUint8Array, {
-        contentType: 'audio/mpeg',
-        upsert: true,
-      });
+      .upload(filePath, audioUint8Array, { contentType: 'audio/mpeg', upsert: true });
+    if (uploadError) throw uploadError;
 
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      throw uploadError;
-    }
-
-    // Get public URL with cache-busting parameter
-    const { data: urlData } = supabase.storage
-      .from('voiceover-audio')
-      .getPublicUrl(filePath);
-    
-    // Add cache-busting query parameter to force browser to reload
+    const { data: urlData } = supabase.storage.from('voiceover-audio').getPublicUrl(filePath);
     const cacheBustedUrl = `${urlData.publicUrl}?v=${Date.now()}`;
 
-    // Estimate duration with speed factor (rough calculation: ~150 words per minute)
     const wordCount = text.split(/\s+/).length;
-    const baseEstimatedDuration = (wordCount / 150) * 60; // Base duration in seconds
-    const estimatedDuration = Math.ceil(baseEstimatedDuration / speed); // Adjust for speed
-
-    console.log('Voiceover generated successfully:', {
-      url: cacheBustedUrl,
-      duration: estimatedDuration,
-      size: audioUint8Array.length,
-      speed,
-      stability,
-      similarityBoost
-    });
+    const baseEstimatedDuration = (wordCount / 150) * 60;
+    const estimatedDuration = Math.ceil(baseEstimatedDuration / speed);
 
     return new Response(
       JSON.stringify({
@@ -152,23 +121,15 @@ serve(async (req) => {
         duration: estimatedDuration,
         voiceId,
         modelId,
+        voiceUsed: premium?.name || voiceId,
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error) {
     console.error('Error generating voiceover:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        success: false 
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error', success: false }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
