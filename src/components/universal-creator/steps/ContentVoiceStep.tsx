@@ -7,11 +7,13 @@ import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Volume2, Play, Pause, Upload, Sparkles } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Volume2, Play, Pause, Upload, Sparkles, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { VoiceoverScriptGenerator } from '@/components/universal-creator/VoiceoverScriptGenerator';
 import { useTranslation } from '@/hooks/useTranslation';
+import { sortVoicesPremiumFirst } from '@/lib/elevenlabs-voices';
 import type { ContentConfig, VoiceoverConfig } from '@/types/universal-creator';
 
 interface ContentVoiceStepProps {
@@ -28,6 +30,15 @@ interface Voice {
   gender?: string;
   age?: string;
   description?: string;
+  tier?: string;
+  recommended_model?: string;
+  recommended_settings?: {
+    stability: number;
+    similarity_boost: number;
+    style: number;
+    use_speaker_boost: boolean;
+  };
+  supportedLanguages?: string[];
 }
 
 export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceStepProps) => {

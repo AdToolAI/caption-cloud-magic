@@ -276,8 +276,8 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
           </div>
 
           {generatedUrl && (
-            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-              <p className="text-sm text-green-600 dark:text-green-400 mb-2 font-medium">✓ Voice-Over generiert</p>
+            <div className="p-3 bg-success/10 border border-success/20 rounded-lg">
+              <p className="text-sm text-success mb-2 font-medium">✓ Voice-Over generiert</p>
               <audio ref={audioRef} src={generatedUrl} onEnded={() => setIsPlaying(false)} className="hidden" />
             </div>
           )}
