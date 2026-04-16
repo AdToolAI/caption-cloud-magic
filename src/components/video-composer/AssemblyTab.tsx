@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import ColorGradingSelector from './ColorGradingSelector';
 import type { AssemblyConfig, ComposerScene, TransitionStyle } from '@/types/video-composer';
-import { CLIP_SOURCE_COSTS } from '@/types/video-composer';
+import { getClipCost } from '@/types/video-composer';
 
 interface AssemblyTabProps {
   project: any;
@@ -22,7 +22,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
   const [isRendering, setIsRendering] = useState(false);
   const [renderResult, setRenderResult] = useState<{ renderId?: string; error?: string } | null>(null);
 
-  const clipCost = scenes.reduce((sum, s) => sum + (CLIP_SOURCE_COSTS[s.clipSource] || 0) * s.durationSeconds, 0);
+  const clipCost = scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
   const voCost = assemblyConfig.voiceover?.enabled ? 0.05 : 0;
   const renderCost = 0.10;
   const totalCost = clipCost + voCost + renderCost;
