@@ -62,46 +62,70 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
 
   const pollRenderStatus = async (rid: string) => {
     try {
-      const { data, error } = await supabase
-        .from('video_renders')
-        .select('status, video_url, error_message')
-        .eq('render_id', rid)
-        .maybeSingle();
+      const { data, error } = await supabase.functions.invoke('check-remotion-progress', {
+        body: { render_id: rid, source: 'composer' },
+      });
 
       if (error) {
-        console.warn('[AssemblyTab] poll error:', error);
+        console.warn('[AssemblyTab] check-remotion-progress error:', error);
       }
 
       if (data) {
-        const status = (data.status || 'pending').toLowerCase();
-        if (status === 'completed' && data.video_url) {
-          setRenderStatus('completed');
-          setVideoUrl(data.video_url);
-          setIsRendering(false);
-          stopPolling();
-          toast({
-            title: t('videoComposer.videoReady') || 'Video fertig',
-            description: t('videoComposer.videoReadyDesc') || 'Dein Video kann angesehen und heruntergeladen werden.',
-          });
-          // Inform that the video was saved to the Media Library
-          setTimeout(() => {
-            toast({
-              title: t('videoComposer.savedToLibrary') || 'In Mediathek gespeichert',
-              description: t('videoComposer.savedToLibraryDesc') || 'Du findest dein Video jetzt auch in der Mediathek.',
-            });
-          }, 800);
-          return;
-        }
-        if (status === 'failed') {
-          const msg = data.error_message || t('videoComposer.renderFailed');
+        const prog = data.progress || {};
+        const pct = Math.max(0, Math.min(100, Math.round((prog.overallProgress ?? 0) * 100)));
+        setProgress(pct);
+
+        // Fatal error from Lambda
+        if (prog.fatalErrorEncountered) {
+          const errMsg = (Array.isArray(prog.errors) && prog.errors[0]?.message) || (Array.isArray(prog.errors) && prog.errors[0]) || t('videoComposer.renderFailed');
+          const msgStr = typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg);
           setRenderStatus('failed');
-          setRenderError(msg);
+          setRenderError(msgStr);
           setIsRendering(false);
           stopPolling();
-          toast({ title: t('videoComposer.renderFailed'), description: msg, variant: 'destructive' });
+          toast({ title: t('videoComposer.renderFailed'), description: msgStr, variant: 'destructive' });
           return;
         }
-        setRenderStatus(status === 'rendering' ? 'rendering' : 'pending');
+
+        // Done — fetch final URL from DB (storage URL is the canonical source)
+        if (prog.done || data.status === 'completed') {
+          const { data: row } = await supabase
+            .from('video_renders')
+            .select('status, video_url, error_message')
+            .eq('render_id', rid)
+            .maybeSingle();
+
+          const finalUrl = row?.video_url || prog.outputFile || null;
+          if (finalUrl) {
+            setProgress(100);
+            setRenderStatus('completed');
+            setVideoUrl(finalUrl);
+            setIsRendering(false);
+            stopPolling();
+            toast({
+              title: t('videoComposer.videoReady') || 'Video fertig',
+              description: t('videoComposer.videoReadyDesc') || 'Dein Video kann angesehen und heruntergeladen werden.',
+            });
+            setTimeout(() => {
+              toast({
+                title: t('videoComposer.savedToLibrary') || 'In Mediathek gespeichert',
+                description: t('videoComposer.savedToLibraryDesc') || 'Du findest dein Video jetzt auch in der Mediathek.',
+              });
+            }, 800);
+            return;
+          }
+          if (row?.status === 'failed') {
+            const msg = row.error_message || t('videoComposer.renderFailed');
+            setRenderStatus('failed');
+            setRenderError(msg);
+            setIsRendering(false);
+            stopPolling();
+            toast({ title: t('videoComposer.renderFailed'), description: msg, variant: 'destructive' });
+            return;
+          }
+        }
+
+        setRenderStatus('rendering');
       }
     } catch (err) {
       console.warn('[AssemblyTab] poll exception:', err);
