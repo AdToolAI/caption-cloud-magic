@@ -31,6 +31,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
   const [videoUrl, setVideoUrl] = useState<string | null>(project?.outputUrl || null);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [longRunning, setLongRunning] = useState(false);
+  const [progress, setProgress] = useState<number>(0);
   const pollTimerRef = useRef<number | null>(null);
   const pollStartRef = useRef<number>(0);
 
