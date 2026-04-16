@@ -217,9 +217,3 @@ export default function SceneMediaUpload({
     </div>
   );
 }
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
