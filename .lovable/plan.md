@@ -1,48 +1,52 @@
+<final-text>## Befund
+- Der Fehler passiert aktuell noch **vor** dem eigentlichen Remotion-Render.
+- Die Live-Logs von `compose-video-assemble` zeigen eindeutig:
+  `PGRST204: Could not find the 'template_id' column of 'video_renders'`
+- `compose-video-assemble` schreibt also in ein **falsches Schema** der Tabelle `video_renders`.
+- Laut aktueller DB-Typdefinition hat `video_renders` **keine** `template_id`, sondern erwartet Felder wie `format_config`, `subtitle_config`, `user_id`, `render_id`, `content_config`.
+- Die anderen Console-Warnings im Screenshot (`X-Frame-Options`, `icon-192.png`) sind nur Nebengeräusche und **nicht** die Ursache.
 
+## Plan
+### 1. `compose-video-assemble` an das echte `video_renders`-Schema anpassen
+- `template_id` aus dem Insert entfernen
+- den Insert an die funktionierenden Render-Pipelines angleichen
+- dabei korrekt setzen:
+  - `project_id`
+  - `user_id`
+  - `format_config`
+  - `content_config`
+  - `subtitle_config`
+  - `status`
+  - `started_at`
+  - `source`
+  - optional `bucket_name`
 
-## Plan — Persistenz-Verbesserung & Reset im Motion Studio
+### 2. Lambda-Payload für Motion Studio vollständig machen
+Damit nach dem DB-Fix nicht direkt der nächste Renderfehler kommt:
+- `width`, `height`, `fps`, `durationInFrames` sauber in den Payload aufnehmen
+- `webhook` + `customData` ergänzen
+- bei Audio `muted: false` und `audioCodec: 'aac'` setzen
+- `outName` pro Render eindeutig machen
 
-### Problem
-Aktuell wird zwar ein localStorage-Draft beim Verlassen gespeichert, aber:
-1. **Clip-Status drift**: Wenn Clips bei Verlassen noch `generating` waren, sind sie in der DB längst `ready` — der localStorage zeigt aber den alten Stand. → User denkt, er muss neu generieren.
-2. **Kein Reset-Button**: User können kein neues Projekt starten ohne den Browser-Cache zu leeren.
-3. **Kein Hinweis auf geladenen Draft**: User wissen nicht, ob sie weiterarbeiten oder neu starten.
+### 3. Completion/Fallback für Motion Studio sauber verdrahten
+- den Render-Webhook bzw. die Abschlusslogik so erweitern, dass Motion-Studio-Renders auch auf `composer_projects` zurückgeschrieben werden
+- bei Erfolg: `status='completed'`, `output_url` setzen
+- bei Fehler: `status='failed'`
+- optional den Media-Library-Eintrag mit passender Source-Metadaten kennzeichnen
 
-### Fix
+### 4. Fehleranzeige im UI verbessern
+In `AssemblyTab.tsx`:
+- bei Function-Fehlern die Response aus `error.context.json()` lesen
+- echte Backend-Meldung anzeigen statt nur
+  `Edge Function returned a non-2xx status code`
 
-**1. DB-Sync beim Mount (`VideoComposerDashboard.tsx`)**
-- Wenn der geladene Draft eine `project.id` (UUID) hat → `composer_scenes` aus der DB nachladen und mit localStorage mergen
-- DB ist Source of Truth für `clip_status`, `clip_url`, `cost_euros`
-- localStorage-Reste werden mit den frischen DB-Werten überschrieben
+## Verify
+- Klick auf „Video rendern“ erzeugt keinen 500-Fehler mehr in `compose-video-assemble`
+- danach erscheinen Logs in `invoke-remotion-render`
+- `video_renders` wird korrekt angelegt
+- der Toast zeigt bei Problemen die echte Ursache
+- bei erfolgreichem Render bleibt das Projekt nicht auf `assembling` hängen, sondern bekommt eine `output_url`
 
-**2. Reset-Button im Header**
-- Neuer Button "Neues Projekt" (Icon: `RotateCcw` oder `Plus`) rechts neben dem Kosten-Indikator
-- Bei Klick: Bestätigungs-Dialog *"Aktuelles Projekt verwerfen und neu starten?"*
-- Bei Bestätigung: localStorage löschen, `setProject(defaultProject)`, zurück zum Briefing-Tab
-- Wichtig: **DB-Projekt bleibt erhalten** (nicht löschen) — User können später über die Mediathek darauf zugreifen
-
-**3. "Draft geladen" Toast beim Mount**
-- Wenn ein Draft mit `project.id` geladen wird: dezenter Toast *"Letztes Projekt fortgesetzt — X Szenen, Y bereit"* mit Action-Button "Neu starten"
-- Wenn nur localStorage ohne DB-ID existiert: stiller Load (wie bisher)
-
-**4. Auto-Refresh-Pull alle 5s im Clips-Tab** (bereits teilweise vorhanden via Realtime)
-- Sicherstellen, dass beim Tab-Wechsel zurück zu Clips ein einmaliger Re-Fetch passiert
-
-### Geänderte Dateien
-- `src/components/video-composer/VideoComposerDashboard.tsx` — Reset-Button, Confirm-Dialog, DB-Mount-Sync, Draft-Toast
-- Keine neuen Dateien, keine DB-Änderungen, keine Edge-Function-Änderungen
-
-### Lokalisierung (EN/DE/ES)
-- `videoComposer.newProject` ("Neues Projekt" / "New Project" / "Nuevo Proyecto")
-- `videoComposer.confirmReset` ("Aktuelles Projekt verwerfen?" …)
-- `videoComposer.draftRestored` ("Letztes Projekt fortgesetzt")
-
-### Verify
-- Seite verlassen → zurückkehren → Briefing, Storyboard, Clips inkl. aktuellem `ready` Status erscheinen
-- "Neues Projekt" → Confirm → komplett leer, Briefing-Tab aktiv
-- Alter DB-Eintrag bleibt erhalten (über Mediathek prüfbar)
-
-### Was unverändert bleibt
-- DB-Schema, RLS, Edge Functions, Pricing, Quality-Tier
-- Alle anderen Tabs UI
-
+## Wichtig
+- Ich würde **nicht** die DB künstlich um eine `template_id`-Spalte erweitern
+- der richtige Fix ist, Motion Studio an das bestehende Render-Schema anzupassen</final-text>
