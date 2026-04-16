@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Upload, X, Film, ImageIcon, Loader2, Sparkles } from 'lucide-react';
+import { Upload, X, Film, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
@@ -7,7 +7,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB
-const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20 MB
 const ACCEPTED_VIDEO = ['video/mp4', 'video/quicktime', 'video/webm'];
 const ACCEPTED_IMAGE = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -40,16 +39,20 @@ export default function SceneMediaUpload({
       const isVideo = ACCEPTED_VIDEO.includes(file.type);
       const isImage = ACCEPTED_IMAGE.includes(file.type);
 
-      if (!isVideo && !isImage) {
-        toast.error('Nicht unterstütztes Format. Bitte MP4, MOV, WEBM, JPG, PNG oder WEBP wählen.');
+      // Reject images explicitly — they belong in the AI reference image slot
+      if (isImage) {
+        toast.error(
+          'Bitte Video-Datei wählen — Bilder gehören zur KI-Referenz (im KI-Tab unter dem Prompt).'
+        );
         return;
       }
-      const limit = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
-      if (file.size > limit) {
+      if (!isVideo) {
+        toast.error('Nicht unterstütztes Format. Bitte MP4, MOV oder WEBM wählen.');
+        return;
+      }
+      if (file.size > MAX_VIDEO_BYTES) {
         toast.error(
-          `Datei zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximal ${
-            isVideo ? '200' : '20'
-          } MB erlaubt.`
+          `Datei zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximal 200 MB erlaubt.`
         );
         return;
       }
@@ -65,7 +68,7 @@ export default function SceneMediaUpload({
         if (authErr || !user) throw new Error('Nicht angemeldet');
 
         const projectFolder = projectId || 'draft';
-        const ext = file.name.split('.').pop()?.toLowerCase() || (isVideo ? 'mp4' : 'jpg');
+        const ext = file.name.split('.').pop()?.toLowerCase() || 'mp4';
         const fileName = `${user.id}/${projectFolder}/${sceneId}-${Date.now()}.${ext}`;
 
         setProgress(20);
@@ -86,10 +89,8 @@ export default function SceneMediaUpload({
         if (!pub?.publicUrl) throw new Error('Public URL konnte nicht erstellt werden');
 
         setProgress(100);
-        onChange(pub.publicUrl, isVideo ? 'video' : 'image');
-        toast.success(
-          `${isVideo ? 'Video' : 'Bild'} hochgeladen (${(file.size / 1024 / 1024).toFixed(1)} MB)`
-        );
+        onChange(pub.publicUrl, 'video');
+        toast.success(`Video hochgeladen (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
       } catch (err) {
         console.error('[SceneMediaUpload] Upload error:', err);
         toast.error(err instanceof Error ? err.message : 'Upload fehlgeschlagen');

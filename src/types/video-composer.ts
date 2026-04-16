@@ -61,6 +61,8 @@ export interface ComposerScene {
   stockKeywords?: string;
   uploadUrl?: string;
   uploadType?: 'video' | 'image';
+  /** Optional reference image used as a visual guide for AI sources (image-to-video). */
+  referenceImageUrl?: string;
   clipUrl?: string;
   clipStatus: ClipStatus;
   textOverlay: TextOverlayConfig;
