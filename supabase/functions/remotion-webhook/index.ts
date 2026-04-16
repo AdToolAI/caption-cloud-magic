@@ -31,6 +31,8 @@ serve(async (req) => {
     const source = customData?.source;
     const progressIdFromWebhook = customData?.progressId; // ← NEW: direct progressId
     const isDirectorsCut = source === 'directors-cut';
+    const isComposer = source === 'composer';
+    const composerProjectId = customData?.composer_project_id;
     const renderJobId = customData?.render_job_id;
 
     console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, progressIdFromWebhook });
@@ -212,6 +214,16 @@ serve(async (req) => {
             await supabaseAdmin.from('content_projects').update({ status: 'completed' }).eq('id', matchedRender.project_id);
           }
 
+          // Composer project completion
+          if (isComposer && composerProjectId) {
+            await supabaseAdmin.from('composer_projects').update({
+              status: 'completed',
+              output_url: finalOutputUrl,
+              updated_at: new Date().toISOString(),
+            }).eq('id', composerProjectId);
+            console.log('✅ composer_projects marked completed:', composerProjectId);
+          }
+
           // Update universal_video_progress — PRIMARY via progressId, fallback via renderId scan
           try {
             let progressUpdated = false;
@@ -366,6 +378,15 @@ serve(async (req) => {
 
         if (creditsUsed && userId) {
           await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: creditsUsed });
+        }
+
+        // Composer project failure
+        if (isComposer && composerProjectId) {
+          await supabaseAdmin.from('composer_projects').update({
+            status: 'failed',
+            updated_at: new Date().toISOString(),
+          }).eq('id', composerProjectId);
+          console.log('✅ composer_projects marked failed:', composerProjectId);
         }
 
         // r28: Update universal_video_progress — MERGE errorCategory into result_data
