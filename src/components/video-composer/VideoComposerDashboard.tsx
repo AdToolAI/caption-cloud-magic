@@ -234,6 +234,7 @@ export default function VideoComposerDashboard() {
               onUpdateScenes={setScenes}
               onGoToClips={persistAndGoToClips}
               language={project.language}
+              projectId={project.id}
             />
           </TabsContent>
 
