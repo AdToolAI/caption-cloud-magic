@@ -373,7 +373,8 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         >
           {isRendering ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" /> {t('videoComposer.renderingVideo')}
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {(t('videoComposer.renderingPercent') || 'Video wird gerendert … {{percent}}%').replace('{{percent}}', String(progress))}
             </>
           ) : (
             <>
