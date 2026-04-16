@@ -145,6 +145,7 @@ export default function VideoComposerDashboard() {
             stockKeywords: row.stock_keywords ?? local?.stockKeywords,
             uploadUrl: row.upload_url ?? local?.uploadUrl,
             uploadType: row.upload_type ?? local?.uploadType,
+            referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
             clipUrl: row.clip_url ?? undefined,
             clipStatus: (row.clip_status || 'pending') as ClipStatus,
             textOverlay: row.text_overlay ?? local?.textOverlay ?? {
