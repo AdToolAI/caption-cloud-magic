@@ -380,6 +380,15 @@ serve(async (req) => {
           await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: creditsUsed });
         }
 
+        // Composer project failure
+        if (isComposer && composerProjectId) {
+          await supabaseAdmin.from('composer_projects').update({
+            status: 'failed',
+            updated_at: new Date().toISOString(),
+          }).eq('id', composerProjectId);
+          console.log('✅ composer_projects marked failed:', composerProjectId);
+        }
+
         // r28: Update universal_video_progress — MERGE errorCategory into result_data
         try {
           let progressUpdated = false;
