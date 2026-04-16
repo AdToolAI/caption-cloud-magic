@@ -120,6 +120,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
           aiPrompt: s.aiPrompt,
           stockKeywords: s.stockKeywords,
           uploadUrl: s.uploadUrl,
+          referenceImageUrl: s.referenceImageUrl,
           durationSeconds: s.durationSeconds,
         }));
 
@@ -212,6 +213,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
             aiPrompt: targetScene.aiPrompt,
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
+            referenceImageUrl: targetScene.referenceImageUrl,
             durationSeconds: targetScene.durationSeconds,
           }],
         },
@@ -364,6 +366,12 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
                               : 'border-border/40 bg-muted/40 text-muted-foreground'
                           }`}>
                             {QUALITY_LABELS[scene.clipSource][sceneQuality]}
+                          </span>
+                        )}
+                        {isAi && scene.referenceImageUrl && (
+                          <span className="px-1.5 py-0 rounded text-[9px] border border-primary/40 bg-primary/10 text-primary inline-flex items-center gap-1">
+                            <Sparkles className="h-2.5 w-2.5" />
+                            Mit Referenzbild
                           </span>
                         )}
                         {scene.clipStatus === 'generating' && isAi && (

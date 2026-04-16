@@ -28,6 +28,7 @@ import type {
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALITY_LABELS } from '@/types/video-composer';
 
 import SceneMediaUpload from './SceneMediaUpload';
+import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 
 interface SceneCardProps {
   scene: ComposerScene;
@@ -130,7 +131,7 @@ export default function SceneCard({
               {(['ai-hailuo', 'ai-kling', 'stock', 'upload'] as ClipSource[]).map((src) => {
                 const label =
                   src === 'upload'
-                    ? 'Eigene Datei (Video/Bild)'
+                    ? 'Eigenes Video'
                     : CLIP_SOURCE_LABELS[src]?.de || src;
                 return (
                   <button
@@ -178,14 +179,22 @@ export default function SceneCard({
 
             {/* Prompt / Keywords / Upload */}
             {scene.clipSource.startsWith('ai-') && (
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">KI-Prompt (EN)</Label>
-                <Textarea
-                  value={scene.aiPrompt || ''}
-                  onChange={(e) => onUpdate({ aiPrompt: e.target.value })}
-                  placeholder="Describe the scene visually in English..."
-                  rows={2}
-                  className="text-xs bg-background/50 resize-none"
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">KI-Prompt (EN)</Label>
+                  <Textarea
+                    value={scene.aiPrompt || ''}
+                    onChange={(e) => onUpdate({ aiPrompt: e.target.value })}
+                    placeholder="Describe the scene visually in English..."
+                    rows={2}
+                    className="text-xs bg-background/50 resize-none"
+                  />
+                </div>
+                <SceneReferenceImageUpload
+                  projectId={projectId}
+                  sceneId={scene.id}
+                  referenceImageUrl={scene.referenceImageUrl}
+                  onChange={(url) => onUpdate({ referenceImageUrl: url ?? undefined })}
                 />
               </div>
             )}
