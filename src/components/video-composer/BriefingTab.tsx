@@ -475,6 +475,43 @@ export default function BriefingTab({
               ))}
             </div>
           </div>
+
+          {/* Default Quality Tier */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">KI-Qualität (Standard für alle Szenen)</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { q: 'standard' as ClipQuality, title: 'Standard', desc: '768p / 720p — günstiger', rate: '€0.15/s' },
+                { q: 'pro' as ClipQuality, title: 'Pro', desc: '1080p — höhere Auflösung', rate: 'ab €0.20/s' },
+              ]).map(({ q, title, desc, rate }) => {
+                const isActive = (briefing.defaultQuality || 'standard') === q;
+                return (
+                  <button
+                    key={q}
+                    onClick={() => onUpdateBriefing({ defaultQuality: q })}
+                    className={`p-3 rounded-lg border text-left transition-all ${
+                      isActive
+                        ? q === 'pro'
+                          ? 'border-amber-500/60 bg-amber-500/5 ring-1 ring-amber-500/30'
+                          : 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                        : 'border-border/40 hover:border-border'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className={`font-medium text-xs ${isActive && q === 'pro' ? 'text-amber-400' : isActive ? 'text-primary' : ''}`}>
+                        {title}
+                      </p>
+                      <span className="text-[10px] text-muted-foreground">{rate}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-muted-foreground/70">
+              Pro-Szene überschreibbar im Storyboard.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
