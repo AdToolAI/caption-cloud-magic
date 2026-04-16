@@ -26,10 +26,13 @@ import type {
 } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, CLIP_SOURCE_COSTS } from '@/types/video-composer';
 
+import SceneMediaUpload from './SceneMediaUpload';
+
 interface SceneCardProps {
   scene: ComposerScene;
   index: number;
   totalScenes: number;
+  projectId?: string;
   onUpdate: (updates: Partial<ComposerScene>) => void;
   onDelete: () => void;
   onMoveUp: () => void;
@@ -53,6 +56,7 @@ export default function SceneCard({
   scene,
   index,
   totalScenes,
+  projectId,
   onUpdate,
   onDelete,
   onMoveUp,
@@ -121,23 +125,29 @@ export default function SceneCard({
             />
 
             {/* Clip source */}
-            <div className="flex gap-2">
-              {(['ai-hailuo', 'ai-kling', 'stock', 'upload'] as ClipSource[]).map((src) => (
-                <button
-                  key={src}
-                  onClick={() => onUpdate({ clipSource: src })}
-                  className={`px-2 py-1 rounded text-[10px] border transition-all ${
-                    scene.clipSource === src
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border/40 text-muted-foreground hover:border-border'
-                  }`}
-                >
-                  {CLIP_SOURCE_LABELS[src]?.de || src}
-                </button>
-              ))}
+            <div className="flex flex-wrap gap-2">
+              {(['ai-hailuo', 'ai-kling', 'stock', 'upload'] as ClipSource[]).map((src) => {
+                const label =
+                  src === 'upload'
+                    ? 'Eigene Datei (Video/Bild)'
+                    : CLIP_SOURCE_LABELS[src]?.de || src;
+                return (
+                  <button
+                    key={src}
+                    onClick={() => onUpdate({ clipSource: src })}
+                    className={`px-2 py-1 rounded text-[10px] border transition-all ${
+                      scene.clipSource === src
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border/40 text-muted-foreground hover:border-border'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Prompt / Keywords */}
+            {/* Prompt / Keywords / Upload */}
             {scene.clipSource.startsWith('ai-') && (
               <div className="space-y-1">
                 <Label className="text-[10px] text-muted-foreground">KI-Prompt (EN)</Label>
@@ -160,7 +170,27 @@ export default function SceneCard({
                   placeholder="z.B. business meeting, happy team"
                   className="text-xs bg-background/50"
                 />
+                <p className="text-[9px] text-muted-foreground/70">
+                  Wir suchen automatisch passende Stock-Videos im Clips-Tab.
+                </p>
               </div>
+            )}
+
+            {scene.clipSource === 'upload' && (
+              <SceneMediaUpload
+                projectId={projectId}
+                sceneId={scene.id}
+                uploadUrl={scene.uploadUrl}
+                uploadType={scene.uploadType}
+                onChange={(url, type) =>
+                  onUpdate({
+                    uploadUrl: url ?? undefined,
+                    uploadType: type ?? undefined,
+                    clipUrl: url ?? undefined,
+                    clipStatus: url ? 'ready' : 'pending',
+                  })
+                }
+              />
             )}
 
             {/* Text Overlay */}
