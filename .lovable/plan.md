@@ -1,49 +1,53 @@
 
 
 ## Befund
-Im Storyboard-Tab sehen User den automatisch generierten KI-Prompt (z. B. "Close-up of a stylish young woman..."), wissen aber nicht, dass:
-1. Der Prompt **editierbar** ist (Textarea wirkt wie reine Anzeige)
-2. Manuelle Anpassungen oft zu **besseren Ergebnissen** führen
-3. Der KI-Prompt nur eine **Startvorlage** ist, nicht das finale Wort
+Der Storyboard-Generator (`compose-video-storyboard`) erstellt mehrere Szenen-Prompts, die später **einzeln und unabhängig** an Hailuo/Kling/Sora gehen. Diese Modelle haben **keine Charakter-Konsistenz zwischen separaten Generierungen** — d. h. wenn Szene 1 sagt "young woman with red hair" und Szene 3 ebenfalls, kommt **nicht dieselbe Person** raus, sondern zwei verschiedene Frauen mit roten Haaren.
 
-→ Es fehlt ein klar sichtbarer Hinweis direkt am Prompt-Feld.
+Aktuell weiß der LLM-Prompt-Generator das nicht und schreibt teils:
+- "the same woman from scene 1 now smiling"
+- "she walks into the kitchen"  
+- "he picks up the product again"
 
-## Plan — Hinweis "Prompt anpassen für beste Ergebnisse"
+→ Resultat: User erwartet wiederkehrende Person, bekommt aber visuell unterschiedliche Menschen → wirkt unzusammenhängend.
 
-### 1. Info-Banner über dem KI-Prompt-Feld
-In `src/components/video-composer/SceneCard.tsx` (oder wo das Label "KI-Prompt (EN)" gerendert wird) direkt **unter** dem Label, **über** der Textarea, einen dezenten Info-Banner einfügen:
-- Lampen-/Sparkles-Icon links
-- Kurzer Text: *"💡 Tipp: Dieser KI-Prompt ist nur eine Vorlage. Passe ihn an dein Produkt und deine Vision an — je präziser, desto besser das Ergebnis."*
-- Stil: kleines Banner mit `bg-primary/5 border border-primary/20 rounded-md p-2 text-xs text-muted-foreground`
-- Erscheint nur bei AI-Quellen (`ai-hailuo`, `ai-kling`, `ai-sora`) — nicht bei Stock/Upload, da dort kein Prompt verwendet wird
+## Plan — Charakter-Konsistenz-Regel im Storyboard-Prompt
 
-### 2. Mikrocopy am Label verstärken
-Label-Text ändern von `KI-Prompt (EN)` → `KI-Prompt (EN) — bearbeitbar`
-- macht sofort klar, dass das Feld editierbar ist
+### 1. Neue harte Regel im `systemPrompt` (compose-video-storyboard)
+Zusätzlich zu den bestehenden Regeln eine **🚨 CHARACTER CONSISTENCY CONSTRAINT** Sektion einfügen:
 
-### 3. Lokalisierung
-Neue Keys in `src/lib/translations.ts` für DE/EN/ES:
-- `videoComposer.promptEditableHint` — der Tipp-Text
-- `videoComposer.promptEditableLabel` — das verstärkte Label
+> Each scene is generated INDEPENDENTLY by a separate AI video model call. There is NO character/face consistency between scenes. Therefore:
+> - NEVER reference "the same person", "she/he from before", "the woman from scene 1"
+> - NEVER use pronouns that imply continuity ("she continues", "he then…")
+> - Each scene must describe its human subject FRESH and SELF-CONTAINED (age, gender, appearance, clothing, setting) as if the viewer has never seen them before
+> - If a recurring "type" of person is desired (e.g. always a young professional woman), describe the **archetype** generically in each scene (e.g. "a young professional woman in business casual") — but never claim it's the same individual
+> - Treat each scene as a standalone shot from a montage / mood-board, not as a continuous narrative with a single protagonist
 
-### 4. Optional: Beispielhafte Anpassungs-Hinweise
-Unter dem Banner ein kleiner ausklappbarer Hinweis (collapsed by default) mit konkreten Beispielen:
-- "Ergänze konkrete Details: Marke, Farbe, Setting, Stimmung"
-- "Beschreibe wie das Produkt verwendet wird"
-- "Nenne Kameraperspektive (Nahaufnahme, Totale, Drohne)"
+### 2. Szenen-Hint-Anpassungen
+In `sceneTypeHints` ergänzen, wo nötig, den Hinweis "fresh standalone subject — no reference to previous scenes". Vor allem bei `solution`, `demo`, `social-proof`, `cta` (die häufig auf einen "Hauptcharakter" zurückgreifen würden).
 
-→ Hält das Standard-UI ruhig, gibt aber Tiefe für Power-User.
+### 3. User-Prompt-Erweiterung
+Im `userPrompt` zusätzlich:
+> "INDEPENDENCE REQUIREMENT: Every scene is rendered by a separate AI generation. Describe each human subject from scratch with no implied continuity from other scenes."
+
+### 4. UI-Hinweis im Storyboard-Tab (SceneCard)
+Im bestehenden Tipp-Banner über dem KI-Prompt einen zweiten Mini-Hinweis ergänzen oder den Text leicht erweitern um:
+> "Hinweis: Jede Szene wird einzeln generiert — Personen können zwischen Szenen optisch variieren."
+
+So versteht der User die technische Limitierung sofort visuell und ist nicht überrascht, wenn die "Frau" in Szene 1 und 3 unterschiedlich aussieht.
+
+### 5. Lokalisierung
+Den UI-Hinweis in DE/EN/ES inline im SceneCard (gleiche Pattern wie zuvor).
 
 ## Geänderte Dateien
-- `src/components/video-composer/SceneCard.tsx` — Banner über Textarea, Label-Text, optionaler Tipp-Block
-- `src/lib/translations.ts` — neue Keys (DE/EN/ES)
+- `supabase/functions/compose-video-storyboard/index.ts` — neue Konsistenz-Regel im systemPrompt + userPrompt + Hint-Anpassungen
+- `src/components/video-composer/SceneCard.tsx` — Mini-Hinweis im Tipp-Banner über Charakter-Variation
 
 ## Verify
-- Storyboard-Tab öffnen → über jedem KI-Prompt-Feld erscheint der Tipp-Banner
-- Banner nur bei AI-Quellen sichtbar (nicht Stock/Upload)
-- Label macht klar: Feld ist bearbeitbar
-- Texte erscheinen auf DE/EN/ES korrekt — keine rohen Keys
+- Neues Storyboard generieren → keine Phrasen wie "the same person", "she from before"
+- Jede Szene beschreibt ihr Subject eigenständig
+- Im Storyboard-Tab steht klar: Personen können zwischen Szenen variieren
+- Render-Pipeline, Pricing, Mediathek-Save unverändert
 
 ## Was unverändert bleibt
-- Prompt-Generierungs-Logik, Render-Pipeline, Pricing, Audio/Text-Overlay-System
+- DB-Schema, Render-Pipeline, andere Studios, Audio/Text-Overlay-System
 
