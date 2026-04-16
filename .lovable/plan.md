@@ -1,58 +1,53 @@
 
-
 ## Befund
-- AssemblyTab pollt aktuell nur `video_renders.status` — solange `status='rendering'` zeigt es einen Spinner ohne Prozent.
-- Es gibt aber bereits eine Edge-Function `check-remotion-progress`, die direkt aus dem Lambda-Progress-Bucket in S3 einen echten `overallProgress` (0..1) liefert. Diese wird vom Composer noch nicht genutzt.
-- `invoke-remotion-render` schreibt bereits `real_remotion_render_id`, `lambda_invoked_at`, `bucket_name` in `content_config` — alles, was `check-remotion-progress` braucht. **Backend-seitig keine Änderung nötig.**
+- Der Ladebalken ist in `AssemblyTab.tsx` zwar technisch angelegt, wirkt aber oft trotzdem „nicht da“, weil:
+  1. der erste Poll erst nach 4 Sekunden startet,
+  2. bei 0% praktisch kein sichtbarer Füllstand entsteht,
+  3. ein laufender Render nach Reload/Tab-Wechsel nicht sauber wieder aufgenommen wird.
+- In deinen Screenshots sieht der Bereich zusätzlich unfertig aus, weil rohe Übersetzungs-Keys angezeigt werden (`videoComposer.videoReady`, `videoComposer.download` usw.).
+- Ursache dafür: Mehrere `videoComposer`-Keys fehlen in `src/lib/translations.ts`, und `t('key') || 'Fallback'` funktioniert hier nicht, weil `t()` bei fehlenden Keys den Key-String zurückgibt.
 
-## Plan — Echter Ladebalken statt nur Spinner
+## Plan
+### 1. Fortschritt wirklich sichtbar machen
+- In `AssemblyTab.tsx` das Polling sofort nach Renderstart starten statt erst verzögert.
+- Während der Startphase einen klar sichtbaren Anfangszustand anzeigen, damit sofort ein echter Balken wahrnehmbar ist.
+- Laufende Renders beim Öffnen des Export-Tabs aus DB-Status + letztem `video_renders`-Eintrag wiederherstellen und das Polling fortsetzen.
 
-### 1. Polling im AssemblyTab umstellen
-- Statt direkter `video_renders`-DB-Query → `supabase.functions.invoke('check-remotion-progress', { body: { render_id, source: 'composer' } })`
-- Antwort liefert `{ progress: { done, overallProgress, outputFile?, fatalErrorEncountered? }, status }`
-- State erweitern: `progress: number` (0–100, gerundet)
-- Polling-Intervall bleibt 4 s, Timeout-Handling bleibt
+### 2. Export-Bereich fertig gestalten
+- Die aktuelle Render-Card in eine klare „Final Render“-Statusfläche umbauen:
+  - Titel + Status-Badge
+  - deutlicher Progress-Bar-Bereich
+  - Prozentanzeige
+  - Phasen-Text („Lambda startet“, „Frames werden gerendert“, „Kodierung & Upload“)
+  - Meta-Zeile mit Render-ID / Speicherhinweis
+- Die Success-Ansicht sauber strukturieren: fertiger Titel, Beschreibung, schön eingefasste Video-Vorschau, sichtbarer Download-Button und optional direkter Weg zur Mediathek.
 
-### 2. UI: echter Progress-Bar im „rendert …"-Card
-Ersetze die aktuelle Spinner-Card durch eine Card mit:
-- `<Progress value={progress} />` (existierende shadcn-Komponente)
-- Prozent-Label rechts: `{progress}%`
-- Status-Text unten: 
-  - `0–4%` → „Lambda startet …"
-  - `5–94%` → „Frames werden gerendert …"
-  - `95–99%` → „Video wird kodiert & hochgeladen …"
-- Render-ID weiterhin als kleine Subline
-- Spinner bleibt klein neben dem Label
+### 3. Roh-Keys komplett beseitigen
+- In `src/lib/translations.ts` die fehlenden `videoComposer`-Texte ergänzen, u. a.:
+  - `videoReady`
+  - `videoReadyDesc`
+  - `download`
+  - `savedToLibraryDesc`
+  - `takingLonger`
+  - `checkLaterDesc`
+- In `AssemblyTab.tsx` eine sichere Übersetzungs-Helferfunktion nutzen, damit nie wieder `videoComposer.xxx` im UI landet, selbst wenn später ein Key fehlt.
 
-### 3. Render-Button anpassen
-- Beschriftung während Render: `Video wird gerendert … {progress}%`
-- Bleibt disabled bis fertig
+### 4. Status-Sync im Dashboard abrunden
+- `VideoComposerDashboard.tsx` so erweitern, dass nicht nur fertige Videos, sondern auch aktive Render-Zustände zuverlässig an den Export-Tab übergeben werden.
+- Ergebnis:
+  - läuft der Render noch, sieht man direkt wieder den Ladebalken,
+  - ist er fertig, erscheint sofort die fertige Video-Karte.
 
-### 4. Robustheit
-- Wenn `check-remotion-progress` einen Fehler liefert → einmal still loggen und weiterpollen (kein Abbruch)
-- Wenn `done=true` und `outputFile` → wie bisher in `completed`-Branch
-- Wenn `fatalErrorEncountered` → in `failed`-Branch mit `errors[0]`
-
-### 5. Translation-Keys (de/en/es)
-Neu hinzufügen:
-- `videoComposer.lambdaStarting` ("Lambda startet …")
-- `videoComposer.framesRendering` ("Frames werden gerendert …")
-- `videoComposer.encodingUploading` ("Video wird kodiert & hochgeladen …")
-- `videoComposer.renderingPercent` ("Video wird gerendert … {{percent}}%")
-
-## Geänderte Dateien
-- `src/components/video-composer/AssemblyTab.tsx` — Polling auf `check-remotion-progress` umstellen, Progress-Bar UI, Button-Label
-- `src/i18n/locales/de.json`, `en.json`, `es.json` — neue Keys
+## Technische Details
+- Betroffene Dateien:
+  - `src/components/video-composer/AssemblyTab.tsx`
+  - `src/components/video-composer/VideoComposerDashboard.tsx`
+  - `src/lib/translations.ts`
+- Backend muss dafür nicht geändert werden: `check-remotion-progress` und der bestehende Webhook liefern bereits genug Daten.
+- Optional nur falls nötig: `src/components/ui/progress.tsx`, falls der Balken visuell stärker hervorgehoben werden soll.
 
 ## Verify
-- „Video rendern" → Progress-Bar füllt sich live von 0 % → 100 %
-- Status-Text wechselt von „Lambda startet" über „Frames werden gerendert" zu „Video wird kodiert"
-- Render-Button zeigt aktuellen Prozentwert
-- Bei Erfolg → Vorschau + Download wie gehabt
-- Bei Fehler → konkrete Lambda-Meldung wie gehabt
-
-## Was unverändert bleibt
-- DB-Schema (kein neues Feld)
-- Backend-Pipeline (`compose-video-assemble`, `invoke-remotion-render`, `remotion-webhook`)
-- Mediathek-Auto-Save, Download-Button, Color-Grading, Transitions, Kinetic-Text
-
+- Render starten → sofort sichtbarer Ladebalken mit Prozent und Status
+- Reload oder Tab-Wechsel während des Renders → Fortschritt wird wieder aufgenommen
+- Abschluss → fertiges Video mit sauberem Download-Button und ohne rohe `videoComposer.*`-Texte
+- Der gesamte Export-Bereich wirkt wie ein fertiger Bestandteil von Motion Studio statt wie ein Zwischenstand
