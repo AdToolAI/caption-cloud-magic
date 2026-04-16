@@ -214,7 +214,7 @@ serve(async (req) => {
             await supabaseAdmin.from('content_projects').update({ status: 'completed' }).eq('id', matchedRender.project_id);
           }
 
-          // Composer project completion
+          // Composer project completion + Media Library auto-save
           if (isComposer && composerProjectId) {
             await supabaseAdmin.from('composer_projects').update({
               status: 'completed',
@@ -222,6 +222,41 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             }).eq('id', composerProjectId);
             console.log('✅ composer_projects marked completed:', composerProjectId);
+
+            // Auto-save composer render into Media Library (idempotent via output_url)
+            const composerUserId = matchedRender.user_id || userId;
+            if (composerUserId) {
+              const { data: existingComposer } = await supabaseAdmin
+                .from('video_creations')
+                .select('id')
+                .eq('output_url', finalOutputUrl)
+                .maybeSingle();
+              if (!existingComposer) {
+                // Pull scene metadata for richer entry
+                const { data: composerProj } = await supabaseAdmin
+                  .from('composer_projects')
+                  .select('title, storyboard, briefing')
+                  .eq('id', composerProjectId)
+                  .maybeSingle();
+                const storyboard = (composerProj?.storyboard as any[]) || [];
+                const totalDuration = storyboard.reduce((s, sc) => s + (sc?.durationSeconds || 0), 0);
+
+                await supabaseAdmin.from('video_creations').insert({
+                  user_id: composerUserId,
+                  output_url: finalOutputUrl,
+                  status: 'completed',
+                  metadata: {
+                    source: 'composer',
+                    composer_project_id: composerProjectId,
+                    render_id: renderId,
+                    title: composerProj?.title || 'Motion Studio Video',
+                    scenes_count: storyboard.length,
+                    total_duration: totalDuration,
+                  },
+                });
+                console.log('✅ Composer video saved to Media Library');
+              }
+            }
           }
 
           // Update universal_video_progress — PRIMARY via progressId, fallback via renderId scan

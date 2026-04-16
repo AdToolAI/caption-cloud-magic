@@ -73,17 +73,50 @@ serve(async (req) => {
 
     const langLabel = language === "de" ? "German" : language === "es" ? "Spanish" : "English";
 
-    const systemPrompt = `You are a professional video ad storyboard director. You create structured scene-by-scene storyboards for short-form video ads.
+    // Tone → visual styling translation (drives lighting/lens/look)
+    const toneStyling: Record<string, string> = {
+      professional: 'clean key light, neutral white-balance, 50mm lens, subtle dolly, restrained composition',
+      energetic: 'handheld camera, neon practicals, rapid push-ins, high-contrast color, 24mm wide lens',
+      emotional: 'soft window light, shallow depth of field, 85mm portrait lens, slow motion, golden hour warmth',
+      funny: 'bright even light, playful primary colors, snap-zoom punch-ins, whip pans, 35mm lens',
+      luxury: 'low-key chiaroscuro, marble & gold textures, slow orbit, 50mm anamorphic, deep blacks',
+      minimal: 'single hard light source, monochrome palette, locked-off composition, 50mm lens, generous negative space',
+      dramatic: 'top-down rim light, smoke, low angle, 35mm anamorphic with lens flares, slow dolly-in',
+      friendly: 'soft daylight, pastel palette, eye-level composition, 35mm lens, gentle handheld breathing',
+    };
+    const toneLook = toneStyling[briefing.tone] || toneStyling.professional;
 
-Rules:
-- Each scene must be 3-15 seconds
-- Total duration must be approximately ${briefing.duration} seconds
-- Create ${targetSceneCount} scenes (±1)
-- Write all AI video prompts in English (they're for AI video generation)
-- Write text overlays in ${langLabel}
-- Each scene needs a clear, detailed AI generation prompt describing the visual
-- Include stock search keywords as fallback for each scene
-- Text overlays should be short, punchy ad copy (max 8 words)`;
+    // Per scene-type structural hints
+    const sceneTypeHints = `Scene-type visual templates (use as starting point):
+- hook: extreme close-up or macro detail · 24-35mm wide · sudden motion · pattern-interrupt
+- problem: medium shot of frustrated subject · low-key light · cool tint · static or shake
+- solution: reveal shot · key-light up · push-in or rack focus · warm tint
+- demo: product hero shot · 50mm or macro · controlled lighting · slow rotation or detail tracking
+- social-proof: portrait shot or testimonial framing · 85mm · soft natural light · shallow depth
+- cta: wide hero shot · symmetrical composition · brand color dominant · slow pull-out`;
+
+    const systemPrompt = `You are a senior cinematographer + video ad director. You write professional, production-ready storyboards for short-form video ads. Your AI prompts must read like real cinematography directions, not generic descriptions.
+
+Hard rules:
+- Each scene 3-15 seconds; total ≈ ${briefing.duration}s; create ${targetSceneCount} scenes (±1)
+- Text overlays in ${langLabel} (max 8 words, punchy)
+- Transitions in English (enum)
+
+AI prompt requirements (CRITICAL — every aiPrompt MUST contain ALL of these):
+1. SUBJECT: who/what is on screen (concrete, not abstract)
+2. ACTION: what they/it are doing
+3. CAMERA: angle + movement (e.g. "low angle slow dolly-in", "overhead static", "handheld whip pan")
+4. LENS: focal length or framing (e.g. "shot on 35mm anamorphic", "macro lens", "85mm portrait")
+5. LIGHTING: direction + quality + color temp (e.g. "golden hour key from camera left, soft fill")
+6. MOOD/STYLE: cinematic look (e.g. "shallow depth of field, filmic grain, muted Kodak Portra palette")
+7. TONE-DRIVEN LOOK for "${briefing.tone}" → ${toneLook}
+8. Length: minimum 50 words per aiPrompt — aim for 60-80
+9. Always end aiPrompt with: ", no on-screen text, no captions, no subtitles, no watermarks, no logos" (CRITICAL — prevents AI from burning text into the video which would conflict with our overlay system)
+10. Never include any quoted on-screen text in the aiPrompt itself
+
+${sceneTypeHints}
+
+Write text overlays separately (in ${langLabel}) — they're rendered as a distinct layer on top of the video.`;
 
     const labels = (() => {
       switch (category) {

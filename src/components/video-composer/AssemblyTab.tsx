@@ -81,6 +81,13 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
             title: t('videoComposer.videoReady') || 'Video fertig',
             description: t('videoComposer.videoReadyDesc') || 'Dein Video kann angesehen und heruntergeladen werden.',
           });
+          // Inform that the video was saved to the Media Library
+          setTimeout(() => {
+            toast({
+              title: t('videoComposer.savedToLibrary') || 'In Mediathek gespeichert',
+              description: t('videoComposer.savedToLibraryDesc') || 'Du findest dein Video jetzt auch in der Mediathek.',
+            });
+          }, 800);
           return;
         }
         if (status === 'failed') {

@@ -135,6 +135,18 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const webhookUrl = `${supabaseUrl}/functions/v1/compose-clip-webhook`;
 
+    // Append a negative-text suffix to AI prompts so models don't burn captions/watermarks
+    // into the generated clip (would conflict with our manual overlay system).
+    const NEGATIVE_TEXT_SUFFIX = ", no on-screen text, no captions, no subtitles, no watermarks, no logos";
+    const enrichPrompt = (prompt?: string): string => {
+      const base = (prompt || "cinematic footage").trim();
+      const lower = base.toLowerCase();
+      if (lower.includes("no text") || lower.includes("no captions") || lower.includes("no subtitles")) {
+        return base;
+      }
+      return base + NEGATIVE_TEXT_SUFFIX;
+    };
+
     const results: Array<{ sceneId: string; status: string; predictionId?: string; clipUrl?: string; error?: string }> = [];
 
     // Helper: extract a useful error message from Replicate / generic errors
@@ -202,7 +214,7 @@ serve(async (req) => {
             .eq('id', scene.id);
 
           const hailuoInput: Record<string, unknown> = {
-            prompt: scene.aiPrompt || "cinematic footage",
+            prompt: enrichPrompt(scene.aiPrompt),
             duration: duration,
             resolution: resolution,
           };
@@ -234,7 +246,7 @@ serve(async (req) => {
             .eq('id', scene.id);
 
           const klingInput: Record<string, unknown> = {
-            prompt: scene.aiPrompt || "cinematic footage",
+            prompt: enrichPrompt(scene.aiPrompt),
             duration: Math.min(scene.durationSeconds, 10),
             aspect_ratio: "16:9",
             mode: quality === 'pro' ? 'pro' : 'standard',
