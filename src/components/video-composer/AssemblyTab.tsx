@@ -286,18 +286,26 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         </CardContent>
       </Card>
 
-      {/* Polling: live status */}
+      {/* Polling: live progress bar */}
       {isPolling && (
         <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="py-4 flex items-center gap-3">
-            <Loader2 className="h-5 w-5 text-primary shrink-0 animate-spin" />
-            <div className="flex-1">
-              <p className="text-sm font-medium">{t('videoComposer.lambdaRendering') || 'Lambda rendert …'}</p>
-              <p className="text-[10px] text-muted-foreground">
-                {renderId ? `${t('videoComposer.renderIdShort')}: ${renderId.slice(0, 8)}…` : ''}
-                {longRunning && ' — ' + (t('videoComposer.takingLonger') || 'Dauert länger als erwartet')}
+          <CardContent className="py-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-4 w-4 text-primary shrink-0 animate-spin" />
+              <p className="text-sm font-medium flex-1">
+                {progress < 5
+                  ? (t('videoComposer.lambdaStarting') || 'Lambda startet …')
+                  : progress < 95
+                    ? (t('videoComposer.framesRendering') || 'Frames werden gerendert …')
+                    : (t('videoComposer.encodingUploading') || 'Video wird kodiert & hochgeladen …')}
               </p>
+              <span className="text-sm font-semibold text-primary tabular-nums">{progress}%</span>
             </div>
+            <Progress value={progress} className="h-2" />
+            <p className="text-[10px] text-muted-foreground">
+              {renderId ? `${t('videoComposer.renderIdShort')}: ${renderId.slice(0, 8)}…` : ''}
+              {longRunning && ' — ' + (t('videoComposer.takingLonger') || 'Dauert länger als erwartet')}
+            </p>
           </CardContent>
         </Card>
       )}
