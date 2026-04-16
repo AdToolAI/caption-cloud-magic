@@ -160,11 +160,11 @@ export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> 
   upload: { de: 'Eigener Upload', en: 'Own Upload' },
 };
 
-// Estimated costs per clip source
+// Estimated costs per clip source — EUR per second (aligned with AI Video Studio Hub pricing, upper bound)
 export const CLIP_SOURCE_COSTS: Record<ClipSource, number> = {
-  'ai-hailuo': 1.20,
-  'ai-kling': 1.50,
-  'ai-sora': 2.00,
+  'ai-hailuo': 0.20,  // €0.15–0.20/s
+  'ai-kling': 0.21,   // €0.10–0.21/s
+  'ai-sora': 0.53,    // €0.25–0.53/s
   stock: 0,
   upload: 0,
 };

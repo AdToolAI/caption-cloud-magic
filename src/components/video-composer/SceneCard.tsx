@@ -102,7 +102,7 @@ export default function SceneCard({
                 </Select>
 
                 <span className="text-xs text-muted-foreground">{scene.durationSeconds}s</span>
-                <span className="text-[10px] text-primary">€{(CLIP_SOURCE_COSTS[scene.clipSource] || 0).toFixed(2)}</span>
+                <span className="text-[10px] text-primary">€{((CLIP_SOURCE_COSTS[scene.clipSource] || 0) * scene.durationSeconds).toFixed(2)}</span>
               </div>
 
               <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={onDelete}>

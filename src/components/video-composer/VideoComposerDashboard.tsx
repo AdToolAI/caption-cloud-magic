@@ -16,6 +16,7 @@ import type {
   ComposerCategory,
   ComposerStatus,
 } from '@/types/video-composer';
+import { CLIP_SOURCE_COSTS } from '@/types/video-composer';
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'audio' | 'export';
 
@@ -117,6 +118,7 @@ export default function VideoComposerDashboard() {
   }, []);
 
   const totalDuration = project.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
+  const liveCost = project.scenes.reduce((sum, s) => sum + (CLIP_SOURCE_COSTS[s.clipSource] || 0) * s.durationSeconds, 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -147,7 +149,7 @@ export default function VideoComposerDashboard() {
             <div className="text-right">
               <p className="text-xs text-muted-foreground">{t('videoComposer.estimatedCost')}</p>
               <p className="text-sm font-semibold text-primary">
-                €{project.totalCostEuros.toFixed(2)}
+                €{liveCost.toFixed(2)}
               </p>
             </div>
           </div>
