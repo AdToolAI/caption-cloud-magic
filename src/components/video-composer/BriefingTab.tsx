@@ -27,6 +27,7 @@ import type {
   ComposerMode,
   AspectRatio,
   EmotionalTone,
+  ClipQuality,
 } from '@/types/video-composer';
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string; desc: string }[] = [
@@ -191,7 +192,13 @@ export default function BriefingTab({
 
       if (error) throw error;
       if (data?.scenes) {
-        onScenesGenerated(data.scenes);
+        // Apply default quality to all generated scenes
+        const defaultQ: ClipQuality = briefing.defaultQuality || 'standard';
+        const scenesWithQuality = data.scenes.map((s: ComposerScene) => ({
+          ...s,
+          clipQuality: s.clipQuality || defaultQ,
+        }));
+        onScenesGenerated(scenesWithQuality);
         onUpdateProject({ status: 'storyboard' });
         toast({ title: t('videoComposer.storyboardGenerated'), description: `${data.scenes.length} ${t('videoComposer.scenesCreated')}` });
       }
