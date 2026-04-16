@@ -148,6 +148,34 @@ export default function SceneCard({
               })}
             </div>
 
+            {/* Quality Tier — only for AI sources */}
+            {scene.clipSource.startsWith('ai-') && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <Label className="text-[10px] text-muted-foreground">Qualität:</Label>
+                <div className="flex gap-1">
+                  {(['standard', 'pro'] as ClipQuality[]).map((q) => {
+                    const isActive = (scene.clipQuality || 'standard') === q;
+                    const rate = getClipRate(scene.clipSource, q);
+                    return (
+                      <button
+                        key={q}
+                        onClick={() => onUpdate({ clipQuality: q })}
+                        className={`px-2 py-1 rounded text-[10px] border transition-all ${
+                          isActive
+                            ? q === 'pro'
+                              ? 'border-amber-500/60 bg-amber-500/10 text-amber-400'
+                              : 'border-primary bg-primary/10 text-primary'
+                            : 'border-border/40 text-muted-foreground hover:border-border'
+                        }`}
+                      >
+                        {QUALITY_LABELS[scene.clipSource][q]} — €{rate.toFixed(2)}/s
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Prompt / Keywords / Upload */}
             {scene.clipSource.startsWith('ai-') && (
               <div className="space-y-1">
