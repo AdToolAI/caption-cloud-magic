@@ -80,7 +80,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
           toast({ title: t('uc.errorLoadingVoices'), description: t('uc.errorLoadingVoicesDesc'), variant: 'destructive' });
           return;
         }
-        setVoices(data.voices || []);
+        setVoices(sortVoicesPremiumFirst(data.voices || []));
       } catch (err) {
         console.error('Failed to load voices:', err);
       } finally {
