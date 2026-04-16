@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
+import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 
 interface AIVoiceOverProps {
   settings: {
@@ -196,32 +197,40 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
                   ) : (
                     <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
                       {voicesForLang(lang).map((voice) => (
-                        <button
+                        <div
                           key={voice.id}
-                          onClick={() => handleVoiceSelect(voice.id)}
-                          className={`p-3 rounded-lg border text-left transition-all ${
+                          className={`p-3 rounded-lg border text-left transition-all relative ${
                             settings.voiceId === voice.id
                               ? 'border-primary bg-primary/10 ring-1 ring-primary'
                               : 'border-border hover:border-primary/50 hover:bg-muted/50'
                           }`}
                         >
-                          <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
-                            <span className="text-base">
-                              {voice.gender === 'female' ? '♀' : voice.gender === 'male' ? '♂' : '◎'}
-                            </span>
-                            <span className="truncate">{voice.name}</span>
-                            {voice.tier === 'premium' && (
-                              <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">
-                                Premium
-                              </Badge>
-                            )}
-                          </div>
-                          {voice.description && (
-                            <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                              {voice.description}
+                          <button
+                            type="button"
+                            onClick={() => handleVoiceSelect(voice.id)}
+                            className="w-full text-left pr-8"
+                          >
+                            <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
+                              <span className="text-base">
+                                {voice.gender === 'female' ? '♀' : voice.gender === 'male' ? '♂' : '◎'}
+                              </span>
+                              <span className="truncate">{voice.name}</span>
+                              {voice.tier === 'premium' && (
+                                <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">
+                                  Premium
+                                </Badge>
+                              )}
                             </div>
-                          )}
-                        </button>
+                            {voice.description && (
+                              <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                                {voice.description}
+                              </div>
+                            )}
+                          </button>
+                          <div className="absolute top-1.5 right-1.5">
+                            <VoicePreviewButton voiceId={voice.id} language={lang} />
+                          </div>
+                        </div>
                       ))}
                     </div>
                   )}
