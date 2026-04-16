@@ -157,10 +157,19 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
       });
       onUpdateScenes(updatedScenes);
 
-      toast({
-        title: 'Clip-Generierung gestartet',
-        description: `${data?.generatingCount || 0} KI-Clips werden generiert (€${(data?.totalCost || 0).toFixed(2)}).`,
-      });
+      const failedResults = (data?.results || []).filter((r: any) => r.status === 'failed');
+      if (failedResults.length > 0) {
+        toast({
+          title: `${failedResults.length} Clip(s) fehlgeschlagen`,
+          description: failedResults[0]?.error?.slice(0, 200) || 'Unbekannter Fehler',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Clip-Generierung gestartet',
+          description: `${data?.generatingCount || 0} KI-Clips werden generiert (€${remainingCost.toFixed(2)}).`,
+        });
+      }
       // Trigger immediate poll
       setTimeout(pollScenes, 500);
     } catch (err: any) {
