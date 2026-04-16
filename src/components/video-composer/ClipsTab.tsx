@@ -116,6 +116,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
         .map(s => ({
           id: s.id,
           clipSource: s.clipSource,
+          clipQuality: s.clipQuality || 'standard',
           aiPrompt: s.aiPrompt,
           stockKeywords: s.stockKeywords,
           uploadUrl: s.uploadUrl,
@@ -197,6 +198,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
           scenes: [{
             id: targetScene.id,
             clipSource: targetScene.clipSource,
+            clipQuality: targetScene.clipQuality || 'standard',
             aiPrompt: targetScene.aiPrompt,
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
