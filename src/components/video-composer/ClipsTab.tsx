@@ -8,7 +8,7 @@ import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Sear
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { ComposerScene } from '@/types/video-composer';
-import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, CLIP_SOURCE_COSTS } from '@/types/video-composer';
+import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
 import { SceneClipProgress } from './SceneClipProgress';
 
 interface ClipsTabProps {
@@ -43,7 +43,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
   // Calculate total cost (only pending AI scenes)
   const remainingCost = pendingScenes.reduce((sum, s) => {
     if (s.clipSource.startsWith('ai-')) {
-      return sum + s.durationSeconds * (CLIP_SOURCE_COSTS[s.clipSource] || 0);
+      return sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds);
     }
     return sum;
   }, 0);
@@ -303,8 +303,9 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
       <div className="grid gap-3">
         {scenes.map((scene, i) => {
           const status = statusConfig[scene.clipStatus] || statusConfig.pending;
+          const sceneQuality = scene.clipQuality || 'standard';
           const costPerClip = scene.clipSource.startsWith('ai-')
-            ? scene.durationSeconds * (CLIP_SOURCE_COSTS[scene.clipSource] || 0)
+            ? getClipCost(scene.clipSource, sceneQuality, scene.durationSeconds)
             : 0;
           const isUpload = scene.clipSource === 'upload';
           const hasUpload = !!scene.uploadUrl;

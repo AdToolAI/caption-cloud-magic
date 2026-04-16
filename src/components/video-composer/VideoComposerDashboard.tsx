@@ -16,7 +16,7 @@ import type {
   ComposerCategory,
   ComposerStatus,
 } from '@/types/video-composer';
-import { CLIP_SOURCE_COSTS } from '@/types/video-composer';
+import { getClipCost } from '@/types/video-composer';
 import { useComposerPersistence } from '@/hooks/useComposerPersistence';
 import { toast } from '@/hooks/use-toast';
 

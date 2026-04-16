@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, ArrowRight } from 'lucide-react';
 import SceneCard from './SceneCard';
 import type { ComposerScene, ClipSource } from '@/types/video-composer';
-import { DEFAULT_TEXT_OVERLAY, CLIP_SOURCE_COSTS } from '@/types/video-composer';
+import { DEFAULT_TEXT_OVERLAY, getClipCost, getClipRate } from '@/types/video-composer';
 
 interface StoryboardTabProps {
   scenes: ComposerScene[];
@@ -22,6 +22,7 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
       sceneType: 'custom',
       durationSeconds: 5,
       clipSource: 'stock',
+      clipQuality: 'standard',
       clipStatus: 'pending',
       textOverlay: { ...DEFAULT_TEXT_OVERLAY },
       transitionType: 'fade',
@@ -37,10 +38,13 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
       scenes.map((s) => {
         if (s.id !== id) return s;
         const updated = { ...s, ...updates };
-        // Recalculate cost when source or duration changes (per-second × duration)
-        if (updates.clipSource || updates.durationSeconds) {
-          const perSec = CLIP_SOURCE_COSTS[(updates.clipSource ?? updated.clipSource) as ClipSource] || 0;
-          updated.costEuros = perSec * updated.durationSeconds;
+        // Recalculate cost when source, quality or duration changes
+        if (updates.clipSource || updates.durationSeconds || updates.clipQuality) {
+          updated.costEuros = getClipCost(
+            updated.clipSource,
+            updated.clipQuality || 'standard',
+            updated.durationSeconds
+          );
         }
         return updated;
       })
@@ -64,7 +68,7 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
   };
 
   const totalDuration = scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
-  const totalCost = scenes.reduce((sum, s) => sum + (CLIP_SOURCE_COSTS[s.clipSource] || 0) * s.durationSeconds, 0);
+  const totalCost = scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto">
