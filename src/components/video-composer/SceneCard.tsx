@@ -196,13 +196,31 @@ export default function SceneCard({
             {/* Prompt / Keywords / Upload */}
             {scene.clipSource.startsWith('ai-') && (
               <div className="space-y-2">
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">KI-Prompt (EN)</Label>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-[10px] text-muted-foreground">
+                      {lang === 'de'
+                        ? 'KI-Prompt (EN) — bearbeitbar'
+                        : lang === 'es'
+                        ? 'Prompt IA (EN) — editable'
+                        : 'AI Prompt (EN) — editable'}
+                    </Label>
+                  </div>
+                  <div className="flex items-start gap-2 rounded-md border border-primary/20 bg-primary/5 p-2">
+                    <Lightbulb className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />
+                    <p className="text-[10px] leading-relaxed text-muted-foreground">
+                      {lang === 'de'
+                        ? 'Tipp: Dieser Prompt ist nur eine Vorlage. Passe ihn an dein Produkt und deine Vision an — je präziser (Setting, Kamera, Stimmung, Verwendung), desto besser das Ergebnis.'
+                        : lang === 'es'
+                        ? 'Consejo: Este prompt es solo una plantilla. Adáptalo a tu producto y visión — cuanto más preciso (escenario, cámara, ambiente, uso), mejor será el resultado.'
+                        : 'Tip: This prompt is only a template. Adapt it to your product and vision — the more specific (setting, camera, mood, usage), the better the result.'}
+                    </p>
+                  </div>
                   <Textarea
                     value={scene.aiPrompt || ''}
                     onChange={(e) => onUpdate({ aiPrompt: e.target.value })}
                     placeholder="Describe the scene visually in English..."
-                    rows={2}
+                    rows={3}
                     className="text-xs bg-background/50 resize-none"
                   />
                 </div>
