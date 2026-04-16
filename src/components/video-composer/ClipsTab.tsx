@@ -343,10 +343,19 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
                       <p className="text-[11px] text-foreground/80 truncate">
                         {scene.aiPrompt || scene.stockKeywords || (isUpload ? 'Eigener Upload' : 'Kein Prompt')}
                       </p>
-                      <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                        {CLIP_SOURCE_LABELS[scene.clipSource]?.de}
+                      <p className="text-[10px] text-muted-foreground/70 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span>{CLIP_SOURCE_LABELS[scene.clipSource]?.de}</span>
+                        {isAi && (
+                          <span className={`px-1.5 py-0 rounded text-[9px] border ${
+                            sceneQuality === 'pro'
+                              ? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
+                              : 'border-border/40 bg-muted/40 text-muted-foreground'
+                          }`}>
+                            {QUALITY_LABELS[scene.clipSource][sceneQuality]}
+                          </span>
+                        )}
                         {scene.clipStatus === 'generating' && isAi && (
-                          <span className="ml-2 text-accent inline-flex items-center gap-1">
+                          <span className="text-accent inline-flex items-center gap-1">
                             <Loader2 className="h-2.5 w-2.5 animate-spin" />
                             KI rendert ca. 30–60s…
                           </span>
