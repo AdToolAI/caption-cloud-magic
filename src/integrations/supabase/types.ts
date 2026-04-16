@@ -3389,6 +3389,7 @@ export type Database = {
           id: string
           order_index: number
           project_id: string
+          reference_image_url: string | null
           replicate_prediction_id: string | null
           retry_count: number
           scene_type: string
@@ -3412,6 +3413,7 @@ export type Database = {
           id?: string
           order_index?: number
           project_id: string
+          reference_image_url?: string | null
           replicate_prediction_id?: string | null
           retry_count?: number
           scene_type?: string
@@ -3435,6 +3437,7 @@ export type Database = {
           id?: string
           order_index?: number
           project_id?: string
+          reference_image_url?: string | null
           replicate_prediction_id?: string | null
           retry_count?: number
           scene_type?: string
