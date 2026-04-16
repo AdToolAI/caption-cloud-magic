@@ -142,7 +142,15 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
   const charCount = value?.scriptText?.length || 0;
   const wordCount = value?.scriptText?.split(/\s+/).filter(Boolean).length || 0;
   const estimatedDuration = Math.ceil((wordCount / 150) * 60);
-  const filteredVoices = voices.filter((v) => v.language === selectedLanguage);
+  const filteredVoices = voices.filter((v) =>
+    v.language === selectedLanguage || (v.supportedLanguages || []).includes(selectedLanguage)
+  );
+
+  const TIPS: Record<string, string> = {
+    de: '💡 Premium-Stimmen klingen am natürlichsten. Tipp: Nutze Satzzeichen für realistische Pausen.',
+    en: '💡 Premium voices sound most natural. Tip: Use punctuation for realistic pauses.',
+    es: '💡 Las voces premium suenan más naturales. Consejo: usa puntuación para pausas realistas.',
+  };
 
   const voiceoverUrlRef = useRef<string | undefined>();
   useEffect(() => {
@@ -209,24 +217,52 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">{t('uc.voiceoverSettings')}</h3>
             <div className="space-y-6">
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
+                <Info className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                <span>{TIPS[language] || TIPS.en}</span>
+              </div>
+
               <div className="space-y-2">
                 <Label>{t('uc.languageLabel')}</Label>
                 <Tabs value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="de" disabled={loadingVoices}>Deutsch {!loadingVoices && `(${voices.filter(v => v.language === 'de').length})`}</TabsTrigger>
-                    <TabsTrigger value="en" disabled={loadingVoices}>English {!loadingVoices && `(${voices.filter(v => v.language === 'en').length})`}</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="de" disabled={loadingVoices}>🇩🇪 DE {!loadingVoices && `(${voices.filter(v => v.language === 'de' || (v.supportedLanguages || []).includes('de')).length})`}</TabsTrigger>
+                    <TabsTrigger value="en" disabled={loadingVoices}>🇬🇧 EN {!loadingVoices && `(${voices.filter(v => v.language === 'en' || (v.supportedLanguages || []).includes('en')).length})`}</TabsTrigger>
+                    <TabsTrigger value="es" disabled={loadingVoices}>🇪🇸 ES {!loadingVoices && `(${voices.filter(v => v.language === 'es' || (v.supportedLanguages || []).includes('es')).length})`}</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
 
               <div className="space-y-2">
                 <Label>{t('uc.selectVoice')}</Label>
-                <Select value={voiceConfig.voiceId} onValueChange={(voiceId) => { const voice = filteredVoices.find((v) => v.id === voiceId); setVoiceConfig({ ...voiceConfig, voiceId, voiceName: voice?.name || 'Voice' }); }} disabled={loadingVoices || filteredVoices.length === 0}>
+                <Select
+                  value={voiceConfig.voiceId}
+                  onValueChange={(voiceId) => {
+                    const voice = filteredVoices.find((v) => v.id === voiceId);
+                    const newCfg = {
+                      ...voiceConfig,
+                      voiceId,
+                      voiceName: voice?.name || 'Voice',
+                      modelId: voice?.recommended_model || voiceConfig.modelId,
+                      stability: voice?.recommended_settings?.stability ?? voiceConfig.stability,
+                      similarityBoost: voice?.recommended_settings?.similarity_boost ?? voiceConfig.similarityBoost,
+                    };
+                    setVoiceConfig(newCfg);
+                  }}
+                  disabled={loadingVoices || filteredVoices.length === 0}
+                >
                   <SelectTrigger><SelectValue placeholder={loadingVoices ? t('uc.loadingVoices') : t('uc.chooseAVoice')} /></SelectTrigger>
                   <SelectContent>
                     {filteredVoices.map((voice) => (
                       <SelectItem key={voice.id} value={voice.id}>
-                        {voice.name}{voice.gender && ` (${voice.gender})`}{voice.accent && voice.accent !== 'neutral' && ` - ${voice.accent}`}
+                        <span className="flex items-center gap-2">
+                          {voice.tier === 'premium' && (
+                            <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">Premium</Badge>
+                          )}
+                          <span>{voice.name}</span>
+                          {voice.gender && <span className="text-xs text-muted-foreground">({voice.gender})</span>}
+                          {voice.accent && voice.accent !== 'neutral' && <span className="text-xs text-muted-foreground">— {voice.accent}</span>}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
