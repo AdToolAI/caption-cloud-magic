@@ -76,7 +76,7 @@ export default function HubPage() {
   const HubIcon = hub.icon;
 
   return (
-    <PageWrapper className="relative p-6 md:p-10 max-w-6xl mx-auto overflow-hidden">
+    <PageWrapper className="relative p-6 md:p-10 max-w-6xl mx-auto">
       {/* ── Shimmer keyframes ── */}
       <style>{`
         @keyframes shimmer-border {
