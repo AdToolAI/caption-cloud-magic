@@ -18,6 +18,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
+import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import type { AssemblyConfig, ComposerScene, VoiceoverConfig, MusicConfig } from '@/types/video-composer';
 
 interface AudioTabProps {
