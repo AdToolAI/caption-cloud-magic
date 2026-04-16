@@ -56,6 +56,7 @@ export interface ComposerScene {
   aiPrompt?: string;
   stockKeywords?: string;
   uploadUrl?: string;
+  uploadType?: 'video' | 'image';
   clipUrl?: string;
   clipStatus: ClipStatus;
   textOverlay: TextOverlayConfig;

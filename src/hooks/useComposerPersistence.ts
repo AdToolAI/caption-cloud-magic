@@ -80,13 +80,14 @@ export function useComposerPersistence() {
               ai_prompt: scene.aiPrompt ?? null,
               stock_keywords: scene.stockKeywords ?? null,
               upload_url: scene.uploadUrl ?? null,
+              upload_type: scene.uploadType ?? null,
               clip_url: scene.clipUrl ?? null,
               clip_status: scene.clipStatus,
               text_overlay: scene.textOverlay as any,
               transition_type: scene.transitionType,
               transition_duration: scene.transitionDuration,
               cost_euros: scene.costEuros,
-            })
+            } as any)
             .eq('id', scene.id);
 
           if (updErr) {
