@@ -228,9 +228,13 @@ export default function SceneCard({
           </div>
 
           {/* Thumbnail preview */}
-          <div className="w-24 h-16 rounded bg-muted/30 border border-border/20 flex items-center justify-center flex-shrink-0">
-            {scene.clipUrl ? (
-              <video src={scene.clipUrl} className="w-full h-full object-cover rounded" muted />
+          <div className="w-24 h-16 rounded bg-muted/30 border border-border/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+            {scene.uploadType === 'image' && scene.uploadUrl ? (
+              <img src={scene.uploadUrl} alt="" className="w-full h-full object-cover" />
+            ) : scene.clipUrl ? (
+              <video src={scene.clipUrl} className="w-full h-full object-cover" muted />
+            ) : scene.uploadUrl ? (
+              <video src={scene.uploadUrl} className="w-full h-full object-cover" muted />
             ) : (
               <ClipIcon className="h-5 w-5 text-muted-foreground/30" />
             )}
