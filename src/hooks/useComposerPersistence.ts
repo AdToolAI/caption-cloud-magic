@@ -107,6 +107,7 @@ export function useComposerPersistence() {
               ai_prompt: scene.aiPrompt ?? null,
               stock_keywords: scene.stockKeywords ?? null,
               upload_url: scene.uploadUrl ?? null,
+              upload_type: scene.uploadType ?? null,
               clip_url: scene.clipUrl ?? null,
               clip_status: scene.clipStatus || 'pending',
               text_overlay: scene.textOverlay as any,
@@ -114,7 +115,7 @@ export function useComposerPersistence() {
               transition_duration: scene.transitionDuration ?? 0.5,
               cost_euros: scene.costEuros || 0,
               retry_count: scene.retryCount || 0,
-            })
+            } as any)
             .select('id')
             .single();
 
