@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/collapsible';
 import {
   ChevronUp, ChevronDown, Trash2, GripVertical,
-  Sparkles, Upload, Video, Type, AlertTriangle,
+  Sparkles, Upload, Video, Type, AlertTriangle, Lightbulb,
 } from 'lucide-react';
 import type {
   ComposerScene,
