@@ -1,50 +1,63 @@
 
 
-## Problem
-Im **Motion Studio** (`/video-composer` → `BriefingTab.tsx`) ist die Kategorie-Auswahl (Storytelling, Unternehmen, Editor, Produktvideo) nur visuell — sie ändert nur das aktive `category`-Feld im State, aber das gerenderte Formular ist **immer das gleiche Produktvideo-Briefing** (Produktname, USPs, Zielgruppe). Auch die "Weiter"-Validierung verlangt immer `productName`.
+## Befund
+Der User hat recht — im AI Video Studio Hub (`/ai-video-studio`) sind die offiziellen, beworbenen Preise pro Modell:
 
-→ Universal Video Creator wird **nicht** angefasst.
+| Modell | Beworbener Preis |
+|---|---|
+| Sora 2 | €0.25–0.53/s |
+| Kling 3.0 | €0.10–0.21/s |
+| Seedance 2.0 | €0.10–0.21/s |
+| Wan 2.5 | €0.10–0.15/s |
+| **Hailuo 2.3** | **€0.15–0.20/s** |
+| Luma Ray 2 | €0.18–0.25/s |
 
-## Lösung — Kategorie-spezifische Briefings im Motion Studio
+Im Motion Studio (`BriefingTab.tsx`) sind dagegen die `CLIP_SOURCE_COSTS` viel zu hoch:
+- `ai-hailuo`: **1.20 €/s** (statt €0.15–0.20)
+- `ai-kling`: **1.50 €/s** (statt €0.10–0.21)
+- `ai-sora`: **2.00 €/s** (statt €0.25–0.53)
 
-### 1. `BriefingTab.tsx` umbauen
-Das Statement "Produkt / Service"-Card abhängig von `category` rendern. 4 Varianten:
+→ Das sind ~6–10× zu hohe Werte. Daher €36 für 30s Hailuo statt korrekt **€4.50–€6.00**.
 
-| Kategorie | Felder | Validierung |
+## Untersuchung nötig
+- `src/types/video-composer.ts` lesen (wo `CLIP_SOURCE_COSTS` definiert ist)
+- AI Video Studio Hub-Seite lesen, um Preise als Single Source of Truth zu identifizieren
+- `BriefingTab.tsx`, `ClipsTab.tsx`, `StoryboardTab.tsx`, `SceneCard.tsx`, `AssemblyTab.tsx`, `VideoComposerDashboard.tsx` für Anzeige
+
+## Plan — Preise an offizielle AI Video Studio Tarife angleichen
+
+### 1. `CLIP_SOURCE_COSTS` korrigieren (`src/types/video-composer.ts`)
+Wir nehmen die **obere Grenze** (worst case, ehrlich) der offiziellen Preise als Default:
+
+| Quelle | Alt | Neu |
 |---|---|---|
-| `product-ad` (Produktvideo) | Projektname, Produktname, Beschreibung, USPs, Zielgruppe | `productName` |
-| `corporate-ad` (Unternehmen) | Projektname, Firmenname, Branche/Mission, Kernbotschaften, Zielgruppe | `productName` (= Firmenname) |
-| `storytelling` (Storytelling) | Projektname, Story-Titel, Protagonist, Konflikt/Setting, Kernbotschaft, Zielemotion | `productName` (= Story-Titel) |
-| `custom` (Editor) | Projektname, Titel, freie Beschreibung/Notizen, optional Stilhinweise | `productName` (= Titel) |
+| `ai-hailuo` | 1.20 €/s | **0.20 €/s** |
+| `ai-kling` | 1.50 €/s | **0.21 €/s** |
+| `ai-sora` | 2.00 €/s | **0.53 €/s** |
+| `stock` | 0 | 0 |
+| `upload` | 0 | 0 |
 
-→ Wir behalten die Datenstruktur `ComposerBriefing` unverändert (kein DB-Schema-Change). `productName` wird je Kategorie semantisch umetikettiert: Firmenname / Story-Titel / Titel. `usps` wird umetikettiert: Kernbotschaften / Schlüsselszenen / Notizen. So bleibt die Edge-Function `compose-video-storyboard` kompatibel.
+→ 30s Hailuo = **€6.00** (statt €36). 30s Kling = €6.30. 30s Sora = €15.90.
 
-### 2. Implementation
-- Eine kleine Helper-Funktion `getCategoryLabels(category)` in `BriefingTab.tsx`, die Label-Keys für die aktuelle Kategorie zurückgibt (z. B. `productNameLabel` → `companyNameLabel` / `storyTitleLabel` / `titleLabel`).
-- Conditional Rendering: bei Storytelling die Felder "Protagonist", "Konflikt", "Zielemotion" zeigen statt "USPs / Zielgruppe". Bei Editor nur ein freies Notes-Textfeld.
-- Card-Titel ändern: "Produkt / Service" → wechselt mit Kategorie.
-- Toast-Texte beim Generieren ("Bitte Produktname eingeben") ebenfalls dynamisch.
+### 2. EUR-Anzeige beibehalten (kein Wechsel auf Credits)
+Der User hat im AI Video Studio Hub bewusst EUR-Pricing etabliert. Konsistenz ist wichtiger als Credit-Umstellung. Daher:
+- Anzeige bleibt in **€**
+- Format: `€X.XX` (zwei Dezimalstellen statt vier)
+- Optionaler Hinweis "ab €0.15/s" per Tooltip oder Untertitel an der Quelle-Auswahl, damit der User Range vs. Worst-Case versteht
 
-### 3. Lokalisierung (`src/lib/translations.ts`)
-Neue Keys in EN/DE/ES für alle 4 Kategorie-Varianten anlegen, z. B.:
-- `videoComposer.companyNameLabel`, `videoComposer.coreMessage`, `videoComposer.industry`
-- `videoComposer.storyTitle`, `videoComposer.protagonist`, `videoComposer.conflict`, `videoComposer.targetEmotion`
-- `videoComposer.editorTitle`, `videoComposer.editorNotes`
-- `videoComposer.briefingFor.product` / `.corporate` / `.storytelling` / `.editor` (für den dynamischen Card-Titel)
+### 3. UI-Cleanups (kleine Änderungen)
+- `ClipsTab.tsx`, `StoryboardTab.tsx`, `SceneCard.tsx`, `AssemblyTab.tsx`, `VideoComposerDashboard.tsx`: Formatierung von `toFixed(2)` (statt `.toFixed(4)` falls vorhanden) für saubere Cent-Beträge
+- Briefing-Tab: bei der Quellen-Auswahl die neuen Preise pro Sekunde anzeigen
 
-### 4. Edge-Function leicht anpassen (`supabase/functions/compose-video-storyboard`)
-Den System-Prompt erweitern, sodass der `category`-Parameter den Storyboard-Stil tatsächlich beeinflusst:
-- `storytelling` → narrativer 3-Akt-Aufbau (Setup → Konflikt → Auflösung)
-- `corporate-ad` → vertrauenserweckend, Mission-getrieben
-- `custom` → minimal-prompt, folgt freier Beschreibung möglichst wörtlich
-- `product-ad` → bisheriges Verhalten (USP-getrieben)
+### 4. Lokalisierung
+Keine neuen Strings nötig — bestehende `videoComposer.estimatedCost` etc. bleiben.
 
 ### 5. Verify
-End-to-End jede der 4 Kategorien anklicken und prüfen, dass jeweils das passende Formular erscheint und das generierte Storyboard zur Kategorie passt.
+30s Hailuo briefen → Header sollte **€6.00** zeigen (statt €36). Sora-Quelle wechseln → **€15.90**. Stock → €0.00.
 
 ### Was unverändert bleibt
-- Universal Video Creator (`/universal-video-creator`) — nicht anfassen
-- Datenmodell `ComposerBriefing` und DB-Schema
-- Tab-Struktur (Briefing → Storyboard → Clips → Audio → Export)
-- Style/Format-Card (Tonfall, Sprache, Dauer, Aspect Ratio)
+- Datenmodell `ComposerBriefing`, DB-Schema, Edge Functions
+- Briefing-Tab Kategorie-Logik (gerade fertiggestellt)
+- Universal Video Creator
+- Tab-Struktur
 
