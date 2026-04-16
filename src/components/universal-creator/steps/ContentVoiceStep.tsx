@@ -236,38 +236,43 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
 
               <div className="space-y-2">
                 <Label>{t('uc.selectVoice')}</Label>
-                <Select
-                  value={voiceConfig.voiceId}
-                  onValueChange={(voiceId) => {
-                    const voice = filteredVoices.find((v) => v.id === voiceId);
-                    const newCfg = {
-                      ...voiceConfig,
-                      voiceId,
-                      voiceName: voice?.name || 'Voice',
-                      modelId: voice?.recommended_model || voiceConfig.modelId,
-                      stability: voice?.recommended_settings?.stability ?? voiceConfig.stability,
-                      similarityBoost: voice?.recommended_settings?.similarity_boost ?? voiceConfig.similarityBoost,
-                    };
-                    setVoiceConfig(newCfg);
-                  }}
-                  disabled={loadingVoices || filteredVoices.length === 0}
-                >
-                  <SelectTrigger><SelectValue placeholder={loadingVoices ? t('uc.loadingVoices') : t('uc.chooseAVoice')} /></SelectTrigger>
-                  <SelectContent>
-                    {filteredVoices.map((voice) => (
-                      <SelectItem key={voice.id} value={voice.id}>
-                        <span className="flex items-center gap-2">
-                          {voice.tier === 'premium' && (
-                            <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">Premium</Badge>
-                          )}
-                          <span>{voice.name}</span>
-                          {voice.gender && <span className="text-xs text-muted-foreground">({voice.gender})</span>}
-                          {voice.accent && voice.accent !== 'neutral' && <span className="text-xs text-muted-foreground">— {voice.accent}</span>}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={voiceConfig.voiceId}
+                    onValueChange={(voiceId) => {
+                      const voice = filteredVoices.find((v) => v.id === voiceId);
+                      const newCfg = {
+                        ...voiceConfig,
+                        voiceId,
+                        voiceName: voice?.name || 'Voice',
+                        modelId: voice?.recommended_model || voiceConfig.modelId,
+                        stability: voice?.recommended_settings?.stability ?? voiceConfig.stability,
+                        similarityBoost: voice?.recommended_settings?.similarity_boost ?? voiceConfig.similarityBoost,
+                      };
+                      setVoiceConfig(newCfg);
+                    }}
+                    disabled={loadingVoices || filteredVoices.length === 0}
+                  >
+                    <SelectTrigger className="flex-1"><SelectValue placeholder={loadingVoices ? t('uc.loadingVoices') : t('uc.chooseAVoice')} /></SelectTrigger>
+                    <SelectContent>
+                      {filteredVoices.map((voice) => (
+                        <SelectItem key={voice.id} value={voice.id}>
+                          <span className="flex items-center gap-2">
+                            {voice.tier === 'premium' && (
+                              <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">Premium</Badge>
+                            )}
+                            <span>{voice.name}</span>
+                            {voice.gender && <span className="text-xs text-muted-foreground">({voice.gender})</span>}
+                            {voice.accent && voice.accent !== 'neutral' && <span className="text-xs text-muted-foreground">— {voice.accent}</span>}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {voiceConfig.voiceId && (
+                    <VoicePreviewButton voiceId={voiceConfig.voiceId} language={selectedLanguage} size="sm" className="shrink-0" />
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
