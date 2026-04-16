@@ -55,6 +55,31 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
   // Beat sync state
   const [analyzingBeats, setAnalyzingBeats] = useState(false);
 
+  // Premium voices state
+  const [voices, setVoices] = useState<VoiceMeta[]>([]);
+  const [loadingVoices, setLoadingVoices] = useState(true);
+  const [voiceLangTab, setVoiceLangTab] = useState<'de' | 'en' | 'es'>('de');
+
+  useEffect(() => {
+    (async () => {
+      setLoadingVoices(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('list-voices', { body: { language: 'all' } });
+        if (error) throw error;
+        setVoices(sortVoicesPremiumFirst<VoiceMeta>(data?.voices || []));
+      } catch (err) {
+        console.error('Failed to load voices:', err);
+      } finally {
+        setLoadingVoices(false);
+      }
+    })();
+  }, []);
+
+  const voicesForTab = voices.filter((v) =>
+    v.language === voiceLangTab || (v.supportedLanguages || []).includes(voiceLangTab)
+  );
+  const fallbackVoice = { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah' };
+
   // Auto-generate script from scene text overlays
   const generateScriptFromScenes = () => {
     const script = scenes
@@ -210,36 +235,60 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
             </CardTitle>
             <Switch
               checked={!!voiceover?.enabled}
-              onCheckedChange={(checked) =>
+              onCheckedChange={(checked) => {
+                const first = voicesForTab[0] || voices[0] || fallbackVoice;
                 onUpdateAssembly({
                   voiceover: checked
-                    ? { enabled: true, voiceId: VOICES[0].id, voiceName: VOICES[0].name, script: '' }
+                    ? { enabled: true, voiceId: first.id, voiceName: first.name, script: '' }
                     : null,
-                })
-              }
+                });
+              }}
             />
           </div>
         </CardHeader>
         {voiceover?.enabled && (
           <CardContent className="space-y-4">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+              <span>💡 Premium-Stimmen klingen am natürlichsten. Tipp: Nutze Satzzeichen für realistische Pausen.</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Sprache</Label>
+              <Tabs value={voiceLangTab} onValueChange={(v) => setVoiceLangTab(v as 'de' | 'en' | 'es')}>
+                <TabsList className="grid w-full grid-cols-3 h-8">
+                  <TabsTrigger value="de" className="text-xs">🇩🇪 DE</TabsTrigger>
+                  <TabsTrigger value="en" className="text-xs">🇬🇧 EN</TabsTrigger>
+                  <TabsTrigger value="es" className="text-xs">🇪🇸 ES</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
             <div className="space-y-1.5">
               <Label className="text-xs">Stimme</Label>
               <Select
                 value={voiceover.voiceId}
                 onValueChange={(v) => {
-                  const voice = VOICES.find((vo) => vo.id === v);
+                  const voice = voices.find((vo) => vo.id === v);
                   onUpdateAssembly({
                     voiceover: { ...voiceover, voiceId: v, voiceName: voice?.name || '' },
                   });
                 }}
+                disabled={loadingVoices}
               >
                 <SelectTrigger className="bg-background/50">
-                  <SelectValue />
+                  <SelectValue placeholder={loadingVoices ? 'Lade Stimmen…' : 'Stimme wählen'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {VOICES.map((v) => (
+                  {voicesForTab.map((v) => (
                     <SelectItem key={v.id} value={v.id}>
-                      {v.name} ({v.lang})
+                      <span className="flex items-center gap-2">
+                        {v.tier === 'premium' && (
+                          <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">Premium</Badge>
+                        )}
+                        <span>{v.name}</span>
+                        {v.gender && <span className="text-xs text-muted-foreground">({v.gender})</span>}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
