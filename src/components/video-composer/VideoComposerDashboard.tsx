@@ -1,7 +1,17 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
 import BriefingTab from './BriefingTab';
@@ -15,10 +25,14 @@ import type {
   AssemblyConfig,
   ComposerCategory,
   ComposerStatus,
+  ClipStatus,
+  ClipSource,
+  ClipQuality,
 } from '@/types/video-composer';
 import { getClipCost } from '@/types/video-composer';
 import { useComposerPersistence } from '@/hooks/useComposerPersistence';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'audio' | 'export';
 
@@ -47,6 +61,12 @@ function loadDraft(): LocalProject | null {
 function saveDraft(project: LocalProject) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
+  } catch { /* ignore */ }
+}
+
+function clearDraft() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
   } catch { /* ignore */ }
 }
 
@@ -85,7 +105,93 @@ export default function VideoComposerDashboard() {
   const [project, setProject] = useState<LocalProject>(() => loadDraft() || defaultProject);
   const [error, setError] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
   const { ensureProjectPersisted } = useComposerPersistence();
+  const didInitialSyncRef = useRef(false);
+
+  // DB sync on mount: if the loaded draft has a project.id, hydrate scenes from DB
+  useEffect(() => {
+    if (didInitialSyncRef.current) return;
+    didInitialSyncRef.current = true;
+
+    const projectId = project.id;
+    if (!projectId) return;
+
+    (async () => {
+      try {
+        const { data, error: dbError } = await supabase
+          .from('composer_scenes')
+          .select('*')
+          .eq('project_id', projectId)
+          .order('order_index', { ascending: true });
+
+        if (dbError) throw dbError;
+        if (!data || data.length === 0) return;
+
+        // Map DB rows → local ComposerScene shape, preferring DB as source of truth
+        // for status/url/cost. Fall back to localStorage values for the rest.
+        const localById = new Map(project.scenes.map(s => [s.id, s]));
+        const dbScenes: ComposerScene[] = data.map((row: any) => {
+          const local = localById.get(row.id);
+          return {
+            id: row.id,
+            projectId: row.project_id,
+            orderIndex: row.order_index,
+            sceneType: row.scene_type,
+            durationSeconds: row.duration_seconds,
+            clipSource: row.clip_source as ClipSource,
+            clipQuality: (row.clip_quality || 'standard') as ClipQuality,
+            aiPrompt: row.ai_prompt ?? local?.aiPrompt,
+            stockKeywords: row.stock_keywords ?? local?.stockKeywords,
+            uploadUrl: row.upload_url ?? local?.uploadUrl,
+            uploadType: row.upload_type ?? local?.uploadType,
+            clipUrl: row.clip_url ?? undefined,
+            clipStatus: (row.clip_status || 'pending') as ClipStatus,
+            textOverlay: row.text_overlay ?? local?.textOverlay ?? {
+              text: '',
+              position: 'bottom',
+              animation: 'fade-in',
+              fontSize: 48,
+              color: '#FFFFFF',
+            },
+            transitionType: row.transition_type ?? local?.transitionType ?? 'fade',
+            transitionDuration: row.transition_duration ?? local?.transitionDuration ?? 0.5,
+            replicatePredictionId: row.replicate_prediction_id ?? local?.replicatePredictionId,
+            retryCount: row.retry_count ?? 0,
+            costEuros: Number(row.cost_euros ?? 0),
+          };
+        });
+
+        const readyCount = dbScenes.filter(s =>
+          s.clipStatus === 'ready' || (s.clipSource === 'upload' && !!s.uploadUrl)
+        ).length;
+
+        const hadDrift = dbScenes.some(s => {
+          const local = localById.get(s.id);
+          return local && local.clipStatus !== s.clipStatus;
+        });
+
+        setProject(prev => ({ ...prev, scenes: dbScenes }));
+
+        toast({
+          title: t('videoComposer.draftRestored'),
+          description: t('videoComposer.draftRestoredDesc')
+            .replace('{count}', String(dbScenes.length))
+            .replace('{ready}', String(readyCount)),
+        });
+
+        if (hadDrift) {
+          // Subtle follow-up only when DB actually corrected something
+          setTimeout(() => {
+            toast({ title: t('videoComposer.syncedFromDb') });
+          }, 600);
+        }
+      } catch (err) {
+        console.warn('[VideoComposerDashboard] DB sync on mount failed:', err);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const persistAndGoToClips = useCallback(async () => {
     setIsPersisting(true);
@@ -102,6 +208,42 @@ export default function VideoComposerDashboard() {
       setIsPersisting(false);
     }
   }, [project, ensureProjectPersisted]);
+
+  const handleReset = useCallback(() => {
+    clearDraft();
+    setProject(defaultProject);
+    setActiveTab('briefing');
+    setError(null);
+    setShowResetDialog(false);
+  }, []);
+
+  // One-shot DB re-fetch when user switches BACK to the Clips tab
+  const handleTabChange = useCallback(async (next: TabId) => {
+    setActiveTab(next);
+    if (next !== 'clips' || !project.id) return;
+    try {
+      const { data } = await supabase
+        .from('composer_scenes')
+        .select('id, clip_status, clip_url, cost_euros')
+        .eq('project_id', project.id);
+      if (!data) return;
+      setProject(prev => ({
+        ...prev,
+        scenes: prev.scenes.map(s => {
+          const fresh = data.find((d: any) => d.id === s.id);
+          if (!fresh) return s;
+          return {
+            ...s,
+            clipStatus: (fresh.clip_status || s.clipStatus) as ClipStatus,
+            clipUrl: fresh.clip_url ?? s.clipUrl,
+            costEuros: Number(fresh.cost_euros ?? s.costEuros),
+          };
+        }),
+      }));
+    } catch (err) {
+      console.warn('[VideoComposerDashboard] tab refresh failed:', err);
+    }
+  }, [project.id]);
 
   const TABS = [
     { id: 'briefing' as TabId, label: t('videoComposer.briefing'), icon: FileText },
@@ -172,6 +314,16 @@ export default function VideoComposerDashboard() {
                 €{liveCost.toFixed(2)}
               </p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowResetDialog(true)}
+              className="gap-2"
+              aria-label={t('videoComposer.newProject')}
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('videoComposer.newProject')}</span>
+            </Button>
           </div>
         </div>
       </div>
@@ -191,7 +343,7 @@ export default function VideoComposerDashboard() {
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)}>
+        <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabId)}>
           <TabsList className="grid grid-cols-5 w-full max-w-2xl mx-auto mb-6 bg-card border border-border/40">
             {TABS.map((tab, i) => {
               const Icon = tab.icon;
@@ -271,6 +423,24 @@ export default function VideoComposerDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Reset Confirmation Dialog */}
+      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('videoComposer.confirmResetTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('videoComposer.confirmResetDesc')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('videoComposer.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReset}>
+              {t('videoComposer.confirmResetAction')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
