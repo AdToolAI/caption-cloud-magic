@@ -3396,6 +3396,7 @@ export type Database = {
           transition_duration: number
           transition_type: string
           updated_at: string
+          upload_type: string | null
           upload_url: string | null
         }
         Insert: {
@@ -3417,6 +3418,7 @@ export type Database = {
           transition_duration?: number
           transition_type?: string
           updated_at?: string
+          upload_type?: string | null
           upload_url?: string | null
         }
         Update: {
@@ -3438,6 +3440,7 @@ export type Database = {
           transition_duration?: number
           transition_type?: string
           updated_at?: string
+          upload_type?: string | null
           upload_url?: string | null
         }
         Relationships: [
