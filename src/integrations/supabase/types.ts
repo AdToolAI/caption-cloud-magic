@@ -3379,6 +3379,7 @@ export type Database = {
       composer_scenes: {
         Row: {
           ai_prompt: string | null
+          clip_quality: string
           clip_source: string
           clip_status: string
           clip_url: string | null
@@ -3401,6 +3402,7 @@ export type Database = {
         }
         Insert: {
           ai_prompt?: string | null
+          clip_quality?: string
           clip_source?: string
           clip_status?: string
           clip_url?: string | null
@@ -3423,6 +3425,7 @@ export type Database = {
         }
         Update: {
           ai_prompt?: string | null
+          clip_quality?: string
           clip_source?: string
           clip_status?: string
           clip_url?: string | null
