@@ -44,7 +44,21 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         body: { projectId: project?.id },
       });
 
-      if (error) throw error;
+      // Parse real backend message from FunctionsHttpError context
+      if (error) {
+        let detailedMessage = error.message;
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.json();
+            if (body?.error) detailedMessage = body.error;
+          } else if (ctx && typeof ctx.text === 'function') {
+            const txt = await ctx.text();
+            if (txt) detailedMessage = txt;
+          }
+        } catch { /* ignore parse errors, use original message */ }
+        throw new Error(detailedMessage);
+      }
       if (!data?.success) throw new Error(data?.error || t('videoComposer.renderFailed'));
 
       setRenderResult({ renderId: data.renderId });
