@@ -14,6 +14,7 @@ interface ClipsTabProps {
   projectId?: string;
   onUpdateScenes: (scenes: ComposerScene[]) => void;
   onGoToAudio: () => void;
+  onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
 }
 
 const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
@@ -23,7 +24,7 @@ const statusConfig: Record<string, { icon: React.ElementType; color: string; lab
   failed: { icon: XCircle, color: 'text-destructive', label: 'Fehlgeschlagen' },
 };
 
-export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudio }: ClipsTabProps) {
+export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudio, onEnsurePersisted }: ClipsTabProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [stockSearch, setStockSearch] = useState<Record<string, string>>({});
   const [stockResults, setStockResults] = useState<Record<string, any[]>>({});
@@ -76,7 +77,20 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
     setIsGenerating(true);
 
     try {
-      const scenesPayload = scenes
+      // Ensure project + scenes are persisted in DB first
+      let effectiveProjectId = projectId;
+      let effectiveScenes = scenes;
+      if (!effectiveProjectId && onEnsurePersisted) {
+        const persisted = await onEnsurePersisted();
+        effectiveProjectId = persisted.projectId;
+        effectiveScenes = persisted.scenes;
+      }
+
+      if (!effectiveProjectId) {
+        throw new Error('Projekt konnte nicht gespeichert werden — bitte gehe zurück zum Briefing.');
+      }
+
+      const scenesPayload = effectiveScenes
         .filter(s => s.clipStatus !== 'ready')
         .map(s => ({
           id: s.id,
@@ -94,13 +108,13 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
       }
 
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
-        body: { projectId, scenes: scenesPayload },
+        body: { projectId: effectiveProjectId, scenes: scenesPayload },
       });
 
       if (error) throw error;
 
       // Update local state with generating status
-      const updatedScenes = scenes.map(scene => {
+      const updatedScenes = effectiveScenes.map(scene => {
         const result = data?.results?.find((r: any) => r.sceneId === scene.id);
         if (result) {
           return {
@@ -156,12 +170,22 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
   };
 
   const handleRegenerateScene = async (scene: ComposerScene) => {
-    if (!projectId) return;
+    let effectiveProjectId = projectId;
+    if (!effectiveProjectId && onEnsurePersisted) {
+      try {
+        const persisted = await onEnsurePersisted();
+        effectiveProjectId = persisted.projectId;
+      } catch (err: any) {
+        toast({ title: 'Fehler', description: err.message || 'Projekt konnte nicht gespeichert werden', variant: 'destructive' });
+        return;
+      }
+    }
+    if (!effectiveProjectId) return;
 
     try {
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
         body: {
-          projectId,
+          projectId: effectiveProjectId,
           scenes: [{
             id: scene.id,
             clipSource: scene.clipSource,
