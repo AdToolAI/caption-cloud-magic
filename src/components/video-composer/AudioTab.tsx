@@ -267,33 +267,38 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
 
             <div className="space-y-1.5">
               <Label className="text-xs">Stimme</Label>
-              <Select
-                value={voiceover.voiceId}
-                onValueChange={(v) => {
-                  const voice = voices.find((vo) => vo.id === v);
-                  onUpdateAssembly({
-                    voiceover: { ...voiceover, voiceId: v, voiceName: voice?.name || '' },
-                  });
-                }}
-                disabled={loadingVoices}
-              >
-                <SelectTrigger className="bg-background/50">
-                  <SelectValue placeholder={loadingVoices ? 'Lade Stimmen…' : 'Stimme wählen'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {voicesForTab.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>
-                      <span className="flex items-center gap-2">
-                        {v.tier === 'premium' && (
-                          <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">Premium</Badge>
-                        )}
-                        <span>{v.name}</span>
-                        {v.gender && <span className="text-xs text-muted-foreground">({v.gender})</span>}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={voiceover.voiceId}
+                  onValueChange={(v) => {
+                    const voice = voices.find((vo) => vo.id === v);
+                    onUpdateAssembly({
+                      voiceover: { ...voiceover, voiceId: v, voiceName: voice?.name || '' },
+                    });
+                  }}
+                  disabled={loadingVoices}
+                >
+                  <SelectTrigger className="bg-background/50 flex-1">
+                    <SelectValue placeholder={loadingVoices ? 'Lade Stimmen…' : 'Stimme wählen'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {voicesForTab.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        <span className="flex items-center gap-2">
+                          {v.tier === 'premium' && (
+                            <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">Premium</Badge>
+                          )}
+                          <span>{v.name}</span>
+                          {v.gender && <span className="text-xs text-muted-foreground">({v.gender})</span>}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {voiceover.voiceId && (
+                  <VoicePreviewButton voiceId={voiceover.voiceId} language={voiceLangTab} size="sm" className="shrink-0" />
+                )}
+              </div>
             </div>
 
             <div className="space-y-1.5">
