@@ -1,27 +1,23 @@
 
 
-## Plan: "Video Composer" → "Motion Studio" umbenennen
+## Plan: Motion Studio im Erstellen-Hub sichtbar machen
 
-### Änderungen
+### Problem
+In `src/pages/HubPage.tsx` (Zeile 79) hat der `PageWrapper` die Klasse `overflow-hidden`. Das schneidet die 4. Reihe des 3-Spalten-Grids ab — Motion Studio (Item 8 von 10) und die weiteren Items werden abgeschnitten und man kann nicht scrollen.
 
-1. **Translations (src/lib/translations.ts)** — 3 Sprachen:
-   - EN: `videoComposer.title` → "Motion Studio", `hubItemDesc.videoComposer` → "Scene-based video assembly with AI clips, stock & uploads"
-   - DE: `videoComposer.title` → "Motion Studio", Beschreibung anpassen
-   - ES: `videoComposer.title` → "Motion Studio", Beschreibung anpassen
+### Lösung
+Eine einzige Änderung in `src/pages/HubPage.tsx`, Zeile 79:
 
-2. **Hub Config (src/config/hubConfig.ts)**:
-   - Route `/video-composer` bleibt gleich (URL-Stabilität)
-   - `titleKey` bleibt `videoComposer.title` (wird über Translation aufgelöst)
+`overflow-hidden` entfernen oder durch `overflow-visible` ersetzen. Die Klasse wurde ursprünglich für die Floating-Particles und Gradient-Hintergründe verwendet, aber diese haben bereits `pointer-events-none` und `-z-10`, sodass sie auch ohne `overflow-hidden` keine Probleme verursachen.
 
-3. **Page Title (src/pages/VideoComposer/index.tsx)**:
-   - Helmet title → "Motion Studio | AdTool"
-   - Meta description anpassen
+**Änderung:**
+```
+// Vorher:
+<PageWrapper className="relative p-6 md:p-10 max-w-6xl mx-auto overflow-hidden">
 
-4. **Dashboard Header (src/components/video-composer/VideoComposerDashboard.tsx)**:
-   - Sicherstellen, dass der Titel aus der Translation kommt (nicht hardcoded)
+// Nachher:
+<PageWrapper className="relative p-6 md:p-10 max-w-6xl mx-auto">
+```
 
-5. **Memory Update (mem://features/video-composer/architecture)**:
-   - "AI Video Composer" → "Motion Studio" im Memory-File
-
-Dateistruktur und Komponentennamen (VideoComposer, video-composer/) bleiben intern unverändert — nur der User-facing Name ändert sich.
+Das ist eine 1-Zeilen-Änderung. Danach werden alle 10 Items im Erstellen-Hub sichtbar, einschließlich Motion Studio.
 
