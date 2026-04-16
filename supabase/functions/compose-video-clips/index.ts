@@ -24,6 +24,8 @@ interface ClipScene {
   aiPrompt?: string;
   stockKeywords?: string;
   uploadUrl?: string;
+  /** Optional image used as visual guide for AI sources (image-to-video). */
+  referenceImageUrl?: string;
   durationSeconds: number;
 }
 
@@ -199,13 +201,20 @@ serve(async (req) => {
             .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
             .eq('id', scene.id);
 
+          const hailuoInput: Record<string, unknown> = {
+            prompt: scene.aiPrompt || "cinematic footage",
+            duration: duration,
+            resolution: resolution,
+          };
+          // Image-to-Video: use reference image as the first frame
+          if (scene.referenceImageUrl) {
+            hailuoInput.first_frame_image = scene.referenceImageUrl;
+            console.log(`[compose-video-clips] Hailuo scene ${scene.id} uses reference image`);
+          }
+
           const prediction = await replicate.predictions.create({
             model: "minimax/hailuo-2.3",
-            input: {
-              prompt: scene.aiPrompt || "cinematic footage",
-              duration: duration,
-              resolution: resolution,
-            },
+            input: hailuoInput,
             webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
@@ -218,20 +227,27 @@ serve(async (req) => {
           results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
 
         } else if (scene.clipSource === 'ai-kling') {
-          // Kling via Replicate — Kling 3.0 Omni (use correct slug)
+          // Kling via Replicate — Kling 2.1
           await supabaseAdmin
             .from('composer_scenes')
             .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
             .eq('id', scene.id);
 
+          const klingInput: Record<string, unknown> = {
+            prompt: scene.aiPrompt || "cinematic footage",
+            duration: Math.min(scene.durationSeconds, 10),
+            aspect_ratio: "16:9",
+            mode: quality === 'pro' ? 'pro' : 'standard',
+          };
+          // Image-to-Video: Kling 2.1 supports start_image
+          if (scene.referenceImageUrl) {
+            klingInput.start_image = scene.referenceImageUrl;
+            console.log(`[compose-video-clips] Kling scene ${scene.id} uses reference image`);
+          }
+
           const prediction = await replicate.predictions.create({
             model: "kwaivgi/kling-v2.1",
-            input: {
-              prompt: scene.aiPrompt || "cinematic footage",
-              duration: Math.min(scene.durationSeconds, 10),
-              aspect_ratio: "16:9",
-              mode: quality === 'pro' ? 'pro' : 'standard',
-            },
+            input: klingInput,
             webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });

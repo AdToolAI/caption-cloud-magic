@@ -120,6 +120,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
           aiPrompt: s.aiPrompt,
           stockKeywords: s.stockKeywords,
           uploadUrl: s.uploadUrl,
+          referenceImageUrl: s.referenceImageUrl,
           durationSeconds: s.durationSeconds,
         }));
 
@@ -212,6 +213,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
             aiPrompt: targetScene.aiPrompt,
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
+            referenceImageUrl: targetScene.referenceImageUrl,
             durationSeconds: targetScene.durationSeconds,
           }],
         },
