@@ -1,63 +1,36 @@
 
 
-## Befund
-Der User hat recht — im AI Video Studio Hub (`/ai-video-studio`) sind die offiziellen, beworbenen Preise pro Modell:
+## Root Cause
+Der "Alle Clips generieren"-Button schickt `projectId: undefined` an `compose-video-clips`. Die Edge Function lehnt deshalb mit `"projectId and scenes are required"` ab (HTTP 400).
 
-| Modell | Beworbener Preis |
-|---|---|
-| Sora 2 | €0.25–0.53/s |
-| Kling 3.0 | €0.10–0.21/s |
-| Seedance 2.0 | €0.10–0.21/s |
-| Wan 2.5 | €0.10–0.15/s |
-| **Hailuo 2.3** | **€0.15–0.20/s** |
-| Luma Ray 2 | €0.18–0.25/s |
+**Warum?** `VideoComposerDashboard.tsx` hält das gesamte Projekt **nur in localStorage**. Es gibt nirgends einen `INSERT INTO composer_projects` oder `composer_scenes`. Auch die Szenen-IDs sind Client-Strings (`scene_1234567890`) statt echte UUIDs, und die Edge Function macht `UPDATE composer_scenes ... WHERE id = '...'` — also würde selbst mit projectId nichts gefunden.
 
-Im Motion Studio (`BriefingTab.tsx`) sind dagegen die `CLIP_SOURCE_COSTS` viel zu hoch:
-- `ai-hailuo`: **1.20 €/s** (statt €0.15–0.20)
-- `ai-kling`: **1.50 €/s** (statt €0.10–0.21)
-- `ai-sora`: **2.00 €/s** (statt €0.25–0.53)
+## Fix — Projekt + Szenen in DB persistieren bevor Clips generiert werden
 
-→ Das sind ~6–10× zu hohe Werte. Daher €36 für 30s Hailuo statt korrekt **€4.50–€6.00**.
+### 1. Neuer Hook `useComposerPersistence.ts`
+Eine Helper-Funktion `ensureProjectPersisted(project)`:
+- Wenn `project.id` bereits existiert → return id
+- Sonst: `INSERT INTO composer_projects` mit `user_id`, `title`, `category`, `briefing`, `status='draft'`, `language` → erhält UUID zurück
+- Dann **alle Szenen** in `composer_scenes` upserten (mit echten UUIDs aus DB) — die Client-IDs werden auf die DB-UUIDs gemappt
+- Das gemappte `scenes`-Array zurückgeben (mit echten UUIDs als `id`)
 
-## Untersuchung nötig
-- `src/types/video-composer.ts` lesen (wo `CLIP_SOURCE_COSTS` definiert ist)
-- AI Video Studio Hub-Seite lesen, um Preise als Single Source of Truth zu identifizieren
-- `BriefingTab.tsx`, `ClipsTab.tsx`, `StoryboardTab.tsx`, `SceneCard.tsx`, `AssemblyTab.tsx`, `VideoComposerDashboard.tsx` für Anzeige
+### 2. `VideoComposerDashboard.tsx` anpassen
+- Vor dem Wechsel zu Tab "Clips" (oder beim Klick auf "Alle Clips generieren") `ensureProjectPersisted` aufrufen
+- `project.id` und Szenen-IDs ins lokale State übernehmen
+- localStorage-Draft weiterhin als UX-Backup behalten
 
-## Plan — Preise an offizielle AI Video Studio Tarife angleichen
+### 3. `ClipsTab.tsx` defensiv absichern
+- Wenn beim Klick auf "Alle Clips generieren" `projectId` fehlt → `ensureProjectPersisted` aufrufen, dann fortsetzen
+- Eindeutige Fehlermeldung statt nur "Edge Function returned non-2xx"
 
-### 1. `CLIP_SOURCE_COSTS` korrigieren (`src/types/video-composer.ts`)
-Wir nehmen die **obere Grenze** (worst case, ehrlich) der offiziellen Preise als Default:
-
-| Quelle | Alt | Neu |
-|---|---|---|
-| `ai-hailuo` | 1.20 €/s | **0.20 €/s** |
-| `ai-kling` | 1.50 €/s | **0.21 €/s** |
-| `ai-sora` | 2.00 €/s | **0.53 €/s** |
-| `stock` | 0 | 0 |
-| `upload` | 0 | 0 |
-
-→ 30s Hailuo = **€6.00** (statt €36). 30s Kling = €6.30. 30s Sora = €15.90.
-
-### 2. EUR-Anzeige beibehalten (kein Wechsel auf Credits)
-Der User hat im AI Video Studio Hub bewusst EUR-Pricing etabliert. Konsistenz ist wichtiger als Credit-Umstellung. Daher:
-- Anzeige bleibt in **€**
-- Format: `€X.XX` (zwei Dezimalstellen statt vier)
-- Optionaler Hinweis "ab €0.15/s" per Tooltip oder Untertitel an der Quelle-Auswahl, damit der User Range vs. Worst-Case versteht
-
-### 3. UI-Cleanups (kleine Änderungen)
-- `ClipsTab.tsx`, `StoryboardTab.tsx`, `SceneCard.tsx`, `AssemblyTab.tsx`, `VideoComposerDashboard.tsx`: Formatierung von `toFixed(2)` (statt `.toFixed(4)` falls vorhanden) für saubere Cent-Beträge
-- Briefing-Tab: bei der Quellen-Auswahl die neuen Preise pro Sekunde anzeigen
-
-### 4. Lokalisierung
-Keine neuen Strings nötig — bestehende `videoComposer.estimatedCost` etc. bleiben.
+### 4. `compose-video-clips` Edge Function — bessere Fehlermeldung
+- Statt nur `"projectId and scenes are required"` einen klaren Code (`MISSING_PROJECT_ID`) zurückgeben, damit das UI besseres Feedback geben kann
 
 ### 5. Verify
-30s Hailuo briefen → Header sollte **€6.00** zeigen (statt €36). Sora-Quelle wechseln → **€15.90**. Stock → €0.00.
+- 1× Briefing → Storyboard → Clips → "Alle Clips generieren" → DB-Insert sollte stattfinden, dann sollte die Generierung starten ohne 400-Fehler.
 
 ### Was unverändert bleibt
-- Datenmodell `ComposerBriefing`, DB-Schema, Edge Functions
-- Briefing-Tab Kategorie-Logik (gerade fertiggestellt)
-- Universal Video Creator
-- Tab-Struktur
+- Datenmodell (DB-Schema schon korrekt)
+- Tab-Logik, Pricing-Logik, Briefing-Tab
+- Universal Video Creator (nicht angefasst)
 
