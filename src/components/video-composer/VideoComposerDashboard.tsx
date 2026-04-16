@@ -46,6 +46,7 @@ interface LocalProject {
   assemblyConfig: AssemblyConfig;
   totalCostEuros: number;
   language: string;
+  outputUrl?: string;
 }
 
 const STORAGE_KEY = 'video-composer-draft';
@@ -119,11 +120,28 @@ export default function VideoComposerDashboard() {
 
     (async () => {
       try {
-        const { data, error: dbError } = await supabase
-          .from('composer_scenes')
-          .select('*')
-          .eq('project_id', projectId)
-          .order('order_index', { ascending: true });
+        // Also pull project-level fields (output_url, status) so the rendered
+        // video remains visible after a reload.
+        const [{ data: projRow }, { data, error: dbError }] = await Promise.all([
+          supabase
+            .from('composer_projects')
+            .select('output_url, status')
+            .eq('id', projectId)
+            .maybeSingle(),
+          supabase
+            .from('composer_scenes')
+            .select('*')
+            .eq('project_id', projectId)
+            .order('order_index', { ascending: true }),
+        ]);
+
+        if (projRow) {
+          setProject(prev => ({
+            ...prev,
+            outputUrl: projRow.output_url ?? prev.outputUrl,
+            status: (projRow.status as ComposerStatus) ?? prev.status,
+          }));
+        }
 
         if (dbError) throw dbError;
         if (!data || data.length === 0) return;
