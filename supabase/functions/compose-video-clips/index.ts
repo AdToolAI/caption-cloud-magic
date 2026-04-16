@@ -1,3 +1,4 @@
+// compose-video-clips v2.1.0 — webhook_events_filter fix (only "completed" allowed)
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Replicate from "https://esm.sh/replicate@0.25.2";
