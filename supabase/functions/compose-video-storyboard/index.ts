@@ -123,6 +123,15 @@ AI prompt requirements (CRITICAL — every aiPrompt MUST contain ALL of these):
 
 ${sceneTypeHints}
 
+🚨 CHARACTER CONSISTENCY CONSTRAINT (CRITICAL — technical limitation):
+Each scene is generated INDEPENDENTLY by a separate AI video model call (Hailuo / Kling / Sora). There is NO character/face consistency between scenes — the model cannot remember a person from a previous scene. Therefore:
+- NEVER reference "the same person", "she from before", "he again", "the woman from scene 1", "our protagonist returns"
+- NEVER use pronouns or phrases that imply continuity across scenes ("she continues", "he then…", "later that day she…", "now smiling at the camera")
+- Each scene MUST describe its human subject FRESH and SELF-CONTAINED — re-state age, gender, appearance, clothing, ethnicity hints, setting — as if the viewer has never seen them before
+- If a recurring TYPE of person is desired (e.g. always a young professional woman), describe the ARCHETYPE generically in each scene (e.g. "a young professional woman in business casual, late 20s, warm smile") — but never claim it's the same individual
+- Treat the storyboard as a MONTAGE / MOOD-BOARD of standalone shots that share a vibe, NOT as a continuous narrative with one persistent protagonist
+- Variation between scenes' people is expected and fine — do not try to lock identity
+
 Write text overlays separately (in ${langLabel}) — they're rendered as a distinct layer on top of the video.`;
 
     const labels = (() => {
@@ -151,6 +160,8 @@ Structure to follow:
 ${structure}
 
 🚨 INTEGRATION REQUIREMENT (non-negotiable): The product must appear *within* real-world scenes — used by people, in real environments, in lifestyle moments. The product is part of the story, not the story itself. Avoid isolated product shots entirely, except for AT MOST ONE hero scene if the briefing genuinely calls for a clean beauty-shot. Every other scene must feature a human or life situation with the product integrated naturally.
+
+🚨 INDEPENDENCE REQUIREMENT (non-negotiable): Every scene is rendered by a SEPARATE AI generation with no memory of other scenes. Describe each human subject FROM SCRATCH in each scene — no "same person", no "she/he from before", no continuity pronouns. Treat each scene as a standalone shot in a montage. If you want a recurring type, describe the archetype generically in every scene rather than claiming identity continuity.
 
 Generate the storyboard using the create_storyboard function.`;
 

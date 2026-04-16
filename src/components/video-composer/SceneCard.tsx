@@ -206,15 +206,27 @@ export default function SceneCard({
                         : 'AI Prompt (EN) — editable'}
                     </Label>
                   </div>
-                  <div className="flex items-start gap-2 rounded-md border border-primary/20 bg-primary/5 p-2">
-                    <Lightbulb className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />
-                    <p className="text-[10px] leading-relaxed text-muted-foreground">
-                      {lang === 'de'
-                        ? 'Tipp: Dieser Prompt ist nur eine Vorlage. Passe ihn an dein Produkt und deine Vision an — je präziser (Setting, Kamera, Stimmung, Verwendung), desto besser das Ergebnis.'
-                        : lang === 'es'
-                        ? 'Consejo: Este prompt es solo una plantilla. Adáptalo a tu producto y visión — cuanto más preciso (escenario, cámara, ambiente, uso), mejor será el resultado.'
-                        : 'Tip: This prompt is only a template. Adapt it to your product and vision — the more specific (setting, camera, mood, usage), the better the result.'}
-                    </p>
+                  <div className="space-y-1.5">
+                    <div className="flex items-start gap-2 rounded-md border border-primary/20 bg-primary/5 p-2">
+                      <Lightbulb className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />
+                      <p className="text-[10px] leading-relaxed text-muted-foreground">
+                        {lang === 'de'
+                          ? 'Tipp: Dieser Prompt ist nur eine Vorlage. Passe ihn an dein Produkt und deine Vision an — je präziser (Setting, Kamera, Stimmung, Verwendung), desto besser das Ergebnis.'
+                          : lang === 'es'
+                          ? 'Consejo: Este prompt es solo una plantilla. Adáptalo a tu producto y visión — cuanto más preciso (escenario, cámara, ambiente, uso), mejor será el resultado.'
+                          : 'Tip: This prompt is only a template. Adapt it to your product and vision — the more specific (setting, camera, mood, usage), the better the result.'}
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-500" />
+                      <p className="text-[10px] leading-relaxed text-amber-200/80">
+                        {lang === 'de'
+                          ? 'Hinweis: Jede Szene wird einzeln von der KI generiert — Personen können zwischen Szenen optisch variieren. Die exakt gleiche Person über mehrere Clips ist technisch nicht möglich.'
+                          : lang === 'es'
+                          ? 'Nota: Cada escena se genera por separado con IA — las personas pueden variar visualmente entre escenas. La misma persona exacta en varios clips no es técnicamente posible.'
+                          : 'Note: Each scene is generated separately by the AI — people may vary visually between scenes. The exact same person across multiple clips is technically not possible.'}
+                      </p>
+                    </div>
                   </div>
                   <Textarea
                     value={scene.aiPrompt || ''}
