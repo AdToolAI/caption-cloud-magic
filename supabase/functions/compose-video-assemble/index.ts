@@ -196,7 +196,8 @@ serve(async (req) => {
       envVariables: {},
       chromiumOptions: {},
       timeoutInMilliseconds: 600000,
-      concurrencyPerLambda: 10,
+      concurrencyPerLambda: 1,
+      framesPerLambda: 270,
       downloadBehavior: { type: 'play-in-browser' },
       webhook: webhookData,
     };
