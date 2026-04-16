@@ -36,9 +36,10 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
       scenes.map((s) => {
         if (s.id !== id) return s;
         const updated = { ...s, ...updates };
-        // Recalculate cost when source changes
-        if (updates.clipSource) {
-          updated.costEuros = CLIP_SOURCE_COSTS[updates.clipSource as ClipSource] || 0;
+        // Recalculate cost when source or duration changes (per-second × duration)
+        if (updates.clipSource || updates.durationSeconds) {
+          const perSec = CLIP_SOURCE_COSTS[(updates.clipSource ?? updated.clipSource) as ClipSource] || 0;
+          updated.costEuros = perSec * updated.durationSeconds;
         }
         return updated;
       })
@@ -62,7 +63,7 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
   };
 
   const totalDuration = scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
-  const totalCost = scenes.reduce((sum, s) => sum + (CLIP_SOURCE_COSTS[s.clipSource] || 0), 0);
+  const totalCost = scenes.reduce((sum, s) => sum + (CLIP_SOURCE_COSTS[s.clipSource] || 0) * s.durationSeconds, 0);
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto">
