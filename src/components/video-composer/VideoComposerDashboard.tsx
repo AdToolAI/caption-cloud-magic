@@ -16,7 +16,7 @@ import type {
   ComposerCategory,
   ComposerStatus,
 } from '@/types/video-composer';
-import { CLIP_SOURCE_COSTS } from '@/types/video-composer';
+import { getClipCost } from '@/types/video-composer';
 import { useComposerPersistence } from '@/hooks/useComposerPersistence';
 import { toast } from '@/hooks/use-toast';
 
@@ -138,7 +138,7 @@ export default function VideoComposerDashboard() {
   }, []);
 
   const totalDuration = project.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
-  const liveCost = project.scenes.reduce((sum, s) => sum + (CLIP_SOURCE_COSTS[s.clipSource] || 0) * s.durationSeconds, 0);
+  const liveCost = project.scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
 
   return (
     <div className="min-h-screen bg-background">

@@ -8,6 +8,8 @@ export type SceneType = 'hook' | 'problem' | 'solution' | 'demo' | 'social-proof
 
 export type ClipSource = 'ai-hailuo' | 'ai-kling' | 'ai-sora' | 'stock' | 'upload';
 
+export type ClipQuality = 'standard' | 'pro';
+
 export type ClipStatus = 'pending' | 'generating' | 'ready' | 'failed';
 
 export type TransitionStyle = 'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom';
@@ -44,6 +46,7 @@ export interface ComposerBriefing {
   aspectRatio: AspectRatio;
   brandColors: string[];
   logoUrl?: string;
+  defaultQuality?: ClipQuality;
 }
 
 export interface ComposerScene {
@@ -53,6 +56,7 @@ export interface ComposerScene {
   sceneType: SceneType;
   durationSeconds: number;
   clipSource: ClipSource;
+  clipQuality: ClipQuality;
   aiPrompt?: string;
   stockKeywords?: string;
   uploadUrl?: string;
@@ -122,6 +126,7 @@ export const DEFAULT_BRIEFING: ComposerBriefing = {
   duration: 30,
   aspectRatio: '16:9',
   brandColors: [],
+  defaultQuality: 'standard',
 };
 
 export const DEFAULT_ASSEMBLY_CONFIG: AssemblyConfig = {
@@ -161,14 +166,35 @@ export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> 
   upload: { de: 'Eigener Upload', en: 'Own Upload' },
 };
 
-// Estimated costs per clip source — EUR per second (aligned with AI Video Studio Hub pricing, upper bound)
-export const CLIP_SOURCE_COSTS: Record<ClipSource, number> = {
-  'ai-hailuo': 0.20,  // €0.15–0.20/s
-  'ai-kling': 0.21,   // €0.10–0.21/s
-  'ai-sora': 0.53,    // €0.25–0.53/s
-  stock: 0,
-  upload: 0,
+// Estimated costs per clip source × quality tier — EUR per second
+// Standard = lower resolution (Hailuo 768p / Kling 720p / Sora std)
+// Pro = higher resolution (Hailuo 1080p / Kling 1080p / Sora pro)
+export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> = {
+  'ai-hailuo': { standard: 0.15, pro: 0.20 },
+  'ai-kling':  { standard: 0.15, pro: 0.21 },
+  'ai-sora':   { standard: 0.25, pro: 0.53 },
+  stock:       { standard: 0, pro: 0 },
+  upload:      { standard: 0, pro: 0 },
 };
+
+// Quality tier labels & resolution hints
+export const QUALITY_LABELS: Record<ClipSource, Record<ClipQuality, string>> = {
+  'ai-hailuo': { standard: 'Standard 768p', pro: 'Pro 1080p' },
+  'ai-kling':  { standard: 'Standard 720p', pro: 'Pro 1080p' },
+  'ai-sora':   { standard: 'Standard',      pro: 'Pro' },
+  stock:       { standard: '-', pro: '-' },
+  upload:      { standard: '-', pro: '-' },
+};
+
+/** Returns total cost for a clip in EUR. */
+export function getClipCost(source: ClipSource, quality: ClipQuality, durationSec: number): number {
+  return (CLIP_SOURCE_COSTS[source]?.[quality] ?? 0) * durationSec;
+}
+
+/** Returns the per-second rate. */
+export function getClipRate(source: ClipSource, quality: ClipQuality): number {
+  return CLIP_SOURCE_COSTS[source]?.[quality] ?? 0;
+}
 
 export const CATEGORY_LABELS: Record<ComposerCategory, { de: string; en: string; es: string }> = {
   'product-ad': { de: 'Produktvideo', en: 'Product Ad', es: 'Anuncio de Producto' },

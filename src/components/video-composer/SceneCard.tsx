@@ -20,11 +20,12 @@ import type {
   ComposerScene,
   SceneType,
   ClipSource,
+  ClipQuality,
   TransitionStyle,
   TextPosition,
   TextAnimation,
 } from '@/types/video-composer';
-import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, CLIP_SOURCE_COSTS } from '@/types/video-composer';
+import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALITY_LABELS } from '@/types/video-composer';
 
 import SceneMediaUpload from './SceneMediaUpload';
 
@@ -106,7 +107,7 @@ export default function SceneCard({
                 </Select>
 
                 <span className="text-xs text-muted-foreground">{scene.durationSeconds}s</span>
-                <span className="text-[10px] text-primary">€{((CLIP_SOURCE_COSTS[scene.clipSource] || 0) * scene.durationSeconds).toFixed(2)}</span>
+                <span className="text-[10px] text-primary">€{getClipCost(scene.clipSource, scene.clipQuality || 'standard', scene.durationSeconds).toFixed(2)}</span>
               </div>
 
               <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={onDelete}>
@@ -146,6 +147,34 @@ export default function SceneCard({
                 );
               })}
             </div>
+
+            {/* Quality Tier — only for AI sources */}
+            {scene.clipSource.startsWith('ai-') && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <Label className="text-[10px] text-muted-foreground">Qualität:</Label>
+                <div className="flex gap-1">
+                  {(['standard', 'pro'] as ClipQuality[]).map((q) => {
+                    const isActive = (scene.clipQuality || 'standard') === q;
+                    const rate = getClipRate(scene.clipSource, q);
+                    return (
+                      <button
+                        key={q}
+                        onClick={() => onUpdate({ clipQuality: q })}
+                        className={`px-2 py-1 rounded text-[10px] border transition-all ${
+                          isActive
+                            ? q === 'pro'
+                              ? 'border-amber-500/60 bg-amber-500/10 text-amber-400'
+                              : 'border-primary bg-primary/10 text-primary'
+                            : 'border-border/40 text-muted-foreground hover:border-border'
+                        }`}
+                      >
+                        {QUALITY_LABELS[scene.clipSource][q]} — €{rate.toFixed(2)}/s
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Prompt / Keywords / Upload */}
             {scene.clipSource.startsWith('ai-') && (

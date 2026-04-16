@@ -8,7 +8,7 @@ import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Sear
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { ComposerScene } from '@/types/video-composer';
-import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, CLIP_SOURCE_COSTS } from '@/types/video-composer';
+import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
 import { SceneClipProgress } from './SceneClipProgress';
 
 interface ClipsTabProps {
@@ -43,7 +43,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
   // Calculate total cost (only pending AI scenes)
   const remainingCost = pendingScenes.reduce((sum, s) => {
     if (s.clipSource.startsWith('ai-')) {
-      return sum + s.durationSeconds * (CLIP_SOURCE_COSTS[s.clipSource] || 0);
+      return sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds);
     }
     return sum;
   }, 0);
@@ -116,6 +116,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
         .map(s => ({
           id: s.id,
           clipSource: s.clipSource,
+          clipQuality: s.clipQuality || 'standard',
           aiPrompt: s.aiPrompt,
           stockKeywords: s.stockKeywords,
           uploadUrl: s.uploadUrl,
@@ -156,10 +157,19 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
       });
       onUpdateScenes(updatedScenes);
 
-      toast({
-        title: 'Clip-Generierung gestartet',
-        description: `${data?.generatingCount || 0} KI-Clips werden generiert (€${(data?.totalCost || 0).toFixed(2)}).`,
-      });
+      const failedResults = (data?.results || []).filter((r: any) => r.status === 'failed');
+      if (failedResults.length > 0) {
+        toast({
+          title: `${failedResults.length} Clip(s) fehlgeschlagen`,
+          description: failedResults[0]?.error?.slice(0, 200) || 'Unbekannter Fehler',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Clip-Generierung gestartet',
+          description: `${data?.generatingCount || 0} KI-Clips werden generiert (€${remainingCost.toFixed(2)}).`,
+        });
+      }
       // Trigger immediate poll
       setTimeout(pollScenes, 500);
     } catch (err: any) {
@@ -197,6 +207,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
           scenes: [{
             id: targetScene.id,
             clipSource: targetScene.clipSource,
+            clipQuality: targetScene.clipQuality || 'standard',
             aiPrompt: targetScene.aiPrompt,
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
@@ -303,8 +314,9 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
       <div className="grid gap-3">
         {scenes.map((scene, i) => {
           const status = statusConfig[scene.clipStatus] || statusConfig.pending;
+          const sceneQuality = scene.clipQuality || 'standard';
           const costPerClip = scene.clipSource.startsWith('ai-')
-            ? scene.durationSeconds * (CLIP_SOURCE_COSTS[scene.clipSource] || 0)
+            ? getClipCost(scene.clipSource, sceneQuality, scene.durationSeconds)
             : 0;
           const isUpload = scene.clipSource === 'upload';
           const hasUpload = !!scene.uploadUrl;
@@ -342,10 +354,19 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
                       <p className="text-[11px] text-foreground/80 truncate">
                         {scene.aiPrompt || scene.stockKeywords || (isUpload ? 'Eigener Upload' : 'Kein Prompt')}
                       </p>
-                      <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                        {CLIP_SOURCE_LABELS[scene.clipSource]?.de}
+                      <p className="text-[10px] text-muted-foreground/70 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span>{CLIP_SOURCE_LABELS[scene.clipSource]?.de}</span>
+                        {isAi && (
+                          <span className={`px-1.5 py-0 rounded text-[9px] border ${
+                            sceneQuality === 'pro'
+                              ? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
+                              : 'border-border/40 bg-muted/40 text-muted-foreground'
+                          }`}>
+                            {QUALITY_LABELS[scene.clipSource][sceneQuality]}
+                          </span>
+                        )}
                         {scene.clipStatus === 'generating' && isAi && (
-                          <span className="ml-2 text-accent inline-flex items-center gap-1">
+                          <span className="text-accent inline-flex items-center gap-1">
                             <Loader2 className="h-2.5 w-2.5 animate-spin" />
                             KI rendert ca. 30–60s…
                           </span>

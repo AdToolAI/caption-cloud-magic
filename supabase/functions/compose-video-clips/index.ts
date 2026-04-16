@@ -7,23 +7,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Cost per second by model
-const CLIP_COSTS: Record<string, number> = {
-  'ai-hailuo': 0.15,
-  'ai-kling': 0.15,
-  'ai-sora': 0.25,
+type Quality = 'standard' | 'pro';
+
+// Cost per second by source × quality tier — synced with client (src/types/video-composer.ts)
+const CLIP_COSTS: Record<string, Record<Quality, number>> = {
+  'ai-hailuo': { standard: 0.15, pro: 0.20 },
+  'ai-kling':  { standard: 0.15, pro: 0.21 },
+  'ai-sora':   { standard: 0.25, pro: 0.53 },
 };
+
+interface ClipScene {
+  id: string;
+  clipSource: string;
+  clipQuality?: Quality;
+  aiPrompt?: string;
+  stockKeywords?: string;
+  uploadUrl?: string;
+  durationSeconds: number;
+}
 
 interface ClipRequest {
   projectId: string;
-  scenes: Array<{
-    id: string;
-    clipSource: string;
-    aiPrompt?: string;
-    stockKeywords?: string;
-    uploadUrl?: string;
-    durationSeconds: number;
-  }>;
+  scenes: ClipScene[];
 }
 
 serve(async (req) => {
@@ -81,11 +86,12 @@ serve(async (req) => {
       );
     }
 
-    // Calculate total cost for AI scenes
+    // Calculate total cost for AI scenes (quality-tier aware)
     const aiScenes = scenes.filter(s => s.clipSource.startsWith('ai-'));
     let totalCost = 0;
     for (const scene of aiScenes) {
-      const costPerSec = CLIP_COSTS[scene.clipSource] || 0.15;
+      const quality: Quality = scene.clipQuality === 'pro' ? 'pro' : 'standard';
+      const costPerSec = CLIP_COSTS[scene.clipSource]?.[quality] ?? 0.15;
       totalCost += scene.durationSeconds * costPerSec;
     }
 
@@ -128,8 +134,23 @@ serve(async (req) => {
 
     const results: Array<{ sceneId: string; status: string; predictionId?: string; clipUrl?: string; error?: string }> = [];
 
+    // Helper: extract a useful error message from Replicate / generic errors
+    const errorToString = (err: unknown): string => {
+      if (!err) return 'Unknown error';
+      if (err instanceof Error) {
+        // Replicate errors often have .response.data with details
+        const anyErr = err as any;
+        const detail = anyErr?.response?.data?.detail || anyErr?.response?.data?.error || anyErr?.response?.statusText;
+        if (detail) return `${err.message} — ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`;
+        return err.message;
+      }
+      try { return JSON.stringify(err); } catch { return String(err); }
+    };
+
     // Process each scene
     for (const scene of scenes) {
+      const quality: Quality = scene.clipQuality === 'pro' ? 'pro' : 'standard';
+
       try {
         if (scene.clipSource === 'upload' && scene.uploadUrl) {
           // Upload: just mark as ready
@@ -168,11 +189,13 @@ serve(async (req) => {
           }
 
         } else if (scene.clipSource === 'ai-hailuo') {
-          // Hailuo via Replicate
+          // Hailuo via Replicate (Standard 768p / Pro 1080p)
           const duration = scene.durationSeconds >= 8 ? 10 : 6;
+          const resolution = quality === 'pro' ? '1080p' : '768p';
+
           await supabaseAdmin
             .from('composer_scenes')
-            .update({ clip_status: 'generating', updated_at: new Date().toISOString() })
+            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
             .eq('id', scene.id);
 
           const prediction = await replicate.predictions.create({
@@ -180,10 +203,10 @@ serve(async (req) => {
             input: {
               prompt: scene.aiPrompt || "cinematic footage",
               duration: duration,
-              resolution: "768p",
+              resolution: resolution,
             },
             webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
-            webhook_events_filter: ["completed", "failed"],
+            webhook_events_filter: ["completed"],
           });
 
           await supabaseAdmin
@@ -194,21 +217,22 @@ serve(async (req) => {
           results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
 
         } else if (scene.clipSource === 'ai-kling') {
-          // Kling via Replicate
+          // Kling via Replicate — Kling 3.0 Omni (use correct slug)
           await supabaseAdmin
             .from('composer_scenes')
-            .update({ clip_status: 'generating', updated_at: new Date().toISOString() })
+            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
             .eq('id', scene.id);
 
           const prediction = await replicate.predictions.create({
-            model: "kwaai/kling-3.0-pro",
+            model: "kwaivgi/kling-v2.1",
             input: {
               prompt: scene.aiPrompt || "cinematic footage",
               duration: Math.min(scene.durationSeconds, 10),
               aspect_ratio: "16:9",
+              mode: quality === 'pro' ? 'pro' : 'standard',
             },
             webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
-            webhook_events_filter: ["completed", "failed"],
+            webhook_events_filter: ["completed"],
           });
 
           await supabaseAdmin
@@ -223,25 +247,35 @@ serve(async (req) => {
           results.push({ sceneId: scene.id, status: 'skipped', error: `Unknown clip source: ${scene.clipSource}` });
         }
       } catch (sceneError) {
-        console.error(`[compose-video-clips] Scene ${scene.id} error:`, sceneError);
+        const errMsg = errorToString(sceneError);
+        console.error(`[compose-video-clips] Scene ${scene.id} error:`, errMsg);
         await supabaseAdmin
           .from('composer_scenes')
           .update({ clip_status: 'failed', updated_at: new Date().toISOString() })
           .eq('id', scene.id);
-        results.push({ sceneId: scene.id, status: 'failed', error: String(sceneError) });
+        results.push({ sceneId: scene.id, status: 'failed', error: errMsg });
       }
     }
 
-    // Deduct credits for AI scenes that started generating
-    const generatingCount = results.filter(r => r.status === 'generating').length;
-    if (generatingCount > 0 && totalCost > 0) {
+    // Deduct credits ONLY for AI scenes that actually started generating
+    const generatingResults = results.filter(r => r.status === 'generating');
+    const generatingCount = generatingResults.length;
+    let actualCost = 0;
+    for (const r of generatingResults) {
+      const scene = scenes.find(s => s.id === r.sceneId);
+      if (!scene) continue;
+      const q: Quality = scene.clipQuality === 'pro' ? 'pro' : 'standard';
+      actualCost += scene.durationSeconds * (CLIP_COSTS[scene.clipSource]?.[q] ?? 0);
+    }
+
+    if (generatingCount > 0 && actualCost > 0) {
       try {
         await supabaseAdmin.rpc('deduct_ai_video_credits', {
           p_user_id: user.id,
-          p_amount: totalCost,
+          p_amount: actualCost,
           p_generation_id: projectId,
         });
-        console.log(`[compose-video-clips] Deducted €${totalCost.toFixed(2)} for ${generatingCount} AI clips`);
+        console.log(`[compose-video-clips] Deducted €${actualCost.toFixed(2)} for ${generatingCount} AI clips`);
       } catch (creditErr) {
         console.error('[compose-video-clips] Credit deduction failed:', creditErr);
       }
@@ -257,7 +291,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, results, totalCost, generatingCount }),
+      JSON.stringify({ success: true, results, totalCost: actualCost, generatingCount }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
