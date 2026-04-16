@@ -153,6 +153,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
     setLongRunning(false);
     setRenderStatus('pending');
     setRenderId(null);
+    setProgress(0);
 
     try {
       const { data, error } = await supabase.functions.invoke('compose-video-assemble', {
