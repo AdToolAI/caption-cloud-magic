@@ -140,12 +140,8 @@ export default function SceneMediaUpload({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-muted-foreground flex items-center gap-1.5">
-            {uploadType === 'image' ? (
-              <ImageIcon className="h-3 w-3 text-primary" />
-            ) : (
-              <Film className="h-3 w-3 text-primary" />
-            )}
-            Eigene {uploadType === 'image' ? 'Bilddatei' : 'Videodatei'} hochgeladen
+            <Film className="h-3 w-3 text-primary" />
+            Eigenes Video hochgeladen
           </span>
           <Button
             size="sm"
@@ -158,25 +154,15 @@ export default function SceneMediaUpload({
           </Button>
         </div>
         <div className="relative rounded-md overflow-hidden border border-border/40 bg-black">
-          {uploadType === 'image' ? (
-            <img src={uploadUrl} alt="Scene upload preview" className="w-full max-h-48 object-contain" />
-          ) : (
-            <video src={uploadUrl} controls className="w-full max-h-48 object-contain bg-black" />
-          )}
+          <video src={uploadUrl} controls className="w-full max-h-48 object-contain bg-black" />
         </div>
-        {uploadType === 'image' && (
-          <div className="flex items-start gap-1.5 text-[10px] text-primary/80 bg-primary/5 border border-primary/20 rounded px-2 py-1.5">
-            <Sparkles className="h-3 w-3 mt-0.5 flex-shrink-0" />
-            <span>Wird im finalen Video mit Ken-Burns-Effekt animiert (sanftes Zoomen & Schwenken).</span>
-          </div>
-        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-1">
-      <span className="text-[10px] text-muted-foreground">Eigene Datei hochladen</span>
+      <span className="text-[10px] text-muted-foreground">Eigenes Video hochladen</span>
       <div
         onDrop={handleDrop}
         onDragOver={(e) => {
@@ -199,7 +185,7 @@ export default function SceneMediaUpload({
         <input
           ref={inputRef}
           type="file"
-          accept={[...ACCEPTED_VIDEO, ...ACCEPTED_IMAGE].join(',')}
+          accept={ACCEPTED_VIDEO.join(',')}
           disabled={disabled || uploading}
           onChange={(e) => handleFile(e.target.files?.[0] || null)}
           className="hidden"
@@ -215,14 +201,22 @@ export default function SceneMediaUpload({
             <div className="flex items-center justify-center gap-2 mb-1.5">
               <Upload className="h-4 w-4 text-muted-foreground" />
               <Film className="h-4 w-4 text-muted-foreground/60" />
-              <ImageIcon className="h-4 w-4 text-muted-foreground/60" />
             </div>
             <p className="text-[11px] text-foreground font-medium">
-              Video oder Bild hierher ziehen
+              Video hierher ziehen
             </p>
             <p className="text-[9px] text-muted-foreground mt-0.5">
-              MP4, MOV, WEBM bis 200 MB · JPG, PNG, WEBP bis 20 MB
+              MP4, MOV, WEBM · max. 200 MB
             </p>
+            <p className="text-[9px] text-muted-foreground/60 mt-1">
+              💡 Bilder gehören zur KI-Referenz (im KI-Tab)
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
           </>
         )}
       </div>
