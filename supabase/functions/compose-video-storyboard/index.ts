@@ -86,14 +86,14 @@ serve(async (req) => {
     };
     const toneLook = toneStyling[briefing.tone] || toneStyling.professional;
 
-    // Per scene-type structural hints
-    const sceneTypeHints = `Scene-type visual templates (use as starting point):
-- hook: extreme close-up or macro detail · 24-35mm wide · sudden motion · pattern-interrupt
-- problem: medium shot of frustrated subject · low-key light · cool tint · static or shake
-- solution: reveal shot · key-light up · push-in or rack focus · warm tint
-- demo: product hero shot · 50mm or macro · controlled lighting · slow rotation or detail tracking
-- social-proof: portrait shot or testimonial framing · 85mm · soft natural light · shallow depth
-- cta: wide hero shot · symmetrical composition · brand color dominant · slow pull-out`;
+    // Per scene-type structural hints — PRODUCT-IN-SCENE, NOT PRODUCT-AS-SCENE
+    const sceneTypeHints = `Scene-type visual templates (product MUST appear within a real-world human moment, not isolated):
+- hook: emotional human moment that stops the scroll — a person in a relatable situation, product visible but in context (held in hand, in pocket, on the table next to them, on the desk while they work). NEVER an isolated product macro on a plain background.
+- problem: medium shot of a frustrated/struggling person in their real environment · low-key light · cool tint · NO product yet (this is the pain scene)
+- solution: reveal moment where the person discovers / picks up / uses the product for the first time — product ENTERS the scene through human action (hand reaching in, unboxing, switching it on). Product is NOT standing alone.
+- demo: a real person actively USING the product in a real environment — show the result/benefit on their face and surroundings, not just the product spinning. ⚠️ If (and only if) the briefing truly demands a clean product beauty-shot, this is the ONE scene allowed to be an isolated hero — but prefer hands-in-frame even here.
+- social-proof: real people in real settings reacting to / holding / wearing / talking about the product — testimonial or candid lifestyle framing · 85mm · soft natural light · shallow depth
+- cta: wide hero shot of person + product together in their world (lifestyle final frame), brand color dominant in environment — NEVER product alone on background or gradient`;
 
     const systemPrompt = `You are a senior cinematographer + video ad director. You write professional, production-ready storyboards for short-form video ads. Your AI prompts must read like real cinematography directions, not generic descriptions.
 
@@ -102,17 +102,24 @@ Hard rules:
 - Text overlays in ${langLabel} (max 8 words, punchy)
 - Transitions in English (enum)
 
+🚨 PRODUCT INTEGRATION RULES (HIGHEST PRIORITY — overrides anything else):
+A. The SUBJECT of the MAJORITY of scenes must be a HUMAN or a LIFE SITUATION — NOT the product alone. The product appears WITHIN the scene, integrated into the action.
+B. Maximum ratio: at most ONE out of every four scenes may be a pure isolated product hero-shot. All other scenes must show the product in use / in context / in a human's hands / in an environment.
+C. Every aiPrompt MUST explicitly describe HOW the product is embedded in the scene (e.g. "in the hands of a jogging woman at sunrise", "on the kitchen counter next to a cooking family", "in the backpack of a hiker overlooking the valley", "on the desk while she takes a video call").
+D. ANTI-PATTERNS — strictly avoid these phrasings unless writing the single allowed hero scene: "product floating", "product rotating on white", "product on pedestal", "isolated product shot", "product hero on gradient", "product spinning in empty space", "product on plain background".
+
 AI prompt requirements (CRITICAL — every aiPrompt MUST contain ALL of these):
-1. SUBJECT: who/what is on screen (concrete, not abstract)
-2. ACTION: what they/it are doing
+1. SUBJECT: a person or life situation (per Rule A) — concrete, with role/age/mood, in a specific environment. Product is mentioned as part of the scene, not as the subject itself.
+2. ACTION: what the person is doing AND how they interact with the product
 3. CAMERA: angle + movement (e.g. "low angle slow dolly-in", "overhead static", "handheld whip pan")
 4. LENS: focal length or framing (e.g. "shot on 35mm anamorphic", "macro lens", "85mm portrait")
 5. LIGHTING: direction + quality + color temp (e.g. "golden hour key from camera left, soft fill")
 6. MOOD/STYLE: cinematic look (e.g. "shallow depth of field, filmic grain, muted Kodak Portra palette")
 7. TONE-DRIVEN LOOK for "${briefing.tone}" → ${toneLook}
-8. Length: minimum 50 words per aiPrompt — aim for 60-80
-9. Always end aiPrompt with: ", no on-screen text, no captions, no subtitles, no watermarks, no logos" (CRITICAL — prevents AI from burning text into the video which would conflict with our overlay system)
-10. Never include any quoted on-screen text in the aiPrompt itself
+8. ENVIRONMENT: explicit real-world setting (kitchen, sidewalk, café, bedroom, gym, office, park...) — never "studio" or "white background" except for the single allowed hero scene
+9. Length: minimum 50 words per aiPrompt — aim for 60-80
+10. Always end aiPrompt with: ", no on-screen text, no captions, no subtitles, no watermarks, no logos, no isolated product on plain background, no floating product, no product rotating in empty space" (CRITICAL — prevents AI from burning text or generating isolated product shots)
+11. Never include any quoted on-screen text in the aiPrompt itself
 
 ${sceneTypeHints}
 
@@ -142,6 +149,8 @@ Aspect Ratio: ${briefing.aspectRatio}
 
 Structure to follow:
 ${structure}
+
+🚨 INTEGRATION REQUIREMENT (non-negotiable): The product must appear *within* real-world scenes — used by people, in real environments, in lifestyle moments. The product is part of the story, not the story itself. Avoid isolated product shots entirely, except for AT MOST ONE hero scene if the briefing genuinely calls for a clean beauty-shot. Every other scene must feature a human or life situation with the product integrated naturally.
 
 Generate the storyboard using the create_storyboard function.`;
 
