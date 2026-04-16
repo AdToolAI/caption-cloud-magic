@@ -16,6 +16,7 @@ import type {
   ComposerCategory,
   ComposerStatus,
 } from '@/types/video-composer';
+import { CLIP_SOURCE_COSTS } from '@/types/video-composer';
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'audio' | 'export';
 
