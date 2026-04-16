@@ -47,10 +47,24 @@ serve(async (req) => {
 
     if (scenesError) throw new Error('Failed to load scenes');
 
-    // 3. Verify all clips are ready
-    const notReady = (scenes || []).filter(s => s.clip_status !== 'ready' || !s.clip_url);
+    // 3. Verify each clip is renderable: ready OR upload-with-url
+    const isRenderable = (s: any) =>
+      (s.clip_status === 'ready' && !!s.clip_url) ||
+      (s.clip_source === 'upload' && !!s.upload_url);
+
+    const notReady = (scenes || []).filter(s => !isRenderable(s));
     if (notReady.length > 0) {
-      throw new Error(`${notReady.length} clips are not ready yet`);
+      const details = notReady
+        .map(s => `Szene ${(s.order_index ?? 0) + 1} (${s.scene_type || 'custom'}, status: ${s.clip_status})`)
+        .join(', ');
+      throw new Error(`Folgende Szenen sind noch nicht fertig: ${details}. Bitte erst alle Clips generieren.`);
+    }
+
+    // Normalize: prefer upload_url for upload-source scenes
+    for (const s of (scenes || []) as any[]) {
+      if (s.clip_source === 'upload' && !s.clip_url && s.upload_url) {
+        s.clip_url = s.upload_url;
+      }
     }
 
     // 4. Parse assembly config

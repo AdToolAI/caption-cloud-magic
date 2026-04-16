@@ -61,7 +61,36 @@ export function useComposerPersistence() {
         projectId = inserted.id;
       }
 
-      // 2. Persist all scenes — upsert by re-inserting any scene that lacks a real UUID
+      // 2. Delete any scenes that are no longer part of the storyboard
+      //    (prevents orphans + frees up order_index slots for the unique constraint)
+      const keepIds = project.scenes.filter(s => isUuid(s.id)).map(s => s.id);
+      let delQuery = supabase
+        .from('composer_scenes')
+        .delete()
+        .eq('project_id', projectId!);
+      if (keepIds.length > 0) {
+        delQuery = delQuery.not('id', 'in', `(${keepIds.join(',')})`);
+      }
+      const { error: delErr } = await delQuery;
+      if (delErr) {
+        console.warn('[persistence] Cleanup of removed scenes failed:', delErr);
+      }
+
+      // 3. Two-phase write to satisfy UNIQUE(project_id, order_index):
+      //    Phase A — push every existing row to a temporary negative order_index
+      //    Phase B — write the final order_index in the target loop
+      const existingIds = project.scenes.filter(s => isUuid(s.id)).map(s => s.id);
+      if (existingIds.length > 0) {
+        // Move each existing scene to a unique negative slot to free real slots
+        for (let i = 0; i < existingIds.length; i++) {
+          await supabase
+            .from('composer_scenes')
+            .update({ order_index: -(i + 1) } as any)
+            .eq('id', existingIds[i]);
+        }
+      }
+
+      // 4. Persist scenes (update existing, insert new) at their final order_index
       const persistedScenes: ComposerScene[] = [];
 
       for (let i = 0; i < project.scenes.length; i++) {
