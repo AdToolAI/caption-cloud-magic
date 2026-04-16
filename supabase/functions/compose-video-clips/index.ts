@@ -137,7 +137,7 @@ serve(async (req) => {
 
     // Append a negative-text suffix to AI prompts so models don't burn captions/watermarks
     // into the generated clip (would conflict with our manual overlay system).
-    const NEGATIVE_TEXT_SUFFIX = ", no on-screen text, no captions, no subtitles, no watermarks, no logos";
+    const NEGATIVE_TEXT_SUFFIX = ", no on-screen text, no captions, no subtitles, no watermarks, no logos, no isolated product on plain background, no floating product, no product rotating in empty space";
     const enrichPrompt = (prompt?: string): string => {
       const base = (prompt || "cinematic footage").trim();
       const lower = base.toLowerCase();
