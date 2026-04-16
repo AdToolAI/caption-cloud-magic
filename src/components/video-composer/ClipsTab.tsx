@@ -159,9 +159,10 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
 
       const failedResults = (data?.results || []).filter((r: any) => r.status === 'failed');
       if (failedResults.length > 0) {
+        console.error('[ClipsTab] Failed clip details:', failedResults);
         toast({
           title: `${failedResults.length} Clip(s) fehlgeschlagen`,
-          description: failedResults[0]?.error?.slice(0, 200) || 'Unbekannter Fehler',
+          description: 'Generierung fehlgeschlagen — bitte erneut versuchen. Details in der Konsole.',
           variant: 'destructive',
         });
       } else {
@@ -174,7 +175,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
       setTimeout(pollScenes, 500);
     } catch (err: any) {
       console.error('Generate clips error:', err);
-      toast({ title: 'Fehler', description: err.message || 'Clip-Generierung fehlgeschlagen', variant: 'destructive' });
+      toast({ title: 'Fehler', description: 'Clip-Generierung fehlgeschlagen — bitte erneut versuchen.', variant: 'destructive' });
     } finally {
       setIsGeneratingAll(false);
     }
