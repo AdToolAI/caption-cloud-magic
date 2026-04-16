@@ -19,7 +19,7 @@ interface Briefing {
 }
 
 const CATEGORY_STRUCTURES: Record<string, string> = {
-  "product-ad": `Use the AIDA framework:
+  "product-ad": `USP-DRIVEN PRODUCT AD — use the AIDA framework. Treat the briefing's "productName" as the product, "usps" as benefits, "targetAudience" as the buyer persona.
 1. Hook (3-4s): Attention-grabbing visual that stops scrolling
 2. Problem (4-6s): Show the pain point the audience faces
 3. Solution (4-6s): Introduce the product as the answer
@@ -27,26 +27,21 @@ const CATEGORY_STRUCTURES: Record<string, string> = {
 5. Social Proof (4-6s): Testimonials, numbers, or trust signals
 6. CTA (3-5s): Clear call-to-action with urgency`,
 
-  "corporate-ad": `Use brand storytelling:
+  "corporate-ad": `MISSION-DRIVEN CORPORATE FILM — trust-building, brand-led. Treat "productName" as the COMPANY name, "productDescription" as industry/mission, "usps" as core brand messages.
 1. Hook (3-5s): Bold brand statement or vision
-2. Problem (4-6s): Industry challenge or market need
-3. Solution (5-8s): Company's unique approach
-4. Demo (5-10s): Products/services showcase
-5. Social Proof (4-6s): Client logos, awards, metrics
-6. CTA (3-5s): Brand tagline + next step`,
+2. Problem (4-6s): Industry challenge or market need the company addresses
+3. Solution (5-8s): Company's unique approach / mission in action
+4. Demo (5-10s): Team, services or impact showcase
+5. Social Proof (4-6s): Client logos, awards, metrics, longevity
+6. CTA (3-5s): Brand tagline + next step (visit, contact, join)`,
 
-  storytelling: `Use the Hero's Journey:
-1. Hook (3-5s): Intriguing opening that creates curiosity
-2. Problem (5-8s): Establish the protagonist's struggle
-3. Solution (5-8s): The turning point / discovery
-4. Demo (5-10s): Transformation in action
-5. Social Proof (4-6s): Emotional payoff / results
-6. CTA (3-5s): Inspire action`,
+  storytelling: `NARRATIVE STORYTELLING — 3-act emotional arc, NO ad copy. Treat "productName" as the STORY TITLE, "productDescription" as the logline/setting, "usps" as key beats/scenes, "targetAudience" as the protagonist + conflict (parsed from "Protagonist: X | Conflict: Y") combined with the target emotion. Build a real story with character, tension and emotional payoff. Avoid sales language entirely. Text overlays should be poetic/cinematic (a single line of dialogue, a date, a place, a feeling) — never marketing copy.
+ACT 1 — SETUP (≈25% of duration): Introduce protagonist and world. Establish tone and stakes.
+ACT 2 — CONFRONTATION (≈50% of duration): Inciting incident → rising conflict → midpoint twist → crisis. Multiple scenes here.
+ACT 3 — RESOLUTION (≈25% of duration): Climax → emotional payoff → final image that lingers.
+Use sceneType values loosely — map "hook"=opening, "problem"=conflict beats, "solution"=turning point, "demo"=climax, "social-proof"=emotional payoff, "cta"=final image.`,
 
-  custom: `Create a flexible structure:
-1. Opening (3-5s): Strong visual intro
-2-5. Middle scenes (4-8s each): Core content, flexible purpose
-6. Closing (3-5s): Wrap-up with clear message`,
+  custom: `FREE EDITOR MODE — follow the user's free description as literally as possible. Treat "productName" as the title, "productDescription" as the user's full creative brief (TOP PRIORITY — the storyboard must reflect it scene-by-scene), "usps" as optional style hints. Do NOT impose AIDA or any fixed framework. Generate scenes that mirror the user's description in order. Text overlays only if the brief implies them.`,
 };
 
 serve(async (req) => {
