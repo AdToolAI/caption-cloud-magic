@@ -1,11 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowRight, Loader2, Mic, Music, Pause, Play, Search, Volume2, Zap } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowRight, Info, Loader2, Mic, Music, Pause, Play, Search, Volume2, Zap } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -15,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import type { AssemblyConfig, ComposerScene, VoiceoverConfig, MusicConfig } from '@/types/video-composer';
 
 interface AudioTabProps {
@@ -23,16 +26,6 @@ interface AudioTabProps {
   scenes: ComposerScene[];
   onGoToExport: () => void;
 }
-
-const VOICES = [
-  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel (M)', lang: 'DE' },
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah (F)', lang: 'EN' },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George (M)', lang: 'EN' },
-  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily (F)', lang: 'EN' },
-  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger (M)', lang: 'EN' },
-  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura (F)', lang: 'EN' },
-  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica (F)', lang: 'EN' },
-];
 
 interface MusicTrack {
   id: string;
