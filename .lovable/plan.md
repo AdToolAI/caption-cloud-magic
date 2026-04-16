@@ -1,29 +1,40 @@
 
 
-## Root Cause
-Die **deployte Edge Function `compose-video-clips`** ist veraltet. Im Repo ist `webhook_events_filter: ["completed"]` korrekt, aber die laufende Version sendet noch `["completed", "failed"]` → Replicate antwortet mit **422 für jeden einzelnen Clip** (Hailuo, Kling, Sora gleichermaßen).
+## Fix-Plan — Datenintegrität + Render-Robustheit
 
-Beweis aus Live-Logs:
+### 1. DB-Aufräumung (Migration)
+Einmalige Bereinigung: Pro `(project_id, order_index)` nur die **neueste `ready` Szene** behalten, Rest löschen. Bei keiner `ready` Variante: neueste behalten.
+
+```sql
+-- Schritt 1: Für jede order_index pro Projekt die "beste" Szene markieren
+-- Priorität: ready > pending > failed, bei Gleichstand: neueste
+-- Schritt 2: Alle anderen löschen
 ```
-422 Unprocessable Entity: webhook_events_filter.1 must be one of: 
-"start", "output", "logs", "completed"
+
+### 2. Persistenz-Hook (`useComposerPersistence.ts`) härten
+Beim Speichern des Storyboards: **DELETE alte Szenen vor INSERT** (transaktional via RPC oder upsert mit unique key auf `(project_id, order_index)`). Verhindert künftige Duplikate.
+
+### 3. Unique Constraint auf `composer_scenes`
+```sql
+ALTER TABLE composer_scenes ADD CONSTRAINT composer_scenes_project_order_unique 
+UNIQUE (project_id, order_index);
 ```
+Macht künftige Duplikate technisch unmöglich.
 
-## Fix-Plan
+### 4. `compose-video-assemble` defensiv filtern
+Auch wenn DB sauber ist: nur Szenen mit `clip_status='ready' OR (clip_source='upload' AND upload_url IS NOT NULL)` in den Render-Payload nehmen, geordnet nach `order_index`. Verhindert künftige False-Positives.
 
-### 1. Re-Deploy `compose-video-clips`
-Der Code im Repo ist bereits korrekt (Zeile 209 + 235 = `["completed"]`). Es reicht, die Function neu zu deployen, damit die Live-Version dem Repo entspricht. Ich werde dafür eine minimale Touch-Änderung (Comment-Bump mit Versions-Marker) machen, damit der Deploy garantiert greift.
+### 5. Klarere Fehlermeldung
+Statt `"22 clips are not ready yet"` → konkret welche Szenen-Indizes fehlen, im UI als Toast: *"Szene 2 (Demo) ist noch nicht fertig — bitte erst alle Clips generieren"*.
 
-### 2. Klarere Fehler-Toasts im Client
-`ClipsTab.tsx` zeigt aktuell den vollen Replicate-Stacktrace im Toast. Ich kürze das auf eine lesbare Meldung wie *"Generierung fehlgeschlagen — bitte erneut versuchen"* + Detail in der Konsole.
-
-### 3. Verify
-- Nach Deploy: "Alle generieren" auf einem 30s/4-Szenen-Brief
-- Header zeigt €4.50 → Toast €4.50 → **alle 4 Szenen wechseln auf `generating` (kein 422)**
-- Nach ~30–60s: Webhook setzt sie auf `ready`
+### 6. Verify
+- Nach Cleanup: nur 5 Szenen pro `order_index 0-4` in der DB
+- Storyboard-Reload erzeugt keine neuen Duplikate
+- "Video rendern" startet erfolgreich, Lambda bekommt 5 Clips
+- Bei manuell pending-gelassener Szene → klare Fehlermeldung statt 500
 
 ### Was unverändert bleibt
-- DB-Schema, Types, Pricing-Matrix, Quality-Tier-System
-- Briefing/Storyboard/Audio/Export Tabs
-- Andere AI-Studio Functions (separate Aufgabe)
+- Pricing-Matrix, Quality-Tier, Webhook-Logik
+- Briefing/Storyboard/Audio Tabs UI
+- Universal Video Creator
 
