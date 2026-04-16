@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { getPremiumVoiceById, getDefaultSettingsForVoice, getDefaultModelForVoice } from '../_shared/premium-voices.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -85,12 +86,16 @@ serve(async (req) => {
     // Get voice ID from map or use as-is if it's already an ID
     const voiceId = VOICE_MAP[voice.toLowerCase()] || voice;
 
-    // ✅ NEW: Use with-timestamps endpoint for lip-sync data
+    // Pull premium settings if this is a curated voice
+    const premium = getPremiumVoiceById(voiceId);
+    const premiumSettings = getDefaultSettingsForVoice(voiceId);
+    const modelId = body.modelId || getDefaultModelForVoice(voiceId);
+
+    // ✅ Use with-timestamps endpoint for lip-sync data
     const endpoint = withTimestamps 
       ? `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`
-      : `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+      : `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
 
-    // Call ElevenLabs TTS API (Turbo v2.5 for best quality/speed)
     const ttsResponse = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -99,15 +104,17 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         text: scriptText,
-        model_id: 'eleven_turbo_v2_5',
+        model_id: modelId,
         voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0.5,
-          use_speaker_boost: true,
+          stability: body.stability ?? premiumSettings.stability,
+          similarity_boost: body.similarityBoost ?? premiumSettings.similarity_boost,
+          style: body.style ?? premiumSettings.style,
+          use_speaker_boost: body.useSpeakerBoost ?? premiumSettings.use_speaker_boost,
         },
       }),
     });
+
+    console.log('[generate-video-voiceover] premium=', !!premium, 'model=', modelId);
 
     if (!ttsResponse.ok) {
       const errorText = await ttsResponse.text();
