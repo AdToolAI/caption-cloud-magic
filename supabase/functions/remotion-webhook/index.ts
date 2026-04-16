@@ -31,6 +31,8 @@ serve(async (req) => {
     const source = customData?.source;
     const progressIdFromWebhook = customData?.progressId; // ← NEW: direct progressId
     const isDirectorsCut = source === 'directors-cut';
+    const isComposer = source === 'composer';
+    const composerProjectId = customData?.composer_project_id;
     const renderJobId = customData?.render_job_id;
 
     console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, progressIdFromWebhook });
