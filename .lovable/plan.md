@@ -1,48 +1,52 @@
 
+## Plan — Mediathek-Save, Download im AssemblyTab, Prompt-Verbesserung, Text-Overlay & Subtitle-Hinweis
 
-## Befund (Live-Logs)
-Aus `video_renders` für `source='composer'`:
-```
-status=failed, error=concurrencyPerLambda is set higher than the amount of CPU cores
-available. Available CPU cores: 2, value set: 10
-```
+### 1. Auto-Save in Mediathek + Download-Button (AssemblyTab)
+Der `remotion-webhook` legt für `source: 'composer'` aktuell **keinen** `video_creations`-Eintrag an (nur Composer-Status-Update). Fix:
+- In `remotion-webhook/index.ts` direkt nach dem `composer_projects` Update auch in `video_creations` inserten (mit Idempotenz-Check über `output_url`), Metadaten:
+  ```ts
+  { source: 'composer', composer_project_id, render_id, scenes_count, total_duration }
+  ```
+- AssemblyTab: Download-Button bleibt, zusätzlich Toast „In Mediathek gespeichert" beim `completed`-Switch. Für ältere bereits-fertige Renders ohne Mediathek-Eintrag: einmaliger Backfill direkt nach Polling-Completion (Client-seitig per Edge-Call wäre overkill — wir lassen es aus, neuer Webhook-Pfad reicht).
 
-Beide letzten Composer-Renders sind **innerhalb von 1–7 Sekunden** nach dem Insert mit Lambda-Validierungsfehler abgeschmettert worden. Die UI merkt das aber nicht, weil:
-1. `AssemblyTab` schickt nur `compose-video-assemble` ab, zeigt einmalig „Rendering läuft" und **pollt danach nichts mehr**.
-2. Der Webhook kann nichts liefern, weil Lambda nie startet.
-3. `composer_projects.status='failed'` wird zwar gesetzt, aber im UI nicht abgefragt.
+### 2. Prompt-Qualität deutlich erhöhen (`compose-video-storyboard`)
+Im `systemPrompt` schärfen:
+- AI-Prompt-Länge erzwingen: **mind. 50 Wörter** mit Pflichtbestandteilen: **Subjekt + Aktion + Kameraperspektive + Objektivbrennweite + Lichtsetzung + Stimmung/Look + cinematischer Stil** (z. B. "shot on 35mm anamorphic, shallow depth of field, golden hour, slow dolly-in").
+- Negative-Prompt-Hinweise: **„never use on-screen captions, watermarks, or text in the AI prompt"** → verhindert dass das KI-Video selbst Untertitel rendert (Pkt. 4).
+- Pro Szenentyp Beispielstrukturen mitgeben (Hook = extreme close-up + macro, CTA = wide hero shot etc.).
+- Tone (`briefing.tone`) explizit ins visual styling übersetzen ("luxury" → marble/gold/key light low; "energetic" → handheld + neon).
 
-## Fix in 3 Teilen
+### 3. Text-Overlay Editor pro Szene (volle Kontrolle)
+Aktuell hat `SceneCard` nur ein **einfaches Text-Input** ohne Position/Animation/Stil. Audio-Tab/Render-Pipeline unterstützt aber bereits `position`, `animation`, `fontSize`, `color`, `fontFamily`. Erweitern:
+- In `SceneCard.tsx`: Collapsible „Text-Overlay" mit **Text-Input + Position-Select (top/center/bottom/…) + Animation-Select (fade/scale/slide/word-by-word/glow) + Farb-Picker + Schriftgröße-Slider**.
+- Defaults aus `DEFAULT_TEXT_OVERLAY` bleiben.
+- Render-Pipeline (`compose-video-assemble` → `ComposedAdVideo.tsx`) ist bereits darauf vorbereitet — keine Backend-Änderungen nötig.
 
-### 1. Lambda-Payload: `concurrencyPerLambda` korrekt setzen
-In `compose-video-assemble/index.ts`:
-- `concurrencyPerLambda: 10` → **`1`** (so wie auch `validate-music-track` und alle anderen Pipelines es nutzen)
-- Optional `framesPerLambda: 270` ergänzen (passend zur Lambda-Concurrency-Policy aus dem Memory)
+### 4. Konflikt „eingebrannte KI-Untertitel + manuelle Untertitel"
+KI-Modelle (Hailuo/Kling) rendern manchmal Text in das Video — wenn der User dann ein Text-Overlay drüberlegt, hat man Doppel-Text. Lösung in mehreren Ebenen:
 
-### 2. UI: echtes Polling auf Render-Status
-`AssemblyTab.tsx` erweitern:
-- Nach erfolgreichem `invoke` → alle 4s `video_renders.select('status, video_url, error_message').eq('render_id', renderId)` abfragen
-- Drei Endzustände:
-  - `completed` + `video_url` → Erfolgs-Card mit **Vorschau-Player** + **Download-Button** + Toast „Video fertig"
-  - `failed` → Fehler-Card mit echter `error_message` + Toast (rot)
-  - `rendering`/`pending` → unverändert weiterpollen (max 10 Min, danach Hinweis „dauert länger als erwartet")
-- Während des Pollings einen kleinen `Progress`-Indikator zeigen (Spinner + „Lambda rendert …")
+**a) Prävention im Prompt** (siehe Pkt. 2): explizit `--no text, no captions, no subtitles, no watermarks` in `aiPrompt` einbauen (im Storyboard-LLM erzwingen + auch im Edge-Function `compose-video-clips` als Suffix anhängen, falls fehlt).
 
-### 3. Composer-Project-Status zurück in den Dashboard-State
-Im Dashboard nach Mount/Tab-Wechsel zusätzlich `composer_projects.output_url` + `status` mitziehen, damit auch nach Reload das fertige Video sichtbar bleibt.
+**b) UI-Hinweis im SceneCard**: kleines Info-Banner über Text-Overlay-Feld:
+> ⚠️ "Falls die KI bereits Text rendert, kann es zu Doppel-Untertiteln kommen. Wir versuchen das im Prompt zu vermeiden."
 
-## Geänderte Dateien
-- `supabase/functions/compose-video-assemble/index.ts` — `concurrencyPerLambda: 1`
-- `src/components/video-composer/AssemblyTab.tsx` — Polling, Vorschau, Download
-- `src/components/video-composer/VideoComposerDashboard.tsx` — beim DB-Sync `output_url` mitlesen
+**c) AudioTab voiceover-script generation**: bleibt wie aktuell (nutzt `textOverlay.text`) — keine Doppelung mit KI-rendered text dort.
 
-## Verify
-- „Video rendern" → Render startet ohne Lambda-Validation-Error
-- UI zeigt Spinner mit Live-Status
-- Nach ~1–3 Min: Player + „Herunterladen"-Button erscheinen automatisch
-- Bei Fehler: konkrete Lambda-Meldung statt nur „Rendering läuft" für immer
-- Reload behält fertiges Video bei
+### 5. Was unverändert bleibt
+- DB-Schema, RLS, Pricing/Quality-Tier
+- Polling/Render-Pipeline aus letzter Iteration
+- BriefingTab, StoryboardTab, AudioTab UI
 
-## Was unverändert bleibt
-- DB-Schema, RLS, Pricing, Webhook-Logik, andere Studios
+### Geänderte Dateien
+- `supabase/functions/remotion-webhook/index.ts` — `video_creations` Insert für composer
+- `supabase/functions/compose-video-storyboard/index.ts` — verschärfte System-Prompts + No-Text-Klausel
+- `supabase/functions/compose-video-clips/index.ts` — Negative-Suffix `, no text, no captions, no subtitles, no watermarks` an `aiPrompt` anhängen falls fehlt
+- `src/components/video-composer/SceneCard.tsx` — Text-Overlay-Editor (Position/Animation/Farbe/Größe) + Info-Banner
+- `src/components/video-composer/AssemblyTab.tsx` — Toast "In Mediathek gespeichert" bei completion
 
+### Verify
+- Render fertig → erscheint sofort in `/mediathek`
+- Download-Button im AssemblyTab funktioniert (bereits da)
+- Neue Szenen-Prompts sind detailliert und enthalten Kamera/Licht/Stil
+- KI-Videos rendern keinen Text mehr (durch Negative Prompt)
+- SceneCard erlaubt Position/Animation/Farbe/Größe pro Text-Overlay
