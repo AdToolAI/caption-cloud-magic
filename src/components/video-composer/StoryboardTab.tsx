@@ -10,9 +10,10 @@ interface StoryboardTabProps {
   onUpdateScenes: (scenes: ComposerScene[]) => void;
   onGoToClips: () => void;
   language: string;
+  projectId?: string;
 }
 
-export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, language }: StoryboardTabProps) {
+export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, language, projectId }: StoryboardTabProps) {
   const addScene = () => {
     const newScene: ComposerScene = {
       id: `scene_${Date.now()}`,
@@ -109,6 +110,7 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
               scene={scene}
               index={index}
               totalScenes={scenes.length}
+              projectId={projectId}
               onUpdate={(updates) => updateScene(scene.id, updates)}
               onDelete={() => deleteScene(scene.id)}
               onMoveUp={() => moveScene(index, index - 1)}
