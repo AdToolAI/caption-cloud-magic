@@ -1,65 +1,64 @@
 
 
 ## Befund
-Zwei Probleme im Clips-Tab (`ClipsTab.tsx`):
+User möchte **Quality-Tiers** (Standard / Pro) pro KI-Quelle wählbar machen — analog zu den Standalone-Studios (Hailuo Standard 768p / Pro 1080p, Kling Standard 720p / Pro 1080p, Sora Standard / Pro). Aktuell ist im Composer nur Standard hardcoded.
 
-1. **Keine sichtbare Generierungs-Anzeige**: Nach dem Klick auf "Alle Clips generieren" wird zwar ein Toast gezeigt und intern wird `clipStatus='generating'` gesetzt, aber die einzelne Szenen-Card zeigt nur ein winziges Spinner-Icon rechts. Es gibt **keinen prominenten Progress-Bar pro Clip**, kein Skeleton-Overlay auf dem Vorschau-Slot, keine Statuszeile à la "KI rendert (~30–60s)…" wie im AI Video Studio. Daher der Eindruck "es passiert nichts".
+## Plan — Quality-Tier-System pro AI-Clip
 
-2. **Nur Bulk-Generierung**: Es gibt `handleRegenerateScene` (rotierender Pfeil-Button), aber das ist semantisch "Nochmal versuchen". Es fehlt ein klarer **"Diesen Clip generieren"**-Button für noch nicht gestartete Szenen, sodass der User Clip für Clip einzeln testen/triggern kann (Kosten- und Risikokontrolle).
+### 1. Datenmodell (`src/types/video-composer.ts`)
+- Neuer Typ `ClipQuality = 'standard' | 'pro'`
+- Neues Feld in `ComposerScene`: `clipQuality: ClipQuality` (Default `'standard'`)
+- `CLIP_SOURCE_COSTS` umbauen zu Matrix:
+  ```
+  CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>>
+  ai-hailuo: { standard: 0.15, pro: 0.20 }
+  ai-kling:  { standard: 0.15, pro: 0.21 }
+  ai-sora:   { standard: 0.25, pro: 0.53 }
+  stock/upload: { standard: 0, pro: 0 }
+  ```
+- Helper `getClipCost(source, quality, durationSec)` für UI + Header
 
-## Plan — Sichtbares Generierungs-Feedback + Einzel-Clip-Generierung
+### 2. DB-Migration
+- Neue Spalte `clip_quality text default 'standard'` in `composer_scenes`
+- Persistenz-Hook `useComposerPersistence.ts` mappt Feld mit
 
-### 1. Neue Komponente `SceneClipProgress.tsx` (Mini)
-- Zeigt im Vorschau-Slot der Szenen-Card (das aktuell graue 28×16 Quadrat) ein **Pulsing-Skeleton mit Loader** und Text "KI rendert…" wenn `clipStatus='generating'`
-- Bei `failed`: rotes XCircle + "Fehlgeschlagen — neu versuchen"
-- Bei `ready`: das Video wie heute
-- Bei `pending`: Platzhalter-Text + neuer "Generieren"-Button überlagert
+### 3. UI in `SceneCard.tsx` (Storyboard-Tab)
+- Direkt unter der Quellen-Dropdown ein zweiter kleiner Tab/Toggle: **Standard** | **Pro**
+- Nur sichtbar bei KI-Quellen (`ai-*`)
+- Zeigt Live-Preis: *"Standard 768p — €0.15/s"* / *"Pro 1080p — €0.20/s"*
+- Bei Wechsel: sofortiger Re-Calc des Header-Totals
 
-### 2. `ClipsTab.tsx` — Status-Visualisierung verbessern
-- Vorschau-Slot vergrößern auf 36×20 (gut sichtbar)
-- Bei `generating`: animierter Gradient-Skeleton (Tailwind `animate-pulse` + Shimmer)
-- Status-Badge größer und farbig: gelb (pending), blau-pulsierend (generating), grün (ready), rot (failed)
-- Pro Karte eine **Status-Zeile** unter dem Prompt-Text: "KI generiert… (Hailuo, ~30–60s)" mit Loader2-Icon
-- Header-Bar: neuer Mini-Progress-Bar `readyCount / totalCount` als Balken (nicht nur Text)
+### 4. UI in `ClipsTab.tsx`
+- Pro Karte Mini-Badge: "Standard" oder "Pro" neben dem Source-Label
+- Generate-Button-Cost zeigt korrekten Tier-Preis
 
-### 3. Neuer Einzel-Generierung-Button
-- Neue Funktion `handleGenerateSingle(scene)` — sehr ähnlich zu `handleGenerateAll` aber Payload nur mit dieser einen Szene
-- Sicherstellen, dass `ensureProjectPersisted` auch hier gerufen wird
-- Button-Logik in der Karte:
-  - `pending` + KI-Source → primärer **"Generieren"**-Button (Sparkles-Icon), zeigt Kosten "€0.20/s • €1.60"
-  - `generating` → disabled "Wird generiert…"
-  - `ready` → Refresh-Button bleibt für Re-Roll
-  - `failed` → roter "Erneut versuchen"-Button
-- Bei `upload`: kein Button, nur Vorschau wenn vorhanden
-- Bei `stock` ohne Auswahl: "Stock-Video suchen"-Button
+### 5. Edge Function `compose-video-clips/index.ts`
+- Für `ai-hailuo`: bei `clipQuality='pro'` → `resolution: '1080p'`, sonst `'768p'`
+- Für `ai-kling`: bei `pro` → `kwaivgi/kling-v3-omni-video` (1080p Mode), sonst Standard 720p
+- Für `ai-sora`: bei `pro` → Sora Pro Endpoint, sonst Standard
+- `CLIP_COSTS` als Matrix synchron zum Client
+- **Bonus-Fixes (aus letztem Plan):** `webhook_events_filter: ["completed"]` und bessere Fehler-Propagation
 
-### 4. Polling-Verbesserung
-- Polling-Interval von 5s → 3s für schnelleres Feedback
-- Beim Statuswechsel `generating → ready` einen Toast mit Szenenname zeigen ("Szene 2 fertig ✓")
-- Beim ersten Aufruf nach Generate-Click sofort einen Poll triggern (nicht erst nach 3s warten)
+### 6. Briefing-Tab — Default-Quality
+- Neuer Schalter im Briefing: *"Standard-Qualität für alle Szenen"* / *"Pro-Qualität (höhere Auflösung, höhere Kosten)"*
+- Storyboard-Generator setzt `clipQuality` aller neuen Szenen entsprechend
+- Pro-Szene-Override im Storyboard bleibt möglich
 
-### 5. Header-Polish
-- "Alle Clips generieren" zeigt verbleibende Anzahl und Restkosten:  
-  z.B. *"Alle generieren (3 Clips • €4.20)"*
-- Wenn 0 zu generieren: Button disabled mit Text "Alle Clips bereit"
-
-### 6. Lokalisierung (`src/lib/translations.ts`)
+### 7. Lokalisierung
 Neue Keys EN/DE/ES:
-- `videoComposer.generateSingle`, `videoComposer.generating`
-- `videoComposer.generationFailed`, `videoComposer.retry`
-- `videoComposer.aiRenderingHint` ("KI rendert ca. 30–60s")
-- `videoComposer.sceneReady`
+- `videoComposer.qualityStandard`, `videoComposer.qualityPro`
+- `videoComposer.qualityHint` ("Pro: höhere Auflösung, höhere Kosten")
+- `videoComposer.perSecond` ("/s")
 
-### 7. Verify
-- Klick "Alle generieren" → jede betroffene Karte zeigt sofort animiertes Skeleton + "KI rendert…"
-- Header-Progress-Bar bewegt sich beim Polling
-- Klick "Generieren" auf einzelner Karte → nur diese Karte geht in `generating`, Kosten korrekt abgezogen
-- Bei Fehler → roter Status + Retry-Button funktioniert
-- Bei Upload-Szene → kein Generate-Button, direkte Vorschau
+### 8. Verify
+- Hailuo 30s alle Standard → Header **€4.50** (30 × €0.15)
+- 1× Szene auf Pro umschalten (5s lang) → Header **€4.25 + €0.25 = €4.50** ändert sich auf **€4.50 - 0.75 + 1.00 = €4.75** (5×0.20 statt 5×0.15)
+- Generation läuft erfolgreich, Pro-Clip kommt in 1080p zurück
+- Toast-Cost = Header-Cost (kein Drift)
 
 ### Was unverändert bleibt
-- Edge Function `compose-video-clips` (unterstützt bereits Single-Scene-Payload)
-- DB-Schema, Persistenz-Hook, Pricing-Logik
-- Briefing, Storyboard, Audio, Export Tabs
+- DB-Schema außer neue `clip_quality` Spalte
+- Storyboard-AI-Logik, Upload-System, Persistenz-Hook-Struktur
 - Universal Video Creator
+- Tab-Struktur
 
