@@ -1,11 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowRight, Loader2, Mic, Music, Pause, Play, Search, Volume2, Zap } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowRight, Info, Loader2, Mic, Music, Pause, Play, Search, Volume2, Zap } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -15,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import type { AssemblyConfig, ComposerScene, VoiceoverConfig, MusicConfig } from '@/types/video-composer';
 
 interface AudioTabProps {
@@ -23,16 +26,6 @@ interface AudioTabProps {
   scenes: ComposerScene[];
   onGoToExport: () => void;
 }
-
-const VOICES = [
-  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel (M)', lang: 'DE' },
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah (F)', lang: 'EN' },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George (M)', lang: 'EN' },
-  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily (F)', lang: 'EN' },
-  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger (M)', lang: 'EN' },
-  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura (F)', lang: 'EN' },
-  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica (F)', lang: 'EN' },
-];
 
 interface MusicTrack {
   id: string;
@@ -61,6 +54,31 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
 
   // Beat sync state
   const [analyzingBeats, setAnalyzingBeats] = useState(false);
+
+  // Premium voices state
+  const [voices, setVoices] = useState<VoiceMeta[]>([]);
+  const [loadingVoices, setLoadingVoices] = useState(true);
+  const [voiceLangTab, setVoiceLangTab] = useState<'de' | 'en' | 'es'>('de');
+
+  useEffect(() => {
+    (async () => {
+      setLoadingVoices(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('list-voices', { body: { language: 'all' } });
+        if (error) throw error;
+        setVoices(sortVoicesPremiumFirst<VoiceMeta>(data?.voices || []));
+      } catch (err) {
+        console.error('Failed to load voices:', err);
+      } finally {
+        setLoadingVoices(false);
+      }
+    })();
+  }, []);
+
+  const voicesForTab = voices.filter((v) =>
+    v.language === voiceLangTab || (v.supportedLanguages || []).includes(voiceLangTab)
+  );
+  const fallbackVoice = { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah' };
 
   // Auto-generate script from scene text overlays
   const generateScriptFromScenes = () => {
@@ -217,36 +235,60 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
             </CardTitle>
             <Switch
               checked={!!voiceover?.enabled}
-              onCheckedChange={(checked) =>
+              onCheckedChange={(checked) => {
+                const first = voicesForTab[0] || voices[0] || fallbackVoice;
                 onUpdateAssembly({
                   voiceover: checked
-                    ? { enabled: true, voiceId: VOICES[0].id, voiceName: VOICES[0].name, script: '' }
+                    ? { enabled: true, voiceId: first.id, voiceName: first.name, script: '' }
                     : null,
-                })
-              }
+                });
+              }}
             />
           </div>
         </CardHeader>
         {voiceover?.enabled && (
           <CardContent className="space-y-4">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+              <span>💡 Premium-Stimmen klingen am natürlichsten. Tipp: Nutze Satzzeichen für realistische Pausen.</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Sprache</Label>
+              <Tabs value={voiceLangTab} onValueChange={(v) => setVoiceLangTab(v as 'de' | 'en' | 'es')}>
+                <TabsList className="grid w-full grid-cols-3 h-8">
+                  <TabsTrigger value="de" className="text-xs">🇩🇪 DE</TabsTrigger>
+                  <TabsTrigger value="en" className="text-xs">🇬🇧 EN</TabsTrigger>
+                  <TabsTrigger value="es" className="text-xs">🇪🇸 ES</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
             <div className="space-y-1.5">
               <Label className="text-xs">Stimme</Label>
               <Select
                 value={voiceover.voiceId}
                 onValueChange={(v) => {
-                  const voice = VOICES.find((vo) => vo.id === v);
+                  const voice = voices.find((vo) => vo.id === v);
                   onUpdateAssembly({
                     voiceover: { ...voiceover, voiceId: v, voiceName: voice?.name || '' },
                   });
                 }}
+                disabled={loadingVoices}
               >
                 <SelectTrigger className="bg-background/50">
-                  <SelectValue />
+                  <SelectValue placeholder={loadingVoices ? 'Lade Stimmen…' : 'Stimme wählen'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {VOICES.map((v) => (
+                  {voicesForTab.map((v) => (
                     <SelectItem key={v.id} value={v.id}>
-                      {v.name} ({v.lang})
+                      <span className="flex items-center gap-2">
+                        {v.tier === 'premium' && (
+                          <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">Premium</Badge>
+                        )}
+                        <span>{v.name}</span>
+                        {v.gender && <span className="text-xs text-muted-foreground">({v.gender})</span>}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
