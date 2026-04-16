@@ -47,6 +47,85 @@ interface BriefingTabProps {
   onScenesGenerated: (scenes: ComposerScene[]) => void;
 }
 
+/**
+ * Returns the label/placeholder set for a given category. Keeps the underlying
+ * ComposerBriefing fields (`productName`, `productDescription`, `usps`,
+ * `targetAudience`) unchanged but re-labels them per category.
+ */
+function getCategoryConfig(category: ComposerCategory, t: (k: string) => string) {
+  switch (category) {
+    case 'corporate-ad':
+      return {
+        cardTitle: t('videoComposer.briefingForCorporate'),
+        primaryNameLabel: t('videoComposer.companyNameLabel'),
+        primaryNamePlaceholder: t('videoComposer.companyNamePlaceholder'),
+        descriptionLabel: t('videoComposer.industryLabel'),
+        descriptionPlaceholder: t('videoComposer.industryPlaceholder'),
+        listLabel: t('videoComposer.coreMessages'),
+        listPlaceholder: t('videoComposer.coreMessagePlaceholder'),
+        showAudience: true,
+        showList: true,
+        showSecondary: false,
+        secondaryLabel: '',
+        secondaryPlaceholder: '',
+        missingPrimaryToast: t('videoComposer.enterCompanyName'),
+      };
+    case 'storytelling':
+      return {
+        cardTitle: t('videoComposer.briefingForStorytelling'),
+        primaryNameLabel: t('videoComposer.storyTitleLabel'),
+        primaryNamePlaceholder: t('videoComposer.storyTitlePlaceholder'),
+        descriptionLabel: t('videoComposer.logline'),
+        descriptionPlaceholder: t('videoComposer.loglinePlaceholder'),
+        listLabel: t('videoComposer.keyScenes'),
+        listPlaceholder: t('videoComposer.keyScenePlaceholder'),
+        showAudience: true,
+        showList: true,
+        showSecondary: true,
+        secondaryLabel: t('videoComposer.protagonist'),
+        secondaryPlaceholder: t('videoComposer.protagonistPlaceholder'),
+        thirdLabel: t('videoComposer.conflict'),
+        thirdPlaceholder: t('videoComposer.conflictPlaceholder'),
+        audienceOverrideLabel: t('videoComposer.targetEmotion'),
+        audienceOverridePlaceholder: t('videoComposer.targetEmotionPlaceholder'),
+        missingPrimaryToast: t('videoComposer.enterStoryTitle'),
+      };
+    case 'custom':
+      return {
+        cardTitle: t('videoComposer.briefingForEditor'),
+        primaryNameLabel: t('videoComposer.editorTitleLabel'),
+        primaryNamePlaceholder: t('videoComposer.editorTitlePlaceholder'),
+        descriptionLabel: t('videoComposer.editorNotes'),
+        descriptionPlaceholder: t('videoComposer.editorNotesPlaceholder'),
+        listLabel: t('videoComposer.editorStyleHints'),
+        listPlaceholder: t('videoComposer.editorStyleHintsPlaceholder'),
+        showAudience: false,
+        showList: true,
+        showSecondary: false,
+        secondaryLabel: '',
+        secondaryPlaceholder: '',
+        missingPrimaryToast: t('videoComposer.enterEditorTitle'),
+      };
+    case 'product-ad':
+    default:
+      return {
+        cardTitle: t('videoComposer.briefingForProduct'),
+        primaryNameLabel: t('videoComposer.productNameLabel'),
+        primaryNamePlaceholder: t('videoComposer.productNamePlaceholder'),
+        descriptionLabel: t('videoComposer.description'),
+        descriptionPlaceholder: t('videoComposer.descriptionPlaceholder'),
+        listLabel: t('videoComposer.usps'),
+        listPlaceholder: t('videoComposer.uspPlaceholder'),
+        showAudience: true,
+        showList: true,
+        showSecondary: false,
+        secondaryLabel: '',
+        secondaryPlaceholder: '',
+        missingPrimaryToast: t('videoComposer.enterProductName'),
+      };
+  }
+}
+
 export default function BriefingTab({
   briefing,
   category,
@@ -60,6 +139,8 @@ export default function BriefingTab({
   const { t } = useTranslation();
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const cfg = getCategoryConfig(category, t);
 
   const CATEGORIES: { id: ComposerCategory; label: string; icon: React.ElementType; desc: string }[] = [
     { id: 'product-ad', label: t('videoComposer.productVideo'), icon: ShoppingBag, desc: t('videoComposer.productVideoDesc') },
@@ -92,7 +173,7 @@ export default function BriefingTab({
 
   const handleGenerateStoryboard = async () => {
     if (!briefing.productName.trim()) {
-      toast({ title: t('videoComposer.enterProductName'), variant: 'destructive' });
+      toast({ title: cfg.missingPrimaryToast, variant: 'destructive' });
       return;
     }
 
@@ -127,6 +208,21 @@ export default function BriefingTab({
   };
 
   const canProceed = briefing.productName.trim().length > 0;
+
+  // Storytelling stores protagonist + conflict in targetAudience as "Protagonist: ... | Conflict: ..."
+  const storyMeta = (() => {
+    if (category !== 'storytelling') return { protagonist: '', conflict: '' };
+    const raw = briefing.targetAudience || '';
+    const protagonist = raw.match(/Protagonist:\s*([^|]*)/)?.[1]?.trim() || '';
+    const conflict = raw.match(/Conflict:\s*([^|]*)/)?.[1]?.trim() || '';
+    return { protagonist, conflict };
+  })();
+
+  const updateStoryMeta = (next: { protagonist?: string; conflict?: string }) => {
+    const protagonist = next.protagonist ?? storyMeta.protagonist;
+    const conflict = next.conflict ?? storyMeta.conflict;
+    onUpdateBriefing({ targetAudience: `Protagonist: ${protagonist} | Conflict: ${conflict}` });
+  };
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -185,10 +281,10 @@ export default function BriefingTab({
         </CardContent>
       </Card>
 
-      {/* Project Basics */}
+      {/* Category-Specific Briefing */}
       <Card className="border-border/40 bg-card/80">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">{t('videoComposer.productService')}</CardTitle>
+          <CardTitle className="text-base">{cfg.cardTitle}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -202,63 +298,92 @@ export default function BriefingTab({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">{t('videoComposer.productNameLabel')}</Label>
+              <Label className="text-xs">{cfg.primaryNameLabel}</Label>
               <Input
                 value={briefing.productName}
                 onChange={(e) => onUpdateBriefing({ productName: e.target.value })}
-                placeholder={t('videoComposer.productNamePlaceholder')}
+                placeholder={cfg.primaryNamePlaceholder}
                 className="bg-background/50"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">{t('videoComposer.description')}</Label>
+            <Label className="text-xs">{cfg.descriptionLabel}</Label>
             <Textarea
               value={briefing.productDescription}
               onChange={(e) => onUpdateBriefing({ productDescription: e.target.value })}
-              placeholder={t('videoComposer.descriptionPlaceholder')}
-              rows={3}
+              placeholder={cfg.descriptionPlaceholder}
+              rows={category === 'custom' ? 5 : 3}
               className="bg-background/50 resize-none"
             />
           </div>
 
-          {/* USPs */}
-          <div className="space-y-1.5">
-            <Label className="text-xs">{t('videoComposer.usps')}</Label>
-            <div className="flex gap-2">
-              <Input
-                value={uspInput}
-                onChange={(e) => setUspInput(e.target.value)}
-                placeholder={t('videoComposer.uspPlaceholder')}
-                className="bg-background/50"
-                onKeyDown={(e) => e.key === 'Enter' && addUsp()}
-              />
-              <Button size="sm" variant="outline" onClick={addUsp}>
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-            {briefing.usps.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {briefing.usps.map((usp, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs gap-1">
-                    {usp}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => removeUsp(i)} />
-                  </Badge>
-                ))}
+          {/* Storytelling: Protagonist + Conflict */}
+          {category === 'storytelling' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">{cfg.secondaryLabel}</Label>
+                <Input
+                  value={storyMeta.protagonist}
+                  onChange={(e) => updateStoryMeta({ protagonist: e.target.value })}
+                  placeholder={cfg.secondaryPlaceholder}
+                  className="bg-background/50"
+                />
               </div>
-            )}
-          </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{cfg.thirdLabel}</Label>
+                <Input
+                  value={storyMeta.conflict}
+                  onChange={(e) => updateStoryMeta({ conflict: e.target.value })}
+                  placeholder={cfg.thirdPlaceholder}
+                  className="bg-background/50"
+                />
+              </div>
+            </div>
+          )}
 
-          <div className="space-y-1.5">
-            <Label className="text-xs">{t('videoComposer.targetAudience')}</Label>
-            <Input
-              value={briefing.targetAudience}
-              onChange={(e) => onUpdateBriefing({ targetAudience: e.target.value })}
-              placeholder={t('videoComposer.targetAudiencePlaceholder')}
-              className="bg-background/50"
-            />
-          </div>
+          {/* List (USPs / Core Messages / Key Scenes / Style Hints) */}
+          {cfg.showList && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">{cfg.listLabel}</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={uspInput}
+                  onChange={(e) => setUspInput(e.target.value)}
+                  placeholder={cfg.listPlaceholder}
+                  className="bg-background/50"
+                  onKeyDown={(e) => e.key === 'Enter' && addUsp()}
+                />
+                <Button size="sm" variant="outline" onClick={addUsp}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {briefing.usps.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {briefing.usps.map((usp, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs gap-1">
+                      {usp}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => removeUsp(i)} />
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Target Audience / Target Emotion (storytelling re-labels) */}
+          {cfg.showAudience && category !== 'storytelling' && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t('videoComposer.targetAudience')}</Label>
+              <Input
+                value={briefing.targetAudience}
+                onChange={(e) => onUpdateBriefing({ targetAudience: e.target.value })}
+                placeholder={t('videoComposer.targetAudiencePlaceholder')}
+                className="bg-background/50"
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
