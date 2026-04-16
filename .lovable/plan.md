@@ -1,103 +1,55 @@
 
 
 ## Befund
-Aktuelle Situation in den 3 Modulen:
+Der User sieht im Screenshot **nicht** die `AIVoiceOver`-Komponente, sondern die **`SubtitleVoiceoverSection`** in `src/components/directors-cut/studio/CapCutSidebar.tsx` (Zeile 322–434). Diese ist eine separate Sub-Komponente speziell für "Voiceover aus Untertiteln" und hat ihre **eigene hartkodierte Stimmenliste** mit nur 7 generischen englischen Stimmen (Sarah, Roger, Aria, Laura, Charlie, George, Brian) — sie wurde im letzten Update übersehen.
 
-**Director's Cut** (`AIVoiceOver.tsx` + `director-cut-voice-over`):
-- Hartkodierte Liste mit 6 DE / 6 EN Stimmen
-- Nutzt `eleven_multilingual_v2` (älteres Modell)
-- Voice Settings: `stability 0.5`, `similarity_boost 0.75`, kein `style`, kein `use_speaker_boost` → klingt flach/roboterhaft
-- "Deutsche" Stimmen sind eigentlich englische Stimmen mit multilingual-Modell → Akzent-Probleme
+```typescript
+const VOICEOVER_VOICES = [
+  { id: 'sarah', name: 'Sarah', gender: '♀' },
+  { id: 'roger', name: 'Roger', gender: '♂' },
+  // ... 5 weitere
+];
+```
 
-**Universal Content Creator** (`ContentVoiceStep.tsx` + `generate-voiceover`):
-- ✅ Lädt bereits dynamisch alle Stimmen via `list-voices`
-- ❌ Aber: Sprach-Erkennung filtert nur grob; viele echte deutsche Stimmen (Multilingual v2 + v3) werden als "en" eingestuft
-- Voice Settings ebenfalls flach
+→ Deshalb sieht der User immer noch nur "Sarah" als Standardstimme im Dropdown.
 
-**Motion Studio / Video Composer** (`AudioTab.tsx`):
-- Hartkodierte Mini-Liste mit 7 Stimmen, davon nur 1 als "DE" markiert (Daniel)
-- Nutzt `generate-voiceover` mit Defaults
+## Plan — `SubtitleVoiceoverSection` auf Premium-Voices umstellen
 
-**Kernproblem**: ElevenLabs hat seit Mitte 2024 deutlich bessere deutsche Stimmen über die **Voice Library** (community + premade) und das neue **`eleven_v3`** Modell sowie verbessertes `eleven_multilingual_v2` mit `style`-Parameter. Diese werden derzeit nicht genutzt.
+### 1. Hartkodierte Liste ersetzen
+- `VOICEOVER_VOICES`-Konstante (Zeile 323–332) entfernen
+- Dynamisches Laden via `supabase.functions.invoke('list-voices')` direkt in der Komponente — gleiches Pattern wie `AIVoiceOver.tsx`
+- Premium-Voices zuerst sortieren via `sortVoicesPremiumFirst`
 
-## Plan — Premium-Stimmen + besseres Modell überall
+### 2. UI-Upgrade
+Statt einfachem `<Select>` mit nur Name+Gender:
+- **Sprach-Tabs** (DE/EN/ES) — kompakte Mini-Variante passend zur engen Sidebar
+- Voice-Cards mit: Gender-Icon + Name + **Premium-Badge** + kurzer Beschreibung
+- **Hörprobe-Button** pro Voice (`VoicePreviewButton`)
+- Auto-Tab-Auswahl basierend auf `captionLanguage` beim ersten Render
+- Default-Voice = erste Premium-Voice der erkannten Sprache (nicht mehr `'sarah'`)
 
-### 1. Kuratierte Premium-Voice-Library (zentral)
-Neue Datei `src/lib/elevenlabs-voices.ts` mit einer kuratierten Liste **echter, hochwertiger Stimmen** pro Sprache (DE/EN/ES) — direkt aus der ElevenLabs Voice Library, jeweils mit:
-- `voice_id`, `name`, `gender`, `age`, `description`
-- `recommended_model`: `eleven_v3` für DE (beste deutsche Aussprache) bzw. `eleven_multilingual_v2`
-- `recommended_settings`: stability/similarity/style/speaker_boost je nach Voice
-- `tier`: `premium` (Library, premade)
+### 3. Generation-Call erweitern
+Im `handleGenerate`: Wie bei `AIVoiceOver` `model_id` und `voice_settings` aus der ausgewählten Premium-Voice mitsenden, damit die natürlicheren Settings (`stability 0.4`, `style 0.3`, `use_speaker_boost true`) auch hier greifen.
 
-Beispiele für **echte deutsche Premium-Stimmen** (öffentlich aus EL Voice Library):
-- **Klaus** (deutscher Erzähler, männlich, warm) — `eleven_v3`
-- **Julia** (deutsche weibliche Erzählerin) — `eleven_v3`
-- **Markus** (deutscher Werbesprecher) — `eleven_multilingual_v2`
-- **Hannah** (jung, freundlich, deutsch)
-- **Stefan** (tief, autoritär, deutsch)
-- **Lena** (warm, sympathisch, deutsch)
+### 4. Layout-Anpassung
+Da die Sidebar schmal ist (kein Platz für 2-Spalten-Grid wie in `AIVoiceOver`):
+- 1-Spalten-Liste mit `max-h-64 overflow-y-auto`
+- Kompakte Cards (kleinere Padding, kleinere Beschreibung)
+- Sprach-Tabs als 3 schmale Buttons mit Flagge + Anzahl
 
-→ 6–8 echte deutsche Stimmen + 6–8 englische + 4 spanische. Diese Liste ist **die Single Source of Truth** für alle 3 Module.
+### 5. Lokalisierung
+Voice-Tipp-Banner (DE/EN/ES) inline — analog `AIVoiceOver`.
 
-### 2. Edge-Function `list-voices` aufwerten
-Statt nur die Account-eigenen Voices zu listen, **die kuratierte Premium-Liste mit der ElevenLabs-Library mergen**:
-- API-Call an `/v1/voices` für eigene Voices
-- Kuratierte Liste aus `elevenlabs-voices.ts` (geteilt via `_shared/voices.ts` in supabase functions) wird als statische Premium-Voices vorangestellt
-- Sprach-Filter funktioniert sauber, da `language` direkt aus der kuratierten Liste kommt
-- Response enthält neu: `tier`, `recommended_model`, `recommended_settings`
-
-### 3. Bessere Voice-Settings & neues Modell überall
-Alle drei TTS-Edge-Functions (`generate-voiceover`, `director-cut-voice-over`, `generate-video-voiceover`) so anpassen, dass:
-- Standard-Modell wechselt von `eleven_multilingual_v2` auf **`eleven_v3`** (für deutsche Stimmen) bzw. `eleven_turbo_v2_5` (für Echtzeit-Preview)
-- Voice-Settings akzeptieren optional `style` (0–1) und `use_speaker_boost: true`
-- Default-Settings für natürlicheren Klang: `stability 0.4` (statt 0.5, mehr Expression), `similarity_boost 0.8`, `style 0.3`, `use_speaker_boost true`
-- Falls vom Frontend `recommended_settings` mitgegeben → diese verwenden
-- Backwards-compatible: alte Voice-IDs funktionieren weiter
-
-### 4. UI-Updates in allen drei Modulen
-**Director's Cut (`AIVoiceOver.tsx`)**:
-- Hartkodierte `GERMAN_VOICES`/`ENGLISH_VOICES` ersetzen → dynamisch via `list-voices` laden
-- Tabs DE / EN / ES (neu)
-- Pro Voice: Badge "Premium" + kurze Beschreibung
-- Optional: Mini-Preview-Button pro Voice (5s Sample via `preview-voice`)
-
-**Universal Content Creator (`ContentVoiceStep.tsx`)**:
-- Bereits dynamisch — nur Sortierung anpassen: Premium-Voices zuerst, dann eigene
-- Premium-Badge anzeigen
-- Recommended-Settings beim Auswählen automatisch übernehmen
-
-**Motion Studio (`AudioTab.tsx`)**:
-- Hartkodierte `VOICES`-Liste durch dynamischen Load via `list-voices` ersetzen
-- Sprach-Tabs DE/EN/ES
-- Gleiche Premium-Sortierung
-
-### 5. Hinweis-Banner & Lokalisierung
-Kleiner Info-Banner in jedem Voice-Picker:
-> "💡 Premium-Stimmen klingen am natürlichsten. Tipp: Nutze Satzzeichen für realistische Pausen."
-
-DE/EN/ES inline (gleiches Pattern wie zuletzt).
-
-## Geänderte / Neue Dateien
-**Neu**:
-- `supabase/functions/_shared/premium-voices.ts` — kuratierte Premium-Voice-Liste (Single Source of Truth)
-- `src/lib/elevenlabs-voices.ts` — Frontend-Spiegelung für Typen/Defaults
-
-**Bearbeitet**:
-- `supabase/functions/list-voices/index.ts` — merged Premium-Liste mit API-Voices, gibt `tier`/`recommended_model`/`recommended_settings` zurück
-- `supabase/functions/generate-voiceover/index.ts` — neues Standardmodell `eleven_v3`, neue Settings inkl. `style`/`use_speaker_boost`
-- `supabase/functions/director-cut-voice-over/index.ts` — gleiche Aufwertung, akzeptiert beliebige voice_ids (nicht nur Mapping)
-- `supabase/functions/generate-video-voiceover/index.ts` — gleiche Aufwertung
-- `src/components/directors-cut/features/AIVoiceOver.tsx` — dynamisches Voice-Loading mit Tabs DE/EN/ES + Premium-Badges
-- `src/components/video-composer/AudioTab.tsx` — dynamisches Voice-Loading mit Tabs + Premium-Badges
-- `src/components/universal-creator/steps/ContentVoiceStep.tsx` — Premium-Sortierung + Badge
+## Geänderte Dateien
+- `src/components/directors-cut/studio/CapCutSidebar.tsx` — `SubtitleVoiceoverSection` komplett auf dynamisches Premium-Voice-Loading umbauen, alte `VOICEOVER_VOICES`-Konstante entfernen
 
 ## Verify
-- Director's Cut → Voice-Tab zeigt 6+ echte deutsche Stimmen (Klaus, Julia, Markus, …) mit Premium-Badge
-- Generierter Voice-Over auf Deutsch klingt natürlich, kein US-Akzent, weniger roboterhaft
-- Universal Creator → deutsche Tab zeigt Premium-Stimmen ganz oben
-- Motion Studio → Sprach-Tabs DE/EN/ES funktionieren, Premium-Stimmen sichtbar
-- Bestehende Voice-Over-URLs/Projekte unverändert (backwards-compatible)
+- Director's Cut → "Voiceover aus Untertiteln"-Sektion zeigt Premium-Stimmen (Klaus, Julia, Markus …) statt nur Sarah/Roger
+- Sprach-Tabs DE/EN/ES funktionieren, Auto-Selektion basierend auf Untertitel-Sprache
+- Hörprobe-Button pro Stimme spielt 5s Sample
+- Generierter Voice-Over klingt natürlich (neue Settings werden mitgesendet)
 
 ## Was unverändert bleibt
-- DB-Schema, Mediathek, Render-Pipeline, Pricing, andere Studios
+- `AIVoiceOver.tsx` (bereits korrekt)
+- Andere Sidebar-Sektionen, Render-Pipeline, DB
 
