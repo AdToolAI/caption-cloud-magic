@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Progress } from '@/components/ui/progress';
 import { Loader2, Download, Palette, Film, Type, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,6 +31,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
   const [videoUrl, setVideoUrl] = useState<string | null>(project?.outputUrl || null);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [longRunning, setLongRunning] = useState(false);
+  const [progress, setProgress] = useState<number>(0);
   const pollTimerRef = useRef<number | null>(null);
   const pollStartRef = useRef<number>(0);
 
@@ -60,46 +62,70 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
 
   const pollRenderStatus = async (rid: string) => {
     try {
-      const { data, error } = await supabase
-        .from('video_renders')
-        .select('status, video_url, error_message')
-        .eq('render_id', rid)
-        .maybeSingle();
+      const { data, error } = await supabase.functions.invoke('check-remotion-progress', {
+        body: { render_id: rid, source: 'composer' },
+      });
 
       if (error) {
-        console.warn('[AssemblyTab] poll error:', error);
+        console.warn('[AssemblyTab] check-remotion-progress error:', error);
       }
 
       if (data) {
-        const status = (data.status || 'pending').toLowerCase();
-        if (status === 'completed' && data.video_url) {
-          setRenderStatus('completed');
-          setVideoUrl(data.video_url);
-          setIsRendering(false);
-          stopPolling();
-          toast({
-            title: t('videoComposer.videoReady') || 'Video fertig',
-            description: t('videoComposer.videoReadyDesc') || 'Dein Video kann angesehen und heruntergeladen werden.',
-          });
-          // Inform that the video was saved to the Media Library
-          setTimeout(() => {
-            toast({
-              title: t('videoComposer.savedToLibrary') || 'In Mediathek gespeichert',
-              description: t('videoComposer.savedToLibraryDesc') || 'Du findest dein Video jetzt auch in der Mediathek.',
-            });
-          }, 800);
-          return;
-        }
-        if (status === 'failed') {
-          const msg = data.error_message || t('videoComposer.renderFailed');
+        const prog = data.progress || {};
+        const pct = Math.max(0, Math.min(100, Math.round((prog.overallProgress ?? 0) * 100)));
+        setProgress(pct);
+
+        // Fatal error from Lambda
+        if (prog.fatalErrorEncountered) {
+          const errMsg = (Array.isArray(prog.errors) && prog.errors[0]?.message) || (Array.isArray(prog.errors) && prog.errors[0]) || t('videoComposer.renderFailed');
+          const msgStr = typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg);
           setRenderStatus('failed');
-          setRenderError(msg);
+          setRenderError(msgStr);
           setIsRendering(false);
           stopPolling();
-          toast({ title: t('videoComposer.renderFailed'), description: msg, variant: 'destructive' });
+          toast({ title: t('videoComposer.renderFailed'), description: msgStr, variant: 'destructive' });
           return;
         }
-        setRenderStatus(status === 'rendering' ? 'rendering' : 'pending');
+
+        // Done — fetch final URL from DB (storage URL is the canonical source)
+        if (prog.done || data.status === 'completed') {
+          const { data: row } = await supabase
+            .from('video_renders')
+            .select('status, video_url, error_message')
+            .eq('render_id', rid)
+            .maybeSingle();
+
+          const finalUrl = row?.video_url || prog.outputFile || null;
+          if (finalUrl) {
+            setProgress(100);
+            setRenderStatus('completed');
+            setVideoUrl(finalUrl);
+            setIsRendering(false);
+            stopPolling();
+            toast({
+              title: t('videoComposer.videoReady') || 'Video fertig',
+              description: t('videoComposer.videoReadyDesc') || 'Dein Video kann angesehen und heruntergeladen werden.',
+            });
+            setTimeout(() => {
+              toast({
+                title: t('videoComposer.savedToLibrary') || 'In Mediathek gespeichert',
+                description: t('videoComposer.savedToLibraryDesc') || 'Du findest dein Video jetzt auch in der Mediathek.',
+              });
+            }, 800);
+            return;
+          }
+          if (row?.status === 'failed') {
+            const msg = row.error_message || t('videoComposer.renderFailed');
+            setRenderStatus('failed');
+            setRenderError(msg);
+            setIsRendering(false);
+            stopPolling();
+            toast({ title: t('videoComposer.renderFailed'), description: msg, variant: 'destructive' });
+            return;
+          }
+        }
+
+        setRenderStatus('rendering');
       }
     } catch (err) {
       console.warn('[AssemblyTab] poll exception:', err);
@@ -127,6 +153,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
     setLongRunning(false);
     setRenderStatus('pending');
     setRenderId(null);
+    setProgress(0);
 
     try {
       const { data, error } = await supabase.functions.invoke('compose-video-assemble', {
@@ -259,18 +286,26 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         </CardContent>
       </Card>
 
-      {/* Polling: live status */}
+      {/* Polling: live progress bar */}
       {isPolling && (
         <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="py-4 flex items-center gap-3">
-            <Loader2 className="h-5 w-5 text-primary shrink-0 animate-spin" />
-            <div className="flex-1">
-              <p className="text-sm font-medium">{t('videoComposer.lambdaRendering') || 'Lambda rendert …'}</p>
-              <p className="text-[10px] text-muted-foreground">
-                {renderId ? `${t('videoComposer.renderIdShort')}: ${renderId.slice(0, 8)}…` : ''}
-                {longRunning && ' — ' + (t('videoComposer.takingLonger') || 'Dauert länger als erwartet')}
+          <CardContent className="py-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-4 w-4 text-primary shrink-0 animate-spin" />
+              <p className="text-sm font-medium flex-1">
+                {progress < 5
+                  ? (t('videoComposer.lambdaStarting') || 'Lambda startet …')
+                  : progress < 95
+                    ? (t('videoComposer.framesRendering') || 'Frames werden gerendert …')
+                    : (t('videoComposer.encodingUploading') || 'Video wird kodiert & hochgeladen …')}
               </p>
+              <span className="text-sm font-semibold text-primary tabular-nums">{progress}%</span>
             </div>
+            <Progress value={progress} className="h-2" />
+            <p className="text-[10px] text-muted-foreground">
+              {renderId ? `${t('videoComposer.renderIdShort')}: ${renderId.slice(0, 8)}…` : ''}
+              {longRunning && ' — ' + (t('videoComposer.takingLonger') || 'Dauert länger als erwartet')}
+            </p>
           </CardContent>
         </Card>
       )}
@@ -338,7 +373,8 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         >
           {isRendering ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" /> {t('videoComposer.renderingVideo')}
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {(t('videoComposer.renderingPercent') || 'Video wird gerendert … {{percent}}%').replace('{{percent}}', String(progress))}
             </>
           ) : (
             <>
