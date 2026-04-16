@@ -85,13 +85,25 @@ Rules:
 - Include stock search keywords as fallback for each scene
 - Text overlays should be short, punchy ad copy (max 8 words)`;
 
-    const userPrompt = `Create a storyboard for a ${category} video ad.
+    const labels = (() => {
+      switch (category) {
+        case "corporate-ad":
+          return { name: "Company", desc: "Industry / Mission", list: "Core messages", audience: "Target audience" };
+        case "storytelling":
+          return { name: "Story title", desc: "Logline / Setting", list: "Key scenes / Beats", audience: "Protagonist & conflict (+ target emotion)" };
+        case "custom":
+          return { name: "Title", desc: "Creative brief (follow literally, scene-by-scene)", list: "Style hints", audience: "" };
+        default:
+          return { name: "Product", desc: "Description", list: "USPs", audience: "Target audience" };
+      }
+    })();
 
-Product: ${briefing.productName}
-Description: ${briefing.productDescription || "Not provided"}
-USPs: ${briefing.usps.length > 0 ? briefing.usps.join(", ") : "Not provided"}
-Target Audience: ${briefing.targetAudience || "General audience"}
-Tone: ${briefing.tone}
+    const userPrompt = `Create a storyboard for a ${category} video.
+
+${labels.name}: ${briefing.productName}
+${labels.desc}: ${briefing.productDescription || "Not provided"}
+${labels.list}: ${briefing.usps.length > 0 ? briefing.usps.join(", ") : "Not provided"}
+${labels.audience ? `${labels.audience}: ${briefing.targetAudience || "Not provided"}\n` : ""}Tone: ${briefing.tone}
 Duration: ${briefing.duration} seconds
 Aspect Ratio: ${briefing.aspectRatio}
 
