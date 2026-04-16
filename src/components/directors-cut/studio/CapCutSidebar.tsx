@@ -320,15 +320,14 @@ const AISubtitleScriptSection: React.FC<{
   );
 };
 
-// Voice IDs matching the director-cut-voice-over edge function
-const VOICEOVER_VOICES = [
-  { id: 'sarah', name: 'Sarah', gender: '♀' },
-  { id: 'roger', name: 'Roger', gender: '♂' },
-  { id: 'aria', name: 'Aria', gender: '♀' },
-  { id: 'laura', name: 'Laura', gender: '♀' },
-  { id: 'charlie', name: 'Charlie', gender: '♂' },
-  { id: 'george', name: 'George', gender: '♂' },
-  { id: 'brian', name: 'Brian', gender: '♂' },
+import { sortVoicesPremiumFirst, DEFAULT_VOICE_SETTINGS, DEFAULT_MODEL, type VoiceMeta } from '@/lib/elevenlabs-voices';
+import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
+import { Badge } from '@/components/ui/badge';
+
+const VOICE_LANG_TABS: Array<{ code: 'de' | 'en' | 'es'; flag: string; label: string }> = [
+  { code: 'de', flag: '🇩🇪', label: 'DE' },
+  { code: 'en', flag: '🇬🇧', label: 'EN' },
+  { code: 'es', flag: '🇪🇸', label: 'ES' },
 ];
 
 const SubtitleVoiceoverSection: React.FC<{
@@ -339,23 +338,80 @@ const SubtitleVoiceoverSection: React.FC<{
   onVoiceoverVolumeChange?: (volume: number) => void;
   t: (key: string, params?: Record<string, any>) => string;
 }> = ({ existingCaptions, captionLanguage, onVoiceOverGenerated, voiceoverVolume, onVoiceoverVolumeChange, t }) => {
-  const [selectedVoice, setSelectedVoice] = useState('sarah');
+  const initialLang = (['de', 'en', 'es'].includes(captionLanguage) ? captionLanguage : 'de') as 'de' | 'en' | 'es';
+  const [activeLang, setActiveLang] = useState<'de' | 'en' | 'es'>(initialLang);
+  const [allVoices, setAllVoices] = useState<VoiceMeta[]>([]);
+  const [loadingVoices, setLoadingVoices] = useState(true);
+  const [selectedVoice, setSelectedVoice] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [localVolume, setLocalVolume] = useState(voiceoverVolume);
 
   const captionsWithText = existingCaptions.filter(c => c.text && c.text.trim() !== '');
   const combinedText = captionsWithText.map(c => c.text).join(' ');
 
+  // Load voices once
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingVoices(true);
+        const { data, error } = await supabase.functions.invoke('list-voices', { body: { language: 'all' } });
+        if (error) throw error;
+        if (cancelled) return;
+        const voices: VoiceMeta[] = data?.voices || [];
+        setAllVoices(sortVoicesPremiumFirst(voices));
+      } catch (err) {
+        console.error('[SubtitleVoiceover] list-voices failed:', err);
+        toast.error(t('dc.voiceoverGenerationFailed') || 'Stimmen konnten nicht geladen werden');
+      } finally {
+        if (!cancelled) setLoadingVoices(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [t]);
+
+  // Voices in active language
+  const voicesByLang = useMemo(() => {
+    const out: Record<'de' | 'en' | 'es', VoiceMeta[]> = { de: [], en: [], es: [] };
+    for (const v of allVoices) {
+      const langs = (v.supportedLanguages && v.supportedLanguages.length ? v.supportedLanguages : [v.language]) as string[];
+      for (const l of langs) {
+        if (l === 'de' || l === 'en' || l === 'es') out[l].push(v);
+      }
+    }
+    return out;
+  }, [allVoices]);
+
+  const visibleVoices = voicesByLang[activeLang] || [];
+
+  // Auto-select first premium voice when language changes / voices load
+  useEffect(() => {
+    if (!visibleVoices.length) return;
+    if (!visibleVoices.find(v => v.id === selectedVoice)) {
+      setSelectedVoice(visibleVoices[0].id);
+    }
+  }, [activeLang, visibleVoices, selectedVoice]);
+
+  const selectedVoiceMeta = useMemo(() => allVoices.find(v => v.id === selectedVoice), [allVoices, selectedVoice]);
+
+  const tipText = activeLang === 'de'
+    ? '💡 Premium-Stimmen klingen am natürlichsten. Tipp: Nutze Satzzeichen für realistische Pausen.'
+    : activeLang === 'es'
+    ? '💡 Las voces Premium suenan más naturales. Consejo: usa puntuación para pausas realistas.'
+    : '💡 Premium voices sound most natural. Tip: use punctuation for realistic pauses.';
+
   const handleGenerate = async () => {
-    if (!combinedText.trim()) return;
+    if (!combinedText.trim() || !selectedVoice) return;
     setIsGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('director-cut-voice-over', {
         body: {
           script_text: combinedText,
           voice_id: selectedVoice,
-          language: captionLanguage === 'en' ? 'en-US' : captionLanguage === 'es' ? 'es-ES' : 'de-DE',
+          language: activeLang === 'en' ? 'en-US' : activeLang === 'es' ? 'es-ES' : 'de-DE',
           speed: 1,
+          model_id: selectedVoiceMeta?.recommended_model || DEFAULT_MODEL,
+          voice_settings: selectedVoiceMeta?.recommended_settings || DEFAULT_VOICE_SETTINGS,
         },
       });
 
@@ -381,23 +437,84 @@ const SubtitleVoiceoverSection: React.FC<{
         <h4 className="text-xs font-medium text-amber-300">{t('dc.subtitleVoiceover')}</h4>
       </div>
       <p className="text-[10px] text-white/50">{t('dc.subtitleVoiceoverDesc')}</p>
-      
-      {/* Voice Select */}
-      <div className="space-y-1">
-        <label className="text-[10px] text-white/40">{t('dc.voiceoverVoice')}</label>
-        <Select value={selectedVoice} onValueChange={setSelectedVoice}>
-          <SelectTrigger className="h-8 text-xs bg-[#1a1a1a] border-[#3a3a3a] text-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {VOICEOVER_VOICES.map(v => (
-              <SelectItem key={v.id} value={v.id}>
-                {v.gender} {v.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+
+      {/* Language tabs */}
+      <div className="grid grid-cols-3 gap-1">
+        {VOICE_LANG_TABS.map(tab => {
+          const count = voicesByLang[tab.code]?.length || 0;
+          const active = activeLang === tab.code;
+          return (
+            <button
+              key={tab.code}
+              type="button"
+              onClick={() => setActiveLang(tab.code)}
+              className={cn(
+                'h-7 rounded text-[10px] font-medium transition-colors flex items-center justify-center gap-1 border',
+                active
+                  ? 'bg-amber-500/20 border-amber-400/60 text-amber-200'
+                  : 'bg-[#1a1a1a] border-[#3a3a3a] text-white/60 hover:text-white/90'
+              )}
+            >
+              <span>{tab.flag}</span>
+              <span>{tab.label}</span>
+              <span className="opacity-60">({count})</span>
+            </button>
+          );
+        })}
       </div>
+
+      {/* Voices list */}
+      <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+        {loadingVoices ? (
+          <div className="flex items-center justify-center py-4 text-white/50">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </div>
+        ) : visibleVoices.length === 0 ? (
+          <p className="text-[10px] text-white/40 text-center py-3">—</p>
+        ) : (
+          visibleVoices.map(v => {
+            const isSelected = v.id === selectedVoice;
+            const isPremium = v.tier === 'premium';
+            const genderIcon = v.gender === 'female' ? '♀' : v.gender === 'male' ? '♂' : '◆';
+            return (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => setSelectedVoice(v.id)}
+                className={cn(
+                  'w-full text-left rounded-md p-2 border transition-all flex items-start gap-2',
+                  isSelected
+                    ? 'bg-amber-500/15 border-amber-400/60'
+                    : 'bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#4a4a4a]'
+                )}
+              >
+                <span className="text-amber-300/80 text-sm leading-none mt-0.5">{genderIcon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11px] font-medium text-white truncate">{v.name}</span>
+                    {isPremium && (
+                      <Badge variant="outline" className="h-3.5 px-1 text-[8px] border-amber-400/40 text-amber-300 bg-amber-500/10">
+                        Premium
+                      </Badge>
+                    )}
+                  </div>
+                  {v.description && (
+                    <p className="text-[9px] text-white/45 line-clamp-1 mt-0.5">{v.description}</p>
+                  )}
+                </div>
+                <VoicePreviewButton
+                  voiceId={v.id}
+                  language={activeLang}
+                  size="icon"
+                  className="h-6 w-6 shrink-0 text-amber-300/80 hover:text-amber-200 hover:bg-amber-500/10"
+                />
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      <p className="text-[9px] text-white/40 leading-snug">{tipText}</p>
 
       {/* Volume Slider */}
       <div className="space-y-1">
@@ -420,7 +537,7 @@ const SubtitleVoiceoverSection: React.FC<{
 
       <Button
         onClick={handleGenerate}
-        disabled={isGenerating || captionsWithText.length === 0}
+        disabled={isGenerating || captionsWithText.length === 0 || !selectedVoice}
         className="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs h-8"
       >
         {isGenerating ? (
