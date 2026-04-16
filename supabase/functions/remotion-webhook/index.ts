@@ -214,6 +214,16 @@ serve(async (req) => {
             await supabaseAdmin.from('content_projects').update({ status: 'completed' }).eq('id', matchedRender.project_id);
           }
 
+          // Composer project completion
+          if (isComposer && composerProjectId) {
+            await supabaseAdmin.from('composer_projects').update({
+              status: 'completed',
+              output_url: finalOutputUrl,
+              updated_at: new Date().toISOString(),
+            }).eq('id', composerProjectId);
+            console.log('✅ composer_projects marked completed:', composerProjectId);
+          }
+
           // Update universal_video_progress — PRIMARY via progressId, fallback via renderId scan
           try {
             let progressUpdated = false;
