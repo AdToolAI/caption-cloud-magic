@@ -17,6 +17,8 @@ import type {
   ComposerStatus,
 } from '@/types/video-composer';
 import { CLIP_SOURCE_COSTS } from '@/types/video-composer';
+import { useComposerPersistence } from '@/hooks/useComposerPersistence';
+import { toast } from '@/hooks/use-toast';
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'audio' | 'export';
 
@@ -82,6 +84,24 @@ export default function VideoComposerDashboard() {
   const [activeTab, setActiveTab] = useState<TabId>('briefing');
   const [project, setProject] = useState<LocalProject>(() => loadDraft() || defaultProject);
   const [error, setError] = useState<string | null>(null);
+  const [isPersisting, setIsPersisting] = useState(false);
+  const { ensureProjectPersisted } = useComposerPersistence();
+
+  const persistAndGoToClips = useCallback(async () => {
+    setIsPersisting(true);
+    try {
+      const result = await ensureProjectPersisted(project);
+      setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
+      setActiveTab('clips');
+    } catch (err: any) {
+      console.error('[VideoComposerDashboard] persist failed:', err);
+      const msg = err?.message || 'Projekt konnte nicht gespeichert werden';
+      setError(msg);
+      toast({ title: 'Fehler beim Speichern', description: msg, variant: 'destructive' });
+    } finally {
+      setIsPersisting(false);
+    }
+  }, [project, ensureProjectPersisted]);
 
   const TABS = [
     { id: 'briefing' as TabId, label: t('videoComposer.briefing'), icon: FileText },
@@ -212,7 +232,7 @@ export default function VideoComposerDashboard() {
             <StoryboardTab
               scenes={project.scenes}
               onUpdateScenes={setScenes}
-              onGoToClips={() => setActiveTab('clips')}
+              onGoToClips={persistAndGoToClips}
               language={project.language}
             />
           </TabsContent>
@@ -223,6 +243,11 @@ export default function VideoComposerDashboard() {
               projectId={project.id}
               onUpdateScenes={setScenes}
               onGoToAudio={() => setActiveTab('audio')}
+              onEnsurePersisted={async () => {
+                const result = await ensureProjectPersisted(project);
+                setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
+                return result;
+              }}
             />
           </TabsContent>
 

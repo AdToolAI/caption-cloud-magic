@@ -53,8 +53,17 @@ serve(async (req) => {
     const body: ClipRequest = await req.json();
     const { projectId, scenes } = body;
 
-    if (!projectId || !scenes?.length) {
-      throw new Error("projectId and scenes are required");
+    if (!projectId) {
+      return new Response(
+        JSON.stringify({ error: "MISSING_PROJECT_ID", message: "projectId is required — project must be saved before clips can be generated" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (!scenes?.length) {
+      return new Response(
+        JSON.stringify({ error: "MISSING_SCENES", message: "At least one scene is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Verify project ownership
@@ -66,7 +75,10 @@ serve(async (req) => {
       .single();
 
     if (projError || !project) {
-      throw new Error("Project not found or unauthorized");
+      return new Response(
+        JSON.stringify({ error: "PROJECT_NOT_FOUND", message: "Project not found or you don't have access to it" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Calculate total cost for AI scenes
