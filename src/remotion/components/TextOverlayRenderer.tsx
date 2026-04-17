@@ -119,17 +119,33 @@ export const TextOverlayRenderer: React.FC<{ overlay: TextOverlayProps }> = ({ o
     delete positionStyle.transform;
   }
 
+  const hasBg = overlay.style.backgroundColor && overlay.style.backgroundColor !== 'transparent';
+
+  // Stronger shadow when there's no background box, so text remains readable
+  // over busy video backgrounds. Honors the user's explicit `shadow: false`.
+  const computedShadow = overlay.style.shadow === false
+    ? undefined
+    : hasBg
+      ? '2px 2px 4px rgba(0,0,0,0.8)'
+      : '0 2px 8px rgba(0,0,0,0.85), 0 0 4px rgba(0,0,0,0.6)';
+
   const baseStyle: React.CSSProperties = {
     position: 'absolute',
     fontSize: FONT_SIZES[overlay.style.fontSize],
     color: overlay.style.color,
-    backgroundColor: overlay.style.backgroundColor !== 'transparent' ? overlay.style.backgroundColor : undefined,
-    padding: overlay.style.backgroundColor !== 'transparent' ? '8px 16px' : undefined,
-    borderRadius: overlay.style.backgroundColor !== 'transparent' ? '8px' : undefined,
+    backgroundColor: hasBg ? overlay.style.backgroundColor : undefined,
+    padding: hasBg ? '14px 26px' : '12px 24px',
+    borderRadius: hasBg ? '10px' : undefined,
     fontFamily: overlay.style.fontFamily || 'Inter',
     fontWeight: 'bold',
-    textShadow: overlay.style.shadow ? '2px 2px 4px rgba(0,0,0,0.8)' : undefined,
-    whiteSpace: 'nowrap',
+    textShadow: computedShadow,
+    // Allow wrapping (was nowrap → caused cramped single-line look on long copy)
+    whiteSpace: 'normal',
+    wordBreak: 'normal',
+    overflowWrap: 'break-word',
+    lineHeight: 1.3,
+    maxWidth: '80%',
+    textAlign: 'center',
     ...positionStyle,
     ...animationStyle,
   };

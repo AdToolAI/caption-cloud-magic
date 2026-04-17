@@ -160,15 +160,15 @@ const SubtitleSegmentRenderer: React.FC<{
       <div style={{
         backgroundColor: style?.background || SUBTITLE_DEFAULT_BG,
         color: style?.color || SUBTITLE_DEFAULT_COLOR,
-        padding: '14px 28px',
-        borderRadius: '8px',
+        padding: '18px 32px',
+        borderRadius: '10px',
         fontSize: style?.size ? `${style.size}px` : SUBTITLE_FONT_SIZE_MAP[fontSizeKey],
         fontFamily: style?.font || SUBTITLE_DEFAULT_FONT_FAMILY,
         fontWeight: 'bold',
         textAlign: 'center' as const,
-        maxWidth: '90%',
-        lineHeight: 1.4,
-        textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+        maxWidth: '85%',
+        lineHeight: 1.35,
+        textShadow: '0 2px 6px rgba(0,0,0,0.65)',
       }}>
         {text}
       </div>
