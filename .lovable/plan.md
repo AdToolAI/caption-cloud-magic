@@ -2,50 +2,82 @@
 
 ## Befund
 
-Im `ComposerSequencePreview.tsx` gibt es noch einen Fall, in dem **eine** Übergangsstelle „hängt" (Video bleibt schwarz / `opacity: 0` und springt nicht zur nächsten Szene weiter). Die Ursache liegt im Reveal-Flow nach dem `src`-Wechsel:
+Zwei zusammenhängende Probleme, die dieselbe Wurzel haben — die **Single-Video-Architektur** in `ComposerSequencePreview.tsx`:
 
-### Wurzelursachen
+### 1. Übergänge wirken jetzt hart (Regression)
+Die jüngste Version macht beim Szenenwechsel:
+- `videoVisible = false` → 80ms opacity-fade-out
+- `<video src=...>` wechselt
+- Warten auf `canplay`/`loadeddata`
+- `videoVisible = true` → 80ms opacity-fade-in
 
-**1. Fehlendes Safety-Net beim Reveal**
-Nach `setSceneIdx` (Z. 107-153) wird `transitioningRef = true`, `videoVisible = false` gesetzt und `currentTime = 0` zugewiesen. Reveal passiert nur über drei Pfade:
-- `seeked` Listener
-- `canplay` Listener (nur registriert wenn `readyState < 2`)
-- `requestAnimationFrame` (nur wenn `readyState >= 2`)
+Effekt: Ein **schwarzer Blink** (kein Crossfade) — fühlt sich „hart" an, weil zwischen Slot-A-Frame und neuem Slot-A-Frame nichts liegt außer schwarzer Hintergrund.
 
-**Problem:** Wenn der neue Clip-`src` noch nicht geladen ist (`readyState === 0`), wird `currentTime = 0` **vor** dem Setzen von `src` ausgeführt → wirft still einen Fehler, `seeked` feuert nie. Falls der Browser dann auch `canplay` verzögert oder gar nicht feuert (bei einigen Codec-/Cache-Konstellationen passiert das), bleibt das Video **dauerhaft unsichtbar** und `transitioningRef` bleibt `true` → `onTimeUpdate` wird ignoriert → `advanceScene` feuert nie → Übergang hängt.
+### 2. Ein Übergang hängt immer noch
+Der 1500ms-Safety-Timer feuert zwar, aber bei genau **einem** Clip (vermutlich dem 4. — auf dem Screenshot mitten in einer Frau am Schreibtisch) ist die Source-URL aus AWS S3 langsam. Die Reveal-Logik feuert, aber das Video hat **noch keinen ersten Frame dekodiert** → User sieht 1.5s lang das Standbild der vorherigen Szene plus dann einen Hard-Cut.
 
-**2. `preload` fehlt am `<video>`-Element (Z. 342-354)**
-Ohne `preload="auto"` lädt der Browser bei einigen Konfigurationen die Metadata erst nach dem ersten Play-Versuch → `canplay` verzögert sich. Genau dort entsteht der „hängt"-Effekt.
-
-**3. Kein Fallback-Timeout**
-Es gibt keinen Sicherheits-Timeout, der nach z. B. 1500 ms zwangsweise revealt + zur nächsten Szene weitergeht, falls weder `canplay` noch `seeked` feuern.
-
-**Warum nur EIN Übergang hängt:** Genau jener Clip, dessen Source langsamer dekodiert wird (oft der erste, der nicht im Browser-Cache ist). Die anderen sind nach dem ersten Durchlauf gecacht.
+### Wurzel
+Beide Probleme verschwinden mit einer **Dual-Slot-Architektur** (Ping-Pong, identisch zu Director's Cut, siehe Memory): Slot B lädt + dekodiert den nächsten Clip im Hintergrund **während Slot A noch spielt**, dann Crossfade über 400ms zwischen beiden `<video>`-Elementen. Kein Schwarz, kein Hänger.
 
 ## Plan
 
-### Fix 1 — Reveal-Reihenfolge umdrehen
-- **Zuerst** `addEventListener('canplay', ...)` registrieren, **dann** auf `loadedmetadata`/`loadeddata` warten, erst **dann** `currentTime = 0` setzen. So feuert `seeked` zuverlässig.
-- `loadeddata` als zusätzlichen Reveal-Trigger ergänzen.
+### Fix — Ping-Pong Dual-Slot Player für Composer Preview
 
-### Fix 2 — Hard-Fallback-Timeout (1500 ms)
-- Nach dem Szenenwechsel einen `setTimeout(reveal, 1500)` registrieren. Wenn nach 1.5 s **immer noch** weder `canplay` noch `seeked` gefeuert hat, einfach revealen (der Browser wird beim nächsten `play()` automatisch buffern und der User sieht statt schwarzem Bild ein kurzes Stuttern — viel besser als „hängen").
-- Timeout im Cleanup canceln.
+In `ComposerSequencePreview.tsx`:
 
-### Fix 3 — `preload="auto"` am `<video>`
-- Attribute setzen, damit der Browser den Clip aggressiv vorlädt und `canplay` schneller feuert.
+**1. Zwei `<video>`-Elemente statt eines**
+- `videoARef`, `videoBRef` mit jeweils `preload="auto"`, `playsInline`, `muted`
+- State: `activeSlot: 'A' | 'B'` (default `'A'`)
+- Helper: `getActive()` / `getStandby()` Refs
 
-### Fix 4 — Defensive: `currentTime = 0` nur wenn Video bereit
-- `if (v.readyState >= 1) v.currentTime = 0;` — sonst überspringen (das Video startet ohnehin von 0, weil nach `src`-Wechsel `currentTime` automatisch auf 0 zurückspringt).
+**2. Preload-Strategie**
+- `useEffect([sceneIdx])`: setze `standby.src = playable[sceneIdx + 1]?.clipUrl` (peek-ahead)
+- Standby ist absolut positioniert, `opacity: 0`, **lautlos**, gepausiert auf Frame 0
+- Während `playing && !transitioning`: standby ist bereits dekodiert (warm)
+
+**3. Übergang (Crossfade 400ms)**
+- Wenn `currentScene` endet (oder `local >= sceneDur`):
+  - Standby auf `currentTime = 0` (ist bereits dekodiert → instant)
+  - `standby.play()`
+  - Crossfade per CSS `transition: opacity 400ms ease-in-out`: active → 0, standby → 1
+  - Nach 400ms: `active.pause()`, `setActiveSlot(swap)`, alter Slot wird neuer Standby
+  - Preload nächsten Peek-Ahead-Clip in den frisch frei gewordenen Slot
+
+**4. Hänger eliminiert**
+- Da Standby vorab dekodiert ist (während Slot A spielt), gibt es **keine Wartezeit** mehr beim Swap
+- Falls Standby nach 1.2s noch nicht `readyState >= 2`: trotzdem swappen + 600ms Crossfade statt 400ms (sichtbarer Buffer-Frame ist immer noch besser als Hänger)
+
+**5. Audio (Voiceover)**
+- Bleibt am separaten `<audio>`-Element (linear über Timeline), unverändert
+
+**6. Scrub (Slider)**
+- Beim manuellen Scrub: setze direkt aktives Slot auf `currentTime = local`, Standby bekommt nächsten Peek-Ahead
+- Kein Crossfade beim Scrub (würde verwirren) — nur bei automatischem Szenenwechsel
+
+**7. Bilder (uploadType === 'image')**
+- Bleibt bei `<img>`-Rendering, kein Slot-Swap nötig
+- Bei Übergang Bild → Video: Crossfade gegen Slot A
+
+**8. CSS-Stack**
+```text
+<div relative aspect-video>
+  <video slot-a absolute inset-0 opacity={a} transition-opacity 400ms />
+  <video slot-b absolute inset-0 opacity={b} transition-opacity 400ms />
+  <img>...</img> (wenn isImage)
+  <PreviewTextOverlayLayer />
+  <Subtitles />
+</div>
+```
 
 ## Geänderte Dateien
 
-- `src/components/video-composer/ComposerSequencePreview.tsx` — alle vier Fixes oben (in einem Edit am Source-Effekt + dem `<video>`-Element)
+- `src/components/video-composer/ComposerSequencePreview.tsx` — komplette Re-Implementierung des Player-Cores mit Dual-Slot Ping-Pong (UI/Controls/Subtitles/Overlays bleiben strukturell identisch)
 
 ## Verify
 
-1. Preview eines Projekts mit ≥3 Szenen abspielen → **kein** Übergang bleibt schwarz hängen
-2. Mit DevTools → Network throttling auf „Slow 3G" → Preview spielt weiter durch (mit kurzem Stuttern, aber ohne Hänger)
-3. Slider scrubt sauber zwischen allen Szenen, auch bei kalt geladenem Cache
-4. Slider bewegt sich monoton vorwärts (kein Rubber-Band)
+1. Preview eines Projekts mit ≥4 Szenen → **alle** Szenenwechsel zeigen sanften 400ms-Crossfade, kein Schwarz
+2. Der bisher hängende Übergang läuft ohne Hänger durch (Standby ist warm)
+3. Slider-Scrub funktioniert weiterhin sauber (Hard-Cut beim manuellen Scrub ist gewünscht)
+4. Voiceover bleibt synchron
+5. Bei sehr langsamer Netzwerkverbindung: Übergang läuft trotzdem durch, ggf. minimal längere Crossfade-Dauer
 
