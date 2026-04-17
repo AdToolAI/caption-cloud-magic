@@ -78,7 +78,8 @@ export default function VoiceSubtitlesTab({
   const { t } = useTranslation();
   const subtitles: SubtitlesConfig = assemblyConfig.subtitles ?? DEFAULT_SUBTITLES_CONFIG;
   const voiceover = assemblyConfig.voiceover;
-  const [openSceneId, setOpenSceneId] = useState<string | null>(scenes[0]?.id ?? null);
+  const globalOverlays: GlobalTextOverlay[] = assemblyConfig.globalTextOverlays ?? [];
+  const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
 
   // ── Voice loader ─────────────────────────────────────────────────
   const [voices, setVoices] = useState<VoiceMeta[]>([]);
