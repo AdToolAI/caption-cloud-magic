@@ -99,6 +99,7 @@ serve(async (req) => {
     const fps = 30;
     const durationInFrames = Math.max(1, Math.ceil(totalDuration * fps));
 
+    const subtitlesCfg = assemblyConfig.subtitles || {};
     const inputProps = {
       scenes: remotionScenes,
       colorGrading: assemblyConfig.colorGrading || 'none',
@@ -107,6 +108,12 @@ serve(async (req) => {
       backgroundMusicUrl: assemblyConfig.music?.trackUrl || '',
       backgroundMusicVolume: (assemblyConfig.music?.volume || 30) / 100,
       aspectRatio,
+      subtitles: {
+        enabled: !!subtitlesCfg.enabled,
+        language: subtitlesCfg.language || 'de',
+        style: subtitlesCfg.style || {},
+        segments: Array.isArray(subtitlesCfg.segments) ? subtitlesCfg.segments : [],
+      },
     };
 
     // 7. Create video_renders entry — match real schema (no template_id!)
@@ -141,7 +148,7 @@ serve(async (req) => {
           scenesCount: remotionScenes.length,
           totalDuration,
         },
-        subtitle_config: {},
+        subtitle_config: inputProps.subtitles,
       });
 
     if (renderInsertError) {
