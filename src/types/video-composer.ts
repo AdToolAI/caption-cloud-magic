@@ -127,6 +127,12 @@ export interface AssemblyConfig {
    * of scene boundaries. Replaces the legacy per-scene `ComposerScene.textOverlay`.
    */
   globalTextOverlays?: GlobalTextOverlay[];
+  /**
+   * Toggle for the entire text-overlays feature. When `false`, overlays are kept
+   * in storage but not rendered in preview or final export. `undefined` defaults
+   * to enabled (backwards-compat for older drafts).
+   */
+  textOverlaysEnabled?: boolean;
 }
 
 export interface VoiceoverConfig {

@@ -102,6 +102,10 @@ serve(async (req) => {
     const durationInFrames = Math.max(1, Math.ceil(totalDuration * fps));
 
     const subtitlesCfg = assemblyConfig.subtitles || {};
+    const textOverlaysEnabled = assemblyConfig.textOverlaysEnabled !== false;
+    const globalTextOverlays = textOverlaysEnabled
+      ? (Array.isArray(assemblyConfig.globalTextOverlays) ? assemblyConfig.globalTextOverlays : [])
+      : [];
     const inputProps = {
       scenes: remotionScenes,
       colorGrading: assemblyConfig.colorGrading || 'none',
@@ -116,6 +120,7 @@ serve(async (req) => {
         style: subtitlesCfg.style || {},
         segments: Array.isArray(subtitlesCfg.segments) ? subtitlesCfg.segments : [],
       },
+      globalTextOverlays,
     };
 
     // 7. Create video_renders entry — match real schema (no template_id!)
