@@ -3,6 +3,51 @@ import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, 
 import { z } from 'zod';
 import { KineticText } from '../components/KineticText';
 import { ColorGrading } from '../components/ColorGrading';
+import { TextOverlayRenderer } from '../components/TextOverlayRenderer';
+import {
+  SUBTITLE_FONT_SIZE_MAP,
+  SUBTITLE_DEFAULT_BG,
+  SUBTITLE_DEFAULT_COLOR,
+  SUBTITLE_DEFAULT_FONT_FAMILY,
+  SUBTITLE_DEFAULT_FONT_SIZE,
+  SUBTITLE_BOTTOM_PADDING,
+  SUBTITLE_TOP_PADDING,
+  SUBTITLE_Z_INDEX,
+} from '../utils/subtitleConstants';
+
+// ---- Subtitle schema (matches snake-free composer payload) ----
+const SubtitleSegmentSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  startTime: z.number(),
+  endTime: z.number(),
+});
+
+const SubtitleStyleSchema = z.object({
+  font: z.string().optional(),
+  size: z.number().optional(),
+  color: z.string().optional(),
+  background: z.string().optional(),
+  position: z.enum(['top', 'bottom']).optional(),
+}).partial();
+
+// ---- Global Text Overlay schema (1:1 with TextOverlayRenderer) ----
+const GlobalTextOverlaySchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  animation: z.enum(['fadeIn', 'scaleUp', 'bounce', 'typewriter', 'highlight', 'glitch']),
+  position: z.enum(['top', 'center', 'bottom', 'bottomLeft', 'bottomRight', 'topLeft', 'topRight', 'centerLeft', 'centerRight', 'custom']),
+  customPosition: z.object({ x: z.number(), y: z.number() }).optional(),
+  startTime: z.number(),
+  endTime: z.number().nullable(),
+  style: z.object({
+    fontSize: z.enum(['sm', 'md', 'lg', 'xl']),
+    color: z.string(),
+    backgroundColor: z.string(),
+    shadow: z.boolean(),
+    fontFamily: z.string(),
+  }),
+});
 
 // Schema
 export const ComposedAdVideoSchema = z.object({
@@ -26,6 +71,13 @@ export const ComposedAdVideoSchema = z.object({
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().default(0.3),
   aspectRatio: z.enum(['16:9', '9:16', '1:1', '4:5']).default('16:9'),
+  subtitles: z.object({
+    enabled: z.boolean(),
+    language: z.string().optional(),
+    style: SubtitleStyleSchema.optional(),
+    segments: z.array(SubtitleSegmentSchema),
+  }).optional(),
+  globalTextOverlays: z.array(GlobalTextOverlaySchema).optional(),
 });
 
 type ComposedAdVideoProps = z.infer<typeof ComposedAdVideoSchema>;
@@ -84,6 +136,51 @@ const Scene: React.FC<{
   );
 };
 
+// ---- Inline subtitle renderer (mirrors DirectorsCut SubtitleClipRenderer) ----
+const SubtitleSegmentRenderer: React.FC<{
+  text: string;
+  style?: z.infer<typeof SubtitleStyleSchema>;
+}> = ({ text, style }) => {
+  const position = style?.position || 'bottom';
+  const fontSizeKey = SUBTITLE_DEFAULT_FONT_SIZE;
+  return (
+    <div style={{
+      position: 'absolute',
+      left: 0, right: 0, top: 0, bottom: 0,
+      width: '100%', height: '100%',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: position === 'top' ? 'flex-start' : 'flex-end',
+      paddingTop: position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
+      paddingBottom: position === 'top' ? '5%' : SUBTITLE_BOTTOM_PADDING,
+      paddingLeft: '5%', paddingRight: '5%',
+      pointerEvents: 'none',
+      zIndex: SUBTITLE_Z_INDEX,
+    }}>
+      <div style={{
+        backgroundColor: style?.background || SUBTITLE_DEFAULT_BG,
+        color: style?.color || SUBTITLE_DEFAULT_COLOR,
+        padding: '14px 28px',
+        borderRadius: '8px',
+        fontSize: style?.size ? `${style.size}px` : SUBTITLE_FONT_SIZE_MAP[fontSizeKey],
+        fontFamily: style?.font || SUBTITLE_DEFAULT_FONT_FAMILY,
+        fontWeight: 'bold',
+        textAlign: 'center' as const,
+        maxWidth: '90%',
+        lineHeight: 1.4,
+        textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+      }}>
+        {text}
+      </div>
+    </div>
+  );
+};
+
+const clampVolume = (v: number) => {
+  if (!Number.isFinite(v)) return 0;
+  return Math.min(1, Math.max(0, v));
+};
+
 // Main composition
 export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
   scenes,
@@ -92,8 +189,10 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
   voiceoverUrl,
   backgroundMusicUrl,
   backgroundMusicVolume,
+  subtitles,
+  globalTextOverlays,
 }) => {
-  const { fps } = useVideoConfig();
+  const { fps, durationInFrames } = useVideoConfig();
 
   // Calculate frame offsets for each scene (hard cuts, no transition overlap)
   let frameOffset = 0;
@@ -103,6 +202,10 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
     frameOffset += durationFrames;
     return entry;
   });
+
+  const musicVolume = clampVolume(backgroundMusicVolume ?? 0.3);
+  const voEnabled = !!voiceoverUrl && voiceoverUrl.length > 0;
+  const musicEnabled = !!backgroundMusicUrl && backgroundMusicUrl.length > 0;
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
@@ -122,17 +225,44 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
         ))}
       </ColorGrading>
 
+      {/* Subtitles (above color grading so they stay readable) */}
+      {subtitles?.enabled && Array.isArray(subtitles.segments) && subtitles.segments.map((seg) => {
+        const startFrame = Math.max(0, Math.floor(seg.startTime * fps));
+        const endFrame = Math.min(durationInFrames, Math.ceil(seg.endTime * fps));
+        const segDuration = Math.max(1, endFrame - startFrame);
+        return (
+          <Sequence key={seg.id} from={startFrame} durationInFrames={segDuration}>
+            <SubtitleSegmentRenderer text={seg.text} style={subtitles.style} />
+          </Sequence>
+        );
+      })}
+
+      {/* Global Text Overlays */}
+      {Array.isArray(globalTextOverlays) && globalTextOverlays.map((overlay) => {
+        const startFrame = Math.max(0, Math.floor(overlay.startTime * fps));
+        const endFrameRaw = overlay.endTime != null
+          ? Math.ceil(overlay.endTime * fps)
+          : durationInFrames;
+        const endFrame = Math.min(durationInFrames, endFrameRaw);
+        const ovDuration = Math.max(1, endFrame - startFrame);
+        return (
+          <Sequence key={overlay.id} from={startFrame} durationInFrames={ovDuration}>
+            <TextOverlayRenderer overlay={overlay as any} />
+          </Sequence>
+        );
+      })}
+
       {/* Voiceover */}
-      {voiceoverUrl && (
+      {voEnabled && (
         <Sequence from={0}>
-          <Audio src={voiceoverUrl} volume={1} />
+          <Audio src={voiceoverUrl as string} volume={1} pauseWhenBuffering />
         </Sequence>
       )}
 
       {/* Background Music */}
-      {backgroundMusicUrl && (
+      {musicEnabled && (
         <Sequence from={0}>
-          <Audio src={backgroundMusicUrl} volume={backgroundMusicVolume} />
+          <Audio src={backgroundMusicUrl as string} volume={musicVolume} pauseWhenBuffering />
         </Sequence>
       )}
     </AbsoluteFill>
