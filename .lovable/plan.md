@@ -1,66 +1,61 @@
 
 ## Befund
-Im aktuellen `VoiceSubtitlesTab.tsx` fehlen zwei Dinge:
-1. **KI-Skript-Generator**-Button mit frei wählbarer Ziel-Länge (analog Universal Content Creator)
-2. **Voice-Tuning-Controls**: Geschwindigkeit, Stabilität, Ähnlichkeit, Stil-Verstärkung, Speaker Boost
+Der User möchte, dass die KI-generierten Video-Prompts (in den Storyboard-Szenen) **niemals** Untertitel, Captions oder Text-Overlays im Video selbst erzeugen. Sonst kollidieren später die separat hinzugefügten Untertitel mit eingebrannten Texten in den Clips.
 
-Beide Bausteine existieren bereits in der Codebase und können wiederverwendet werden:
-- `src/components/universal-creator/VoiceoverScriptGenerator.tsx` — Skript-Dialog mit Idee/Tone/Dauer-Slider, ruft `generate-voiceover-script`
-- `src/components/video/AdvancedVoiceSettings.tsx` — Slider für Stability, Similarity, Style, Speaker Boost + 4 Presets (Professionell/Energisch/Emotional/Neutral)
-- Edge-Function `generate-voiceover` akzeptiert bereits `speed`, `stability`, `similarityBoost`, `style`, `useSpeakerBoost` (Zeile 17–24, 76–96)
+Im Screenshot sieht man bereits einen guten Prompt:
+> "...no on-screen text, no captions, no subtitles, no watermarks, no logos..."
+
+Aber das ist offenbar nicht überall konsistent — manche Szenen-Prompts enthalten diese Schutzklauseln nicht, oder die Prompt-Generierung in den Edge Functions fügt sie nicht zuverlässig hinzu.
+
+## Analyse-Schritte (was ich prüfen muss)
+1. **Prompt-Generierungs-Logik finden**: Wo werden die Storyboard-Szenen-Prompts erzeugt?
+   - Vermutlich in einer Edge Function wie `generate-storyboard` oder `compose-video-storyboard`
+2. **Clip-Generierung prüfen**: Wo werden die Prompts an Hailuo/Kling/Seedance/etc. weitergegeben?
+   - Edge Functions wie `generate-scene-clip` o.ä.
+3. **Prompt-Editor im Frontend**: Wo kann der User den Prompt manuell editieren? (Dort ggf. Hinweis einblenden.)
 
 ## Plan
 
-### 1. KI-Skript-Generator-Button
-In `VoiceSubtitlesTab.tsx` im Skript-Header **vor** dem "Aus Szenen"-Button einen **"KI-Generator"**-Button (Sparkles-Icon) hinzufügen. Öffnet `<VoiceoverScriptGenerator>`-Dialog. Bei Übernahme: `setScript(generatedScript)`.
-
-### 2. Slider-Range erweitern in `VoiceoverScriptGenerator.tsx`
-Aktuell 15–60s → erweitern auf **10–180s** (Step 5). Default-Wert wird beim Öffnen aus der Gesamtdauer der Szenen vorbelegt:
+### 1. Negative-Prompt-Suffix zentralisieren
+Eine konstante Negative-Suffix-Klausel in einer geteilten Datei (z.B. `supabase/functions/_shared/videoPromptGuards.ts`):
 ```ts
-const totalSceneDuration = scenes.reduce((sum, s) => sum + (s.durationSeconds || 0), 0);
-const defaultDuration = Math.max(10, Math.min(180, Math.round(totalSceneDuration) || 30));
+export const NO_TEXT_NEGATIVE_SUFFIX = 
+  ", no on-screen text, no captions, no subtitles, no watermarks, " +
+  "no logos, no written words, no typography, no signs with text, " +
+  "no UI overlays, clean visuals only";
 ```
-Dazu wird eine optionale `defaultDuration`-Prop ergänzt.
 
-### 3. Voice-Tuning-Sektion (neu)
-Direkt **unter dem Voice-Picker** eine kompakte Sektion mit:
-- **Geschwindigkeits-Slider** (0.7–1.2, Step 0.05) — eigener Slider, weil `AdvancedVoiceSettings` aktuell keine Speed hat
-- **`<AdvancedVoiceSettings>`** — komplette Komponente einbinden (Stabilität, Ähnlichkeit, Stil-Verstärkung, Speaker Boost + 4 Presets)
-- State `voiceTuning: { speed, stability, similarityBoost, styleExaggeration, useSpeakerBoost }` lokal halten
-- Werte werden beim "Voiceover generieren" an `generate-voiceover` mitgegeben
+### 2. Anwendung in 3 Phasen
+- **Storyboard-Generierung** (Edge Function, die initial die Prompts erstellt): System-Prompt für die KI um eine harte Regel ergänzen → "NEVER include text, captions, subtitles, signs with readable words, or written language in the visual description."
+- **Suffix-Append vor Clip-Render**: Bevor der Prompt an Hailuo/Kling/Seedance/etc. geschickt wird, automatisch `NO_TEXT_NEGATIVE_SUFFIX` anhängen (falls nicht schon enthalten — Idempotenz-Check via `includes('no subtitles')`).
+- **Frontend-Sanitizer (optional)**: Wenn User manuell Prompt editiert, beim Speichern Suffix sicherstellen.
 
-### 4. Persistenz im Draft
-Aktuelle `voiceover`-Konfiguration in `assemblyConfig` um Tuning-Felder erweitern:
-```ts
-voiceover: {
-  enabled, voiceId, language, script, audioUrl, duration,
-  speed?: number,
-  stability?: number,
-  similarityBoost?: number,
-  styleExaggeration?: number,
-  useSpeakerBoost?: boolean,
-}
-```
-→ Werte überleben Reload und werden beim erneuten Generieren wiederverwendet.
+### 3. Bestehende Storyboard-Szenen migrieren (optional)
+Bei Klick auf "Clips generieren" werden alle Szenen-Prompts vor dem Render durch den Suffix-Guard geschickt → keine DB-Migration nötig, läuft transparent.
 
-### 5. Lokalisierung
-Neue Keys in `translations.ts` (DE/EN/ES):
-- `aiScriptGenerator` ("KI-Generator" / "AI Generator" / "Generador IA")
-- `voiceTuning` ("Stimm-Feinabstimmung" / "Voice Tuning" / "Ajuste de Voz")
-- `speed` ("Geschwindigkeit" / "Speed" / "Velocidad")
+### 4. UI-Hinweis im Prompt-Editor
+Unter dem Prompt-Textfeld einen kleinen Hinweis: 
+> "ℹ️ Untertitel und Texte werden automatisch ausgeschlossen — füge sie später im 'Voiceover & Untertitel'-Tab hinzu."
 
-`AdvancedVoiceSettings` enthält intern deutsche Strings — wir lassen die wie sie sind (sie sind bereits selbsterklärend mit Tooltips), oder optional in einem zweiten Schritt lokalisieren.
+## Was ich noch prüfen muss (vor Implementierung)
+- Welche Edge Functions die Storyboard-Prompts erzeugen und welche die Clips rendern (`compose-video-*` und `generate-scene-clip*`)
+- Wo im Frontend der Prompt-Editor liegt (`StoryboardTab.tsx` oder Sub-Komponente)
 
-## Geänderte Dateien
-- `src/components/video-composer/VoiceSubtitlesTab.tsx` — KI-Button + Dialog + Speed-Slider + AdvancedVoiceSettings + Tuning-State
-- `src/components/universal-creator/VoiceoverScriptGenerator.tsx` — Slider 10–180s, optionale `defaultDuration`-Prop
-- `src/types/video-composer.ts` — `VoiceoverConfig` um Tuning-Felder erweitern
-- `src/lib/translations.ts` — neue Keys
+## Geänderte Dateien (geschätzt)
+- `supabase/functions/_shared/videoPromptGuards.ts` (neu) — Suffix + Helfer `ensureNoTextSuffix(prompt)`
+- `supabase/functions/compose-video-storyboard/index.ts` (oder äquivalent) — System-Prompt-Ergänzung
+- `supabase/functions/generate-scene-clip/index.ts` (oder äquivalent) — `ensureNoTextSuffix()` vor Provider-Call
+- `src/components/video-composer/StoryboardTab.tsx` (oder Prompt-Editor-Sub-Komponente) — kleiner Hinweis-Text
+- `src/lib/translations.ts` — Hinweis-Text (DE/EN/ES)
 
 ## Verify
-- Skript-Header zeigt 2 Buttons: **"KI-Generator"** + **"Aus Szenen"**
-- KI-Dialog: Slider geht bis 180s, vorbelegt mit Szenen-Gesamtdauer
-- Generiertes Skript landet im Textarea
-- Unter Voice-Picker: Speed-Slider (0.7–1.2) + Erweiterte Einstellungen aufklappbar
-- Generiertes Voiceover klingt entsprechend schneller/langsamer + reagiert auf Stabilität/Stil
-- Werte überleben Tab-Wechsel und Reload
+- Neue Storyboard-Generierung: alle Szenen-Prompts enden mit Negative-Klausel
+- Bestehende Storyboards: beim "Clips generieren" wird Suffix automatisch angehängt
+- Manuelles Editieren: Suffix wird beim Render trotzdem garantiert
+- Generierte Clips zeigen kein eingebranntes Text/Captions
+- UI-Hinweis erscheint unter dem Prompt-Editor
+
+## Was unverändert bleibt
+- Voiceover- & Untertitel-Logik (Tab 4)
+- Clip-Render-Pipeline, Pricing, DB-Schema
+- Provider-Auswahl (Hailuo/Kling/Seedance/Stock/Custom)
