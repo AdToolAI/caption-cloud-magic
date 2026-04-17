@@ -67,27 +67,42 @@ serve(async (req) => {
       speed, stability, similarityBoost, style, useSpeakerBoost, projectId,
     });
 
-    const elevenlabsUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128&optimize_streaming_latency=2`;
-
-    const elevenlabsResponse = await fetch(elevenlabsUrl, {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': elevenlabsApiKey,
+    const DEFAULT_FALLBACK_VOICE_ID = '9BWtsMINqrJLrRacOk9x'; // Aria — universal default
+    const ttsPayload = {
+      text,
+      model_id: modelId,
+      voice_settings: {
+        stability,
+        similarity_boost: similarityBoost,
+        style,
+        use_speaker_boost: useSpeakerBoost,
+        speed,
       },
-      body: JSON.stringify({
-        text,
-        model_id: modelId,
-        voice_settings: {
-          stability,
-          similarity_boost: similarityBoost,
-          style,
-          use_speaker_boost: useSpeakerBoost,
-          speed,
+    };
+
+    const callElevenLabs = async (vid: string) => {
+      const url = `https://api.elevenlabs.io/v1/text-to-speech/${vid}?output_format=mp3_44100_128&optimize_streaming_latency=2`;
+      return fetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': elevenlabsApiKey,
         },
-      }),
-    });
+        body: JSON.stringify(ttsPayload),
+      });
+    };
+
+    let effectiveVoiceId = voiceId;
+    let elevenlabsResponse = await callElevenLabs(voiceId);
+
+    // Fallback: if voice not found (404) or invalid (422), retry with a known-good default
+    if (!elevenlabsResponse.ok && (elevenlabsResponse.status === 404 || elevenlabsResponse.status === 422) && voiceId !== DEFAULT_FALLBACK_VOICE_ID) {
+      const errorText = await elevenlabsResponse.text().catch(() => '');
+      console.warn(`ElevenLabs voice ${voiceId} failed (${elevenlabsResponse.status}): ${errorText}. Falling back to ${DEFAULT_FALLBACK_VOICE_ID}.`);
+      effectiveVoiceId = DEFAULT_FALLBACK_VOICE_ID;
+      elevenlabsResponse = await callElevenLabs(DEFAULT_FALLBACK_VOICE_ID);
+    }
 
     if (!elevenlabsResponse.ok) {
       const errorText = await elevenlabsResponse.text();

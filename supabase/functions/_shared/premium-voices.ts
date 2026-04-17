@@ -40,7 +40,7 @@ const NARRATOR_SETTINGS = {
 export const PREMIUM_VOICES: PremiumVoice[] = [
   // ========== GERMAN — Real native German voices from EL Voice Library ==========
   {
-    id: 'flHkNRp1BlvT73UL6gyz', // Julia - German female narrator
+    id: 'EXAVITQu4vr4xnSDxMaL', // Sarah — warm multilingual narrator, works great for DE
     name: 'Julia',
     language: 'de',
     gender: 'female',
@@ -52,7 +52,7 @@ export const PREMIUM_VOICES: PremiumVoice[] = [
     accent: 'german',
   },
   {
-    id: 'de5LFXQjQQGyAwjBLcVD', // Klaus - German male narrator
+    id: 'nPczCjzI2devNBz1zQrb', // Brian — deep, trustworthy, strong for DE narration
     name: 'Klaus',
     language: 'de',
     gender: 'male',
@@ -239,7 +239,7 @@ export const PREMIUM_VOICES: PremiumVoice[] = [
 
   // ========== SPANISH ==========
   {
-    id: 'gD1IexrzCvsXPHUuT0s3', // Mateo - Spanish male
+    id: 'JBFqnCBsd6RMkjVDRZzb', // George — deep multilingual narrator, works for ES
     name: 'Mateo',
     language: 'es',
     gender: 'male',
@@ -251,7 +251,7 @@ export const PREMIUM_VOICES: PremiumVoice[] = [
     accent: 'spanish',
   },
   {
-    id: '9oPKasc15pfAbMr7N6Gs', // Lucia - Spanish female
+    id: 'FGY2WhTYpPnrIDTdsKH5', // Laura — clear, elegant multilingual
     name: 'Lucía',
     language: 'es',
     gender: 'female',
