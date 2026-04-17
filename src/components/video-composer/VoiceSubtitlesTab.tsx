@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,13 +16,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import {
-  ChevronUp, ChevronDown, Type, Subtitles, Sparkles, AlertTriangle,
-  Wand2, Copy, Film, Mic, Loader2, Info, Edit2, Trash2, Check, X,
+  Type, Subtitles, Sparkles,
+  Wand2, Film, Mic, Loader2, Info, Edit2, Trash2, Check, X,
 } from 'lucide-react';
 import ComposerSequencePreview from './ComposerSequencePreview';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
@@ -35,11 +30,9 @@ import type {
   AssemblyConfig,
   SubtitlesConfig,
   SubtitleSegment,
-  TextPosition,
-  TextAnimation,
   GlobalTextOverlay,
 } from '@/types/video-composer';
-import { DEFAULT_TEXT_OVERLAY, DEFAULT_SUBTITLES_CONFIG } from '@/types/video-composer';
+import { DEFAULT_SUBTITLES_CONFIG } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from '@/hooks/use-toast';
 import { TextOverlayEditor2028 } from '@/components/directors-cut/features/TextOverlayEditor2028';
