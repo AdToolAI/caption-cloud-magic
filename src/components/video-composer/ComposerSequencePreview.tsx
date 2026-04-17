@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, useReducer } from 'react';
 import { Play, Pause, Volume2, VolumeX, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -40,8 +40,8 @@ const formatTime = (s: number) => {
 };
 
 const CROSSFADE_MS = 400;
-const CROSSFADE_LONG_MS = 600;
-const STANDBY_READY_BUDGET_MS = 1200;
+const STANDBY_BUDGET_MS = 1200;
+const WATCHDOG_MS = 5000;
 
 type Slot = 'A' | 'B';
 
@@ -53,7 +53,7 @@ export default function ComposerSequencePreview({
   onTimeUpdate,
 }: Props) {
   const { t } = useTranslation();
-  // Filter playable scenes (have a clipUrl OR are an image upload with uploadUrl)
+
   const playable = useMemo(
     () =>
       scenes.filter(
@@ -82,215 +82,303 @@ export default function ComposerSequencePreview({
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
 
-  // ── Dual-slot ping-pong refs/state ─────────────────────────────
+  // Force re-render hook for opacity changes (refs alone don't trigger renders).
+  const [, forceRender] = useReducer((x: number) => x + 1, 0);
+
+  // ── Refs are the source of truth (no stale closures) ──────────
   const videoARef = useRef<HTMLVideoElement>(null);
   const videoBRef = useRef<HTMLVideoElement>(null);
-  const [activeSlot, setActiveSlot] = useState<Slot>('A');
-  // src per slot — controlled imperatively so React doesn't reset playback.
-  const [slotASrc, setSlotASrc] = useState<string | undefined>(undefined);
-  const [slotBSrc, setSlotBSrc] = useState<string | undefined>(undefined);
-  // Opacity per slot — drives the CSS crossfade.
-  const [slotAOpacity, setSlotAOpacity] = useState(1);
-  const [slotBOpacity, setSlotBOpacity] = useState(0);
 
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const imageStartRef = useRef<number | null>(null);
-  const rafRef = useRef<number | null>(null);
-  /** Guard: prevent double-advance from time-cap + onEnded racing. */
-  const advancedRef = useRef(false);
-  /** Holds onto a pause-at-end freeze timer for clips shorter than durationSeconds. */
-  const freezeTimerRef = useRef<number | null>(null);
-  /** True during the 400ms crossfade window — used to ignore stale timeupdates. */
+  /** Which slot DOM element is currently the visible/active player. */
+  const activeSlotRef = useRef<Slot>('A');
+  /** Maps each slot to the sceneIdx whose src is currently loaded into it. -1 = empty. */
+  const slotMapRef = useRef<{ A: number; B: number }>({ A: -1, B: -1 });
+  /** Imperative src holders so React doesn't trigger unwanted reloads. */
+  const slotASrcRef = useRef<string | undefined>(undefined);
+  const slotBSrcRef = useRef<string | undefined>(undefined);
+  /** Opacity per slot (driven by ref, mirrored to DOM via forceRender). */
+  const slotAOpacityRef = useRef(1);
+  const slotBOpacityRef = useRef(0);
+
+  /** Singleton transition lock — prevents overlapping advances. */
   const transitioningRef = useRef(false);
-  /** Track which scene index each slot currently holds (so we know what's preloaded). */
-  const slotASceneIdxRef = useRef<number>(-1);
-  const slotBSceneIdxRef = useRef<number>(-1);
+  /** Guards against double-advance from time-cap + onEnded racing. */
+  const advancedRef = useRef(false);
+  /** Latest scene index — readable inside async callbacks without closure problems. */
+  const sceneIdxRef = useRef(0);
+  /** Tracks last timeupdate timestamp for the watchdog. */
+  const lastTimeUpdateRef = useRef<number>(performance.now());
+
+  /** All pending timers — cleared on unmount or scene reset. */
+  const timersRef = useRef<Set<number>>(new Set());
+  const rafRef = useRef<number | null>(null);
+  const imageStartRef = useRef<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const playableRef = useRef(playable);
+  const startOffsetsRef = useRef(startOffsets);
+  const playingRef = useRef(playing);
+  const mutedRef = useRef(muted);
+  useEffect(() => { playableRef.current = playable; }, [playable]);
+  useEffect(() => { startOffsetsRef.current = startOffsets; }, [startOffsets]);
+  useEffect(() => { playingRef.current = playing; }, [playing]);
+  useEffect(() => { mutedRef.current = muted; }, [muted]);
+  useEffect(() => { sceneIdxRef.current = sceneIdx; }, [sceneIdx]);
 
   const currentScene = playable[sceneIdx];
   const isImage = currentScene?.uploadType === 'image';
   const mediaUrl = isImage ? currentScene?.uploadUrl : currentScene?.clipUrl;
 
-  const getActiveVideo = useCallback(
-    () => (activeSlot === 'A' ? videoARef.current : videoBRef.current),
-    [activeSlot],
-  );
-  const getStandbyVideo = useCallback(
-    () => (activeSlot === 'A' ? videoBRef.current : videoARef.current),
-    [activeSlot],
-  );
+  const scheduleTimer = useCallback((cb: () => void, ms: number): number => {
+    const id = window.setTimeout(() => {
+      timersRef.current.delete(id);
+      cb();
+    }, ms);
+    timersRef.current.add(id);
+    return id;
+  }, []);
 
-  // ── Reset when scene set changes ───────────────────────────────
+  const clearAllTimers = useCallback(() => {
+    timersRef.current.forEach(id => window.clearTimeout(id));
+    timersRef.current.clear();
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  }, []);
+
+  // ── Helpers operating on refs only (no closures over slot state) ──
+  const getVideoForSlot = (slot: Slot): HTMLVideoElement | null =>
+    slot === 'A' ? videoARef.current : videoBRef.current;
+
+  const setSrcForSlot = useCallback((slot: Slot, src: string | undefined) => {
+    const el = getVideoForSlot(slot);
+    if (!el) return;
+    if (slot === 'A') {
+      if (slotASrcRef.current === src) return;
+      slotASrcRef.current = src;
+    } else {
+      if (slotBSrcRef.current === src) return;
+      slotBSrcRef.current = src;
+    }
+    if (src) {
+      el.src = src;
+      try { el.load(); } catch { /* noop */ }
+    } else {
+      try { el.removeAttribute('src'); el.load(); } catch { /* noop */ }
+    }
+  }, []);
+
+  const setOpacityForSlot = useCallback((slot: Slot, opacity: number) => {
+    if (slot === 'A') slotAOpacityRef.current = opacity;
+    else slotBOpacityRef.current = opacity;
+    const el = getVideoForSlot(slot);
+    if (el) el.style.opacity = String(opacity);
+    forceRender();
+  }, []);
+
+  const preloadSlot = useCallback((slot: Slot, idx: number) => {
+    const list = playableRef.current;
+    const target = list[idx];
+    if (!target) {
+      // No more scenes — leave slot as is (but mark empty).
+      slotMapRef.current[slot] = -1;
+      return;
+    }
+    if (target.uploadType === 'image' || !target.clipUrl) {
+      slotMapRef.current[slot] = -1;
+      return;
+    }
+    if (slotMapRef.current[slot] === idx) return; // already preloaded
+    setSrcForSlot(slot, target.clipUrl);
+    slotMapRef.current[slot] = idx;
+    const el = getVideoForSlot(slot);
+    if (el) {
+      el.muted = true;
+      try { el.currentTime = 0; } catch { /* noop */ }
+    }
+  }, [setSrcForSlot]);
+
+  // ── Reset when scene set fundamentally changes ─────────────────
   useEffect(() => {
+    clearAllTimers();
+    transitioningRef.current = false;
+    advancedRef.current = false;
     setSceneIdx(0);
     setGlobalTime(0);
     setPlaying(false);
     imageStartRef.current = null;
-  }, [playable.length]);
+    activeSlotRef.current = 'A';
+    slotMapRef.current = { A: -1, B: -1 };
 
-  // ── Initial load: put scene 0 into slot A ──────────────────────
-  useEffect(() => {
-    if (!playable.length) return;
-    const first = playable[0];
-    if (first.uploadType !== 'image' && first.clipUrl) {
-      setSlotASrc(first.clipUrl);
-      slotASceneIdxRef.current = 0;
-    }
-    setActiveSlot('A');
-    setSlotAOpacity(1);
-    setSlotBOpacity(0);
-    // Preload scene 1 into B
-    const next = playable[1];
-    if (next && next.uploadType !== 'image' && next.clipUrl) {
-      setSlotBSrc(next.clipUrl);
-      slotBSceneIdxRef.current = 1;
-    } else {
-      setSlotBSrc(undefined);
-      slotBSceneIdxRef.current = -1;
+    if (playable.length > 0) {
+      // Init: load scene 0 → A, scene 1 → B.
+      preloadSlot('A', 0);
+      preloadSlot('B', 1);
+      setOpacityForSlot('A', 1);
+      setOpacityForSlot('B', 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playable]);
 
-  // ── Preload next scene into the standby slot whenever sceneIdx changes ─
-  useEffect(() => {
-    if (!playable.length) return;
-    const nextIdx = sceneIdx + 1;
-    const next = playable[nextIdx];
-    const standbyIsA = activeSlot === 'B';
-    if (next && next.uploadType !== 'image' && next.clipUrl) {
-      if (standbyIsA) {
-        if (slotASceneIdxRef.current !== nextIdx) {
-          setSlotASrc(next.clipUrl);
-          slotASceneIdxRef.current = nextIdx;
-        }
-      } else {
-        if (slotBSceneIdxRef.current !== nextIdx) {
-          setSlotBSrc(next.clipUrl);
-          slotBSceneIdxRef.current = nextIdx;
-        }
-      }
-    }
-  }, [sceneIdx, activeSlot, playable]);
+  // ── Cleanup on unmount ─────────────────────────────────────────
+  useEffect(() => () => clearAllTimers(), [clearAllTimers]);
 
-  // ── Play/pause handling for the ACTIVE video slot ──────────────
+  // ── Active video play/pause sync ───────────────────────────────
   useEffect(() => {
     if (isImage) {
       imageStartRef.current = playing ? performance.now() : null;
       return;
     }
-    const v = getActiveVideo();
+    const v = getVideoForSlot(activeSlotRef.current);
     if (!v) return;
-    if (playing) v.play().catch(() => {});
-    else v.pause();
-  }, [playing, isImage, activeSlot, getActiveVideo]);
+    if (playing) {
+      v.muted = mutedRef.current;
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  }, [playing, isImage, sceneIdx]);
 
-  const advanceScene = useCallback(() => {
-    if (sceneIdx + 1 >= playable.length) {
+  // Apply mute changes to the active slot
+  useEffect(() => {
+    const v = getVideoForSlot(activeSlotRef.current);
+    if (v && !isImage) v.muted = muted;
+  }, [muted, isImage, sceneIdx]);
+
+  // ── The core: stateless ref-based transition ──────────────────
+  const performTransition = useCallback((toIdx: number) => {
+    if (transitioningRef.current) return;
+    const list = playableRef.current;
+    if (toIdx >= list.length) {
       setPlaying(false);
-      setSceneIdx(0);
-      setGlobalTime(0);
+      transitioningRef.current = false;
       return;
     }
-    const nextIdx = sceneIdx + 1;
-    const nextScene = playable[nextIdx];
-    const fromIsImage = isImage;
+    const nextScene = list[toIdx];
+    if (!nextScene) return;
+
+    const currentIdx = sceneIdxRef.current;
+    const fromScene = list[currentIdx];
+    const fromIsImage = fromScene?.uploadType === 'image';
     const toIsImage = nextScene.uploadType === 'image';
 
+    transitioningRef.current = true;
     advancedRef.current = false;
 
-    // Image → anything OR anything → image: skip crossfade between video slots,
-    // do a quick fade and swap state. (Image lives in its own <img>.)
+    // Image-involved transitions: no slot crossfade — instant switch.
     if (fromIsImage || toIsImage) {
-      setSceneIdx(nextIdx);
-      setGlobalTime(startOffsets[nextIdx] || 0);
-      // For video destinations, ensure the new clip lands in active slot A.
+      setSceneIdx(toIdx);
+      setGlobalTime(startOffsetsRef.current[toIdx] || 0);
       if (!toIsImage && nextScene.clipUrl) {
-        setActiveSlot('A');
-        setSlotASrc(nextScene.clipUrl);
-        slotASceneIdxRef.current = nextIdx;
-        setSlotAOpacity(1);
-        setSlotBOpacity(0);
+        // Land the new video in slot A.
+        activeSlotRef.current = 'A';
+        preloadSlot('A', toIdx);
+        setOpacityForSlot('A', 1);
+        setOpacityForSlot('B', 0);
+        scheduleTimer(() => {
+          const v = videoARef.current;
+          if (v) {
+            try { v.currentTime = 0; } catch { /* noop */ }
+            v.muted = mutedRef.current;
+            if (playingRef.current) v.play().catch(() => {});
+          }
+        }, 30);
+        // Preload the next-next into B
+        preloadSlot('B', toIdx + 1);
       }
+      transitioningRef.current = false;
       return;
     }
 
-    // Video → Video: ping-pong crossfade.
-    const standby = getStandbyVideo();
-    const standbyHoldsNext =
-      (activeSlot === 'A' ? slotBSceneIdxRef.current : slotASceneIdxRef.current) === nextIdx;
+    // Video → Video crossfade via ref-based slot mapping.
+    const fromSlot = activeSlotRef.current;
+    const toSlot: Slot = fromSlot === 'A' ? 'B' : 'A';
+    const standby = getVideoForSlot(toSlot);
 
-    transitioningRef.current = true;
+    if (!standby || !nextScene.clipUrl) {
+      // Defensive: just hard-cut sceneIdx so we don't stall.
+      setSceneIdx(toIdx);
+      setGlobalTime(startOffsetsRef.current[toIdx] || 0);
+      transitioningRef.current = false;
+      return;
+    }
 
-    const performSwap = (fadeMs: number) => {
-      // Reset standby to frame 0 (it's preloaded → instant).
-      if (standby) {
-        try {
-          if (standby.readyState >= 1) standby.currentTime = 0;
-        } catch { /* noop */ }
-        standby.muted = true; // standby always silent
-        if (playing) standby.play().catch(() => {});
+    // Make sure the standby actually holds the toIdx clip.
+    if (slotMapRef.current[toSlot] !== toIdx) {
+      preloadSlot(toSlot, toIdx);
+    }
+
+    const startCrossfade = () => {
+      const standbyEl = getVideoForSlot(toSlot);
+      if (standbyEl) {
+        try { standbyEl.currentTime = 0; } catch { /* noop */ }
+        standbyEl.muted = mutedRef.current;
+        if (playingRef.current) standbyEl.play().catch(() => {});
       }
       // Crossfade
-      if (activeSlot === 'A') {
-        setSlotAOpacity(0);
-        setSlotBOpacity(1);
-      } else {
-        setSlotBOpacity(0);
-        setSlotAOpacity(1);
-      }
-      // After fade: pause old active, swap activeSlot, advance index.
-      window.setTimeout(() => {
-        const oldActive = getActiveVideo();
-        try { oldActive?.pause(); } catch { /* noop */ }
-        setActiveSlot(prev => (prev === 'A' ? 'B' : 'A'));
-        setSceneIdx(nextIdx);
-        setGlobalTime(startOffsets[nextIdx] || 0);
+      setOpacityForSlot(toSlot, 1);
+      setOpacityForSlot(fromSlot, 0);
+
+      scheduleTimer(() => {
+        // Pause the now-hidden slot and finalize state.
+        const oldEl = getVideoForSlot(fromSlot);
+        try { oldEl?.pause(); } catch { /* noop */ }
+        // Mute the now-hidden slot, unmute the active one.
+        if (oldEl) oldEl.muted = true;
+
+        activeSlotRef.current = toSlot;
+        setSceneIdx(toIdx);
+        setGlobalTime(startOffsetsRef.current[toIdx] || 0);
+        lastTimeUpdateRef.current = performance.now();
+
+        // Preload toIdx + 1 into the now-free slot for the next transition.
+        preloadSlot(fromSlot, toIdx + 1);
+
         transitioningRef.current = false;
-      }, fadeMs);
+      }, CROSSFADE_MS);
     };
 
-    if (standby && standbyHoldsNext && standby.readyState >= 2) {
-      performSwap(CROSSFADE_MS);
+    if (standby.readyState >= 2) {
+      startCrossfade();
     } else {
-      // Standby not warm yet — set src if mismatched, then wait briefly.
-      if (standby && nextScene.clipUrl && !standbyHoldsNext) {
-        if (activeSlot === 'A') {
-          setSlotBSrc(nextScene.clipUrl);
-          slotBSceneIdxRef.current = nextIdx;
-        } else {
-          setSlotASrc(nextScene.clipUrl);
-          slotASceneIdxRef.current = nextIdx;
-        }
-      }
-      let done = false;
-      const fire = (longer: boolean) => {
-        if (done) return;
-        done = true;
-        performSwap(longer ? CROSSFADE_LONG_MS : CROSSFADE_MS);
+      let fired = false;
+      const onReady = () => {
+        if (fired) return;
+        fired = true;
+        startCrossfade();
       };
-      const onReady = () => fire(false);
-      if (standby) {
-        standby.addEventListener('canplay', onReady, { once: true });
-        standby.addEventListener('loadeddata', onReady, { once: true });
-      }
-      // Safety: even if it never fires, swap with longer crossfade after budget.
-      window.setTimeout(() => {
-        if (standby) {
+      standby.addEventListener('canplay', onReady, { once: true });
+      standby.addEventListener('loadeddata', onReady, { once: true });
+      // Hard fallback — always advance, even if buffering.
+      scheduleTimer(() => {
+        try {
           standby.removeEventListener('canplay', onReady);
           standby.removeEventListener('loadeddata', onReady);
-        }
-        fire(true);
-      }, STANDBY_READY_BUDGET_MS);
+        } catch { /* noop */ }
+        onReady();
+      }, STANDBY_BUDGET_MS);
     }
-  }, [
-    sceneIdx,
-    playable,
-    isImage,
-    activeSlot,
-    getActiveVideo,
-    getStandbyVideo,
-    startOffsets,
-    playing,
-  ]);
+  }, [preloadSlot, setOpacityForSlot, scheduleTimer]);
+
+  const advanceScene = useCallback(() => {
+    const currentIdx = sceneIdxRef.current;
+    const list = playableRef.current;
+    if (currentIdx + 1 >= list.length) {
+      // End of sequence — stop and reset to start.
+      setPlaying(false);
+      transitioningRef.current = false;
+      setSceneIdx(0);
+      setGlobalTime(0);
+      activeSlotRef.current = 'A';
+      preloadSlot('A', 0);
+      preloadSlot('B', 1);
+      setOpacityForSlot('A', 1);
+      setOpacityForSlot('B', 0);
+      return;
+    }
+    performTransition(currentIdx + 1);
+  }, [performTransition, preloadSlot, setOpacityForSlot]);
 
   // ── Image-clip ticker ──────────────────────────────────────────
   useEffect(() => {
@@ -300,7 +388,7 @@ export default function ComposerSequencePreview({
       const start = imageStartRef.current ?? performance.now();
       const elapsed = (performance.now() - start) / 1000;
       const local = Math.min(elapsed, dur);
-      setGlobalTime((startOffsets[sceneIdx] || 0) + local);
+      setGlobalTime((startOffsetsRef.current[sceneIdxRef.current] || 0) + local);
       if (elapsed >= dur) {
         advanceScene();
         return;
@@ -309,58 +397,63 @@ export default function ComposerSequencePreview({
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
-  }, [isImage, playing, currentScene, sceneIdx, startOffsets, advanceScene]);
+  }, [isImage, playing, currentScene, advanceScene]);
+
+  // ── Watchdog: if no timeupdate for >5s while playing, force advance ──
+  useEffect(() => {
+    if (!playing || isImage) return;
+    lastTimeUpdateRef.current = performance.now();
+    const id = window.setInterval(() => {
+      if (transitioningRef.current) {
+        lastTimeUpdateRef.current = performance.now();
+        return;
+      }
+      const since = performance.now() - lastTimeUpdateRef.current;
+      if (since > WATCHDOG_MS) {
+        lastTimeUpdateRef.current = performance.now();
+        advanceScene();
+      }
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [playing, isImage, advanceScene]);
 
   const onVideoTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     if (isImage) return;
-    // Only honor timeupdates from the currently active slot.
-    const isASource = e.currentTarget === videoARef.current;
-    const fromActive = (isASource && activeSlot === 'A') || (!isASource && activeSlot === 'B');
-    if (!fromActive) return;
     if (transitioningRef.current) return;
+    // Only honour timeupdates from the active slot.
+    const isASource = e.currentTarget === videoARef.current;
+    const fromActive =
+      (isASource && activeSlotRef.current === 'A') ||
+      (!isASource && activeSlotRef.current === 'B');
+    if (!fromActive) return;
+
+    lastTimeUpdateRef.current = performance.now();
     const v = e.currentTarget;
     const sceneDur = currentScene?.durationSeconds || 0;
     const local = v.currentTime;
 
     if (sceneDur > 0 && local >= sceneDur && !advancedRef.current) {
       advancedRef.current = true;
-      setGlobalTime((startOffsets[sceneIdx] || 0) + sceneDur);
+      setGlobalTime((startOffsetsRef.current[sceneIdxRef.current] || 0) + sceneDur);
       advanceScene();
       return;
     }
-    setGlobalTime((startOffsets[sceneIdx] || 0) + local);
+    setGlobalTime((startOffsetsRef.current[sceneIdxRef.current] || 0) + local);
   };
 
   const onVideoEnded = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    if (transitioningRef.current) return;
     const isASource = e.currentTarget === videoARef.current;
-    const fromActive = (isASource && activeSlot === 'A') || (!isASource && activeSlot === 'B');
+    const fromActive =
+      (isASource && activeSlotRef.current === 'A') ||
+      (!isASource && activeSlotRef.current === 'B');
     if (!fromActive) return;
     if (advancedRef.current) return;
-    const v = e.currentTarget;
-    const sceneDur = currentScene?.durationSeconds || 0;
-    const local = v?.currentTime ?? 0;
-    if (sceneDur > 0 && local < sceneDur - 0.05) {
-      const remainMs = Math.max(0, (sceneDur - local) * 1000);
-      const startedAt = performance.now();
-      const baseGlobal = (startOffsets[sceneIdx] || 0) + local;
-      const tick = () => {
-        if (advancedRef.current) return;
-        const elapsed = (performance.now() - startedAt) / 1000;
-        const next = Math.min(baseGlobal + elapsed, (startOffsets[sceneIdx] || 0) + sceneDur);
-        setGlobalTime(next);
-        if (elapsed * 1000 < remainMs) {
-          rafRef.current = requestAnimationFrame(tick);
-        }
-      };
-      rafRef.current = requestAnimationFrame(tick);
-      freezeTimerRef.current = window.setTimeout(() => {
-        advancedRef.current = true;
-        advanceScene();
-      }, remainMs);
-      return;
-    }
     advancedRef.current = true;
     advanceScene();
   };
@@ -379,36 +472,63 @@ export default function ComposerSequencePreview({
     }
     const localTime = val - startOffsets[idx];
     const target = playable[idx];
+
+    // Cancel any pending transitions/timers — scrub takes priority.
+    clearAllTimers();
+    transitioningRef.current = false;
     advancedRef.current = false;
+
     setSceneIdx(idx);
     setGlobalTime(val);
 
     if (target.uploadType === 'image') {
       imageStartRef.current = playing ? performance.now() - localTime * 1000 : null;
+      // Hide both video slots.
+      setOpacityForSlot('A', 0);
+      setOpacityForSlot('B', 0);
       return;
     }
 
-    // Hard-cut on scrub: load into active slot A, hide B.
-    transitioningRef.current = false;
-    setActiveSlot('A');
-    setSlotAOpacity(1);
-    setSlotBOpacity(0);
+    // Hard-cut on scrub: load into slot A, keep B as next-preload.
+    activeSlotRef.current = 'A';
+    setOpacityForSlot('A', 1);
+    setOpacityForSlot('B', 0);
     if (target.clipUrl) {
-      if (slotASceneIdxRef.current !== idx) {
-        setSlotASrc(target.clipUrl);
-        slotASceneIdxRef.current = idx;
+      const needsLoad = slotMapRef.current.A !== idx;
+      if (needsLoad) {
+        setSrcForSlot('A', target.clipUrl);
+        slotMapRef.current.A = idx;
       }
-      requestAnimationFrame(() => {
+      // Preload next into B.
+      preloadSlot('B', idx + 1);
+
+      const apply = () => {
+        const v = videoARef.current;
+        if (!v) return;
+        try { v.currentTime = localTime; } catch { /* noop */ }
+        v.muted = mutedRef.current;
+        if (playing) v.play().catch(() => {});
+      };
+      if (needsLoad) {
         const v = videoARef.current;
         if (v) {
-          try { v.currentTime = localTime; } catch { /* noop */ }
-          if (playing) v.play().catch(() => {});
+          let fired = false;
+          const onReady = () => {
+            if (fired) return;
+            fired = true;
+            apply();
+          };
+          v.addEventListener('loadeddata', onReady, { once: true });
+          scheduleTimer(onReady, STANDBY_BUDGET_MS);
         }
-      });
+      } else {
+        apply();
+      }
     }
+    lastTimeUpdateRef.current = performance.now();
   };
 
-  // Notify parent of playhead changes so the timeline editor stays in sync.
+  // Notify parent of playhead changes
   useEffect(() => {
     onTimeUpdate?.(globalTime, totalDuration);
   }, [globalTime, totalDuration, onTimeUpdate]);
@@ -437,7 +557,6 @@ export default function ComposerSequencePreview({
     }
   }, [globalTime, voiceoverUrl]);
 
-  // Find the active subtitle segment for the current playhead time.
   const activeSubtitle = useMemo(() => {
     if (!subtitles?.enabled || !subtitles.segments?.length) return null;
     return (
@@ -473,15 +592,13 @@ export default function ComposerSequencePreview({
         {/* Slot A */}
         <video
           ref={videoARef}
-          src={slotASrc}
-          muted={activeSlot === 'A' ? muted : true}
           playsInline
           preload="auto"
           onTimeUpdate={onVideoTimeUpdate}
           onEnded={onVideoEnded}
           className="absolute inset-0 w-full h-full object-contain"
           style={{
-            opacity: isImage ? 0 : slotAOpacity,
+            opacity: isImage ? 0 : slotAOpacityRef.current,
             transition: `opacity ${CROSSFADE_MS}ms ease-in-out`,
           }}
         />
@@ -489,15 +606,14 @@ export default function ComposerSequencePreview({
         {/* Slot B */}
         <video
           ref={videoBRef}
-          src={slotBSrc}
-          muted={activeSlot === 'B' ? muted : true}
           playsInline
           preload="auto"
+          muted
           onTimeUpdate={onVideoTimeUpdate}
           onEnded={onVideoEnded}
           className="absolute inset-0 w-full h-full object-contain"
           style={{
-            opacity: isImage ? 0 : slotBOpacity,
+            opacity: isImage ? 0 : slotBOpacityRef.current,
             transition: `opacity ${CROSSFADE_MS}ms ease-in-out`,
           }}
         />
