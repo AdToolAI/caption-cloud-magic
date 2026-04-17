@@ -1,55 +1,68 @@
 
 
 ## Befund
-Der User sieht im Screenshot **nicht** die `AIVoiceOver`-Komponente, sondern die **`SubtitleVoiceoverSection`** in `src/components/directors-cut/studio/CapCutSidebar.tsx` (Zeile 322–434). Diese ist eine separate Sub-Komponente speziell für "Voiceover aus Untertiteln" und hat ihre **eigene hartkodierte Stimmenliste** mit nur 7 generischen englischen Stimmen (Sarah, Roger, Aria, Laura, Charlie, George, Brian) — sie wurde im letzten Update übersehen.
+Aktuell hat das Motion Studio 5 Tabs: **Briefing → Storyboard → Clips → Audio → Export**. Pro Szene-Card im Storyboard ist ein "Text-Overlay"-Collapsible eingebaut (Zeile 281–383 in `SceneCard.tsx`) — das wirkt überladen, die Untertitel-Logik fehlt komplett, und Text-Settings sind zwischen Prompt + Übergang gequetscht → unprofessionell.
 
-```typescript
-const VOICEOVER_VOICES = [
-  { id: 'sarah', name: 'Sarah', gender: '♀' },
-  { id: 'roger', name: 'Roger', gender: '♂' },
-  // ... 5 weitere
-];
-```
+User möchte: **eigener Tab "Text & Untertitel"** zwischen "Clips" und "Audio".
 
-→ Deshalb sieht der User immer noch nur "Sarah" als Standardstimme im Dropdown.
+## Plan — Neuer Tab "Text & Untertitel"
 
-## Plan — `SubtitleVoiceoverSection` auf Premium-Voices umstellen
+### 1. Neuer Tab in der Navigation
+`VideoComposerDashboard.tsx`: 6 Tabs statt 5
+- Briefing → Storyboard → Clips → **Text** → Audio → Export
+- Neues Icon: `Type` (lucide)
+- Tab erst zugänglich, wenn mindestens 1 Szene existiert (gleiche Logik wie Audio)
 
-### 1. Hartkodierte Liste ersetzen
-- `VOICEOVER_VOICES`-Konstante (Zeile 323–332) entfernen
-- Dynamisches Laden via `supabase.functions.invoke('list-voices')` direkt in der Komponente — gleiches Pattern wie `AIVoiceOver.tsx`
-- Premium-Voices zuerst sortieren via `sortVoicesPremiumFirst`
+### 2. Neue Komponente `TextSubtitlesTab.tsx`
+Pro Szene aufgelistet (kompakte Liste mit Thumbnail + Szenenname), aufklappbar:
+- **Text-Overlay-Editor** (umgezogen aus `SceneCard`): Text, Position, Animation, Farbe, Schriftgröße, Konflikt-Hinweis
+- **Live-Preview-Mini** (Thumbnail + Text-Position-Indikator als Overlay)
+- "Auf alle Szenen anwenden"-Button (Position/Farbe/Animation als Style-Preset)
 
-### 2. UI-Upgrade
-Statt einfachem `<Select>` mit nur Name+Gender:
-- **Sprach-Tabs** (DE/EN/ES) — kompakte Mini-Variante passend zur engen Sidebar
-- Voice-Cards mit: Gender-Icon + Name + **Premium-Badge** + kurzer Beschreibung
-- **Hörprobe-Button** pro Voice (`VoicePreviewButton`)
-- Auto-Tab-Auswahl basierend auf `captionLanguage` beim ersten Render
-- Default-Voice = erste Premium-Voice der erkannten Sprache (nicht mehr `'sarah'`)
+Zusätzlich am Tab-Anfang **Globale Untertitel-Sektion**:
+- Toggle "Automatische Untertitel generieren" (basierend auf Voiceover/Audio später im Audio-Tab erkannt)
+- Style-Picker: Schriftart, Größe, Farbe, Hintergrund-Box, Position (top/bottom)
+- Sprach-Auswahl (DE/EN/ES — default = Projekt-Sprache)
+- Hinweis-Banner: "Untertitel werden im Export aus dem Voiceover automatisch transkribiert"
 
-### 3. Generation-Call erweitern
-Im `handleGenerate`: Wie bei `AIVoiceOver` `model_id` und `voice_settings` aus der ausgewählten Premium-Voice mitsenden, damit die natürlicheren Settings (`stability 0.4`, `style 0.3`, `use_speaker_boost true`) auch hier greifen.
+### 3. Datenmodell
+- Pro-Szene-Overlay bleibt unverändert (`scene.textOverlay`) — wird nur in den neuen Tab verschoben
+- Neuer Block in `assemblyConfig`: `subtitles: { enabled, language, style: { font, size, color, background, position } }`
+- DB-Migration: `composer_projects` erhält `subtitles_config jsonb` (default off)
 
-### 4. Layout-Anpassung
-Da die Sidebar schmal ist (kein Platz für 2-Spalten-Grid wie in `AIVoiceOver`):
-- 1-Spalten-Liste mit `max-h-64 overflow-y-auto`
-- Kompakte Cards (kleinere Padding, kleinere Beschreibung)
-- Sprach-Tabs als 3 schmale Buttons mit Flagge + Anzahl
+### 4. Aufräumen `SceneCard.tsx`
+- Komplettes Text-Overlay-Collapsible (Zeile 281–383) **entfernen**
+- Stattdessen kleiner Status-Hinweis: "📝 Text & Untertitel werden im Tab 'Text' bearbeitet"
+- Karte wird ~30% kürzer → professioneller, fokussiert auf Clip-Generierung
 
 ### 5. Lokalisierung
-Voice-Tipp-Banner (DE/EN/ES) inline — analog `AIVoiceOver`.
+Neue Keys in `translations.ts` (DE/EN/ES):
+- `videoComposer.text` ("Text"), `videoComposer.textSubtitles` ("Text & Untertitel")
+- Sektions-Labels, Buttons, Hinweise — analog vorheriger Pattern
 
-## Geänderte Dateien
-- `src/components/directors-cut/studio/CapCutSidebar.tsx` — `SubtitleVoiceoverSection` komplett auf dynamisches Premium-Voice-Loading umbauen, alte `VOICEOVER_VOICES`-Konstante entfernen
+### 6. Export-Anpassung
+`AssemblyTab.tsx` / Render-Pipeline liest `subtitles_config` aus `assemblyConfig` und gibt es an die Render-Edge-Function weiter (snake_case `subtitles_config`).
+
+## Geänderte / Neue Dateien
+**Neu**:
+- `src/components/video-composer/TextSubtitlesTab.tsx`
+- DB-Migration: `composer_projects.subtitles_config jsonb`
+
+**Bearbeitet**:
+- `src/components/video-composer/VideoComposerDashboard.tsx` — 6. Tab + Routing
+- `src/components/video-composer/SceneCard.tsx` — Overlay-Editor entfernt, Hinweis stattdessen
+- `src/components/video-composer/AssemblyTab.tsx` — `subtitles_config` ans Render-Backend mitsenden
+- `src/types/video-composer.ts` — `SubtitlesConfig` Type + Default
+- `src/lib/translations.ts` — neue Keys (DE/EN/ES)
 
 ## Verify
-- Director's Cut → "Voiceover aus Untertiteln"-Sektion zeigt Premium-Stimmen (Klaus, Julia, Markus …) statt nur Sarah/Roger
-- Sprach-Tabs DE/EN/ES funktionieren, Auto-Selektion basierend auf Untertitel-Sprache
-- Hörprobe-Button pro Stimme spielt 5s Sample
-- Generierter Voice-Over klingt natürlich (neue Settings werden mitgesendet)
+- Motion Studio zeigt 6 Tabs: Briefing → Storyboard → Clips → **Text** → Audio → Export
+- Storyboard-Karten sind aufgeräumt (kein Text-Overlay mehr inline)
+- Im neuen Text-Tab: globale Untertitel-Settings + pro-Szene-Overlay-Editor mit Live-Preview-Indikator
+- Bestehende Drafts mit Text-Overlays migrieren sauber (Daten bleiben in `scene.textOverlay`)
+- Export berücksichtigt sowohl pro-Szene-Overlays als auch globale Untertitel
 
 ## Was unverändert bleibt
-- `AIVoiceOver.tsx` (bereits korrekt)
-- Andere Sidebar-Sektionen, Render-Pipeline, DB
+- Storyboard-Generierung, Clip-Pipeline, Audio-Tab, Pricing
+- Bestehende Szenen-Daten (`textOverlay` bleibt im Schema)
 
