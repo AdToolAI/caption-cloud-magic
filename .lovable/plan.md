@@ -1,67 +1,58 @@
 
-## Befund
-Aktuell hat Motion Studio im Tab **"Voiceover & Untertitel"** einen Bereich **"Text-Overlays pro Szene"** — d.h. Text wird **pro Szene** konfiguriert und nur über genau diese eine Szene gelegt. Das ist:
-- **umständlich** (8 Szenen = 8 Mini-Editoren)
-- **starr** (Overlay startet/endet immer mit Szene, kein freies Timing)
-- **arm an Features** (nur Position + Animation + Farbe + Größe)
 
-Im **Director's Cut** existiert bereits ein professioneller Editor `TextOverlayEditor2028.tsx` mit:
-- **freier Timeline** (Drag-Handles für Start/Ende, Multi-Track, Playhead-Visualisierung)
-- **6 Animationen** mit Live-Preview (FadeIn, ScaleUp, Bounce, Typewriter, Highlight, Glitch)
-- **9 Positionen** über Position-Grid mit Live-Hover-Preview
-- **6 Templates** (CTA, Hashtag, Watermark, Titel, Impact, Countdown)
-- **Style-System**: Schriftgröße (S/M/L/XL), Schatten, Hintergrund, Schriftart, 10 Preset-Farben
-- **Custom-Position** via x/y-Koordinaten
+## Befund
+
+Drei zusammenhängende Probleme im Tab "Voiceover & Untertitel":
+
+### 1. Zweiter "Player" unten = Style-Live-Preview
+Zeile 663–679 in `VoiceSubtitlesTab.tsx` rendert eine separate `aspect-video`-Box, die nur einen statischen Untertitel-Platzhalter zeigt. Im Screenshot ist das der große schwarze leere Kasten unter den Segmenten. Wirkt unprofessionell und doppelt sich mit dem oberen Preview-Player.
+
+### 2. Echte Untertitel werden nicht im Player angezeigt
+In `ComposerSequencePreview.tsx` Zeile 232–249 wird ein **statischer Platzhalter-Text** (`subtitlesPreviewLine`) gerendert — unabhängig davon, ob bereits Segmente existieren. Die generierten 16 Segmente aus `subtitles.segments` werden **nirgends** zeitsynchron eingeblendet.
+
+### 3. Voiceover-Audio nicht im Hauptplayer
+Der Voiceover-Sound wird nur über einen separaten Mini-Play-Button (Zeile 458) wiedergegeben. Im Hauptplayer läuft er nicht mit → man kann generierte Untertitel gar nicht synchron erleben.
 
 ## Plan
 
-### 1. Datenmodell wechseln (`src/types/video-composer.ts`)
-- `ComposerScene.textOverlay` (single per scene) → **deprecated** (für Rückwärtskompatibilität noch lesen, beim nächsten Save migrieren)
-- Neuer Top-Level-State auf `LocalProject`: `globalTextOverlays: TextOverlay[]` (gleicher Typ wie Director's Cut)
-- Migrations-Helper: bei Laden einer Draft mit per-scene Overlays → in globale Overlays mit `startTime = sceneStartOffset` und `endTime = sceneStartOffset + sceneDuration` umwandeln
+### A. Style-Live-Preview entfernen (Zeile 663–679)
+Die separate Vorschaubox komplett rauswerfen. Style-Änderungen sind im oberen Player live sichtbar (siehe Schritt B).
 
-### 2. UI-Umbau in `VoiceSubtitlesTab.tsx`
-- Kompletten Block **"Text-Overlays pro Szene"** (Zeilen 683–855) entfernen
-- Stattdessen: `<TextOverlayEditor2028>` einbinden, der bereits die ganze Mächtigkeit liefert
-- Die `videoDuration` = Summe aller Szenen-Dauern; `currentTime` kommt vom Preview-Player
+### B. Echte zeitsynchrone Untertitel im Hauptplayer
+In `ComposerSequencePreview.tsx`:
+- Den Platzhalter-Block (Zeile 232–249) **ersetzen** durch:
+  - Wenn `subtitles.segments?.length > 0`: das Segment finden, dessen `[startTime, endTime]` den aktuellen `globalTime` enthält → dessen `text` rendern.
+  - Wenn keine Segmente, aber `subtitles.enabled`: dezenter "Noch keine Untertitel generiert"-Hinweis (statt fixer Platzhalter), klein und nur als Hilfe.
+- Styling (Font, Größe, Farbe, Position, Background) aus `subtitles.style` weiterhin anwenden.
 
-### 3. Preview-Integration (`ComposerSequencePreview.tsx`)
-- Per-Scene-Overlay-Logik (Zeilen 185–226) entfernen
-- Stattdessen: **`globalTextOverlays`** als Prop akzeptieren und während Wiedergabe nur jene rendern, deren `[startTime, endTime]`-Range den aktuellen `globalTime` enthält
-- Renderer-Komponente: `TextOverlayRenderer.tsx` aus `src/remotion/components/` als reine HTML/CSS-Variante adaptieren (Animationen via React-State + CSS, da Preview kein Remotion ist)
+### C. Voiceover-Audio in Hauptplayer integrieren
+In `ComposerSequencePreview.tsx`:
+- Neuen Prop `voiceoverUrl?: string` akzeptieren.
+- Verstecktes `<audio>`-Element parallel zur Video-Wiedergabe steuern:
+  - Bei `togglePlay`: Audio mit-starten/pausieren.
+  - Bei `handleScrub`: `audio.currentTime = globalTime` setzen.
+  - Beim Wechsel zwischen Szenen NICHT neu starten (das Audio läuft linear über das gesamte Video).
+- Mute-Knopf steuert künftig **Voiceover** (Szenen-Clips bleiben sowieso meist stumm).
 
-### 4. Editor-Player-Sync
-- `TextOverlayEditor2028` braucht `currentTime` + `videoDuration` → vom Dashboard hochgereicht, vom Preview-Player gesetzt
-- Klick auf Overlay-Track im Editor scrubt den Preview-Player auf Overlay-Start (optional)
+### D. Mini-Play-Button entfernen
+In `VoiceSubtitlesTab.tsx` den separaten Play/Pause-Button (Zeile 457–461) und `toggleVoPreview`/`voAudioRef`-State **entfernen** — Wiedergabe erfolgt zentral im Hauptplayer.
 
-### 5. Backend-Render anpassen (`supabase/functions/compose-video-assemble/index.ts`)
-- `inputProps.textOverlays`: neues Feld mit der globalen Overlay-Liste (id, text, animation, position, startTime, endTime, style)
-- Per-Scene `s.text_overlay`-Mapping fallweise weiter unterstützen, aber wenn `globalTextOverlays` vorhanden → diese benutzen
-- Remotion-Template `ComposerVideo.tsx` (oder Pendant) nutzt bereits `TextOverlayRenderer` aus Director's Cut → ggf. Sequence-Wrapper mit `from={startTime*fps}` und `durationInFrames={(endTime-startTime)*fps}` ergänzen
+### E. Prop-Durchreichung
+- `<ComposerSequencePreview ... voiceoverUrl={voiceover?.audioUrl} />` in `VoiceSubtitlesTab.tsx`
 
-### 6. DB-Persistenz
-- Neues Feld `global_text_overlays jsonb` auf `video_composer_projects` (Migration)
-- `useComposerPersistence` lädt/speichert `globalTextOverlays`
-- Per-Scene `text_overlay` bleibt im Schema (Soft-Deprecation), wird aber nicht mehr beschrieben
-
-### 7. Lokalisierung
-- Neue/angepasste Keys in `src/lib/translations.ts` (DE/EN/ES) für: "Text-Overlays" (statt "pro Szene"), Tooltip-Hinweis, Editor-Labels falls nötig
+### F. Optional: kleiner UX-Hinweis
+Über dem Player-Kasten ein dezenter Status-Chip wenn Voiceover & Untertitel beide vorhanden sind: "🎙️ Voiceover · 16 Untertitel" damit klar ist, was abgespielt wird.
 
 ## Geänderte Dateien
-- `src/types/video-composer.ts` — globale Overlay-Liste hinzufügen
-- `src/components/video-composer/VoiceSubtitlesTab.tsx` — Per-Scene-Block entfernen, Director's-Cut-Editor einbauen
-- `src/components/video-composer/ComposerSequencePreview.tsx` — globale Overlays rendern statt per-scene
-- `src/components/video-composer/VideoComposerDashboard.tsx` — `globalTextOverlays`-State + Migration
-- `src/hooks/useComposerPersistence.ts` — Speichern/Laden des neuen Feldes
-- `supabase/functions/compose-video-assemble/index.ts` — neuer Render-Payload
-- `src/remotion/compositions/ComposerVideo.tsx` (falls vorhanden) — `<Sequence>`-basiertes Rendering der globalen Overlays
-- DB-Migration: `global_text_overlays jsonb` auf `video_composer_projects`
-- `src/lib/translations.ts` — DE/EN/ES-Keys
+- `src/components/video-composer/ComposerSequencePreview.tsx` — neuer `voiceoverUrl`-Prop, Audio-Element, zeitsynchroner Untertitel-Renderer (statt Platzhalter)
+- `src/components/video-composer/VoiceSubtitlesTab.tsx` — Style-Preview-Box weg, Mini-Play-Button weg, `voiceoverUrl` durchreichen
+- `src/lib/translations.ts` — neuer Key z.B. `videoComposer.subtitlesEmptyHint` (DE/EN/ES)
 
 ## Verify
-- Tab "Voiceover & Untertitel": **kein** "Text-Overlays pro Szene"-Block mehr
-- Stattdessen: einheitlicher Director's-Cut-Style-Editor mit Timeline, Templates, Position-Grid, Animations-Preview
-- Preview-Player oben zeigt Overlays exakt zur konfigurierten Zeit, unabhängig von Szenen-Grenzen
-- Overlay kann z.B. von Sek 3 bis Sek 12 laufen, auch wenn dazwischen 2 Szenen-Cuts sind
-- Bestehende Drafts mit Per-Scene-Overlays werden beim Öffnen automatisch migriert → keine Datenverluste
-- Final-Render im Tab "Export" enthält die Overlays an den richtigen Zeitpunkten mit der richtigen Animation
+- Tab "Voiceover & Untertitel": **kein** zweiter Player-Kasten unten mehr
+- Untertitel generieren → die generierten Segmente erscheinen **zeitsynchron im oberen Player** während der Wiedergabe
+- Beim Drücken von ▶ im oberen Player läuft das **Voiceover gleichzeitig** mit dem Video
+- Scrubben in der Timeline springt Video + Voiceover gemeinsam
+- Mute-Button schaltet Voiceover stumm
+- Style-Änderungen (Farbe, Font, Position) sind live im oberen Player sichtbar
+
