@@ -6,12 +6,18 @@ import type {
   ComposerScene,
   SubtitlesConfig,
   TextPosition,
+  GlobalTextOverlay,
 } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
+import { PreviewTextOverlayLayer } from './PreviewTextOverlayLayer';
 
 interface Props {
   scenes: ComposerScene[];
   subtitles?: SubtitlesConfig;
+  /** Timeline-based overlays that span the full video (independent of scenes). */
+  globalTextOverlays?: GlobalTextOverlay[];
+  /** Notifies parent of playhead changes so the editor timeline can stay in sync. */
+  onTimeUpdate?: (currentTime: number, totalDuration: number) => void;
 }
 
 const POSITION_TO_STYLE: Record<TextPosition, React.CSSProperties> = {
@@ -31,9 +37,13 @@ const formatTime = (s: number) => {
   return `${m}:${sec.toString().padStart(2, '0')}`;
 };
 
-export default function ComposerSequencePreview({ scenes, subtitles }: Props) {
+export default function ComposerSequencePreview({
+  scenes,
+  subtitles,
+  globalTextOverlays,
+  onTimeUpdate,
+}: Props) {
   const { t } = useTranslation();
-
   // Filter playable scenes (have a clipUrl OR are an image upload with uploadUrl)
   const playable = useMemo(
     () =>
@@ -171,6 +181,12 @@ export default function ComposerSequencePreview({ scenes, subtitles }: Props) {
     }
   };
 
+  // Notify parent of playhead changes so the timeline editor stays in sync.
+  // (Must be declared BEFORE any early return to satisfy React's rules of hooks.)
+  useEffect(() => {
+    onTimeUpdate?.(globalTime, totalDuration);
+  }, [globalTime, totalDuration, onTimeUpdate]);
+
   if (playable.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border/60 bg-background/30 p-8 text-center">
@@ -181,9 +197,6 @@ export default function ComposerSequencePreview({ scenes, subtitles }: Props) {
       </div>
     );
   }
-
-  const overlay = currentScene?.textOverlay;
-  const hasOverlayText = overlay && (overlay.text || '').trim().length > 0;
 
   return (
     <div className="space-y-3">
@@ -207,22 +220,13 @@ export default function ComposerSequencePreview({ scenes, subtitles }: Props) {
           />
         )}
 
-        {/* Per-scene text overlay */}
-        {hasOverlayText && (
-          <div
-            className="absolute px-3 py-1 max-w-[90%] pointer-events-none"
-            style={{
-              ...POSITION_TO_STYLE[overlay!.position],
-              color: overlay!.color || '#FFFFFF',
-              fontSize: Math.max(12, (overlay!.fontSize || 48) / 2.2),
-              fontFamily: overlay!.fontFamily || 'Inter',
-              fontWeight: 700,
-              textShadow: '0 2px 6px rgba(0,0,0,0.65)',
-              lineHeight: 1.15,
-            }}
-          >
-            {overlay!.text}
-          </div>
+        {/* Global timeline-based text overlays (independent of scene boundaries) */}
+        {globalTextOverlays && globalTextOverlays.length > 0 && (
+          <PreviewTextOverlayLayer
+            overlays={globalTextOverlays}
+            currentTime={globalTime}
+            totalDuration={totalDuration}
+          />
         )}
 
         {/* Global subtitles preview line */}
