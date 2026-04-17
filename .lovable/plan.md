@@ -2,48 +2,57 @@
 
 ## Befund
 
-Aktuell zeigt jede Szenenkarte (`SceneCard.tsx`) bei AI-Quelle drei separate Hinweis-Boxen (Blau/Amber/Rot). Das wirkt redundant und unprofessionell, wenn 5 Szenen vorhanden sind = 15 Boxen.
+Der User möchte den AI-Hinweisblock (technische Tipps + rechtliche Nutzungsregeln) **nicht** im Storyboard-Tab pro Szene, sondern **prominent oben im Briefing-Tab** platzieren. Das macht Sinn:
 
-Besser: **Ein** zusammengefasster Hinweis-Block **einmal oben** im Storyboard-Tab, gut sichtbar oberhalb aller Szenen.
+- Briefing ist der **erste** Tab, den jeder Nutzer sieht
+- Hinweise erscheinen **einmalig** vor jeglicher Generierung
+- Logischer Flow: erst Regeln lesen → dann Modus/Kategorie wählen → dann Storyboard
+
+Aktueller Stand:
+- `StoryboardTab.tsx` enthält den kombinierten goldenen Hinweis-Block (collapse via `localStorage`)
+- `BriefingTab.tsx` (vermutlich) hat oben "Modus" und "Kategorie" Sektionen, aber **keinen** Hinweisblock
+- Rechtliche Sektion (verbotene Inhalte, Konsequenzen) wurde noch nicht implementiert
 
 ## Plan
 
-### 1. Hinweise aus `SceneCard.tsx` entfernen
-Die drei Boxen (Z. ~198–217: Blau "Prompt-Vorlage", Amber "Personen-Variation", Rot "Credits-Warnung") komplett aus der Szenenkarte entfernen. Auch die nicht mehr benötigten Icon-Imports (`Lightbulb`, `AlertTriangle`, `CreditCard`) bereinigen.
+### 1. Hinweis-Block aus `StoryboardTab.tsx` entfernen
+Den kompletten goldenen Hinweis-Block (inkl. `tipsCollapsed` State + `localStorage`-Logik + `Sparkles`/`ChevronDown`/`ChevronUp` Imports) entfernen. Storyboard bleibt aufgeräumt mit nur Summary-Bar + Szenenkarten.
 
-### 2. Neuer kombinierter Hinweis-Block in `StoryboardTab.tsx`
-Direkt **unter der Summary-Bar** (über der Szenenliste) eine elegante Hinweis-Karte einfügen — im James-Bond-2028-Stil:
-- Glasmorphismus-Hintergrund (`bg-card/40 backdrop-blur-sm border border-amber-500/20`)
-- Linker goldener Akzent-Strich (vertikale Linie, passend zum Enterprise-Status-Pattern)
-- Überschrift "Wichtige Hinweise zur AI-Generierung" mit `Sparkles`-Icon in Gold
-- Drei kompakte Bullet-Points (statt drei Boxen):
-  1. **Prompt-Qualität:** Präzise Prompts liefern bessere Ergebnisse — passe die Vorlage an dein Produkt/deine Marke an.
-  2. **Personen-Konsistenz:** AI-generierte Personen können zwischen Szenen variieren. Für konsistente Charaktere setze auf abstrakte Szenen oder verwende Stock-Footage.
-  3. **Credits-Verbrauch:** Credits werden **sofort** beim Generieren abgebucht — auch bei nicht passendem Ergebnis. Prüfe deinen Prompt sorgfältig vor dem Start.
-- Optional: Klick-zum-Einklappen (Standardmäßig aufgeklappt, per `useState` zusammenklappbar) — für Power-User, die den Hinweis nach dem ersten Lesen wegklappen wollen. Status in `localStorage` persistieren.
+### 2. Neuen kombinierten Hinweis-Block in `BriefingTab.tsx`
+Ganz **oben im Briefing-Tab** (vor "Modus"-Sektion) den Block einfügen — gleicher James-Bond-2028-Stil:
+- Glasmorphismus + linker goldener Akzent-Strich
+- Header: `Sparkles`-Icon + "Wichtige Hinweise zur AI-Generierung"
+- Kollabierbar via `localStorage` (Key: `video-composer-briefing-tips-collapsed`)
 
-### 3. Lokalisierung
-Bestehende Keys in `src/lib/translations.ts` umbenennen/zusammenführen:
-- `videoComposer.aiTipsTitle` — "Wichtige Hinweise zur AI-Generierung" / "Important AI Generation Tips" / "Notas importantes sobre la generación con IA"
-- `videoComposer.aiTipPrompt` — Prompt-Qualität-Text (DE/EN/ES)
-- `videoComposer.aiTipPersons` — Personen-Konsistenz-Text (DE/EN/ES)
-- `videoComposer.aiTipCredits` — Credits-Warnung-Text (DE/EN/ES)
-- `videoComposer.aiTipsCollapse` / `aiTipsExpand` — "Hinweise ausblenden" / "Hinweise einblenden"
+**Inhalt** (zwei Sektionen, optisch getrennt):
 
-Alte, jetzt ungenutzte Keys aus `SceneCard` (falls vorhanden) entfernen.
+**A) Technische Tipps (gold-Akzente):**
+1. **Prompt-Qualität:** Präzise Prompts liefern bessere Ergebnisse
+2. **Personen-Konsistenz:** AI-Personen können zwischen Szenen variieren
+3. **Credits-Verbrauch:** Credits werden sofort beim Generieren abgebucht — auch bei nicht passendem Ergebnis
 
-### 4. Bedingte Anzeige
-Hinweis-Block nur anzeigen, wenn **mindestens eine Szene** mit `clipSource === 'ai'` existiert. Bei reinen Stock-Workflows wird er ausgeblendet → kein Visual Noise.
+**B) Rechtliche Nutzungsregeln (rote/destruktive Akzente, mit `ShieldAlert`-Icon + dünner Trennlinie davor):**
+1. **Strikt verboten:** Pornografische, sexuell explizite, gewaltverherrlichende, hasserfüllte, diskriminierende, illegale Inhalte sowie Deepfakes ohne Einwilligung und CSAM
+2. **Konsequenzen:** Verwarnung → temporäre Sperre → permanente Account-Löschung (ohne Credit-Rückerstattung), je nach Schwere
+3. **Verantwortung:** Nutzer ist rechtlich verantwortlich; bei schweren Verstößen Behörden-Meldung (z. B. NCMEC)
+
+### 3. Lokalisierung (`src/lib/translations.ts`)
+Bestehende Keys umziehen + neue ergänzen unter `videoComposer.*` (DE/EN/ES):
+- Bestehende `aiTipsTitle`, `aiTipPrompt`, `aiTipPersons`, `aiTipCredits`, `aiTipsCollapse`, `aiTipsExpand` bleiben → werden nur in `BriefingTab` statt `StoryboardTab` genutzt
+- Neue Keys: `aiLegalTitle`, `aiLegalProhibited`, `aiLegalConsequences`, `aiLegalResponsibility`
+
+### 4. Bedingung
+Im Briefing-Tab **immer** anzeigen (nicht abhängig von AI-Szenen) — denn der Nutzer wählt erst hier den Modus. Block ist standardmäßig **aufgeklappt**, kann via `localStorage` weggeklappt werden.
 
 ## Geänderte Dateien
-- `src/components/video-composer/SceneCard.tsx` — Drei Hinweis-Boxen + Icon-Imports entfernen
-- `src/components/video-composer/StoryboardTab.tsx` — Neuer kombinierter Hinweis-Block mit Collapse + localStorage
-- `src/lib/translations.ts` — Konsolidierte Keys (DE/EN/ES)
+- `src/components/video-composer/BriefingTab.tsx` — neuer Hinweis-Block oben (technische + rechtliche Sektion, kollabierbar)
+- `src/components/video-composer/StoryboardTab.tsx` — alten Hinweis-Block + zugehörige Imports/State entfernen
+- `src/lib/translations.ts` — neue rechtliche Keys ergänzen (`aiLegalTitle`, `aiLegalProhibited`, `aiLegalConsequences`, `aiLegalResponsibility`) in DE/EN/ES
 
 ## Verify
-- Storyboard-Tab mit AI-Szenen: **Ein** eleganter goldener Hinweis-Block direkt unter der Summary-Bar
-- Szenenkarten sind aufgeräumt — keine wiederholten Hinweis-Boxen mehr
-- Klick auf "Hinweise ausblenden" → Block kollabiert, Status bleibt nach Reload erhalten
-- Bei reinem Stock-Workflow (keine AI-Szenen): Hinweis-Block wird **nicht** angezeigt
-- Sprachen DE/EN/ES korrekt durchgeschaltet
+- Briefing-Tab: Ganz oben erscheint **ein** eleganter Hinweis-Block mit zwei Sektionen (gold = Tipps, rot = Recht)
+- Klick auf Header → kollabiert/expandiert, Status persistent nach Reload
+- Storyboard-Tab: kein Hinweis-Block mehr, nur Summary + Szenenkarten
+- Sprachen DE/EN/ES korrekt
+- Verboten-Liste, Konsequenzen und Verantwortung sind klar erkennbar (rotes Schild-Icon)
 
