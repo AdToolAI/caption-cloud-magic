@@ -30,100 +30,57 @@ export const ComposedAdVideoSchema = z.object({
 
 type ComposedAdVideoProps = z.infer<typeof ComposedAdVideoSchema>;
 
-// Transition component
-const SceneTransition: React.FC<{
-  type: string;
-  progress: number; // 0-1
-  children: React.ReactNode;
-}> = ({ type, progress, children }) => {
-  let style: React.CSSProperties = {};
-
-  switch (type) {
-    case 'fade':
-      style = { opacity: interpolate(progress, [0, 1], [0, 1], { extrapolateRight: 'clamp' }) };
-      break;
-    case 'slide':
-      style = { transform: `translateX(${interpolate(progress, [0, 1], [100, 0], { extrapolateRight: 'clamp' })}%)` };
-      break;
-    case 'zoom':
-      style = {
-        transform: `scale(${interpolate(progress, [0, 1], [1.3, 1], { extrapolateRight: 'clamp' })})`,
-        opacity: interpolate(progress, [0, 0.3], [0, 1], { extrapolateRight: 'clamp' }),
-      };
-      break;
-    case 'wipe': {
-      const clip = interpolate(progress, [0, 1], [100, 0], { extrapolateRight: 'clamp' });
-      style = { clipPath: `inset(0 ${clip}% 0 0)` };
-      break;
-    }
-    default:
-      break;
-  }
-
-  return <AbsoluteFill style={style}>{children}</AbsoluteFill>;
-};
-
-// Single scene renderer
+// Single scene renderer — hard cuts only.
+// Refined transitions are handled in Director's Cut after export.
 const Scene: React.FC<{
   videoUrl: string;
   textOverlay?: ComposedAdVideoProps['scenes'][0]['textOverlay'];
   kineticText: boolean;
-  transitionType: string;
-  transitionFrames: number;
-  durationFrames: number;
-}> = ({ videoUrl, textOverlay, kineticText, transitionType, transitionFrames, durationFrames }) => {
+}> = ({ videoUrl, textOverlay, kineticText }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  // Transition in
-  const transitionProgress = transitionFrames > 0
-    ? interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
-    : 1;
 
   return (
-    <SceneTransition type={transitionType} progress={transitionProgress}>
-      <AbsoluteFill style={{ backgroundColor: '#000' }}>
-        {videoUrl && (
-          <Video
-            src={videoUrl}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            muted
+    <AbsoluteFill style={{ backgroundColor: '#000' }}>
+      {videoUrl && (
+        <Video
+          src={videoUrl}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          muted
+        />
+      )}
+      {textOverlay?.text && (
+        kineticText ? (
+          <KineticText
+            text={textOverlay.text}
+            position={textOverlay.position as any}
+            animation={textOverlay.animation as any}
+            fontSize={textOverlay.fontSize}
+            color={textOverlay.color}
+            fontFamily={textOverlay.fontFamily}
+            delay={0}
           />
-        )}
-        {textOverlay?.text && (
-          kineticText ? (
-            <KineticText
-              text={textOverlay.text}
-              position={textOverlay.position as any}
-              animation={textOverlay.animation as any}
-              fontSize={textOverlay.fontSize}
-              color={textOverlay.color}
-              fontFamily={textOverlay.fontFamily}
-              delay={Math.min(10, transitionFrames)}
-            />
-          ) : (
-            <div style={{
-              position: 'absolute',
-              bottom: '10%',
-              width: '100%',
-              textAlign: 'center',
-              padding: '0 40px',
+        ) : (
+          <div style={{
+            position: 'absolute',
+            bottom: '10%',
+            width: '100%',
+            textAlign: 'center',
+            padding: '0 40px',
+          }}>
+            <span style={{
+              fontSize: textOverlay.fontSize,
+              color: textOverlay.color,
+              fontWeight: 700,
+              fontFamily: textOverlay.fontFamily || 'Inter, sans-serif',
+              textShadow: '0 2px 12px rgba(0,0,0,0.6)',
+              opacity: interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' }),
             }}>
-              <span style={{
-                fontSize: textOverlay.fontSize,
-                color: textOverlay.color,
-                fontWeight: 700,
-                fontFamily: textOverlay.fontFamily || 'Inter, sans-serif',
-                textShadow: '0 2px 12px rgba(0,0,0,0.6)',
-                opacity: interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' }),
-              }}>
-                {textOverlay.text}
-              </span>
-            </div>
-          )
-        )}
-      </AbsoluteFill>
-    </SceneTransition>
+              {textOverlay.text}
+            </span>
+          </div>
+        )
+      )}
+    </AbsoluteFill>
   );
 };
 
@@ -138,12 +95,11 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
 }) => {
   const { fps } = useVideoConfig();
 
-  // Calculate frame offsets for each scene
+  // Calculate frame offsets for each scene (hard cuts, no transition overlap)
   let frameOffset = 0;
   const sceneFrames = scenes.map((scene) => {
     const durationFrames = Math.ceil(scene.durationSeconds * fps);
-    const transitionFrames = Math.ceil((scene.transitionDuration || 0) * fps);
-    const entry = { from: frameOffset, duration: durationFrames, transitionFrames };
+    const entry = { from: frameOffset, duration: durationFrames };
     frameOffset += durationFrames;
     return entry;
   });
@@ -161,9 +117,6 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
               videoUrl={scene.videoUrl}
               textOverlay={scene.textOverlay}
               kineticText={kineticText}
-              transitionType={scene.transitionType || 'fade'}
-              transitionFrames={sceneFrames[i].transitionFrames}
-              durationFrames={sceneFrames[i].duration}
             />
           </Sequence>
         ))}

@@ -4,12 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Download, Palette, Film, Type, CheckCircle, AlertCircle, Sparkles, FolderOpen } from 'lucide-react';
+import { Loader2, Download, Palette, Type, CheckCircle, AlertCircle, Sparkles, FolderOpen, Scissors } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import ColorGradingSelector from './ColorGradingSelector';
-import type { AssemblyConfig, ComposerScene, TransitionStyle } from '@/types/video-composer';
+import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
 import { getClipCost } from '@/types/video-composer';
 
 interface AssemblyTabProps {
@@ -311,29 +311,13 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         </CardContent>
       </Card>
 
-      {/* Transition Style */}
-      <Card className="border-border/40 bg-card/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Film className="h-4 w-4 text-primary" /> {t('videoComposer.transitionStyle')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            {(['fade', 'crossfade', 'wipe', 'slide', 'zoom', 'none'] as TransitionStyle[]).map((tr) => (
-              <button
-                key={tr}
-                onClick={() => onUpdateAssembly({ transitionStyle: tr })}
-                className={`p-2 rounded-lg border text-center transition-all ${
-                  assemblyConfig.transitionStyle === tr
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border/40 hover:border-border text-muted-foreground'
-                }`}
-              >
-                <p className="text-xs font-medium capitalize">{tr}</p>
-              </button>
-            ))}
-          </div>
+      {/* Transitions hint — handled in Director's Cut */}
+      <Card className="border-border/40 bg-card/40">
+        <CardContent className="py-3 flex items-start gap-2">
+          <Scissors className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {t('videoComposer.transitionsRemovedHint')}
+          </p>
         </CardContent>
       </Card>
 

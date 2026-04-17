@@ -93,19 +93,31 @@ export default function ComposerSequencePreview({
     imageStartRef.current = null;
   }, [playable.length]);
 
-  // Load source on scene change
+  // Load source on scene change — hard cut, but wait for canplay before resuming
+  // playback to avoid a brief stutter showing the previous frame.
   useEffect(() => {
     if (!currentScene) return;
     if (!isImage && videoRef.current) {
-      videoRef.current.currentTime = 0;
+      const v = videoRef.current;
+      v.currentTime = 0;
       if (playing) {
-        videoRef.current.play().catch(() => {});
+        const onCanPlay = () => {
+          v.play().catch(() => {});
+          v.removeEventListener('canplay', onCanPlay);
+        };
+        // If already buffered enough, play immediately; otherwise wait.
+        if (v.readyState >= 3) {
+          v.play().catch(() => {});
+        } else {
+          v.addEventListener('canplay', onCanPlay, { once: true });
+        }
+        return () => v.removeEventListener('canplay', onCanPlay);
       }
     }
     if (isImage) {
       imageStartRef.current = playing ? performance.now() : null;
     }
-  }, [sceneIdx, isImage, currentScene]);
+  }, [sceneIdx, isImage, currentScene, playing]);
 
   // Play/pause
   useEffect(() => {

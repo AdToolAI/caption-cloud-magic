@@ -25,8 +25,8 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
       clipQuality: 'standard',
       clipStatus: 'pending',
       textOverlay: { ...DEFAULT_TEXT_OVERLAY },
-      transitionType: 'fade',
-      transitionDuration: 0.5,
+      transitionType: 'none',
+      transitionDuration: 0,
       retryCount: 0,
       costEuros: 0,
     };
