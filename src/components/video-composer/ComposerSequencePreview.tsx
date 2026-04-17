@@ -37,9 +37,13 @@ const formatTime = (s: number) => {
   return `${m}:${sec.toString().padStart(2, '0')}`;
 };
 
-export default function ComposerSequencePreview({ scenes, subtitles }: Props) {
+export default function ComposerSequencePreview({
+  scenes,
+  subtitles,
+  globalTextOverlays,
+  onTimeUpdate,
+}: Props) {
   const { t } = useTranslation();
-
   // Filter playable scenes (have a clipUrl OR are an image upload with uploadUrl)
   const playable = useMemo(
     () =>
