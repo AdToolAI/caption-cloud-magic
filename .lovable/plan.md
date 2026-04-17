@@ -2,92 +2,48 @@
 
 ## Befund
 
-Das gerenderte MP4 hat **keinen Sound** und **keine Untertitel/Text-Overlays**, weil das Remotion-Template `ComposedAdVideo.tsx` diese Felder **gar nicht kennt**.
+Aktuell zeigt jede Szenenkarte (`SceneCard.tsx`) bei AI-Quelle drei separate Hinweis-Boxen (Blau/Amber/Rot). Das wirkt redundant und unprofessionell, wenn 5 Szenen vorhanden sind = 15 Boxen.
 
-**Konkret:**
-
-1. **Audio fehlt im Render** — Voiceover/Musik werden zwar als Props an Lambda geschickt (`voiceoverUrl`, `backgroundMusicUrl`), aber:
-   - Die Edge-Function setzt `muted: !hasAudio` korrekt → Audio wird Lambda-seitig **nicht stummgeschaltet**
-   - Im Template ist `<Audio>` zwar eingebaut, aber `audioCodec: 'aac'` allein reicht nicht — die `videoUrl` der Szenen wird mit `muted` eingebunden ✓ (richtig). 
-   - **Eigentliches Problem**: Der Lambda-Bundle (REMOTION_SERVE_URL) ist möglicherweise auf einer **älteren Version** des Templates, und die neuen Audio-URLs werden in der gerenderten Version nicht durchgereicht. **ABER:** In ComposedAdVideo (Z. 125–137) ist `<Audio>` korrekt vorhanden — also sollte es laufen. Sehr wahrscheinlich ist der **Lambda-Bundle veraltet** und enthält noch eine alte Version ohne Audio-Section, oder der `voiceoverUrl` wird nicht gesetzt, weil `assemblyConfig.voiceover?.audioUrl` leer ist (Switch aus oder URL nicht gespeichert).
-
-2. **Untertitel & Text-Overlays fehlen komplett** — das ist ein **echter Bug**:
-   - `ComposedAdVideoSchema` hat **keine** Felder für `subtitles` oder `globalTextOverlays`
-   - Edge-Function sendet beide Felder in `inputProps`, aber Zod verwirft unbekannte Properties stillschweigend
-   - Im Template-Body wird **nichts** gerendert dafür → MP4 hat weder Untertitel-Boxen noch globale Text-Overlays
+Besser: **Ein** zusammengefasster Hinweis-Block **einmal oben** im Storyboard-Tab, gut sichtbar oberhalb aller Szenen.
 
 ## Plan
 
-### 1. `ComposedAdVideo.tsx` erweitern
+### 1. Hinweise aus `SceneCard.tsx` entfernen
+Die drei Boxen (Z. ~198–217: Blau "Prompt-Vorlage", Amber "Personen-Variation", Rot "Credits-Warnung") komplett aus der Szenenkarte entfernen. Auch die nicht mehr benötigten Icon-Imports (`Lightbulb`, `AlertTriangle`, `CreditCard`) bereinigen.
 
-**Schema ergänzen:**
-```ts
-subtitles: z.object({
-  enabled: z.boolean(),
-  language: z.string().optional(),
-  style: z.object({
-    font: z.string().optional(),
-    size: z.number().optional(),
-    color: z.string().optional(),
-    background: z.string().optional(),
-    position: z.enum(['top', 'bottom']).optional(),
-  }).optional(),
-  segments: z.array(z.object({
-    id: z.string(),
-    text: z.string(),
-    startTime: z.number(),
-    endTime: z.number(),
-  })),
-}).optional(),
-globalTextOverlays: z.array(z.object({
-  id: z.string(),
-  text: z.string(),
-  animation: z.enum(['fadeIn','scaleUp','bounce','typewriter','highlight','glitch']),
-  position: z.enum(['top','center','bottom','bottomLeft','bottomRight','topLeft','topRight','centerLeft','centerRight','custom']),
-  customPosition: z.object({ x: z.number(), y: z.number() }).optional(),
-  startTime: z.number(),
-  endTime: z.number().nullable(),
-  style: z.object({
-    fontSize: z.enum(['sm','md','lg','xl']),
-    color: z.string(),
-    backgroundColor: z.string(),
-    shadow: z.boolean(),
-    fontFamily: z.string(),
-  }),
-})).optional(),
-```
+### 2. Neuer kombinierter Hinweis-Block in `StoryboardTab.tsx`
+Direkt **unter der Summary-Bar** (über der Szenenliste) eine elegante Hinweis-Karte einfügen — im James-Bond-2028-Stil:
+- Glasmorphismus-Hintergrund (`bg-card/40 backdrop-blur-sm border border-amber-500/20`)
+- Linker goldener Akzent-Strich (vertikale Linie, passend zum Enterprise-Status-Pattern)
+- Überschrift "Wichtige Hinweise zur AI-Generierung" mit `Sparkles`-Icon in Gold
+- Drei kompakte Bullet-Points (statt drei Boxen):
+  1. **Prompt-Qualität:** Präzise Prompts liefern bessere Ergebnisse — passe die Vorlage an dein Produkt/deine Marke an.
+  2. **Personen-Konsistenz:** AI-generierte Personen können zwischen Szenen variieren. Für konsistente Charaktere setze auf abstrakte Szenen oder verwende Stock-Footage.
+  3. **Credits-Verbrauch:** Credits werden **sofort** beim Generieren abgebucht — auch bei nicht passendem Ergebnis. Prüfe deinen Prompt sorgfältig vor dem Start.
+- Optional: Klick-zum-Einklappen (Standardmäßig aufgeklappt, per `useState` zusammenklappbar) — für Power-User, die den Hinweis nach dem ersten Lesen wegklappen wollen. Status in `localStorage` persistieren.
 
-**Renderer ergänzen** (im Hauptcomponent, nach `<ColorGrading>`):
-- `<TextOverlayRenderer>` (existiert bereits in `src/remotion/components/TextOverlayRenderer.tsx`) für `globalTextOverlays`, jeder mit eigener `<Sequence from={startTime*fps} durationInFrames={...}>`
-- Inline-Subtitle-Renderer (nach Vorbild `SubtitleClipRenderer` aus `DirectorsCutVideo.tsx`) für jedes Subtitle-Segment in `subtitles.segments`, mit `<Sequence>` pro Segment
+### 3. Lokalisierung
+Bestehende Keys in `src/lib/translations.ts` umbenennen/zusammenführen:
+- `videoComposer.aiTipsTitle` — "Wichtige Hinweise zur AI-Generierung" / "Important AI Generation Tips" / "Notas importantes sobre la generación con IA"
+- `videoComposer.aiTipPrompt` — Prompt-Qualität-Text (DE/EN/ES)
+- `videoComposer.aiTipPersons` — Personen-Konsistenz-Text (DE/EN/ES)
+- `videoComposer.aiTipCredits` — Credits-Warnung-Text (DE/EN/ES)
+- `videoComposer.aiTipsCollapse` / `aiTipsExpand` — "Hinweise ausblenden" / "Hinweise einblenden"
 
-### 2. Audio-Robustheit in `ComposedAdVideo.tsx`
-- `<Audio>` für Voiceover und Musik um `pauseWhenBuffering` ergänzen (verhindert Tonabbrüche bei langsamen Netzwerk-Loads im Lambda)
-- Volume-Clamping `Math.min(1, Math.max(0, volume))` (verhindert IndexSizeError bei korrupten Werten)
+Alte, jetzt ungenutzte Keys aus `SceneCard` (falls vorhanden) entfernen.
 
-### 3. Edge-Function `compose-video-assemble/index.ts`
-- Die globalen Overlays sind als snake_case-freie JSON-Objekte gespeichert — **direkt durchreichen** (keine Konvertierung, da Schema sie 1:1 erwartet)
-- Subtitle-Segments-Array bereinigen: nur `id`, `text`, `startTime`, `endTime` (ohne optionale `words`, die das Schema nicht hat)
-- Sicherstellen, dass `inputProps.voiceoverUrl` aus `assemblyConfig.voiceover?.audioUrl` UND nur wenn `voiceover.enabled !== false` gesetzt wird (sonst leer-string, damit `muted: !hasAudio` korrekt greift)
-- Analog für Musik: `assemblyConfig.music?.enabled !== false && trackUrl` 
-
-### 4. Lambda-Bundle neu deployen (zwingend!)
-Nach den Template-Änderungen muss der Remotion-Lambda-Bundle **neu hochgeladen** werden, sonst rendert Lambda weiterhin die alte Version. Plan:
-- Nach dem Code-Edit den User darauf hinweisen, dass der Bundle neu deployt werden muss (Edge-Function `deploy-remotion-lambda` oder Admin-Trigger)
-- Alternativ: einen Kommentar/Bundle-Version-Bump in `Root.tsx` einfügen, damit der CI-Hook das Bundle automatisch neu baut
-
-### 5. Edge-Function-Logs prüfen (Diagnose)
-Nach Edit: Mit `supabase--edge_function_logs` für `compose-video-assemble` prüfen, ob `voiceoverUrl` und `subtitles.segments.length` beim letzten Render tatsächlich gesetzt waren. Falls nein → das Setup-Problem liegt in den Tab-Daten (User hat keinen VO generiert / Subtitle-Switch aus).
+### 4. Bedingte Anzeige
+Hinweis-Block nur anzeigen, wenn **mindestens eine Szene** mit `clipSource === 'ai'` existiert. Bei reinen Stock-Workflows wird er ausgeblendet → kein Visual Noise.
 
 ## Geänderte Dateien
-- `src/remotion/templates/ComposedAdVideo.tsx` — Schema + Renderer für `subtitles` und `globalTextOverlays`, Audio-Hardening
-- `supabase/functions/compose-video-assemble/index.ts` — Subtitle-Cleanup, strikteres Audio-Gating
-- (optional) `src/remotion/Root.tsx` — Bundle-Version-Bump-Kommentar zur Erzwingung neuen Lambda-Bundles
+- `src/components/video-composer/SceneCard.tsx` — Drei Hinweis-Boxen + Icon-Imports entfernen
+- `src/components/video-composer/StoryboardTab.tsx` — Neuer kombinierter Hinweis-Block mit Collapse + localStorage
+- `src/lib/translations.ts` — Konsolidierte Keys (DE/EN/ES)
 
 ## Verify
-- Tab "Voiceover & Untertitel": VO generieren, Untertitel-Switch an, Text-Overlay hinzufügen
-- Render starten → fertiges MP4 herunterladen
-- MP4 hat **Sound** (Voiceover + ggf. Musik), **Untertitel-Box** an gewählter Position, **Text-Overlay** zur richtigen Sekunde sichtbar
-- Edge-Logs zeigen `voiceoverUrl` gesetzt + `subtitles.segments` mit > 0 Einträgen
-- Lambda-Bundle ist auf neuestem Stand (Bundle-Hash-Check via `verify_lambda_bundle`-Funktion oder Admin-UI)
+- Storyboard-Tab mit AI-Szenen: **Ein** eleganter goldener Hinweis-Block direkt unter der Summary-Bar
+- Szenenkarten sind aufgeräumt — keine wiederholten Hinweis-Boxen mehr
+- Klick auf "Hinweise ausblenden" → Block kollabiert, Status bleibt nach Reload erhalten
+- Bei reinem Stock-Workflow (keine AI-Szenen): Hinweis-Block wird **nicht** angezeigt
+- Sprachen DE/EN/ES korrekt durchgeschaltet
 
