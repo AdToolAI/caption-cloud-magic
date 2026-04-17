@@ -6,12 +6,18 @@ import type {
   ComposerScene,
   SubtitlesConfig,
   TextPosition,
+  GlobalTextOverlay,
 } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
+import { PreviewTextOverlayLayer } from './PreviewTextOverlayLayer';
 
 interface Props {
   scenes: ComposerScene[];
   subtitles?: SubtitlesConfig;
+  /** Timeline-based overlays that span the full video (independent of scenes). */
+  globalTextOverlays?: GlobalTextOverlay[];
+  /** Notifies parent of playhead changes so the editor timeline can stay in sync. */
+  onTimeUpdate?: (currentTime: number, totalDuration: number) => void;
 }
 
 const POSITION_TO_STYLE: Record<TextPosition, React.CSSProperties> = {
