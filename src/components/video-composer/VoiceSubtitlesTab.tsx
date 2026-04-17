@@ -861,6 +861,18 @@ export default function VoiceSubtitlesTab({
           {t('videoComposer.continueToMusic')}
         </Button>
       </div>
+
+      {/* AI Script Generator dialog */}
+      <VoiceoverScriptGenerator
+        open={scriptGenOpen}
+        onClose={() => setScriptGenOpen(false)}
+        defaultDuration={totalSceneDuration}
+        onScriptGenerated={(script) => {
+          if (voiceover) {
+            onUpdateAssembly({ voiceover: { ...voiceover, script } });
+          }
+        }}
+      />
     </div>
   );
 }
