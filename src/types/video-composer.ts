@@ -1,5 +1,14 @@
 // AI Video Composer — Scene-Based Video Assembly Types
 
+import type { TextOverlay as DirectorCutTextOverlay } from '@/types/directors-cut';
+
+/**
+ * Re-exported global text overlay shape (shared with Director's Cut).
+ * Lives on AssemblyConfig.globalTextOverlays — overlays span the FULL video
+ * timeline, independent of scene boundaries.
+ */
+export type GlobalTextOverlay = DirectorCutTextOverlay;
+
 export type ComposerCategory = 'product-ad' | 'corporate-ad' | 'storytelling' | 'custom';
 
 export type ComposerStatus = 'draft' | 'storyboard' | 'generating' | 'assembling' | 'preview' | 'completed' | 'failed';
