@@ -102,6 +102,9 @@ Hard rules:
 - Text overlays in ${langLabel} (max 8 words, punchy)
 - Transitions in English (enum)
 
+🚨 NO BURNED-IN TEXT RULE (ABSOLUTE — overrides everything else):
+The video clips are generated independently and we apply our OWN subtitles, captions and text overlays in a later editing step. Therefore the AI-generated footage MUST NEVER contain any readable text, captions, subtitles, watermarks, logos, signs with words, UI overlays, lower-thirds, typography or written language of any kind. Every aiPrompt MUST end with the exact negative clause defined in rule 10 below. Never quote on-screen text inside the prompt.
+
 🚨 PRODUCT INTEGRATION RULES (HIGHEST PRIORITY — overrides anything else):
 A. The SUBJECT of the MAJORITY of scenes must be a HUMAN or a LIFE SITUATION — NOT the product alone. The product appears WITHIN the scene, integrated into the action.
 B. Maximum ratio: at most ONE out of every four scenes may be a pure isolated product hero-shot. All other scenes must show the product in use / in context / in a human's hands / in an environment.

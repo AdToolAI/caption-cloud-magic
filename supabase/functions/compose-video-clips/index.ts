@@ -137,14 +137,19 @@ serve(async (req) => {
 
     // Append a negative-text suffix to AI prompts so models don't burn captions/watermarks
     // into the generated clip (would conflict with our manual overlay system).
-    const NEGATIVE_TEXT_SUFFIX = ", no on-screen text, no captions, no subtitles, no watermarks, no logos, no isolated product on plain background, no floating product, no product rotating in empty space";
+    // Hard guard: NEVER allow burned-in text, captions, subtitles or any written
+    // language in the generated clip — they would conflict with our overlay /
+    // subtitle system in the "Voice & Subtitles" tab.
+    const NEGATIVE_TEXT_SUFFIX = ", no on-screen text, no captions, no subtitles, no watermarks, no logos, no written words, no typography, no signs with readable text, no UI overlays, no lower thirds, no isolated product on plain background, no floating product, no product rotating in empty space, clean visuals only";
     const enrichPrompt = (prompt?: string): string => {
       const base = (prompt || "cinematic footage").trim();
       const lower = base.toLowerCase();
-      if (lower.includes("no text") || lower.includes("no captions") || lower.includes("no subtitles")) {
+      if (lower.includes("no subtitles") && lower.includes("no captions") && lower.includes("no on-screen text")) {
         return base;
       }
-      return base + NEGATIVE_TEXT_SUFFIX;
+      // Strip any partial old guard before re-appending the canonical one
+      const cleaned = base.replace(/,?\s*no on-screen text[\s\S]*$/i, "").trim().replace(/[,.]\s*$/, "");
+      return cleaned + NEGATIVE_TEXT_SUFFIX;
     };
 
     const results: Array<{ sceneId: string; status: string; predictionId?: string; clipUrl?: string; error?: string }> = [];

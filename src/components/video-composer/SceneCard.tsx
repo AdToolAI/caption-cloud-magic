@@ -223,6 +223,13 @@ export default function SceneCard({
                     rows={3}
                     className="text-xs bg-background/50 resize-none"
                   />
+                  <p className="text-[10px] leading-relaxed text-muted-foreground/80 italic">
+                    {lang === 'de'
+                      ? 'ℹ️ Untertitel, Captions und eingebrannte Texte werden automatisch ausgeschlossen — füge sie später im Tab „Voiceover & Untertitel" hinzu.'
+                      : lang === 'es'
+                      ? 'ℹ️ Subtítulos, captions y textos incrustados se excluyen automáticamente — añádelos luego en la pestaña "Voz y subtítulos".'
+                      : 'ℹ️ Subtitles, captions and burned-in text are automatically excluded — add them later in the "Voice & Subtitles" tab.'}
+                  </p>
                 </div>
                 <SceneReferenceImageUpload
                   projectId={projectId}
