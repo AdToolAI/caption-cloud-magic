@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { ArrowRight, Loader2, Music, Pause, Play, Search, Volume2, Zap } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { ArrowRight, Loader2, Music, Pause, Play, Search, Upload, UploadCloud, Volume2, X, Zap } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -46,6 +47,91 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
 
   // Beat sync state
   const [analyzingBeats, setAnalyzingBeats] = useState(false);
+
+  // Upload state
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle music file upload
+  const handleMusicUpload = useCallback(async (file: File | null) => {
+    if (!file || !music) return;
+
+    if (!file.type.startsWith('audio/')) {
+      toast({ title: t('videoComposer.musicUploadError'), description: 'Audio only', variant: 'destructive' });
+      return;
+    }
+
+    const MAX_SIZE = 20 * 1024 * 1024; // 20MB
+    if (file.size > MAX_SIZE) {
+      toast({ title: t('videoComposer.musicTooLarge'), variant: 'destructive' });
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    // Simulated progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress((prev) => (prev >= 90 ? prev : prev + 10));
+    }, 200);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const ext = file.name.split('.').pop() || 'mp3';
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${user.id}/${Date.now()}_${safeName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('background-music')
+        .upload(path, file, { contentType: file.type, upsert: false });
+
+      if (uploadErr) throw uploadErr;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('background-music')
+        .getPublicUrl(path);
+
+      // Stop any preview playback
+      musicAudioRef.current?.pause();
+      setMusicPlaying(null);
+
+      onUpdateAssembly({
+        music: { ...music, trackUrl: publicUrl, trackName: file.name, isUpload: true },
+      });
+
+      setUploadProgress(100);
+      toast({ title: t('videoComposer.musicUploaded'), description: file.name });
+    } catch (err: any) {
+      toast({ title: t('videoComposer.musicUploadError'), description: err.message, variant: 'destructive' });
+    } finally {
+      clearInterval(progressInterval);
+      setTimeout(() => {
+        setUploading(false);
+        setUploadProgress(0);
+      }, 500);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [music, onUpdateAssembly, t]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    handleMusicUpload(file);
+  }, [handleMusicUpload]);
+
+  const handleRemoveUpload = useCallback(() => {
+    if (!music) return;
+    musicAudioRef.current?.pause();
+    setMusicPlaying(null);
+    onUpdateAssembly({
+      music: { ...music, trackUrl: '', trackName: '', isUpload: false },
+    });
+  }, [music, onUpdateAssembly]);
 
   // Search background music
   const handleSearchMusic = async () => {
@@ -219,8 +305,73 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
               </div>
             )}
 
+            {/* Divider + Upload own music */}
+            <div className="relative py-1">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border/40" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-card px-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {t('videoComposer.orDivider')}
+                </span>
+              </div>
+            </div>
+
+            <div
+              onDrop={handleDrop}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
+              className={`relative border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+                dragOver ? 'border-primary bg-primary/5' : 'border-border/40 hover:border-primary/40'
+              } ${uploading ? 'pointer-events-none opacity-70' : 'cursor-pointer'}`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*,.mp3,.wav,.ogg,.m4a"
+                disabled={uploading}
+                onChange={(e) => handleMusicUpload(e.target.files?.[0] || null)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+              />
+              {uploading ? (
+                <div className="space-y-2">
+                  <UploadCloud className="h-6 w-6 mx-auto text-primary animate-pulse" />
+                  <Progress value={uploadProgress} className="max-w-xs mx-auto h-1.5" />
+                  <p className="text-[10px] text-muted-foreground">{uploadProgress}%</p>
+                </div>
+              ) : (
+                <>
+                  <Upload className="h-5 w-5 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-xs font-medium">{t('videoComposer.uploadOwnMusic')}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{t('videoComposer.musicFormats')}</p>
+                </>
+              )}
+            </div>
+
             {music.trackName && (
-              <p className="text-[10px] text-emerald-400">♫ {music.trackName}</p>
+              <div className={`flex items-center gap-2 p-2 rounded-md border ${
+                music.isUpload ? 'border-primary/40 bg-primary/5' : 'border-border/40 bg-muted/20'
+              }`}>
+                {music.isUpload && (
+                  <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[9px] font-semibold uppercase tracking-wider">
+                    <Upload className="h-2.5 w-2.5" />
+                    {t('videoComposer.uploadedTrack')}
+                  </span>
+                )}
+                <p className="flex-1 truncate text-[11px] text-foreground">
+                  ♫ {music.trackName}
+                </p>
+                {music.isUpload && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0"
+                    onClick={handleRemoveUpload}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
             )}
 
             <div className="space-y-2">
