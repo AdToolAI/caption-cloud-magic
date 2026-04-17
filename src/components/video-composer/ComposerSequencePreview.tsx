@@ -116,35 +116,45 @@ export default function ComposerSequencePreview({
       // Mark transitioning + hide until the new first frame is ready.
       transitioningRef.current = true;
       setVideoVisible(false);
-      try { v.currentTime = 0; } catch { /* noop */ }
 
+      let revealed = false;
       const reveal = () => {
+        if (revealed) return;
+        revealed = true;
         transitioningRef.current = false;
         setVideoVisible(true);
-      };
-      const onSeeked = () => {
-        reveal();
-        v.removeEventListener('seeked', onSeeked);
-      };
-      const onCanPlay = () => {
-        // Some browsers fire canplay before seeked(0) — reveal on whichever comes first.
-        reveal();
         if (playing) v.play().catch(() => {});
-        v.removeEventListener('canplay', onCanPlay);
       };
+      const onSeeked = () => reveal();
+      const onCanPlay = () => reveal();
+      const onLoadedData = () => reveal();
+
+      // Register listeners FIRST so we never miss the event.
       v.addEventListener('seeked', onSeeked, { once: true });
-      if (v.readyState >= 2) {
-        // Already have data — reveal next tick and play if needed.
-        requestAnimationFrame(() => {
-          reveal();
-          if (playing) v.play().catch(() => {});
-        });
-      } else {
-        v.addEventListener('canplay', onCanPlay, { once: true });
+      v.addEventListener('canplay', onCanPlay, { once: true });
+      v.addEventListener('loadeddata', onLoadedData, { once: true });
+
+      // Only seek to 0 when the element is at least metadata-ready.
+      // Otherwise the assignment throws silently and `seeked` never fires.
+      if (v.readyState >= 1) {
+        try { v.currentTime = 0; } catch { /* noop */ }
       }
+
+      // If data is already buffered, reveal next tick.
+      if (v.readyState >= 2) {
+        requestAnimationFrame(() => reveal());
+      }
+
+      // Hard safety net: if neither canplay/seeked/loadeddata fires within
+      // 1.5s (slow decode, codec stall, cold cache), reveal anyway so the
+      // transition never hangs. Browser will buffer on next play().
+      const safetyTimer = window.setTimeout(() => reveal(), 1500);
+
       return () => {
+        window.clearTimeout(safetyTimer);
         v.removeEventListener('canplay', onCanPlay);
         v.removeEventListener('seeked', onSeeked);
+        v.removeEventListener('loadeddata', onLoadedData);
       };
     }
     if (isImage) {
