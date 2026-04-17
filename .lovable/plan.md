@@ -1,54 +1,87 @@
 
 
 ## Befund
-Aktuell zeigt der Text-Tab nur eine kleine fake "Untertitel-Preview-Box" und pro Szene ein Mini-Thumbnail. Es fehlt ein zusammenhängender Preview-Player, der das gesamte Video (alle Clips hintereinander) zeigt — so kann man Text-Overlays und Untertitel nicht im Gesamtkontext beurteilen.
+Aktuell hat Motion Studio 6 Tabs: Briefing → Storyboard → Clips → **Text** (nur Overlays + Untertitel-Style) → **Audio** (Voiceover + Musik) → Export.
 
-Vorhandene Daten: jede `scene.clipUrl` ist bereits gerendert (Status `ready`), inkl. `durationSeconds`. Kein Render nötig — wir spielen die Clips clientseitig sequenziell ab.
+User möchte Umstrukturierung analog Universal Content Creator:
+- **Step 4 (Text)** → wird zu **"Voiceover & Untertitel"**: Voiceover-Generierung (umgezogen aus Audio) + automatische Untertitel-Generierung **aus dem Voiceover** (analog `SubtitleTimingStep` mit `generate-subtitles` Edge-Function) + Text-Overlays pro Szene bleiben unten
+- **Step 5 (Audio)** → wird zu **"Musik"**: nur noch Hintergrundmusik + Beat-Sync
 
-## Plan — Sequenzieller Multi-Clip-Preview oben im Text-Tab
+So viele Premium-Stimmen wie möglich (gleicher `list-voices`-Loader + `sortVoicesPremiumFirst` wie ContentVoiceStep — der bereits alle ElevenLabs-Premium-Stimmen lädt).
 
-### 1. Neue Komponente `ComposerSequencePreview.tsx`
-Im Ordner `src/components/video-composer/`. Funktion:
-- Nimmt `scenes` (mit `clipUrl` + `durationSeconds`) + `subtitles` + per-scene `textOverlay`
-- **Dual-`<video>`-Slot-Architektur** (Ping-Pong) für nahtlose Übergänge: während Slot A spielt, lädt Slot B den nächsten Clip → kein Black-Frame
-- Für Bild-Szenen (`uploadType === 'image'`): zeigt das Bild für die definierte Dauer
-- Eigene Timeline-Logik: `currentSceneIndex` + `localTime` → kombiniert zu globaler Zeit
-- Controls: Play/Pause, Scrubber (gesamte Sequenz), aktuelle Zeit / Gesamtdauer, Mute
-- **Live-Overlay-Rendering** über dem Video:
-  - Aktiver Szenen-Text-Overlay (mit Position/Animation aus `scene.textOverlay`)
-  - Globale Untertitel-Zeile (Demo-Text aus aktiver Szene wenn `subtitles.enabled`) mit Schriftart, Größe, Farbe, Hintergrund, Position aus `subtitles.style`
-- Szenen-Indikator (kleine Punkte unten: "Szene 3 / 8")
+## Plan
 
-### 2. Integration in `TextSubtitlesTab.tsx`
-- Ganz oben (über "Automatische Untertitel"-Sektion) Card mit `<ComposerSequencePreview>` einfügen
-- Nur anzeigen wenn `scenes.some(s => s.clipUrl)` — sonst Hinweis "Generiere zuerst Clips im Clips-Tab"
-- Die existierende kleine Mini-Preview-Box (Zeile 234-250) bleibt zusätzlich als isolierte Untertitel-Style-Vorschau
+### 1. `TextSubtitlesTab.tsx` → `VoiceSubtitlesTab.tsx` umbauen
+Neue Reihenfolge in der Komponente (von oben nach unten):
 
-### 3. Reaktivität
-- Komponente erhält Props (scenes, subtitles, overlays-per-scene) und re-rendert Overlays sofort bei Änderungen → User sieht direkt im großen Preview, wie sich Schriftart/Position/Farbe auswirken
-- Keine DB- oder Render-Calls — rein clientseitig
+**A. Sequenz-Preview-Player** (bleibt oben, unverändert)
 
-### 4. Edge-Cases
-- Fehlt `clipUrl` einer Szene → Black-Slate mit "Szene X — Clip fehlt"
-- Beim Scrub springt der Player zur richtigen Szene + Offset
-- Bei Pause stoppt sowohl Video als auch interner Timer
+**B. Voiceover-Sektion** (umgezogen aus `AudioTab`)
+- Toggle "Voiceover aktivieren"
+- Sprach-Tabs DE/EN/ES (gleiches Pattern wie AudioTab Zeile 257-266)
+- Premium-Voice-Dropdown mit `list-voices` + `sortVoicesPremiumFirst` + Premium-Badge + `VoicePreviewButton`
+- Erweitert: Voice-Cards-Liste statt nur Dropdown (analog `ContentVoiceStep` für mehr Übersicht über alle Premium-Stimmen)
+- Script-Textarea + "Aus Szenen-Texten generieren"-Button
+- Generate-Button → ruft `generate-voiceover` mit `voice_settings` aus `recommended_settings` (für natürlicheren Klang) und `model_id` aus `recommended_model`
+- Audio-Preview mit Play/Pause
 
-## Geänderte / Neue Dateien
-**Neu**:
-- `src/components/video-composer/ComposerSequencePreview.tsx`
+**C. Automatische Untertitel-Sektion** (neu, analog `SubtitleTimingStep`)
+- Toggle "Untertitel automatisch generieren"
+- Button "Untertitel aus Voiceover generieren" → ruft `generate-subtitles` Edge-Function mit `audioUrl = voiceover.audioUrl` 
+- Hinweis falls noch kein Voiceover: "Generiere zuerst dein Voiceover oben"
+- Style-Picker (bleibt wie aktuell: Schriftart, Größe, Farbe, Hintergrund, Position)
+- Liste der generierten Segmente mit Edit/Delete (kompakt, max-h-64)
+- Speichert Segmente in `assemblyConfig.subtitles.segments`
 
-**Bearbeitet**:
-- `src/components/video-composer/TextSubtitlesTab.tsx` — Preview-Card oben einfügen
-- `src/lib/translations.ts` — neue Keys (`previewFullVideo`, `clipsMissingForPreview`, `sceneOf`) DE/EN/ES
+**D. Text-Overlays pro Szene** (bleibt unten, unverändert)
+
+### 2. Datenmodell — `SubtitlesConfig` erweitern
+```ts
+export interface SubtitlesConfig {
+  enabled: boolean;
+  language: string;
+  style: { font, size, color, background, position };
+  segments?: Array<{ id, text, startTime, endTime, words? }>; // NEU
+}
+```
+Keine DB-Migration nötig (`subtitles_config` ist bereits `jsonb`).
+
+### 3. `AudioTab.tsx` → `MusicTab.tsx` reduzieren
+- Voiceover-Sektion komplett entfernen (Zeile 230-341)
+- Nur noch: Hintergrundmusik-Suche + Beat-Sync
+- "Weiter zu Export"-Button bleibt
+
+### 4. `VideoComposerDashboard.tsx` — Tab-Labels & Icons
+- Tab "text": Label `videoComposer.voiceSubtitles` ("Voiceover & Untertitel" / "Voice & Subtitles" / "Voz y Subtítulos"), Icon `Mic` statt `Type`
+- Tab "audio": Label bleibt "Musik" / "Music" / "Música", Icon `Music` (bereits korrekt)
+- Routing unverändert
+
+### 5. Export-Anpassung (`AssemblyTab`)
+- `subtitles_config.segments` mit ans Render-Backend senden (snake_case `segments`) — Render-Pipeline kann dann eingebrannte Untertitel mit echten Timings rendern statt nur Style
+
+### 6. Lokalisierung
+Neue Keys in `translations.ts` (DE/EN/ES):
+- `voiceSubtitles`, `generateSubsFromVo`, `noVoiceoverYet`, `subSegmentsGenerated`, `musicOnly`, etc.
+
+## Geänderte Dateien
+- `src/components/video-composer/TextSubtitlesTab.tsx` → umbenennen/umbauen zu `VoiceSubtitlesTab.tsx` (Voiceover oben, Untertitel-Generierung Mitte, Overlays unten)
+- `src/components/video-composer/AudioTab.tsx` → auf reine Musik-Verwaltung reduzieren
+- `src/components/video-composer/VideoComposerDashboard.tsx` — Tab-Label & Icon
+- `src/components/video-composer/AssemblyTab.tsx` — `subtitles.segments` mit exportieren
+- `src/types/video-composer.ts` — `SubtitlesConfig.segments` ergänzen
+- `src/lib/translations.ts` — neue Keys
 
 ## Verify
-- Im Text-Tab erscheint ganz oben ein großer Preview-Player
-- Play spielt alle Clips nahtlos hintereinander ab
-- Text-Overlays erscheinen szenenabhängig korrekt positioniert
-- Untertitel-Style-Änderungen (Schriftart/Farbe/Position) wirken sich live im großen Player aus
-- Scrubber springt korrekt zwischen Szenen
-- Wenn noch keine Clips bereit: freundlicher Hinweis statt Player
+- Step 4 heißt "Voiceover & Untertitel" mit Mic-Icon
+- Voiceover-Generierung mit allen Premium-Stimmen (DE/EN/ES Tabs, ~10+ Stimmen pro Sprache, Premium-Badges, Hörprobe-Button)
+- Button "Untertitel aus Voiceover generieren" produziert Segmente mit Timings → erscheinen in Liste
+- Step 5 heißt nur noch "Musik" — keine Voiceover-Optionen mehr
+- Untertitel-Style + Segmente werden im Export-Render mit korrekten Timings eingebrannt
+- Bestehende Drafts laden sauber (Voiceover bleibt in `assemblyConfig.voiceover`)
 
 ## Was unverändert bleibt
-- DB-Schema, Render-Pipeline, Audio/Briefing/Clips/Storyboard-Tabs, Pricing
+- Premium-Voice-Backend (`list-voices`, `generate-voiceover`), `generate-subtitles` Edge-Function
+- DB-Schema, Pricing, Storyboard/Clips/Briefing/Export-Tabs
+- Sequenz-Preview oben im Tab
+- Text-Overlay-Editor pro Szene unten
 
