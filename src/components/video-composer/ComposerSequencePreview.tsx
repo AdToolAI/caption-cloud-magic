@@ -192,8 +192,10 @@ export default function ComposerSequencePreview({
     );
   }
 
-  const overlay = currentScene?.textOverlay;
-  const hasOverlayText = overlay && (overlay.text || '').trim().length > 0;
+  // Notify parent of playhead changes so the timeline editor stays in sync.
+  useEffect(() => {
+    onTimeUpdate?.(globalTime, totalDuration);
+  }, [globalTime, totalDuration, onTimeUpdate]);
 
   return (
     <div className="space-y-3">
@@ -217,22 +219,13 @@ export default function ComposerSequencePreview({
           />
         )}
 
-        {/* Per-scene text overlay */}
-        {hasOverlayText && (
-          <div
-            className="absolute px-3 py-1 max-w-[90%] pointer-events-none"
-            style={{
-              ...POSITION_TO_STYLE[overlay!.position],
-              color: overlay!.color || '#FFFFFF',
-              fontSize: Math.max(12, (overlay!.fontSize || 48) / 2.2),
-              fontFamily: overlay!.fontFamily || 'Inter',
-              fontWeight: 700,
-              textShadow: '0 2px 6px rgba(0,0,0,0.65)',
-              lineHeight: 1.15,
-            }}
-          >
-            {overlay!.text}
-          </div>
+        {/* Global timeline-based text overlays (independent of scene boundaries) */}
+        {globalTextOverlays && globalTextOverlays.length > 0 && (
+          <PreviewTextOverlayLayer
+            overlays={globalTextOverlays}
+            currentTime={globalTime}
+            totalDuration={totalDuration}
+          />
         )}
 
         {/* Global subtitles preview line */}
