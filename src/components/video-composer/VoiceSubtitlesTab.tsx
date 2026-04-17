@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/collapsible';
 import {
   ChevronUp, ChevronDown, Type, Subtitles, Sparkles, AlertTriangle,
-  Wand2, Copy, Film, Mic, Loader2, Play, Pause, Info, Edit2, Trash2, Check, X,
+  Wand2, Copy, Film, Mic, Loader2, Info, Edit2, Trash2, Check, X,
 } from 'lucide-react';
 import ComposerSequencePreview from './ComposerSequencePreview';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
@@ -116,8 +116,6 @@ export default function VoiceSubtitlesTab({
 
   // ── Voiceover state ──────────────────────────────────────────────
   const [generatingVo, setGeneratingVo] = useState(false);
-  const [voPreviewPlaying, setVoPreviewPlaying] = useState(false);
-  const voAudioRef = useRef<HTMLAudioElement | null>(null);
   const [scriptGenOpen, setScriptGenOpen] = useState(false);
 
   // Voice tuning (speed + ElevenLabs settings) — synced from/to assemblyConfig.voiceover
@@ -207,21 +205,6 @@ export default function VoiceSubtitlesTab({
       toast({ title: t('videoComposer.voError'), description: err.message, variant: 'destructive' });
     } finally {
       setGeneratingVo(false);
-    }
-  };
-
-  const toggleVoPreview = () => {
-    if (!voiceover?.audioUrl) return;
-    if (voPreviewPlaying) {
-      voAudioRef.current?.pause();
-      setVoPreviewPlaying(false);
-    } else {
-      if (!voAudioRef.current || voAudioRef.current.src !== voiceover.audioUrl) {
-        voAudioRef.current = new Audio(voiceover.audioUrl);
-        voAudioRef.current.onended = () => setVoPreviewPlaying(false);
-      }
-      voAudioRef.current.play();
-      setVoPreviewPlaying(true);
     }
   };
 
@@ -319,7 +302,11 @@ export default function VoiceSubtitlesTab({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ComposerSequencePreview scenes={scenes} subtitles={subtitles} />
+          <ComposerSequencePreview
+            scenes={scenes}
+            subtitles={subtitles}
+            voiceoverUrl={voiceover?.audioUrl ?? null}
+          />
         </CardContent>
       </Card>
 
@@ -454,14 +441,9 @@ export default function VoiceSubtitlesTab({
                 {generatingVo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
                 {generatingVo ? t('videoComposer.generating') : t('videoComposer.generateVo')}
               </Button>
-              {voiceover.audioUrl && (
-                <Button variant="outline" size="icon" onClick={toggleVoPreview}>
-                  {voPreviewPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                </Button>
-              )}
             </div>
             {voiceover.audioUrl && (
-              <p className="text-[10px] text-emerald-400">✓ {t('videoComposer.voReady')}</p>
+              <p className="text-[10px] text-emerald-400">✓ {t('videoComposer.voReady')} — {t('videoComposer.voPlaysInPreview')}</p>
             )}
           </CardContent>
         )}
@@ -660,23 +642,10 @@ export default function VoiceSubtitlesTab({
                 </div>
               )}
 
-              {/* Style live preview */}
-              <div className="rounded-lg border border-border/40 bg-black/40 aspect-video relative overflow-hidden">
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 px-3 py-1 rounded-sm whitespace-nowrap"
-                  style={{
-                    top: subtitles.style.position === 'top' ? '8%' : undefined,
-                    bottom: subtitles.style.position === 'bottom' ? '8%' : undefined,
-                    color: subtitles.style.color,
-                    background: subtitles.style.background || 'transparent',
-                    fontFamily: subtitles.style.font,
-                    fontSize: Math.max(10, subtitles.style.size / 3),
-                    fontWeight: 600,
-                  }}
-                >
-                  {t('videoComposer.subtitlesPreviewLine')}
-                </div>
-              </div>
+              {/* Note: live style preview happens in the main player above. */}
+              <p className="text-[10px] text-muted-foreground text-center pt-1">
+                {t('videoComposer.subtitlesStyleLiveHint')}
+              </p>
             </>
           )}
         </CardContent>
