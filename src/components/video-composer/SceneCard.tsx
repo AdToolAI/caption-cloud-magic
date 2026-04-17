@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import {
   ChevronUp, ChevronDown, Trash2, GripVertical,
-  Sparkles, Upload, Video, Type, AlertTriangle, Lightbulb,
+  Sparkles, Upload, Video, Type,
 } from 'lucide-react';
 import type {
   ComposerScene,
