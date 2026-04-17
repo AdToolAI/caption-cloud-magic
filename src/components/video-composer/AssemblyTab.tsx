@@ -11,6 +11,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import ColorGradingSelector from './ColorGradingSelector';
 import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
 import { getClipCost } from '@/types/video-composer';
+import { persistAssemblyConfig } from '@/hooks/useComposerPersistence';
 
 interface AssemblyTabProps {
   project: any;
@@ -247,6 +248,19 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
     setProgress(4); // immediate visible baseline so the bar is never empty
 
     try {
+      // CRITICAL: synchronously flush latest assemblyConfig to the DB before
+      // invoking the edge function. The compose-video-assemble function reads
+      // assembly_config from the DB, so any in-memory voiceover/music/subtitle
+      // changes that haven't been debounce-persisted yet would otherwise be
+      // missing → silent video export.
+      if (project?.id && assemblyConfig) {
+        try {
+          await persistAssemblyConfig(project.id, assemblyConfig);
+        } catch (flushErr) {
+          console.warn('[AssemblyTab] pre-render assembly flush failed:', flushErr);
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke('compose-video-assemble', {
         body: { projectId: project?.id },
       });

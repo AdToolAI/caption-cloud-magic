@@ -31,7 +31,7 @@ import type {
   ClipQuality,
 } from '@/types/video-composer';
 import { getClipCost } from '@/types/video-composer';
-import { useComposerPersistence } from '@/hooks/useComposerPersistence';
+import { useComposerPersistence, persistAssemblyConfig } from '@/hooks/useComposerPersistence';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -293,11 +293,37 @@ export default function VideoComposerDashboard() {
     setProject(prev => ({ ...prev, scenes }));
   }, []);
 
+  // Debounced DB-write of assembly_config so voiceover / music / subtitle
+  // changes are persisted before the user triggers a render.
+  const assemblyPersistTimer = useRef<number | null>(null);
   const updateAssembly = useCallback((config: Partial<AssemblyConfig>) => {
-    setProject(prev => ({
-      ...prev,
-      assemblyConfig: { ...prev.assemblyConfig, ...config },
-    }));
+    setProject(prev => {
+      const nextAssembly = { ...prev.assemblyConfig, ...config };
+      const next = { ...prev, assemblyConfig: nextAssembly };
+
+      // Schedule a debounced DB flush only for already-persisted projects.
+      if (prev.id) {
+        if (assemblyPersistTimer.current) {
+          window.clearTimeout(assemblyPersistTimer.current);
+        }
+        assemblyPersistTimer.current = window.setTimeout(() => {
+          persistAssemblyConfig(prev.id!, nextAssembly).catch(err =>
+            console.warn('[VideoComposerDashboard] assembly persist failed:', err)
+          );
+        }, 800);
+      }
+
+      return next;
+    });
+  }, []);
+
+  // Cleanup pending debounce on unmount.
+  useEffect(() => {
+    return () => {
+      if (assemblyPersistTimer.current) {
+        window.clearTimeout(assemblyPersistTimer.current);
+      }
+    };
   }, []);
 
   const totalDuration = project.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);

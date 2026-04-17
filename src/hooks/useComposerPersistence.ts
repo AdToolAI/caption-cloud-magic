@@ -8,6 +8,27 @@ import type {
   ComposerStatus,
 } from '@/types/video-composer';
 
+/**
+ * Persist the assembly_config of an existing composer project to the database.
+ * Used by the dashboard (debounced on every change) and AssemblyTab (synchronous
+ * pre-render flush) to guarantee the export edge function reads the latest
+ * voiceover / music / subtitle URLs.
+ */
+export async function persistAssemblyConfig(
+  projectId: string,
+  assemblyConfig: AssemblyConfig
+): Promise<void> {
+  if (!projectId) return;
+  const { error } = await supabase
+    .from('composer_projects')
+    .update({ assembly_config: assemblyConfig as any })
+    .eq('id', projectId);
+  if (error) {
+    console.warn('[persistence] persistAssemblyConfig failed:', error);
+    throw error;
+  }
+}
+
 export interface PersistableProject {
   id?: string;
   title: string;
