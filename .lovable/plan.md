@@ -1,87 +1,66 @@
 
-
 ## Befund
-Aktuell hat Motion Studio 6 Tabs: Briefing → Storyboard → Clips → **Text** (nur Overlays + Untertitel-Style) → **Audio** (Voiceover + Musik) → Export.
+Im aktuellen `VoiceSubtitlesTab.tsx` fehlen zwei Dinge:
+1. **KI-Skript-Generator**-Button mit frei wählbarer Ziel-Länge (analog Universal Content Creator)
+2. **Voice-Tuning-Controls**: Geschwindigkeit, Stabilität, Ähnlichkeit, Stil-Verstärkung, Speaker Boost
 
-User möchte Umstrukturierung analog Universal Content Creator:
-- **Step 4 (Text)** → wird zu **"Voiceover & Untertitel"**: Voiceover-Generierung (umgezogen aus Audio) + automatische Untertitel-Generierung **aus dem Voiceover** (analog `SubtitleTimingStep` mit `generate-subtitles` Edge-Function) + Text-Overlays pro Szene bleiben unten
-- **Step 5 (Audio)** → wird zu **"Musik"**: nur noch Hintergrundmusik + Beat-Sync
-
-So viele Premium-Stimmen wie möglich (gleicher `list-voices`-Loader + `sortVoicesPremiumFirst` wie ContentVoiceStep — der bereits alle ElevenLabs-Premium-Stimmen lädt).
+Beide Bausteine existieren bereits in der Codebase und können wiederverwendet werden:
+- `src/components/universal-creator/VoiceoverScriptGenerator.tsx` — Skript-Dialog mit Idee/Tone/Dauer-Slider, ruft `generate-voiceover-script`
+- `src/components/video/AdvancedVoiceSettings.tsx` — Slider für Stability, Similarity, Style, Speaker Boost + 4 Presets (Professionell/Energisch/Emotional/Neutral)
+- Edge-Function `generate-voiceover` akzeptiert bereits `speed`, `stability`, `similarityBoost`, `style`, `useSpeakerBoost` (Zeile 17–24, 76–96)
 
 ## Plan
 
-### 1. `TextSubtitlesTab.tsx` → `VoiceSubtitlesTab.tsx` umbauen
-Neue Reihenfolge in der Komponente (von oben nach unten):
+### 1. KI-Skript-Generator-Button
+In `VoiceSubtitlesTab.tsx` im Skript-Header **vor** dem "Aus Szenen"-Button einen **"KI-Generator"**-Button (Sparkles-Icon) hinzufügen. Öffnet `<VoiceoverScriptGenerator>`-Dialog. Bei Übernahme: `setScript(generatedScript)`.
 
-**A. Sequenz-Preview-Player** (bleibt oben, unverändert)
-
-**B. Voiceover-Sektion** (umgezogen aus `AudioTab`)
-- Toggle "Voiceover aktivieren"
-- Sprach-Tabs DE/EN/ES (gleiches Pattern wie AudioTab Zeile 257-266)
-- Premium-Voice-Dropdown mit `list-voices` + `sortVoicesPremiumFirst` + Premium-Badge + `VoicePreviewButton`
-- Erweitert: Voice-Cards-Liste statt nur Dropdown (analog `ContentVoiceStep` für mehr Übersicht über alle Premium-Stimmen)
-- Script-Textarea + "Aus Szenen-Texten generieren"-Button
-- Generate-Button → ruft `generate-voiceover` mit `voice_settings` aus `recommended_settings` (für natürlicheren Klang) und `model_id` aus `recommended_model`
-- Audio-Preview mit Play/Pause
-
-**C. Automatische Untertitel-Sektion** (neu, analog `SubtitleTimingStep`)
-- Toggle "Untertitel automatisch generieren"
-- Button "Untertitel aus Voiceover generieren" → ruft `generate-subtitles` Edge-Function mit `audioUrl = voiceover.audioUrl` 
-- Hinweis falls noch kein Voiceover: "Generiere zuerst dein Voiceover oben"
-- Style-Picker (bleibt wie aktuell: Schriftart, Größe, Farbe, Hintergrund, Position)
-- Liste der generierten Segmente mit Edit/Delete (kompakt, max-h-64)
-- Speichert Segmente in `assemblyConfig.subtitles.segments`
-
-**D. Text-Overlays pro Szene** (bleibt unten, unverändert)
-
-### 2. Datenmodell — `SubtitlesConfig` erweitern
+### 2. Slider-Range erweitern in `VoiceoverScriptGenerator.tsx`
+Aktuell 15–60s → erweitern auf **10–180s** (Step 5). Default-Wert wird beim Öffnen aus der Gesamtdauer der Szenen vorbelegt:
 ```ts
-export interface SubtitlesConfig {
-  enabled: boolean;
-  language: string;
-  style: { font, size, color, background, position };
-  segments?: Array<{ id, text, startTime, endTime, words? }>; // NEU
+const totalSceneDuration = scenes.reduce((sum, s) => sum + (s.durationSeconds || 0), 0);
+const defaultDuration = Math.max(10, Math.min(180, Math.round(totalSceneDuration) || 30));
+```
+Dazu wird eine optionale `defaultDuration`-Prop ergänzt.
+
+### 3. Voice-Tuning-Sektion (neu)
+Direkt **unter dem Voice-Picker** eine kompakte Sektion mit:
+- **Geschwindigkeits-Slider** (0.7–1.2, Step 0.05) — eigener Slider, weil `AdvancedVoiceSettings` aktuell keine Speed hat
+- **`<AdvancedVoiceSettings>`** — komplette Komponente einbinden (Stabilität, Ähnlichkeit, Stil-Verstärkung, Speaker Boost + 4 Presets)
+- State `voiceTuning: { speed, stability, similarityBoost, styleExaggeration, useSpeakerBoost }` lokal halten
+- Werte werden beim "Voiceover generieren" an `generate-voiceover` mitgegeben
+
+### 4. Persistenz im Draft
+Aktuelle `voiceover`-Konfiguration in `assemblyConfig` um Tuning-Felder erweitern:
+```ts
+voiceover: {
+  enabled, voiceId, language, script, audioUrl, duration,
+  speed?: number,
+  stability?: number,
+  similarityBoost?: number,
+  styleExaggeration?: number,
+  useSpeakerBoost?: boolean,
 }
 ```
-Keine DB-Migration nötig (`subtitles_config` ist bereits `jsonb`).
+→ Werte überleben Reload und werden beim erneuten Generieren wiederverwendet.
 
-### 3. `AudioTab.tsx` → `MusicTab.tsx` reduzieren
-- Voiceover-Sektion komplett entfernen (Zeile 230-341)
-- Nur noch: Hintergrundmusik-Suche + Beat-Sync
-- "Weiter zu Export"-Button bleibt
-
-### 4. `VideoComposerDashboard.tsx` — Tab-Labels & Icons
-- Tab "text": Label `videoComposer.voiceSubtitles` ("Voiceover & Untertitel" / "Voice & Subtitles" / "Voz y Subtítulos"), Icon `Mic` statt `Type`
-- Tab "audio": Label bleibt "Musik" / "Music" / "Música", Icon `Music` (bereits korrekt)
-- Routing unverändert
-
-### 5. Export-Anpassung (`AssemblyTab`)
-- `subtitles_config.segments` mit ans Render-Backend senden (snake_case `segments`) — Render-Pipeline kann dann eingebrannte Untertitel mit echten Timings rendern statt nur Style
-
-### 6. Lokalisierung
+### 5. Lokalisierung
 Neue Keys in `translations.ts` (DE/EN/ES):
-- `voiceSubtitles`, `generateSubsFromVo`, `noVoiceoverYet`, `subSegmentsGenerated`, `musicOnly`, etc.
+- `aiScriptGenerator` ("KI-Generator" / "AI Generator" / "Generador IA")
+- `voiceTuning` ("Stimm-Feinabstimmung" / "Voice Tuning" / "Ajuste de Voz")
+- `speed` ("Geschwindigkeit" / "Speed" / "Velocidad")
+
+`AdvancedVoiceSettings` enthält intern deutsche Strings — wir lassen die wie sie sind (sie sind bereits selbsterklärend mit Tooltips), oder optional in einem zweiten Schritt lokalisieren.
 
 ## Geänderte Dateien
-- `src/components/video-composer/TextSubtitlesTab.tsx` → umbenennen/umbauen zu `VoiceSubtitlesTab.tsx` (Voiceover oben, Untertitel-Generierung Mitte, Overlays unten)
-- `src/components/video-composer/AudioTab.tsx` → auf reine Musik-Verwaltung reduzieren
-- `src/components/video-composer/VideoComposerDashboard.tsx` — Tab-Label & Icon
-- `src/components/video-composer/AssemblyTab.tsx` — `subtitles.segments` mit exportieren
-- `src/types/video-composer.ts` — `SubtitlesConfig.segments` ergänzen
+- `src/components/video-composer/VoiceSubtitlesTab.tsx` — KI-Button + Dialog + Speed-Slider + AdvancedVoiceSettings + Tuning-State
+- `src/components/universal-creator/VoiceoverScriptGenerator.tsx` — Slider 10–180s, optionale `defaultDuration`-Prop
+- `src/types/video-composer.ts` — `VoiceoverConfig` um Tuning-Felder erweitern
 - `src/lib/translations.ts` — neue Keys
 
 ## Verify
-- Step 4 heißt "Voiceover & Untertitel" mit Mic-Icon
-- Voiceover-Generierung mit allen Premium-Stimmen (DE/EN/ES Tabs, ~10+ Stimmen pro Sprache, Premium-Badges, Hörprobe-Button)
-- Button "Untertitel aus Voiceover generieren" produziert Segmente mit Timings → erscheinen in Liste
-- Step 5 heißt nur noch "Musik" — keine Voiceover-Optionen mehr
-- Untertitel-Style + Segmente werden im Export-Render mit korrekten Timings eingebrannt
-- Bestehende Drafts laden sauber (Voiceover bleibt in `assemblyConfig.voiceover`)
-
-## Was unverändert bleibt
-- Premium-Voice-Backend (`list-voices`, `generate-voiceover`), `generate-subtitles` Edge-Function
-- DB-Schema, Pricing, Storyboard/Clips/Briefing/Export-Tabs
-- Sequenz-Preview oben im Tab
-- Text-Overlay-Editor pro Szene unten
-
+- Skript-Header zeigt 2 Buttons: **"KI-Generator"** + **"Aus Szenen"**
+- KI-Dialog: Slider geht bis 180s, vorbelegt mit Szenen-Gesamtdauer
+- Generiertes Skript landet im Textarea
+- Unter Voice-Picker: Speed-Slider (0.7–1.2) + Erweiterte Einstellungen aufklappbar
+- Generiertes Voiceover klingt entsprechend schneller/langsamer + reagiert auf Stabilität/Stil
+- Werte überleben Tab-Wechsel und Reload
