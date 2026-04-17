@@ -80,6 +80,15 @@ export default function ComposerSequencePreview({
   const audioRef = useRef<HTMLAudioElement>(null);
   const imageStartRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
+  /** True from the moment sceneIdx changes until the new clip's first frame is decoded.
+   *  While true, we ignore stale `timeupdate` events (which still report the previous
+   *  clip's currentTime) and hide the <video> to avoid a frozen end-frame "rubber-band". */
+  const transitioningRef = useRef(false);
+  const [videoVisible, setVideoVisible] = useState(true);
+  /** Guard so the duration-cap in onTimeUpdate doesn't fire advanceScene twice. */
+  const advancedRef = useRef(false);
+  /** Holds onto a pause-at-end freeze timer for clips shorter than durationSeconds. */
+  const freezeTimerRef = useRef<number | null>(null);
 
   const currentScene = playable[sceneIdx];
   const isImage = currentScene?.uploadType === 'image';
@@ -97,22 +106,46 @@ export default function ComposerSequencePreview({
   // playback to avoid a brief stutter showing the previous frame.
   useEffect(() => {
     if (!currentScene) return;
+    advancedRef.current = false;
+    if (freezeTimerRef.current != null) {
+      window.clearTimeout(freezeTimerRef.current);
+      freezeTimerRef.current = null;
+    }
     if (!isImage && videoRef.current) {
       const v = videoRef.current;
-      v.currentTime = 0;
-      if (playing) {
-        const onCanPlay = () => {
-          v.play().catch(() => {});
-          v.removeEventListener('canplay', onCanPlay);
-        };
-        // If already buffered enough, play immediately; otherwise wait.
-        if (v.readyState >= 3) {
-          v.play().catch(() => {});
-        } else {
-          v.addEventListener('canplay', onCanPlay, { once: true });
-        }
-        return () => v.removeEventListener('canplay', onCanPlay);
+      // Mark transitioning + hide until the new first frame is ready.
+      transitioningRef.current = true;
+      setVideoVisible(false);
+      try { v.currentTime = 0; } catch { /* noop */ }
+
+      const reveal = () => {
+        transitioningRef.current = false;
+        setVideoVisible(true);
+      };
+      const onSeeked = () => {
+        reveal();
+        v.removeEventListener('seeked', onSeeked);
+      };
+      const onCanPlay = () => {
+        // Some browsers fire canplay before seeked(0) — reveal on whichever comes first.
+        reveal();
+        if (playing) v.play().catch(() => {});
+        v.removeEventListener('canplay', onCanPlay);
+      };
+      v.addEventListener('seeked', onSeeked, { once: true });
+      if (v.readyState >= 2) {
+        // Already have data — reveal next tick and play if needed.
+        requestAnimationFrame(() => {
+          reveal();
+          if (playing) v.play().catch(() => {});
+        });
+      } else {
+        v.addEventListener('canplay', onCanPlay, { once: true });
       }
+      return () => {
+        v.removeEventListener('canplay', onCanPlay);
+        v.removeEventListener('seeked', onSeeked);
+      };
     }
     if (isImage) {
       imageStartRef.current = playing ? performance.now() : null;
