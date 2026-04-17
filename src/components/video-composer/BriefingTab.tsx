@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import {
   ShoppingBag, Building2, BookOpen, Palette,
-  Wand2, Hand, Plus, X, ArrowRight, Loader2, ShieldAlert, ChevronDown, ChevronUp,
+  Wand2, Hand, Plus, X, ArrowRight, Loader2, Sparkles, ShieldAlert, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
