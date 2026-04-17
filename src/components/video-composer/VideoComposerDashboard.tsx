@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle, RotateCcw } from 'lucide-react';
+import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle, RotateCcw, Type } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -17,6 +17,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import BriefingTab from './BriefingTab';
 import StoryboardTab from './StoryboardTab';
 import ClipsTab from './ClipsTab';
+import TextSubtitlesTab from './TextSubtitlesTab';
 import AudioTab from './AudioTab';
 import AssemblyTab from './AssemblyTab';
 import type {
@@ -34,7 +35,7 @@ import { useComposerPersistence } from '@/hooks/useComposerPersistence';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-type TabId = 'briefing' | 'storyboard' | 'clips' | 'audio' | 'export';
+type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export';
 
 interface LocalProject {
   id?: string;
@@ -268,6 +269,7 @@ export default function VideoComposerDashboard() {
     { id: 'briefing' as TabId, label: t('videoComposer.briefing'), icon: FileText },
     { id: 'storyboard' as TabId, label: t('videoComposer.storyboard'), icon: LayoutGrid },
     { id: 'clips' as TabId, label: t('videoComposer.clips'), icon: Film },
+    { id: 'text' as TabId, label: t('videoComposer.text'), icon: Type },
     { id: 'audio' as TabId, label: t('videoComposer.audio'), icon: Music },
     { id: 'export' as TabId, label: t('videoComposer.export'), icon: Download },
   ];
@@ -363,7 +365,7 @@ export default function VideoComposerDashboard() {
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabId)}>
-          <TabsList className="grid grid-cols-5 w-full max-w-2xl mx-auto mb-6 bg-card border border-border/40">
+          <TabsList className="grid grid-cols-6 w-full max-w-3xl mx-auto mb-6 bg-card border border-border/40">
             {TABS.map((tab, i) => {
               const Icon = tab.icon;
               const isAccessible = i === 0 ||
@@ -420,6 +422,17 @@ export default function VideoComposerDashboard() {
                 setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
                 return result;
               }}
+            />
+          </TabsContent>
+
+          <TabsContent value="text">
+            <TextSubtitlesTab
+              scenes={project.scenes}
+              onUpdateScenes={setScenes}
+              assemblyConfig={project.assemblyConfig}
+              onUpdateAssembly={updateAssembly}
+              language={project.language}
+              onGoToAudio={() => setActiveTab('audio')}
             />
           </TabsContent>
 
