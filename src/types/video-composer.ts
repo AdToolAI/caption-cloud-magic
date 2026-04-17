@@ -208,6 +208,7 @@ export const DEFAULT_ASSEMBLY_CONFIG: AssemblyConfig = {
   music: null,
   beatSync: false,
   subtitles: DEFAULT_SUBTITLES_CONFIG,
+  globalTextOverlays: [],
 };
 
 export const DEFAULT_TEXT_OVERLAY: TextOverlayConfig = {
