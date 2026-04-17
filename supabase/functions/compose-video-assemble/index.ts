@@ -91,8 +91,10 @@ serve(async (req) => {
         color: s.text_overlay.color || '#FFFFFF',
         fontFamily: s.text_overlay.fontFamily,
       } : undefined,
-      transitionType: s.transition_type || assemblyConfig.transitionStyle || 'fade',
-      transitionDuration: s.transition_duration || 0.5,
+      // Transitions removed from Motion Studio — always hard cuts.
+      // Refined transitions are handled in Director's Cut after export.
+      transitionType: 'none',
+      transitionDuration: 0,
     }));
 
     const totalDuration = remotionScenes.reduce((sum: number, s: any) => sum + s.durationSeconds, 0);
