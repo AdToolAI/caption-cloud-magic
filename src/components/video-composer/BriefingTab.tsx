@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import {
   ShoppingBag, Building2, BookOpen, Palette,
-  Wand2, Hand, Plus, X, ArrowRight, Loader2, Sparkles,
+  Wand2, Hand, Plus, X, ArrowRight, Loader2, Sparkles, ShieldAlert, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
