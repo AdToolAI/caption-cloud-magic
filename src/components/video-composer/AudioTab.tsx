@@ -305,8 +305,73 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
               </div>
             )}
 
+            {/* Divider + Upload own music */}
+            <div className="relative py-1">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border/40" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-card px-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {t('videoComposer.orDivider')}
+                </span>
+              </div>
+            </div>
+
+            <div
+              onDrop={handleDrop}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
+              className={`relative border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+                dragOver ? 'border-primary bg-primary/5' : 'border-border/40 hover:border-primary/40'
+              } ${uploading ? 'pointer-events-none opacity-70' : 'cursor-pointer'}`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*,.mp3,.wav,.ogg,.m4a"
+                disabled={uploading}
+                onChange={(e) => handleMusicUpload(e.target.files?.[0] || null)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+              />
+              {uploading ? (
+                <div className="space-y-2">
+                  <UploadCloud className="h-6 w-6 mx-auto text-primary animate-pulse" />
+                  <Progress value={uploadProgress} className="max-w-xs mx-auto h-1.5" />
+                  <p className="text-[10px] text-muted-foreground">{uploadProgress}%</p>
+                </div>
+              ) : (
+                <>
+                  <Upload className="h-5 w-5 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-xs font-medium">{t('videoComposer.uploadOwnMusic')}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{t('videoComposer.musicFormats')}</p>
+                </>
+              )}
+            </div>
+
             {music.trackName && (
-              <p className="text-[10px] text-emerald-400">♫ {music.trackName}</p>
+              <div className={`flex items-center gap-2 p-2 rounded-md border ${
+                music.isUpload ? 'border-primary/40 bg-primary/5' : 'border-border/40 bg-muted/20'
+              }`}>
+                {music.isUpload && (
+                  <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[9px] font-semibold uppercase tracking-wider">
+                    <Upload className="h-2.5 w-2.5" />
+                    {t('videoComposer.uploadedTrack')}
+                  </span>
+                )}
+                <p className="flex-1 truncate text-[11px] text-foreground">
+                  ♫ {music.trackName}
+                </p>
+                {music.isUpload && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0"
+                    onClick={handleRemoveUpload}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
             )}
 
             <div className="space-y-2">
