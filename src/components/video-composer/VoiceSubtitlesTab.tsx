@@ -26,6 +26,8 @@ import {
 } from 'lucide-react';
 import ComposerSequencePreview from './ComposerSequencePreview';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
+import { VoiceoverScriptGenerator } from '@/components/universal-creator/VoiceoverScriptGenerator';
+import { AdvancedVoiceSettings, type VoiceSettings } from '@/components/video/AdvancedVoiceSettings';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { supabase } from '@/integrations/supabase/client';
 import type {
@@ -114,6 +116,34 @@ export default function VoiceSubtitlesTab({
   const [generatingVo, setGeneratingVo] = useState(false);
   const [voPreviewPlaying, setVoPreviewPlaying] = useState(false);
   const voAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [scriptGenOpen, setScriptGenOpen] = useState(false);
+
+  // Voice tuning (speed + ElevenLabs settings) — synced from/to assemblyConfig.voiceover
+  const [speed, setSpeed] = useState<number>(voiceover?.speed ?? 1.0);
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
+    stability: voiceover?.stability ?? 0.5,
+    similarityBoost: voiceover?.similarityBoost ?? 0.75,
+    styleExaggeration: voiceover?.styleExaggeration ?? 0.0,
+    useSpeakerBoost: voiceover?.useSpeakerBoost ?? true,
+  });
+
+  // Hydrate when voiceover loads from a saved draft
+  useEffect(() => {
+    if (!voiceover) return;
+    if (typeof voiceover.speed === 'number') setSpeed(voiceover.speed);
+    setVoiceSettings({
+      stability: voiceover.stability ?? 0.5,
+      similarityBoost: voiceover.similarityBoost ?? 0.75,
+      styleExaggeration: voiceover.styleExaggeration ?? 0.0,
+      useSpeakerBoost: voiceover.useSpeakerBoost ?? true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceover?.voiceId]);
+
+  const totalSceneDuration = useMemo(
+    () => scenes.reduce((sum, s) => sum + (s.durationSeconds || 0), 0),
+    [scenes],
+  );
 
   const generateScriptFromScenes = () => {
     const script = scenes
@@ -142,25 +172,34 @@ export default function VoiceSubtitlesTab({
       if (!user) throw new Error('Nicht eingeloggt');
 
       const selected = voices.find(v => v.id === voiceover.voiceId);
-      const settings = selected?.recommended_settings;
 
       const { data, error } = await supabase.functions.invoke('generate-voiceover', {
         body: {
           text: voiceover.script,
           voiceId: voiceover.voiceId,
           projectId: `composer-${Date.now()}`,
-          stability: settings?.stability ?? 0.4,
-          similarityBoost: settings?.similarity_boost ?? 0.8,
-          style: settings?.style ?? 0.3,
-          useSpeakerBoost: settings?.use_speaker_boost ?? true,
+          stability: voiceSettings.stability,
+          similarityBoost: voiceSettings.similarityBoost,
+          style: voiceSettings.styleExaggeration,
+          useSpeakerBoost: voiceSettings.useSpeakerBoost,
           modelId: selected?.recommended_model,
-          speed: 1.0,
+          speed,
         },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Voiceover failed');
 
-      onUpdateAssembly({ voiceover: { ...voiceover, audioUrl: data.audioUrl } });
+      onUpdateAssembly({
+        voiceover: {
+          ...voiceover,
+          audioUrl: data.audioUrl,
+          speed,
+          stability: voiceSettings.stability,
+          similarityBoost: voiceSettings.similarityBoost,
+          styleExaggeration: voiceSettings.styleExaggeration,
+          useSpeakerBoost: voiceSettings.useSpeakerBoost,
+        },
+      });
       toast({ title: t('videoComposer.voGenerated'), description: `~${data.duration}s` });
     } catch (err: any) {
       toast({ title: t('videoComposer.voError'), description: err.message, variant: 'destructive' });
@@ -360,13 +399,41 @@ export default function VoiceSubtitlesTab({
               </div>
             </div>
 
+            {/* ── VOICE TUNING ──────────────────────────── */}
+            <div className="space-y-3 p-3 rounded-lg border border-border/40 bg-background/30">
+              <Label className="text-xs font-medium flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3 text-primary" />
+                {t('videoComposer.voiceTuning')}
+              </Label>
+              <div className="space-y-1.5">
+                <div className="flex justify-between">
+                  <Label className="text-xs">{t('videoComposer.speed')}</Label>
+                  <span className="text-xs text-muted-foreground">{speed.toFixed(2)}x</span>
+                </div>
+                <Slider
+                  value={[speed]}
+                  onValueChange={([v]) => setSpeed(v)}
+                  min={0.7}
+                  max={1.2}
+                  step={0.05}
+                />
+              </div>
+              <AdvancedVoiceSettings onSettingsChange={setVoiceSettings} />
+            </div>
+
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label className="text-xs">{t('videoComposer.voScript')}</Label>
-                <Button variant="ghost" size="sm" className="text-[10px] h-6" onClick={generateScriptFromScenes}>
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  {t('videoComposer.fromScenes')}
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="text-[10px] h-6" onClick={() => setScriptGenOpen(true)}>
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    {t('videoComposer.aiGenerator')}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-[10px] h-6" onClick={generateScriptFromScenes}>
+                    <Wand2 className="h-3 w-3 mr-1" />
+                    {t('videoComposer.fromScenes')}
+                  </Button>
+                </div>
               </div>
               <Textarea
                 value={voiceover.script}
@@ -794,6 +861,18 @@ export default function VoiceSubtitlesTab({
           {t('videoComposer.continueToMusic')}
         </Button>
       </div>
+
+      {/* AI Script Generator dialog */}
+      <VoiceoverScriptGenerator
+        open={scriptGenOpen}
+        onClose={() => setScriptGenOpen(false)}
+        defaultDuration={totalSceneDuration}
+        onScriptGenerated={(script) => {
+          if (voiceover) {
+            onUpdateAssembly({ voiceover: { ...voiceover, script } });
+          }
+        }}
+      />
     </div>
   );
 }
