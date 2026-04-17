@@ -196,10 +196,54 @@ export default function ComposerSequencePreview({
 
   const onVideoTimeUpdate = () => {
     if (!videoRef.current || isImage) return;
-    setGlobalTime((startOffsets[sceneIdx] || 0) + videoRef.current.currentTime);
+    // Ignore stale `timeupdate` events fired right after a src swap — they still
+    // report the previous clip's currentTime and would yank the slider backward.
+    if (transitioningRef.current) return;
+    const v = videoRef.current;
+    const sceneDur = currentScene?.durationSeconds || 0;
+    const local = v.currentTime;
+
+    // Hard duration cap: if the underlying clip is longer than the planned scene,
+    // advance immediately at the boundary instead of waiting for `onEnded`.
+    if (sceneDur > 0 && local >= sceneDur && !advancedRef.current) {
+      advancedRef.current = true;
+      setGlobalTime((startOffsets[sceneIdx] || 0) + sceneDur);
+      try { v.pause(); } catch { /* noop */ }
+      advanceScene();
+      return;
+    }
+    setGlobalTime((startOffsets[sceneIdx] || 0) + local);
   };
 
   const onVideoEnded = () => {
+    if (advancedRef.current) return;
+    const v = videoRef.current;
+    const sceneDur = currentScene?.durationSeconds || 0;
+    const local = v?.currentTime ?? 0;
+    // Clip is shorter than planned scene duration → freeze on last frame and
+    // schedule advance once the remaining scene time elapses (no auto-loop).
+    if (sceneDur > 0 && local < sceneDur - 0.05) {
+      const remainMs = Math.max(0, (sceneDur - local) * 1000);
+      const startedAt = performance.now();
+      const baseGlobal = (startOffsets[sceneIdx] || 0) + local;
+      // Tick the global slider while the freeze plays out.
+      const tick = () => {
+        if (advancedRef.current) return;
+        const elapsed = (performance.now() - startedAt) / 1000;
+        const next = Math.min(baseGlobal + elapsed, (startOffsets[sceneIdx] || 0) + sceneDur);
+        setGlobalTime(next);
+        if (elapsed * 1000 < remainMs) {
+          rafRef.current = requestAnimationFrame(tick);
+        }
+      };
+      rafRef.current = requestAnimationFrame(tick);
+      freezeTimerRef.current = window.setTimeout(() => {
+        advancedRef.current = true;
+        advanceScene();
+      }, remainMs);
+      return;
+    }
+    advancedRef.current = true;
     advanceScene();
   };
 
