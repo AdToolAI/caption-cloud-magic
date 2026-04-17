@@ -42,7 +42,7 @@ import type {
 import { DEFAULT_TEXT_OVERLAY, DEFAULT_SUBTITLES_CONFIG } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from '@/hooks/use-toast';
-import TextOverlayEditor2028 from '@/components/directors-cut/features/TextOverlayEditor2028';
+import { TextOverlayEditor2028 } from '@/components/directors-cut/features/TextOverlayEditor2028';
 
 interface VoiceSubtitlesTabProps {
   scenes: ComposerScene[];
