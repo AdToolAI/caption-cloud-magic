@@ -73,6 +73,22 @@ export interface ComposerScene {
   costEuros: number;
 }
 
+export type SubtitlePosition = 'top' | 'bottom';
+
+export interface SubtitlesStyle {
+  font: string;
+  size: number;
+  color: string;
+  background: string; // rgba or hex w/ alpha; '' = no box
+  position: SubtitlePosition;
+}
+
+export interface SubtitlesConfig {
+  enabled: boolean;
+  language: string; // 'de' | 'en' | 'es' | …
+  style: SubtitlesStyle;
+}
+
 export interface AssemblyConfig {
   colorGrading: ColorGradingPreset;
   transitionStyle: TransitionStyle;
@@ -80,6 +96,7 @@ export interface AssemblyConfig {
   voiceover: VoiceoverConfig | null;
   music: MusicConfig | null;
   beatSync: boolean;
+  subtitles?: SubtitlesConfig;
 }
 
 export interface VoiceoverConfig {
@@ -131,6 +148,18 @@ export const DEFAULT_BRIEFING: ComposerBriefing = {
   defaultQuality: 'standard',
 };
 
+export const DEFAULT_SUBTITLES_CONFIG: SubtitlesConfig = {
+  enabled: false,
+  language: 'de',
+  style: {
+    font: 'Inter',
+    size: 36,
+    color: '#FFFFFF',
+    background: 'rgba(0,0,0,0.55)',
+    position: 'bottom',
+  },
+};
+
 export const DEFAULT_ASSEMBLY_CONFIG: AssemblyConfig = {
   colorGrading: 'none',
   transitionStyle: 'fade',
@@ -138,6 +167,7 @@ export const DEFAULT_ASSEMBLY_CONFIG: AssemblyConfig = {
   voiceover: null,
   music: null,
   beatSync: false,
+  subtitles: DEFAULT_SUBTITLES_CONFIG,
 };
 
 export const DEFAULT_TEXT_OVERLAY: TextOverlayConfig = {
