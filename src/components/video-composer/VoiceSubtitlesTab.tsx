@@ -116,8 +116,6 @@ export default function VoiceSubtitlesTab({
 
   // ── Voiceover state ──────────────────────────────────────────────
   const [generatingVo, setGeneratingVo] = useState(false);
-  const [voPreviewPlaying, setVoPreviewPlaying] = useState(false);
-  const voAudioRef = useRef<HTMLAudioElement | null>(null);
   const [scriptGenOpen, setScriptGenOpen] = useState(false);
 
   // Voice tuning (speed + ElevenLabs settings) — synced from/to assemblyConfig.voiceover
@@ -207,21 +205,6 @@ export default function VoiceSubtitlesTab({
       toast({ title: t('videoComposer.voError'), description: err.message, variant: 'destructive' });
     } finally {
       setGeneratingVo(false);
-    }
-  };
-
-  const toggleVoPreview = () => {
-    if (!voiceover?.audioUrl) return;
-    if (voPreviewPlaying) {
-      voAudioRef.current?.pause();
-      setVoPreviewPlaying(false);
-    } else {
-      if (!voAudioRef.current || voAudioRef.current.src !== voiceover.audioUrl) {
-        voAudioRef.current = new Audio(voiceover.audioUrl);
-        voAudioRef.current.onended = () => setVoPreviewPlaying(false);
-      }
-      voAudioRef.current.play();
-      setVoPreviewPlaying(true);
     }
   };
 
