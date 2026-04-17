@@ -416,7 +416,7 @@ export default function VideoComposerDashboard() {
               scenes={project.scenes}
               projectId={project.id}
               onUpdateScenes={setScenes}
-              onGoToAudio={() => setActiveTab('audio')}
+              onGoToVoiceSubtitles={() => setActiveTab('text')}
               onEnsurePersisted={async () => {
                 const result = await ensureProjectPersisted(project);
                 setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
