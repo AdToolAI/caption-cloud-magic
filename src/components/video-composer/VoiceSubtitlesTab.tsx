@@ -172,25 +172,34 @@ export default function VoiceSubtitlesTab({
       if (!user) throw new Error('Nicht eingeloggt');
 
       const selected = voices.find(v => v.id === voiceover.voiceId);
-      const settings = selected?.recommended_settings;
 
       const { data, error } = await supabase.functions.invoke('generate-voiceover', {
         body: {
           text: voiceover.script,
           voiceId: voiceover.voiceId,
           projectId: `composer-${Date.now()}`,
-          stability: settings?.stability ?? 0.4,
-          similarityBoost: settings?.similarity_boost ?? 0.8,
-          style: settings?.style ?? 0.3,
-          useSpeakerBoost: settings?.use_speaker_boost ?? true,
+          stability: voiceSettings.stability,
+          similarityBoost: voiceSettings.similarityBoost,
+          style: voiceSettings.styleExaggeration,
+          useSpeakerBoost: voiceSettings.useSpeakerBoost,
           modelId: selected?.recommended_model,
-          speed: 1.0,
+          speed,
         },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Voiceover failed');
 
-      onUpdateAssembly({ voiceover: { ...voiceover, audioUrl: data.audioUrl } });
+      onUpdateAssembly({
+        voiceover: {
+          ...voiceover,
+          audioUrl: data.audioUrl,
+          speed,
+          stability: voiceSettings.stability,
+          similarityBoost: voiceSettings.similarityBoost,
+          styleExaggeration: voiceSettings.styleExaggeration,
+          useSpeakerBoost: voiceSettings.useSpeakerBoost,
+        },
+      });
       toast({ title: t('videoComposer.voGenerated'), description: `~${data.duration}s` });
     } catch (err: any) {
       toast({ title: t('videoComposer.voError'), description: err.message, variant: 'destructive' });
