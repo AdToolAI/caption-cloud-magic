@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/collapsible';
 import {
   ChevronUp, ChevronDown, Type, Subtitles, Sparkles, AlertTriangle,
-  Wand2, Copy, Film, Mic, Loader2, Play, Pause, Info, Edit2, Trash2, Check, X,
+  Wand2, Copy, Film, Mic, Loader2, Info, Edit2, Trash2, Check, X,
 } from 'lucide-react';
 import ComposerSequencePreview from './ComposerSequencePreview';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
