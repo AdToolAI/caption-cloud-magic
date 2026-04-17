@@ -313,6 +313,8 @@ export default function VoiceSubtitlesTab({
             scenes={scenes}
             subtitles={subtitles}
             voiceoverUrl={voiceover?.audioUrl ?? null}
+            globalTextOverlays={globalOverlays}
+            onTimeUpdate={(time) => setPreviewCurrentTime(time)}
           />
         </CardContent>
       </Card>
@@ -658,177 +660,24 @@ export default function VoiceSubtitlesTab({
         </CardContent>
       </Card>
 
-      {/* ── PER-SCENE OVERLAYS ──────────────────────── */}
+      {/* ── GLOBAL TIMELINE TEXT-OVERLAYS ───────────────────────── */}
       <Card className="border-border/40 bg-card/80">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center justify-between gap-2">
-            <span className="flex items-center gap-2">
-              <Type className="h-4 w-4 text-primary" />
-              {t('videoComposer.sceneOverlays')}
-            </span>
-            <Badge variant="outline" className="text-[10px] font-normal">
-              {overlayCount}/{scenes.length} {t('videoComposer.withText')}
-            </Badge>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Type className="h-4 w-4 text-primary" />
+            {t('videoComposer.textOverlays')}
           </CardTitle>
+          <p className="text-[11px] text-muted-foreground">
+            {t('videoComposer.textOverlaysHint')}
+          </p>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {scenes.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-6">
-              {t('videoComposer.noScenesYet')}
-            </p>
-          )}
-
-          {scenes.map((scene, idx) => {
-            const overlay = scene.textOverlay || DEFAULT_TEXT_OVERLAY;
-            const isOpen = openSceneId === scene.id;
-            const hasText = (overlay.text || '').trim().length > 0;
-            const aiConflict = scene.clipSource.startsWith('ai-');
-            const thumb = scene.uploadType === 'image' ? scene.uploadUrl : (scene.clipUrl || scene.uploadUrl);
-
-            return (
-              <Collapsible key={scene.id} open={isOpen} onOpenChange={(o) => setOpenSceneId(o ? scene.id : null)}>
-                <CollapsibleTrigger asChild>
-                  <button className="flex items-center gap-3 w-full text-left rounded-lg border border-border/40 bg-background/40 p-2.5 hover:border-border transition-colors">
-                    <div className="relative w-20 h-12 rounded bg-muted/30 border border-border/20 flex-shrink-0 overflow-hidden">
-                      {thumb ? (
-                        scene.uploadType === 'image' ? (
-                          <img src={thumb} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <video src={thumb} className="w-full h-full object-cover" muted />
-                        )
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Type className="h-3.5 w-3.5 text-muted-foreground/40" />
-                        </div>
-                      )}
-                      {hasText && (
-                        <div
-                          className={`absolute ${POSITION_TO_CSS[overlay.position]} px-1 py-0.5 rounded-sm bg-black/70 text-[7px] font-semibold leading-none truncate max-w-[80%]`}
-                          style={{ color: overlay.color || '#FFFFFF' }}
-                        >
-                          Aa
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">
-                        {t('videoComposer.scene')} {idx + 1}
-                        <span className="text-muted-foreground ml-1.5 font-normal">· {scene.durationSeconds}s</span>
-                      </p>
-                      <p className="text-[11px] text-muted-foreground truncate">
-                        {hasText ? `"${overlay.text}"` : t('videoComposer.noOverlayText')}
-                      </p>
-                    </div>
-
-                    {hasText && (
-                      <Badge className="bg-primary/15 text-primary border-0 text-[10px] font-normal">
-                        <Type className="h-2.5 w-2.5 mr-1" />
-                        {overlay.position}
-                      </Badge>
-                    )}
-                    {isOpen
-                      ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                      : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-                </CollapsibleTrigger>
-
-                <CollapsibleContent className="space-y-3 pt-3 px-1 pb-1">
-                  {aiConflict && (
-                    <div className="flex items-start gap-1.5 rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1.5">
-                      <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" />
-                      <p className="text-[10px] text-amber-200/80 leading-snug">
-                        {t('videoComposer.overlayAiConflict')}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">{t('videoComposer.overlayText')}</Label>
-                    <Textarea
-                      value={overlay.text || ''}
-                      onChange={(e) => updateOverlay(scene.id, { text: e.target.value })}
-                      placeholder={t('videoComposer.overlayPlaceholder')}
-                      rows={2}
-                      className="text-xs bg-background/50 resize-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-[11px] text-muted-foreground">{t('videoComposer.position')}</Label>
-                      <Select
-                        value={overlay.position}
-                        onValueChange={(v) => updateOverlay(scene.id, { position: v as TextPosition })}
-                      >
-                        <SelectTrigger className="h-8 text-xs bg-background/50"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {TEXT_POSITIONS.map((p) => (
-                            <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-[11px] text-muted-foreground">{t('videoComposer.animation')}</Label>
-                      <Select
-                        value={overlay.animation}
-                        onValueChange={(v) => updateOverlay(scene.id, { animation: v as TextAnimation })}
-                      >
-                        <SelectTrigger className="h-8 text-xs bg-background/50"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {TEXT_ANIMATIONS.map((a) => (
-                            <SelectItem key={a} value={a} className="text-xs">{a}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-[11px] text-muted-foreground">{t('videoComposer.color')}</Label>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="color"
-                          value={overlay.color || '#FFFFFF'}
-                          onChange={(e) => updateOverlay(scene.id, { color: e.target.value })}
-                          className="h-8 w-10 rounded border border-border/40 bg-background/50 cursor-pointer"
-                        />
-                        <Input
-                          value={overlay.color || '#FFFFFF'}
-                          onChange={(e) => updateOverlay(scene.id, { color: e.target.value })}
-                          className="text-[11px] h-8 bg-background/50 font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-[11px] text-muted-foreground">
-                        {t('videoComposer.fontSize')}: {overlay.fontSize ?? 48}px
-                      </Label>
-                      <Slider
-                        value={[overlay.fontSize ?? 48]}
-                        onValueChange={([v]) => updateOverlay(scene.id, { fontSize: v })}
-                        min={16} max={120} step={2}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => applyStyleToAll(scene.id)}
-                      className="h-7 text-[11px] gap-1.5"
-                    >
-                      <Copy className="h-3 w-3" />
-                      {t('videoComposer.applyStyleAll')}
-                    </Button>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })}
+        <CardContent>
+          <TextOverlayEditor2028
+            overlays={globalOverlays}
+            onOverlaysChange={(next) => onUpdateAssembly({ globalTextOverlays: next })}
+            videoDuration={Math.max(totalSceneDuration, 1)}
+            currentTime={previewCurrentTime}
+          />
         </CardContent>
       </Card>
 
