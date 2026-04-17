@@ -134,9 +134,10 @@ serve(async (req) => {
         success: true,
         audioUrl: cacheBustedUrl,
         duration: estimatedDuration,
-        voiceId,
+        voiceId: effectiveVoiceId,
         modelId,
-        voiceUsed: premium?.name || voiceId,
+        voiceUsed: (effectiveVoiceId !== voiceId) ? 'Aria (fallback)' : (premium?.name || voiceId),
+        fallbackUsed: effectiveVoiceId !== voiceId,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
