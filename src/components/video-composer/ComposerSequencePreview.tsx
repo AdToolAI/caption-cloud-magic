@@ -16,6 +16,8 @@ interface Props {
   subtitles?: SubtitlesConfig;
   /** Timeline-based overlays that span the full video (independent of scenes). */
   globalTextOverlays?: GlobalTextOverlay[];
+  /** Voiceover audio URL — plays in sync with the video timeline. */
+  voiceoverUrl?: string | null;
   /** Notifies parent of playhead changes so the editor timeline can stay in sync. */
   onTimeUpdate?: (currentTime: number, totalDuration: number) => void;
 }
@@ -41,6 +43,7 @@ export default function ComposerSequencePreview({
   scenes,
   subtitles,
   globalTextOverlays,
+  voiceoverUrl,
   onTimeUpdate,
 }: Props) {
   const { t } = useTranslation();
@@ -74,6 +77,7 @@ export default function ComposerSequencePreview({
   const [muted, setMuted] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const imageStartRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
 
@@ -187,6 +191,43 @@ export default function ComposerSequencePreview({
     onTimeUpdate?.(globalTime, totalDuration);
   }, [globalTime, totalDuration, onTimeUpdate]);
 
+  // ── Voiceover audio sync ──────────────────────────────────────
+  // Audio plays linearly across the full video timeline (independent of scenes).
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !voiceoverUrl) return;
+    audio.muted = muted;
+    if (playing) {
+      // Re-align before playing so scrub jumps are reflected immediately.
+      if (Math.abs(audio.currentTime - globalTime) > 0.25) {
+        audio.currentTime = Math.min(globalTime, audio.duration || globalTime);
+      }
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, voiceoverUrl, muted]);
+
+  // Keep audio in sync when user scrubs the timeline while paused/playing.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !voiceoverUrl) return;
+    if (Math.abs(audio.currentTime - globalTime) > 0.4) {
+      audio.currentTime = Math.min(globalTime, audio.duration || globalTime);
+    }
+  }, [globalTime, voiceoverUrl]);
+
+  // Find the active subtitle segment for the current playhead time.
+  const activeSubtitle = useMemo(() => {
+    if (!subtitles?.enabled || !subtitles.segments?.length) return null;
+    return (
+      subtitles.segments.find(
+        (seg) => globalTime >= seg.startTime && globalTime <= seg.endTime,
+      ) || null
+    );
+  }, [subtitles, globalTime]);
+
   if (playable.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border/60 bg-background/30 p-8 text-center">
@@ -229,10 +270,10 @@ export default function ComposerSequencePreview({
           />
         )}
 
-        {/* Global subtitles preview line */}
-        {subtitles?.enabled && (
+        {/* Time-synced subtitle line — only shows the segment matching the playhead */}
+        {subtitles?.enabled && activeSubtitle && (
           <div
-            className="absolute left-1/2 -translate-x-1/2 px-3 py-1 rounded-sm whitespace-nowrap pointer-events-none"
+            className="absolute left-1/2 -translate-x-1/2 px-3 py-1 rounded-sm pointer-events-none max-w-[90%] text-center"
             style={{
               top: subtitles.style.position === 'top' ? '6%' : undefined,
               bottom: subtitles.style.position === 'bottom' ? '6%' : undefined,
@@ -242,9 +283,27 @@ export default function ComposerSequencePreview({
               fontSize: Math.max(12, subtitles.style.size / 2.4),
               fontWeight: 600,
               textShadow: subtitles.style.background ? 'none' : '0 2px 6px rgba(0,0,0,0.65)',
+              lineHeight: 1.2,
             }}
           >
-            {t('videoComposer.subtitlesPreviewLine')}
+            {activeSubtitle.text}
+          </div>
+        )}
+
+        {/* Empty-state hint when subtitles enabled but no segments generated yet */}
+        {subtitles?.enabled && !subtitles.segments?.length && (
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black/60 backdrop-blur text-[10px] text-white/70 pointer-events-none">
+            {t('videoComposer.subtitlesEmptyHint')}
+          </div>
+        )}
+
+        {/* Status chip — voiceover + subtitles indicator */}
+        {(voiceoverUrl || (subtitles?.enabled && subtitles.segments?.length)) && (
+          <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-black/60 backdrop-blur text-[10px] text-white/90 font-medium flex items-center gap-1.5">
+            {voiceoverUrl && <span>🎙️</span>}
+            {subtitles?.enabled && subtitles.segments?.length ? (
+              <span>{subtitles.segments.length} {t('videoComposer.subtitlesShortLabel')}</span>
+            ) : null}
           </div>
         )}
 
@@ -252,6 +311,16 @@ export default function ComposerSequencePreview({
         <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/60 backdrop-blur text-[10px] text-white/90 font-medium">
           {t('videoComposer.sceneOf', { current: sceneIdx + 1, total: playable.length })}
         </div>
+
+        {/* Hidden voiceover audio — synced with the video timeline */}
+        {voiceoverUrl && (
+          <audio
+            ref={audioRef}
+            src={voiceoverUrl}
+            preload="auto"
+            className="hidden"
+          />
+        )}
       </div>
 
       {/* Controls */}
