@@ -213,7 +213,7 @@ Generate the storyboard using the create_storyboard function.`;
                         },
                         textOverlayText: {
                           type: "string",
-                          description: `Short overlay text in ${langLabel} (max 8 words). Empty string if no text needed.`,
+                          description: `Short overlay text in ${langLabel} (max 8 words). Empty string if no text needed.${category === 'storytelling' ? ' 🚨 For category="storytelling": MUST always be an empty string "". No exceptions.' : ''}`,
                         },
                         textPosition: {
                           type: "string",
