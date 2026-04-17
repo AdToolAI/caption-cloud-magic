@@ -347,6 +347,10 @@ export default function ComposerSequencePreview({
             onTimeUpdate={onVideoTimeUpdate}
             onEnded={onVideoEnded}
             className="w-full h-full object-contain"
+            style={{
+              opacity: videoVisible ? 1 : 0,
+              transition: 'opacity 80ms linear',
+            }}
           />
         )}
 
