@@ -399,13 +399,41 @@ export default function VoiceSubtitlesTab({
               </div>
             </div>
 
+            {/* ── VOICE TUNING ──────────────────────────── */}
+            <div className="space-y-3 p-3 rounded-lg border border-border/40 bg-background/30">
+              <Label className="text-xs font-medium flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3 text-primary" />
+                {t('videoComposer.voiceTuning')}
+              </Label>
+              <div className="space-y-1.5">
+                <div className="flex justify-between">
+                  <Label className="text-xs">{t('videoComposer.speed')}</Label>
+                  <span className="text-xs text-muted-foreground">{speed.toFixed(2)}x</span>
+                </div>
+                <Slider
+                  value={[speed]}
+                  onValueChange={([v]) => setSpeed(v)}
+                  min={0.7}
+                  max={1.2}
+                  step={0.05}
+                />
+              </div>
+              <AdvancedVoiceSettings onSettingsChange={setVoiceSettings} />
+            </div>
+
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label className="text-xs">{t('videoComposer.voScript')}</Label>
-                <Button variant="ghost" size="sm" className="text-[10px] h-6" onClick={generateScriptFromScenes}>
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  {t('videoComposer.fromScenes')}
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="text-[10px] h-6" onClick={() => setScriptGenOpen(true)}>
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    {t('videoComposer.aiGenerator')}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-[10px] h-6" onClick={generateScriptFromScenes}>
+                    <Wand2 className="h-3 w-3 mr-1" />
+                    {t('videoComposer.fromScenes')}
+                  </Button>
+                </div>
               </div>
               <Textarea
                 value={voiceover.script}
