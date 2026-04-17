@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -20,13 +21,18 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  ChevronUp, ChevronDown, Type, Subtitles, Sparkles, AlertTriangle, Wand2, Copy, Film,
+  ChevronUp, ChevronDown, Type, Subtitles, Sparkles, AlertTriangle,
+  Wand2, Copy, Film, Mic, Loader2, Play, Pause, Info, Edit2, Trash2, Check, X,
 } from 'lucide-react';
 import ComposerSequencePreview from './ComposerSequencePreview';
+import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
+import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
+import { supabase } from '@/integrations/supabase/client';
 import type {
   ComposerScene,
   AssemblyConfig,
   SubtitlesConfig,
+  SubtitleSegment,
   TextPosition,
   TextAnimation,
 } from '@/types/video-composer';
@@ -34,7 +40,7 @@ import { DEFAULT_TEXT_OVERLAY, DEFAULT_SUBTITLES_CONFIG } from '@/types/video-co
 import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from '@/hooks/use-toast';
 
-interface TextSubtitlesTabProps {
+interface VoiceSubtitlesTabProps {
   scenes: ComposerScene[];
   onUpdateScenes: (scenes: ComposerScene[]) => void;
   assemblyConfig: AssemblyConfig;
@@ -47,7 +53,6 @@ const TEXT_POSITIONS: TextPosition[] = ['top', 'center', 'bottom', 'top-left', '
 const TEXT_ANIMATIONS: TextAnimation[] = ['none', 'fade-in', 'scale-bounce', 'slide-left', 'slide-right', 'word-by-word', 'glow-pulse'];
 const FONT_FAMILIES = ['Inter', 'Roboto', 'Montserrat', 'Poppins', 'Bebas Neue', 'Playfair Display'];
 
-// Map TextPosition to absolute CSS position for the live preview indicator
 const POSITION_TO_CSS: Record<TextPosition, string> = {
   top: 'top-1 left-1/2 -translate-x-1/2',
   center: 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
@@ -58,19 +63,178 @@ const POSITION_TO_CSS: Record<TextPosition, string> = {
   'bottom-right': 'bottom-1 right-1',
 };
 
-export default function TextSubtitlesTab({
+const formatTimeShort = (s: number) => {
+  if (!isFinite(s) || s < 0) s = 0;
+  const m = Math.floor(s / 60);
+  const sec = (s % 60).toFixed(1);
+  return `${m}:${sec.padStart(4, '0')}`;
+};
+
+export default function VoiceSubtitlesTab({
   scenes,
   onUpdateScenes,
   assemblyConfig,
   onUpdateAssembly,
   language,
   onGoToAudio,
-}: TextSubtitlesTabProps) {
+}: VoiceSubtitlesTabProps) {
   const { t } = useTranslation();
-  const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
   const subtitles: SubtitlesConfig = assemblyConfig.subtitles ?? DEFAULT_SUBTITLES_CONFIG;
+  const voiceover = assemblyConfig.voiceover;
   const [openSceneId, setOpenSceneId] = useState<string | null>(scenes[0]?.id ?? null);
 
+  // ── Voice loader ─────────────────────────────────────────────────
+  const [voices, setVoices] = useState<VoiceMeta[]>([]);
+  const [loadingVoices, setLoadingVoices] = useState(true);
+  const initialLang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
+  const [voiceLangTab, setVoiceLangTab] = useState<'de' | 'en' | 'es'>(initialLang);
+
+  useEffect(() => {
+    (async () => {
+      setLoadingVoices(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('list-voices', { body: { language: 'all' } });
+        if (error) throw error;
+        setVoices(sortVoicesPremiumFirst<VoiceMeta>(data?.voices || []));
+      } catch (err) {
+        console.error('[VoiceSubtitlesTab] Failed to load voices:', err);
+      } finally {
+        setLoadingVoices(false);
+      }
+    })();
+  }, []);
+
+  const voicesForTab = useMemo(
+    () => voices.filter((v) => v.language === voiceLangTab || (v.supportedLanguages || []).includes(voiceLangTab)),
+    [voices, voiceLangTab],
+  );
+  const fallbackVoice = { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah' };
+
+  // ── Voiceover state ──────────────────────────────────────────────
+  const [generatingVo, setGeneratingVo] = useState(false);
+  const [voPreviewPlaying, setVoPreviewPlaying] = useState(false);
+  const voAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const generateScriptFromScenes = () => {
+    const script = scenes
+      .filter(s => s.textOverlay?.text)
+      .map(s => s.textOverlay.text)
+      .join('. ');
+    if (voiceover && script) {
+      onUpdateAssembly({ voiceover: { ...voiceover, script } });
+      toast({
+        title: t('videoComposer.scriptGenerated'),
+        description: t('videoComposer.scriptGeneratedDesc').replace('{count}', String(script.split(/\s+/).length)),
+      });
+    } else if (!script) {
+      toast({ title: t('videoComposer.noOverlayTextsForScript'), variant: 'destructive' });
+    }
+  };
+
+  const handleGenerateVoiceover = async () => {
+    if (!voiceover?.script?.trim()) {
+      toast({ title: t('videoComposer.scriptMissing'), variant: 'destructive' });
+      return;
+    }
+    setGeneratingVo(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Nicht eingeloggt');
+
+      const selected = voices.find(v => v.id === voiceover.voiceId);
+      const settings = selected?.recommended_settings;
+
+      const { data, error } = await supabase.functions.invoke('generate-voiceover', {
+        body: {
+          text: voiceover.script,
+          voiceId: voiceover.voiceId,
+          projectId: `composer-${Date.now()}`,
+          stability: settings?.stability ?? 0.4,
+          similarityBoost: settings?.similarity_boost ?? 0.8,
+          style: settings?.style ?? 0.3,
+          useSpeakerBoost: settings?.use_speaker_boost ?? true,
+          modelId: selected?.recommended_model,
+          speed: 1.0,
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Voiceover failed');
+
+      onUpdateAssembly({ voiceover: { ...voiceover, audioUrl: data.audioUrl } });
+      toast({ title: t('videoComposer.voGenerated'), description: `~${data.duration}s` });
+    } catch (err: any) {
+      toast({ title: t('videoComposer.voError'), description: err.message, variant: 'destructive' });
+    } finally {
+      setGeneratingVo(false);
+    }
+  };
+
+  const toggleVoPreview = () => {
+    if (!voiceover?.audioUrl) return;
+    if (voPreviewPlaying) {
+      voAudioRef.current?.pause();
+      setVoPreviewPlaying(false);
+    } else {
+      if (!voAudioRef.current || voAudioRef.current.src !== voiceover.audioUrl) {
+        voAudioRef.current = new Audio(voiceover.audioUrl);
+        voAudioRef.current.onended = () => setVoPreviewPlaying(false);
+      }
+      voAudioRef.current.play();
+      setVoPreviewPlaying(true);
+    }
+  };
+
+  // ── Subtitle generation ──────────────────────────────────────────
+  const [generatingSubs, setGeneratingSubs] = useState(false);
+  const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [editStart, setEditStart] = useState(0);
+  const [editEnd, setEditEnd] = useState(0);
+
+  const handleGenerateSubtitles = async () => {
+    if (!voiceover?.audioUrl) {
+      toast({ title: t('videoComposer.noVoiceoverYet'), variant: 'destructive' });
+      return;
+    }
+    setGeneratingSubs(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-subtitles', {
+        body: { audioUrl: voiceover.audioUrl, language: subtitles.language },
+      });
+      if (error) throw error;
+      const segs = (data?.subtitles || []) as SubtitleSegment[];
+      onUpdateAssembly({
+        subtitles: { ...subtitles, enabled: true, segments: segs },
+      });
+      toast({
+        title: t('videoComposer.subSegmentsGenerated').replace('{count}', String(segs.length)),
+      });
+    } catch (err: any) {
+      toast({ title: t('videoComposer.subGenError'), description: err.message, variant: 'destructive' });
+    } finally {
+      setGeneratingSubs(false);
+    }
+  };
+
+  const startEditSegment = (seg: SubtitleSegment) => {
+    setEditingSegmentId(seg.id);
+    setEditText(seg.text);
+    setEditStart(seg.startTime);
+    setEditEnd(seg.endTime);
+  };
+  const saveEditSegment = (id: string) => {
+    const updated = (subtitles.segments || []).map(s =>
+      s.id === id ? { ...s, text: editText, startTime: editStart, endTime: editEnd } : s
+    );
+    onUpdateAssembly({ subtitles: { ...subtitles, segments: updated } });
+    setEditingSegmentId(null);
+  };
+  const deleteSegment = (id: string) => {
+    const updated = (subtitles.segments || []).filter(s => s.id !== id);
+    onUpdateAssembly({ subtitles: { ...subtitles, segments: updated } });
+  };
+
+  // ── Per-scene overlays helpers ───────────────────────────────────
   const overlayCount = useMemo(
     () => scenes.filter(s => (s.textOverlay?.text || '').trim().length > 0).length,
     [scenes]
@@ -79,20 +243,16 @@ export default function TextSubtitlesTab({
   const updateScene = (sceneId: string, patch: Partial<ComposerScene>) => {
     onUpdateScenes(scenes.map(s => (s.id === sceneId ? { ...s, ...patch } : s)));
   };
-
   const updateOverlay = (sceneId: string, patch: Partial<typeof DEFAULT_TEXT_OVERLAY>) => {
     const scene = scenes.find(s => s.id === sceneId);
     if (!scene) return;
     const next = { ...DEFAULT_TEXT_OVERLAY, ...(scene.textOverlay || {}), ...patch };
     updateScene(sceneId, { textOverlay: next });
   };
-
-  const updateSubtitles = (patch: Partial<SubtitlesConfig>) => {
+  const updateSubtitles = (patch: Partial<SubtitlesConfig>) =>
     onUpdateAssembly({ subtitles: { ...subtitles, ...patch } });
-  };
-  const updateSubtitleStyle = (patch: Partial<SubtitlesConfig['style']>) => {
+  const updateSubtitleStyle = (patch: Partial<SubtitlesConfig['style']>) =>
     onUpdateAssembly({ subtitles: { ...subtitles, style: { ...subtitles.style, ...patch } } });
-  };
 
   const applyStyleToAll = (sourceSceneId: string) => {
     const src = scenes.find(s => s.id === sourceSceneId);
@@ -122,7 +282,123 @@ export default function TextSubtitlesTab({
         </CardContent>
       </Card>
 
-      {/* ── GLOBAL SUBTITLES ───────────────────────────── */}
+      {/* ── VOICEOVER ─────────────────────────────────── */}
+      <Card className="border-border/40 bg-card/80">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Mic className="h-4 w-4 text-primary" /> {t('videoComposer.voiceover')}
+            </CardTitle>
+            <Switch
+              checked={!!voiceover?.enabled}
+              onCheckedChange={(checked) => {
+                const first = voicesForTab[0] || voices[0] || fallbackVoice;
+                onUpdateAssembly({
+                  voiceover: checked
+                    ? { enabled: true, voiceId: first.id, voiceName: first.name, script: '' }
+                    : null,
+                });
+              }}
+            />
+          </div>
+        </CardHeader>
+        {voiceover?.enabled && (
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+              <span>{t('videoComposer.voHint')}</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t('videoComposer.voLanguage')}</Label>
+              <Tabs value={voiceLangTab} onValueChange={(v) => setVoiceLangTab(v as 'de' | 'en' | 'es')}>
+                <TabsList className="grid w-full grid-cols-3 h-8">
+                  <TabsTrigger value="de" className="text-xs">🇩🇪 DE</TabsTrigger>
+                  <TabsTrigger value="en" className="text-xs">🇬🇧 EN</TabsTrigger>
+                  <TabsTrigger value="es" className="text-xs">🇪🇸 ES</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">
+                {t('videoComposer.voVoice')}
+                <span className="text-muted-foreground ml-1.5 font-normal">({voicesForTab.length} {t('videoComposer.voicesAvailable')})</span>
+              </Label>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={voiceover.voiceId}
+                  onValueChange={(v) => {
+                    const voice = voices.find((vo) => vo.id === v);
+                    onUpdateAssembly({ voiceover: { ...voiceover, voiceId: v, voiceName: voice?.name || '' } });
+                  }}
+                  disabled={loadingVoices}
+                >
+                  <SelectTrigger className="bg-background/50 flex-1">
+                    <SelectValue placeholder={loadingVoices ? t('videoComposer.loadingVoices') : t('videoComposer.chooseVoice')} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-80">
+                    {voicesForTab.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        <span className="flex items-center gap-2">
+                          {v.tier === 'premium' && (
+                            <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">
+                              Premium
+                            </Badge>
+                          )}
+                          <span>{v.name}</span>
+                          {v.gender && <span className="text-xs text-muted-foreground">({v.gender})</span>}
+                          {v.accent && <span className="text-[10px] text-muted-foreground">— {v.accent}</span>}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {voiceover.voiceId && (
+                  <VoicePreviewButton voiceId={voiceover.voiceId} language={voiceLangTab} size="sm" className="shrink-0" />
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">{t('videoComposer.voScript')}</Label>
+                <Button variant="ghost" size="sm" className="text-[10px] h-6" onClick={generateScriptFromScenes}>
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  {t('videoComposer.fromScenes')}
+                </Button>
+              </div>
+              <Textarea
+                value={voiceover.script}
+                onChange={(e) => onUpdateAssembly({ voiceover: { ...voiceover, script: e.target.value } })}
+                placeholder={t('videoComposer.voScriptPlaceholder')}
+                rows={4}
+                className="bg-background/50 resize-none text-sm"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                {voiceover.script.split(/\s+/).filter(Boolean).length} {t('videoComposer.words')} · ~{Math.ceil(voiceover.script.split(/\s+/).filter(Boolean).length / 150 * 60)}s
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button onClick={handleGenerateVoiceover} disabled={generatingVo || !voiceover.script.trim()} className="gap-2 flex-1">
+                {generatingVo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
+                {generatingVo ? t('videoComposer.generating') : t('videoComposer.generateVo')}
+              </Button>
+              {voiceover.audioUrl && (
+                <Button variant="outline" size="icon" onClick={toggleVoPreview}>
+                  {voPreviewPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                </Button>
+              )}
+            </div>
+            {voiceover.audioUrl && (
+              <p className="text-[10px] text-emerald-400">✓ {t('videoComposer.voReady')}</p>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
+      {/* ── AUTOMATIC SUBTITLES (from voiceover) ──────── */}
       <Card className="border-border/40 bg-card/80">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -134,9 +410,7 @@ export default function TextSubtitlesTab({
           <div className="flex items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/40 p-3">
             <div className="min-w-0">
               <p className="text-sm font-medium">{t('videoComposer.subtitlesAutoLabel')}</p>
-              <p className="text-[11px] text-muted-foreground">
-                {t('videoComposer.subtitlesAutoDesc')}
-              </p>
+              <p className="text-[11px] text-muted-foreground">{t('videoComposer.subtitlesAutoDesc')}</p>
             </div>
             <Switch
               checked={subtitles.enabled}
@@ -146,13 +420,28 @@ export default function TextSubtitlesTab({
 
           {subtitles.enabled && (
             <>
-              <div className="flex items-start gap-2 rounded-md border border-primary/20 bg-primary/5 p-2.5">
-                <Sparkles className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  {t('videoComposer.subtitlesHint')}
-                </p>
+              {/* Generate from voiceover */}
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2.5">
+                <div className="flex items-start gap-2">
+                  <Sparkles className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                    {voiceover?.audioUrl
+                      ? t('videoComposer.generateSubsFromVoHint')
+                      : t('videoComposer.noVoiceoverYet')}
+                  </p>
+                </div>
+                <Button
+                  onClick={handleGenerateSubtitles}
+                  disabled={!voiceover?.audioUrl || generatingSubs}
+                  size="sm"
+                  className="w-full gap-2"
+                >
+                  {generatingSubs ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                  {generatingSubs ? t('videoComposer.generating') : t('videoComposer.generateSubsFromVo')}
+                </Button>
               </div>
 
+              {/* Style picker */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">{t('videoComposer.subtitlesLanguage')}</Label>
@@ -185,9 +474,7 @@ export default function TextSubtitlesTab({
                   <Slider
                     value={[subtitles.style.size]}
                     onValueChange={([v]) => updateSubtitleStyle({ size: v })}
-                    min={20}
-                    max={72}
-                    step={2}
+                    min={20} max={72} step={2}
                   />
                 </div>
 
@@ -245,7 +532,66 @@ export default function TextSubtitlesTab({
                 </div>
               </div>
 
-              {/* Live preview */}
+              {/* Generated segments list */}
+              {subtitles.segments && subtitles.segments.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-muted-foreground">
+                      {t('videoComposer.subtitleSegments')} ({subtitles.segments.length})
+                    </Label>
+                  </div>
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto rounded-lg border border-border/40 bg-background/40 p-2">
+                    {subtitles.segments.map((seg) => (
+                      <div key={seg.id} className="rounded-md border border-border/30 bg-card/40 p-2">
+                        {editingSegmentId === seg.id ? (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                type="number" step="0.1" min="0" value={editStart}
+                                onChange={(e) => setEditStart(parseFloat(e.target.value) || 0)}
+                                className="h-7 text-[11px]"
+                              />
+                              <Input
+                                type="number" step="0.1" min="0" value={editEnd}
+                                onChange={(e) => setEditEnd(parseFloat(e.target.value) || 0)}
+                                className="h-7 text-[11px]"
+                              />
+                            </div>
+                            <Input
+                              value={editText}
+                              onChange={(e) => setEditText(e.target.value)}
+                              className="h-7 text-[11px]"
+                            />
+                            <div className="flex gap-1.5 justify-end">
+                              <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setEditingSegmentId(null)}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                              <Button size="sm" className="h-6 px-2" onClick={() => saveEditSegment(seg.id)}>
+                                <Check className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground tabular-nums shrink-0 w-20">
+                              {formatTimeShort(seg.startTime)}–{formatTimeShort(seg.endTime)}
+                            </span>
+                            <p className="text-xs flex-1 truncate">{seg.text}</p>
+                            <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => startEditSegment(seg)}>
+                              <Edit2 className="h-3 w-3" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0 text-destructive hover:text-destructive" onClick={() => deleteSegment(seg.id)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Style live preview */}
               <div className="rounded-lg border border-border/40 bg-black/40 aspect-video relative overflow-hidden">
                 <div
                   className="absolute left-1/2 -translate-x-1/2 px-3 py-1 rounded-sm whitespace-nowrap"
@@ -298,7 +644,6 @@ export default function TextSubtitlesTab({
               <Collapsible key={scene.id} open={isOpen} onOpenChange={(o) => setOpenSceneId(o ? scene.id : null)}>
                 <CollapsibleTrigger asChild>
                   <button className="flex items-center gap-3 w-full text-left rounded-lg border border-border/40 bg-background/40 p-2.5 hover:border-border transition-colors">
-                    {/* Thumb + position indicator */}
                     <div className="relative w-20 h-12 rounded bg-muted/30 border border-border/20 flex-shrink-0 overflow-hidden">
                       {thumb ? (
                         scene.uploadType === 'image' ? (
@@ -419,9 +764,7 @@ export default function TextSubtitlesTab({
                       <Slider
                         value={[overlay.fontSize ?? 48]}
                         onValueChange={([v]) => updateOverlay(scene.id, { fontSize: v })}
-                        min={16}
-                        max={120}
-                        step={2}
+                        min={16} max={120} step={2}
                       />
                     </div>
                   </div>
@@ -448,7 +791,7 @@ export default function TextSubtitlesTab({
       <div className="flex justify-end">
         <Button onClick={onGoToAudio} className="gap-2">
           <Wand2 className="h-4 w-4" />
-          {t('videoComposer.continueToAudio')}
+          {t('videoComposer.continueToMusic')}
         </Button>
       </div>
     </div>

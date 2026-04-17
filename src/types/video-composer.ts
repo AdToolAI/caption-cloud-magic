@@ -83,10 +83,26 @@ export interface SubtitlesStyle {
   position: SubtitlePosition;
 }
 
+export interface SubtitleSegmentWord {
+  text: string;
+  startTime: number;
+  endTime: number;
+}
+
+export interface SubtitleSegment {
+  id: string;
+  text: string;
+  startTime: number;
+  endTime: number;
+  words?: SubtitleSegmentWord[];
+}
+
 export interface SubtitlesConfig {
   enabled: boolean;
   language: string; // 'de' | 'en' | 'es' | …
   style: SubtitlesStyle;
+  /** Optional pre-generated timed segments (from `generate-subtitles` edge function). */
+  segments?: SubtitleSegment[];
 }
 
 export interface AssemblyConfig {
