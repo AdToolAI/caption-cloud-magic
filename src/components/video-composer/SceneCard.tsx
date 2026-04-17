@@ -265,110 +265,28 @@ export default function SceneCard({
               />
             )}
 
-            {/* Text Overlay — collapsible editor */}
-            <Collapsible open={overlayOpen} onOpenChange={setOverlayOpen}>
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full text-left rounded border border-border/40 bg-background/30 px-2 py-1.5 hover:border-border transition-colors">
-                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                    <Type className="h-3 w-3" />
-                    Text-Overlay {overlay.text ? `· "${overlay.text.slice(0, 24)}${overlay.text.length > 24 ? '…' : ''}"` : '(optional)'}
+            {/* Text Overlay — moved to dedicated "Text & Subtitles" tab */}
+            <div className="flex items-center justify-between gap-2 rounded-md border border-border/40 bg-background/30 px-2 py-1.5">
+              <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground min-w-0">
+                <Type className="h-3 w-3 shrink-0 text-primary/70" />
+                {hasOverlayText ? (
+                  <>
+                    <span className="text-foreground/80 truncate">"{overlay.text}"</span>
+                    <Badge variant="outline" className="text-[9px] font-normal capitalize shrink-0">
+                      {overlay.position}
+                    </Badge>
+                  </>
+                ) : (
+                  <span>
+                    {lang === 'de'
+                      ? 'Text & Untertitel im Tab „Text" bearbeiten'
+                      : lang === 'es'
+                      ? 'Edita texto y subtítulos en la pestaña "Texto"'
+                      : 'Edit text & subtitles in the "Text" tab'}
                   </span>
-                  {overlayOpen
-                    ? <ChevronUp className="h-3 w-3 text-muted-foreground" />
-                    : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-2 pt-2">
-                {/* Konflikt-Hinweis */}
-                {scene.clipSource.startsWith('ai-') && (
-                  <div className="flex items-start gap-1.5 rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1.5">
-                    <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[9px] text-amber-200/80 leading-snug">
-                      Falls die KI bereits Text rendert, kann es zu Doppel-Untertiteln kommen. Wir versuchen das im Prompt automatisch zu vermeiden.
-                    </p>
-                  </div>
                 )}
-
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Text</Label>
-                  <Input
-                    value={overlay.text || ''}
-                    onChange={(e) => updateOverlay({ text: e.target.value })}
-                    placeholder="Optionaler Text über dem Video"
-                    className="text-xs bg-background/50"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">Position</Label>
-                    <Select
-                      value={overlay.position}
-                      onValueChange={(v) => updateOverlay({ position: v as TextPosition })}
-                    >
-                      <SelectTrigger className="h-7 text-[10px] bg-background/50">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TEXT_POSITIONS.map((p) => (
-                          <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">Animation</Label>
-                    <Select
-                      value={overlay.animation}
-                      onValueChange={(v) => updateOverlay({ animation: v as TextAnimation })}
-                    >
-                      <SelectTrigger className="h-7 text-[10px] bg-background/50">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TEXT_ANIMATIONS.map((a) => (
-                          <SelectItem key={a} value={a} className="text-xs">{a}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 items-end">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">Farbe</Label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="color"
-                        value={overlay.color || '#FFFFFF'}
-                        onChange={(e) => updateOverlay({ color: e.target.value })}
-                        className="h-7 w-10 rounded border border-border/40 bg-background/50 cursor-pointer"
-                      />
-                      <Input
-                        value={overlay.color || '#FFFFFF'}
-                        onChange={(e) => updateOverlay({ color: e.target.value })}
-                        className="text-[10px] h-7 bg-background/50 font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">
-                      Schriftgröße: {overlay.fontSize ?? 48}px
-                    </Label>
-                    <Slider
-                      value={[overlay.fontSize ?? 48]}
-                      onValueChange={([v]) => updateOverlay({ fontSize: v })}
-                      min={16}
-                      max={120}
-                      step={2}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
+              </span>
+            </div>
 
             {/* Transition */}
             <div className="flex items-center gap-2">
