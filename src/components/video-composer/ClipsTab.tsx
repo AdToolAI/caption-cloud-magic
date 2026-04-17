@@ -15,7 +15,7 @@ interface ClipsTabProps {
   scenes: ComposerScene[];
   projectId?: string;
   onUpdateScenes: (scenes: ComposerScene[]) => void;
-  onGoToAudio: () => void;
+  onGoToVoiceSubtitles: () => void;
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
 }
 
@@ -26,7 +26,7 @@ const statusConfig: Record<string, { color: string; bg: string; label: string }>
   failed: { color: 'text-destructive', bg: 'bg-destructive/15 border-destructive/40', label: 'Fehlgeschlagen' },
 };
 
-export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudio, onEnsurePersisted }: ClipsTabProps) {
+export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [singleGenerating, setSingleGenerating] = useState<Record<string, boolean>>({});
   const [stockSearch, setStockSearch] = useState<Record<string, string>>({});
@@ -302,11 +302,11 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToAudi
             </Button>
             <Button
               size="sm"
-              onClick={onGoToAudio}
+              onClick={onGoToVoiceSubtitles}
               disabled={!allReady && readyCount === 0}
               className="gap-1 text-xs"
             >
-              Weiter zu Audio <ArrowRight className="h-3.5 w-3.5" />
+              Weiter zu Voiceover & Untertitel <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
