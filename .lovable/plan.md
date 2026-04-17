@@ -1,61 +1,44 @@
 
 ## Befund
-Der User möchte, dass die KI-generierten Video-Prompts (in den Storyboard-Szenen) **niemals** Untertitel, Captions oder Text-Overlays im Video selbst erzeugen. Sonst kollidieren später die separat hinzugefügten Untertitel mit eingebrannten Texten in den Clips.
+ElevenLabs gibt **404 voice_not_found** für `de5LFXQjQQGyAwjBLcVD` (Klaus) zurück. Diese ID existiert nicht im ElevenLabs-Katalog — sie wurde als Platzhalter eingetragen.
 
-Im Screenshot sieht man bereits einen guten Prompt:
-> "...no on-screen text, no captions, no subtitles, no watermarks, no logos..."
+Betroffene fiktive IDs in `supabase/functions/_shared/premium-voices.ts`:
+- `de5LFXQjQQGyAwjBLcVD` — "Klaus" (DE male) ❌
+- `flHkNRp1BlvT73UL6gyz` — "Julia" (DE female) ❌
+- `gD1IexrzCvsXPHUuT0s3` — "Mateo" (ES male) ❌
+- `9oPKasc15pfAbMr7N6Gs` — "Lucía" (ES female) ❌
 
-Aber das ist offenbar nicht überall konsistent — manche Szenen-Prompts enthalten diese Schutzklauseln nicht, oder die Prompt-Generierung in den Edge Functions fügt sie nicht zuverlässig hinzu.
-
-## Analyse-Schritte (was ich prüfen muss)
-1. **Prompt-Generierungs-Logik finden**: Wo werden die Storyboard-Szenen-Prompts erzeugt?
-   - Vermutlich in einer Edge Function wie `generate-storyboard` oder `compose-video-storyboard`
-2. **Clip-Generierung prüfen**: Wo werden die Prompts an Hailuo/Kling/Seedance/etc. weitergegeben?
-   - Edge Functions wie `generate-scene-clip` o.ä.
-3. **Prompt-Editor im Frontend**: Wo kann der User den Prompt manuell editieren? (Dort ggf. Hinweis einblenden.)
+Die anderen DE/ES-Stimmen nutzen bereits **echte multilinguale ElevenLabs-IDs** (Matilda, Bill, Daniel, Eric, Jessica, Laura) mit deutschen/spanischen Anzeigenamen — das funktioniert mit `eleven_multilingual_v2` einwandfrei.
 
 ## Plan
 
-### 1. Negative-Prompt-Suffix zentralisieren
-Eine konstante Negative-Suffix-Klausel in einer geteilten Datei (z.B. `supabase/functions/_shared/videoPromptGuards.ts`):
-```ts
-export const NO_TEXT_NEGATIVE_SUFFIX = 
-  ", no on-screen text, no captions, no subtitles, no watermarks, " +
-  "no logos, no written words, no typography, no signs with text, " +
-  "no UI overlays, clean visuals only";
-```
+### 1. Ungültige Voice-IDs durch echte ersetzen
+In `supabase/functions/_shared/premium-voices.ts`:
 
-### 2. Anwendung in 3 Phasen
-- **Storyboard-Generierung** (Edge Function, die initial die Prompts erstellt): System-Prompt für die KI um eine harte Regel ergänzen → "NEVER include text, captions, subtitles, signs with readable words, or written language in the visual description."
-- **Suffix-Append vor Clip-Render**: Bevor der Prompt an Hailuo/Kling/Seedance/etc. geschickt wird, automatisch `NO_TEXT_NEGATIVE_SUFFIX` anhängen (falls nicht schon enthalten — Idempotenz-Check via `includes('no subtitles')`).
-- **Frontend-Sanitizer (optional)**: Wenn User manuell Prompt editiert, beim Speichern Suffix sicherstellen.
+**Deutsch:**
+- "Klaus" (mature male, narrator) → `nPczCjzI2devNBz1zQrb` (Brian — tief, vertrauensvoll, perfekt für DE-Narration)
+- "Julia" (adult female, narrator) → `EXAVITQu4vr4xnSDxMaL` (Sarah — warm, narratorisch)
 
-### 3. Bestehende Storyboard-Szenen migrieren (optional)
-Bei Klick auf "Clips generieren" werden alle Szenen-Prompts vor dem Render durch den Suffix-Guard geschickt → keine DB-Migration nötig, läuft transparent.
+**Spanisch:**
+- "Mateo" (adult male) → `JBFqnCBsd6RMkjVDRZzb` (George — tiefer Erzähler)
+- "Lucía" (adult female) → `FGY2WhTYpPnrIDTdsKH5` (Laura — klar, elegant)
 
-### 4. UI-Hinweis im Prompt-Editor
-Unter dem Prompt-Textfeld einen kleinen Hinweis: 
-> "ℹ️ Untertitel und Texte werden automatisch ausgeschlossen — füge sie später im 'Voiceover & Untertitel'-Tab hinzu."
+Alle nutzen `eleven_multilingual_v2`, das DE und ES nativ unterstützt.
 
-## Was ich noch prüfen muss (vor Implementierung)
-- Welche Edge Functions die Storyboard-Prompts erzeugen und welche die Clips rendern (`compose-video-*` und `generate-scene-clip*`)
-- Wo im Frontend der Prompt-Editor liegt (`StoryboardTab.tsx` oder Sub-Komponente)
+### 2. Frontend-Mirror prüfen
+Falls `src/lib/elevenlabs-voices.ts` (oder ähnliche Liste) die IDs hartcodiert spiegelt, dort dieselben 4 IDs aktualisieren. Bestehende User-Drafts mit alter "Klaus"-ID (`de5LFXQjQQGyAwjBLcVD`) erhalten beim nächsten Generieren automatisch den neuen Brian-Klang ohne DB-Migration — aber wir brauchen einen **Fallback-Guard** in der Edge Function:
 
-## Geänderte Dateien (geschätzt)
-- `supabase/functions/_shared/videoPromptGuards.ts` (neu) — Suffix + Helfer `ensureNoTextSuffix(prompt)`
-- `supabase/functions/compose-video-storyboard/index.ts` (oder äquivalent) — System-Prompt-Ergänzung
-- `supabase/functions/generate-scene-clip/index.ts` (oder äquivalent) — `ensureNoTextSuffix()` vor Provider-Call
-- `src/components/video-composer/StoryboardTab.tsx` (oder Prompt-Editor-Sub-Komponente) — kleiner Hinweis-Text
-- `src/lib/translations.ts` — Hinweis-Text (DE/EN/ES)
+### 3. Fallback-Guard in `generate-voiceover/index.ts`
+Bevor ElevenLabs gerufen wird: Wenn die übergebene `voiceId` **nicht** in `PREMIUM_VOICES` ist UND nicht dem ElevenLabs-Standard-Format entspricht (oder wir 404 bekommen), fallback auf eine bekannt gute ID je nach Sprache (`9BWtsMINqrJLrRacOk9x` Aria als universeller Default).
+
+Konkret: Try/Catch um den ElevenLabs-Call → bei 404 retry mit Default-Voice + Log-Warnung. Das schützt auch alte Drafts, die noch die ungültigen IDs gespeichert haben.
+
+## Geänderte Dateien
+- `supabase/functions/_shared/premium-voices.ts` — 4 ungültige IDs ersetzen
+- `supabase/functions/generate-voiceover/index.ts` — 404-Fallback-Retry mit Default-Voice
 
 ## Verify
-- Neue Storyboard-Generierung: alle Szenen-Prompts enden mit Negative-Klausel
-- Bestehende Storyboards: beim "Clips generieren" wird Suffix automatisch angehängt
-- Manuelles Editieren: Suffix wird beim Render trotzdem garantiert
-- Generierte Clips zeigen kein eingebranntes Text/Captions
-- UI-Hinweis erscheint unter dem Prompt-Editor
-
-## Was unverändert bleibt
-- Voiceover- & Untertitel-Logik (Tab 4)
-- Clip-Render-Pipeline, Pricing, DB-Schema
-- Provider-Auswahl (Hailuo/Kling/Seedance/Stock/Custom)
+- Stimme "Klaus" (DE) auswählen → Voiceover generiert erfolgreich
+- "Julia" (DE), "Mateo" (ES), "Lucía" (ES) generieren erfolgreich
+- Edge Function Logs zeigen keine 404 mehr
+- Bei unbekannter Voice-ID: Fallback greift, kein Crash
