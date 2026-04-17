@@ -2,41 +2,35 @@
 
 ## Befund
 
-Der User möchte die Hinweise **aufteilen**:
-- **Briefing-Tab:** nur die **rechtlichen** Hinweise (verbotene Inhalte, Konsequenzen, Verantwortung) — rote/destruktive Sektion mit `ShieldAlert`
-- **Storyboard-Tab:** nur die **technischen KI-Generierungs-Hinweise** (Prompt-Qualität, Personen-Konsistenz, Credits) — goldene Sektion mit `Sparkles`
+Der User möchte das AI-Video-Wallet-Guthaben für den Account `bestofproducts4u@gmail.com` auf **€200** setzen.
 
-Aktuell stecken **beide** Sektionen zusammen im Briefing-Tab. Storyboard hat keinen Block.
+Relevante Tabelle: `ai_video_wallets` (separates Wallet für AI-Video-Generierung, getrennt vom regulären Credit-`wallets`-System).
 
 ## Plan
 
-### 1. `BriefingTab.tsx` — nur rechtliche Sektion behalten
-- Komplette **technische Sektion** (gold, Sparkles, Prompt/Personen/Credits) entfernen
-- Block-Header von "Wichtige Hinweise zur AI-Generierung" auf `aiLegalTitle` ("Nutzungsrichtlinien & verbotene Inhalte") umstellen
-- Header-Icon von `Sparkles` (gold) auf `ShieldAlert` (destruktiv/rot) tauschen
-- Linker Akzent-Strich + Border auf destruktive Farbe (`border-destructive/20`, Akzent rot statt gold) anpassen
-- Collapse-Logik + `localStorage`-Key bleiben (`video-composer-briefing-tips-collapsed`)
-- Innere Trennlinie zwischen Sektionen entfernen — nur noch eine Sektion vorhanden
+### 1. User-ID ermitteln
+Per SQL die `auth.users.id` für die E-Mail `bestofproducts4u@gmail.com` nachschlagen.
 
-### 2. `StoryboardTab.tsx` — neue technische Sektion einfügen
-- Direkt **unter der Summary-Bar**, über den Szenenkarten
-- Goldener James-Bond-2028-Stil: Glasmorphismus, linker goldener Akzent-Strich, `Sparkles`-Icon
-- Header: `aiTipsTitle` ("Wichtige Hinweise zur AI-Generierung")
-- Drei Bullet-Points: `aiTipPrompt`, `aiTipPersons`, `aiTipCredits` (gold-Akzent-Punkte)
-- Collapse-Toggle (Chevron-Up/Down) + neuer `localStorage`-Key: `video-composer-storyboard-tips-collapsed`
-- Standardmäßig **aufgeklappt**
-- **Immer sichtbar** (nicht abhängig von AI-Szenen) — Nutzer sieht Hinweise vor erster Szene
+### 2. Wallet aktualisieren / anlegen
+In `ai_video_wallets`:
+- Falls Eintrag existiert: `balance_euros = 200`, `updated_at = now()`
+- Falls kein Eintrag: neuen Datensatz anlegen mit `balance_euros = 200`, `currency = 'EUR'`, `total_purchased_euros = 200`, `total_spent_euros = 0`
 
-### 3. `src/lib/translations.ts`
-Keine Änderung nötig — alle Keys (`aiTipsTitle`, `aiTipPrompt`, `aiTipPersons`, `aiTipCredits`, `aiTipsCollapse`, `aiTipsExpand`, `aiLegalTitle`, `aiLegalProhibited`, `aiLegalConsequences`, `aiLegalResponsibility`) existieren bereits in DE/EN/ES.
+Per `UPSERT` (`ON CONFLICT (user_id) DO UPDATE`) in einem Schritt erledigt.
 
-## Geänderte Dateien
-- `src/components/video-composer/BriefingTab.tsx` — technische Sektion entfernen, Header/Icon/Farben auf rechtlich umstellen
-- `src/components/video-composer/StoryboardTab.tsx` — goldener technischer Hinweis-Block unter Summary-Bar einfügen
+### 3. Transaktion protokollieren
+Optional, aber sauber: einen Eintrag in `ai_video_transactions` erzeugen (`type = 'adjustment'` oder `'manual_credit'`) mit `amount_euros = differenz`, `balance_after = 200`, `description = 'Manual balance adjustment by admin'`.
+
+Falls der `type`-Check-Constraint nur `purchase|bonus|deduction|refund` zulässt, wird der Eintrag als `bonus` mit Beschreibung "Manual admin adjustment" gebucht.
+
+### 4. Verifikation
+Nach dem Update: `SELECT balance_euros FROM ai_video_wallets WHERE user_id = ...` → muss **200.00** zurückgeben. Realtime-Subscription im `useAIVideoWallet`-Hook aktualisiert die UI automatisch beim nächsten Reload des Users.
+
+## Betroffene Daten
+- `ai_video_wallets` — Balance auf 200 EUR setzen (Insert/Update)
+- `ai_video_transactions` — Audit-Log-Eintrag
 
 ## Verify
-- Briefing-Tab: oben **nur** rote rechtliche Sektion mit `ShieldAlert`-Header, kollabierbar
-- Storyboard-Tab: unter Summary-Bar **nur** goldene technische Sektion mit `Sparkles`-Header, kollabierbar
-- Beide Collapse-States unabhängig, Persistenz nach Reload korrekt
-- Sprachen DE/EN/ES korrekt
+- Nach Reload zeigt der Account `bestofproducts4u@gmail.com` im AI-Video-Bereich €200 verfügbares Guthaben
+- Die im Composer fehlgeschlagene Generierung (€4.50 benötigt) lässt sich nun problemlos starten
 
