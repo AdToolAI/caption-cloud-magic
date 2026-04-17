@@ -181,6 +181,12 @@ export default function ComposerSequencePreview({
     }
   };
 
+  // Notify parent of playhead changes so the timeline editor stays in sync.
+  // (Must be declared BEFORE any early return to satisfy React's rules of hooks.)
+  useEffect(() => {
+    onTimeUpdate?.(globalTime, totalDuration);
+  }, [globalTime, totalDuration, onTimeUpdate]);
+
   if (playable.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border/60 bg-background/30 p-8 text-center">
@@ -191,11 +197,6 @@ export default function ComposerSequencePreview({
       </div>
     );
   }
-
-  // Notify parent of playhead changes so the timeline editor stays in sync.
-  useEffect(() => {
-    onTimeUpdate?.(globalTime, totalDuration);
-  }, [globalTime, totalDuration, onTimeUpdate]);
 
   return (
     <div className="space-y-3">
