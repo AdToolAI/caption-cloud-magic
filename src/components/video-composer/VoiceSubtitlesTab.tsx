@@ -313,7 +313,9 @@ export default function VoiceSubtitlesTab({
             scenes={scenes}
             subtitles={subtitles}
             voiceoverUrl={voiceover?.audioUrl ?? null}
-            globalTextOverlays={globalOverlays}
+            globalTextOverlays={
+              assemblyConfig.textOverlaysEnabled === false ? [] : globalOverlays
+            }
             onTimeUpdate={(time) => setPreviewCurrentTime(time)}
           />
         </CardContent>
@@ -661,25 +663,53 @@ export default function VoiceSubtitlesTab({
       </Card>
 
       {/* ── GLOBAL TIMELINE TEXT-OVERLAYS ───────────────────────── */}
-      <Card className="border-border/40 bg-card/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Type className="h-4 w-4 text-primary" />
-            {t('videoComposer.textOverlays')}
-          </CardTitle>
-          <p className="text-[11px] text-muted-foreground">
-            {t('videoComposer.textOverlaysHint')}
-          </p>
-        </CardHeader>
-        <CardContent>
-          <TextOverlayEditor2028
-            overlays={globalOverlays}
-            onOverlaysChange={(next) => onUpdateAssembly({ globalTextOverlays: next })}
-            videoDuration={Math.max(totalSceneDuration, 1)}
-            currentTime={previewCurrentTime}
-          />
-        </CardContent>
-      </Card>
+      {(() => {
+        const overlaysEnabled = assemblyConfig.textOverlaysEnabled !== false;
+        return (
+          <Card className="border-border/40 bg-card/80">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Type className="h-4 w-4 text-primary" />
+                  {t('videoComposer.textOverlays')}
+                </CardTitle>
+                <Switch
+                  checked={overlaysEnabled}
+                  onCheckedChange={(checked) =>
+                    onUpdateAssembly({ textOverlaysEnabled: checked })
+                  }
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {t('videoComposer.textOverlaysHint')}
+              </p>
+            </CardHeader>
+            <CardContent>
+              {!overlaysEnabled && (
+                <div className="flex items-start gap-2 p-3 mb-3 rounded-lg bg-muted/40 border border-border/40 text-xs text-muted-foreground">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                  <span>{t('videoComposer.textOverlaysDisabledHint')}</span>
+                </div>
+              )}
+              <div
+                className={
+                  overlaysEnabled
+                    ? ''
+                    : 'opacity-50 pointer-events-none select-none'
+                }
+                aria-disabled={!overlaysEnabled}
+              >
+                <TextOverlayEditor2028
+                  overlays={globalOverlays}
+                  onOverlaysChange={(next) => onUpdateAssembly({ globalTextOverlays: next })}
+                  videoDuration={Math.max(totalSceneDuration, 1)}
+                  currentTime={previewCurrentTime}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Continue */}
       <div className="flex justify-end">
