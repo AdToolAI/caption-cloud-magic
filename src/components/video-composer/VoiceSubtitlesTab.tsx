@@ -46,19 +46,7 @@ interface VoiceSubtitlesTabProps {
   onGoToAudio: () => void;
 }
 
-const TEXT_POSITIONS: TextPosition[] = ['top', 'center', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
-const TEXT_ANIMATIONS: TextAnimation[] = ['none', 'fade-in', 'scale-bounce', 'slide-left', 'slide-right', 'word-by-word', 'glow-pulse'];
 const FONT_FAMILIES = ['Inter', 'Roboto', 'Montserrat', 'Poppins', 'Bebas Neue', 'Playfair Display'];
-
-const POSITION_TO_CSS: Record<TextPosition, string> = {
-  top: 'top-1 left-1/2 -translate-x-1/2',
-  center: 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
-  bottom: 'bottom-1 left-1/2 -translate-x-1/2',
-  'top-left': 'top-1 left-1',
-  'top-right': 'top-1 right-1',
-  'bottom-left': 'bottom-1 left-1',
-  'bottom-right': 'bottom-1 right-1',
-};
 
 const formatTimeShort = (s: number) => {
   if (!isFinite(s) || s < 0) s = 0;
@@ -140,9 +128,9 @@ export default function VoiceSubtitlesTab({
   );
 
   const generateScriptFromScenes = () => {
-    const script = scenes
-      .filter(s => s.textOverlay?.text)
-      .map(s => s.textOverlay.text)
+    const script = (globalOverlays || [])
+      .filter(o => (o.text || '').trim().length > 0)
+      .map(o => o.text.trim())
       .join('. ');
     if (voiceover && script) {
       onUpdateAssembly({ voiceover: { ...voiceover, script } });
@@ -252,38 +240,63 @@ export default function VoiceSubtitlesTab({
     onUpdateAssembly({ subtitles: { ...subtitles, segments: updated } });
   };
 
-  // ── Per-scene overlays helpers ───────────────────────────────────
-  const overlayCount = useMemo(
-    () => scenes.filter(s => (s.textOverlay?.text || '').trim().length > 0).length,
-    [scenes]
-  );
-
-  const updateScene = (sceneId: string, patch: Partial<ComposerScene>) => {
-    onUpdateScenes(scenes.map(s => (s.id === sceneId ? { ...s, ...patch } : s)));
-  };
-  const updateOverlay = (sceneId: string, patch: Partial<typeof DEFAULT_TEXT_OVERLAY>) => {
-    const scene = scenes.find(s => s.id === sceneId);
-    if (!scene) return;
-    const next = { ...DEFAULT_TEXT_OVERLAY, ...(scene.textOverlay || {}), ...patch };
-    updateScene(sceneId, { textOverlay: next });
-  };
+  // ── Subtitles helpers ─────────────────────────────────────────────
   const updateSubtitles = (patch: Partial<SubtitlesConfig>) =>
     onUpdateAssembly({ subtitles: { ...subtitles, ...patch } });
   const updateSubtitleStyle = (patch: Partial<SubtitlesConfig['style']>) =>
     onUpdateAssembly({ subtitles: { ...subtitles, style: { ...subtitles.style, ...patch } } });
 
-  const applyStyleToAll = (sourceSceneId: string) => {
-    const src = scenes.find(s => s.id === sourceSceneId);
-    if (!src?.textOverlay) return;
-    const { text: _ignore, ...stylePart } = src.textOverlay;
-    onUpdateScenes(
-      scenes.map(s => ({
-        ...s,
-        textOverlay: { ...DEFAULT_TEXT_OVERLAY, ...(s.textOverlay || {}), ...stylePart },
-      }))
-    );
-    toast({ title: t('videoComposer.styleAppliedAll') });
-  };
+  // ── One-time migration: legacy per-scene textOverlays → globalTextOverlays
+  const migratedRef = (globalOverlays.length > 0);
+  useEffect(() => {
+    if (migratedRef) return;
+    const legacy = scenes.filter(s => (s.textOverlay?.text || '').trim().length > 0);
+    if (legacy.length === 0) return;
+
+    // Compute scene start offsets for accurate timing
+    let acc = 0;
+    const offsets = new Map<string, { start: number; end: number }>();
+    for (const s of scenes) {
+      const dur = s.durationSeconds || 0;
+      offsets.set(s.id, { start: acc, end: acc + dur });
+      acc += dur;
+    }
+
+    // Map legacy positions to Director's-Cut positions
+    const posMap: Record<string, GlobalTextOverlay['position']> = {
+      top: 'top',
+      center: 'center',
+      bottom: 'bottom',
+      'top-left': 'topLeft',
+      'top-right': 'topRight',
+      'bottom-left': 'bottomLeft',
+      'bottom-right': 'bottomRight',
+    };
+
+    const migrated: GlobalTextOverlay[] = legacy.map((s, i) => {
+      const o = s.textOverlay;
+      const off = offsets.get(s.id) || { start: 0, end: (s.durationSeconds || 3) };
+      return {
+        id: `migrated-${s.id}-${i}`,
+        text: o.text,
+        animation: 'fadeIn',
+        position: posMap[o.position] || 'center',
+        startTime: off.start,
+        endTime: off.end,
+        style: {
+          fontSize: 'lg',
+          color: o.color || '#FFFFFF',
+          backgroundColor: 'transparent',
+          shadow: true,
+          fontFamily: o.fontFamily || 'sans-serif',
+        },
+      };
+    });
+
+    onUpdateAssembly({ globalTextOverlays: migrated });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
