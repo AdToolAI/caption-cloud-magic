@@ -101,6 +101,7 @@ Hard rules:
 - Each scene 3-15 seconds; total ≈ ${briefing.duration}s; create ${targetSceneCount} scenes (±1)
 - Text overlays in ${langLabel} (max 8 words, punchy)
 - Transitions in English (enum)
+${category === 'storytelling' ? '\n🚨 STORYTELLING MODE — TEXT OVERLAY BAN (ABSOLUTE): textOverlayText MUST be "" (empty string) for EVERY scene. textAnimation MUST be "none". No exceptions. No dates, no place names, no dialogue cards, no chapter titles. The story is told purely visually.\n' : ''}
 
 🚨 NO BURNED-IN TEXT RULE (ABSOLUTE — overrides everything else):
 The video clips are generated independently and we apply our OWN subtitles, captions and text overlays in a later editing step. Therefore the AI-generated footage MUST NEVER contain any readable text, captions, subtitles, watermarks, logos, signs with words, UI overlays, lower-thirds, typography or written language of any kind. Every aiPrompt MUST end with the exact negative clause defined in rule 10 below. Never quote on-screen text inside the prompt.
