@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, ArrowRight } from 'lucide-react';
 import SceneCard from './SceneCard';
 import type { ComposerScene, ClipSource } from '@/types/video-composer';
 import { DEFAULT_TEXT_OVERLAY, getClipCost, getClipRate } from '@/types/video-composer';
@@ -15,25 +14,8 @@ interface StoryboardTabProps {
   projectId?: string;
 }
 
-const TIPS_STORAGE_KEY = 'video-composer-ai-tips-collapsed';
-
 export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, language, projectId }: StoryboardTabProps) {
   const { t } = useTranslation();
-  const [tipsCollapsed, setTipsCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(TIPS_STORAGE_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(TIPS_STORAGE_KEY, tipsCollapsed ? '1' : '0');
-    } catch {
-      /* ignore */
-    }
-  }, [tipsCollapsed]);
 
   const addScene = () => {
     const newScene: ComposerScene = {
@@ -89,7 +71,6 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
 
   const totalDuration = scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
   const totalCost = scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
-  const hasAiScenes = scenes.some((s) => s.clipSource.startsWith('ai-'));
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto">
@@ -116,59 +97,6 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
           </Button>
         </div>
       </div>
-
-      {/* Combined AI Tips Block — only shown if at least one AI scene exists */}
-      {hasAiScenes && (
-        <div className="relative overflow-hidden rounded-xl bg-card/40 backdrop-blur-sm border border-gold/20 shadow-soft">
-          {/* Vertical gold accent line (Enterprise pattern) */}
-          <div
-            className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-gold via-gold/60 to-transparent"
-            style={{ boxShadow: '0 0 12px hsl(var(--primary) / 0.4)' }}
-          />
-          <div className="p-4 pl-5">
-            <button
-              type="button"
-              onClick={() => setTipsCollapsed((v) => !v)}
-              className="flex w-full items-center justify-between gap-3 text-left group"
-              aria-expanded={!tipsCollapsed}
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gold/10 border border-gold/20">
-                  <Sparkles className="h-3.5 w-3.5 text-gold" />
-                </div>
-                <h3 className="font-display text-sm font-semibold tracking-wide text-foreground">
-                  {t('videoComposer.aiTipsTitle')}
-                </h3>
-              </div>
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1 group-hover:text-foreground transition-colors">
-                {tipsCollapsed ? t('videoComposer.aiTipsExpand') : t('videoComposer.aiTipsCollapse')}
-                {tipsCollapsed ? (
-                  <ChevronDown className="h-3 w-3" />
-                ) : (
-                  <ChevronUp className="h-3 w-3" />
-                )}
-              </span>
-            </button>
-
-            {!tipsCollapsed && (
-              <ul className="mt-4 space-y-2.5 text-xs leading-relaxed text-muted-foreground">
-                <li className="flex gap-2.5">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/70" />
-                  <span>{t('videoComposer.aiTipPrompt')}</span>
-                </li>
-                <li className="flex gap-2.5">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/70" />
-                  <span>{t('videoComposer.aiTipPersons')}</span>
-                </li>
-                <li className="flex gap-2.5">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/70" />
-                  <span className="text-foreground/90">{t('videoComposer.aiTipCredits')}</span>
-                </li>
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Scene Cards */}
       {scenes.length === 0 ? (
