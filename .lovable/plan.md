@@ -2,63 +2,64 @@
 
 ## Befund
 
-Die Per-Szene-Editor-Karte ist **noch im Code** (`VoiceSubtitlesTab.tsx` Z. 654–826) — daher zeigt der Screenshot weiterhin "Szene 1 / Szene 2 / …" mit individuellen Position/Animation/Farbe-Steuerungen.
+Im Tab "Voiceover & Untertitel" gibt es aktuell:
+- **Voiceover-Karte** mit Toggle (an/aus) ✓
+- **Hintergrundmusik-Karte** mit Toggle ✓
+- **Automatische Untertitel-Karte** mit Toggle ✓
+- **Text-Overlays-Karte** — **kein Toggle**, immer aktiv
 
-In den vorherigen Turns wurde zwar:
-- Der `TextOverlayEditor2028` **importiert** (Z. 45), aber nie **gerendert**
-- `globalTextOverlays` im Datenmodell ergänzt (`AssemblyConfig.globalTextOverlays`)
-- `ComposerSequencePreview` so erweitert, dass es `globalTextOverlays` rendert
-
-…aber der **letzte Schritt fehlt**: 
-1. Die alte Per-Szene-Karte entfernen
-2. Den neuen Editor einbauen
-3. Die Overlays an den Preview-Player durchreichen
+Das ist inkonsistent. Außerdem werden die Overlays auch dann im Preview-Player gerendert, wenn der Nutzer sie eigentlich aus hat (z.B. um schnell ohne Text zu prüfen, wie das Video wirkt).
 
 ## Plan
 
-### 1. `VoiceSubtitlesTab.tsx` — Per-Szene-Block ersetzen
-- **Z. 654–826 entfernen** (kompletter `<Card>`-Block "Per-Scene Overlays" inkl. Collapsibles, Thumbnails, applyStyleToAll usw.)
-- Stattdessen **eine neue Karte** mit:
-  ```tsx
-  <Card>
-    <CardHeader> Type-Icon + "Text-Overlays" + dezenter Hinweis "Spannen über das gesamte Video" </CardHeader>
-    <CardContent>
-      <TextOverlayEditor2028
-        overlays={assemblyConfig.globalTextOverlays ?? []}
-        onOverlaysChange={(next) => onUpdateAssembly({ globalTextOverlays: next })}
-        videoDuration={totalSceneDuration}
-        currentTime={previewCurrentTime}
-      />
-    </CardContent>
-  </Card>
-  ```
-- Lokaler State `previewCurrentTime` hochreichen via `onTimeUpdate`-Callback vom `ComposerSequencePreview`
-- Unbenutzte Imports/Helper aufräumen: `TEXT_POSITIONS`, `TEXT_ANIMATIONS`, `FONT_FAMILIES`, `POSITION_TO_CSS`, `openSceneId`, `updateOverlay`, `applyStyleToAll`, `overlayCount`, `Collapsible*`, `ChevronUp/Down`, `Edit2/Trash2/Check/X` (wo nur für den entfernten Block)
+### 1. Datenmodell: `enabled`-Flag
+`src/types/video-composer.ts` — `AssemblyConfig` um Feld erweitern:
+```ts
+textOverlaysEnabled?: boolean; // default: true wenn Overlays existieren
+```
+(Backwards-Compat: undefined = true, damit alte Drafts weiterhin funktionieren.)
 
-### 2. Overlays an den Preview-Player durchreichen
-- In `<ComposerSequencePreview>`-Aufruf (Z. 305–309) ergänzen:
-  ```tsx
-  globalTextOverlays={assemblyConfig.globalTextOverlays}
-  onTimeUpdate={(t) => setPreviewCurrentTime(t)}
-  ```
+### 2. UI: Toggle in der Text-Overlays-Karte
+`VoiceSubtitlesTab.tsx` — den `<CardHeader>` der Text-Overlays-Karte um einen Switch ergänzen, **identisch im Stil** zu Voiceover/Music/Subtitles:
+- Switch rechts oben in der Karte
+- Wenn **aus**: Editor disabled (`opacity-50`, `pointer-events-none`) **und** ein dezenter Hinweis "Text-Overlays sind deaktiviert — aktiviere sie, um sie im Video anzuzeigen."
+- Wenn **an**: normal nutzbar
 
-### 3. `generateScriptFromScenes` anpassen
-Funktion las bisher aus `scene.textOverlay.text` → wechselt auf `assemblyConfig.globalTextOverlays.map(o => o.text).join('. ')`. (Bleibt nützlich als Voiceover-Skript-Quelle.)
+### 3. Preview-Player: Overlays nur bei `enabled` rendern
+`VoiceSubtitlesTab.tsx` Z. ~305 — Prop-Durchreichung anpassen:
+```tsx
+globalTextOverlays={
+  assemblyConfig.textOverlaysEnabled === false 
+    ? [] 
+    : assemblyConfig.globalTextOverlays
+}
+```
+So bleiben die Daten erhalten, werden aber nicht angezeigt.
 
-### 4. Mini-Migration beim Mount
-Einmaliger `useEffect`: wenn `globalTextOverlays` leer **und** mind. eine Szene noch ein altes `textOverlay.text` hat → konvertiere automatisch (mit `startTime = startOffset(scene)`, `endTime = startOffset + duration`) und schreibe in `assemblyConfig.globalTextOverlays`. Verhindert Datenverlust für alte Drafts.
+### 4. Final-Render: Overlays respektieren das Flag
+`supabase/functions/compose-video-assemble/index.ts` — beim Aufbau des Render-Payloads:
+```ts
+globalTextOverlays: body.assemblyConfig?.textOverlaysEnabled === false 
+  ? [] 
+  : (body.assemblyConfig?.globalTextOverlays ?? [])
+```
+Damit ist der finale MP4-Output deckungsgleich mit dem Preview.
 
-### 5. Build-Sanitychecks
-- `Sparkles`/`Wand2`/`Loader2`-Imports prüfen — bleiben, weil Voiceover-UI sie nutzt
-- Kein referenzieller Use von entfernten Helfern → keine TS-Errors mehr
+### 5. Lokalisierung
+`src/lib/translations.ts` — drei neue Keys (DE/EN/ES):
+- `videoComposer.textOverlaysEnabled` — "Text-Overlays" (Switch-Label)
+- `videoComposer.textOverlaysDisabledHint` — "Text-Overlays sind deaktiviert. Aktiviere sie, um sie im Video anzuzeigen."
 
 ## Geänderte Dateien
-- `src/components/video-composer/VoiceSubtitlesTab.tsx` — Per-Szene-Block raus, Director's-Cut-Editor rein, Migration, Time-Sync, Imports aufräumen
+- `src/types/video-composer.ts` — neues Feld `textOverlaysEnabled`
+- `src/components/video-composer/VoiceSubtitlesTab.tsx` — Switch in Karte, disabled-State, conditional Pass-Through an Preview
+- `supabase/functions/compose-video-assemble/index.ts` — Flag im Render-Payload respektieren
+- `src/lib/translations.ts` — neue Keys (DE/EN/ES)
 
 ## Verify
-- Tab "Voiceover & Untertitel": **kein** "Szene 1 / Szene 2 / …" Per-Szene-Editor mehr
-- Stattdessen: Der mächtige Director's-Cut-Editor mit Timeline, Templates, Position-Grid, Animations-Live-Preview, Style-Presets
-- Text-Overlays erscheinen **nur** im oberen Preview-Player, zeitsynchron zur Wiedergabe
-- Ein Overlay kann z.B. von Sek 3 bis Sek 12 laufen, unabhängig von Szenen-Cuts
-- Alte Drafts mit Per-Szene-Overlays werden automatisch in globale Overlays migriert
+- Tab "Voiceover & Untertitel": Text-Overlays-Karte hat **rechts oben einen Switch** wie die anderen Karten
+- Switch **aus** → Editor wird grau/inaktiv, Hinweistext erscheint, **keine Overlays** im Preview-Player oben
+- Switch **an** → alles wie gewohnt nutzbar, Overlays sichtbar
+- Bestehende Drafts ohne `textOverlaysEnabled`-Feld verhalten sich wie "an" (kein Datenverlust)
+- Final-Render via Lambda enthält Overlays nur wenn der Switch beim Export an war
 
