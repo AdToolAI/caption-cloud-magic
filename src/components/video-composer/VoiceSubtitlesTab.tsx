@@ -26,6 +26,8 @@ import {
 } from 'lucide-react';
 import ComposerSequencePreview from './ComposerSequencePreview';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
+import { VoiceoverScriptGenerator } from '@/components/universal-creator/VoiceoverScriptGenerator';
+import { AdvancedVoiceSettings, type VoiceSettings } from '@/components/video/AdvancedVoiceSettings';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { supabase } from '@/integrations/supabase/client';
 import type {
@@ -114,6 +116,34 @@ export default function VoiceSubtitlesTab({
   const [generatingVo, setGeneratingVo] = useState(false);
   const [voPreviewPlaying, setVoPreviewPlaying] = useState(false);
   const voAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [scriptGenOpen, setScriptGenOpen] = useState(false);
+
+  // Voice tuning (speed + ElevenLabs settings) — synced from/to assemblyConfig.voiceover
+  const [speed, setSpeed] = useState<number>(voiceover?.speed ?? 1.0);
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
+    stability: voiceover?.stability ?? 0.5,
+    similarityBoost: voiceover?.similarityBoost ?? 0.75,
+    styleExaggeration: voiceover?.styleExaggeration ?? 0.0,
+    useSpeakerBoost: voiceover?.useSpeakerBoost ?? true,
+  });
+
+  // Hydrate when voiceover loads from a saved draft
+  useEffect(() => {
+    if (!voiceover) return;
+    if (typeof voiceover.speed === 'number') setSpeed(voiceover.speed);
+    setVoiceSettings({
+      stability: voiceover.stability ?? 0.5,
+      similarityBoost: voiceover.similarityBoost ?? 0.75,
+      styleExaggeration: voiceover.styleExaggeration ?? 0.0,
+      useSpeakerBoost: voiceover.useSpeakerBoost ?? true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceover?.voiceId]);
+
+  const totalSceneDuration = useMemo(
+    () => scenes.reduce((sum, s) => sum + (s.durationSeconds || 0), 0),
+    [scenes],
+  );
 
   const generateScriptFromScenes = () => {
     const script = scenes
