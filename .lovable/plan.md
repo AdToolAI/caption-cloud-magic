@@ -2,59 +2,50 @@
 
 ## Befund
 
-Zwei separate Probleme:
+Im `ComposerSequencePreview.tsx` gibt es noch einen Fall, in dem **eine** Übergangsstelle „hängt" (Video bleibt schwarz / `opacity: 0` und springt nicht zur nächsten Szene weiter). Die Ursache liegt im Reveal-Flow nach dem `src`-Wechsel:
 
-### Problem 1: Kein Sound im Export (Hauptbug)
+### Wurzelursachen
 
-`useComposerPersistence.ts` speichert `assembly_config` **nur beim ersten Insert** eines Projekts. Spätere Änderungen (Voiceover hinzufügen, Musik wählen, Untertitel generieren) leben nur im React-State (`updateAssembly` in `VideoComposerDashboard.tsx` Zeile 296–301 ruft nur `setProject`). Es gibt **keinen einzigen** `UPDATE composer_projects SET assembly_config = ...` im Code.
+**1. Fehlendes Safety-Net beim Reveal**
+Nach `setSceneIdx` (Z. 107-153) wird `transitioningRef = true`, `videoVisible = false` gesetzt und `currentTime = 0` zugewiesen. Reveal passiert nur über drei Pfade:
+- `seeked` Listener
+- `canplay` Listener (nur registriert wenn `readyState < 2`)
+- `requestAnimationFrame` (nur wenn `readyState >= 2`)
 
-**Beweis aus DB:** Letzter Composer-Render (`6ed30e9f-9b6d-417c-89df-65348a91eff6`) hat in der DB `"music": null, "voiceover": null` — obwohl in der Preview Sound zu hören war (weil dort der lokale State genutzt wird). `compose-video-assemble` liest aber `assembly_config` aus der DB → leerer `voiceoverUrl`/`musicUrl` → Lambda rendert mit `muted: true` → MP4 ohne Audio-Spur (`r41_audioMuxed: false` im Logging bestätigt).
+**Problem:** Wenn der neue Clip-`src` noch nicht geladen ist (`readyState === 0`), wird `currentTime = 0` **vor** dem Setzen von `src` ausgeführt → wirft still einen Fehler, `seeked` feuert nie. Falls der Browser dann auch `canplay` verzögert oder gar nicht feuert (bei einigen Codec-/Cache-Konstellationen passiert das), bleibt das Video **dauerhaft unsichtbar** und `transitioningRef` bleibt `true` → `onTimeUpdate` wird ignoriert → `advanceScene` feuert nie → Übergang hängt.
 
-### Problem 2: „Zusammengekrampfte" Untertitel/Overlays
+**2. `preload` fehlt am `<video>`-Element (Z. 342-354)**
+Ohne `preload="auto"` lädt der Browser bei einigen Konfigurationen die Metadata erst nach dem ersten Play-Versuch → `canplay` verzögert sich. Genau dort entsteht der „hängt"-Effekt.
 
-Im Screenshot überlappen das obere Overlay („Über 500 Creator skalieren bereits.") und das untere („Skaliere dein Marketing mit KI.") visuell mit der Bottom-Padding-Zone der Subtitle-Renderer. Beide sind **globale Text-Overlays** (aus der Migration), keine echten Untertitel — aber sie nutzen `fontSize: 'lg'` ohne ausreichendes Padding und ohne Background, daher wirkt der Text gequetscht und schwer lesbar bei stark texturiertem Video-Hintergrund.
+**3. Kein Fallback-Timeout**
+Es gibt keinen Sicherheits-Timeout, der nach z. B. 1500 ms zwangsweise revealt + zur nächsten Szene weitergeht, falls weder `canplay` noch `seeked` feuern.
 
-Konkret in `TextOverlayRenderer` (gerendert via `ComposedAdVideo.tsx`): keine line-height-Kontrolle, kein Min-Padding, kein Max-Width. Bei langen Sätzen umbricht der Text eng am Rand.
+**Warum nur EIN Übergang hängt:** Genau jener Clip, dessen Source langsamer dekodiert wird (oft der erste, der nicht im Browser-Cache ist). Die anderen sind nach dem ersten Durchlauf gecacht.
 
 ## Plan
 
-### Fix 1 — `assembly_config` bei jeder Änderung in der DB persistieren (kritisch)
+### Fix 1 — Reveal-Reihenfolge umdrehen
+- **Zuerst** `addEventListener('canplay', ...)` registrieren, **dann** auf `loadedmetadata`/`loadeddata` warten, erst **dann** `currentTime = 0` setzen. So feuert `seeked` zuverlässig.
+- `loadeddata` als zusätzlichen Reveal-Trigger ergänzen.
 
-In `src/components/video-composer/VideoComposerDashboard.tsx`:
-- `updateAssembly` ergänzen: nach `setProject` zusätzlich asynchron in `composer_projects` schreiben (debounced 800 ms, damit bei schnellen Slider-Änderungen nicht jeder Tick einen DB-Call löst).
-- Außerdem **vor jedem Render-Trigger** (in `AssemblyTab.handleRender`, vor `supabase.functions.invoke('compose-video-assemble', ...)`) ein **synchrones Flush** der aktuellen `assemblyConfig` durchführen, damit der Edge-Function-Aufruf garantiert die neuesten Audio-URLs sieht. Das deckt Race Conditions ab (User klickt sofort nach Voiceover-Generierung auf Render).
+### Fix 2 — Hard-Fallback-Timeout (1500 ms)
+- Nach dem Szenenwechsel einen `setTimeout(reveal, 1500)` registrieren. Wenn nach 1.5 s **immer noch** weder `canplay` noch `seeked` gefeuert hat, einfach revealen (der Browser wird beim nächsten `play()` automatisch buffern und der User sieht statt schwarzem Bild ein kurzes Stuttern — viel besser als „hängen").
+- Timeout im Cleanup canceln.
 
-In `useComposerPersistence.ts`:
-- Eine neue Funktion `persistAssemblyConfig(projectId, assemblyConfig)` hinzufügen, die `supabase.from('composer_projects').update({ assembly_config, updated_at: now }).eq('id', projectId)` ausführt. Wird von beiden Stellen oben benutzt.
+### Fix 3 — `preload="auto"` am `<video>`
+- Attribute setzen, damit der Browser den Clip aggressiv vorlädt und `canplay` schneller feuert.
 
-### Fix 2 — Text-Overlay Lesbarkeit verbessern
-
-In `src/remotion/components/TextOverlayRenderer.tsx` (oder wo auch immer die Overlays gerendert werden — wird beim Edit lokalisiert):
-- `line-height: 1.3` setzen
-- `padding: 12px 24px` als Mindest-Innenabstand
-- `max-width: 80%` und `word-break: keep-all` für vernünftige Umbrüche
-- Bei `style.backgroundColor === 'transparent'` automatisch eine **stärkere Text-Shadow** (`0 2px 8px rgba(0,0,0,0.85), 0 0 4px rgba(0,0,0,0.6)`) für Lesbarkeit ohne Kasten
-- Position-Padding erhöhen: `top` und `bottom` Positionen mindestens 8 % vom Rand entfernt halten, damit sie nicht mit eventuellen Untertiteln (Bottom-Padding 12 %) kollidieren
-
-### Fix 3 — Untertitel-Renderer Padding leicht erhöhen
-
-In `src/remotion/templates/ComposedAdVideo.tsx` `SubtitleSegmentRenderer`:
-- `padding: '18px 32px'` (statt `14px 28px`) für luftigeres Erscheinungsbild
-- `lineHeight: 1.35` (statt 1.4) — minimal kompakter aber ausgewogener
-- Bei langen Subtitle-Texten: `maxWidth: '85%'` (statt 90%) für bessere Lesbarkeit
+### Fix 4 — Defensive: `currentTime = 0` nur wenn Video bereit
+- `if (v.readyState >= 1) v.currentTime = 0;` — sonst überspringen (das Video startet ohnehin von 0, weil nach `src`-Wechsel `currentTime` automatisch auf 0 zurückspringt).
 
 ## Geänderte Dateien
 
-- `src/hooks/useComposerPersistence.ts` — neue `persistAssemblyConfig`-Funktion
-- `src/components/video-composer/VideoComposerDashboard.tsx` — `updateAssembly` debounced DB-Write
-- `src/components/video-composer/AssemblyTab.tsx` — Pre-Render synchroner Flush
-- `src/remotion/components/TextOverlayRenderer.tsx` — Padding/Shadow/Lesbarkeit
-- `src/remotion/templates/ComposedAdVideo.tsx` — Subtitle-Padding-Tuning
+- `src/components/video-composer/ComposerSequencePreview.tsx` — alle vier Fixes oben (in einem Edit am Source-Effekt + dem `<video>`-Element)
 
 ## Verify
 
-1. **Audio im Export:** Voiceover generieren → Musik wählen → Render starten → fertiges MP4 herunterladen → Audio-Spur ist hörbar (auch außerhalb des Browsers, z. B. in VLC)
-2. **DB-State:** Nach jeder Voiceover-/Musik-Änderung ist `composer_projects.assembly_config` in der DB aktualisiert (per psql verifizierbar)
-3. **Race Condition:** Direkt nach Voiceover-Generierung „Render" klicken → Audio ist trotzdem im finalen Video enthalten
-4. **Lesbarkeit:** Text-Overlays haben sichtbares Padding und sind auch ohne Background-Box gut lesbar; Untertitel und Overlays überlappen nicht mehr visuell
+1. Preview eines Projekts mit ≥3 Szenen abspielen → **kein** Übergang bleibt schwarz hängen
+2. Mit DevTools → Network throttling auf „Slow 3G" → Preview spielt weiter durch (mit kurzem Stuttern, aber ohne Hänger)
+3. Slider scrubt sauber zwischen allen Szenen, auch bei kalt geladenem Cache
+4. Slider bewegt sich monoton vorwärts (kein Rubber-Band)
 
