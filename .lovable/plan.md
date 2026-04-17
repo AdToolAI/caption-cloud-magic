@@ -1,133 +1,53 @@
 
 
-## Befund — warum die aktuelle Dual-Slot-Implementierung schlechter geworden ist
+## Befund
 
-Beim Lesen von `ComposerSequencePreview.tsx` finde ich **fünf** zusammenwirkende Race-Conditions, die das Erlebnis unzuverlässig machen — insbesondere bei langsameren Verbindungen, also genau für die "1000 Nutzer", die du erwähnst:
+Im Storytelling-Prompt (`supabase/functions/compose-video-storyboard/index.ts`, Zeile 38) steht aktuell:
 
-### Bug 1: Stale closures durch `setActiveSlot`-Toggle
-`performSwap` ruft `setActiveSlot(prev => prev === 'A' ? 'B' : 'A')`. Aber `advanceScene` selbst ist mit dem **alten** `activeSlot` als Closure gebaut. Beim **nächsten** Übergang ist `getStandbyVideo()` falsch berechnet → Standby zeigt auf das gerade-aktive Slot → **Hänger oder schwarzer Frame**.
+> "Text overlays should be poetic/cinematic (a single line of dialogue, a date, a place, a feiling) — never marketing copy."
 
-### Bug 2: Doppeltes Preloading überschreibt warmes Standby
-`useEffect([sceneIdx])` (Z. 154–172) lädt nach Setzen von `sceneIdx` den **übernächsten** Clip in den Standby-Slot. Aber `setSceneIdx` passiert **nach** dem 400 ms Crossfade — der Standby ist zu diesem Zeitpunkt aber bereits der **gerade aktive Slot** geworden. Resultat: Dieses useEffect überschreibt unter Umständen die `src` des aktiven, gerade abspielenden Videos → **abrupter Cut + Reload**.
+Damit **fordert** der Prompt das Modell aktiv auf, Text-Overlays (z. B. „Sleepy Hollow, 1790" wie im Screenshot) zu erzeugen. Die generelle "NO BURNED-IN TEXT"-Regel (Z. 105–106) verbietet zwar Text **innerhalb** des AI-generierten Videoclips, regelt aber **nicht** die Overlay-Felder (`textOverlayText`, `textPosition`, `textAnimation`) im Storyboard-Schema (Z. 213–224).
 
-### Bug 3: `setSceneIdx` mitten im Crossfade
-Während der 400 ms Fade läuft, ist `sceneIdx` noch der alte. Nach dem Timeout wird `sceneIdx` gesetzt — aber `currentScene`, `mediaUrl`, `isImage` re-evaluieren mid-fade nicht synchron. Bei React-Batching landet der Fade-Endpunkt manchmal vor dem State-Commit → Slot B zeigt korrekten Frame, aber `currentScene` ist noch alt → `onTimeUpdate`-Handler vergleicht gegen falsche `sceneDur` → **Doppel-Advance**.
+Zusätzlich: Auch im Screenshot ist „Sleepy Hollow, 1790" im Video-Clip **eingebrannt** — das ist ein zusätzliches Problem (das AI-Modell ignoriert die negative Klausel manchmal), aber dafür bräuchte es separate Maßnahmen am Clip-Generator-Level.
 
-### Bug 4: `slotASceneIdxRef.current !== nextIdx`-Check nutzt alten Slot-Mapping
-Nach Toggle in `performSwap` zeigt `slotASceneIdxRef` nicht mehr das, was tatsächlich in Slot A ist (weil die Refs nicht beim Toggle umgelabelt werden).
+Für diese Anfrage konzentrieren wir uns sauber auf den **Storytelling-Prompt** und stellen sicher, dass der Storyboard-Generator für Storytelling **keinerlei Text-Overlays** mehr produziert.
 
-### Bug 5: Initial-Setup race
-`useEffect([playable])` setzt Slot A src und sofort danach Slot B src in **demselben Render**. Beide `<video>`-Elemente fangen parallel an zu laden und konkurrieren um Bandbreite — das ist akzeptabel, aber kombiniert mit Bug 1+2 kann der erste Übergang schon hängen.
+## Plan
 
-### Wurzelursache
-Die Implementierung mischt **Slot-Identität** (welches DOM-Element) mit **Szenen-Index** (welcher Inhalt). Das Director's Cut-Memory beschreibt explizit, wie das richtig gemacht wird: **Slot-Mapping per Ref, niemals per State**, und **alle Slot-Operationen mit aktuellen Refs lesen** statt closures.
+### Fix 1 — Storytelling-Strukturprompt: Text-Overlays komplett verbieten
+In `compose-video-storyboard/index.ts` Z. 38 die Zeile
 
----
+> "Text overlays should be poetic/cinematic..."
 
-## Plan — Robuste Production-Grade Lösung
+ersetzen durch eine harte Regel:
 
-### Strategie: "Stateless Crossfade" mit Ref-basiertem Mapping
+> "🚨 NO TEXT OVERLAYS AT ALL — `textOverlayText` MUST be an empty string `""` for every scene. Storytelling lebt rein von Bildsprache, Atmosphäre, Schauspiel und Schnitt — keine Schrift, keine Untertitel, keine Datums-/Ort-Inserts. Der Zuschauer soll den Film sehen, nicht lesen."
 
-Statt `activeSlot` als React-State zu führen (was Closures invalidiert), wird Slot-Mapping ausschließlich über Refs gemacht. Der UI-Renderer liest Opacities aus React-State, aber die Logik nutzt nur Refs → keine Stale Closures, keine Race Conditions.
+### Fix 2 — System-Prompt-Hinweis am `textOverlayText`-Schema
+Im Schema (Z. 213–215) die `description` von `textOverlayText` ergänzen:
 
-### Konkrete Architektur
+> `Short overlay text in ${langLabel} (max 8 words). Empty string if no text needed. **For category="storytelling": MUST always be empty string "".**`
 
-**1. Ref-basierte Slot-Identität**
-```ts
-const activeSlotRef = useRef<'A' | 'B'>('A');
-const slotMapRef = useRef<{ A: number; B: number }>({ A: 0, B: 1 }); // sceneIdx in each slot
-const [, forceRender] = useReducer(x => x + 1, 0); // for opacity changes
+### Fix 3 — Conditional Hard-Rule im System-Prompt
+Direkt nach den „Hard rules" (Z. 100–103) einen kategorie-bedingten Block einfügen:
+
 ```
-Nie mehr `useState` für Slot-Identität — Refs lesen sich immer aktuell.
-
-**2. Singleton-Übergang mit Lock**
-Eine `transitioningRef` schützt vor doppelten `advanceScene`-Calls. Erst nach komplettem Crossfade + Cleanup wird sie freigegeben.
-
-**3. Klare Phasen**
-- **Phase IDLE**: Active spielt, Standby ist auf `nextIdx` vorgeladen + auf Frame 0 gepausiert
-- **Phase TRANSITION**: Standby `play()` + opacity-swap (400 ms)
-- **Phase SETTLE**: Active wird neuer Standby, lädt `nextIdx + 1` nach
-- Kein `setSceneIdx` mid-fade — `sceneIdx` springt erst in Phase SETTLE
-
-**4. Robustes Preloading**
-- Bei Init: Slot A = scene 0, Slot B = scene 1 (parallel)
-- Nach jedem Settle: alter Slot bekommt `playable[currentIdx + 1]?.clipUrl`
-- Wenn `clipUrl` schon gesetzt ist (gleicher Wert): nichts tun (verhindert Reload)
-
-**5. "Always advance" Garantie für 1000 Nutzer**
-- Standby ist nach 1.2s **immer** sichtbar gemacht — auch wenn `readyState < 2`. Das Video buffert dann sichtbar aber das Erlebnis hängt nicht.
-- Falls Standby gar keine `src` hat (Bug-Case): direkt zum `nextIdx + 1` springen statt zu hängen.
-- 5s Watchdog: Wenn nach 5s kein `timeupdate` vom aktiven Slot kam → manuell `advanceScene` triggern.
-
-**6. Defensive Cleanup**
-- Alle `setTimeout`s in einer Map gespeichert, beim Unmount/Scene-Change gecleart.
-- Alle Event-Listener mit `{ once: true }` registriert.
-
-**7. Audio bleibt unabhängig**
-Voiceover am separaten `<audio>`-Element, drift-correction bei > 0.4s Differenz zur globalTime.
-
-### Code-Struktur (vereinfacht)
-```ts
-const performTransition = (toIdx: number) => {
-  if (transitioningRef.current) return;
-  transitioningRef.current = true;
-  
-  const fromSlot = activeSlotRef.current;
-  const toSlot = fromSlot === 'A' ? 'B' : 'A';
-  const standby = toSlot === 'A' ? videoARef.current : videoBRef.current;
-  
-  // Ensure standby holds toIdx (preloaded ideally)
-  if (slotMapRef.current[toSlot] !== toIdx) {
-    setSrcForSlot(toSlot, playable[toIdx].clipUrl);
-    slotMapRef.current[toSlot] = toIdx;
-  }
-  
-  const startCrossfade = () => {
-    try { standby!.currentTime = 0; standby!.play(); } catch {}
-    setOpacity(toSlot, 1); setOpacity(fromSlot, 0);
-    
-    setTimeout(() => {
-      try { (fromSlot === 'A' ? videoARef : videoBRef).current?.pause(); } catch {}
-      activeSlotRef.current = toSlot;
-      setSceneIdx(toIdx);
-      // Preload toIdx+1 into the now-free slot (fromSlot)
-      const nextNext = playable[toIdx + 1];
-      if (nextNext?.clipUrl && slotMapRef.current[fromSlot] !== toIdx + 1) {
-        setSrcForSlot(fromSlot, nextNext.clipUrl);
-        slotMapRef.current[fromSlot] = toIdx + 1;
-      }
-      transitioningRef.current = false;
-    }, CROSSFADE_MS);
-  };
-  
-  if (standby!.readyState >= 2) {
-    startCrossfade();
-  } else {
-    let fired = false;
-    const onReady = () => { if (!fired) { fired = true; startCrossfade(); } };
-    standby!.addEventListener('canplay', onReady, { once: true });
-    standby!.addEventListener('loadeddata', onReady, { once: true });
-    setTimeout(onReady, STANDBY_BUDGET_MS); // hard fallback
-  }
-};
+${category === 'storytelling' ? '🚨 STORYTELLING MODE — TEXT OVERLAY BAN: textOverlayText MUST be "" for every scene. textAnimation MUST be "none". textPosition can stay default but is irrelevant.' : ''}
 ```
 
-### Skalierbarkeit für 1000+ Nutzer
-- **Keine Bandbreiten-Verschwendung**: Nur 2 parallel preloadete Clips, nicht alle.
-- **Graceful degradation**: Bei Buffering läuft die Sequenz weiter, statt zu hängen.
-- **Watchdog**: Gibt es überhaupt keinen `timeupdate` für 5s, wird zwangsweise weitergesprungen.
-- **Kein Memory Leak**: Alle Timer/Listener werden konsequent gecleart.
+So sieht das LLM die Regel zweimal (Struktur + System), was bei Gemini Flash die Compliance deutlich erhöht.
+
+### Optional (nicht in diesem Plan, aber Nebenbefund)
+Der Screenshot zeigt eingebrannten Text **im AI-Clip selbst** („Sleepy Hollow, 1790"). Das ist ein separates Problem im `compose-video-clips`-Negativ-Suffix bzw. am Modell. Wenn gewünscht, kann ich das als Folgeschritt verschärfen (z. B. „no movie title cards, no date stamps, no location cards" zur Negativ-Liste hinzufügen).
 
 ## Geänderte Dateien
 
-- `src/components/video-composer/ComposerSequencePreview.tsx` — komplette Re-Implementierung des Player-Cores nach obigem Schema. UI-Layout (Controls, Subtitles, Overlays, Scene-Dots) bleibt 1:1 erhalten.
+- `supabase/functions/compose-video-storyboard/index.ts` — drei kleine Edits in der Storytelling-Struktur, im Schema und im System-Prompt
 
 ## Verify
 
-1. Preview eines Projekts mit ≥4 Szenen → **alle** Übergänge zeigen sanften 400ms-Crossfade, kein Schwarz, kein Hänger
-2. Hard-reload (Cache leer) → erste Wiedergabe spielt komplett durch
-3. DevTools → Network throttling "Slow 3G" → Preview spielt durch (mit kurzem Buffering, aber ohne Hänger >2s)
-4. Slider-Scrub auf jede Szene → Hard-Cut, kein Crossfade-Artefakt
-5. Voiceover bleibt synchron (Drift < 0.4s)
-6. Mehrfaches Play/Pause während eines Crossfades → keine doppelten Advances, kein Crash
+1. Neues Storytelling-Projekt anlegen → Storyboard generieren → in der DB hat **jede** Szene `textOverlayText = ""`
+2. Im Voiceover & Untertitel-Tab erscheinen keine Text-Overlays mehr aus dem Storyboard
+3. Sprachen DE/EN/ES alle gleiches Verhalten
+4. Andere Kategorien (corporate-ad, product-ad, custom) generieren weiterhin normal Text-Overlays
 
