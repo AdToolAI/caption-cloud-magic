@@ -48,6 +48,91 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
   // Beat sync state
   const [analyzingBeats, setAnalyzingBeats] = useState(false);
 
+  // Upload state
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle music file upload
+  const handleMusicUpload = useCallback(async (file: File | null) => {
+    if (!file || !music) return;
+
+    if (!file.type.startsWith('audio/')) {
+      toast({ title: t('videoComposer.musicUploadError'), description: 'Audio only', variant: 'destructive' });
+      return;
+    }
+
+    const MAX_SIZE = 20 * 1024 * 1024; // 20MB
+    if (file.size > MAX_SIZE) {
+      toast({ title: t('videoComposer.musicTooLarge'), variant: 'destructive' });
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    // Simulated progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress((prev) => (prev >= 90 ? prev : prev + 10));
+    }, 200);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const ext = file.name.split('.').pop() || 'mp3';
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${user.id}/${Date.now()}_${safeName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('background-music')
+        .upload(path, file, { contentType: file.type, upsert: false });
+
+      if (uploadErr) throw uploadErr;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('background-music')
+        .getPublicUrl(path);
+
+      // Stop any preview playback
+      musicAudioRef.current?.pause();
+      setMusicPlaying(null);
+
+      onUpdateAssembly({
+        music: { ...music, trackUrl: publicUrl, trackName: file.name, isUpload: true },
+      });
+
+      setUploadProgress(100);
+      toast({ title: t('videoComposer.musicUploaded'), description: file.name });
+    } catch (err: any) {
+      toast({ title: t('videoComposer.musicUploadError'), description: err.message, variant: 'destructive' });
+    } finally {
+      clearInterval(progressInterval);
+      setTimeout(() => {
+        setUploading(false);
+        setUploadProgress(0);
+      }, 500);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [music, onUpdateAssembly, t]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    handleMusicUpload(file);
+  }, [handleMusicUpload]);
+
+  const handleRemoveUpload = useCallback(() => {
+    if (!music) return;
+    musicAudioRef.current?.pause();
+    setMusicPlaying(null);
+    onUpdateAssembly({
+      music: { ...music, trackUrl: '', trackName: '', isUpload: false },
+    });
+  }, [music, onUpdateAssembly]);
+
   // Search background music
   const handleSearchMusic = async () => {
     if (!music) return;
