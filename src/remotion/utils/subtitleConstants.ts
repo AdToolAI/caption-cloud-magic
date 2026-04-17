@@ -20,4 +20,4 @@ export const SUBTITLE_TOP_PADDING = '8%';
 export const SUBTITLE_Z_INDEX = 200;
 
 /** Version marker — bump on every subtitle-related change to verify bundle freshness */
-export const SUBTITLE_RENDER_VERSION = 'v2026-04-13e-unified-subtitle-renderer';
+export const SUBTITLE_RENDER_VERSION = 'v2026-04-17a-composed-ad-subtitles-overlays';

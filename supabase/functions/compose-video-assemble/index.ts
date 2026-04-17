@@ -106,22 +106,51 @@ serve(async (req) => {
     const globalTextOverlays = textOverlaysEnabled
       ? (Array.isArray(assemblyConfig.globalTextOverlays) ? assemblyConfig.globalTextOverlays : [])
       : [];
+
+    // Strict audio gating: only include URLs when feature is enabled AND URL is set
+    const voiceoverEnabled = assemblyConfig.voiceover?.enabled !== false;
+    const voiceoverUrl = (voiceoverEnabled && assemblyConfig.voiceover?.audioUrl)
+      ? String(assemblyConfig.voiceover.audioUrl)
+      : '';
+    const musicEnabled = assemblyConfig.music?.enabled !== false;
+    const musicUrl = (musicEnabled && assemblyConfig.music?.trackUrl)
+      ? String(assemblyConfig.music.trackUrl)
+      : '';
+
+    // Sanitize subtitle segments — keep only fields the schema expects
+    const cleanSegments = (Array.isArray(subtitlesCfg.segments) ? subtitlesCfg.segments : [])
+      .filter((s: any) => s && typeof s.text === 'string' && Number.isFinite(Number(s.startTime)) && Number.isFinite(Number(s.endTime)))
+      .map((s: any) => ({
+        id: String(s.id || crypto.randomUUID()),
+        text: String(s.text),
+        startTime: Number(s.startTime),
+        endTime: Number(s.endTime),
+      }));
+
     const inputProps = {
       scenes: remotionScenes,
       colorGrading: assemblyConfig.colorGrading || 'none',
       kineticText: assemblyConfig.kineticText || false,
-      voiceoverUrl: assemblyConfig.voiceover?.audioUrl || '',
-      backgroundMusicUrl: assemblyConfig.music?.trackUrl || '',
+      voiceoverUrl,
+      backgroundMusicUrl: musicUrl,
       backgroundMusicVolume: (assemblyConfig.music?.volume || 30) / 100,
       aspectRatio,
       subtitles: {
         enabled: !!subtitlesCfg.enabled,
         language: subtitlesCfg.language || 'de',
         style: subtitlesCfg.style || {},
-        segments: Array.isArray(subtitlesCfg.segments) ? subtitlesCfg.segments : [],
+        segments: cleanSegments,
       },
       globalTextOverlays,
     };
+
+    console.log('[compose-video-assemble] Audio/overlay payload:', {
+      voiceoverUrl: voiceoverUrl ? '[set]' : '[empty]',
+      backgroundMusicUrl: musicUrl ? '[set]' : '[empty]',
+      subtitlesEnabled: !!subtitlesCfg.enabled,
+      subtitleSegments: cleanSegments.length,
+      globalOverlays: globalTextOverlays.length,
+    });
 
     // 7. Create video_renders entry — match real schema (no template_id!)
     const renderId = crypto.randomUUID();
