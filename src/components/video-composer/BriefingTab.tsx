@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import {
   ShoppingBag, Building2, BookOpen, Palette,
-  Wand2, Hand, Plus, X, ArrowRight, Loader2, Sparkles, ShieldAlert, ChevronDown, ChevronUp,
+  Wand2, Hand, Plus, X, ArrowRight, Loader2, ShieldAlert, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -240,11 +240,11 @@ export default function BriefingTab({
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Combined AI Tips & Legal Notice */}
-      <div className="relative overflow-hidden rounded-xl bg-card/40 backdrop-blur-sm border border-gold/20 shadow-soft">
+      {/* Legal Usage Notice */}
+      <div className="relative overflow-hidden rounded-xl bg-card/40 backdrop-blur-sm border border-destructive/20 shadow-soft">
         <div
-          className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-gold via-gold/60 to-transparent"
-          style={{ boxShadow: '0 0 12px hsl(var(--primary) / 0.4)' }}
+          className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-destructive via-destructive/60 to-transparent"
+          style={{ boxShadow: '0 0 12px hsl(var(--destructive) / 0.4)' }}
         />
         <div className="p-4 pl-5">
           <button
@@ -254,11 +254,11 @@ export default function BriefingTab({
             aria-expanded={!tipsCollapsed}
           >
             <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gold/10 border border-gold/20">
-                <Sparkles className="h-3.5 w-3.5 text-gold" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-destructive/10 border border-destructive/30">
+                <ShieldAlert className="h-3.5 w-3.5 text-destructive" />
               </div>
-              <h3 className="font-display text-sm font-semibold tracking-wide text-foreground">
-                {t('videoComposer.aiTipsTitle')}
+              <h3 className="font-display text-sm font-semibold tracking-wide text-destructive">
+                {t('videoComposer.aiLegalTitle')}
               </h3>
             </div>
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1 group-hover:text-foreground transition-colors">
@@ -268,49 +268,20 @@ export default function BriefingTab({
           </button>
 
           {!tipsCollapsed && (
-            <>
-              {/* Technical Tips (gold) */}
-              <ul className="mt-4 space-y-2.5 text-xs leading-relaxed text-muted-foreground">
-                <li className="flex gap-2.5">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/70" />
-                  <span>{t('videoComposer.aiTipPrompt')}</span>
-                </li>
-                <li className="flex gap-2.5">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/70" />
-                  <span>{t('videoComposer.aiTipPersons')}</span>
-                </li>
-                <li className="flex gap-2.5">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/70" />
-                  <span className="text-foreground/90">{t('videoComposer.aiTipCredits')}</span>
-                </li>
-              </ul>
-
-              {/* Legal Section (destructive) */}
-              <div className="mt-4 pt-4 border-t border-border/30">
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-destructive/10 border border-destructive/30">
-                    <ShieldAlert className="h-3.5 w-3.5 text-destructive" />
-                  </div>
-                  <h4 className="font-display text-sm font-semibold tracking-wide text-destructive">
-                    {t('videoComposer.aiLegalTitle')}
-                  </h4>
-                </div>
-                <ul className="space-y-2.5 text-xs leading-relaxed text-muted-foreground">
-                  <li className="flex gap-2.5">
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
-                    <span className="text-foreground/90">{t('videoComposer.aiLegalProhibited')}</span>
-                  </li>
-                  <li className="flex gap-2.5">
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
-                    <span>{t('videoComposer.aiLegalConsequences')}</span>
-                  </li>
-                  <li className="flex gap-2.5">
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
-                    <span>{t('videoComposer.aiLegalResponsibility')}</span>
-                  </li>
-                </ul>
-              </div>
-            </>
+            <ul className="mt-4 space-y-2.5 text-xs leading-relaxed text-muted-foreground">
+              <li className="flex gap-2.5">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
+                <span className="text-foreground/90">{t('videoComposer.aiLegalProhibited')}</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
+                <span>{t('videoComposer.aiLegalConsequences')}</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
+                <span>{t('videoComposer.aiLegalResponsibility')}</span>
+              </li>
+            </ul>
           )}
         </div>
       </div>
