@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { ArrowRight, Loader2, Music, Pause, Play, Search, Volume2, Zap } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { ArrowRight, Loader2, Music, Pause, Play, Search, Upload, UploadCloud, Volume2, X, Zap } from 'lucide-react';
 import {
   Select,
   SelectContent,
