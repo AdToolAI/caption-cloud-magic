@@ -2,64 +2,51 @@
 
 ## Befund
 
-Der User hat absolut recht — die Text-Overlay-Szenen (wie "Revolutioniere dein Marketing mit KI." mit Position "Top") sollten **nicht** als separate Storyboard-Szenen existieren. 
+Der "Gummiband"-Effekt tritt im **Preview-Player** (`ComposerSequencePreview.tsx`) auf. Der Player verwendet **ein einziges `<video>`-Element**, dessen `src` bei jedem Szenenwechsel getauscht wird. Genau dort liegt das Problem.
 
-**Logischer Workflow laut User:**
-1. **Storyboard:** Nur reine Video-Szenen (KI-generiert oder Stock) — **kein** Text, **keine** Titelkarten
-2. **Voiceover & Untertitel-Tab:** Hier werden später Texte/Untertitel/Overlays hinzugefügt — als **globale Overlays** über den fertigen Clips
+### Wurzelursache (3 zusammenwirkende Fehler)
 
-Aktuell mischt der Composer beides im Storyboard, was verwirrt und die Trennung „erst Bild generieren, dann Text drüberlegen" aufweicht.
+**Fehler 1: Clip-Länge ≠ `durationSeconds`**
+Die KI-Modelle (Hailuo: 6s/10s fixed, Kling: 5s/10s, Sora: 4/8/12s) liefern **feste Längen**. Der User stellt aber im Storyboard z. B. `durationSeconds: 5` ein. Beim Abspielen läuft das Video bis `onEnded` (also volle 6/10 s) — `advanceScene()` wird **erst dann** ausgelöst. Das bedeutet: die letzten 1–5 Sekunden des Clips werden trotz "Szenendauer = 5s" weitergespielt → die Slider-Position überspringt die geplante Boundary, dann erfolgt der harte Cut. Der User nimmt das als "Wiederholung/Zurückspulen" wahr.
+
+**Fehler 2: `onTimeUpdate` läuft beim Src-Tausch weiter und meldet Müll-Werte**
+Wenn `sceneIdx` wechselt, setzt der Effekt (Zeile 100–115) `v.currentTime = 0` und wartet auf `canplay`. **Browser feuern jedoch beim Src-Wechsel noch ein bis zwei `timeupdate`-Events mit dem alten `currentTime` des vorigen Clips**. Das ruft `onVideoTimeUpdate` (Zeile 164) auf → setzt `globalTime = startOffsets[neueSzene] + alterCurrentTime` → der Slider springt sichtbar **nach vorne** und dann wieder zurück. Das ist der "Gummiband"-Look.
+
+**Fehler 3: `<video>`-Element zeigt während des Src-Wechsels den letzten Frame des alten Clips weiter**
+Da nur **ein** Video-Element existiert und `src` gewechselt wird, bleibt der **letzte gerenderte Frame** des Vorgänger-Clips solange sichtbar, bis das neue Video den ersten Frame dekodiert hat (typisch 100–400 ms). Der User sieht: alter Clip → kurzer Freeze auf dem Endframe → neuer Clip startet. Das wirkt wie "kurzer Loop / Wiederholung".
+
+### Warum war es bei den ersten Videos nicht so?
+Höchstwahrscheinlich, weil dort entweder (a) die Clip-Längen zufällig genau zur gewählten `durationSeconds` passten, oder (b) der Composer früher die Clips serverseitig auf Szenenlänge **getrimmt** hat. Aktuell wird offensichtlich der **rohe** Clip vom Provider an den Preview gegeben.
 
 ## Plan
 
-### 1. Text-Szenen aus dem Storyboard entfernen
+### Fix 1 — Harte Längen-Begrenzung im Preview-Player
+In `ComposerSequencePreview.tsx`:
+- Beim `onTimeUpdate` prüfen: wenn `videoRef.current.currentTime >= scene.durationSeconds`, **sofort** `advanceScene()` und nicht auf `onEnded` warten.
+- Falls der Clip kürzer als `durationSeconds` ist (auch möglich), den letzten Frame freezen (Pause bei Ende, manueller Tick weiter bis `durationSeconds` erreicht ist) — kein Auto-Loop.
 
-In `StoryboardTab.tsx`:
-- Den `+ Text/Titel`-Button (oder ähnlichen Trigger zum Anlegen von `sceneType === 'text'` / `clipSource === 'text'`) **entfernen**
-- Beim Hinzufügen neuer Szenen wird **nur noch** zwischen KI/Stock/Upload gewählt — keine reinen Textkarten mehr
-- Bestehende Text-Szenen werden in der Liste **automatisch ausgeblendet** (mit einmaligem Hinweis-Toast: „Text-Overlays wurden in den Voiceover & Untertitel-Tab verschoben")
+### Fix 2 — Stale-`timeupdate`-Events beim Src-Wechsel ignorieren
+- Eine `transitioningRef` (boolean) einführen, die beim `sceneIdx`-Wechsel auf `true` geht und erst nach `canplay` + `currentTime === 0` auf `false`.
+- Solange `transitioningRef.current === true`: `onVideoTimeUpdate` ignorieren. So springt der globale Zeit-State nicht zurück.
 
-### 2. SceneCard `T`-Variante entfernen
+### Fix 3 — Sauberer Frame-Übergang via Ping-Pong oder Black-Frame
+Zwei Optionen, ich empfehle Option **A** als minimalinvasiv:
 
-In `SceneCard.tsx`:
-- Den Render-Zweig für Text-Only-Szenen (gold "T"-Icon + Text-Vorschau + `Top/Mitte/Unten`-Badge) entfernen
-- SceneCard rendert nur noch echte Video-Clip-Karten
+- **Option A (klein, sicher):** Beim Szenenwechsel **kurz das Video-Element ausblenden** (`opacity: 0`) bis `canplay` + erster `seeked`-Callback feuert, dann wieder einblenden. Dauer typisch 80–150 ms — nicht als "Gummiband", sondern als sauberer Cut wahrnehmbar.
 
-### 3. Migration bestehender Text-Szenen → globale Overlays
+- **Option B (groß, später):** Dual-Slot-Architektur (zwei `<video>`-Elemente, Ping-Pong wie im Director's Cut, siehe `mem://architecture/directors-cut/ping-pong-transition-architecture`). Vorteil: nahtlos. Nachteil: doppelt so viel Code, doppelter Bandbreitenverbrauch beim Preloading. **Nicht in diesem Schritt** — erst nach Verifikation, ob A schon ausreicht.
 
-Beim Laden eines Projekts in `VideoComposerPage.tsx` (oder `useComposerProject`-Hook):
-- Alle `composer_scenes` mit `clipSource === 'text'` (oder `sceneType === 'text'`) **automatisch** in `composer_global_overlays` migrieren:
-  - `text` ← `scene.textOverlay.text`
-  - `position` ← Mapping `top/center/bottom` aus `scene.textOverlay.position`
-  - `startTime` ← berechnete Position basierend auf `orderIndex` der vorherigen Szenen
-  - `endTime` ← `startTime + scene.durationSeconds`
-- Anschließend die Text-Szenen aus `composer_scenes` löschen (oder auf `archived` setzen)
-- Migration läuft **idempotent** und nur einmal pro Projekt (Flag in `composer_projects.metadata.text_scenes_migrated`)
-
-### 4. Voiceover/Untertitel-Tab als klaren Ort für Texte etablieren
-
-Im entsprechenden Tab (`VoiceoverTab.tsx` o. ä.) — falls noch nicht vorhanden:
-- Sektion „Text-Overlays" hinzufügen (oder hervorheben), in der globale Texte mit Start-/End-Zeit, Position, Animation und Style verwaltet werden
-- Das nutzt bereits den bestehenden `PreviewTextOverlayLayer`-Renderer
-
-(Falls die Sektion schon existiert: nur Migration + Storyboard-Cleanup nötig.)
-
-### 5. Klärungsfrage zur Storyboard-Architektur
-
-Nur noch unklar: Soll der „+ Szene"-Button im Storyboard künftig direkt eine **KI-Video-Szene** anlegen, oder weiterhin einen Auswahl-Dialog (KI / Stock / Upload) öffnen? Aktuell nehme ich an: bestehender Auswahl-Flow bleibt, nur die Text-Option entfällt.
+### Fix 4 (optional, falls A nicht reicht) — Preload des nächsten Clips
+- Verstecktes zweites `<video preload="auto">` für `playable[sceneIdx + 1]`, damit beim Wechsel der nächste Clip schon dekodiert ist.
 
 ## Geänderte Dateien
 
-- `src/components/video-composer/StoryboardTab.tsx` — Text-Szenen-Anlage entfernen, Filterung beim Rendern
-- `src/components/video-composer/SceneCard.tsx` — Text-Only-Render-Zweig entfernen
-- `src/pages/VideoComposerPage.tsx` (oder `src/hooks/useComposerProject.ts`) — einmalige Migration `text-scenes → global_overlays`
-- *(optional, falls fehlend)* `src/components/video-composer/VoiceoverTab.tsx` — Text-Overlay-Sektion sichtbarer machen
+- `src/components/video-composer/ComposerSequencePreview.tsx` — alle drei Fixes oben
 
 ## Verify
 
-- Im Storyboard-Tab gibt es **keinen** Button mehr, der eine reine Text-Szene anlegt
-- Bestehende Text-Szenen erscheinen nicht mehr als Karten — stattdessen tauchen sie als Overlays im Voiceover & Untertitel-Tab auf
-- KI-Generierung im Clips-Tab betrifft nur noch echte Video-Szenen → keine „Top"-Position-Tokens mehr in Prompts
-- Vorschau zeigt Texte korrekt zur richtigen Zeit über den Clips (via bestehendem `PreviewTextOverlayLayer`)
-- Reload / erneutes Öffnen des Projekts: Migration läuft nicht doppelt
+1. Preview eines Projekts mit gemischten Szenenlängen (5s / 10s) abspielen → kein sichtbares Zurückspringen mehr beim Übergang
+2. Slider-Wert bewegt sich monoton vorwärts, kein kurzer Sprung beim Szenenwechsel (in DevTools beobachtbar)
+3. Bei sehr kurzen geplanten Szenen (3s) wird der Clip korrekt nach 3s abgeschnitten, auch wenn er physisch 6s lang ist
+4. Scrubben über Szenengrenzen funktioniert weiterhin sauber
 
