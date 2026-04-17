@@ -122,6 +122,11 @@ export interface AssemblyConfig {
   music: MusicConfig | null;
   beatSync: boolean;
   subtitles?: SubtitlesConfig;
+  /**
+   * Timeline-based text overlays that span across the full video — independent
+   * of scene boundaries. Replaces the legacy per-scene `ComposerScene.textOverlay`.
+   */
+  globalTextOverlays?: GlobalTextOverlay[];
 }
 
 export interface VoiceoverConfig {
