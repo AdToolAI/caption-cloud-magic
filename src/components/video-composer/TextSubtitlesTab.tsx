@@ -20,8 +20,9 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  ChevronUp, ChevronDown, Type, Subtitles, Sparkles, AlertTriangle, Wand2, Copy,
+  ChevronUp, ChevronDown, Type, Subtitles, Sparkles, AlertTriangle, Wand2, Copy, Film,
 } from 'lucide-react';
+import ComposerSequencePreview from './ComposerSequencePreview';
 import type {
   ComposerScene,
   AssemblyConfig,
@@ -108,6 +109,19 @@ export default function TextSubtitlesTab({
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
+      {/* ── FULL SEQUENCE PREVIEW ──────────────────────── */}
+      <Card className="border-border/40 bg-card/80">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Film className="h-4 w-4 text-primary" />
+            {t('videoComposer.previewFullVideo')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ComposerSequencePreview scenes={scenes} subtitles={subtitles} />
+        </CardContent>
+      </Card>
+
       {/* ── GLOBAL SUBTITLES ───────────────────────────── */}
       <Card className="border-border/40 bg-card/80">
         <CardHeader className="pb-3">
