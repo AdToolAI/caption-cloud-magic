@@ -1,4 +1,4 @@
-import { useState } from 'react';
+// (no useState needed after overlay editor moved to TextSubtitlesTab)
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,11 +14,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import {
   ChevronUp, ChevronDown, Trash2, GripVertical,
   Sparkles, Upload, Video, Type, AlertTriangle, Lightbulb,
 } from 'lucide-react';
@@ -28,8 +23,6 @@ import type {
   ClipSource,
   ClipQuality,
   TransitionStyle,
-  TextPosition,
-  TextAnimation,
 } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALITY_LABELS, DEFAULT_TEXT_OVERLAY } from '@/types/video-composer';
 
@@ -60,8 +53,7 @@ const sceneTypeColor: Record<SceneType, string> = {
   custom: 'bg-muted text-muted-foreground',
 };
 
-const TEXT_POSITIONS: TextPosition[] = ['top', 'center', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
-const TEXT_ANIMATIONS: TextAnimation[] = ['none', 'fade-in', 'scale-bounce', 'slide-left', 'slide-right', 'word-by-word', 'glow-pulse'];
+// Text overlay editing has moved to the dedicated "Text & Subtitles" tab.
 
 export default function SceneCard({
   scene,
@@ -79,11 +71,7 @@ export default function SceneCard({
   const ClipIcon = clipSourceIcon;
 
   const overlay = scene.textOverlay || DEFAULT_TEXT_OVERLAY;
-  const [overlayOpen, setOverlayOpen] = useState(Boolean(overlay.text));
-
-  const updateOverlay = (patch: Partial<typeof overlay>) => {
-    onUpdate({ textOverlay: { ...DEFAULT_TEXT_OVERLAY, ...overlay, ...patch } });
-  };
+  const hasOverlayText = (overlay.text || '').trim().length > 0;
 
   return (
     <Card className="border-border/40 bg-card/80 group">
