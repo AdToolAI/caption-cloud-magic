@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import {
   ChevronUp, ChevronDown, Trash2, GripVertical,
-  Sparkles, Upload, Video, Type,
+  Sparkles, Upload, Video,
 } from 'lucide-react';
 import type {
   ComposerScene,
@@ -24,7 +24,7 @@ import type {
   ClipQuality,
   TransitionStyle,
 } from '@/types/video-composer';
-import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALITY_LABELS, DEFAULT_TEXT_OVERLAY } from '@/types/video-composer';
+import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALITY_LABELS } from '@/types/video-composer';
 
 import SceneMediaUpload from './SceneMediaUpload';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
@@ -69,9 +69,6 @@ export default function SceneCard({
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
   const clipSourceIcon = scene.clipSource.startsWith('ai-') ? Sparkles : scene.clipSource === 'stock' ? Video : Upload;
   const ClipIcon = clipSourceIcon;
-
-  const overlay = scene.textOverlay || DEFAULT_TEXT_OVERLAY;
-  const hasOverlayText = (overlay.text || '').trim().length > 0;
 
   return (
     <Card className="border-border/40 bg-card/80 group">
@@ -249,29 +246,6 @@ export default function SceneCard({
                 }
               />
             )}
-
-            {/* Text Overlay — moved to dedicated "Text & Subtitles" tab */}
-            <div className="flex items-center justify-between gap-2 rounded-md border border-border/40 bg-background/30 px-2 py-1.5">
-              <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground min-w-0">
-                <Type className="h-3 w-3 shrink-0 text-primary/70" />
-                {hasOverlayText ? (
-                  <>
-                    <span className="text-foreground/80 truncate">"{overlay.text}"</span>
-                    <Badge variant="outline" className="text-[9px] font-normal capitalize shrink-0">
-                      {overlay.position}
-                    </Badge>
-                  </>
-                ) : (
-                  <span>
-                    {lang === 'de'
-                      ? 'Text & Untertitel im Tab „Text" bearbeiten'
-                      : lang === 'es'
-                      ? 'Edita texto y subtítulos en la pestaña "Texto"'
-                      : 'Edit text & subtitles in the "Text" tab'}
-                  </span>
-                )}
-              </span>
-            </div>
 
             {/* Transition */}
             <div className="flex items-center gap-2">
