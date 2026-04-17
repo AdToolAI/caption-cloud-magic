@@ -354,6 +354,7 @@ export default function ComposerSequencePreview({
             src={mediaUrl}
             muted={muted}
             playsInline
+            preload="auto"
             onTimeUpdate={onVideoTimeUpdate}
             onEnded={onVideoEnded}
             className="w-full h-full object-contain"
