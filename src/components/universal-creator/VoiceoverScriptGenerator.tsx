@@ -14,12 +14,15 @@ interface VoiceoverScriptGeneratorProps {
   open: boolean;
   onClose: () => void;
   onScriptGenerated: (script: string) => void;
+  /** Optional default duration (seconds) to pre-fill the slider with. Clamped to 10–180. */
+  defaultDuration?: number;
 }
 
-export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated }: VoiceoverScriptGeneratorProps) {
+export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, defaultDuration }: VoiceoverScriptGeneratorProps) {
+  const initialDuration = Math.max(10, Math.min(180, Math.round(defaultDuration ?? 30) || 30));
   const [idea, setIdea] = useState("");
   const [tone, setTone] = useState("friendly");
-  const [targetDuration, setTargetDuration] = useState(30);
+  const [targetDuration, setTargetDuration] = useState(initialDuration);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedScript, setGeneratedScript] = useState("");
   const [wordCount, setWordCount] = useState(0);
@@ -88,7 +91,7 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated }: V
             </div>
             <div className="space-y-2">
               <Label htmlFor="duration">{t('uc.targetDuration')}: {targetDuration}s</Label>
-              <Slider id="duration" min={15} max={60} step={5} value={[targetDuration]} onValueChange={(value) => setTargetDuration(value[0])} className="mt-2" />
+              <Slider id="duration" min={10} max={180} step={5} value={[targetDuration]} onValueChange={(value) => setTargetDuration(value[0])} className="mt-2" />
             </div>
           </div>
 

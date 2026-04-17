@@ -121,6 +121,16 @@ export interface VoiceoverConfig {
   voiceName: string;
   script: string;
   audioUrl?: string;
+  /** Playback / synthesis speed multiplier (0.7 – 1.2). */
+  speed?: number;
+  /** ElevenLabs stability (0–1). */
+  stability?: number;
+  /** ElevenLabs similarity boost (0–1). */
+  similarityBoost?: number;
+  /** ElevenLabs style exaggeration (0–1). */
+  styleExaggeration?: number;
+  /** ElevenLabs speaker boost flag. */
+  useSpeakerBoost?: boolean;
 }
 
 export interface MusicConfig {
