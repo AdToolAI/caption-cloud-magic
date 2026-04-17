@@ -35,7 +35,7 @@ const CATEGORY_STRUCTURES: Record<string, string> = {
 5. Social Proof (4-6s): Client logos, awards, metrics, longevity
 6. CTA (3-5s): Brand tagline + next step (visit, contact, join)`,
 
-  storytelling: `NARRATIVE STORYTELLING — 3-act emotional arc, NO ad copy. Treat "productName" as the STORY TITLE, "productDescription" as the logline/setting, "usps" as key beats/scenes, "targetAudience" as the protagonist + conflict (parsed from "Protagonist: X | Conflict: Y") combined with the target emotion. Build a real story with character, tension and emotional payoff. Avoid sales language entirely. Text overlays should be poetic/cinematic (a single line of dialogue, a date, a place, a feeling) — never marketing copy.
+  storytelling: `NARRATIVE STORYTELLING — 3-act emotional arc, NO ad copy. Treat "productName" as the STORY TITLE, "productDescription" as the logline/setting, "usps" as key beats/scenes, "targetAudience" as the protagonist + conflict (parsed from "Protagonist: X | Conflict: Y") combined with the target emotion. Build a real story with character, tension and emotional payoff. Avoid sales language entirely. 🚨 NO TEXT OVERLAYS AT ALL — `textOverlayText` MUST be an empty string "" for every single scene. Storytelling lebt rein von Bildsprache, Atmosphäre, Schauspiel und Schnitt — keine Schrift, keine Untertitel, keine Datums-/Ort-Inserts, keine Title-Cards, keine Lower-Thirds. Der Zuschauer soll den Film SEHEN, nicht LESEN.
 ACT 1 — SETUP (≈25% of duration): Introduce protagonist and world. Establish tone and stakes.
 ACT 2 — CONFRONTATION (≈50% of duration): Inciting incident → rising conflict → midpoint twist → crisis. Multiple scenes here.
 ACT 3 — RESOLUTION (≈25% of duration): Climax → emotional payoff → final image that lingers.
@@ -101,6 +101,7 @@ Hard rules:
 - Each scene 3-15 seconds; total ≈ ${briefing.duration}s; create ${targetSceneCount} scenes (±1)
 - Text overlays in ${langLabel} (max 8 words, punchy)
 - Transitions in English (enum)
+${category === 'storytelling' ? '\n🚨 STORYTELLING MODE — TEXT OVERLAY BAN (ABSOLUTE): textOverlayText MUST be "" (empty string) for EVERY scene. textAnimation MUST be "none". No exceptions. No dates, no place names, no dialogue cards, no chapter titles. The story is told purely visually.\n' : ''}
 
 🚨 NO BURNED-IN TEXT RULE (ABSOLUTE — overrides everything else):
 The video clips are generated independently and we apply our OWN subtitles, captions and text overlays in a later editing step. Therefore the AI-generated footage MUST NEVER contain any readable text, captions, subtitles, watermarks, logos, signs with words, UI overlays, lower-thirds, typography or written language of any kind. Every aiPrompt MUST end with the exact negative clause defined in rule 10 below. Never quote on-screen text inside the prompt.
@@ -212,7 +213,7 @@ Generate the storyboard using the create_storyboard function.`;
                         },
                         textOverlayText: {
                           type: "string",
-                          description: `Short overlay text in ${langLabel} (max 8 words). Empty string if no text needed.`,
+                          description: `Short overlay text in ${langLabel} (max 8 words). Empty string if no text needed.${category === 'storytelling' ? ' 🚨 For category="storytelling": MUST always be an empty string "". No exceptions.' : ''}`,
                         },
                         textPosition: {
                           type: "string",
