@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle, RotateCcw, Type } from 'lucide-react';
+import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle, RotateCcw, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -17,7 +17,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import BriefingTab from './BriefingTab';
 import StoryboardTab from './StoryboardTab';
 import ClipsTab from './ClipsTab';
-import TextSubtitlesTab from './TextSubtitlesTab';
+import VoiceSubtitlesTab from './VoiceSubtitlesTab';
 import AudioTab from './AudioTab';
 import AssemblyTab from './AssemblyTab';
 import type {
@@ -269,8 +269,8 @@ export default function VideoComposerDashboard() {
     { id: 'briefing' as TabId, label: t('videoComposer.briefing'), icon: FileText },
     { id: 'storyboard' as TabId, label: t('videoComposer.storyboard'), icon: LayoutGrid },
     { id: 'clips' as TabId, label: t('videoComposer.clips'), icon: Film },
-    { id: 'text' as TabId, label: t('videoComposer.text'), icon: Type },
-    { id: 'audio' as TabId, label: t('videoComposer.audio'), icon: Music },
+    { id: 'text' as TabId, label: t('videoComposer.voiceSubtitles'), icon: Mic },
+    { id: 'audio' as TabId, label: t('videoComposer.music'), icon: Music },
     { id: 'export' as TabId, label: t('videoComposer.export'), icon: Download },
   ];
 
@@ -426,7 +426,7 @@ export default function VideoComposerDashboard() {
           </TabsContent>
 
           <TabsContent value="text">
-            <TextSubtitlesTab
+            <VoiceSubtitlesTab
               scenes={project.scenes}
               onUpdateScenes={setScenes}
               assemblyConfig={project.assemblyConfig}
