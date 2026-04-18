@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { ComposerScene } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
 import { SceneClipProgress } from './SceneClipProgress';
+import { probeMediaDuration } from '@/lib/probeMp4Duration';
 
 interface ClipsTabProps {
   scenes: ComposerScene[];
@@ -53,13 +54,19 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToVoic
     if (!projectId) return;
     const { data } = await supabase
       .from('composer_scenes')
-      .select('id, clip_status, clip_url')
+      .select('id, clip_status, clip_url, duration_seconds')
       .eq('project_id', projectId);
 
     if (!data) return;
 
     let changed = false;
     const newPrev: Record<string, string> = { ...previousStatuses };
+    // Collect scenes that just transitioned to "ready" so we can probe their
+    // real MP4 duration (Hailuo etc. often deliver shorter clips than requested)
+    // and then update DB + UI in a single follow-up pass. This is the
+    // single source of truth for downstream WAV padding + composition math.
+    const justReady: Array<{ sceneId: string; clipUrl: string }> = [];
+
     const updatedScenes = scenes.map((scene, idx) => {
       const dbScene = data.find((d: any) => d.id === scene.id);
       if (dbScene && (dbScene.clip_status !== scene.clipStatus || dbScene.clip_url !== scene.clipUrl)) {
@@ -67,6 +74,9 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToVoic
         // Toast on transition generating → ready
         if (scene.clipStatus === 'generating' && dbScene.clip_status === 'ready') {
           toast({ title: `Szene ${idx + 1} fertig ✓`, description: SCENE_TYPE_LABELS[scene.sceneType]?.de });
+          if (dbScene.clip_url) {
+            justReady.push({ sceneId: scene.id, clipUrl: dbScene.clip_url });
+          }
         }
         if (scene.clipStatus === 'generating' && dbScene.clip_status === 'failed') {
           toast({ title: `Szene ${idx + 1} fehlgeschlagen`, variant: 'destructive' });
@@ -79,6 +89,48 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToVoic
     if (changed) {
       setPreviousStatuses(newPrev);
       onUpdateScenes(updatedScenes);
+    }
+
+    // Probe each just-ready clip for its real MP4 duration. Update DB + UI
+    // when the real value differs from the configured nominal duration.
+    // We do this *after* the main state update so the user sees the clip
+    // immediately, then sees the corrected duration shortly after.
+    if (justReady.length > 0) {
+      Promise.all(
+        justReady.map(async ({ sceneId, clipUrl }) => {
+          try {
+            const realDur = await probeMediaDuration(clipUrl);
+            const sceneNow = updatedScenes.find(s => s.id === sceneId);
+            const nominal = sceneNow?.durationSeconds ?? 0;
+            // Only persist if there is a meaningful drift (>50ms)
+            if (Math.abs(realDur - nominal) > 0.05) {
+              console.log(`[ClipsTab] Scene ${sceneId} real duration ${realDur.toFixed(3)}s (nominal ${nominal}s) — syncing`);
+              const { error: upErr } = await supabase
+                .from('composer_scenes')
+                .update({ duration_seconds: realDur })
+                .eq('id', sceneId);
+              if (upErr) {
+                console.warn('[ClipsTab] Failed to persist real duration:', upErr);
+                return { sceneId, realDur, persisted: false };
+              }
+              return { sceneId, realDur, persisted: true };
+            }
+            return { sceneId, realDur, persisted: false };
+          } catch (e) {
+            console.warn('[ClipsTab] probeMediaDuration failed:', e);
+            return null;
+          }
+        })
+      ).then((results) => {
+        const persistedUpdates = results.filter((r): r is { sceneId: string; realDur: number; persisted: boolean } => !!r && r.persisted);
+        if (persistedUpdates.length === 0) return;
+        // Apply real durations to UI state in one batch
+        const merged = updatedScenes.map(s => {
+          const u = persistedUpdates.find(p => p.sceneId === s.id);
+          return u ? { ...s, durationSeconds: u.realDur } : s;
+        });
+        onUpdateScenes(merged);
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, scenes, onUpdateScenes]);

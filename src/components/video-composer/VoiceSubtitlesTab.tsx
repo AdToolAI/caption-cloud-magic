@@ -26,6 +26,7 @@ import { AdvancedVoiceSettings, type VoiceSettings } from '@/components/video/Ad
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { supabase } from '@/integrations/supabase/client';
 import { padAudioToExactWav } from '@/lib/audioToWav';
+import { probeMediaDuration } from '@/lib/probeMp4Duration';
 import type {
   ComposerScene,
   AssemblyConfig,
@@ -225,12 +226,26 @@ export default function VoiceSubtitlesTab({
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // Pad to TRUE composition duration. With TransitionSeries, the
-            // visual timeline = sum(scene_durations) − sum(transition_overlaps).
-            // The renderer adds a 0.15s safety pad on top.
+            // ⚠ CRITICAL: Probe the REAL MP4 duration of every scene clip.
+            // Hailuo (and most AI video models) deliver clips whose actual
+            // duration differs from the requested value (e.g. 7s requested → 5.875s real).
+            // The Edge Function uses the REAL durations for composition geometry.
+            // If we pad the WAV using nominal UI durations, the audio timeline
+            // diverges from the video timeline → voiceover gets cut at transitions.
+            // Probing here ensures: WAV length == Edge composition length == Renderer composition length.
             const fps = 30;
-            const sumSceneFrames = scenes.reduce(
-              (acc, s) => acc + Math.max(1, Math.ceil((s.durationSeconds || 0) * fps)),
+            const realDurations = await Promise.all(
+              scenes.map(async (s) => {
+                if (!s.clipUrl) return s.durationSeconds || 0;
+                try {
+                  return await probeMediaDuration(s.clipUrl);
+                } catch {
+                  return s.durationSeconds || 0;
+                }
+              })
+            );
+            const sumSceneFrames = realDurations.reduce(
+              (acc, d) => acc + Math.max(1, Math.round(d * fps)),
               0
             );
             let overlapFrames = 0;
@@ -238,13 +253,13 @@ export default function VoiceSubtitlesTab({
               const cur = scenes[i] as any;
               const tType = cur.transitionType || 'none';
               if (tType !== 'none') {
-                overlapFrames += Math.max(1, Math.ceil((cur.transitionDuration ?? 0.4) * fps));
+                overlapFrames += Math.max(1, Math.round((cur.transitionDuration ?? 0.4) * fps));
               }
             }
             const compositionSeconds = Math.max(0, sumSceneFrames - overlapFrames) / fps;
             const compositionDuration = Math.max(realDur, compositionSeconds) + 0.15;
             const { blob, exactSeconds } = await padAudioToExactWav(generatedUrl, compositionDuration);
-            console.log(`[VO] WAV pad applied, exact duration ${exactSeconds.toFixed(3)}s (VO ${realDur.toFixed(3)}s, comp ${compositionSeconds.toFixed(3)}s, size ${(blob.size / 1024).toFixed(1)} KB)`);
+            console.log(`[VO] WAV pad applied — exact ${exactSeconds.toFixed(3)}s | VO ${realDur.toFixed(3)}s | comp ${compositionSeconds.toFixed(3)}s | real scene durs: [${realDurations.map(d => d.toFixed(3)).join(', ')}] | size ${(blob.size / 1024).toFixed(1)} KB`);
 
 
             const wavPath = `${user.id}/${Date.now()}-voiceover.wav`;
