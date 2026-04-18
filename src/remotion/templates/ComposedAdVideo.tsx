@@ -163,7 +163,7 @@ const Scene: React.FC<{
           src={videoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           muted
-          pauseWhenBuffering={false}
+          pauseWhenBuffering={true}
           delayRenderTimeoutInMilliseconds={30000}
         />
       )}
@@ -362,27 +362,31 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
         );
       })}
 
-      {/* Voiceover — no Sequence wrapper, no pauseWhenBuffering: keeps audio
-          linear over the whole composition (avoids drift at crossfade overlaps
-          which previously cut the first VO sentence). */}
+      {/* Voiceover — top-level Audio with pauseWhenBuffering=true and explicit
+          startFrom/endAt so all Lambda chunks share the same sample-position map.
+          This eliminates 1-sample glitches at chunk boundaries during crossfades. */}
       {voEnabled && (
         <Audio
           src={voiceoverUrl as string}
           volume={1}
-          pauseWhenBuffering={false}
+          pauseWhenBuffering={true}
           toneFrequency={1}
           playbackRate={1}
+          startFrom={0}
+          endAt={durationInFrames}
         />
       )}
 
-      {/* Background Music — same treatment for stable playback */}
+      {/* Background Music — same treatment for stable playback across chunks */}
       {musicEnabled && (
         <Audio
           src={backgroundMusicUrl as string}
           volume={musicVolume}
-          pauseWhenBuffering={false}
+          pauseWhenBuffering={true}
           toneFrequency={1}
           playbackRate={1}
+          startFrom={0}
+          endAt={durationInFrames}
         />
       )}
     </AbsoluteFill>

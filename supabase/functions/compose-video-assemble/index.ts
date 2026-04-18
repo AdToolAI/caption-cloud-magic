@@ -266,7 +266,15 @@ serve(async (req) => {
       chromiumOptions: {},
       timeoutInMilliseconds: 600000,
       concurrencyPerLambda: 1,
-      framesPerLambda: 270,
+      // Scene-aligned chunking: align Lambda chunk boundaries with scene boundaries
+      // so the audio mux/concat happens at scene cuts rather than mid-crossfade.
+      // This eliminates micro-glitches (1-sample discontinuities) at transitions.
+      framesPerLambda: (() => {
+        const avgSceneFrames = Math.ceil(durationInFrames / Math.max(1, remotionScenes.length));
+        const chosen = Math.max(150, Math.min(450, avgSceneFrames));
+        console.log(`[compose-video-assemble] Dynamic framesPerLambda=${chosen} (avgSceneFrames=${avgSceneFrames}, scenes=${remotionScenes.length}, totalFrames=${durationInFrames})`);
+        return chosen;
+      })(),
       downloadBehavior: { type: 'play-in-browser' },
       webhook: webhookData,
     };
