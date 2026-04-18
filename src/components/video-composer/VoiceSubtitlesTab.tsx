@@ -66,6 +66,11 @@ export default function VoiceSubtitlesTab({
   const { t } = useTranslation();
   const subtitles: SubtitlesConfig = assemblyConfig.subtitles ?? DEFAULT_SUBTITLES_CONFIG;
   const voiceover = assemblyConfig.voiceover;
+  // Keep latest voiceover in a ref so async callbacks (e.g. browser-decoded
+  // duration probe after VO generation) can read the *current* state instead
+  // of a stale closure value captured at the moment of generation.
+  const voiceoverRef = useRef(voiceover);
+  useEffect(() => { voiceoverRef.current = voiceover; }, [voiceover]);
   const globalOverlays: GlobalTextOverlay[] = assemblyConfig.globalTextOverlays ?? [];
   const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
 
