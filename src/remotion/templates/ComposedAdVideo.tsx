@@ -190,7 +190,7 @@ const clampVolume = (v: number) => {
 // no <TransitionSeries.Transition> is inserted (hard cut, zero overlap).
 const getPresentation = (
   type: 'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom'
-) => {
+): any => {
   switch (type) {
     case 'fade':
     case 'crossfade':
