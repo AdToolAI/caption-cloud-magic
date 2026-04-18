@@ -7,6 +7,81 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ── MP4 duration probe ─────────────────────────────────────────────
+// Reads only the first ~512 KB of the file and parses the `mvhd` atom from
+// the `moov` box. Works for nearly all MP4s where moov is at the start.
+// If moov is at the end (some encoders), falls back to a Range request near EOF.
+async function probeMp4Duration(url: string): Promise<number | null> {
+  if (!url || !url.startsWith('http')) return null;
+  try {
+    let dur = await tryProbeRange(url, 0, 512 * 1024 - 1);
+    if (dur != null) return dur;
+    const head = await fetch(url, { method: 'HEAD' });
+    const len = Number(head.headers.get('content-length') || 0);
+    if (len > 0) {
+      const start = Math.max(0, len - 512 * 1024);
+      dur = await tryProbeRange(url, start, len - 1);
+      if (dur != null) return dur;
+    }
+  } catch (e) {
+    console.warn('[probeMp4Duration] error:', e);
+  }
+  return null;
+}
+
+async function tryProbeRange(url: string, start: number, end: number): Promise<number | null> {
+  const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
+  if (!res.ok) return null;
+  const buf = new Uint8Array(await res.arrayBuffer());
+  return parseMvhdDuration(buf);
+}
+
+function parseMvhdDuration(buf: Uint8Array): number | null {
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const readU32 = (o: number) => view.getUint32(o);
+  const readU64 = (o: number) => Number(view.getBigUint64(o));
+
+  function walk(offset: number, end: number): number | null {
+    let p = offset;
+    while (p + 8 <= end) {
+      let size = readU32(p);
+      const type = String.fromCharCode(buf[p + 4], buf[p + 5], buf[p + 6], buf[p + 7]);
+      let headerSize = 8;
+      if (size === 1) {
+        if (p + 16 > end) return null;
+        size = readU64(p + 8);
+        headerSize = 16;
+      }
+      if (size < headerSize || p + size > end) return null;
+      if (type === 'mvhd') {
+        const boxStart = p + headerSize;
+        const version = buf[boxStart];
+        let timescale: number, duration: number;
+        if (version === 1) {
+          timescale = readU32(boxStart + 4 + 8 + 8);
+          duration = readU64(boxStart + 4 + 8 + 8 + 4);
+        } else {
+          timescale = readU32(boxStart + 4 + 4 + 4);
+          duration = readU32(boxStart + 4 + 4 + 4 + 4);
+        }
+        if (timescale > 0) return duration / timescale;
+        return null;
+      }
+      if (type === 'moov' || type === 'trak' || type === 'mdia' || type === 'minf' || type === 'stbl') {
+        const inner = walk(p + headerSize, p + size);
+        if (inner != null) return inner;
+      }
+      p += size;
+    }
+    return null;
+  }
+  try {
+    return walk(0, buf.byteLength);
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
