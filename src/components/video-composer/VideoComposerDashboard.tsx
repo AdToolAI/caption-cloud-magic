@@ -297,6 +297,13 @@ export default function VideoComposerDashboard() {
     saveDraft(project);
   }, [project]);
 
+  // Persist active tab so users return to where they left off
+  useEffect(() => {
+    try {
+      localStorage.setItem(TAB_STORAGE_KEY, activeTab);
+    } catch { /* ignore */ }
+  }, [activeTab]);
+
   const updateBriefing = useCallback((briefing: Partial<ComposerBriefing>) => {
     setProject(prev => ({
       ...prev,
