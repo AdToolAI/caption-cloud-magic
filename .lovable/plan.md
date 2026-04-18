@@ -1,65 +1,67 @@
 
 
-Du hast recht — die VO-Dauer-Schätzung gab es vorher auch schon und es funktionierte. Das Problem muss also durch die **neue Crossfade-Architektur** entstanden sein, nicht durch die Schätzung selbst.
+## Echter Befund — warum das VO sich „wiederholt" oder „abschneidet"
 
-## Echter Befund
+Die aktuelle Architektur (Szenen verlängern statt Komposition zu kürzen) ist konzeptionell richtig. Das VO ist **linear** und die **Komposition exakt = Summe der Szenen-Dauern**. Trotzdem hört man Wiederholungen / Cuts. Beim genauen Lesen finde ich **zwei** echte Bugs in `ComposedAdVideo.tsx`:
 
-Vorher: **Hard-Cuts**, `durationInFrames` = Summe aller Szenen → Komposition war exakt so lang wie das Skript geschätzt → VO passte.
+### Bug 1 — `<Video>` startet bei jeder Szene mit eigenem Audio-Decoder, der dann eingreift
+Im `<Scene>`-Renderer (Z. 162-167) ist `<Video>` mit `muted` markiert — **gut**. Aber er hat keinen `startFrom`/`endAt` Hint und keinen `playbackRate`. Wenn zwei Szenen sich überlappen (Crossfade-Fenster), laufen **beide `<Video>`-Elemente gleichzeitig**. Da der Decoder beim Crossfade-Start die nächste Quelle „pre-rollt", entstehen kurze Stalls in der gesamten Render-Pipeline → das **VO wird vom Renderer kurz pausiert** trotz `pauseWhenBuffering={false}` (das gilt nur für Audio-Buffering, nicht für Video-Decoder-Stalls).
 
-Jetzt: **Crossfades** überlappen Szenen → Komposition ist **6 × 0.4s = 2.4s kürzer** als vorher. Selbst mit `Math.max(video, vo)` aus dem letzten Fix gibt's Probleme, weil:
-
-1. Die VO-Dauer wird beim **Generieren** in `generate-voiceover` per Wörter-Heuristik geschätzt → wird nur in der DB gespeichert wenn der User danach VO generiert hat. Bei **Bestandsprojekten** ist `durationSeconds` oft **0** oder fehlt → der Max-Check greift nicht → Komposition bleibt bei der gekürzten Crossfade-Dauer → letzter VO-Satz wird gekappt.
-
-2. Die zwei „minimalen Cuts" mittendrin sind kein VO-Decoder-Problem — sie kommen daher, dass das **VO als linearer Audio-Track** läuft, während die **visuelle Timeline durch Crossfades komprimiert** ist. Bei jedem Crossfade „rutscht" das VO 0.4s relativ zur Bildebene → an Stellen wo VO und Szenen-Inhalt vorher synchron waren (z.B. Produkt-Erwähnung in Szene 3), klingt es jetzt als würde das VO „springen".
-
-## Die echte Ursache
-
-**Das VO wurde für eine Timeline ohne Crossfades generiert.** Wenn wir jetzt Crossfades einbauen, müssen wir die **Szenen-Dauern verlängern**, damit die Gesamtlänge gleich bleibt — NICHT die Komposition kürzen.
-
-## Plan — Szenen verlängern statt Komposition zu kürzen
-
-### Fix 1 — `compose-video-assemble`: Szenen-Dauern um Crossfade-Anteil verlängern
-
-Statt `durationInFrames` zu verkürzen, **verlängern wir jede Szene** (außer der letzten) um die Hälfte der Transition-Dauer auf jeder Seite. So bleibt:
-- Gesamtlänge = ungekürzte Summe (passt zum VO)
-- Crossfade entsteht durch **Überlappung der erweiterten Szenen-Sequenzen**, nicht durch Verkürzung
-
+### Bug 2 — Sequence-Verlängerung macht die letzte Szene überproportional lang
+Schauen wir auf Z. 281-291:
 ```ts
-// Neue Logik in compose-video-assemble
-let totalFrames = 0;
-const sceneFrames = remotionScenes.map((s, i) => {
-  const baseFrames = Math.ceil(s.durationSeconds * fps);
-  const tFrames = (s.transitionType !== 'none')
-    ? Math.ceil((s.transitionDuration || 0.4) * fps)
-    : 0;
-  // Szene wird um halbe Transition vorne+hinten verlängert (außer Rändern)
-  const extendedFrames = baseFrames + (i > 0 ? tFrames / 2 : 0) + (i < remotionScenes.length - 1 ? tFrames / 2 : 0);
-  return { from: totalFrames - (i > 0 ? tFrames : 0), duration: extendedFrames };
-});
-// Gesamtlänge = exakt Summe der Original-Dauern
-const durationInFrames = Math.ceil(totalSeconds * fps);
+const extendStart = !isFirst ? Math.floor(tFrames / 2) : 0;
+const extendEnd = !isLast ? Math.ceil(tFrames / 2) : 0;
+const seqDuration = baseFrames + extendStart + extendEnd;
+const from = Math.max(0, cursor - extendStart);
+cursor += baseFrames;
 ```
 
-### Fix 2 — `ComposedAdVideo.tsx`: Crossfade über Opacity in den Überlappungs-Frames
+Das stimmt mathematisch — **aber**: `transitionInFrames` wird auf die volle `tFrames`-Länge gesetzt (Z. 297), während die tatsächliche Überlappung am Anfang nur `extendStart = floor(tFrames/2)` Frames beträgt. Das heißt: das **Fade-In dauert doppelt so lang wie das Überlappungsfenster** → die nächste Szene ist schon vollflächig sichtbar (frames > extendStart), aber die Scene-Komponente fadet immer noch von `opacity 0→1`. Dadurch:
+- Die zweite Szene ist während der ersten Hälfte ihres Fade-Ins **gar nicht sichtbar** (Vor-Szene ist schon weg)
+- Das wirkt wie ein **kurzer Schwarz-Frame** zwischen den Szenen
+- Beim Audio-Track des `<Video>`-Elements (auch wenn `muted`) entsteht beim erneuten Mounten ein Decoder-Hick-Up → **VO stallt → klingt wie wiederholt**
 
-Die Überlappung passiert durch **negative `from`-Offsets** + **Opacity-Interpolation in den Überlappungs-Bereichen**. Das ist exakt das, was schon implementiert ist — aber jetzt mit Frame-Math die die Gesamtlänge respektiert.
+## Plan — drei chirurgische Fixes
 
-### Fix 3 — `pauseWhenBuffering={false}` für VO behalten
-Bereits gemacht im letzten Fix — bleibt.
+### Fix 1 — Transition-Frames an reale Überlappung anpassen
+In `ComposedAdVideo.tsx` Z. 297-298: `transitionInFrames`/`transitionOutFrames` müssen **= reale Überlappung = `extendStart` bzw. `extendEnd`** sein, nicht `tFrames`. Sonst fadet der Renderer länger als das Überlappungsfenster.
 
-### Fix 4 — Safety-Buffer 0.3s am Ende
-Klein halten, aber schwarzer Frame am Ende verhindert harten Cut bei MP3-Decoder-Latenz.
+```ts
+transitionInFrames: extendStart,    // statt tFrames
+transitionOutFrames: extendEnd,     // statt tFrames
+```
+
+### Fix 2 — Scene-Komponente: Fade-In-Berechnung an reale Überlappung
+In `Scene` Z. 104-105:
+- `safeIn = Math.max(1, transitionInFrames)` — bleibt
+- Aber die **Fade-Out-Berechnung** (Z. 116) muss `safeOut` (nicht `tFrames`) verwenden — ist bereits korrekt nach Fix 1, weil `transitionOutFrames` jetzt = reale Überlappung ist
+
+### Fix 3 — Video-Decoder-Stalls vermeiden
+`<Video>` bekommt:
+- `pauseWhenBuffering={false}` (statt `true`) → Decoder-Stalls werden nicht ans Audio-System propagiert
+- `delayRenderTimeoutInMilliseconds={30000}` als zusätzliche Sicherheit für Lambda
+
+```tsx
+<Video
+  src={videoUrl}
+  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+  muted
+  pauseWhenBuffering={false}
+  delayRenderTimeoutInMilliseconds={30000}
+/>
+```
+
+### Fix 4 — Safety-Pad reduzieren von 0.3s auf 0.15s
+In `compose-video-assemble/index.ts` Z. 125 — 0.3s ist zu viel, kann beim VO am Ende eine kurze Stille-Pause erzeugen die nach „Wiederholung" klingt wenn der Browser-Player mit der Stille-Detection arbeitet. 0.15s reicht für MP3-Decoder-Latenz.
 
 ## Geänderte Dateien
-
-- `supabase/functions/compose-video-assemble/index.ts` — Szenen-Frames verlängern statt Komposition kürzen
-- `src/remotion/templates/ComposedAdVideo.tsx` — Frame-Offsets entsprechend anpassen (Szenen starten in der Mitte der Crossfade-Überlappung)
+- `src/remotion/templates/ComposedAdVideo.tsx` — `transitionInFrames/OutFrames` = reale Überlappung; `<Video>` mit `pauseWhenBuffering={false}`
+- `supabase/functions/compose-video-assemble/index.ts` — Safety-Pad 0.3s → 0.15s
 
 ## Verify
-
-1. 7-Szenen-Projekt: Gesamtlänge = exakt Summe der Szenen-Dauern (z.B. 7×6s = 42s, nicht 39.6s)
-2. VO spielt vollständig durch — Anfang, Mitte, Ende synchron
-3. Keine „minimalen Cuts" mehr in der Mitte
-4. Crossfades bleiben smooth (visuell identisch zum jetzigen Zustand)
-5. Bestandsprojekte mit altem VO funktionieren ohne Re-Generierung
+1. 7-Szenen-Projekt rendern → keine Schwarz-Frames mehr zwischen Szenen, Crossfades smooth
+2. VO spielt komplett durch — keine Wiederholungen, keine Cuts an Übergang 1, 6→7 oder anderen Stellen
+3. Gesamtlänge weiterhin = Summe der Szenen-Dauern (+ 0.15s Pad)
+4. Bestandsprojekte funktionieren ohne Re-Generierung
 
