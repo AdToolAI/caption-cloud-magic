@@ -51,6 +51,8 @@ interface LocalProject {
 }
 
 const STORAGE_KEY = 'video-composer-draft';
+const TAB_STORAGE_KEY = 'video-composer-draft-tab';
+const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'clips', 'text', 'audio', 'export'];
 
 function loadDraft(): LocalProject | null {
   try {
@@ -69,7 +71,24 @@ function saveDraft(project: LocalProject) {
 function clearDraft() {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TAB_STORAGE_KEY);
   } catch { /* ignore */ }
+}
+
+/** Restore last active tab, but only if it's actually accessible
+ *  given the current draft state (mirrors the `isAccessible` rule below). */
+function restoreActiveTab(draft: LocalProject | null): TabId {
+  try {
+    const stored = localStorage.getItem(TAB_STORAGE_KEY) as TabId | null;
+    if (!stored || !TAB_ORDER.includes(stored) || !draft) return 'briefing';
+    const idx = TAB_ORDER.indexOf(stored);
+    if (idx === 0) return 'briefing';
+    if (idx === 1 && !draft.briefing?.productName) return 'briefing';
+    if (idx >= 2 && (!draft.scenes || draft.scenes.length === 0)) return 'briefing';
+    return stored;
+  } catch {
+    return 'briefing';
+  }
 }
 
 const defaultProject: LocalProject = {
