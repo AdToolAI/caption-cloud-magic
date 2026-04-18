@@ -175,6 +175,10 @@ export default function VoiceSubtitlesTab({
         voiceover: {
           ...voiceover,
           audioUrl: data.audioUrl,
+          // Persist VO duration so the renderer can extend the composition
+          // (crossfades shorten the video timeline; without this the last VO
+          // sentence gets cut off).
+          durationSeconds: Number(data.duration) || 0,
           speed,
           stability: voiceSettings.stability,
           similarityBoost: voiceSettings.similarityBoost,
