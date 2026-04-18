@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate, spring, Easing } from 'remotion';
+import { AbsoluteFill, OffthreadVideo, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate, spring, Easing } from 'remotion';
 import { z } from 'zod';
 import { KineticText } from '../components/KineticText';
 import { ColorGrading } from '../components/ColorGrading';
@@ -159,7 +159,7 @@ const Scene: React.FC<{
   return (
     <AbsoluteFill style={{ backgroundColor: '#000', opacity, transform, clipPath }}>
       {videoUrl && (
-        <Video
+        <OffthreadVideo
           src={videoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           muted
@@ -366,12 +366,24 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
           linear over the whole composition (avoids drift at crossfade overlaps
           which previously cut the first VO sentence). */}
       {voEnabled && (
-        <Audio src={voiceoverUrl as string} volume={1} pauseWhenBuffering={false} />
+        <Audio
+          src={voiceoverUrl as string}
+          volume={1}
+          pauseWhenBuffering={false}
+          toneFrequency={1}
+          playbackRate={1}
+        />
       )}
 
       {/* Background Music — same treatment for stable playback */}
       {musicEnabled && (
-        <Audio src={backgroundMusicUrl as string} volume={musicVolume} pauseWhenBuffering={false} />
+        <Audio
+          src={backgroundMusicUrl as string}
+          volume={musicVolume}
+          pauseWhenBuffering={false}
+          toneFrequency={1}
+          playbackRate={1}
+        />
       )}
     </AbsoluteFill>
   );
