@@ -366,12 +366,24 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
           linear over the whole composition (avoids drift at crossfade overlaps
           which previously cut the first VO sentence). */}
       {voEnabled && (
-        <Audio src={voiceoverUrl as string} volume={1} pauseWhenBuffering={false} />
+        <Audio
+          src={voiceoverUrl as string}
+          volume={1}
+          pauseWhenBuffering={false}
+          toneFrequency={1}
+          playbackRate={1}
+        />
       )}
 
       {/* Background Music — same treatment for stable playback */}
       {musicEnabled && (
-        <Audio src={backgroundMusicUrl as string} volume={musicVolume} pauseWhenBuffering={false} />
+        <Audio
+          src={backgroundMusicUrl as string}
+          volume={musicVolume}
+          pauseWhenBuffering={false}
+          toneFrequency={1}
+          playbackRate={1}
+        />
       )}
     </AbsoluteFill>
   );
