@@ -114,16 +114,43 @@ serve(async (req) => {
     const audioBuffer = await audioBlob.arrayBuffer();
     const audioUint8Array = new Uint8Array(audioBuffer);
 
-    const fileName = `${projectId}_voiceover.mp3`;
+    // ✅ Unique path per generation — prevents Supabase CDN AND Lambda worker
+    // caches from serving stale audio across parallel chunk renders.
+    // Previously `${projectId}_voiceover.mp3` with upsert=true overwrote the
+    // same file → different Lambda workers occasionally fetched mixed versions
+    // (old vs new), causing "repetitions" and "cuts" at chunk boundaries.
+    const fileName = `${projectId}_${Date.now()}_voiceover.mp3`;
     const filePath = `${user.id}/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from('voiceover-audio')
-      .upload(filePath, audioUint8Array, { contentType: 'audio/mpeg', upsert: true });
+      .upload(filePath, audioUint8Array, { contentType: 'audio/mpeg', upsert: false });
     if (uploadError) throw uploadError;
 
     const { data: urlData } = supabase.storage.from('voiceover-audio').getPublicUrl(filePath);
-    const cacheBustedUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+    // Clean URL — no `?v=` query string. Path itself is unique, query strings
+    // can confuse some CDN fetchers / Lambda video-fetcher.
+    const cacheBustedUrl = urlData.publicUrl;
+
+    // Fire-and-forget cleanup of older VO files for the same projectId
+    // (keeps storage tidy without blocking the response).
+    try {
+      const prefix = `${user.id}/`;
+      const { data: listing } = await supabase.storage
+        .from('voiceover-audio')
+        .list(user.id, { limit: 100, search: `${projectId}_` });
+      if (listing && listing.length > 1) {
+        const toDelete = listing
+          .filter(f => f.name.startsWith(`${projectId}_`) && f.name !== fileName)
+          .map(f => `${prefix}${f.name}`);
+        if (toDelete.length > 0) {
+          await supabase.storage.from('voiceover-audio').remove(toDelete);
+          console.log('[generate-voiceover] cleaned old VO files:', toDelete.length);
+        }
+      }
+    } catch (cleanupErr) {
+      console.warn('[generate-voiceover] cleanup skipped:', cleanupErr);
+    }
 
     // Bit-exact duration from MP3 file size (CBR @ 128 kbps).
     // Replaces the old 150-WPM heuristic which mis-estimated VO length
