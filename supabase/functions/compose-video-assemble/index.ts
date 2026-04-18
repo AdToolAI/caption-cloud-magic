@@ -193,8 +193,9 @@ serve(async (req) => {
         : nominalDuration;
       return {
         videoUrl: s.clip_url,
+        // Single source of truth: durationSeconds IS the real (probed) length
+        // when available. The renderer takes this 1:1 — no further clamping.
         durationSeconds: effectiveDuration,
-        actualVideoDurationSeconds: realDuration || effectiveDuration,
         textOverlay: s.text_overlay ? {
           text: s.text_overlay.text || '',
           position: s.text_overlay.position || 'bottom',

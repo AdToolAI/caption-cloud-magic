@@ -57,11 +57,11 @@ const GlobalTextOverlaySchema = z.object({
 export const ComposedAdVideoSchema = z.object({
   scenes: z.array(z.object({
     videoUrl: z.string(),
+    // SINGLE SOURCE OF TRUTH: this is the EFFECTIVE duration the edge function
+    // has already probed/clamped against the real mp4 length. The renderer
+    // takes it 1:1 — no further math. This guarantees Audio/Video geometry
+    // stays in lock-step and eliminates the rubber-band effect at transitions.
     durationSeconds: z.number(),
-    // Real mp4 duration (probed server-side via mvhd box). When present and
-    // SHORTER than durationSeconds, the renderer clamps the Sequence so the
-    // <OffthreadVideo> is never stretched/squeezed → no rubber-band effect.
-    actualVideoDurationSeconds: z.number().optional(),
     textOverlay: z.object({
       text: z.string(),
       position: z.enum(['top', 'center', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right']),
@@ -229,19 +229,13 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
   // Build transition descriptors. Each scene contributes: baseFrames + (optional) transitionFrames to the NEXT scene.
   // <TransitionSeries> overlaps adjacent sequences by exactly transitionFrames — sample-accurate, Lambda-tested.
   //
-  // ⚠️ RUBBER-BAND FIX: When the actual mp4 duration is SHORTER than the
-  // configured scene duration, we MUST clamp baseFrames to the real video length.
-  // Otherwise <OffthreadVideo> stretches the video over the longer Sequence
-  // window, producing visible speed-warp at every transition. Math.round avoids
-  // the off-by-one drift that ceil/floor introduce on fractional second values.
+  // ⚠️ DURATION POLICY: durationSeconds IS already the effective/probed length
+  // (set server-side in compose-video-assemble). The renderer must NOT clamp,
+  // floor, ceil, or otherwise mutate it — doing so causes audio/video geometry
+  // to drift apart and produces the rubber-band/repeat artifacts at transitions.
+  // playbackRate={1} on <OffthreadVideo> handles any sub-frame mp4 length jitter.
   const sceneDescriptors = scenes.map((scene, i) => {
-    const requestedFrames = Math.max(1, Math.round(scene.durationSeconds * fps));
-    const realVideoFrames = scene.actualVideoDurationSeconds && scene.actualVideoDurationSeconds > 0
-      ? Math.max(1, Math.floor(scene.actualVideoDurationSeconds * fps))
-      : requestedFrames;
-    // Use the SHORTER of the two — if the real video is 5.875s but the scene
-    // wants 7s, we render 5.875s of real video and stop. No stretching.
-    const baseFrames = Math.min(requestedFrames, realVideoFrames);
+    const baseFrames = Math.max(1, Math.round(scene.durationSeconds * fps));
     const isLast = i === scenes.length - 1;
     const transitionType = (scene.transitionType || 'none') as
       'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom';
