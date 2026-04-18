@@ -122,7 +122,6 @@ const defaultProject: LocalProject = {
 export default function VideoComposerDashboard() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<TabId>('briefing');
   const [project, setProject] = useState<LocalProject>(() => loadDraft() || defaultProject);
   const [activeTab, setActiveTab] = useState<TabId>(() => restoreActiveTab(loadDraft()));
   const [error, setError] = useState<string | null>(null);
