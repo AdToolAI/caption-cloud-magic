@@ -1,49 +1,50 @@
 
 
-## Echter Befund — warum das VO sich „wiederholt" oder „abschneidet"
+Der User hat recht: meine bisherigen Fixes greifen nicht am echten Problem. Lass mich das **logisch** durchdenken statt weiter an Symptomen rumzudoktern.
 
-Die aktuelle Architektur (Szenen verlängern statt Komposition zu kürzen) ist konzeptionell richtig. Das VO ist **linear** und die **Komposition exakt = Summe der Szenen-Dauern**. Trotzdem hört man Wiederholungen / Cuts. Beim genauen Lesen finde ich **zwei** echte Bugs in `ComposedAdVideo.tsx`:
+## Was wir wissen
+- VO ist linear, **kein** Audio-Re-Mount
+- Komposition = Summe Szenen-Dauern + Pad
+- Crossfades visuell smooth ✅
+- VO **wiederholt** sich an manchen Übergängen, **schneidet** an anderen
+- "Manche Übergänge gut, manche schlecht" → das ist der Schlüssel
 
-### Bug 1 — `<Video>` startet bei jeder Szene mit eigenem Audio-Decoder, der dann eingreift
-Im `<Scene>`-Renderer (Z. 162-167) ist `<Video>` mit `muted` markiert — **gut**. Aber er hat keinen `startFrom`/`endAt` Hint und keinen `playbackRate`. Wenn zwei Szenen sich überlappen (Crossfade-Fenster), laufen **beide `<Video>`-Elemente gleichzeitig**. Da der Decoder beim Crossfade-Start die nächste Quelle „pre-rollt", entstehen kurze Stalls in der gesamten Render-Pipeline → das **VO wird vom Renderer kurz pausiert** trotz `pauseWhenBuffering={false}` (das gilt nur für Audio-Buffering, nicht für Video-Decoder-Stalls).
+## Die echte Frage: Warum unterschiedlich?
 
-### Bug 2 — Sequence-Verlängerung macht die letzte Szene überproportional lang
-Schauen wir auf Z. 281-291:
-```ts
-const extendStart = !isFirst ? Math.floor(tFrames / 2) : 0;
-const extendEnd = !isLast ? Math.ceil(tFrames / 2) : 0;
-const seqDuration = baseFrames + extendStart + extendEnd;
-const from = Math.max(0, cursor - extendStart);
-cursor += baseFrames;
-```
+Wenn das VO ein **linearer Audio-Track** wäre, dürfte er sich **niemals wiederholen**. Wiederholungen entstehen nur, wenn:
+1. Audio mehrfach gemountet wird, oder
+2. Der Renderer einen Frame-Bereich **zweimal rendert**
 
-Das stimmt mathematisch — **aber**: `transitionInFrames` wird auf die volle `tFrames`-Länge gesetzt (Z. 297), während die tatsächliche Überlappung am Anfang nur `extendStart = floor(tFrames/2)` Frames beträgt. Das heißt: das **Fade-In dauert doppelt so lang wie das Überlappungsfenster** → die nächste Szene ist schon vollflächig sichtbar (frames > extendStart), aber die Scene-Komponente fadet immer noch von `opacity 0→1`. Dadurch:
-- Die zweite Szene ist während der ersten Hälfte ihres Fade-Ins **gar nicht sichtbar** (Vor-Szene ist schon weg)
-- Das wirkt wie ein **kurzer Schwarz-Frame** zwischen den Szenen
-- Beim Audio-Track des `<Video>`-Elements (auch wenn `muted`) entsteht beim erneuten Mounten ein Decoder-Hick-Up → **VO stallt → klingt wie wiederholt**
+Punkt 2 ist der Schlüssel. In Remotion Lambda werden Frames in **Chunks** parallel gerendert (`framesPerLambda: 270`). Wenn an einem Chunk-Boundary ein Crossfade liegt, kann es passieren, dass:
+- Lambda A rendert Frames 0–269 inkl. Audio-Sample für Frame 269
+- Lambda B rendert Frames 270–539 inkl. Audio-Sample für Frame 270
+- Beim Audio-Stitching am Ende **überlappen** die Audio-Segmente um wenige ms → klingt wie Wiederholung
+- Oder: an manchen Chunk-Boundaries wird **gekappt** statt überlappt → klingt wie Cut
 
-## Plan — drei chirurgische Fixes
+**Das erklärt warum manche Übergänge gut/schlecht sind:** Es hat NICHTS mit dem Übergang an sich zu tun, sondern damit, ob ein Lambda-Chunk-Boundary zufällig in der Nähe des Übergangs liegt.
 
-### Fix 1 — Transition-Frames an reale Überlappung anpassen
-In `ComposedAdVideo.tsx` Z. 297-298: `transitionInFrames`/`transitionOutFrames` müssen **= reale Überlappung = `extendStart` bzw. `extendEnd`** sein, nicht `tFrames`. Sonst fadet der Renderer länger als das Überlappungsfenster.
+## Aber Moment — der echte Hauptverdächtige ist ein anderer
 
-```ts
-transitionInFrames: extendStart,    // statt tFrames
-transitionOutFrames: extendEnd,     // statt tFrames
-```
+Schauen wir nochmal auf `ComposedAdVideo.tsx`. Die `<Audio>` Komponente ist auf **Top-Level** (außerhalb der Sequences) — gut. Aber: die `<Scene>`-Komponenten werden in `<Sequence from={X} durationInFrames={Y}>` gewrappt. Jede Sequence hat ein **eigenes `<Video muted>`** drin.
 
-### Fix 2 — Scene-Komponente: Fade-In-Berechnung an reale Überlappung
-In `Scene` Z. 104-105:
-- `safeIn = Math.max(1, transitionInFrames)` — bleibt
-- Aber die **Fade-Out-Berechnung** (Z. 116) muss `safeOut` (nicht `tFrames`) verwenden — ist bereits korrekt nach Fix 1, weil `transitionOutFrames` jetzt = reale Überlappung ist
+Hier ist der Knackpunkt: Wenn zwei Sequences **überlappen** (durch unsere `extendStart`/`extendEnd` Logik), laufen zwei `<Video>`-Elemente parallel. Remotion's interner Audio-Mixer merkt sich pro `<Audio>`/`<Video>`-Element die **`assetPosition`** (welches Audio-Sample an welcher Frame). 
 
-### Fix 3 — Video-Decoder-Stalls vermeiden
-`<Video>` bekommt:
-- `pauseWhenBuffering={false}` (statt `true`) → Decoder-Stalls werden nicht ans Audio-System propagiert
-- `delayRenderTimeoutInMilliseconds={30000}` als zusätzliche Sicherheit für Lambda
+**Das `<Video muted>` zählt im Mixer als Audio-Quelle** (auch wenn stumm) — Remotion baut intern eine Sample-Position-Map. Beim Crossfade-Overlap hat der Mixer **drei** parallele Audio-Quellen (VO + 2x Video). Bei Lambda-Rendering wird die Sample-Map pro Chunk neu aufgebaut, und an Chunk-Boundaries die im Overlap-Fenster liegen, kommt es zu **Sample-Drift** → das VO-Sample wird relativ zum erwarteten Frame um wenige ms verschoben → klingt wie Wiederholung oder Cut.
 
+## Die Lösung
+
+Statt `<Video muted>` zu verwenden, müssen wir **`<OffthreadVideo muted>`** OHNE Audio-Track verwenden. `OffthreadVideo` hat einen `muted`-Prop der das Audio-Element komplett aushängt (nicht nur stummschaltet) — der Renderer behandelt es dann als reines Visual ohne Audio-Mixer-Eintrag.
+
+**Plus:** Wir brauchen `toneFrequency={1}` auf dem VO-Audio um Pitch-Drift zu vermeiden, und `playbackRate={1}` explizit zu setzen.
+
+## Plan
+
+### Fix 1 — `<Video>` → `<OffthreadVideo>` mit echtem Audio-Bypass
+In `src/remotion/templates/ComposedAdVideo.tsx`:
 ```tsx
-<Video
+import { OffthreadVideo } from 'remotion';
+
+<OffthreadVideo
   src={videoUrl}
   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
   muted
@@ -51,17 +52,35 @@ In `Scene` Z. 104-105:
   delayRenderTimeoutInMilliseconds={30000}
 />
 ```
+`OffthreadVideo` rendert frame-by-frame als Bilder ohne Audio-Decoder → kein Sample-Map-Eintrag → keine Drift im Audio-Mixer.
 
-### Fix 4 — Safety-Pad reduzieren von 0.3s auf 0.15s
-In `compose-video-assemble/index.ts` Z. 125 — 0.3s ist zu viel, kann beim VO am Ende eine kurze Stille-Pause erzeugen die nach „Wiederholung" klingt wenn der Browser-Player mit der Stille-Detection arbeitet. 0.15s reicht für MP3-Decoder-Latenz.
+### Fix 2 — VO-Audio explizit ohne Time-Stretching
+```tsx
+<Audio 
+  src={voiceoverUrl as string} 
+  volume={1} 
+  pauseWhenBuffering={false}
+  toneFrequency={1}
+  playbackRate={1}
+/>
+```
+
+### Fix 3 — Lambda Render-Settings: `framesPerLambda` reduzieren
+In der Render-Pipeline (vermutlich `render-with-remotion` oder ähnlich): `framesPerLambda` von 270 auf **150** reduzieren. Das halbiert die Wahrscheinlichkeit dass ein Chunk-Boundary genau in einem Crossfade-Fenster liegt. Außerdem `concurrency: 1` für Audio-Composing erzwingen.
+
+Aber: laut Memory ist `framesPerLambda: 270, max 3 parallel` aktuelle Policy. Reduzieren bedeutet längere Renderzeit. **Daher**: nicht ändern, sondern die Crossfade-Fenster so legen, dass sie **garantiert nicht** auf Chunk-Boundaries fallen — das geht aber nicht deterministisch.
+
+→ Stattdessen: Fix 1 + Fix 2 sind die echten Fixes. Lambda-Settings nicht anfassen.
 
 ## Geänderte Dateien
-- `src/remotion/templates/ComposedAdVideo.tsx` — `transitionInFrames/OutFrames` = reale Überlappung; `<Video>` mit `pauseWhenBuffering={false}`
-- `supabase/functions/compose-video-assemble/index.ts` — Safety-Pad 0.3s → 0.15s
+- `src/remotion/templates/ComposedAdVideo.tsx` — `<Video>` → `<OffthreadVideo>`, `<Audio>` mit `toneFrequency={1}` und `playbackRate={1}`
+
+## Warum diesmal anders
+Bisher haben wir an Frame-Math und Transition-Timing geschraubt. **Echte Ursache** ist der **Audio-Mixer von Remotion**, der bei überlappenden `<Video>`-Elementen mit `muted` trotzdem eine Audio-Sample-Map führt → Drift bei Lambda-Chunks. `<OffthreadVideo muted>` umgeht das komplett.
 
 ## Verify
-1. 7-Szenen-Projekt rendern → keine Schwarz-Frames mehr zwischen Szenen, Crossfades smooth
-2. VO spielt komplett durch — keine Wiederholungen, keine Cuts an Übergang 1, 6→7 oder anderen Stellen
-3. Gesamtlänge weiterhin = Summe der Szenen-Dauern (+ 0.15s Pad)
+1. Render → VO spielt durchgehend linear, **keine** Wiederholungen, **keine** Cuts an Übergang 1 oder anderen
+2. Crossfades visuell weiterhin smooth
+3. Performance: `OffthreadVideo` ist auf Lambda meist **schneller** als `<Video>` (kein Audio-Decode)
 4. Bestandsprojekte funktionieren ohne Re-Generierung
 
