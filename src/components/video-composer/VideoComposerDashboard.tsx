@@ -124,6 +124,7 @@ export default function VideoComposerDashboard() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>('briefing');
   const [project, setProject] = useState<LocalProject>(() => loadDraft() || defaultProject);
+  const [activeTab, setActiveTab] = useState<TabId>(() => restoreActiveTab(loadDraft()));
   const [error, setError] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
