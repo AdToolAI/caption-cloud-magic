@@ -116,7 +116,18 @@ serve(async (req) => {
         : 0;
       totalFrames += dFrames - tFrames;
     }
-    const durationInFrames = Math.max(1, totalFrames);
+    let durationInFrames = Math.max(1, totalFrames);
+
+    // Voiceover sync: if VO is longer than the (crossfade-shortened) video timeline,
+    // extend duration so audio plays to completion. Last scene's frame will hold.
+    const voDurationSeconds = Number(assemblyConfig?.voiceover?.durationSeconds) || 0;
+    if (voDurationSeconds > 0) {
+      const voFrames = Math.ceil(voDurationSeconds * fps);
+      if (voFrames > durationInFrames) {
+        console.log('[compose-video-assemble] Extending duration for VO sync:', { videoFrames: durationInFrames, voFrames });
+        durationInFrames = voFrames;
+      }
+    }
     const totalDuration = durationInFrames / fps;
 
     const subtitlesCfg = assemblyConfig.subtitles || {};

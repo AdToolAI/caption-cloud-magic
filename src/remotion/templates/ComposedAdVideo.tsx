@@ -343,18 +343,16 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
         );
       })}
 
-      {/* Voiceover */}
+      {/* Voiceover — no Sequence wrapper, no pauseWhenBuffering: keeps audio
+          linear over the whole composition (avoids drift at crossfade overlaps
+          which previously cut the first VO sentence). */}
       {voEnabled && (
-        <Sequence from={0}>
-          <Audio src={voiceoverUrl as string} volume={1} pauseWhenBuffering />
-        </Sequence>
+        <Audio src={voiceoverUrl as string} volume={1} pauseWhenBuffering={false} />
       )}
 
-      {/* Background Music */}
+      {/* Background Music — same treatment for stable playback */}
       {musicEnabled && (
-        <Sequence from={0}>
-          <Audio src={backgroundMusicUrl as string} volume={musicVolume} pauseWhenBuffering />
-        </Sequence>
+        <Audio src={backgroundMusicUrl as string} volume={musicVolume} pauseWhenBuffering={false} />
       )}
     </AbsoluteFill>
   );
