@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, OffthreadVideo, Audio, Sequence, Series, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { AbsoluteFill, Video, Audio, Sequence, Series, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
 import { z } from 'zod';
 import { KineticText } from '../components/KineticText';
 import { ColorGrading } from '../components/ColorGrading';
@@ -97,15 +97,15 @@ const Scene: React.FC<{
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
       {videoUrl && (
-        <OffthreadVideo
+        <Video
           src={videoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           muted
           // Lock playback rate to 1.0 — prevents implicit speed warping when
           // Sequence/Video durations diverge.
           playbackRate={1}
-          pauseWhenBuffering={false}
-          delayRenderTimeoutInMilliseconds={30000}
+          // Use Remotion default pauseWhenBuffering=true (matches DirectorsCut/
+          // UniversalCreator) so audio stays glitch-free at scene boundaries.
         />
       )}
       {textOverlay?.text && (
@@ -263,28 +263,31 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
         );
       })}
 
-      {/* Voiceover — Lambda default pauseWhenBuffering=false for sample-accurate
-          playback. Composition geometry now uses TransitionSeries → no overlap drift. */}
+      {/* ── ONE-TRACK VOICEOVER (matches DirectorsCut/UniversalCreator pattern) ──
+          CRITICAL FIX (2026-04-18): Both DirectorsCut and UniversalCreator use
+          Remotion's DEFAULT `pauseWhenBuffering=true` and a stable `key` so
+          React never remounts the <Audio> element across scene boundaries.
+          The Composer was previously forcing `pauseWhenBuffering={false}`,
+          which caused Lambda workers to keep audio playing even when the
+          next scene's video chunk wasn't decoded yet → audible stutters /
+          micro-cuts at every scene boundary. Now we mirror the working
+          pattern: stable key + default buffering behavior. */}
       {voEnabled && (
         <Audio
+          key="composer-voiceover-stable"
           src={voiceoverUrl as string}
           volume={1}
-          pauseWhenBuffering={false}
           loop={false}
-          toneFrequency={1}
-          playbackRate={1}
           startFrom={0}
         />
       )}
 
-      {/* Background Music */}
+      {/* Background Music — same stable-key pattern */}
       {musicEnabled && (
         <Audio
+          key="composer-bgmusic-stable"
           src={backgroundMusicUrl as string}
           volume={musicVolume}
-          pauseWhenBuffering={false}
-          toneFrequency={1}
-          playbackRate={1}
           startFrom={0}
           endAt={durationInFrames}
         />
