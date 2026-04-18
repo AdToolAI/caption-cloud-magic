@@ -149,7 +149,7 @@ serve(async (req) => {
     for (let i = 0; i < remotionScenes.length - 1; i++) {
       const cur = remotionScenes[i];
       if (cur.transitionType !== 'none') {
-        overlapFrames += Math.max(1, Math.ceil((cur.transitionDuration ?? 0.4) * fps));
+        overlapFrames += Math.max(1, Math.round((cur.transitionDuration ?? 0.4) * fps));
       }
     }
     let durationInFrames = Math.max(1, sumSceneFrames - overlapFrames);
