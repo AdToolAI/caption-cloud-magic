@@ -1,52 +1,53 @@
 
 
-## Diagnose: AlbumImagePicker (Sora Studio) — vier echte Bugs
+## Plan: Konfigurierbares Watermark im Composer Export-Tab
 
-DB-Daten zeigen klar: User haben Alben **mit vielen Bildern** (108, 43, 6, 2, 1) — der Picker müsste sie alle anzeigen. Tut er aber nicht. Hier die Bugs:
+User will im Export-Tab des Motion Studios das Watermark vollständig konfigurieren: An/Aus, Text, Position, Größe.
 
-### Bug 1: Doppelte System-Alben erscheinen einmal
-Manche User haben **zwei** "KI Picture Studio"-Alben (eines mit Bildern, eines leer mit `image_count: 0`). Das leere wird durch `.filter(a => a.image_count > 0)` (Zeile 78) ausgeblendet — das ist ok. Aber der Filter blendet auch andere Alben aus, wenn der Count-Query wegen RLS/Race silent failed.
+### Was ich gefunden habe
 
-### Bug 2: N+1 Query mit Promise.all in Promise.all (Zeile 49–73)
-Für **jedes Album** zwei zusätzliche Queries (count + cover). Bei 5+ Alben = 10+ parallele Requests. Browser/Supabase rate-limited oder timed-outed → einige Counts kommen als `null` zurück → Album fällt durch's Raster.
+- `ExportOptions` (in `ExportOptionsEditor.tsx`) hat aktuell nur `includeWatermark: boolean` — kein Text, keine Position, keine Größe
+- Der Composer-Renderer (`ComposedAdVideo.tsx`) und die Assemble-Edge-Function müssen die Watermark-Config durchreichen
+- Im Screenshot sehe ich: Color Grading + Kinetic Typography sind schon im Export-Tab — Watermark fehlt komplett als sichtbare Sektion
 
-### Bug 3: Orphan-Bilder (album_id = NULL) sind unsichtbar
-DB zeigt: User `43d88fa6...` hat **48 Bilder ohne album_id**, User `8948d3d9...` hat **17**. Diese Bilder sind im Picker **komplett unauffindbar** — der Picker zeigt nur Bilder, die einer Album-ID zugeordnet sind. User denkt "ich hab so viele Bilder, warum nur 2 Alben?"
+### Änderungen
 
-### Bug 4: Klick auf Album startet `loadImages` ohne Error-Handling (Zeile 80–93)
-`.maybeSingle()` / `.select()` Fehler werden silent geschluckt (kein `.error`-Check, kein Toast). Wenn RLS einen Fehler wirft, scheint das Album "klickt nicht" — wie im Screenshot beschrieben.
+**1. `src/types/video-composer.ts` (oder wo `AssemblyConfig` definiert ist)**
+Neuen Typ ergänzen:
+```ts
+interface WatermarkConfig {
+  enabled: boolean;
+  text: string;              // z.B. "@deinname" oder "MyBrand"
+  position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
+  size: 'small' | 'medium' | 'large';   // 16/24/36 px @ 1080p
+  opacity: number;           // 0.3–1.0, default 0.7
+}
+```
+Default: `{ enabled: false, text: '', position: 'bottom-right', size: 'medium', opacity: 0.7 }`
 
-### Lösung
+**2. `src/components/video/ExportOptionsEditor.tsx` (oder Composer-Pendant im Export-Tab)**
+Watermark-Sektion ausbauen:
+- Switch "Wasserzeichen anzeigen"
+- Wenn aktiv: Input für Text, 5-Optionen-Grid für Position (Eck-Auswahl), Slider/Select für Größe, optional Opacity-Slider
+- Live-Preview-Hint (kleine Vorschau-Box mit dem Text an gewählter Position)
 
-**`src/components/media-library/AlbumImagePicker.tsx` umbauen:**
+**3. Composer Export-Tab Komponente** (`src/components/video-composer/AssemblyTab.tsx` o.ä.)
+Neue Watermark-Karte zwischen "Color Grading" und dem Director's-Cut-Hinweis einfügen — gleiche James-Bond-2028-Optik (gold accent, glassmorphism).
 
-1. **Eine einzige Query statt N+1:**
-   ```ts
-   // Alben + Counts in einem Roundtrip
-   const { data } = await supabase
-     .from('studio_albums')
-     .select('id, name, cover_image_url, is_system, studio_images(count)')
-     .eq('user_id', user.id)
-     .order('is_system', { ascending: false })
-     .order('name');
-   ```
-   Damit ist der count garantiert konsistent, kein Race.
+**4. `src/remotion/templates/ComposedAdVideo.tsx`**
+Watermark als `<AbsoluteFill>` Overlay über alle Szenen rendern (außerhalb der `<TransitionSeries>`, damit es bei Crossfades stabil bleibt). Position via `flexbox` justify/align, Größe via fontSize-Mapping (small=16/medium=24/large=36 px relativ zur 1080p-Höhe).
 
-2. **Virtuelles "Ohne Album"-Album hinzufügen** für orphan Bilder (`album_id IS NULL`), wenn der User welche hat → die 48 bzw. 17 unsichtbaren Bilder werden auffindbar.
+**5. `supabase/functions/compose-video-assemble/index.ts`**
+`watermark`-Config in die Render-Payload an Lambda durchreichen.
 
-3. **Filter lockern:** `image_count > 0` bleibt, aber leere System-Alben (Default-Album ohne Bilder) werden mit Hint angezeigt statt versteckt — oder konsistent ausgeblendet (System-Album ist sowieso bereits durch das gefüllte ersetzt).
+**6. Persistierung**
+`useComposerPersistence.ts` speichert `assembly_config` bereits — Watermark ist Teil davon, also kein DB-Schema-Change nötig.
 
-4. **`loadImages` mit Error-Toast:** `if (error) toast.error(...)` — wenn RLS/Network failed, sieht der User es statt eines toten Klicks.
+**7. Bundle-Redeploy**
+Renderer-Änderung → `bash scripts/deploy-remotion-bundle.sh` muss laufen (mache ich nach Code-Änderung).
 
-5. **Klick-Handler defensiv:** `disabled={loading}` auf Album-Buttons + Loading-Indikator pro Karte → kein Doppelklick-Race.
+### Was bleibt
 
-### Dateien
-
-1. `src/components/media-library/AlbumImagePicker.tsx` — komplett refactor (eine Query, virtuelles Orphan-Album, Error-Toasts, Disabled-State)
-
-### Was NICHT geändert wird
-
-- DB-Schema bleibt (orphan Bilder sind ein bestehendes Feature, kein Bug)
-- Sora Studio (`SoraVideoStudio.tsx`) bleibt — nutzt den Picker nur, keine Änderung am Aufrufer nötig
-- Keine Migration nötig (read-only Fix)
+- Aktueller `includeWatermark: boolean` wird erweitert, nicht ersetzt — wir mappen `enabled` auf das alte Feld für Backwards-Compat
+- Andere Export-Optionen (Format, Quality, FPS, EndScreen) unverändert
 
