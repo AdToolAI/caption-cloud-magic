@@ -105,6 +105,9 @@ const Scene: React.FC<{
           src={videoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           muted
+          // Lock playback rate to 1.0 — prevents implicit speed warping when
+          // Sequence/Video durations diverge.
+          playbackRate={1}
           pauseWhenBuffering={false}
           delayRenderTimeoutInMilliseconds={30000}
         />
