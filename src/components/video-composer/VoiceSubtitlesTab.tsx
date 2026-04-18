@@ -248,18 +248,12 @@ export default function VoiceSubtitlesTab({
               (acc, d) => acc + Math.max(1, Math.round(d * fps)),
               0
             );
-            let overlapFrames = 0;
-            for (let i = 0; i < scenes.length - 1; i++) {
-              const cur = scenes[i] as any;
-              const tType = cur.transitionType || 'none';
-              if (tType !== 'none') {
-                overlapFrames += Math.max(1, Math.round((cur.transitionDuration ?? 0.4) * fps));
-              }
-            }
-            const compositionSeconds = Math.max(0, sumSceneFrames - overlapFrames) / fps;
+            // HARD-CUT POLICY: Composer no longer applies transitions (renderer uses <Series>),
+            // so audio composition length = exact sum of scene frames. No overlap subtraction.
+            const compositionSeconds = sumSceneFrames / fps;
             const compositionDuration = Math.max(realDur, compositionSeconds) + 0.15;
             const { blob, exactSeconds } = await padAudioToExactWav(generatedUrl, compositionDuration);
-            console.log(`[VO] WAV pad applied — exact ${exactSeconds.toFixed(3)}s | VO ${realDur.toFixed(3)}s | comp ${compositionSeconds.toFixed(3)}s | real scene durs: [${realDurations.map(d => d.toFixed(3)).join(', ')}] | size ${(blob.size / 1024).toFixed(1)} KB`);
+            console.log(`[VO] WAV pad applied (hard-cut mode) — exact ${exactSeconds.toFixed(3)}s | VO ${realDur.toFixed(3)}s | comp ${compositionSeconds.toFixed(3)}s | real scene durs: [${realDurations.map(d => d.toFixed(3)).join(', ')}] | size ${(blob.size / 1024).toFixed(1)} KB`);
 
 
             const wavPath = `${user.id}/${Date.now()}-voiceover.wav`;
