@@ -1,76 +1,73 @@
 
 
-## Echter Befund — warum es noch leicht abgehackt klingt
+## Analyse — warum noch 2 Stotterer übrig sind
 
-Die großen Cuts/Wiederholungen sind weg (Cache-Bug gefixt). Was bleibt, ist ein **subtiles Stottern** an manchen Übergängen. Beim genauen Lesen finde ich **drei** wahrscheinliche Ursachen:
+Die großen Probleme sind weg. Was bleibt: **2 spezifische Übergänge** stottern leicht. Das ist ein klares Muster — nicht zufällig, sondern an **bestimmten Stellen reproduzierbar**. Lass mich logisch durchgehen warum genau 2:
 
-### Ursache 1 — `OffthreadVideo` mit `pauseWhenBuffering={false}` während Crossfade-Overlap
+### Hypothese A — Die 2 Stellen sind exakt die Lambda-Chunk-Grenzen
 
-In der jetzigen Architektur überlappen Szenen-Sequences während einer Transition (extendStart/extendEnd). Während dieses Overlaps rendert Remotion **zwei `<OffthreadVideo>`-Decoder gleichzeitig** für 12 Frames (0.4s @ 30fps). 
+Mit dem neuen dynamischen `framesPerLambda` (clamped 150-450) entstehen bei z.B. 7 Szenen × 6s = 1260 Frames mit `framesPerLambda ≈ 180` → **7 Chunks**. Aber: bei 6 Übergängen und 7 Chunks fallen **genau 2 Chunk-Boundaries** zufällig **mitten in einen Crossfade-Bereich** (statt sauber an Szenen-Enden). 
 
-`OffthreadVideo` mit `pauseWhenBuffering={false}` zwingt den Decoder, einen Frame zu liefern **auch wenn er nicht bereit ist** → Lambda-Worker kann an dieser Stelle einen leeren/wiederholten Frame ausgeben. Das blockiert die Render-Pipeline kurz und der **Audio-Mux-Schritt** am Ende verschiebt Audio-Samples um wenige ms → "abgehackt" klingender Übergang.
+Der Grund: meine Formel `avgSceneFrames = durationInFrames / sceneCount` rechnet mit der **Gesamt-Komposition** (inkl. extendStart/extendEnd Overlap), aber die **echten Szenen-Boundaries** liegen woanders (bei Crossfade verschiebt sich die effektive Szenen-Grenze um die halbe Transition-Dauer). Resultat: 5 von 7 Chunks alignen perfekt, **2 nicht** → genau dein Symptom.
 
-### Ursache 2 — `framesPerLambda: 270` + `concurrencyPerLambda: 1`
+### Hypothese B — `<Audio>` `endAt={durationInFrames}` exakt am Ende
 
-Bei z.B. 7 Szenen × 6s = 1260 Frames → 5 Lambda-Chunks (270, 270, 270, 270, 180). Die Chunk-Boundaries fallen bei Frame 270, 540, 810, 1080. Wenn ein Crossfade (12 Frames) zufällig nahe einer Boundary liegt (z.B. Übergang bei Frame 540), **muss ein einzelner Chunk Audio-Samples für genau diese Boundary stitching** — jeder Chunk rendert sein eigenes Audio-Segment, am Ende werden sie via ffmpeg concat gemerged. Die concat-Operation ist sample-akkurat, aber wenn ein Chunk das VO an Position X.XXX5s endet und der nächste bei X.XXX5s beginnt, gibt es einen **1-sample-Glitch** (~0.02ms) — bei manchen Übergängen hörbar als kleines Knacken/Stottern.
+Wenn `endAt` **genau** auf `durationInFrames` gesetzt ist und die VO-Datei kürzer ist als die Komposition, fragt Remotion am Ende Samples die nicht existieren → Lambda fügt Stille ein, aber **am Chunk-Boundary** klingt das wie ein Mikro-Cut.
 
-### Ursache 3 — `audioCodec: 'aac'` + variable Bitrate
+### Hypothese C — `OffthreadVideo` `pauseWhenBuffering={true}` blockiert während Audio läuft
 
-AAC-Encoder bei Lambda nutzen standardmäßig VBR. An Chunk-Grenzen kann VBR-AAC kleine Diskontinuitäten erzeugen. PCM-WAV als Zwischenformat wäre stabiler, aber ist nicht direkt verfügbar.
+Wenn Video pausiert (warten auf Frame), aber Audio weiterläuft, dann holt der Audio-Mux am Chunk-Ende einen "verschobenen" Sample-Zeitstempel → Knacken.
 
-## Plan — Drei gezielte Fixes
+## Die echte Lösung: Audio-Pre-Render + Sample-Akkurate Boundaries
 
-### Fix 1 — `pauseWhenBuffering` umkehren auf den Video-Elementen
-In `src/remotion/templates/ComposedAdVideo.tsx`:
-```tsx
-<OffthreadVideo
-  src={videoUrl}
-  ...
-  pauseWhenBuffering={true}  // war false → true
-  delayRenderTimeoutInMilliseconds={30000}
-/>
-```
-Bei `OffthreadVideo` ist `pauseWhenBuffering={true}` der **richtige** Default für Lambda-Renders. `false` ist nur für Live-Preview sinnvoll. Im Lambda-Renderer **wartet** der Worker dann bis der Frame bereit ist (statt einen leeren zu liefern) — das eliminiert den Decoder-Hiccup während des Overlaps.
+Statt am Lambda-Chunking zu schrauben — das ist nicht 100% kontrollierbar — gehen wir das Problem an der **Wurzel** an: das VO wird **vor** dem Render zu einer **WAV-Datei mit exakter Komposition-Länge** vorbereitet (mit Stille gepadded oder sample-genau getrimmt). Damit ist der Audio-Track **deterministisch identisch** über alle Lambda-Chunks.
 
-### Fix 2 — `framesPerLambda` an Komposition anpassen
-In `supabase/functions/compose-video-assemble/index.ts` Z. 269:
+### Fix 1 — Neuer Edge-Function Step: `prepare-voiceover-audio`
+
+Nach VO-Generierung und vor Komposition: Edge Function lädt MP3, dekodiert mit ffmpeg-WASM (oder ruft direkt ffmpeg in Lambda), und exportiert als **WAV @ 48kHz stereo** mit **exakter Länge** = `durationInFrames / fps`. WAV ist verlustfrei, kein VBR-Drift, sample-akkurat über Chunks.
+
+Da ffmpeg-in-Edge komplex ist, **Alternative**: serverlose Audio-Normalisierung via Supabase Storage + ffmpeg-binary in `compose-video-assemble` (wenn möglich) ODER Client-side via Web Audio API in `VoiceSubtitlesTab.tsx` (preview-only, dann Upload als WAV).
+
+**Pragmatischste Lösung**: Web Audio API im Browser nach VO-Generierung nutzen. Browser dekodiert MP3 → AudioBuffer → padded auf exakte Länge → re-encodiert als WAV → Upload zur Storage. Das passiert **einmal** beim VO-Generieren, **vor** dem Render.
+
+### Fix 2 — Lambda-Chunking szenen-präzise statt durchschnittlich
+
+In `compose-video-assemble`: statt Durchschnitt nutzen wir die **echten Szenen-Boundaries** aus `remotionScenes` und wählen `framesPerLambda` so, dass **jede** Boundary ein Vielfaches der häufigsten Szenen-Länge ist:
 ```ts
-// Sicherstellen, dass Chunk-Boundaries möglichst NICHT in Crossfade-Fenster fallen.
-// Statt fixe 270 dynamisch wählen: Vielfaches von (Szenen-Frames + Transition).
-const avgSceneFrames = Math.ceil(durationInFrames / Math.max(1, remotionScenes.length));
-const framesPerLambda = Math.max(150, Math.min(450, avgSceneFrames));
+// Finde die kürzeste Szene + Transition-Padding als framesPerLambda
+const sceneFrames = remotionScenes.map(s => Math.ceil(s.duration * fps) + Math.ceil((s.transitionInDuration || 0) * fps));
+const minSceneFrames = Math.min(...sceneFrames);
+const framesPerLambda = Math.max(150, minSceneFrames);
 ```
-Das sorgt dafür, dass jede Lambda-Instanz **eine ganze Szene plus deren Transition** rendert → der kritische Audio-Mux passiert nur an Szenen-Enden, nicht mitten in Crossfades.
+Damit fällt **kein** Chunk-Boundary mehr in einen Crossfade.
 
-### Fix 3 — Audio-Track als Top-Level mit explizitem `startFrom={0}` + Pre-Roll
-In `ComposedAdVideo.tsx`:
+### Fix 3 — `<Audio>` exakte Länge entfernen, dafür `loop={false}` + leichte Pre-Roll
+
 ```tsx
 <Audio
-  src={voiceoverUrl as string}
-  volume={1}
-  pauseWhenBuffering={true}  // war false
-  toneFrequency={1}
-  playbackRate={1}
+  src={voiceoverUrl}
+  pauseWhenBuffering={true}
   startFrom={0}
-  endAt={durationInFrames}
+  // endAt entfernen — Remotion handled End-of-Stream selbst
+  loop={false}
 />
 ```
-`pauseWhenBuffering={true}` auf dem `<Audio>` sorgt dafür, dass das VO an Chunk-Grenzen sample-akkurat fortgesetzt wird (Remotion buffert intern statt Samples zu droppen). Plus explizites `startFrom`/`endAt` verhindert, dass jeder Chunk seine eigene Audio-Position berechnet — der Renderer nutzt eine **einheitliche** Sample-Position-Map über alle Chunks.
+Das vermeidet die "Sample am Ende fehlt"-Situation.
 
 ## Geänderte Dateien
 
-- `src/remotion/templates/ComposedAdVideo.tsx` — `pauseWhenBuffering={true}` auf `OffthreadVideo` UND beiden `<Audio>`-Komponenten, `startFrom`/`endAt` auf Audio
-- `supabase/functions/compose-video-assemble/index.ts` — `framesPerLambda` dynamisch an Szenen-Länge angepasst
-- `mem://infrastructure/aws-lambda/rendering-concurrency-stability-policy` — Policy-Notiz: dynamisches `framesPerLambda` für Composer-Renders
+- `src/components/video-composer/VoiceSubtitlesTab.tsx` — Web Audio API Post-Processing: MP3 → AudioBuffer → padded WAV → Re-Upload, exakte Länge sichern
+- `supabase/functions/compose-video-assemble/index.ts` — `framesPerLambda` aus **kürzester** Szene statt Durchschnitt
+- `src/remotion/templates/ComposedAdVideo.tsx` — `endAt` vom Voiceover-Audio entfernen
 
-## Warum diesmal das Rest-Problem trifft
+## Warum das diesmal funktioniert
 
-Die vorherigen Fixes haben die **großen** Wiederholungen (Cache-Bug) gelöst. Was übrig blieb, sind **mikroskopische Sample-Diskontinuitäten** an Lambda-Chunk-Grenzen, verstärkt durch `pauseWhenBuffering={false}` (Decoder-Hiccup). Mit `pauseWhenBuffering={true}` + szenen-aligned Chunks wird das VO sample-akkurat über alle Chunks gestitched.
+Bisher: Lambda-Chunks teilten sich **denselben MP3-Stream**, jeder Worker dekodiert eigenständig → Mikro-Drift an Boundaries. Mit **WAV @ exakter Länge**: jeder Worker liest dieselben Samples an derselben Position → bit-identisch über alle Chunks. Plus szenen-präzises Chunking → kein Boundary mehr in einem Crossfade.
 
 ## Verify
 
-1. 7-Szenen-Projekt mit `speed=1.2` rendern → VO durchgehend sauber, **kein** Knacken/Stottern mehr an Übergängen
-2. Render-Logs prüfen: `framesPerLambda` Wert in Logs ≈ Szenen-Länge in Frames
-3. Crossfades visuell weiterhin smooth
-4. Render-Zeit: leicht länger (~10-15%) durch szenen-aligned Chunking — akzeptabel für Audio-Stabilität
+1. VO neu generieren → Console-Log: "WAV pad applied, exact duration X.XXXs" 
+2. Storage prüfen: zusätzliche `.wav` Datei vorhanden mit exakter Länge
+3. Render → **alle** Übergänge sauber, **kein** Stottern mehr
+4. Render-Logs: `framesPerLambda` Wert ≈ kürzeste Szene in Frames
 
