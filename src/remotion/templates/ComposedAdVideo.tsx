@@ -1,5 +1,9 @@
 import React from 'react';
-import { AbsoluteFill, OffthreadVideo, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate, spring, Easing } from 'remotion';
+import { AbsoluteFill, OffthreadVideo, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { TransitionSeries, linearTiming } from '@remotion/transitions';
+import { fade } from '@remotion/transitions/fade';
+import { slide } from '@remotion/transitions/slide';
+import { wipe } from '@remotion/transitions/wipe';
 import { z } from 'zod';
 import { KineticText } from '../components/KineticText';
 import { ColorGrading } from '../components/ColorGrading';
@@ -82,88 +86,16 @@ export const ComposedAdVideoSchema = z.object({
 
 type ComposedAdVideoProps = z.infer<typeof ComposedAdVideoSchema>;
 
-// Single scene renderer with crossfade-aware in/out transitions.
-// Frame-based opacity/transform interpolation, zero CSS animations — Lambda-safe.
+// Plain scene renderer — no manual transitions, TransitionSeries handles all overlap/fade math.
 const Scene: React.FC<{
   videoUrl: string;
   textOverlay?: ComposedAdVideoProps['scenes'][0]['textOverlay'];
   kineticText: boolean;
-  durationInFrames: number;
-  transitionType: 'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom';
-  transitionInFrames: number;
-  hasTransitionOut: boolean;
-  transitionOutFrames: number;
-}> = ({ videoUrl, textOverlay, kineticText, durationInFrames, transitionType, transitionInFrames, hasTransitionOut, transitionOutFrames }) => {
+}> = ({ videoUrl, textOverlay, kineticText }) => {
   const frame = useCurrentFrame();
 
-  // Compute transition effects (only if a real transition is requested)
-  let opacity = 1;
-  let transform = 'none';
-  let clipPath: string | undefined = undefined;
-
-  const safeIn = Math.max(1, transitionInFrames);
-  const safeOut = Math.max(1, transitionOutFrames);
-
-  if (transitionType === 'fade' || transitionType === 'crossfade') {
-    if (transitionInFrames > 0 && frame < safeIn) {
-      opacity = interpolate(frame, [0, safeIn], [0, 1], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-        easing: Easing.inOut(Easing.ease),
-      });
-    }
-  } else if (transitionType === 'slide') {
-    if (transitionInFrames > 0 && frame < safeIn) {
-      const tx = interpolate(frame, [0, safeIn], [100, 0], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-        easing: Easing.out(Easing.cubic),
-      });
-      transform = `translateX(${tx}%)`;
-    }
-  } else if (transitionType === 'zoom') {
-    if (transitionInFrames > 0 && frame < safeIn) {
-      const scale = interpolate(frame, [0, safeIn], [0.85, 1], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-        easing: Easing.out(Easing.cubic),
-      });
-      opacity = interpolate(frame, [0, safeIn], [0, 1], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-        easing: Easing.inOut(Easing.ease),
-      });
-      transform = `scale(${scale})`;
-    }
-  } else if (transitionType === 'wipe') {
-    if (transitionInFrames > 0 && frame < safeIn) {
-      const progress = interpolate(frame, [0, safeIn], [0, 100], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-        easing: Easing.inOut(Easing.ease),
-      });
-      clipPath = `inset(0 ${100 - progress}% 0 0)`;
-    }
-  }
-
-  // UNIVERSAL OUT-FADE: whenever the Sequence is extended past the canonical
-  // scene end (extendEnd > 0), the scene MUST fade out during the overlap
-  // window — regardless of its own transitionType. Otherwise it stays fully
-  // opaque on top of the next scene → hard cut + decoder pipeline block.
-  if (hasTransitionOut && transitionOutFrames > 0) {
-    const fadeOutStart = Math.max(0, durationInFrames - safeOut);
-    if (frame > fadeOutStart) {
-      const fadeOpacity = interpolate(frame, [fadeOutStart, durationInFrames], [1, 0], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-        easing: Easing.inOut(Easing.ease),
-      });
-      opacity = Math.min(opacity, fadeOpacity);
-    }
-  }
-
   return (
-    <AbsoluteFill style={{ backgroundColor: '#000', opacity, transform, clipPath }}>
+    <AbsoluteFill style={{ backgroundColor: '#000' }}>
       {videoUrl && (
         <OffthreadVideo
           src={videoUrl}
@@ -254,6 +186,26 @@ const clampVolume = (v: number) => {
   return Math.min(1, Math.max(0, v));
 };
 
+// Map our transitionType to a Remotion presentation. 'none' returns null →
+// no <TransitionSeries.Transition> is inserted (hard cut, zero overlap).
+const getPresentation = (
+  type: 'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom'
+): any => {
+  switch (type) {
+    case 'fade':
+    case 'crossfade':
+    case 'zoom': // zoom not in @remotion/transitions core → degrade to fade
+      return fade();
+    case 'slide':
+      return slide({ direction: 'from-right' });
+    case 'wipe':
+      return wipe({ direction: 'from-left' });
+    case 'none':
+    default:
+      return null;
+  }
+};
+
 // Main composition
 export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
   scenes,
@@ -267,46 +219,20 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
 }) => {
   const { fps, durationInFrames } = useVideoConfig();
 
-  // Frame-math: total composition length = sum of original scene durations
-  // (NO crossfade shortening). Crossfades are achieved by EXTENDING each
-  // scene's Sequence by half the transition duration on each side, so
-  // consecutive Sequences overlap during the transition window. This keeps
-  // the audio (VO/music) perfectly in sync with the visual timeline.
-  let cursor = 0;
-  const sceneFrames = scenes.map((scene, i) => {
-    const baseFrames = Math.ceil(scene.durationSeconds * fps);
+  // Build transition descriptors. Each scene contributes: baseFrames + (optional) transitionFrames to the NEXT scene.
+  // <TransitionSeries> overlaps adjacent sequences by exactly transitionFrames — sample-accurate, Lambda-tested.
+  const sceneDescriptors = scenes.map((scene, i) => {
+    const baseFrames = Math.max(1, Math.ceil(scene.durationSeconds * fps));
+    const isLast = i === scenes.length - 1;
     const transitionType = (scene.transitionType || 'none') as
       'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom';
-    const tFrames = transitionType !== 'none'
-      ? Math.ceil((scene.transitionDuration ?? 0.4) * fps)
+    const transitionFrames = (!isLast && transitionType !== 'none')
+      ? Math.max(1, Math.ceil((scene.transitionDuration ?? 0.4) * fps))
       : 0;
-
-    const isFirst = i === 0;
-    const isLast = i === scenes.length - 1;
-
-    // Extend the Sequence by half the transition window on each non-edge side.
-    const extendStart = !isFirst ? Math.floor(tFrames / 2) : 0;
-    const extendEnd = !isLast ? Math.ceil(tFrames / 2) : 0;
-    const seqDuration = baseFrames + extendStart + extendEnd;
-
-    // Sequence starts `extendStart` frames earlier than the canonical timeline
-    // position so the overlap with the previous scene is `tFrames`.
-    const from = Math.max(0, cursor - extendStart);
-
-    // Advance the canonical cursor by the original scene duration ONLY,
-    // so the total timeline = sum of original scene durations (audio-safe).
-    cursor += baseFrames;
-
     return {
-      from,
-      duration: seqDuration,
+      baseFrames,
       transitionType,
-      // Fade durations MUST match the actual overlap window, not the full
-      // transition duration — otherwise the fade outlasts the overlap and
-      // creates a brief black frame + decoder hiccup.
-      transitionInFrames: extendStart,
-      transitionOutFrames: extendEnd,
-      hasTransitionOut: extendEnd > 0,
+      transitionFrames,
       isLast,
     };
   });
@@ -318,27 +244,29 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
       <ColorGrading preset={colorGrading as any}>
-        {scenes.map((scene, i) => {
-          const sf = sceneFrames[i];
-          return (
-            <Sequence
-              key={i}
-              from={sf.from}
-              durationInFrames={sf.duration}
-            >
-              <Scene
-                videoUrl={scene.videoUrl}
-                textOverlay={scene.textOverlay}
-                kineticText={kineticText}
-                durationInFrames={sf.duration}
-                transitionType={sf.transitionType}
-                transitionInFrames={sf.transitionInFrames}
-                hasTransitionOut={sf.hasTransitionOut}
-                transitionOutFrames={sf.transitionOutFrames}
-              />
-            </Sequence>
-          );
-        })}
+        <TransitionSeries>
+          {scenes.map((scene, i) => {
+            const desc = sceneDescriptors[i];
+            const presentation = getPresentation(desc.transitionType);
+            return (
+              <React.Fragment key={i}>
+                <TransitionSeries.Sequence durationInFrames={desc.baseFrames}>
+                  <Scene
+                    videoUrl={scene.videoUrl}
+                    textOverlay={scene.textOverlay}
+                    kineticText={kineticText}
+                  />
+                </TransitionSeries.Sequence>
+                {!desc.isLast && presentation && desc.transitionFrames > 0 && (
+                  <TransitionSeries.Transition
+                    presentation={presentation}
+                    timing={linearTiming({ durationInFrames: desc.transitionFrames })}
+                  />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </TransitionSeries>
       </ColorGrading>
 
       {/* Subtitles (above color grading so they stay readable) */}
@@ -369,8 +297,7 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
       })}
 
       {/* Voiceover — Lambda default pauseWhenBuffering=false for sample-accurate
-          playback across chunk boundaries. With clean Sequence geometry (no
-          overlapping hard cuts), no decoder lock can stall the audio cursor. */}
+          playback. Composition geometry now uses TransitionSeries → no overlap drift. */}
       {voEnabled && (
         <Audio
           src={voiceoverUrl as string}
@@ -383,7 +310,7 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
         />
       )}
 
-      {/* Background Music — Lambda default pauseWhenBuffering=false */}
+      {/* Background Music */}
       {musicEnabled && (
         <Audio
           src={backgroundMusicUrl as string}

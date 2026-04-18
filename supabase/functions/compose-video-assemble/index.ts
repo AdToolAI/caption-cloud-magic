@@ -103,29 +103,27 @@ serve(async (req) => {
       };
     });
 
-    // Pre-process: ensure every scene that has a successor with an active
-    // transition ALSO uses that transition. Otherwise scene N stays opaque
-    // during the overlap window with scene N+1 → hard cut + decoder pipeline
-    // block at the boundary. The geometric overlap is already extended in the
-    // renderer; this just guarantees the visual fade matches it.
-    let normalizedCount = 0;
+    // NOTE: TransitionSeries-based composition. Transitions OVERLAP adjacent
+    // sequences by exactly transitionFrames — total composition is shortened
+    // by the sum of transition windows. We must mirror that math here so the
+    // Lambda durationInFrames matches the visual timeline exactly.
+    const fps = 30;
+    const sumSeconds = remotionScenes.reduce((acc, s) => acc + (s.durationSeconds || 0), 0);
+    const sumSceneFrames = remotionScenes.reduce(
+      (acc, s) => acc + Math.max(1, Math.ceil((s.durationSeconds || 0) * fps)),
+      0
+    );
+    // Sum overlap frames: only between consecutive scenes when the FIRST
+    // (left) scene has an active transition.
+    let overlapFrames = 0;
     for (let i = 0; i < remotionScenes.length - 1; i++) {
       const cur = remotionScenes[i];
-      const next = remotionScenes[i + 1];
-      if (next.transitionType !== 'none' && cur.transitionType === 'none') {
-        cur.transitionType = next.transitionType;
-        cur.transitionDuration = next.transitionDuration;
-        normalizedCount++;
+      if (cur.transitionType !== 'none') {
+        overlapFrames += Math.max(1, Math.ceil((cur.transitionDuration ?? 0.4) * fps));
       }
     }
-    console.log(`[compose-video-assemble] Pre-processed ${normalizedCount} scenes for transition consistency`);
-
-    const fps = 30;
-    // IMPORTANT: total duration = sum of original scene durations (NO crossfade shortening).
-    // Crossfades are achieved in the renderer by extending each scene's Sequence by the
-    // transition overlap, so the audio (VO/music) stays in sync with the visual timeline.
-    const sumSeconds = remotionScenes.reduce((acc, s) => acc + (s.durationSeconds || 0), 0);
-    let durationInFrames = Math.max(1, Math.ceil(sumSeconds * fps));
+    let durationInFrames = Math.max(1, sumSceneFrames - overlapFrames);
+    console.log(`[compose-video-assemble] Composition geometry: sumSceneFrames=${sumSceneFrames}, overlapFrames=${overlapFrames}, durationInFrames=${durationInFrames} (sumSeconds=${sumSeconds.toFixed(3)})`);
 
     // Voiceover sync safety net: if a VO duration is recorded and longer than the
     // composed timeline, extend so it plays to completion.
@@ -139,8 +137,8 @@ serve(async (req) => {
     }
 
     // Small safety pad (0.15s) for MP3 decoder latency at the very end.
-    // Larger pads can introduce silence detection artifacts.
     durationInFrames += Math.ceil(0.15 * fps);
+
 
     const totalDuration = durationInFrames / fps;
 
@@ -283,22 +281,10 @@ serve(async (req) => {
       chromiumOptions: {},
       timeoutInMilliseconds: 600000,
       concurrencyPerLambda: 1,
-      // Scene-aligned chunking: align Lambda chunk boundaries with scene boundaries
-      // so the audio mux/concat happens at scene cuts rather than mid-crossfade.
-      // This eliminates micro-glitches (1-sample discontinuities) at transitions.
-      framesPerLambda: (() => {
-        // Use the SHORTEST scene length as the chunk size. This guarantees that
-        // every chunk boundary aligns with a scene cut (or earlier), never falling
-        // mid-crossfade. Avg-based math could leave 1-2 boundaries inside a
-        // transition window — those cause the residual micro-stutters.
-        const sceneFrames = remotionScenes
-          .map((s: any) => Math.ceil((s.durationSeconds || 0) * fps))
-          .filter((f: number) => f > 0);
-        const minSceneFrames = sceneFrames.length > 0 ? Math.min(...sceneFrames) : 180;
-        const chosen = Math.max(150, Math.min(450, minSceneFrames));
-        console.log(`[compose-video-assemble] Scene-precise framesPerLambda=${chosen} (minSceneFrames=${minSceneFrames}, sceneFrames=[${sceneFrames.join(',')}], totalFrames=${durationInFrames})`);
-        return chosen;
-      })(),
+      // framesPerLambda: omitted → Lambda default heuristic. With TransitionSeries
+      // the composition has no manual overlap stretching, so chunk boundaries are
+      // safe to fall anywhere — no decoder lock at scene seams.
+
       downloadBehavior: { type: 'play-in-browser' },
       webhook: webhookData,
     };
