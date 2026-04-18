@@ -1,77 +1,77 @@
 
 
-## Stop. Diagnose first — keine weiteren blinden Fixes.
+## Was ich aus den Daten sehe
 
-Ich habe in diesem Loop bereits **5 verschiedene Code-Änderungen** an denselben drei Dateien gemacht — jede mit einer überzeugenden Begründung, jede mit dem Effekt "Symptome verschoben, nicht gelöst". Das ist klassisches Loop-Verhalten und ich höre damit auf.
+Ich habe das Projekt `Grusselgeschichten` (8 Szenen) analysiert. Reale vs. konfigurierte Längen:
 
-## Was ich jetzt brauche statt weiterer Hypothesen
+```text
+Szene 1: configured 7.0s → real 5.875s  (Δ -1.125s) → Übergang fade
+Szene 2: configured 8.0s → real 10.125s (Δ +2.125s) 
+Szene 3: configured 6.0s → real 5.875s
+Szene 4: configured 8.0s → real 10.125s
+Szene 5: configured 9.0s → real 10.125s
+Szene 6: configured 7.0s → real 5.875s  (Δ -1.125s) → Übergang zoom→fade
+Szene 7: configured 8.0s → real 10.125s
+Szene 8: configured 7.0s → real 5.875s
+```
 
-**Echte Daten von einem konkreten fehlgeschlagenen Render**, nicht Theoriemodelle:
+**Auffällig**: Übergang **1→2** (Szene 1 verkürzt um 1.125s) und **6→7** (Szene 6 verkürzt um 1.125s) — exakt deine zwei Problemstellen. Die Szenen werden REAL **1.125s früher beendet** als das VO erwartet.
 
-1. **Edge Function Logs** vom letzten Render: `compose-video-assemble` — was wurden tatsächlich für Werte berechnet (sumSceneFrames, durationSeconds pro Szene, realDuration)
-2. **Renderer-Bundle-Version**: ist das Lambda-Bundle nach dem letzten Fix tatsächlich neu deployed worden? (`bundle-version.json` checken)
-3. **DB-Snapshot eines konkreten Composer-Projekts**: was steht wirklich in `assembly_config`? Welche `durationSeconds` hat jede Szene? Welcher Render lief zuletzt durch?
-4. **Audio/Voiceover-State**: wann wurde das WAV zuletzt generiert? Vor oder nach den Szenen-Anpassungen?
+## Der eigentliche Bug
 
-## Und 2 Klärungsfragen an dich, weil ich das nicht raten kann
+Drei Komponenten rechnen mit **unterschiedlichen** Komposition-Längen:
 
-### Frage 1: Hast du seit dem letzten Fix das Lambda-Bundle redeployed?
-Ich habe in Plan + Code geschrieben "redeploy nicht vergessen" — aber ich sehe nicht ob du den `npx remotion lambda sites create ...` Befehl tatsächlich ausgeführt hast. Wenn nicht, läuft das Lambda **immer noch mit dem alten Bundle** — alle meine letzten Code-Änderungen sind dann unwirksam.
+| Komponente | nutzt | Komposition |
+|------------|-------|-------------|
+| WAV-Padding (`VoiceSubtitlesTab.tsx`) | nominelle 7s/8s/... | **57.0s** |
+| Edge Function (`compose-video-assemble`) | reale 5.875/10.125/... | **61.0s** |
+| Renderer (`ComposedAdVideo.tsx`) | bekommt reale Werte vom Edge | **61.0s** |
 
-### Frage 2: Welche Symptome **genau** in welcher Reihenfolge?
-- Stotterer (ursprünglich) → angeblich behoben
-- Gummibandeffekt → angeblich behoben  
-- Wiederholung von Szene 5 + VO-Cut → ?
-- **Aktuell**: was siehst/hörst du **konkret**? An welchen Übergängen? Audio oder Video oder beides?
+Das WAV ist auf 57s gepaddet, die Komposition ist 61s. **Aber wichtiger**: das gesprochene VO ist auf nominelle Szenen-Längen ausgerichtet (Satz für Szene 1 dauert ~6.5s passend zu 7s-Slot). Wenn Szene 1 real nur 5.875s dauert und dann ein 0.5s-Fade startet, liegt das VO-Ende des "Szene-1-Satzes" mitten im Fade — wahrscheinlich **schneidet die Sprachpause oder das Satz-Ende zwischen den Audio-Decoder-Chunks an der Übergangsstelle**.
 
-## Plan
+## Lösung: WAV-Padding muss die REALEN Dauern nutzen, nicht die nominellen
 
-### Phase 1 — Echte Diagnose (lese, analysiere, NICHT codieren)
+Die WAV-Generierung in `VoiceSubtitlesTab.tsx` Zeile 232 nutzt `scenes[i].durationSeconds` — das ist der UI-State-Wert (nominell 7s). Der Server probt aber später beim Render die echten 5.875s. **Diese beiden müssen identisch sein.**
 
-1. **Bundle-Version prüfen**: `bundle-version.json` von S3 fetchen → ist das aktuelle Bundle deployed?
-2. **Edge Function Logs lesen**: letzter `compose-video-assemble` Run → welche `sumSceneFrames`, `durationInFrames`, `realDuration` pro Szene wurden gelogt?
-3. **DB-Query**: dein letztes `composer_project` mit allen `assembly_config`-Werten, plus letzter `video_render` mit Status + Output-URL
-4. **Code-Re-Read**: aktuellen Stand von `ComposedAdVideo.tsx`, `compose-video-assemble/index.ts`, `VoiceSubtitlesTab.tsx` lesen — was ist nach den letzten Edits **wirklich** im Code?
+### Konkrete Fixes
 
-### Phase 2 — Hypothese mit Daten begründen
+**1. `VoiceSubtitlesTab.tsx` (WAV-Padding-Berechnung):**
+- VOR der WAV-Generierung: für jede Szene das echte MP4 probe (`new Audio(s.clipUrl); audio.duration`)
+- Diese realen Werte für die `compositionSeconds`-Berechnung nutzen, NICHT die nominellen UI-Werte
+- Damit ist das WAV exakt so lang wie die echte Komposition
 
-Erst nach den echten Werten formuliere ich eine neue Hypothese — diesmal mit konkreten Frame-Zahlen, nicht Spekulation. Beispiel-Format:
-> "Szene 4: real=176f, configured=210f, sentToRenderer=176f. Szene 5: real=176f, configured=210f, sentToRenderer=176f. Audio-Track: 13.5s = 405f. Komposition-sumFrames: 880f = 29.33s. Differenz: ..."
+**2. Beim Hailuo-Clip-Generierung-Callback (`ClipsTab.tsx`):**
+- Wenn ein Clip fertig ist, das echte MP4 kurz proben (Audio-Element loadedmetadata)
+- `duration_seconds` in der DB überschreiben mit der realen Länge
+- Damit ist UI-State = DB = Edge = Renderer permanent in Sync
+- Der User sieht in der UI auch die echten Längen statt der nominellen — kein Mismatch mehr möglich
 
-### Phase 3 — Gezielter Fix (NICHT vorher)
+**3. Edge Function bleibt unverändert** — sie probed bereits korrekt.
 
-Wenn die Daten zeigen:
-- **Bundle nicht deployed** → User muss redeployen, kein Code-Change
-- **Edge-Function-Werte korrekt, Renderer ignoriert sie** → Bundle-Cache-Problem oder Renderer-Bug
-- **WAV wurde vor Probe generiert** → WAV-Regenerationspflicht in UI einbauen
-- **Etwas ganz anderes** → entsprechend handeln
+**4. Renderer bleibt unverändert** — er nimmt bereits `durationSeconds` 1:1.
 
-### Phase 4 — Verify
+### Warum dieser Fix die Wurzel trifft
 
-Konkreter Test mit dem **gleichen** Composer-Projekt, vergleichen mit den vorherigen Render-URLs (Vorher/Nachher).
+Aktuell ist die Pipeline asynchron:
+- UI-State sagt "7s" → WAV wird mit 7s-Slots erzeugt → Edge probed "5.875s" → Komposition wird 5.875s → WAV-Slot von 7s wird auf 5.875s zusammengedrückt → Sprachende fällt in den Fade-Übergang.
 
-## Klärungsfragen die ich dir jetzt stelle
+Nach dem Fix:
+- Clip wird generiert → echte Dauer 5.875s wird sofort in DB & UI geschrieben → User sieht "5.875s" → VO wird mit 5.875s-Slots erzeugt → Edge probed (gleiche) 5.875s → Komposition 5.875s → WAV-Slot perfekt deckungsgleich → kein VO-Cut.
 
-Beantworte bitte diese 2 Punkte bevor ich weiter mache:
+### Verify nach Fix
 
-1. **Bundle-Deploy-Status**: Hast du nach meinem letzten Code-Change (Edge Function + Renderer Vereinfachung) den Befehl `npx remotion lambda sites create src/remotion/index.ts --site-name=adtool-remotion-bundle --region=eu-central-1` in deinem CMD ausgeführt? (Ja/Nein/Weiß nicht mehr)
+1. Im Composer alten Clip-Slot anschauen: `duration_seconds` in DB sollte jetzt **5.875s** stehen statt **7s** (für Szene 1 und 6)
+2. Beim VO-Generieren in der Console-Log: `[VO] WAV pad applied, exact duration X.XXs (comp Y.YYs)` — `comp` muss == Edge-Function `durationInFrames/fps` sein
+3. Render starten, Übergang 1→2 prüfen: Sprache läuft sauber durch, kein Schnitt
+4. Optional: das WAV vorher per ffprobe checken — `realDur < compositionSeconds` darf nicht sein
 
-2. **Aktuelles Symptom**: Beschreibe in **einem** Satz was genau falsch ist:
-   - "Wieder Stotterer an Übergang X→Y"
-   - "Wieder Wiederholung an Übergang X→Y"  
-   - "Wieder Gummiband an Übergang X→Y"
-   - "Audio-Cut an Übergang X→Y"
-   - "Etwas Neues: ..."
+### Lambda-Bundle nach Fix
 
-## Geänderte Dateien (voraussichtlich nach Daten-Analyse)
+Der Renderer-Code ändert sich **nicht** — `ComposedAdVideo.tsx` bleibt wie es ist. Du musst das Bundle diesmal NICHT redeployen.
 
-Noch unbekannt — ich entscheide nach den echten Logs/DB-Werten welche Datei tatsächlich angefasst werden muss. Möglich sind:
-- **Keine** (nur Bundle-Redeploy nötig)
-- `src/components/video-composer/VoiceSubtitlesTab.tsx` (WAV-Regenerationszwang)
-- `supabase/functions/compose-video-assemble/index.ts` (Probe-Reihenfolge)
-- `src/remotion/templates/ComposedAdVideo.tsx` (Audio-Sequence-Geometrie)
+## Geänderte Dateien
 
-## Warum dieser Plan diesmal anders ist
-
-Ich habe in den letzten 5 Iterationen **gecodet ohne zu messen**. Das endet jetzt. Phase 1 produziert **null Code-Änderungen** — nur Datenerhebung. Erst wenn ich die echten Frame-Zahlen aus deinem letzten Render habe, mache ich einen Fix. Wenn die Daten zeigen "alles korrekt im Code, nur Bundle alt" → kein Code-Change, nur Deploy-Anweisung.
+1. `src/components/video-composer/VoiceSubtitlesTab.tsx` — vor WAV-Padding alle Szenen-MP4s proben, reale Dauern für `sumSceneFrames` benutzen
+2. `src/components/video-composer/ClipsTab.tsx` (oder dort wo Clips ankommen) — beim Clip-ready-Event echte MP4-Dauer messen und `duration_seconds` in `composer_scenes` updaten
+3. Optional: `src/lib/probeMp4Duration.ts` — neue Utility (Browser-seitig via `<Audio>` oder `<Video>` element loadedmetadata)
 
