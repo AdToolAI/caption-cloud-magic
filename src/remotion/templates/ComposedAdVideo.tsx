@@ -1,5 +1,6 @@
 import React from 'react';
-import { AbsoluteFill, Video, Audio, Sequence, Series, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { TransitionSeries } from '@remotion/transitions';
 import { z } from 'zod';
 import { KineticText } from '../components/KineticText';
 import { ColorGrading } from '../components/ColorGrading';
