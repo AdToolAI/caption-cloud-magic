@@ -1,77 +1,73 @@
 
 
-## Was ich aus den Daten sehe
+## Pragmatischer Ansatz: Übergänge entfernen
 
-Ich habe das Projekt `Grusselgeschichten` (8 Szenen) analysiert. Reale vs. konfigurierte Längen:
+Du hast absolut recht — und das ist der **klügste Move**, den wir machen können. Nach 6+ Iterationen am Audio/Video-Sync mit Übergängen ist klar:
 
-```text
-Szene 1: configured 7.0s → real 5.875s  (Δ -1.125s) → Übergang fade
-Szene 2: configured 8.0s → real 10.125s (Δ +2.125s) 
-Szene 3: configured 6.0s → real 5.875s
-Szene 4: configured 8.0s → real 10.125s
-Szene 5: configured 9.0s → real 10.125s
-Szene 6: configured 7.0s → real 5.875s  (Δ -1.125s) → Übergang zoom→fade
-Szene 7: configured 8.0s → real 10.125s
-Szene 8: configured 7.0s → real 5.875s
-```
+**Das Übergangs-System im Composer ist die Quelle der Bugs.** Es ist nicht ein Bug, sondern eine ganze Klasse von Bugs:
+- Frame-Math-Drift zwischen Edge/Renderer
+- Audio-Geometrie vs. Video-Overlap-Asymmetrie  
+- Reale vs. nominelle Dauern desynchronisieren das WAV
+- Hailuo-Clips haben unvorhersehbare reale Längen
 
-**Auffällig**: Übergang **1→2** (Szene 1 verkürzt um 1.125s) und **6→7** (Szene 6 verkürzt um 1.125s) — exakt deine zwei Problemstellen. Die Szenen werden REAL **1.125s früher beendet** als das VO erwartet.
+Der Composer hat einen klaren Job: **Szenen aneinanderreihen + Voiceover drüberlegen**. Übergänge gehören in den **Universal Director's Cut**, der genau dafür gebaut ist (Ping-Pong-Architektur, RAF-Renderer, Boundary-Marker — Memory bestätigt das).
 
-## Der eigentliche Bug
+## Plan: Hard-Cuts only im Composer
 
-Drei Komponenten rechnen mit **unterschiedlichen** Komposition-Längen:
+### Was geändert wird
 
-| Komponente | nutzt | Komposition |
-|------------|-------|-------------|
-| WAV-Padding (`VoiceSubtitlesTab.tsx`) | nominelle 7s/8s/... | **57.0s** |
-| Edge Function (`compose-video-assemble`) | reale 5.875/10.125/... | **61.0s** |
-| Renderer (`ComposedAdVideo.tsx`) | bekommt reale Werte vom Edge | **61.0s** |
+**1. Renderer (`src/remotion/templates/ComposedAdVideo.tsx`)**
+- `<TransitionSeries>` durch `<Series>` ersetzen
+- Komplette Transition-Logik raus: keine `transitionFrames`, kein `Math.floor(baseFrames/2)`, kein Overlap-Handling
+- Jede Szene ist eine simple `<Series.Sequence>` mit `durationInFrames = round(durationSeconds * fps)`
+- Audio-Track unverändert — er wird durch das Wegfallen der Overlaps automatisch korrekt aligniert
 
-Das WAV ist auf 57s gepaddet, die Komposition ist 61s. **Aber wichtiger**: das gesprochene VO ist auf nominelle Szenen-Längen ausgerichtet (Satz für Szene 1 dauert ~6.5s passend zu 7s-Slot). Wenn Szene 1 real nur 5.875s dauert und dann ein 0.5s-Fade startet, liegt das VO-Ende des "Szene-1-Satzes" mitten im Fade — wahrscheinlich **schneidet die Sprachpause oder das Satz-Ende zwischen den Audio-Decoder-Chunks an der Übergangsstelle**.
+**2. Edge Function (`supabase/functions/compose-video-assemble/index.ts`)**
+- `sumSceneFrames` rechnet bereits ohne Overlap-Korrektur (war eh nie drin) → bleibt
+- `transitionType` und `transitionDuration` aus dem Payload **können** drinbleiben (zukunftssicher), werden aber vom Renderer ignoriert
+- Optional: im Log einen Hinweis "transitions disabled — hard cuts only"
 
-## Lösung: WAV-Padding muss die REALEN Dauern nutzen, nicht die nominellen
+**3. UI (`src/components/video-composer/...`)**
+- Übergangs-Auswahl im Composer-UI ausblenden oder mit Hinweis "Übergänge im Director's Cut nachträglich hinzufügen" ersetzen
+- Nicht hart entfernen — nur visuell deaktivieren, falls wir es später reaktivieren wollen
 
-Die WAV-Generierung in `VoiceSubtitlesTab.tsx` Zeile 232 nutzt `scenes[i].durationSeconds` — das ist der UI-State-Wert (nominell 7s). Der Server probt aber später beim Render die echten 5.875s. **Diese beiden müssen identisch sein.**
+### Warum das funktioniert
 
-### Konkrete Fixes
+Mit Hard-Cuts verschwinden **alle** der bisher debugten Probleme auf einen Schlag:
+- Kein Overlap → keine asymmetrische Frame-Math
+- Kein Crossfade → kein Audio-Decoder-Chunk-Schnitt zwischen Szenen
+- Audio-Timeline = exakte Summe der realen Szenen-Dauern → kein Drift
+- VO-Slot pro Szene endet **genau** wenn das Video endet
 
-**1. `VoiceSubtitlesTab.tsx` (WAV-Padding-Berechnung):**
-- VOR der WAV-Generierung: für jede Szene das echte MP4 probe (`new Audio(s.clipUrl); audio.duration`)
-- Diese realen Werte für die `compositionSeconds`-Berechnung nutzen, NICHT die nominellen UI-Werte
-- Damit ist das WAV exakt so lang wie die echte Komposition
+Der User-Workflow wird sogar besser:
+1. Composer: schnelles Zusammenstellen + Voiceover (in 3 Min)
+2. Director's Cut: gezielt 2-3 Übergänge an gewünschten Stellen hinzufügen (in 2 Min)
 
-**2. Beim Hailuo-Clip-Generierung-Callback (`ClipsTab.tsx`):**
-- Wenn ein Clip fertig ist, das echte MP4 kurz proben (Audio-Element loadedmetadata)
-- `duration_seconds` in der DB überschreiben mit der realen Länge
-- Damit ist UI-State = DB = Edge = Renderer permanent in Sync
-- Der User sieht in der UI auch die echten Längen statt der nominellen — kein Mismatch mehr möglich
+Statt bei jedem Render ein Glücksspiel.
 
-**3. Edge Function bleibt unverändert** — sie probed bereits korrekt.
+### Lambda-Bundle
 
-**4. Renderer bleibt unverändert** — er nimmt bereits `durationSeconds` 1:1.
+Da `ComposedAdVideo.tsx` sich ändert: **Bundle-Redeploy nötig** nach den Code-Änderungen.
 
-### Warum dieser Fix die Wurzel trifft
+### Geänderte Dateien
 
-Aktuell ist die Pipeline asynchron:
-- UI-State sagt "7s" → WAV wird mit 7s-Slots erzeugt → Edge probed "5.875s" → Komposition wird 5.875s → WAV-Slot von 7s wird auf 5.875s zusammengedrückt → Sprachende fällt in den Fade-Übergang.
-
-Nach dem Fix:
-- Clip wird generiert → echte Dauer 5.875s wird sofort in DB & UI geschrieben → User sieht "5.875s" → VO wird mit 5.875s-Slots erzeugt → Edge probed (gleiche) 5.875s → Komposition 5.875s → WAV-Slot perfekt deckungsgleich → kein VO-Cut.
+1. `src/remotion/templates/ComposedAdVideo.tsx` — `<TransitionSeries>` → `<Series>`, Transition-Logik raus
+2. `src/components/video-composer/ClipsTab.tsx` (oder wo Transitions konfiguriert werden) — UI-Hinweis "Übergänge in Director's Cut"
+3. **Optional**: `supabase/functions/compose-video-assemble/index.ts` — Log-Hinweis, Payload bleibt kompatibel
 
 ### Verify nach Fix
 
-1. Im Composer alten Clip-Slot anschauen: `duration_seconds` in DB sollte jetzt **5.875s** stehen statt **7s** (für Szene 1 und 6)
-2. Beim VO-Generieren in der Console-Log: `[VO] WAV pad applied, exact duration X.XXs (comp Y.YYs)` — `comp` muss == Edge-Function `durationInFrames/fps` sein
-3. Render starten, Übergang 1→2 prüfen: Sprache läuft sauber durch, kein Schnitt
-4. Optional: das WAV vorher per ffprobe checken — `realDur < compositionSeconds` darf nicht sein
+1. Frischen Composer-Render starten
+2. **Alle** Übergänge prüfen: harte Cuts, kein Audio-Cut, keine Wiederholung
+3. Resultierendes Video in den Director's Cut laden → 2-3 Übergänge dort hinzufügen → exportieren
+4. Endergebnis sollte sauber sein
 
-### Lambda-Bundle nach Fix
+### Klärungsfrage
 
-Der Renderer-Code ändert sich **nicht** — `ComposedAdVideo.tsx` bleibt wie es ist. Du musst das Bundle diesmal NICHT redeployen.
+Bevor ich code: soll der Composer-UI-Hinweis 
+- (a) die Übergangs-Dropdowns **komplett ausblenden** mit einem Banner "Übergänge werden im Director's Cut hinzugefügt", oder
+- (b) die Dropdowns **sichtbar lassen** aber als "Vorschau (im Director's Cut anwenden)" markiert, oder
+- (c) erstmal **gar nichts** an der UI ändern (nur Renderer-Fix), und wir kümmern uns um die UI-Klärung später?
 
-## Geänderte Dateien
-
-1. `src/components/video-composer/VoiceSubtitlesTab.tsx` — vor WAV-Padding alle Szenen-MP4s proben, reale Dauern für `sumSceneFrames` benutzen
-2. `src/components/video-composer/ClipsTab.tsx` (oder dort wo Clips ankommen) — beim Clip-ready-Event echte MP4-Dauer messen und `duration_seconds` in `composer_scenes` updaten
-3. Optional: `src/lib/probeMp4Duration.ts` — neue Utility (Browser-seitig via `<Audio>` oder `<Video>` element loadedmetadata)
+Mein Vorschlag: **(a)** — klar kommuniziert, kein User-Frust durch nicht-funktionierende Optionen.
 
