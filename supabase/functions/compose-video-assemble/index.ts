@@ -7,6 +7,81 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ── MP4 duration probe ─────────────────────────────────────────────
+// Reads only the first ~512 KB of the file and parses the `mvhd` atom from
+// the `moov` box. Works for nearly all MP4s where moov is at the start.
+// If moov is at the end (some encoders), falls back to a Range request near EOF.
+async function probeMp4Duration(url: string): Promise<number | null> {
+  if (!url || !url.startsWith('http')) return null;
+  try {
+    let dur = await tryProbeRange(url, 0, 512 * 1024 - 1);
+    if (dur != null) return dur;
+    const head = await fetch(url, { method: 'HEAD' });
+    const len = Number(head.headers.get('content-length') || 0);
+    if (len > 0) {
+      const start = Math.max(0, len - 512 * 1024);
+      dur = await tryProbeRange(url, start, len - 1);
+      if (dur != null) return dur;
+    }
+  } catch (e) {
+    console.warn('[probeMp4Duration] error:', e);
+  }
+  return null;
+}
+
+async function tryProbeRange(url: string, start: number, end: number): Promise<number | null> {
+  const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
+  if (!res.ok) return null;
+  const buf = new Uint8Array(await res.arrayBuffer());
+  return parseMvhdDuration(buf);
+}
+
+function parseMvhdDuration(buf: Uint8Array): number | null {
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const readU32 = (o: number) => view.getUint32(o);
+  const readU64 = (o: number) => Number(view.getBigUint64(o));
+
+  function walk(offset: number, end: number): number | null {
+    let p = offset;
+    while (p + 8 <= end) {
+      let size = readU32(p);
+      const type = String.fromCharCode(buf[p + 4], buf[p + 5], buf[p + 6], buf[p + 7]);
+      let headerSize = 8;
+      if (size === 1) {
+        if (p + 16 > end) return null;
+        size = readU64(p + 8);
+        headerSize = 16;
+      }
+      if (size < headerSize || p + size > end) return null;
+      if (type === 'mvhd') {
+        const boxStart = p + headerSize;
+        const version = buf[boxStart];
+        let timescale: number, duration: number;
+        if (version === 1) {
+          timescale = readU32(boxStart + 4 + 8 + 8);
+          duration = readU64(boxStart + 4 + 8 + 8 + 4);
+        } else {
+          timescale = readU32(boxStart + 4 + 4 + 4);
+          duration = readU32(boxStart + 4 + 4 + 4 + 4);
+        }
+        if (timescale > 0) return duration / timescale;
+        return null;
+      }
+      if (type === 'moov' || type === 'trak' || type === 'mdia' || type === 'minf' || type === 'stbl') {
+        const inner = walk(p + headerSize, p + size);
+        if (inner != null) return inner;
+      }
+      p += size;
+    }
+    return null;
+  }
+  try {
+    return walk(0, buf.byteLength);
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -81,15 +156,45 @@ serve(async (req) => {
 
     // 6. Build Remotion input props — pass DB transition choice through to renderer
     const ALLOWED_TRANSITIONS = new Set(['none', 'fade', 'crossfade', 'wipe', 'slide', 'zoom']);
-    const remotionScenes = (scenes || []).map((s: any) => {
+
+    // ── Probe REAL mp4 durations to prevent rubber-band stretching ──
+    // Hailuo & co. report nominal durations (e.g. "7s") but produce 5.875s files at 24fps.
+    // <TransitionSeries.Sequence durationInFrames={210}> would then stretch the 5.875s
+    // video to 7s → visible speed warp at every transition. Probe each clip's real
+    // duration via mp4 mvhd box parsing and pass it to the renderer so it can clamp.
+    const probedDurations = await Promise.all(
+      (scenes || []).map(async (s: any) => {
+        try {
+          const dur = await probeMp4Duration(s.clip_url);
+          if (dur && dur > 0) {
+            console.log(`[probe] scene ${s.order_index}: nominal=${s.duration_seconds}s real=${dur.toFixed(3)}s`);
+            return dur;
+          }
+        } catch (e) {
+          console.warn(`[probe] failed for scene ${s.order_index}:`, e);
+        }
+        return null;
+      })
+    );
+
+    const remotionScenes = (scenes || []).map((s: any, idx: number) => {
       const rawType = (s.transition_type || 'fade').toString().toLowerCase();
       const transitionType = ALLOWED_TRANSITIONS.has(rawType) ? rawType : 'fade';
       const transitionDuration = Number.isFinite(Number(s.transition_duration))
         ? Math.max(0, Number(s.transition_duration))
         : 0.4;
+      const nominalDuration = s.duration_seconds || 5;
+      const realDuration = probedDurations[idx];
+      // Use REAL video duration if available — this is the single most important
+      // anti-rubber-band fix. Without it, Sequence/Video length mismatch causes
+      // Remotion to time-warp the video.
+      const effectiveDuration = realDuration && realDuration > 0
+        ? realDuration
+        : nominalDuration;
       return {
         videoUrl: s.clip_url,
-        durationSeconds: s.duration_seconds || 5,
+        durationSeconds: effectiveDuration,
+        actualVideoDurationSeconds: realDuration || effectiveDuration,
         textOverlay: s.text_overlay ? {
           text: s.text_overlay.text || '',
           position: s.text_overlay.position || 'bottom',
@@ -110,7 +215,7 @@ serve(async (req) => {
     const fps = 30;
     const sumSeconds = remotionScenes.reduce((acc, s) => acc + (s.durationSeconds || 0), 0);
     const sumSceneFrames = remotionScenes.reduce(
-      (acc, s) => acc + Math.max(1, Math.ceil((s.durationSeconds || 0) * fps)),
+      (acc, s) => acc + Math.max(1, Math.round((s.durationSeconds || 0) * fps)),
       0
     );
     // Sum overlap frames: only between consecutive scenes when the FIRST
@@ -119,7 +224,7 @@ serve(async (req) => {
     for (let i = 0; i < remotionScenes.length - 1; i++) {
       const cur = remotionScenes[i];
       if (cur.transitionType !== 'none') {
-        overlapFrames += Math.max(1, Math.ceil((cur.transitionDuration ?? 0.4) * fps));
+        overlapFrames += Math.max(1, Math.round((cur.transitionDuration ?? 0.4) * fps));
       }
     }
     let durationInFrames = Math.max(1, sumSceneFrames - overlapFrames);
