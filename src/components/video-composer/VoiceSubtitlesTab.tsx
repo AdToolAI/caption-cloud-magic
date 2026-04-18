@@ -25,6 +25,7 @@ import { VoiceoverScriptGenerator } from '@/components/universal-creator/Voiceov
 import { AdvancedVoiceSettings, type VoiceSettings } from '@/components/video/AdvancedVoiceSettings';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { supabase } from '@/integrations/supabase/client';
+import { padAudioToExactWav } from '@/lib/audioToWav';
 import type {
   ComposerScene,
   AssemblyConfig,
