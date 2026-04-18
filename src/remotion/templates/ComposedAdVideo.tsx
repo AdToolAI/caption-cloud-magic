@@ -1,9 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, OffthreadVideo, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
-import { TransitionSeries, linearTiming } from '@remotion/transitions';
-import { fade } from '@remotion/transitions/fade';
-import { slide } from '@remotion/transitions/slide';
-import { wipe } from '@remotion/transitions/wipe';
+import { AbsoluteFill, OffthreadVideo, Audio, Sequence, Series, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
 import { z } from 'zod';
 import { KineticText } from '../components/KineticText';
 import { ColorGrading } from '../components/ColorGrading';
@@ -193,25 +189,13 @@ const clampVolume = (v: number) => {
   return Math.min(1, Math.max(0, v));
 };
 
-// Map our transitionType to a Remotion presentation. 'none' returns null →
-// no <TransitionSeries.Transition> is inserted (hard cut, zero overlap).
-const getPresentation = (
-  type: 'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom'
-): any => {
-  switch (type) {
-    case 'fade':
-    case 'crossfade':
-    case 'zoom': // zoom not in @remotion/transitions core → degrade to fade
-      return fade();
-    case 'slide':
-      return slide({ direction: 'from-right' });
-    case 'wipe':
-      return wipe({ direction: 'from-left' });
-    case 'none':
-    default:
-      return null;
-  }
-};
+// ---- HARD-CUT POLICY (2026-04-18) ----
+// Transitions in the Composer caused a class of bugs around frame-math drift,
+// audio-overlap asymmetry, and Hailuo clips with sub-frame jitter.
+// The Composer now ALWAYS hard-cuts. Use the Universal Director's Cut to add
+// per-cut transitions afterwards (it has the ping-pong/RAF architecture for it).
+// `transitionType` / `transitionDuration` remain in the schema for forward
+// compatibility but are intentionally ignored by this renderer.
 
 // Main composition
 export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
@@ -226,31 +210,11 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
 }) => {
   const { fps, durationInFrames } = useVideoConfig();
 
-  // Build transition descriptors. Each scene contributes: baseFrames + (optional) transitionFrames to the NEXT scene.
-  // <TransitionSeries> overlaps adjacent sequences by exactly transitionFrames — sample-accurate, Lambda-tested.
-  //
-  // ⚠️ DURATION POLICY: durationSeconds IS already the effective/probed length
-  // (set server-side in compose-video-assemble). The renderer must NOT clamp,
-  // floor, ceil, or otherwise mutate it — doing so causes audio/video geometry
-  // to drift apart and produces the rubber-band/repeat artifacts at transitions.
-  // playbackRate={1} on <OffthreadVideo> handles any sub-frame mp4 length jitter.
-  const sceneDescriptors = scenes.map((scene, i) => {
-    const baseFrames = Math.max(1, Math.round(scene.durationSeconds * fps));
-    const isLast = i === scenes.length - 1;
-    const transitionType = (scene.transitionType || 'none') as
-      'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom';
-    const rawTransitionFrames = (!isLast && transitionType !== 'none')
-      ? Math.max(1, Math.round((scene.transitionDuration ?? 0.4) * fps))
-      : 0;
-    // Transition cannot exceed half the scene length (Remotion constraint).
-    const transitionFrames = Math.min(rawTransitionFrames, Math.floor(baseFrames / 2));
-    return {
-      baseFrames,
-      transitionType,
-      transitionFrames,
-      isLast,
-    };
-  });
+  // Hard cuts only — each scene's frame count is `round(durationSeconds * fps)`.
+  // Audio timeline therefore equals the exact sum of scene frames, no overlap drift.
+  const sceneFrames = scenes.map((scene) =>
+    Math.max(1, Math.round(scene.durationSeconds * fps))
+  );
 
   const musicVolume = clampVolume(backgroundMusicVolume ?? 0.3);
   const voEnabled = !!voiceoverUrl && voiceoverUrl.length > 0;
@@ -259,29 +223,17 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
       <ColorGrading preset={colorGrading as any}>
-        <TransitionSeries>
-          {scenes.map((scene, i) => {
-            const desc = sceneDescriptors[i];
-            const presentation = getPresentation(desc.transitionType);
-            return (
-              <React.Fragment key={i}>
-                <TransitionSeries.Sequence durationInFrames={desc.baseFrames}>
-                  <Scene
-                    videoUrl={scene.videoUrl}
-                    textOverlay={scene.textOverlay}
-                    kineticText={kineticText}
-                  />
-                </TransitionSeries.Sequence>
-                {!desc.isLast && presentation && desc.transitionFrames > 0 && (
-                  <TransitionSeries.Transition
-                    presentation={presentation}
-                    timing={linearTiming({ durationInFrames: desc.transitionFrames })}
-                  />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </TransitionSeries>
+        <Series>
+          {scenes.map((scene, i) => (
+            <Series.Sequence key={i} durationInFrames={sceneFrames[i]}>
+              <Scene
+                videoUrl={scene.videoUrl}
+                textOverlay={scene.textOverlay}
+                kineticText={kineticText}
+              />
+            </Series.Sequence>
+          ))}
+        </Series>
       </ColorGrading>
 
       {/* Subtitles (above color grading so they stay readable) */}

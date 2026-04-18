@@ -247,22 +247,14 @@ export default function SceneCard({
               />
             )}
 
-            {/* Transition */}
-            <div className="flex items-center gap-2">
-              <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Übergang:</Label>
-              <Select
-                value={scene.transitionType}
-                onValueChange={(v) => onUpdate({ transitionType: v as TransitionStyle })}
-              >
-                <SelectTrigger className="h-6 text-[10px] w-24 bg-background/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(['fade', 'crossfade', 'wipe', 'slide', 'zoom', 'none'] as TransitionStyle[]).map((t) => (
-                    <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Transitions disabled in Composer — handled in Director's Cut */}
+            <div
+              className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/40 border border-border/30"
+              title="Übergänge werden im Universal Director's Cut nachträglich hinzugefügt (sauberer & flexibler)."
+            >
+              <span className="text-[10px] text-muted-foreground">
+                Harter Schnitt → Übergänge im Director's Cut
+              </span>
             </div>
           </div>
 
