@@ -1,6 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
-import { TransitionSeries } from '@remotion/transitions';
+import { TransitionSeries, linearTiming } from '@remotion/transitions';
+import { fade } from '@remotion/transitions/fade';
 import { z } from 'zod';
 import { KineticText } from '../components/KineticText';
 import { ColorGrading } from '../components/ColorGrading';
@@ -190,13 +191,14 @@ const clampVolume = (v: number) => {
   return Math.min(1, Math.max(0, v));
 };
 
-// ---- HARD-CUT POLICY (2026-04-18) ----
-// Transitions in the Composer caused a class of bugs around frame-math drift,
-// audio-overlap asymmetry, and Hailuo clips with sub-frame jitter.
-// The Composer now ALWAYS hard-cuts. Use the Universal Director's Cut to add
-// per-cut transitions afterwards (it has the ping-pong/RAF architecture for it).
-// `transitionType` / `transitionDuration` remain in the schema for forward
-// compatibility but are intentionally ignored by this renderer.
+// ---- UNIFORM CROSSFADE POLICY (2026-04-18b) ----
+// All scenes use a single, uniform 15-frame (0.5s) crossfade. No per-scene
+// choice — eliminates the bug class around mixed transition types. Audio
+// (voiceover + bgmusic) lives OUTSIDE TransitionSeries in its own pre-buffer
+// Sequence, so crossfades are acoustically invisible: only the video layer
+// blends. `transitionType` / `transitionDuration` in the schema remain for
+// forward compatibility but are ignored by this renderer.
+const CROSSFADE_FRAMES = 15;
 
 // Main composition
 export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
@@ -224,21 +226,30 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
       <ColorGrading preset={colorGrading as any}>
-        {/* TransitionSeries WITHOUT transitions = hard cuts, but enables `premountFor`
-            so the next scene's video decoder warms up 60 frames before its in-point.
-            This eliminates the cold-start decoder pause at scene boundaries that
-            was causing the voiceover to "stutter" — the VO never actually broke,
-            the renderer was stalling the entire pipeline waiting for the next
-            video chunk. Mirrors DirectorsCut's proven approach. */}
+        {/* TransitionSeries with uniform 15-frame crossfade between scenes.
+            `premountFor={60}` warms up the next decoder 60 frames before
+            its in-point → no cold-start stall. Audio is decoupled (lives
+            outside TransitionSeries), so the crossfade is silent. */}
         <TransitionSeries>
           {scenes.map((scene, i) => (
-            <TransitionSeries.Sequence key={i} durationInFrames={sceneFrames[i]} premountFor={60}>
-              <Scene
-                videoUrl={scene.videoUrl}
-                textOverlay={scene.textOverlay}
-                kineticText={kineticText}
-              />
-            </TransitionSeries.Sequence>
+            <React.Fragment key={i}>
+              <TransitionSeries.Sequence
+                durationInFrames={sceneFrames[i]}
+                premountFor={60}
+              >
+                <Scene
+                  videoUrl={scene.videoUrl}
+                  textOverlay={scene.textOverlay}
+                  kineticText={kineticText}
+                />
+              </TransitionSeries.Sequence>
+              {i < scenes.length - 1 && (
+                <TransitionSeries.Transition
+                  presentation={fade()}
+                  timing={linearTiming({ durationInFrames: CROSSFADE_FRAMES })}
+                />
+              )}
+            </React.Fragment>
           ))}
         </TransitionSeries>
       </ColorGrading>

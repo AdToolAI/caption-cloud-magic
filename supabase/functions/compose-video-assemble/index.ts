@@ -209,20 +209,24 @@ serve(async (req) => {
       };
     });
 
-    // ── HARD-CUT + ONE-TRACK VO POLICY (2026-04-18) ──
-    // Composer renderer uses <Series> (no transitions, no overlap).
-    // Composition duration = sum of real scene frames, then extended to fit
-    // the voiceover if the VO is longer. The VO itself is a single, padded WAV
-    // that runs as one continuous <Audio> over the whole composition — no
-    // per-scene seams, no chunk-boundary stutter.
+    // ── UNIFORM CROSSFADE + ONE-TRACK VO POLICY (2026-04-18b) ──
+    // Renderer uses <TransitionSeries> with a uniform 15-frame fade between
+    // every pair of scenes. Each transition OVERLAPS by `CROSSFADE_FRAMES`,
+    // so the composed timeline is shorter than the raw sum of scene frames:
+    //   composedFrames = sumSceneFrames - (numScenes - 1) * CROSSFADE_FRAMES
+    // Audio runs as a single continuous <Audio> outside TransitionSeries, so
+    // the crossfade is acoustically invisible.
     const fps = 30;
+    const CROSSFADE_FRAMES = 15;
     const sumSeconds = remotionScenes.reduce((acc, s) => acc + (s.durationSeconds || 0), 0);
     const sumSceneFrames = remotionScenes.reduce(
       (acc, s) => acc + Math.max(1, Math.round((s.durationSeconds || 0) * fps)),
       0
     );
-    let durationInFrames = Math.max(1, sumSceneFrames);
-    console.log(`[compose-video-assemble] Hard-cut geometry: sumSceneFrames=${sumSceneFrames}, durationInFrames=${durationInFrames} (sumSeconds=${sumSeconds.toFixed(3)})`);
+    const numTransitions = Math.max(0, remotionScenes.length - 1);
+    const transitionOverlapFrames = numTransitions * CROSSFADE_FRAMES;
+    let durationInFrames = Math.max(1, sumSceneFrames - transitionOverlapFrames);
+    console.log(`[compose-video-assemble] Crossfade geometry: sumSceneFrames=${sumSceneFrames}, transitions=${numTransitions}x${CROSSFADE_FRAMES}f, composed=${durationInFrames} (sumSeconds=${sumSeconds.toFixed(3)})`);
 
     // Voiceover sync safety net: if a VO duration is recorded and longer than the
     // composed timeline, extend so it plays to completion.
