@@ -188,25 +188,25 @@ export default function VoiceSubtitlesTab({
         },
       });
 
-      // Verify with browser-decoded duration (most precise — overrides server estimate)
+      // Verify with browser-decoded duration (most precise — overrides server estimate).
+      // Capture audioUrl locally so the probe callback can't be affected by
+      // a stale `voiceover` from the closure if the user changes settings mid-probe.
+      const generatedUrl: string = data.audioUrl;
       try {
         const probe = new Audio();
         probe.preload = 'metadata';
-        probe.src = data.audioUrl;
+        probe.src = generatedUrl;
         probe.addEventListener('loadedmetadata', () => {
           const realDur = probe.duration;
           if (isFinite(realDur) && realDur > 0 && Math.abs(realDur - serverDuration) > 0.05) {
             console.log('[VO] browser-verified duration:', realDur.toFixed(3), 's (server:', serverDuration, 's)');
+            // Only patch the two fields we actually verified, using the LATEST
+            // voiceover from the ref — never overwrite user-tweaked settings.
             onUpdateAssembly({
               voiceover: {
-                ...voiceover,
-                audioUrl: data.audioUrl,
+                ...voiceoverRef.current,
+                audioUrl: generatedUrl,
                 durationSeconds: realDur,
-                speed,
-                stability: voiceSettings.stability,
-                similarityBoost: voiceSettings.similarityBoost,
-                styleExaggeration: voiceSettings.styleExaggeration,
-                useSpeakerBoost: voiceSettings.useSpeakerBoost,
               },
             });
           }
