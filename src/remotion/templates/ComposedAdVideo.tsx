@@ -370,6 +370,7 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
           src={voiceoverUrl as string}
           volume={1}
           pauseWhenBuffering={true}
+          loop={false}
           toneFrequency={1}
           playbackRate={1}
           startFrom={0}
