@@ -1,5 +1,6 @@
 import React from 'react';
-import { AbsoluteFill, Video, Audio, Sequence, Series, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { TransitionSeries } from '@remotion/transitions';
 import { z } from 'zod';
 import { KineticText } from '../components/KineticText';
 import { ColorGrading } from '../components/ColorGrading';
@@ -223,17 +224,23 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
       <ColorGrading preset={colorGrading as any}>
-        <Series>
+        {/* TransitionSeries WITHOUT transitions = hard cuts, but enables `premountFor`
+            so the next scene's video decoder warms up 60 frames before its in-point.
+            This eliminates the cold-start decoder pause at scene boundaries that
+            was causing the voiceover to "stutter" — the VO never actually broke,
+            the renderer was stalling the entire pipeline waiting for the next
+            video chunk. Mirrors DirectorsCut's proven approach. */}
+        <TransitionSeries>
           {scenes.map((scene, i) => (
-            <Series.Sequence key={i} durationInFrames={sceneFrames[i]}>
+            <TransitionSeries.Sequence key={i} durationInFrames={sceneFrames[i]} premountFor={60}>
               <Scene
                 videoUrl={scene.videoUrl}
                 textOverlay={scene.textOverlay}
                 kineticText={kineticText}
               />
-            </Series.Sequence>
+            </TransitionSeries.Sequence>
           ))}
-        </Series>
+        </TransitionSeries>
       </ColorGrading>
 
       {/* Subtitles (above color grading so they stay readable) */}
@@ -271,26 +278,35 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
           which caused Lambda workers to keep audio playing even when the
           next scene's video chunk wasn't decoded yet → audible stutters /
           micro-cuts at every scene boundary. Now we mirror the working
-          pattern: stable key + default buffering behavior. */}
+          pattern: stable key + default buffering behavior.
+
+          PRE-BUFFER (2026-04-18b): Wrap audio in a Sequence starting `-fps`
+          frames before frame 0. This gives the audio decoder a full second
+          to initialize before the first frame is rendered, eliminating
+          initial cold-start audio glitches. */}
       {voEnabled && (
-        <Audio
-          key="composer-voiceover-stable"
-          src={voiceoverUrl as string}
-          volume={1}
-          loop={false}
-          startFrom={0}
-        />
+        <Sequence from={-fps} durationInFrames={durationInFrames + fps}>
+          <Audio
+            key="composer-voiceover-stable"
+            src={voiceoverUrl as string}
+            volume={1}
+            loop={false}
+            startFrom={0}
+          />
+        </Sequence>
       )}
 
-      {/* Background Music — same stable-key pattern */}
+      {/* Background Music — same stable-key + pre-buffer pattern */}
       {musicEnabled && (
-        <Audio
-          key="composer-bgmusic-stable"
-          src={backgroundMusicUrl as string}
-          volume={musicVolume}
-          startFrom={0}
-          endAt={durationInFrames}
-        />
+        <Sequence from={-fps} durationInFrames={durationInFrames + fps}>
+          <Audio
+            key="composer-bgmusic-stable"
+            src={backgroundMusicUrl as string}
+            volume={musicVolume}
+            startFrom={0}
+            endAt={durationInFrames}
+          />
+        </Sequence>
       )}
     </AbsoluteFill>
   );
