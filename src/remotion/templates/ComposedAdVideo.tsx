@@ -84,6 +84,13 @@ export const ComposedAdVideoSchema = z.object({
     segments: z.array(SubtitleSegmentSchema),
   }).optional(),
   globalTextOverlays: z.array(GlobalTextOverlaySchema).optional(),
+  watermark: z.object({
+    enabled: z.boolean(),
+    text: z.string(),
+    position: z.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center']),
+    size: z.enum(['small', 'medium', 'large']),
+    opacity: z.number(),
+  }).optional(),
 });
 
 type ComposedAdVideoProps = z.infer<typeof ComposedAdVideoSchema>;
