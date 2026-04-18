@@ -225,13 +225,27 @@ export default function VoiceSubtitlesTab({
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // Pad to FULL composition duration (scene total + safety pad),
-            // not just VO duration. Lambda chunks near scene boundaries past
-            // the VO end would otherwise hit "no samples" → mux glitch.
-            const sceneTotal = scenes.reduce((sum, s) => sum + (s.durationSeconds || 0), 0);
-            const compositionDuration = Math.max(realDur, sceneTotal) + 0.15;
+            // Pad to TRUE composition duration. With TransitionSeries, the
+            // visual timeline = sum(scene_durations) − sum(transition_overlaps).
+            // The renderer adds a 0.15s safety pad on top.
+            const fps = 30;
+            const sumSceneFrames = scenes.reduce(
+              (acc, s) => acc + Math.max(1, Math.ceil((s.durationSeconds || 0) * fps)),
+              0
+            );
+            let overlapFrames = 0;
+            for (let i = 0; i < scenes.length - 1; i++) {
+              const cur = scenes[i] as any;
+              const tType = cur.transitionType || 'none';
+              if (tType !== 'none') {
+                overlapFrames += Math.max(1, Math.ceil((cur.transitionDuration ?? 0.4) * fps));
+              }
+            }
+            const compositionSeconds = Math.max(0, sumSceneFrames - overlapFrames) / fps;
+            const compositionDuration = Math.max(realDur, compositionSeconds) + 0.15;
             const { blob, exactSeconds } = await padAudioToExactWav(generatedUrl, compositionDuration);
-            console.log(`[VO] WAV pad applied, exact duration ${exactSeconds.toFixed(3)}s (VO ${realDur.toFixed(3)}s, scenes ${sceneTotal.toFixed(3)}s, size ${(blob.size / 1024).toFixed(1)} KB)`);
+            console.log(`[VO] WAV pad applied, exact duration ${exactSeconds.toFixed(3)}s (VO ${realDur.toFixed(3)}s, comp ${compositionSeconds.toFixed(3)}s, size ${(blob.size / 1024).toFixed(1)} KB)`);
+
 
             const wavPath = `${user.id}/${Date.now()}-voiceover.wav`;
             const { data: upload, error: upErr } = await supabase.storage
