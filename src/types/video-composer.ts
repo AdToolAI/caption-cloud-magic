@@ -114,6 +114,18 @@ export interface SubtitlesConfig {
   segments?: SubtitleSegment[];
 }
 
+export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
+export type WatermarkSize = 'small' | 'medium' | 'large';
+
+export interface WatermarkConfig {
+  enabled: boolean;
+  text: string;
+  position: WatermarkPosition;
+  size: WatermarkSize;
+  /** 0.3 – 1.0 */
+  opacity: number;
+}
+
 export interface AssemblyConfig {
   colorGrading: ColorGradingPreset;
   transitionStyle: TransitionStyle;
@@ -133,6 +145,8 @@ export interface AssemblyConfig {
    * to enabled (backwards-compat for older drafts).
    */
   textOverlaysEnabled?: boolean;
+  /** Configurable watermark overlay rendered above all scenes. */
+  watermark?: WatermarkConfig;
 }
 
 export interface VoiceoverConfig {
@@ -209,6 +223,14 @@ export const DEFAULT_SUBTITLES_CONFIG: SubtitlesConfig = {
   },
 };
 
+export const DEFAULT_WATERMARK_CONFIG: WatermarkConfig = {
+  enabled: false,
+  text: '',
+  position: 'bottom-right',
+  size: 'medium',
+  opacity: 0.7,
+};
+
 export const DEFAULT_ASSEMBLY_CONFIG: AssemblyConfig = {
   colorGrading: 'none',
   transitionStyle: 'fade',
@@ -218,6 +240,7 @@ export const DEFAULT_ASSEMBLY_CONFIG: AssemblyConfig = {
   beatSync: false,
   subtitles: DEFAULT_SUBTITLES_CONFIG,
   globalTextOverlays: [],
+  watermark: DEFAULT_WATERMARK_CONFIG,
 };
 
 export const DEFAULT_TEXT_OVERLAY: TextOverlayConfig = {
