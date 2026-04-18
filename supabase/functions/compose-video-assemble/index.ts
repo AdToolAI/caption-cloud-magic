@@ -209,27 +209,20 @@ serve(async (req) => {
       };
     });
 
-    // NOTE: TransitionSeries-based composition. Transitions OVERLAP adjacent
-    // sequences by exactly transitionFrames — total composition is shortened
-    // by the sum of transition windows. We must mirror that math here so the
-    // Lambda durationInFrames matches the visual timeline exactly.
+    // ── HARD-CUT + ONE-TRACK VO POLICY (2026-04-18) ──
+    // Composer renderer uses <Series> (no transitions, no overlap).
+    // Composition duration = sum of real scene frames, then extended to fit
+    // the voiceover if the VO is longer. The VO itself is a single, padded WAV
+    // that runs as one continuous <Audio> over the whole composition — no
+    // per-scene seams, no chunk-boundary stutter.
     const fps = 30;
     const sumSeconds = remotionScenes.reduce((acc, s) => acc + (s.durationSeconds || 0), 0);
     const sumSceneFrames = remotionScenes.reduce(
       (acc, s) => acc + Math.max(1, Math.round((s.durationSeconds || 0) * fps)),
       0
     );
-    // Sum overlap frames: only between consecutive scenes when the FIRST
-    // (left) scene has an active transition.
-    let overlapFrames = 0;
-    for (let i = 0; i < remotionScenes.length - 1; i++) {
-      const cur = remotionScenes[i];
-      if (cur.transitionType !== 'none') {
-        overlapFrames += Math.max(1, Math.round((cur.transitionDuration ?? 0.4) * fps));
-      }
-    }
-    let durationInFrames = Math.max(1, sumSceneFrames - overlapFrames);
-    console.log(`[compose-video-assemble] Composition geometry: sumSceneFrames=${sumSceneFrames}, overlapFrames=${overlapFrames}, durationInFrames=${durationInFrames} (sumSeconds=${sumSeconds.toFixed(3)})`);
+    let durationInFrames = Math.max(1, sumSceneFrames);
+    console.log(`[compose-video-assemble] Hard-cut geometry: sumSceneFrames=${sumSceneFrames}, durationInFrames=${durationInFrames} (sumSeconds=${sumSeconds.toFixed(3)})`);
 
     // Voiceover sync safety net: if a VO duration is recorded and longer than the
     // composed timeline, extend so it plays to completion.
