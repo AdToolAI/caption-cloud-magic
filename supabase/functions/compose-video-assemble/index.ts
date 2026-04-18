@@ -103,6 +103,23 @@ serve(async (req) => {
       };
     });
 
+    // Pre-process: ensure every scene that has a successor with an active
+    // transition ALSO uses that transition. Otherwise scene N stays opaque
+    // during the overlap window with scene N+1 → hard cut + decoder pipeline
+    // block at the boundary. The geometric overlap is already extended in the
+    // renderer; this just guarantees the visual fade matches it.
+    let normalizedCount = 0;
+    for (let i = 0; i < remotionScenes.length - 1; i++) {
+      const cur = remotionScenes[i];
+      const next = remotionScenes[i + 1];
+      if (next.transitionType !== 'none' && cur.transitionType === 'none') {
+        cur.transitionType = next.transitionType;
+        cur.transitionDuration = next.transitionDuration;
+        normalizedCount++;
+      }
+    }
+    console.log(`[compose-video-assemble] Pre-processed ${normalizedCount} scenes for transition consistency`);
+
     const fps = 30;
     // IMPORTANT: total duration = sum of original scene durations (NO crossfade shortening).
     // Crossfades are achieved in the renderer by extending each scene's Sequence by the

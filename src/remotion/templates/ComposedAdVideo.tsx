@@ -112,16 +112,6 @@ const Scene: React.FC<{
         easing: Easing.inOut(Easing.ease),
       });
     }
-    if (hasTransitionOut && transitionOutFrames > 0) {
-      const fadeOutStart = Math.max(0, durationInFrames - safeOut);
-      if (frame > fadeOutStart) {
-        opacity = interpolate(frame, [fadeOutStart, durationInFrames], [1, 0], {
-          extrapolateLeft: 'clamp',
-          extrapolateRight: 'clamp',
-          easing: Easing.inOut(Easing.ease),
-        });
-      }
-    }
   } else if (transitionType === 'slide') {
     if (transitionInFrames > 0 && frame < safeIn) {
       const tx = interpolate(frame, [0, safeIn], [100, 0], {
@@ -156,6 +146,22 @@ const Scene: React.FC<{
     }
   }
 
+  // UNIVERSAL OUT-FADE: whenever the Sequence is extended past the canonical
+  // scene end (extendEnd > 0), the scene MUST fade out during the overlap
+  // window — regardless of its own transitionType. Otherwise it stays fully
+  // opaque on top of the next scene → hard cut + decoder pipeline block.
+  if (hasTransitionOut && transitionOutFrames > 0) {
+    const fadeOutStart = Math.max(0, durationInFrames - safeOut);
+    if (frame > fadeOutStart) {
+      const fadeOpacity = interpolate(frame, [fadeOutStart, durationInFrames], [1, 0], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+        easing: Easing.inOut(Easing.ease),
+      });
+      opacity = Math.min(opacity, fadeOpacity);
+    }
+  }
+
   return (
     <AbsoluteFill style={{ backgroundColor: '#000', opacity, transform, clipPath }}>
       {videoUrl && (
@@ -163,7 +169,7 @@ const Scene: React.FC<{
           src={videoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           muted
-          pauseWhenBuffering={true}
+          pauseWhenBuffering={false}
           delayRenderTimeoutInMilliseconds={30000}
         />
       )}
@@ -362,17 +368,14 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
         );
       })}
 
-      {/* Voiceover — top-level Audio with pauseWhenBuffering=true and explicit
-          startFrom so all Lambda chunks share the same sample-position map.
-          We intentionally OMIT endAt: when endAt exactly matches durationInFrames
-          and the VO file is slightly shorter, Remotion asks for samples that don't
-          exist → Lambda inserts silence which can manifest as micro-cuts at chunk
-          boundaries. Letting Remotion handle end-of-stream naturally is safer. */}
+      {/* Voiceover — Lambda default pauseWhenBuffering=false for sample-accurate
+          playback across chunk boundaries. With clean Sequence geometry (no
+          overlapping hard cuts), no decoder lock can stall the audio cursor. */}
       {voEnabled && (
         <Audio
           src={voiceoverUrl as string}
           volume={1}
-          pauseWhenBuffering={true}
+          pauseWhenBuffering={false}
           loop={false}
           toneFrequency={1}
           playbackRate={1}
@@ -380,12 +383,12 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
         />
       )}
 
-      {/* Background Music — same treatment for stable playback across chunks */}
+      {/* Background Music — Lambda default pauseWhenBuffering=false */}
       {musicEnabled && (
         <Audio
           src={backgroundMusicUrl as string}
           volume={musicVolume}
-          pauseWhenBuffering={true}
+          pauseWhenBuffering={false}
           toneFrequency={1}
           playbackRate={1}
           startFrom={0}
