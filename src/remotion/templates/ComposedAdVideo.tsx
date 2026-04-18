@@ -1,9 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, OffthreadVideo, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
-import { TransitionSeries, linearTiming } from '@remotion/transitions';
-import { fade } from '@remotion/transitions/fade';
-import { slide } from '@remotion/transitions/slide';
-import { wipe } from '@remotion/transitions/wipe';
+import { AbsoluteFill, OffthreadVideo, Audio, Sequence, Series, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
 import { z } from 'zod';
 import { KineticText } from '../components/KineticText';
 import { ColorGrading } from '../components/ColorGrading';
