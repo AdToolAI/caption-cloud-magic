@@ -1,82 +1,65 @@
 
 
-## Befund — Warum das Voiceover beim ersten Übergang abgeschnitten wird
+Du hast recht — die VO-Dauer-Schätzung gab es vorher auch schon und es funktionierte. Das Problem muss also durch die **neue Crossfade-Architektur** entstanden sein, nicht durch die Schätzung selbst.
 
-In `src/remotion/templates/ComposedAdVideo.tsx` Z. 261–283 berechnen wir die **Gesamt-`durationInFrames`** im Render mit Crossfade-Überlappung — **jede** Transition kürzt die Timeline um `transitionFrames`. Bei 7 Szenen mit je 0.4s fade entfallen 6 × 0.4s = **2.4 Sekunden** an Gesamtlaufzeit.
+## Echter Befund
 
-Das Voiceover wird dann ab Frame 0 abgespielt:
-```tsx
-<Sequence from={0}>
-  <Audio src={voiceoverUrl} volume={1} pauseWhenBuffering />
-</Sequence>
-```
+Vorher: **Hard-Cuts**, `durationInFrames` = Summe aller Szenen → Komposition war exakt so lang wie das Skript geschätzt → VO passte.
 
-Das Voiceover ist aber für die **ungekürzte** Zeitachse generiert worden (Summe der Szenen-Dauern OHNE Überlappung). Ergebnis:
-- Das Voiceover ist 2.4s **länger** als die Komposition
-- Remotion **schneidet das Audio am Ende der Komposition hart ab** → der letzte VO-Satz wird gekappt
-- Während des **ersten Crossfades** bei ~5s kollabiert die Timeline um 0.4s → das VO „springt" relativ zur Bildebene → klingt wie abgeschnitten
+Jetzt: **Crossfades** überlappen Szenen → Komposition ist **6 × 0.4s = 2.4s kürzer** als vorher. Selbst mit `Math.max(video, vo)` aus dem letzten Fix gibt's Probleme, weil:
 
-Genauer: Beim ersten Übergang läuft das Audio linear weiter, während die Bilder durch die Überlappung „komprimiert" sind → die Lippen-Synchronität & der Rhythmus reißen ab und dem Nutzer fällt es als „Cut-Off" beim ersten Übergang auf.
+1. Die VO-Dauer wird beim **Generieren** in `generate-voiceover` per Wörter-Heuristik geschätzt → wird nur in der DB gespeichert wenn der User danach VO generiert hat. Bei **Bestandsprojekten** ist `durationSeconds` oft **0** oder fehlt → der Max-Check greift nicht → Komposition bleibt bei der gekürzten Crossfade-Dauer → letzter VO-Satz wird gekappt.
 
-Das Voiceover-Asset wurde basierend auf der **alten** Gesamtdauer (Summe ohne Crossfade-Verkürzung) generiert. Das Audio ist also korrekt — aber unsere Komposition ist jetzt kürzer als das Audio.
+2. Die zwei „minimalen Cuts" mittendrin sind kein VO-Decoder-Problem — sie kommen daher, dass das **VO als linearer Audio-Track** läuft, während die **visuelle Timeline durch Crossfades komprimiert** ist. Bei jedem Crossfade „rutscht" das VO 0.4s relativ zur Bildebene → an Stellen wo VO und Szenen-Inhalt vorher synchron waren (z.B. Produkt-Erwähnung in Szene 3), klingt es jetzt als würde das VO „springen".
 
-## Plan — Audio-Timeline an die echte Komposition anpassen
+## Die echte Ursache
 
-### Fix 1 — `compose-video-assemble`: Voiceover-Sync respektieren
-In `compose-video-assemble/index.ts` zwei Strategien kombinieren:
+**Das VO wurde für eine Timeline ohne Crossfades generiert.** Wenn wir jetzt Crossfades einbauen, müssen wir die **Szenen-Dauern verlängern**, damit die Gesamtlänge gleich bleibt — NICHT die Komposition kürzen.
 
-**A) Komposition lang genug halten, damit das VO komplett spielt**
+## Plan — Szenen verlängern statt Komposition zu kürzen
 
-Wir berechnen zusätzlich die **VO-Dauer** (aus `assemblyConfig.voiceover.durationSeconds`, falls verfügbar) und nehmen das **Maximum** aus Video-Total und VO-Total für `durationInFrames`. So wird das Voiceover NIE abgeschnitten, auch wenn die Crossfade-Überlappung die Bildspur verkürzt:
+### Fix 1 — `compose-video-assemble`: Szenen-Dauern um Crossfade-Anteil verlängern
+
+Statt `durationInFrames` zu verkürzen, **verlängern wir jede Szene** (außer der letzten) um die Hälfte der Transition-Dauer auf jeder Seite. So bleibt:
+- Gesamtlänge = ungekürzte Summe (passt zum VO)
+- Crossfade entsteht durch **Überlappung der erweiterten Szenen-Sequenzen**, nicht durch Verkürzung
 
 ```ts
-const voDurationSeconds = Number(assemblyConfig.voiceover?.durationSeconds) || 0;
-const voFrames = Math.ceil(voDurationSeconds * fps);
-const finalDurationInFrames = Math.max(durationInFrames, voFrames);
+// Neue Logik in compose-video-assemble
+let totalFrames = 0;
+const sceneFrames = remotionScenes.map((s, i) => {
+  const baseFrames = Math.ceil(s.durationSeconds * fps);
+  const tFrames = (s.transitionType !== 'none')
+    ? Math.ceil((s.transitionDuration || 0.4) * fps)
+    : 0;
+  // Szene wird um halbe Transition vorne+hinten verlängert (außer Rändern)
+  const extendedFrames = baseFrames + (i > 0 ? tFrames / 2 : 0) + (i < remotionScenes.length - 1 ? tFrames / 2 : 0);
+  return { from: totalFrames - (i > 0 ? tFrames : 0), duration: extendedFrames };
+});
+// Gesamtlänge = exakt Summe der Original-Dauern
+const durationInFrames = Math.ceil(totalSeconds * fps);
 ```
 
-**B) Letzte Szene leicht verlängern statt abzuschneiden**
+### Fix 2 — `ComposedAdVideo.tsx`: Crossfade über Opacity in den Überlappungs-Frames
 
-Falls das VO länger als die Bildspur ist, halten wir den letzten Frame der letzten Szene per `Sequence.durationInFrames`-Padding bis zum VO-Ende. Das vermeidet ein Schwarzbild am Ende.
+Die Überlappung passiert durch **negative `from`-Offsets** + **Opacity-Interpolation in den Überlappungs-Bereichen**. Das ist exakt das, was schon implementiert ist — aber jetzt mit Frame-Math die die Gesamtlänge respektiert.
 
-### Fix 2 — `ComposedAdVideo.tsx`: Voiceover gegen Cut-Off absichern
-Im Audio-Element pausieren wir nicht beim Buffering (das verursacht zusätzliche Drift) und stellen sicher, dass das VO über die volle Komposition spielt:
+### Fix 3 — `pauseWhenBuffering={false}` für VO behalten
+Bereits gemacht im letzten Fix — bleibt.
 
-```tsx
-{voEnabled && (
-  <Audio 
-    src={voiceoverUrl as string} 
-    volume={1} 
-    pauseWhenBuffering={false}  // ← keine Pausen, lieber leichten Drift akzeptieren
-  />
-)}
-```
-
-Außerdem entfernen wir das umgebende `<Sequence from={0}>`-Wrapper — bei `Audio` ohne Sequence läuft das Asset einfach von Anfang an parallel zur Komposition mit, und Remotion respektiert die volle Audio-Länge bis `durationInFrames` der Komposition.
-
-### Fix 3 — Voiceover-Dauer in DB speichern (falls nicht schon)
-Falls `assemblyConfig.voiceover.durationSeconds` nicht persistiert wird, müssen wir das in der VO-Generierungs-Funktion (`generate-voiceover` o.ä.) sicherstellen. Die ElevenLabs-Antwort liefert eine geschätzte Dauer (siehe `generate-voiceover/index.ts` Z. ~115: `estimatedDuration`) — diese muss in `composer_projects.assembly_config.voiceover.durationSeconds` geschrieben werden.
-
-Ich prüfe in der Implementierung, wo das VO im Composer generiert wird, und stelle sicher, dass die Dauer mit gespeichert wird.
-
-### Skalierbarkeit
-- Reine Frame-Math, null Render-Overhead pro Lambda
-- Funktioniert auch wenn VO kürzer als Video ist (kein Padding)
-- Kein zusätzlicher Audio-Decode, keine zusätzliche Bandbreite
-- 100% Lambda-safe
+### Fix 4 — Safety-Buffer 0.3s am Ende
+Klein halten, aber schwarzer Frame am Ende verhindert harten Cut bei MP3-Decoder-Latenz.
 
 ## Geänderte Dateien
 
-- `supabase/functions/compose-video-assemble/index.ts` — VO-Dauer einlesen, `durationInFrames` als Max(Video, VO) berechnen
-- `src/remotion/templates/ComposedAdVideo.tsx` — Audio-Sequence-Wrapper entfernen, `pauseWhenBuffering={false}` für VO
-- ggf. `src/components/video-composer/VoiceSubtitlesTab.tsx` oder die VO-Generierungs-Funktion — sicherstellen, dass `durationSeconds` in `assembly_config.voiceover` persistiert wird
+- `supabase/functions/compose-video-assemble/index.ts` — Szenen-Frames verlängern statt Komposition kürzen
+- `src/remotion/templates/ComposedAdVideo.tsx` — Frame-Offsets entsprechend anpassen (Szenen starten in der Mitte der Crossfade-Überlappung)
 
 ## Verify
 
-1. 7-Szenen-Projekt mit fade-Transitions (0.4s) rendern → VO spielt vollständig durch, kein Cut-Off am ersten Übergang
-2. Letzter VO-Satz ist im Output hörbar und endet sauber
-3. Übergänge bleiben smooth (keine Regression auf der jüngst gefixten Crossfade-Architektur)
-4. Bei VO kürzer als Video → keine Stille am Ende, Bild läuft normal weiter
-5. Bei VO länger als Video → letzte Szene hält den Frame, VO endet sauber
-6. Untertitel-Timing passt weiterhin
+1. 7-Szenen-Projekt: Gesamtlänge = exakt Summe der Szenen-Dauern (z.B. 7×6s = 42s, nicht 39.6s)
+2. VO spielt vollständig durch — Anfang, Mitte, Ende synchron
+3. Keine „minimalen Cuts" mehr in der Mitte
+4. Crossfades bleiben smooth (visuell identisch zum jetzigen Zustand)
+5. Bestandsprojekte mit altem VO funktionieren ohne Re-Generierung
 
