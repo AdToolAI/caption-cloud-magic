@@ -224,17 +224,23 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
       <ColorGrading preset={colorGrading as any}>
-        <Series>
+        {/* TransitionSeries WITHOUT transitions = hard cuts, but enables `premountFor`
+            so the next scene's video decoder warms up 60 frames before its in-point.
+            This eliminates the cold-start decoder pause at scene boundaries that
+            was causing the voiceover to "stutter" — the VO never actually broke,
+            the renderer was stalling the entire pipeline waiting for the next
+            video chunk. Mirrors DirectorsCut's proven approach. */}
+        <TransitionSeries>
           {scenes.map((scene, i) => (
-            <Series.Sequence key={i} durationInFrames={sceneFrames[i]}>
+            <TransitionSeries.Sequence key={i} durationInFrames={sceneFrames[i]} premountFor={60}>
               <Scene
                 videoUrl={scene.videoUrl}
                 textOverlay={scene.textOverlay}
                 kineticText={kineticText}
               />
-            </Series.Sequence>
+            </TransitionSeries.Sequence>
           ))}
-        </Series>
+        </TransitionSeries>
       </ColorGrading>
 
       {/* Subtitles (above color grading so they stay readable) */}
