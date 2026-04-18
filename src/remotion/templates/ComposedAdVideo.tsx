@@ -57,11 +57,11 @@ const GlobalTextOverlaySchema = z.object({
 export const ComposedAdVideoSchema = z.object({
   scenes: z.array(z.object({
     videoUrl: z.string(),
+    // SINGLE SOURCE OF TRUTH: this is the EFFECTIVE duration the edge function
+    // has already probed/clamped against the real mp4 length. The renderer
+    // takes it 1:1 — no further math. This guarantees Audio/Video geometry
+    // stays in lock-step and eliminates the rubber-band effect at transitions.
     durationSeconds: z.number(),
-    // Real mp4 duration (probed server-side via mvhd box). When present and
-    // SHORTER than durationSeconds, the renderer clamps the Sequence so the
-    // <OffthreadVideo> is never stretched/squeezed → no rubber-band effect.
-    actualVideoDurationSeconds: z.number().optional(),
     textOverlay: z.object({
       text: z.string(),
       position: z.enum(['top', 'center', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right']),
