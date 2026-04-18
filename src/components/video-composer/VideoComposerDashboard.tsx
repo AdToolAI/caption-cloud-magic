@@ -75,17 +75,15 @@ function clearDraft() {
   } catch { /* ignore */ }
 }
 
-/** Restore last active tab, but only if it's actually accessible
- *  given the current draft state (mirrors the `isAccessible` rule below). */
-function restoreActiveTab(draft: LocalProject | null): TabId {
+/** Restore the last active tab purely from localStorage.
+ *  Tab content components handle empty-draft state themselves (e.g. Briefing
+ *  shows the form, other tabs show empty states), so no accessibility pre-check
+ *  is needed — the previous strict gating caused unwanted resets to 'briefing'. */
+function restoreActiveTab(): TabId {
   try {
     const stored = localStorage.getItem(TAB_STORAGE_KEY) as TabId | null;
-    if (!stored || !TAB_ORDER.includes(stored) || !draft) return 'briefing';
-    const idx = TAB_ORDER.indexOf(stored);
-    if (idx === 0) return 'briefing';
-    if (idx === 1 && !draft.briefing?.productName) return 'briefing';
-    if (idx >= 2 && (!draft.scenes || draft.scenes.length === 0)) return 'briefing';
-    return stored;
+    if (stored && TAB_ORDER.includes(stored)) return stored;
+    return 'briefing';
   } catch {
     return 'briefing';
   }
@@ -123,7 +121,7 @@ export default function VideoComposerDashboard() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [project, setProject] = useState<LocalProject>(() => loadDraft() || defaultProject);
-  const [activeTab, setActiveTab] = useState<TabId>(() => restoreActiveTab(loadDraft()));
+  const [activeTab, setActiveTab] = useState<TabId>(() => restoreActiveTab());
   const [error, setError] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
