@@ -363,8 +363,11 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
       })}
 
       {/* Voiceover — top-level Audio with pauseWhenBuffering=true and explicit
-          startFrom/endAt so all Lambda chunks share the same sample-position map.
-          This eliminates 1-sample glitches at chunk boundaries during crossfades. */}
+          startFrom so all Lambda chunks share the same sample-position map.
+          We intentionally OMIT endAt: when endAt exactly matches durationInFrames
+          and the VO file is slightly shorter, Remotion asks for samples that don't
+          exist → Lambda inserts silence which can manifest as micro-cuts at chunk
+          boundaries. Letting Remotion handle end-of-stream naturally is safer. */}
       {voEnabled && (
         <Audio
           src={voiceoverUrl as string}
@@ -374,7 +377,6 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
           toneFrequency={1}
           playbackRate={1}
           startFrom={0}
-          endAt={durationInFrames}
         />
       )}
 
