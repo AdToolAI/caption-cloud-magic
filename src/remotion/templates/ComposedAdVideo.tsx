@@ -58,6 +58,10 @@ export const ComposedAdVideoSchema = z.object({
   scenes: z.array(z.object({
     videoUrl: z.string(),
     durationSeconds: z.number(),
+    // Real mp4 duration (probed server-side via mvhd box). When present and
+    // SHORTER than durationSeconds, the renderer clamps the Sequence so the
+    // <OffthreadVideo> is never stretched/squeezed → no rubber-band effect.
+    actualVideoDurationSeconds: z.number().optional(),
     textOverlay: z.object({
       text: z.string(),
       position: z.enum(['top', 'center', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right']),
