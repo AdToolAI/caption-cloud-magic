@@ -146,6 +146,22 @@ const Scene: React.FC<{
     }
   }
 
+  // UNIVERSAL OUT-FADE: whenever the Sequence is extended past the canonical
+  // scene end (extendEnd > 0), the scene MUST fade out during the overlap
+  // window — regardless of its own transitionType. Otherwise it stays fully
+  // opaque on top of the next scene → hard cut + decoder pipeline block.
+  if (hasTransitionOut && transitionOutFrames > 0) {
+    const fadeOutStart = Math.max(0, durationInFrames - safeOut);
+    if (frame > fadeOutStart) {
+      const fadeOpacity = interpolate(frame, [fadeOutStart, durationInFrames], [1, 0], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+        easing: Easing.inOut(Easing.ease),
+      });
+      opacity = Math.min(opacity, fadeOpacity);
+    }
+  }
+
   return (
     <AbsoluteFill style={{ backgroundColor: '#000', opacity, transform, clipPath }}>
       {videoUrl && (
