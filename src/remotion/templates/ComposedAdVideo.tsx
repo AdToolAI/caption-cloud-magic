@@ -278,26 +278,35 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
           which caused Lambda workers to keep audio playing even when the
           next scene's video chunk wasn't decoded yet → audible stutters /
           micro-cuts at every scene boundary. Now we mirror the working
-          pattern: stable key + default buffering behavior. */}
+          pattern: stable key + default buffering behavior.
+
+          PRE-BUFFER (2026-04-18b): Wrap audio in a Sequence starting `-fps`
+          frames before frame 0. This gives the audio decoder a full second
+          to initialize before the first frame is rendered, eliminating
+          initial cold-start audio glitches. */}
       {voEnabled && (
-        <Audio
-          key="composer-voiceover-stable"
-          src={voiceoverUrl as string}
-          volume={1}
-          loop={false}
-          startFrom={0}
-        />
+        <Sequence from={-fps} durationInFrames={durationInFrames + fps}>
+          <Audio
+            key="composer-voiceover-stable"
+            src={voiceoverUrl as string}
+            volume={1}
+            loop={false}
+            startFrom={0}
+          />
+        </Sequence>
       )}
 
-      {/* Background Music — same stable-key pattern */}
+      {/* Background Music — same stable-key + pre-buffer pattern */}
       {musicEnabled && (
-        <Audio
-          key="composer-bgmusic-stable"
-          src={backgroundMusicUrl as string}
-          volume={musicVolume}
-          startFrom={0}
-          endAt={durationInFrames}
-        />
+        <Sequence from={-fps} durationInFrames={durationInFrames + fps}>
+          <Audio
+            key="composer-bgmusic-stable"
+            src={backgroundMusicUrl as string}
+            volume={musicVolume}
+            startFrom={0}
+            endAt={durationInFrames}
+          />
+        </Sequence>
       )}
     </AbsoluteFill>
   );
