@@ -2,15 +2,19 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, FolderOpen, Check, Loader2, ImageIcon } from 'lucide-react';
+import { ArrowLeft, FolderOpen, Check, Loader2, ImageIcon, Inbox } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+
+const ORPHAN_ALBUM_ID = '__orphan__';
 
 interface Album {
   id: string;
   name: string;
   cover_image_url: string | null;
   image_count: number;
+  is_orphan?: boolean;
 }
 
 interface AlbumImage {
@@ -42,57 +46,117 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
     if (!user) return;
     setLoading(true);
     try {
-      const { data: albumsData } = await supabase
+      // Single query: albums with embedded image counts
+      const { data: albumsData, error: albumsError } = await supabase
         .from('studio_albums')
-        .select('id, name, cover_image_url')
+        .select('id, name, cover_image_url, is_system, studio_images(count)')
         .eq('user_id', user.id)
         .order('is_system', { ascending: false })
         .order('name');
 
-      if (albumsData) {
-        // Get image counts and dynamic covers per album
-        const albumsWithCounts = await Promise.all(
-          albumsData.map(async (album) => {
-            const [{ count }, { data: latestImg }] = await Promise.all([
-              supabase
-                .from('studio_images')
-                .select('id', { count: 'exact', head: true })
-                .eq('album_id', album.id),
-              !album.cover_image_url
-                ? supabase
-                    .from('studio_images')
-                    .select('image_url')
-                    .eq('album_id', album.id)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle()
-                : Promise.resolve({ data: null }),
-            ]);
-            return {
-              ...album,
-              image_count: count || 0,
-              cover_image_url: album.cover_image_url || latestImg?.image_url || null,
-            };
-          })
-        );
-        setAlbums(albumsWithCounts.filter(a => a.image_count > 0));
+      if (albumsError) {
+        console.error('[AlbumImagePicker] albums query error:', albumsError);
+        toast.error('Fehler beim Laden der Alben', { description: albumsError.message });
+        return;
       }
+
+      // Map embedded counts and fetch fallback covers in one batch
+      const mapped: Album[] = (albumsData || []).map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        cover_image_url: a.cover_image_url,
+        image_count: a.studio_images?.[0]?.count ?? 0,
+      }));
+
+      // Fetch latest image as fallback cover only for albums missing a cover
+      const needsCover = mapped.filter((a) => !a.cover_image_url && a.image_count > 0);
+      if (needsCover.length > 0) {
+        const { data: covers } = await supabase
+          .from('studio_images')
+          .select('album_id, image_url, created_at')
+          .in('album_id', needsCover.map((a) => a.id))
+          .order('created_at', { ascending: false });
+
+        const coverMap = new Map<string, string>();
+        (covers || []).forEach((row: any) => {
+          if (!coverMap.has(row.album_id)) coverMap.set(row.album_id, row.image_url);
+        });
+        mapped.forEach((a) => {
+          if (!a.cover_image_url) a.cover_image_url = coverMap.get(a.id) || null;
+        });
+      }
+
+      // Check for orphan images (album_id IS NULL)
+      const { count: orphanCount, data: orphanCover } = await (async () => {
+        const [{ count }, { data }] = await Promise.all([
+          supabase
+            .from('studio_images')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .is('album_id', null),
+          supabase
+            .from('studio_images')
+            .select('image_url')
+            .eq('user_id', user.id)
+            .is('album_id', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
+        return { count: count ?? 0, data };
+      })();
+
+      const finalAlbums: Album[] = mapped.filter((a) => a.image_count > 0);
+
+      if (orphanCount > 0) {
+        finalAlbums.unshift({
+          id: ORPHAN_ALBUM_ID,
+          name: 'Ohne Album',
+          cover_image_url: orphanCover?.image_url || null,
+          image_count: orphanCount,
+          is_orphan: true,
+        });
+      }
+
+      setAlbums(finalAlbums);
+    } catch (err: any) {
+      console.error('[AlbumImagePicker] loadAlbums exception:', err);
+      toast.error('Unerwarteter Fehler', { description: err?.message });
     } finally {
       setLoading(false);
     }
   };
 
   const loadImages = async (albumId: string, albumName: string) => {
+    if (!user) return;
     setSelectedAlbumId(albumId);
     setSelectedAlbumName(albumName);
     setLoading(true);
     try {
-      const { data } = await supabase
+      let query = supabase
         .from('studio_images')
         .select('id, image_url, prompt, created_at')
-        .eq('album_id', albumId)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+
+      if (albumId === ORPHAN_ALBUM_ID) {
+        query = query.is('album_id', null);
+      } else {
+        query = query.eq('album_id', albumId);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.error('[AlbumImagePicker] loadImages error:', error);
+        toast.error('Album konnte nicht geöffnet werden', { description: error.message });
+        setImages([]);
+        return;
+      }
       setImages(data || []);
+    } catch (err: any) {
+      console.error('[AlbumImagePicker] loadImages exception:', err);
+      toast.error('Unerwarteter Fehler', { description: err?.message });
+      setImages([]);
     } finally {
       setLoading(false);
     }
@@ -141,13 +205,18 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
                   <button
                     key={album.id}
                     onClick={() => loadImages(album.id, album.name)}
-                    className="group relative rounded-lg border border-border overflow-hidden hover:border-primary/50 transition-all text-left"
+                    disabled={loading}
+                    className="group relative rounded-lg border border-border overflow-hidden hover:border-primary/50 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {album.cover_image_url ? (
                       <img src={album.cover_image_url} alt={album.name} className="w-full h-24 object-cover" />
                     ) : (
                       <div className="w-full h-24 bg-muted flex items-center justify-center">
-                        <FolderOpen className="h-8 w-8 text-muted-foreground" />
+                        {album.is_orphan ? (
+                          <Inbox className="h-8 w-8 text-muted-foreground" />
+                        ) : (
+                          <FolderOpen className="h-8 w-8 text-muted-foreground" />
+                        )}
                       </div>
                     )}
                     <div className="p-2">
