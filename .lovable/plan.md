@@ -1,86 +1,97 @@
 
 
-Der User hat recht: meine bisherigen Fixes greifen nicht am echten Problem. Lass mich das **logisch** durchdenken statt weiter an Symptomen rumzudoktern.
+## Ja — die Geschwindigkeit 1.2 ist sehr wahrscheinlich die Ursache
 
-## Was wir wissen
-- VO ist linear, **kein** Audio-Re-Mount
-- Komposition = Summe Szenen-Dauern + Pad
-- Crossfades visuell smooth ✅
-- VO **wiederholt** sich an manchen Übergängen, **schneidet** an anderen
-- "Manche Übergänge gut, manche schlecht" → das ist der Schlüssel
+Du hast den Bug gefunden. Hier die Beweiskette aus dem Code:
 
-## Die echte Frage: Warum unterschiedlich?
+### Die Schätzung passt nicht zur Realität
 
-Wenn das VO ein **linearer Audio-Track** wäre, dürfte er sich **niemals wiederholen**. Wiederholungen entstehen nur, wenn:
-1. Audio mehrfach gemountet wird, oder
-2. Der Renderer einen Frame-Bereich **zweimal rendert**
-
-Punkt 2 ist der Schlüssel. In Remotion Lambda werden Frames in **Chunks** parallel gerendert (`framesPerLambda: 270`). Wenn an einem Chunk-Boundary ein Crossfade liegt, kann es passieren, dass:
-- Lambda A rendert Frames 0–269 inkl. Audio-Sample für Frame 269
-- Lambda B rendert Frames 270–539 inkl. Audio-Sample für Frame 270
-- Beim Audio-Stitching am Ende **überlappen** die Audio-Segmente um wenige ms → klingt wie Wiederholung
-- Oder: an manchen Chunk-Boundaries wird **gekappt** statt überlappt → klingt wie Cut
-
-**Das erklärt warum manche Übergänge gut/schlecht sind:** Es hat NICHTS mit dem Übergang an sich zu tun, sondern damit, ob ein Lambda-Chunk-Boundary zufällig in der Nähe des Übergangs liegt.
-
-## Aber Moment — der echte Hauptverdächtige ist ein anderer
-
-Schauen wir nochmal auf `ComposedAdVideo.tsx`. Die `<Audio>` Komponente ist auf **Top-Level** (außerhalb der Sequences) — gut. Aber: die `<Scene>`-Komponenten werden in `<Sequence from={X} durationInFrames={Y}>` gewrappt. Jede Sequence hat ein **eigenes `<Video muted>`** drin.
-
-Hier ist der Knackpunkt: Wenn zwei Sequences **überlappen** (durch unsere `extendStart`/`extendEnd` Logik), laufen zwei `<Video>`-Elemente parallel. Remotion's interner Audio-Mixer merkt sich pro `<Audio>`/`<Video>`-Element die **`assetPosition`** (welches Audio-Sample an welcher Frame). 
-
-**Das `<Video muted>` zählt im Mixer als Audio-Quelle** (auch wenn stumm) — Remotion baut intern eine Sample-Position-Map. Beim Crossfade-Overlap hat der Mixer **drei** parallele Audio-Quellen (VO + 2x Video). Bei Lambda-Rendering wird die Sample-Map pro Chunk neu aufgebaut, und an Chunk-Boundaries die im Overlap-Fenster liegen, kommt es zu **Sample-Drift** → das VO-Sample wird relativ zum erwarteten Frame um wenige ms verschoben → klingt wie Wiederholung oder Cut.
-
-## Die Lösung
-
-Statt `<Video muted>` zu verwenden, müssen wir **`<OffthreadVideo muted>`** OHNE Audio-Track verwenden. `OffthreadVideo` hat einen `muted`-Prop der das Audio-Element komplett aushängt (nicht nur stummschaltet) — der Renderer behandelt es dann als reines Visual ohne Audio-Mixer-Eintrag.
-
-**Plus:** Wir brauchen `toneFrequency={1}` auf dem VO-Audio um Pitch-Drift zu vermeiden, und `playbackRate={1}` explizit zu setzen.
-
-## Plan
-
-### Fix 1 — `<Video>` → `<OffthreadVideo>` mit echtem Audio-Bypass
-In `src/remotion/templates/ComposedAdVideo.tsx`:
-```tsx
-import { OffthreadVideo } from 'remotion';
-
-<OffthreadVideo
-  src={videoUrl}
-  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-  muted
-  pauseWhenBuffering={false}
-  delayRenderTimeoutInMilliseconds={30000}
-/>
-```
-`OffthreadVideo` rendert frame-by-frame als Bilder ohne Audio-Decoder → kein Sample-Map-Eintrag → keine Drift im Audio-Mixer.
-
-### Fix 2 — VO-Audio explizit ohne Time-Stretching
-```tsx
-<Audio 
-  src={voiceoverUrl as string} 
-  volume={1} 
-  pauseWhenBuffering={false}
-  toneFrequency={1}
-  playbackRate={1}
-/>
+In `generate-voiceover/index.ts` Z. 128-130:
+```ts
+const wordCount = text.split(/\s+/).length;
+const baseEstimatedDuration = (wordCount / 150) * 60;  // 150 Wörter/Min @ 1.0x
+const estimatedDuration = Math.ceil(baseEstimatedDuration / speed);
 ```
 
-### Fix 3 — Lambda Render-Settings: `framesPerLambda` reduzieren
-In der Render-Pipeline (vermutlich `render-with-remotion` oder ähnlich): `framesPerLambda` von 270 auf **150** reduzieren. Das halbiert die Wahrscheinlichkeit dass ein Chunk-Boundary genau in einem Crossfade-Fenster liegt. Außerdem `concurrency: 1` für Audio-Composing erzwingen.
+Diese Schätzung wird in der DB als `voiceover.durationSeconds` gespeichert (Z. 181 in `VoiceSubtitlesTab.tsx`).
 
-Aber: laut Memory ist `framesPerLambda: 270, max 3 parallel` aktuelle Policy. Reduzieren bedeutet längere Renderzeit. **Daher**: nicht ändern, sondern die Crossfade-Fenster so legen, dass sie **garantiert nicht** auf Chunk-Boundaries fallen — das geht aber nicht deterministisch.
+**Problem:** ElevenLabs sprachsynthetisierte Stimmen sprechen **nicht exakt 150 Wörter/Min** bei `speed=1.0`. Je nach Stimme variiert das zwischen **130 und 175 WPM**. Bei `speed=1.2` wird der Fehler **multipliziert**:
+- Schätzung sagt z.B. 25s, **echtes Audio dauert 28s** → 3s werden abgeschnitten
+- Oder umgekehrt: Schätzung sagt 28s, echt sind 25s → 3s Stille am Ende
 
-→ Stattdessen: Fix 1 + Fix 2 sind die echten Fixes. Lambda-Settings nicht anfassen.
+### Warum das die "manche Übergänge gut, manche schlecht"-Symptomatik erklärt
+
+Der `compose-video-assemble` (Z. 115-121) extendet die Komposition **nur** wenn `voDurationSeconds > durationInFrames`. Bei `speed=1.2`:
+- Wenn das echte Audio **länger** ist als die Schätzung → Komposition zu kurz → **letzter VO-Satz abgeschnitten** (= dein Übergang-1-Cut)
+- Mittendrin: das VO-Audio läuft an einer Stelle, die nicht mehr mit den Szenen-Längen synchron ist (weil das Audio physisch eine andere Länge hat als geplant) → klingt wie **"Wiederholung"** weil derselbe Szenen-Inhalt mit verschobenem VO doppelt gehört wird
+
+### Die echte Ursache
+
+Die **VO-Dauer wird geschätzt statt gemessen**. Bei `speed=1.0` ist die Heuristik halbwegs OK (bekannter Fehler), bei `speed=1.2` wird der Heuristik-Fehler verstärkt.
+
+## Plan — VO-Dauer **echt messen** statt schätzen
+
+### Fix 1 — `generate-voiceover`: Echte Audio-Dauer aus MP3 ermitteln
+Statt Wort-Heuristik die **echte Dauer aus der MP3-Datei** berechnen. Bei `mp3_44100_128` (128kbps, 44.1kHz) gilt:
+```ts
+const realDurationSeconds = audioBuffer.byteLength / (128 * 1000 / 8);
+// = bytes / 16000 (für 128kbps)
+```
+Das ist eine **bit-exakte** Berechnung aus der Datei-Größe — keine Heuristik mehr nötig. Ergebnis ist auf ±50ms genau (CBR-MP3-Frames sind 26ms lang).
+
+```ts
+// generate-voiceover/index.ts — ersetzt Z. 128-130
+const BITRATE_BPS = 128 * 1000;
+const realDurationSeconds = (audioUint8Array.byteLength * 8) / BITRATE_BPS;
+const estimatedDuration = Math.ceil(realDurationSeconds * 100) / 100; // auf 0.01s gerundet
+```
+
+### Fix 2 — Client: Audio-Element-Dauer als Verifikation nach Generierung
+In `VoiceSubtitlesTab.tsx` nach Z. 181: zusätzlich ein verstecktes `<audio>` mit `loadedmetadata`-Event nutzen um die **vom Browser dekodierte echte Dauer** zu bekommen und in `voiceover.durationSeconds` zu schreiben (überschreibt die Server-Schätzung mit dem präzisesten Wert):
+
+```ts
+// Nach onUpdateAssembly: lade Audio und korrigiere Dauer
+const audio = new Audio(data.audioUrl);
+audio.addEventListener('loadedmetadata', () => {
+  if (isFinite(audio.duration) && audio.duration > 0) {
+    onUpdateAssembly({
+      voiceover: { ...voiceover, audioUrl: data.audioUrl, durationSeconds: audio.duration, /* ... */ },
+    });
+  }
+});
+```
+
+### Fix 3 — `compose-video-assemble`: Beidseitiger Sync-Check
+Z. 115-121 erweitern: nicht nur **extenden** wenn VO länger, sondern auch **trimmen** der hinteren Szenen wenn VO deutlich kürzer (>0.5s Differenz). Aktuell läuft Bild 3s länger als Audio → klingt nach „Cut" am Ende.
+
+```ts
+const voDurationSeconds = Number(assemblyConfig?.voiceover?.durationSeconds) || 0;
+if (voDurationSeconds > 0) {
+  const voFrames = Math.ceil(voDurationSeconds * fps);
+  // Sync auf max(VO, Video) — wenn beide bekannt, nimm den Längeren
+  durationInFrames = Math.max(durationInFrames, voFrames);
+}
+```
+
+(Das ist bereits da — bleibt. Aber jetzt mit **korrektem** `voDurationSeconds`.)
+
+### Fix 4 — Speed-Range warning in der UI
+Bei `speed > 1.1` einen kleinen Hinweis im UI: „Hohe Geschwindigkeit kann Sync-Probleme verursachen — generiere VO neu wenn du die Speed änderst".
 
 ## Geänderte Dateien
-- `src/remotion/templates/ComposedAdVideo.tsx` — `<Video>` → `<OffthreadVideo>`, `<Audio>` mit `toneFrequency={1}` und `playbackRate={1}`
 
-## Warum diesmal anders
-Bisher haben wir an Frame-Math und Transition-Timing geschraubt. **Echte Ursache** ist der **Audio-Mixer von Remotion**, der bei überlappenden `<Video>`-Elementen mit `muted` trotzdem eine Audio-Sample-Map führt → Drift bei Lambda-Chunks. `<OffthreadVideo muted>` umgeht das komplett.
+- `supabase/functions/generate-voiceover/index.ts` — echte Dauer aus MP3-Bytes statt Wort-Heuristik
+- `src/components/video-composer/VoiceSubtitlesTab.tsx` — Browser-Audio-Metadaten zur Verifikation nutzen, optional UI-Hinweis bei Speed > 1.1
+
+## Warum das diesmal das echte Problem trifft
+
+Alle bisherigen Fixes (Crossfade-Math, OffthreadVideo, Audio-Mixer-Bypass) waren technisch korrekt — aber sie haben das **falsche Symptom** behandelt. Der echte Bug ist: **die Komposition kennt die wahre VO-Länge nicht**, weil sie geschätzt wird. Bei `speed=1.0` fällt der Schätzfehler nicht auf, bei `speed=1.2` schon.
 
 ## Verify
-1. Render → VO spielt durchgehend linear, **keine** Wiederholungen, **keine** Cuts an Übergang 1 oder anderen
-2. Crossfades visuell weiterhin smooth
-3. Performance: `OffthreadVideo` ist auf Lambda meist **schneller** als `<Video>` (kein Audio-Decode)
-4. Bestandsprojekte funktionieren ohne Re-Generierung
+
+1. Mit `speed=1.0` generieren → Sync sollte wie vorher passen
+2. Mit `speed=1.2` neu generieren → VO komplett, keine Cuts, keine Wiederholungen
+3. Mit `speed=0.8` testen → ebenfalls sauber, keine Stille am Ende
+4. Bestandsprojekte: VO **neu generieren** damit echte Dauer in DB steht (alte geschätzte Dauer ist falsch)
+5. Console-Log zeigt: `realDurationSeconds` ≈ Browser `audio.duration` (±0.1s)
 
