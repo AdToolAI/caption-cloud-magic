@@ -159,7 +159,7 @@ const Scene: React.FC<{
   return (
     <AbsoluteFill style={{ backgroundColor: '#000', opacity, transform, clipPath }}>
       {videoUrl && (
-        <Video
+        <OffthreadVideo
           src={videoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           muted
