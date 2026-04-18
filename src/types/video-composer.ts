@@ -151,6 +151,9 @@ export interface VoiceoverConfig {
   styleExaggeration?: number;
   /** ElevenLabs speaker boost flag. */
   useSpeakerBoost?: boolean;
+  /** Estimated VO duration in seconds — used by the renderer to extend the
+   *  composition timeline so crossfade overlap doesn't cut off audio. */
+  durationSeconds?: number;
 }
 
 export interface MusicConfig {
