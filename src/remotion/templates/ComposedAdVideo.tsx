@@ -112,16 +112,6 @@ const Scene: React.FC<{
         easing: Easing.inOut(Easing.ease),
       });
     }
-    if (hasTransitionOut && transitionOutFrames > 0) {
-      const fadeOutStart = Math.max(0, durationInFrames - safeOut);
-      if (frame > fadeOutStart) {
-        opacity = interpolate(frame, [fadeOutStart, durationInFrames], [1, 0], {
-          extrapolateLeft: 'clamp',
-          extrapolateRight: 'clamp',
-          easing: Easing.inOut(Easing.ease),
-        });
-      }
-    }
   } else if (transitionType === 'slide') {
     if (transitionInFrames > 0 && frame < safeIn) {
       const tx = interpolate(frame, [0, safeIn], [100, 0], {
