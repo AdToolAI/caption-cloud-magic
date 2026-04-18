@@ -169,7 +169,7 @@ const Scene: React.FC<{
           src={videoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           muted
-          pauseWhenBuffering={true}
+          pauseWhenBuffering={false}
           delayRenderTimeoutInMilliseconds={30000}
         />
       )}
