@@ -260,26 +260,45 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
 }) => {
   const { fps, durationInFrames } = useVideoConfig();
 
-  // Calculate frame offsets WITH transition overlap so consecutive scenes crossfade
-  // smoothly instead of hard-cutting (which causes decoder stutters on AI clips).
-  let frameOffset = 0;
+  // Frame-math: total composition length = sum of original scene durations
+  // (NO crossfade shortening). Crossfades are achieved by EXTENDING each
+  // scene's Sequence by half the transition duration on each side, so
+  // consecutive Sequences overlap during the transition window. This keeps
+  // the audio (VO/music) perfectly in sync with the visual timeline.
+  let cursor = 0;
   const sceneFrames = scenes.map((scene, i) => {
-    const durationFrames = Math.ceil(scene.durationSeconds * fps);
-    const transitionType = scene.transitionType || 'none';
-    const transitionFrames = transitionType !== 'none'
+    const baseFrames = Math.ceil(scene.durationSeconds * fps);
+    const transitionType = (scene.transitionType || 'none') as
+      'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom';
+    const tFrames = transitionType !== 'none'
       ? Math.ceil((scene.transitionDuration ?? 0.4) * fps)
       : 0;
+
+    const isFirst = i === 0;
     const isLast = i === scenes.length - 1;
-    const entry = {
-      from: frameOffset,
-      duration: durationFrames,
-      transitionType: transitionType as 'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom',
-      transitionFrames,
+
+    // Extend the Sequence by half the transition window on each non-edge side.
+    const extendStart = !isFirst ? Math.floor(tFrames / 2) : 0;
+    const extendEnd = !isLast ? Math.ceil(tFrames / 2) : 0;
+    const seqDuration = baseFrames + extendStart + extendEnd;
+
+    // Sequence starts `extendStart` frames earlier than the canonical timeline
+    // position so the overlap with the previous scene is `tFrames`.
+    const from = Math.max(0, cursor - extendStart);
+
+    // Advance the canonical cursor by the original scene duration ONLY,
+    // so the total timeline = sum of original scene durations (audio-safe).
+    cursor += baseFrames;
+
+    return {
+      from,
+      duration: seqDuration,
+      transitionType,
+      transitionInFrames: extendStart > 0 ? tFrames : 0,
+      transitionOutFrames: extendEnd > 0 ? tFrames : 0,
+      hasTransitionOut: extendEnd > 0,
       isLast,
     };
-    // Next scene starts `transitionFrames` earlier → real overlap (crossfade)
-    frameOffset += durationFrames - (isLast ? 0 : transitionFrames);
-    return entry;
   });
 
   const musicVolume = clampVolume(backgroundMusicVolume ?? 0.3);
@@ -291,10 +310,6 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
       <ColorGrading preset={colorGrading as any}>
         {scenes.map((scene, i) => {
           const sf = sceneFrames[i];
-          // Outgoing transition uses the NEXT scene's transition setting
-          const next = sceneFrames[i + 1];
-          const hasTransitionOut = !!next && next.transitionType !== 'none' && next.transitionFrames > 0;
-          const transitionOutFrames = hasTransitionOut ? next.transitionFrames : 0;
           return (
             <Sequence
               key={i}
@@ -307,9 +322,9 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
                 kineticText={kineticText}
                 durationInFrames={sf.duration}
                 transitionType={sf.transitionType}
-                transitionInFrames={sf.transitionFrames}
-                hasTransitionOut={hasTransitionOut}
-                transitionOutFrames={transitionOutFrames}
+                transitionInFrames={sf.transitionInFrames}
+                hasTransitionOut={sf.hasTransitionOut}
+                transitionOutFrames={sf.transitionOutFrames}
               />
             </Sequence>
           );

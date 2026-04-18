@@ -104,22 +104,14 @@ serve(async (req) => {
     });
 
     const fps = 30;
-    // Compute total frames accounting for transition overlap between consecutive scenes.
-    // Each non-final scene with a transition shortens the timeline by transitionFrames.
-    let totalFrames = 0;
-    for (let i = 0; i < remotionScenes.length; i++) {
-      const s = remotionScenes[i];
-      const dFrames = Math.ceil(s.durationSeconds * fps);
-      const isLast = i === remotionScenes.length - 1;
-      const tFrames = (!isLast && s.transitionType !== 'none')
-        ? Math.ceil(s.transitionDuration * fps)
-        : 0;
-      totalFrames += dFrames - tFrames;
-    }
-    let durationInFrames = Math.max(1, totalFrames);
+    // IMPORTANT: total duration = sum of original scene durations (NO crossfade shortening).
+    // Crossfades are achieved in the renderer by extending each scene's Sequence by the
+    // transition overlap, so the audio (VO/music) stays in sync with the visual timeline.
+    const sumSeconds = remotionScenes.reduce((acc, s) => acc + (s.durationSeconds || 0), 0);
+    let durationInFrames = Math.max(1, Math.ceil(sumSeconds * fps));
 
-    // Voiceover sync: if VO is longer than the (crossfade-shortened) video timeline,
-    // extend duration so audio plays to completion. Last scene's frame will hold.
+    // Voiceover sync safety net: if a VO duration is recorded and longer than the
+    // composed timeline, extend so it plays to completion.
     const voDurationSeconds = Number(assemblyConfig?.voiceover?.durationSeconds) || 0;
     if (voDurationSeconds > 0) {
       const voFrames = Math.ceil(voDurationSeconds * fps);
@@ -128,6 +120,10 @@ serve(async (req) => {
         durationInFrames = voFrames;
       }
     }
+
+    // Small safety pad (0.3s) for MP3 decoder latency at the very end.
+    durationInFrames += Math.ceil(0.3 * fps);
+
     const totalDuration = durationInFrames / fps;
 
     const subtitlesCfg = assemblyConfig.subtitles || {};
