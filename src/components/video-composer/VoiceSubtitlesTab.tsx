@@ -225,8 +225,13 @@ export default function VoiceSubtitlesTab({
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const { blob, exactSeconds } = await padAudioToExactWav(generatedUrl, realDur);
-            console.log(`[VO] WAV pad applied, exact duration ${exactSeconds.toFixed(3)}s (size ${(blob.size / 1024).toFixed(1)} KB)`);
+            // Pad to FULL composition duration (scene total + safety pad),
+            // not just VO duration. Lambda chunks near scene boundaries past
+            // the VO end would otherwise hit "no samples" → mux glitch.
+            const sceneTotal = scenes.reduce((sum, s) => sum + (s.durationSeconds || 0), 0);
+            const compositionDuration = Math.max(realDur, sceneTotal) + 0.15;
+            const { blob, exactSeconds } = await padAudioToExactWav(generatedUrl, compositionDuration);
+            console.log(`[VO] WAV pad applied, exact duration ${exactSeconds.toFixed(3)}s (VO ${realDur.toFixed(3)}s, scenes ${sceneTotal.toFixed(3)}s, size ${(blob.size / 1024).toFixed(1)} KB)`);
 
             const wavPath = `${user.id}/${Date.now()}-voiceover.wav`;
             const { data: upload, error: upErr } = await supabase.storage
