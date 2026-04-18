@@ -171,14 +171,15 @@ export default function VoiceSubtitlesTab({
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Voiceover failed');
 
+      const serverDuration = Number(data.duration) || 0;
       onUpdateAssembly({
         voiceover: {
           ...voiceover,
           audioUrl: data.audioUrl,
-          // Persist VO duration so the renderer can extend the composition
-          // (crossfades shorten the video timeline; without this the last VO
-          // sentence gets cut off).
-          durationSeconds: Number(data.duration) || 0,
+          // Server returns bit-exact duration from MP3 bytes (CBR 128 kbps).
+          // We additionally verify with browser-decoded metadata below for
+          // maximum precision (handles edge cases like ID3 tags / VBR).
+          durationSeconds: serverDuration,
           speed,
           stability: voiceSettings.stability,
           similarityBoost: voiceSettings.similarityBoost,
@@ -186,7 +187,35 @@ export default function VoiceSubtitlesTab({
           useSpeakerBoost: voiceSettings.useSpeakerBoost,
         },
       });
-      toast({ title: t('videoComposer.voGenerated'), description: `~${data.duration}s` });
+
+      // Verify with browser-decoded duration (most precise — overrides server estimate)
+      try {
+        const probe = new Audio();
+        probe.preload = 'metadata';
+        probe.src = data.audioUrl;
+        probe.addEventListener('loadedmetadata', () => {
+          const realDur = probe.duration;
+          if (isFinite(realDur) && realDur > 0 && Math.abs(realDur - serverDuration) > 0.05) {
+            console.log('[VO] browser-verified duration:', realDur.toFixed(3), 's (server:', serverDuration, 's)');
+            onUpdateAssembly({
+              voiceover: {
+                ...voiceover,
+                audioUrl: data.audioUrl,
+                durationSeconds: realDur,
+                speed,
+                stability: voiceSettings.stability,
+                similarityBoost: voiceSettings.similarityBoost,
+                styleExaggeration: voiceSettings.styleExaggeration,
+                useSpeakerBoost: voiceSettings.useSpeakerBoost,
+              },
+            });
+          }
+        }, { once: true });
+      } catch (e) {
+        console.warn('[VO] browser duration probe failed:', e);
+      }
+
+      toast({ title: t('videoComposer.voGenerated'), description: `~${serverDuration.toFixed(1)}s` });
     } catch (err: any) {
       toast({ title: t('videoComposer.voError'), description: err.message, variant: 'destructive' });
     } finally {

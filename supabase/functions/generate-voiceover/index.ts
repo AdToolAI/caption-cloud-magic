@@ -125,9 +125,14 @@ serve(async (req) => {
     const { data: urlData } = supabase.storage.from('voiceover-audio').getPublicUrl(filePath);
     const cacheBustedUrl = `${urlData.publicUrl}?v=${Date.now()}`;
 
-    const wordCount = text.split(/\s+/).length;
-    const baseEstimatedDuration = (wordCount / 150) * 60;
-    const estimatedDuration = Math.ceil(baseEstimatedDuration / speed);
+    // Bit-exact duration from MP3 file size (CBR @ 128 kbps).
+    // Replaces the old 150-WPM heuristic which mis-estimated VO length
+    // (especially at speed != 1.0), causing audio cut-offs and "repetitions"
+    // when the composition length didn't match the real audio length.
+    const BITRATE_BPS = 128 * 1000;
+    const realDurationSeconds = (audioUint8Array.byteLength * 8) / BITRATE_BPS;
+    const estimatedDuration = Math.round(realDurationSeconds * 100) / 100;
+    console.log('[generate-voiceover] real duration (from bytes):', realDurationSeconds.toFixed(3), 's', '| bytes:', audioUint8Array.byteLength);
 
     return new Response(
       JSON.stringify({
