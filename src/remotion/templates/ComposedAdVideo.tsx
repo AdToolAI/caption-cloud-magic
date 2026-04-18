@@ -84,6 +84,13 @@ export const ComposedAdVideoSchema = z.object({
     segments: z.array(SubtitleSegmentSchema),
   }).optional(),
   globalTextOverlays: z.array(GlobalTextOverlaySchema).optional(),
+  watermark: z.object({
+    enabled: z.boolean(),
+    text: z.string(),
+    position: z.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center']),
+    size: z.enum(['small', 'medium', 'large']),
+    opacity: z.number(),
+  }).optional(),
 });
 
 type ComposedAdVideoProps = z.infer<typeof ComposedAdVideoSchema>;
@@ -210,8 +217,9 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
   backgroundMusicVolume,
   subtitles,
   globalTextOverlays,
+  watermark,
 }) => {
-  const { fps, durationInFrames } = useVideoConfig();
+  const { fps, durationInFrames, height } = useVideoConfig();
 
   // Hard cuts only — each scene's frame count is `round(durationSeconds * fps)`.
   // Audio timeline therefore equals the exact sum of scene frames, no overlap drift.
@@ -280,6 +288,55 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
           </Sequence>
         );
       })}
+
+      {/* ── WATERMARK OVERLAY (above scenes, below subtitles)
+          Rendered as a single AbsoluteFill outside TransitionSeries so the
+          stamp stays rock-stable through every crossfade. */}
+      {watermark?.enabled && watermark.text && (() => {
+        const sizePxMap = { small: 16, medium: 24, large: 36 } as const;
+        const baseFontPx = sizePxMap[watermark.size] ?? 24;
+        // Scale relative to 1080p reference height
+        const scaledFontPx = Math.round((baseFontPx * height) / 1080);
+        const pos = watermark.position;
+        const justifyContent =
+          pos === 'top-left' || pos === 'bottom-left'
+            ? 'flex-start'
+            : pos === 'top-right' || pos === 'bottom-right'
+            ? 'flex-end'
+            : 'center';
+        const alignItems =
+          pos === 'top-left' || pos === 'top-right'
+            ? 'flex-start'
+            : pos === 'bottom-left' || pos === 'bottom-right'
+            ? 'flex-end'
+            : 'center';
+        return (
+          <AbsoluteFill
+            style={{
+              display: 'flex',
+              justifyContent,
+              alignItems,
+              padding: `${Math.round(height * 0.04)}px`,
+              pointerEvents: 'none',
+              zIndex: 50,
+            }}
+          >
+            <span
+              style={{
+                fontSize: `${scaledFontPx}px`,
+                color: '#FFFFFF',
+                opacity: watermark.opacity,
+                fontWeight: 600,
+                fontFamily: 'Inter, sans-serif',
+                textShadow: '0 2px 8px rgba(0,0,0,0.7)',
+                letterSpacing: '0.02em',
+              }}
+            >
+              {watermark.text}
+            </span>
+          </AbsoluteFill>
+        );
+      })()}
 
       {/* ── ONE-TRACK VOICEOVER (matches DirectorsCut/UniversalCreator pattern) ──
           CRITICAL FIX (2026-04-18): Both DirectorsCut and UniversalCreator use

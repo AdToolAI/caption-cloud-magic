@@ -9,8 +9,9 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import ColorGradingSelector from './ColorGradingSelector';
-import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
-import { getClipCost } from '@/types/video-composer';
+import WatermarkEditor from './WatermarkEditor';
+import type { AssemblyConfig, ComposerScene, WatermarkConfig } from '@/types/video-composer';
+import { DEFAULT_WATERMARK_CONFIG, getClipCost } from '@/types/video-composer';
 import { persistAssemblyConfig } from '@/hooks/useComposerPersistence';
 
 interface AssemblyTabProps {
@@ -353,6 +354,12 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
           </div>
         </CardContent>
       </Card>
+
+      {/* Watermark */}
+      <WatermarkEditor
+        value={assemblyConfig.watermark ?? DEFAULT_WATERMARK_CONFIG}
+        onChange={(wm: WatermarkConfig) => onUpdateAssembly({ watermark: wm })}
+      />
 
       {/* Cost Summary */}
       <Card className="border-primary/30 bg-primary/5">

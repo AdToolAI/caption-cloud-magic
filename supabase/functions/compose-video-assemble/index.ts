@@ -271,6 +271,20 @@ serve(async (req) => {
         endTime: Number(s.endTime),
       }));
 
+    // Watermark passthrough — defaults to disabled
+    const wmRaw = (assemblyConfig.watermark ?? {}) as any;
+    const ALLOWED_WM_POS = new Set(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center']);
+    const ALLOWED_WM_SIZE = new Set(['small', 'medium', 'large']);
+    const watermark = {
+      enabled: !!wmRaw.enabled && typeof wmRaw.text === 'string' && wmRaw.text.trim().length > 0,
+      text: typeof wmRaw.text === 'string' ? wmRaw.text.slice(0, 80) : '',
+      position: ALLOWED_WM_POS.has(wmRaw.position) ? wmRaw.position : 'bottom-right',
+      size: ALLOWED_WM_SIZE.has(wmRaw.size) ? wmRaw.size : 'medium',
+      opacity: Number.isFinite(Number(wmRaw.opacity))
+        ? Math.min(1, Math.max(0.3, Number(wmRaw.opacity)))
+        : 0.7,
+    };
+
     const inputProps = {
       scenes: remotionScenes,
       colorGrading: assemblyConfig.colorGrading || 'none',
@@ -286,6 +300,7 @@ serve(async (req) => {
         segments: cleanSegments,
       },
       globalTextOverlays,
+      watermark,
     };
 
     console.log('[compose-video-assemble] Audio/overlay payload:', {
