@@ -163,7 +163,8 @@ const Scene: React.FC<{
           src={videoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           muted
-          pauseWhenBuffering
+          pauseWhenBuffering={false}
+          delayRenderTimeoutInMilliseconds={30000}
         />
       )}
       {textOverlay?.text && (
@@ -294,8 +295,11 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
       from,
       duration: seqDuration,
       transitionType,
-      transitionInFrames: extendStart > 0 ? tFrames : 0,
-      transitionOutFrames: extendEnd > 0 ? tFrames : 0,
+      // Fade durations MUST match the actual overlap window, not the full
+      // transition duration — otherwise the fade outlasts the overlap and
+      // creates a brief black frame + decoder hiccup.
+      transitionInFrames: extendStart,
+      transitionOutFrames: extendEnd,
       hasTransitionOut: extendEnd > 0,
       isLast,
     };

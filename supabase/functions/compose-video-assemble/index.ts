@@ -121,8 +121,9 @@ serve(async (req) => {
       }
     }
 
-    // Small safety pad (0.3s) for MP3 decoder latency at the very end.
-    durationInFrames += Math.ceil(0.3 * fps);
+    // Small safety pad (0.15s) for MP3 decoder latency at the very end.
+    // Larger pads can introduce silence detection artifacts.
+    durationInFrames += Math.ceil(0.15 * fps);
 
     const totalDuration = durationInFrames / fps;
 
