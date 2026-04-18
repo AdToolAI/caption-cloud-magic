@@ -243,15 +243,18 @@ export default function VoiceSubtitlesTab({
               .from('voiceover-audio')
               .getPublicUrl(upload.path);
 
-            // Swap to deterministic WAV for the renderer
+            // Swap to deterministic WAV for the renderer.
+            // NOTE: keep durationSeconds = realDur (actual VO length) so
+            // subtitle sync logic remains correct — the WAV is intentionally
+            // longer (silence-padded) but the spoken content ends at realDur.
             onUpdateAssembly({
               voiceover: {
                 ...voiceoverRef.current,
                 audioUrl: publicUrl,
-                durationSeconds: exactSeconds,
+                durationSeconds: realDur,
               },
             });
-            console.log('[VO] WAV uploaded and swapped:', publicUrl);
+            console.log('[VO] WAV uploaded and swapped:', publicUrl, '(padded to', exactSeconds.toFixed(3), 's)');
           } catch (wavErr) {
             console.warn('[VO] WAV pre-render failed, falling back to MP3:', wavErr);
           }
