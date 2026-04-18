@@ -218,42 +218,26 @@ export default function VoiceSubtitlesTab({
             });
           }
 
-          // ── WAV pre-render pass ────────────────────────────────────
-          // Convert the MP3 to a sample-accurate WAV padded to the exact
-          // composition duration. This eliminates micro-stutters at Lambda
-          // chunk boundaries because every worker reads bit-identical samples.
+          // ── WAV pre-render pass (ONE-TRACK VO POLICY) ──────────────
+          // Convert the MP3 to a sample-accurate WAV. The WAV is intentionally
+          // DECOUPLED from scene geometry — it's just the spoken audio plus a
+          // generous silence tail. This guarantees:
+          //   • The voiceover plays as ONE continuous, uncut audio stream
+          //     across all scene boundaries (no per-scene seams).
+          //   • Slight scene-duration drift (Hailuo clips, frame rounding,
+          //     edge-function padding) cannot truncate or stutter the VO.
+          // The Remotion renderer uses a single <Audio> over the full
+          // composition — silence at the end is simply not played past
+          // durationInFrames, which is harmless.
           try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // ⚠ CRITICAL: Probe the REAL MP4 duration of every scene clip.
-            // Hailuo (and most AI video models) deliver clips whose actual
-            // duration differs from the requested value (e.g. 7s requested → 5.875s real).
-            // The Edge Function uses the REAL durations for composition geometry.
-            // If we pad the WAV using nominal UI durations, the audio timeline
-            // diverges from the video timeline → voiceover gets cut at transitions.
-            // Probing here ensures: WAV length == Edge composition length == Renderer composition length.
-            const fps = 30;
-            const realDurations = await Promise.all(
-              scenes.map(async (s) => {
-                if (!s.clipUrl) return s.durationSeconds || 0;
-                try {
-                  return await probeMediaDuration(s.clipUrl);
-                } catch {
-                  return s.durationSeconds || 0;
-                }
-              })
-            );
-            const sumSceneFrames = realDurations.reduce(
-              (acc, d) => acc + Math.max(1, Math.round(d * fps)),
-              0
-            );
-            // HARD-CUT POLICY: Composer no longer applies transitions (renderer uses <Series>),
-            // so audio composition length = exact sum of scene frames. No overlap subtraction.
-            const compositionSeconds = sumSceneFrames / fps;
-            const compositionDuration = Math.max(realDur, compositionSeconds) + 0.15;
-            const { blob, exactSeconds } = await padAudioToExactWav(generatedUrl, compositionDuration);
-            console.log(`[VO] WAV pad applied (hard-cut mode) — exact ${exactSeconds.toFixed(3)}s | VO ${realDur.toFixed(3)}s | comp ${compositionSeconds.toFixed(3)}s | real scene durs: [${realDurations.map(d => d.toFixed(3)).join(', ')}] | size ${(blob.size / 1024).toFixed(1)} KB`);
+            // Pad to VO duration + 2.0s safety tail. Independent of scenes.
+            const SAFETY_TAIL_SECONDS = 2.0;
+            const wavDuration = realDur + SAFETY_TAIL_SECONDS;
+            const { blob, exactSeconds } = await padAudioToExactWav(generatedUrl, wavDuration);
+            console.log(`[VO] WAV pad applied (one-track mode) — VO ${realDur.toFixed(3)}s + ${SAFETY_TAIL_SECONDS}s tail = ${exactSeconds.toFixed(3)}s | size ${(blob.size / 1024).toFixed(1)} KB`);
 
 
             const wavPath = `${user.id}/${Date.now()}-voiceover.wav`;
