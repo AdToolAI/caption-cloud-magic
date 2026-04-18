@@ -1,85 +1,53 @@
 
 
-## Was ich tatsächlich finde — vs. was die Summaries behaupten
+## Plan: Einheitlicher Crossfade-Übergang für alle Szenen
 
-Die Summaries sagen "alles umgesetzt". Ich habe jetzt die echten Dateien gelesen. Status:
+Der User will Übergänge zurück — aber **nur einen einzigen Typ**, der historisch am wenigsten Probleme gemacht hat. Aus dem Verlauf und der Memory (`mem://architecture/directors-cut/ping-pong-transition-architecture`) ist das eindeutig **Crossfade/Fade** — die DirectorsCut-Engine nutzt genau das in einer stabilen Dual-Slot-Architektur.
 
-✅ **Drin:** Hard-Cuts (`<Series>` statt `<TransitionSeries>`), one-track WAV-Padding, `key="composer-voiceover-stable"`, default buffering
-❌ **NICHT drin:** Drei harte Unterschiede zu den funktionierenden Renderern, die das Stottern erklären
+### Was geändert wird
 
-### Vergleich der Audio-Tags (alle drei Renderer side-by-side)
+**1. `src/remotion/templates/ComposedAdVideo.tsx`**
+- Aktuelle Hard-Cut-Logik (`<TransitionSeries>` ohne Transitions zwischen Sequences) wird ersetzt durch `<TransitionSeries>` **mit** `fade()`-Transitions zwischen jeder Szene
+- Transition-Dauer: **15 Frames (0.5s)** — kurz genug, um Audio-Nähte minimal zu halten, lang genug für visuelle Glättung
+- `premountFor={60}` bleibt auf jeder Sequence (Decoder-Warmup)
+- Audio-Track bleibt unverändert (durchgehend, eine `<Audio>`-Komponente in pre-buffer Sequence)
+- Wichtig: Scene-Frame-Berechnung muss Transition-Overlap berücksichtigen
 
-**UniversalCreator (funktioniert):**
-```tsx
-<Audio key="stable-voiceover-audio" src={voiceoverUrl}
-  volume={masterVolume} startFrom={0} loop={false} pauseWhenBuffering />
-```
+**2. `supabase/functions/compose-video-assemble/index.ts`**
+- Komposition-Dauer: `sumSceneFrames - (numScenes - 1) * 15` weil jede Transition die Gesamtdauer um 15 Frames reduziert (Overlap)
+- Audio-Geometrie bleibt unabhängig (one-track), VO läuft einfach durch
+- `durationInFrames = max(adjustedVideoFrames, audioFrames) + safetyBuffer`
 
-**DirectorsCut (funktioniert):**
-```tsx
-<Audio src={voiceoverUrl} volume={...} startFrom={0} pauseWhenBuffering />
-```
+**3. `src/remotion/utils/subtitleConstants.ts`**
+- `SUBTITLE_RENDER_VERSION` bumpen → `v2026-04-18b-composer-crossfade-uniform`
 
-**Composer (stottert):**
-```tsx
-<Audio key="composer-voiceover-stable" src={voiceoverUrl}
-  volume={1} loop={false} startFrom={0} />
-```
+**4. `src/components/video-composer/` (UI)**
+- Falls Übergangs-Selector aktuell ausgeblendet/deaktiviert ist: Banner einfügen "Alle Szenen nutzen einen einheitlichen 0.5s Crossfade-Übergang"
+- Pro-Szene Übergangs-Dropdowns bleiben ausgeblendet (kein User-Wahlrecht → keine Bug-Klasse zurück)
 
-**Unterschied 1:** Composer hat **kein** `pauseWhenBuffering` als explizite Prop. Default ist zwar `true`, aber die anderen Templates setzen es **explizit** als Boolean-Attribut. Beim TSX-Kompilieren ist das gleichbedeutend — also nicht der Unterschied.
+### Warum Crossfade
 
-**Unterschied 2 (das ist es wahrscheinlich):** Im Composer ist die `<Audio>`-Komponente innerhalb des `<AbsoluteFill>` gerendert, **nach** dem `<Series>`. Da `<Series>` aber Sequences enthält, die `useCurrentFrame()` lokal scopen, kann React beim Übergang von Sequence N zu Sequence N+1 den gesamten Subtree (inkl. nachgelagerter Geschwister?) anders behandeln. **Aber:** Audio steht außerhalb von Series — sollte nicht betroffen sein.
+| Übergang | Risiko | Status |
+|---|---|---|
+| **Crossfade** | Niedrigster — überlagert nur Opacity, keine Transform/Geometry-Änderung | ✅ Gewählt |
+| Slide | Mittel — bewegt komplette Frames, kann Decoder belasten |  |
+| Wipe/Push | Hoch — clipPath/Transform pro Frame |  |
+| Zoom | Hoch — Scale-Animation auf Video-Element |  |
 
-**Unterschied 3 (der wahre Killer):** Schau auf die **Video-Komponente**:
+Crossfade nutzt nur `opacity`-Interpolation auf zwei übereinanderliegenden Sequences. Der Audio-Track läuft komplett unbeeindruckt durch (ist ja außerhalb der `<TransitionSeries>`).
 
-```tsx
-// Composer (stottert):
-<Video src={videoUrl} muted playbackRate={1} />
+### Audio-Sicherheit
 
-// DirectorsCut (funktioniert):
-// → SceneVideo Component innerhalb TransitionSeries.Sequence mit premountFor={60}
-```
+Da der VO-Track in `<Sequence from={-fps}>` außerhalb der `<TransitionSeries>` läuft, sind die Crossfade-Übergänge **akustisch unsichtbar**. Nur die Video-Layer crossfaden. Das ist der entscheidende Punkt — keine Audio-Nähte, weil Audio nicht Teil der Transition ist.
 
-Der DirectorsCut nutzt **`premountFor={60}`** auf seinen Sequences — das **lädt das nächste Video 60 Frames vor dem Start vor**, sodass an der Naht keine Decoder-Pause entsteht. Beim Composer (`<Series.Sequence>`) gibt es **kein Premounting** — jede neue Szene startet kalt, der Decoder muss erst öffnen → **das ist die Pause die du hörst**.
+### Required Action nach Code-Änderung
 
-`<Series.Sequence>` unterstützt kein `premountFor`. Nur `<TransitionSeries.Sequence>` tut das.
+Bundle-Redeploy via `bash scripts/deploy-remotion-bundle.sh` (Renderer-Änderung).
 
-### Die echte Lösung
+### Dateien
 
-**Option A — `<TransitionSeries>` mit Null-Frame-Transitions (empfohlen):**
-
-```tsx
-import { TransitionSeries, linearTiming } from '@remotion/transitions';
-import { none } from '@remotion/transitions/none'; // existiert nicht — wir nehmen fade mit 0 frames
-
-<TransitionSeries>
-  <TransitionSeries.Sequence durationInFrames={f1} premountFor={60}>
-    <Scene .../>
-  </TransitionSeries.Sequence>
-  {/* keine <TransitionSeries.Transition> dazwischen → harte Schnitte */}
-  <TransitionSeries.Sequence durationInFrames={f2} premountFor={60}>
-    ...
-```
-
-Das gibt uns **Hard-Cuts + Premounting** — das beste aus beiden Welten. Tatsächlich kannst du `<TransitionSeries>` ohne irgendwelche `<Transition>`-Elemente dazwischen nutzen → verhält sich wie `<Series>`, aber mit Premount-Support.
-
-**Option B — Audio-Track mit Vorlauf:**
-Den `<Audio>`-Tag in eine `<Sequence from={-15}>` wickeln, damit er 15 Frames vor Frame 0 "decodiert" wird (also pre-buffered). Das hilft am Anfang, aber nicht an Szenen-Übergängen.
-
-**Option C — Statt `<Video>` `<OffthreadVideo>` zurückbringen, aber mit korrektem `transparent` & `pauseWhenBuffering`:**
-War vorher drin, wurde laut Summary in der vorletzten Iteration **rausgenommen**. Aber UniversalCreator nutzt auch `<Video>` (nicht Offthread) und funktioniert. Also nicht die Ursache.
-
-### Klarer Plan
-
-1. **`ComposedAdVideo.tsx`** — `<Series>` durch `<TransitionSeries>` mit `premountFor={60}` auf jeder Sequence ersetzen, **ohne** Transitions dazwischen → Hard-Cuts bleiben, Premounting gewinnt
-2. **`<Audio>` in `<Sequence from={-fps}>`** (= -30 Frames) wrappen, damit Lambda den Audio-Decoder vor Frame 0 öffnet und keine Initial-Buffer-Pause entsteht
-3. **Bundle-Redeploy** nötig
-
-### Warum ich diesmal sicher bin
-
-Das sind nicht Hypothesen — das sind **konkrete Unterschiede im Code zwischen funktionierenden und nicht-funktionierenden Templates.** DirectorsCut nutzt `premountFor={60}` ausdrücklich genau für dieses Problem (Decoder-Aufwärmphase an Szenen-Naht). Wir haben es im Composer nie übernommen.
-
-### Klärungsfrage (1)
-
-Soll ich zusätzlich zur Premount-Lösung auch das **Audio in eine pre-buffer Sequence** wrappen (`<Sequence from={-30} durationInFrames={total+30}>`)? Das ist ein zusätzliches Sicherheitsnetz, falls die erste Szene einen Audio-Cold-Start hat. Empfehlung: **ja**, kostet nichts.
+1. `src/remotion/templates/ComposedAdVideo.tsx` — Fade-Transitions zwischen Sequences
+2. `supabase/functions/compose-video-assemble/index.ts` — Komposition-Dauer um Transition-Overlap reduzieren
+3. `src/remotion/utils/subtitleConstants.ts` — Version-Bump
+4. `src/components/video-composer/` — UI-Hinweis auf einheitlichen Übergang (falls relevant)
 
