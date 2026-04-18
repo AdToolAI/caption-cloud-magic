@@ -1,48 +1,68 @@
 
 
-## Wurzel gefunden — Remotion Version-Mismatch
+## Diagnose — Gummibandeffekt nach allen vorherigen Fixes
 
-Die Warnung in deinem Screenshot ist **die Ursache** der unzuverlässigen Renders:
+Nach 6+ Iterationen am Audio/Versionspinning besteht das Problem weiterhin an **immer denselben 2-3 Stellen**. Das ist ein **deterministisches** Symptom — nicht zufällig, nicht race-bedingt. Zeit für eine echte Code-Analyse statt weiterer Spekulation.
 
-- `remotion`, `@remotion/cli`, `@remotion/lambda`, `@remotion/lottie`, `@remotion/player` → `4.0.441` (gepinnt)
-- `@remotion/transitions` → `^4.0.448` (Caret → resolved auf 4.0.448)
-- `@remotion/paths`, `@remotion/shapes` → ebenfalls 4.0.448 (transitive deps von transitions)
+Lass mich den aktuellen Zustand der relevanten Dateien lesen, bevor ich eine neue Hypothese aufstelle. Ich brauche:
 
-Remotion's eigene Doku sagt explizit: *"You may experience breakages such as: React context and hooks not working, Type errors and feature incompatibilities, **Failed renders and unclear errors**."* Genau das beobachten wir — die `<TransitionSeries>` (aus 4.0.448) bekommt vom 4.0.441 Renderer nicht die richtigen Hooks/Context, daher die Audio-Glitches.
+1. Den aktuellen `ComposedAdVideo.tsx` (wurde mehrfach umgeschrieben)
+2. Den aktuellen `compose-video-assemble/index.ts` 
+3. Den `VoiceSubtitlesTab.tsx` mit der WAV-Padding-Logik
+4. Die Scene-Daten-Struktur aus DB (welche Werte für Szenen-Dauer + Transitions liegen wirklich an?)
 
-## Fix — alle Remotion-Packages auf identische Version pinnen
+## Was "Gummibandeffekt" technisch bedeutet
 
-**`package.json`** — Zeile 52 ändern:
-```diff
-- "@remotion/transitions": "^4.0.448",
-+ "@remotion/transitions": "4.0.441",
-```
+- **Visuell**: Das Bild wird kurz beschleunigt UND dann wieder verlangsamt (oder umgekehrt) → Eindruck eines Gummibands
+- **NICHT**: Audio-Stotterer, Wiederholung, Cut (das waren die alten Symptome)
+- **Ursache-Klasse**: `playbackRate`-Manipulation oder asymmetrische `Sequence`-Geometrie wo das Video schneller/langsamer abgespielt wird als seine echte Dauer
 
-Damit ist jedes `@remotion/*` Paket auf exakt `4.0.441`. Die Caret-Notation entfernen, damit auch zukünftige `bun install` keine neueren Versionen ziehen.
+## Hypothesen die ich prüfen muss
 
-**Lockfile-Refresh nötig** — nach dem Edit muss `bun install` einmal laufen, um `bun.lock` zu aktualisieren und 4.0.448 vollständig durch 4.0.441 zu ersetzen.
+1. **`<TransitionSeries>` + `<OffthreadVideo>` Speed-Mismatch**: Wenn eine Szene `durationInFrames=90` hat, aber das echte Video 92 Frames lang ist, "rennt" Remotion am Ende → Gummiband
+2. **Szenen-Dauer falsch berechnet**: `Math.ceil(seconds * fps)` vs. `Math.floor` — bei 30fps und ungeraden Sekundenwerten gibt es konsistent 1-Frame-Abweichungen genau an den 2-3 Stellen
+3. **Voiceover-Padding diktiert eine andere Gesamtdauer als die `<TransitionSeries>` ergibt** → Audio-Track ist länger/kürzer als Video-Komposition → Remotion stretched eines von beiden
+4. **`playbackRate` aus Scene-Trim**: Falls Szenen durch User-Trimming einen anderen `playbackRate` haben, multipliziert sich das mit `<TransitionSeries>`-Timing
 
-## Lambda-Bundle neu deployen
+## Plan
 
-Da die Lambda-Site vom alten Bundle (mit gemischten Versionen) gerendert wurde, muss nach dem Version-Fix:
+### Schritt 1 — Code-Inspektion (ohne Änderungen)
 
-1. Bundle neu erstellen: `npx remotion lambda sites create src/remotion/index.ts --site-name=adtool-remotion-bundle --region=eu-central-1` 
-2. **WICHTIG**: Die Site-URL in der DB / im `REMOTION_SERVE_URL` Secret aktualisieren falls sich der Hash ändert (laut Memory `mem://infrastructure/remotion/lambda-bundle-deployment-and-verification` macht ihr Bundle-Version-Checking)
+Lese diese Dateien um die echten aktuellen Werte zu sehen:
+- `src/remotion/templates/ComposedAdVideo.tsx` (aktuelle TransitionSeries-Implementierung)
+- `supabase/functions/compose-video-assemble/index.ts` (Duration-Math + Payload-Struktur)
+- `src/components/video-composer/VoiceSubtitlesTab.tsx` (WAV-Padding-Logik)
+- DB-Query: ein konkretes `video_creations`-Projekt mit den problematischen Scenes anschauen → echte `duration` + `transitionType` Werte
 
-Da du das Bundle vom Terminal aus deployst (sichtbar im Screenshot), erledigst du Schritt 1 selbst. Lovable kann nur das `package.json` fixen.
+### Schritt 2 — Hypothese verifizieren mit konkreten Zahlen
 
-## Geänderte Dateien
+Berechne für die 2-3 problematischen Übergänge:
+- Erwartete Frames: `seconds × 30`
+- Tatsächlich gerundete Frames in `<TransitionSeries.Sequence>`
+- Echte Video-Dauer (aus ffprobe-Daten in der DB falls vorhanden)
+- Differenz → erklärt sie den Gummibandeffekt?
 
-- `package.json` — `@remotion/transitions` auf `4.0.441` pinnen (ohne Caret)
+### Schritt 3 — Fix implementieren (in Default-Mode)
 
-## Nach dem Fix — Verify
+Je nach Ursache:
+- **Falls Frame-Rounding-Mismatch**: `Math.round(seconds × fps)` durchgängig verwenden, ODER `useVideoMetadata`-Hook nutzen um die echte Video-Frame-Anzahl als `durationInFrames` zu setzen
+- **Falls Audio/Video-Längen-Mismatch**: `<Audio>`-Komponente mit `endAt` exakt auf Komposition-Länge clampen, WAV-Padding in `VoiceSubtitlesTab` an die **gerundete** Composition-Frames-Länge anpassen statt an die Roh-Sekunden
+- **Falls `<OffthreadVideo>` über das Szenen-Ende hinaus ziehen**: `endAt`-Prop auf der Szenen-Video-Komponente setzen, damit Remotion nicht das letzte Frame "stretched"
+- **Falls `<TransitionSeries>` selbst speed-affine ist**: Zurück zu manuellen `<Sequence>` mit präzisem Frame-Snapping (deterministisch, keine `floor`/`ceil`-Asymmetrie)
 
-1. Lokal: `bun install` → `bun.lock` neu generieren
-2. `npx remotion versions` → alle Pakete zeigen 4.0.441, **keine** Mismatch-Warnung mehr
-3. `npx remotion lambda sites create src/remotion/index.ts --site-name=adtool-remotion-bundle --region=eu-central-1` → neue Bundle deployen
-4. Render starten → Audio durchgehend sauber, **keine** Stotterer mehr
+### Schritt 4 — Verify
 
-## Warum das diesmal die Wurzel ist
+- Render mit den 2-3 problematischen Scenes
+- Frame-by-Frame an den Übergangs-Boundaries prüfen (z.B. bei `frame=N-2 ... N+2` jeweils Stills)
+- User testet finalen Render
 
-Die letzten 4-5 Iterationen haben am **Code** geschraubt, während das eigentliche Problem im **Build-Setup** lag. `<TransitionSeries>` aus 4.0.448 nutzt intern Hooks/Context-APIs die im 4.0.441 Core anders implementiert sind → undefiniertes Verhalten beim Audio-Sync, sichtbar als Stotterer/Wiederholung/Cut an Übergängen. Das erklärt auch warum dieselben Code-Änderungen mal helfen und mal nicht — es ist Race-bedingt durch die Version-Inkompatibilität.
+## Geänderte Dateien (voraussichtlich)
+
+- `src/remotion/templates/ComposedAdVideo.tsx` — Frame-Snapping + `endAt`-Clamping pro Szene
+- `supabase/functions/compose-video-assemble/index.ts` — konsistente Duration-Math (Math.round statt ceil/floor)
+- `src/components/video-composer/VoiceSubtitlesTab.tsx` — WAV-Padding an gerundete Composition-Frames anpassen
+
+## Warum das diesmal anders ist
+
+Ich höre auf zu spekulieren und lese **die echten Werte** aus der DB für ein konkretes problematisches Projekt. Bisher habe ich Hypothesen ohne Daten gefixt — daher die Wiederholungs-Loop. Mit echten Frame-Zahlen lässt sich der Gummibandeffekt mathematisch nachweisen oder ausschließen.
 
