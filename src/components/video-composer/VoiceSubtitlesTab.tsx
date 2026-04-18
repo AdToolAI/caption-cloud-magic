@@ -25,6 +25,7 @@ import { VoiceoverScriptGenerator } from '@/components/universal-creator/Voiceov
 import { AdvancedVoiceSettings, type VoiceSettings } from '@/components/video/AdvancedVoiceSettings';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { supabase } from '@/integrations/supabase/client';
+import { padAudioToExactWav } from '@/lib/audioToWav';
 import type {
   ComposerScene,
   AssemblyConfig,
@@ -198,15 +199,15 @@ export default function VoiceSubtitlesTab({
       // a stale `voiceover` from the closure if the user changes settings mid-probe.
       const generatedUrl: string = data.audioUrl;
       try {
-        const probe = new Audio();
+        const probe = new (window as any).Audio();
         probe.preload = 'metadata';
         probe.src = generatedUrl;
-        probe.addEventListener('loadedmetadata', () => {
+        probe.addEventListener('loadedmetadata', async () => {
           const realDur = probe.duration;
-          if (isFinite(realDur) && realDur > 0 && Math.abs(realDur - serverDuration) > 0.05) {
+          if (!isFinite(realDur) || realDur <= 0) return;
+
+          if (Math.abs(realDur - serverDuration) > 0.05) {
             console.log('[VO] browser-verified duration:', realDur.toFixed(3), 's (server:', serverDuration, 's)');
-            // Only patch the two fields we actually verified, using the LATEST
-            // voiceover from the ref — never overwrite user-tweaked settings.
             onUpdateAssembly({
               voiceover: {
                 ...voiceoverRef.current,
@@ -214,6 +215,40 @@ export default function VoiceSubtitlesTab({
                 durationSeconds: realDur,
               },
             });
+          }
+
+          // ── WAV pre-render pass ────────────────────────────────────
+          // Convert the MP3 to a sample-accurate WAV padded to the exact
+          // composition duration. This eliminates micro-stutters at Lambda
+          // chunk boundaries because every worker reads bit-identical samples.
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { blob, exactSeconds } = await padAudioToExactWav(generatedUrl, realDur);
+            console.log(`[VO] WAV pad applied, exact duration ${exactSeconds.toFixed(3)}s (size ${(blob.size / 1024).toFixed(1)} KB)`);
+
+            const wavPath = `${user.id}/${Date.now()}-voiceover.wav`;
+            const { data: upload, error: upErr } = await supabase.storage
+              .from('voiceover-audio')
+              .upload(wavPath, blob, { contentType: 'audio/wav', cacheControl: '3600', upsert: false });
+            if (upErr) throw upErr;
+
+            const { data: { publicUrl } } = supabase.storage
+              .from('voiceover-audio')
+              .getPublicUrl(upload.path);
+
+            // Swap to deterministic WAV for the renderer
+            onUpdateAssembly({
+              voiceover: {
+                ...voiceoverRef.current,
+                audioUrl: publicUrl,
+                durationSeconds: exactSeconds,
+              },
+            });
+            console.log('[VO] WAV uploaded and swapped:', publicUrl);
+          } catch (wavErr) {
+            console.warn('[VO] WAV pre-render failed, falling back to MP3:', wavErr);
           }
         }, { once: true });
       } catch (e) {

@@ -270,9 +270,16 @@ serve(async (req) => {
       // so the audio mux/concat happens at scene cuts rather than mid-crossfade.
       // This eliminates micro-glitches (1-sample discontinuities) at transitions.
       framesPerLambda: (() => {
-        const avgSceneFrames = Math.ceil(durationInFrames / Math.max(1, remotionScenes.length));
-        const chosen = Math.max(150, Math.min(450, avgSceneFrames));
-        console.log(`[compose-video-assemble] Dynamic framesPerLambda=${chosen} (avgSceneFrames=${avgSceneFrames}, scenes=${remotionScenes.length}, totalFrames=${durationInFrames})`);
+        // Use the SHORTEST scene length as the chunk size. This guarantees that
+        // every chunk boundary aligns with a scene cut (or earlier), never falling
+        // mid-crossfade. Avg-based math could leave 1-2 boundaries inside a
+        // transition window — those cause the residual micro-stutters.
+        const sceneFrames = remotionScenes
+          .map((s: any) => Math.ceil((s.durationSeconds || 0) * fps))
+          .filter((f: number) => f > 0);
+        const minSceneFrames = sceneFrames.length > 0 ? Math.min(...sceneFrames) : 180;
+        const chosen = Math.max(150, Math.min(450, minSceneFrames));
+        console.log(`[compose-video-assemble] Scene-precise framesPerLambda=${chosen} (minSceneFrames=${minSceneFrames}, sceneFrames=[${sceneFrames.join(',')}], totalFrames=${durationInFrames})`);
         return chosen;
       })(),
       downloadBehavior: { type: 'play-in-browser' },
