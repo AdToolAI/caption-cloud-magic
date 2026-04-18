@@ -81,15 +81,45 @@ serve(async (req) => {
 
     // 6. Build Remotion input props — pass DB transition choice through to renderer
     const ALLOWED_TRANSITIONS = new Set(['none', 'fade', 'crossfade', 'wipe', 'slide', 'zoom']);
-    const remotionScenes = (scenes || []).map((s: any) => {
+
+    // ── Probe REAL mp4 durations to prevent rubber-band stretching ──
+    // Hailuo & co. report nominal durations (e.g. "7s") but produce 5.875s files at 24fps.
+    // <TransitionSeries.Sequence durationInFrames={210}> would then stretch the 5.875s
+    // video to 7s → visible speed warp at every transition. Probe each clip's real
+    // duration via mp4 mvhd box parsing and pass it to the renderer so it can clamp.
+    const probedDurations = await Promise.all(
+      (scenes || []).map(async (s: any) => {
+        try {
+          const dur = await probeMp4Duration(s.clip_url);
+          if (dur && dur > 0) {
+            console.log(`[probe] scene ${s.order_index}: nominal=${s.duration_seconds}s real=${dur.toFixed(3)}s`);
+            return dur;
+          }
+        } catch (e) {
+          console.warn(`[probe] failed for scene ${s.order_index}:`, e);
+        }
+        return null;
+      })
+    );
+
+    const remotionScenes = (scenes || []).map((s: any, idx: number) => {
       const rawType = (s.transition_type || 'fade').toString().toLowerCase();
       const transitionType = ALLOWED_TRANSITIONS.has(rawType) ? rawType : 'fade';
       const transitionDuration = Number.isFinite(Number(s.transition_duration))
         ? Math.max(0, Number(s.transition_duration))
         : 0.4;
+      const nominalDuration = s.duration_seconds || 5;
+      const realDuration = probedDurations[idx];
+      // Use REAL video duration if available — this is the single most important
+      // anti-rubber-band fix. Without it, Sequence/Video length mismatch causes
+      // Remotion to time-warp the video.
+      const effectiveDuration = realDuration && realDuration > 0
+        ? realDuration
+        : nominalDuration;
       return {
         videoUrl: s.clip_url,
-        durationSeconds: s.duration_seconds || 5,
+        durationSeconds: effectiveDuration,
+        actualVideoDurationSeconds: realDuration || effectiveDuration,
         textOverlay: s.text_overlay ? {
           text: s.text_overlay.text || '',
           position: s.text_overlay.position || 'bottom',
@@ -110,7 +140,7 @@ serve(async (req) => {
     const fps = 30;
     const sumSeconds = remotionScenes.reduce((acc, s) => acc + (s.durationSeconds || 0), 0);
     const sumSceneFrames = remotionScenes.reduce(
-      (acc, s) => acc + Math.max(1, Math.ceil((s.durationSeconds || 0) * fps)),
+      (acc, s) => acc + Math.max(1, Math.round((s.durationSeconds || 0) * fps)),
       0
     );
     // Sum overlap frames: only between consecutive scenes when the FIRST
