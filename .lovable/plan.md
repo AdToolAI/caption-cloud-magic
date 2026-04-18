@@ -1,73 +1,74 @@
 
 
-## Analyse — warum noch 2 Stotterer übrig sind
+## Zwei separate Bugs gefunden
 
-Die großen Probleme sind weg. Was bleibt: **2 spezifische Übergänge** stottern leicht. Das ist ein klares Muster — nicht zufällig, sondern an **bestimmten Stellen reproduzierbar**. Lass mich logisch durchgehen warum genau 2:
+### Bug 1 — WAV wird auf falsche Länge gepadded (Audio-Stotterer)
 
-### Hypothese A — Die 2 Stellen sind exakt die Lambda-Chunk-Grenzen
-
-Mit dem neuen dynamischen `framesPerLambda` (clamped 150-450) entstehen bei z.B. 7 Szenen × 6s = 1260 Frames mit `framesPerLambda ≈ 180` → **7 Chunks**. Aber: bei 6 Übergängen und 7 Chunks fallen **genau 2 Chunk-Boundaries** zufällig **mitten in einen Crossfade-Bereich** (statt sauber an Szenen-Enden). 
-
-Der Grund: meine Formel `avgSceneFrames = durationInFrames / sceneCount` rechnet mit der **Gesamt-Komposition** (inkl. extendStart/extendEnd Overlap), aber die **echten Szenen-Boundaries** liegen woanders (bei Crossfade verschiebt sich die effektive Szenen-Grenze um die halbe Transition-Dauer). Resultat: 5 von 7 Chunks alignen perfekt, **2 nicht** → genau dein Symptom.
-
-### Hypothese B — `<Audio>` `endAt={durationInFrames}` exakt am Ende
-
-Wenn `endAt` **genau** auf `durationInFrames` gesetzt ist und die VO-Datei kürzer ist als die Komposition, fragt Remotion am Ende Samples die nicht existieren → Lambda fügt Stille ein, aber **am Chunk-Boundary** klingt das wie ein Mikro-Cut.
-
-### Hypothese C — `OffthreadVideo` `pauseWhenBuffering={true}` blockiert während Audio läuft
-
-Wenn Video pausiert (warten auf Frame), aber Audio weiterläuft, dann holt der Audio-Mux am Chunk-Ende einen "verschobenen" Sample-Zeitstempel → Knacken.
-
-## Die echte Lösung: Audio-Pre-Render + Sample-Akkurate Boundaries
-
-Statt am Lambda-Chunking zu schrauben — das ist nicht 100% kontrollierbar — gehen wir das Problem an der **Wurzel** an: das VO wird **vor** dem Render zu einer **WAV-Datei mit exakter Komposition-Länge** vorbereitet (mit Stille gepadded oder sample-genau getrimmt). Damit ist der Audio-Track **deterministisch identisch** über alle Lambda-Chunks.
-
-### Fix 1 — Neuer Edge-Function Step: `prepare-voiceover-audio`
-
-Nach VO-Generierung und vor Komposition: Edge Function lädt MP3, dekodiert mit ffmpeg-WASM (oder ruft direkt ffmpeg in Lambda), und exportiert als **WAV @ 48kHz stereo** mit **exakter Länge** = `durationInFrames / fps`. WAV ist verlustfrei, kein VBR-Drift, sample-akkurat über Chunks.
-
-Da ffmpeg-in-Edge komplex ist, **Alternative**: serverlose Audio-Normalisierung via Supabase Storage + ffmpeg-binary in `compose-video-assemble` (wenn möglich) ODER Client-side via Web Audio API in `VoiceSubtitlesTab.tsx` (preview-only, dann Upload als WAV).
-
-**Pragmatischste Lösung**: Web Audio API im Browser nach VO-Generierung nutzen. Browser dekodiert MP3 → AudioBuffer → padded auf exakte Länge → re-encodiert als WAV → Upload zur Storage. Das passiert **einmal** beim VO-Generieren, **vor** dem Render.
-
-### Fix 2 — Lambda-Chunking szenen-präzise statt durchschnittlich
-
-In `compose-video-assemble`: statt Durchschnitt nutzen wir die **echten Szenen-Boundaries** aus `remotionScenes` und wählen `framesPerLambda` so, dass **jede** Boundary ein Vielfaches der häufigsten Szenen-Länge ist:
+In `VoiceSubtitlesTab.tsx` Z. 228:
 ```ts
-// Finde die kürzeste Szene + Transition-Padding als framesPerLambda
-const sceneFrames = remotionScenes.map(s => Math.ceil(s.duration * fps) + Math.ceil((s.transitionInDuration || 0) * fps));
-const minSceneFrames = Math.min(...sceneFrames);
-const framesPerLambda = Math.max(150, minSceneFrames);
+const { blob, exactSeconds } = await padAudioToExactWav(generatedUrl, realDur);
 ```
-Damit fällt **kein** Chunk-Boundary mehr in einen Crossfade.
 
-### Fix 3 — `<Audio>` exakte Länge entfernen, dafür `loop={false}` + leichte Pre-Roll
+`realDur` ist die **VO-Länge** (z.B. 38s). Aber die **Komposition** ist `sumSceneSeconds + 0.15s pad` (z.B. 42s — siehe `compose-video-assemble` Z. 110-126).
 
-```tsx
-<Audio
-  src={voiceoverUrl}
-  pauseWhenBuffering={true}
-  startFrom={0}
-  // endAt entfernen — Remotion handled End-of-Stream selbst
-  loop={false}
-/>
+Das WAV ist also nur 38s lang, nicht 42s. Wenn Lambda an Sekunde 38-42 Audio-Samples anfragt, gibt es nichts → Remotion-Audio-Mux füllt mit Stille, aber an **Chunk-Grenzen** (die jetzt dank szenen-aligned Chunking exakt an Szenen-Enden liegen, **inkl. der letzten Szenen-Grenze nahe VO-Ende**) entsteht ein Sample-Mismatch zwischen "WAV liefert keine Daten" und "nächster Chunk erwartet Stille". Deshalb stottert es **an manchen Übergängen** — genau an denen, die nahe oder hinter dem VO-Ende liegen.
+
+**Fix**: Padding muss auf **Komposition-Länge** = `sceneTotalSeconds + 0.15s safety pad` rechnen, nicht auf `realDur`. Beim Berechnen brauchen wir `scenes` als Input zum VO-Generierungs-Handler, was schon der Fall ist (die Komponente hat `scenes` als prop).
+
+```ts
+const sceneTotal = scenes.reduce((sum, s) => sum + (s.durationSeconds || 0), 0);
+const compositionDuration = Math.max(realDur, sceneTotal) + 0.15;
+const { blob, exactSeconds } = await padAudioToExactWav(generatedUrl, compositionDuration);
 ```
-Das vermeidet die "Sample am Ende fehlt"-Situation.
+
+Damit ist das WAV **mindestens so lang wie die Komposition** und hat saubere Stille bis zum Ende. Lambda findet an jeder Chunk-Grenze **echte Sample-Daten** (entweder VO-Audio oder explizite WAV-Stille — beides bit-deterministisch). Keine Mux-Heuristik mehr → keine Stotterer.
+
+Zusätzlich: `durationSeconds` im DB-State setzen wir auf `realDur` (echte VO-Länge für Subtitle-Sync), aber das WAV ist länger gepadded — das ist die korrekte Trennung.
+
+### Bug 2 — Tab-Position geht beim Verlassen verloren
+
+In `VideoComposerDashboard.tsx` Z. 106:
+```ts
+const [activeTab, setActiveTab] = useState<TabId>('briefing');
+```
+
+`activeTab` wird **nicht** im `localStorage` Draft gespeichert. `loadDraft()` lädt nur `project`, nicht den Tab. Beim Re-Mount (z.B. nach Navigation zurück) startet man immer auf 'briefing'.
+
+**Fix**: 
+1. `activeTab` in einem separaten localStorage-Key persistieren (`video-composer-draft-tab`)
+2. Beim Mount: aus localStorage lesen + nur dann setzen wenn der Tab "accessible" ist (z.B. nicht 'clips' wenn keine Szenen existieren — sonst sieht der User einen leeren Tab)
+
+```ts
+const TAB_STORAGE_KEY = 'video-composer-draft-tab';
+
+const [activeTab, setActiveTab] = useState<TabId>(() => {
+  const stored = localStorage.getItem(TAB_STORAGE_KEY) as TabId | null;
+  const draft = loadDraft();
+  if (!stored || !draft) return 'briefing';
+  // Verify the stored tab is still accessible given the loaded project state
+  const idx = ['briefing','storyboard','clips','text','audio','export'].indexOf(stored);
+  if (idx === 0) return 'briefing';
+  if (idx === 1 && !draft.briefing.productName) return 'briefing';
+  if (idx >= 2 && (!draft.scenes || draft.scenes.length === 0)) return 'briefing';
+  return stored;
+});
+
+useEffect(() => {
+  localStorage.setItem(TAB_STORAGE_KEY, activeTab);
+}, [activeTab]);
+```
+
+Bei `handleReset` zusätzlich `localStorage.removeItem(TAB_STORAGE_KEY)` aufrufen.
 
 ## Geänderte Dateien
 
-- `src/components/video-composer/VoiceSubtitlesTab.tsx` — Web Audio API Post-Processing: MP3 → AudioBuffer → padded WAV → Re-Upload, exakte Länge sichern
-- `supabase/functions/compose-video-assemble/index.ts` — `framesPerLambda` aus **kürzester** Szene statt Durchschnitt
-- `src/remotion/templates/ComposedAdVideo.tsx` — `endAt` vom Voiceover-Audio entfernen
-
-## Warum das diesmal funktioniert
-
-Bisher: Lambda-Chunks teilten sich **denselben MP3-Stream**, jeder Worker dekodiert eigenständig → Mikro-Drift an Boundaries. Mit **WAV @ exakter Länge**: jeder Worker liest dieselben Samples an derselben Position → bit-identisch über alle Chunks. Plus szenen-präzises Chunking → kein Boundary mehr in einem Crossfade.
+- `src/components/video-composer/VoiceSubtitlesTab.tsx` — WAV-Padding auf `max(realDur, sceneTotal) + 0.15` statt `realDur`
+- `src/components/video-composer/VideoComposerDashboard.tsx` — Tab-Persistenz in localStorage mit Accessibility-Check beim Restore
 
 ## Verify
 
-1. VO neu generieren → Console-Log: "WAV pad applied, exact duration X.XXXs" 
-2. Storage prüfen: zusätzliche `.wav` Datei vorhanden mit exakter Länge
-3. Render → **alle** Übergänge sauber, **kein** Stottern mehr
-4. Render-Logs: `framesPerLambda` Wert ≈ kürzeste Szene in Frames
+1. VO neu generieren → Console: `WAV pad applied, exact duration X.XXXs` mit X ≥ Komposition-Länge (nicht VO-Länge)
+2. Render → **alle** Übergänge sauber, auch die nahe am VO-Ende
+3. Tab wechseln zu 'audio' → Browser zurück → wieder Composer öffnen → User landet wieder auf 'audio', nicht auf 'briefing'
+4. Reset-Button → User landet auf 'briefing' (sauber zurückgesetzt)
 
