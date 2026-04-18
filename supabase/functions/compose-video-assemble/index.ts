@@ -281,22 +281,10 @@ serve(async (req) => {
       chromiumOptions: {},
       timeoutInMilliseconds: 600000,
       concurrencyPerLambda: 1,
-      // Scene-aligned chunking: align Lambda chunk boundaries with scene boundaries
-      // so the audio mux/concat happens at scene cuts rather than mid-crossfade.
-      // This eliminates micro-glitches (1-sample discontinuities) at transitions.
-      framesPerLambda: (() => {
-        // Use the SHORTEST scene length as the chunk size. This guarantees that
-        // every chunk boundary aligns with a scene cut (or earlier), never falling
-        // mid-crossfade. Avg-based math could leave 1-2 boundaries inside a
-        // transition window — those cause the residual micro-stutters.
-        const sceneFrames = remotionScenes
-          .map((s: any) => Math.ceil((s.durationSeconds || 0) * fps))
-          .filter((f: number) => f > 0);
-        const minSceneFrames = sceneFrames.length > 0 ? Math.min(...sceneFrames) : 180;
-        const chosen = Math.max(150, Math.min(450, minSceneFrames));
-        console.log(`[compose-video-assemble] Scene-precise framesPerLambda=${chosen} (minSceneFrames=${minSceneFrames}, sceneFrames=[${sceneFrames.join(',')}], totalFrames=${durationInFrames})`);
-        return chosen;
-      })(),
+      // framesPerLambda: omitted → Lambda default heuristic. With TransitionSeries
+      // the composition has no manual overlap stretching, so chunk boundaries are
+      // safe to fall anywhere — no decoder lock at scene seams.
+
       downloadBehavior: { type: 'play-in-browser' },
       webhook: webhookData,
     };
