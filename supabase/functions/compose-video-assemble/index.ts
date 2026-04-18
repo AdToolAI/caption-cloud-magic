@@ -79,27 +79,45 @@ serve(async (req) => {
     else if (aspectRatio === '1:1') { width = 1080; height = 1080; }
     else if (aspectRatio === '4:5') { width = 1080; height = 1350; }
 
-    // 6. Build Remotion input props
-    const remotionScenes = (scenes || []).map((s: any) => ({
-      videoUrl: s.clip_url,
-      durationSeconds: s.duration_seconds || 5,
-      textOverlay: s.text_overlay ? {
-        text: s.text_overlay.text || '',
-        position: s.text_overlay.position || 'bottom',
-        animation: s.text_overlay.animation || 'fade-in',
-        fontSize: s.text_overlay.fontSize || 48,
-        color: s.text_overlay.color || '#FFFFFF',
-        fontFamily: s.text_overlay.fontFamily,
-      } : undefined,
-      // Transitions removed from Motion Studio — always hard cuts.
-      // Refined transitions are handled in Director's Cut after export.
-      transitionType: 'none',
-      transitionDuration: 0,
-    }));
+    // 6. Build Remotion input props — pass DB transition choice through to renderer
+    const ALLOWED_TRANSITIONS = new Set(['none', 'fade', 'crossfade', 'wipe', 'slide', 'zoom']);
+    const remotionScenes = (scenes || []).map((s: any) => {
+      const rawType = (s.transition_type || 'fade').toString().toLowerCase();
+      const transitionType = ALLOWED_TRANSITIONS.has(rawType) ? rawType : 'fade';
+      const transitionDuration = Number.isFinite(Number(s.transition_duration))
+        ? Math.max(0, Number(s.transition_duration))
+        : 0.4;
+      return {
+        videoUrl: s.clip_url,
+        durationSeconds: s.duration_seconds || 5,
+        textOverlay: s.text_overlay ? {
+          text: s.text_overlay.text || '',
+          position: s.text_overlay.position || 'bottom',
+          animation: s.text_overlay.animation || 'fade-in',
+          fontSize: s.text_overlay.fontSize || 48,
+          color: s.text_overlay.color || '#FFFFFF',
+          fontFamily: s.text_overlay.fontFamily,
+        } : undefined,
+        transitionType,
+        transitionDuration,
+      };
+    });
 
-    const totalDuration = remotionScenes.reduce((sum: number, s: any) => sum + s.durationSeconds, 0);
     const fps = 30;
-    const durationInFrames = Math.max(1, Math.ceil(totalDuration * fps));
+    // Compute total frames accounting for transition overlap between consecutive scenes.
+    // Each non-final scene with a transition shortens the timeline by transitionFrames.
+    let totalFrames = 0;
+    for (let i = 0; i < remotionScenes.length; i++) {
+      const s = remotionScenes[i];
+      const dFrames = Math.ceil(s.durationSeconds * fps);
+      const isLast = i === remotionScenes.length - 1;
+      const tFrames = (!isLast && s.transitionType !== 'none')
+        ? Math.ceil(s.transitionDuration * fps)
+        : 0;
+      totalFrames += dFrames - tFrames;
+    }
+    const durationInFrames = Math.max(1, totalFrames);
+    const totalDuration = durationInFrames / fps;
 
     const subtitlesCfg = assemblyConfig.subtitles || {};
     const textOverlaysEnabled = assemblyConfig.textOverlaysEnabled !== false;

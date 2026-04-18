@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
+import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate, spring, Easing } from 'remotion';
 import { z } from 'zod';
 import { KineticText } from '../components/KineticText';
 import { ColorGrading } from '../components/ColorGrading';
@@ -82,22 +82,88 @@ export const ComposedAdVideoSchema = z.object({
 
 type ComposedAdVideoProps = z.infer<typeof ComposedAdVideoSchema>;
 
-// Single scene renderer — hard cuts only.
-// Refined transitions are handled in Director's Cut after export.
+// Single scene renderer with crossfade-aware in/out transitions.
+// Frame-based opacity/transform interpolation, zero CSS animations — Lambda-safe.
 const Scene: React.FC<{
   videoUrl: string;
   textOverlay?: ComposedAdVideoProps['scenes'][0]['textOverlay'];
   kineticText: boolean;
-}> = ({ videoUrl, textOverlay, kineticText }) => {
+  durationInFrames: number;
+  transitionType: 'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom';
+  transitionInFrames: number;
+  hasTransitionOut: boolean;
+  transitionOutFrames: number;
+}> = ({ videoUrl, textOverlay, kineticText, durationInFrames, transitionType, transitionInFrames, hasTransitionOut, transitionOutFrames }) => {
   const frame = useCurrentFrame();
 
+  // Compute transition effects (only if a real transition is requested)
+  let opacity = 1;
+  let transform = 'none';
+  let clipPath: string | undefined = undefined;
+
+  const safeIn = Math.max(1, transitionInFrames);
+  const safeOut = Math.max(1, transitionOutFrames);
+
+  if (transitionType === 'fade' || transitionType === 'crossfade') {
+    if (transitionInFrames > 0 && frame < safeIn) {
+      opacity = interpolate(frame, [0, safeIn], [0, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+        easing: Easing.inOut(Easing.ease),
+      });
+    }
+    if (hasTransitionOut && transitionOutFrames > 0) {
+      const fadeOutStart = Math.max(0, durationInFrames - safeOut);
+      if (frame > fadeOutStart) {
+        opacity = interpolate(frame, [fadeOutStart, durationInFrames], [1, 0], {
+          extrapolateLeft: 'clamp',
+          extrapolateRight: 'clamp',
+          easing: Easing.inOut(Easing.ease),
+        });
+      }
+    }
+  } else if (transitionType === 'slide') {
+    if (transitionInFrames > 0 && frame < safeIn) {
+      const tx = interpolate(frame, [0, safeIn], [100, 0], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+        easing: Easing.out(Easing.cubic),
+      });
+      transform = `translateX(${tx}%)`;
+    }
+  } else if (transitionType === 'zoom') {
+    if (transitionInFrames > 0 && frame < safeIn) {
+      const scale = interpolate(frame, [0, safeIn], [0.85, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+        easing: Easing.out(Easing.cubic),
+      });
+      opacity = interpolate(frame, [0, safeIn], [0, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+        easing: Easing.inOut(Easing.ease),
+      });
+      transform = `scale(${scale})`;
+    }
+  } else if (transitionType === 'wipe') {
+    if (transitionInFrames > 0 && frame < safeIn) {
+      const progress = interpolate(frame, [0, safeIn], [0, 100], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+        easing: Easing.inOut(Easing.ease),
+      });
+      clipPath = `inset(0 ${100 - progress}% 0 0)`;
+    }
+  }
+
   return (
-    <AbsoluteFill style={{ backgroundColor: '#000' }}>
+    <AbsoluteFill style={{ backgroundColor: '#000', opacity, transform, clipPath }}>
       {videoUrl && (
         <Video
           src={videoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           muted
+          pauseWhenBuffering
         />
       )}
       {textOverlay?.text && (
@@ -194,12 +260,25 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
 }) => {
   const { fps, durationInFrames } = useVideoConfig();
 
-  // Calculate frame offsets for each scene (hard cuts, no transition overlap)
+  // Calculate frame offsets WITH transition overlap so consecutive scenes crossfade
+  // smoothly instead of hard-cutting (which causes decoder stutters on AI clips).
   let frameOffset = 0;
-  const sceneFrames = scenes.map((scene) => {
+  const sceneFrames = scenes.map((scene, i) => {
     const durationFrames = Math.ceil(scene.durationSeconds * fps);
-    const entry = { from: frameOffset, duration: durationFrames };
-    frameOffset += durationFrames;
+    const transitionType = scene.transitionType || 'none';
+    const transitionFrames = transitionType !== 'none'
+      ? Math.ceil((scene.transitionDuration ?? 0.4) * fps)
+      : 0;
+    const isLast = i === scenes.length - 1;
+    const entry = {
+      from: frameOffset,
+      duration: durationFrames,
+      transitionType: transitionType as 'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom',
+      transitionFrames,
+      isLast,
+    };
+    // Next scene starts `transitionFrames` earlier → real overlap (crossfade)
+    frameOffset += durationFrames - (isLast ? 0 : transitionFrames);
     return entry;
   });
 
@@ -210,19 +289,31 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
       <ColorGrading preset={colorGrading as any}>
-        {scenes.map((scene, i) => (
-          <Sequence
-            key={i}
-            from={sceneFrames[i].from}
-            durationInFrames={sceneFrames[i].duration}
-          >
-            <Scene
-              videoUrl={scene.videoUrl}
-              textOverlay={scene.textOverlay}
-              kineticText={kineticText}
-            />
-          </Sequence>
-        ))}
+        {scenes.map((scene, i) => {
+          const sf = sceneFrames[i];
+          // Outgoing transition uses the NEXT scene's transition setting
+          const next = sceneFrames[i + 1];
+          const hasTransitionOut = !!next && next.transitionType !== 'none' && next.transitionFrames > 0;
+          const transitionOutFrames = hasTransitionOut ? next.transitionFrames : 0;
+          return (
+            <Sequence
+              key={i}
+              from={sf.from}
+              durationInFrames={sf.duration}
+            >
+              <Scene
+                videoUrl={scene.videoUrl}
+                textOverlay={scene.textOverlay}
+                kineticText={kineticText}
+                durationInFrames={sf.duration}
+                transitionType={sf.transitionType}
+                transitionInFrames={sf.transitionFrames}
+                hasTransitionOut={hasTransitionOut}
+                transitionOutFrames={transitionOutFrames}
+              />
+            </Sequence>
+          );
+        })}
       </ColorGrading>
 
       {/* Subtitles (above color grading so they stay readable) */}
