@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import SceneCard from './SceneCard';
-import type { ComposerScene, ClipSource } from '@/types/video-composer';
+import type { ComposerScene, ClipSource, ComposerCharacter } from '@/types/video-composer';
 import { DEFAULT_TEXT_OVERLAY, getClipCost, getClipRate } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -13,9 +13,10 @@ interface StoryboardTabProps {
   onGoToClips: () => void;
   language: string;
   projectId?: string;
+  characters?: ComposerCharacter[];
 }
 
-export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, language, projectId }: StoryboardTabProps) {
+export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, language, projectId, characters }: StoryboardTabProps) {
   const { t } = useTranslation();
   const TIPS_KEY = 'video-composer-storyboard-tips-collapsed';
   const [tipsCollapsed, setTipsCollapsed] = useState<boolean>(() => {
@@ -171,6 +172,7 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
               index={index}
               totalScenes={scenes.length}
               projectId={projectId}
+              characters={characters}
               onUpdate={(updates) => updateScene(scene.id, updates)}
               onDelete={() => deleteScene(scene.id)}
               onMoveUp={() => moveScene(index, index - 1)}

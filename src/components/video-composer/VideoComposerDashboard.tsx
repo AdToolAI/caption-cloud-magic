@@ -459,6 +459,7 @@ export default function VideoComposerDashboard() {
               onGoToClips={persistAndGoToClips}
               language={project.language}
               projectId={project.id}
+              characters={project.briefing?.characters}
             />
           </TabsContent>
 
