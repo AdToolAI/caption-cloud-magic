@@ -232,6 +232,99 @@ export function useStrategyMode() {
     },
   });
 
+  // Update arbitrary fields (caption, hashtags, scheduled_at, media_urls, auto_publish)
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Record<string, any> }) => {
+      const { error } = await supabase
+        .from("strategy_posts")
+        .update(patch)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["strategy-posts"] });
+      toast.success("Vorschlag aktualisiert");
+    },
+    onError: (e: any) => toast.error(e?.message || "Update fehlgeschlagen"),
+  });
+
+  // Submit to calendar — creates a calendar_events entry and links it back
+  const submitToCalendarMutation = useMutation({
+    mutationFn: async ({
+      post,
+      overrides,
+    }: {
+      post: StrategyPost;
+      overrides: {
+        caption_draft?: string | null;
+        hashtags?: string[];
+        scheduled_at?: string;
+        media_urls?: string[];
+        auto_publish?: boolean;
+      };
+    }) => {
+      if (!user) throw new Error("not authenticated");
+
+      // Resolve workspace
+      const { data: ws } = await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("user_id", user.id)
+        .limit(1)
+        .maybeSingle();
+      const workspaceId = ws?.workspace_id;
+      if (!workspaceId) throw new Error("Kein Workspace gefunden");
+
+      const scheduled = overrides.scheduled_at || post.scheduled_at;
+      const mediaUrls = overrides.media_urls ?? [];
+      const assets = mediaUrls.map((url) => ({
+        url,
+        type: /\.(mp4|mov|webm)/i.test(url) ? "video" : "image",
+      }));
+
+      // 1. Insert calendar event
+      const { data: ev, error: evErr } = await supabase
+        .from("calendar_events")
+        .insert({
+          workspace_id: workspaceId,
+          created_by: user.id,
+          owner_id: user.id,
+          title: post.content_idea,
+          caption: overrides.caption_draft ?? post.caption_draft ?? "",
+          hashtags: overrides.hashtags ?? post.hashtags ?? [],
+          channels: [post.platform],
+          start_at: scheduled,
+          status: overrides.auto_publish ? "scheduled" : "draft",
+          assets_json: assets,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        })
+        .select()
+        .single();
+      if (evErr) throw evErr;
+
+      // 2. Link strategy post → event + persist edits
+      const { error: linkErr } = await supabase
+        .from("strategy_posts")
+        .update({
+          completed_event_id: ev.id,
+          caption_draft: overrides.caption_draft ?? post.caption_draft,
+          hashtags: overrides.hashtags ?? post.hashtags,
+          scheduled_at: scheduled,
+          media_urls: mediaUrls,
+          auto_publish: overrides.auto_publish ?? false,
+        })
+        .eq("id", post.id);
+      if (linkErr) throw linkErr;
+
+      return ev;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["strategy-posts"] });
+      toast.success("In Kalender übernommen");
+    },
+    onError: (e: any) => toast.error(e?.message || "Übernahme fehlgeschlagen"),
+  });
+
   // Manual level override (also pauses auto-upgrade for 14 days)
   const setLevelMutation = useMutation({
     mutationFn: async (newLevel: CreatorLevel) => {
@@ -307,5 +400,9 @@ export function useStrategyMode() {
     complete: completeMutation.mutate,
     setLevel: setLevelMutation.mutate,
     isSettingLevel: setLevelMutation.isPending,
+    update: updateMutation.mutate,
+    isUpdating: updateMutation.isPending,
+    submitToCalendar: submitToCalendarMutation.mutate,
+    isSubmittingToCalendar: submitToCalendarMutation.isPending,
   };
 }

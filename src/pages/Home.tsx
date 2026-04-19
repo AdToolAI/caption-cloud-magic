@@ -29,7 +29,7 @@ import { NicheTutorialModal } from "@/components/onboarding/NicheTutorialModal";
 import { type WeekPost } from "@/components/dashboard/WeekDayCard";
 import { WeekTimelineDay } from "@/components/dashboard/WeekTimelineDay";
 import { WeekPostEditor } from "@/components/dashboard/WeekPostEditor";
-import { WeekStrategyTimeline } from "@/components/dashboard/WeekStrategyTimeline";
+import { WeekStrategyRingTimeline } from "@/components/dashboard/WeekStrategyRingTimeline";
 import { StrategyPostDialog } from "@/components/dashboard/StrategyPostDialog";
 import { useStrategyMode, type StrategyPost } from "@/hooks/useStrategyMode";
 import { Switch } from "@/components/ui/switch";
@@ -648,7 +648,7 @@ const Home = () => {
               }
             >
               {sm.enabled ? (
-                <WeekStrategyTimeline weekStart={sm.weekStart} />
+                <WeekStrategyRingTimeline weekStart={sm.weekStart} />
               ) : (
                 <div className="flex items-start gap-2 overflow-x-auto pb-2 justify-between">
                   {weekDays.map(day => (
