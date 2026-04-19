@@ -2,101 +2,68 @@
 
 ## Befund
 
-Aktuell hat `PlatformRingDialog.tsx` 3 Tabs: **Inhalt** (Idee + Caption + Hashtags + Reasoning), **Medien** (Upload), **Zeitplan**. Der User will eine bessere Trennung:
+In `generate-week-strategy/index.ts` (Zeile 196 / 209) wird die KI lediglich angewiesen, *„nutze die besten Posting-Zeiten pro Plattform"*. Die KI bekommt zwar `platformStats` mit `bestHour` aus User-Historie — aber kein Beginner ohne Posts hat Daten, also wird `bestHour=19` Default verwendet. Die KI wählt dann einfach 21:00 als „runde Prime-Time" — weil sie keine konkreten Slots vor sich hat.
 
-1. **Tab "Vorschau"** (neu, primär) → Caption + Medien zusammen → fertiges Post-Mockup
-2. **Tab "Strategie"** (umbenannt von Inhalt) → KI-Idee + Reasoning + Tipps + Strategie-Kontext (Phase, Wochenziel, Engagement-Insights)
-3. **Tab "Zeitplan"** → bleibt
+Gleichzeitig existiert eine vollständige, deterministische **Posting-Times-Engine** (`posting-times-api` + Heuristiken in `PLATFORM_PEAKS`), die **pro Plattform und Wochentag** den optimalen Slot liefert — die wird vom Strategy-Generator komplett ignoriert.
 
-## Plan: Dialog-Tabs neu strukturieren
+Außerdem: Die Wochenleiste / Strategie-Tab zeigt nicht, *warum* genau diese Uhrzeit gewählt wurde — keine Verbindung zur Heatmap.
 
-### Tab 1: **Vorschau** (Standard-Tab beim Öffnen)
-Live-Mockup wie der finale Post aussieht — Caption + Medien Seite an Seite/übereinander:
+## Plan: Posting-Times-Engine als Source of Truth für Strategy-Slots
 
-```text
-┌─────────────────────────────────┐
-│ [IG Avatar] @username           │
-├─────────────────────────────────┤
-│                                 │
-│   [ Medien-Preview / Upload ]   │  ← Drag&Drop, zeigt hochgeladene Bilder/Videos
-│                                 │
-├─────────────────────────────────┤
-│ ❤ 💬 ✈                          │
-│ @username Caption-Text hier...  │  ← Editierbare Caption (inline)
-│ #hashtag1 #hashtag2             │
-└─────────────────────────────────┘
-[ Caption-Editor (Textarea) ]
-[ Hashtags (Input) ]
-[ ✨ Mit KI verbessern ]
-```
-
-- Plattform-spezifischer Mockup-Frame (IG/FB/X/LinkedIn/YouTube Style)
-- Medien direkt im Mockup sichtbar → fühlt sich wie "fertiger Post" an
-- Caption + Hashtags darunter editierbar
-
-### Tab 2: **Strategie** (umbenannt von "Inhalt")
-Erklärt **warum** dieser Post existiert und wo der User in der Gesamtstrategie steht:
+### 1) Backend — `generate-week-strategy` ruft Posting-Times-Engine auf
+Vor der KI-Generierung: Pro Woche & pro Plattform den `posting-times-api` aufrufen (intern, mit Service Role Key) und die **Top-Slots** pro Tag holen. Daraus eine deterministische **Slot-Zuteilung** bauen:
 
 ```text
-┌── Wo du gerade stehst ──────────┐
-│ 📍 Woche 2 von 4 · Phase: Trust │
-│ Level: Fortgeschritten           │
-│ Engagement-Trend: ↑ +12%         │
-└──────────────────────────────────┘
-
-┌── Die Idee ──────────────────────┐
-│ 💡 Behind the Scenes: Packing... │
-│                                  │
-│ Warum genau dieser Post?         │
-│ Deine Story-Views sind 3x höher  │
-│ als deine Feed-Posts. BTS-Content│
-│ funktioniert besonders gut bei   │
-│ deiner Zielgruppe (25-34).       │
-└──────────────────────────────────┘
-
-┌── Tipps für maximale Wirkung ────┐
-│ ✓ Vertikales Format (9:16)       │
-│ ✓ Erste 3 Sek = Hook             │
-│ ✓ Posten Mo 21:00 (peak time)    │
-│ ✓ Stories cross-posten           │
-└──────────────────────────────────┘
-
-┌── Was die KI über dich weiß ─────┐
-│ Top-Format: Reels (78% Engage)   │
-│ Beste Zeit: Mo/Mi/Fr 21:00       │
-│ Top-Theme: Behind-the-Scenes     │
-└──────────────────────────────────┘
+Für Woche W:
+  Für jede Plattform P in user.platforms:
+    slots = posting-times-api(platform=P, days=7, lang)
+    bestSlots[P] = Top-5 nach Score, gefiltert auf Tagesoptimum
 ```
 
-Daten dafür kommen aus:
-- `strategy_post.reasoning` (bereits vorhanden) → "Warum dieser Post"
-- `profiles.experience_level` + `engagement_score` → Level/Trend
-- `strategy_posts` Liste der Woche → "Woche X von Y"
-- Neue/erweiterte Felder in `strategy_post`: `tips: string[]`, `phase: string` (z. B. "Trust Building", "Conversion") — wenn nicht vorhanden, aus `reasoning` per einfacher Heuristik ableiten oder leer lassen
+### 2) Slot-Picker (deterministisch, vor dem AI-Call)
+Statt der KI freie Hand zu lassen, generiert der Picker für jeden gewünschten Post einen festen `(date, time, platform)`-Slot **basierend auf der Heatmap**:
+- Verteilt N Posts gleichmäßig über die 7 Tage.
+- Für jeden Tag/Plattform den **höchstbewerteten** Slot aus der Engine wählen.
+- Dabei das User-Niveau berücksichtigen (Beginner=3 Slots, Intermediate=5, Advanced=7).
+- Mehrere Plattformen → rotieren (Mo=IG-Best, Mi=TikTok-Best, Fr=YouTube-Best …).
 
-### Tab 3: **Zeitplan** (unverändert)
-Date/Time-Picker, Auto-Publish-Toggle.
+### 3) AI bekommt nur noch Content-Aufgabe
+Der KI-Prompt wird umgebaut: Statt „wähle Datum+Zeit+Plattform" bekommt sie eine **vorgegebene Liste**:
+```text
+Erstelle Inhalte für folgende vorbereitete Slots:
+1. 2026-04-20 21:00 · Instagram · (Score 90, Reason: Prime time evening)
+2. 2026-04-22 17:00 · LinkedIn · (Score 87, Reason: End of work)
+3. 2026-04-24 18:00 · TikTok · (Score 88, Reason: After work/school)
+```
+Die KI füllt nur noch `content_idea`, `caption_draft`, `hashtags`, `reasoning`, `tips`, `phase`. Datum/Zeit/Plattform werden NICHT mehr von der KI gewählt.
 
-### Backend — leichte Erweiterung
-- `generate-week-strategy` Edge Function: AI-Prompt um zusätzliche Felder pro Post ergänzen:
-  - `tips: string[]` (3–5 konkrete Action-Tipps)
-  - `phase: string` (Trust Building / Awareness / Conversion / Retention / Community)
-- Migration: `strategy_posts` bekommt `tips TEXT[]` und `phase TEXT` Spalten (nullable, idempotent).
-- Bestehende Posts ohne diese Felder → Tab "Strategie" zeigt Reasoning + Standard-Tipps basierend auf Plattform.
+### 4) Slot-Score & Reason werden mitgespeichert
+Migration: `strategy_posts` bekommt zwei neue Felder:
+- `slot_score INTEGER` — z. B. 90
+- `slot_reason TEXT[]` — z. B. ["Prime time evening", "Personalized + industry trend"]
 
-### Frontend — Datei-Änderungen
-- **`PlatformRingDialog.tsx`** komplett umstrukturieren:
-  - Tabs: `["preview", "strategy", "schedule"]`, Default `preview`
-  - Neue Sub-Komponente `PostPreviewMockup` (plattform-spezifisches Frame, Medien + Caption inline)
-  - Neue Sub-Komponente `StrategyContextPanel` (Position in Wochenplan, Reasoning, Tipps, Engagement-Insights)
-- **`useStrategyMode.ts`**: 
-  - Hook `getWeekProgress(post)` → returns `{ weekIndex, totalWeeks, phase, level }` für Strategie-Tab
-- **`generate-week-strategy/index.ts`**: AI-Prompt um `tips` + `phase` erweitern, Insert-Statement um neue Spalten ergänzen
-- **Migration**: 2 neue Spalten auf `strategy_posts`
+Damit kann der Strategie-Tab des Dialogs zeigen: *„Diese Zeit (21:00 Mo) wurde gewählt, weil Score 90 — Prime-Time deiner Zielgruppe."*
+
+### 5) Frontend — Verbindung Posting-Times ↔ Strategie
+- **`StrategyContextPanel`** zeigt neuen Block **„Warum diese Uhrzeit?"** mit `slot_score` + `slot_reason` aus DB.
+- **`PostingTimesHeatmap`** (Best-Time Heatmap) bekommt visuelle Hervorhebung: Slots, die in `strategy_posts` der nächsten 14 Tage genutzt werden, bekommen einen **goldenen Ring** → User sieht direkt: „Hier hat die KI für mich Posts geplant."
+- **`PlatformRingDialog` Zeitplan-Tab**: Beim Ändern der Uhrzeit ein **Hinweis-Badge** anzeigen, falls die neue Zeit nicht im optimalen Slot liegt: *„⚠ 14:00 hat Score 45 — empfohlen 19:00 (Score 90)."*
+
+### 6) Re-Generation bei manuellen Änderungen
+Wenn User per `submitToCalendar` oder `update` die Uhrzeit ändert → keine automatische Korrektur, aber im Dialog Score-Hinweis anzeigen.
+
+### Betroffene Dateien
+- `supabase/functions/generate-week-strategy/index.ts` — Slot-Picker + AI-Prompt-Umbau
+- `supabase/functions/_shared/posting-times-fetcher.ts` *(neu)* — interner Aufruf der `posting-times-api` Logik (oder direkt PLATFORM_PEAKS-Auswertung wiederverwenden)
+- *(Migration)* `strategy_posts.slot_score INT`, `strategy_posts.slot_reason TEXT[]`
+- `src/components/dashboard/StrategyContextPanel.tsx` — Block "Warum diese Uhrzeit?"
+- `src/components/dashboard/PlatformRingDialog.tsx` (Zeitplan-Tab) — Score-Hinweis bei manueller Änderung
+- `src/components/posting-times/HeatmapCalendar.tsx` + `HeatmapCalendarPremium.tsx` — Goldener Ring für genutzte Strategy-Slots
 
 ### Erwartetes Ergebnis
-- **Vorschau-Tab** zeigt direkt beim Öffnen den fertig aussehenden Post mit Medien + Caption → User sieht sofort, was gepostet wird.
-- **Strategie-Tab** erklärt Position in der Strategie (Woche X von Y, Phase, Level, Engagement-Trend) + warum genau dieser Post + konkrete Tipps + KI-Insights über den User.
-- **Zeitplan-Tab** unverändert für Time-/Date-Anpassung.
-- Der User versteht jeden Vorschlag im Kontext seiner Reise — keine Black-Box mehr.
+- Strategy-Posts haben **echte** beste Posting-Zeiten aus der Heatmap-Engine — nicht mehr stumpf 21:00.
+- Beispiel: Instagram Mo → 19:00 (Prime), LinkedIn Di → 8:00 (Early business), TikTok Fr → 18:00 (After work).
+- Heatmap und Strategie-Modus sind sichtbar verbunden: optimale Slots in der Heatmap sind golden markiert, wenn die KI dort einen Post plant.
+- Im Strategie-Tab erklärt das System dem User, *warum* diese exakte Uhrzeit gewählt wurde (Score + Reason).
+- Wenn der User die Zeit manuell ändert, warnt der Dialog bei suboptimaler Wahl.
 
