@@ -46,7 +46,66 @@ const resolveVideoUrl = (rawUrl: string): string => {
   return data.publicUrl;
 };
 
-export const DashboardVideoCarousel = ({ quickActions = [] }: { quickActions?: QuickAction[] }) => {
+interface DashboardVideoCarouselProps {
+  quickActions?: QuickAction[];
+  tipText?: string;
+  tipLabel?: string;
+  nextPostLabel?: string;
+  nextPostPrefix?: string;
+}
+
+const StatusPills = ({
+  tipText,
+  tipLabel,
+  nextPostLabel,
+  nextPostPrefix,
+}: Pick<DashboardVideoCarouselProps, 'tipText' | 'tipLabel' | 'nextPostLabel' | 'nextPostPrefix'>) => {
+  if (!tipText && !nextPostLabel) return null;
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {tipText && (
+        <TooltipProvider delayDuration={150}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-border/40 bg-card/40 backdrop-blur-sm hover:bg-muted/60 transition-colors"
+                aria-label={tipLabel}
+              >
+                <Lightbulb className="h-3.5 w-3.5 text-primary" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs">
+              {tipLabel && <p className="text-xs font-semibold mb-1">{tipLabel}</p>}
+              <p className="text-xs leading-relaxed">{tipText}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+      <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-amber-500/40 bg-gradient-to-r from-amber-500/10 to-yellow-500/5 text-xs font-medium text-amber-600 dark:text-amber-400 backdrop-blur-sm">
+        <InfinityIcon className="h-3.5 w-3.5" />
+        <span className="hidden md:inline">Unlimited</span>
+      </span>
+      {nextPostLabel && (
+        <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-border/40 bg-card/40 text-xs text-muted-foreground backdrop-blur-sm">
+          <Clock className="h-3.5 w-3.5 text-warning" />
+          <span className="truncate max-w-[180px]">
+            <span className="hidden lg:inline">{nextPostPrefix}: </span>
+            {nextPostLabel}
+          </span>
+        </span>
+      )}
+    </div>
+  );
+};
+
+export const DashboardVideoCarousel = ({
+  quickActions = [],
+  tipText,
+  tipLabel,
+  nextPostLabel,
+  nextPostPrefix,
+}: DashboardVideoCarouselProps) => {
   const { videos, isLoading } = useVideoHistory();
   const { t, language } = useTranslation();
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
