@@ -1,87 +1,72 @@
 
 
-## Plan: A4 Getting-Started-Checkliste + A3 Interactive Tour
+## Status
 
-Alle 4 Klärungen bestätigt:
-1. **Reihenfolge:** A4 zuerst → danach A3
-2. **5 Checklisten-Schritte:** wie vorgeschlagen
-3. **Checkliste:** kollabierbar (Default: offen)
-4. **Tour:** Auto-Start beim ersten Login mit „Tour überspringen"-Button
+`RESEND_API_KEY` ist als manueller Runtime-Secret schon in deinem Projekt vorhanden — perfekt, dann brauchen wir den Resend-Connector NICHT. Edge Functions können direkt mit dem Key gegen die Resend-API sprechen.
 
-Mein Take zu deiner Tour-Entscheidung: **sehr gut**. Auto-Start sorgt dafür, dass keiner die Tour verpasst, der Skip-Button respektiert Power-User. Standard im SaaS-Onboarding (Notion, Linear, Stripe machen es genauso).
+## Vereinfachter Plan: B1 Drip-Kampagne via Resend (direct API)
 
----
+### Sender
+`AdTool <notify@useadtool.ai>` (deine verifizierte Domain auf Resend)
 
-## A4 — Getting-Started-Checkliste
+### 1. DB-Migration
+- Tabelle `drip_email_log` (`id`, `user_id`, `drip_step` 1/3/7, `sent_at`, `progress_at_send`, `status`)
+- Unique-Index `(user_id, drip_step)` → strikte Idempotenz, kein Doppel-Send
+- Spalte `profiles.drip_emails_enabled` BOOLEAN DEFAULT true
+- Spalte `profiles.unsubscribe_token` UUID DEFAULT gen_random_uuid() UNIQUE
 
-### Komponenten
-- **`GettingStartedChecklist.tsx`** — neue Komponente, eingebettet in die Sidebar (unter den Hub-Icons). Kollabierbar via Chevron-Toggle, Default: offen für User mit `progress < 100%`.
-- **`useGettingStartedProgress.ts`** — Hook, der parallel 5 Datenquellen prüft:
-  1. `onboarding_profiles` existiert → ✅ Onboarding
-  2. `video_creations` count > 0 → ✅ Erstes Video
-  3. `social_connections` count > 0 → ✅ Konto verbunden
-  4. `calendar_events` count > 0 → ✅ Post geplant
-  5. `brand_kits` count > 0 → ✅ Brand Kit
-- **Progress-Ring** im James-Bond-2028-Style: kreisförmiger Fortschrittsbalken in Gold (#F5C76A) mit Glow-Effekt, zeigt „3/5"
-- **Auto-Hide:** Bei 100% verschwindet die Checkliste mit einem „Alle Schritte abgeschlossen!"-Toast und persistiert via `localStorage`-Flag (User kann nicht wieder aufploppen)
-- **Lokalisiert** (DE/EN/ES) über bestehenden `useTranslation()`-Hook
-- **Layout:** Da Sidebar nur 68px breit ist → **Floating Panel** rechts neben der Sidebar (kollabiert: nur Progress-Ring-Icon sichtbar; expandiert: 280px breites Panel mit allen 5 Steps)
+### 2. Edge Function `process-drip-emails`
+- Cron-getriggert (stündlich via pg_cron)
+- Findet User in Zeitfenstern: 24h±30min (Tag 1) / 72h±30min (Tag 3) / 7d±30min (Tag 7)
+- Filter: `drip_emails_enabled = true`, kein Eintrag in `drip_email_log` für diesen Step
+- Berechnet Progress aus 5 Tabellen (gleiche Logik wie `useGettingStartedProgress`)
+- Threshold-Check: Tag 1 < 100%, Tag 3 < 60%, Tag 7 < 100%
+- Lädt HTML-Template (Sprache aus `profiles.language`, Fallback EN)
+- POST direkt an `https://api.resend.com/emails` mit `Authorization: Bearer ${RESEND_API_KEY}`
+- Loggt nach `drip_email_log` (sent / failed / skipped)
+- Optional: `?dry_run=true&user_id=<uuid>&step=1` für End-to-End-Test ohne DB-Log
 
-### CTAs pro Step
-Jeder offene Step ist klickbar und routet zur passenden Seite:
-- Onboarding → `/onboarding`
-- Erstes Video → `/hailuo-video-studio` (mit personalisiertem Prompt aus A2)
-- Konto verbinden → `/hub/social-management`
-- Post planen → `/calendar`
-- Brand Kit → `/brand-kit`
+### 3. Email-Templates (3× DE/EN/ES, inline-HTML)
+Speicherort: `supabase/functions/_shared/drip-templates/`
 
-### Aufwand: ~45 Min
+| Tag | Subject (DE / EN / ES) | Inhalt |
+|---|---|---|
+| **1** | „Dein erstes Video wartet" / „Your first video is waiting" / „Tu primer video te espera" | Hero + CTA zum ersten offenen Step |
+| **3** | „Noch X von 5 Schritten" / „X of 5 steps left" / „X de 5 pasos pendientes" | Inline-Progress-Bar + Step-Liste |
+| **7** | „Letzte Erinnerung + Bonus" / „Last reminder + bonus" / „Último recordatorio + bono" | Trend-Beispiele + Upgrade-Hint |
 
----
+Style: James-Bond-2028 Look (gold #F5C76A Akzente), aber **weißer Body** für Mail-Client-Kompatibilität. Jede Mail enthält Footer mit Unsubscribe-Link → `https://useadtool.ai/email-preferences?token={unsubscribe_token}`.
 
-## A3 — Interactive Product Tour
+### 4. Pg_cron Schedule
+Job stündlich (`0 * * * *`) → triggert `process-drip-emails` via `net.http_post` mit Service-Role-Key.
 
-### Setup
-- **Library:** `react-joyride` installieren
-- **`useProductTour.ts`** — Hook, der Tour-Status in neuer Spalte `profiles.tour_completed_at TIMESTAMPTZ` persistiert
-- **Auto-Start:** beim ersten Login nach Onboarding (1× pro User), Skip-Button immer sichtbar
-- **Manuell startbar:** „Tour erneut starten"-Button in `/settings`
+### 5. Frontend
+- **Neue Route** `/email-preferences` (lokalisiert): liest `?token=` aus URL, zeigt Status + Toggle „Onboarding-Erinnerungen erhalten" + Sofort-Unsubscribe-Button
+- **Neuer Toggle in `ProfileTab.tsx`**: „E-Mail-Erinnerungen" Switch (gleicher Endpunkt, schaltet `drip_emails_enabled`)
 
-### Tour-Stationen (6 Steps)
-1. Sidebar-Hubs („Hier findest du alle Tools")
-2. Dashboard-Cards (News & Trend Radar)
-3. „Erstes Video"-Hero (aus A2)
-4. Getting-Started-Checkliste (aus A4)
-5. AI-Studios-Hub
-6. Calendar/Planner
+### 6. End-to-End-Test
+Dry-Run-Aufruf für Tag 1, 3 und 7 → Mail landet in deinem Posteingang, ohne dass `drip_email_log` geschrieben wird. So sehen wir alle 3 Mails sofort.
 
-### Theming
-- **Dark/Gold-Style** passend zum James-Bond-2028-Design (`backgroundColor: '#050816'`, `primaryColor: '#F5C76A'`, Glassmorphism)
-- **Lokalisierte Tooltips** (DE/EN/ES)
-- **Skip-Button** prominent: „Tour überspringen" / „Skip Tour" / „Saltar tour"
+## Aufwand
+| Schritt | Zeit |
+|---|---|
+| DB-Migration | 10 min |
+| 3 HTML-Templates × 3 Sprachen | 35 min |
+| Edge Function `process-drip-emails` (mit Dry-Run) | 30 min |
+| Pg_cron Job | 5 min |
+| `/email-preferences` Page + Account-Toggle | 25 min |
+| E2E-Test (Dry-Run für Tag 1/3/7) | 15 min |
+| **Gesamt** | **~2h** |
 
-### DB-Migration
-- `ALTER TABLE profiles ADD COLUMN tour_completed_at TIMESTAMPTZ;`
-
-### Aufwand: ~60 Min
-
----
-
-## Reihenfolge der Umsetzung
-
-1. **A4 Schritt 1:** `useGettingStartedProgress`-Hook (15 min)
-2. **A4 Schritt 2:** `GettingStartedChecklist`-Komponente + Floating Panel (20 min)
-3. **A4 Schritt 3:** Sidebar-Integration + E2E-Test (10 min)
-4. **A3 Schritt 1:** DB-Migration + `react-joyride` install (5 min)
-5. **A3 Schritt 2:** `useProductTour`-Hook + Auto-Start-Logik (15 min)
-6. **A3 Schritt 3:** 6 Tour-Steps + Theming + Lokalisierung (30 min)
-7. **A3 Schritt 4:** Settings-Button „Tour erneut starten" + E2E-Test (10 min)
-
-**Gesamt: ~1h 45min**
-
----
+## Was wir NICHT brauchen
+- ❌ Resend-Connector (Direct API-Call mit existierendem Key reicht)
+- ❌ Lovable-Email-Domain-Setup (Resend macht das)
+- ❌ Connector-Gateway (kein OAuth-Refresh nötig)
 
 ## Nach Approval
-
-Ich baue Schritt für Schritt durch — erst A4 komplett, dann A3 — und teste am Ende beide Features End-to-End in der Preview.
+1. Migration ausführen
+2. Templates + Edge Function bauen
+3. Pg_cron einrichten
+4. Frontend (Preferences + Toggle)
+5. Dry-Run für alle 3 Drip-Mails an deine Test-Adresse
 
