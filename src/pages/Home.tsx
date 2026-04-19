@@ -479,9 +479,10 @@ const Home = () => {
 
   // Find the next pending strategy post (when strategy mode is on)
   const getNextStrategyPost = (): StrategyPost | null => {
-    if (!sm.enabled || !sm.posts || sm.posts.length === 0) return null;
+    const pool = (sm.allPosts && sm.allPosts.length > 0) ? sm.allPosts : sm.posts;
+    if (!sm.enabled || !pool || pool.length === 0) return null;
     const now = Date.now();
-    const upcoming = sm.posts
+    const upcoming = pool
       .filter((p) => p.status === "pending" || p.status === "rescheduled")
       .filter((p) => new Date(p.scheduled_at).getTime() >= now)
       .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
