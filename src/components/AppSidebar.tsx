@@ -10,11 +10,9 @@ import { cn } from "@/lib/utils";
 import { hubDefinitions } from "@/config/hubConfig";
 import {
   Sidebar,
-  SidebarContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
 } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
