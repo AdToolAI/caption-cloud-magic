@@ -28,7 +28,9 @@ import type {
   AspectRatio,
   EmotionalTone,
   ClipQuality,
+  ComposerVisualStyle,
 } from '@/types/video-composer';
+import { VISUAL_STYLES } from '@/config/composerVisualStyles';
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string; desc: string }[] = [
   { value: '16:9', label: '16:9', desc: 'YouTube / Landscape' },
