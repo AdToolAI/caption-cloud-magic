@@ -15,10 +15,14 @@ export interface StrategyPost {
   caption_draft: string | null;
   hashtags: string[];
   reasoning: string | null;
+  tips: string[] | null;
+  phase: string | null;
   status: StrategyPostStatus;
   original_scheduled_at: string | null;
   completed_event_id: string | null;
   generation_batch_id: string | null;
+  media_urls?: string[];
+  auto_publish?: boolean;
   created_at: string;
   updated_at: string;
 }
