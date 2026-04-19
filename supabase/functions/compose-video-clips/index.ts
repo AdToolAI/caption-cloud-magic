@@ -18,6 +18,15 @@ const CLIP_COSTS: Record<string, Record<Quality, number>> = {
   'ai-sora':   { standard: 0.25, pro: 0.53 },
 };
 
+interface ComposerCharacter {
+  id: string;
+  name: string;
+  appearance: string;
+  signatureItems: string;
+}
+
+type CharacterShotType = 'full' | 'profile' | 'back' | 'detail' | 'pov' | 'silhouette' | 'absent';
+
 interface ClipScene {
   id: string;
   clipSource: string;
@@ -28,6 +37,7 @@ interface ClipScene {
   /** Optional image used as visual guide for AI sources (image-to-video). */
   referenceImageUrl?: string;
   durationSeconds: number;
+  characterShot?: { characterId: string; shotType: CharacterShotType };
 }
 
 interface ClipRequest {
@@ -36,6 +46,9 @@ interface ClipRequest {
   /** Optional visual style override (Comic, Realistic, Anime, ...). When set,
    *  every AI scene prompt is suffixed with the matching style clause. */
   visualStyle?: string;
+  /** Optional recurring characters from the briefing — used to inject
+   *  appearance / signatureItems into prompts based on each scene's shotType. */
+  characters?: ComposerCharacter[];
 }
 
 serve(async (req) => {
