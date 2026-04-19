@@ -1,0 +1,191 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+
+export type StrategyPostStatus = "pending" | "completed" | "missed" | "dismissed" | "rescheduled";
+
+export interface StrategyPost {
+  id: string;
+  user_id: string;
+  week_start: string;
+  scheduled_at: string;
+  platform: string;
+  content_idea: string;
+  caption_draft: string | null;
+  hashtags: string[];
+  reasoning: string | null;
+  status: StrategyPostStatus;
+  original_scheduled_at: string | null;
+  completed_event_id: string | null;
+  generation_batch_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function getMonday(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+export function useStrategyMode() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  // Read profile flag
+  const profileQuery = useQuery({
+    queryKey: ["strategy-mode-profile", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("strategy_mode_enabled, strategy_mode_activated_at")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 30_000,
+  });
+
+  const enabled = !!profileQuery.data?.strategy_mode_enabled;
+
+  // Current week posts
+  const weekStart = getMonday(new Date()).toISOString().split("T")[0];
+  const postsQuery = useQuery({
+    queryKey: ["strategy-posts", user?.id, weekStart],
+    queryFn: async () => {
+      if (!user) return [] as StrategyPost[];
+      const { data, error } = await supabase
+        .from("strategy_posts")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("week_start", weekStart)
+        .order("scheduled_at", { ascending: true });
+      if (error) throw error;
+      return (data || []).map((d: any) => ({
+        ...d,
+        hashtags: Array.isArray(d.hashtags) ? d.hashtags : [],
+      })) as StrategyPost[];
+    },
+    enabled: !!user && enabled,
+    staleTime: 60_000,
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async (next: boolean) => {
+      if (!user) throw new Error("not authenticated");
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          strategy_mode_enabled: next,
+          strategy_mode_activated_at: next ? new Date().toISOString() : null,
+        })
+        .eq("id", user.id);
+      if (error) throw error;
+
+      if (next) {
+        // Trigger initial generation
+        const { error: fnErr } = await supabase.functions.invoke("generate-week-strategy", {
+          body: { week_start: weekStart },
+        });
+        if (fnErr) console.warn("initial generation failed:", fnErr);
+      }
+      return next;
+    },
+    onSuccess: (next) => {
+      qc.invalidateQueries({ queryKey: ["strategy-mode-profile"] });
+      qc.invalidateQueries({ queryKey: ["strategy-posts"] });
+      toast.success(next ? "Strategie-Modus aktiviert" : "Strategie-Modus deaktiviert");
+    },
+    onError: (e: any) => toast.error(e?.message || "Fehler beim Umschalten"),
+  });
+
+  const regenerateMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke("generate-week-strategy", {
+        body: { week_start: weekStart, force: true },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["strategy-posts"] });
+      toast.success("Neue Wochen-Strategie generiert");
+    },
+    onError: (e: any) => toast.error(e?.message || "Generierung fehlgeschlagen"),
+  });
+
+  const dismissMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("strategy_posts")
+        .update({ status: "dismissed" })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["strategy-posts"] });
+      toast.success("Vorschlag verworfen");
+    },
+  });
+
+  const rescheduleMutation = useMutation({
+    mutationFn: async ({ id, newAt }: { id: string; newAt: string }) => {
+      // Read current scheduled_at for original
+      const { data: current } = await supabase
+        .from("strategy_posts")
+        .select("scheduled_at, original_scheduled_at")
+        .eq("id", id)
+        .single();
+      const original = current?.original_scheduled_at || current?.scheduled_at || null;
+      const { error } = await supabase
+        .from("strategy_posts")
+        .update({
+          scheduled_at: newAt,
+          original_scheduled_at: original,
+          status: "rescheduled",
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["strategy-posts"] });
+      toast.success("Neu geplant");
+    },
+  });
+
+  const completeMutation = useMutation({
+    mutationFn: async ({ id, eventId }: { id: string; eventId?: string }) => {
+      const { error } = await supabase
+        .from("strategy_posts")
+        .update({ status: "completed", completed_event_id: eventId || null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["strategy-posts"] });
+      toast.success("Als erledigt markiert");
+    },
+  });
+
+  return {
+    enabled,
+    activatedAt: profileQuery.data?.strategy_mode_activated_at,
+    isLoadingProfile: profileQuery.isLoading,
+    posts: postsQuery.data || [],
+    isLoadingPosts: postsQuery.isLoading,
+    weekStart,
+    toggle: toggleMutation.mutate,
+    isToggling: toggleMutation.isPending,
+    regenerate: regenerateMutation.mutate,
+    isRegenerating: regenerateMutation.isPending,
+    dismiss: dismissMutation.mutate,
+    reschedule: rescheduleMutation.mutate,
+    complete: completeMutation.mutate,
+  };
+}
