@@ -2,6 +2,7 @@
 // Public endpoint (no JWT) — used by:
 //   1) /email-preferences page (token-based unsubscribe via URL)
 //   2) ProfileTab toggle (authenticated user updates own setting)
+// Supports both drip_emails_enabled and reminder_pushes_enabled
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -14,15 +15,35 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
+async function getPushEnabled(admin: any, userId: string): Promise<boolean> {
+  const { data } = await admin
+    .from("notification_preferences")
+    .select("reminder_pushes_enabled")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data?.reminder_pushes_enabled ?? true;
+}
+
+async function setPushEnabled(admin: any, userId: string, value: boolean) {
+  return admin
+    .from("notification_preferences")
+    .upsert({
+      user_id: userId,
+      reminder_pushes_enabled: value,
+      updated_at: new Date().toISOString(),
+    });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { token, enabled, action } = body as {
+    const { token, enabled, action, push_enabled } = body as {
       token?: string;
       enabled?: boolean;
       action?: "lookup" | "update";
+      push_enabled?: boolean;
     };
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
@@ -42,31 +63,42 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (action === "lookup" || enabled === undefined) {
+      if (action === "lookup" || (enabled === undefined && push_enabled === undefined)) {
+        const reminder_pushes_enabled = await getPushEnabled(admin, profile.id);
         return new Response(
           JSON.stringify({
             email: profile.email,
             drip_emails_enabled: profile.drip_emails_enabled,
+            reminder_pushes_enabled,
             language: profile.language ?? "en",
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      const { error: updateErr } = await admin
-        .from("profiles")
-        .update({ drip_emails_enabled: enabled })
-        .eq("id", profile.id);
+      if (typeof enabled === "boolean") {
+        const { error: updateErr } = await admin
+          .from("profiles")
+          .update({ drip_emails_enabled: enabled })
+          .eq("id", profile.id);
+        if (updateErr) {
+          return new Response(JSON.stringify({ error: updateErr.message }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
 
-      if (updateErr) {
-        return new Response(JSON.stringify({ error: updateErr.message }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (typeof push_enabled === "boolean") {
+        const { error: pushErr } = await setPushEnabled(admin, profile.id, push_enabled);
+        if (pushErr) {
+          return new Response(JSON.stringify({ error: pushErr.message }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
 
       return new Response(
-        JSON.stringify({ ok: true, email: profile.email, drip_emails_enabled: enabled }),
+        JSON.stringify({ ok: true, email: profile.email }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -89,23 +121,29 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (typeof enabled !== "boolean") {
-      return new Response(JSON.stringify({ error: "enabled must be boolean" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+    if (typeof enabled === "boolean") {
+      const { error: updateErr } = await admin
+        .from("profiles")
+        .update({ drip_emails_enabled: enabled })
+        .eq("id", userData.user.id);
+      if (updateErr) {
+        return new Response(JSON.stringify({ error: updateErr.message }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
-    const { error: updateErr } = await admin
-      .from("profiles")
-      .update({ drip_emails_enabled: enabled })
-      .eq("id", userData.user.id);
-    if (updateErr) {
-      return new Response(JSON.stringify({ error: updateErr.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+    if (typeof push_enabled === "boolean") {
+      const { error: pushErr } = await setPushEnabled(admin, userData.user.id, push_enabled);
+      if (pushErr) {
+        return new Response(JSON.stringify({ error: pushErr.message }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
-    return new Response(JSON.stringify({ ok: true, drip_emails_enabled: enabled }), {
+
+    return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

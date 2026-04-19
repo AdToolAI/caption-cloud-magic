@@ -13,6 +13,7 @@ const COPY: Record<Lang, {
   title: string; desc: string; loading: string; invalid: string; back: string;
   toggleLabel: string; toggleDesc: string; saved: string; error: string;
   unsubscribed: string; resubscribed: string; quickUnsub: string;
+  pushLabel: string; pushDesc: string;
 }> = {
   en: {
     title: "Email preferences",
@@ -27,6 +28,8 @@ const COPY: Record<Lang, {
     unsubscribed: "You have been unsubscribed.",
     resubscribed: "You are subscribed again.",
     quickUnsub: "Unsubscribe from all reminders",
+    pushLabel: "Browser push reminders",
+    pushDesc: "Short browser notifications during your first week (requires permission).",
   },
   de: {
     title: "E-Mail-Einstellungen",
@@ -41,6 +44,8 @@ const COPY: Record<Lang, {
     unsubscribed: "Du wurdest abgemeldet.",
     resubscribed: "Du bist wieder angemeldet.",
     quickUnsub: "Von allen Erinnerungen abmelden",
+    pushLabel: "Browser-Push-Erinnerungen",
+    pushDesc: "Kurze Browser-Benachrichtigungen in deiner ersten Woche (Berechtigung erforderlich).",
   },
   es: {
     title: "Preferencias de correo",
@@ -55,6 +60,8 @@ const COPY: Record<Lang, {
     unsubscribed: "Te has dado de baja.",
     resubscribed: "Te has suscrito de nuevo.",
     quickUnsub: "Darse de baja de todos los recordatorios",
+    pushLabel: "Recordatorios push del navegador",
+    pushDesc: "Notificaciones cortas durante tu primera semana (requiere permiso).",
   },
 };
 
@@ -64,10 +71,12 @@ const EmailPreferences = () => {
   const token = searchParams.get("token");
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [savingPush, setSavingPush] = useState(false);
   const [valid, setValid] = useState<boolean | null>(null);
   const [email, setEmail] = useState<string>("");
   const [enabled, setEnabled] = useState<boolean>(true);
+  const [pushEnabled, setPushEnabled] = useState<boolean>(true);
   const [lang, setLang] = useState<Lang>("en");
   const c = COPY[lang];
 
@@ -90,6 +99,7 @@ const EmailPreferences = () => {
           setValid(true);
           setEmail(data.email);
           setEnabled(!!data.drip_emails_enabled);
+          setPushEnabled(data.reminder_pushes_enabled !== false);
           const l = (data.language as string) || "en";
           setLang((["en", "de", "es"].includes(l) ? l : "en") as Lang);
         }
@@ -103,9 +113,9 @@ const EmailPreferences = () => {
     return () => { cancelled = true; };
   }, [token]);
 
-  const update = async (next: boolean) => {
+  const updateEmail = async (next: boolean) => {
     if (!token) return;
-    setSaving(true);
+    setSavingEmail(true);
     const previous = enabled;
     setEnabled(next);
     try {
@@ -118,7 +128,26 @@ const EmailPreferences = () => {
       setEnabled(previous);
       toast({ title: c.error, description: (e as Error).message, variant: "destructive" });
     } finally {
-      setSaving(false);
+      setSavingEmail(false);
+    }
+  };
+
+  const updatePush = async (next: boolean) => {
+    if (!token) return;
+    setSavingPush(true);
+    const previous = pushEnabled;
+    setPushEnabled(next);
+    try {
+      const { data, error } = await supabase.functions.invoke("update-email-preferences", {
+        body: { token, push_enabled: next },
+      });
+      if (error || !data || data.error) throw new Error(data?.error || error?.message);
+      toast({ title: c.saved });
+    } catch (e) {
+      setPushEnabled(previous);
+      toast({ title: c.error, description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSavingPush(false);
     }
   };
 
@@ -163,17 +192,25 @@ const EmailPreferences = () => {
                   <div className="font-medium">{c.toggleLabel}</div>
                   <div className="text-sm text-muted-foreground">{c.toggleDesc}</div>
                 </div>
-                <Switch checked={enabled} onCheckedChange={update} disabled={saving} />
+                <Switch checked={enabled} onCheckedChange={updateEmail} disabled={savingEmail} />
+              </div>
+
+              <div className="flex items-start justify-between gap-4 p-4 rounded-lg border border-white/10 bg-muted/10">
+                <div className="space-y-1">
+                  <div className="font-medium">{c.pushLabel}</div>
+                  <div className="text-sm text-muted-foreground">{c.pushDesc}</div>
+                </div>
+                <Switch checked={pushEnabled} onCheckedChange={updatePush} disabled={savingPush} />
               </div>
 
               {enabled && (
                 <Button
-                  onClick={() => update(false)}
-                  disabled={saving}
+                  onClick={() => updateEmail(false)}
+                  disabled={savingEmail}
                   variant="outline"
                   className="w-full border-destructive/40 text-destructive hover:bg-destructive/10"
                 >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  {savingEmail ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {c.quickUnsub}
                 </Button>
               )}

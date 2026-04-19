@@ -146,8 +146,103 @@ export const ProfileTab = () => {
       </Card>
 
       <DripEmailToggleCard />
+      <PushReminderToggleCard />
       <RestartTourCard />
     </motion.div>
+  );
+};
+
+const pushCopy: Record<string, { title: string; desc: string; label: string; sublabel: string; saved: string; error: string }> = {
+  en: {
+    title: "Push reminders",
+    desc: "Browser push notifications during your first week.",
+    label: "Receive push reminders",
+    sublabel: "Up to 3 short reminders (day 1, 3, 7). Requires push permission.",
+    saved: "Preferences updated",
+    error: "Could not update preferences",
+  },
+  de: {
+    title: "Push-Erinnerungen",
+    desc: "Browser-Push-Benachrichtigungen in deiner ersten Woche.",
+    label: "Push-Erinnerungen erhalten",
+    sublabel: "Bis zu 3 kurze Erinnerungen (Tag 1, 3, 7). Push-Berechtigung erforderlich.",
+    saved: "Einstellungen aktualisiert",
+    error: "Einstellungen konnten nicht aktualisiert werden",
+  },
+  es: {
+    title: "Recordatorios push",
+    desc: "Notificaciones push del navegador durante tu primera semana.",
+    label: "Recibir recordatorios push",
+    sublabel: "Hasta 3 recordatorios cortos (día 1, 3, 7). Requiere permiso push.",
+    saved: "Preferencias actualizadas",
+    error: "No se pudieron actualizar las preferencias",
+  },
+};
+
+const PushReminderToggleCard = () => {
+  const { user } = useAuth();
+  const { language } = useTranslation();
+  const { toast } = useToast();
+  const copy = pushCopy[language] || pushCopy.en;
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("notification_preferences")
+      .select("reminder_pushes_enabled")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setEnabled((data as any)?.reminder_pushes_enabled ?? true);
+      });
+  }, [user]);
+
+  const onChange = async (next: boolean) => {
+    if (!user) return;
+    setSaving(true);
+    const prev = enabled;
+    setEnabled(next);
+    const { error } = await supabase
+      .from("notification_preferences")
+      .upsert({
+        user_id: user.id,
+        reminder_pushes_enabled: next,
+        updated_at: new Date().toISOString(),
+      } as any);
+    setSaving(false);
+    if (error) {
+      setEnabled(prev);
+      toast({ title: copy.error, description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: copy.saved });
+    }
+  };
+
+  return (
+    <Card className="mt-6 bg-card/60 backdrop-blur-xl border-white/10">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Bell className="h-4 w-4 text-primary" />
+          {copy.title}
+        </CardTitle>
+        <CardDescription>{copy.desc}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-start justify-between gap-4 p-4 rounded-lg border border-white/10 bg-muted/10">
+          <div className="space-y-1">
+            <div className="font-medium text-sm">{copy.label}</div>
+            <div className="text-xs text-muted-foreground">{copy.sublabel}</div>
+          </div>
+          <Switch
+            checked={enabled ?? true}
+            onCheckedChange={onChange}
+            disabled={saving || enabled === null}
+          />
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
