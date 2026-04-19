@@ -29,6 +29,10 @@ import { NicheTutorialModal } from "@/components/onboarding/NicheTutorialModal";
 import { type WeekPost } from "@/components/dashboard/WeekDayCard";
 import { WeekTimelineDay } from "@/components/dashboard/WeekTimelineDay";
 import { WeekPostEditor } from "@/components/dashboard/WeekPostEditor";
+import { WeekStrategyTimeline } from "@/components/dashboard/WeekStrategyTimeline";
+import { useStrategyMode } from "@/hooks/useStrategyMode";
+import { Switch } from "@/components/ui/switch";
+import { Sparkles } from "lucide-react";
 
 interface Post {
   id: string;
