@@ -56,13 +56,25 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Reassign any remaining storage.objects.owner to null via SQL
-    // (objects uploaded outside userId/ folder structure)
-    const { error: sqlErr } = await admin.rpc("exec_sql_admin_oneoff", { p_user_id: userId }).maybeSingle();
-    // Function probably doesn't exist - that's fine, we'll handle below
-
-    // Best-effort table cleanup
-    await admin.from("email_verification_tokens").delete().eq("user_id", userId);
+    // Clear NO-ACTION FKs on auth.users that block CASCADE delete
+    const cleanupTables: Array<[string, string]> = [
+      ["content_reviews", "submitted_by"],
+      ["content_reviews", "reviewed_by"],
+      ["content_templates", "created_by"],
+      ["performance_analyses", "user_id"],
+      ["replies", "created_by"],
+      ["studio_images", "user_id"],
+      ["studio_albums", "user_id"],
+      ["video_template_versions", "created_by"],
+      ["weekplans", "created_by"],
+      ["user_roles", "granted_by"],
+      ["email_verification_tokens", "user_id"],
+    ];
+    const cleanupReport: Record<string, string> = {};
+    for (const [table, col] of cleanupTables) {
+      const { error, count } = await admin.from(table).delete({ count: "exact" }).eq(col, userId);
+      cleanupReport[`${table}.${col}`] = error ? `ERR: ${error.message}` : `deleted ${count ?? 0}`;
+    }
 
     const { error: delErr } = await admin.auth.admin.deleteUser(userId);
     if (delErr) {
