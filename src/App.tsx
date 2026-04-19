@@ -25,6 +25,8 @@ import { EmailVerificationGate } from "@/components/auth/EmailVerificationGate";
 import { AICompanionWidget } from "@/components/ai-companion/AICompanionWidget";
 import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedChecklist";
 import { ProductTour } from "@/components/onboarding/ProductTour";
+import { UpgradeTriggerProvider } from "@/hooks/useUpgradeTrigger";
+import { UpgradeMount } from "@/components/upgrade/UpgradeMount";
 
 
 const Index = lazy(() => import("./pages/Index"));
@@ -300,17 +302,20 @@ const AppContent = () => {
       <AuthProvider>
         <TooltipProvider>
           <SidebarProvider>
-            <Toaster />
-            <Sonner />
-            <CookieConsent />
-            <CommandBar />
-            <CommandPalette />
-            <AICompanionWidget />
-            <EmailVerificationGate>
-              <AppLayout />
-              <GettingStartedChecklist />
-              <ProductTour />
-            </EmailVerificationGate>
+            <UpgradeTriggerProvider>
+              <Toaster />
+              <Sonner />
+              <CookieConsent />
+              <CommandBar />
+              <CommandPalette />
+              <AICompanionWidget />
+              <UpgradeMount />
+              <EmailVerificationGate>
+                <AppLayout />
+                <GettingStartedChecklist />
+                <ProductTour />
+              </EmailVerificationGate>
+            </UpgradeTriggerProvider>
           </SidebarProvider>
         </TooltipProvider>
       </AuthProvider>
