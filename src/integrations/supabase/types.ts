@@ -3379,6 +3379,7 @@ export type Database = {
       composer_scenes: {
         Row: {
           ai_prompt: string | null
+          character_shot: Json | null
           clip_quality: string
           clip_source: string
           clip_status: string
@@ -3403,6 +3404,7 @@ export type Database = {
         }
         Insert: {
           ai_prompt?: string | null
+          character_shot?: Json | null
           clip_quality?: string
           clip_source?: string
           clip_status?: string
@@ -3427,6 +3429,7 @@ export type Database = {
         }
         Update: {
           ai_prompt?: string | null
+          character_shot?: Json | null
           clip_quality?: string
           clip_source?: string
           clip_status?: string
