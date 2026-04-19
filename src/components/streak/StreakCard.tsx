@@ -32,12 +32,13 @@ export function StreakCard() {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          const m = payload.new as { milestone_days: number; reward_credits: number };
+          const m = payload.new as { milestone_days: number; reward_dollars: number };
+          const dollars = Number(m.reward_dollars ?? 0);
           toast.success(
             t("streak.milestoneReached", { days: m.milestone_days }),
             {
-              description: m.reward_credits > 0
-                ? t("streak.milestoneCredits", { credits: m.reward_credits })
+              description: dollars > 0
+                ? t("streak.milestoneDollars", { amount: dollars.toFixed(2) })
                 : undefined,
               duration: 6000,
               icon: "🔥",
@@ -164,15 +165,18 @@ export function StreakCard() {
 
         {milestones && milestones.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-1">
-            {milestones.slice(0, 5).map((m) => (
-              <span
-                key={m.id}
-                className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20"
-                title={new Date(m.reached_at).toLocaleDateString()}
-              >
-                🏆 {m.milestone_days}d
-              </span>
-            ))}
+            {milestones.slice(0, 5).map((m) => {
+              const dollars = Number(m.reward_dollars ?? 0);
+              return (
+                <span
+                  key={m.id}
+                  className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                  title={new Date(m.reached_at).toLocaleDateString()}
+                >
+                  🏆 {m.milestone_days}d{dollars > 0 ? ` · +$${dollars.toFixed(2)}` : ""}
+                </span>
+              );
+            })}
           </div>
         )}
       </CardContent>

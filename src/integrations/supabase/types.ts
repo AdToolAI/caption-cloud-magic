@@ -8456,6 +8456,7 @@ export type Database = {
           milestone_days: number
           reached_at: string
           reward_credits: number | null
+          reward_dollars: number
           user_id: string
         }
         Insert: {
@@ -8463,6 +8464,7 @@ export type Database = {
           milestone_days: number
           reached_at?: string
           reward_credits?: number | null
+          reward_dollars?: number
           user_id: string
         }
         Update: {
@@ -8470,6 +8472,7 @@ export type Database = {
           milestone_days?: number
           reached_at?: string
           reward_credits?: number | null
+          reward_dollars?: number
           user_id?: string
         }
         Relationships: []

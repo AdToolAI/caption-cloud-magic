@@ -145,9 +145,13 @@ export default function StreakPage() {
                   <div className="text-xs text-muted-foreground">
                     {new Date(m.reached_at).toLocaleDateString()}
                   </div>
-                  {m.reward_credits > 0 && (
-                    <div className="text-xs text-amber-500 mt-1">+{m.reward_credits} credits</div>
-                  )}
+                  {Number(m.reward_dollars ?? 0) > 0 ? (
+                    <div className="text-xs text-amber-500 mt-1">
+                      {t("streak.milestoneDollarsShort", { amount: Number(m.reward_dollars).toFixed(2) })}
+                    </div>
+                  ) : m.reward_credits > 0 ? (
+                    <div className="text-xs text-muted-foreground mt-1">+{m.reward_credits} credits</div>
+                  ) : null}
                 </motion.div>
               ))}
             </div>
