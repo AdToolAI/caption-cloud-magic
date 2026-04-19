@@ -1,104 +1,54 @@
 
 
-## Befund
+## Befund — zwei Fragen, zwei Antworten
 
-Der User hat eine **clevere Idee**: Statt zu versuchen, die KI zu zwingen, in allen 7 Szenen exakt das gleiche Gesicht zu zeigen (technisch unmöglich), nutzt man **Storytelling-Tricks**, um dem **Zuschauer den Eindruck** von Kontinuität zu vermitteln. Das ist genau, wie echte Filmregisseure mit Stand-Ins, Maskenwechseln oder Doppelgängern arbeiten — und es funktioniert mit txt2video sogar **besser** als der Brute-Force-Ansatz.
+### 1) Werden hier schon Credits abgezogen? **Ja.**
+Im Edge-Function `compose-video-clips/index.ts` (Zeile 354-376) zieht der Server **direkt nach erfolgreichem Render-Start** den vollen Betrag pro AI-Clip vom AI-Video-Wallet ab — über `deduct_ai_video_credits` RPC. Konkret:
 
-## Die Tricks im Detail
+- **Pro Klick auf „Generieren"** (einzeln) oder **„Alle generieren"** wird der Wallet-Stand geprüft.
+- Hat der User genug → Lambda/Replicate-Call wird gestartet → **sofortige Belastung** (z. B. €1.51 für eine 10s Hailuo-Szene).
+- Schlägt der Replicate-Start fehl (`status: 'failed'`) → wird **nicht** abgezogen (nur `'generating'` zählt).
+- Schlägt der Render danach im Hintergrund fehl (Webhook meldet Fehler) → **aktuell kein automatischer Refund** ⚠️ (das wäre ein separater Hardening-Schritt — sage an, ob ich das auch mit angehen soll).
 
-### 1) Verteilung statt Wiederholung
-Nicht jede Szene zeigt den Charakter direkt. Bei 7 Szenen z. B.:
-- **Szene 1:** Voller Charakter (Establishing Shot — setzt das Bild im Kopf)
-- **Szene 2:** Nur Hände/Detail (Sword-Closeup)
-- **Szene 3:** Rückenansicht / über die Schulter
-- **Szene 4:** POV (was er sieht — Charakter unsichtbar)
-- **Szene 5:** Silhouette / Gegenlicht
-- **Szene 6:** Halbtotale aus Distanz
-- **Szene 7:** Closeup Augen oder Reaction-Shot
+### 2) Re-Roll bei Unzufriedenheit — **technisch da, aber unsichtbar.**
+Der „Neu generieren"-Button (`RefreshCw`-Icon) existiert bereits in `ClipsTab.tsx` Zeile 481-496 für jede fertige AI-Szene. Aber:
 
-→ Nur **2-3 von 7 Szenen** zeigen das volle Gesicht. Der Rest nutzt **Identifikatoren** (Krone, Mantel, Schwert), die die KI zuverlässig wiederholen kann.
+- Es ist **nur ein 7×7px Icon ohne Label** → User sieht es nicht.
+- Es gibt **keinen Hinweis**, dass das Geld kostet (User klickt vielleicht versehentlich auf einen €1.51-Reroll).
+- Es gibt **keinen Hinweis-Banner** der dem User die Möglichkeit erklärt.
 
-### 2) Konsistenz-Anker statt Gesicht
-Die KI ist **schlecht bei Gesichtern**, aber **exzellent bei Objekten/Kleidung**. Wenn in jeder Szene erscheint:
-> *"crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies"*
+## Plan: Transparente Re-Roll-Möglichkeit
 
-…erkennt der Zuschauer „den König" auch wenn das Gesicht leicht anders ist. Das ist der **Sherlock-Holmes-Effekt** (Pfeife + Mütze = Sherlock, egal welcher Schauspieler).
+### A) Info-Banner oben in der Clips-Liste
+Ein dezenter Hinweis-Block (Lightbulb-Icon, gold/amber Tönung im Bond-Stil) **über der Scene-Liste**, einmalig sichtbar:
 
-### 3) Kamera-Variation als Feature
-Genau wie der User vorschlägt: **„aus einem anderen Winkel"** entlastet die KI. Wenn Szene 2 ein Side-Profile aus 30 m Distanz ist, fällt eine kleine Gesichtsabweichung gar nicht auf — der Zuschauer denkt automatisch „klar, anderer Blickwinkel".
+> 💡 *„Nicht zufrieden mit einer Szene? Klicke auf das ↻-Icon rechts neben einer fertigen Szene, um sie neu zu generieren — jeder Re-Roll kostet erneut Credits, aber du kannst Stil, Prompt oder Charakter-Shot vorher anpassen."*
 
-## Plan: Smart Character Consistency v2
+Mit kleinem Dismiss-X (gespeichert in `localStorage` als `composer-reroll-hint-dismissed`).
 
-Aufbauend auf dem vorherigen Plan (Character Profiles im Briefing) — aber mit einer **intelligenteren Storyboard-Strategie**:
+### B) Re-Roll-Button sichtbarer machen
+Statt nur ein Icon → ein Text-Button **„↻ Neu generieren (€X.XX)"** rechts an jeder fertigen AI-Szene. Konsistent mit dem „Generieren"-Button bei pending Szenen.
 
-### 1) Character Profile bleibt wie geplant
-`characters[]` in `ComposerBriefing` mit **zwei** statt einem Beschreibungsfeld:
-```typescript
-{
-  id, name,
-  appearance: string;     // Gesicht/Körper (selten verwendet)
-  signatureItems: string; // Kleidung/Objekte (in JEDER Szene wiederholt)
-}
-```
-Beispiel Richard Löwenherz:
-- `appearance`: *"tall man late 30s, long auburn red hair, full beard, blue eyes"*
-- `signatureItems`: *"crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword"*
+### C) Bestätigungs-Dialog beim Re-Roll
+Bevor Credits ein zweites Mal verbrannt werden:
 
-### 2) Smart Shot Variation Strategy im Storyboard-Prompt
-`compose-video-storyboard/index.ts` bekommt eine neue System-Anweisung wenn Charaktere definiert sind:
+> *„Szene 3 neu generieren?  
+> Dies kostet erneut **€1.51**. Der vorherige Clip wird ersetzt.  
+> Tipp: Passe vorher den Prompt im Storyboard-Tab oder den Charakter-Shot-Typ an, um ein anderes Ergebnis zu bekommen."*  
+> [Abbrechen] [Neu generieren €1.51]
 
-> *„For the named character(s) below, **vary the shot composition across scenes** to create a sense of continuity without overusing facial close-ups. Use this distribution as a guideline:*
-> - *1-2 scenes: Full character visible (establishing/hero shots) — include `appearance` + `signatureItems`*
-> - *2-3 scenes: Indirect views (back, profile, silhouette, hands, POV, distant figure) — include only `signatureItems`*
-> - *1-2 scenes: Detail shots (eyes, hands holding object, feet walking) — include only the relevant body part + 1 signature item*
-> - *Remaining scenes: Environment/object focus (no character) — include 1 signature item if naturally present*
->
-> *Always include `signatureItems` verbatim when the character or any part of them is visible. This creates visual continuity without forcing the AI to recreate the exact same face."*
+Standard `AlertDialog` aus shadcn — keine neue Dependency.
 
-### 3) Per-Scene `characterShot` Feld
-Storyboard-JSON bekommt pro Szene ein neues Optional-Feld:
-```typescript
-characterShot?: {
-  characterId: string;
-  shotType: 'full' | 'profile' | 'back' | 'detail' | 'pov' | 'silhouette' | 'absent';
-}
-```
-→ User sieht im Storyboard-Tab, welche Szene welche Strategie nutzt, und kann manuell umverteilen.
+### D) Klare Credit-Deduction-Info im bestehenden Cost-Banner
+In der Summary-Bar (`8/8 Clips fertig`) oben einen Mini-Hinweis hinzufügen:
 
-### 4) UI-Visualisierung im StoryboardTab
-Pro Szene kleines Icon-Badge:
-- 👤 Full Shot
-- 🚶 Back/Profile
-- ✋ Detail
-- 👁 POV
-- 🌅 Silhouette
-- — Absent
+> *„Credits werden pro Generierung abgezogen — Re-Rolls kosten erneut."*
 
-Plus Tooltip: *„Strategie: weniger Gesichts-Closeups → konsistentere Charakter-Wahrnehmung"*
-
-### 5) Briefing-Hinweisbox
-In der „Charaktere"-Karte ein dezenter Tipp:
-> 💡 *„Pro-Tipp: Beschreibe **markante Kleidung & Objekte** ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Die KI variiert automatisch Kamerawinkel, damit nicht jede Szene ein Closeup ist."*
-
-## Was der User bekommt
-
-| Aspekt | Vorher (naiv) | Mit Smart Strategy |
-|---|---|---|
-| Gesicht in 7/7 Szenen | KI variiert stark — Bruch sichtbar | KI zeigt Gesicht nur 2-3× — kaum auffällig |
-| Kleidung/Krone/Schwert | Variiert ebenfalls | **Konsistent** durch `signatureItems`-Repeat |
-| Wahrnehmung „gleiche Person" | ❌ Nein | ✅ **Ja** (Sherlock-Effekt) |
-| Pixel-perfect Gesicht | Nein | Nein (technisch unmöglich) |
-| Cineastische Bildsprache | Monoton (Closeups) | **Vielfältig** (Pro-Look) |
+Klein, subtil, einmalig sichtbar.
 
 ## Betroffene Dateien
+- `src/components/video-composer/ClipsTab.tsx` — Banner + größerer Re-Roll-Button + AlertDialog
 
-- `src/types/video-composer.ts` — `characters[]` mit `appearance` + `signatureItems`, `characterShot` pro Scene
-- `src/components/video-composer/BriefingTab.tsx` — Character-Manager mit zwei Feldern + Pro-Tipp-Box
-- `src/components/video-composer/StoryboardTab.tsx` — Shot-Type Badges pro Szene
-- `src/components/video-composer/SceneCard.tsx` — optional: Shot-Type-Selector zum manuellen Override
-- `supabase/functions/compose-video-storyboard/index.ts` — Smart Shot Variation Strategy + JSON-Schema-Erweiterung
-- `supabase/functions/compose-video-clips/index.ts` — `enrichPrompt` injiziert je nach `shotType` nur `appearance` und/oder `signatureItems`
-
-## Bonus (später, optional)
-Ein „Konsistenz-Score" (0-100%) im Storyboard-Tab, der berechnet wie gut die Verteilung balanciert ist (z. B. „⚠️ 6/7 Szenen sind Closeups — empfehle Distribution") + One-Click „Auto-Balance".
+## Optional — bitte sag Bescheid
+**E) Auto-Refund bei Background-Render-Failure:** Aktuell werden Credits abgezogen sobald Replicate `'generating'` meldet — wenn der Render dann später (im Webhook) fehlschlägt, bleibt das Geld weg. Soll ich `compose-clip-webhook` so erweitern, dass es bei `status: 'failed'` automatisch `refund_ai_video_credits` aufruft? (Schließt einen Reliability-Lücke nach unserer Memory-Policy „Credit Refund Automation".)
 
