@@ -5602,6 +5602,7 @@ export type Database = {
           business_type: string
           created_at: string
           experience_level: string
+          first_video_prompts: Json | null
           id: string
           niche: string
           platforms: string[]
@@ -5613,6 +5614,7 @@ export type Database = {
           business_type?: string
           created_at?: string
           experience_level?: string
+          first_video_prompts?: Json | null
           id?: string
           niche?: string
           platforms?: string[]
@@ -5624,6 +5626,7 @@ export type Database = {
           business_type?: string
           created_at?: string
           experience_level?: string
+          first_video_prompts?: Json | null
           id?: string
           niche?: string
           platforms?: string[]
