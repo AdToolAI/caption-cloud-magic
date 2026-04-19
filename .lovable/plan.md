@@ -1,70 +1,87 @@
 
 
-## Entscheidung – alles geklärt
+## Plan: A4 Getting-Started-Checkliste + A3 Interactive Tour
 
-1. **Backfill: ja** – Lazy-Trigger für existierende User
-2. **Sprache: UI-Sprache anzeigen, EN an Hailuo** – via `prompt` (UI) + `prompt_en` (Übersetzung) in DB-Cache
-3. **Auto-Submit: nein** – Prompt wird nur vorausgefüllt, User klickt selbst „Generate"
+Alle 4 Klärungen bestätigt:
+1. **Reihenfolge:** A4 zuerst → danach A3
+2. **5 Checklisten-Schritte:** wie vorgeschlagen
+3. **Checkliste:** kollabierbar (Default: offen)
+4. **Tour:** Auto-Start beim ersten Login mit „Tour überspringen"-Button
 
-## Plan: A2 mit personalisierten Prompts
+Mein Take zu deiner Tour-Entscheidung: **sehr gut**. Auto-Start sorgt dafür, dass keiner die Tour verpasst, der Skip-Button respektiert Power-User. Standard im SaaS-Onboarding (Notion, Linear, Stripe machen es genauso).
 
-### Schritt 1 — DB-Migration
-- `ALTER TABLE onboarding_profiles ADD COLUMN first_video_prompts JSONB;`
-- Struktur: `[{ prompt, prompt_en, style_hint }, ...]` (3 Einträge)
+---
 
-### Schritt 2 — Edge Function `generate-first-video-prompts`
-- Input: `niche`, `business_type`, `platforms`, `posting_goal`, `experience_level`, `language`
-- Modell: `google/gemini-2.5-flash-lite` (schnell, günstig)
-- Tool-Calling für strukturiertes JSON-Output (3 Prompts mit `prompt`, `prompt_en`, `style_hint`)
-- System-Prompt: maßgeschneiderte 6-Sek-Hailuo-Prompts (max. 25 Wörter), realistisch umsetzbar
-- Speichert direkt in `onboarding_profiles.first_video_prompts`
-- Idempotent (überspringt, wenn vorhanden, außer `force: true`)
+## A4 — Getting-Started-Checkliste
 
-### Schritt 3 — Onboarding-Integration
-- In `NicheTutorialModal.tsx`: nach `generate-starter-plan` parallel `generate-first-video-prompts` aufrufen (fire-and-forget)
-- Fehler tolerabel → Fallback auf statische Defaults
+### Komponenten
+- **`GettingStartedChecklist.tsx`** — neue Komponente, eingebettet in die Sidebar (unter den Hub-Icons). Kollabierbar via Chevron-Toggle, Default: offen für User mit `progress < 100%`.
+- **`useGettingStartedProgress.ts`** — Hook, der parallel 5 Datenquellen prüft:
+  1. `onboarding_profiles` existiert → ✅ Onboarding
+  2. `video_creations` count > 0 → ✅ Erstes Video
+  3. `social_connections` count > 0 → ✅ Konto verbunden
+  4. `calendar_events` count > 0 → ✅ Post geplant
+  5. `brand_kits` count > 0 → ✅ Brand Kit
+- **Progress-Ring** im James-Bond-2028-Style: kreisförmiger Fortschrittsbalken in Gold (#F5C76A) mit Glow-Effekt, zeigt „3/5"
+- **Auto-Hide:** Bei 100% verschwindet die Checkliste mit einem „Alle Schritte abgeschlossen!"-Toast und persistiert via `localStorage`-Flag (User kann nicht wieder aufploppen)
+- **Lokalisiert** (DE/EN/ES) über bestehenden `useTranslation()`-Hook
+- **Layout:** Da Sidebar nur 68px breit ist → **Floating Panel** rechts neben der Sidebar (kollabiert: nur Progress-Ring-Icon sichtbar; expandiert: 280px breites Panel mit allen 5 Steps)
 
-### Schritt 4 — Frontend-Hook `useFirstVideoPrompts()`
-- Lädt Prompts aus `onboarding_profiles.first_video_prompts`
-- **Backfill-Logic**: Wenn `IS NULL` und User hat Onboarding-Profil → Edge Function lazy aufrufen, während Defaults gezeigt werden, dann sanft ersetzen
-- Fallback-Kette: DB-Prompts → statische Defaults pro Sprache
+### CTAs pro Step
+Jeder offene Step ist klickbar und routet zur passenden Seite:
+- Onboarding → `/onboarding`
+- Erstes Video → `/hailuo-video-studio` (mit personalisiertem Prompt aus A2)
+- Konto verbinden → `/hub/social-management`
+- Post planen → `/calendar`
+- Brand Kit → `/brand-kit`
 
-### Schritt 5 — `FirstVideoGuide.tsx` aktualisieren
-- Statische Prompts durch `useFirstVideoPrompts()` ersetzen
-- Link enthält **beide** Werte: `?prompt=<UI>&prompt_en=<EN>`
+### Aufwand: ~45 Min
 
-### Schritt 6 — Neue Komponente `FirstVideoExpressHero`
-- Persistent auf `/home` (Wallet > 0, 0 Generationen)
-- 3 personalisierte Beispielprompts + „Mit Hailuo 2.3 erstellen"
-- Lokalisiert (DE/EN/ES)
-- Verschwindet nach erster Generation
+---
 
-### Schritt 7 — Hailuo Studio: URL-Param-Handling
-- `useSearchParams()` in `HailuoVideoStudio.tsx`
-- `?prompt=` füllt UI-Prompt-Feld (User sieht in seiner Sprache, kann editieren)
-- `?prompt_en=` wird intern an Hailuo geschickt (falls vorhanden, sonst Übersetzung via bestehendem `VideoPromptOptimizer`)
-- **Kein Auto-Submit** – User klickt selbst
+## A3 — Interactive Product Tour
 
-### Schritt 8 — CTA-Routing vereinheitlichen
-- `DashboardVideoCarousel`: First-Time-User (0 Generationen) → `/hailuo-video-studio?prompt=...&prompt_en=...`
-- Power-User → wie bisher `/universal-video-creator`
-- `WelcomeBonusModal`: direkt zu `/hailuo-video-studio` mit erstem personalisierten Prompt
+### Setup
+- **Library:** `react-joyride` installieren
+- **`useProductTour.ts`** — Hook, der Tour-Status in neuer Spalte `profiles.tour_completed_at TIMESTAMPTZ` persistiert
+- **Auto-Start:** beim ersten Login nach Onboarding (1× pro User), Skip-Button immer sichtbar
+- **Manuell startbar:** „Tour erneut starten"-Button in `/settings`
 
-### Schritt 9 — E2E-Test in Preview
-- Neuer User: Onboarding → Modal → Hero/Guide mit personalisierten Prompts → Klick → Hailuo mit Prompt vorausgefüllt → User editiert ggf. → Generate → Video < 90 Sek
+### Tour-Stationen (6 Steps)
+1. Sidebar-Hubs („Hier findest du alle Tools")
+2. Dashboard-Cards (News & Trend Radar)
+3. „Erstes Video"-Hero (aus A2)
+4. Getting-Started-Checkliste (aus A4)
+5. AI-Studios-Hub
+6. Calendar/Planner
 
-## Technische Details
+### Theming
+- **Dark/Gold-Style** passend zum James-Bond-2028-Design (`backgroundColor: '#050816'`, `primaryColor: '#F5C76A'`, Glassmorphism)
+- **Lokalisierte Tooltips** (DE/EN/ES)
+- **Skip-Button** prominent: „Tour überspringen" / „Skip Tour" / „Saltar tour"
 
-- **Übersetzungsfluss**: KI generiert beide Versionen (`prompt` in UI-Sprache, `prompt_en` in Englisch) im selben Call → keine doppelte API-Latenz
-- **Caching**: Einmal generiert, bleibt in `onboarding_profiles` – keine wiederholten KI-Calls
-- **Editierbarkeit**: User sieht den Prompt im Hailuo-Studio im Textfeld, kann frei ändern; bei Submit wird (falls Prompt unverändert) `prompt_en` genutzt, sonst der editierte Text durch bestehenden `VideoPromptOptimizer`
-- **Backfill für Edge Cases**: Hook löst Edge Function lazy aus, falls User Onboarding hat aber `first_video_prompts IS NULL` (z. B. existierende User vor diesem Feature)
+### DB-Migration
+- `ALTER TABLE profiles ADD COLUMN tour_completed_at TIMESTAMPTZ;`
 
-## Aufwand
+### Aufwand: ~60 Min
 
-~2 h Gesamt (DB 5min, Edge Function 25min, Hook+Backfill 25min, Express-Hero 30min, Hailuo URL-Param 15min, CTA-Routing 15min, E2E-Test 15min)
+---
+
+## Reihenfolge der Umsetzung
+
+1. **A4 Schritt 1:** `useGettingStartedProgress`-Hook (15 min)
+2. **A4 Schritt 2:** `GettingStartedChecklist`-Komponente + Floating Panel (20 min)
+3. **A4 Schritt 3:** Sidebar-Integration + E2E-Test (10 min)
+4. **A3 Schritt 1:** DB-Migration + `react-joyride` install (5 min)
+5. **A3 Schritt 2:** `useProductTour`-Hook + Auto-Start-Logik (15 min)
+6. **A3 Schritt 3:** 6 Tour-Steps + Theming + Lokalisierung (30 min)
+7. **A3 Schritt 4:** Settings-Button „Tour erneut starten" + E2E-Test (10 min)
+
+**Gesamt: ~1h 45min**
+
+---
 
 ## Nach Approval
 
-Sobald freigegeben, baue ich Schritt für Schritt durch und teste am Ende End-to-End in der Preview.
+Ich baue Schritt für Schritt durch — erst A4 komplett, dann A3 — und teste am Ende beide Features End-to-End in der Preview.
 
