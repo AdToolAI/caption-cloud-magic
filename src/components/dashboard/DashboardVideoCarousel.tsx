@@ -388,12 +388,8 @@ export const DashboardVideoCarousel = ({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between py-1">
-        <div className="flex items-center gap-3">
-          <Video className="h-4 w-4 text-primary" />
-          <h2 className="text-lg font-bold text-foreground">{t("carousel.yourVideos")}</h2>
-          <Badge variant="secondary" className="text-xs">{sortedVideos.length}</Badge>
-        </div>
+      <div className="flex items-center justify-between gap-2 py-1 flex-wrap">
+        <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} />
         <div className="flex items-center gap-1.5">
           {quickActions.map((action, i) => (
             <Button key={i} asChild variant={action.variant || 'outline'} size="sm" className="h-7 px-2.5 text-xs rounded-lg gap-1.5">
