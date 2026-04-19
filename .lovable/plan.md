@@ -1,44 +1,34 @@
 
 
-## Plan: Sidebar-Icon und AppHeader-Brand auf eine Linie bringen
+## Plan: Komplette Status-Bar-Zeile auf halbe Höhe reduzieren
 
-### Diagnose (aus Screenshot + Code)
-- Beide Sparkles-Icons sind **gleich groß** (`h-5 w-5` = 20px, beide via `Brand compact`)
-- **Sidebar-Brand-Container**: `pt-2 pb-3` (8px top) → Icon bei ~8px vom Top
-- **AppHeader**: `h-14` (56px), Brand vertikal zentriert → Icon bei ~18px vom Top
-- **Resultat**: Sidebar-Icon sitzt höher und wirkt dadurch optisch "kürzer/kleiner", weil es nicht auf einer Linie mit dem Header-Brand steht
+### Diagnose
+Die Status-Bar auf `/` (Home.tsx) enthält nebeneinander: **CreditBalance**, **NotificationBell**, **WeatherWidget** etc. — alle ~230px hoch. Ziel: gesamte Zeile auf ~115px halbieren.
 
-### Fix — Sidebar-Brand-Container exakt auf Header-Höhe (`h-14`) bringen
-Damit das Icon mittig im selben 56px-Slot wie der Header-Brand sitzt.
+### Vorgehen
+Ich muss zuerst sehen, welche Komponenten in der Zeile sind und wie sie strukturiert sind, um die Höhen einheitlich zu reduzieren.
 
-### Änderung — minimal
+### Geplante Änderungen
 
-**`src/components/AppSidebar.tsx` (Z. 39–41)**
+**1. `src/pages/Home.tsx` (Status-Bar-Container)**
+- Falls `min-h-*` oder feste Höhe gesetzt ist → halbieren
+- Grid-Gap ggf. von `gap-6` → `gap-3`
 
-Aktuell:
-```tsx
-<div className="flex flex-col items-center pt-2 pb-3 border-b border-border bg-card">
-  <Brand compact showText={false} />
-</div>
-```
+**2. `src/components/credits/CreditBalance.tsx`**
+- `CardHeader`/`CardContent` Padding: `p-6` → `p-3`
+- Enterprise-Block: `InfinityIcon` `h-16 w-16` → `h-7 w-7`
+- Header + Infinity-Block in **eine Zeile** legen
+- Plan-Badge inline neben Title (nicht `mt-2`)
+- Free/Basic/Pro: Schrift `text-5xl` → `text-3xl`, Progress-Bar `h-3` → `h-2`
 
-Neu:
-```tsx
-<div className="flex items-center justify-center h-14 border-b border-border bg-card">
-  <Brand compact showText={false} />
-</div>
-```
-
-- `h-14` → exakt gleiche Höhe wie `AppHeader`
-- `items-center justify-center` → Icon wird vertikal + horizontal mittig platziert
-- Border-bottom bleibt, sodass die Trennlinie unter Sidebar-Brand und Header bündig durchläuft
+**3. Alle anderen Karten in der Zeile (NotificationBell, WeatherWidget, etc.)**
+- Padding und Innenabstände parallel reduzieren, damit alle Karten dieselbe (halbierte) Höhe haben
+- Icons/Fonts proportional verkleinern
 
 ### Was NICHT geändert wird
-- Icon-Größe (`h-5 w-5`) bleibt — sie ist bereits identisch
-- Header bleibt unverändert
-- Ticker bleibt unverändert
-- Keine weiteren Layout-Änderungen
+- Inhalte, Daten, Glow/Border/Animationen, James-Bond-2028-Styling
+- Keine Logik
 
 ### Risiko
-- Null. Reine Höhen-Anpassung in einem Container.
+Niedrig. Reine CSS/Layout-Anpassung über mehrere Karten in einer Zeile.
 
