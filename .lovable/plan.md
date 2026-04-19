@@ -1,38 +1,40 @@
 
 
-## Plan: Linke Sidebar vollständig entfernen
+## Plan: Sidebar wiederherstellen + zweite Scrollbar gezielt entfernen
 
-### Ziel
-Die `AppSidebar` wird aus dem App-Shell entfernt. Damit verschwindet auch der Sidebar-interne Scroll-Container (`data-sidebar="content"` mit `overflow-y-auto`), der die zweite vertikale Scrollbar im Bild verursacht.
+### Missverständnis-Korrektur
+Die linke Icon-Sidebar war gewollt und soll **bleiben**. Im Bild sind rechts **zwei vertikale Scrollbars** sichtbar — die linke davon ist die **innere Scrollbar des `SidebarContent`**, die rechte ist die normale Dokument-Scrollbar. Entfernt werden soll nur die innere Sidebar-Scrollbar.
 
-### Navigation nach Entfernen
-- Die Hauptnavigation läuft bereits über die **Hub-Seiten** (`/hub/:hubKey`) und das Home-Dashboard.
-- Im `AppHeader` ist die Navigation zu Home und den Hubs erreichbar (Logo/Brand + ggf. Menü).
-- Routing bleibt komplett unverändert, alle Routen funktionieren weiter.
+### Ursache
+In `src/components/ui/sidebar.tsx` (Zeile 334) hat `SidebarContent` ein hartes `overflow-y-auto`. Unsere `AppSidebar` versucht das mit `[&::-webkit-scrollbar]:hidden [scrollbar-width:none]` zu verstecken, aber:
+- Die Klasse landet auf dem `SidebarContent`-Wrapper, nicht zuverlässig auf dem Element, das tatsächlich scrollt
+- In bestimmten Render-Zuständen (z. B. wenn der Inhalt knapp die Höhe überschreitet) erscheint die native Scrollbar trotzdem
 
-### Änderungen
+### Schritte
 
-1. **`src/App.tsx`**
-   - Import `AppSidebar` entfernen.
-   - In `AppLayout` Zeile 135 das `{user && !isLandingRoute && <AppSidebar />}` löschen.
-   - Den `SidebarProvider` in `AppContent` entfernen (wird ohne Sidebar nicht mehr gebraucht). Falls einzelne Komponenten weiterhin `useSidebar()` verwenden, bleibt der Provider zur Sicherheit erhalten — wird im Code geprüft.
-   - Wrapper-`div` in `AppLayout` vereinfachen: Das äußere `flex` wird nicht mehr benötigt, Content nimmt volle Breite.
+1. **`src/App.tsx`** — Sidebar wieder einsetzen
+   - Import `AppSidebar` ergänzen
+   - Layout zurück auf `flex` umstellen
+   - In `AppLayout` wieder `{user && !isLandingRoute && <AppSidebar />}` rendern
+   - `SidebarProvider` in `AppContent` bleibt (existiert bereits)
 
-2. **`src/components/AppHeader.tsx`** (nur falls nötig)
-   - Sicherstellen, dass Brand/Logo links sichtbar ist und zu `/home` linkt, damit der Einstiegspunkt zur Navigation klar bleibt.
-   - Kein Umbau, nur Sichtprüfung.
+2. **`src/components/AppSidebar.tsx`** — innere Scrollbar zuverlässig unterdrücken
+   - `SidebarContent` so konfigurieren, dass es **nicht mehr scrollt**:
+     - die wenigen Hub-Icons passen immer in die Viewport-Höhe
+     - daher `overflow-hidden` statt `overflow-y-auto` durchsetzen
+   - Konkret: zusätzliche Klasse `!overflow-hidden` (Tailwind important) auf `SidebarContent` setzen, plus weiterhin `[&::-webkit-scrollbar]:hidden [scrollbar-width:none]` als Fallback
+   - Damit verschwindet die zweite (linke) Scrollbar im rechten Bereich endgültig
 
-3. **`src/index.css`**
-   - Bisherige Sidebar-bezogene Workarounds (z. B. `[data-sidebar="content"]`-Overrides) entfernen, da nicht mehr nötig.
+3. **Sichtprüfung**
+   - Auf Home prüfen: nur noch die normale Dokument-Scrollbar ist sichtbar
+   - Sidebar-Icons bleiben voll bedienbar (kein Overflow nötig, da nur wenige Items)
 
-4. **Datei `src/components/AppSidebar.tsx`**
-   - Bleibt im Projekt liegen (nicht löschen), aber wird nicht mehr verwendet. Kann später bei Bedarf reaktiviert werden.
+### Betroffene Dateien
+- `src/App.tsx`
+- `src/components/AppSidebar.tsx`
 
 ### Ergebnis
-- Nur noch **eine vertikale Scrollbar** (Dokument-Scroll).
-- Mehr horizontaler Platz für den Hauptcontent.
-- Navigation über Header + Hub-Seiten, wie es ohnehin schon vorgesehen ist.
-
-### Risiko
-Niedrig. Falls einzelne Seiten direkt `useSidebar()` aufrufen, bleibt der `SidebarProvider` im Tree erhalten — die Sidebar selbst wird einfach nicht mehr gerendert.
+- Linke Icon-Sidebar ist wieder da
+- Nur noch **eine** vertikale Scrollbar rechts (die echte Seiten-Scrollbar)
+- Die störende zweite Scrollbar direkt daneben ist weg
 
