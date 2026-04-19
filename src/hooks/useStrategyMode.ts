@@ -32,6 +32,14 @@ function getMonday(date: Date): Date {
   return d;
 }
 
+export type CreatorLevel = "beginner" | "intermediate" | "advanced";
+
+const POSTS_PER_WEEK_FOR_LEVEL: Record<CreatorLevel, number> = {
+  beginner: 3,
+  intermediate: 5,
+  advanced: 7,
+};
+
 export function useStrategyMode() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -54,6 +62,57 @@ export function useStrategyMode() {
   });
 
   const enabled = !!profileQuery.data?.strategy_mode_enabled;
+
+  // Read onboarding profile (level + frequency)
+  const onboardingQuery = useQuery({
+    queryKey: ["onboarding-profile", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from("onboarding_profiles")
+        .select("experience_level, posts_per_week")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
+  const rawLevel = (onboardingQuery.data?.experience_level || "beginner").toLowerCase();
+  const experienceLevel: CreatorLevel = (["beginner", "intermediate", "advanced"].includes(rawLevel)
+    ? rawLevel
+    : "beginner") as CreatorLevel;
+  const postsPerWeek = onboardingQuery.data?.posts_per_week || POSTS_PER_WEEK_FOR_LEVEL[experienceLevel];
+
+  // Level progress: posts published + avg ER (last 28 days)
+  const progressQuery = useQuery({
+    queryKey: ["creator-level-progress", user?.id, experienceLevel],
+    queryFn: async () => {
+      if (!user) return null;
+      const since = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString();
+      const [{ data: metrics }, publishedRes, stratAllRes, stratDoneRes] = await Promise.all([
+        supabase.from("post_metrics").select("engagement_rate").eq("user_id", user.id).gte("posted_at", since),
+        supabase.from("calendar_events").select("id", { count: "exact", head: true }).eq("created_by", user.id).eq("status", "published").gte("published_at", since),
+        supabase.from("strategy_posts").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("scheduled_at", since),
+        supabase.from("strategy_posts").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "completed").gte("scheduled_at", since),
+      ]);
+      const er = (metrics || []).map((m: any) => m.engagement_rate || 0).filter((v: number) => v > 0);
+      const avgEr = er.length > 0 ? er.reduce((a, b) => a + b, 0) / er.length : 0;
+      const total = stratAllRes.count ?? 0;
+      const done = stratDoneRes.count ?? 0;
+      return {
+        postsPublished: publishedRes.count ?? 0,
+        avgEngagementRate: Number(avgEr.toFixed(2)),
+        strategyTotal: total,
+        strategyCompleted: done,
+        completionRate: total > 0 ? done / total : 0,
+      };
+    },
+    enabled: !!user && enabled,
+    staleTime: 5 * 60_000,
+  });
 
   // Current week posts
   const weekStart = getMonday(new Date()).toISOString().split("T")[0];
@@ -173,6 +232,62 @@ export function useStrategyMode() {
     },
   });
 
+  // Manual level override (also pauses auto-upgrade for 14 days)
+  const setLevelMutation = useMutation({
+    mutationFn: async (newLevel: CreatorLevel) => {
+      if (!user) throw new Error("not authenticated");
+      const newPostsPerWeek = POSTS_PER_WEEK_FOR_LEVEL[newLevel];
+      const pauseUntil = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+      const prevLevel = experienceLevel;
+      const { error: e1 } = await supabase
+        .from("onboarding_profiles")
+        .update({ experience_level: newLevel, posts_per_week: newPostsPerWeek })
+        .eq("user_id", user.id);
+      if (e1) throw e1;
+
+      const { error: e2 } = await supabase
+        .from("profiles")
+        .update({ level_auto_pause_until: pauseUntil })
+        .eq("id", user.id);
+      if (e2) throw e2;
+
+      await supabase.from("creator_level_history").insert({
+        user_id: user.id,
+        level_from: prevLevel,
+        level_to: newLevel,
+        trigger: "manual",
+        reason: "Manual override by creator",
+        metrics_snapshot: {},
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["onboarding-profile"] });
+      qc.invalidateQueries({ queryKey: ["creator-level-progress"] });
+      toast.success("Level aktualisiert");
+    },
+    onError: (e: any) => toast.error(e?.message || "Fehler beim Aktualisieren"),
+  });
+
+  // Compute progress to next level
+  const next = experienceLevel === "beginner" ? "intermediate" : experienceLevel === "intermediate" ? "advanced" : null;
+  const thresholds = next === "intermediate"
+    ? { posts: 8, er: 2.5, completion: 0.6 }
+    : next === "advanced"
+    ? { posts: 16, er: 4.5, completion: 0.7 }
+    : null;
+  const progress = progressQuery.data;
+  const levelProgress = next && thresholds && progress ? {
+    nextLevel: next as CreatorLevel,
+    postsNeeded: Math.max(0, thresholds.posts - progress.postsPublished),
+    erNeeded: Math.max(0, Number((thresholds.er - progress.avgEngagementRate).toFixed(2))),
+    completionNeeded: Math.max(0, Number(((thresholds.completion - progress.completionRate) * 100).toFixed(0))),
+    postsPublished: progress.postsPublished,
+    avgEr: progress.avgEngagementRate,
+    completionRate: progress.completionRate,
+    thresholds,
+  } : null;
+
   return {
     enabled,
     activatedAt: profileQuery.data?.strategy_mode_activated_at,
@@ -180,6 +295,9 @@ export function useStrategyMode() {
     posts: postsQuery.data || [],
     isLoadingPosts: postsQuery.isLoading,
     weekStart,
+    experienceLevel,
+    postsPerWeek,
+    levelProgress,
     toggle: toggleMutation.mutate,
     isToggling: toggleMutation.isPending,
     regenerate: regenerateMutation.mutate,
@@ -187,5 +305,7 @@ export function useStrategyMode() {
     dismiss: dismissMutation.mutate,
     reschedule: rescheduleMutation.mutate,
     complete: completeMutation.mutate,
+    setLevel: setLevelMutation.mutate,
+    isSettingLevel: setLevelMutation.isPending,
   };
 }

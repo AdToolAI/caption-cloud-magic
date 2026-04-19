@@ -3900,6 +3900,39 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_level_history: {
+        Row: {
+          created_at: string
+          id: string
+          level_from: string | null
+          level_to: string
+          metrics_snapshot: Json | null
+          reason: string | null
+          trigger: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          level_from?: string | null
+          level_to: string
+          metrics_snapshot?: Json | null
+          reason?: string | null
+          trigger: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          level_from?: string | null
+          level_to?: string
+          metrics_snapshot?: Json | null
+          reason?: string | null
+          trigger?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       credit_reservations: {
         Row: {
           actual_amount: number | null
@@ -6378,6 +6411,7 @@ export type Database = {
           email_verified: boolean | null
           id: string
           language: string | null
+          level_auto_pause_until: string | null
           login_notification_enabled: boolean | null
           name: string | null
           onboarding_completed: boolean | null
@@ -6410,6 +6444,7 @@ export type Database = {
           email_verified?: boolean | null
           id: string
           language?: string | null
+          level_auto_pause_until?: string | null
           login_notification_enabled?: boolean | null
           name?: string | null
           onboarding_completed?: boolean | null
@@ -6442,6 +6477,7 @@ export type Database = {
           email_verified?: boolean | null
           id?: string
           language?: string | null
+          level_auto_pause_until?: string | null
           login_notification_enabled?: boolean | null
           name?: string | null
           onboarding_completed?: boolean | null
