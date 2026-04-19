@@ -6465,6 +6465,7 @@ export type Database = {
           phone_number: string | null
           plan: string | null
           security_alerts_enabled: boolean | null
+          sora2_grandfathered: boolean
           storage_limit_mb: number | null
           storage_used_mb: number | null
           strategy_mode_activated_at: string | null
@@ -6503,6 +6504,7 @@ export type Database = {
           phone_number?: string | null
           plan?: string | null
           security_alerts_enabled?: boolean | null
+          sora2_grandfathered?: boolean
           storage_limit_mb?: number | null
           storage_used_mb?: number | null
           strategy_mode_activated_at?: string | null
@@ -6541,6 +6543,7 @@ export type Database = {
           phone_number?: string | null
           plan?: string | null
           security_alerts_enabled?: boolean | null
+          sora2_grandfathered?: boolean
           storage_limit_mb?: number | null
           storage_used_mb?: number | null
           strategy_mode_activated_at?: string | null
@@ -8249,6 +8252,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sora2_waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          language: string
+          notified_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          language?: string
+          notified_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          language?: string
+          notified_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       spotlight_rotation: {
         Row: {
