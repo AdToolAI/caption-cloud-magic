@@ -342,7 +342,7 @@ const GoalsDashboard = () => {
   const completedGoals = goals.filter(g => g.status === 'completed');
 
   return (
-    <div className="min-h-screen bg-background py-8 px-4">
+    <div className="bg-background py-8 px-4">
       <div className="max-w-6xl mx-auto">
         {/* Header with improved typography */}
         <div className="mb-8">

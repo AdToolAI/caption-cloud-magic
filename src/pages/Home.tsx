@@ -488,7 +488,7 @@ const Home = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
+    <div className="bg-background overflow-x-hidden">
       {showNicheTutorial && <NicheTutorialModal onComplete={handleTutorialComplete} />}
       <SEO
         title={language === "de" ? "KI Social Media Manager" : language === "es" ? "Gestor de Redes Sociales con IA" : "AI Social Media Manager"}
