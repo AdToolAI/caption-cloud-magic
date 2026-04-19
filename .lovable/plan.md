@@ -1,42 +1,36 @@
 
 
-## Plan: Doppelte Scrollbar entfernen — nur eine globale Scrollbar
+## Plan: Doppelte Scrollbar — echte Ursache finden & fixen
 
-### Diagnose
-Im Screenshot sind **zwei vertikale Scrollbars** sichtbar:
-1. **Browser-Scrollbar ganz rechts** (für die Page)
-2. **Sidebar-Scrollbar** direkt links daneben — kommt aus `SidebarContent` in `src/components/ui/sidebar.tsx` Z. 334:
-   ```
-   "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden ..."
-   ```
-   Da `AppSidebar` `h-screen` ist und die Hub-Icons fast immer in den Viewport passen, ist die zweite Scrollbar überflüssig und optisch störend.
+### Diagnose-Update
+Der erste Fix (Sidebar-Scrollbar verstecken) hat das Problem nicht gelöst, weil die zweite Scrollbar im Screenshot **rechts neben dem Hauptcontent** sitzt — nicht in der Sidebar. Das deutet auf einen **inneren Scroll-Container im Main-Bereich** hin (z. B. `overflow-y-auto` auf einem Wrapper in `App.tsx` oder `PageWrapper`), der zusätzlich zur Browser-Scrollbar einen eigenen Track erzeugt.
 
-### Fix — minimal, nur in `src/components/AppSidebar.tsx`
+### Vorgehen (Read-Only-Phase)
+Ich muss zuerst inspizieren:
+1. `src/App.tsx` — Layout-Wrapper (`min-h-screen`, `h-screen`, `overflow-y-auto`?)
+2. `src/components/layout/PageWrapper.tsx` — schon gesehen, kein overflow
+3. `src/index.css` — globale `html`/`body`-Höhen-Regeln
+4. `src/components/ui/sidebar.tsx` — `SidebarProvider`-Wrapper, der ggf. `h-svh overflow-hidden` setzt und damit den Main-Bereich zu einem Scroll-Container macht
 
-In Z. 45 die `SidebarContent`-Klasse erweitern, sodass die Scrollbar dort visuell **versteckt** wird (Inhalt bleibt scrollbar bei Bedarf, aber kein sichtbarer Track):
+### Wahrscheinlicher Verdacht
+`SidebarProvider` von shadcn rendert ein Wrapper-Div mit `min-h-svh`. Wenn `App.tsx` zusätzlich einen Container mit fester Höhe (`h-screen`) und `overflow-y-auto` setzt, scrollt **dieser innere Container**, während gleichzeitig die Browser-Scrollbar erscheint, weil der Body ebenfalls overflow hat (z. B. durch `NewsTicker` oder `AICompanionWidget` mit `position: fixed` + großer Höhe).
 
-Aktuell:
-```tsx
-<SidebarContent className="bg-card border-r border-border h-full flex flex-col items-center py-3 gap-1">
-```
+### Geplanter Fix (nach Inspektion)
+**Eine** der folgenden Maßnahmen — abhängig vom Befund:
 
-Neu:
-```tsx
-<SidebarContent className="bg-card border-r border-border h-full flex flex-col items-center py-3 gap-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
-```
+**Option A** (wahrscheinlichster Fall): In `src/App.tsx` den Main-Wrapper von `h-screen overflow-y-auto` → **`min-h-screen`** ändern. So scrollt nur noch der Body/Browser, kein innerer Container mehr.
 
-- `[&::-webkit-scrollbar]:hidden` → versteckt Scrollbar in Chrome/Safari/Edge
-- `[scrollbar-width:none]` → versteckt Scrollbar in Firefox
-- Funktional bleibt Scrollen erhalten (Mausrad/Touch), nur die Track-Anzeige verschwindet
+**Option B**: Falls `SidebarProvider` der Schuldige ist → Wrapper-Style überschreiben (`overflow-visible` auf dem äußeren Div).
 
-### Wirkung auf andere Seiten
-Die User hat erwähnt, das Problem tritt **auch auf anderen Seiten** auf. Da die Sidebar global ist (`AppSidebar`), wirkt der Fix automatisch auf **allen Seiten mit Sidebar**.
+**Option C**: Falls `body` und ein innerer Container beide scrollen → `body { overflow: hidden }` + nur **einen** definierten Scroll-Container (Main) behalten.
 
 ### Was NICHT geändert wird
-- `src/components/ui/sidebar.tsx` (shadcn-Komponente bleibt unangetastet — Override per Tailwind-Arbitrary-Class)
-- Sidebar-Funktionalität, Inhalt, Styling
-- Globale Page-Scrollbar bleibt (das ist die richtige/erwartete)
+- Sidebar-Inhalte, Routing, Komponenten-Logik
+- Der bereits gemachte Sidebar-Scrollbar-Hide-Fix bleibt (schadet nicht)
 
 ### Risiko
-Null. Reine CSS-Anpassung, scoped über Tailwind-Selektor auf eine Komponente.
+Niedrig — eine gezielte Layout-Klassen-Änderung in `App.tsx` oder `index.css` nach Inspektion.
+
+### Nächster Schritt nach Approval
+Default-Mode: `App.tsx` + `index.css` lesen → exakte Stelle identifizieren → Single-Line-Fix anwenden → Browser-Verifikation.
 
