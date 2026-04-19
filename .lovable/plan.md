@@ -1,57 +1,37 @@
 
-Ziel: Nicht die Sidebar ändern, sondern den echten verbleibenden Scroll-Owner sauber bestimmen. Die äußere Scrollbar zu entfernen ist technisch möglich, aber sehr wahrscheinlich nicht die richtige Lösung.
 
-Kurzantwort auf deine Frage:
-- Ja, man kann die äußere Scrollbar entfernen.
-- Sinnvoll ist das nur, wenn du bewusst ein App-Shell-Scrolling willst.
-- Für dein Problem würde das die Ursache eher verstecken als lösen.
+## Plan: Doppelte Scrollbar auf Home entfernen
 
-Befund aus dem Code:
-- `AppSidebar.tsx` nutzt bereits kein `SidebarContent` mehr und hat aktuell keinen offensichtlichen eigenen Vertikal-Scroll mehr.
-- Im Screenshot ist jetzt die Hub-Seite „Erstellen“ betroffen, also nicht nur Home.
-- `Home.tsx` und `HubPage.tsx` erzeugen selbst keinen klaren Full-Height-Scrollcontainer.
-- Damit sitzt die zweite Scrollbar sehr wahrscheinlich höher im App-Shell/Layout und nicht mehr in der linken Icon-Leiste.
+### Befund
+Die zweite Scrollbar erscheint jetzt **nur noch auf `/home`**, nicht mehr auf den Hub-Seiten (Erstellen etc.). Das bestätigt der Vergleich der Screenshots.
 
-Was ich als Nächstes umsetzen würde:
-1. Exakten Scroll-Owner im laufenden Preview identifizieren
-   - Per DOM-Inspektion das Element finden, das die innere rechte Scrollbar wirklich trägt.
-   - Entscheidend sind `overflow-y`, `clientHeight` und `scrollHeight` des betroffenen Wrappers.
-
-2. Standardlösung bevorzugen: äußere Scrollbar behalten
-   - Die äußere Browser-/Dokument-Scrollbar ist normalerweise die richtige.
-   - Danach den zusätzlichen inneren Scrollcontainer im App-Shell entfernen.
-   - Wahrscheinliche Zielstellen:
-     - `src/App.tsx`
-     - `src/components/ui/sidebar.tsx` (Provider-/Wrapper-Verhalten)
-     - ggf. `src/index.css` für globale Overflow-/Height-Normalisierung
-
-3. Nur wenn ausdrücklich gewünscht: äußere Scrollbar entfernen
-   - Dann würde ich `html/body` bzw. den Root so umstellen, dass die Seite selbst nicht mehr scrollt.
-   - Stattdessen scrollt nur noch der Hauptcontent-Bereich.
-   - Das ist ein bewusst anderes Navigationsmodell und kann Sticky-Header, Ticker, Stepper, Modals und Mobile-Verhalten beeinflussen.
-
-Empfohlene Umsetzung:
-- Nicht die äußere Scrollbar entfernen.
-- Stattdessen den verbliebenen inneren Scroll-Container auf App-Shell-Ebene entfernen, sodass genau eine Scrollbar übrig bleibt.
-
-Technische Zielregel:
-```text
-Erlaubt:
-- genau 1 vertikale Scrollbar für normale Seiten
-
-Nur ausnahmsweise:
-- zusätzliche Scrollbars in Dialogen, Drawern, Chat-/Editor-Panels
-
-Nicht erlaubt:
-- normale Seiten oder App-Shell mit zweitem sichtbaren Vertikal-Scroll
+Ursache liegt in `src/pages/Home.tsx`, Zeile 491:
+```tsx
+<div className="bg-background overflow-x-hidden">
 ```
 
-Betroffene Dateien für den Fix:
-- `src/App.tsx`
-- eventuell `src/components/ui/sidebar.tsx`
-- eventuell `src/index.css`
+Dieser äußere Home-Wrapper hat `overflow-x-hidden`. Sobald in CSS `overflow-x` auf etwas anderes als `visible` gesetzt wird, **erzwingt der Browser implizit `overflow-y: auto`** auf demselben Element. Da der Wrapper genug Inhalt enthält, um die Viewport-Höhe zu überschreiten, entsteht damit ein **eigener vertikaler Scroll-Container innerhalb der Seite** — zusätzlich zur normalen Dokument-Scrollbar.
 
-Erwartetes Ergebnis:
-- Die linke Sidebar bleibt exakt wie sie ist.
-- Es bleibt nur eine vertikale Scrollbar sichtbar.
-- Falls du ausdrücklich das Gegenteil willst, kann alternativ die äußere Scrollbar entfernt und der Hauptcontent zum einzigen Scrollbereich gemacht werden.
+Die Hub-Seiten nutzen `PageWrapper` ohne `overflow-x-hidden` und haben deshalb das Problem nicht.
+
+### Fix
+In `src/pages/Home.tsx` Zeile 491:
+- `overflow-x-hidden` vom äußeren Home-Wrapper entfernen.
+- Begründung: Der App-Shell selbst (`min-w-0 flex-1` in `App.tsx`) verhindert bereits horizontales Überlaufen. Die Klasse hier ist redundant und erzeugt den unerwünschten zweiten Scrollkontext.
+
+### Konkret
+```tsx
+- <div className="bg-background overflow-x-hidden">
++ <div className="bg-background">
+```
+
+Falls nach dem Entfernen tatsächlich ein horizontaler Overflow auftritt (z. B. durch den Wochen-Strip oder den Video-Carousel), dann gezielt nur **auf den betroffenen inneren Containern** `overflow-x-hidden` setzen — nicht auf dem Seiten-Root.
+
+### Betroffene Datei
+- `src/pages/Home.tsx`
+
+### Erwartetes Ergebnis
+- Auf `/home` ist nur noch **eine** vertikale Scrollbar sichtbar (die Dokument-Scrollbar).
+- Hub-Seiten bleiben unverändert (waren bereits korrekt).
+- Sidebar bleibt unverändert.
+
