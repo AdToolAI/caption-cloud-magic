@@ -11206,7 +11206,6 @@ export type Database = {
         }
         Returns: number
       }
-      admin_force_delete_user: { Args: { p_user_id: string }; Returns: Json }
       calculate_template_conversion_rates: {
         Args: { p_date_from: string; p_date_to: string; p_template_id: string }
         Returns: {
