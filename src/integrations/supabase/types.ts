@@ -5482,6 +5482,7 @@ export type Database = {
           in_app_notifications: boolean | null
           push_enabled: boolean
           push_subscription: Json | null
+          reminder_pushes_enabled: boolean
           render_complete_notify: boolean | null
           updated_at: string | null
           user_id: string
@@ -5494,6 +5495,7 @@ export type Database = {
           in_app_notifications?: boolean | null
           push_enabled?: boolean
           push_subscription?: Json | null
+          reminder_pushes_enabled?: boolean
           render_complete_notify?: boolean | null
           updated_at?: string | null
           user_id: string
@@ -5506,6 +5508,7 @@ export type Database = {
           in_app_notifications?: boolean | null
           push_enabled?: boolean
           push_subscription?: Json | null
+          reminder_pushes_enabled?: boolean
           render_complete_notify?: boolean | null
           updated_at?: string | null
           user_id?: string
@@ -6890,6 +6893,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      push_reminder_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          progress_at_send: number | null
+          reminder_step: number
+          sent_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          progress_at_send?: number | null
+          reminder_step: number
+          sent_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          progress_at_send?: number | null
+          reminder_step?: number
+          sent_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       rate_limit_state: {
         Row: {
