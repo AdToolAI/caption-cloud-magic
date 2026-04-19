@@ -6434,6 +6434,8 @@ export type Database = {
           timezone: string | null
           twitch_username: string | null
           updated_at: string | null
+          welcome_bonus_granted_at: string | null
+          welcome_bonus_seen_at: string | null
         }
         Insert: {
           analytics_enabled?: boolean | null
@@ -6467,6 +6469,8 @@ export type Database = {
           timezone?: string | null
           twitch_username?: string | null
           updated_at?: string | null
+          welcome_bonus_granted_at?: string | null
+          welcome_bonus_seen_at?: string | null
         }
         Update: {
           analytics_enabled?: boolean | null
@@ -6500,6 +6504,8 @@ export type Database = {
           timezone?: string | null
           twitch_username?: string | null
           updated_at?: string | null
+          welcome_bonus_granted_at?: string | null
+          welcome_bonus_seen_at?: string | null
         }
         Relationships: []
       }

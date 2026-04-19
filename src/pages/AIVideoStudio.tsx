@@ -11,6 +11,7 @@ import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurcha
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
 import { AIVideoProviderCard } from '@/components/ai-video/AIVideoProviderCard';
 import { AIVideoDisclaimer } from '@/components/ai-video/AIVideoDisclaimer';
+import { FirstVideoGuide } from '@/components/ai-video/FirstVideoGuide';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { canUseAIVideoGeneration } from '@/lib/entitlements';
@@ -295,6 +296,9 @@ export default function AIVideoStudio() {
 
           {/* ── TAB: Studios Overview ── */}
           <TabsContent value="studios" className="space-y-6">
+            {/* First-time user banner with starter credits */}
+            <FirstVideoGuide />
+
             {/* Provider Grid */}
             <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {providers.map((p, idx) => (
