@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { pickWeekSlots, type Lang, type ScoredSlot } from "../_shared/posting-times-fetcher.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,7 +43,6 @@ function levelConfig(level: Level, isDE: boolean) {
         : "Mix of Reels/Carousel/Story, trend-leaning, A/B hooks, clear CTAs.",
     };
   }
-  // beginner
   return {
     minPosts: 3,
     maxPosts: 3,
@@ -78,7 +78,6 @@ serve(async (req) => {
     const weeksAhead = Math.max(1, Math.min(4, body.weeks_ahead ?? 2));
     const force = !!body.force;
 
-    // Gather context: last 90 days metrics + profile + onboarding (level)
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
@@ -101,34 +100,18 @@ serve(async (req) => {
       ? (rawLevel as Level)
       : "beginner";
 
-    // Compute platform performance
-    const platformStats: Record<string, { posts: number; avgEr: number; bestHour: number }> = {};
-    const hourBuckets: Record<string, Record<number, number[]>> = {};
-
+    // Compute platform performance (used only for prompt context now, not slot selection)
+    const platformStats: Record<string, { posts: number; avgEr: number }> = {};
     for (const m of metrics || []) {
       const p = m.provider || "instagram";
-      if (!platformStats[p]) {
-        platformStats[p] = { posts: 0, avgEr: 0, bestHour: 19 };
-        hourBuckets[p] = {};
-      }
+      if (!platformStats[p]) platformStats[p] = { posts: 0, avgEr: 0 };
       platformStats[p].posts++;
       platformStats[p].avgEr += m.engagement_rate || 0;
-      if (m.posted_at) {
-        const hour = new Date(m.posted_at).getHours();
-        if (!hourBuckets[p][hour]) hourBuckets[p][hour] = [];
-        hourBuckets[p][hour].push(m.engagement_rate || 0);
-      }
     }
-
     for (const p in platformStats) {
-      platformStats[p].avgEr = platformStats[p].posts > 0 ? platformStats[p].avgEr / platformStats[p].posts : 0;
-      let bestHour = 19, bestScore = 0;
-      for (const h in hourBuckets[p]) {
-        const scores = hourBuckets[p][h as any];
-        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-        if (avg > bestScore) { bestScore = avg; bestHour = parseInt(h); }
-      }
-      platformStats[p].bestHour = bestHour;
+      platformStats[p].avgEr = platformStats[p].posts > 0
+        ? Number((platformStats[p].avgEr / platformStats[p].posts).toFixed(2))
+        : 0;
     }
 
     const onboardingPlatforms = Array.isArray(onboarding?.platforms) && onboarding!.platforms.length > 0
@@ -138,7 +121,7 @@ serve(async (req) => {
       ? Object.keys(platformStats)
       : (onboardingPlatforms || ["instagram", "tiktok", "linkedin"]);
 
-    const lang = profile?.language || "de";
+    const lang: Lang = (profile?.language as Lang) || "de";
     const isDE = lang === "de";
     const cfg = levelConfig(level, isDE);
 
@@ -146,8 +129,8 @@ serve(async (req) => {
     const levelLabelEN = level === "advanced" ? "Advanced" : level === "intermediate" ? "Intermediate" : "Beginner";
 
     const systemPrompt = isDE
-      ? `Du bist ein Social-Media-Stratege. Erstelle einen 7-Tage-Wochenplan mit GENAU ${cfg.minPosts} Postvorschlägen, abgestimmt auf das Creator-Level "${levelLabelDE}". Tonalität: ${cfg.tone} Komplexität: ${cfg.complexity} Antworte ausschließlich über den Tool-Call.`
-      : `You are a social media strategist. Create a 7-day weekly plan with EXACTLY ${cfg.minPosts} post suggestions, tuned for creator level "${levelLabelEN}". Tone: ${cfg.tone} Complexity: ${cfg.complexity} Respond only via the tool call.`;
+      ? `Du bist ein Social-Media-Stratege. Du erhältst eine FESTE Liste von vorberechneten Posting-Slots (Datum + Uhrzeit + Plattform), die anhand der Heatmap-Engine optimiert wurden. Deine einzige Aufgabe: für jeden Slot eine kreative Content-Idee, Caption, Hashtags, Tipps und Strategie-Phase liefern. ÄNDERE NIEMALS Datum, Uhrzeit oder Plattform. Tonalität: ${cfg.tone} Komplexität: ${cfg.complexity} Antworte ausschließlich über den Tool-Call.`
+      : `You are a social media strategist. You receive a FIXED list of pre-computed posting slots (date + time + platform), optimized via the heatmap engine. Your only job: for each slot, produce a creative content idea, caption, hashtags, tips and strategy phase. NEVER change date, time or platform. Tone: ${cfg.tone} Complexity: ${cfg.complexity} Respond only via the tool call.`;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
@@ -162,7 +145,6 @@ serve(async (req) => {
       weekStart.setHours(0, 0, 0, 0);
       const weekStartStr = weekStart.toISOString().split("T")[0];
 
-      // Idempotent skip unless force
       const { data: existing } = await supabase
         .from("strategy_posts")
         .select("id")
@@ -182,33 +164,50 @@ serve(async (req) => {
         weekDates.push(d.toISOString().split("T")[0]);
       }
 
+      // 1) DETERMINISTIC SLOT PICKING — heatmap-engine driven
+      const pickedSlots: ScoredSlot[] = pickWeekSlots(platforms, weekDates, cfg.minPosts, lang);
+      if (pickedSlots.length === 0) {
+        console.warn(`[strategy] no slots picked for week ${weekStartStr}`);
+        continue;
+      }
+
+      // 2) Build the slot list for the AI (humans-readable + index)
+      const slotListForPrompt = pickedSlots.map((s, idx) => {
+        const date = new Date(s.isoStart);
+        const dayName = date.toLocaleDateString(isDE ? "de-DE" : "en-US", { weekday: "long" });
+        const timeStr = `${String(s.hour).padStart(2, "0")}:00`;
+        const reasonStr = s.reasons.join(", ");
+        return isDE
+          ? `${idx + 1}. ${dayName} ${s.date} ${timeStr} · ${s.platform} · (Score ${s.score}, Grund: ${reasonStr})`
+          : `${idx + 1}. ${dayName} ${s.date} ${timeStr} · ${s.platform} · (Score ${s.score}, Reason: ${reasonStr})`;
+      }).join("\n");
+
       const userPrompt = isDE ? `Wochenplan für ${weekStartStr} (Mo) bis ${weekDates[6]} (So).
 
 Creator-Level: ${levelLabelDE}
 Nische: ${onboarding?.niche || "allgemein"} | Business: ${onboarding?.business_type || "—"}
-Verfügbare Plattformen: ${platforms.join(", ")}
-Performance der letzten 90 Tage:
-${JSON.stringify(platformStats, null, 2)}
+Performance der letzten 90 Tage: ${JSON.stringify(platformStats)}
 
 Top 5 Captions (zur Inspiration):
 ${(metrics || []).slice(0, 5).map(m => `- [${m.provider}] ${(m.caption_text || "").substring(0, 80)} (ER: ${m.engagement_rate?.toFixed(1) || 0}%)`).join("\n")}
 
-Erstelle GENAU ${cfg.minPosts} Vorschläge. Verteile sie über die Woche, nutze die besten Posting-Zeiten pro Plattform, mische Plattformen, gib pro Vorschlag eine kurze Begründung (Tonalität dem Level "${levelLabelDE}" entsprechend).
+VORBEREITETE SLOTS (deterministisch aus Heatmap-Engine — NIEMALS ÄNDERN):
+${slotListForPrompt}
 
-Wochentage (YYYY-MM-DD): ${weekDates.join(", ")}` : `Weekly plan for ${weekStartStr} (Mon) to ${weekDates[6]} (Sun).
+Erstelle für JEDEN dieser ${pickedSlots.length} Slots einen Content-Vorschlag in der gleichen Reihenfolge. Nutze "slot_index" (1-basiert) als Referenz. Tonalität dem Level "${levelLabelDE}" entsprechend.`
+        : `Weekly plan for ${weekStartStr} (Mon) to ${weekDates[6]} (Sun).
 
 Creator level: ${levelLabelEN}
 Niche: ${onboarding?.niche || "general"} | Business: ${onboarding?.business_type || "—"}
-Available platforms: ${platforms.join(", ")}
-Performance last 90 days:
-${JSON.stringify(platformStats, null, 2)}
+Performance last 90 days: ${JSON.stringify(platformStats)}
 
 Top 5 captions (inspiration):
 ${(metrics || []).slice(0, 5).map(m => `- [${m.provider}] ${(m.caption_text || "").substring(0, 80)} (ER: ${m.engagement_rate?.toFixed(1) || 0}%)`).join("\n")}
 
-Create EXACTLY ${cfg.minPosts} suggestions. Spread across the week, use best posting times per platform, mix platforms, provide reasoning per suggestion (tone matching level "${levelLabelEN}").
+PREPARED SLOTS (deterministic from heatmap engine — NEVER CHANGE):
+${slotListForPrompt}
 
-Weekdays (YYYY-MM-DD): ${weekDates.join(", ")}`;
+Create one content suggestion for EACH of these ${pickedSlots.length} slots in the same order. Use "slot_index" (1-based) as reference. Tone matching level "${levelLabelEN}".`;
 
       const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -223,7 +222,7 @@ Weekdays (YYYY-MM-DD): ${weekDates.join(", ")}`;
             type: "function",
             function: {
               name: "create_week_plan",
-              description: "Create a weekly content strategy plan",
+              description: "Fill content for the prepared slots",
               parameters: {
                 type: "object",
                 properties: {
@@ -232,17 +231,15 @@ Weekdays (YYYY-MM-DD): ${weekDates.join(", ")}`;
                     items: {
                       type: "object",
                       properties: {
-                        date: { type: "string", description: "YYYY-MM-DD" },
-                        time: { type: "string", description: "HH:MM 24h" },
-                        platform: { type: "string", enum: platforms },
+                        slot_index: { type: "integer", description: "1-based slot index (must match prepared list)" },
                         content_idea: { type: "string", description: "Short title (max 60 chars)" },
                         caption_draft: { type: "string", description: "Ready-to-post caption (80-200 chars)" },
                         hashtags: { type: "array", items: { type: "string" } },
-                        reasoning: { type: "string", description: "Why this suggestion (max 120 chars)" },
+                        reasoning: { type: "string", description: "Why this content works (max 120 chars)" },
                         tips: {
                           type: "array",
                           items: { type: "string" },
-                          description: "3-5 concrete actionable tips for maximum impact (each max 80 chars)",
+                          description: "3-5 concrete actionable tips (each max 80 chars)",
                           minItems: 3,
                           maxItems: 5,
                         },
@@ -252,11 +249,11 @@ Weekdays (YYYY-MM-DD): ${weekDates.join(", ")}`;
                           description: "Strategic phase this post belongs to",
                         },
                       },
-                      required: ["date", "time", "platform", "content_idea", "caption_draft", "hashtags", "reasoning", "tips", "phase"],
+                      required: ["slot_index", "content_idea", "caption_draft", "hashtags", "reasoning", "tips", "phase"],
                       additionalProperties: false,
                     },
-                    minItems: cfg.minPosts,
-                    maxItems: cfg.maxPosts,
+                    minItems: pickedSlots.length,
+                    maxItems: pickedSlots.length,
                   },
                 },
                 required: ["posts"],
@@ -298,19 +295,27 @@ Weekdays (YYYY-MM-DD): ${weekDates.join(", ")}`;
           .eq("status", "pending");
       }
 
-      const rows = (plan.posts || []).map((p: any) => {
-        const scheduledAt = new Date(`${p.date}T${p.time}:00`);
+      // 3) Merge AI content with deterministic slots — slot drives date/time/platform/score
+      const aiByIdx = new Map<number, any>();
+      for (const p of plan.posts || []) {
+        if (typeof p.slot_index === "number") aiByIdx.set(p.slot_index, p);
+      }
+
+      const rows = pickedSlots.map((slot, i) => {
+        const ai = aiByIdx.get(i + 1) || {};
         return {
           user_id: user.id,
           week_start: weekStartStr,
-          scheduled_at: scheduledAt.toISOString(),
-          platform: p.platform,
-          content_idea: p.content_idea,
-          caption_draft: p.caption_draft,
-          hashtags: p.hashtags || [],
-          reasoning: p.reasoning,
-          tips: Array.isArray(p.tips) ? p.tips : null,
-          phase: p.phase || null,
+          scheduled_at: slot.isoStart,
+          platform: slot.platform,
+          content_idea: ai.content_idea || (isDE ? "Neuer Post" : "New post"),
+          caption_draft: ai.caption_draft || "",
+          hashtags: Array.isArray(ai.hashtags) ? ai.hashtags : [],
+          reasoning: ai.reasoning || null,
+          tips: Array.isArray(ai.tips) ? ai.tips : null,
+          phase: ai.phase || null,
+          slot_score: slot.score,
+          slot_reason: slot.reasons,
           status: "pending",
           generation_batch_id: batchId,
         };
