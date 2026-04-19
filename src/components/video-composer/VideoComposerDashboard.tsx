@@ -465,6 +465,7 @@ export default function VideoComposerDashboard() {
             <ClipsTab
               scenes={project.scenes}
               projectId={project.id}
+              visualStyle={project.briefing?.visualStyle}
               onUpdateScenes={setScenes}
               onGoToVoiceSubtitles={() => setActiveTab('text')}
               onEnsurePersisted={async () => {

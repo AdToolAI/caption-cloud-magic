@@ -1,7 +1,8 @@
-// compose-video-clips v2.1.0 — webhook_events_filter fix (only "completed" allowed)
+// compose-video-clips v2.2.0 — visual style injection
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Replicate from "https://esm.sh/replicate@0.25.2";
+import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,6 +33,9 @@ interface ClipScene {
 interface ClipRequest {
   projectId: string;
   scenes: ClipScene[];
+  /** Optional visual style override (Comic, Realistic, Anime, ...). When set,
+   *  every AI scene prompt is suffixed with the matching style clause. */
+  visualStyle?: string;
 }
 
 serve(async (req) => {
@@ -59,7 +63,7 @@ serve(async (req) => {
     );
 
     const body: ClipRequest = await req.json();
-    const { projectId, scenes } = body;
+    const { projectId, scenes, visualStyle } = body;
 
     if (!projectId) {
       return new Response(
@@ -141,15 +145,27 @@ serve(async (req) => {
     // language in the generated clip — they would conflict with our overlay /
     // subtitle system in the "Voice & Subtitles" tab.
     const NEGATIVE_TEXT_SUFFIX = ", no on-screen text, no captions, no subtitles, no watermarks, no logos, no written words, no typography, no signs with readable text, no UI overlays, no lower thirds, no isolated product on plain background, no floating product, no product rotating in empty space, clean visuals only";
+    // Visual-style clause derived from briefing (if any). Appended once per prompt
+    // so manually edited prompts also pick up the chosen style.
+    const STYLE_HINT = getVisualStyleHint(visualStyle);
     const enrichPrompt = (prompt?: string): string => {
       const base = (prompt || "cinematic footage").trim();
       const lower = base.toLowerCase();
-      if (lower.includes("no subtitles") && lower.includes("no captions") && lower.includes("no on-screen text")) {
-        return base;
-      }
+      let result = base;
       // Strip any partial old guard before re-appending the canonical one
-      const cleaned = base.replace(/,?\s*no on-screen text[\s\S]*$/i, "").trim().replace(/[,.]\s*$/, "");
-      return cleaned + NEGATIVE_TEXT_SUFFIX;
+      const cleaned = result.replace(/,?\s*no on-screen text[\s\S]*$/i, "").trim().replace(/[,.]\s*$/, "");
+      // Inject style hint if not already present (probe = first 30 chars after the leading ", ")
+      if (STYLE_HINT) {
+        const probe = STYLE_HINT.replace(/^,\s*/, "").slice(0, 30).toLowerCase();
+        result = lower.includes(probe) ? cleaned : cleaned + STYLE_HINT;
+      } else {
+        result = cleaned;
+      }
+      // Always append the negative-text guard
+      if (!(result.toLowerCase().includes("no subtitles") && result.toLowerCase().includes("no captions") && result.toLowerCase().includes("no on-screen text"))) {
+        result = result.replace(/[,.]\s*$/, "") + NEGATIVE_TEXT_SUFFIX;
+      }
+      return result;
     };
 
     const results: Array<{ sceneId: string; status: string; predictionId?: string; clipUrl?: string; error?: string }> = [];

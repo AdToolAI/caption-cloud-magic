@@ -15,6 +15,7 @@ import { probeMediaDuration } from '@/lib/probeMp4Duration';
 interface ClipsTabProps {
   scenes: ComposerScene[];
   projectId?: string;
+  visualStyle?: string;
   onUpdateScenes: (scenes: ComposerScene[]) => void;
   onGoToVoiceSubtitles: () => void;
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
@@ -27,7 +28,7 @@ const statusConfig: Record<string, { color: string; bg: string; label: string }>
   failed: { color: 'text-destructive', bg: 'bg-destructive/15 border-destructive/40', label: 'Fehlgeschlagen' },
 };
 
-export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
+export default function ClipsTab({ scenes, projectId, visualStyle, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [singleGenerating, setSingleGenerating] = useState<Record<string, boolean>>({});
   const [stockSearch, setStockSearch] = useState<Record<string, string>>({});
@@ -192,7 +193,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToVoic
       onUpdateScenes(optimistic);
 
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
-        body: { projectId: pid, scenes: scenesPayload },
+        body: { projectId: pid, scenes: scenesPayload, visualStyle },
       });
       if (error) throw error;
 
@@ -258,6 +259,7 @@ export default function ClipsTab({ scenes, projectId, onUpdateScenes, onGoToVoic
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
         body: {
           projectId: pid,
+          visualStyle,
           scenes: [{
             id: targetScene.id,
             clipSource: targetScene.clipSource,

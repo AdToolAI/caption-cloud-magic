@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,6 +17,7 @@ interface Briefing {
   duration: number;
   aspectRatio: string;
   brandColors: string[];
+  visualStyle?: string;
 }
 
 const CATEGORY_STRUCTURES: Record<string, string> = {
@@ -86,6 +88,13 @@ serve(async (req) => {
     };
     const toneLook = toneStyling[briefing.tone] || toneStyling.professional;
 
+    // Visual style — applied uniformly to every scene for visual consistency.
+    const visualStyleId = briefing.visualStyle || 'realistic';
+    const visualStyleHint = getVisualStyleHint(visualStyleId);
+    const styleDirective = visualStyleHint
+      ? `\n\n🎨 GLOBAL VISUAL STYLE (HIGHEST PRIORITY — applied to ALL scenes for visual consistency):\nEvery aiPrompt MUST be written in the "${visualStyleId}" visual style. Style clause: "${visualStyleHint.replace(/^,\s*/, '')}". This style overrides realism defaults — for example, "comic" means flat ink-and-color illustration (NOT photoreal), "anime" means hand-drawn 2D animation, "claymation" means stop-motion clay puppets, "pixel-art" means 16-bit sprites. Treat humans, products and environments consistently in this style across ALL scenes. Do NOT mix styles between scenes.`
+      : '';
+
     // Per scene-type structural hints — PRODUCT-IN-SCENE, NOT PRODUCT-AS-SCENE
     const sceneTypeHints = `Scene-type visual templates (product MUST appear within a real-world human moment, not isolated):
 - hook: emotional human moment that stops the scroll — a person in a relatable situation, product visible but in context (held in hand, in pocket, on the table next to them, on the desk while they work). NEVER an isolated product macro on a plain background.
@@ -136,7 +145,7 @@ Each scene is generated INDEPENDENTLY by a separate AI video model call (Hailuo 
 - Treat the storyboard as a MONTAGE / MOOD-BOARD of standalone shots that share a vibe, NOT as a continuous narrative with one persistent protagonist
 - Variation between scenes' people is expected and fine — do not try to lock identity
 
-Write text overlays separately (in ${langLabel}) — they're rendered as a distinct layer on top of the video.`;
+Write text overlays separately (in ${langLabel}) — they're rendered as a distinct layer on top of the video.${styleDirective}`;
 
     const labels = (() => {
       switch (category) {
@@ -275,7 +284,17 @@ Generate the storyboard using the create_storyboard function.`;
       throw new Error("Failed to parse AI storyboard output");
     }
 
-    // Map AI output to ComposerScene format
+    // Map AI output to ComposerScene format. We append the visual style hint
+    // server-side as a hard guarantee — even if the AI forgot it, the rendered
+    // clip will still match the chosen style.
+    const appendStyle = (prompt: string): string => {
+      if (!visualStyleHint) return prompt;
+      // Avoid duplicate appending if AI already included the exact clause.
+      const probe = visualStyleHint.replace(/^,\s*/, '').slice(0, 30).toLowerCase();
+      if (prompt.toLowerCase().includes(probe)) return prompt;
+      return prompt.replace(/[.\s,]*$/, '') + visualStyleHint;
+    };
+
     const scenes = parsed.scenes.map((s: any, index: number) => ({
       id: `scene_${Date.now()}_${index}`,
       projectId: "",
@@ -283,7 +302,7 @@ Generate the storyboard using the create_storyboard function.`;
       sceneType: s.sceneType || "custom",
       durationSeconds: Math.max(3, Math.min(15, s.durationSeconds || 5)),
       clipSource: "ai-hailuo",
-      aiPrompt: s.aiPrompt || "",
+      aiPrompt: appendStyle(s.aiPrompt || ""),
       stockKeywords: s.stockKeywords || "",
       clipStatus: "pending",
       textOverlay: {
