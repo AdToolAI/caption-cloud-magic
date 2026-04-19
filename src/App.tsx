@@ -131,7 +131,7 @@ function AppLayout() {
   const isLandingRoute = ['/', '/auth', '/pricing', '/faq', '/legal', '/privacy', '/terms', '/imprint', '/delete-data', '/coming-soon'].includes(location.pathname) || location.pathname.startsWith('/legal/');
   
   return (
-    <div className="flex min-h-screen w-full overflow-x-hidden">
+    <div className="flex w-full overflow-x-hidden">
       {user && !isLandingRoute && <AppSidebar />}
       <div className="min-w-0 flex-1 flex flex-col overflow-x-hidden">
         {isLandingRoute ? <Header /> : <AppHeader />}
