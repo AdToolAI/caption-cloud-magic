@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
@@ -43,6 +44,7 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
   const [searchingMusic, setSearchingMusic] = useState(false);
   const [musicResults, setMusicResults] = useState<MusicTrack[]>([]);
   const [musicPlaying, setMusicPlaying] = useState<string | null>(null);
+  const [musicQuery, setMusicQuery] = useState('');
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Beat sync state
@@ -138,8 +140,10 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
     if (!music) return;
     setSearchingMusic(true);
     try {
+      // Free-text query takes precedence; fallback to genre+mood combo
+      const effectiveQuery = musicQuery.trim() || `${music.genre} ${music.mood}`;
       const { data, error } = await supabase.functions.invoke('search-stock-music', {
-        body: { query: `${music.genre} ${music.mood}`, mood: music.mood, genre: music.genre },
+        body: { query: effectiveQuery, mood: music.mood, genre: music.genre },
       });
       if (error) throw error;
       const tracks: MusicTrack[] = (data?.results || []).map((tr: any) => ({
