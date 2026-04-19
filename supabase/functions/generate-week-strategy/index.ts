@@ -15,6 +15,46 @@ function getMonday(date: Date): Date {
   return d;
 }
 
+type Level = "beginner" | "intermediate" | "advanced";
+
+function levelConfig(level: Level, isDE: boolean) {
+  if (level === "advanced") {
+    return {
+      minPosts: 7,
+      maxPosts: 7,
+      tone: isDE
+        ? "Datengetrieben, knapp, Profi-Sprache. Nutze konkrete Slots, Serien-Konzepte und Multi-Plattform-Strategien."
+        : "Data-driven, concise, expert language. Use concrete slots, series concepts and multi-platform strategies.",
+      complexity: isDE
+        ? "Multi-Plattform-Mix, Serien (Teil 1/2/3), datenbasierte Empfehlungen mit Performance-Bezug, Cross-Posting-Strategien."
+        : "Multi-platform mix, series (part 1/2/3), data-driven recommendations referencing performance, cross-posting strategies.",
+    };
+  }
+  if (level === "intermediate") {
+    return {
+      minPosts: 5,
+      maxPosts: 5,
+      tone: isDE
+        ? "Konkret, mit Performance-Hinweisen. Direkt und motivierend, aber nicht zu fachlich."
+        : "Concrete, with performance hints. Direct and motivating, but not too technical.",
+      complexity: isDE
+        ? "Mix aus Reels/Karussell/Story, Trend-Anlehnung, A/B-Hooks, klare CTAs."
+        : "Mix of Reels/Carousel/Story, trend-leaning, A/B hooks, clear CTAs.",
+    };
+  }
+  // beginner
+  return {
+    minPosts: 3,
+    maxPosts: 3,
+    tone: isDE
+      ? "Erkläre einfach, ermutigend, keine Fachbegriffe. Schritt-für-Schritt, motivierend."
+      : "Explain simply, encouraging, no jargon. Step-by-step, motivating.",
+    complexity: isDE
+      ? "Einfache Formate (Foto + Caption), klare Hooks, Schritt-für-Schritt Ideen, leicht umsetzbar."
+      : "Simple formats (photo + caption), clear hooks, step-by-step ideas, easy to execute.",
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -57,19 +97,28 @@ serve(async (req) => {
       });
     }
 
-    // Gather context: last 90 days metrics + profile
+    // Gather context: last 90 days metrics + profile + onboarding (level)
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-    const [{ data: metrics }, { data: profile }] = await Promise.all([
+    const [{ data: metrics }, { data: profile }, { data: onboarding }] = await Promise.all([
       supabase.from("post_metrics")
         .select("provider, posted_at, engagement_rate, likes, comments, shares, impressions, caption_text")
         .eq("user_id", user.id)
         .gte("posted_at", ninetyDaysAgo.toISOString())
         .order("engagement_rate", { ascending: false })
         .limit(50),
-      supabase.from("profiles").select("brand_name, language, timezone").eq("id", user.id).single(),
+      supabase.from("profiles").select("brand_name, language, timezone").eq("id", user.id).maybeSingle(),
+      supabase.from("onboarding_profiles")
+        .select("experience_level, posts_per_week, niche, business_type, platforms")
+        .eq("user_id", user.id)
+        .maybeSingle(),
     ]);
+
+    const rawLevel = (onboarding?.experience_level || "beginner").toLowerCase();
+    const level: Level = ["beginner", "intermediate", "advanced"].includes(rawLevel)
+      ? (rawLevel as Level)
+      : "beginner";
 
     // Compute platform performance
     const platformStats: Record<string, { posts: number; avgEr: number; bestHour: number }> = {};
@@ -101,16 +150,23 @@ serve(async (req) => {
       platformStats[p].bestHour = bestHour;
     }
 
+    const onboardingPlatforms = Array.isArray(onboarding?.platforms) && onboarding!.platforms.length > 0
+      ? onboarding!.platforms
+      : null;
     const platforms = Object.keys(platformStats).length > 0
       ? Object.keys(platformStats)
-      : ["instagram", "tiktok", "linkedin"];
+      : (onboardingPlatforms || ["instagram", "tiktok", "linkedin"]);
 
     const lang = profile?.language || "de";
     const isDE = lang === "de";
+    const cfg = levelConfig(level, isDE);
+
+    const levelLabelDE = level === "advanced" ? "Profi" : level === "intermediate" ? "Fortgeschritten" : "Anfänger";
+    const levelLabelEN = level === "advanced" ? "Advanced" : level === "intermediate" ? "Intermediate" : "Beginner";
 
     const systemPrompt = isDE
-      ? "Du bist ein Social-Media-Stratege. Erstelle einen datenbasierten 7-Tage-Wochenplan mit 5-7 Postvorschlägen. Antworte ausschließlich über den Tool-Call."
-      : "You are a social media strategist. Create a data-driven 7-day weekly plan with 5-7 post suggestions. Respond only via the tool call.";
+      ? `Du bist ein Social-Media-Stratege. Erstelle einen 7-Tage-Wochenplan mit GENAU ${cfg.minPosts} Postvorschlägen, abgestimmt auf das Creator-Level "${levelLabelDE}". Tonalität: ${cfg.tone} Komplexität: ${cfg.complexity} Antworte ausschließlich über den Tool-Call.`
+      : `You are a social media strategist. Create a 7-day weekly plan with EXACTLY ${cfg.minPosts} post suggestions, tuned for creator level "${levelLabelEN}". Tone: ${cfg.tone} Complexity: ${cfg.complexity} Respond only via the tool call.`;
 
     const weekDates: string[] = [];
     for (let i = 0; i < 7; i++) {
@@ -119,8 +175,10 @@ serve(async (req) => {
       weekDates.push(d.toISOString().split("T")[0]);
     }
 
-    const userPrompt = `Wochenplan für ${weekStartStr} (Mo) bis ${weekDates[6]} (So).
+    const userPrompt = isDE ? `Wochenplan für ${weekStartStr} (Mo) bis ${weekDates[6]} (So).
 
+Creator-Level: ${levelLabelDE}
+Nische: ${onboarding?.niche || "allgemein"} | Business: ${onboarding?.business_type || "—"}
 Verfügbare Plattformen: ${platforms.join(", ")}
 Performance der letzten 90 Tage:
 ${JSON.stringify(platformStats, null, 2)}
@@ -128,9 +186,22 @@ ${JSON.stringify(platformStats, null, 2)}
 Top 5 Captions (zur Inspiration):
 ${(metrics || []).slice(0, 5).map(m => `- [${m.provider}] ${(m.caption_text || "").substring(0, 80)} (ER: ${m.engagement_rate?.toFixed(1) || 0}%)`).join("\n")}
 
-Erstelle 5-7 abwechslungsreiche Vorschläge. Verteile sie über die Woche, nutze die besten Posting-Zeiten pro Plattform, mische Plattformen, gib pro Vorschlag eine kurze Begründung.
+Erstelle GENAU ${cfg.minPosts} Vorschläge. Verteile sie über die Woche, nutze die besten Posting-Zeiten pro Plattform, mische Plattformen, gib pro Vorschlag eine kurze Begründung (Tonalität dem Level "${levelLabelDE}" entsprechend).
 
-Wochentage (YYYY-MM-DD): ${weekDates.join(", ")}`;
+Wochentage (YYYY-MM-DD): ${weekDates.join(", ")}` : `Weekly plan for ${weekStartStr} (Mon) to ${weekDates[6]} (Sun).
+
+Creator level: ${levelLabelEN}
+Niche: ${onboarding?.niche || "general"} | Business: ${onboarding?.business_type || "—"}
+Available platforms: ${platforms.join(", ")}
+Performance last 90 days:
+${JSON.stringify(platformStats, null, 2)}
+
+Top 5 captions (inspiration):
+${(metrics || []).slice(0, 5).map(m => `- [${m.provider}] ${(m.caption_text || "").substring(0, 80)} (ER: ${m.engagement_rate?.toFixed(1) || 0}%)`).join("\n")}
+
+Create EXACTLY ${cfg.minPosts} suggestions. Spread across the week, use best posting times per platform, mix platforms, provide reasoning per suggestion (tone matching level "${levelLabelEN}").
+
+Weekdays (YYYY-MM-DD): ${weekDates.join(", ")}`;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
@@ -168,8 +239,8 @@ Wochentage (YYYY-MM-DD): ${weekDates.join(", ")}`;
                     required: ["date", "time", "platform", "content_idea", "caption_draft", "hashtags", "reasoning"],
                     additionalProperties: false,
                   },
-                  minItems: 5,
-                  maxItems: 7,
+                  minItems: cfg.minPosts,
+                  maxItems: cfg.maxPosts,
                 },
               },
               required: ["posts"],
@@ -234,7 +305,7 @@ Wochentage (YYYY-MM-DD): ${weekDates.join(", ")}`;
 
     if (insertError) throw insertError;
 
-    return new Response(JSON.stringify({ posts: inserted, generated: true, batch_id: batchId }), {
+    return new Response(JSON.stringify({ posts: inserted, generated: true, batch_id: batchId, level }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

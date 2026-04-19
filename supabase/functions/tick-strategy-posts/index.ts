@@ -26,16 +26,33 @@ serve(async (req) => {
 
     if (missedError) console.error("missed update error:", missedError);
 
-    // 2. Sunday 22:00-23:59 UTC: regenerate next week for users with mode enabled
+    // 2. Sunday 22:00-23:59 UTC: evaluate levels + regenerate next week for users with mode enabled
     const now = new Date();
     const isSundayNight = now.getUTCDay() === 0 && now.getUTCHours() >= 22;
     let regenerated = 0;
+    let levelEvaluated = 0;
 
     if (isSundayNight) {
       const { data: users } = await supabase
         .from("profiles")
         .select("id")
         .eq("strategy_mode_enabled", true);
+
+      // First: evaluate creator levels (auto-upgrade) BEFORE generating new week
+      try {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/evaluate-creator-level`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+          },
+          body: JSON.stringify({}),
+        });
+        levelEvaluated = (users || []).length;
+      } catch (e) {
+        console.error("evaluate-creator-level call failed:", e);
+      }
 
       for (const u of users || []) {
         // Compute next Monday
@@ -72,7 +89,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ marked_missed: missed?.length ?? 0, regenerated }),
+      JSON.stringify({ marked_missed: missed?.length ?? 0, regenerated, level_evaluated: levelEvaluated }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
