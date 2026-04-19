@@ -134,8 +134,8 @@ function AppLayout() {
     <div className="flex min-h-screen w-full overflow-x-hidden">
       {user && !isLandingRoute && <AppSidebar />}
       <div className="min-w-0 flex-1 flex flex-col overflow-x-hidden">
-        {user && <NewsTicker />}
         {isLandingRoute ? <Header /> : <AppHeader />}
+        {user && <NewsTicker />}
         {user && !isLandingRoute && <OnboardingStepper />}
         <main className="flex-1">
           <ErrorBoundary>
