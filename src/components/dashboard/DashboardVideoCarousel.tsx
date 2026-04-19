@@ -285,9 +285,8 @@ export const DashboardVideoCarousel = ({
 
     return (
       <div className="space-y-2">
-        <div className="flex items-center gap-3">
-          <Video className="h-4 w-4 text-primary" />
-          <h2 className="text-lg font-bold text-foreground">{t("carousel.yourVideos")}</h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} />
           {quickActions.length > 0 && (
             <div className="flex items-center gap-1.5 ml-auto">
               {quickActions.map((action, i) => (
