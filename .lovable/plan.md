@@ -1,36 +1,65 @@
 
 
-## Plan: Doppelte Scrollbar — echte Ursache finden & fixen
+## Plan: Doppelte Scrollbar systematisch beheben
 
-### Diagnose-Update
-Der erste Fix (Sidebar-Scrollbar verstecken) hat das Problem nicht gelöst, weil die zweite Scrollbar im Screenshot **rechts neben dem Hauptcontent** sitzt — nicht in der Sidebar. Das deutet auf einen **inneren Scroll-Container im Main-Bereich** hin (z. B. `overflow-y-auto` auf einem Wrapper in `App.tsx` oder `PageWrapper`), der zusätzlich zur Browser-Scrollbar einen eigenen Track erzeugt.
+### Diagnose
+Die Sidebar ist sehr wahrscheinlich **nicht** mehr die Ursache. Beim Lesen der Layout-Dateien fällt ein anderes Muster auf:
 
-### Vorgehen (Read-Only-Phase)
-Ich muss zuerst inspizieren:
-1. `src/App.tsx` — Layout-Wrapper (`min-h-screen`, `h-screen`, `overflow-y-auto`?)
-2. `src/components/layout/PageWrapper.tsx` — schon gesehen, kein overflow
-3. `src/index.css` — globale `html`/`body`-Höhen-Regeln
-4. `src/components/ui/sidebar.tsx` — `SidebarProvider`-Wrapper, der ggf. `h-svh overflow-hidden` setzt und damit den Main-Bereich zu einem Scroll-Container macht
+- `src/App.tsx` hat bereits einen globalen App-Shell-Wrapper mit  
+  `className="flex min-h-screen w-full overflow-x-hidden"`
+- Gleichzeitig nutzen viele eingeloggte Seiten erneut `min-h-screen`
+- Konkret auf Home:
+  - `src/App.tsx` stellt schon die volle Viewport-Höhe bereit
+  - `src/pages/Home.tsx` rendert zusätzlich  
+    `className="min-h-screen bg-background overflow-x-hidden"`
 
-### Wahrscheinlicher Verdacht
-`SidebarProvider` von shadcn rendert ein Wrapper-Div mit `min-h-svh`. Wenn `App.tsx` zusätzlich einen Container mit fester Höhe (`h-screen`) und `overflow-y-auto` setzt, scrollt **dieser innere Container**, während gleichzeitig die Browser-Scrollbar erscheint, weil der Body ebenfalls overflow hat (z. B. durch `NewsTicker` oder `AICompanionWidget` mit `position: fixed` + großer Höhe).
+Dadurch wird die Seitenhöhe effektiv **noch einmal um eine volle Viewport-Höhe aufgespannt**, obwohl Header, NewsTicker und Shell bereits darüber liegen. Genau das erklärt, warum das Problem auch auf anderen Seiten auftaucht.
 
-### Geplanter Fix (nach Inspektion)
-**Eine** der folgenden Maßnahmen — abhängig vom Befund:
+### Wahrscheinlichste Ursache
+Die eigentliche Ursache ist ein **verschachteltes Full-Height-Layout**:
+- globale App-Shell = `min-h-screen`
+- eingeloggte Unterseite = nochmal `min-h-screen`
 
-**Option A** (wahrscheinlichster Fall): In `src/App.tsx` den Main-Wrapper von `h-screen overflow-y-auto` → **`min-h-screen`** ändern. So scrollt nur noch der Body/Browser, kein innerer Container mehr.
+Das erzeugt unnötigen vertikalen Overflow und lässt eine zweite Scroll-Situation entstehen.
 
-**Option B**: Falls `SidebarProvider` der Schuldige ist → Wrapper-Style überschreiben (`overflow-visible` auf dem äußeren Div).
+### Umsetzung nach Approval
+1. **`src/pages/Home.tsx` anpassen**
+   - obersten Wrapper von `min-h-screen` auf eine nicht-viewportbasierte Variante umstellen
+   - wahrscheinlich:
+     - `min-h-screen` entfernen, oder
+     - auf `min-h-full` / normales `bg-background overflow-x-hidden` reduzieren
 
-**Option C**: Falls `body` und ein innerer Container beide scrollen → `body { overflow: hidden }` + nur **einen** definierten Scroll-Container (Main) behalten.
+2. **Weitere eingeloggte Seiten prüfen und angleichen**
+   - gleiche Korrektur für Seiten, die innerhalb `AppLayout` laufen und ebenfalls `min-h-screen` setzen
+   - Fokus auf die Seiten, auf denen der Effekt laut User ebenfalls sichtbar ist
 
-### Was NICHT geändert wird
-- Sidebar-Inhalte, Routing, Komponenten-Logik
-- Der bereits gemachte Sidebar-Scrollbar-Hide-Fix bleibt (schadet nicht)
+3. **Klare Regel für das Layout festziehen**
+   - **nur die App-Shell** darf die Viewport-Höhe kontrollieren
+   - innere App-Seiten dürfen **nicht erneut** `min-h-screen` setzen
+   - öffentliche Standalone-Seiten wie Login/Pricing/Legal dürfen `min-h-screen` behalten
 
-### Risiko
-Niedrig — eine gezielte Layout-Klassen-Änderung in `App.tsx` oder `index.css` nach Inspektion.
+4. **Vorherige Scrollbar-Hide-Fixes bereinigen**
+   - die globalen CSS-Hacks in `src/index.css` nur behalten, wenn sie wirklich noch gebraucht werden
+   - Ziel ist ein echter Layout-Fix statt reines Verstecken
 
-### Nächster Schritt nach Approval
-Default-Mode: `App.tsx` + `index.css` lesen → exakte Stelle identifizieren → Single-Line-Fix anwenden → Browser-Verifikation.
+### Betroffene Dateien
+- `src/App.tsx`
+- `src/pages/Home.tsx`
+- danach weitere betroffene eingeloggte `src/pages/*.tsx`
+- ggf. `src/index.css` zur Bereinigung des bisherigen Workarounds
+
+### Technische Details
+```text
+Richtig:
+AppShell = min-h-screen
+Page inside shell = auto / min-h-full
+
+Problematisch:
+AppShell = min-h-screen
+Inner page = min-h-screen
+Header + ticker + inner page => künstlicher Extra-Overflow
+```
+
+### Ergebnis
+Nach dem Fix soll es pro App-Seite nur noch **eine echte vertikale Scroll-Ebene** geben, statt der aktuellen doppelten Scroll-Situation.
 
