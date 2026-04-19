@@ -88,6 +88,13 @@ serve(async (req) => {
     };
     const toneLook = toneStyling[briefing.tone] || toneStyling.professional;
 
+    // Visual style — applied uniformly to every scene for visual consistency.
+    const visualStyleId = briefing.visualStyle || 'realistic';
+    const visualStyleHint = getVisualStyleHint(visualStyleId);
+    const styleDirective = visualStyleHint
+      ? `\n\n🎨 GLOBAL VISUAL STYLE (HIGHEST PRIORITY — applied to ALL scenes for visual consistency):\nEvery aiPrompt MUST be written in the "${visualStyleId}" visual style. Style clause: "${visualStyleHint.replace(/^,\s*/, '')}". This style overrides realism defaults — for example, "comic" means flat ink-and-color illustration (NOT photoreal), "anime" means hand-drawn 2D animation, "claymation" means stop-motion clay puppets, "pixel-art" means 16-bit sprites. Treat humans, products and environments consistently in this style across ALL scenes. Do NOT mix styles between scenes.`
+      : '';
+
     // Per scene-type structural hints — PRODUCT-IN-SCENE, NOT PRODUCT-AS-SCENE
     const sceneTypeHints = `Scene-type visual templates (product MUST appear within a real-world human moment, not isolated):
 - hook: emotional human moment that stops the scroll — a person in a relatable situation, product visible but in context (held in hand, in pocket, on the table next to them, on the desk while they work). NEVER an isolated product macro on a plain background.
