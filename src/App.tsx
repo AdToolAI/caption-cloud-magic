@@ -68,6 +68,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const EmailPreferences = lazy(() => import("./pages/EmailPreferences"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const FAQ = lazy(() => import("./pages/FAQ"));
 const Billing = lazy(() => import("./pages/Billing"));
@@ -157,8 +158,9 @@ function AppLayout() {
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
-                    <Route path="/verify-email" element={<VerifyEmail />} />
-                    <Route path="/account" element={<Account />} />
+                   <Route path="/verify-email" element={<VerifyEmail />} />
+                   <Route path="/email-preferences" element={<EmailPreferences />} />
+                   <Route path="/account" element={<Account />} />
                     <Route path="/account/delete" element={<ProtectedRoute><DeleteAccount /></ProtectedRoute>} />
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/faq" element={<FAQ />} />

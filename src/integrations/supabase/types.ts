@@ -4449,6 +4449,42 @@ export type Database = {
           },
         ]
       }
+      drip_email_log: {
+        Row: {
+          created_at: string
+          drip_step: number
+          error_message: string | null
+          id: string
+          progress_at_send: number | null
+          resend_message_id: string | null
+          sent_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          drip_step: number
+          error_message?: string | null
+          id?: string
+          progress_at_send?: number | null
+          resend_message_id?: string | null
+          sent_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          drip_step?: number
+          error_message?: string | null
+          id?: string
+          progress_at_send?: number | null
+          resend_message_id?: string | null
+          sent_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       email_verification_tokens: {
         Row: {
           created_at: string
@@ -6413,6 +6449,7 @@ export type Database = {
           brand_name: string | null
           created_at: string | null
           current_period_end: string | null
+          drip_emails_enabled: boolean
           email: string
           email_verified: boolean | null
           id: string
@@ -6437,6 +6474,7 @@ export type Database = {
           timezone: string | null
           tour_completed_at: string | null
           twitch_username: string | null
+          unsubscribe_token: string
           updated_at: string | null
           welcome_bonus_granted_at: string | null
           welcome_bonus_seen_at: string | null
@@ -6449,6 +6487,7 @@ export type Database = {
           brand_name?: string | null
           created_at?: string | null
           current_period_end?: string | null
+          drip_emails_enabled?: boolean
           email: string
           email_verified?: boolean | null
           id: string
@@ -6473,6 +6512,7 @@ export type Database = {
           timezone?: string | null
           tour_completed_at?: string | null
           twitch_username?: string | null
+          unsubscribe_token?: string
           updated_at?: string | null
           welcome_bonus_granted_at?: string | null
           welcome_bonus_seen_at?: string | null
@@ -6485,6 +6525,7 @@ export type Database = {
           brand_name?: string | null
           created_at?: string | null
           current_period_end?: string | null
+          drip_emails_enabled?: boolean
           email?: string
           email_verified?: boolean | null
           id?: string
@@ -6509,6 +6550,7 @@ export type Database = {
           timezone?: string | null
           tour_completed_at?: string | null
           twitch_username?: string | null
+          unsubscribe_token?: string
           updated_at?: string | null
           welcome_bonus_granted_at?: string | null
           welcome_bonus_seen_at?: string | null
