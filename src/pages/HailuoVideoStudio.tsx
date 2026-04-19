@@ -32,6 +32,10 @@ export default function HailuoVideoStudio() {
   const [activeTab, setActiveTab] = useState('generate');
 
   const [prompt, setPrompt] = useState('');
+  // Cached English translation of the prefilled prompt — used at submit time
+  // if the user hasn't edited the prompt. Cleared whenever the user types.
+  const [promptEn, setPromptEn] = useState<string | null>(null);
+  const [originalPrompt, setOriginalPrompt] = useState<string | null>(null);
   const [model, setModel] = useState<HailuoVideoModel>('hailuo-standard');
   const [duration, setDuration] = useState(6);
   const [resolution, setResolution] = useState<HailuoResolution>('768p');
@@ -65,6 +69,20 @@ export default function HailuoVideoStudio() {
     }
   }, [searchParams]);
 
+  // Prefill prompt from URL params (e.g. coming from FirstVideoExpressHero or FirstVideoGuide)
+  // We accept ?prompt=<UI text>&prompt_en=<EN translation>. The user sees the UI version,
+  // can edit freely, and on submit we send the EN version if they didn't change anything.
+  useEffect(() => {
+    const incoming = searchParams.get('prompt');
+    const incomingEn = searchParams.get('prompt_en');
+    if (incoming && !prompt) {
+      setPrompt(incoming);
+      setOriginalPrompt(incoming);
+      setPromptEn(incomingEn || null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const uploadFile = async (file: File): Promise<string | null> => {
     if (!user) return null;
     const ext = file.name.split('.').pop();
@@ -86,10 +104,17 @@ export default function HailuoVideoStudio() {
     if (!prompt.trim() || !user) return;
     if (!canAfford) { toast.error('Nicht genügend Credits'); setActiveTab('credits'); return; }
 
+    // If the user kept the prefilled prompt unchanged AND we have an English translation,
+    // send the English version to Hailuo for best output quality.
+    const promptToSend =
+      promptEn && originalPrompt && prompt.trim() === originalPrompt.trim()
+        ? promptEn
+        : prompt.trim();
+
     setGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-hailuo-video', {
-        body: { prompt: prompt.trim(), model, duration, resolution, startImageUrl, visualStyle },
+        body: { prompt: promptToSend, model, duration, resolution, startImageUrl, visualStyle },
       });
       if (error) throw error;
       if (data?.error) {
