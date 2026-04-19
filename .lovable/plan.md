@@ -1,53 +1,39 @@
 
 
-## Plan: Konfigurierbares Watermark im Composer Export-Tab
+## Verstanden — zwei separate Probleme
 
-User will im Export-Tab des Motion Studios das Watermark vollständig konfigurieren: An/Aus, Text, Position, Größe.
+### Problem 1: KI Picture Studio → Image-to-Image Upload (Screenshot 2)
+Aktuell (Zeile 287–308 in `ImageGenerator.tsx`): Nutzer aktiviert den "Image to Image"-Switch, lädt **ein** Foto hoch — danach gibt es nur einen kleinen X-Button auf dem Thumbnail. Wer ein **anderes** Foto nutzen will, muss erst X klicken (Switch toggeln zählt der User als "Schieber zweimal klicken"), dann den Upload-Button. Umständlich.
 
-### Was ich gefunden habe
+**User will:** Ohne Toggle/X direkt ein neues Foto hochladen, das alte wird automatisch ersetzt.
 
-- `ExportOptions` (in `ExportOptionsEditor.tsx`) hat aktuell nur `includeWatermark: boolean` — kein Text, keine Position, keine Größe
-- Der Composer-Renderer (`ComposedAdVideo.tsx`) und die Assemble-Edge-Function müssen die Watermark-Config durchreichen
-- Im Screenshot sehe ich: Color Grading + Kinetic Typography sind schon im Export-Tab — Watermark fehlt komplett als sichtbare Sektion
+### Problem 2: Mediathek → Bilder zwischen Alben verschieben (Screenshot 1)
+Aktuell (`MediaAlbumManager.tsx`): Drag-and-Drop funktioniert **nur für unsortierte Bilder** (Zeile 199–216 — Drop ändert `album_id`). In der **Album-Detail-Ansicht** (Zeile 260–313) gibt es **keinen Weg**, ein Bild in ein anderes Album zu verschieben — nur Lightbox/Delete. Der User will z.B. ein Foto aus "KI Picture Studio" in "Heiße Weiber in Test" verschieben.
+
+**User will:** Bilder aus einem Album in ein anderes Album verschieben können.
 
 ### Änderungen
 
-**1. `src/types/video-composer.ts` (oder wo `AssemblyConfig` definiert ist)**
-Neuen Typ ergänzen:
-```ts
-interface WatermarkConfig {
-  enabled: boolean;
-  text: string;              // z.B. "@deinname" oder "MyBrand"
-  position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
-  size: 'small' | 'medium' | 'large';   // 16/24/36 px @ 1080p
-  opacity: number;           // 0.3–1.0, default 0.7
-}
-```
-Default: `{ enabled: false, text: '', position: 'bottom-right', size: 'medium', opacity: 0.7 }`
+**1. `src/components/picture-studio/ImageGenerator.tsx` — Upload-UX vereinfachen**
+- Den Reference-Thumbnail klickbar machen → öffnet sofort den File-Picker und ersetzt das Bild beim Auswählen
+- Kleines "Ändern"-Overlay (Pencil/Replace-Icon) beim Hovern über dem Thumbnail
+- Der separate "Upload Image"-Button bleibt für den initialen Upload — aber nach Upload wird das Thumbnail selbst zur Replace-Zone
+- Alternativ: zusätzlicher kleiner "↻"-Button neben dem X für "anderes Bild wählen"
+- Switch bleibt — nur das Replace-Verhalten wird intuitiver
 
-**2. `src/components/video/ExportOptionsEditor.tsx` (oder Composer-Pendant im Export-Tab)**
-Watermark-Sektion ausbauen:
-- Switch "Wasserzeichen anzeigen"
-- Wenn aktiv: Input für Text, 5-Optionen-Grid für Position (Eck-Auswahl), Slider/Select für Größe, optional Opacity-Slider
-- Live-Preview-Hint (kleine Vorschau-Box mit dem Text an gewählter Position)
+**2. `src/components/media-library/MediaAlbumManager.tsx` — "In Album verschieben" aus Album-Ansicht**
+- In der Album-Detail-Ansicht (Zeile 260–313): jeder `ImageCard` bekommt zusätzlich einen "In anderes Album verschieben"-Button (Folder-Icon, nutzt bereits vorhandenen `SaveToAlbumDialog`)
+- Dafür `onSaveToAlbum={handleSaveToAlbum}` zur Album-Detail-`ImageCard` hinzufügen (aktuell nur in Unsorted-Sektion, Zeile 388)
+- `handleUnsortedImageSaved` umbenennen zu `handleImageMoved` und so erweitern, dass es **auch aus `albumImages`** entfernt (nicht nur aus `unsortedImages`)
+- Bonus: Drag-and-Drop auch in Album-Detail-Ansicht ermöglichen — Bild ziehen → "Zurück"-Button-Bereich zeigt Album-Liste als Drop-Targets (optional, kann phase 2 sein)
 
-**3. Composer Export-Tab Komponente** (`src/components/video-composer/AssemblyTab.tsx` o.ä.)
-Neue Watermark-Karte zwischen "Color Grading" und dem Director's-Cut-Hinweis einfügen — gleiche James-Bond-2028-Optik (gold accent, glassmorphism).
+**3. `src/components/picture-studio/SaveToAlbumDialog.tsx`**
+- Funktioniert bereits — kein Refactor nötig. Setzt einfach `album_id` neu, das ist genau das, was beim Verschieben gebraucht wird.
+- Eventuell Title je nach Kontext umbenennen ("In Album verschieben" statt "In Album speichern", wenn Bild bereits in einem Album ist)
 
-**4. `src/remotion/templates/ComposedAdVideo.tsx`**
-Watermark als `<AbsoluteFill>` Overlay über alle Szenen rendern (außerhalb der `<TransitionSeries>`, damit es bei Crossfades stabil bleibt). Position via `flexbox` justify/align, Größe via fontSize-Mapping (small=16/medium=24/large=36 px relativ zur 1080p-Höhe).
+### Was NICHT geändert wird
 
-**5. `supabase/functions/compose-video-assemble/index.ts`**
-`watermark`-Config in die Render-Payload an Lambda durchreichen.
-
-**6. Persistierung**
-`useComposerPersistence.ts` speichert `assembly_config` bereits — Watermark ist Teil davon, also kein DB-Schema-Change nötig.
-
-**7. Bundle-Redeploy**
-Renderer-Änderung → `bash scripts/deploy-remotion-bundle.sh` muss laufen (mache ich nach Code-Änderung).
-
-### Was bleibt
-
-- Aktueller `includeWatermark: boolean` wird erweitert, nicht ersetzt — wir mappen `enabled` auf das alte Feld für Backwards-Compat
-- Andere Export-Optionen (Format, Quality, FPS, EndScreen) unverändert
+- DB-Schema bleibt
+- Drag-Drop für unsortierte Bilder bleibt unverändert (funktioniert)
+- Andere Tabs der Mediathek bleiben
 
