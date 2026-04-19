@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,6 +17,7 @@ interface Briefing {
   duration: number;
   aspectRatio: string;
   brandColors: string[];
+  visualStyle?: string;
 }
 
 const CATEGORY_STRUCTURES: Record<string, string> = {
