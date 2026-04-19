@@ -23,6 +23,8 @@ import { OnboardingStepper } from "@/features/onboarding/Stepper";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { EmailVerificationGate } from "@/components/auth/EmailVerificationGate";
 import { AICompanionWidget } from "@/components/ai-companion/AICompanionWidget";
+import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedChecklist";
+import { ProductTour } from "@/components/onboarding/ProductTour";
 
 
 const Index = lazy(() => import("./pages/Index"));
@@ -302,6 +304,8 @@ const AppContent = () => {
             <AICompanionWidget />
             <EmailVerificationGate>
               <AppLayout />
+              <GettingStartedChecklist />
+              <ProductTour />
             </EmailVerificationGate>
           </SidebarProvider>
         </TooltipProvider>

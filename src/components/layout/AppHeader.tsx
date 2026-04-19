@@ -56,7 +56,7 @@ export function AppHeader() {
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-2 ml-12">
+        <div data-tour="header-actions" className="flex items-center gap-2 ml-12">
           <LanguageSwitcher />
           <ThemeToggle />
           {user && (

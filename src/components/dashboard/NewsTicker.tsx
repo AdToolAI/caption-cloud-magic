@@ -29,7 +29,7 @@ export const NewsTicker = () => {
 
   const renderScrollContent = () => {
     return news.map((item, i) => (
-      <div key={`news-${i}`} className="flex items-center">
+      <div key={`news-${i}`} data-tour={i === 0 ? "news-radar" : undefined} className="flex items-center">
         <button
           onClick={() => navigate(`/news-hub?headline=${encodeURIComponent(item.headline)}`)}
           className="flex-shrink-0 flex items-center gap-2 px-3 py-0.5 group/card cursor-pointer"
