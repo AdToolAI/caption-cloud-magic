@@ -531,22 +531,42 @@ const Home = () => {
 
       <div className="container mx-auto px-4 py-4 max-w-7xl space-y-4">
         {/* Hero Banner */}
-        {user && (
-          <DashboardVideoCarousel
-            quickActions={quickActions}
-            tipText={topInsight ? topInsight.headline : t("dashboard.statusBar.tipContent")}
-            tipLabel={t("dashboard.statusBar.tipOfTheDay")}
-            nextPostLabel={(() => {
-              const next = getNextPost();
-              if (!next) return t("homePage.noPostScheduled");
-              const d = new Date(next.date);
-              const dd = String(d.getDate()).padStart(2, '0');
-              const mm = String(d.getMonth() + 1).padStart(2, '0');
-              return `${dd}.${mm}. ${next.post.suggestedTime || "12:00"}`;
-            })()}
-            nextPostPrefix={t("dashboard.statusBar.nextPost")}
-          />
-        )}
+        {user && (() => {
+          const next = getNextPost();
+          let nextLabel: string;
+          let nextPostInfo: any = null;
+          if (next) {
+            const d = new Date(next.date);
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const time = next.post.suggestedTime || "12:00";
+            nextLabel = `${dd}.${mm}. ${time}`;
+            const [h, m] = time.split(':').map(Number);
+            const iso = new Date(d);
+            iso.setHours(h, m, 0, 0);
+            nextPostInfo = {
+              platform: next.post.platform,
+              contentIdea: next.post.contentIdea,
+              caption: next.post.caption,
+              mediaUrl: next.post.mediaUrl,
+              hashtags: next.post.hashtags,
+              whenLabel: nextLabel,
+              isoDate: iso.toISOString(),
+            };
+          } else {
+            nextLabel = t("homePage.noPostScheduled");
+          }
+          return (
+            <DashboardVideoCarousel
+              quickActions={quickActions}
+              tipText={topInsight ? topInsight.headline : t("dashboard.statusBar.tipContent")}
+              tipLabel={t("dashboard.statusBar.tipOfTheDay")}
+              nextPostLabel={nextLabel}
+              nextPostPrefix={t("dashboard.statusBar.nextPost")}
+              nextPost={nextPostInfo}
+            />
+          );
+        })()}
 
         {/* Week Calendar */}
         {user && (
