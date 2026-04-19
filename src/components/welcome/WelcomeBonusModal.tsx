@@ -5,6 +5,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
 import { formatPrice } from "@/lib/currency";
+import { useFirstVideoPrompts } from "@/hooks/useFirstVideoPrompts";
 
 interface WelcomeBonusModalProps {
   open: boolean;
@@ -49,12 +50,20 @@ const copy = {
 export const WelcomeBonusModal = ({ open, bonusAmount, bonusCurrency, onDismiss }: WelcomeBonusModalProps) => {
   const navigate = useNavigate();
   const { language } = useTranslation();
+  const { prompts } = useFirstVideoPrompts();
   const t = copy[language as "de" | "en" | "es"] ?? copy.en;
   const formattedAmount = formatPrice(bonusAmount, bonusCurrency);
 
   const handleStart = () => {
     onDismiss();
-    navigate("/ai-video-studio");
+    const first = prompts[0];
+    if (first) {
+      navigate(
+        `/hailuo-video-studio?prompt=${encodeURIComponent(first.prompt)}&prompt_en=${encodeURIComponent(first.prompt_en)}`
+      );
+    } else {
+      navigate("/hailuo-video-studio");
+    }
   };
 
   return (

@@ -69,17 +69,30 @@ export function NicheTutorialModal({ onComplete }: NicheTutorialModalProps) {
         experience_level: experienceLevel,
       }, { onConflict: "user_id" });
 
-      // Call edge function
-      const { data, error } = await supabase.functions.invoke("generate-starter-plan", {
-        body: {
-          niche,
-          business_type: businessType,
-          platforms: selectedPlatforms,
-          posting_goal: postingGoal,
-          posts_per_week: postsPerWeek,
-          experience_level: experienceLevel,
-        },
-      });
+      // Call starter-plan + first-video-prompts in parallel.
+      // first-video-prompts is fire-and-forget — failures fall back to defaults in the hook.
+      const [{ data, error }] = await Promise.all([
+        supabase.functions.invoke("generate-starter-plan", {
+          body: {
+            niche,
+            business_type: businessType,
+            platforms: selectedPlatforms,
+            posting_goal: postingGoal,
+            posts_per_week: postsPerWeek,
+            experience_level: experienceLevel,
+          },
+        }),
+        supabase.functions
+          .invoke("generate-first-video-prompts", {
+            body: {
+              language: typeof navigator !== "undefined" ? (navigator.language?.slice(0, 2) || "en") : "en",
+            },
+          })
+          .catch((e) => {
+            console.warn("first-video-prompts generation failed:", e);
+            return null;
+          }),
+      ]);
 
       if (error) throw error;
       setPlans(data?.plans || []);
