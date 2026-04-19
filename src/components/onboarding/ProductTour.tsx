@@ -186,13 +186,6 @@ export const ProductTour = () => {
         zIndex: 10000,
         showProgress: true,
       }}
-        arrowColor: "hsl(240 14% 6%)",
-        backgroundColor: "hsl(240 14% 6%)",
-        primaryColor: "hsl(43 90% 68%)",
-        textColor: "hsl(0 0% 98%)",
-        overlayColor: "rgba(5, 8, 22, 0.75)",
-        zIndex: 10000,
-      }}
       locale={{
         back: copy.back,
         close: copy.last,
