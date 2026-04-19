@@ -1,6 +1,9 @@
 // AI Video Composer — Scene-Based Video Assembly Types
 
 import type { TextOverlay as DirectorCutTextOverlay } from '@/types/directors-cut';
+import type { ComposerVisualStyle } from '@/config/composerVisualStyles';
+
+export type { ComposerVisualStyle };
 
 /**
  * Re-exported global text overlay shape (shared with Director's Cut).
@@ -56,6 +59,8 @@ export interface ComposerBriefing {
   brandColors: string[];
   logoUrl?: string;
   defaultQuality?: ClipQuality;
+  /** Visual style applied to every AI-generated scene (Comic, Realistic, Cinematic, …). */
+  visualStyle?: ComposerVisualStyle;
 }
 
 export interface ComposerScene {
@@ -209,6 +214,7 @@ export const DEFAULT_BRIEFING: ComposerBriefing = {
   aspectRatio: '16:9',
   brandColors: [],
   defaultQuality: 'standard',
+  visualStyle: 'realistic',
 };
 
 export const DEFAULT_SUBTITLES_CONFIG: SubtitlesConfig = {
