@@ -102,6 +102,7 @@ const defaultProject: LocalProject = {
     duration: 30,
     aspectRatio: '16:9',
     brandColors: [],
+    characters: [],
   },
   status: 'draft',
   scenes: [],
@@ -458,6 +459,7 @@ export default function VideoComposerDashboard() {
               onGoToClips={persistAndGoToClips}
               language={project.language}
               projectId={project.id}
+              characters={project.briefing?.characters}
             />
           </TabsContent>
 
@@ -466,6 +468,7 @@ export default function VideoComposerDashboard() {
               scenes={project.scenes}
               projectId={project.id}
               visualStyle={project.briefing?.visualStyle}
+              characters={project.briefing?.characters}
               onUpdateScenes={setScenes}
               onGoToVoiceSubtitles={() => setActiveTab('text')}
               onEnsurePersisted={async () => {

@@ -23,17 +23,20 @@ import type {
   ClipSource,
   ClipQuality,
   TransitionStyle,
+  ComposerCharacter,
 } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALITY_LABELS } from '@/types/video-composer';
 
 import SceneMediaUpload from './SceneMediaUpload';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
+import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
 
 interface SceneCardProps {
   scene: ComposerScene;
   index: number;
   totalScenes: number;
   projectId?: string;
+  characters?: ComposerCharacter[];
   onUpdate: (updates: Partial<ComposerScene>) => void;
   onDelete: () => void;
   onMoveUp: () => void;
@@ -60,6 +63,7 @@ export default function SceneCard({
   index,
   totalScenes,
   projectId,
+  characters,
   onUpdate,
   onDelete,
   onMoveUp,
@@ -69,6 +73,9 @@ export default function SceneCard({
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
   const clipSourceIcon = scene.clipSource.startsWith('ai-') ? Sparkles : scene.clipSource === 'stock' ? Video : Upload;
   const ClipIcon = clipSourceIcon;
+  const activeChar = scene.characterShot
+    ? characters?.find((c) => c.id === scene.characterShot!.characterId)
+    : undefined;
 
   return (
     <Card className="border-border/40 bg-card/80 group">
@@ -110,6 +117,9 @@ export default function SceneCard({
 
                 <span className="text-xs text-muted-foreground">{scene.durationSeconds}s</span>
                 <span className="text-[10px] text-primary">€{getClipCost(scene.clipSource, scene.clipQuality || 'standard', scene.durationSeconds).toFixed(2)}</span>
+                {scene.characterShot && scene.characterShot.shotType !== 'absent' && (
+                  <CharacterShotBadge shot={scene.characterShot} characterName={activeChar?.name} />
+                )}
               </div>
 
               <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={onDelete}>
@@ -178,7 +188,14 @@ export default function SceneCard({
               </div>
             )}
 
-            {/* Prompt / Keywords / Upload */}
+            {/* Character Shot picker — only when characters are defined in the briefing AND it's an AI scene */}
+            {scene.clipSource.startsWith('ai-') && characters && characters.length > 0 && (
+              <CharacterShotPicker
+                characters={characters}
+                value={scene.characterShot}
+                onChange={(next) => onUpdate({ characterShot: next })}
+              />
+            )}
             {scene.clipSource.startsWith('ai-') && (
               <div className="space-y-2">
                 <div className="space-y-1.5">

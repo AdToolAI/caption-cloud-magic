@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Search, Film, DollarSign, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import type { ComposerScene } from '@/types/video-composer';
+import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
@@ -16,6 +16,7 @@ interface ClipsTabProps {
   scenes: ComposerScene[];
   projectId?: string;
   visualStyle?: string;
+  characters?: ComposerCharacter[];
   onUpdateScenes: (scenes: ComposerScene[]) => void;
   onGoToVoiceSubtitles: () => void;
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
@@ -28,7 +29,7 @@ const statusConfig: Record<string, { color: string; bg: string; label: string }>
   failed: { color: 'text-destructive', bg: 'bg-destructive/15 border-destructive/40', label: 'Fehlgeschlagen' },
 };
 
-export default function ClipsTab({ scenes, projectId, visualStyle, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
+export default function ClipsTab({ scenes, projectId, visualStyle, characters, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [singleGenerating, setSingleGenerating] = useState<Record<string, boolean>>({});
   const [stockSearch, setStockSearch] = useState<Record<string, string>>({});
@@ -175,6 +176,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, onUpdateScene
           uploadUrl: s.uploadUrl,
           referenceImageUrl: s.referenceImageUrl,
           durationSeconds: s.durationSeconds,
+          characterShot: s.characterShot,
         }));
 
       if (scenesPayload.length === 0) {
@@ -193,7 +195,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, onUpdateScene
       onUpdateScenes(optimistic);
 
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
-        body: { projectId: pid, scenes: scenesPayload, visualStyle },
+        body: { projectId: pid, scenes: scenesPayload, visualStyle, characters },
       });
       if (error) throw error;
 
@@ -260,6 +262,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, onUpdateScene
         body: {
           projectId: pid,
           visualStyle,
+          characters,
           scenes: [{
             id: targetScene.id,
             clipSource: targetScene.clipSource,
@@ -269,6 +272,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, onUpdateScene
             uploadUrl: targetScene.uploadUrl,
             referenceImageUrl: targetScene.referenceImageUrl,
             durationSeconds: targetScene.durationSeconds,
+            characterShot: targetScene.characterShot,
           }],
         },
       });
