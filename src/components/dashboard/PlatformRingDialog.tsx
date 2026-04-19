@@ -14,11 +14,12 @@ import { useStrategyMode, type StrategyPost } from "@/hooks/useStrategyMode";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Instagram, Music, Linkedin, Facebook, Twitter, Youtube, Trash2, Save, CalendarPlus, Sparkles, Clock, Wand2, Eye, Compass, Calendar as CalendarIcon } from "lucide-react";
+import { Instagram, Music, Linkedin, Facebook, Twitter, Youtube, Trash2, Save, CalendarPlus, Sparkles, Clock, Wand2, Eye, Compass, Calendar as CalendarIcon, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { evaluateSlot } from "@/lib/slotScoring";
 
 interface Props {
   open: boolean;
