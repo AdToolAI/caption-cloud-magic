@@ -122,6 +122,8 @@ export function StrategyContextPanel({
             <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
               {phaseDe}
             </Badge>
+          </div>
+        )}
       </div>
 
       {/* Warum diese Uhrzeit? — Slot-Score aus der Posting-Times-Engine */}
@@ -164,8 +166,6 @@ export function StrategyContextPanel({
           )}
         </div>
       )}
-        )}
-      </div>
 
       {/* Die Idee */}
       <div className="rounded-lg border border-border/50 bg-card/40 p-3">
