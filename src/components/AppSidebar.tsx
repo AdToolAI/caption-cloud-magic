@@ -42,7 +42,7 @@ export function AppSidebar() {
           <Brand compact showText={false} />
         </div>
 
-        <SidebarContent className="bg-card border-r border-border h-full flex flex-col items-center py-3 gap-1">
+        <SidebarContent className="bg-card border-r border-border h-full flex flex-col items-center py-3 gap-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
           {/* Home */}
           <SidebarMenu className="w-full px-2">
             <SidebarMenuItem>
