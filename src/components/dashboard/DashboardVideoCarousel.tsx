@@ -48,12 +48,34 @@ const resolveVideoUrl = (rawUrl: string): string => {
   return data.publicUrl;
 };
 
+export interface NextPostInfo {
+  platform?: string;
+  contentIdea?: string;
+  caption?: string;
+  mediaUrl?: string;
+  hashtags?: string[];
+  /** Display string e.g. "20.04. 14:30" */
+  whenLabel: string;
+  /** Optional ISO date for full formatting */
+  isoDate?: string;
+}
+
 interface DashboardVideoCarouselProps {
   quickActions?: QuickAction[];
   tipText?: string;
   tipLabel?: string;
   nextPostLabel?: string;
   nextPostPrefix?: string;
+  nextPost?: NextPostInfo | null;
+}
+
+interface StatusPillsProps {
+  tipText?: string;
+  tipLabel?: string;
+  nextPostLabel?: string;
+  nextPostPrefix?: string;
+  nextPost?: NextPostInfo | null;
+  onOpenNextPost?: () => void;
 }
 
 const StatusPills = ({
@@ -61,7 +83,8 @@ const StatusPills = ({
   tipLabel,
   nextPostLabel,
   nextPostPrefix,
-}: Pick<DashboardVideoCarouselProps, 'tipText' | 'tipLabel' | 'nextPostLabel' | 'nextPostPrefix'>) => {
+  onOpenNextPost,
+}: StatusPillsProps) => {
   if (!tipText && !nextPostLabel) return null;
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
@@ -71,10 +94,10 @@ const StatusPills = ({
             <TooltipTrigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-border/40 bg-card/40 backdrop-blur-sm hover:bg-muted/60 transition-colors"
+                className="inline-flex items-center justify-center h-11 w-11 rounded-2xl border border-border/40 bg-card/40 backdrop-blur-sm hover:bg-muted/60 hover:border-primary/40 transition-colors"
                 aria-label={tipLabel}
               >
-                <Lightbulb className="h-3.5 w-3.5 text-primary" />
+                <Lightbulb className="h-4 w-4 text-primary" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-xs">
@@ -84,18 +107,28 @@ const StatusPills = ({
           </Tooltip>
         </TooltipProvider>
       )}
-      <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-warning/40 bg-warning/10 text-xs font-medium text-warning backdrop-blur-sm">
-        <InfinityIcon className="h-3.5 w-3.5" />
+      <span className="inline-flex items-center gap-1.5 h-11 px-3 rounded-2xl border border-warning/40 bg-warning/10 text-xs font-medium text-warning backdrop-blur-sm">
+        <InfinityIcon className="h-4 w-4" />
         <span className="hidden md:inline">Unlimited</span>
       </span>
       {nextPostLabel && (
-        <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-border/40 bg-card/40 text-xs text-muted-foreground backdrop-blur-sm">
-          <Clock className="h-3.5 w-3.5 text-warning" />
-          <span className="truncate max-w-[180px]">
-            <span className="hidden lg:inline">{nextPostPrefix}: </span>
-            {nextPostLabel}
+        <button
+          type="button"
+          onClick={onOpenNextPost}
+          className="inline-flex items-center gap-2 h-11 pl-2.5 pr-3 rounded-2xl border border-border/40 bg-card/40 backdrop-blur-sm hover:bg-muted/60 hover:border-warning/50 transition-colors text-left group"
+        >
+          <span className="inline-flex items-center justify-center h-7 w-7 rounded-xl bg-warning/10 text-warning shrink-0">
+            <Clock className="h-3.5 w-3.5" />
           </span>
-        </span>
+          <span className="flex flex-col leading-tight">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80 font-medium">
+              {nextPostPrefix}
+            </span>
+            <span className="text-xs font-medium text-foreground whitespace-nowrap">
+              {nextPostLabel}
+            </span>
+          </span>
+        </button>
       )}
     </div>
   );
