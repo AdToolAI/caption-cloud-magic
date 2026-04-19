@@ -47,16 +47,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Best-effort cleanup of tables that may not have ON DELETE CASCADE
+    // Reassign storage object ownership so deletion is not blocked
+    const { error: storageErr } = await admin.rpc("admin_reassign_storage_owner", { p_user_id: userId }).maybeSingle();
+    // RPC may not exist - fallback to direct UPDATE via raw query is not possible, so we ignore
+    if (storageErr && !storageErr.message.includes("does not exist")) {
+      console.warn("storage reassign failed:", storageErr.message);
+    }
+
+    // Best-effort cleanup
     await admin.from("email_verification_tokens").delete().eq("user_id", userId);
-    await admin.from("workspace_members").delete().eq("user_id", userId);
-    await admin.from("workspaces").delete().eq("owner_id", userId);
-    await admin.from("ai_video_wallets").delete().eq("user_id", userId);
-    await admin.from("wallets").delete().eq("user_id", userId);
-    await admin.from("profiles").delete().eq("id", userId);
 
     const { error: delErr } = await admin.auth.admin.deleteUser(userId);
-    if (delErr) throw delErr;
+    if (delErr) {
+      // Detailed error for debugging
+      console.error("deleteUser error:", JSON.stringify(delErr));
+      throw new Error(`deleteUser: ${delErr.message} | status: ${(delErr as any).status} | code: ${(delErr as any).code}`);
+    }
 
     return new Response(JSON.stringify({ success: true, deletedUserId: userId, email }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
