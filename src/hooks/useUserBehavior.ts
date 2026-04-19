@@ -2,6 +2,19 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
+const PRODUCTIVE_EVENTS = new Set([
+  'project_create',
+  'publish',
+  'template_select',
+  'caption_saved',
+  'video_created',
+  'post_scheduled',
+  'social_connected',
+  'brand_kit_updated',
+]);
+
+let lastStreakCallDate: string | null = null;
+
 let sessionId: string | null = null;
 
 export function useUserBehavior() {
@@ -46,6 +59,17 @@ export function useUserBehavior() {
       }).catch(err => {
         console.debug('Failed to track event:', err);
       });
+
+      // Productive events also bump the streak (idempotent per day)
+      if (PRODUCTIVE_EVENTS.has(event_type)) {
+        const today = new Date().toISOString().slice(0, 10);
+        if (lastStreakCallDate !== today) {
+          lastStreakCallDate = today;
+          supabase.rpc('record_streak_activity' as any, { p_user_id: user.id }).then(({ error }) => {
+            if (error) console.debug('[streak] rpc error:', error.message);
+          });
+        }
+      }
     } catch (error) {
       // Silent fail - tracking should never block user
       console.debug('Failed to track event:', error);
