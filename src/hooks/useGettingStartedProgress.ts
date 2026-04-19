@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
+let lastStreakHeartbeat: string | null = null;
+
 export interface ChecklistStep {
   key: "onboarding" | "first_video" | "social_connected" | "post_planned" | "brand_kit";
   done: boolean;
@@ -99,6 +101,17 @@ export const useGettingStartedProgress = () => {
       const completedCount = steps.filter((s) => s.done).length;
       const totalCount = steps.length;
       const percent = Math.round((completedCount / totalCount) * 100);
+
+      // Fire-and-forget streak heartbeat (idempotent server-side, throttled client-side)
+      if (completedCount > 0) {
+        const today = new Date().toISOString().slice(0, 10);
+        if (lastStreakHeartbeat !== today) {
+          lastStreakHeartbeat = today;
+          supabase.rpc("record_streak_activity" as any, { p_user_id: userId }).then(({ error }) => {
+            if (error) console.debug("[streak] heartbeat error:", error.message);
+          });
+        }
+      }
 
       return {
         steps,
