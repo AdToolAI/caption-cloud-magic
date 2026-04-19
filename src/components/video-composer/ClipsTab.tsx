@@ -193,7 +193,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, onUpdateScene
       onUpdateScenes(optimistic);
 
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
-        body: { projectId: pid, scenes: scenesPayload },
+        body: { projectId: pid, scenes: scenesPayload, visualStyle },
       });
       if (error) throw error;
 
@@ -259,6 +259,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, onUpdateScene
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
         body: {
           projectId: pid,
+          visualStyle,
           scenes: [{
             id: targetScene.id,
             clipSource: targetScene.clipSource,
