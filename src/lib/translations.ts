@@ -4464,6 +4464,44 @@ export const translations: Record<Language, any> = {
       milestonesTitle: "Milestones",
       noMilestonesYet: "No milestones yet — keep going!",
     },
+    upgrade: {
+      smart: {
+        credits: {
+          title: "Only {count} credits left",
+          body: "You're running low. Upgrade to {plan} for a fresh monthly credit pack and never run out mid-project.",
+        },
+        feature: {
+          title: "{feature} is a {plan} feature",
+          body: "Unlock {feature} and a stack of pro tools by upgrading to {plan}.",
+        },
+        streak: {
+          title: "🔥 {days}-day streak — you're on fire!",
+          body: "Power users like you save the most on {plan}. Get more credits, premium features, and exclusive perks.",
+        },
+        usage: {
+          title: "You're using AdTool intensively",
+          body: "Based on your activity, {plan} would give you more credits and unlock the features you need next.",
+        },
+        manual: {
+          title: "Unlock more with {plan}",
+          body: "Upgrade to {plan} to unlock the full suite of pro features.",
+        },
+        annualSaving: "Save 17% yearly",
+        perfectForYou: "Perfect for power users",
+        maybeLater: "Maybe later",
+        upgradeCta: "Upgrade now",
+        benefit: {
+          credits: "{count} monthly credits",
+          unlimited: "Unlimited credits",
+          posting: "Auto-publishing to all platforms",
+          team: "Team collaboration & workspaces",
+          analytics: "Advanced analytics dashboard",
+          brands: "Unlimited brand kits",
+          api: "Full API access",
+          priority: "Priority support",
+        },
+      },
+    },
   },
   de: {
     // Feature Guides
@@ -8757,6 +8795,44 @@ export const translations: Record<Language, any> = {
       milestoneDollarsShort: "+${{amount}} AI-Video-Guthaben",
       milestonesTitle: "Meilensteine",
       noMilestonesYet: "Noch keine Meilensteine — leg los!",
+    },
+    upgrade: {
+      smart: {
+        credits: {
+          title: "Nur noch {count} Credits übrig",
+          body: "Deine Credits gehen zur Neige. Upgrade auf {plan} für ein frisches monatliches Credit-Paket und nie wieder mittendrin stoppen.",
+        },
+        feature: {
+          title: "{feature} ist ein {plan}-Feature",
+          body: "Schalte {feature} und viele weitere Pro-Tools mit einem Upgrade auf {plan} frei.",
+        },
+        streak: {
+          title: "🔥 {days}-Tage-Streak — du bist on fire!",
+          body: "Power-User wie du sparen am meisten mit {plan}. Mehr Credits, Premium-Features und exklusive Extras.",
+        },
+        usage: {
+          title: "Du nutzt AdTool richtig intensiv",
+          body: "Basierend auf deiner Aktivität bietet dir {plan} mehr Credits und schaltet die Features frei, die du als Nächstes brauchst.",
+        },
+        manual: {
+          title: "Mehr freischalten mit {plan}",
+          body: "Upgrade auf {plan} und nutze das volle Pro-Feature-Set.",
+        },
+        annualSaving: "17 % im Jahr sparen",
+        perfectForYou: "Perfekt für Power-User",
+        maybeLater: "Vielleicht später",
+        upgradeCta: "Jetzt upgraden",
+        benefit: {
+          credits: "{count} Credits pro Monat",
+          unlimited: "Unbegrenzte Credits",
+          posting: "Auto-Publishing auf allen Plattformen",
+          team: "Team-Kollaboration & Workspaces",
+          analytics: "Erweiterte Analytics-Dashboard",
+          brands: "Unbegrenzte Brand-Kits",
+          api: "Voller API-Zugriff",
+          priority: "Priority-Support",
+        },
+      },
     },
   },
   es: {
@@ -17666,6 +17742,44 @@ Object.assign(translations.es, {
       milestoneDollarsShort: "+${{amount}} créditos AI Video",
       milestonesTitle: "Hitos",
       noMilestonesYet: "Aún no hay hitos — ¡continúa!",
+    },
+    upgrade: {
+      smart: {
+        credits: {
+          title: "Solo te quedan {count} créditos",
+          body: "Te estás quedando sin créditos. Mejora a {plan} para obtener un paquete mensual nuevo y no quedarte a medias.",
+        },
+        feature: {
+          title: "{feature} es una función de {plan}",
+          body: "Desbloquea {feature} y muchas otras herramientas pro mejorando a {plan}.",
+        },
+        streak: {
+          title: "🔥 ¡Racha de {days} días — estás imparable!",
+          body: "Los usuarios avanzados como tú ahorran más con {plan}. Más créditos, funciones premium y beneficios exclusivos.",
+        },
+        usage: {
+          title: "Estás usando AdTool intensivamente",
+          body: "Según tu actividad, {plan} te daría más créditos y desbloquearía las funciones que necesitas a continuación.",
+        },
+        manual: {
+          title: "Desbloquea más con {plan}",
+          body: "Mejora a {plan} para acceder al conjunto completo de funciones pro.",
+        },
+        annualSaving: "Ahorra 17 % al año",
+        perfectForYou: "Perfecto para usuarios avanzados",
+        maybeLater: "Quizá más tarde",
+        upgradeCta: "Mejorar ahora",
+        benefit: {
+          credits: "{count} créditos al mes",
+          unlimited: "Créditos ilimitados",
+          posting: "Publicación automática en todas las plataformas",
+          team: "Colaboración en equipo y espacios de trabajo",
+          analytics: "Panel de analytics avanzado",
+          brands: "Kits de marca ilimitados",
+          api: "Acceso completo a la API",
+          priority: "Soporte prioritario",
+        },
+      },
     },
   },
 });
