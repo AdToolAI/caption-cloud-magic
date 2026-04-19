@@ -76,7 +76,7 @@ serve(async (req) => {
     );
 
     const body: ClipRequest = await req.json();
-    const { projectId, scenes, visualStyle } = body;
+    const { projectId, scenes, visualStyle, characters } = body;
 
     if (!projectId) {
       return new Response(
@@ -158,23 +158,54 @@ serve(async (req) => {
     // language in the generated clip — they would conflict with our overlay /
     // subtitle system in the "Voice & Subtitles" tab.
     const NEGATIVE_TEXT_SUFFIX = ", no on-screen text, no captions, no subtitles, no watermarks, no logos, no written words, no typography, no signs with readable text, no UI overlays, no lower thirds, no isolated product on plain background, no floating product, no product rotating in empty space, clean visuals only";
-    // Visual-style clause derived from briefing (if any). Appended once per prompt
-    // so manually edited prompts also pick up the chosen style.
     const STYLE_HINT = getVisualStyleHint(visualStyle);
-    const enrichPrompt = (prompt?: string): string => {
+
+    // Build a quick character lookup for the safety-net injection
+    const charById = new Map<string, ComposerCharacter>();
+    (characters || []).forEach(c => { if (c?.id) charById.set(c.id, c); });
+
+    /** Inject character description based on shotType (Sherlock-Holmes anchor). */
+    const injectCharacter = (prompt: string, shot?: { characterId: string; shotType: CharacterShotType }): string => {
+      if (!shot || !shot.characterId || shot.shotType === 'absent') return prompt;
+      const char = charById.get(shot.characterId);
+      if (!char) return prompt;
+      const appearance = (char.appearance || '').trim();
+      const items = (char.signatureItems || '').trim();
+      let prefix = '';
+      // Skip if the prompt already contains the signatureItems verbatim
+      const lowerPrompt = prompt.toLowerCase();
+      const itemsProbe = items.slice(0, 30).toLowerCase();
+      const appearanceProbe = appearance.slice(0, 30).toLowerCase();
+      const hasItems = items && lowerPrompt.includes(itemsProbe);
+      const hasAppearance = appearance && lowerPrompt.includes(appearanceProbe);
+      switch (shot.shotType) {
+        case 'full':
+          if (!hasAppearance && appearance) prefix += appearance + ', ';
+          if (!hasItems && items) prefix += 'wearing ' + items + ', ';
+          break;
+        case 'profile':
+        case 'back':
+        case 'silhouette':
+        case 'detail':
+        case 'pov':
+          if (!hasItems && items) prefix += items + ', ';
+          break;
+      }
+      return prefix ? prefix + prompt : prompt;
+    };
+
+    const enrichPrompt = (prompt?: string, shot?: { characterId: string; shotType: CharacterShotType }): string => {
       const base = (prompt || "cinematic footage").trim();
-      const lower = base.toLowerCase();
-      let result = base;
-      // Strip any partial old guard before re-appending the canonical one
+      const withChar = injectCharacter(base, shot);
+      const lower = withChar.toLowerCase();
+      let result = withChar;
       const cleaned = result.replace(/,?\s*no on-screen text[\s\S]*$/i, "").trim().replace(/[,.]\s*$/, "");
-      // Inject style hint if not already present (probe = first 30 chars after the leading ", ")
       if (STYLE_HINT) {
         const probe = STYLE_HINT.replace(/^,\s*/, "").slice(0, 30).toLowerCase();
         result = lower.includes(probe) ? cleaned : cleaned + STYLE_HINT;
       } else {
         result = cleaned;
       }
-      // Always append the negative-text guard
       if (!(result.toLowerCase().includes("no subtitles") && result.toLowerCase().includes("no captions") && result.toLowerCase().includes("no on-screen text"))) {
         result = result.replace(/[,.]\s*$/, "") + NEGATIVE_TEXT_SUFFIX;
       }
