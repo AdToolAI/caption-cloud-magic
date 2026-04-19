@@ -147,6 +147,7 @@ export const DashboardVideoCarousel = ({
   nextPostLabel,
   nextPostPrefix,
   nextPost,
+  onOpenStrategyNext,
 }: DashboardVideoCarouselProps) => {
   const { videos, isLoading } = useVideoHistory();
   const { t, language } = useTranslation();
@@ -160,7 +161,13 @@ export const DashboardVideoCarousel = ({
   const wheelTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const openNextPost = useCallback(() => setNextPostDialogOpen(true), []);
+  const openNextPost = useCallback(() => {
+    if (nextPost?.source === 'strategy' && onOpenStrategyNext) {
+      onOpenStrategyNext();
+    } else {
+      setNextPostDialogOpen(true);
+    }
+  }, [nextPost?.source, onOpenStrategyNext]);
 
   const sortedVideos = useMemo(() =>
     [...videos]
