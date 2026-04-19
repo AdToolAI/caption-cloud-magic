@@ -33,6 +33,11 @@ export const AIVideoCreditPurchase = () => {
 
   return (
     <div className="space-y-6">
+      {currency === 'EUR' && (
+        <p className="text-xs text-muted-foreground text-center">
+          Alle Preise inkl. 19% MwSt. (Deutschland). Eine Rechnung wird automatisch nach dem Kauf per E-Mail zugestellt und im Billing-Bereich verfügbar.
+        </p>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {Object.entries(AI_VIDEO_CREDIT_PACKS).map(([key, pack]) => (
           <Card key={key} className={`p-6 relative ${pack.popular ? 'border-primary border-2' : ''}`}>
