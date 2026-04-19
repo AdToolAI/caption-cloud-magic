@@ -532,7 +532,20 @@ const Home = () => {
       <div className="container mx-auto px-4 py-4 max-w-7xl space-y-4">
         {/* Hero Banner */}
         {user && (
-          <DashboardVideoCarousel quickActions={quickActions} />
+          <DashboardVideoCarousel
+            quickActions={quickActions}
+            tipText={topInsight ? topInsight.headline : t("dashboard.statusBar.tipContent")}
+            tipLabel={t("dashboard.statusBar.tipOfTheDay")}
+            nextPostLabel={(() => {
+              const next = getNextPost();
+              if (!next) return t("homePage.noPostScheduled");
+              const d = new Date(next.date);
+              const dd = String(d.getDate()).padStart(2, '0');
+              const mm = String(d.getMonth() + 1).padStart(2, '0');
+              return `${dd}.${mm}. ${next.post.suggestedTime || "12:00"}`;
+            })()}
+            nextPostPrefix={t("dashboard.statusBar.nextPost")}
+          />
         )}
 
         {/* Week Calendar */}
