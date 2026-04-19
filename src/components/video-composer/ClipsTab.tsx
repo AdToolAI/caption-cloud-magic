@@ -561,18 +561,19 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                     {/* Ready → Re-roll */}
                     {scene.clipStatus === 'ready' && isAi && (
                       <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        title="Neu generieren"
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-[10px] h-7 px-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                        title="Diese Szene neu generieren (kostet erneut Credits)"
                         disabled={isThisGenerating}
-                        onClick={() => handleGenerateSingle(scene)}
+                        onClick={() => setRerollTarget(scene)}
                       >
                         {isThisGenerating ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
-                          <RefreshCw className="h-3.5 w-3.5" />
+                          <RefreshCw className="h-3 w-3" />
                         )}
+                        Neu generieren €{costPerClip.toFixed(2)}
                       </Button>
                     )}
                     {/* Generating disabled marker */}
