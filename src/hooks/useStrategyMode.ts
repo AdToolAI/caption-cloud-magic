@@ -283,21 +283,22 @@ export function useStrategyMode() {
       }));
 
       // 1. Insert calendar event
+      const eventRow: any = {
+        workspace_id: workspaceId,
+        created_by: user.id,
+        owner_id: user.id,
+        title: post.content_idea,
+        caption: overrides.caption_draft ?? post.caption_draft ?? "",
+        hashtags: overrides.hashtags ?? post.hashtags ?? [],
+        channels: [post.platform],
+        start_at: scheduled,
+        status: overrides.auto_publish ? "scheduled" : "draft",
+        assets_json: assets,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      };
       const { data: ev, error: evErr } = await supabase
         .from("calendar_events")
-        .insert({
-          workspace_id: workspaceId,
-          created_by: user.id,
-          owner_id: user.id,
-          title: post.content_idea,
-          caption: overrides.caption_draft ?? post.caption_draft ?? "",
-          hashtags: overrides.hashtags ?? post.hashtags ?? [],
-          channels: [post.platform],
-          start_at: scheduled,
-          status: overrides.auto_publish ? "scheduled" : "draft",
-          assets_json: assets,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-        })
+        .insert(eventRow)
         .select()
         .single();
       if (evErr) throw evErr;
