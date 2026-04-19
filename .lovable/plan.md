@@ -1,75 +1,70 @@
 
 
-## Entscheidung: Plan B — Resend direkt mit eigenem DNS-Setup
+## Entscheidung – alles geklärt
 
-Du wählst **maximale Provider-Unabhängigkeit**. Resend bekommt seine DNS-Records bei deinem Domain-Registrar (nicht über Cloudflare-Auto-Authorize, nicht über Lovable).
+1. **Backfill: ja** – Lazy-Trigger für existierende User
+2. **Sprache: UI-Sprache anzeigen, EN an Hailuo** – via `prompt` (UI) + `prompt_en` (Übersetzung) in DB-Cache
+3. **Auto-Submit: nein** – Prompt wird nur vorausgefüllt, User klickt selbst „Generate"
 
-## Wichtige Vorab-Klärung
+## Plan: A2 mit personalisierten Prompts
 
-In deinem Projekt sind bereits **Lovable-Email-Komponenten vorhanden** (`auth-email-hook`, `process-email-queue`, `email_send_log`-Tabelle). Falls in Lovable Cloud auch eine **Sender-Domain** auf einem Subdomain von `useadtool.ai` (z. B. `notify.useadtool.ai`) konfiguriert ist, müssen wir das wissen, **bevor** wir die DNS-Records bei Resend setzen — sonst riskieren wir Konflikte mit den NS-Delegationen, die Lovable bei Cloudflare gesetzt hat.
+### Schritt 1 — DB-Migration
+- `ALTER TABLE onboarding_profiles ADD COLUMN first_video_prompts JSONB;`
+- Struktur: `[{ prompt, prompt_en, style_hint }, ...]` (3 Einträge)
 
-**Erste Aktion im Default-Mode:** Status der Lovable-Email-Domain prüfen und dir das Ergebnis zeigen.
+### Schritt 2 — Edge Function `generate-first-video-prompts`
+- Input: `niche`, `business_type`, `platforms`, `posting_goal`, `experience_level`, `language`
+- Modell: `google/gemini-2.5-flash-lite` (schnell, günstig)
+- Tool-Calling für strukturiertes JSON-Output (3 Prompts mit `prompt`, `prompt_en`, `style_hint`)
+- System-Prompt: maßgeschneiderte 6-Sek-Hailuo-Prompts (max. 25 Wörter), realistisch umsetzbar
+- Speichert direkt in `onboarding_profiles.first_video_prompts`
+- Idempotent (überspringt, wenn vorhanden, außer `force: true`)
 
-## Plan
+### Schritt 3 — Onboarding-Integration
+- In `NicheTutorialModal.tsx`: nach `generate-starter-plan` parallel `generate-first-video-prompts` aufrufen (fire-and-forget)
+- Fehler tolerabel → Fallback auf statische Defaults
 
-### Schritt 1: Cloudflare-Authorize-Tab schließen — NICHT klicken
-Sonst überschreibt Cloudflare automatisch DNS-Records, was den Lovable-Setup brechen könnte.
+### Schritt 4 — Frontend-Hook `useFirstVideoPrompts()`
+- Lädt Prompts aus `onboarding_profiles.first_video_prompts`
+- **Backfill-Logic**: Wenn `IS NULL` und User hat Onboarding-Profil → Edge Function lazy aufrufen, während Defaults gezeigt werden, dann sanft ersetzen
+- Fallback-Kette: DB-Prompts → statische Defaults pro Sprache
 
-### Schritt 2: Domain-Status in Lovable prüfen
-Ich rufe den Status der konfigurierten Lovable-Email-Domain ab. Drei mögliche Ergebnisse:
+### Schritt 5 — `FirstVideoGuide.tsx` aktualisieren
+- Statische Prompts durch `useFirstVideoPrompts()` ersetzen
+- Link enthält **beide** Werte: `?prompt=<UI>&prompt_en=<EN>`
 
-- **Keine Lovable-Domain konfiguriert** → freie Bahn, du kannst `useadtool.ai` (Root) bei Resend nutzen
-- **Lovable nutzt einen anderen Subdomain** (z. B. `notify.useadtool.ai`) → freie Bahn für Resend auf der Root-Domain
-- **Lovable nutzt die Root-Domain oder denselben Subdomain wie Resend will** → echter Konflikt, du musst dich entscheiden
+### Schritt 6 — Neue Komponente `FirstVideoExpressHero`
+- Persistent auf `/home` (Wallet > 0, 0 Generationen)
+- 3 personalisierte Beispielprompts + „Mit Hailuo 2.3 erstellen"
+- Lokalisiert (DE/EN/ES)
+- Verschwindet nach erster Generation
 
-### Schritt 3: Resend-DNS-Records manuell beim Registrar setzen
-Sobald wir wissen, dass kein Konflikt besteht:
+### Schritt 7 — Hailuo Studio: URL-Param-Handling
+- `useSearchParams()` in `HailuoVideoStudio.tsx`
+- `?prompt=` füllt UI-Prompt-Feld (User sieht in seiner Sprache, kann editieren)
+- `?prompt_en=` wird intern an Hailuo geschickt (falls vorhanden, sonst Übersetzung via bestehendem `VideoPromptOptimizer`)
+- **Kein Auto-Submit** – User klickt selbst
 
-1. **In Resend-Dashboard** → Domains → Add Domain → `useadtool.ai` (oder Subdomain wählen)
-2. Resend zeigt dir 3–4 Records (typisch: 1× MX, 1× TXT/SPF, 1× TXT/DKIM, optional 1× TXT/DMARC)
-3. **Wo trägst du sie ein?** → Bei deinem **Domain-Registrar** (dort, wo du `useadtool.ai` gekauft hast — IONOS, GoDaddy, Cloudflare als Registrar, Namecheap, Google Domains, etc.). Ich helfe dir bei der Identifikation, wenn du mir sagst, wo die Domain registriert ist.
-4. Records exakt 1:1 kopieren (Name, Typ, Wert)
-5. In Resend → "Verify DNS Records" → 5 Min bis 48 h warten
+### Schritt 8 — CTA-Routing vereinheitlichen
+- `DashboardVideoCarousel`: First-Time-User (0 Generationen) → `/hailuo-video-studio?prompt=...&prompt_en=...`
+- Power-User → wie bisher `/universal-video-creator`
+- `WelcomeBonusModal`: direkt zu `/hailuo-video-studio` mit erstem personalisierten Prompt
 
-### Schritt 4: Verifizierungs-E-Mail neu auslösen
-Sobald Resend die Domain als **Verified ✅** markiert:
-- Edge Function `send-verification-email` neu aufrufen für `dusatkojr@web.de`
-- E-Mail kommt innerhalb von Sekunden an
-- Klick auf Verifizierungslink → Account aktiviert
+### Schritt 9 — E2E-Test in Preview
+- Neuer User: Onboarding → Modal → Hero/Guide mit personalisierten Prompts → Klick → Hailuo mit Prompt vorausgefüllt → User editiert ggf. → Generate → Video < 90 Sek
 
-### Schritt 5: Aufräumen
-- Migration für `email_verification_tokens.user_id` UNIQUE-Constraint anwenden (liegt schon im Branch)
-- Logs prüfen: `Email sent successfully: <id>`
-- Eintrag in `email_verification_tokens` für den User checken
+## Technische Details
 
-## Wichtige Hinweise
-
-**Was ich für dich tun kann (im Default-Mode):**
-- Domain-Status prüfen
-- Migration anwenden (UNIQUE-Constraint)
-- Verifizierungs-E-Mail neu auslösen
-- Logs lesen und debuggen
-
-**Was DU tun musst (manuell, kann ich nicht):**
-- Cloudflare-Authorize-Tab schließen ohne klicken
-- Resend-Dashboard öffnen, Domain hinzufügen, Records anzeigen lassen
-- Records bei deinem Domain-Registrar eintragen
-- "Verify DNS" in Resend klicken
+- **Übersetzungsfluss**: KI generiert beide Versionen (`prompt` in UI-Sprache, `prompt_en` in Englisch) im selben Call → keine doppelte API-Latenz
+- **Caching**: Einmal generiert, bleibt in `onboarding_profiles` – keine wiederholten KI-Calls
+- **Editierbarkeit**: User sieht den Prompt im Hailuo-Studio im Textfeld, kann frei ändern; bei Submit wird (falls Prompt unverändert) `prompt_en` genutzt, sonst der editierte Text durch bestehenden `VideoPromptOptimizer`
+- **Backfill für Edge Cases**: Hook löst Edge Function lazy aus, falls User Onboarding hat aber `first_video_prompts IS NULL` (z. B. existierende User vor diesem Feature)
 
 ## Aufwand
 
-- Domain-Status-Check: 30 Sek
-- Resend-Setup + manuelle DNS-Einträge: 5–10 Min (deine Arbeit)
-- DNS-Propagation: 5 Min – 48 h (typisch < 1 h)
-- Verifizierungs-E-Mail-Test: 30 Sek
+~2 h Gesamt (DB 5min, Edge Function 25min, Hook+Backfill 25min, Express-Hero 30min, Hailuo URL-Param 15min, CTA-Routing 15min, E2E-Test 15min)
 
-**Gesamt:** 15 Min aktive Arbeit + Wartezeit auf DNS-Propagation.
+## Nach Approval
 
-## Nächster Schritt nach Approval
-
-Sobald du diesen Plan freigibst:
-1. Ich prüfe sofort den Lovable-Domain-Status
-2. Sage dir, ob es einen Konflikt gibt oder freie Bahn
-3. Du gehst parallel zu Resend und fügst die Domain hinzu
-4. Du sagst mir, bei welchem Registrar `useadtool.ai` liegt — ich gebe dir bei Bedarf die exakten Klick-Pfade
+Sobald freigegeben, baue ich Schritt für Schritt durch und teste am Ende End-to-End in der Preview.
 
