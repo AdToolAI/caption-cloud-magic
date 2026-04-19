@@ -6435,6 +6435,7 @@ export type Database = {
           subscription_status: string | null
           test_mode_plan: string | null
           timezone: string | null
+          tour_completed_at: string | null
           twitch_username: string | null
           updated_at: string | null
           welcome_bonus_granted_at: string | null
@@ -6470,6 +6471,7 @@ export type Database = {
           subscription_status?: string | null
           test_mode_plan?: string | null
           timezone?: string | null
+          tour_completed_at?: string | null
           twitch_username?: string | null
           updated_at?: string | null
           welcome_bonus_granted_at?: string | null
@@ -6505,6 +6507,7 @@ export type Database = {
           subscription_status?: string | null
           test_mode_plan?: string | null
           timezone?: string | null
+          tour_completed_at?: string | null
           twitch_username?: string | null
           updated_at?: string | null
           welcome_bonus_granted_at?: string | null
