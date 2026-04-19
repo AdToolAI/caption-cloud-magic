@@ -38,6 +38,34 @@ export type AspectRatio = '16:9' | '9:16' | '1:1' | '4:5';
 
 export type EmotionalTone = 'professional' | 'energetic' | 'emotional' | 'funny' | 'luxury' | 'minimal' | 'dramatic' | 'friendly';
 
+/**
+ * Recurring on-screen character profile.
+ * - `appearance`: physical description (face, age, hair, build) — used sparingly.
+ * - `signatureItems`: clothing / objects / props — repeated in EVERY scene where
+ *   the character (or a part of them) is visible. AI is reliable at repeating
+ *   props/clothing, much less so at faces — this is the Sherlock-Holmes anchor.
+ */
+export interface ComposerCharacter {
+  id: string;
+  name: string;
+  appearance: string;
+  signatureItems: string;
+}
+
+/**
+ * Per-scene shot strategy for character continuity. Set by the storyboard AI
+ * (or manually by the user) to vary camera framing across scenes — only 2-3
+ * scenes show the full face, the rest use detail / silhouette / POV / back-
+ * shot framing so face inconsistencies between independent video generations
+ * are not noticed.
+ */
+export type CharacterShotType = 'full' | 'profile' | 'back' | 'detail' | 'pov' | 'silhouette' | 'absent';
+
+export interface CharacterShot {
+  characterId: string;
+  shotType: CharacterShotType;
+}
+
 export interface TextOverlayConfig {
   text: string;
   position: TextPosition;
