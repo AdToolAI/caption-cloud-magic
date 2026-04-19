@@ -30,7 +30,8 @@ import { type WeekPost } from "@/components/dashboard/WeekDayCard";
 import { WeekTimelineDay } from "@/components/dashboard/WeekTimelineDay";
 import { WeekPostEditor } from "@/components/dashboard/WeekPostEditor";
 import { WeekStrategyTimeline } from "@/components/dashboard/WeekStrategyTimeline";
-import { useStrategyMode } from "@/hooks/useStrategyMode";
+import { StrategyPostDialog } from "@/components/dashboard/StrategyPostDialog";
+import { useStrategyMode, type StrategyPost } from "@/hooks/useStrategyMode";
 import { Switch } from "@/components/ui/switch";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,7 @@ const Home = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { topInsight } = useNewsRadar();
+  const sm = useStrategyMode();
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
   const [weekDays, setWeekDays] = useState<{ date: string; name: string; day: number; isToday: boolean; posts: WeekPost[] }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,6 +60,7 @@ const Home = () => {
   const [editingDate, setEditingDate] = useState<string>("");
   const [editorOpen, setEditorOpen] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string>("");
+  const [strategyNextDialogOpen, setStrategyNextDialogOpen] = useState(false);
 
   // Performance KPI state
   const [performanceKPIs, setPerformanceKPIs] = useState({
@@ -474,6 +477,17 @@ const Home = () => {
     return best ? { post: best.post, date: best.date } : null;
   };
 
+  // Find the next pending strategy post (when strategy mode is on)
+  const getNextStrategyPost = (): StrategyPost | null => {
+    if (!sm.enabled || !sm.posts || sm.posts.length === 0) return null;
+    const now = Date.now();
+    const upcoming = sm.posts
+      .filter((p) => p.status === "pending" || p.status === "rescheduled")
+      .filter((p) => new Date(p.scheduled_at).getTime() >= now)
+      .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+    return upcoming[0] || null;
+  };
+
   const getPlatformColor = (platform: string) => {
     const colors: Record<string, string> = {
       instagram: 'bg-pink-500',
@@ -537,46 +551,80 @@ const Home = () => {
       <div className="container mx-auto px-4 py-4 max-w-7xl space-y-4">
         {/* Hero Banner */}
         {user && (() => {
-          const next = getNextPost();
+          const calNext = getNextPost();
+          const stratNext = getNextStrategyPost();
+
+          // Pick whichever is sooner
+          const calTime = calNext
+            ? (() => {
+                const d = new Date(calNext.date);
+                const [h, m] = (calNext.post.suggestedTime || "12:00").split(":").map(Number);
+                d.setHours(h, m, 0, 0);
+                return d.getTime();
+              })()
+            : Infinity;
+          const stratTime = stratNext ? new Date(stratNext.scheduled_at).getTime() : Infinity;
+
           let nextLabel: string;
           let nextPostInfo: any = null;
-          if (next) {
-            const d = new Date(next.date);
-            const dd = String(d.getDate()).padStart(2, '0');
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const time = next.post.suggestedTime || "12:00";
+          let prefix = t("dashboard.statusBar.nextPost");
+
+          if (stratNext && stratTime <= calTime) {
+            const d = new Date(stratNext.scheduled_at);
+            const dd = String(d.getDate()).padStart(2, "0");
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const hh = String(d.getHours()).padStart(2, "0");
+            const mins = String(d.getMinutes()).padStart(2, "0");
+            nextLabel = `${dd}.${mm}. ${hh}:${mins}`;
+            prefix = "Nächster Vorschlag";
+            nextPostInfo = {
+              platform: stratNext.platform,
+              contentIdea: stratNext.content_idea,
+              caption: stratNext.caption_draft || undefined,
+              hashtags: stratNext.hashtags,
+              whenLabel: nextLabel,
+              isoDate: d.toISOString(),
+              source: "strategy" as const,
+              reasoning: stratNext.reasoning || undefined,
+            };
+          } else if (calNext) {
+            const d = new Date(calNext.date);
+            const dd = String(d.getDate()).padStart(2, "0");
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const time = calNext.post.suggestedTime || "12:00";
             nextLabel = `${dd}.${mm}. ${time}`;
-            const [h, m] = time.split(':').map(Number);
+            const [h, m] = time.split(":").map(Number);
             const iso = new Date(d);
             iso.setHours(h, m, 0, 0);
             nextPostInfo = {
-              platform: next.post.platform,
-              contentIdea: next.post.contentIdea,
-              caption: next.post.caption,
-              mediaUrl: next.post.mediaUrl,
-              hashtags: next.post.hashtags,
+              platform: calNext.post.platform,
+              contentIdea: calNext.post.contentIdea,
+              caption: calNext.post.caption,
+              mediaUrl: calNext.post.mediaUrl,
+              hashtags: calNext.post.hashtags,
               whenLabel: nextLabel,
               isoDate: iso.toISOString(),
+              source: "calendar" as const,
             };
           } else {
             nextLabel = t("homePage.noPostScheduled");
           }
+
           return (
             <DashboardVideoCarousel
               quickActions={quickActions}
               tipText={topInsight ? topInsight.headline : t("dashboard.statusBar.tipContent")}
               tipLabel={t("dashboard.statusBar.tipOfTheDay")}
               nextPostLabel={nextLabel}
-              nextPostPrefix={t("dashboard.statusBar.nextPost")}
+              nextPostPrefix={prefix}
               nextPost={nextPostInfo}
+              onOpenStrategyNext={() => setStrategyNextDialogOpen(true)}
             />
           );
         })()}
 
         {/* Week Calendar */}
-        {user && (() => {
-          const sm = useStrategyMode();
-          return (
+        {user && (
             <Section 
               title={t("dashboard.sections.thisWeek")}
               description={sm.enabled ? "Dein KI-Co-Pilot — neue Vorschläge jede Woche, automatisch." : t("dashboard.sections.thisWeekDescription")}
@@ -618,8 +666,28 @@ const Home = () => {
                 </div>
               )}
             </Section>
-          );
-        })()}
+        )}
+
+        {/* Strategy Next Post Dialog (opened from carousel pill) */}
+        <StrategyPostDialog
+          open={strategyNextDialogOpen}
+          onOpenChange={setStrategyNextDialogOpen}
+          post={getNextStrategyPost()}
+          onDismiss={(id) => sm.dismiss(id)}
+          onAddToCalendar={(p) => {
+            navigate("/calendar", {
+              state: {
+                prefill: {
+                  caption: p.caption_draft,
+                  hashtags: p.hashtags,
+                  platform: p.platform,
+                  scheduled_at: p.scheduled_at,
+                  source_strategy_post_id: p.id,
+                },
+              },
+            });
+          }}
+        />
 
 
         {/* Week Post Editor */}

@@ -201,65 +201,85 @@ export function WeekStrategyTimeline({ weekStart }: Props) {
           </Button>
         </div>
 
-        <div className="grid grid-cols-7 gap-2">
-          {days.map((day) => (
-            <div
-              key={day.date.toISOString()}
-              className={cn(
-                "rounded-xl border p-2 min-h-[140px] flex flex-col gap-1.5",
-                day.isToday ? "border-primary/50 bg-primary/5" : "border-border/40 bg-card/40"
-              )}
-            >
-              <div className="text-center mb-1">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-                  {format(day.date, "EEE", { locale: de })}
-                </div>
-                <div className={cn("text-base font-semibold", day.isToday && "text-primary")}>
-                  {format(day.date, "d")}
-                </div>
+        <div className="relative">
+          {/* Connecting timeline rail */}
+          <div className="pointer-events-none absolute left-0 right-0 top-[34px] h-px bg-gradient-to-r from-warning/10 via-warning/40 to-warning/10" />
+          {/* Nodes per day, aligned to the rail */}
+          <div className="pointer-events-none absolute left-0 right-0 top-[30px] grid grid-cols-7 gap-2">
+            {days.map((day) => (
+              <div key={`node-${day.date.toISOString()}`} className="flex justify-center">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full border",
+                    day.posts.length > 0
+                      ? "bg-warning border-warning shadow-[0_0_8px_hsl(var(--warning))]"
+                      : "bg-background border-muted-foreground/30"
+                  )}
+                />
               </div>
+            ))}
+          </div>
 
-              {day.posts.length === 0 ? (
-                <div className="flex-1 flex items-center justify-center text-[10px] text-muted-foreground/50 italic">
-                  —
+          <div className="relative grid grid-cols-7 gap-2">
+            {days.map((day) => (
+              <div
+                key={day.date.toISOString()}
+                className={cn(
+                  "rounded-xl border p-2 pt-5 min-h-[140px] flex flex-col gap-1.5",
+                  day.isToday ? "border-primary/50 bg-primary/5" : "border-border/40 bg-card/40"
+                )}
+              >
+                <div className="text-center mb-1">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                    {format(day.date, "EEE", { locale: de })}
+                  </div>
+                  <div className={cn("text-base font-semibold", day.isToday && "text-primary")}>
+                    {format(day.date, "d")}
+                  </div>
                 </div>
-              ) : (
-                day.posts.map((p) => {
-                  const key = getStatusKey(p);
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => handlePostClick(p)}
-                      className={cn(
-                        "w-full text-left rounded-lg border p-1.5 transition-all",
-                        STATUS_STYLES[key]
-                      )}
-                    >
-                      <div className="flex items-center gap-1 mb-0.5">
-                        {key === "missed" && <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />}
-                        {p.status === "completed" && <Check className="h-3 w-3 text-success shrink-0" />}
-                        {p.status === "dismissed" && <X className="h-3 w-3 text-muted-foreground shrink-0" />}
-                        {p.status === "rescheduled" && <ArrowRight className="h-3 w-3 text-primary shrink-0" />}
-                        <span className="text-[9px] uppercase tracking-wide font-medium text-muted-foreground truncate">
-                          {p.platform}
-                        </span>
-                      </div>
-                      <div className={cn(
-                        "text-[10px] font-medium line-clamp-2 leading-tight",
-                        p.status === "dismissed" && "line-through"
-                      )}>
-                        {p.content_idea}
-                      </div>
-                      <div className="flex items-center gap-0.5 mt-0.5 text-[9px] text-muted-foreground">
-                        <Clock className="h-2.5 w-2.5" />
-                        {format(new Date(p.scheduled_at), "HH:mm")}
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          ))}
+
+                {day.posts.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center text-[10px] text-muted-foreground/50 italic">
+                    —
+                  </div>
+                ) : (
+                  day.posts.map((p) => {
+                    const key = getStatusKey(p);
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => handlePostClick(p)}
+                        className={cn(
+                          "w-full text-left rounded-lg border p-1.5 transition-all",
+                          STATUS_STYLES[key]
+                        )}
+                      >
+                        <div className="flex items-center gap-1 mb-0.5">
+                          {key === "missed" && <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />}
+                          {p.status === "completed" && <Check className="h-3 w-3 text-success shrink-0" />}
+                          {p.status === "dismissed" && <X className="h-3 w-3 text-muted-foreground shrink-0" />}
+                          {p.status === "rescheduled" && <ArrowRight className="h-3 w-3 text-primary shrink-0" />}
+                          <span className="text-[9px] uppercase tracking-wide font-medium text-muted-foreground truncate">
+                            {p.platform}
+                          </span>
+                        </div>
+                        <div className={cn(
+                          "text-[10px] font-medium line-clamp-2 leading-tight",
+                          p.status === "dismissed" && "line-through"
+                        )}>
+                          {p.content_idea}
+                        </div>
+                        <div className="flex items-center gap-0.5 mt-0.5 text-[9px] text-muted-foreground">
+                          <Clock className="h-2.5 w-2.5" />
+                          {format(new Date(p.scheduled_at), "HH:mm")}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
         {!isLoadingPosts && posts.length === 0 && (

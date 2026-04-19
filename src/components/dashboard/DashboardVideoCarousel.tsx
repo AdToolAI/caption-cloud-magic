@@ -58,6 +58,10 @@ export interface NextPostInfo {
   whenLabel: string;
   /** Optional ISO date for full formatting */
   isoDate?: string;
+  /** Source: 'calendar' (real scheduled event) or 'strategy' (KI suggestion) */
+  source?: 'calendar' | 'strategy';
+  /** Reasoning text (only for strategy posts) */
+  reasoning?: string;
 }
 
 interface DashboardVideoCarouselProps {
@@ -67,6 +71,8 @@ interface DashboardVideoCarouselProps {
   nextPostLabel?: string;
   nextPostPrefix?: string;
   nextPost?: NextPostInfo | null;
+  /** Called when user clicks the next-post pill and source is 'strategy' */
+  onOpenStrategyNext?: () => void;
 }
 
 interface StatusPillsProps {
@@ -141,6 +147,7 @@ export const DashboardVideoCarousel = ({
   nextPostLabel,
   nextPostPrefix,
   nextPost,
+  onOpenStrategyNext,
 }: DashboardVideoCarouselProps) => {
   const { videos, isLoading } = useVideoHistory();
   const { t, language } = useTranslation();
@@ -154,7 +161,13 @@ export const DashboardVideoCarousel = ({
   const wheelTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const openNextPost = useCallback(() => setNextPostDialogOpen(true), []);
+  const openNextPost = useCallback(() => {
+    if (nextPost?.source === 'strategy' && onOpenStrategyNext) {
+      onOpenStrategyNext();
+    } else {
+      setNextPostDialogOpen(true);
+    }
+  }, [nextPost?.source, onOpenStrategyNext]);
 
   const sortedVideos = useMemo(() =>
     [...videos]
