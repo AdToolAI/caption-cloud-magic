@@ -643,6 +643,134 @@ export const DashboardVideoCarousel = ({
           title={selectedVideo.title}
         />
       )}
+
+      <NextPostDialog
+        open={nextPostDialogOpen}
+        onOpenChange={setNextPostDialogOpen}
+        nextPost={nextPost}
+        whenLabel={nextPostLabel}
+        title={nextPostPrefix}
+      />
     </div>
+  );
+};
+
+interface NextPostDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  nextPost?: NextPostInfo | null;
+  whenLabel?: string;
+  title?: string;
+}
+
+const NextPostDialog = ({ open, onOpenChange, nextPost, whenLabel, title }: NextPostDialogProps) => {
+  const { t, language } = useTranslation();
+  const hasPost = !!nextPost && !!nextPost.platform;
+
+  const formattedDate = (() => {
+    if (!nextPost?.isoDate) return whenLabel || '';
+    try {
+      const d = new Date(nextPost.isoDate);
+      const locale = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
+      return d.toLocaleDateString(locale, {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      });
+    } catch {
+      return whenLabel || '';
+    }
+  })();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-warning" />
+            {title || t('dashboard.statusBar.nextPost')}
+          </DialogTitle>
+          <DialogDescription>
+            {hasPost
+              ? t('homePage.nextScheduledPost')
+              : t('homePage.noPostScheduled')}
+          </DialogDescription>
+        </DialogHeader>
+
+        {hasPost ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/30 p-3">
+              <div className="flex items-center gap-2">
+                {nextPost!.platform && <PlatformBadge platform={nextPost!.platform} />}
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">{formattedDate}</p>
+                <p className="text-sm font-semibold text-foreground">{whenLabel}</p>
+              </div>
+            </div>
+
+            {nextPost!.mediaUrl && (
+              <div className="rounded-xl overflow-hidden border border-border/40 bg-black aspect-video">
+                <img
+                  src={nextPost!.mediaUrl}
+                  alt={nextPost!.contentIdea || 'Post preview'}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+
+            {(nextPost!.contentIdea || nextPost!.caption) && (
+              <div className="space-y-1">
+                {nextPost!.contentIdea && (
+                  <p className="text-sm font-medium text-foreground">
+                    {nextPost!.contentIdea}
+                  </p>
+                )}
+                {nextPost!.caption && (
+                  <p className="text-sm text-muted-foreground line-clamp-4 whitespace-pre-wrap">
+                    {nextPost!.caption}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {nextPost!.hashtags && nextPost!.hashtags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {nextPost!.hashtags.slice(0, 8).map((tag, i) => (
+                  <Badge key={i} variant="secondary" className="text-[10px]">
+                    #{tag.replace(/^#/, '')}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border/50 bg-muted/20 p-6 text-center">
+            <CalendarPlus className="h-8 w-8 text-muted-foreground/60 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              {t('homePage.noPostScheduled')}
+            </p>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button asChild variant="outline" onClick={() => onOpenChange(false)}>
+            <Link to="/calendar">
+              <CalendarDays className="h-4 w-4 mr-2" />
+              {t('homePage.planInCalendar')}
+            </Link>
+          </Button>
+          {!hasPost && (
+            <Button asChild onClick={() => onOpenChange(false)}>
+              <Link to="/calendar">
+                <CalendarPlus className="h-4 w-4 mr-2" />
+                {t('homePage.startPlanning')}
+              </Link>
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
