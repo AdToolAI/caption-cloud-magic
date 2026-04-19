@@ -49,6 +49,7 @@ const Home = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { topInsight } = useNewsRadar();
+  const sm = useStrategyMode();
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
   const [weekDays, setWeekDays] = useState<{ date: string; name: string; day: number; isToday: boolean; posts: WeekPost[] }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,6 +59,7 @@ const Home = () => {
   const [editingDate, setEditingDate] = useState<string>("");
   const [editorOpen, setEditorOpen] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string>("");
+  const [strategyNextDialogOpen, setStrategyNextDialogOpen] = useState(false);
 
   // Performance KPI state
   const [performanceKPIs, setPerformanceKPIs] = useState({
