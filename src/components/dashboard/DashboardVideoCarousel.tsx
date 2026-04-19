@@ -58,6 +58,10 @@ export interface NextPostInfo {
   whenLabel: string;
   /** Optional ISO date for full formatting */
   isoDate?: string;
+  /** Source: 'calendar' (real scheduled event) or 'strategy' (KI suggestion) */
+  source?: 'calendar' | 'strategy';
+  /** Reasoning text (only for strategy posts) */
+  reasoning?: string;
 }
 
 interface DashboardVideoCarouselProps {
@@ -67,6 +71,8 @@ interface DashboardVideoCarouselProps {
   nextPostLabel?: string;
   nextPostPrefix?: string;
   nextPost?: NextPostInfo | null;
+  /** Called when user clicks the next-post pill and source is 'strategy' */
+  onOpenStrategyNext?: () => void;
 }
 
 interface StatusPillsProps {
