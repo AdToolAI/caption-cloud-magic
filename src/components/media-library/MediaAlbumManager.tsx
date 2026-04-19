@@ -221,9 +221,10 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
     setAlbumDialogOpen(true);
   };
 
-  const handleUnsortedImageSaved = () => {
+  const handleImageMoved = () => {
     if (selectedImageId) {
       setUnsortedImages(prev => prev.filter(img => img.id !== selectedImageId));
+      setAlbumImages(prev => prev.filter(img => img.id !== selectedImageId));
       setSelectedImageId(null);
       loadAlbums();
     }
