@@ -1,66 +1,102 @@
 
 
-## Befund (korrigiert)
+## Befund
 
-Du hast recht — die Taskleiste zeigt **19.04.2026, 21:04 Uhr** = **Sonntag**. Morgen früh ist Montag, also Start der **neuen Woche** (20.–26. April).
+Aktuell hat `PlatformRingDialog.tsx` 3 Tabs: **Inhalt** (Idee + Caption + Hashtags + Reasoning), **Medien** (Upload), **Zeitplan**. Der User will eine bessere Trennung:
 
-Der Fehler in der App: Die Wochenleiste sollte heute (Sonntag) bereits **die kommende Woche** anzeigen, da die aktuelle Woche faktisch vorbei ist. Stattdessen zeigt sie noch die abgelaufene Woche (13.–19.) — ohne Posts mehr → Pill „Nächster Post" leer.
+1. **Tab "Vorschau"** (neu, primär) → Caption + Medien zusammen → fertiges Post-Mockup
+2. **Tab "Strategie"** (umbenannt von Inhalt) → KI-Idee + Reasoning + Tipps + Strategie-Kontext (Phase, Wochenziel, Engagement-Insights)
+3. **Tab "Zeitplan"** → bleibt
 
-## Plan: 2-Wochen-Vorausplanung + Auto-Forward am Sonntag
+## Plan: Dialog-Tabs neu strukturieren
 
-### 1) Backend — `generate-week-strategy` generiert 2 Wochen
-- Neuer optionaler Parameter `weeks_ahead` (Default **2**).
-- Loop generiert beide Wochen-Batches in einem Aufruf:
-  - Woche 1 = Montag dieser ISO-Woche
-  - Woche 2 = Montag der Folgewoche
-- Skip pro Woche, wenn schon Posts für diesen `week_start` existieren (idempotent).
+### Tab 1: **Vorschau** (Standard-Tab beim Öffnen)
+Live-Mockup wie der finale Post aussieht — Caption + Medien Seite an Seite/übereinander:
 
-### 2) Backend — `tick-strategy-posts` Self-Healing
-- Bei jedem Tick (stündlich) für jeden User mit `strategy_mode_enabled=true` prüfen:
-  - Existieren Posts für (`currentMonday`) **und** (`nextMonday`)?
-  - Wenn nein → `generate-week-strategy` mit `weeks_ahead=2` triggern.
-- Sonntag-Logik bleibt zusätzlich (zur Sicherheit), aber der tägliche Self-Healing-Check stellt sicher, dass nie mehr eine Lücke entsteht.
-
-### 3) Backend — `useStrategyMode.toggle` (initial activation)
-- Beim ersten Aktivieren des Toggles: ebenfalls `weeks_ahead=2` mitgeben statt nur 1 Woche.
-
-### 4) Frontend — Auto-Forward der angezeigten Woche
-In `useStrategyMode`:
 ```text
-const today = new Date();
-const dow = today.getDay(); // 0=So
-const currentMonday = startOfISOWeek(today);
-const nextMonday = addDays(currentMonday, 7);
-
-// Auto-Forward Bedingungen:
-// - Heute ist Sonntag (dow === 0)
-// - ODER: alle Posts der currentWeek liegen bereits in der Vergangenheit
-const visibleWeekStart = (
-  dow === 0 ||
-  allCurrentWeekPostsArePast
-) ? nextMonday : currentMonday;
+┌─────────────────────────────────┐
+│ [IG Avatar] @username           │
+├─────────────────────────────────┤
+│                                 │
+│   [ Medien-Preview / Upload ]   │  ← Drag&Drop, zeigt hochgeladene Bilder/Videos
+│                                 │
+├─────────────────────────────────┤
+│ ❤ 💬 ✈                          │
+│ @username Caption-Text hier...  │  ← Editierbare Caption (inline)
+│ #hashtag1 #hashtag2             │
+└─────────────────────────────────┘
+[ Caption-Editor (Textarea) ]
+[ Hashtags (Input) ]
+[ ✨ Mit KI verbessern ]
 ```
 
-- Posts-Query lädt **beide** Wochen (`week_start IN (currentMonday, nextMonday)`).
-- Selector `getPostsForWeek(visibleWeekStart)` filtert die anzuzeigende Woche.
-- `getNextStrategyPost` durchsucht **alle geladenen Posts** → findet sofort „Mo 20.04. Instagram", auch wenn das in der Folgewoche liegt.
+- Plattform-spezifischer Mockup-Frame (IG/FB/X/LinkedIn/YouTube Style)
+- Medien direkt im Mockup sichtbar → fühlt sich wie "fertiger Post" an
+- Caption + Hashtags darunter editierbar
 
-### 5) Frontend — `WeekStrategyRingTimeline` zeigt korrekte Woche
-- Akzeptiert `weekStart` Prop (vorgegeben von `useStrategyMode.visibleWeekStart`).
-- Header zeigt z. B. „20.–26. April" statt „13.–19. April".
-- Optional: kleine Pfeile ‹ › im Header, um manuell zwischen den 2 geladenen Wochen zu wechseln (Standard: Auto-gewählte Woche).
+### Tab 2: **Strategie** (umbenannt von "Inhalt")
+Erklärt **warum** dieser Post existiert und wo der User in der Gesamtstrategie steht:
 
-### 6) Pill „Nächster Post"
-Funktioniert automatisch — `getNextStrategyPost` findet jetzt den nächsten anstehenden Vorschlag aus den 2 geladenen Wochen. Heute (So 21:04) → zeigt morgen früh „Mo 20.04. 21:00 · Instagram".
+```text
+┌── Wo du gerade stehst ──────────┐
+│ 📍 Woche 2 von 4 · Phase: Trust │
+│ Level: Fortgeschritten           │
+│ Engagement-Trend: ↑ +12%         │
+└──────────────────────────────────┘
 
-### Betroffene Dateien
-- `supabase/functions/generate-week-strategy/index.ts` — `weeks_ahead` Loop
-- `supabase/functions/tick-strategy-posts/index.ts` — täglicher Self-Healing-Check
-- `src/hooks/useStrategyMode.ts` — 2-Wochen-Query, `visibleWeekStart`, `nextPost` über alle geladenen Posts, `toggle` mit `weeks_ahead=2`
-- `src/components/dashboard/WeekStrategyRingTimeline.tsx` — `weekStart` Prop respektieren, optional Pfeil-Navigation
+┌── Die Idee ──────────────────────┐
+│ 💡 Behind the Scenes: Packing... │
+│                                  │
+│ Warum genau dieser Post?         │
+│ Deine Story-Views sind 3x höher  │
+│ als deine Feed-Posts. BTS-Content│
+│ funktioniert besonders gut bei   │
+│ deiner Zielgruppe (25-34).       │
+└──────────────────────────────────┘
+
+┌── Tipps für maximale Wirkung ────┐
+│ ✓ Vertikales Format (9:16)       │
+│ ✓ Erste 3 Sek = Hook             │
+│ ✓ Posten Mo 21:00 (peak time)    │
+│ ✓ Stories cross-posten           │
+└──────────────────────────────────┘
+
+┌── Was die KI über dich weiß ─────┐
+│ Top-Format: Reels (78% Engage)   │
+│ Beste Zeit: Mo/Mi/Fr 21:00       │
+│ Top-Theme: Behind-the-Scenes     │
+└──────────────────────────────────┘
+```
+
+Daten dafür kommen aus:
+- `strategy_post.reasoning` (bereits vorhanden) → "Warum dieser Post"
+- `profiles.experience_level` + `engagement_score` → Level/Trend
+- `strategy_posts` Liste der Woche → "Woche X von Y"
+- Neue/erweiterte Felder in `strategy_post`: `tips: string[]`, `phase: string` (z. B. "Trust Building", "Conversion") — wenn nicht vorhanden, aus `reasoning` per einfacher Heuristik ableiten oder leer lassen
+
+### Tab 3: **Zeitplan** (unverändert)
+Date/Time-Picker, Auto-Publish-Toggle.
+
+### Backend — leichte Erweiterung
+- `generate-week-strategy` Edge Function: AI-Prompt um zusätzliche Felder pro Post ergänzen:
+  - `tips: string[]` (3–5 konkrete Action-Tipps)
+  - `phase: string` (Trust Building / Awareness / Conversion / Retention / Community)
+- Migration: `strategy_posts` bekommt `tips TEXT[]` und `phase TEXT` Spalten (nullable, idempotent).
+- Bestehende Posts ohne diese Felder → Tab "Strategie" zeigt Reasoning + Standard-Tipps basierend auf Plattform.
+
+### Frontend — Datei-Änderungen
+- **`PlatformRingDialog.tsx`** komplett umstrukturieren:
+  - Tabs: `["preview", "strategy", "schedule"]`, Default `preview`
+  - Neue Sub-Komponente `PostPreviewMockup` (plattform-spezifisches Frame, Medien + Caption inline)
+  - Neue Sub-Komponente `StrategyContextPanel` (Position in Wochenplan, Reasoning, Tipps, Engagement-Insights)
+- **`useStrategyMode.ts`**: 
+  - Hook `getWeekProgress(post)` → returns `{ weekIndex, totalWeeks, phase, level }` für Strategie-Tab
+- **`generate-week-strategy/index.ts`**: AI-Prompt um `tips` + `phase` erweitern, Insert-Statement um neue Spalten ergänzen
+- **Migration**: 2 neue Spalten auf `strategy_posts`
 
 ### Erwartetes Ergebnis
-- Sonntag (heute) → Timeline zeigt automatisch die Folgewoche (20.–26. April) mit den neuen Vorschlägen.
-- Pill „Nächster Post" zeigt sofort „Mo 20.04. 21:00 · Instagram" — keine Leere mehr am Wochenende.
-- System hält dauerhaft 2 Wochen Vorschläge bereit, Self-Healing über Cron — kein Black-Out mehr möglich.
+- **Vorschau-Tab** zeigt direkt beim Öffnen den fertig aussehenden Post mit Medien + Caption → User sieht sofort, was gepostet wird.
+- **Strategie-Tab** erklärt Position in der Strategie (Woche X von Y, Phase, Level, Engagement-Trend) + warum genau dieser Post + konkrete Tipps + KI-Insights über den User.
+- **Zeitplan-Tab** unverändert für Time-/Date-Anpassung.
+- Der User versteht jeden Vorschlag im Kontext seiner Reise — keine Black-Box mehr.
 
