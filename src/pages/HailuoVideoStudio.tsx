@@ -171,7 +171,30 @@ export default function HailuoVideoStudio() {
                   </div>
                 </Card>
 
-                {/* Model Selection */}
+                {/* Visual Style */}
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Palette className="h-4 w-4" />
+                      Visueller Stil
+                    </Label>
+                    <span className="text-xs text-muted-foreground">
+                      {visualStyle ? 'Wird an Prompt angehängt' : 'Optional'}
+                    </span>
+                  </div>
+                  <StylePickerCompact
+                    value={visualStyle}
+                    onChange={setVisualStyle}
+                    model="hailuo"
+                    language={language as 'de' | 'en' | 'es'}
+                  />
+                  <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Optimal</span>
+                    <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Funktioniert</span>
+                    <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-orange-500" /> Eingeschränkt</span>
+                  </div>
+                </Card>
+
                 <Card className="p-4">
                   <Label className="text-sm font-medium mb-3 block">Modell</Label>
                   <div className="grid grid-cols-2 gap-3">
