@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.admin_force_delete_user(uuid);
