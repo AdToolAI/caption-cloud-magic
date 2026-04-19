@@ -57,7 +57,10 @@ Deno.serve(async (req) => {
     }
 
     // Clear NO-ACTION FKs on auth.users that block CASCADE delete
+    // ORDER MATTERS: child tables before parent tables
     const cleanupTables: Array<[string, string]> = [
+      ["user_credit_transactions", "user_id"],
+      ["credit_reservations", "user_id"],
       ["content_reviews", "submitted_by"],
       ["content_reviews", "reviewed_by"],
       ["content_templates", "created_by"],
