@@ -1,14 +1,23 @@
 import { useMemo, useState } from "react";
 import { format, addDays, isSameDay } from "date-fns";
 import { de } from "date-fns/locale";
-import { AlertTriangle, Check, X, ArrowRight, Clock, Sparkles, RefreshCw } from "lucide-react";
+import { AlertTriangle, Check, X, ArrowRight, Clock, Sparkles, RefreshCw, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useStrategyMode, type StrategyPost } from "@/hooks/useStrategyMode";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { useStrategyMode, type StrategyPost, type CreatorLevel } from "@/hooks/useStrategyMode";
 import { MissedPostDialog } from "./MissedPostDialog";
 import { StrategyPostDialog } from "./StrategyPostDialog";
 import { useNavigate } from "react-router-dom";
+
+const LEVEL_LABEL: Record<CreatorLevel, string> = {
+  beginner: "Anfänger",
+  intermediate: "Fortgeschritten",
+  advanced: "Profi",
+};
 
 interface Props {
   weekStart: string; // YYYY-MM-DD (Mo)
@@ -34,7 +43,19 @@ function getStatusKey(p: StrategyPost): string {
 }
 
 export function WeekStrategyTimeline({ weekStart }: Props) {
-  const { posts, isLoadingPosts, regenerate, isRegenerating, dismiss, reschedule } = useStrategyMode();
+  const {
+    posts,
+    isLoadingPosts,
+    regenerate,
+    isRegenerating,
+    dismiss,
+    reschedule,
+    experienceLevel,
+    postsPerWeek,
+    levelProgress,
+    setLevel,
+    isSettingLevel,
+  } = useStrategyMode();
   const navigate = useNavigate();
 
   const [missedPost, setMissedPost] = useState<StrategyPost | null>(null);
