@@ -1,65 +1,78 @@
 
+## Plan: Doppelte Scrollbar jetzt an der echten Scroll-Quelle fixen
 
-## Plan: Doppelte Scrollbar systematisch beheben
-
-### Diagnose
-Die Sidebar ist sehr wahrscheinlich **nicht** mehr die Ursache. Beim Lesen der Layout-Dateien fällt ein anderes Muster auf:
-
-- `src/App.tsx` hat bereits einen globalen App-Shell-Wrapper mit  
-  `className="flex min-h-screen w-full overflow-x-hidden"`
-- Gleichzeitig nutzen viele eingeloggte Seiten erneut `min-h-screen`
-- Konkret auf Home:
-  - `src/App.tsx` stellt schon die volle Viewport-Höhe bereit
-  - `src/pages/Home.tsx` rendert zusätzlich  
-    `className="min-h-screen bg-background overflow-x-hidden"`
-
-Dadurch wird die Seitenhöhe effektiv **noch einmal um eine volle Viewport-Höhe aufgespannt**, obwohl Header, NewsTicker und Shell bereits darüber liegen. Genau das erklärt, warum das Problem auch auf anderen Seiten auftaucht.
+### Erkenntnisstand
+Der bisherige Home-Fix war richtig, aber **nicht ausreichend**:
+- `Home.tsx` hat aktuell **kein** `min-h-screen` mehr
+- die zweite Leiste kommt also sehr wahrscheinlich **nicht mehr von Home selbst**
+- im globalen App-Shell gibt es weiterhin mehrere starke Verdachtsmomente:
+  - `SidebarProvider` mit `min-h-svh`
+  - `AppLayout` mit `min-h-screen`
+  - `AppSidebar` mit `sticky top-0 h-screen`
+  - `AppHeader` und `OnboardingStepper` beide `sticky top-0`
+  - viele weitere eingeloggte Seiten nutzen weiterhin `min-h-screen`
 
 ### Wahrscheinlichste Ursache
-Die eigentliche Ursache ist ein **verschachteltes Full-Height-Layout**:
-- globale App-Shell = `min-h-screen`
-- eingeloggte Unterseite = nochmal `min-h-screen`
+Es gibt weiterhin **mehr als einen Scroll-Kontext**:
+```text
+SidebarProvider
+└ AppLayout (min-h-screen)
+  ├ Sidebar (sticky + h-screen)
+  └ Content column
+    ├ Header (sticky)
+    ├ NewsTicker
+    ├ OnboardingStepper (sticky)
+    └ main (Route-Inhalt)
+```
 
-Das erzeugt unnötigen vertikalen Overflow und lässt eine zweite Scroll-Situation entstehen.
+Dadurch entsteht sehr wahrscheinlich ein Mix aus:
+- globalem Dokument-Scroll
+- zusätzlichem inneren Layout-/Content-Scroll
+- plus einzelnen Seiten mit erneutem `min-h-screen`
 
 ### Umsetzung nach Approval
-1. **`src/pages/Home.tsx` anpassen**
-   - obersten Wrapper von `min-h-screen` auf eine nicht-viewportbasierte Variante umstellen
-   - wahrscheinlich:
-     - `min-h-screen` entfernen, oder
-     - auf `min-h-full` / normales `bg-background overflow-x-hidden` reduzieren
+1. **Live-DOM gezielt prüfen**
+   - im Browser den exakten Container identifizieren, der die zweite vertikale Scrollbar erzeugt
+   - nicht mehr raten, sondern den echten Scroll-Owner bestimmen
 
-2. **Weitere eingeloggte Seiten prüfen und angleichen**
-   - gleiche Korrektur für Seiten, die innerhalb `AppLayout` laufen und ebenfalls `min-h-screen` setzen
-   - Fokus auf die Seiten, auf denen der Effekt laut User ebenfalls sichtbar ist
+2. **Eine klare Scroll-Regel durchziehen**
+   - bevorzugt: **nur der Dokument-/Body-Scroll**
+   - dafür alle inneren App-Wrapper ohne eigenes vertikales Scrolling
+   - falls nötig: genau einen zentralen App-Scrollcontainer definieren und alle anderen deaktivieren
 
-3. **Klare Regel für das Layout festziehen**
-   - **nur die App-Shell** darf die Viewport-Höhe kontrollieren
-   - innere App-Seiten dürfen **nicht erneut** `min-h-screen` setzen
-   - öffentliche Standalone-Seiten wie Login/Pricing/Legal dürfen `min-h-screen` behalten
+3. **Globales Layout bereinigen**
+   - `App.tsx` / App-Shell so anpassen, dass Header, Ticker, Stepper und Main nicht versehentlich einen zweiten Scroll-Kontext aufspannen
+   - besonders prüfen:
+     - `SidebarProvider`
+     - `AppLayout`
+     - `AppSidebar`
+     - Sticky-Kombination von `AppHeader` + `OnboardingStepper`
 
-4. **Vorherige Scrollbar-Hide-Fixes bereinigen**
-   - die globalen CSS-Hacks in `src/index.css` nur behalten, wenn sie wirklich noch gebraucht werden
-   - Ziel ist ein echter Layout-Fix statt reines Verstecken
+4. **Systematische Seiten-Angleichung**
+   - alle eingeloggten Seiten mit weiterem `min-h-screen` im Shell-Kontext bereinigen
+   - Fokus auf die noch betroffenen Seiten, nicht auf Public Pages wie Auth/Pricing/Legal
 
-### Betroffene Dateien
+5. **Workarounds entfernen**
+   - bisherige Scrollbar-Hide-CSS nur behalten, wenn sie nach dem echten Fix noch sinnvoll ist
+   - Ziel bleibt: **echte Ursache beheben, nichts kaschieren**
+
+### Betroffene Bereiche
 - `src/App.tsx`
-- `src/pages/Home.tsx`
-- danach weitere betroffene eingeloggte `src/pages/*.tsx`
-- ggf. `src/index.css` zur Bereinigung des bisherigen Workarounds
+- `src/components/ui/sidebar.tsx`
+- `src/components/AppSidebar.tsx`
+- `src/components/layout/AppHeader.tsx`
+- `src/features/onboarding/Stepper.tsx`
+- weitere eingeloggte `src/pages/*.tsx` mit `min-h-screen`
 
-### Technische Details
+### Technische Zielregel
 ```text
-Richtig:
-AppShell = min-h-screen
-Page inside shell = auto / min-h-full
+Erlaubt:
+- genau 1 vertikale Scroll-Ebene pro App-Ansicht
 
-Problematisch:
-AppShell = min-h-screen
-Inner page = min-h-screen
-Header + ticker + inner page => künstlicher Extra-Overflow
+Nicht erlaubt:
+- Body scrollt
+- und zusätzlich ein innerer App-/Main-/Sidebar-Container scrollt
 ```
 
 ### Ergebnis
-Nach dem Fix soll es pro App-Seite nur noch **eine echte vertikale Scroll-Ebene** geben, statt der aktuellen doppelten Scroll-Situation.
-
+Nach dem Fix soll auf Home und den anderen internen Seiten nur noch **eine einzige vertikale Scrollbar** sichtbar sein — unabhängig davon, ob Header, NewsTicker oder Onboarding-Leiste eingeblendet sind.
