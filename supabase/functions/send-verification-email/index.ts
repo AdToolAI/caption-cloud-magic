@@ -107,6 +107,33 @@ const handler = async (req: Request): Promise<Response> => {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
+    // Server-side validation: ensure user exists and email matches
+    // (function runs without JWT, so we must validate the userId ourselves)
+    const { data: userLookup, error: userLookupError } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (userLookupError || !userLookup?.user) {
+      console.error("[send-verification-email] User not found:", userLookupError);
+      return new Response(
+        JSON.stringify({ error: "Invalid user" }),
+        { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+    if (userLookup.user.email?.toLowerCase() !== email.toLowerCase()) {
+      console.error("[send-verification-email] Email mismatch for user", userId);
+      return new Response(
+        JSON.stringify({ error: "Email does not match user" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // If already confirmed, skip
+    if (userLookup.user.email_confirmed_at) {
+      console.log("[send-verification-email] Email already confirmed");
+      return new Response(
+        JSON.stringify({ success: true, alreadyVerified: true }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     // Generate a verification token
     const verificationToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours

@@ -678,3 +678,9 @@ verify_jwt = false
 [functions.fetch-news-hub]
 verify_jwt = false
 timeout_sec = 180
+
+[functions.verify-email]
+verify_jwt = false
+
+[functions.send-verification-email]
+verify_jwt = false
