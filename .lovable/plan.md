@@ -1,40 +1,36 @@
 
+Ziel: Die Navigation bleibt exakt wie sie ist. Wir ändern nicht die linke Icon-Leiste als Feature, sondern nur den zusätzlichen vertikalen Scroll-Owner, der die zweite sichtbare Scrollbar erzeugt.
 
-## Plan: Sidebar wiederherstellen + zweite Scrollbar gezielt entfernen
+Befund aus dem Code:
+- `src/components/ui/sidebar.tsx` setzt in `SidebarContent` fest `overflow-y-auto`.
+- `src/components/AppSidebar.tsx` versucht das aktuell nur mit Klassen wie `!overflow-hidden` zu übersteuern.
+- Genau dieser Ansatz war schon aktiv und hat das Problem nicht zuverlässig entfernt.
+- Auf `Home` selbst gibt es im normalen Seitenlayout keinen offensichtlichen vertikalen Inner-Scroll-Container; die klar sichtbare dauerhafte Kandidatenquelle bleibt daher der Sidebar-Content-Container.
 
-### Missverständnis-Korrektur
-Die linke Icon-Sidebar war gewollt und soll **bleiben**. Im Bild sind rechts **zwei vertikale Scrollbars** sichtbar — die linke davon ist die **innere Scrollbar des `SidebarContent`**, die rechte ist die normale Dokument-Scrollbar. Entfernt werden soll nur die innere Sidebar-Scrollbar.
+Umsetzung:
+1. `src/components/AppSidebar.tsx`
+   - `SidebarContent` in dieser einen Sidebar nicht mehr verwenden.
+   - Stattdessen den Inhalt in ein normales `div` mit nicht-scrollendem Layout legen:
+     - `flex min-h-0 flex-1 flex-col overflow-hidden`
+   - Die Icon-Struktur, Tooltips und Navigation bleiben unverändert.
 
-### Ursache
-In `src/components/ui/sidebar.tsx` (Zeile 334) hat `SidebarContent` ein hartes `overflow-y-auto`. Unsere `AppSidebar` versucht das mit `[&::-webkit-scrollbar]:hidden [scrollbar-width:none]` zu verstecken, aber:
-- Die Klasse landet auf dem `SidebarContent`-Wrapper, nicht zuverlässig auf dem Element, das tatsächlich scrollt
-- In bestimmten Render-Zuständen (z. B. wenn der Inhalt knapp die Höhe überschreitet) erscheint die native Scrollbar trotzdem
+2. `src/components/AppSidebar.tsx`
+   - `h-full` auf dem inneren Content-Wrapper weglassen, damit keine künstliche Überhöhe entsteht.
+   - Falls nötig `SidebarRail` entfernen, falls es optisch als zusätzliche schmale Leiste daneben wirkt.
 
-### Schritte
+3. `src/components/ui/sidebar.tsx`
+   - Unverändert lassen, damit andere echte Scroll-Kontexte im Projekt nicht kaputtgehen.
+   - Wir lösen das gezielt nur für diese eine feste App-Leiste.
 
-1. **`src/App.tsx`** — Sidebar wieder einsetzen
-   - Import `AppSidebar` ergänzen
-   - Layout zurück auf `flex` umstellen
-   - In `AppLayout` wieder `{user && !isLandingRoute && <AppSidebar />}` rendern
-   - `SidebarProvider` in `AppContent` bleibt (existiert bereits)
+4. Sichtprüfung
+   - Auf `/home` prüfen: rechts nur noch eine normale Seiten-Scrollbar.
+   - Icon-Leiste bleibt vollständig sichtbar und klickbar.
+   - Mobile Menü-Toggle im Header bleibt funktionsfähig.
 
-2. **`src/components/AppSidebar.tsx`** — innere Scrollbar zuverlässig unterdrücken
-   - `SidebarContent` so konfigurieren, dass es **nicht mehr scrollt**:
-     - die wenigen Hub-Icons passen immer in die Viewport-Höhe
-     - daher `overflow-hidden` statt `overflow-y-auto` durchsetzen
-   - Konkret: zusätzliche Klasse `!overflow-hidden` (Tailwind important) auf `SidebarContent` setzen, plus weiterhin `[&::-webkit-scrollbar]:hidden [scrollbar-width:none]` als Fallback
-   - Damit verschwindet die zweite (linke) Scrollbar im rechten Bereich endgültig
-
-3. **Sichtprüfung**
-   - Auf Home prüfen: nur noch die normale Dokument-Scrollbar ist sichtbar
-   - Sidebar-Icons bleiben voll bedienbar (kein Overflow nötig, da nur wenige Items)
-
-### Betroffene Dateien
-- `src/App.tsx`
+Betroffene Datei:
 - `src/components/AppSidebar.tsx`
 
-### Ergebnis
-- Linke Icon-Sidebar ist wieder da
-- Nur noch **eine** vertikale Scrollbar rechts (die echte Seiten-Scrollbar)
-- Die störende zweite Scrollbar direkt daneben ist weg
-
+Erwartetes Ergebnis:
+- Keine Änderung an der Sidebar-Navigation selbst.
+- Die zusätzliche innere Scrollbar verschwindet.
+- Es bleibt nur die echte Seiten-Scrollbar sichtbar.
