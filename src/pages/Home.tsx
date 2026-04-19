@@ -30,7 +30,8 @@ import { type WeekPost } from "@/components/dashboard/WeekDayCard";
 import { WeekTimelineDay } from "@/components/dashboard/WeekTimelineDay";
 import { WeekPostEditor } from "@/components/dashboard/WeekPostEditor";
 import { WeekStrategyTimeline } from "@/components/dashboard/WeekStrategyTimeline";
-import { useStrategyMode } from "@/hooks/useStrategyMode";
+import { StrategyPostDialog } from "@/components/dashboard/StrategyPostDialog";
+import { useStrategyMode, type StrategyPost } from "@/hooks/useStrategyMode";
 import { Switch } from "@/components/ui/switch";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -474,6 +475,17 @@ const Home = () => {
       }
     }
     return best ? { post: best.post, date: best.date } : null;
+  };
+
+  // Find the next pending strategy post (when strategy mode is on)
+  const getNextStrategyPost = (): StrategyPost | null => {
+    if (!sm.enabled || !sm.posts || sm.posts.length === 0) return null;
+    const now = Date.now();
+    const upcoming = sm.posts
+      .filter((p) => p.status === "pending" || p.status === "rescheduled")
+      .filter((p) => new Date(p.scheduled_at).getTime() >= now)
+      .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+    return upcoming[0] || null;
   };
 
   const getPlatformColor = (platform: string) => {
