@@ -188,7 +188,14 @@ export default function SceneCard({
               </div>
             )}
 
-            {/* Prompt / Keywords / Upload */}
+            {/* Character Shot picker — only when characters are defined in the briefing AND it's an AI scene */}
+            {scene.clipSource.startsWith('ai-') && characters && characters.length > 0 && (
+              <CharacterShotPicker
+                characters={characters}
+                value={scene.characterShot}
+                onChange={(next) => onUpdate({ characterShot: next })}
+              />
+            )}
             {scene.clipSource.startsWith('ai-') && (
               <div className="space-y-2">
                 <div className="space-y-1.5">
