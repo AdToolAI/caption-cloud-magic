@@ -99,11 +99,97 @@ export function WeekStrategyTimeline({ weekStart }: Props) {
   return (
     <>
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Sparkles className="h-4 w-4 text-warning" />
-            <span>{posts.length} KI-Vorschläge für diese Woche</span>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/5 px-2.5 py-1 text-xs font-medium text-warning hover:bg-warning/10 transition-colors"
+                  aria-label="Level-Details"
+                >
+                  <TrendingUp className="h-3 w-3" />
+                  Level: {LEVEL_LABEL[experienceLevel]} · {postsPerWeek} Posts/Woche
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80" align="start">
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-sm font-semibold">Dein Creator-Level</div>
+                    <div className="text-xs text-muted-foreground">
+                      {LEVEL_LABEL[experienceLevel]} · {postsPerWeek} Posts/Woche
+                    </div>
+                  </div>
+
+                  {levelProgress ? (
+                    <div className="space-y-2 rounded-lg border border-border/40 p-2.5">
+                      <div className="text-xs font-medium">
+                        Fortschritt zu <span className="text-warning">{LEVEL_LABEL[levelProgress.nextLevel]}</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                          <span>Veröffentlichte Posts (28d)</span>
+                          <span>{levelProgress.postsPublished} / {levelProgress.thresholds.posts}</span>
+                        </div>
+                        <Progress value={Math.min(100, (levelProgress.postsPublished / levelProgress.thresholds.posts) * 100)} className="h-1.5" />
+
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
+                          <span>Ø Engagement-Rate</span>
+                          <span>{levelProgress.avgEr.toFixed(1)}% / {levelProgress.thresholds.er}%</span>
+                        </div>
+                        <Progress value={Math.min(100, (levelProgress.avgEr / levelProgress.thresholds.er) * 100)} className="h-1.5" />
+
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
+                          <span>Strategie-Erledigt</span>
+                          <span>{Math.round(levelProgress.completionRate * 100)}% / {Math.round(levelProgress.thresholds.completion * 100)}%</span>
+                        </div>
+                        <Progress value={Math.min(100, (levelProgress.completionRate / levelProgress.thresholds.completion) * 100)} className="h-1.5" />
+                      </div>
+                      {levelProgress.postsNeeded === 0 && levelProgress.erNeeded === 0 && levelProgress.completionNeeded === 0 ? (
+                        <p className="text-[11px] text-success">Bereit zum Upgrade — wird Sonntag automatisch hochgestuft.</p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">
+                          Noch {levelProgress.postsNeeded > 0 ? `${levelProgress.postsNeeded} Posts` : ""}
+                          {levelProgress.postsNeeded > 0 && levelProgress.erNeeded > 0 ? " und " : ""}
+                          {levelProgress.erNeeded > 0 ? `${levelProgress.erNeeded.toFixed(1)}% ER` : ""} bis {LEVEL_LABEL[levelProgress.nextLevel]}.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-border/40 p-2.5 text-xs text-muted-foreground">
+                      Du bist bereits auf höchstem Level. 🚀
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="text-[11px] text-muted-foreground mb-1">Level manuell anpassen</div>
+                    <Select
+                      value={experienceLevel}
+                      onValueChange={(v) => setLevel(v as CreatorLevel)}
+                      disabled={isSettingLevel}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="beginner">Anfänger · 3 Posts/Woche</SelectItem>
+                        <SelectItem value="intermediate">Fortgeschritten · 5 Posts/Woche</SelectItem>
+                        <SelectItem value="advanced">Profi · 7 Posts/Woche</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Manuelle Auswahl pausiert Auto-Upgrade für 14 Tage.
+                    </p>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Sparkles className="h-3.5 w-3.5 text-warning" />
+              <span>{posts.length} KI-Vorschläge</span>
+            </div>
           </div>
+
           <Button
             variant="ghost"
             size="sm"
