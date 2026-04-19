@@ -7,8 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Label } from '@/components/ui/label';
-import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, ArrowLeft, Wand2, Clock, Monitor } from 'lucide-react';
+import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, ArrowLeft, Wand2, Clock, Monitor, Palette } from 'lucide-react';
 import { VideoPromptOptimizer } from '@/components/ai-video/VideoPromptOptimizer';
+import { StylePickerCompact } from '@/components/ai-video/StylePickerCompact';
+import type { ComposerVisualStyle } from '@/config/composerVisualStyles';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
@@ -38,6 +40,7 @@ export default function HailuoVideoStudio() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const startImageRef = useRef<HTMLInputElement>(null);
 
+  const [visualStyle, setVisualStyle] = useState<ComposerVisualStyle | null>(null);
   const [showPromptOptimizer, setShowPromptOptimizer] = useState(false);
 
   const currency: Currency = getCurrencyForLanguage(language);
@@ -86,7 +89,7 @@ export default function HailuoVideoStudio() {
     setGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-hailuo-video', {
-        body: { prompt: prompt.trim(), model, duration, resolution, startImageUrl },
+        body: { prompt: prompt.trim(), model, duration, resolution, startImageUrl, visualStyle },
       });
       if (error) throw error;
       if (data?.error) {
