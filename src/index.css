@@ -323,16 +323,15 @@
     scrollbar-color: rgba(245, 199, 106, 0.5) rgba(255, 255, 255, 0.05);
   }
 
-  /* Hide redundant inner sidebar scrollbar — keep only the global document scrollbar.
-     Fixes the visible double-scrollbar on right side of layout. */
-  [data-sidebar="content"]::-webkit-scrollbar,
-  .group\/sidebar-wrapper > [data-sidebar="sidebar"] ::-webkit-scrollbar {
+  /* SINGLE SCROLL RULE — only the document/html scrolls.
+     Disable any inner scroll context inside the sidebar to prevent a second scrollbar. */
+  [data-sidebar="content"] {
+    overflow: hidden !important;
+    scrollbar-width: none !important;
+  }
+  [data-sidebar="content"]::-webkit-scrollbar {
     width: 0 !important;
     height: 0 !important;
     display: none !important;
-  }
-  [data-sidebar="content"],
-  .group\/sidebar-wrapper > [data-sidebar="sidebar"] * {
-    scrollbar-width: none !important;
   }
 }
