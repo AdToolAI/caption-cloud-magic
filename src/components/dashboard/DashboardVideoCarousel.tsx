@@ -82,7 +82,7 @@ const StatusPills = ({
           </Tooltip>
         </TooltipProvider>
       )}
-      <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-amber-500/40 bg-gradient-to-r from-amber-500/10 to-yellow-500/5 text-xs font-medium text-amber-600 dark:text-amber-400 backdrop-blur-sm">
+      <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-warning/40 bg-warning/10 text-xs font-medium text-warning backdrop-blur-sm">
         <InfinityIcon className="h-3.5 w-3.5" />
         <span className="hidden md:inline">Unlimited</span>
       </span>
