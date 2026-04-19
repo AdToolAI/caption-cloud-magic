@@ -17,7 +17,6 @@ import {
   Palette,
   TrendingUp
 } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -114,7 +113,7 @@ export function RecentActivityFeed() {
           <CardDescription>{getEventTranslation('recentActivityDesc', language)}</CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[400px] pr-4">
+          <div>
             {events.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <motion.div
@@ -198,7 +197,7 @@ export function RecentActivityFeed() {
                 </AnimatePresence>
               </div>
             )}
-          </ScrollArea>
+          </div>
         </CardContent>
       </Card>
     </motion.div>
