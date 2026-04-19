@@ -502,33 +502,7 @@ const Home = () => {
         lang={language}
       />
       
-      {/* Hero Status Bar */}
-      {user && (
-        <div className="bg-card border-b border-border py-3 px-4">
-          <div className="container max-w-7xl mx-auto flex items-center justify-between gap-4 text-sm flex-wrap">
-             <div className="flex items-center gap-2 text-muted-foreground">
-              <Lightbulb className="h-4 w-4 text-primary" />
-              <span className="font-medium">{t("dashboard.statusBar.tipOfTheDay")}:</span>
-              <span>{topInsight ? topInsight.headline : t("dashboard.statusBar.tipContent")}</span>
-            </div>
-            <div className="flex items-center gap-6">
-              <CreditBalance compact />
-              
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-warning" />
-                <span>{t("dashboard.statusBar.nextPost")}: {(() => {
-                  const next = getNextPost();
-                  if (!next) return t("homePage.noPostScheduled");
-                  const d = new Date(next.date);
-                  const dd = String(d.getDate()).padStart(2, '0');
-                  const mm = String(d.getMonth() + 1).padStart(2, '0');
-                  return `${dd}.${mm}. ${next.post.suggestedTime || "12:00"}`;
-                })()}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Status info now lives inside the video carousel action bar */}
 
       {/* Welcome Hero */}
       {!user && (
@@ -558,7 +532,20 @@ const Home = () => {
       <div className="container mx-auto px-4 py-4 max-w-7xl space-y-4">
         {/* Hero Banner */}
         {user && (
-          <DashboardVideoCarousel quickActions={quickActions} />
+          <DashboardVideoCarousel
+            quickActions={quickActions}
+            tipText={topInsight ? topInsight.headline : t("dashboard.statusBar.tipContent")}
+            tipLabel={t("dashboard.statusBar.tipOfTheDay")}
+            nextPostLabel={(() => {
+              const next = getNextPost();
+              if (!next) return t("homePage.noPostScheduled");
+              const d = new Date(next.date);
+              const dd = String(d.getDate()).padStart(2, '0');
+              const mm = String(d.getMonth() + 1).padStart(2, '0');
+              return `${dd}.${mm}. ${next.post.suggestedTime || "12:00"}`;
+            })()}
+            nextPostPrefix={t("dashboard.statusBar.nextPost")}
+          />
         )}
 
         {/* Week Calendar */}

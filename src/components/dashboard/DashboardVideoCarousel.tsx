@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
-import { Play, ChevronLeft, ChevronRight, Video, Sparkles, Expand, Volume2, VolumeX, LucideIcon } from 'lucide-react';
+import { Play, ChevronLeft, ChevronRight, Video, Sparkles, Expand, Volume2, VolumeX, LucideIcon, Lightbulb, Infinity as InfinityIcon, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoHistory } from '@/hooks/useVideoHistory';
 import { VideoPreviewPlayer } from '@/components/video/VideoPreviewPlayer';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { DEMO_VIDEO, isDemoVideo } from '@/constants/demo-video';
@@ -45,7 +46,66 @@ const resolveVideoUrl = (rawUrl: string): string => {
   return data.publicUrl;
 };
 
-export const DashboardVideoCarousel = ({ quickActions = [] }: { quickActions?: QuickAction[] }) => {
+interface DashboardVideoCarouselProps {
+  quickActions?: QuickAction[];
+  tipText?: string;
+  tipLabel?: string;
+  nextPostLabel?: string;
+  nextPostPrefix?: string;
+}
+
+const StatusPills = ({
+  tipText,
+  tipLabel,
+  nextPostLabel,
+  nextPostPrefix,
+}: Pick<DashboardVideoCarouselProps, 'tipText' | 'tipLabel' | 'nextPostLabel' | 'nextPostPrefix'>) => {
+  if (!tipText && !nextPostLabel) return null;
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {tipText && (
+        <TooltipProvider delayDuration={150}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-border/40 bg-card/40 backdrop-blur-sm hover:bg-muted/60 transition-colors"
+                aria-label={tipLabel}
+              >
+                <Lightbulb className="h-3.5 w-3.5 text-primary" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs">
+              {tipLabel && <p className="text-xs font-semibold mb-1">{tipLabel}</p>}
+              <p className="text-xs leading-relaxed">{tipText}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+      <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-warning/40 bg-warning/10 text-xs font-medium text-warning backdrop-blur-sm">
+        <InfinityIcon className="h-3.5 w-3.5" />
+        <span className="hidden md:inline">Unlimited</span>
+      </span>
+      {nextPostLabel && (
+        <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-border/40 bg-card/40 text-xs text-muted-foreground backdrop-blur-sm">
+          <Clock className="h-3.5 w-3.5 text-warning" />
+          <span className="truncate max-w-[180px]">
+            <span className="hidden lg:inline">{nextPostPrefix}: </span>
+            {nextPostLabel}
+          </span>
+        </span>
+      )}
+    </div>
+  );
+};
+
+export const DashboardVideoCarousel = ({
+  quickActions = [],
+  tipText,
+  tipLabel,
+  nextPostLabel,
+  nextPostPrefix,
+}: DashboardVideoCarouselProps) => {
   const { videos, isLoading } = useVideoHistory();
   const { t, language } = useTranslation();
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
@@ -196,9 +256,8 @@ export const DashboardVideoCarousel = ({ quickActions = [] }: { quickActions?: Q
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Video className="h-4 w-4 text-primary" />
-          <h2 className="text-lg font-bold text-foreground">{t("carousel.yourVideos")}</h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} />
           {quickActions.length > 0 && (
             <div className="flex items-center gap-1.5 ml-auto">
               {quickActions.map((action, i) => (
@@ -226,9 +285,8 @@ export const DashboardVideoCarousel = ({ quickActions = [] }: { quickActions?: Q
 
     return (
       <div className="space-y-2">
-        <div className="flex items-center gap-3">
-          <Video className="h-4 w-4 text-primary" />
-          <h2 className="text-lg font-bold text-foreground">{t("carousel.yourVideos")}</h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} />
           {quickActions.length > 0 && (
             <div className="flex items-center gap-1.5 ml-auto">
               {quickActions.map((action, i) => (
@@ -330,12 +388,8 @@ export const DashboardVideoCarousel = ({ quickActions = [] }: { quickActions?: Q
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between py-1">
-        <div className="flex items-center gap-3">
-          <Video className="h-4 w-4 text-primary" />
-          <h2 className="text-lg font-bold text-foreground">{t("carousel.yourVideos")}</h2>
-          <Badge variant="secondary" className="text-xs">{sortedVideos.length}</Badge>
-        </div>
+      <div className="flex items-center justify-between gap-2 py-1 flex-wrap">
+        <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} />
         <div className="flex items-center gap-1.5">
           {quickActions.map((action, i) => (
             <Button key={i} asChild variant={action.variant || 'outline'} size="sm" className="h-7 px-2.5 text-xs rounded-lg gap-1.5">
