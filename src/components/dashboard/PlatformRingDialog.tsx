@@ -257,6 +257,38 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
               </div>
             </div>
 
+            {(() => {
+              if (!scheduledDate || !scheduledTime) return null;
+              const iso = `${scheduledDate}T${scheduledTime}:00`;
+              const evalResult = evaluateSlot(post.platform, iso);
+              const original = typeof post.slot_score === "number" ? post.slot_score : null;
+              const showWarning = evalResult.score > 0 && evalResult.score < 70 && evalResult.bestHour !== null;
+              const showOk = evalResult.score >= 85;
+              if (showWarning) {
+                return (
+                  <div className="flex items-start gap-2 p-2.5 rounded-md border border-warning/40 bg-warning/10 text-xs">
+                    <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-semibold text-warning">Suboptimale Zeit (Score {evalResult.score})</div>
+                      <div className="text-muted-foreground">
+                        Empfohlen: <span className="font-medium text-foreground">{String(evalResult.bestHour).padStart(2, "0")}:00</span> (Score {evalResult.bestScore})
+                        {original !== null && ` · KI-Vorschlag war Score ${original}`}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              if (showOk) {
+                return (
+                  <div className="flex items-center gap-2 p-2.5 rounded-md border border-success/40 bg-success/10 text-xs">
+                    <Sparkles className="h-3.5 w-3.5 text-success" />
+                    <span className="font-medium text-success">Top-Slot deiner Heatmap (Score {evalResult.score})</span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             <div className="flex items-center justify-between p-3 rounded-md border border-border/50 bg-card/40">
               <div>
                 <div className="text-sm font-medium">Automatisch posten</div>
