@@ -61,7 +61,7 @@ async function sendOneDrip(
   // Load profile
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, email, language, drip_emails_enabled, unsubscribe_token, full_name")
+    .select("id, email, language, drip_emails_enabled, unsubscribe_token, name")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -85,7 +85,7 @@ async function sendOneDrip(
   const nextStepLabel = STEP_LABELS[firstOpen.key]?.[lang] ?? firstOpen.key;
   const nextStepUrl = `${BASE_URL}${firstOpen.route}`;
   const unsubscribeUrl = `${BASE_URL}/email-preferences?token=${profile.unsubscribe_token}`;
-  const firstName = profile.full_name?.split(" ")[0];
+  const firstName = profile.name?.split(" ")[0];
 
   const { subject, html, text } = renderDripEmail(step, lang, {
     firstName,
