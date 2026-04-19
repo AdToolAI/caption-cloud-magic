@@ -7,8 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Label } from '@/components/ui/label';
-import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, ArrowLeft, Wand2, Clock, Monitor } from 'lucide-react';
+import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, ArrowLeft, Wand2, Clock, Monitor, Palette } from 'lucide-react';
 import { VideoPromptOptimizer } from '@/components/ai-video/VideoPromptOptimizer';
+import { StylePickerCompact } from '@/components/ai-video/StylePickerCompact';
+import type { ComposerVisualStyle } from '@/config/composerVisualStyles';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
@@ -38,6 +40,7 @@ export default function HailuoVideoStudio() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const startImageRef = useRef<HTMLInputElement>(null);
 
+  const [visualStyle, setVisualStyle] = useState<ComposerVisualStyle | null>(null);
   const [showPromptOptimizer, setShowPromptOptimizer] = useState(false);
 
   const currency: Currency = getCurrencyForLanguage(language);
@@ -86,7 +89,7 @@ export default function HailuoVideoStudio() {
     setGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-hailuo-video', {
-        body: { prompt: prompt.trim(), model, duration, resolution, startImageUrl },
+        body: { prompt: prompt.trim(), model, duration, resolution, startImageUrl, visualStyle },
       });
       if (error) throw error;
       if (data?.error) {
@@ -168,7 +171,30 @@ export default function HailuoVideoStudio() {
                   </div>
                 </Card>
 
-                {/* Model Selection */}
+                {/* Visual Style */}
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Palette className="h-4 w-4" />
+                      Visueller Stil
+                    </Label>
+                    <span className="text-xs text-muted-foreground">
+                      {visualStyle ? 'Wird an Prompt angehängt' : 'Optional'}
+                    </span>
+                  </div>
+                  <StylePickerCompact
+                    value={visualStyle}
+                    onChange={setVisualStyle}
+                    model="hailuo"
+                    language={language as 'de' | 'en' | 'es'}
+                  />
+                  <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Optimal</span>
+                    <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Funktioniert</span>
+                    <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-orange-500" /> Eingeschränkt</span>
+                  </div>
+                </Card>
+
                 <Card className="p-4">
                   <Label className="text-sm font-medium mb-3 block">Modell</Label>
                   <div className="grid grid-cols-2 gap-3">
@@ -273,6 +299,9 @@ export default function HailuoVideoStudio() {
                     <div className="flex justify-between"><span className="text-muted-foreground">Modell</span><span>{HAILUO_VIDEO_MODELS[model].name}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Auflösung</span><span>{resolution}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Dauer</span><span>{duration}s</span></div>
+                    {visualStyle && (
+                      <div className="flex justify-between"><span className="text-muted-foreground">Stil</span><span className="capitalize">{visualStyle.replace('-', ' ')}</span></div>
+                    )}
                     {startImageUrl && <div className="flex justify-between"><span className="text-muted-foreground">Modus</span><span>Image-to-Video</span></div>}
                     <hr className="my-2" />
                     <div className="flex justify-between font-semibold text-base">
