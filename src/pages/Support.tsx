@@ -204,7 +204,7 @@ const Support = () => {
   const t = text[language as keyof typeof text] || text.en;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="flex flex-col bg-background">
       <main className="flex-1 container mx-auto px-4 py-12 max-w-6xl">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">{t.title}</h1>

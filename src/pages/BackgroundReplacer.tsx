@@ -337,7 +337,7 @@ export default function BackgroundReplacer() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="flex flex-col bg-background">
       <main className="flex-1 container mx-auto px-4 py-8">
         <Breadcrumbs category="design" feature="Smart Background" />
         
