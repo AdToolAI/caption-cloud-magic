@@ -26,19 +26,34 @@ serve(async (req) => {
 
     if (missedError) console.error("missed update error:", missedError);
 
-    // 2. Sunday 22:00-23:59 UTC: evaluate levels + regenerate next week for users with mode enabled
+    // 2. Self-healing: ensure every strategy-mode user has posts for current + next week
+    function getMonday(d: Date): Date {
+      const x = new Date(d);
+      const day = x.getDay();
+      const diff = x.getDate() - day + (day === 0 ? -6 : 1);
+      x.setDate(diff);
+      x.setHours(0, 0, 0, 0);
+      return x;
+    }
+
     const now = new Date();
-    const isSundayNight = now.getUTCDay() === 0 && now.getUTCHours() >= 22;
+    const currentMonday = getMonday(now);
+    const nextMonday = new Date(currentMonday);
+    nextMonday.setDate(nextMonday.getDate() + 7);
+    const currentMondayStr = currentMonday.toISOString().split("T")[0];
+    const nextMondayStr = nextMonday.toISOString().split("T")[0];
+
     let regenerated = 0;
     let levelEvaluated = 0;
+    const isSundayNight = now.getUTCDay() === 0 && now.getUTCHours() >= 22;
 
+    const { data: users } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("strategy_mode_enabled", true);
+
+    // Sunday night: evaluate creator levels BEFORE generating new week
     if (isSundayNight) {
-      const { data: users } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("strategy_mode_enabled", true);
-
-      // First: evaluate creator levels (auto-upgrade) BEFORE generating new week
       try {
         await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/evaluate-creator-level`, {
           method: "POST",
@@ -53,38 +68,38 @@ serve(async (req) => {
       } catch (e) {
         console.error("evaluate-creator-level call failed:", e);
       }
+    }
 
-      for (const u of users || []) {
-        // Compute next Monday
-        const nextMonday = new Date();
-        nextMonday.setUTCDate(nextMonday.getUTCDate() + 1);
-        nextMonday.setUTCHours(0, 0, 0, 0);
-        const weekStartStr = nextMonday.toISOString().split("T")[0];
+    for (const u of users || []) {
+      // Check both weeks
+      const { data: existing } = await supabase
+        .from("strategy_posts")
+        .select("week_start")
+        .eq("user_id", u.id)
+        .in("week_start", [currentMondayStr, nextMondayStr]);
 
-        const { data: existing } = await supabase
-          .from("strategy_posts")
-          .select("id")
-          .eq("user_id", u.id)
-          .eq("week_start", weekStartStr)
-          .limit(1);
+      const haveCurrent = (existing || []).some((r: any) => r.week_start === currentMondayStr);
+      const haveNext = (existing || []).some((r: any) => r.week_start === nextMondayStr);
 
-        if (existing && existing.length > 0) continue;
+      if (haveCurrent && haveNext) continue;
 
-        // Trigger generation via edge function call (best effort)
-        try {
-          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-week-strategy`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-              apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-            },
-            body: JSON.stringify({ week_start: weekStartStr, user_id: u.id }),
-          });
-          regenerated++;
-        } catch (e) {
-          console.error(`regen failed for ${u.id}:`, e);
-        }
+      // Generate the missing week(s) — start from the earliest missing
+      const startWeek = !haveCurrent ? currentMondayStr : nextMondayStr;
+      const weeksAhead = !haveCurrent && !haveNext ? 2 : 1;
+
+      try {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-week-strategy`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+          },
+          body: JSON.stringify({ week_start: startWeek, user_id: u.id, weeks_ahead: weeksAhead }),
+        });
+        regenerated++;
+      } catch (e) {
+        console.error(`self-heal regen failed for ${u.id}:`, e);
       }
     }
 
