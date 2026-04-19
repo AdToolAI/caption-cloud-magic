@@ -73,29 +73,10 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const weekStart = body.week_start ? new Date(body.week_start) : getMonday(new Date());
-    weekStart.setHours(0, 0, 0, 0);
-    const weekStartStr = weekStart.toISOString().split("T")[0];
-
-    // Check if already exists for this week
-    const { data: existing } = await supabase
-      .from("strategy_posts")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("week_start", weekStartStr)
-      .limit(1);
-
-    if (existing && existing.length > 0 && !body.force) {
-      const { data: posts } = await supabase
-        .from("strategy_posts")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("week_start", weekStartStr)
-        .order("scheduled_at", { ascending: true });
-      return new Response(JSON.stringify({ posts, cached: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const baseWeekStart = body.week_start ? new Date(body.week_start) : getMonday(new Date());
+    baseWeekStart.setHours(0, 0, 0, 0);
+    const weeksAhead = Math.max(1, Math.min(4, body.weeks_ahead ?? 2));
+    const force = !!body.force;
 
     // Gather context: last 90 days metrics + profile + onboarding (level)
     const ninetyDaysAgo = new Date();
