@@ -1,107 +1,66 @@
 
 
-## Plan: Wochenleiste als „Glowing Platform Rings"-Timeline + smarter Ring-Dialog
+## Befund (korrigiert)
 
-### Befund
-- Aktuelle `WeekStrategyTimeline` zeigt Tageskarten mit Verbindungslinie + kleinen Punkten — der Streifen wirkt deplatziert.
-- Wir hatten bereits in `WeekTimelineDay.tsx` eine viel coolere Variante mit leuchtenden Plattform-Ringen — wird aktuell im Strategy-Mode aber nicht genutzt.
-- Plattformfarben sind dort schon definiert, aber: Facebook=blau ✅, Instagram=lila ✅, LinkedIn=grün ✅, YouTube=rot ✅, X=violett (soll → Schwarzlicht/UV-Purple), TikTok=weiß (bleibt).
+Du hast recht — die Taskleiste zeigt **19.04.2026, 21:04 Uhr** = **Sonntag**. Morgen früh ist Montag, also Start der **neuen Woche** (20.–26. April).
 
-### Zielbild
+Der Fehler in der App: Die Wochenleiste sollte heute (Sonntag) bereits **die kommende Woche** anzeigen, da die aktuelle Woche faktisch vorbei ist. Stattdessen zeigt sie noch die abgelaufene Woche (13.–19.) — ohne Posts mehr → Pill „Nächster Post" leer.
 
+## Plan: 2-Wochen-Vorausplanung + Auto-Forward am Sonntag
+
+### 1) Backend — `generate-week-strategy` generiert 2 Wochen
+- Neuer optionaler Parameter `weeks_ahead` (Default **2**).
+- Loop generiert beide Wochen-Batches in einem Aufruf:
+  - Woche 1 = Montag dieser ISO-Woche
+  - Woche 2 = Montag der Folgewoche
+- Skip pro Woche, wenn schon Posts für diesen `week_start` existieren (idempotent).
+
+### 2) Backend — `tick-strategy-posts` Self-Healing
+- Bei jedem Tick (stündlich) für jeden User mit `strategy_mode_enabled=true` prüfen:
+  - Existieren Posts für (`currentMonday`) **und** (`nextMonday`)?
+  - Wenn nein → `generate-week-strategy` mit `weeks_ahead=2` triggern.
+- Sonntag-Logik bleibt zusätzlich (zur Sicherheit), aber der tägliche Self-Healing-Check stellt sicher, dass nie mehr eine Lücke entsteht.
+
+### 3) Backend — `useStrategyMode.toggle` (initial activation)
+- Beim ersten Aktivieren des Toggles: ebenfalls `weeks_ahead=2` mitgeben statt nur 1 Woche.
+
+### 4) Frontend — Auto-Forward der angezeigten Woche
+In `useStrategyMode`:
 ```text
-   So       Mo       Di       Mi       Do       Fr       Sa
-   12       13       14       15       16       17       18
-   ──●──────●──────●──────●──────●──────●──────●──   ← dünne goldene Linie
-            ◉                ○              ◉
-         (IG lila          (FB blau       (YT rot
-          glüht)            wartet)        glüht)
+const today = new Date();
+const dow = today.getDay(); // 0=So
+const currentMonday = startOfISOWeek(today);
+const nextMonday = addDays(currentMonday, 7);
+
+// Auto-Forward Bedingungen:
+// - Heute ist Sonntag (dow === 0)
+// - ODER: alle Posts der currentWeek liegen bereits in der Vergangenheit
+const visibleWeekStart = (
+  dow === 0 ||
+  allCurrentWeekPostsArePast
+) ? nextMonday : currentMonday;
 ```
 
-- **Eine** dünne goldene Timeline-Linie quer durch die Woche (subtil, statt aktuellem klobigen Streifen).
-- Pro Tag: vertikal gestapelte Plattform-Ringe in Markenfarben.
-- **Status-Visualisierung pro Ring**:
-  - `pending` (Zukunft) → gedimmter Ring (`ring-{color}/30`), kein Glow
-  - `pending` (heute, in Kürze) → langsam pulsierend in Plattformfarbe
-  - `completed/published` → **voller Glow** in Plattformfarbe (z. B. IG = lila Glow)
-  - `missed` → **roter Glow + langsames Blinken** (`animate-pulse` mit ~2s Dauer, deutlich langsamer als YouTube-Static-Glow → klar unterscheidbar)
-  - `dismissed` → fast unsichtbar, durchgestrichen
-- Klick auf Ring → öffnet **`PlatformRingDialog`** (neu).
+- Posts-Query lädt **beide** Wochen (`week_start IN (currentMonday, nextMonday)`).
+- Selector `getPostsForWeek(visibleWeekStart)` filtert die anzuzeigende Woche.
+- `getNextStrategyPost` durchsucht **alle geladenen Posts** → findet sofort „Mo 20.04. Instagram", auch wenn das in der Folgewoche liegt.
 
-### Plattformfarben (final)
-| Plattform | Ring | Glow |
-|---|---|---|
-| Instagram | `ring-purple-500` | `shadow-[0_0_18px_rgba(168,85,247,0.85)]` |
-| Facebook | `ring-blue-500` | `shadow-[0_0_18px_rgba(59,130,246,0.85)]` |
-| LinkedIn | `ring-green-500` | `shadow-[0_0_18px_rgba(34,197,94,0.85)]` |
-| YouTube | `ring-red-500` | `shadow-[0_0_18px_rgba(239,68,68,0.85)]` (statisch) |
-| X | `ring-violet-700` | `shadow-[0_0_18px_rgba(109,40,217,0.95)]` (Schwarzlicht/UV) |
-| TikTok | `ring-white` | `shadow-[0_0_14px_rgba(255,255,255,0.7)]` |
-| **Missed** | `ring-red-500` | `shadow-[0_0_18px_rgba(239,68,68,0.7)]` + `animate-pulse` (2s) |
+### 5) Frontend — `WeekStrategyRingTimeline` zeigt korrekte Woche
+- Akzeptiert `weekStart` Prop (vorgegeben von `useStrategyMode.visibleWeekStart`).
+- Header zeigt z. B. „20.–26. April" statt „13.–19. April".
+- Optional: kleine Pfeile ‹ › im Header, um manuell zwischen den 2 geladenen Wochen zu wechseln (Standard: Auto-gewählte Woche).
 
-### Neue Komponente: `WeekStrategyRingTimeline.tsx`
-Ersetzt visuell die aktuelle `WeekStrategyTimeline`. Nutzt die bestehende `WeekTimelineDay`-Logik als Basis, erweitert um:
-- Strategy-Posts statt Calendar-Posts.
-- Status-Mapping `pending|completed|missed|dismissed` → visuelles Verhalten.
-- Eine **horizontale Goldlinie** hinter den Day-Numbers (dünn, `h-px`, Gradient).
-
-### Neuer Dialog: `PlatformRingDialog.tsx`
-Klick auf Ring → Dialog mit allen Aktionen in einem Fenster:
-
-**Header**: Plattform-Icon in Farbe + Datum/Uhrzeit + Status-Badge
-
-**Inhalt (Tabs oder Accordion)**:
-1. **Vorschau & Bearbeiten**
-   - Caption-Editor (Textarea, AI-Entwurf vorausgefüllt)
-   - Hashtags
-   - Hook (optional)
-   - Reasoning (warum dieser Vorschlag)
-2. **Medien**
-   - Drag & Drop Upload-Zone (Bild/Video)
-   - Auswahl aus Mediathek (`media_library`)
-   - „Mit KI generieren" Button → ruft Picture Studio bzw. AI Video Studio auf
-3. **Zeitplan**
-   - Date- & Time-Picker (vorausgefüllt mit `scheduled_at`)
-   - Plattform-Switcher (falls anderer Account)
-
-**Footer-Actions**:
-- 🗑️ **Verwerfen** (status='dismissed')
-- ✏️ **Speichern** (Update strategy_post)
-- 📅 **In Kalender übernehmen & auto-publishen** → erstellt `calendar_events` Eintrag mit `auto_publish=true`, verknüpft `completed_event_id`
-
-### Auto-Publish-Flow
-Sobald ein Strategy-Post „in Kalender übernommen" wird:
-1. Insert in `calendar_events` mit `status='scheduled'`, `auto_publish=true`, Caption, Medien, Plattform, `scheduled_at`.
-2. Der bestehende `tick-strategy-posts` (oder ein neuer `tick-publish-scheduled`) Cron-Job prüft jede Minute auf fällige Posts und triggert die jeweilige Publish-Edge-Function (Instagram/Facebook/X/LinkedIn/YouTube).
-3. Bei Erfolg: `strategy_posts.status='completed'` → Ring leuchtet in Plattformfarbe.
-4. Bei Fehler: `status='failed'` → roter Glow + Toast.
-
-> Hinweis: Da `tick-strategy-posts` bereits stündlich läuft, wird er erweitert um die Publish-Logik. Für minutengenaue Posts wäre ein zusätzlicher Cron `*/1 * * * *` nötig.
-
-### Medien-Upload
-- Reuse vom bestehenden `media-assets` Bucket
-- Pfad: `{user_id}/strategy/{post_id}/{filename}` (RLS-konform)
-- Neue Spalte `strategy_posts.media_urls TEXT[]` (Migration)
-
-### Datenmodell-Erweiterung
-```sql
-ALTER TABLE strategy_posts ADD COLUMN media_urls TEXT[] DEFAULT '{}';
-ALTER TABLE strategy_posts ADD COLUMN auto_publish BOOLEAN DEFAULT false;
-```
+### 6) Pill „Nächster Post"
+Funktioniert automatisch — `getNextStrategyPost` findet jetzt den nächsten anstehenden Vorschlag aus den 2 geladenen Wochen. Heute (So 21:04) → zeigt morgen früh „Mo 20.04. 21:00 · Instagram".
 
 ### Betroffene Dateien
-- *(neu)* `src/components/dashboard/WeekStrategyRingTimeline.tsx` — neue Visualisierung
-- *(neu)* `src/components/dashboard/PlatformRingDialog.tsx` — Edit-Dialog mit Upload + KI
-- `src/components/dashboard/WeekStrategyTimeline.tsx` — wird ersetzt/zur Wrapper
-- `src/hooks/useStrategyMode.ts` — Mutation `updateStrategyPost(id, {media_urls, caption_draft, scheduled_at, ...})`, `submitToCalendar`
-- `supabase/functions/tick-strategy-posts/index.ts` — erweitert um Auto-Publish
-- *(Migration)* `strategy_posts.media_urls`, `auto_publish` Spalten
-- `src/pages/Home.tsx` — ggf. Komponenten-Tausch
+- `supabase/functions/generate-week-strategy/index.ts` — `weeks_ahead` Loop
+- `supabase/functions/tick-strategy-posts/index.ts` — täglicher Self-Healing-Check
+- `src/hooks/useStrategyMode.ts` — 2-Wochen-Query, `visibleWeekStart`, `nextPost` über alle geladenen Posts, `toggle` mit `weeks_ahead=2`
+- `src/components/dashboard/WeekStrategyRingTimeline.tsx` — `weekStart` Prop respektieren, optional Pfeil-Navigation
 
 ### Erwartetes Ergebnis
-- Klare, elegante Wochenleiste mit dünner Goldlinie und leuchtenden Plattform-Ringen pro Tag.
-- Ringe leuchten erst wenn Post veröffentlicht wurde — sonst dezent gedimmt.
-- Verpasste Posts leuchten **rot pulsierend** (klar von YouTube-Statik-Rot unterscheidbar).
-- Klick auf Ring → ein einziger smarter Dialog mit Caption-Editor, Medien-Upload, KI-Generator, Zeitplan und Lösch-/Auto-Publish-Aktion.
-- Nach dem Posten leuchtet der Ring automatisch in Plattformfarbe — visuelles Belohnungs-Feedback für den Creator.
+- Sonntag (heute) → Timeline zeigt automatisch die Folgewoche (20.–26. April) mit den neuen Vorschlägen.
+- Pill „Nächster Post" zeigt sofort „Mo 20.04. 21:00 · Instagram" — keine Leere mehr am Wochenende.
+- System hält dauerhaft 2 Wochen Vorschläge bereit, Self-Healing über Cron — kein Black-Out mehr möglich.
 
