@@ -512,7 +512,7 @@ const Home = () => {
               <span>{topInsight ? topInsight.headline : t("dashboard.statusBar.tipContent")}</span>
             </div>
             <div className="flex items-center gap-6">
-              <div className="text-xs"><CreditBalance /></div>
+              <CreditBalance compact />
               
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-warning" />
