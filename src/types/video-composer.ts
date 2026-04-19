@@ -38,6 +38,34 @@ export type AspectRatio = '16:9' | '9:16' | '1:1' | '4:5';
 
 export type EmotionalTone = 'professional' | 'energetic' | 'emotional' | 'funny' | 'luxury' | 'minimal' | 'dramatic' | 'friendly';
 
+/**
+ * Recurring on-screen character profile.
+ * - `appearance`: physical description (face, age, hair, build) — used sparingly.
+ * - `signatureItems`: clothing / objects / props — repeated in EVERY scene where
+ *   the character (or a part of them) is visible. AI is reliable at repeating
+ *   props/clothing, much less so at faces — this is the Sherlock-Holmes anchor.
+ */
+export interface ComposerCharacter {
+  id: string;
+  name: string;
+  appearance: string;
+  signatureItems: string;
+}
+
+/**
+ * Per-scene shot strategy for character continuity. Set by the storyboard AI
+ * (or manually by the user) to vary camera framing across scenes — only 2-3
+ * scenes show the full face, the rest use detail / silhouette / POV / back-
+ * shot framing so face inconsistencies between independent video generations
+ * are not noticed.
+ */
+export type CharacterShotType = 'full' | 'profile' | 'back' | 'detail' | 'pov' | 'silhouette' | 'absent';
+
+export interface CharacterShot {
+  characterId: string;
+  shotType: CharacterShotType;
+}
+
 export interface TextOverlayConfig {
   text: string;
   position: TextPosition;
@@ -61,6 +89,8 @@ export interface ComposerBriefing {
   defaultQuality?: ClipQuality;
   /** Visual style applied to every AI-generated scene (Comic, Realistic, Cinematic, …). */
   visualStyle?: ComposerVisualStyle;
+  /** Recurring characters that should look consistent across scenes. */
+  characters?: ComposerCharacter[];
 }
 
 export interface ComposerScene {
@@ -77,6 +107,8 @@ export interface ComposerScene {
   uploadType?: 'video' | 'image';
   /** Optional reference image used as a visual guide for AI sources (image-to-video). */
   referenceImageUrl?: string;
+  /** Optional shot-strategy hint for character continuity. */
+  characterShot?: CharacterShot;
   clipUrl?: string;
   clipStatus: ClipStatus;
   textOverlay: TextOverlayConfig;
@@ -215,6 +247,7 @@ export const DEFAULT_BRIEFING: ComposerBriefing = {
   brandColors: [],
   defaultQuality: 'standard',
   visualStyle: 'realistic',
+  characters: [],
 };
 
 export const DEFAULT_SUBTITLES_CONFIG: SubtitlesConfig = {

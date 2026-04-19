@@ -139,6 +139,7 @@ export function useComposerPersistence() {
               transition_type: scene.transitionType,
               transition_duration: scene.transitionDuration,
               cost_euros: scene.costEuros,
+              character_shot: (scene.characterShot ?? null) as any,
             } as any)
             .eq('id', scene.id);
 
@@ -169,6 +170,7 @@ export function useComposerPersistence() {
               transition_duration: scene.transitionDuration ?? 0.5,
               cost_euros: scene.costEuros || 0,
               retry_count: scene.retryCount || 0,
+              character_shot: (scene.characterShot ?? null) as any,
             } as any)
             .select('id')
             .single();

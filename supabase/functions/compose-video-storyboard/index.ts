@@ -7,6 +7,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+interface ComposerCharacter {
+  id: string;
+  name: string;
+  appearance: string;
+  signatureItems: string;
+}
+
 interface Briefing {
   mode: string;
   productName: string;
@@ -18,6 +25,7 @@ interface Briefing {
   aspectRatio: string;
   brandColors: string[];
   visualStyle?: string;
+  characters?: ComposerCharacter[];
 }
 
 const CATEGORY_STRUCTURES: Record<string, string> = {
@@ -136,14 +144,49 @@ AI prompt requirements (CRITICAL — every aiPrompt MUST contain ALL of these):
 
 ${sceneTypeHints}
 
-🚨 CHARACTER CONSISTENCY CONSTRAINT (CRITICAL — technical limitation):
+${(() => {
+  const chars = (briefing.characters || []).filter(c => c.name && (c.appearance || c.signatureItems));
+  if (chars.length === 0) {
+    // No characters defined → original constraint applies (each scene self-contained)
+    return `🚨 CHARACTER CONSISTENCY CONSTRAINT (CRITICAL — technical limitation):
 Each scene is generated INDEPENDENTLY by a separate AI video model call (Hailuo / Kling / Sora). There is NO character/face consistency between scenes — the model cannot remember a person from a previous scene. Therefore:
 - NEVER reference "the same person", "she from before", "he again", "the woman from scene 1", "our protagonist returns"
 - NEVER use pronouns or phrases that imply continuity across scenes ("she continues", "he then…", "later that day she…", "now smiling at the camera")
 - Each scene MUST describe its human subject FRESH and SELF-CONTAINED — re-state age, gender, appearance, clothing, ethnicity hints, setting — as if the viewer has never seen them before
 - If a recurring TYPE of person is desired (e.g. always a young professional woman), describe the ARCHETYPE generically in each scene (e.g. "a young professional woman in business casual, late 20s, warm smile") — but never claim it's the same individual
 - Treat the storyboard as a MONTAGE / MOOD-BOARD of standalone shots that share a vibe, NOT as a continuous narrative with one persistent protagonist
-- Variation between scenes' people is expected and fine — do not try to lock identity
+- Variation between scenes' people is expected and fine — do not try to lock identity`;
+  }
+
+  // Characters defined → switch to SMART SHOT VARIATION strategy
+  const charList = chars.map(c => {
+    const appearance = c.appearance ? `appearance="${c.appearance}"` : 'appearance=(none provided)';
+    const items = c.signatureItems ? `signatureItems="${c.signatureItems}"` : 'signatureItems=(none provided)';
+    return `  • id="${c.id}" name="${c.name}" — ${appearance}, ${items}`;
+  }).join('\n');
+
+  return `🎭 SMART CHARACTER CONSISTENCY (the user defined recurring characters):
+Each AI video scene is generated INDEPENDENTLY — exact face identity between scenes is technically impossible. Instead we use the "Sherlock Holmes effect": the AI is reliable at repeating CLOTHING and OBJECTS but unreliable at faces, so we vary camera framing across scenes and lean on signatureItems as the visual anchor of the character.
+
+Available characters:
+${charList}
+
+DISTRIBUTION RULES (over the full storyboard, vary the shotType per scene):
+- 1-2 scenes → shotType="full": full character visible (establishing / hero shots). Include BOTH appearance + signatureItems verbatim at the start of aiPrompt.
+- 2-3 scenes → shotType="profile" OR "back" OR "silhouette": indirect view (side-profile from distance, over-the-shoulder, back-shot, gegenlicht silhouette). Include ONLY signatureItems verbatim — omit appearance.
+- 1-2 scenes → shotType="detail": detail framing (just the eyes, just the hands holding an object, just the feet walking). Include ONLY the relevant body part + 1 matching signature item.
+- 1-2 scenes → shotType="pov": point-of-view of the character (we see what they see — character not visible at all). Include 1 signature item naturally present in their visual field if possible.
+- Remaining scenes → shotType="absent": environment / object focus, no character. Include 1 signature item if it would naturally be in the scene (e.g. crown sitting on a table), otherwise omit.
+
+CRITICAL:
+- ALWAYS write signatureItems verbatim when ANY part of the character is visible. This is the visual anchor that makes the viewer perceive continuity.
+- DO NOT have the same shotType in two consecutive scenes. Vary to keep the cinematography dynamic.
+- DO NOT reference "the same person" or use continuity pronouns — the consistency comes from the repeated signatureItems, not from claiming identity.
+- For each scene that features a character, set characterShot.characterId to the exact id from the list and characterShot.shotType to the chosen value.
+- For scenes WITHOUT any character, omit characterShot entirely (or set characterId="" + shotType="absent").
+
+If multiple characters are defined and a scene features more than one, pick the primary one for characterShot and include both sets of signatureItems in the prompt.`;
+})()}
 
 Write text overlays separately (in ${langLabel}) — they're rendered as a distinct layer on top of the video.${styleDirective}`;
 
@@ -174,7 +217,9 @@ ${structure}
 
 🚨 INTEGRATION REQUIREMENT (non-negotiable): The product must appear *within* real-world scenes — used by people, in real environments, in lifestyle moments. The product is part of the story, not the story itself. Avoid isolated product shots entirely, except for AT MOST ONE hero scene if the briefing genuinely calls for a clean beauty-shot. Every other scene must feature a human or life situation with the product integrated naturally.
 
-🚨 INDEPENDENCE REQUIREMENT (non-negotiable): Every scene is rendered by a SEPARATE AI generation with no memory of other scenes. Describe each human subject FROM SCRATCH in each scene — no "same person", no "she/he from before", no continuity pronouns. Treat each scene as a standalone shot in a montage. If you want a recurring type, describe the archetype generically in every scene rather than claiming identity continuity.
+${(briefing.characters && briefing.characters.length > 0)
+  ? `🎭 CHARACTER REQUIREMENT (non-negotiable): The user defined ${briefing.characters.length} recurring character(s): ${briefing.characters.map(c => c.name).join(', ')}. Distribute their appearances across scenes per the SMART CHARACTER CONSISTENCY rules in the system prompt — vary shotType so face close-ups happen in only 1-2 scenes; rely on signatureItems verbatim for visual continuity. Set characterShot per scene.`
+  : `🚨 INDEPENDENCE REQUIREMENT (non-negotiable): Every scene is rendered by a SEPARATE AI generation with no memory of other scenes. Describe each human subject FROM SCRATCH in each scene — no "same person", no "she/he from before", no continuity pronouns. Treat each scene as a standalone shot in a montage. If you want a recurring type, describe the archetype generically in every scene rather than claiming identity continuity.`}
 
 Generate the storyboard using the create_storyboard function.`;
 
@@ -236,10 +281,30 @@ Generate the storyboard using the create_storyboard function.`;
                           type: "string",
                           enum: ["none", "fade", "crossfade", "wipe", "slide", "zoom"],
                         },
+                        characterShot: {
+                          type: "object",
+                          description: "Optional — when a recurring character is featured, set characterId to the character's id from the briefing and shotType to the chosen framing strategy. Omit (or shotType=\"absent\") for scenes without any character.",
+                          properties: {
+                            characterId: { type: "string" },
+                            shotType: {
+                              type: "string",
+                              enum: ["full", "profile", "back", "detail", "pov", "silhouette", "absent"],
+                            },
+                          },
+                          required: ["characterId", "shotType"],
+                          additionalProperties: false,
+                        },
                       },
                       required: ["sceneType", "durationSeconds", "aiPrompt", "stockKeywords", "textOverlayText", "textPosition", "textAnimation", "transitionType"],
                       additionalProperties: false,
                     },
+                  },
+                },
+                required: ["scenes"],
+                additionalProperties: false,
+              },
+            },
+          },
                   },
                 },
                 required: ["scenes"],
@@ -316,6 +381,9 @@ Generate the storyboard using the create_storyboard function.`;
       transitionDuration: 0.5,
       retryCount: 0,
       costEuros: 1.2, // Default Hailuo cost
+      ...(s.characterShot && s.characterShot.shotType
+        ? { characterShot: { characterId: s.characterShot.characterId || "", shotType: s.characterShot.shotType } }
+        : {}),
     }));
 
     return new Response(JSON.stringify({ scenes, sceneCount: scenes.length }), {

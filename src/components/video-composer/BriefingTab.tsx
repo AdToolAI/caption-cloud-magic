@@ -29,8 +29,10 @@ import type {
   EmotionalTone,
   ClipQuality,
   ComposerVisualStyle,
+  ComposerCharacter,
 } from '@/types/video-composer';
 import { VISUAL_STYLES } from '@/config/composerVisualStyles';
+import CharacterManager from './CharacterManager';
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string; desc: string }[] = [
   { value: '16:9', label: '16:9', desc: 'YouTube / Landscape' },
@@ -569,6 +571,13 @@ export default function BriefingTab({
           </div>
         </CardContent>
       </Card>
+
+      {/* Recurring Characters — drives consistency across scenes */}
+      <CharacterManager
+        characters={briefing.characters || []}
+        language={language}
+        onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
+      />
 
       {/* Visual Style — drives consistent look across all AI-generated scenes */}
       <Card className="border-border/40 bg-card/80">
