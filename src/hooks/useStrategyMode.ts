@@ -114,17 +114,22 @@ export function useStrategyMode() {
     staleTime: 5 * 60_000,
   });
 
-  // Current week posts
-  const weekStart = getMonday(new Date()).toISOString().split("T")[0];
+  // Current + next week posts (load 2 weeks for auto-forward + pill lookup)
+  const currentMondayDate = getMonday(new Date());
+  const nextMondayDate = new Date(currentMondayDate);
+  nextMondayDate.setDate(nextMondayDate.getDate() + 7);
+  const currentMonday = currentMondayDate.toISOString().split("T")[0];
+  const nextMonday = nextMondayDate.toISOString().split("T")[0];
+
   const postsQuery = useQuery({
-    queryKey: ["strategy-posts", user?.id, weekStart],
+    queryKey: ["strategy-posts", user?.id, currentMonday, nextMonday],
     queryFn: async () => {
       if (!user) return [] as StrategyPost[];
       const { data, error } = await supabase
         .from("strategy_posts")
         .select("*")
         .eq("user_id", user.id)
-        .eq("week_start", weekStart)
+        .in("week_start", [currentMonday, nextMonday])
         .order("scheduled_at", { ascending: true });
       if (error) throw error;
       return (data || []).map((d: any) => ({
@@ -135,6 +140,21 @@ export function useStrategyMode() {
     enabled: !!user && enabled,
     staleTime: 60_000,
   });
+
+  // Auto-forward: if today is Sunday OR all current-week posts are in the past → show next week
+  const allPosts = postsQuery.data || [];
+  const nowMs = Date.now();
+  const currentWeekPosts = allPosts.filter((p) => p.week_start === currentMonday);
+  const nextWeekPostsExist = allPosts.some((p) => p.week_start === nextMonday);
+  const allCurrentPast =
+    currentWeekPosts.length > 0 &&
+    currentWeekPosts.every((p) => new Date(p.scheduled_at).getTime() < nowMs);
+  const todayDow = new Date().getDay(); // 0 = Sunday
+  const shouldForward = (todayDow === 0 || allCurrentPast || currentWeekPosts.length === 0) && nextWeekPostsExist;
+  const visibleWeekStart = shouldForward ? nextMonday : currentMonday;
+
+  const visiblePosts = allPosts.filter((p) => p.week_start === visibleWeekStart);
+  const weekStart = visibleWeekStart;
 
   const toggleMutation = useMutation({
     mutationFn: async (next: boolean) => {
