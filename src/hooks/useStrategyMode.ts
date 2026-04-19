@@ -169,9 +169,9 @@ export function useStrategyMode() {
       if (error) throw error;
 
       if (next) {
-        // Trigger initial generation
+        // Trigger initial generation for current + next week
         const { error: fnErr } = await supabase.functions.invoke("generate-week-strategy", {
-          body: { week_start: weekStart },
+          body: { week_start: currentMonday, weeks_ahead: 2 },
         });
         if (fnErr) console.warn("initial generation failed:", fnErr);
       }
@@ -188,7 +188,7 @@ export function useStrategyMode() {
   const regenerateMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke("generate-week-strategy", {
-        body: { week_start: weekStart, force: true },
+        body: { week_start: visibleWeekStart, force: true, weeks_ahead: 1 },
       });
       if (error) throw error;
     },
