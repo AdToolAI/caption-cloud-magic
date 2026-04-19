@@ -1,59 +1,44 @@
 
 
-## Plan: News-Ticker unter die AdTool-Leiste schieben (kein Versatz mehr)
+## Plan: Sidebar-Icon und AppHeader-Brand auf eine Linie bringen
 
-### Was der User will (Mockup im WhatsApp-Screenshot)
-Der News-Ticker soll **unter der AdTool-Leiste** beginnen — also unter `AppHeader` statt darüber. Dadurch verschwindet der optische Versatz: Ticker und Hauptcontent starten an derselben x/y-Achse.
+### Diagnose (aus Screenshot + Code)
+- Beide Sparkles-Icons sind **gleich groß** (`h-5 w-5` = 20px, beide via `Brand compact`)
+- **Sidebar-Brand-Container**: `pt-2 pb-3` (8px top) → Icon bei ~8px vom Top
+- **AppHeader**: `h-14` (56px), Brand vertikal zentriert → Icon bei ~18px vom Top
+- **Resultat**: Sidebar-Icon sitzt höher und wirkt dadurch optisch "kürzer/kleiner", weil es nicht auf einer Linie mit dem Header-Brand steht
 
-### Aktuelle Reihenfolge (`src/App.tsx` Z. 134–138)
-```
-<div flex>
-  <AppSidebar />                          ← klebt oben (sticky)
-  <div flex-col>
-    <NewsTicker />     ← ganz oben
-    <AppHeader />      ← darunter
-    <main>...</main>
-  </div>
+### Fix — Sidebar-Brand-Container exakt auf Header-Höhe (`h-14`) bringen
+Damit das Icon mittig im selben 56px-Slot wie der Header-Brand sitzt.
+
+### Änderung — minimal
+
+**`src/components/AppSidebar.tsx` (Z. 39–41)**
+
+Aktuell:
+```tsx
+<div className="flex flex-col items-center pt-2 pb-3 border-b border-border bg-card">
+  <Brand compact showText={false} />
 </div>
 ```
 
-Das erzeugt: Ticker oben → AppHeader (mit AdTool-Logo) darunter → Logo sitzt visuell tiefer als das Sidebar-Logo links → Versatz.
-
-### Geplante Reihenfolge
-```
-<div flex>
-  <AppSidebar />
-  <div flex-col>
-    <AppHeader />      ← AdTool-Leiste oben
-    <NewsTicker />     ← Ticker direkt darunter
-    <main>...</main>
-  </div>
+Neu:
+```tsx
+<div className="flex items-center justify-center h-14 border-b border-border bg-card">
+  <Brand compact showText={false} />
 </div>
 ```
 
-Dann sitzt das AdTool-Logo im Header **auf gleicher Höhe** wie das Sparkles-Icon in der Sidebar (beide ganz oben). Der Ticker liegt sauber darunter, ohne Versatz.
-
-### Änderungen — minimal
-
-**1. `src/App.tsx` (Z. 137–138)**
-- Reihenfolge tauschen: `AppHeader` zuerst, danach `NewsTicker`
-- `AppHeader` hat aktuell `sticky top-0 z-50` → bleibt beim Scrollen oben kleben
-- `NewsTicker` muss dann **nicht** sticky sein (scrollt mit weg) — passt, da der User den Ticker nur anfangs sehen will
-
-**2. `src/components/layout/AppHeader.tsx` — kein Change nötig**
-- `sticky top-0 z-50` bleibt → AdTool-Leiste klebt oben
-- Optional: Wenn User den Ticker auch beim Scrollen sehen möchte, könnten wir ihn ebenfalls sticky machen (`sticky top-14 z-40`, da Header h-14 ist). **Default: nicht sticky** — wir machen das nur, wenn der User es ausdrücklich nachfordert.
-
-**3. `src/components/AppSidebar.tsx` — bereits korrekt**
-- `sticky top-0 h-screen self-start` mit `pt-2 pb-3` für Brand-Container → Sparkles-Icon sitzt oben links auf gleicher Höhe wie der AppHeader
+- `h-14` → exakt gleiche Höhe wie `AppHeader`
+- `items-center justify-center` → Icon wird vertikal + horizontal mittig platziert
+- Border-bottom bleibt, sodass die Trennlinie unter Sidebar-Brand und Header bündig durchläuft
 
 ### Was NICHT geändert wird
-- Ticker-Inhalt, Animation, Switch, News-Quelle bleiben
-- Sidebar-Inhalte und -Verhalten bleiben
-- Routing/Pages bleiben
-- Kein DB/Bundle-Redeploy nötig (reines Frontend-Layout)
+- Icon-Größe (`h-5 w-5`) bleibt — sie ist bereits identisch
+- Header bleibt unverändert
+- Ticker bleibt unverändert
+- Keine weiteren Layout-Änderungen
 
-### Risiken
-- Minimal — eine Zeilen-Vertauschung in `App.tsx`
-- Falls der User danach sagt "Ticker soll auch beim Scrollen sichtbar bleiben" → `sticky top-14` als Mini-Folge-Iteration
+### Risiko
+- Null. Reine Höhen-Anpassung in einem Container.
 
