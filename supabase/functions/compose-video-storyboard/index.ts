@@ -144,14 +144,49 @@ AI prompt requirements (CRITICAL — every aiPrompt MUST contain ALL of these):
 
 ${sceneTypeHints}
 
-🚨 CHARACTER CONSISTENCY CONSTRAINT (CRITICAL — technical limitation):
+${(() => {
+  const chars = (briefing.characters || []).filter(c => c.name && (c.appearance || c.signatureItems));
+  if (chars.length === 0) {
+    // No characters defined → original constraint applies (each scene self-contained)
+    return `🚨 CHARACTER CONSISTENCY CONSTRAINT (CRITICAL — technical limitation):
 Each scene is generated INDEPENDENTLY by a separate AI video model call (Hailuo / Kling / Sora). There is NO character/face consistency between scenes — the model cannot remember a person from a previous scene. Therefore:
 - NEVER reference "the same person", "she from before", "he again", "the woman from scene 1", "our protagonist returns"
 - NEVER use pronouns or phrases that imply continuity across scenes ("she continues", "he then…", "later that day she…", "now smiling at the camera")
 - Each scene MUST describe its human subject FRESH and SELF-CONTAINED — re-state age, gender, appearance, clothing, ethnicity hints, setting — as if the viewer has never seen them before
 - If a recurring TYPE of person is desired (e.g. always a young professional woman), describe the ARCHETYPE generically in each scene (e.g. "a young professional woman in business casual, late 20s, warm smile") — but never claim it's the same individual
 - Treat the storyboard as a MONTAGE / MOOD-BOARD of standalone shots that share a vibe, NOT as a continuous narrative with one persistent protagonist
-- Variation between scenes' people is expected and fine — do not try to lock identity
+- Variation between scenes' people is expected and fine — do not try to lock identity`;
+  }
+
+  // Characters defined → switch to SMART SHOT VARIATION strategy
+  const charList = chars.map(c => {
+    const appearance = c.appearance ? `appearance="${c.appearance}"` : 'appearance=(none provided)';
+    const items = c.signatureItems ? `signatureItems="${c.signatureItems}"` : 'signatureItems=(none provided)';
+    return `  • id="${c.id}" name="${c.name}" — ${appearance}, ${items}`;
+  }).join('\n');
+
+  return `🎭 SMART CHARACTER CONSISTENCY (the user defined recurring characters):
+Each AI video scene is generated INDEPENDENTLY — exact face identity between scenes is technically impossible. Instead we use the "Sherlock Holmes effect": the AI is reliable at repeating CLOTHING and OBJECTS but unreliable at faces, so we vary camera framing across scenes and lean on signatureItems as the visual anchor of the character.
+
+Available characters:
+${charList}
+
+DISTRIBUTION RULES (over the full storyboard, vary the shotType per scene):
+- 1-2 scenes → shotType="full": full character visible (establishing / hero shots). Include BOTH appearance + signatureItems verbatim at the start of aiPrompt.
+- 2-3 scenes → shotType="profile" OR "back" OR "silhouette": indirect view (side-profile from distance, over-the-shoulder, back-shot, gegenlicht silhouette). Include ONLY signatureItems verbatim — omit appearance.
+- 1-2 scenes → shotType="detail": detail framing (just the eyes, just the hands holding an object, just the feet walking). Include ONLY the relevant body part + 1 matching signature item.
+- 1-2 scenes → shotType="pov": point-of-view of the character (we see what they see — character not visible at all). Include 1 signature item naturally present in their visual field if possible.
+- Remaining scenes → shotType="absent": environment / object focus, no character. Include 1 signature item if it would naturally be in the scene (e.g. crown sitting on a table), otherwise omit.
+
+CRITICAL:
+- ALWAYS write signatureItems verbatim when ANY part of the character is visible. This is the visual anchor that makes the viewer perceive continuity.
+- DO NOT have the same shotType in two consecutive scenes. Vary to keep the cinematography dynamic.
+- DO NOT reference "the same person" or use continuity pronouns — the consistency comes from the repeated signatureItems, not from claiming identity.
+- For each scene that features a character, set characterShot.characterId to the exact id from the list and characterShot.shotType to the chosen value.
+- For scenes WITHOUT any character, omit characterShot entirely (or set characterId="" + shotType="absent").
+
+If multiple characters are defined and a scene features more than one, pick the primary one for characterShot and include both sets of signatureItems in the prompt.`;
+})()}
 
 Write text overlays separately (in ${langLabel}) — they're rendered as a distinct layer on top of the video.${styleDirective}`;
 
