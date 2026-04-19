@@ -78,11 +78,12 @@ Deno.serve(async (req) => {
 
     const { error: delErr } = await admin.auth.admin.deleteUser(userId);
     if (delErr) {
-      throw new Error(`deleteUser failed: ${delErr.message} | storage cleanup: ${JSON.stringify(storageReport)}`);
+      throw new Error(`deleteUser failed: ${delErr.message} | cleanup: ${JSON.stringify(cleanupReport)}`);
     }
 
     return new Response(JSON.stringify({
-      success: true, deletedUserId: userId, email, storageRemoved: storageReport,
+      success: true, deletedUserId: userId, email,
+      storageRemoved: storageReport, cleanup: cleanupReport,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String((e as Error).message ?? e) }), {
