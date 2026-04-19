@@ -32,6 +32,14 @@ function getMonday(date: Date): Date {
   return d;
 }
 
+export type CreatorLevel = "beginner" | "intermediate" | "advanced";
+
+const POSTS_PER_WEEK_FOR_LEVEL: Record<CreatorLevel, number> = {
+  beginner: 3,
+  intermediate: 5,
+  advanced: 7,
+};
+
 export function useStrategyMode() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -54,6 +62,57 @@ export function useStrategyMode() {
   });
 
   const enabled = !!profileQuery.data?.strategy_mode_enabled;
+
+  // Read onboarding profile (level + frequency)
+  const onboardingQuery = useQuery({
+    queryKey: ["onboarding-profile", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from("onboarding_profiles")
+        .select("experience_level, posts_per_week")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
+  const rawLevel = (onboardingQuery.data?.experience_level || "beginner").toLowerCase();
+  const experienceLevel: CreatorLevel = (["beginner", "intermediate", "advanced"].includes(rawLevel)
+    ? rawLevel
+    : "beginner") as CreatorLevel;
+  const postsPerWeek = onboardingQuery.data?.posts_per_week || POSTS_PER_WEEK_FOR_LEVEL[experienceLevel];
+
+  // Level progress: posts published + avg ER (last 28 days)
+  const progressQuery = useQuery({
+    queryKey: ["creator-level-progress", user?.id, experienceLevel],
+    queryFn: async () => {
+      if (!user) return null;
+      const since = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString();
+      const [{ data: metrics }, publishedRes, stratAllRes, stratDoneRes] = await Promise.all([
+        supabase.from("post_metrics").select("engagement_rate").eq("user_id", user.id).gte("posted_at", since),
+        supabase.from("calendar_events").select("id", { count: "exact", head: true }).eq("created_by", user.id).eq("status", "published").gte("published_at", since),
+        supabase.from("strategy_posts").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("scheduled_at", since),
+        supabase.from("strategy_posts").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "completed").gte("scheduled_at", since),
+      ]);
+      const er = (metrics || []).map((m: any) => m.engagement_rate || 0).filter((v: number) => v > 0);
+      const avgEr = er.length > 0 ? er.reduce((a, b) => a + b, 0) / er.length : 0;
+      const total = stratAllRes.count ?? 0;
+      const done = stratDoneRes.count ?? 0;
+      return {
+        postsPublished: publishedRes.count ?? 0,
+        avgEngagementRate: Number(avgEr.toFixed(2)),
+        strategyTotal: total,
+        strategyCompleted: done,
+        completionRate: total > 0 ? done / total : 0,
+      };
+    },
+    enabled: !!user && enabled,
+    staleTime: 5 * 60_000,
+  });
 
   // Current week posts
   const weekStart = getMonday(new Date()).toISOString().split("T")[0];
