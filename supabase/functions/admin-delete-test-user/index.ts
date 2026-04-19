@@ -76,9 +76,13 @@ Deno.serve(async (req) => {
       cleanupReport[`${table}.${col}`] = error ? `ERR: ${error.message}` : `deleted ${count ?? 0}`;
     }
 
-    const { error: delErr } = await admin.auth.admin.deleteUser(userId);
-    if (delErr) {
-      throw new Error(`deleteUser failed: ${delErr.message} | cleanup: ${JSON.stringify(cleanupReport)}`);
+    const { data: rpcResult, error: rpcErr } = await admin.rpc("admin_force_delete_user", { p_user_id: userId });
+    if (rpcErr) {
+      throw new Error(`RPC error: ${rpcErr.message} | cleanup: ${JSON.stringify(cleanupReport)}`);
+    }
+    const result = rpcResult as { success: boolean; sqlerrm?: string; sqlstate?: string; context?: string };
+    if (!result?.success) {
+      throw new Error(`SQL delete failed: ${result?.sqlerrm} (${result?.sqlstate}) | context: ${result?.context}`);
     }
 
     return new Response(JSON.stringify({
