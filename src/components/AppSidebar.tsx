@@ -36,9 +36,9 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar className="w-[68px] min-w-[68px] max-w-[68px] sticky top-0 h-screen" collapsible="none">
+      <Sidebar className="w-[68px] min-w-[68px] max-w-[68px] sticky top-0 h-screen self-start" collapsible="none">
         {/* Brand icon */}
-        <div className="flex flex-col items-center py-4 border-b border-border bg-card">
+        <div className="flex flex-col items-center pt-2 pb-3 border-b border-border bg-card">
           <Brand compact showText={false} />
         </div>
 
