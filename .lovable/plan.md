@@ -1,127 +1,55 @@
 
 
-## Plan: B3 Streak-Mechanik (Activation & Retention)
+User möchte Streak-Belohnungen umstellen: Statt Plattform-Credits (10/30/50/100/200/500) sollen **AI-Video-Dollar-Credits** vergeben werden — und deutlich konservativer, mit **Max 25$ beim 100-Tage-Milestone**.
 
-Letzter Activation-Baustein. Belohnt tägliche Aktivität mit visuellem Streak-Counter, Milestones und sanften Erinnerungen — schließt das Activation-Triple (Email-Drip + Push + Streak) ab.
+## Aktueller Stand
+- `record_streak_activity` ruft `increment_balance(p_user_id, v_reward)` auf → das addiert auf `wallets.balance` (Plattform-Credits, nicht USD).
+- Die richtige Funktion für AI-Video-Credits ist `add_ai_video_credits` oder direkt UPDATE auf `ai_video_wallets.balance_euros`.
+- `streak_milestones.reward_credits` (INT) speichert aktuell Credits — wir sollten die Bedeutung umwidmen auf "USD-Cent" oder eine neue Spalte `reward_dollars` (NUMERIC) ergänzen.
 
-## Konzept
+## Neue Belohnungsstaffel (Dollar)
 
-Ein User hat eine "Active Streak", wenn er an aufeinanderfolgenden Tagen mind. **eine produktive Aktion** ausführt:
-- Video erstellt (jedes Studio)
-- Post geplant (calendar_event)
-- Caption generiert
-- Social-Account verknüpft
-- Brand-Kit-Update
+| Milestone | Belohnung | Begründung |
+|---|---|---|
+| 3 Tage | $0.50 | Kleiner First-Win-Boost |
+| 7 Tage | $1.50 | Erste Woche durchgehalten |
+| 14 Tage | $3.00 | Zwei Wochen Habit |
+| 30 Tage | $7.00 | Monatsstreak — solide |
+| 60 Tage | $15.00 | Power-User |
+| 100 Tage | $25.00 | Legendärer Maximalbonus |
 
-Streak bricht, wenn ein Kalendertag (in User-Timezone, Fallback UTC) ohne Aktivität vergeht. **Grace Period:** 1 "Freeze-Token" pro Woche schützt vor versehentlichem Bruch.
+**Gesamt-Maximalkosten pro User über 100 Tage:** $52 (verteilt über >3 Monate, nur die hartnäckigsten ~1–5% erreichen alles).
 
-## 1. DB-Migration
+## Plan
 
-**Tabelle `user_streaks`** (1 Zeile pro User)
-- `user_id` (PK, FK → auth.users)
-- `current_streak` INT DEFAULT 0
-- `longest_streak` INT DEFAULT 0
-- `last_activity_date` DATE
-- `freeze_tokens` INT DEFAULT 1 (max 2)
-- `freeze_used_at` DATE (für Wochen-Reset-Logik)
-- `total_active_days` INT DEFAULT 0
-- `updated_at` TIMESTAMPTZ
+### 1. DB-Migration
+- Spalte `streak_milestones.reward_dollars` NUMERIC(10,2) DEFAULT 0 ergänzen
+- `reward_credits` bleibt für Rückwärtskompatibilität (alte Einträge), wird aber nicht mehr genutzt
+- `record_streak_activity` RPC anpassen:
+  - Neue CASE-Map auf USD-Beträge (0.50/1.50/3.00/7.00/15.00/25.00)
+  - Statt `increment_balance` → direkter UPDATE auf `ai_video_wallets.balance_euros` + Insert in `ai_video_transactions` (type='bonus', description='Streak milestone reward: X days')
+  - Falls noch kein Wallet existiert → Insert mit Defaults (currency='USD', balance_euros=v_reward_dollars)
+  - Idempotenz bleibt via Unique-Index `(user_id, milestone_days)` erhalten
 
-**Tabelle `streak_milestones`** (Achievements-Log)
-- `id`, `user_id`, `milestone_days` (3/7/14/30/60/100), `reached_at`
-- Unique-Index `(user_id, milestone_days)` → kein Doppel-Trigger
+### 2. Edge Function `process-push-reminders` / Streak-Push-Texte
+- Push-Body lokalisiert: „🔥 7-Tage-Streak! +$1.50 für AI-Videos" (DE/EN/ES) — falls bereits implementiert, Beträge anpassen.
 
-**RLS:** User darf nur eigene Daten lesen; Updates nur via SECURITY DEFINER-Funktion.
+### 3. UI Updates
+- **`StreakCard`** (Dashboard): Milestone-Liste zeigt USD-Beträge (z. B. „🏅 7 Tage — +$1.50 AI Credits")
+- **`/streak` Page**: Milestone-Tabelle mit USD-Beträgen
+- **Tooltip im StreakBadge**: „Nächster Milestone in X Tagen — $Y AI-Credits"
 
-**DB-Funktion `record_streak_activity(p_user_id uuid)`**
-- Liest `user_streaks` für User (oder erstellt Row)
-- Wenn `last_activity_date = today` → no-op (idempotent)
-- Wenn `last_activity_date = yesterday` → `current_streak +1`
-- Wenn Lücke = 1 Tag UND `freeze_tokens > 0` UND nicht in dieser Woche genutzt → Freeze konsumieren, Streak hält
-- Sonst → Streak resetten auf 1
-- Aktualisiert `longest_streak`, `total_active_days`
-- Prüft Milestone-Schwellen (3/7/14/30/60/100) → Insert in `streak_milestones`
+### 4. Localization
+- Neue/aktualisierte Keys in `de/en/es` für Dollar-Beträge und „AI-Video-Credits"-Wording.
 
-## 2. Trigger-Punkte (Frontend)
+### 5. E2E-Test
+- Manueller RPC-Aufruf (`SELECT record_streak_activity('<uid>')` mit künstlich gesetztem `last_activity_date`) für jede Milestone-Schwelle
+- Verifizieren: `ai_video_wallets.balance_euros` steigt um exakten USD-Betrag, `ai_video_transactions` hat passenden Bonus-Eintrag
+- Toast/Push erscheint mit korrektem Betrag
 
-Hook `useStreakTracker` mit Funktion `trackActivity()`. Wird in folgenden Erfolgs-Events aufgerufen (nach erfolgreichem DB-Insert):
-- `useGettingStartedProgress`-Quellen (video_creations, calendar_events, social_connections, brand_kits)
-- Caption Generator (nach Save)
-- Post-Publish-Bestätigungen
+## Aufwand: ~30 min
 
-Aufruf via `supabase.rpc('record_streak_activity', { p_user_id: user.id })` — fire-and-forget, kein Toast-Spam.
-
-## 3. Wöchentlicher Freeze-Token-Refill (Cron)
-
-Edge Function `refresh-streak-freeze-tokens`
-- Sonntags 23:00 UTC via pg_cron
-- Setzt `freeze_tokens = LEAST(freeze_tokens + 1, 2)` für alle aktiven User
-- Resettet `freeze_used_at = NULL` wenn älter als 7 Tage
-
-## 4. Streak-Bruch-Detection (Cron)
-
-Edge Function `check-streak-breaks`
-- Täglich 02:00 UTC via pg_cron
-- Findet User mit `last_activity_date < today - 1 day` UND `current_streak > 0`
-- Falls Freeze verfügbar → konsumieren, Streak hält
-- Sonst → `current_streak = 0`
-- Optional: Push-Notification "Deine X-Tage-Streak ist in Gefahr ⚡" am Vorabend (22:00, wenn `last_activity_date = today - 1` und kein heutiges Event) — hängt von `notification_preferences.reminder_pushes_enabled`
-
-## 5. Milestone-Belohnungen
-
-Wenn `streak_milestones`-Insert triggert:
-- Toast/Confetti im UI (Realtime-Subscribe auf eigene Streaks)
-- Push-Notification "🔥 7-Tage-Streak erreicht!" (lokalisiert DE/EN/ES)
-- Optional: Bonus-Credits (z. B. 30/7-Tage, 100/30-Tage) via existierender `increment_balance`-Funktion
-
-## 6. UI-Komponenten
-
-**`StreakBadge`** (Sidebar/Header)
-- Flammen-Icon + Zahl (z. B. "🔥 7")
-- Hover-Tooltip: "7 Tage in Folge — noch 7 für nächste Belohnung"
-- Click → `/streak` Detail-Page
-
-**`StreakCard`** im Dashboard (in der Nähe von `GettingStartedChecklist`)
-- Aktueller Streak, Longest, Total Active Days
-- Mini-Heatmap der letzten 30 Tage (CSS-Grid)
-- Freeze-Token-Anzeige (🛡️ x1)
-- "Nächster Milestone in X Tagen"
-
-**Optional `/streak` Page** (low priority — kann B4 werden)
-- Volle Heatmap-Historie + Milestone-Liste
-
-## 7. Localization
-
-Neue Keys in `de/en/es` für: Streak-Badge, Milestone-Texte, Push-Notifications, Tooltips.
-
-## Aufwand
-
-| Schritt | Zeit |
-|---|---|
-| DB-Migration + RPC `record_streak_activity` | 20 min |
-| Hook `useStreakTracker` + Trigger-Integration (5 Punkte) | 25 min |
-| Edge Functions (refresh + check) + Cron | 20 min |
-| `StreakBadge` (Sidebar) | 15 min |
-| `StreakCard` (Dashboard, mit Heatmap) | 25 min |
-| Milestone-Push-Texte (3×3) + Realtime-Toast | 15 min |
-| Localization | 10 min |
-| E2E-Test (Streak +1, Freeze, Milestone) | 20 min |
-| **Gesamt** | **~2.5h** |
-
-## Was wir NICHT machen
-
-- ❌ Public Leaderboard (gehört in C1, nicht Activation)
-- ❌ NFT/Token-Belohnungen
-- ❌ Eigenes Animation-Framework — nutzen `framer-motion` (bereits installiert) für Confetti/Pulse
-
-## Reihenfolge nach Approval
-
-1. Migration + RPC
-2. Hook + Trigger-Integration
-3. Cron-Edge-Functions
-4. UI-Komponenten (Badge + Card)
-5. Push-Texte + Localization
-6. E2E-Test (manueller RPC-Call mit Datum-Manipulation)
-
-Damit ist die **Activation-Phase (B1+B2+B3) komplett**: Email-Drip → Push-Reminder → Streak-Loop. Danach gehen wir an Phase C (Retention/Monetization).
+## Hinweis
+- Bestehende Streak-Milestones (falls schon User welche erreicht haben): `reward_credits` bleibt historisch erhalten, neue Milestones bekommen `reward_dollars` — keine Rückwirkung.
+- AI-Video-Wallet nutzt das Feld `balance_euros` aber speichert je nach `currency` USD oder EUR. Da Streak-Belohnungen in USD definiert werden, setzen wir bei Wallet-Erstellung `currency='USD'`. Bei existierenden EUR-Wallets vergeben wir den gleichen numerischen Betrag (ein User mit EUR-Wallet bekommt also „1.50 EUR" statt „1.50 USD" — der Differenzbetrag ist marginal und vereinfacht die Logik massiv).
 
