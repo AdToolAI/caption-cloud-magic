@@ -8294,10 +8294,12 @@ export type Database = {
           id: string
           media_urls: string[] | null
           original_scheduled_at: string | null
+          phase: string | null
           platform: string
           reasoning: string | null
           scheduled_at: string
           status: string
+          tips: string[] | null
           updated_at: string
           user_id: string
           week_start: string
@@ -8314,10 +8316,12 @@ export type Database = {
           id?: string
           media_urls?: string[] | null
           original_scheduled_at?: string | null
+          phase?: string | null
           platform: string
           reasoning?: string | null
           scheduled_at: string
           status?: string
+          tips?: string[] | null
           updated_at?: string
           user_id: string
           week_start: string
@@ -8334,10 +8338,12 @@ export type Database = {
           id?: string
           media_urls?: string[] | null
           original_scheduled_at?: string | null
+          phase?: string | null
           platform?: string
           reasoning?: string | null
           scheduled_at?: string
           status?: string
+          tips?: string[] | null
           updated_at?: string
           user_id?: string
           week_start?: string
