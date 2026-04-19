@@ -185,15 +185,15 @@ export const ProductTour = () => {
         next: copy.next,
         skip: copy.skip,
       }}
+      options={{
+        arrowColor: "hsl(240 14% 6%)",
+        backgroundColor: "hsl(240 14% 6%)",
+        primaryColor: "hsl(43 90% 68%)",
+        textColor: "hsl(0 0% 98%)",
+        overlayColor: "rgba(5, 8, 22, 0.75)",
+        zIndex: 10000,
+      }}
       styles={{
-        options: {
-          arrowColor: "hsl(240 14% 6%)",
-          backgroundColor: "hsl(240 14% 6%)",
-          primaryColor: "hsl(43 90% 68%)",
-          textColor: "hsl(0 0% 98%)",
-          overlayColor: "rgba(5, 8, 22, 0.75)",
-          zIndex: 10000,
-        },
         tooltip: {
           borderRadius: 16,
           padding: 20,
@@ -212,7 +212,7 @@ export const ProductTour = () => {
           lineHeight: 1.55,
           padding: "4px 0",
         },
-        buttonNext: {
+        buttonPrimary: {
           backgroundColor: "hsl(43 90% 68%)",
           color: "hsl(240 14% 6%)",
           borderRadius: 10,
@@ -233,7 +233,6 @@ export const ProductTour = () => {
         buttonClose: {
           display: "none",
         },
-        // spotlight is an SVGPath in v3 — basic styling via overlay handles the rest
       }}
     />
   );
