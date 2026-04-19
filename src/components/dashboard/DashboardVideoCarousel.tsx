@@ -325,7 +325,7 @@ export const DashboardVideoCarousel = ({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} />
+          <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} nextPost={nextPost} onOpenNextPost={openNextPost} />
           {quickActions.length > 0 && (
             <div className="flex items-center gap-1.5 ml-auto">
               {quickActions.map((action, i) => (
@@ -428,7 +428,7 @@ export const DashboardVideoCarousel = ({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2 py-1 flex-wrap">
-        <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} />
+        <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} nextPost={nextPost} onOpenNextPost={openNextPost} />
         <div className="flex items-center gap-1.5">
           {quickActions.map((action, i) => (
             <Button key={i} asChild variant={action.variant || 'outline'} size="sm" className="h-7 px-2.5 text-xs rounded-lg gap-1.5">
