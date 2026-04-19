@@ -7,9 +7,18 @@ import { LongFormWizard } from '@/components/sora-long-form/LongFormWizard';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
+import { Sora2ComingSoonGate } from '@/components/sora2/Sora2ComingSoonGate';
 import type { Sora2LongFormProject, Sora2Scene } from '@/types/sora-long-form';
 
 export default function Sora2LongFormCreator() {
+  return (
+    <Sora2ComingSoonGate>
+      <Sora2LongFormCreatorInner />
+    </Sora2ComingSoonGate>
+  );
+}
+
+function Sora2LongFormCreatorInner() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useTranslation();
