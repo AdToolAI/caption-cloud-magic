@@ -117,17 +117,37 @@ serve(async (req) => {
       customerId = customer.id;
     }
 
+    // Apply 19% German VAT only for EUR purchases (DE tax law)
+    const TAX_RATE_ID = Deno.env.get("STRIPE_TAX_RATE_19_PCT");
+    const applyTaxRate = currency === 'EUR' && TAX_RATE_ID;
+
     // Create Checkout Session using Stripe Price ID
+    // invoice_creation forces a full PDF invoice with VAT breakdown (instead of a basic receipt)
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       line_items: [
         {
           price: priceId,
           quantity: 1,
+          tax_rates: applyTaxRate ? [TAX_RATE_ID] : undefined,
         },
       ],
       mode: 'payment',
       currency: currency.toLowerCase(),
+      invoice_creation: {
+        enabled: true,
+        invoice_data: {
+          description: `AI Video Credits - ${packId.charAt(0).toUpperCase() + packId.slice(1)} Pack`,
+          metadata: {
+            user_id: user.id,
+            pack_id: packId,
+            type: 'ai_video_credits',
+          },
+          footer: currency === 'EUR' 
+            ? 'Alle Preise inkl. 19% MwSt. (Deutschland). Vielen Dank für Ihren Einkauf.'
+            : 'Thank you for your purchase.',
+        },
+      },
       success_url: `${req.headers.get("origin")}/ai-video-studio?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin")}/ai-video-studio?payment=canceled`,
       metadata: {
@@ -137,6 +157,7 @@ serve(async (req) => {
         base_amount: pack.price.toString(),
         bonus_amount: pack.bonus.toString(),
         bonus_percent: pack.bonusPercent.toString(),
+        type: 'ai_video_credits',
       },
     });
 
