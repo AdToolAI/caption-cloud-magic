@@ -140,17 +140,21 @@ export const DashboardVideoCarousel = ({
   tipLabel,
   nextPostLabel,
   nextPostPrefix,
+  nextPost,
 }: DashboardVideoCarouselProps) => {
   const { videos, isLoading } = useVideoHistory();
   const { t, language } = useTranslation();
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [nextPostDialogOpen, setNextPostDialogOpen] = useState(false);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const [errorVideos, setErrorVideos] = useState<Set<string>>(new Set());
   const [retriedVideos, setRetriedVideos] = useState<Set<string>>(new Set());
   const [isMuted, setIsMuted] = useState(true);
   const wheelTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const openNextPost = useCallback(() => setNextPostDialogOpen(true), []);
 
   const sortedVideos = useMemo(() =>
     [...videos]
