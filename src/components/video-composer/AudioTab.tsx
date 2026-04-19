@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
@@ -43,6 +44,7 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
   const [searchingMusic, setSearchingMusic] = useState(false);
   const [musicResults, setMusicResults] = useState<MusicTrack[]>([]);
   const [musicPlaying, setMusicPlaying] = useState<string | null>(null);
+  const [musicQuery, setMusicQuery] = useState('');
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Beat sync state
@@ -138,8 +140,10 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
     if (!music) return;
     setSearchingMusic(true);
     try {
+      // Free-text query takes precedence; fallback to genre+mood combo
+      const effectiveQuery = musicQuery.trim() || `${music.genre} ${music.mood}`;
       const { data, error } = await supabase.functions.invoke('search-stock-music', {
-        body: { query: `${music.genre} ${music.mood}`, mood: music.mood, genre: music.genre },
+        body: { query: effectiveQuery, mood: music.mood, genre: music.genre },
       });
       if (error) throw error;
       const tracks: MusicTrack[] = (data?.results || []).map((tr: any) => ({
@@ -235,6 +239,28 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
         </CardHeader>
         {music?.enabled && (
           <CardContent className="space-y-4">
+            {/* Free-text search */}
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1">
+                <Search className="h-3 w-3" /> {t('videoComposer.musicSearchLabel') || 'Suchen (Titel, Künstler, Stichwort)'}
+              </Label>
+              <Input
+                value={musicQuery}
+                onChange={(e) => setMusicQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearchMusic();
+                  }
+                }}
+                placeholder={t('videoComposer.musicSearchPlaceholder') || 'z.B. Beach Sunset, Lofi Chill, Hans Zimmer...'}
+                className="bg-background/50 h-9"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                {t('videoComposer.musicSearchHint') || 'Leer lassen, um nach Genre + Stimmung zu suchen.'}
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs">{t('videoComposer.genre')}</Label>
@@ -272,7 +298,7 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
 
             <Button onClick={handleSearchMusic} disabled={searchingMusic} variant="outline" className="w-full gap-2">
               {searchingMusic ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              {searchingMusic ? t('videoComposer.searching') : t('videoComposer.searchMusic')}
+              {searchingMusic ? t('videoComposer.searching') : (musicQuery.trim() ? (t('videoComposer.searchByQuery') || `Suche „${musicQuery.trim()}"`) : t('videoComposer.searchMusic'))}
             </Button>
 
             {musicResults.length > 0 && (
