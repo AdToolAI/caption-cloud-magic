@@ -232,6 +232,62 @@ export function useStrategyMode() {
     },
   });
 
+  // Manual level override (also pauses auto-upgrade for 14 days)
+  const setLevelMutation = useMutation({
+    mutationFn: async (newLevel: CreatorLevel) => {
+      if (!user) throw new Error("not authenticated");
+      const newPostsPerWeek = POSTS_PER_WEEK_FOR_LEVEL[newLevel];
+      const pauseUntil = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+      const prevLevel = experienceLevel;
+      const { error: e1 } = await supabase
+        .from("onboarding_profiles")
+        .update({ experience_level: newLevel, posts_per_week: newPostsPerWeek })
+        .eq("user_id", user.id);
+      if (e1) throw e1;
+
+      const { error: e2 } = await supabase
+        .from("profiles")
+        .update({ level_auto_pause_until: pauseUntil })
+        .eq("id", user.id);
+      if (e2) throw e2;
+
+      await supabase.from("creator_level_history").insert({
+        user_id: user.id,
+        level_from: prevLevel,
+        level_to: newLevel,
+        trigger: "manual",
+        reason: "Manual override by creator",
+        metrics_snapshot: {},
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["onboarding-profile"] });
+      qc.invalidateQueries({ queryKey: ["creator-level-progress"] });
+      toast.success("Level aktualisiert");
+    },
+    onError: (e: any) => toast.error(e?.message || "Fehler beim Aktualisieren"),
+  });
+
+  // Compute progress to next level
+  const next = experienceLevel === "beginner" ? "intermediate" : experienceLevel === "intermediate" ? "advanced" : null;
+  const thresholds = next === "intermediate"
+    ? { posts: 8, er: 2.5, completion: 0.6 }
+    : next === "advanced"
+    ? { posts: 16, er: 4.5, completion: 0.7 }
+    : null;
+  const progress = progressQuery.data;
+  const levelProgress = next && thresholds && progress ? {
+    nextLevel: next as CreatorLevel,
+    postsNeeded: Math.max(0, thresholds.posts - progress.postsPublished),
+    erNeeded: Math.max(0, Number((thresholds.er - progress.avgEngagementRate).toFixed(2))),
+    completionNeeded: Math.max(0, Number(((thresholds.completion - progress.completionRate) * 100).toFixed(0))),
+    postsPublished: progress.postsPublished,
+    avgEr: progress.avgEngagementRate,
+    completionRate: progress.completionRate,
+    thresholds,
+  } : null;
+
   return {
     enabled,
     activatedAt: profileQuery.data?.strategy_mode_activated_at,
@@ -239,6 +295,9 @@ export function useStrategyMode() {
     posts: postsQuery.data || [],
     isLoadingPosts: postsQuery.isLoading,
     weekStart,
+    experienceLevel,
+    postsPerWeek,
+    levelProgress,
     toggle: toggleMutation.mutate,
     isToggling: toggleMutation.isPending,
     regenerate: regenerateMutation.mutate,
@@ -246,5 +305,7 @@ export function useStrategyMode() {
     dismiss: dismissMutation.mutate,
     reschedule: rescheduleMutation.mutate,
     complete: completeMutation.mutate,
+    setLevel: setLevelMutation.mutate,
+    isSettingLevel: setLevelMutation.isPending,
   };
 }
