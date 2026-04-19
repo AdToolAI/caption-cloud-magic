@@ -422,6 +422,7 @@ export const DashboardVideoCarousel = ({
             title={selectedVideo.title}
           />
         )}
+        <NextPostDialog open={nextPostDialogOpen} onOpenChange={setNextPostDialogOpen} nextPost={nextPost} whenLabel={nextPostLabel} title={nextPostPrefix} />
       </div>
     );
   }
