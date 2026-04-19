@@ -33,6 +33,7 @@ import { WeekStrategyTimeline } from "@/components/dashboard/WeekStrategyTimelin
 import { useStrategyMode } from "@/hooks/useStrategyMode";
 import { Switch } from "@/components/ui/switch";
 import { Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Post {
   id: string;
