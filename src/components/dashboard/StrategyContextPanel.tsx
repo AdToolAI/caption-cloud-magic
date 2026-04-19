@@ -1,5 +1,7 @@
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Sparkles, Lightbulb, TrendingUp, Brain, Target } from "lucide-react";
+import { MapPin, Sparkles, Lightbulb, TrendingUp, Brain, Target, Clock, Flame } from "lucide-react";
+import { format } from "date-fns";
+import { de } from "date-fns/locale";
 import type { StrategyPost, CreatorLevel } from "@/hooks/useStrategyMode";
 
 interface Props {
