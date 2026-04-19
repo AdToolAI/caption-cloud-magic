@@ -174,18 +174,18 @@ export const ProductTour = () => {
     <Joyride
       steps={steps}
       continuous
-      showProgress
-      showSkipButton
-      scrollToFirstStep
       onEvent={handleEvent}
-      locale={{
-        back: copy.back,
-        close: copy.last,
-        last: copy.last,
-        next: copy.next,
-        skip: copy.skip,
-      }}
       options={{
+        arrowColor: "hsl(240 14% 6%)",
+        backgroundColor: "hsl(240 14% 6%)",
+        primaryColor: "hsl(43 90% 68%)",
+        textColor: "hsl(0 0% 98%)",
+        overlayColor: "rgba(5, 8, 22, 0.75)",
+        zIndex: 10000,
+        showProgress: true,
+        showSkipButton: true,
+        scrollToFirstStep: true,
+      }}
         arrowColor: "hsl(240 14% 6%)",
         backgroundColor: "hsl(240 14% 6%)",
         primaryColor: "hsl(43 90% 68%)",
