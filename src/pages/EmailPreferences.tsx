@@ -13,6 +13,7 @@ const COPY: Record<Lang, {
   title: string; desc: string; loading: string; invalid: string; back: string;
   toggleLabel: string; toggleDesc: string; saved: string; error: string;
   unsubscribed: string; resubscribed: string; quickUnsub: string;
+  pushLabel: string; pushDesc: string;
 }> = {
   en: {
     title: "Email preferences",
@@ -27,6 +28,8 @@ const COPY: Record<Lang, {
     unsubscribed: "You have been unsubscribed.",
     resubscribed: "You are subscribed again.",
     quickUnsub: "Unsubscribe from all reminders",
+    pushLabel: "Browser push reminders",
+    pushDesc: "Short browser notifications during your first week (requires permission).",
   },
   de: {
     title: "E-Mail-Einstellungen",
@@ -41,6 +44,8 @@ const COPY: Record<Lang, {
     unsubscribed: "Du wurdest abgemeldet.",
     resubscribed: "Du bist wieder angemeldet.",
     quickUnsub: "Von allen Erinnerungen abmelden",
+    pushLabel: "Browser-Push-Erinnerungen",
+    pushDesc: "Kurze Browser-Benachrichtigungen in deiner ersten Woche (Berechtigung erforderlich).",
   },
   es: {
     title: "Preferencias de correo",
@@ -55,6 +60,8 @@ const COPY: Record<Lang, {
     unsubscribed: "Te has dado de baja.",
     resubscribed: "Te has suscrito de nuevo.",
     quickUnsub: "Darse de baja de todos los recordatorios",
+    pushLabel: "Recordatorios push del navegador",
+    pushDesc: "Notificaciones cortas durante tu primera semana (requiere permiso).",
   },
 };
 
