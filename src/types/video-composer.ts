@@ -89,6 +89,8 @@ export interface ComposerBriefing {
   defaultQuality?: ClipQuality;
   /** Visual style applied to every AI-generated scene (Comic, Realistic, Cinematic, …). */
   visualStyle?: ComposerVisualStyle;
+  /** Recurring characters that should look consistent across scenes. */
+  characters?: ComposerCharacter[];
 }
 
 export interface ComposerScene {
@@ -105,6 +107,8 @@ export interface ComposerScene {
   uploadType?: 'video' | 'image';
   /** Optional reference image used as a visual guide for AI sources (image-to-video). */
   referenceImageUrl?: string;
+  /** Optional shot-strategy hint for character continuity. */
+  characterShot?: CharacterShot;
   clipUrl?: string;
   clipStatus: ClipStatus;
   textOverlay: TextOverlayConfig;
