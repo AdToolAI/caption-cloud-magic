@@ -233,10 +233,7 @@ export const ProductTour = () => {
         buttonClose: {
           display: "none",
         },
-        spotlight: {
-          borderRadius: 14,
-          boxShadow: "0 0 0 4px hsla(43, 90%, 68%, 0.35)",
-        },
+        // spotlight is an SVGPath in v3 — basic styling via overlay handles the rest
       }}
     />
   );
