@@ -29,6 +29,11 @@ import { NicheTutorialModal } from "@/components/onboarding/NicheTutorialModal";
 import { type WeekPost } from "@/components/dashboard/WeekDayCard";
 import { WeekTimelineDay } from "@/components/dashboard/WeekTimelineDay";
 import { WeekPostEditor } from "@/components/dashboard/WeekPostEditor";
+import { WeekStrategyTimeline } from "@/components/dashboard/WeekStrategyTimeline";
+import { useStrategyMode } from "@/hooks/useStrategyMode";
+import { Switch } from "@/components/ui/switch";
+import { Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Post {
   id: string;
@@ -569,34 +574,53 @@ const Home = () => {
         })()}
 
         {/* Week Calendar */}
-        {user && (
-          <Section 
-            title={t("dashboard.sections.thisWeek")}
-            description={t("dashboard.sections.thisWeekDescription")}
-            action={
-              <Button asChild variant="link">
-                <Link to="/calendar">
-                  {t("homePage.planInCalendar")} →
-                </Link>
-              </Button>
-            }
-          >
-            <div className="flex items-start gap-2 overflow-x-auto pb-2 justify-between">
-              {weekDays.map(day => (
-                <WeekTimelineDay
-                  key={day.date}
-                  date={day.date}
-                  dayName={day.name}
-                  dayNumber={day.day}
-                  isToday={day.isToday}
-                  posts={day.posts}
-                  onRingClick={handleEditPost}
-                  onAddPost={handleAddPost}
-                />
-              ))}
-            </div>
-          </Section>
-        )}
+        {user && (() => {
+          const sm = useStrategyMode();
+          return (
+            <Section 
+              title={t("dashboard.sections.thisWeek")}
+              description={sm.enabled ? "Dein KI-Co-Pilot — neue Vorschläge jede Woche, automatisch." : t("dashboard.sections.thisWeekDescription")}
+              action={
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                    <Sparkles className={cn("h-3.5 w-3.5", sm.enabled && "text-warning")} />
+                    Strategie-Modus
+                    <Switch
+                      checked={sm.enabled}
+                      onCheckedChange={(v) => sm.toggle(v)}
+                      disabled={sm.isToggling}
+                    />
+                  </label>
+                  <Button asChild variant="link">
+                    <Link to="/calendar">
+                      {t("homePage.planInCalendar")} →
+                    </Link>
+                  </Button>
+                </div>
+              }
+            >
+              {sm.enabled ? (
+                <WeekStrategyTimeline weekStart={sm.weekStart} />
+              ) : (
+                <div className="flex items-start gap-2 overflow-x-auto pb-2 justify-between">
+                  {weekDays.map(day => (
+                    <WeekTimelineDay
+                      key={day.date}
+                      date={day.date}
+                      dayName={day.name}
+                      dayNumber={day.day}
+                      isToday={day.isToday}
+                      posts={day.posts}
+                      onRingClick={handleEditPost}
+                      onAddPost={handleAddPost}
+                    />
+                  ))}
+                </div>
+              )}
+            </Section>
+          );
+        })()}
+
 
         {/* Week Post Editor */}
         <WeekPostEditor
