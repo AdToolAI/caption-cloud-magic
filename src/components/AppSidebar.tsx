@@ -107,9 +107,8 @@ export function AppSidebar() {
               );
             })}
           </SidebarMenu>
-        </SidebarContent>
+        </div>
 
-        <SidebarRail className="hover:after:bg-primary/40 transition-colors" />
       </Sidebar>
     </>
   );
