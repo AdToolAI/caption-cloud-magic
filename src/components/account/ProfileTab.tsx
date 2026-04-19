@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User, Mail, Phone, CheckCircle2, AlertCircle, Save } from "lucide-react";
+import { Loader2, User, Mail, Phone, CheckCircle2, AlertCircle, Save, Bell } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const profileSchema = z.object({
@@ -144,8 +145,100 @@ export const ProfileTab = () => {
         </CardContent>
       </Card>
 
+      <DripEmailToggleCard />
       <RestartTourCard />
     </motion.div>
+  );
+};
+
+const dripCopy: Record<string, { title: string; desc: string; label: string; sublabel: string; saved: string; error: string }> = {
+  en: {
+    title: "Email reminders",
+    desc: "Onboarding tips during your first week.",
+    label: "Receive onboarding reminders",
+    sublabel: "Up to 3 helpful emails (day 1, 3, 7) to help you set up.",
+    saved: "Preferences updated",
+    error: "Could not update preferences",
+  },
+  de: {
+    title: "E-Mail-Erinnerungen",
+    desc: "Onboarding-Tipps in deiner ersten Woche.",
+    label: "Onboarding-Erinnerungen erhalten",
+    sublabel: "Bis zu 3 hilfreiche E-Mails (Tag 1, 3, 7) für deinen Start.",
+    saved: "Einstellungen aktualisiert",
+    error: "Einstellungen konnten nicht aktualisiert werden",
+  },
+  es: {
+    title: "Recordatorios por correo",
+    desc: "Consejos de incorporación durante tu primera semana.",
+    label: "Recibir recordatorios de incorporación",
+    sublabel: "Hasta 3 correos útiles (día 1, 3, 7) para tu configuración.",
+    saved: "Preferencias actualizadas",
+    error: "No se pudieron actualizar las preferencias",
+  },
+};
+
+const DripEmailToggleCard = () => {
+  const { user } = useAuth();
+  const { language } = useTranslation();
+  const { toast } = useToast();
+  const copy = dripCopy[language] || dripCopy.en;
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("drip_emails_enabled")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setEnabled(data?.drip_emails_enabled ?? true);
+      });
+  }, [user]);
+
+  const onChange = async (next: boolean) => {
+    if (!user) return;
+    setSaving(true);
+    const prev = enabled;
+    setEnabled(next);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ drip_emails_enabled: next })
+      .eq("id", user.id);
+    setSaving(false);
+    if (error) {
+      setEnabled(prev);
+      toast({ title: copy.error, description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: copy.saved });
+    }
+  };
+
+  return (
+    <Card className="mt-6 bg-card/60 backdrop-blur-xl border-white/10">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Bell className="h-4 w-4 text-primary" />
+          {copy.title}
+        </CardTitle>
+        <CardDescription>{copy.desc}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-start justify-between gap-4 p-4 rounded-lg border border-white/10 bg-muted/10">
+          <div className="space-y-1">
+            <div className="font-medium text-sm">{copy.label}</div>
+            <div className="text-xs text-muted-foreground">{copy.sublabel}</div>
+          </div>
+          <Switch
+            checked={enabled ?? true}
+            onCheckedChange={onChange}
+            disabled={saving || enabled === null}
+          />
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
