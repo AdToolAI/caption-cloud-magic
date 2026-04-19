@@ -381,6 +381,9 @@ Generate the storyboard using the create_storyboard function.`;
       transitionDuration: 0.5,
       retryCount: 0,
       costEuros: 1.2, // Default Hailuo cost
+      ...(s.characterShot && s.characterShot.shotType
+        ? { characterShot: { characterId: s.characterShot.characterId || "", shotType: s.characterShot.shotType } }
+        : {}),
     }));
 
     return new Response(JSON.stringify({ scenes, sceneCount: scenes.length }), {
