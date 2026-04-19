@@ -247,6 +247,7 @@ export const DEFAULT_BRIEFING: ComposerBriefing = {
   brandColors: [],
   defaultQuality: 'standard',
   visualStyle: 'realistic',
+  characters: [],
 };
 
 export const DEFAULT_SUBTITLES_CONFIG: SubtitlesConfig = {
