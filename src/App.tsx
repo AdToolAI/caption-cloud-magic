@@ -9,7 +9,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useAnalyticsSync } from "@/hooks/useAnalyticsSync";
 import { useSessionTracking } from "@/hooks/useSessionTracking";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/AppSidebar";
+
 import { Header } from "@/components/Header";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { Loader2 } from "lucide-react";
