@@ -239,6 +239,28 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
         </CardHeader>
         {music?.enabled && (
           <CardContent className="space-y-4">
+            {/* Free-text search */}
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1">
+                <Search className="h-3 w-3" /> {t('videoComposer.musicSearchLabel') || 'Suchen (Titel, Künstler, Stichwort)'}
+              </Label>
+              <Input
+                value={musicQuery}
+                onChange={(e) => setMusicQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearchMusic();
+                  }
+                }}
+                placeholder={t('videoComposer.musicSearchPlaceholder') || 'z.B. Beach Sunset, Lofi Chill, Hans Zimmer...'}
+                className="bg-background/50 h-9"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                {t('videoComposer.musicSearchHint') || 'Leer lassen, um nach Genre + Stimmung zu suchen.'}
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs">{t('videoComposer.genre')}</Label>
@@ -276,7 +298,7 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
 
             <Button onClick={handleSearchMusic} disabled={searchingMusic} variant="outline" className="w-full gap-2">
               {searchingMusic ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              {searchingMusic ? t('videoComposer.searching') : t('videoComposer.searchMusic')}
+              {searchingMusic ? t('videoComposer.searching') : (musicQuery.trim() ? (t('videoComposer.searchByQuery') || `Suche „${musicQuery.trim()}"`) : t('videoComposer.searchMusic'))}
             </Button>
 
             {musicResults.length > 0 && (
