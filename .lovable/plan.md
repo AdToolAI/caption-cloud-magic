@@ -1,34 +1,42 @@
 
 
-## Plan: Komplette Status-Bar-Zeile auf halbe Höhe reduzieren
+## Plan: Doppelte Scrollbar entfernen — nur eine globale Scrollbar
 
 ### Diagnose
-Die Status-Bar auf `/` (Home.tsx) enthält nebeneinander: **CreditBalance**, **NotificationBell**, **WeatherWidget** etc. — alle ~230px hoch. Ziel: gesamte Zeile auf ~115px halbieren.
+Im Screenshot sind **zwei vertikale Scrollbars** sichtbar:
+1. **Browser-Scrollbar ganz rechts** (für die Page)
+2. **Sidebar-Scrollbar** direkt links daneben — kommt aus `SidebarContent` in `src/components/ui/sidebar.tsx` Z. 334:
+   ```
+   "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden ..."
+   ```
+   Da `AppSidebar` `h-screen` ist und die Hub-Icons fast immer in den Viewport passen, ist die zweite Scrollbar überflüssig und optisch störend.
 
-### Vorgehen
-Ich muss zuerst sehen, welche Komponenten in der Zeile sind und wie sie strukturiert sind, um die Höhen einheitlich zu reduzieren.
+### Fix — minimal, nur in `src/components/AppSidebar.tsx`
 
-### Geplante Änderungen
+In Z. 45 die `SidebarContent`-Klasse erweitern, sodass die Scrollbar dort visuell **versteckt** wird (Inhalt bleibt scrollbar bei Bedarf, aber kein sichtbarer Track):
 
-**1. `src/pages/Home.tsx` (Status-Bar-Container)**
-- Falls `min-h-*` oder feste Höhe gesetzt ist → halbieren
-- Grid-Gap ggf. von `gap-6` → `gap-3`
+Aktuell:
+```tsx
+<SidebarContent className="bg-card border-r border-border h-full flex flex-col items-center py-3 gap-1">
+```
 
-**2. `src/components/credits/CreditBalance.tsx`**
-- `CardHeader`/`CardContent` Padding: `p-6` → `p-3`
-- Enterprise-Block: `InfinityIcon` `h-16 w-16` → `h-7 w-7`
-- Header + Infinity-Block in **eine Zeile** legen
-- Plan-Badge inline neben Title (nicht `mt-2`)
-- Free/Basic/Pro: Schrift `text-5xl` → `text-3xl`, Progress-Bar `h-3` → `h-2`
+Neu:
+```tsx
+<SidebarContent className="bg-card border-r border-border h-full flex flex-col items-center py-3 gap-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+```
 
-**3. Alle anderen Karten in der Zeile (NotificationBell, WeatherWidget, etc.)**
-- Padding und Innenabstände parallel reduzieren, damit alle Karten dieselbe (halbierte) Höhe haben
-- Icons/Fonts proportional verkleinern
+- `[&::-webkit-scrollbar]:hidden` → versteckt Scrollbar in Chrome/Safari/Edge
+- `[scrollbar-width:none]` → versteckt Scrollbar in Firefox
+- Funktional bleibt Scrollen erhalten (Mausrad/Touch), nur die Track-Anzeige verschwindet
+
+### Wirkung auf andere Seiten
+Die User hat erwähnt, das Problem tritt **auch auf anderen Seiten** auf. Da die Sidebar global ist (`AppSidebar`), wirkt der Fix automatisch auf **allen Seiten mit Sidebar**.
 
 ### Was NICHT geändert wird
-- Inhalte, Daten, Glow/Border/Animationen, James-Bond-2028-Styling
-- Keine Logik
+- `src/components/ui/sidebar.tsx` (shadcn-Komponente bleibt unangetastet — Override per Tailwind-Arbitrary-Class)
+- Sidebar-Funktionalität, Inhalt, Styling
+- Globale Page-Scrollbar bleibt (das ist die richtige/erwartete)
 
 ### Risiko
-Niedrig. Reine CSS/Layout-Anpassung über mehrere Karten in einer Zeile.
+Null. Reine CSS-Anpassung, scoped über Tailwind-Selektor auf eine Komponente.
 
