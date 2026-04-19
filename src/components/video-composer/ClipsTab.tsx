@@ -4,9 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Search, Film, DollarSign, Sparkles } from 'lucide-react';
+import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Search, Film, DollarSign, Sparkles, Lightbulb, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
 import { SceneClipProgress } from './SceneClipProgress';
@@ -36,6 +46,16 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
   const [stockResults, setStockResults] = useState<Record<string, any[]>>({});
   const [searchingStock, setSearchingStock] = useState<Record<string, boolean>>({});
   const [previousStatuses, setPreviousStatuses] = useState<Record<string, string>>({});
+  const [rerollHintDismissed, setRerollHintDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('composer-reroll-hint-dismissed') === '1';
+  });
+  const [rerollTarget, setRerollTarget] = useState<ComposerScene | null>(null);
+
+  const dismissRerollHint = () => {
+    setRerollHintDismissed(true);
+    try { localStorage.setItem('composer-reroll-hint-dismissed', '1'); } catch {}
+  };
 
   const allReady = scenes.every((s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && s.uploadUrl));
   const readyCount = scenes.filter((s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && s.uploadUrl)).length;
@@ -325,6 +345,24 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto">
+      {/* Re-Roll Hint Banner */}
+      {!rerollHintDismissed && scenes.some(s => s.clipSource.startsWith('ai-')) && (
+        <div className="relative p-3 rounded-lg border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-500/5 flex items-start gap-3">
+          <Lightbulb className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 text-[11px] text-foreground/90 leading-relaxed">
+            <span className="font-semibold text-amber-300">Nicht zufrieden mit einer Szene?</span>{' '}
+            Klicke auf <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium"><RefreshCw className="h-2.5 w-2.5" />Neu generieren</span> bei einer fertigen Szene, um sie erneut zu erstellen — jeder Re-Roll kostet erneut Credits, aber du kannst Stil, Prompt oder Charakter-Shot vorher anpassen.
+          </div>
+          <button
+            onClick={dismissRerollHint}
+            className="flex-shrink-0 text-amber-400/60 hover:text-amber-300 transition-colors"
+            aria-label="Hinweis schließen"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Summary Bar with Progress */}
       <div className="p-3 rounded-lg bg-card/60 border border-border/40 space-y-2">
         <div className="flex items-center justify-between">
@@ -369,7 +407,50 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           </div>
         </div>
         <Progress value={progressPercent} className="h-1.5" />
+        <p className="text-[10px] text-muted-foreground/70 italic">
+          Credits werden pro Generierung abgezogen — Re-Rolls kosten erneut.
+        </p>
       </div>
+
+      {/* Re-Roll Confirmation Dialog */}
+      <AlertDialog open={!!rerollTarget} onOpenChange={(open) => !open && setRerollTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Szene {(rerollTarget?.orderIndex ?? 0) + 1} neu generieren?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Dies kostet erneut{' '}
+                  <span className="font-semibold text-amber-400">
+                    €{rerollTarget ? getClipCost(rerollTarget.clipSource, rerollTarget.clipQuality || 'standard', rerollTarget.durationSeconds).toFixed(2) : '0.00'}
+                  </span>
+                  . Der vorherige Clip wird ersetzt.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  💡 Tipp: Passe vorher den Prompt im Storyboard-Tab oder den Charakter-Shot-Typ an, um ein anderes Ergebnis zu bekommen.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (rerollTarget) {
+                  const target = rerollTarget;
+                  setRerollTarget(null);
+                  handleGenerateSingle(target);
+                }
+              }}
+              className="bg-amber-500 hover:bg-amber-600 text-amber-950"
+            >
+              Neu generieren €{rerollTarget ? getClipCost(rerollTarget.clipSource, rerollTarget.clipQuality || 'standard', rerollTarget.durationSeconds).toFixed(2) : '0.00'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Clip Cards */}
       <div className="grid gap-3">
@@ -480,18 +561,19 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                     {/* Ready → Re-roll */}
                     {scene.clipStatus === 'ready' && isAi && (
                       <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        title="Neu generieren"
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-[10px] h-7 px-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                        title="Diese Szene neu generieren (kostet erneut Credits)"
                         disabled={isThisGenerating}
-                        onClick={() => handleGenerateSingle(scene)}
+                        onClick={() => setRerollTarget(scene)}
                       >
                         {isThisGenerating ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
-                          <RefreshCw className="h-3.5 w-3.5" />
+                          <RefreshCw className="h-3 w-3" />
                         )}
+                        Neu generieren €{costPerClip.toFixed(2)}
                       </Button>
                     )}
                     {/* Generating disabled marker */}
