@@ -145,7 +145,7 @@ Each scene is generated INDEPENDENTLY by a separate AI video model call (Hailuo 
 - Treat the storyboard as a MONTAGE / MOOD-BOARD of standalone shots that share a vibe, NOT as a continuous narrative with one persistent protagonist
 - Variation between scenes' people is expected and fine — do not try to lock identity
 
-Write text overlays separately (in ${langLabel}) — they're rendered as a distinct layer on top of the video.`;
+Write text overlays separately (in ${langLabel}) — they're rendered as a distinct layer on top of the video.${styleDirective}`;
 
     const labels = (() => {
       switch (category) {
@@ -284,7 +284,17 @@ Generate the storyboard using the create_storyboard function.`;
       throw new Error("Failed to parse AI storyboard output");
     }
 
-    // Map AI output to ComposerScene format
+    // Map AI output to ComposerScene format. We append the visual style hint
+    // server-side as a hard guarantee — even if the AI forgot it, the rendered
+    // clip will still match the chosen style.
+    const appendStyle = (prompt: string): string => {
+      if (!visualStyleHint) return prompt;
+      // Avoid duplicate appending if AI already included the exact clause.
+      const probe = visualStyleHint.replace(/^,\s*/, '').slice(0, 30).toLowerCase();
+      if (prompt.toLowerCase().includes(probe)) return prompt;
+      return prompt.replace(/[.\s,]*$/, '') + visualStyleHint;
+    };
+
     const scenes = parsed.scenes.map((s: any, index: number) => ({
       id: `scene_${Date.now()}_${index}`,
       projectId: "",
@@ -292,7 +302,7 @@ Generate the storyboard using the create_storyboard function.`;
       sceneType: s.sceneType || "custom",
       durationSeconds: Math.max(3, Math.min(15, s.durationSeconds || 5)),
       clipSource: "ai-hailuo",
-      aiPrompt: s.aiPrompt || "",
+      aiPrompt: appendStyle(s.aiPrompt || ""),
       stockKeywords: s.stockKeywords || "",
       clipStatus: "pending",
       textOverlay: {
