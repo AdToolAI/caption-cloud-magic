@@ -292,9 +292,19 @@ export function ImageGenerator() {
             {editMode && (
               <div className="flex items-center gap-2">
                 {referenceImage ? (
-                  <div className="relative">
-                    <img src={referenceImage} className="h-12 w-12 rounded-md object-cover border border-border" alt="Reference" />
-                    <button onClick={() => { setReferenceImage(null); }} className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center">
+                  <div className="relative group/ref">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="relative block h-12 w-12 rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
+                      title={t('picStudio.uploadImage')}
+                    >
+                      <img src={referenceImage} className="h-full w-full object-cover" alt="Reference" />
+                      <div className="absolute inset-0 bg-background/70 opacity-0 group-hover/ref:opacity-100 transition-opacity flex items-center justify-center">
+                        <Upload className="h-4 w-4 text-foreground" />
+                      </div>
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); setReferenceImage(null); }} className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center z-10">
                       <X className="h-3 w-3" />
                     </button>
                   </div>
