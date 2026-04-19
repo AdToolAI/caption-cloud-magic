@@ -309,6 +309,8 @@ Weekdays (YYYY-MM-DD): ${weekDates.join(", ")}`;
           caption_draft: p.caption_draft,
           hashtags: p.hashtags || [],
           reasoning: p.reasoning,
+          tips: Array.isArray(p.tips) ? p.tips : null,
+          phase: p.phase || null,
           status: "pending",
           generation_batch_id: batchId,
         };
