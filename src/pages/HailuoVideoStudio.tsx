@@ -299,6 +299,9 @@ export default function HailuoVideoStudio() {
                     <div className="flex justify-between"><span className="text-muted-foreground">Modell</span><span>{HAILUO_VIDEO_MODELS[model].name}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Auflösung</span><span>{resolution}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Dauer</span><span>{duration}s</span></div>
+                    {visualStyle && (
+                      <div className="flex justify-between"><span className="text-muted-foreground">Stil</span><span className="capitalize">{visualStyle.replace('-', ' ')}</span></div>
+                    )}
                     {startImageUrl && <div className="flex justify-between"><span className="text-muted-foreground">Modus</span><span>Image-to-Video</span></div>}
                     <hr className="my-2" />
                     <div className="flex justify-between font-semibold text-base">
