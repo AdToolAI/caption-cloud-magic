@@ -570,6 +570,55 @@ export default function BriefingTab({
         </CardContent>
       </Card>
 
+      {/* Visual Style — drives consistent look across all AI-generated scenes */}
+      <Card className="border-border/40 bg-card/80">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Palette className="h-4 w-4 text-primary" />
+            {language === 'de' ? 'Visueller Stil' : language === 'es' ? 'Estilo Visual' : 'Visual Style'}
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            {language === 'de'
+              ? 'Wird auf alle KI-generierten Szenen angewendet — sorgt für einheitlichen Look.'
+              : language === 'es'
+                ? 'Se aplica a todas las escenas generadas por IA — garantiza un aspecto uniforme.'
+                : 'Applied to every AI-generated scene — ensures a consistent look.'}
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {VISUAL_STYLES.map((style) => {
+              const lang = (language === 'de' || language === 'es' ? language : 'en') as 'de' | 'en' | 'es';
+              const isActive = (briefing.visualStyle || 'realistic') === style.id;
+              return (
+                <button
+                  key={style.id}
+                  type="button"
+                  onClick={() => onUpdateBriefing({ visualStyle: style.id as ComposerVisualStyle })}
+                  className={`p-3 rounded-lg border text-left transition-all ${
+                    isActive
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                      : 'border-border/40 hover:border-border'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg leading-none">{style.glyph}</span>
+                    <div className="min-w-0">
+                      <p className={`font-medium text-xs ${isActive ? 'text-primary' : ''}`}>
+                        {style.label[lang]}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
+                        {style.desc[lang]}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Action */}
       <div className="flex justify-end">
         <Button
