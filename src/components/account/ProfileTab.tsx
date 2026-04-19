@@ -143,6 +143,58 @@ export const ProfileTab = () => {
           </Form>
         </CardContent>
       </Card>
+
+      <RestartTourCard />
     </motion.div>
+  );
+};
+
+const restartCopy: Record<string, { title: string; desc: string; cta: string; toast: string }> = {
+  en: {
+    title: "Product tour",
+    desc: "Restart the guided onboarding tour to rediscover the platform.",
+    cta: "Restart tour",
+    toast: "Tour will start on the dashboard",
+  },
+  de: {
+    title: "Produkt-Tour",
+    desc: "Starte die geführte Onboarding-Tour erneut, um die Plattform neu zu entdecken.",
+    cta: "Tour erneut starten",
+    toast: "Tour startet auf dem Dashboard",
+  },
+  es: {
+    title: "Tour del producto",
+    desc: "Reinicia el tour guiado para redescubrir la plataforma.",
+    cta: "Reiniciar tour",
+    toast: "El tour comenzará en el panel",
+  },
+};
+
+const RestartTourCard = () => {
+  const { user } = useAuth();
+  const { language } = useTranslation();
+  const { toast } = useToast();
+  const copy = restartCopy[language] || restartCopy.en;
+
+  const handleRestart = async () => {
+    if (!user) return;
+    await supabase.from("profiles").update({ tour_completed_at: null } as any).eq("id", user.id);
+    sessionStorage.removeItem("adtool-tour-autostart-done");
+    toast({ title: copy.toast });
+    setTimeout(() => { window.location.href = "/home"; }, 600);
+  };
+
+  return (
+    <Card className="mt-6 bg-card/60 backdrop-blur-xl border-white/10">
+      <CardHeader>
+        <CardTitle className="text-base">{copy.title}</CardTitle>
+        <CardDescription>{copy.desc}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button onClick={handleRestart} variant="outline" className="border-primary/40 text-primary hover:bg-primary/10">
+          {copy.cta}
+        </Button>
+      </CardContent>
+    </Card>
   );
 };

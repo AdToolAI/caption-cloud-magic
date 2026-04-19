@@ -74,7 +74,7 @@ export function AppSidebar() {
           <div className="w-8 h-px bg-border my-1" />
 
           {/* Hub Icons */}
-          <SidebarMenu className="w-full px-2 flex-1 space-y-1">
+          <SidebarMenu data-tour="sidebar-hubs" className="w-full px-2 flex-1 space-y-1">
             {visibleHubs.map((hub) => {
               const HubIcon = hub.icon;
               const active = isHubActive(hub.key);
