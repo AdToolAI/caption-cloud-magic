@@ -1,7 +1,8 @@
-// compose-video-clips v2.1.0 — webhook_events_filter fix (only "completed" allowed)
+// compose-video-clips v2.2.0 — visual style injection
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Replicate from "https://esm.sh/replicate@0.25.2";
+import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,6 +33,9 @@ interface ClipScene {
 interface ClipRequest {
   projectId: string;
   scenes: ClipScene[];
+  /** Optional visual style override (Comic, Realistic, Anime, ...). When set,
+   *  every AI scene prompt is suffixed with the matching style clause. */
+  visualStyle?: string;
 }
 
 serve(async (req) => {
