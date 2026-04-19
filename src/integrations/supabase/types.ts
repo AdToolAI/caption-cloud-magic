@@ -8450,6 +8450,30 @@ export type Database = {
         }
         Relationships: []
       }
+      streak_milestones: {
+        Row: {
+          id: string
+          milestone_days: number
+          reached_at: string
+          reward_credits: number | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          milestone_days: number
+          reached_at?: string
+          reward_credits?: number | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          milestone_days?: number
+          reached_at?: string
+          reward_credits?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       stream_clips: {
         Row: {
           clip_url: string | null
@@ -10114,6 +10138,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_streaks: {
+        Row: {
+          created_at: string
+          current_streak: number
+          freeze_tokens: number
+          freeze_used_at: string | null
+          last_activity_date: string | null
+          longest_streak: number
+          total_active_days: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_streak?: number
+          freeze_tokens?: number
+          freeze_used_at?: string | null
+          last_activity_date?: string | null
+          longest_streak?: number
+          total_active_days?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_streak?: number
+          freeze_tokens?: number
+          freeze_used_at?: string | null
+          last_activity_date?: string | null
+          longest_streak?: number
+          total_active_days?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       video_analytics: {
         Row: {
           created_at: string
@@ -11290,6 +11350,7 @@ export type Database = {
         }
         Returns: number
       }
+      break_stale_streaks: { Args: never; Returns: number }
       calculate_template_conversion_rates: {
         Args: { p_date_from: string; p_date_to: string; p_template_id: string }
         Returns: {
@@ -11431,6 +11492,16 @@ export type Database = {
         Returns: boolean
       }
       owns_composer_project: { Args: { _project_id: string }; Returns: boolean }
+      record_streak_activity: {
+        Args: { p_user_id: string }
+        Returns: {
+          current_streak: number
+          freeze_tokens: number
+          longest_streak: number
+          milestone_reached: number
+        }[]
+      }
+      refresh_streak_freeze_tokens: { Args: never; Returns: number }
       refund_ai_video_credits: {
         Args: {
           p_amount_euros: number
