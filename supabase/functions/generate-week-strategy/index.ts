@@ -73,29 +73,10 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const weekStart = body.week_start ? new Date(body.week_start) : getMonday(new Date());
-    weekStart.setHours(0, 0, 0, 0);
-    const weekStartStr = weekStart.toISOString().split("T")[0];
-
-    // Check if already exists for this week
-    const { data: existing } = await supabase
-      .from("strategy_posts")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("week_start", weekStartStr)
-      .limit(1);
-
-    if (existing && existing.length > 0 && !body.force) {
-      const { data: posts } = await supabase
-        .from("strategy_posts")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("week_start", weekStartStr)
-        .order("scheduled_at", { ascending: true });
-      return new Response(JSON.stringify({ posts, cached: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const baseWeekStart = body.week_start ? new Date(body.week_start) : getMonday(new Date());
+    baseWeekStart.setHours(0, 0, 0, 0);
+    const weeksAhead = Math.max(1, Math.min(4, body.weeks_ahead ?? 2));
+    const force = !!body.force;
 
     // Gather context: last 90 days metrics + profile + onboarding (level)
     const ninetyDaysAgo = new Date();
@@ -168,14 +149,40 @@ serve(async (req) => {
       ? `Du bist ein Social-Media-Stratege. Erstelle einen 7-Tage-Wochenplan mit GENAU ${cfg.minPosts} Postvorschlägen, abgestimmt auf das Creator-Level "${levelLabelDE}". Tonalität: ${cfg.tone} Komplexität: ${cfg.complexity} Antworte ausschließlich über den Tool-Call.`
       : `You are a social media strategist. Create a 7-day weekly plan with EXACTLY ${cfg.minPosts} post suggestions, tuned for creator level "${levelLabelEN}". Tone: ${cfg.tone} Complexity: ${cfg.complexity} Respond only via the tool call.`;
 
-    const weekDates: string[] = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(weekStart);
-      d.setDate(d.getDate() + i);
-      weekDates.push(d.toISOString().split("T")[0]);
-    }
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const userPrompt = isDE ? `Wochenplan für ${weekStartStr} (Mo) bis ${weekDates[6]} (So).
+    const allInserted: any[] = [];
+    const allBatches: string[] = [];
+    const skipped: string[] = [];
+
+    for (let w = 0; w < weeksAhead; w++) {
+      const weekStart = new Date(baseWeekStart);
+      weekStart.setDate(weekStart.getDate() + w * 7);
+      weekStart.setHours(0, 0, 0, 0);
+      const weekStartStr = weekStart.toISOString().split("T")[0];
+
+      // Idempotent skip unless force
+      const { data: existing } = await supabase
+        .from("strategy_posts")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("week_start", weekStartStr)
+        .limit(1);
+
+      if (existing && existing.length > 0 && !force) {
+        skipped.push(weekStartStr);
+        continue;
+      }
+
+      const weekDates: string[] = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(weekStart);
+        d.setDate(d.getDate() + i);
+        weekDates.push(d.toISOString().split("T")[0]);
+      }
+
+      const userPrompt = isDE ? `Wochenplan für ${weekStartStr} (Mo) bis ${weekDates[6]} (So).
 
 Creator-Level: ${levelLabelDE}
 Nische: ${onboarding?.niche || "allgemein"} | Business: ${onboarding?.business_type || "—"}
@@ -203,111 +210,118 @@ Create EXACTLY ${cfg.minPosts} suggestions. Spread across the week, use best pos
 
 Weekdays (YYYY-MM-DD): ${weekDates.join(", ")}`;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "create_week_plan",
-            description: "Create a weekly content strategy plan",
-            parameters: {
-              type: "object",
-              properties: {
-                posts: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      date: { type: "string", description: "YYYY-MM-DD" },
-                      time: { type: "string", description: "HH:MM 24h" },
-                      platform: { type: "string", enum: platforms },
-                      content_idea: { type: "string", description: "Short title (max 60 chars)" },
-                      caption_draft: { type: "string", description: "Ready-to-post caption (80-200 chars)" },
-                      hashtags: { type: "array", items: { type: "string" } },
-                      reasoning: { type: "string", description: "Why this suggestion (max 120 chars)" },
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          tools: [{
+            type: "function",
+            function: {
+              name: "create_week_plan",
+              description: "Create a weekly content strategy plan",
+              parameters: {
+                type: "object",
+                properties: {
+                  posts: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        date: { type: "string", description: "YYYY-MM-DD" },
+                        time: { type: "string", description: "HH:MM 24h" },
+                        platform: { type: "string", enum: platforms },
+                        content_idea: { type: "string", description: "Short title (max 60 chars)" },
+                        caption_draft: { type: "string", description: "Ready-to-post caption (80-200 chars)" },
+                        hashtags: { type: "array", items: { type: "string" } },
+                        reasoning: { type: "string", description: "Why this suggestion (max 120 chars)" },
+                      },
+                      required: ["date", "time", "platform", "content_idea", "caption_draft", "hashtags", "reasoning"],
+                      additionalProperties: false,
                     },
-                    required: ["date", "time", "platform", "content_idea", "caption_draft", "hashtags", "reasoning"],
-                    additionalProperties: false,
+                    minItems: cfg.minPosts,
+                    maxItems: cfg.maxPosts,
                   },
-                  minItems: cfg.minPosts,
-                  maxItems: cfg.maxPosts,
                 },
+                required: ["posts"],
+                additionalProperties: false,
               },
-              required: ["posts"],
-              additionalProperties: false,
             },
-          },
-        }],
-        tool_choice: { type: "function", function: { name: "create_week_plan" } },
+          }],
+          tool_choice: { type: "function", function: { name: "create_week_plan" } },
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        if (aiResponse.status === 429) {
+          return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (aiResponse.status === 402) {
+          return new Response(JSON.stringify({ error: "Credits exhausted" }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        throw new Error(`AI Gateway: ${aiResponse.status}`);
+      }
+
+      const aiData = await aiResponse.json();
+      const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+      if (!toolCall) throw new Error("No tool call in AI response");
+
+      const plan = JSON.parse(toolCall.function.arguments);
+      const batchId = crypto.randomUUID();
+      allBatches.push(batchId);
+
+      if (force) {
+        await supabase.from("strategy_posts")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("week_start", weekStartStr)
+          .eq("status", "pending");
+      }
+
+      const rows = (plan.posts || []).map((p: any) => {
+        const scheduledAt = new Date(`${p.date}T${p.time}:00`);
+        return {
+          user_id: user.id,
+          week_start: weekStartStr,
+          scheduled_at: scheduledAt.toISOString(),
+          platform: p.platform,
+          content_idea: p.content_idea,
+          caption_draft: p.caption_draft,
+          hashtags: p.hashtags || [],
+          reasoning: p.reasoning,
+          status: "pending",
+          generation_batch_id: batchId,
+        };
+      });
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("strategy_posts")
+        .insert(rows)
+        .select();
+
+      if (insertError) throw insertError;
+      if (inserted) allInserted.push(...inserted);
+    }
+
+    return new Response(
+      JSON.stringify({
+        posts: allInserted,
+        generated: allInserted.length > 0,
+        skipped_weeks: skipped,
+        batch_ids: allBatches,
+        weeks_ahead: weeksAhead,
+        level,
       }),
-    });
-
-    if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "Credits exhausted" }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`AI Gateway: ${aiResponse.status}`);
-    }
-
-    const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("No tool call in AI response");
-
-    const plan = JSON.parse(toolCall.function.arguments);
-    const batchId = crypto.randomUUID();
-
-    // Delete existing for this week if force
-    if (body.force) {
-      await supabase.from("strategy_posts")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("week_start", weekStartStr)
-        .eq("status", "pending");
-    }
-
-    const rows = (plan.posts || []).map((p: any) => {
-      const scheduledAt = new Date(`${p.date}T${p.time}:00`);
-      return {
-        user_id: user.id,
-        week_start: weekStartStr,
-        scheduled_at: scheduledAt.toISOString(),
-        platform: p.platform,
-        content_idea: p.content_idea,
-        caption_draft: p.caption_draft,
-        hashtags: p.hashtags || [],
-        reasoning: p.reasoning,
-        status: "pending",
-        generation_batch_id: batchId,
-      };
-    });
-
-    const { data: inserted, error: insertError } = await supabase
-      .from("strategy_posts")
-      .insert(rows)
-      .select();
-
-    if (insertError) throw insertError;
-
-    return new Response(JSON.stringify({ posts: inserted, generated: true, batch_id: batchId, level }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (error) {
     console.error("generate-week-strategy error:", error);
     return new Response(
