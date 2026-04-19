@@ -1,54 +1,75 @@
 
 
-## Befund — zwei Fragen, zwei Antworten
+## Befund & Empfehlung
 
-### 1) Werden hier schon Credits abgezogen? **Ja.**
-Im Edge-Function `compose-video-clips/index.ts` (Zeile 354-376) zieht der Server **direkt nach erfolgreichem Render-Start** den vollen Betrag pro AI-Clip vom AI-Video-Wallet ab — über `deduct_ai_video_credits` RPC. Konkret:
+Ich empfehle **klar Option B: Rechnungen nur beim Credit-Kauf**, nicht pro Video. Hier die Begründung:
 
-- **Pro Klick auf „Generieren"** (einzeln) oder **„Alle generieren"** wird der Wallet-Stand geprüft.
-- Hat der User genug → Lambda/Replicate-Call wird gestartet → **sofortige Belastung** (z. B. €1.51 für eine 10s Hailuo-Szene).
-- Schlägt der Replicate-Start fehl (`status: 'failed'`) → wird **nicht** abgezogen (nur `'generating'` zählt).
-- Schlägt der Render danach im Hintergrund fehl (Webhook meldet Fehler) → **aktuell kein automatischer Refund** ⚠️ (das wäre ein separater Hardening-Schritt — sage an, ob ich das auch mit angehen soll).
+### Warum nicht pro Video?
 
-### 2) Re-Roll bei Unzufriedenheit — **technisch da, aber unsichtbar.**
-Der „Neu generieren"-Button (`RefreshCw`-Icon) existiert bereits in `ClipsTab.tsx` Zeile 481-496 für jede fertige AI-Szene. Aber:
+| Aspekt | Pro Video (A) | Pro Credit-Kauf (B) ✅ |
+|---|---|---|
+| **Rechtlich (DE/EU)** | 100+ Mikro-Rechnungen/Monat à €1.51 — Buchhaltungs-Albtraum für Geschäftskunden | 1 Rechnung pro Top-Up — sauber & GoBD-konform |
+| **MwSt.-Ausweis** | Auf €0.24 USt. pro Video — wirkt unprofessionell | Auf €10/€50/€100/€250 — Standard |
+| **Stripe-Kosten** | Jede Rechnung kostet Stripe-Fees (€0.40 + 1.5%) → frisst Marge | Bereits in `ai-video-purchase-credits` Edge Function vorhanden |
+| **User-Inbox** | Spam: 50 Mails/Monat | Sauber: 1-3 Mails/Monat |
+| **Implementierung** | Komplett neu (Webhook + DB + Stripe-Invoice-Creation pro Render) | **Existiert bereits** — nur MwSt.-Ausweis fehlt |
 
-- Es ist **nur ein 7×7px Icon ohne Label** → User sieht es nicht.
-- Es gibt **keinen Hinweis**, dass das Geld kostet (User klickt vielleicht versehentlich auf einen €1.51-Reroll).
-- Es gibt **keinen Hinweis-Banner** der dem User die Möglichkeit erklärt.
+**Es gibt keinen rechtlichen Grund** für Pro-Video-Rechnungen — Credits sind ein **Voucher-System** (Prepaid). Der "Verkauf" passiert beim Top-Up, das Einlösen ist nur Nutzung. Das ist genauso wie bei Adobe Creative Cloud Credits, OpenAI API Credits oder Google Cloud Credits — alle stellen nur beim Top-Up Rechnungen aus.
 
-## Plan: Transparente Re-Roll-Möglichkeit
+### Was bereits existiert
+Die Stripe Checkout Sessions in `ai-video-purchase-credits/index.ts` erzeugen bereits automatische Stripe-Belege. Diese sind über den **Customer Portal** (`customer-portal/index.ts`) und `get-invoices/index.ts` einsehbar. **Aber:** Die MwSt. (19% DE) wird aktuell **nicht ausgewiesen** — die Preise sind als Brutto definiert, aber Stripe hat keine Tax Rate auf die Credit-Käufe konfiguriert (nur auf Subscriptions via `STRIPE_TAX_RATE_19_PCT`).
 
-### A) Info-Banner oben in der Clips-Liste
-Ein dezenter Hinweis-Block (Lightbulb-Icon, gold/amber Tönung im Bond-Stil) **über der Scene-Liste**, einmalig sichtbar:
+## Plan: MwSt.-Ausweis auf Credit-Kauf-Rechnungen
 
-> 💡 *„Nicht zufrieden mit einer Szene? Klicke auf das ↻-Icon rechts neben einer fertigen Szene, um sie neu zu generieren — jeder Re-Roll kostet erneut Credits, aber du kannst Stil, Prompt oder Charakter-Shot vorher anpassen."*
+### 1) Tax Rate auf Credit-Kauf-Checkout anwenden
+In `supabase/functions/ai-video-purchase-credits/index.ts` der Stripe Checkout Session den existierenden `STRIPE_TAX_RATE_19_PCT` (19% inklusiv, DE) hinzufügen — analog zu wie es in `customer-portal/index.ts` für Subscriptions schon gemacht wird:
 
-Mit kleinem Dismiss-X (gespeichert in `localStorage` als `composer-reroll-hint-dismissed`).
+```typescript
+const TAX_RATE_ID = Deno.env.get("STRIPE_TAX_RATE_19_PCT");
+const session = await stripe.checkout.sessions.create({
+  // ... existing config
+  line_items: [{
+    price: priceId,
+    quantity: 1,
+    tax_rates: TAX_RATE_ID ? [TAX_RATE_ID] : undefined,
+  }],
+  invoice_creation: { 
+    enabled: true,  // Erzwingt PDF-Rechnung mit USt-Ausweis
+  },
+});
+```
 
-### B) Re-Roll-Button sichtbarer machen
-Statt nur ein Icon → ein Text-Button **„↻ Neu generieren (€X.XX)"** rechts an jeder fertigen AI-Szene. Konsistent mit dem „Generieren"-Button bei pending Szenen.
+`invoice_creation.enabled: true` zwingt Stripe, für jeden One-Time-Payment-Checkout eine vollwertige PDF-Rechnung mit MwSt-Ausweis zu erstellen (statt nur eines Belegs).
 
-### C) Bestätigungs-Dialog beim Re-Roll
-Bevor Credits ein zweites Mal verbrannt werden:
+### 2) USD-Käufe ausschließen
+USD-Käufe (US-Kunden) bekommen **keine** deutsche MwSt — Tax Rate nur bei `currency === 'EUR'` anwenden.
 
-> *„Szene 3 neu generieren?  
-> Dies kostet erneut **€1.51**. Der vorherige Clip wird ersetzt.  
-> Tipp: Passe vorher den Prompt im Storyboard-Tab oder den Charakter-Shot-Typ an, um ein anderes Ergebnis zu bekommen."*  
-> [Abbrechen] [Neu generieren €1.51]
+### 3) Billing-Page: Credit-Käufe sichtbar machen
+`get-invoices/index.ts` listet bereits alle Stripe-Invoices (auch die von Credit-Käufen). Optional: Im UI eine kleine Trennung "Abos" vs. "Credit-Käufe" via `invoice.metadata.type` oder Subscription-Reference.
 
-Standard `AlertDialog` aus shadcn — keine neue Dependency.
+### 4) Hinweis in der Credit-Kauf-UI
+Kleiner Footer-Text im Credit-Pack-Picker:
+> *„Alle Preise inkl. 19% MwSt. (Deutschland). Eine Rechnung wird automatisch nach dem Kauf per E-Mail zugestellt und im Billing-Bereich verfügbar."*
 
-### D) Klare Credit-Deduction-Info im bestehenden Cost-Banner
-In der Summary-Bar (`8/8 Clips fertig`) oben einen Mini-Hinweis hinzufügen:
+## Alternative — falls du B2B-Kunden mit Steuernummer hast
+**Stripe Tax** (kostet 0.5% extra pro Transaction) automatisiert:
+- VAT-ID-Validierung (Reverse Charge für EU-B2B → 0% MwSt)
+- Korrekte Sätze pro EU-Land
+- OSS-Reporting
 
-> *„Credits werden pro Generierung abgezogen — Re-Rolls kosten erneut."*
-
-Klein, subtil, einmalig sichtbar.
+Das ist aber **nur sinnvoll**, wenn du ernsthaft B2B-EU-Kunden außerhalb DE skalierst. Für jetzt reicht der einfache 19%-Tax-Rate-Ansatz.
 
 ## Betroffene Dateien
-- `src/components/video-composer/ClipsTab.tsx` — Banner + größerer Re-Roll-Button + AlertDialog
+- `supabase/functions/ai-video-purchase-credits/index.ts` — Tax Rate + `invoice_creation: { enabled: true }`
+- `src/components/ai-video/CreditPackSelector.tsx` (oder vergleichbar) — kleiner MwSt.-Hinweis
+- *Optional:* `src/pages/Billing.tsx` — Trennung Abos vs. Credits in der Invoice-Liste
 
-## Optional — bitte sag Bescheid
-**E) Auto-Refund bei Background-Render-Failure:** Aktuell werden Credits abgezogen sobald Replicate `'generating'` meldet — wenn der Render dann später (im Webhook) fehlschlägt, bleibt das Geld weg. Soll ich `compose-clip-webhook` so erweitern, dass es bei `status: 'failed'` automatisch `refund_ai_video_credits` aufruft? (Schließt einen Reliability-Lücke nach unserer Memory-Policy „Credit Refund Automation".)
+## Zusammengefasst
+**Nein, keine Rechnungen pro Video.** Stattdessen:
+- ✅ Credit-Kauf-Rechnungen mit korrektem MwSt-Ausweis
+- ✅ Automatische PDF-Generierung via Stripe `invoice_creation`
+- ✅ USD-Käufe (USA) korrekt ohne deutsche MwSt
+- ✅ Saubere, GoBD-konforme Buchhaltung für deine User
+
+Soll ich das umsetzen?
 
