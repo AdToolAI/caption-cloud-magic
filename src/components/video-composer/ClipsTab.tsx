@@ -46,6 +46,16 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
   const [stockResults, setStockResults] = useState<Record<string, any[]>>({});
   const [searchingStock, setSearchingStock] = useState<Record<string, boolean>>({});
   const [previousStatuses, setPreviousStatuses] = useState<Record<string, string>>({});
+  const [rerollHintDismissed, setRerollHintDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('composer-reroll-hint-dismissed') === '1';
+  });
+  const [rerollTarget, setRerollTarget] = useState<ComposerScene | null>(null);
+
+  const dismissRerollHint = () => {
+    setRerollHintDismissed(true);
+    try { localStorage.setItem('composer-reroll-hint-dismissed', '1'); } catch {}
+  };
 
   const allReady = scenes.every((s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && s.uploadUrl));
   const readyCount = scenes.filter((s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && s.uploadUrl)).length;
