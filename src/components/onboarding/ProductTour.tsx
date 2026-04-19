@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import Joyride, { CallBackProps, STATUS, Step } from "react-joyride";
+import { Joyride, EVENTS, STATUS, type Step, type EventData } from "react-joyride";
 import { useProductTour } from "@/hooks/useProductTour";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -156,14 +156,15 @@ export const ProductTour = () => {
     [copy]
   );
 
-  const handleCallback = (data: CallBackProps) => {
-    const { status, action } = data;
-    if (action === "skip") {
-      skipTour();
+  const handleEvent = (data: EventData) => {
+    const { type, status } = data;
+    // Joyride v3: skipped tours emit STATUS.SKIPPED, finished emit STATUS.FINISHED
+    if (type === EVENTS.TOUR_END || status === STATUS.FINISHED) {
+      markCompleted();
       return;
     }
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
-      markCompleted();
+    if (status === STATUS.SKIPPED) {
+      skipTour();
     }
   };
 
@@ -172,13 +173,11 @@ export const ProductTour = () => {
   return (
     <Joyride
       steps={steps}
-      run={run}
       continuous
       showProgress
       showSkipButton
       scrollToFirstStep
-      disableScrolling={false}
-      callback={handleCallback}
+      onEvent={handleEvent}
       locale={{
         back: copy.back,
         close: copy.last,
