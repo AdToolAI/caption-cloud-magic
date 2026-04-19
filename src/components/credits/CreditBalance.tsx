@@ -6,9 +6,38 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CreditLimitWarning } from "./CreditLimitWarning";
 import { useTranslation } from "@/hooks/useTranslation";
 
-export const CreditBalance = () => {
+interface CreditBalanceProps {
+  compact?: boolean;
+}
+
+export const CreditBalance = ({ compact = false }: CreditBalanceProps = {}) => {
   const { balance, loading, error } = useCredits();
   const { t } = useTranslation();
+
+  if (compact) {
+    if (loading) {
+      return <Skeleton className="h-5 w-28" />;
+    }
+    if (error || !balance) {
+      return <span className="text-xs text-destructive">{t("credits.error")}</span>;
+    }
+    const isEnt = balance.plan_code === 'enterprise';
+    return (
+      <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20">
+        <Coins className="h-3.5 w-3.5 text-primary" />
+        {isEnt ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+            <InfinityIcon className="h-3.5 w-3.5" />
+            {t("credits.unlimitedCredits")}
+          </span>
+        ) : (
+          <span className="text-xs font-medium text-primary">
+            {balance.balance.toLocaleString()} / {balance.monthly_credits.toLocaleString()}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   if (loading) {
     return (
