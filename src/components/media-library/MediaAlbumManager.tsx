@@ -295,6 +295,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
                 key={img.id}
                 image={{ id: img.id, url: img.image_url, prompt: img.prompt || undefined, style: img.style || undefined, aspectRatio: img.aspect_ratio || undefined }}
                 index={i}
+                onSaveToAlbum={handleSaveToAlbum}
                 onOpenLightbox={setLightboxImage}
                 onDelete={handleDeleteImage}
               />
@@ -432,7 +433,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
           open={albumDialogOpen}
           onOpenChange={setAlbumDialogOpen}
           imageId={selectedImageId}
-          onSaved={handleUnsortedImageSaved}
+          onSaved={handleImageMoved}
         />
       )}
 
