@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Replicate from "https://esm.sh/replicate@0.25.2";
+import { getVisualStyleHint, type ComposerVisualStyle } from "../_shared/composer-visual-styles.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,6 +20,7 @@ interface GenerateRequest {
   resolution: '768p' | '1080p';
   startImageUrl?: string;
   promptOptimizer?: boolean;
+  visualStyle?: ComposerVisualStyle | null;
 }
 
 serve(async (req) => {
@@ -46,16 +48,20 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest;
-    const { prompt, model, duration: rawDuration, resolution, startImageUrl, promptOptimizer } = body;
+    const { prompt, model, duration: rawDuration, resolution, startImageUrl, promptOptimizer, visualStyle } = body;
 
     // Hailuo 2.3 only supports 6 or 10 seconds
     const duration = rawDuration >= 8 ? 10 : 6;
     // 1080p only available for 6s
     const finalResolution = (duration === 10 && resolution === '1080p') ? '768p' : resolution;
 
+    // Inject visual style hint into the prompt (if a style was selected)
+    const styleHint = getVisualStyleHint(visualStyle ?? undefined);
+    const finalPrompt = styleHint ? `${prompt.trim()}${styleHint}` : prompt.trim();
+
     const isImageToVideo = !!startImageUrl;
     const mode = isImageToVideo ? 'Image-to-Video' : 'Text-to-Video';
-    console.log(`[generate-hailuo-video] Mode: ${mode}, Duration: ${duration}s, Resolution: ${finalResolution}`);
+    console.log(`[generate-hailuo-video] Mode: ${mode}, Duration: ${duration}s, Resolution: ${finalResolution}, Style: ${visualStyle || 'none'}`);
 
     // Get wallet currency
     const { data: walletPreview } = await supabaseClient
@@ -163,7 +169,7 @@ serve(async (req) => {
 
     // Build Replicate input for minimax/hailuo-2.3
     const replicateInput: Record<string, any> = {
-      prompt,
+      prompt: finalPrompt,
       duration,
       resolution: finalResolution,
     };
