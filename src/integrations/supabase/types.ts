@@ -8284,6 +8284,7 @@ export type Database = {
       }
       strategy_posts: {
         Row: {
+          auto_publish: boolean | null
           caption_draft: string | null
           completed_event_id: string | null
           content_idea: string
@@ -8291,6 +8292,7 @@ export type Database = {
           generation_batch_id: string | null
           hashtags: Json | null
           id: string
+          media_urls: string[] | null
           original_scheduled_at: string | null
           platform: string
           reasoning: string | null
@@ -8302,6 +8304,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          auto_publish?: boolean | null
           caption_draft?: string | null
           completed_event_id?: string | null
           content_idea: string
@@ -8309,6 +8312,7 @@ export type Database = {
           generation_batch_id?: string | null
           hashtags?: Json | null
           id?: string
+          media_urls?: string[] | null
           original_scheduled_at?: string | null
           platform: string
           reasoning?: string | null
@@ -8320,6 +8324,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          auto_publish?: boolean | null
           caption_draft?: string | null
           completed_event_id?: string | null
           content_idea?: string
@@ -8327,6 +8332,7 @@ export type Database = {
           generation_batch_id?: string | null
           hashtags?: Json | null
           id?: string
+          media_urls?: string[] | null
           original_scheduled_at?: string | null
           platform?: string
           reasoning?: string | null
