@@ -17,7 +17,17 @@ export interface StreakMilestone {
   milestone_days: number;
   reached_at: string;
   reward_credits: number;
+  reward_dollars: number;
 }
+
+export const MILESTONE_REWARDS_USD: Record<number, number> = {
+  3: 0.5,
+  7: 1.5,
+  14: 3,
+  30: 7,
+  60: 15,
+  100: 25,
+};
 
 const MILESTONES = [3, 7, 14, 30, 60, 100];
 
@@ -96,7 +106,7 @@ export function useStreakMilestones() {
       if (!user) return [];
       const { data, error } = await supabase
         .from("streak_milestones" as any)
-        .select("id, milestone_days, reached_at, reward_credits")
+        .select("id, milestone_days, reached_at, reward_credits, reward_dollars")
         .eq("user_id", user.id)
         .order("reached_at", { ascending: false });
       if (error) return [];
