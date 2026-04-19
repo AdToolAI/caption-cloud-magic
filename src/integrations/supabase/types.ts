@@ -8298,6 +8298,8 @@ export type Database = {
           platform: string
           reasoning: string | null
           scheduled_at: string
+          slot_reason: string[] | null
+          slot_score: number | null
           status: string
           tips: string[] | null
           updated_at: string
@@ -8320,6 +8322,8 @@ export type Database = {
           platform: string
           reasoning?: string | null
           scheduled_at: string
+          slot_reason?: string[] | null
+          slot_score?: number | null
           status?: string
           tips?: string[] | null
           updated_at?: string
@@ -8342,6 +8346,8 @@ export type Database = {
           platform?: string
           reasoning?: string | null
           scheduled_at?: string
+          slot_reason?: string[] | null
+          slot_score?: number | null
           status?: string
           tips?: string[] | null
           updated_at?: string

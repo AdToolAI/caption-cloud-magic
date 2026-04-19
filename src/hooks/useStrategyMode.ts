@@ -21,6 +21,8 @@ export interface StrategyPost {
   original_scheduled_at: string | null;
   completed_event_id: string | null;
   generation_batch_id: string | null;
+  slot_score?: number | null;
+  slot_reason?: string[] | null;
   media_urls?: string[];
   auto_publish?: boolean;
   created_at: string;

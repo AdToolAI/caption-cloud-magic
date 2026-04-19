@@ -1,5 +1,7 @@
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Sparkles, Lightbulb, TrendingUp, Brain, Target } from "lucide-react";
+import { MapPin, Sparkles, Lightbulb, TrendingUp, Brain, Target, Clock, Flame } from "lucide-react";
+import { format } from "date-fns";
+import { de } from "date-fns/locale";
 import type { StrategyPost, CreatorLevel } from "@/hooks/useStrategyMode";
 
 interface Props {
@@ -123,6 +125,47 @@ export function StrategyContextPanel({
           </div>
         )}
       </div>
+
+      {/* Warum diese Uhrzeit? — Slot-Score aus der Posting-Times-Engine */}
+      {(typeof post.slot_score === "number" && post.slot_score > 0) && (
+        <div className="rounded-lg border border-primary/30 bg-gradient-to-br from-primary/10 to-transparent p-3">
+          <div className="flex items-center gap-2 mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
+            <Clock className="h-3.5 w-3.5" /> Warum diese Uhrzeit?
+          </div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex flex-col items-center justify-center rounded-md bg-primary/15 px-2.5 py-1.5 min-w-[58px]">
+              <div className="text-[9px] text-muted-foreground uppercase leading-none">Score</div>
+              <div className="text-lg font-bold text-primary leading-tight">{post.slot_score}</div>
+              <div className="text-[9px] text-muted-foreground leading-none">/ 100</div>
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-semibold flex items-center gap-1.5">
+                {format(new Date(post.scheduled_at), "EEEE, HH:mm", { locale: de })}
+                {post.slot_score >= 85 && <Flame className="h-3.5 w-3.5 text-warning" />}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {post.slot_score >= 85
+                  ? "Top-Slot deiner Heatmap"
+                  : post.slot_score >= 70
+                  ? "Starker Slot — sehr gute Wahl"
+                  : post.slot_score >= 55
+                  ? "Solider Slot"
+                  : "Optimierbar — siehe Heatmap"}
+              </div>
+            </div>
+          </div>
+          {post.slot_reason && post.slot_reason.length > 0 && (
+            <ul className="space-y-1 pt-2 border-t border-primary/20">
+              {post.slot_reason.map((r, i) => (
+                <li key={i} className="flex items-start gap-2 text-[11px] text-foreground/85">
+                  <span className="mt-1 h-1 w-1 rounded-full bg-primary shrink-0" />
+                  <span>{r}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Die Idee */}
       <div className="rounded-lg border border-border/50 bg-card/40 p-3">

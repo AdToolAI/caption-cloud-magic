@@ -4,6 +4,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { PostingSlot } from '@/hooks/usePostingTimes';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useStrategySlotKeys } from '@/hooks/useStrategySlotKeys';
+import { Sparkles } from 'lucide-react';
 
 interface HeatmapCalendarProps {
   slots: Record<string, PostingSlot[]>;
