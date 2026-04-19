@@ -1,73 +1,107 @@
 
 
-## Befund
+## Plan: Wochenleiste als „Glowing Platform Rings"-Timeline + smarter Ring-Dialog
 
-In Bild 1 ist klar zu sehen: Die Wochenleiste zeigt 3 Strategie-Vorschläge (Mo Instagram 21:00, Mi Facebook 21:00, Fr YouTube 21:00). Aber der Pill „Nächster Post" oben zeigt weiterhin **„Kein Post geplant"**.
+### Befund
+- Aktuelle `WeekStrategyTimeline` zeigt Tageskarten mit Verbindungslinie + kleinen Punkten — der Streifen wirkt deplatziert.
+- Wir hatten bereits in `WeekTimelineDay.tsx` eine viel coolere Variante mit leuchtenden Plattform-Ringen — wird aktuell im Strategy-Mode aber nicht genutzt.
+- Plattformfarben sind dort schon definiert, aber: Facebook=blau ✅, Instagram=lila ✅, LinkedIn=grün ✅, YouTube=rot ✅, X=violett (soll → Schwarzlicht/UV-Purple), TikTok=weiß (bleibt).
 
-### Root Cause
-
-Der Pill „Nächster Post" wird in `Home.tsx` aus `calendar_events` (echte geplante Posts) gespeist — **nicht** aus `strategy_posts` (KI-Vorschläge des Strategie-Modus). Beide Quellen sind aktuell entkoppelt:
-
-- **Wochenleiste (Strategy-Mode AN)** → liest aus `strategy_posts` via `useStrategyMode`
-- **Pill „Nächster Post"** → liest aus `calendar_events` via bestehender Query in `Home.tsx`
-
-Solange der User einen Strategie-Vorschlag nicht aktiv in den Kalender übernommen hat, existiert für ihn kein `calendar_event` → Pill bleibt leer.
-
-## Plan: Pill „Nächster Post" mit Strategy-Modus verbinden
-
-### Logik
-Im Strategy-Mode wird die nächste anstehende Quelle aus **beiden Tabellen** ermittelt und die zeitlich nächste gewinnt:
+### Zielbild
 
 ```text
-nextPost = min(
-  nextCalendarEvent.start_at,
-  nextStrategyPost.scheduled_at WHERE status='pending' AND scheduled_at >= now()
-)
+   So       Mo       Di       Mi       Do       Fr       Sa
+   12       13       14       15       16       17       18
+   ──●──────●──────●──────●──────●──────●──────●──   ← dünne goldene Linie
+            ◉                ○              ◉
+         (IG lila          (FB blau       (YT rot
+          glüht)            wartet)        glüht)
 ```
 
-Bei Strategy-Mode OFF → nur `calendar_events` (wie bisher).
+- **Eine** dünne goldene Timeline-Linie quer durch die Woche (subtil, statt aktuellem klobigen Streifen).
+- Pro Tag: vertikal gestapelte Plattform-Ringe in Markenfarben.
+- **Status-Visualisierung pro Ring**:
+  - `pending` (Zukunft) → gedimmter Ring (`ring-{color}/30`), kein Glow
+  - `pending` (heute, in Kürze) → langsam pulsierend in Plattformfarbe
+  - `completed/published` → **voller Glow** in Plattformfarbe (z. B. IG = lila Glow)
+  - `missed` → **roter Glow + langsames Blinken** (`animate-pulse` mit ~2s Dauer, deutlich langsamer als YouTube-Static-Glow → klar unterscheidbar)
+  - `dismissed` → fast unsichtbar, durchgestrichen
+- Klick auf Ring → öffnet **`PlatformRingDialog`** (neu).
 
-### Anzeige-Anpassungen im Pill
-- Wenn der nächste Eintrag aus `strategy_posts` stammt:
-  - Label-Zeile: „NÄCHSTER VORSCHLAG" (statt „NÄCHSTER POST")
-  - Wert-Zeile: Plattform + lokalisiertes Datum/Zeit (z. B. „Mo 21:00 · Instagram")
-  - Klick öffnet `StrategyPostDialog` (statt `NextPostDialog`)
-- Wenn aus `calendar_events`: bestehendes Verhalten
+### Plattformfarben (final)
+| Plattform | Ring | Glow |
+|---|---|---|
+| Instagram | `ring-purple-500` | `shadow-[0_0_18px_rgba(168,85,247,0.85)]` |
+| Facebook | `ring-blue-500` | `shadow-[0_0_18px_rgba(59,130,246,0.85)]` |
+| LinkedIn | `ring-green-500` | `shadow-[0_0_18px_rgba(34,197,94,0.85)]` |
+| YouTube | `ring-red-500` | `shadow-[0_0_18px_rgba(239,68,68,0.85)]` (statisch) |
+| X | `ring-violet-700` | `shadow-[0_0_18px_rgba(109,40,217,0.95)]` (Schwarzlicht/UV) |
+| TikTok | `ring-white` | `shadow-[0_0_14px_rgba(255,255,255,0.7)]` |
+| **Missed** | `ring-red-500` | `shadow-[0_0_18px_rgba(239,68,68,0.7)]` + `animate-pulse` (2s) |
 
-### Visuelle Verbindung der Punkte (Bild 1)
-Aktuell stehen die Tageskarten in `WeekStrategyTimeline` als isolierte Cards nebeneinander → keine erkennbare „Reise". Lösung:
-- Dünne horizontale Verbindungslinie hinter den Tagen (wie eine Timeline-Schiene), gold/dimmed.
-- An jedem Tag mit Vorschlag → kleiner glühender Knotenpunkt (Gold), an leeren Tagen → muted Punkt.
-- Aktuelle Linie zwischen Punkten zeigt die wöchentliche Kontinuität.
+### Neue Komponente: `WeekStrategyRingTimeline.tsx`
+Ersetzt visuell die aktuelle `WeekStrategyTimeline`. Nutzt die bestehende `WeekTimelineDay`-Logik als Basis, erweitert um:
+- Strategy-Posts statt Calendar-Posts.
+- Status-Mapping `pending|completed|missed|dismissed` → visuelles Verhalten.
+- Eine **horizontale Goldlinie** hinter den Day-Numbers (dünn, `h-px`, Gradient).
 
-```text
-   ●━━━━━○━━━━━●━━━━━○━━━━━●━━━━━○━━━━━○
-   So    Mo    Di    Mi    Do    Fr    Sa
+### Neuer Dialog: `PlatformRingDialog.tsx`
+Klick auf Ring → Dialog mit allen Aktionen in einem Fenster:
+
+**Header**: Plattform-Icon in Farbe + Datum/Uhrzeit + Status-Badge
+
+**Inhalt (Tabs oder Accordion)**:
+1. **Vorschau & Bearbeiten**
+   - Caption-Editor (Textarea, AI-Entwurf vorausgefüllt)
+   - Hashtags
+   - Hook (optional)
+   - Reasoning (warum dieser Vorschlag)
+2. **Medien**
+   - Drag & Drop Upload-Zone (Bild/Video)
+   - Auswahl aus Mediathek (`media_library`)
+   - „Mit KI generieren" Button → ruft Picture Studio bzw. AI Video Studio auf
+3. **Zeitplan**
+   - Date- & Time-Picker (vorausgefüllt mit `scheduled_at`)
+   - Plattform-Switcher (falls anderer Account)
+
+**Footer-Actions**:
+- 🗑️ **Verwerfen** (status='dismissed')
+- ✏️ **Speichern** (Update strategy_post)
+- 📅 **In Kalender übernehmen & auto-publishen** → erstellt `calendar_events` Eintrag mit `auto_publish=true`, verknüpft `completed_event_id`
+
+### Auto-Publish-Flow
+Sobald ein Strategy-Post „in Kalender übernommen" wird:
+1. Insert in `calendar_events` mit `status='scheduled'`, `auto_publish=true`, Caption, Medien, Plattform, `scheduled_at`.
+2. Der bestehende `tick-strategy-posts` (oder ein neuer `tick-publish-scheduled`) Cron-Job prüft jede Minute auf fällige Posts und triggert die jeweilige Publish-Edge-Function (Instagram/Facebook/X/LinkedIn/YouTube).
+3. Bei Erfolg: `strategy_posts.status='completed'` → Ring leuchtet in Plattformfarbe.
+4. Bei Fehler: `status='failed'` → roter Glow + Toast.
+
+> Hinweis: Da `tick-strategy-posts` bereits stündlich läuft, wird er erweitert um die Publish-Logik. Für minutengenaue Posts wäre ein zusätzlicher Cron `*/1 * * * *` nötig.
+
+### Medien-Upload
+- Reuse vom bestehenden `media-assets` Bucket
+- Pfad: `{user_id}/strategy/{post_id}/{filename}` (RLS-konform)
+- Neue Spalte `strategy_posts.media_urls TEXT[]` (Migration)
+
+### Datenmodell-Erweiterung
+```sql
+ALTER TABLE strategy_posts ADD COLUMN media_urls TEXT[] DEFAULT '{}';
+ALTER TABLE strategy_posts ADD COLUMN auto_publish BOOLEAN DEFAULT false;
 ```
-(● = Tag mit Post, ○ = leerer Tag)
-
-### Umsetzung
-
-1. **`src/pages/Home.tsx`**:
-   - Im Strategy-Mode den nächsten `pending` Strategy-Post aus `useStrategyMode().posts` ermitteln (frühestes `scheduled_at` ≥ jetzt).
-   - Mit dem aktuellen `nextCalendarEvent` mergen → der zeitlich nächste gewinnt.
-   - Daten-Objekt für `DashboardVideoCarousel` um Quelle (`source: 'calendar' | 'strategy'`) erweitern.
-
-2. **`src/components/dashboard/DashboardVideoCarousel.tsx`** (Pill + Dialog-Routing):
-   - Label dynamisch: „Nächster Post" vs. „Nächster Vorschlag".
-   - Klick → bei `source='strategy'` öffnet `StrategyPostDialog`, sonst `NextPostDialog`.
-
-3. **`src/components/dashboard/WeekStrategyTimeline.tsx`** (Verbindungslinie):
-   - Hinter der 7-Spalten-Grid-Reihe ein absolut positioniertes `<div>` mit horizontaler Gradient-Linie (`from-warning/30 via-warning/50 to-warning/30`, `h-px`).
-   - Pro Tageskarte einen kleinen Knotenpunkt (4×4px) auf der Linie zentrieren — bei `posts.length > 0` mit `bg-warning shadow-[0_0_8px_hsl(var(--warning))]`, sonst `bg-muted-foreground/30`.
 
 ### Betroffene Dateien
-- `src/pages/Home.tsx` — Merge-Logik für nächsten Post
-- `src/components/dashboard/DashboardVideoCarousel.tsx` — Dynamisches Label + Dialog-Routing
-- `src/components/dashboard/WeekStrategyTimeline.tsx` — Verbindungslinie + Knotenpunkte
+- *(neu)* `src/components/dashboard/WeekStrategyRingTimeline.tsx` — neue Visualisierung
+- *(neu)* `src/components/dashboard/PlatformRingDialog.tsx` — Edit-Dialog mit Upload + KI
+- `src/components/dashboard/WeekStrategyTimeline.tsx` — wird ersetzt/zur Wrapper
+- `src/hooks/useStrategyMode.ts` — Mutation `updateStrategyPost(id, {media_urls, caption_draft, scheduled_at, ...})`, `submitToCalendar`
+- `supabase/functions/tick-strategy-posts/index.ts` — erweitert um Auto-Publish
+- *(Migration)* `strategy_posts.media_urls`, `auto_publish` Spalten
+- `src/pages/Home.tsx` — ggf. Komponenten-Tausch
 
 ### Erwartetes Ergebnis
-- Pill „Nächster Post" zeigt sofort den nächsten Strategie-Vorschlag (z. B. „Mo 21:00 · Instagram"), sobald Strategy-Mode AN ist — keine leere Anzeige mehr.
-- Klick öffnet Detail-Dialog mit Caption-Entwurf und Reasoning.
-- Wochenleiste hat eine sichtbare Timeline-Schiene mit Knotenpunkten — Tage wirken verbunden, nicht isoliert.
+- Klare, elegante Wochenleiste mit dünner Goldlinie und leuchtenden Plattform-Ringen pro Tag.
+- Ringe leuchten erst wenn Post veröffentlicht wurde — sonst dezent gedimmt.
+- Verpasste Posts leuchten **rot pulsierend** (klar von YouTube-Statik-Rot unterscheidbar).
+- Klick auf Ring → ein einziger smarter Dialog mit Caption-Editor, Medien-Upload, KI-Generator, Zeitplan und Lösch-/Auto-Publish-Aktion.
+- Nach dem Posten leuchtet der Ring automatisch in Plattformfarbe — visuelles Belohnungs-Feedback für den Creator.
 
