@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
-import { Play, ChevronLeft, ChevronRight, Video, Sparkles, Expand, Volume2, VolumeX, LucideIcon, Lightbulb, Infinity as InfinityIcon, Clock } from 'lucide-react';
+import { Play, ChevronLeft, ChevronRight, Video, Sparkles, Expand, Volume2, VolumeX, LucideIcon, Lightbulb, Infinity as InfinityIcon, Clock, CalendarPlus, CalendarDays, Edit3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoHistory } from '@/hooks/useVideoHistory';
 import { VideoPreviewPlayer } from '@/components/video/VideoPreviewPlayer';
@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { PlatformBadge } from '@/components/ui/PlatformBadge';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { DEMO_VIDEO, isDemoVideo } from '@/constants/demo-video';
@@ -46,12 +48,34 @@ const resolveVideoUrl = (rawUrl: string): string => {
   return data.publicUrl;
 };
 
+export interface NextPostInfo {
+  platform?: string;
+  contentIdea?: string;
+  caption?: string;
+  mediaUrl?: string;
+  hashtags?: string[];
+  /** Display string e.g. "20.04. 14:30" */
+  whenLabel: string;
+  /** Optional ISO date for full formatting */
+  isoDate?: string;
+}
+
 interface DashboardVideoCarouselProps {
   quickActions?: QuickAction[];
   tipText?: string;
   tipLabel?: string;
   nextPostLabel?: string;
   nextPostPrefix?: string;
+  nextPost?: NextPostInfo | null;
+}
+
+interface StatusPillsProps {
+  tipText?: string;
+  tipLabel?: string;
+  nextPostLabel?: string;
+  nextPostPrefix?: string;
+  nextPost?: NextPostInfo | null;
+  onOpenNextPost?: () => void;
 }
 
 const StatusPills = ({
@@ -59,7 +83,8 @@ const StatusPills = ({
   tipLabel,
   nextPostLabel,
   nextPostPrefix,
-}: Pick<DashboardVideoCarouselProps, 'tipText' | 'tipLabel' | 'nextPostLabel' | 'nextPostPrefix'>) => {
+  onOpenNextPost,
+}: StatusPillsProps) => {
   if (!tipText && !nextPostLabel) return null;
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
@@ -69,10 +94,10 @@ const StatusPills = ({
             <TooltipTrigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-border/40 bg-card/40 backdrop-blur-sm hover:bg-muted/60 transition-colors"
+                className="inline-flex items-center justify-center h-11 w-11 rounded-2xl border border-border/40 bg-card/40 backdrop-blur-sm hover:bg-muted/60 hover:border-primary/40 transition-colors"
                 aria-label={tipLabel}
               >
-                <Lightbulb className="h-3.5 w-3.5 text-primary" />
+                <Lightbulb className="h-4 w-4 text-primary" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-xs">
@@ -82,18 +107,28 @@ const StatusPills = ({
           </Tooltip>
         </TooltipProvider>
       )}
-      <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-warning/40 bg-warning/10 text-xs font-medium text-warning backdrop-blur-sm">
-        <InfinityIcon className="h-3.5 w-3.5" />
+      <span className="inline-flex items-center gap-1.5 h-11 px-3 rounded-2xl border border-warning/40 bg-warning/10 text-xs font-medium text-warning backdrop-blur-sm">
+        <InfinityIcon className="h-4 w-4" />
         <span className="hidden md:inline">Unlimited</span>
       </span>
       {nextPostLabel && (
-        <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-border/40 bg-card/40 text-xs text-muted-foreground backdrop-blur-sm">
-          <Clock className="h-3.5 w-3.5 text-warning" />
-          <span className="truncate max-w-[180px]">
-            <span className="hidden lg:inline">{nextPostPrefix}: </span>
-            {nextPostLabel}
+        <button
+          type="button"
+          onClick={onOpenNextPost}
+          className="inline-flex items-center gap-2 h-11 pl-2.5 pr-3 rounded-2xl border border-border/40 bg-card/40 backdrop-blur-sm hover:bg-muted/60 hover:border-warning/50 transition-colors text-left group"
+        >
+          <span className="inline-flex items-center justify-center h-7 w-7 rounded-xl bg-warning/10 text-warning shrink-0">
+            <Clock className="h-3.5 w-3.5" />
           </span>
-        </span>
+          <span className="flex flex-col leading-tight">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80 font-medium">
+              {nextPostPrefix}
+            </span>
+            <span className="text-xs font-medium text-foreground whitespace-nowrap">
+              {nextPostLabel}
+            </span>
+          </span>
+        </button>
       )}
     </div>
   );
@@ -105,17 +140,21 @@ export const DashboardVideoCarousel = ({
   tipLabel,
   nextPostLabel,
   nextPostPrefix,
+  nextPost,
 }: DashboardVideoCarouselProps) => {
   const { videos, isLoading } = useVideoHistory();
   const { t, language } = useTranslation();
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [nextPostDialogOpen, setNextPostDialogOpen] = useState(false);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const [errorVideos, setErrorVideos] = useState<Set<string>>(new Set());
   const [retriedVideos, setRetriedVideos] = useState<Set<string>>(new Set());
   const [isMuted, setIsMuted] = useState(true);
   const wheelTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const openNextPost = useCallback(() => setNextPostDialogOpen(true), []);
 
   const sortedVideos = useMemo(() =>
     [...videos]
@@ -257,7 +296,7 @@ export const DashboardVideoCarousel = ({
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 flex-wrap">
-          <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} />
+          <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} nextPost={nextPost} onOpenNextPost={openNextPost} />
           {quickActions.length > 0 && (
             <div className="flex items-center gap-1.5 ml-auto">
               {quickActions.map((action, i) => (
@@ -276,6 +315,7 @@ export const DashboardVideoCarousel = ({
             <div key={i} className="w-56 h-36 rounded-xl bg-muted animate-pulse" />
           ))}
         </div>
+        <NextPostDialog open={nextPostDialogOpen} onOpenChange={setNextPostDialogOpen} nextPost={nextPost} whenLabel={nextPostLabel} title={nextPostPrefix} />
       </div>
     );
   }
@@ -286,7 +326,7 @@ export const DashboardVideoCarousel = ({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} />
+          <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} nextPost={nextPost} onOpenNextPost={openNextPost} />
           {quickActions.length > 0 && (
             <div className="flex items-center gap-1.5 ml-auto">
               {quickActions.map((action, i) => (
@@ -382,6 +422,7 @@ export const DashboardVideoCarousel = ({
             title={selectedVideo.title}
           />
         )}
+        <NextPostDialog open={nextPostDialogOpen} onOpenChange={setNextPostDialogOpen} nextPost={nextPost} whenLabel={nextPostLabel} title={nextPostPrefix} />
       </div>
     );
   }
@@ -389,7 +430,7 @@ export const DashboardVideoCarousel = ({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2 py-1 flex-wrap">
-        <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} />
+        <StatusPills tipText={tipText} tipLabel={tipLabel} nextPostLabel={nextPostLabel} nextPostPrefix={nextPostPrefix} nextPost={nextPost} onOpenNextPost={openNextPost} />
         <div className="flex items-center gap-1.5">
           {quickActions.map((action, i) => (
             <Button key={i} asChild variant={action.variant || 'outline'} size="sm" className="h-7 px-2.5 text-xs rounded-lg gap-1.5">
@@ -604,6 +645,134 @@ export const DashboardVideoCarousel = ({
           title={selectedVideo.title}
         />
       )}
+
+      <NextPostDialog
+        open={nextPostDialogOpen}
+        onOpenChange={setNextPostDialogOpen}
+        nextPost={nextPost}
+        whenLabel={nextPostLabel}
+        title={nextPostPrefix}
+      />
     </div>
+  );
+};
+
+interface NextPostDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  nextPost?: NextPostInfo | null;
+  whenLabel?: string;
+  title?: string;
+}
+
+const NextPostDialog = ({ open, onOpenChange, nextPost, whenLabel, title }: NextPostDialogProps) => {
+  const { t, language } = useTranslation();
+  const hasPost = !!nextPost && !!nextPost.platform;
+
+  const formattedDate = (() => {
+    if (!nextPost?.isoDate) return whenLabel || '';
+    try {
+      const d = new Date(nextPost.isoDate);
+      const locale = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
+      return d.toLocaleDateString(locale, {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      });
+    } catch {
+      return whenLabel || '';
+    }
+  })();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-warning" />
+            {title || t('dashboard.statusBar.nextPost')}
+          </DialogTitle>
+          <DialogDescription>
+            {hasPost
+              ? t('homePage.nextScheduledPost')
+              : t('homePage.noPostScheduled')}
+          </DialogDescription>
+        </DialogHeader>
+
+        {hasPost ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/30 p-3">
+              <div className="flex items-center gap-2">
+                {nextPost!.platform && <PlatformBadge platform={nextPost!.platform} />}
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">{formattedDate}</p>
+                <p className="text-sm font-semibold text-foreground">{whenLabel}</p>
+              </div>
+            </div>
+
+            {nextPost!.mediaUrl && (
+              <div className="rounded-xl overflow-hidden border border-border/40 bg-black aspect-video">
+                <img
+                  src={nextPost!.mediaUrl}
+                  alt={nextPost!.contentIdea || 'Post preview'}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+
+            {(nextPost!.contentIdea || nextPost!.caption) && (
+              <div className="space-y-1">
+                {nextPost!.contentIdea && (
+                  <p className="text-sm font-medium text-foreground">
+                    {nextPost!.contentIdea}
+                  </p>
+                )}
+                {nextPost!.caption && (
+                  <p className="text-sm text-muted-foreground line-clamp-4 whitespace-pre-wrap">
+                    {nextPost!.caption}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {nextPost!.hashtags && nextPost!.hashtags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {nextPost!.hashtags.slice(0, 8).map((tag, i) => (
+                  <Badge key={i} variant="secondary" className="text-[10px]">
+                    #{tag.replace(/^#/, '')}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border/50 bg-muted/20 p-6 text-center">
+            <CalendarPlus className="h-8 w-8 text-muted-foreground/60 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              {t('homePage.noPostScheduled')}
+            </p>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button asChild variant="outline" onClick={() => onOpenChange(false)}>
+            <Link to="/calendar">
+              <CalendarDays className="h-4 w-4 mr-2" />
+              {t('homePage.planInCalendar')}
+            </Link>
+          </Button>
+          {!hasPost && (
+            <Button asChild onClick={() => onOpenChange(false)}>
+              <Link to="/calendar">
+                <CalendarPlus className="h-4 w-4 mr-2" />
+                {t('homePage.startPlanning')}
+              </Link>
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
