@@ -315,6 +315,7 @@ export const DashboardVideoCarousel = ({
             <div key={i} className="w-56 h-36 rounded-xl bg-muted animate-pulse" />
           ))}
         </div>
+        <NextPostDialog open={nextPostDialogOpen} onOpenChange={setNextPostDialogOpen} nextPost={nextPost} whenLabel={nextPostLabel} title={nextPostPrefix} />
       </div>
     );
   }
