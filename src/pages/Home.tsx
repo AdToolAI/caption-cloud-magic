@@ -576,6 +576,8 @@ const Home = () => {
         {/* Week Calendar */}
         {user && (() => {
           const sm = useStrategyMode();
+          // Bridge nextPost from strategy mode upward via a state setter is too complex; we surface here.
+          (window as any).__sm = sm;
           return (
             <Section 
               title={t("dashboard.sections.thisWeek")}
