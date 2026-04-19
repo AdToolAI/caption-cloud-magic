@@ -6387,6 +6387,8 @@ export type Database = {
           security_alerts_enabled: boolean | null
           storage_limit_mb: number | null
           storage_used_mb: number | null
+          strategy_mode_activated_at: string | null
+          strategy_mode_enabled: boolean
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_current_period_end: string | null
@@ -6417,6 +6419,8 @@ export type Database = {
           security_alerts_enabled?: boolean | null
           storage_limit_mb?: number | null
           storage_used_mb?: number | null
+          strategy_mode_activated_at?: string | null
+          strategy_mode_enabled?: boolean
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_current_period_end?: string | null
@@ -6447,6 +6451,8 @@ export type Database = {
           security_alerts_enabled?: boolean | null
           storage_limit_mb?: number | null
           storage_used_mb?: number | null
+          strategy_mode_activated_at?: string | null
+          strategy_mode_enabled?: boolean
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_current_period_end?: string | null
@@ -8239,6 +8245,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      strategy_posts: {
+        Row: {
+          caption_draft: string | null
+          completed_event_id: string | null
+          content_idea: string
+          created_at: string
+          generation_batch_id: string | null
+          hashtags: Json | null
+          id: string
+          original_scheduled_at: string | null
+          platform: string
+          reasoning: string | null
+          scheduled_at: string
+          status: string
+          updated_at: string
+          user_id: string
+          week_start: string
+          workspace_id: string | null
+        }
+        Insert: {
+          caption_draft?: string | null
+          completed_event_id?: string | null
+          content_idea: string
+          created_at?: string
+          generation_batch_id?: string | null
+          hashtags?: Json | null
+          id?: string
+          original_scheduled_at?: string | null
+          platform: string
+          reasoning?: string | null
+          scheduled_at: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          week_start: string
+          workspace_id?: string | null
+        }
+        Update: {
+          caption_draft?: string | null
+          completed_event_id?: string | null
+          content_idea?: string
+          created_at?: string
+          generation_batch_id?: string | null
+          hashtags?: Json | null
+          id?: string
+          original_scheduled_at?: string | null
+          platform?: string
+          reasoning?: string | null
+          scheduled_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+          workspace_id?: string | null
+        }
+        Relationships: []
       }
       stream_clips: {
         Row: {
