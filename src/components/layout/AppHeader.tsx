@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/NotificationBell";
 import { SocialConnectionIcons } from "@/components/dashboard/SocialConnectionIcons";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { StreakBadge } from "@/components/streak/StreakBadge";
 
 export function AppHeader() {
   const { toggleSidebar } = useSidebar();
@@ -57,6 +58,7 @@ export function AppHeader() {
 
         {/* Right: Actions */}
         <div data-tour="header-actions" className="flex items-center gap-2 ml-12">
+          {user && <StreakBadge />}
           <LanguageSwitcher />
           <ThemeToggle />
           {user && (
