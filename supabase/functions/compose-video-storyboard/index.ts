@@ -217,7 +217,9 @@ ${structure}
 
 🚨 INTEGRATION REQUIREMENT (non-negotiable): The product must appear *within* real-world scenes — used by people, in real environments, in lifestyle moments. The product is part of the story, not the story itself. Avoid isolated product shots entirely, except for AT MOST ONE hero scene if the briefing genuinely calls for a clean beauty-shot. Every other scene must feature a human or life situation with the product integrated naturally.
 
-🚨 INDEPENDENCE REQUIREMENT (non-negotiable): Every scene is rendered by a SEPARATE AI generation with no memory of other scenes. Describe each human subject FROM SCRATCH in each scene — no "same person", no "she/he from before", no continuity pronouns. Treat each scene as a standalone shot in a montage. If you want a recurring type, describe the archetype generically in every scene rather than claiming identity continuity.
+${(briefing.characters && briefing.characters.length > 0)
+  ? `🎭 CHARACTER REQUIREMENT (non-negotiable): The user defined ${briefing.characters.length} recurring character(s): ${briefing.characters.map(c => c.name).join(', ')}. Distribute their appearances across scenes per the SMART CHARACTER CONSISTENCY rules in the system prompt — vary shotType so face close-ups happen in only 1-2 scenes; rely on signatureItems verbatim for visual continuity. Set characterShot per scene.`
+  : `🚨 INDEPENDENCE REQUIREMENT (non-negotiable): Every scene is rendered by a SEPARATE AI generation with no memory of other scenes. Describe each human subject FROM SCRATCH in each scene — no "same person", no "she/he from before", no continuity pronouns. Treat each scene as a standalone shot in a montage. If you want a recurring type, describe the archetype generically in every scene rather than claiming identity continuity.`}
 
 Generate the storyboard using the create_storyboard function.`;
 
