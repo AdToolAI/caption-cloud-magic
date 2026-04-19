@@ -7,6 +7,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+interface ComposerCharacter {
+  id: string;
+  name: string;
+  appearance: string;
+  signatureItems: string;
+}
+
 interface Briefing {
   mode: string;
   productName: string;
@@ -18,6 +25,7 @@ interface Briefing {
   aspectRatio: string;
   brandColors: string[];
   visualStyle?: string;
+  characters?: ComposerCharacter[];
 }
 
 const CATEGORY_STRUCTURES: Record<string, string> = {
