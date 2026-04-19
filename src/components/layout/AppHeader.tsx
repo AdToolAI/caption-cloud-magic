@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/NotificationBell";
 import { SocialConnectionIcons } from "@/components/dashboard/SocialConnectionIcons";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { StreakBadge } from "@/components/streak/StreakBadge";
 
 export function AppHeader() {
   const { toggleSidebar } = useSidebar();
