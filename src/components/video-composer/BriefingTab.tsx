@@ -572,6 +572,13 @@ export default function BriefingTab({
         </CardContent>
       </Card>
 
+      {/* Recurring Characters — drives consistency across scenes */}
+      <CharacterManager
+        characters={briefing.characters || []}
+        language={language}
+        onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
+      />
+
       {/* Visual Style — drives consistent look across all AI-generated scenes */}
       <Card className="border-border/40 bg-card/80">
         <CardHeader className="pb-3">
