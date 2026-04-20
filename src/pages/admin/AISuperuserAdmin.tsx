@@ -306,7 +306,7 @@ export function AISuperuserAdmin() {
                     {(totalMs / 1000).toFixed(1)}s
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    Summe aller {scenarios.length} Szenarien — &lt; 30s ist normal
+                    Summe aller {scenarios.length} Szenarien — &lt; 45s ist normal
                   </div>
                 </>
               );
