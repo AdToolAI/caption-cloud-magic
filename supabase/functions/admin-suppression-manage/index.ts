@@ -11,8 +11,8 @@ const corsHeaders = {
 };
 
 interface RequestBody {
-  action: "add" | "remove";
-  email: string;
+  action: "add" | "remove" | "bulk_remove_test";
+  email?: string;
   reason?: "bounce" | "complaint" | "unsubscribe" | "manual";
   note?: string;
 }
@@ -57,8 +57,23 @@ Deno.serve(async (req) => {
 
     // Parse body
     const body = (await req.json()) as RequestBody;
-    if (!body?.email || !body?.action) {
-      return json({ error: "Missing 'email' or 'action'" }, 400);
+    if (!body?.action) {
+      return json({ error: "Missing 'action'" }, 400);
+    }
+
+    // Bulk-remove all Resend test addresses (*@resend.dev)
+    if (body.action === "bulk_remove_test") {
+      const { data, error } = await adminClient
+        .from("email_suppression_list")
+        .delete()
+        .ilike("email", "%@resend.dev")
+        .select("email");
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true, action: "bulk_remove_test", removed: data?.length ?? 0 });
+    }
+
+    if (!body.email) {
+      return json({ error: "Missing 'email'" }, 400);
     }
     const email = body.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
