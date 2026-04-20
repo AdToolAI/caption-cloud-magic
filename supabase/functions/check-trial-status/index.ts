@@ -1,7 +1,40 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { Resend } from "https://esm.sh/resend@2.0.0";
-import { renderTrialExpiredEmail, type Lang } from "../process-activation-emails/templates.ts";
+
+type Lang = "de" | "en" | "es";
+
+const trialExpiredCopy: Record<Lang, { subject: string; heading: string; intro: string; cta: string; footnote: string }> = {
+  de: {
+    subject: "Dein 14-Tage Enterprise-Trial ist abgelaufen 🔒",
+    heading: "Dein Trial ist beendet",
+    intro: "Dein 14-Tage Enterprise-Trial ist heute abgelaufen. Damit du wieder posten, generieren und veröffentlichen kannst, wähle jetzt einen Plan – schon ab €19/Monat.",
+    cta: "Plan wählen & freischalten",
+    footnote: "Deine Daten und Assets bleiben gespeichert. Du verlierst nichts.",
+  },
+  en: {
+    subject: "Your 14-day Enterprise trial has ended 🔒",
+    heading: "Your trial has ended",
+    intro: "Your 14-day Enterprise trial expired today. To resume creating, generating and publishing, pick a plan – starting at €19/month.",
+    cta: "Choose plan & unlock",
+    footnote: "Your data and assets stay safe. Nothing is lost.",
+  },
+  es: {
+    subject: "Tu prueba Enterprise de 14 días ha terminado 🔒",
+    heading: "Tu prueba ha terminado",
+    intro: "Tu prueba Enterprise de 14 días expiró hoy. Para seguir creando, generando y publicando, elige un plan – desde €19/mes.",
+    cta: "Elegir plan y desbloquear",
+    footnote: "Tus datos y assets siguen seguros. No pierdes nada.",
+  },
+};
+
+function renderTrialExpiredEmail(input: { lang: Lang; appUrl: string; userEmail: string }) {
+  const copy = trialExpiredCopy[input.lang];
+  const ctaUrl = `${input.appUrl.replace(/\/$/, "")}/pricing?reactivate=1`;
+  const styles = `body{margin:0;background:#0a0a0f;font-family:Inter,-apple-system,sans-serif;color:#e8e6e1}.wrap{max-width:560px;margin:0 auto;padding:40px 24px}.card{background:linear-gradient(180deg,#15151f,#0e0e16);border:1px solid rgba(245,199,106,.15);border-radius:16px;padding:36px 28px}.logo{color:#F5C76A;font-weight:700;font-size:20px;margin-bottom:24px}h1{color:#fff;font-size:26px;margin:0 0 16px}p{color:#cfcdc7;font-size:15px;line-height:1.65;margin:0 0 18px}.cta{display:inline-block;background:linear-gradient(135deg,#F5C76A,#e0a847);color:#0a0a0f!important;text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:700}.foot{color:#7a7770;font-size:12px;margin-top:32px;text-align:center}`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>${styles}</style></head><body><div class="wrap"><div class="card"><div class="logo">AdTool AI</div><h1>${copy.heading}</h1><p>${copy.intro}</p><p style="margin:28px 0;"><a class="cta" href="${ctaUrl}">${copy.cta}</a></p><p style="color:#8a8780;font-size:13px;border-top:1px solid rgba(255,255,255,.05);padding-top:20px;">${copy.footnote}</p></div><div class="foot">AdTool AI · ${input.userEmail}</div></div></body></html>`;
+  return { subject: copy.subject, html };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
