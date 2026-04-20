@@ -1576,6 +1576,69 @@ export type Database = {
           },
         ]
       }
+      bug_reports: {
+        Row: {
+          admin_notes: string | null
+          console_logs: Json | null
+          created_at: string
+          description: string
+          id: string
+          metadata: Json | null
+          resolved_at: string | null
+          resolved_by: string | null
+          route: string | null
+          screenshot_url: string | null
+          severity: string
+          status: string
+          title: string
+          updated_at: string
+          user_agent: string | null
+          user_email: string | null
+          user_id: string | null
+          viewport: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          console_logs?: Json | null
+          created_at?: string
+          description: string
+          id?: string
+          metadata?: Json | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          route?: string | null
+          screenshot_url?: string | null
+          severity?: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          viewport?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          console_logs?: Json | null
+          created_at?: string
+          description?: string
+          id?: string
+          metadata?: Json | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          route?: string | null
+          screenshot_url?: string | null
+          severity?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          viewport?: string | null
+        }
+        Relationships: []
+      }
       bulk_schedule_jobs: {
         Row: {
           completed_at: string | null
@@ -8179,6 +8242,60 @@ export type Database = {
         }
         Relationships: []
       }
+      sentry_issues_cache: {
+        Row: {
+          culprit: string | null
+          event_count: number | null
+          first_seen: string | null
+          id: string
+          last_seen: string | null
+          level: string | null
+          metadata: Json | null
+          permalink: string | null
+          platform: string | null
+          sentry_issue_id: string
+          short_id: string | null
+          status: string | null
+          synced_at: string
+          title: string
+          user_count: number | null
+        }
+        Insert: {
+          culprit?: string | null
+          event_count?: number | null
+          first_seen?: string | null
+          id?: string
+          last_seen?: string | null
+          level?: string | null
+          metadata?: Json | null
+          permalink?: string | null
+          platform?: string | null
+          sentry_issue_id: string
+          short_id?: string | null
+          status?: string | null
+          synced_at?: string
+          title: string
+          user_count?: number | null
+        }
+        Update: {
+          culprit?: string | null
+          event_count?: number | null
+          first_seen?: string | null
+          id?: string
+          last_seen?: string | null
+          level?: string | null
+          metadata?: Json | null
+          permalink?: string | null
+          platform?: string | null
+          sentry_issue_id?: string
+          short_id?: string | null
+          status?: string | null
+          synced_at?: string
+          title?: string
+          user_count?: number | null
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           key: string
@@ -8194,6 +8311,42 @@ export type Database = {
           key?: string
           updated_at?: string | null
           value_json?: Json
+        }
+        Relationships: []
+      }
+      smoke_test_runs: {
+        Row: {
+          error_message: string | null
+          id: string
+          latency_ms: number | null
+          metadata: Json | null
+          response_data: Json | null
+          run_at: string
+          status: string
+          test_name: string
+          test_type: string
+        }
+        Insert: {
+          error_message?: string | null
+          id?: string
+          latency_ms?: number | null
+          metadata?: Json | null
+          response_data?: Json | null
+          run_at?: string
+          status: string
+          test_name: string
+          test_type?: string
+        }
+        Update: {
+          error_message?: string | null
+          id?: string
+          latency_ms?: number | null
+          metadata?: Json | null
+          response_data?: Json | null
+          run_at?: string
+          status?: string
+          test_name?: string
+          test_type?: string
         }
         Relationships: []
       }

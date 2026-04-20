@@ -6,7 +6,10 @@ import { ProviderHealth } from '@/pages/admin/ProviderHealth';
 import { CacheHealth } from '@/pages/admin/CacheHealth';
 import { CostMonitor } from '@/pages/admin/CostMonitor';
 import Alerts from '@/pages/admin/Alerts';
-import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell } from 'lucide-react';
+import { SentryDashboard } from '@/pages/admin/SentryDashboard';
+import { BugReportsAdmin } from '@/pages/admin/BugReportsAdmin';
+import { SmokeTestsAdmin } from '@/pages/admin/SmokeTestsAdmin';
+import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, HeartPulse } from 'lucide-react';
 
 export default function Admin() {
   return (
@@ -18,8 +21,20 @@ export default function Admin() {
         </p>
       </div>
 
-      <Tabs defaultValue="funnel" className="space-y-6">
-        <TabsList>
+      <Tabs defaultValue="bugs" className="space-y-6">
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="bugs" className="flex items-center gap-2">
+            <Bug className="h-4 w-4" />
+            Bug Reports
+          </TabsTrigger>
+          <TabsTrigger value="sentry" className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4" />
+            Sentry
+          </TabsTrigger>
+          <TabsTrigger value="smoke" className="flex items-center gap-2">
+            <HeartPulse className="h-4 w-4" />
+            Smoke Tests
+          </TabsTrigger>
           <TabsTrigger value="funnel" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             Conversion Funnel
@@ -49,6 +64,18 @@ export default function Admin() {
             Alerts
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="bugs">
+          <BugReportsAdmin />
+        </TabsContent>
+
+        <TabsContent value="sentry">
+          <SentryDashboard />
+        </TabsContent>
+
+        <TabsContent value="smoke">
+          <SmokeTestsAdmin />
+        </TabsContent>
 
         <TabsContent value="funnel">
           <ConversionFunnel />
