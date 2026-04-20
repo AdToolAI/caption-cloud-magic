@@ -3756,6 +3756,21 @@ export const translations: Record<Language, any> = {
         scaleCampaignsDesc: "Automate recurring tasks and multiply your output.",
         learnMore: "Learn more"
       },
+      aiModels: {
+        badge: "AI Arsenal",
+        title1: "6 licensed ",
+        title2: "Premium AI Models",
+        subtitle: "Switch between the world's best video generation models — all licensed, all production-ready.",
+        recommended: "Recommended",
+        models: {
+          kling: { name: "Kling 3 Omni", tagline: "Best motion & physics" },
+          wan: { name: "Wan 2.5", tagline: "Native 1080p cinematic" },
+          luma: { name: "Luma Ray 2", tagline: "Photoreal lighting" },
+          hailuo: { name: "Hailuo 2.3", tagline: "Director-grade control" },
+          seedance: { name: "Seedance 2", tagline: "Fast & expressive" },
+          veo: { name: "Veo", tagline: "Google flagship quality" }
+        }
+      },
       pricing: {
         title1: "Choose your ",
         title2: "Mission Level",
@@ -8091,6 +8106,21 @@ export const translations: Record<Language, any> = {
         scaleCampaignsDesc: "Automatisiere wiederkehrende Aufgaben und multipliziere deinen Output.",
         learnMore: "Mehr erfahren"
       },
+      aiModels: {
+        badge: "KI-Arsenal",
+        title1: "6 lizensierte ",
+        title2: "Premium-KI-Modelle",
+        subtitle: "Wechsle zwischen den besten Video-Modellen der Welt — alle lizensiert, alle produktionsbereit.",
+        recommended: "Empfohlen",
+        models: {
+          kling: { name: "Kling 3 Omni", tagline: "Beste Bewegung & Physik" },
+          wan: { name: "Wan 2.5", tagline: "Natives 1080p cinematic" },
+          luma: { name: "Luma Ray 2", tagline: "Fotorealistisches Licht" },
+          hailuo: { name: "Hailuo 2.3", tagline: "Regie-Kontrolle" },
+          seedance: { name: "Seedance 2", tagline: "Schnell & expressiv" },
+          veo: { name: "Veo", tagline: "Google Flaggschiff-Qualität" }
+        }
+      },
       pricing: {
         title1: "Wähle deinen ",
         title2: "Einsatz-Level",
@@ -12209,6 +12239,21 @@ export const translations: Record<Language, any> = {
         scaleCampaigns: "Escala Campañas",
         scaleCampaignsDesc: "Automatiza tareas recurrentes y multiplica tu producción.",
         learnMore: "Saber más"
+      },
+      aiModels: {
+        badge: "Arsenal IA",
+        title1: "6 modelos ",
+        title2: "Premium de IA con licencia",
+        subtitle: "Cambia entre los mejores modelos de video del mundo — todos con licencia, listos para producción.",
+        recommended: "Recomendado",
+        models: {
+          kling: { name: "Kling 3 Omni", tagline: "Mejor movimiento y física" },
+          wan: { name: "Wan 2.5", tagline: "1080p cinematográfico nativo" },
+          luma: { name: "Luma Ray 2", tagline: "Iluminación fotorrealista" },
+          hailuo: { name: "Hailuo 2.3", tagline: "Control de director" },
+          seedance: { name: "Seedance 2", tagline: "Rápido y expresivo" },
+          veo: { name: "Veo", tagline: "Calidad insignia de Google" }
+        }
       },
       pricing: {
         title1: "Elige tu ",
