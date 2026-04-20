@@ -4,7 +4,8 @@ import { ConversionFunnel } from '@/components/admin/ConversionFunnel';
 import { EmailDashboard } from '@/pages/admin/EmailDashboard';
 import { ProviderHealth } from '@/pages/admin/ProviderHealth';
 import { CacheHealth } from '@/pages/admin/CacheHealth';
-import { Activity, TrendingUp, Mail, Gauge, Database } from 'lucide-react';
+import { CostMonitor } from '@/pages/admin/CostMonitor';
+import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign } from 'lucide-react';
 
 export default function Admin() {
   return (
@@ -38,6 +39,10 @@ export default function Admin() {
             <Database className="h-4 w-4" />
             Cache Health
           </TabsTrigger>
+          <TabsTrigger value="cost-monitor" className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            Cost Monitor
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="funnel">
@@ -58,6 +63,10 @@ export default function Admin() {
 
         <TabsContent value="cache-health">
           <CacheHealth />
+        </TabsContent>
+
+        <TabsContent value="cost-monitor">
+          <CostMonitor />
         </TabsContent>
       </Tabs>
     </div>
