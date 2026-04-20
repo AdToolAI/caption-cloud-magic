@@ -22,6 +22,31 @@ interface SendVerificationRequest {
   email: string;
   userId: string;
   language?: string;
+  appUrl?: string;
+}
+
+const ALLOWED_ORIGINS = new Set<string>([
+  "https://useadtool.ai",
+  "https://www.useadtool.ai",
+  "https://captiongenie.app",
+  "https://www.captiongenie.app",
+  "https://caption-cloud-magic.lovable.app",
+]);
+
+const DEFAULT_APP_URL = "https://useadtool.ai";
+
+function resolveAppUrl(candidate?: string | null): string {
+  if (!candidate) return DEFAULT_APP_URL;
+  try {
+    const u = new URL(candidate);
+    const origin = `${u.protocol}//${u.host}`;
+    if (ALLOWED_ORIGINS.has(origin)) return origin;
+    // Allow lovable.app preview subdomains
+    if (u.host.endsWith(".lovable.app")) return origin;
+    return DEFAULT_APP_URL;
+  } catch {
+    return DEFAULT_APP_URL;
+  }
 }
 
 function normalizeLanguage(lang?: string | null): EmailLanguage {
