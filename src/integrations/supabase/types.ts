@@ -4697,6 +4697,33 @@ export type Database = {
         }
         Relationships: []
       }
+      feature_usage_events: {
+        Row: {
+          feature_key: string
+          first_used_at: string
+          id: string
+          last_used_at: string
+          use_count: number
+          user_id: string
+        }
+        Insert: {
+          feature_key: string
+          first_used_at?: string
+          id?: string
+          last_used_at?: string
+          use_count?: number
+          user_id: string
+        }
+        Update: {
+          feature_key?: string
+          first_used_at?: string
+          id?: string
+          last_used_at?: string
+          use_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       gaming_discord_settings: {
         Row: {
           auto_notify_live: boolean | null
@@ -6486,6 +6513,7 @@ export type Database = {
           twitch_username: string | null
           unsubscribe_token: string
           updated_at: string | null
+          upgrade_prompts_dismissed: Json
           welcome_bonus_granted_at: string | null
           welcome_bonus_seen_at: string | null
         }
@@ -6531,6 +6559,7 @@ export type Database = {
           twitch_username?: string | null
           unsubscribe_token?: string
           updated_at?: string | null
+          upgrade_prompts_dismissed?: Json
           welcome_bonus_granted_at?: string | null
           welcome_bonus_seen_at?: string | null
         }
@@ -6576,6 +6605,7 @@ export type Database = {
           twitch_username?: string | null
           unsubscribe_token?: string
           updated_at?: string | null
+          upgrade_prompts_dismissed?: Json
           welcome_bonus_granted_at?: string | null
           welcome_bonus_seen_at?: string | null
         }
@@ -11544,6 +11574,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      increment_feature_usage: {
+        Args: { p_feature_key: string; p_user_id: string }
+        Returns: number
       }
       increment_template_usage: {
         Args: { template_id: string }
