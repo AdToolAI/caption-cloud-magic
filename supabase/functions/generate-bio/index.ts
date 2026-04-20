@@ -79,11 +79,12 @@ serve(withTelemetry('generate-bio', async (req) => {
     // Check user's plan
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan')
+      .select('plan, is_test_account')
       .eq('id', user.id)
       .single();
 
-    const isPro = profile?.plan === 'pro';
+    // Test accounts (KI Superuser) bypass daily limits
+    const isPro = profile?.plan === 'pro' || profile?.plan === 'enterprise' || profile?.is_test_account === true;
 
     // Check daily limit for free users
     if (!isPro) {

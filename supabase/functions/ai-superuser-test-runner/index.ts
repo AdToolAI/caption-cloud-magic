@@ -29,6 +29,7 @@ interface Scenario {
 interface TestContext {
   userId: string;
   userJwt: string;
+  demoProjectId: string;
 }
 
 /**
@@ -122,34 +123,11 @@ const SCENARIOS: Scenario[] = [
       language: "en",
     },
   },
-  // Optional scenarios — functions don't currently exist; will report as warning
-  {
-    name: "Hooks Generation",
-    category: "fast",
-    fn: "generate-hooks",
-    body: { topic: "Productivity tips", platform: "tiktok", tone: "casual", language: "en", styles: ["question", "statistic"] },
-    optional: true,
-  },
-  {
-    name: "Reel Script (30s)",
-    category: "fast",
-    fn: "generate-reel-script",
-    body: { topic: "5 morning habits", duration: 30, style: "educational", hook: "Did you know?", language: "en" },
-    optional: true,
-  },
   {
     name: "Comments Analysis",
     category: "fast",
     fn: "analyze-comments",
-    body: {
-      comments: [
-        { id: "test-1", text: "Love this content!" },
-        { id: "test-2", text: "When is the next post?" },
-      ],
-      generateReplies: true,
-      language: "en",
-    },
-    optional: true,
+    body: (ctx) => ({ projectId: ctx.demoProjectId }),
   },
 ];
 

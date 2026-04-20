@@ -107,6 +107,16 @@ Deno.serve(async (req) => {
           data: { recentLatency: Math.round(stat.recentLatency), baseline: Math.round(baseline) },
         });
       }
+
+      // Absolute latency threshold: anything over 60s is a warning regardless of baseline
+      if (stat.recentLatency > 60000) {
+        anomalies.push({
+          severity: "medium",
+          description: `Hohe Latenz: "${name}" benötigt im Schnitt ${Math.round(stat.recentLatency / 1000)}s pro Run (Schwellwert 60s).`,
+          scenarios: [name],
+          data: { recentLatency: Math.round(stat.recentLatency), threshold: 60000 },
+        });
+      }
     }
 
     // Use AI for deeper pattern analysis if there are multiple anomalies
