@@ -1,7 +1,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SystemMonitor } from '@/components/admin/SystemMonitor';
 import { ConversionFunnel } from '@/components/admin/ConversionFunnel';
-import { Activity, TrendingUp } from 'lucide-react';
+import { EmailDashboard } from '@/pages/admin/EmailDashboard';
+import { Activity, TrendingUp, Mail } from 'lucide-react';
 
 export default function Admin() {
   return (
@@ -9,7 +10,7 @@ export default function Admin() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Admin Dashboard</h1>
         <p className="text-muted-foreground">
-          Überwache das System und die Conversion
+          Überwache das System, die Conversion und Email-Zustellung
         </p>
       </div>
 
@@ -23,6 +24,10 @@ export default function Admin() {
             <Activity className="h-4 w-4" />
             System Monitor
           </TabsTrigger>
+          <TabsTrigger value="emails" className="flex items-center gap-2">
+            <Mail className="h-4 w-4" />
+            Email Monitor
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="funnel">
@@ -31,6 +36,10 @@ export default function Admin() {
 
         <TabsContent value="monitor">
           <SystemMonitor />
+        </TabsContent>
+
+        <TabsContent value="emails">
+          <EmailDashboard />
         </TabsContent>
       </Tabs>
     </div>
