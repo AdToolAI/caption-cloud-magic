@@ -1,68 +1,64 @@
 
 
-## Findings: Landing/Marketing-Page ist bereits größtenteils sauber
+## Was kommt als nächstes?
 
-Nach gründlicher Suche durch alle Landing-Komponenten und Marketing-Surfaces:
+Sora-Cleanup ist durch. Wir sind jetzt am Übergang von Phase C1 (Smart Upgrade Prompts ✅) zu den nächsten Conversion-Hebeln. Hier mein Vorschlag in priorisierter Reihenfolge:
 
-### Was öffentlich (unauthentifiziert sichtbar) ist
-- **Landing-Page** (`/` → `BlackTieHero`, `MissionFeatures`, `FeatureGrid`, `PricingSection`, `BlackTieFooter`, `FAQ`): **0 Sora-Erwähnungen** ✅
-- **Pricing-Page** (`/pricing`): **0 Sora-Erwähnungen** ✅
-- **SEO-Meta-Tags** auf `Index.tsx`: **0 Sora-Erwähnungen** ✅
-- **`index.html`**: **0 Sora-Erwähnungen** ✅
+---
 
-### Wo Sora noch erscheint (nur intern, hinter Login)
-1. **`featureGuide.descriptions.soraLongForm`** (Zeilen 1773 / 6109 / 10397) — Tooltip im internen Feature-Guide-Dialog
-2. **In-App Toasts/Dialoge** (videoStillGenerating, toastBackgroundGeneration, minimizeMsg) — nur sichtbar während Video-Generierung
-3. **`soraLf.*` Namespace** — die komplette interne UI für `/sora2-longform` (durch das Coming-Soon-Gate für neue User abgeschirmt)
-4. **`sora2Gate.*` Namespace** — explizit für das Coming-Soon-Modal (gewollt)
+### 🥇 Empfehlung: USP-Block "6 lizensierte Premium-KI-Modelle" auf der Landing-Page (15 Min)
 
-## Was wir konkret bereinigen sollten
+**Warum jetzt?** Wir haben gerade Sora 2 zurückgestuft — die Marketing-Story muss aktiv die neue Erzählung aufbauen, sonst entsteht eine Lücke. Das ist ein direkter Anschluss-Schritt mit hohem Marketing-Wert.
 
-### 1. Internal Feature-Guide-Texte entschärfen
-Die `featureGuide.descriptions.soraLongForm`-Texte sehen ungrandfathered User potenziell, wenn sie das Feature in der Hub-Übersicht antippen. Umformulierung:
-- **EN:** „Generate long-form cinematic video content" (statt „with Sora 2")
-- **DE:** „Generiere Long-Form Cinematic Videocontent"
-- **ES:** „Genera contenido de video largo y cinematográfico"
+**Was wir bauen:**
+- Neuer Block in `MissionFeatures.tsx`: "6 lizensierte Premium-KI-Modelle"
+- Visuelle Cards für: Kling 3 Omni · Wan 2.5 · Luma Ray 2 · Hailuo 2.3 · Seedance 2 · Veo
+- "⭐ Recommended"-Badge für Kling 3 Omni
+- Lokalisiert in DE/EN/ES
 
-### 2. Generic Toast-Texte (3 Sprachen × 3 Strings = 9 Stellen)
-Diese erscheinen während laufender Generierung — auch bei Kling/Wan/Hailuo-Renders sieht der User aktuell „You'll find it under **Sora AI Videos**". Ändern zu:
-- **EN:** „You'll find it under **AI Videos**" / „Generation continues in the background. You'll find the finished video under **AI Videos**."
-- **DE:** „Du findest es unter **KI-Videos**"
-- **ES:** „Lo encontrarás en **Videos de IA**"
+---
 
-Das ist neutraler und korrekter (gilt für alle Modelle).
+### 🥈 C2: Win-Back-Kampagne (1.5h)
 
-### 3. Was wir NICHT anfassen
-- `soraLf.*` Namespace (interne Studio-UI — nur Grandfathered-User sehen das Studio überhaupt)
-- `sora2Gate.*` Namespace (gewollt, erklärt explizit den Coming-Soon-Status)
-- `soraVideoStudio` interne UI (durch Gate geschützt)
+User reaktivieren, die seit 14+ Tagen inaktiv sind:
+- Edge Function `process-winback-emails` (täglich 11:00 UTC)
+- 2-stufige Sequenz: Tag 14 → 100 Bonus-Credits, Tag 30 → 50% Rabatt-Coupon
+- Push-Variante parallel
+- Idempotenz via `winback_email_log`
 
-## Optional: Marketing-Story aktiv stärken (Bonus)
+---
 
-Falls du möchtest, ergänzen wir parallel auf der **Landing-Page** in `MissionFeatures` oder `FeatureGrid` einen neuen USP-Block:
+### 🥉 C3: Referral-Programm (2.5h)
 
-> **„6 lizensierte Premium-KI-Modelle"**  
-> Kling 3 Omni · Wan 2.5 · Luma Ray 2 · Hailuo 2.3 · Seedance 2 · Veo
+Viraler Wachstumshebel — Streak-Power-User teilen gerne:
+- Eindeutige Referral-Codes (`user_referrals` Tabelle)
+- Belohnung: $5 AI-Credits Referrer + 200 Bonus-Credits Referee
+- Dashboard-Widget "Du hast X Freunde eingeladen"
+- Share-Buttons (WhatsApp, Email, X, LinkedIn) DE/EN/ES
+- Anti-Fraud (Self-Referral-Block)
 
-Damit bauen wir aktiv die neue Erzählung auf, die Sora 2 ersetzt.
+---
 
-## Geplante Änderungen
+### 🎯 C4: Annual Plan Upsell (1.5h)
 
-| Datei | Änderung |
-|---|---|
-| `src/lib/translations.ts` | 3× `soraLongForm` Description (EN/DE/ES) — „Sora 2" entfernt |
-| `src/lib/translations.ts` | 9× generische Toast-Strings — „Sora AI Videos" → „AI Videos" / „KI-Videos" / „Videos de IA" |
-| **Optional:** `src/components/landing/MissionFeatures.tsx` oder `FeatureGrid.tsx` | Neuer „6 lizensierte Modelle"-USP-Block |
-| **Optional:** `src/lib/translations.ts` | Neue Keys für USP-Block (DE/EN/ES) |
+LTV-Steigerung durch Jahres-Pläne:
+- Stripe Annual Prices (17% Rabatt)
+- Toggle "Monatlich/Jährlich" auf Pricing-Page
+- In-App-Banner für aktive Monatsabonnenten
 
-## Aufwand
-- **Pflicht-Cleanup:** ~10 Min
-- **Mit optionalem USP-Block:** ~25 Min
+---
 
-## Frage an dich
+### Alternative Pfade
 
-Zwei Entscheidungen, dann lege ich los:
+- **D**: Wöchentlicher Performance-Report per Email (Retention)
+- **E**: Team-Workspaces für Agenturen (Enterprise-Upsell)
+- **F**: Sora 2 Studio Hardening — Fallback-Logik auf Wan 2.5, falls Replicate das Modell abschaltet (technische Risikoabsicherung für Grandfathered-User)
 
-1. **Nur Cleanup** (Pflicht-Punkte 1+2) **oder Cleanup + USP-Block** auf der Landing-Page?
-2. Falls USP-Block: in **`MissionFeatures`** (passt thematisch — "Why this tool wins") oder **`FeatureGrid`** (visueller Showcase)?
+---
+
+## Meine Empfehlung
+
+**USP-Block zuerst (15 Min, schließt das Sora-Cleanup ab) → dann C2 Win-Back → C3 Referral → C4 Annual.**
+
+Welche Richtung soll ich nehmen?
 
