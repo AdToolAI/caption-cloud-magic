@@ -12045,6 +12045,7 @@ export type Database = {
           success: boolean
         }[]
       }
+      get_ai_superuser_id: { Args: never; Returns: string }
       get_conversion_funnel: { Args: { days?: number }; Returns: Json }
       get_template_performance_summary: {
         Args: { p_days?: number; p_template_id: string }
@@ -12173,6 +12174,10 @@ export type Database = {
         Returns: number
       }
       reset_monthly_credits: { Args: never; Returns: undefined }
+      seed_ai_superuser_demo_data: {
+        Args: { _user_id: string }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       user_owns_comment: { Args: { _comment_id: string }; Returns: boolean }
