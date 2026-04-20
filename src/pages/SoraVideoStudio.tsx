@@ -17,8 +17,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Currency } from '@/config/pricing';
 import { formatPrice, getCurrencyForLanguage } from '@/lib/currency';
+import { Sora2ComingSoonGate } from '@/components/sora2/Sora2ComingSoonGate';
 
 export default function SoraVideoStudio() {
+  return (
+    <Sora2ComingSoonGate>
+      <SoraVideoStudioInner />
+    </Sora2ComingSoonGate>
+  );
+}
+
+function SoraVideoStudioInner() {
   const { user } = useAuth();
   const { language, t } = useTranslation();
   const { wallet, loading: walletLoading, refetch: refetchWallet } = useAIVideoWallet();

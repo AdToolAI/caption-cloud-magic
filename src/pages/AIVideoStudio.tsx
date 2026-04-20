@@ -21,6 +21,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, Link } from 'react-router-dom';
 import { formatPrice, getCurrencyForLanguage } from '@/lib/currency';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useSora2Access } from '@/hooks/useSora2Access';
 
 /* ── Floating particles (James Bond 2028) ── */
 const particles = [
@@ -41,6 +42,7 @@ export default function AIVideoStudio() {
   const { user } = useAuth();
   const { language, t } = useTranslation();
   const { wallet, loading: walletLoading, refetch: refetchWallet } = useAIVideoWallet();
+  const { hasAccess: hasSora2Access } = useSora2Access();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('studios');
 
@@ -86,41 +88,24 @@ export default function AIVideoStudio() {
     setActiveTab(newTab);
   }, []);
 
-  // Provider card data
+  // Provider card data — Kling 3 leads as the recommended, fully-licensed flagship.
+  // Sora 2 is positioned last and shown with a "Coming Soon" badge for non-grandfathered users.
   const currSymbol = currency === 'USD' ? '$' : '€';
+  const recommendedLabel = language === 'de' ? '⭐ Empfohlen' : language === 'es' ? '⭐ Recomendado' : '⭐ Recommended';
+  const comingSoonLabel = language === 'de' ? 'Bald verfügbar' : language === 'es' ? 'Próximamente' : 'Coming Soon';
+
   const providers = [
-    {
-      name: 'Sora 2',
-      provider: 'OpenAI',
-      description: language === 'de' ? 'Kinematische Storytelling-Videos mit erstklassiger visueller Qualität' : 'Cinematic storytelling with top-tier visual quality',
-      features: ['Text-to-Video', 'Image-to-Video', '1080p', '4K-ready'],
-      pricing: `${currSymbol}0.25–0.53/s`,
-      maxDuration: '12s',
-      quality: '1080p',
-      link: '/sora-video-studio',
-      icon: Sparkles,
-    },
     {
       name: 'Kling 3.0',
       provider: 'Kuaishou',
-      description: language === 'de' ? 'Realistische Bewegungen, Audio-Generierung & Video-zu-Video' : 'Realistic motion, audio generation & video-to-video',
+      description: language === 'de' ? 'Premium-Empfehlung der Redaktion: Realistische Bewegungen, Audio-Generierung & Video-zu-Video' : language === 'es' ? 'Recomendación premium: movimientos realistas, audio y video-a-video' : 'Editor\'s premium pick: realistic motion, audio generation & video-to-video',
       features: ['Text-to-Video', 'Image-to-Video', 'Video-to-Video', 'Audio'],
       pricing: `${currSymbol}0.10–0.21/s`,
       maxDuration: '10s',
       quality: '1080p',
       link: '/kling-video-studio',
       icon: Film,
-    },
-    {
-      name: 'Seedance 2.0',
-      provider: 'ByteDance',
-      description: language === 'de' ? 'Kreative Tanzvideos & dynamische Bewegungsszenen' : 'Creative dance videos & dynamic motion scenes',
-      features: ['Text-to-Video', 'Image-to-Video', 'Dance Motion'],
-      pricing: `${currSymbol}0.10–0.21/s`,
-      maxDuration: '10s',
-      quality: '720p',
-      link: '/seedance-video-studio',
-      icon: Video,
+      topBadge: { label: recommendedLabel, variant: 'default' as const },
     },
     {
       name: 'Wan 2.5',
@@ -154,6 +139,29 @@ export default function AIVideoStudio() {
       quality: '720p',
       link: '/luma-video-studio',
       icon: Camera,
+    },
+    {
+      name: 'Seedance 2.0',
+      provider: 'ByteDance',
+      description: language === 'de' ? 'Kreative Tanzvideos & dynamische Bewegungsszenen' : 'Creative dance videos & dynamic motion scenes',
+      features: ['Text-to-Video', 'Image-to-Video', 'Dance Motion'],
+      pricing: `${currSymbol}0.10–0.21/s`,
+      maxDuration: '10s',
+      quality: '720p',
+      link: '/seedance-video-studio',
+      icon: Video,
+    },
+    {
+      name: 'Sora 2',
+      provider: 'OpenAI',
+      description: language === 'de' ? 'Kinematische Storytelling-Videos mit erstklassiger visueller Qualität' : 'Cinematic storytelling with top-tier visual quality',
+      features: ['Text-to-Video', 'Image-to-Video', '1080p', '4K-ready'],
+      pricing: `${currSymbol}0.25–0.53/s`,
+      maxDuration: '12s',
+      quality: '1080p',
+      link: '/sora-video-studio',
+      icon: Sparkles,
+      ...(hasSora2Access ? {} : { topBadge: { label: comingSoonLabel, variant: 'secondary' as const } }),
     },
   ];
 

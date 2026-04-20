@@ -15,6 +15,8 @@ export interface ProviderCardProps {
   icon: LucideIcon;
   accentColor?: string;
   index: number;
+  /** Optional banner badge shown in top-right corner (e.g. "Coming Soon", "Recommended"). */
+  topBadge?: { label: string; variant?: 'default' | 'secondary' | 'outline' | 'destructive' };
 }
 
 const cardVariant = {
@@ -26,7 +28,7 @@ const cardVariant = {
 };
 
 export function AIVideoProviderCard({
-  name, provider, description, features, pricing, maxDuration, quality, link, icon: Icon, index,
+  name, provider, description, features, pricing, maxDuration, quality, link, icon: Icon, index, topBadge,
 }: ProviderCardProps) {
   return (
     <motion.div variants={cardVariant}>
@@ -36,6 +38,15 @@ export function AIVideoProviderCard({
           bg-card/60 backdrop-blur-md hover:-translate-y-2
           hover:shadow-[0_0_40px_hsla(43,90%,68%,0.2),0_0_80px_hsla(187,84%,55%,0.1)]"
       >
+        {/* Top badge (Coming Soon / Recommended) */}
+        {topBadge && (
+          <div className="absolute -top-2 -right-2 z-20">
+            <Badge variant={topBadge.variant ?? 'default'} className="text-[10px] px-2 py-1 shadow-lg">
+              {topBadge.label}
+            </Badge>
+          </div>
+        )}
+
         {/* Hover glow overlay */}
         <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/8 via-transparent to-accent/8 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
