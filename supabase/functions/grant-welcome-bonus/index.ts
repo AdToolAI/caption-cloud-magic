@@ -23,12 +23,36 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Authenticate user
+    // Authenticate user — supports two modes:
+    // 1) User JWT in Authorization header (client-side call)
+    // 2) Service-role key + user_id in body (server-to-server, e.g. from verify-email)
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Unauthorized");
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) throw new Error("Unauthorized");
+
+    let user: { id: string; email?: string | null; email_confirmed_at?: string | null; created_at: string } | null = null;
+
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    if (serviceKey && token === serviceKey) {
+      // Server-to-server call: read user_id from body
+      const body = await req.json().catch(() => ({} as any));
+      const userId = body?.user_id;
+      if (!userId) throw new Error("user_id required for service-role calls");
+      const { data: lookup, error: lookupErr } = await supabase.auth.admin.getUserById(userId);
+      if (lookupErr || !lookup?.user) throw new Error("User not found");
+      user = {
+        id: lookup.user.id,
+        email: lookup.user.email,
+        email_confirmed_at: lookup.user.email_confirmed_at,
+        created_at: lookup.user.created_at,
+      };
+    } else {
+      const { data: { user: jwtUser }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !jwtUser) throw new Error("Unauthorized");
+      user = jwtUser as any;
+    }
+
+    if (!user) throw new Error("Unauthorized");
 
     // Require email verification (anti-abuse)
     if (!user.email_confirmed_at) {
