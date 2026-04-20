@@ -1,77 +1,103 @@
 
 
-# Plan: Systematischer Health-Check der restlichen 10 Admin-Tabs
+# Plan: Komplett-Paket — Phase 1 + 2 + 3 in einem Rutsch
 
-Du hast aktuell den **KI Superuser** komplett auf grün — aber das Admin-Dashboard hat noch 10 weitere Tabs, die echte Probleme verstecken könnten. Lass uns sie nach Wichtigkeit durchgehen.
+Du wählst Option C → Wir fixen alle stillen Bugs sofort, erweitern den AI-Superuser um neue automatische Tests und installieren einen täglichen Consistency-Watcher.
 
-## Inspektions-Reihenfolge (Tab für Tab)
+## Phase 1 — Akute stille Failures fixen (sofortiger User-Impact)
 
-### 🔴 Hohe Priorität — direkter Business-Impact
+### 1.1 Calendar-Publishing-Pipeline reaktivieren
+- Die 18 alten Calendar Events (`scheduled` mit `start_at` >24h in der Vergangenheit) markieren wir als `expired` mit Hinweis-Log — sie als hängend zu zeigen wäre ein Karteileiche-Bug
+- Neuen `pg_cron`-Job `dispatch-calendar-publishing` einrichten, der alle 5 Minuten die Edge Function `calendar-publish-dispatcher` aufruft
+- Falls `calendar-publish-dispatcher` nicht existiert: Wir nutzen `check-scheduled-publications` (existiert bereits) als Fallback und ergänzen es um Calendar-Event-Handling
 
-**1. Bug Reports** *(default Tab — siehst du beim Öffnen)*
-- Offene Bug Reports von echten Usern
-- Inspizieren: Sind unbeantwortete Reports da? Wie alt?
+### 1.2 Storage-Quota-Backfill
+- One-shot SQL-Script: Für alle 45 Profiles ohne `user_storage_quotas`-Zeile passende Default-Quota anlegen (basierend auf `wallets.plan_code`)
+- Bestehender `initialize_storage_quota`-Trigger feuert offenbar nicht zuverlässig → wir prüfen den Trigger und reparieren ihn falls nötig
 
-**2. Cost Monitor**
-- Tägliche/monatliche Kosten von Lambda, OpenAI, Replicate, ElevenLabs, Gemini
-- Inspizieren: Gibt es Cost-Spikes? Liegen wir im Budget?
-- Auffällig: Sora/Kling/Image-Generierung sind teuer
+### 1.3 Campaign→Calendar Re-Sync
+- Manueller Re-Sync für die 33 verwaisten `campaign_posts`: Trigger `sync_campaign_to_content_items` ist da, aber für Altbestand wurde er nie ausgeführt
+- One-shot SQL: `INSERT INTO content_items` für alle Posts ohne entsprechenden Eintrag
 
-**3. Provider Health**
-- Status aller externen APIs (OpenAI, Replicate, Gemini, Meta, X, TikTok, Sentry)
-- Inspizieren: Welche Provider hatten zuletzt Ausfälle? Quotas-Auslastung?
+### 1.4 Social-Token-Expiry-Notification
+- Neue Edge Function `notify-expired-social-tokens` schreibt für alle abgelaufenen Tokens einen Eintrag in `alert_notifications` (User-sichtbar) + sendet Reconnect-Push/Email
+- Token-Status im UI durch Badge „Reconnect erforderlich" auf der Connections-Seite
 
-**4. Sentry Dashboard**
-- Echte Frontend-Errors die User auslösen (nicht nur unsere geplanten Test-Szenarien)
-- Inspizieren: Top-5 ungelöste Errors, Crash-Rate-Trend
+## Phase 2 — AI-Superuser erweitern (automatische Tests)
 
-### 🟡 Mittel — System-Stabilität
+Fügen wir 5 neue Szenarien zur bestehenden Superuser-Suite hinzu:
 
-**5. System Monitor**
-- Edge-Function-Latenzen, AI-Job-Queue-Länge, Storage-Verbrauch
-- Inspizieren: Hängt eine Queue? Wie voll ist der Storage?
+| # | Szenario | Was geprüft wird |
+|---|---|---|
+| 11 | **Trial-Lifecycle-Test** | Erstellt Test-Profil mit Trial → simuliert Ablauf → prüft `account_paused`-Logik |
+| 12 | **Calendar-Publish-Test** | Erstellt Event mit `start_at = now()` → prüft ob Dispatcher es innerhalb 6 Min greift |
+| 13 | **Stripe-Webhook-Test** | Postet Test-Webhook-Payload an `stripe-webhook` → prüft Wallet-Update |
+| 14 | **Onboarding-Complete-Test** | Durchläuft Onboarding-Steps headless via Edge Function → prüft `profiles`-Felder |
+| 15 | **Social-Token-Refresh-Test** | Simuliert OAuth-Refresh-Call für jede Plattform → prüft Token-Encryption |
 
-**6. Cache Health**
-- Redis Hot-Query-Cache + AI Semantic Cache (pgvector)
-- Inspizieren: Hit-Rates, Speicher-Verbrauch, abgelaufene Einträge
+Jedes Szenario folgt dem bestehenden Schema (Eintrag in `ai_superuser_runs`, Status-Logging, Pass-Rate-Tracking).
 
-**7. Smoke Tests**
-- Andere automatisierte Health-Checks (älteres System neben dem KI Superuser)
-- Inspizieren: Was läuft hier doppelt? Können wir konsolidieren?
+## Phase 3 — Consistency-Watcher (täglicher Cron)
 
-**8. Alerts**
-- Aktuelle aktive Alerts (Webhooks, Trigger-bedingte Notifications)
-- Inspizieren: Offene Alerts? Stille Failures?
+### Neue Edge Function `consistency-watcher`
+Läuft täglich um 4:00 Uhr UTC und prüft systematisch:
 
-### 🟢 Niedriger — Business-Insights
+| Check | Schwellwert | Action |
+|---|---|---|
+| Profiles ohne Wallet/Quota | > 0 | Alert + Auto-Backfill |
+| Calendar Events `scheduled` mit `start_at` < now() − 1h | > 5 | Alert |
+| `active_ai_jobs` älter als 2h | > 0 | Alert + Auto-Cleanup |
+| `campaign_posts` ohne `content_items`-Sync | > 0 | Alert + Auto-Resync |
+| Social-Tokens abgelaufen ohne Notification | > 0 | Alert + Notification senden |
+| AI-Video-Generations stuck `processing` > 30 Min | > 0 | Alert + Refund-Check |
+| `ai_video_wallets` mit negativem Balance | > 0 | Kritischer Alert |
+| `director_cut_renders` stuck `rendering` > 1h | > 0 | Alert |
 
-**9. Conversion Funnel**
-- Signup → Verify → Erstes Video → Bezahlt
-- Inspizieren: Wo dropt es am meisten?
+Findings landen in `alert_notifications` → erscheinen automatisch im **Alerts-Tab** des Admin-Dashboards.
 
-**10. Email Monitor**
-- Versandte Emails (Resend), Bounce-Rate, Open-Rate
-- Inspizieren: Email-Zustellung gesund?
+### Cron-Setup
+`pg_cron` Job `consistency-watcher-daily` → täglich 04:00 UTC → ruft Edge Function via `pg_net`.
 
-## Vorgehen
+## Technische Details
 
-Pro Tab schauen wir:
-1. **Was zeigt die UI tatsächlich?** (Screenshot oder Code-Inspektion)
-2. **Stimmen die Daten mit der Realität in der DB überein?** (Spot-Checks via Logs/Queries)
-3. **Gibt es Karteileichen oder falsche Alarme?** (wie wir es beim KI Superuser hatten)
-4. **Quick-Win-Fixes** sammeln und am Ende als Sammel-Plan umsetzen
+**Geänderte/neue Dateien**
+- `supabase/functions/notify-expired-social-tokens/index.ts` (neu)
+- `supabase/functions/consistency-watcher/index.ts` (neu)
+- `supabase/functions/ai-superuser-test-runner/index.ts` (erweitert um 5 Szenarien)
+- `src/pages/admin/AISuperuserDashboard.tsx` (UI für 5 neue Szenarien)
+- `supabase/functions/calendar-publish-dispatcher/index.ts` (neu falls fehlt, sonst Fix)
 
-## Was du tun musst
+**Datenbank-Migrationen**
+- Trigger `initialize_storage_quota` reparieren (falls der Default-Lookup auf `wallets` fehlschlägt)
+- Neue Spalte `expired_at` in `calendar_events` (oder Status-Wert `expired` ergänzen)
 
-Wähle einen Startpunkt:
-- **Option A** — Top-Down: Wir gehen alle 10 Tabs strikt nach Priorität durch
-- **Option B** — Du machst Screenshots von 2–3 Tabs die dich besonders interessieren, ich analysiere die
-- **Option C** — Wir starten mit **Cost Monitor + Provider Health** (höchster Business-Impact, da Geld + externe Abhängigkeiten)
+**One-shot Datenoperationen** (via Insert-Tool, nicht Migration)
+- 18 alte Calendar Events → `status = 'expired'`
+- 45 fehlende Storage-Quotas backfillen
+- 33 verwaiste Campaign Posts → `content_items` re-syncen
 
-## Erwartetes Ergebnis nach Komplett-Durchgang
+**Cron-Jobs** (3 neue)
+- `dispatch-calendar-publishing` — alle 5 Min
+- `consistency-watcher-daily` — täglich 04:00 UTC
+- `notify-expired-tokens-hourly` — stündlich
 
-- ✅ Klares Bild über den Health-Status jedes Subsystems
-- ✅ Liste aller stillen Failures / falschen Alarme / Karteileichen
-- ✅ Konkrete Fix-Liste mit Priorität → in Folge-Loops abarbeiten
-- ✅ Ein „Master Health Banner" auf dem Admin-Dashboard das alle 11 Tabs zusammenfasst (optional als Bonus)
+## Erwartetes Ergebnis
+
+- ✅ 18 alte Calendar Events sauber als `expired` markiert (keine Karteileichen mehr)
+- ✅ Auto-Publishing für neue Events läuft alle 5 Min
+- ✅ 45 Storage-Quotas backfilled, Trigger repariert
+- ✅ 33 Campaign Posts erscheinen im Kalender
+- ✅ User mit abgelaufenen Tokens werden aktiv informiert
+- ✅ AI-Superuser deckt 15 statt 10 kritische Flows ab (50 % mehr Coverage)
+- ✅ Täglicher Consistency-Watcher findet zukünftige stille Bugs ohne dein Zutun
+- ✅ **Du brauchst keine Testuser für Standard-Flows mehr** — das System testet sich selbst
+
+## Reihenfolge der Umsetzung
+
+1. **Phase 1.1** Calendar-Cron + alte Events aufräumen (höchster Impact)
+2. **Phase 1.2 + 1.3** Storage + Campaign Backfills (parallel)
+3. **Phase 1.4** Token-Notification
+4. **Phase 3** Consistency-Watcher deployen + Cron einrichten
+5. **Phase 2** Superuser um 5 neue Szenarien erweitern
+6. **Verifikation**: Komplett-Test im AI-Superuser → 15/15 grün erwartet
 
