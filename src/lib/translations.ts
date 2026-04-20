@@ -2693,7 +2693,10 @@ export const translations: Record<Language, any> = {
       pausedDescription: "Your 14-day Enterprise trial has ended. Choose a plan to keep creating, generating and publishing.",
       pausedCta: "Choose a plan",
       reactivateHeadline: "Reactivate your account",
-      reactivateSub: "Pick a plan to unlock your account again."
+      reactivateSub: "Pick a plan to unlock your account again.",
+      graceTitle: "Trial expired — grace period active",
+      graceBanner: "Your account will be paused in {days} days",
+      graceCta: "Upgrade now & avoid pause"
     },
 
     // Authentication
@@ -7045,7 +7048,10 @@ export const translations: Record<Language, any> = {
       pausedDescription: "Dein 14-Tage Enterprise-Trial ist beendet. Wähle einen Plan, um weiter zu erstellen, generieren und zu veröffentlichen.",
       pausedCta: "Plan wählen",
       reactivateHeadline: "Konto reaktivieren",
-      reactivateSub: "Wähle einen Plan, um dein Konto wieder freizuschalten."
+      reactivateSub: "Wähle einen Plan, um dein Konto wieder freizuschalten.",
+      graceTitle: "Trial abgelaufen — Grace-Period aktiv",
+      graceBanner: "Dein Konto wird in {days} Tagen pausiert",
+      graceCta: "Jetzt upgraden & Pause vermeiden"
     },
 
     // Authentication
@@ -11175,7 +11181,10 @@ export const translations: Record<Language, any> = {
       pausedDescription: "Tu prueba Enterprise de 14 días ha terminado. Elige un plan para seguir creando, generando y publicando.",
       pausedCta: "Elegir plan",
       reactivateHeadline: "Reactivar tu cuenta",
-      reactivateSub: "Elige un plan para desbloquear tu cuenta de nuevo."
+      reactivateSub: "Elige un plan para desbloquear tu cuenta de nuevo.",
+      graceTitle: "Prueba expirada — período de gracia activo",
+      graceBanner: "Tu cuenta será pausada en {days} días",
+      graceCta: "Mejorar ahora y evitar pausa"
     },
 
     // Authentication
