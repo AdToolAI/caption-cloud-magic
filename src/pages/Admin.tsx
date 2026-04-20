@@ -9,7 +9,8 @@ import Alerts from '@/pages/admin/Alerts';
 import { SentryDashboard } from '@/pages/admin/SentryDashboard';
 import { BugReportsAdmin } from '@/pages/admin/BugReportsAdmin';
 import { SmokeTestsAdmin } from '@/pages/admin/SmokeTestsAdmin';
-import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, HeartPulse } from 'lucide-react';
+import { AISuperuserAdmin } from '@/pages/admin/AISuperuserAdmin';
+import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, HeartPulse, Bot } from 'lucide-react';
 
 export default function Admin() {
   return (
