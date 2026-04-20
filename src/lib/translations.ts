@@ -1607,6 +1607,11 @@ export const translations: Record<Language, any> = {
         for3months: "for 3 months",
         hint: "With Creator Code: −30% for 3 months • Creator receives 20% commission"
       },
+      couponBanner: {
+        label: "Coupon active",
+        message: "20% off your first 3 months — applied automatically at checkout.",
+        remove: "Remove coupon"
+      },
       quickPost: {
         locked: {
           title: "Auto-Schedule Locked",
@@ -5965,6 +5970,11 @@ export const translations: Record<Language, any> = {
         for3months: "für 3 Monate",
         hint: "Mit Creator-Code: −30% für 3 Monate • Creator erhält 20% Provision"
       },
+      couponBanner: {
+        label: "Coupon aktiv",
+        message: "20% Rabatt auf deine ersten 3 Monate – wird automatisch beim Checkout angewendet.",
+        remove: "Coupon entfernen"
+      },
       intro: {
         basic: "Intro-Monat: Nur 4,99 € statt 14,99 €",
         enterprise: "Intro-Monat: Nur 9,99 € statt 69,95 €",
@@ -10267,6 +10277,11 @@ export const translations: Record<Language, any> = {
         applied: "Código aplicado",
         for3months: "por 3 meses",
         hint: "Con Código de Creator: −30% por 3 meses • Creator recibe 20% de comisión"
+      },
+      couponBanner: {
+        label: "Cupón activo",
+        message: "20% de descuento en tus primeros 3 meses — se aplica automáticamente al pagar.",
+        remove: "Eliminar cupón"
       },
       intro: {
         basic: "Mes de Intro: Solo €4.99 en lugar de €14.99",
