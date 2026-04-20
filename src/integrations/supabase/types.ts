@@ -12026,6 +12026,10 @@ export type Database = {
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_old_user_sessions: { Args: never; Returns: undefined }
       cleanup_stale_active_jobs: { Args: never; Returns: undefined }
+      cleanup_superuser_runs: {
+        Args: { keep_per_scenario?: number }
+        Returns: number
+      }
       compute_content_hash: {
         Args: {
           p_caption: string
