@@ -82,6 +82,10 @@ export default function Admin() {
           <SmokeTestsAdmin />
         </TabsContent>
 
+        <TabsContent value="superuser">
+          <AISuperuserAdmin />
+        </TabsContent>
+
         <TabsContent value="funnel">
           <ConversionFunnel />
         </TabsContent>
