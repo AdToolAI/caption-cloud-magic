@@ -129,6 +129,42 @@ const SCENARIOS: Scenario[] = [
     fn: "analyze-comments",
     body: (ctx) => ({ projectId: ctx.demoProjectId }),
   },
+  // ─── Phase 2: System-Health Scenarios ───
+  {
+    name: "Trial Lifecycle Check",
+    category: "fast",
+    fn: "check-trial-status",
+    body: { dry_run: true },
+    optional: true,
+  },
+  {
+    name: "Calendar Publish Dispatcher",
+    category: "fast",
+    fn: "calendar-publish-dispatcher",
+    body: {},
+    optional: true,
+  },
+  {
+    name: "Stripe Webhook Reachability",
+    category: "fast",
+    fn: "stripe-webhook",
+    body: { type: "ai_superuser_ping", _test: true },
+    optional: true,
+  },
+  {
+    name: "Social Health Check",
+    category: "fast",
+    fn: "social-health",
+    body: {},
+    optional: true,
+  },
+  {
+    name: "Consistency Watcher",
+    category: "fast",
+    fn: "consistency-watcher",
+    body: {},
+    optional: true,
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────

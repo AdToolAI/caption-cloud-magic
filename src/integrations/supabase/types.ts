@@ -12233,6 +12233,7 @@ export type Database = {
         | "cancelled"
         | "failed"
         | "queued"
+        | "expired"
       calendar_role:
         | "owner"
         | "account_manager"
@@ -12456,6 +12457,7 @@ export const Constants = {
         "cancelled",
         "failed",
         "queued",
+        "expired",
       ],
       calendar_role: [
         "owner",
