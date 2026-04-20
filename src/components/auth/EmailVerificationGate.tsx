@@ -32,6 +32,7 @@ const PUBLIC_ROUTES = [
 export const EmailVerificationGate = ({ children }: EmailVerificationGateProps) => {
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
+  const { t, language } = useTranslation();
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -82,22 +83,22 @@ export const EmailVerificationGate = ({ children }: EmailVerificationGateProps) 
     
     try {
       const { error } = await supabase.functions.invoke('send-verification-email', {
-        body: { email: user.email, userId: user.id }
+        body: { email: user.email, userId: user.id, language }
       });
 
       if (error) {
-        toast.error("Fehler beim Senden", {
+        toast.error(t("emailGate.sendError"), {
           description: error.message,
         });
       } else {
-        toast.success("E-Mail gesendet!", {
-          description: "Prüfen Sie Ihren Posteingang und Spam-Ordner",
+        toast.success(t("emailGate.sentTitle"), {
+          description: t("emailGate.sentDesc"),
         });
         setCountdown(60);
       }
     } catch (err: any) {
-      toast.error("Fehler beim Senden", {
-        description: err.message || "Bitte versuchen Sie es später erneut",
+      toast.error(t("emailGate.sendError"), {
+        description: err.message || t("emailGate.tryAgain"),
       });
     }
     
@@ -107,11 +108,10 @@ export const EmailVerificationGate = ({ children }: EmailVerificationGateProps) 
   const refreshStatus = async () => {
     setLoading(true);
     
-    // Refresh the session to get latest email confirmation status
     const { data: { session }, error } = await supabase.auth.refreshSession();
     
     if (error) {
-      toast.error("Fehler beim Aktualisieren", {
+      toast.error(t("emailGate.refreshError"), {
         description: error.message,
       });
       setLoading(false);
@@ -120,12 +120,12 @@ export const EmailVerificationGate = ({ children }: EmailVerificationGateProps) 
     
     if (session?.user?.email_confirmed_at) {
       setEmailVerified(true);
-      toast.success("E-Mail verifiziert!", {
-        description: "Willkommen bei AdTool!",
+      toast.success(t("emailGate.verified"), {
+        description: t("emailGate.welcome"),
       });
     } else {
-      toast.info("Noch nicht verifiziert", {
-        description: "Bitte klicken Sie auf den Link in der E-Mail",
+      toast.info(t("emailGate.notYet"), {
+        description: t("emailGate.clickLink"),
       });
     }
     setLoading(false);
@@ -208,32 +208,32 @@ export const EmailVerificationGate = ({ children }: EmailVerificationGateProps) 
               className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-sm font-medium text-primary mx-auto"
             >
               <Shield className="h-4 w-4" />
-              E-Mail-Verifizierung erforderlich
+              {t("emailGate.badge")}
             </motion.div>
 
             <CardTitle className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-              Verifizieren Sie Ihre E-Mail
+              {t("emailGate.title")}
             </CardTitle>
             <CardDescription className="text-base">
-              Um AdTool vollständig nutzen zu können, müssen Sie Ihre E-Mail-Adresse bestätigen.
+              {t("emailGate.subtitle")}
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-6 pt-4">
             {/* Email Display */}
             <div className="p-4 rounded-xl bg-muted/30 border border-white/5">
-              <p className="text-sm text-muted-foreground mb-1">E-Mail-Adresse</p>
+              <p className="text-sm text-muted-foreground mb-1">{t("emailGate.emailLabel")}</p>
               <p className="font-medium text-foreground">{user.email}</p>
             </div>
 
             {/* Instructions */}
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Wir haben Ihnen eine Verifizierungs-E-Mail gesendet. Klicken Sie auf den Link in der E-Mail, um Ihr Konto zu aktivieren.
+                {t("emailGate.instructions")}
               </p>
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
                 <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                <span>Prüfen Sie auch Ihren Spam- oder Junk-Ordner</span>
+                <span>{t("emailGate.checkSpam")}</span>
               </div>
             </div>
 
@@ -250,8 +250,8 @@ export const EmailVerificationGate = ({ children }: EmailVerificationGateProps) 
                   <Mail className="mr-2 h-5 w-5" />
                 )}
                 {countdown > 0
-                  ? `Erneut senden in ${countdown}s`
-                  : "Verifizierungs-E-Mail erneut senden"}
+                  ? t("emailGate.resendIn", { seconds: countdown })
+                  : t("emailGate.resend")}
               </Button>
 
               <Button
@@ -265,15 +265,15 @@ export const EmailVerificationGate = ({ children }: EmailVerificationGateProps) 
                 ) : (
                   <RefreshCw className="mr-2 h-4 w-4" />
                 )}
-                Status aktualisieren
+                {t("emailGate.refresh")}
               </Button>
             </div>
 
             {/* Help Text */}
             <p className="text-xs text-center text-muted-foreground">
-              Probleme? Kontaktieren Sie unseren{" "}
+              {t("emailGate.problemsContact")}{" "}
               <a href="/support" className="text-primary hover:underline">
-                Support
+                {t("emailGate.support")}
               </a>
             </p>
           </CardContent>
