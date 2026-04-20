@@ -2,7 +2,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SystemMonitor } from '@/components/admin/SystemMonitor';
 import { ConversionFunnel } from '@/components/admin/ConversionFunnel';
 import { EmailDashboard } from '@/pages/admin/EmailDashboard';
-import { Activity, TrendingUp, Mail } from 'lucide-react';
+import { ProviderHealth } from '@/pages/admin/ProviderHealth';
+import { Activity, TrendingUp, Mail, Gauge } from 'lucide-react';
 
 export default function Admin() {
   return (
@@ -28,6 +29,10 @@ export default function Admin() {
             <Mail className="h-4 w-4" />
             Email Monitor
           </TabsTrigger>
+          <TabsTrigger value="provider-health" className="flex items-center gap-2">
+            <Gauge className="h-4 w-4" />
+            Provider Health
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="funnel">
@@ -40,6 +45,10 @@ export default function Admin() {
 
         <TabsContent value="emails">
           <EmailDashboard />
+        </TabsContent>
+
+        <TabsContent value="provider-health">
+          <ProviderHealth />
         </TabsContent>
       </Tabs>
     </div>

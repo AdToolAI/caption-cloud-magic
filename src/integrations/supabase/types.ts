@@ -5289,6 +5289,45 @@ export type Database = {
         }
         Relationships: []
       }
+      lambda_health_metrics: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          function_name: string | null
+          id: string
+          job_id: string | null
+          memory_limit_mb: number | null
+          memory_used_mb: number | null
+          render_id: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          function_name?: string | null
+          id?: string
+          job_id?: string | null
+          memory_limit_mb?: number | null
+          memory_used_mb?: number | null
+          render_id?: string | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          function_name?: string | null
+          id?: string
+          job_id?: string | null
+          memory_limit_mb?: number | null
+          memory_used_mb?: number | null
+          render_id?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       media_assets: {
         Row: {
           created_at: string | null
@@ -6884,6 +6923,45 @@ export type Database = {
           sample_caption?: string
           tone?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      provider_quota_log: {
+        Row: {
+          created_at: string
+          endpoint: string | null
+          error_message: string | null
+          id: string
+          provider: string
+          rate_limit_remaining: number | null
+          rate_limit_total: number | null
+          response_time_ms: number | null
+          status_code: number | null
+          success: boolean
+        }
+        Insert: {
+          created_at?: string
+          endpoint?: string | null
+          error_message?: string | null
+          id?: string
+          provider: string
+          rate_limit_remaining?: number | null
+          rate_limit_total?: number | null
+          response_time_ms?: number | null
+          status_code?: number | null
+          success?: boolean
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string | null
+          error_message?: string | null
+          id?: string
+          provider?: string
+          rate_limit_remaining?: number | null
+          rate_limit_total?: number | null
+          response_time_ms?: number | null
+          status_code?: number | null
+          success?: boolean
         }
         Relationships: []
       }
@@ -8920,6 +8998,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      system_config: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
       }
       team_comments: {
         Row: {
@@ -11424,6 +11526,32 @@ export type Database = {
       }
     }
     Views: {
+      lambda_health_recent: {
+        Row: {
+          avg_duration_ms: number | null
+          avg_memory_mb: number | null
+          failed: number | null
+          failure_rate: number | null
+          oom_count: number | null
+          peak_memory_mb: number | null
+          successful: number | null
+          total_renders: number | null
+        }
+        Relationships: []
+      }
+      provider_quota_stats_recent: {
+        Row: {
+          avg_response_time_ms: number | null
+          failed_requests: number | null
+          last_call_at: string | null
+          provider: string | null
+          rate_limit_remaining_min: number | null
+          rate_limit_total: number | null
+          requests_last_minute: number | null
+          successful_requests: number | null
+        }
+        Relationships: []
+      }
       v_active_publishes: {
         Row: {
           active_count: number | null
