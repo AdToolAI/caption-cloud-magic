@@ -2708,7 +2708,10 @@ export const translations: Record<Language, any> = {
       loginTitle: "Sign in to your account",
       signupTitle: "Create your account",
       email: "Email",
-      password: "Password"
+      password: "Password",
+      signupSuccessTitle: "Account created!",
+      signupSuccessDesc: "Please check your email for the verification link.",
+      signupErrorGeneric: "Sign-up failed. Please try again."
     },
     
     // Common
@@ -7134,7 +7137,10 @@ export const translations: Record<Language, any> = {
       loginTitle: "Melde dich in deinem Konto an",
       signupTitle: "Erstelle dein Konto",
       email: "E-Mail",
-      password: "Passwort"
+      password: "Passwort",
+      signupSuccessTitle: "Account erstellt!",
+      signupSuccessDesc: "Bitte prüfe deine E-Mails für den Verifizierungs-Link.",
+      signupErrorGeneric: "Registrierung fehlgeschlagen. Bitte versuche es erneut."
     },
     
     // Common
@@ -11338,7 +11344,10 @@ export const translations: Record<Language, any> = {
       loginTitle: "Inicia sesión en tu cuenta",
       signupTitle: "Crea tu cuenta",
       email: "Correo electrónico",
-      password: "Contraseña"
+      password: "Contraseña",
+      signupSuccessTitle: "¡Cuenta creada!",
+      signupSuccessDesc: "Revisa tu correo para encontrar el enlace de verificación.",
+      signupErrorGeneric: "Registro fallido. Inténtalo de nuevo."
     },
     
     // Common
