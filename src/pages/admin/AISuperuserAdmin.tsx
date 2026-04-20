@@ -30,8 +30,15 @@ const ACTIVE_SCENARIOS = new Set<string>([
 // Latency color thresholds (ms) — KI-Calls können legitim 5-10s dauern
 const latencyClass = (ms: number | null | undefined): string => {
   if (!ms) return 'text-muted-foreground';
-  if (ms < 3000) return 'text-muted-foreground';
-  if (ms < 8000) return 'text-yellow-600 dark:text-yellow-400';
+  if (ms < 5000) return 'text-muted-foreground';
+  if (ms < 10000) return 'text-yellow-600 dark:text-yellow-400';
+  return 'text-destructive';
+};
+
+// Aggregierte Latenz (Summe aller Szenarien) — andere Maßstäbe als Einzel-Calls
+const totalLatencyClass = (totalMs: number): string => {
+  if (totalMs < 30000) return 'text-green-500';
+  if (totalMs < 60000) return 'text-yellow-600 dark:text-yellow-400';
   return 'text-destructive';
 };
 
