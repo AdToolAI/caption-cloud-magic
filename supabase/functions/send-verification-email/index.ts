@@ -61,7 +61,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, userId, language: bodyLang }: SendVerificationRequest = await req.json();
+    const { email, userId, language: bodyLang, appUrl: bodyAppUrl }: SendVerificationRequest = await req.json();
 
     if (!email || !userId) {
       return new Response(
