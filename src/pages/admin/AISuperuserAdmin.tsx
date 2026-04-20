@@ -49,6 +49,27 @@ export function AISuperuserAdmin() {
   const [running, setRunning] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedRun, setSelectedRun] = useState<Run | null>(null);
+  const [creatingBugReport, setCreatingBugReport] = useState(false);
+
+  const createBugReportFromRun = async (run: Run) => {
+    setCreatingBugReport(true);
+    try {
+      const { error } = await supabase.from('bug_reports').insert({
+        title: `[KI Superuser] ${run.scenario_name} fehlgeschlagen`,
+        description: `Test-Szenario "${run.scenario_name}" ist fehlgeschlagen.\n\nHTTP: ${run.http_status}\nLatenz: ${run.latency_ms}ms\n\nError: ${run.error_message || 'unknown'}\n\nRequest:\n${JSON.stringify(run.full_request_json, null, 2)}\n\nResponse:\n${JSON.stringify(run.full_response_json, null, 2)}`,
+        severity: run.status === 'fail' ? 'high' : 'medium',
+        status: 'open',
+        route: '/admin (KI Superuser)',
+        metadata: { source: 'ai_superuser', run_id: run.id, scenario: run.scenario_name },
+      });
+      if (error) throw error;
+      toast.success('Bug-Report erstellt');
+    } catch (err) {
+      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`);
+    } finally {
+      setCreatingBugReport(false);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -326,6 +347,19 @@ export function AISuperuserAdmin() {
                   <strong>Response:</strong>
                   <pre className="bg-muted p-2 rounded text-xs overflow-auto mt-1">{JSON.stringify(selectedRun.full_response_json, null, 2)}</pre>
                 </div>
+                {(selectedRun.status === 'fail' || selectedRun.status === 'warning') && (
+                  <div className="pt-2 border-t">
+                    <Button
+                      onClick={() => createBugReportFromRun(selectedRun)}
+                      disabled={creatingBugReport}
+                      variant="destructive"
+                      size="sm"
+                    >
+                      {creatingBugReport ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <AlertTriangle className="h-4 w-4 mr-2" />}
+                      Als Bug-Report melden
+                    </Button>
+                  </div>
+                )}
               </div>
             </ScrollArea>
           )}
