@@ -1,73 +1,73 @@
 
 
-# Plan: Test-Runner Fixes — alle 11 Failures beheben
+# Plan: Letzte Failures beheben + Pass-Rate-Anzeige korrigieren
 
-## Diagnose der Ergebnisse
+## Diagnose
 
-Der KI Superuser hat **erfolgreich Bugs gefunden** — aber **alle 11 Failures sind im Test-Runner selbst**, nicht in der App. Genau dafür ist so ein System da: Wir hätten diese Mismatches sonst nie bemerkt.
+Die Tests zeigen **50 % weil jedes Szenario 2 Runs hat** (1 alter roter + 1 neuer grüner). Die Pass-Rate berechnet beide zusammen statt nur den letzten Lauf. Echte Failures sind nur noch **4 von 13**:
 
-### Die 3 Fehler-Cluster
+| # | Szenario | Echter Grund |
+|---|---|---|
+| **1** | Bio Generation (DE) — `HTTP 429` | `generate-bio` hat ein hartes **Daily-Limit von 2 Bios/Tag** für Non-Pro. Test-User wird als Free behandelt (`profile.plan` ≠ `'pro'`) |
+| **2** | Bio Generation (ES) — `HTTP 429` | Selbe Ursache wie #1 |
+| **3** | Comments Analysis — `HTTP 400 "projectId is required"` | Test schickt `comments`-Array, aber `analyze-comments` erwartet eine **`projectId`** und liest Kommentare aus der DB |
+| **4** | Hooks Generation — `HTTP 500` | Edge Function `generate-hooks` **existiert gar nicht** (siehe `supabase/functions/`-Listing). Test ruft eine nicht-existente Function auf |
+| **5** | Reel Script (30 s) — `HTTP 400` | Edge Function `generate-reel-script` **existiert ebenfalls nicht** |
 
-| # | Fehler | Betroffene Szenarien | Ursache |
-|---|---|---|---|
-| **A** | `HTTP 401 Unauthorized` | Caption (EN), Reel Script, Image Generation, Comments Analysis, Campaign Generation | Edge Functions haben `verify_jwt = true` und brauchen einen **echten User-JWT**, nicht den Service-Role-Key |
-| **B** | `HTTP 400 Invalid input` (enum-Mismatch) | Bio Generation (DE), Bio Generation (ES), Performance Analytics | Test schickt deutsches/spanisches Wort `"motivierend"` / `"profesional"`, aber Schema akzeptiert nur englische Enums (`professional`, `casual`, ...). Performance Analytics fehlt das `posts`-Array komplett. |
-| **C** | `HTTP 500 Internal Error` | Hashtag Analysis, Posting Times, Hooks Generation | Functions erwarten zusätzliche Felder oder echte User-Daten in der DB (z.B. existierende Posts für Hashtag-Auswertung) |
+Plus: **Latenz-Anzeige in der UI ist irreführend**, weil sie über alle 2 Runs gemittelt wird statt den letzten Run anzuzeigen.
 
-Der einzige grüne Test (**Trend Radar**) lief mit 84 Sekunden zwar erfolgreich, ist aber **deutlich zu langsam** — gehört nachgelagert optimiert.
+## Was wird gefixt
 
-## Was wird gebaut
+### Fix 1 — Bio-Daily-Limit für Test-Account umgehen
+In `supabase/functions/generate-bio/index.ts` einen Bypass für Test-Accounts ergänzen:
+```ts
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('plan, is_test_account')
+  .eq('id', user.id)
+  .single();
 
-### Fix 1: Echter Test-User mit JWT-Token (löst Cluster A)
+const isPro = profile?.plan === 'pro' || profile?.is_test_account === true;
+```
+Damit hat der KI-Superuser unbegrenzte Bios — alle anderen User bleiben ans 2/Tag-Limit gebunden.
 
-Statt Service-Role-Key einen **echten Test-User-Account** anlegen, dessen JWT der Test-Runner für authentifizierte Calls nutzt.
+### Fix 2 — Comments-Analysis-Test korrigieren
+Test-Runner umstellen auf den echten Flow:
+1. Setup-Phase: Lege im Test-Workspace ein **Demo-Project** (`projects` Tabelle) + 2 Demo-Comments (`comments` Tabelle) an, falls noch nicht vorhanden
+2. Speichere `demo_project_id` im Test-Context
+3. Comments-Szenario sendet `{ projectId: demo_project_id }` statt rohe Comments
 
-- Migration: legt `ai-superuser@adtool-internal.test` in `auth.users` an (via `auth.admin.createUser`)
-- Markiert in `profiles.is_test_account = true` (Spalte existiert bereits)
-- Wallet mit Enterprise-Plan + 999M Credits
-- Test-Runner generiert bei jedem Lauf einen frischen JWT via `auth.admin.generateLink` und nutzt ihn für alle authentifizierten Functions
+### Fix 3 — Nicht-existente Functions entfernen
+`generate-hooks` und `generate-reel-script` existieren nicht im Repo. Zwei Optionen, ich empfehle **A**:
 
-### Fix 2: Korrekte Test-Payloads (löst Cluster B + C)
+- **A) Aus Test-Suite streichen** (sauber): die zwei Szenarien aus `SCENARIOS` löschen → von 13 auf 11 Szenarien
+- B) Edge Functions neu bauen (großer Aufwand, unklarer Mehrwert weil Feature existiert nicht im Frontend)
 
-Im Test-Runner die fehlerhaften Bodies an die echten Schemas anpassen:
+Falls du das Feature später bauen willst, ergänzen wir die Tests dann wieder.
 
-| Szenario | Korrektur |
-|---|---|
-| **Bio (DE)** | `tone: "motivierend"` → `tone: "inspirational"` (Schema-konform, `language: "de"` bleibt für Output-Sprache) |
-| **Bio (ES)** | `tone: "profesional"` → `tone: "professional"` |
-| **Performance Analytics** | Mock-Posts-Array hinzufügen: `posts: [{ engagement_rate: 0.05, caption_text: "..." }, ...]` |
-| **Hashtag Analysis** | `hashtags: ["#test", "#demo"]` Array mit Mock-Daten ergänzen |
-| **Posting Times** | Mock-Engagement-History im Body mitschicken statt aus DB zu lesen |
-| **Hooks Generation** | `style` als String statt `styles` Array (echtes Schema prüfen + anpassen) |
+### Fix 4 — Pass-Rate-Anzeige korrigieren
+In `src/pages/admin/AISuperuserAdmin.tsx` die Aggregations-Logik anpassen:
+- **Heute:** Pass-Rate = `passed / total` über alle Runs eines Szenarios → bei 1 alter Fail + 1 neuer Pass = 50 %
+- **Neu:** Pass-Rate über die **letzten 5 Runs** (Sliding Window) + **Letzter Status** als großes Icon
+- Latenz-Spalte zeigt **letzte Latenz** statt Durchschnitt
 
-### Fix 3: Robustere Test-Daten-Vorbereitung
+Zusätzlich: Button **„Alte Runs löschen"** der Runs > 7 Tage entfernt (verhindert dass alte Failures die Stats dauerhaft drücken).
 
-- Setup-Phase legt für den Test-User **3 Demo-Posts** in `social_posts` an, damit DB-abhängige Functions (Hashtag, Posting Times) Daten zum Auswerten haben
-- Cleanup-Phase löscht generierte Test-Inhalte nach jedem Run (Captions, Bios, Bilder im Test-Workspace)
+### Fix 5 — Latenz-Warnung Trend Radar
+84 s Latenz für Trend Radar bleibt grenzwertig. In `analyze-superuser-anomalies` Schwellwert auf 60 s setzen → erzeugt automatisch einen Warning-Anomaly-Eintrag, ohne dass wir jetzt sofort optimieren müssen.
 
-### Fix 4: Bessere Error-Anzeige im Admin Dashboard
+## Implementierungsreihenfolge
 
-In `AISuperuserAdmin.tsx` neuer **„Details"**-Modal:
-- Zeigt vollständige `full_request_json` + `full_response_json`
-- Hebt das fehlerhafte Feld farblich hervor
-- Button **„Als Bug-Report melden"** → erstellt `bug_reports` Eintrag mit Stack-Trace
-
-### Fix 5: Latenz-Warnung für Trend Radar
-
-- 84 Sekunden für `fetch-trends` ist grenzwertig (Timeout liegt bei 180s)
-- Plan-Verweis: Wenn nach Fix 1+2 noch ≥ 30s, optimieren wir später separat (Caching-Layer / paralleles Fetching)
-- Fürs Erste: Schwellwert in Anomaly-Detection auf 60s setzen, damit Warning ausgelöst wird
-
-## Reihenfolge
-
-1. Schema-Recherche: Echte Schemas der 6 problematischen Functions exakt auslesen
-2. Migration: Test-User + Wallet + Demo-Posts erstellen
-3. Test-Runner umbauen: JWT-Generierung + korrigierte Payloads
-4. Re-Deploy + manueller Test über „Schnell-Test"-Button
-5. Admin UI: Detail-Modal für fehlgeschlagene Runs
-6. Validierung: Erwartung **≥ 10/12 Pass-Rate** nach den Fixes
+1. `generate-bio`: Test-Account-Bypass für Daily-Limit
+2. Test-Runner: Demo-Project + Demo-Comments seeden, Comments-Szenario auf `projectId` umbauen, `generate-hooks` und `generate-reel-script` entfernen
+3. `AISuperuserAdmin.tsx`: Pass-Rate auf letzte 5 Runs umstellen, Latenz auf letzten Run, „Alte Runs löschen"-Button
+4. `analyze-superuser-anomalies`: 60 s-Latenz-Schwellwert
+5. **Schnell-Test ausführen → Erwartung: 11/11 grün**
 
 ## Erwartetes Ergebnis
 
-Nach den Fixes sollten **alle 12 Szenarien grün laufen**. Falls dann noch Tests rot bleiben, sind das **echte Bugs in der App** — und genau dafür ist dieses System gebaut.
+- ✅ **11/11 Szenarien grün** beim nächsten Schnell-Test
+- ✅ Pass-Rate-Anzeige ehrlich (zeigt Realität, nicht historische Altlasten)
+- ✅ Latenz-Anzeige zeigt aktuellen Stand statt verfälschten Durchschnitt
+- ✅ Trend-Radar-Latenz wird automatisch als Warning getrackt
 
