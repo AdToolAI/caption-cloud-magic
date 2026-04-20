@@ -200,6 +200,9 @@ export function AISuperuserAdmin() {
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
             Komplett-Test
           </Button>
+          <Button onClick={deleteOldRuns} variant="ghost" size="sm" title="Runs > 7 Tage löschen">
+            Alte Runs löschen
+          </Button>
         </div>
       </div>
 
