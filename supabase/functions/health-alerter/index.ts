@@ -18,6 +18,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { ADMIN_ALERT_EMAIL } from '../_shared/admin-config.ts';
+import { sendEmail } from '../_shared/email-send.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -224,21 +225,38 @@ serve(async (req) => {
       });
 
       try {
-        await supabase.functions.invoke('send-transactional-email', {
-          body: {
-            templateName: 'alert-warning',
-            recipientEmail: ADMIN_ALERT_EMAIL,
-            idempotencyKey: `alert-${alert.alert_type}-${Math.floor(now / (alert.cooldown_minutes * 60_000))}`,
-            templateData: {
-              severity: alert.severity,
-              alertType: alert.alert_type,
-              message: alert.message,
-              metricValue: alert.metric_value,
-              threshold: alert.threshold,
-              recommendation: alert.recommendation,
-              dashboardUrl: 'https://useadtool.ai/admin',
-            },
-          },
+        const sevColor = alert.severity === 'critical' ? '#dc2626' : '#f59e0b';
+        const sevLabel = alert.severity === 'critical' ? '🚨 CRITICAL' : '⚠️ WARNING';
+        const html = `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff">
+            <div style="background:${sevColor};color:#fff;padding:20px;text-align:center">
+              <h1 style="margin:0;font-size:22px">${sevLabel}</h1>
+              <p style="margin:6px 0 0;font-size:14px;opacity:.9">${alert.alert_type}</p>
+            </div>
+            <div style="padding:24px;color:#111">
+              <p style="font-size:16px;margin:0 0 16px"><b>${alert.message}</b></p>
+              <table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:14px">
+                <tr><td style="padding:6px 0;color:#666">Wert</td><td style="text-align:right"><b>${alert.metric_value}</b></td></tr>
+                <tr><td style="padding:6px 0;color:#666">Schwelle</td><td style="text-align:right">${alert.threshold}</td></tr>
+              </table>
+              <div style="margin-top:20px;padding:14px;background:#f9fafb;border-left:3px solid ${sevColor};border-radius:4px">
+                <p style="margin:0;font-size:14px;color:#444"><b>Empfehlung:</b><br/>${alert.recommendation}</p>
+              </div>
+              <div style="margin-top:24px;text-align:center">
+                <a href="https://useadtool.ai/admin" style="background:#d4af37;color:#000;padding:11px 22px;text-decoration:none;border-radius:6px;font-weight:bold;display:inline-block">Admin Dashboard öffnen →</a>
+              </div>
+              <p style="margin-top:24px;font-size:11px;color:#999;text-align:center">
+                Cooldown: ${alert.cooldown_minutes} Min · automatisch generiert
+              </p>
+            </div>
+          </div>`;
+
+        await sendEmail({
+          to: ADMIN_ALERT_EMAIL,
+          subject: `${sevLabel} ${alert.alert_type}: ${alert.message.slice(0, 80)}`,
+          html,
+          template: `alert-${alert.alert_type}`,
+          category: 'system',
         });
         sentEmails.push(alert.alert_type);
       } catch (e) {
