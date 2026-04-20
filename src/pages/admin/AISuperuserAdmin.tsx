@@ -406,7 +406,14 @@ export function AISuperuserAdmin() {
                     {s.lastRun ? formatDistanceToNow(new Date(s.lastRun.started_at), { addSuffix: true, locale: de }) : '-'}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={s.passRate >= 80 ? 'default' : s.passRate >= 50 ? 'secondary' : 'destructive'}>
+                    <Badge
+                      variant={s.passRate >= 80 ? 'default' : s.passRate >= 50 ? 'secondary' : 'destructive'}
+                      title={
+                        s.lastRun?.status === 'pass' && s.passRate < 100
+                          ? 'Letzter Run grün — historische Fail-Runs noch im 5-Run-Window. Klicke „Komplett zurücksetzen" für 100%.'
+                          : undefined
+                      }
+                    >
                       {Math.round(s.passRate)}%
                     </Badge>
                   </TableCell>
