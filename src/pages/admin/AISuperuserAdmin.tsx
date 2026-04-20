@@ -128,13 +128,13 @@ export function AISuperuserAdmin() {
     }
   };
 
-  // Group by scenario - latest status
+  // Group by scenario - latest status, pass-rate over last 5 runs (sliding window)
   const scenarios: ScenarioStatus[] = Object.values(
     runs.reduce((acc, run) => {
       if (!acc[run.scenario_name]) {
         acc[run.scenario_name] = {
           name: run.scenario_name,
-          lastRun: run,
+          lastRun: run, // runs are sorted desc → first is latest
           passRate: 0,
           totalRuns: 0,
         };
@@ -143,10 +143,23 @@ export function AISuperuserAdmin() {
       return acc;
     }, {} as Record<string, ScenarioStatus>)
   ).map((s) => {
-    const scenarioRuns = runs.filter((r) => r.scenario_name === s.name);
-    const passes = scenarioRuns.filter((r) => r.status === 'pass').length;
-    return { ...s, passRate: scenarioRuns.length > 0 ? (passes / scenarioRuns.length) * 100 : 0 };
+    // Sliding window: only the most recent 5 runs count toward pass rate
+    const recentRuns = runs.filter((r) => r.scenario_name === s.name).slice(0, 5);
+    const passes = recentRuns.filter((r) => r.status === 'pass').length;
+    return { ...s, passRate: recentRuns.length > 0 ? (passes / recentRuns.length) * 100 : 0 };
   }).sort((a, b) => a.name.localeCompare(b.name));
+
+  const deleteOldRuns = async () => {
+    if (!confirm('Test-Runs älter als 7 Tage löschen?')) return;
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { error } = await supabase.from('ai_superuser_runs').delete().lt('started_at', cutoff);
+    if (error) {
+      toast.error(`Fehler: ${error.message}`);
+    } else {
+      toast.success('Alte Test-Runs gelöscht');
+      await fetchData();
+    }
+  };
 
   const StatusIcon = ({ status }: { status: string }) => {
     if (status === 'pass') return <CheckCircle2 className="h-5 w-5 text-green-500" />;
