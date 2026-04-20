@@ -74,6 +74,11 @@ const Auth = () => {
           method: 'email'
         });
       }
+
+      // Navigate to dedicated check-email page on successful signup
+      if (!result?.error) {
+        navigate(`/auth/check-email?email=${encodeURIComponent(email)}`);
+      }
     }
 
     setLoading(false);

@@ -72,6 +72,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const CheckEmail = lazy(() => import("./pages/CheckEmail"));
 const EmailPreferences = lazy(() => import("./pages/EmailPreferences"));
 const StreakPage = lazy(() => import("./pages/Streak"));
 const Pricing = lazy(() => import("./pages/Pricing"));
@@ -166,6 +167,7 @@ function AppLayout() {
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                    <Route path="/verify-email" element={<VerifyEmail />} />
+                   <Route path="/auth/check-email" element={<CheckEmail />} />
                    <Route path="/email-preferences" element={<EmailPreferences />} />
                    <Route path="/streak" element={<ProtectedRoute><StreakPage /></ProtectedRoute>} />
                    <Route path="/account" element={<Account />} />

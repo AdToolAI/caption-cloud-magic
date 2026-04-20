@@ -2708,7 +2708,10 @@ export const translations: Record<Language, any> = {
       loginTitle: "Sign in to your account",
       signupTitle: "Create your account",
       email: "Email",
-      password: "Password"
+      password: "Password",
+      signupSuccessTitle: "Account created!",
+      signupSuccessDesc: "Please check your email for the verification link.",
+      signupErrorGeneric: "Sign-up failed. Please try again."
     },
     
     // Common
@@ -4590,6 +4593,23 @@ export const translations: Record<Language, any> = {
       notYet: "Not verified yet",
       clickLink: "Please click the link in the email",
       problemsContact: "Problems? Contact our",
+      support: "Support",
+    },
+    checkEmail: {
+      title: "Check your email",
+      subtitle: "We've sent you a verification link to activate your account.",
+      sentTo: "Email sent to:",
+      step1: "Open the email from AdTool AI",
+      step2: "Click the verification link",
+      step3: "Don't forget to check your spam folder",
+      resend: "Resend email",
+      resendIn: "Resend in {seconds}s",
+      useDifferent: "Use a different email",
+      resentTitle: "Email resent!",
+      resentDesc: "Check your inbox and spam folder",
+      resendError: "Failed to resend",
+      notLoggedIn: "Please sign in again to resend",
+      problemsContact: "Need help? Contact our",
       support: "Support",
     },
   },
@@ -7117,7 +7137,10 @@ export const translations: Record<Language, any> = {
       loginTitle: "Melde dich in deinem Konto an",
       signupTitle: "Erstelle dein Konto",
       email: "E-Mail",
-      password: "Passwort"
+      password: "Passwort",
+      signupSuccessTitle: "Account erstellt!",
+      signupSuccessDesc: "Bitte prüfe deine E-Mails für den Verifizierungs-Link.",
+      signupErrorGeneric: "Registrierung fehlgeschlagen. Bitte versuche es erneut."
     },
     
     // Common
@@ -9012,6 +9035,23 @@ export const translations: Record<Language, any> = {
       notYet: "Noch nicht verifiziert",
       clickLink: "Bitte klicke auf den Link in der E-Mail",
       problemsContact: "Probleme? Kontaktiere unseren",
+      support: "Support",
+    },
+    checkEmail: {
+      title: "Prüfe deine E-Mails",
+      subtitle: "Wir haben dir einen Verifizierungs-Link zur Aktivierung deines Kontos gesendet.",
+      sentTo: "E-Mail gesendet an:",
+      step1: "Öffne die E-Mail von AdTool AI",
+      step2: "Klicke auf den Verifizierungs-Link",
+      step3: "Vergiss nicht, deinen Spam-Ordner zu prüfen",
+      resend: "E-Mail erneut senden",
+      resendIn: "Erneut senden in {seconds}s",
+      useDifferent: "Andere E-Mail-Adresse verwenden",
+      resentTitle: "E-Mail erneut gesendet!",
+      resentDesc: "Prüfe deinen Posteingang und Spam-Ordner",
+      resendError: "Senden fehlgeschlagen",
+      notLoggedIn: "Bitte melde dich erneut an, um die E-Mail erneut zu senden",
+      problemsContact: "Hilfe nötig? Kontaktiere unseren",
       support: "Support",
     },
   },
@@ -11304,7 +11344,10 @@ export const translations: Record<Language, any> = {
       loginTitle: "Inicia sesión en tu cuenta",
       signupTitle: "Crea tu cuenta",
       email: "Correo electrónico",
-      password: "Contraseña"
+      password: "Contraseña",
+      signupSuccessTitle: "¡Cuenta creada!",
+      signupSuccessDesc: "Revisa tu correo para encontrar el enlace de verificación.",
+      signupErrorGeneric: "Registro fallido. Inténtalo de nuevo."
     },
     
     // Common
@@ -18121,6 +18164,23 @@ Object.assign(translations.es, {
       notYet: "Aún no verificado",
       clickLink: "Haz clic en el enlace del correo",
       problemsContact: "¿Problemas? Contacta con nuestro",
+      support: "Soporte",
+    },
+    checkEmail: {
+      title: "Revisa tu correo",
+      subtitle: "Te hemos enviado un enlace de verificación para activar tu cuenta.",
+      sentTo: "Correo enviado a:",
+      step1: "Abre el correo de AdTool AI",
+      step2: "Haz clic en el enlace de verificación",
+      step3: "No olvides revisar tu carpeta de spam",
+      resend: "Reenviar correo",
+      resendIn: "Reenviar en {seconds}s",
+      useDifferent: "Usar otro correo",
+      resentTitle: "¡Correo reenviado!",
+      resentDesc: "Revisa tu bandeja de entrada y spam",
+      resendError: "Error al reenviar",
+      notLoggedIn: "Inicia sesión de nuevo para reenviar",
+      problemsContact: "¿Necesitas ayuda? Contacta con nuestro",
       support: "Soporte",
     },
   },
