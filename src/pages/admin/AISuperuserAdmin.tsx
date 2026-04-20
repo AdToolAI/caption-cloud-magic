@@ -25,6 +25,11 @@ const ACTIVE_SCENARIOS = new Set<string>([
   'Posting Times Recommendation',
   'Comments Analysis',
   'Trend Radar Fetch',
+  'Trial Lifecycle Check',
+  'Calendar Publish Dispatcher',
+  'Stripe Webhook Reachability',
+  'Social Health Check',
+  'Consistency Watcher',
 ]);
 
 // Latency color thresholds (ms) — KI-Calls können legitim 5-10s dauern
