@@ -1,73 +1,71 @@
 
 
-# Plan: Letzte Failures beheben + Pass-Rate-Anzeige korrigieren
+# Plan: Dashboard-Bereinigung — echte Realität anzeigen
 
-## Diagnose
+## Was die Daten zeigen
 
-Die Tests zeigen **50 % weil jedes Szenario 2 Runs hat** (1 alter roter + 1 neuer grüner). Die Pass-Rate berechnet beide zusammen statt nur den letzten Lauf. Echte Failures sind nur noch **4 von 13**:
+Letzter Run (vor < 1 Min): **11/11 Szenarien grün** ✅
+- Alle Caption/Bio/Image/Campaign/Performance/Hashtag/Posting/Comments/Trends → HTTP 200
+- Bio (DE/ES) jetzt 2.5s statt 429er — Test-Account-Bypass funktioniert
+- Comments Analysis jetzt 200 statt 400er — projectId-Flow funktioniert
 
-| # | Szenario | Echter Grund |
-|---|---|---|
-| **1** | Bio Generation (DE) — `HTTP 429` | `generate-bio` hat ein hartes **Daily-Limit von 2 Bios/Tag** für Non-Pro. Test-User wird als Free behandelt (`profile.plan` ≠ `'pro'`) |
-| **2** | Bio Generation (ES) — `HTTP 429` | Selbe Ursache wie #1 |
-| **3** | Comments Analysis — `HTTP 400 "projectId is required"` | Test schickt `comments`-Array, aber `analyze-comments` erwartet eine **`projectId`** und liest Kommentare aus der DB |
-| **4** | Hooks Generation — `HTTP 500` | Edge Function `generate-hooks` **existiert gar nicht** (siehe `supabase/functions/`-Listing). Test ruft eine nicht-existente Function auf |
-| **5** | Reel Script (30 s) — `HTTP 400` | Edge Function `generate-reel-script` **existiert ebenfalls nicht** |
+Was noch nervt:
+1. **Pass-Rate zeigt 33%/67%** weil alle 3 historischen Runs zusammengezählt werden (1 alter Fail + 2 neue Pass)
+2. **Hooks Generation + Reel Script (30s)** stehen weiter rot in der Liste — obwohl die Szenarien aus dem Code entfernt wurden, leben ihre alten Runs noch in der DB
+3. Trend Radar Latenz: 932ms — **massiv besser** als 84s vorher (vermutlich Cache-Hit)
 
-Plus: **Latenz-Anzeige in der UI ist irreführend**, weil sie über alle 2 Runs gemittelt wird statt den letzten Run anzuzeigen.
+## Fix 1 — Karteileichen entfernen
 
-## Was wird gefixt
+In `src/pages/admin/AISuperuserAdmin.tsx` die Aggregations-Logik filtern:
+- Liste der **aktuell aktiven Szenarien** aus dem Test-Runner spiegeln (11 Namen)
+- Szenarien deren Name nicht in der aktiven Liste vorkommt → **gar nicht anzeigen**
+- Damit verschwinden „Hooks Generation" und „Reel Script (30s)" sofort aus der Übersicht
 
-### Fix 1 — Bio-Daily-Limit für Test-Account umgehen
-In `supabase/functions/generate-bio/index.ts` einen Bypass für Test-Accounts ergänzen:
-```ts
-const { data: profile } = await supabase
-  .from('profiles')
-  .select('plan, is_test_account')
-  .eq('id', user.id)
-  .single();
-
-const isPro = profile?.plan === 'pro' || profile?.is_test_account === true;
+Alternativ via SQL-Cleanup (einmalig):
+```sql
+DELETE FROM ai_superuser_runs 
+WHERE scenario_name IN ('Hooks Generation', 'Reel Script (30s)');
 ```
-Damit hat der KI-Superuser unbegrenzte Bios — alle anderen User bleiben ans 2/Tag-Limit gebunden.
+Beides — UI-Filter als dauerhafte Schutzschicht + DB-Cleanup für saubere Historie.
 
-### Fix 2 — Comments-Analysis-Test korrigieren
-Test-Runner umstellen auf den echten Flow:
-1. Setup-Phase: Lege im Test-Workspace ein **Demo-Project** (`projects` Tabelle) + 2 Demo-Comments (`comments` Tabelle) an, falls noch nicht vorhanden
-2. Speichere `demo_project_id` im Test-Context
-3. Comments-Szenario sendet `{ projectId: demo_project_id }` statt rohe Comments
+## Fix 2 — Pass-Rate ehrlich berechnen
 
-### Fix 3 — Nicht-existente Functions entfernen
-`generate-hooks` und `generate-reel-script` existieren nicht im Repo. Zwei Optionen, ich empfehle **A**:
+Aktuelles Problem: `passes / total` über alle 3 Runs eines Szenarios → 2 Pass + 1 alte Fail = 67%
 
-- **A) Aus Test-Suite streichen** (sauber): die zwei Szenarien aus `SCENARIOS` löschen → von 13 auf 11 Szenarien
-- B) Edge Functions neu bauen (großer Aufwand, unklarer Mehrwert weil Feature existiert nicht im Frontend)
+Lösung in `AISuperuserAdmin.tsx`:
+- **Default-Window: letzte 5 Runs** (Sliding Window war schon geplant, scheint aber nicht aktiv)
+- Sicherstellen dass `summary.pass_rate` aus den **5 neuesten** Runs berechnet wird, nicht aus allen 24h-Runs
+- Zusätzlich: Pass-Rate-Badge **grün ab ≥ 80%**, gelb 50-79%, rot < 50% (aktuell zeigt 67% rot)
 
-Falls du das Feature später bauen willst, ergänzen wir die Tests dann wieder.
+## Fix 3 — „Alle Tests jetzt grün"-Banner
 
-### Fix 4 — Pass-Rate-Anzeige korrigieren
-In `src/pages/admin/AISuperuserAdmin.tsx` die Aggregations-Logik anpassen:
-- **Heute:** Pass-Rate = `passed / total` über alle Runs eines Szenarios → bei 1 alter Fail + 1 neuer Pass = 50 %
-- **Neu:** Pass-Rate über die **letzten 5 Runs** (Sliding Window) + **Letzter Status** als großes Icon
-- Latenz-Spalte zeigt **letzte Latenz** statt Durchschnitt
+Wenn alle aktiven Szenarien im letzten Run grün waren → grünes Erfolgs-Banner oben:
+> ✅ **Alle 11 Szenarien laufen stabil** — Letzter Komplett-Test vor X Minuten
 
-Zusätzlich: Button **„Alte Runs löschen"** der Runs > 7 Tage entfernt (verhindert dass alte Failures die Stats dauerhaft drücken).
+Damit sieht man auf einen Blick ob das System gesund ist, ohne durch jede Pass-Rate-Spalte scrollen zu müssen.
 
-### Fix 5 — Latenz-Warnung Trend Radar
-84 s Latenz für Trend Radar bleibt grenzwertig. In `analyze-superuser-anomalies` Schwellwert auf 60 s setzen → erzeugt automatisch einen Warning-Anomaly-Eintrag, ohne dass wir jetzt sofort optimieren müssen.
+## Fix 4 — „Historie zurücksetzen"-Button
 
-## Implementierungsreihenfolge
+Neuer Button neben „Alte Runs löschen":
+- **„Pass-Rate zurücksetzen"** löscht alle Runs > 1 Stunde alt
+- Nutzbar nach jedem größeren Fix um saubere Baseline zu starten
+- Mit Bestätigungs-Dialog (irreversibel)
 
-1. `generate-bio`: Test-Account-Bypass für Daily-Limit
-2. Test-Runner: Demo-Project + Demo-Comments seeden, Comments-Szenario auf `projectId` umbauen, `generate-hooks` und `generate-reel-script` entfernen
-3. `AISuperuserAdmin.tsx`: Pass-Rate auf letzte 5 Runs umstellen, Latenz auf letzten Run, „Alte Runs löschen"-Button
-4. `analyze-superuser-anomalies`: 60 s-Latenz-Schwellwert
-5. **Schnell-Test ausführen → Erwartung: 11/11 grün**
+## Reihenfolge
+
+1. SQL-Cleanup: Alte Runs der entfernten Szenarien löschen
+2. `AISuperuserAdmin.tsx`: 
+   - Whitelist-Filter aktiver Szenarien
+   - Pass-Rate strikt über letzte 5 Runs
+   - Farbgebung Badge nach Schwellwert (80/50)
+   - Grünes „All systems operational"-Banner
+   - „Pass-Rate zurücksetzen"-Button
+3. Kurzer Re-Check: Schnell-Test ausführen → Erwartung **11/11 grün, alle Pass-Rates 100%**
 
 ## Erwartetes Ergebnis
 
-- ✅ **11/11 Szenarien grün** beim nächsten Schnell-Test
-- ✅ Pass-Rate-Anzeige ehrlich (zeigt Realität, nicht historische Altlasten)
-- ✅ Latenz-Anzeige zeigt aktuellen Stand statt verfälschten Durchschnitt
-- ✅ Trend-Radar-Latenz wird automatisch als Warning getrackt
+- ✅ Liste zeigt nur noch die 11 aktiven Szenarien (keine Karteileichen)
+- ✅ Pass-Rates rechnen ehrlich über die letzten 5 Runs → nach nächstem Schnell-Test 100% überall
+- ✅ Großes grünes Banner wenn alles läuft → sofortiger Health-Check ohne scrollen
+- ✅ Reset-Button damit historische Altlasten bei künftigen Fixes nicht mehr stören
 
