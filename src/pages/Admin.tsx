@@ -9,7 +9,8 @@ import Alerts from '@/pages/admin/Alerts';
 import { SentryDashboard } from '@/pages/admin/SentryDashboard';
 import { BugReportsAdmin } from '@/pages/admin/BugReportsAdmin';
 import { SmokeTestsAdmin } from '@/pages/admin/SmokeTestsAdmin';
-import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, HeartPulse } from 'lucide-react';
+import { AISuperuserAdmin } from '@/pages/admin/AISuperuserAdmin';
+import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, HeartPulse, Bot } from 'lucide-react';
 
 export default function Admin() {
   return (
@@ -34,6 +35,10 @@ export default function Admin() {
           <TabsTrigger value="smoke" className="flex items-center gap-2">
             <HeartPulse className="h-4 w-4" />
             Smoke Tests
+          </TabsTrigger>
+          <TabsTrigger value="superuser" className="flex items-center gap-2">
+            <Bot className="h-4 w-4" />
+            KI Superuser
           </TabsTrigger>
           <TabsTrigger value="funnel" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
@@ -75,6 +80,10 @@ export default function Admin() {
 
         <TabsContent value="smoke">
           <SmokeTestsAdmin />
+        </TabsContent>
+
+        <TabsContent value="superuser">
+          <AISuperuserAdmin />
         </TabsContent>
 
         <TabsContent value="funnel">
