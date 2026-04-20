@@ -1,8 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { Resend } from "https://esm.sh/resend@2.0.0";
+import { sendEmail } from "../_shared/email-send.ts";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -150,23 +149,23 @@ const handler = async (req: Request): Promise<Response> => {
     // Generate the email HTML
     const html = generatePasswordResetHtml(resetUrl, email);
 
-    // Send the email via Resend
-    const { data, error } = await resend.emails.send({
-      from: "AdTool <support@useadtool.ai>",
-      to: [email],
+    const result = await sendEmail({
+      to: email,
       subject: "Passwort zurücksetzen | AdTool",
       html,
+      template: "password_reset",
+      category: "transactional",
     });
 
-    if (error) {
-      console.error("[send-password-reset-email] Resend error:", error);
-      throw new Error(error.message);
+    if (!result.ok && !result.skipped) {
+      console.error("[send-password-reset-email] Send error:", result.error);
+      throw new Error(result.error || "send failed");
     }
 
-    console.log(`[send-password-reset-email] Email sent successfully: ${data?.id}`);
+    console.log(`[send-password-reset-email] Email sent: ${result.resendId}`);
 
     return new Response(
-      JSON.stringify({ success: true, messageId: data?.id }),
+      JSON.stringify({ success: true, messageId: result.resendId }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
 

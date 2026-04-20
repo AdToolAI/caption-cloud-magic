@@ -1,9 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { Resend } from "https://esm.sh/resend@2.0.0";
 import { renderEmail, type Stage, type Lang } from "./templates.ts";
+import { sendEmail } from "../_shared/email-send.ts";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const APP_URL = Deno.env.get("APP_URL") || Deno.env.get("APP_BASE_URL") || "https://useadtool.ai";
@@ -222,18 +221,21 @@ async function processStage(
         displayName: user.display_name,
       });
 
-      const { data, error } = await resend.emails.send({
-        from: "AdTool <support@useadtool.ai>",
-        to: [user.email],
+      const result = await sendEmail({
+        to: user.email,
         subject,
         html,
+        template: `winback_${stage}`,
+        category: "marketing",
       });
 
-      if (error) {
-        console.error(`[winback] resend error for ${user.email}:`, error);
+      if (!result.ok && !result.skipped) {
+        console.error(`[winback] send error for ${user.email}:`, result.error);
         failed++;
         continue;
       }
+
+      const messageId = result.resendId ?? null;
 
       // Insert log (idempotent)
       const { error: logErr } = await supabase
@@ -241,7 +243,7 @@ async function processStage(
         .insert({
           user_id: user.id,
           stage,
-          email_message_id: data?.id ?? null,
+          email_message_id: messageId,
           metadata: { language: user.language, cta_url: ctaUrl },
         });
 

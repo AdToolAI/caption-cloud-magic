@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { Resend } from "https://esm.sh/resend@2.0.0";
 import { renderActivationEmail, type ActivationStage, type Lang } from "./templates.ts";
+import { sendEmail } from "../_shared/email-send.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,7 +11,6 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const APP_URL = Deno.env.get("APP_URL") || "https://useadtool.ai";
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const normalizeLang = (raw?: string | null): Lang => {
   const v = (raw || "en").toLowerCase().slice(0, 2);
@@ -77,11 +76,12 @@ async function processStage(
         appUrl: APP_URL,
         userEmail: u.email as string,
       });
-      await resend.emails.send({
-        from: "AdTool <hello@useadtool.ai>",
-        to: [u.email as string],
+      await sendEmail({
+        to: u.email as string,
         subject,
         html,
+        template: `activation_${stage}`,
+        category: "marketing",
       });
 
       // Mark as sent

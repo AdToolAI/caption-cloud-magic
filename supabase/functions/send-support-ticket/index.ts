@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "https://esm.sh/resend@2.0.0";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+import { sendEmail } from "../_shared/email-send.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -65,15 +63,8 @@ serve(async (req) => {
       metadata = null;
     }
 
-    console.log("Processing support ticket from:", email, "Category:", category);
-
-    // Send email to support address
-    const { data, error } = await resend.emails.send({
-      from: "AdTool AI Support <support@useadtool.ai>",
-      to: ["bestofproducts4u@gmail.com"],
-      replyTo: email,
-      subject: `[${category.toUpperCase()}] ${subject}`,
-      html: `
+    // Send email to support address (internal notification)
+    const supportHtml = `
         <!DOCTYPE html>
         <html>
           <head>
@@ -100,34 +91,28 @@ serve(async (req) => {
                   <div class="label">Category:</div>
                   <div class="value" style="background: #EFF6FF; color: #1E40AF; padding: 12px; border-radius: 6px; border: 1px solid #BFDBFE; font-weight: 600;">${category}</div>
                 </div>
-
                 <div class="field">
                   <div class="label">From:</div>
                   <div class="value">${name}</div>
                 </div>
-                
                 <div class="field">
                   <div class="label">Email:</div>
                   <div class="value">${email}</div>
                 </div>
-                
                 <div class="field">
                   <div class="label">Subject:</div>
                   <div class="value">${subject}</div>
                 </div>
-                
                 <div class="field">
                   <div class="label">Message:</div>
                   <div class="message-box">${message}</div>
                 </div>
-                
                 ${metadata ? `
                 <div class="field">
                   <div class="label">Technical Details:</div>
                   <div class="message-box" style="font-family: monospace; font-size: 12px;">${JSON.stringify(metadata, null, 2)}</div>
                 </div>
                 ` : ''}
-                
                 <div class="footer">
                   <p>This ticket was submitted via AdTool AI Support Form</p>
                   <p>Reply directly to this email to respond to the customer</p>
@@ -135,24 +120,26 @@ serve(async (req) => {
               </div>
             </div>
           </body>
-        </html>
-      `,
+        </html>`;
+
+    const supportResult = await sendEmail({
+      to: "bestofproducts4u@gmail.com",
+      subject: `[${category.toUpperCase()}] ${subject}`,
+      html: supportHtml,
+      template: "support_ticket_internal",
+      category: "transactional",
+      replyTo: email,
     });
 
-    if (error) {
-      console.error("Resend error:", error);
-      throw error;
+    if (!supportResult.ok && !supportResult.skipped) {
+      console.error("Support email send error:", supportResult.error);
+      throw new Error(supportResult.error || "send failed");
     }
 
-    console.log("Support ticket sent successfully:", data);
+    console.log("Support ticket sent successfully:", supportResult.resendId);
 
     // Send confirmation email to customer
-    await resend.emails.send({
-      from: "AdTool AI Support <support@useadtool.ai>",
-      to: [email],
-      replyTo: "bestofproducts4u@gmail.com",
-      subject: "We received your support ticket",
-      html: `
+    const confirmHtml = `
         <!DOCTYPE html>
         <html>
           <head>
@@ -163,7 +150,6 @@ serve(async (req) => {
               .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
               .footer { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: 0; border-radius: 0 0 8px 8px; text-align: center; color: #6b7280; font-size: 12px; }
               .ticket-info { background: white; padding: 20px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #6366F1; }
-              .btn { display: inline-block; background: #6366F1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
             </style>
           </head>
           <body>
@@ -175,18 +161,14 @@ serve(async (req) => {
               <div class="content">
                 <p>Hi ${name},</p>
                 <p>Thank you for contacting AdTool AI support. We've received your ticket and will respond to your inquiry as soon as possible.</p>
-                
                 <div class="ticket-info">
                   <strong>Your Ticket Details:</strong><br/>
                   <strong>Category:</strong> ${category}<br/>
                   <strong>Subject:</strong> ${subject}<br/>
                   <strong>Submitted:</strong> ${new Date().toLocaleString()}
                 </div>
-                
-                <p>Our support team typically responds within 24 hours during business days. For urgent matters, you can also reach us via WhatsApp.</p>
-                
-                <p>Best regards,<br/>
-                <strong>The AdTool AI Team</strong></p>
+                <p>Our support team typically responds within 24 hours during business days.</p>
+                <p>Best regards,<br/><strong>The AdTool AI Team</strong></p>
               </div>
               <div class="footer">
                 <p>This is an automated confirmation email.</p>
@@ -194,8 +176,14 @@ serve(async (req) => {
               </div>
             </div>
           </body>
-        </html>
-      `,
+        </html>`;
+
+    await sendEmail({
+      to: email,
+      subject: "We received your support ticket",
+      html: confirmHtml,
+      template: "support_ticket_confirmation",
+      category: "transactional",
     });
 
     return new Response(
