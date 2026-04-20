@@ -7,10 +7,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, CheckCircle2, XCircle, ArrowRight, RefreshCw } from "lucide-react";
 import { Footer } from "@/components/Footer";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const VerifyEmail = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { t, language } = useTranslation();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
@@ -20,7 +22,7 @@ const VerifyEmail = () => {
 
       if (!token) {
         setStatus("error");
-        setErrorMessage("Kein Verifizierungstoken gefunden");
+        setErrorMessage(t("verifyEmail.noToken"));
         return;
       }
 
@@ -29,17 +31,13 @@ const VerifyEmail = () => {
           body: { token }
         });
 
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         if (data?.success) {
           setStatus("success");
-          toast.success("E-Mail erfolgreich verifiziert!", {
-            description: "Du kannst jetzt alle Features nutzen"
+          toast.success(t("verifyEmail.success"), {
+            description: t("verifyEmail.successDesc")
           });
-
-          // Refresh the session to update email_confirmed_at
           await supabase.auth.refreshSession();
         } else {
           throw new Error(data?.error || "Verification failed");
@@ -47,34 +45,35 @@ const VerifyEmail = () => {
       } catch (err: any) {
         console.error("Verification error:", err);
         setStatus("error");
-        setErrorMessage(err.message || "Die Verifizierung ist fehlgeschlagen");
+        setErrorMessage(err.message || t("verifyEmail.generic"));
       }
     };
 
     verifyEmail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const handleResendVerification = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user?.email) {
-      toast.error("Bitte melde dich erneut an");
+      toast.error(t("verifyEmail.pleaseLogin"));
       navigate("/auth");
       return;
     }
 
     try {
       const { error } = await supabase.functions.invoke("send-verification-email", {
-        body: { email: user.email, userId: user.id }
+        body: { email: user.email, userId: user.id, language }
       });
 
       if (error) throw error;
 
-      toast.success("Neue Verifizierungs-E-Mail gesendet!", {
-        description: "Prüfe deinen Posteingang"
+      toast.success(t("verifyEmail.resentTitle"), {
+        description: t("verifyEmail.resentDesc")
       });
     } catch (err: any) {
-      toast.error("Fehler beim Senden", {
+      toast.error(t("verifyEmail.resendError"), {
         description: err.message
       });
     }
@@ -82,7 +81,6 @@ const VerifyEmail = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
-      {/* Background Effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
           className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl"
@@ -111,9 +109,9 @@ const VerifyEmail = () => {
                   >
                     <Loader2 className="h-10 w-10 text-primary" />
                   </motion.div>
-                  <CardTitle className="text-2xl">E-Mail wird verifiziert...</CardTitle>
+                  <CardTitle className="text-2xl">{t("verifyEmail.loading")}</CardTitle>
                   <CardDescription className="text-base">
-                    Bitte warten
+                    {t("verifyEmail.pleaseWait")}
                   </CardDescription>
                 </>
               )}
@@ -129,10 +127,10 @@ const VerifyEmail = () => {
                     <CheckCircle2 className="h-10 w-10 text-green-500" />
                   </motion.div>
                   <CardTitle className="text-2xl text-green-500">
-                    Erfolgreich verifiziert! 🎉
+                    {t("verifyEmail.success")}
                   </CardTitle>
                   <CardDescription className="text-base">
-                    Deine E-Mail-Adresse wurde bestätigt. Du hast jetzt vollen Zugriff auf alle Features.
+                    {t("verifyEmail.successDesc")}
                   </CardDescription>
                 </>
               )}
@@ -148,7 +146,7 @@ const VerifyEmail = () => {
                     <XCircle className="h-10 w-10 text-destructive" />
                   </motion.div>
                   <CardTitle className="text-2xl text-destructive">
-                    Verifizierung fehlgeschlagen
+                    {t("verifyEmail.error")}
                   </CardTitle>
                   <CardDescription className="text-base">
                     {errorMessage}
@@ -163,7 +161,7 @@ const VerifyEmail = () => {
                   onClick={() => navigate("/generator")}
                   className="w-full bg-gradient-to-r from-primary to-primary/80"
                 >
-                  Zum Dashboard
+                  {t("verifyEmail.goDashboard")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               )}
@@ -176,14 +174,14 @@ const VerifyEmail = () => {
                     className="w-full"
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
-                    Neue E-Mail senden
+                    {t("verifyEmail.resend")}
                   </Button>
                   <Button
                     onClick={() => navigate("/auth")}
                     variant="ghost"
                     className="w-full"
                   >
-                    Zurück zur Anmeldung
+                    {t("verifyEmail.backToLogin")}
                   </Button>
                 </>
               )}
