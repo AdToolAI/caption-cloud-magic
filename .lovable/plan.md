@@ -1,64 +1,59 @@
 
 
-## Was kommt als nächstes?
+User-Anpassung: **20% Rabatt-Coupon (statt 50%) für 3 Monate** in der Day-30 Win-Back-Email.
 
-Sora-Cleanup ist durch. Wir sind jetzt am Übergang von Phase C1 (Smart Upgrade Prompts ✅) zu den nächsten Conversion-Hebeln. Hier mein Vorschlag in priorisierter Reihenfolge:
+## C2 Win-Back-Kampagne — Final-Spec
 
----
+### Belohnungs-Struktur
+- **Tag 14 inaktiv:** $5 AI-Video-Credits (in `ai_video_wallets`)
+- **Tag 30 inaktiv:** Stripe-Coupon **20% off, 3 Monate** (Code: `WINBACK20`)
 
-### 🥇 Empfehlung: USP-Block "6 lizensierte Premium-KI-Modelle" auf der Landing-Page (15 Min)
+### Implementierung
 
-**Warum jetzt?** Wir haben gerade Sora 2 zurückgestuft — die Marketing-Story muss aktiv die neue Erzählung aufbauen, sonst entsteht eine Lücke. Das ist ein direkter Anschluss-Schritt mit hohem Marketing-Wert.
+**1. Stripe-Coupon erstellen**
+- Name: "Win-Back 20% Off"
+- 20% percent_off, duration `repeating`, 3 Monate
+- Promotion-Code: `WINBACK20`
 
-**Was wir bauen:**
-- Neuer Block in `MissionFeatures.tsx`: "6 lizensierte Premium-KI-Modelle"
-- Visuelle Cards für: Kling 3 Omni · Wan 2.5 · Luma Ray 2 · Hailuo 2.3 · Seedance 2 · Veo
-- "⭐ Recommended"-Badge für Kling 3 Omni
-- Lokalisiert in DE/EN/ES
+**2. DB-Migration**
+- Tabelle `winback_email_log` (user_id, stage `day_14|day_30`, sent_at, unique constraint auf `(user_id, stage)`)
+- RLS: Service-Role schreibt, User liest nur eigene Logs
 
----
+**3. Edge Function `process-winback-emails`**
+- Cron: täglich 11:00 UTC via pg_cron
+- **Day-14-Branch:** User mit `last_sign_in_at` zwischen 13–15 Tagen
+  - Grant: $5 in `ai_video_wallets` via `ai_video_transactions` (type=`bonus`, description="Win-back reward Day 14")
+  - Email "Wir vermissen dich" + Push parallel
+  - Log in `winback_email_log` (ON CONFLICT prevents Doppelversand)
+- **Day-30-Branch:** User zwischen 29–31 Tagen
+  - Email "Letzte Chance" mit Code `WINBACK20` (20% off, 3 Monate)
+  - CTA → `/pricing?coupon=WINBACK20`
+  - Push parallel + Log
+- **Auto-Stop:** User in den letzten 7 Tagen aktiv → kein Mailing
+- **Suppression-Check:** Automatisch via `send-transactional-email`
 
-### 🥈 C2: Win-Back-Kampagne (1.5h)
+**4. Email-Templates (DE/EN/ES)**
+- `winback-day-14`: "Wir vermissen dich" + "$5 für deinen nächsten KI-Clip" + CTA → `/ai-video-studio`
+- `winback-day-30`: "Letzte Chance" + "20% Rabatt für 3 Monate" + Code `WINBACK20` + CTA → `/pricing`
+- Sprache aus `profiles.language`
+- React-Email-Templates in `_shared/transactional-email-templates/`
 
-User reaktivieren, die seit 14+ Tagen inaktiv sind:
-- Edge Function `process-winback-emails` (täglich 11:00 UTC)
-- 2-stufige Sequenz: Tag 14 → 100 Bonus-Credits, Tag 30 → 50% Rabatt-Coupon
-- Push-Variante parallel
-- Idempotenz via `winback_email_log`
+**5. Tracking**
+- PostHog: `winback_email_sent` (mit stage), `winback_reactivated`
 
----
+### Voraussetzungen-Check (vor Start)
+1. Email-Domain-Status prüfen → ggf. Setup-Dialog
+2. Email-Infrastruktur (`setup_email_infra`) ggf. provisionieren
+3. Transactional-Email scaffold falls nicht vorhanden
 
-### 🥉 C3: Referral-Programm (2.5h)
+### Reihenfolge nach Approval
+1. Email-Domain & Infra prüfen/aufsetzen
+2. DB-Migration (`winback_email_log`)
+3. Stripe-Coupon `WINBACK20` erstellen
+4. 2 Email-Templates × 3 Sprachen (DE/EN/ES)
+5. Edge Function `process-winback-emails`
+6. Pg_cron-Schedule (11:00 UTC daily)
+7. End-to-End-Test mit Test-User
 
-Viraler Wachstumshebel — Streak-Power-User teilen gerne:
-- Eindeutige Referral-Codes (`user_referrals` Tabelle)
-- Belohnung: $5 AI-Credits Referrer + 200 Bonus-Credits Referee
-- Dashboard-Widget "Du hast X Freunde eingeladen"
-- Share-Buttons (WhatsApp, Email, X, LinkedIn) DE/EN/ES
-- Anti-Fraud (Self-Referral-Block)
-
----
-
-### 🎯 C4: Annual Plan Upsell (1.5h)
-
-LTV-Steigerung durch Jahres-Pläne:
-- Stripe Annual Prices (17% Rabatt)
-- Toggle "Monatlich/Jährlich" auf Pricing-Page
-- In-App-Banner für aktive Monatsabonnenten
-
----
-
-### Alternative Pfade
-
-- **D**: Wöchentlicher Performance-Report per Email (Retention)
-- **E**: Team-Workspaces für Agenturen (Enterprise-Upsell)
-- **F**: Sora 2 Studio Hardening — Fallback-Logik auf Wan 2.5, falls Replicate das Modell abschaltet (technische Risikoabsicherung für Grandfathered-User)
-
----
-
-## Meine Empfehlung
-
-**USP-Block zuerst (15 Min, schließt das Sora-Cleanup ab) → dann C2 Win-Back → C3 Referral → C4 Annual.**
-
-Welche Richtung soll ich nehmen?
+### Aufwand: ~1.5h
 
