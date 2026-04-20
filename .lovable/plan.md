@@ -1,84 +1,87 @@
 
-## Email-Verifizierung korrigieren
 
-### Festgestelltes Problem
-Die Verifizierungs-Mail kommt an, aber der Link zeigt auf die falsche Domain:
-- In der Mail steht `https://captiongenie.app/verify-email?token=...`
-- Diese Domain liefert für `/verify-email` aktuell nicht die Verifizierungs-Seite, sondern landet effektiv auf der Landingpage
-- Die React-Seite `/verify-email` funktioniert im Projekt grundsätzlich, aber nur auf der korrekt gerouteten Domain
+## Plan: Conversion absichern — Verify-Reminder + Funnel-Dashboard
 
-Zusätzlich kommt eine zweite, eher werbliche Aktivierungs-Mail:
-- Die Onboarding-/Activation-Mail wird derzeit offenbar auch an **nicht verifizierte** Nutzer gesendet
-- Das erzeugt Verwirrung, weil erst die Bestätigung abgeschlossen sein sollte
+Wir bauen drei Bausteine, die zusammen die Conversion vom Signup bis zum ersten Video sichtbar und steuerbar machen:
 
-### Ziel
-1. Verifizierungs-Link immer auf die richtige App-Domain zeigen lassen
-2. Verifizierung nach Klick zuverlässig abschließen
-3. Aktivierungs-/Werbemails erst nach bestätigter E-Mail senden
+### Baustein 1: Verify-Reminder-Mail nach 24h
 
-### Umsetzung
+**Neue Edge Function `process-verify-reminders`**
+- Läuft stündlich per Cron
+- Findet alle User, die:
+  - Vor **24–72 Stunden** registriert haben (`created_at` zwischen -72h und -24h)
+  - **Noch nicht verifiziert** sind (`email_verified = false`)
+  - Noch **keinen Reminder** bekommen haben (neues Feld `verify_reminder_sent_at IS NULL`)
+- Sendet **eine** freundliche Reminder-Mail in der jeweiligen Sprache (DE/EN/ES) mit:
+  - Klarer CTA „E-Mail jetzt bestätigen"
+  - Frischer Resend-Link über bestehende `send-verification-email`-Function (also ein neuer 24h-Token)
+  - Hinweis „Falls du dich umentschieden hast, ignoriere diese Mail einfach"
+- Markiert `verify_reminder_sent_at = now()` → Idempotenz, jeder User bekommt **maximal einen** Reminder
 
-#### 1. Verifizierungs-Link auf die echte aktuelle Domain umstellen
-`send-verification-email` wird so angepasst, dass die Ziel-URL nicht mehr von einer veralteten Server-Variable abhängt.
+**DB-Migration:**
+- Spalte `profiles.verify_reminder_sent_at timestamptz NULL`
+- Cron-Job: `*/30 * * * *` (alle 30 Min)
 
-**Änderung:**
-- Edge Function akzeptiert zusätzlich `appUrl`
-- Beim Signup/Resend wird aus dem Frontend `window.location.origin` mitgeschickt
-- Die Function verwendet nur erlaubte Origins und baut daraus:
-  `https://<aktive-domain>/verify-email?token=...`
-- Fallback bleibt eine definierte Produktionsdomain statt der alten Domain
+### Baustein 2: Activation-Drip pausieren bis verifiziert
 
-**Betroffene Dateien:**
-- `supabase/functions/send-verification-email/index.ts`
-- `src/hooks/useAuth.tsx`
-- `src/pages/CheckEmail.tsx`
-- `src/components/auth/EmailVerificationGate.tsx`
+Bereits durch letzte Änderung gefiltert (`email_verified = true`). Zusätzlich:
+- **Day-0-Mail** wird erst getriggert, sobald die Verifizierung erfolgt ist (nicht ab `created_at`)
+- Dazu nehmen wir als Anker `email_verified_at` statt `created_at` — neue Spalte oder vorhandenes Feld nutzen
 
-#### 2. Flow gegen falsche/veraltete Links härten
-Falls doch noch alte Bestätigungslinks im Umlauf sind, wird der Client robuster gemacht.
+**DB-Migration:**
+- Spalte `profiles.email_verified_at timestamptz NULL`
+- `verify-email`-Function setzt diese beim erfolgreichen Verify
+- `process-activation-emails` nutzt `email_verified_at` als Stage-Anker statt `created_at`
 
-**Änderung:**
-- `VerifyEmail.tsx` bleibt primärer Token-Handler
-- Optionaler Fallback: falls künftig doch ein Auth-Code-Link (`?code=`) auftaucht, kann der Client ihn sauber verarbeiten statt auf der Startseite zu enden
-- Erfolg nach Verifizierung klar anzeigen und Session sauber aktualisieren
+### Baustein 3: Conversion-Funnel-Dashboard im Admin
 
-**Betroffene Dateien:**
-- `src/pages/VerifyEmail.tsx`
-- ggf. `src/pages/Index.tsx` oder zentrale Routing-Logik in `src/App.tsx`
+**Neuer Tab im Admin (`/admin`):** „Conversion Funnel"
 
-#### 3. Signup-Konfiguration bereinigen
-Der Signup nutzt aktuell noch `emailRedirectTo: ${window.location.origin}/`, was bei eventuellen nativen Auth-Mails auf die Startseite zeigt.
+Zeigt für die letzten 30 Tage als Bento-Grid (James-Bond-2028-Stil):
 
-**Änderung:**
-- Redirect-Konfiguration so anpassen, dass sie nicht mehr auf `/` zurückfällt
-- Damit wird der Flow auch bei Nebenfällen nicht wieder auf die Homepage umgebogen
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  Signups        │  Verified       │  1. Video       │ Trial→Paid │
+│   234           │   189 (80.7%)   │   142 (75.1%)   │  18 (12.6%)│
+│   ↑ 12 vs 7d    │   ↑ 4.2pp       │   ↓ 1.8pp        │  ↑ 0.9pp   │
+└─────────────────────────────────────────────────────────────┘
+```
 
-**Betroffene Datei:**
-- `src/hooks/useAuth.tsx`
+- **Stufen**: Signup → E-Mail bestätigt → 1. AI-Video erstellt → Upgrade zu Paid
+- **Drop-off-Raten** pro Stufe + Vergleich zu vorherigem Zeitraum (7d/30d)
+- **Avg. Time-to-Verify** und **Avg. Time-to-First-Video**
+- **Reminder-Wirksamkeit**: „Von X gesendeten Remindern haben Y verifiziert (Z %)"
+- Filter: Heute / 7 Tage / 30 Tage
 
-#### 4. Aktivierungs-/Werbemails erst nach Verifizierung senden
-Die Activation-/Trial-Mails sollen nicht vor bestätigter E-Mail-Adresse rausgehen.
+**Datenquellen:**
+- `profiles` (created_at, email_verified, email_verified_at, verify_reminder_sent_at, trial_status, plan_code)
+- `video_creations` + `ai_video_generations` für „1. Video"-Event (frühestes `created_at` pro `user_id`)
+- Aggregation über neue Read-Only-RPC `get_conversion_funnel(days int)` für Performance
 
-**Änderung:**
-- `process-activation-emails` nur noch für Nutzer ausführen, deren E-Mail verifiziert ist
-- Dazu die bestehende Verifizierungs-Info (`profiles.email_verified`) als Filter verwenden
+### Geänderte/neue Dateien
 
-**Betroffene Datei:**
-- `supabase/functions/process-activation-emails/index.ts`
+**Neu:**
+- `supabase/functions/process-verify-reminders/index.ts`
+- `supabase/functions/process-verify-reminders/templates.ts` (DE/EN/ES Reminder-Mail)
+- `src/components/admin/ConversionFunnel.tsx`
+- DB-Migration: 2 neue Spalten + RPC + Cron-Job
 
-### Technische Details
-- Keine neue Tabelle nötig
-- Keine Migration nötig
-- Edge Functions müssen nach der Änderung neu deployt werden
-- Bestehende Verifizierungstoken können veraltet bleiben, deshalb wird danach mit einer frischen Registrierung bzw. frischem Resend-Link getestet
+**Edit:**
+- `supabase/functions/verify-email/index.ts` → setzt `email_verified_at`
+- `supabase/functions/process-activation-emails/index.ts` → Anker auf `email_verified_at`
+- `src/pages/Admin.tsx` → neuer Tab „Conversion Funnel"
 
 ### Test nach Umsetzung
-1. Test-User frisch registrieren
-2. Prüfen, dass in der Mail der Link auf `useadtool.ai/verify-email?...` zeigt
-3. Link anklicken
-4. Erwartung:
-   - Verifizierungsseite öffnet sich
-   - Erfolgsmeldung erscheint
-   - Nutzer gilt danach als bestätigt
-5. Prüfen, dass vor der Bestätigung keine Aktivierungs-/Trial-Werbemail mehr kommt
-6. Danach einmal kompletten Flow end-to-end erneut testen
+
+1. Test-Signup mit Wegwerf-Mail → 24h zurückdatieren → Reminder muss kommen
+2. Verifizierung durchklicken → `email_verified_at` muss gesetzt sein
+3. Day-0-Activation-Mail erst NACH Verifizierung
+4. Funnel-Dashboard zeigt 1/1/1/0 für den Test-User
+
+### Technische Details
+
+- Cron-Frequenz Reminder: alle 30 Min (kein Druck, aber zeitnah)
+- Reminder-Token-Cooldown wird umgangen (Service-Function überschreibt vorhandenes Token mit frischer 24h-Lifetime)
+- Funnel-Query: einzelne aggregierte SQL-Function statt 4 separate Queries → < 100ms Ladezeit
+- Keine externen API-Keys nötig, alles über Resend (bereits konfiguriert)
+
