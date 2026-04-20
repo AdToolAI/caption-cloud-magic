@@ -161,8 +161,11 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Failed to store verification token");
     }
 
-    const appUrl = Deno.env.get("APP_URL") || Deno.env.get("APP_BASE_URL") || "https://useadtool.ai";
+    // Prefer client-supplied origin (validated against allow-list), then env, then default.
+    const envAppUrl = Deno.env.get("APP_URL") || Deno.env.get("APP_BASE_URL");
+    const appUrl = resolveAppUrl(bodyAppUrl) || resolveAppUrl(envAppUrl) || DEFAULT_APP_URL;
     const verificationUrl = `${appUrl}/verify-email?token=${verificationToken}`;
+    console.log(`[send-verification-email] Using appUrl=${appUrl} (bodyAppUrl=${bodyAppUrl ?? "n/a"})`);
 
     const html = renderVerificationEmail(language, verificationUrl, email);
     const subject = getSubject(language);
