@@ -293,9 +293,19 @@ export function AISuperuserAdmin() {
             <CardTitle className="text-sm text-muted-foreground" title="Summe der Latenzen aller Szenarien im letzten Komplett-Test">Letzter Run (gesamt)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-3xl font-bold ${latencyClass(scenarios.reduce((sum, s) => sum + (s.lastRun?.latency_ms || 0), 0) / Math.max(scenarios.length, 1) * scenarios.length / 3)}`}>
-              {(scenarios.reduce((sum, s) => sum + (s.lastRun?.latency_ms || 0), 0) / 1000).toFixed(1)}s
-            </div>
+            {(() => {
+              const totalMs = scenarios.reduce((sum, s) => sum + (s.lastRun?.latency_ms || 0), 0);
+              return (
+                <>
+                  <div className={`text-3xl font-bold ${totalLatencyClass(totalMs)}`}>
+                    {(totalMs / 1000).toFixed(1)}s
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Summe aller {scenarios.length} Szenarien — &lt; 30s ist normal
+                  </div>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
         <Card>
