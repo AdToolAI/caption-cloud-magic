@@ -36,6 +36,10 @@ export default function Admin() {
             <HeartPulse className="h-4 w-4" />
             Smoke Tests
           </TabsTrigger>
+          <TabsTrigger value="superuser" className="flex items-center gap-2">
+            <Bot className="h-4 w-4" />
+            KI Superuser
+          </TabsTrigger>
           <TabsTrigger value="funnel" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             Conversion Funnel
