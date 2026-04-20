@@ -27,6 +27,8 @@ import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedC
 import { ProductTour } from "@/components/onboarding/ProductTour";
 import { UpgradeTriggerProvider } from "@/hooks/useUpgradeTrigger";
 import { UpgradeMount } from "@/components/upgrade/UpgradeMount";
+import { TrialBanner } from "@/components/trial/TrialBanner";
+import { AccountPausedGate } from "@/components/trial/AccountPausedGate";
 
 
 const Index = lazy(() => import("./pages/Index"));
@@ -142,10 +144,12 @@ function AppLayout() {
       {user && !isLandingRoute && <AppSidebar />}
       <div className="min-w-0 flex-1 flex flex-col">
         {isLandingRoute ? <Header /> : <AppHeader />}
+        {user && !isLandingRoute && <TrialBanner />}
         {user && <NewsTicker />}
         {user && !isLandingRoute && <OnboardingStepper />}
         <main className="flex-1">
           <ErrorBoundary>
+            <AccountPausedGate>
             <Suspense fallback={
               <div className="flex items-center justify-center min-h-screen">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -287,6 +291,7 @@ function AppLayout() {
                     <Route path="*" element={<Navigate to="/home" replace />} />
               </Routes>
             </Suspense>
+            </AccountPausedGate>
           </ErrorBoundary>
         </main>
       </div>

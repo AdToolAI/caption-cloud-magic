@@ -6445,6 +6445,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_paused: boolean | null
+          activation_emails_sent: Json | null
           analytics_enabled: boolean | null
           api_key: string | null
           avatar_url: string | null
@@ -6457,6 +6459,7 @@ export type Database = {
           email_verified: boolean | null
           id: string
           language: string | null
+          last_active_at: string | null
           level_auto_pause_until: string | null
           login_notification_enabled: boolean | null
           name: string | null
@@ -6477,6 +6480,9 @@ export type Database = {
           test_mode_plan: string | null
           timezone: string | null
           tour_completed_at: string | null
+          trial_ends_at: string | null
+          trial_started_at: string | null
+          trial_status: string | null
           twitch_username: string | null
           unsubscribe_token: string
           updated_at: string | null
@@ -6484,6 +6490,8 @@ export type Database = {
           welcome_bonus_seen_at: string | null
         }
         Insert: {
+          account_paused?: boolean | null
+          activation_emails_sent?: Json | null
           analytics_enabled?: boolean | null
           api_key?: string | null
           avatar_url?: string | null
@@ -6496,6 +6504,7 @@ export type Database = {
           email_verified?: boolean | null
           id: string
           language?: string | null
+          last_active_at?: string | null
           level_auto_pause_until?: string | null
           login_notification_enabled?: boolean | null
           name?: string | null
@@ -6516,6 +6525,9 @@ export type Database = {
           test_mode_plan?: string | null
           timezone?: string | null
           tour_completed_at?: string | null
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          trial_status?: string | null
           twitch_username?: string | null
           unsubscribe_token?: string
           updated_at?: string | null
@@ -6523,6 +6535,8 @@ export type Database = {
           welcome_bonus_seen_at?: string | null
         }
         Update: {
+          account_paused?: boolean | null
+          activation_emails_sent?: Json | null
           analytics_enabled?: boolean | null
           api_key?: string | null
           avatar_url?: string | null
@@ -6535,6 +6549,7 @@ export type Database = {
           email_verified?: boolean | null
           id?: string
           language?: string | null
+          last_active_at?: string | null
           level_auto_pause_until?: string | null
           login_notification_enabled?: boolean | null
           name?: string | null
@@ -6555,6 +6570,9 @@ export type Database = {
           test_mode_plan?: string | null
           timezone?: string | null
           tour_completed_at?: string | null
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          trial_status?: string | null
           twitch_username?: string | null
           unsubscribe_token?: string
           updated_at?: string | null
