@@ -1,53 +1,77 @@
 
 
-# Plan: Letzte Karteileiche aufräumen + „Letzter Run gesamt" entwarnen
+# Plan: Systematischer Health-Check der restlichen 10 Admin-Tabs
 
-## Was die Daten zeigen
+Du hast aktuell den **KI Superuser** komplett auf grün — aber das Admin-Dashboard hat noch 10 weitere Tabs, die echte Probleme verstecken könnten. Lass uns sie nach Wichtigkeit durchgehen.
 
-Letzter Komplett-Test (vor < 1 Min): **10/10 grün, alle HTTP 200**. Latenzen sind alle im normalen Bereich für KI-Calls.
+## Inspektions-Reihenfolge (Tab für Tab)
 
-Zwei kleine kosmetische Probleme bleiben:
+### 🔴 Hohe Priorität — direkter Business-Impact
 
-### 1. Comments Analysis zeigt 50 % obwohl letzter Run grün ist
-Im aktuellen 5-Run-Window für Comments Analysis liegen nur 2 Runs (1 alter Fail vor dem Fix + 1 neuer Pass) → 1/2 = 50 %. Sobald der nächste Komplett-Test läuft, wird's 2/3 = 67 % und dann nach weiteren Runs 100 %. Du kannst aber sofort auf 100 % bringen, indem du einmalig **„Komplett zurücksetzen"** drückst (dann bleibt nur der letzte grüne Run pro Szenario).
+**1. Bug Reports** *(default Tab — siehst du beim Öffnen)*
+- Offene Bug Reports von echten Usern
+- Inspizieren: Sind unbeantwortete Reports da? Wie alt?
 
-### 2. „Letzter Run (gesamt)" zeigt 28.3s **rot** — obwohl das ein normaler Wert ist
-Die Card summiert alle 10 Latenzen → 28.3s. Der Farbcode wendet aber den Einzel-Schwellenwert (>8s = rot) an, der für die Summe natürlich immer rot sein wird. Das ist kein echtes Latenz-Problem.
+**2. Cost Monitor**
+- Tägliche/monatliche Kosten von Lambda, OpenAI, Replicate, ElevenLabs, Gemini
+- Inspizieren: Gibt es Cost-Spikes? Liegen wir im Budget?
+- Auffällig: Sora/Kling/Image-Generierung sind teuer
 
-## Fixes
+**3. Provider Health**
+- Status aller externen APIs (OpenAI, Replicate, Gemini, Meta, X, TikTok, Sentry)
+- Inspizieren: Welche Provider hatten zuletzt Ausfälle? Quotas-Auslastung?
 
-### Fix 1 — Eigene Schwellenwerte für „Letzter Run gesamt"
-In `src/pages/admin/AISuperuserAdmin.tsx` für die Summen-Card eigene Grenzen setzen:
-- **< 30s** → grün (alles normal)
-- **30–60s** → gelb (Beobachten)
-- **> 60s** → rot (echtes Problem, z.B. Trend Radar mit 80s)
+**4. Sentry Dashboard**
+- Echte Frontend-Errors die User auslösen (nicht nur unsere geplanten Test-Szenarien)
+- Inspizieren: Top-5 ungelöste Errors, Crash-Rate-Trend
 
-Bei 28.3s = grün, also direkt sichtbar dass das System gesund läuft. Bonus: kleine Hilfe drunter „Summe aller 10 Szenario-Latenzen — < 30s ist normal".
+### 🟡 Mittel — System-Stabilität
 
-### Fix 2 — Latenz-Spalten-Schwellenwerte realistischer
-Aktuell wird **3000ms** schon orange (Caption 4917ms, Posting 3109ms). Das ist noch im Normal-Bereich für Multi-Step KI-Calls. Anpassen:
-- **< 5000ms** → neutral grau
-- **5000–10000ms** → orange (KI-typisch, Bilder/Multi-Step)
-- **> 10000ms** → rot (genauer hinschauen)
+**5. System Monitor**
+- Edge-Function-Latenzen, AI-Job-Queue-Länge, Storage-Verbrauch
+- Inspizieren: Hängt eine Queue? Wie voll ist der Storage?
 
-Damit zeigt nur noch Image Generation (7463ms) orange — was korrekt ist, weil das wirklich der einzige Hot-Spot ist.
+**6. Cache Health**
+- Redis Hot-Query-Cache + AI Semantic Cache (pgvector)
+- Inspizieren: Hit-Rates, Speicher-Verbrauch, abgelaufene Einträge
 
-### Fix 3 — Hinweis-Banner für Comments Analysis 50 %
-Statt der User raten zu lassen warum 50 % bei grünem Run: Wenn `last_status === 'pass'` aber `passRate < 100`, kleinen Tooltip an die Pass-Rate-Badge:
-> *„Letzter Run grün — historische Fail-Runs noch im 5-Run-Window. Klicke „Komplett zurücksetzen" für 100 %."*
+**7. Smoke Tests**
+- Andere automatisierte Health-Checks (älteres System neben dem KI Superuser)
+- Inspizieren: Was läuft hier doppelt? Können wir konsolidieren?
 
-## Reihenfolge
+**8. Alerts**
+- Aktuelle aktive Alerts (Webhooks, Trigger-bedingte Notifications)
+- Inspizieren: Offene Alerts? Stille Failures?
 
-1. `AISuperuserAdmin.tsx`: 
-   - Neue `totalLatencyClass()`-Funktion mit 30s/60s-Schwellen für Summen-Card
-   - Latenz-Spalten-Schwellen auf 5s/10s anheben
-   - Tooltip an Pass-Rate-Badge wenn letzter Run grün aber Rate < 100
-2. Du drückst **„Komplett zurücksetzen"** → Comments Analysis springt sofort auf 100 %
+### 🟢 Niedriger — Business-Insights
 
-## Erwartetes Ergebnis
+**9. Conversion Funnel**
+- Signup → Verify → Erstes Video → Bezahlt
+- Inspizieren: Wo dropt es am meisten?
 
-- ✅ „Letzter Run (gesamt)" zeigt 28.3s **grün** statt rot
-- ✅ Latenz-Spalte: nur noch Image Generation orange (statt 4 Szenarien)
-- ✅ Comments Analysis erklärt sich selbst per Tooltip
-- ✅ Nach „Komplett zurücksetzen" → 10/10 mit 100 % überall
+**10. Email Monitor**
+- Versandte Emails (Resend), Bounce-Rate, Open-Rate
+- Inspizieren: Email-Zustellung gesund?
+
+## Vorgehen
+
+Pro Tab schauen wir:
+1. **Was zeigt die UI tatsächlich?** (Screenshot oder Code-Inspektion)
+2. **Stimmen die Daten mit der Realität in der DB überein?** (Spot-Checks via Logs/Queries)
+3. **Gibt es Karteileichen oder falsche Alarme?** (wie wir es beim KI Superuser hatten)
+4. **Quick-Win-Fixes** sammeln und am Ende als Sammel-Plan umsetzen
+
+## Was du tun musst
+
+Wähle einen Startpunkt:
+- **Option A** — Top-Down: Wir gehen alle 10 Tabs strikt nach Priorität durch
+- **Option B** — Du machst Screenshots von 2–3 Tabs die dich besonders interessieren, ich analysiere die
+- **Option C** — Wir starten mit **Cost Monitor + Provider Health** (höchster Business-Impact, da Geld + externe Abhängigkeiten)
+
+## Erwartetes Ergebnis nach Komplett-Durchgang
+
+- ✅ Klares Bild über den Health-Status jedes Subsystems
+- ✅ Liste aller stillen Failures / falschen Alarme / Karteileichen
+- ✅ Konkrete Fix-Liste mit Priorität → in Folge-Loops abarbeiten
+- ✅ Ein „Master Health Banner" auf dem Admin-Dashboard das alle 11 Tabs zusammenfasst (optional als Bonus)
 
