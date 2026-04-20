@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Lock, Flame, TrendingUp, Zap, Check } from "lucide-react";
+import { Sparkles, Lock, Flame, TrendingUp, Zap, Check, Clock, AlertTriangle, Tag } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,8 @@ const SOURCE_ICON: Record<UpgradeTriggerSource, typeof Sparkles> = {
   feature_wall: Lock,
   streak_milestone: Flame,
   usage_recommendation: TrendingUp,
+  trial_progress: Clock,
+  feature_discovery: Sparkles,
   manual: Sparkles,
 };
 
@@ -27,8 +29,12 @@ const SOURCE_ACCENT: Record<UpgradeTriggerSource, string> = {
   feature_wall: "text-primary bg-primary/10 border-primary/30",
   streak_milestone: "text-orange-500 bg-orange-500/10 border-orange-500/30",
   usage_recommendation: "text-emerald-500 bg-emerald-500/10 border-emerald-500/30",
+  trial_progress: "text-rose-500 bg-rose-500/10 border-rose-500/30",
+  feature_discovery: "text-violet-500 bg-violet-500/10 border-violet-500/30",
   manual: "text-primary bg-primary/10 border-primary/30",
 };
+
+const TRIAL_COUPON = "TRIAL20";
 
 export const SmartUpgradeModal = () => {
   const { active, dismiss } = useUpgradeTrigger();
@@ -44,10 +50,17 @@ export const SmartUpgradeModal = () => {
   const symbol = "$";
   const price = plan.price.USD.toFixed(2);
 
+  // Trial-specific variants get the TRIAL20 coupon attached automatically
+  const showCoupon = active.source === "trial_progress";
+  const trialVariant = (active.metadata?.variant as string) || "halfway";
+
   const handleUpgrade = () => {
     trackUpgradeClick(active);
     dismiss();
-    navigate("/pricing");
+    const params = new URLSearchParams();
+    params.set("plan", active.recommendedPlan);
+    if (showCoupon) params.set("coupon", TRIAL_COUPON);
+    navigate(`/pricing?${params.toString()}`);
   };
 
   // Headline + body per source
@@ -61,6 +74,19 @@ export const SmartUpgradeModal = () => {
         return t("upgrade.smart.streak.title", { days: active.contextValue ?? 0 });
       case "usage_recommendation":
         return t("upgrade.smart.usage.title");
+      case "trial_progress":
+        if (trialVariant === "grace") {
+          return t("upgrade.smart.trial.graceTitle", { days: active.contextValue ?? 0 });
+        }
+        if (trialVariant === "last_day") {
+          return t("upgrade.smart.trial.lastDayTitle");
+        }
+        if (trialVariant === "ending_soon") {
+          return t("upgrade.smart.trial.endingTitle", { days: active.contextValue ?? 0 });
+        }
+        return t("upgrade.smart.trial.halfwayTitle", { days: active.contextValue ?? 0 });
+      case "feature_discovery":
+        return t("upgrade.smart.discovery.title", { feature: active.feature ?? "" });
       default:
         return t("upgrade.smart.manual.title");
     }
@@ -76,6 +102,19 @@ export const SmartUpgradeModal = () => {
         return t("upgrade.smart.streak.body");
       case "usage_recommendation":
         return t("upgrade.smart.usage.body", { plan: plan.name });
+      case "trial_progress":
+        if (trialVariant === "grace") {
+          return t("upgrade.smart.trial.graceBody", { plan: plan.name });
+        }
+        if (trialVariant === "last_day") {
+          return t("upgrade.smart.trial.lastDayBody", { plan: plan.name });
+        }
+        return t("upgrade.smart.trial.body", { plan: plan.name });
+      case "feature_discovery":
+        return t("upgrade.smart.discovery.body", {
+          feature: active.feature ?? "",
+          plan: plan.name,
+        });
       default:
         return t("upgrade.smart.manual.body", { plan: plan.name });
     }
@@ -99,6 +138,8 @@ export const SmartUpgradeModal = () => {
       : t("upgrade.smart.benefit.priority"),
   ];
 
+  const isGrace = active.source === "trial_progress" && trialVariant === "grace";
+
   return (
     <Dialog open={!!active} onOpenChange={(open) => !open && dismiss()}>
       <DialogContent className="sm:max-w-lg overflow-hidden p-0">
@@ -119,7 +160,7 @@ export const SmartUpgradeModal = () => {
                   transition={{ type: "spring", stiffness: 200 }}
                   className={`flex h-12 w-12 items-center justify-center rounded-xl border ${accent}`}
                 >
-                  <Icon className="h-6 w-6" />
+                  {isGrace ? <AlertTriangle className="h-6 w-6" /> : <Icon className="h-6 w-6" />}
                 </motion.div>
                 <div className="flex-1 min-w-0">
                   <DialogHeader className="space-y-1 text-left">
@@ -136,6 +177,25 @@ export const SmartUpgradeModal = () => {
 
             {/* Plan card */}
             <div className="px-6 py-5 space-y-4">
+              {showCoupon && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.1 }}
+                  className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5"
+                >
+                  <Tag className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-muted-foreground">
+                      {t("upgrade.smart.trial.couponLabel")}
+                    </div>
+                    <div className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                      {TRIAL_COUPON} — {t("upgrade.smart.trial.couponDiscount")}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
               <div className="rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-4">
                 <div className="flex items-baseline justify-between mb-3">
                   <div>
@@ -144,6 +204,11 @@ export const SmartUpgradeModal = () => {
                       {showAnnualDiscount && (
                         <Badge variant="secondary" className="text-[10px]">
                           {t("upgrade.smart.annualSaving")}
+                        </Badge>
+                      )}
+                      {showCoupon && (
+                        <Badge className="text-[10px] bg-emerald-500/15 text-emerald-600 border-emerald-500/30 dark:text-emerald-400">
+                          -20%
                         </Badge>
                       )}
                     </div>
@@ -184,7 +249,9 @@ export const SmartUpgradeModal = () => {
                 </Button>
                 <Button onClick={handleUpgrade} className="flex-1" size="default">
                   <Sparkles className="h-4 w-4 mr-1.5" />
-                  {t("upgrade.smart.upgradeCta")}
+                  {showCoupon
+                    ? t("upgrade.smart.trial.cta")
+                    : t("upgrade.smart.upgradeCta")}
                 </Button>
               </div>
             </div>

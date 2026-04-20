@@ -8,9 +8,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Sora2ComingSoonGate } from '@/components/sora2/Sora2ComingSoonGate';
+import { trackFeatureUsage } from '@/lib/featureUsageTracker';
 import type { Sora2LongFormProject, Sora2Scene } from '@/types/sora-long-form';
 
 export default function Sora2LongFormCreator() {
+  useEffect(() => {
+    trackFeatureUsage('sora_long_form');
+  }, []);
+
   return (
     <Sora2ComingSoonGate>
       <Sora2LongFormCreatorInner />

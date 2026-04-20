@@ -13,6 +13,8 @@ export type UpgradeTriggerSource =
   | "feature_wall"          // Locked premium feature
   | "streak_milestone"      // After 7/30 day streak
   | "usage_recommendation"  // Heavy user on lower tier
+  | "trial_progress"        // Day 7/10/13/grace during Enterprise trial
+  | "feature_discovery"     // 3rd+ use of a power feature
   | "manual";               // Explicit upgrade button
 
 export interface UpgradeTriggerPayload {
@@ -48,6 +50,8 @@ const COOLDOWN_HOURS: Record<UpgradeTriggerSource, number> = {
   feature_wall: 0,            // Always show on click
   streak_milestone: 168,      // 7 days
   usage_recommendation: 72,   // 3 days
+  trial_progress: 48,         // 2 days between trial nudges
+  feature_discovery: 72,      // 3 days between power-feature nudges
   manual: 0,
 };
 

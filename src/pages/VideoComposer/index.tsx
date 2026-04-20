@@ -1,7 +1,13 @@
+import { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import VideoComposerDashboard from '@/components/video-composer/VideoComposerDashboard';
+import { trackFeatureUsage } from '@/lib/featureUsageTracker';
 
 const VideoComposer = () => {
+  useEffect(() => {
+    trackFeatureUsage('video_composer');
+  }, []);
+
   return (
     <>
       <Helmet>

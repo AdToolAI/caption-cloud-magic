@@ -3,6 +3,8 @@ import { SmartUpgradeModal } from "./SmartUpgradeModal";
 import { CreditThresholdWatcher } from "./CreditThresholdWatcher";
 import { StreakMilestoneUpsellWatcher } from "./StreakMilestoneUpsellWatcher";
 import { UsageRecommendationWatcher } from "./UsageRecommendationWatcher";
+import { TrialUpgradeWatcher } from "./TrialUpgradeWatcher";
+import { FeatureDiscoveryWatcher } from "./FeatureDiscoveryWatcher";
 
 /**
  * Mounts the SmartUpgradeModal + all background trigger watchers.
@@ -19,6 +21,8 @@ export const UpgradeMount = () => {
           <CreditThresholdWatcher />
           <StreakMilestoneUpsellWatcher />
           <UsageRecommendationWatcher />
+          <TrialUpgradeWatcher />
+          <FeatureDiscoveryWatcher />
         </>
       )}
     </>
