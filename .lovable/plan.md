@@ -1,67 +1,59 @@
 
 
-## Klarstellung: Email-Versand-Pfad
+## Ziel
+Coupon-Code aus URL (`/pricing?coupon=WINBACK20`) automatisch auf der Pricing-Page einlesen, sichtbar als "applied" Banner anzeigen und beim Stripe-Checkout mitschicken.
 
-Du hast recht — wir nutzen bereits **Resend** (siehe `send-password-reset-email/index.ts` mit `import { Resend } from "resend"`). Es macht keinen Sinn, parallel Lovable Emails einzurichten. Der Plan wird angepasst:
+## Status Quo (gefunden via Code-Inspection)
+- ✅ `PromoCodeInput.tsx` existiert bereits (manuelle Eingabe + `validate-promo-code` Edge Function)
+- ✅ `validate-promo-code` Edge Function existiert (prüft DB-Tabelle `promo_codes`)
+- ✅ `create-checkout` Edge Function akzeptiert bereits `promoCode` Parameter und übergibt ihn als Stripe `promotion_code` (siehe `sessionOptions.discounts`)
+- ❌ Win-Back Coupon `WINBACK20` existiert nur in **Stripe** (Coupon `p4EYOZC0`), NICHT in unserer `promo_codes` DB-Tabelle
+- ❌ Pricing-Page liest den `?coupon=` Query-Param aktuell nicht aus
 
-## C2 Win-Back via Resend (statt Lovable Emails)
+## Architektur-Entscheidung
+Win-Back-Coupons (`WINBACK20`) sind **Stripe-native** Promotion Codes — sie müssen NICHT die `validate-promo-code` Edge Function durchlaufen (die ist für Affiliate-Codes aus unserer DB). Stripe validiert den Code beim Checkout selbst.
 
-### Was bleibt gleich
-- $5 AI-Video-Credits an Tag 14 (in `ai_video_wallets`)
-- 20% Stripe-Coupon `WINBACK20` (3 Monate) an Tag 30
-- Pg_cron daily 11:00 UTC
-- Idempotenz via `winback_email_log`
-- Push-Notifications parallel
-- Auto-Stop bei Reaktivierung in den letzten 7 Tagen
+→ **Lösung**: URL-Coupon wird direkt durchgereicht (skip DB-Validation) und an `create-checkout` übergeben. Stripe lehnt ungültige Codes mit klarer Fehlermeldung ab.
 
-### Was sich ändert (vs. vorheriger Plan)
-- **Kein** `email_domain--setup_email_infra`, **kein** `scaffold_transactional_email`, **keine** pgmq-Queues
-- Email-Versand direkt via **Resend SDK** im Stil von `send-password-reset-email`
-- HTML-Templates inline in der Edge Function (gleiches AdTool-Branding: `#0a0a0f` BG, `#F5C76A` Gold, Inter)
-- Domain `support@useadtool.ai` (bereits verifiziert, da bestehend genutzt)
+## Implementierungsschritte
 
-### Implementierungs-Schritte
+### 1. URL-Param Reader Hook
+Neuer Hook `useUrlCoupon()`:
+- Liest `?coupon=` aus URL beim Mount
+- Speichert in `sessionStorage` (überlebt Navigation innerhalb Pricing-Flow)
+- Liefert `{ couponCode, clearCoupon }`
 
-**1. Stripe-Coupon `WINBACK20`** (20% off, 3 Monate, repeating) via `stripe--create_coupon`
+### 2. Pricing-Page Integration
+In der bestehenden Pricing-Page (`src/pages/Pricing.tsx` oder ähnlich — muss noch lokalisiert werden):
+- Hook einbinden
+- Wenn `couponCode` vorhanden: Banner oben anzeigen ("🎉 Coupon WINBACK20 aktiv — 20% Rabatt für 3 Monate")
+- Banner mit "Entfernen"-Button (clearCoupon)
+- Beim Klick auf "Plan wählen" → `couponCode` an Checkout-Aufruf weitergeben
 
-**2. DB-Migration**
-- `winback_email_log` (user_id, stage `day_14|day_30`, sent_at, UNIQUE(user_id, stage))
-- RLS: nur Service-Role schreibt
+### 3. Checkout-Aufruf erweitern
+Wo aktuell `supabase.functions.invoke('create-checkout', { body: { priceId } })` aufgerufen wird:
+- `promoCode` aus URL/sessionStorage hinzufügen
+- Edge Function bekommt es bereits ab (kein Backend-Change nötig!)
 
-**3. Edge Function `process-winback-emails`** (Resend-basiert)
-- Auth: Service-Role + optional Cron-Secret Header
-- Day-14-Branch:
-  - Query: User mit `last_sign_in_at` zwischen 13–15 Tagen, noch kein Day-14-Log
-  - Grant $5 in `ai_video_wallets` + Insert in `ai_video_transactions` (type=`bonus`, description="Win-back reward Day 14")
-  - Sende Email via Resend (`from: "AdTool <support@useadtool.ai>"`)
-  - Web-Push parallel (falls Subscription)
-  - Insert in `winback_email_log` (ON CONFLICT DO NOTHING)
-- Day-30-Branch: gleiche Logik, mit Coupon-Code `WINBACK20`
-- Auto-Stop bei `last_sign_in_at` < 7 Tage
-- Sprache aus `profiles.language` für Template-Auswahl
+### 4. Email-Link Format bestätigen
+Im Win-Back Email Template (`templates.ts`) sicherstellen, dass Day-30 Link auf `/pricing?coupon=WINBACK20` zeigt (falls noch nicht der Fall).
 
-**4. HTML-Templates** (3 Sprachen × 2 Stages = 6 Varianten, alle inline)
-- Day-14 DE/EN/ES: "Wir vermissen dich" / "We miss you" / "Te extrañamos" + "$5 für deinen nächsten KI-Clip" + CTA → `/ai-video-studio`
-- Day-30 DE/EN/ES: "Letzte Chance" / "Last chance" / "Última oportunidad" + Coupon `WINBACK20` + CTA → `/pricing?coupon=WINBACK20`
-- Branding wie `send-password-reset-email`: dunkler BG, Gold-Logo, Footer mit Links
+### 5. Banner-Design
+James-Bond-2028 Stil: Gold (`#F5C76A`) Akzent, Glassmorphism, mit Check-Icon. Lokalisiert (DE/EN/ES).
 
-**5. Pg_cron-Schedule** täglich 11:00 UTC ruft Edge Function via `pg_net` + Vault-Secret auf
+## Was NICHT gebaut wird
+- ❌ Keine neue DB-Tabelle (Stripe ist Source of Truth für `WINBACK20`)
+- ❌ Keine Änderung an `validate-promo-code` (bleibt für Affiliate-Codes)
+- ❌ Keine Änderung an `create-checkout` Edge Function (akzeptiert `promoCode` bereits)
 
-**6. Tracking** (PostHog)
-- `winback_email_sent` (mit stage)
-- `winback_reactivated` (User loggt sich nach Email ein)
+## Aufwand
+~30-40 Min (1 Hook + 1 Banner-Component + Pricing-Page Integration + 3 Übersetzungs-Keys)
 
-### Voraussetzung-Check
-- ✅ `RESEND_API_KEY` ist bereits konfiguriert
-- ✅ Domain `useadtool.ai` ist bereits in Resend verifiziert (genutzt von `send-password-reset-email`)
-- → **Keine Email-Infra-Setup-Schritte nötig**
-
-### Aufwand: ~1h (statt 1.5h, da kein Email-Infra-Setup)
-
-### Reihenfolge nach Approval
-1. DB-Migration `winback_email_log`
-2. Stripe-Coupon `WINBACK20`
-3. Edge Function `process-winback-emails` (mit allen 6 Templates inline)
-4. Pg_cron-Schedule
-5. Manueller Test mit Test-User
+## Reihenfolge
+1. Pricing-Page Datei lokalisieren & Checkout-Call-Stelle finden
+2. `useUrlCoupon` Hook erstellen
+3. `CouponBanner` Component erstellen
+4. Pricing-Page integrieren
+5. i18n-Keys hinzufügen (DE/EN/ES)
+6. Email-Template-Link verifizieren
 
