@@ -3,8 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRenderQueue, QueueJob } from '@/hooks/useRenderQueue';
 import { QueueJobCard } from './QueueJobCard';
+import { QueuePositionBadge } from './QueuePositionBadge';
 import { Loader2, ListOrdered } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { PriorityBadge } from '@/components/video/QueuePrioritySelector';
 
 export const RenderQueuePanel = () => {
@@ -75,11 +75,16 @@ export const RenderQueuePanel = () => {
         ) : (
           <div className="space-y-3">
             {jobs.slice(0, 10).map((job) => (
-              <div key={job.id} className="relative">
+              <div key={job.id} className="relative space-y-2">
                 <div className="absolute top-2 right-2 z-10">
                   <PriorityBadge priority={job.priority as any} />
                 </div>
                 <QueueJobCard job={job} onUpdate={loadJobs} />
+                {(job.status === 'queued' || job.status === 'processing') && (
+                  <div className="px-4 pb-2">
+                    <QueuePositionBadge jobId={job.id} />
+                  </div>
+                )}
               </div>
             ))}
           </div>
