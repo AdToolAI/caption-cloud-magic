@@ -1,154 +1,155 @@
 
 
-## Plan: Bug-Hunting & Quality Assurance ohne Superuser
+# Plan: KI Superuser — Proaktives Bug-Hunting System
 
-### Das Problem klar benannt
+## Was wird gebaut
 
-Du hast **alle Tools schon installiert** (Sentry + PostHog + Playwright + Support-Tickets), aber:
-- 🔴 **Sentry-Errors siehst du nur auf sentry.io** (extra Login, extra Tab)
-- 🔴 **PostHog-Sessions siehst du nur auf posthog.com**
-- 🔴 **Playwright-Tests laufen nur lokal/CI** — niemand führt sie regelmäßig aus
-- 🔴 **support_tickets** hat kein UI — du siehst nicht, wer was meldet
-- 🔴 **Es gibt keinen "User-meldet-Bug"-Button** in der App
+Ein automatisierter „KI Test-Agent", der **wie ein echter User** durch die App läuft, kritische Workflows durchspielt und Bugs meldet **bevor** echte User sie sehen. Ergänzt das bestehende Setup (Sentry + Bug-Reporter + Smoke-Tests) um die fehlende **proaktive Schicht**.
 
-→ **Lösung: Alles in deinem Admin-Dashboard sichtbar machen + automatisierte Daily Tests + In-App-Bug-Reporter.**
-
-### Was du bekommst (4 Module)
-
-#### Modul 1: Bug Monitor Tab im Admin (Sentry-Integration)
-
-**Neuer Tab "Bugs"** im Admin-Dashboard, der **deine Sentry-Daten direkt anzeigt** — kein Login mehr nötig:
+## Die 4 Verteidigungsebenen (komplettes Bild)
 
 ```text
-╔════════════════════════════════════════════════════════╗
-║  🐛 Bug Monitor                          [Letzte 24h ▼] ║
-╠════════════════════════════════════════════════════════╣
-║  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐                       ║
-║  │  3  │ │ 12  │ │  47 │ │ 2.1%│                       ║
-║  │Crit │ │Warn │ │Total│ │User │                       ║
-║  │     │ │     │ │     │ │Affec│                       ║
-║  └─────┘ └─────┘ └─────┘ └─────┘                       ║
-║                                                        ║
-║  🔥 Top Errors (nach Häufigkeit)                       ║
-║  ┌────────────────────────────────────────────────┐    ║
-║  │ #1 TypeError: cannot read 'map' of undefined  │    ║
-║  │    23x · 8 User · /director-cut · letzte 2h   │    ║
-║  │    [Sentry öffnen] [Als gefixt markieren]     │    ║
-║  ├────────────────────────────────────────────────┤    ║
-║  │ #2 NetworkError: fetch failed                 │    ║
-║  │    11x · 4 User · /ai-video-studio · 5h       │    ║
-║  └────────────────────────────────────────────────┘    ║
-║                                                        ║
-║  📊 Error-Trend (7 Tage)  [Line-Chart]                ║
-║  📋 User-Feedback (aus support_tickets)               ║
-╚════════════════════════════════════════════════════════╝
+┌─────────────────────────────────────────────────────────┐
+│ Ebene 1: SENTRY (passiv)                                │
+│   → Fängt Errors die ECHTE User triggern                │
+│   ✅ schon gebaut                                        │
+├─────────────────────────────────────────────────────────┤
+│ Ebene 2: BUG-REPORTER (passiv)                          │
+│   → User melden Probleme manuell                        │
+│   ✅ schon gebaut                                        │
+├─────────────────────────────────────────────────────────┤
+│ Ebene 3: SMOKE-TESTS (semi-aktiv, oberflächlich)        │
+│   → Pingt 5 Functions per CORS                          │
+│   ✅ schon gebaut, aber dünn                             │
+├─────────────────────────────────────────────────────────┤
+│ Ebene 4: KI SUPERUSER (proaktiv, tiefgehend) ← NEU      │
+│   → Durchläuft echte User-Flows mit echten Daten        │
+│   → Findet Bugs BEVOR User sie sehen                    │
+└─────────────────────────────────────────────────────────┘
 ```
 
-**Technisch:** Edge Function `sentry-bridge` ruft Sentry REST API mit Auth-Token, cached 5 Min, zeigt direkt im UI.
+## Architektur des KI Superusers
 
-#### Modul 2: In-App Bug-Reporter
+### Komponente 1: Test-Account in DB
+- Service-Account `ai-superuser@adtool-ai-internal.test` mit Enterprise-Plan + 999M Credits
+- Markierung in `profiles.is_test_account = true` damit er **nicht in echten Statistiken** auftaucht
+- Eigener Workspace mit Demo-Daten (Logo, Brand Kit, 1 Test-Video)
 
-Ein **schwebender "Bug melden" Button** (rechts unten, klein, dezent) in jeder Seite:
+### Komponente 2: Test-Szenarien-Bibliothek
+12 kritische User-Flows als TypeScript-Definitionen:
 
-- User klickt → Modal öffnet sich
-- Auto-erfasst: aktuelle Route, Browser, letzten 5 Console-Errors, Screenshot der Seite (via `html2canvas`)
-- User schreibt: „Was wolltest du tun?" + „Was ist passiert?"
-- Submit → speichert in `support_tickets` + sendet Email an `bestofproducts4u@gmail.com`
-- User sieht: „Danke! Wir kümmern uns drum."
+| # | Szenario | Was wird getestet |
+|---|---|---|
+| 1 | **Caption Generation** | `generate-caption` → DB-Speicherung → Credit-Abzug |
+| 2 | **Bio Generation** | `generate-bio` mit allen 3 Sprachen (EN/DE/ES) |
+| 3 | **Hooks Generation** | `generate-hooks` mit verschiedenen Stilen |
+| 4 | **Reel Script** | `generate-reel-script` für 15s/30s/60s |
+| 5 | **Image Generation** | `generate-studio-image` → Storage Upload → Thumbnail |
+| 6 | **Picture Studio Background** | Smart Background Replacer End-to-End |
+| 7 | **Trend Radar** | `fetch-trends` für DE/EN/ES mit Cache-Check |
+| 8 | **Calendar Auto-Schedule** | `calendar-autoschedule` mit Posting-Time-Recommendations |
+| 9 | **Performance Analytics** | `analyze-performance` mit Mock-Daten |
+| 10 | **Credit Pipeline** | `credit-preflight` → `credit-reserve` → `credit-commit` |
+| 11 | **Auth Flow** | Signup → Email Verify → Wallet Created Trigger |
+| 12 | **AI Video Generation** | `generate-kling-video` Mini-Test (3s Clip) |
 
-**Bonus:** Wenn User eingeloggt → User-ID + Email automatisch erfasst → du kannst direkt antworten.
+### Komponente 3: Edge Function `ai-superuser-test-runner`
+- Läuft alle 12 Szenarien als Service-Account
+- Misst: Latenz, Status, Error-Message, Response-Schema
+- Erkennt **Schema-Drift** (z.B. wenn ein Feld plötzlich fehlt)
+- Speichert Ergebnisse in neue Tabelle `ai_superuser_runs`
+- **Auto-Refund:** Verbrauchte Credits werden nach Test-Run automatisch zurückgebucht (Service-Account hat eh unlimited)
 
-#### Modul 3: Automatisierte Daily Health-Tests
+### Komponente 4: Schedule
+- **Stündlich:** 6 schnelle Szenarien (Caption, Bio, Hooks, Reel, Trends, Credit-Pipeline)
+- **Täglich 03:00 UTC:** Alle 12 Szenarien (inkl. Bild & Video)
+- **Auf Demand:** Admin-Button „Jetzt alle Tests ausführen"
 
-Die existierenden Playwright-Tests laufen **nur manuell**. Wir machen sie zu echtem Monitoring:
+### Komponente 5: Admin Dashboard Tab „KI Superuser"
+Im bestehenden `/admin` Bereich, neuer Tab neben „Smoke Tests":
 
-**Neue Edge Function `daily-smoke-test`** (täglich 06:00 via Cron):
-- Ruft 8 kritische Endpoints ab und prüft Status:
-  1. Landing Page lädt (200)
-  2. `/auth` Login-Form rendert
-  3. `/dashboard` (mit Test-User) lädt
-  4. `auto-generate-universal-video` Edge Function antwortet
-  5. `render-directors-cut` Edge Function antwortet
-  6. `send-transactional-email` Edge Function antwortet
-  7. Stripe-Checkout Edge Function antwortet
-  8. Datenbank-Connection (simple SELECT)
+- **Live-Status-Grid:** 12 Szenarien mit ✅/❌/⚠️ und letzter Latenz
+- **Verlauf-Chart:** Erfolgsrate pro Szenario (letzte 7/30 Tage)
+- **Detail-Drill-Down:** Klick auf ein fehlgeschlagenes Szenario → exakter Request, Response, Stack-Trace
+- **„Issue erstellen"-Button:** Konvertiert einen Failed-Run direkt in einen Bug-Report im bestehenden System
+- **Anomalie-Erkennung:** Warnt wenn Latenz +50% gegenüber 7-Tage-Schnitt
 
-→ Schreibt Ergebnisse in **neue Tabelle `health_check_results`**  
-→ Wenn ein Check fehlschlägt → triggert Alert via existierendes `health-alerter` System  
-→ Du bekommst Email **bevor** ein User es merkt
+### Komponente 6: KI-Powered Anomaly Detection (Bonus)
+Edge Function `analyze-superuser-anomalies` läuft täglich um 04:00:
+- Nimmt letzte 24h Test-Runs
+- Schickt sie an Lovable AI (Gemini Flash)
+- Prompt: „Identifiziere ungewöhnliche Patterns: gestiegene Latenz, neue Error-Typen, intermittierende Fehler"
+- Bei kritischen Findings → automatischer Bug-Report mit Severity „critical"
 
-#### Modul 4: Error-Patterns & Auto-Diagnose im Admin
+## Datenmodell (neue Tabellen)
 
-Eine **„Häufigste Probleme"-Sektion** im Bug Monitor mit **automatischer Pattern-Erkennung**:
+```text
+ai_superuser_runs
+├── id
+├── scenario_name
+├── status (pass | fail | warning)
+├── latency_ms
+├── http_status
+├── error_message
+├── response_schema_hash  ← erkennt Schema-Drift
+├── credits_consumed
+├── full_request_json
+├── full_response_json
+└── started_at
 
-- Gruppiert ähnliche Errors (z.B. „5 verschiedene Pages haben den gleichen NetworkError")
-- Zeigt: „Dieser Error tritt nur bei iOS Safari auf" oder „Nur bei Plan=free"
-- Verlinkt direkt zur Sentry-Detail-Page
-- Markiert als „Bekannt" / „Gefixt" / „Won't Fix"
+ai_superuser_anomalies
+├── id
+├── detected_at
+├── severity (critical | high | medium | low)
+├── pattern_description
+├── affected_scenarios[]
+├── ai_analysis (Gemini Output)
+└── auto_bug_report_id → bug_reports.id
+```
 
-### Komponenten & Dateien
+## Sicherheit & Sauberkeit
 
-**Neu zu erstellen:**
+- ✅ Service-Account hat `is_test_account = true` → **wird aus allen User-Statistiken gefiltert** (Conversion, Revenue, Cost)
+- ✅ Alle Test-Runs werden mit Header `X-AI-Superuser: true` markiert → erscheinen nicht in PostHog Analytics
+- ✅ Generierte Test-Inhalte landen in dediziertem Workspace, **nie** in echter Mediathek
+- ✅ Edge Function `ai-superuser-test-runner` ist nur per Service-Role-Key callbar (keine User-Auth)
+- ✅ RLS-Policy auf `ai_superuser_runs`: nur Admins können lesen
 
-1. `supabase/functions/sentry-bridge/index.ts` — Sentry API Proxy (~150 Zeilen)
-2. `supabase/functions/daily-smoke-test/index.ts` — 8 Smoke Checks (~200 Zeilen)
-3. `supabase/functions/submit-bug-report/index.ts` — Bug-Reporter Backend (~80 Zeilen)
-4. `src/pages/admin/Bugs.tsx` — Haupt-Page Bug Monitor
-5. `src/components/admin/bugs/BugSummaryCards.tsx` — 4 KPI-Karten
-6. `src/components/admin/bugs/TopErrorsList.tsx` — Top 10 Errors
-7. `src/components/admin/bugs/ErrorTrendChart.tsx` — Recharts 7-Tage-Trend
-8. `src/components/admin/bugs/UserFeedbackList.tsx` — Aus support_tickets
-9. `src/components/admin/bugs/HealthCheckStatus.tsx` — Daily Smoke Test Status
-10. `src/components/feedback/BugReporterButton.tsx` — Floating Button
-11. `src/components/feedback/BugReporterModal.tsx` — Report-Form mit Screenshot
+## Reicht das jetzt komplett?
 
-**Geändert:**
+**Ja — mit dieser Erweiterung ist das System vollständig.** Die 4 Ebenen decken zusammen ab:
 
-12. `src/pages/Admin.tsx` — Neuer 8. Tab "Bugs" mit `Bug`-Icon
-13. `src/App.tsx` — `<BugReporterButton />` global einbinden
+| Bug-Typ | Wer findet ihn? |
+|---|---|
+| Frontend JS-Error in echter User-Session | Sentry |
+| User merkt etwas funktioniert nicht | Bug-Reporter |
+| Edge Function ist offline / nicht erreichbar | Smoke-Tests |
+| Edge Function antwortet, aber liefert kaputte Daten | **KI Superuser** ← NEU |
+| Schema-Drift (Feld umbenannt, fehlt) | **KI Superuser** ← NEU |
+| Performance-Regression (Latenz +50%) | **KI Superuser Anomaly Detection** ← NEU |
+| Credit-Pipeline broken | **KI Superuser** ← NEU |
+| Sprach-spezifische Bugs (nur DE betroffen) | **KI Superuser** (testet alle 3 Sprachen) ← NEU |
 
-**Migrations:**
+## Was der KI Superuser **nicht** ersetzt
+- 🎨 **Visuelles QA** (Designfehler, kaputte Layouts) → bleibt manuell oder via späteren Visual Regression Test
+- 🤝 **UX-Tests** (Confusing Flows, schlechte Beschriftungen) → bleiben manuell
+- 🌐 **Browser-Kompatibilität** (Safari-Bug auf iOS) → bleibt manuell
 
-14. Neue Tabelle `health_check_results` (id, check_name, status, response_time_ms, error_message, checked_at)
-15. RLS auf `support_tickets` falls noch fehlt
-16. 1 Cron-Job für `daily-smoke-test` (täglich 06:00)
+Diese 3 Lücken sind **akzeptabel** für eine MVP-Bug-Strategie.
 
-**Secrets:**
+## Implementierungsreihenfolge
 
-17. `SENTRY_AUTH_TOKEN` — wird benötigt für die Sentry-API. Du musst einen Read-Token auf sentry.io erstellen (Settings → Auth Tokens → `event:read project:read`). Ich frage dich beim Build danach.
+1. DB-Migration: `ai_superuser_runs` + `ai_superuser_anomalies` Tabellen + `is_test_account` Spalte in `profiles`
+2. Test-Account Setup-Skript (einmalig erstellt den AI-Superuser + Workspace + Demo-Daten)
+3. Edge Function `ai-superuser-test-runner` mit den 12 Szenarien
+4. Edge Function `analyze-superuser-anomalies` (KI-Analyse via Gemini Flash)
+5. Cron-Jobs (stündlich + täglich)
+6. Admin Dashboard Tab `/admin` → „KI Superuser"
+7. Filter `is_test_account = true` aus allen bestehenden Admin-Statistiken (Cost, Revenue, Conversion)
 
-### Was das **nicht** löst (ehrlich)
+## Aufwand
 
-- ❌ **Es ersetzt nicht echtes manuelles Testen** — wir können nicht alle 7 Video-Studios automatisch testen, weil sie Credits/Geld kosten
-- ❌ **Es findet keine UX-Probleme** („User versteht den Button nicht") — dafür brauchst du echte User oder einen User-Test mit Bekannten
-- ❌ **Visual Bugs** (verrutschte Layouts) erkennt es nicht — die Playwright Visual-Tests existieren zwar, müssen aber manuell gepflegt werden
-
-→ **Aber es findet ~80% aller technischen Bugs**, bevor User sie melden müssen.
-
-### Aufwand-Einschätzung
-
-- **3 neue Edge Functions** (~430 Zeilen)
-- **1 neue Page + 6 Komponenten** (~500 Zeilen)
-- **2 globale Komponenten** (Bug-Reporter Button + Modal, ~250 Zeilen)
-- **1 Migration** (1 neue Tabelle, 1 Cron-Job)
-- **1 Secret** (`SENTRY_AUTH_TOKEN`)
-
-→ **Mittelgroß-Komplex, machbar in 1 Session.**
-
-### Was du danach hast
-
-✅ **Alle Bugs sichtbar im Admin** — kein Sentry-Login mehr nötig  
-✅ **User können selbst Bugs melden** mit einem Klick (mit Auto-Screenshot)  
-✅ **Tägliche Smoke-Tests** prüfen automatisch alle kritischen Flows  
-✅ **Email-Alert bei Smoke-Test-Failure** über das gestern gebaute System  
-✅ **Pattern-Erkennung** — siehst sofort, wo ein Bug-Trend startet  
-✅ **Trend-Charts** — Bug-Anzahl über Zeit, Bouncerate-ähnlich  
-✅ **Support-Tickets im Admin** — kein verlorenes User-Feedback mehr
-
-### Workflow nach dem Build
-
-1. **Morgens 06:05**: Smoke-Test läuft → wenn Fail → Email an dich
-2. **Tagsüber**: User klickt evtl. „Bug melden" → Email + Ticket im Admin
-3. **Wann immer du willst**: `/admin/bugs` öffnen → siehst alle Errors aggregiert  
-4. **Sonntags 08:00**: Wöchentlicher Health-Report (von gestern) inkl. Bug-Statistik
+- **Geschätzte Zeit:** 1 langer Build-Run (alle Komponenten in einem Rutsch, wie beim Bug-Hunting-System)
+- **Laufende Kosten:** ~5–10€/Monat (Edge Function Calls + Gemini Flash)
+- **ROI:** Findet Bugs bevor zahlende Kunden sie melden → schützt deine Revenue
 
