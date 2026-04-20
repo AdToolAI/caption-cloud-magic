@@ -156,25 +156,12 @@ serve(async (req) => {
       </div>
     `;
 
-    await supabase.functions.invoke('send-transactional-email', {
-      body: {
-        templateName: 'weekly-health-report',
-        recipientEmail: ADMIN_ALERT_EMAIL,
-        idempotencyKey: `weekly-report-${new Date().toISOString().slice(0, 10)}`,
-        templateData: {
-          dateStr,
-          sentCount,
-          bounceRate: bounceRate.toFixed(2),
-          aiSpend: aiSpend.toFixed(2),
-          lambdaSpend: lambdaSpend.toFixed(2),
-          totalSpend: totalSpend.toFixed(2),
-          forecast30d: forecast30d.toFixed(2),
-          newSignups,
-          successRenders,
-          failedRenders,
-          html,
-        },
-      },
+    await sendEmail({
+      to: ADMIN_ALERT_EMAIL,
+      subject: `📊 Weekly Health Report — ${dateStr}`,
+      html,
+      template: 'weekly-health-report',
+      category: 'system',
     });
 
     return new Response(
