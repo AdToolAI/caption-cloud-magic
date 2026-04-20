@@ -1,121 +1,68 @@
 
 
-## Plan: Sora 2 → "Coming Soon" für Neu-User + Kling 3 Omni stärken
+## Findings: Landing/Marketing-Page ist bereits größtenteils sauber
 
-## Kling 3 Omni — Qualitäts-Einschätzung
+Nach gründlicher Suche durch alle Landing-Komponenten und Marketing-Surfaces:
 
-Ehrliche Bewertung basierend auf Kling 3.0 (Kuaishou/Kwai), das aktuell als `kwaivgi/kling-v3-omni-video` auf Replicate läuft:
+### Was öffentlich (unauthentifiziert sichtbar) ist
+- **Landing-Page** (`/` → `BlackTieHero`, `MissionFeatures`, `FeatureGrid`, `PricingSection`, `BlackTieFooter`, `FAQ`): **0 Sora-Erwähnungen** ✅
+- **Pricing-Page** (`/pricing`): **0 Sora-Erwähnungen** ✅
+- **SEO-Meta-Tags** auf `Index.tsx`: **0 Sora-Erwähnungen** ✅
+- **`index.html`**: **0 Sora-Erwähnungen** ✅
 
-**Stärken:**
-- **Bewegungsqualität:** Beste am Markt für realistische Charakter-Bewegungen, Stoff-Physik, Wasser. Schlägt Sora 2 oft bei komplexen Motion-Szenen.
-- **Prompt-Adherence:** Sehr präzise — versteht komplexe deutsche Prompts nach Auto-Übersetzung gut.
-- **Image-to-Video:** Hervorragend, mit guter Konsistenz zum Referenzbild (besser als Wan 2.5).
-- **Kamera-Kontrolle:** Native Camera-Move-Parameter (orbit, push-in, pan).
-- **Lizenz:** Offiziell von Kuaishou via Kwaivgi auf Replicate — vollständig sauber.
+### Wo Sora noch erscheint (nur intern, hinter Login)
+1. **`featureGuide.descriptions.soraLongForm`** (Zeilen 1773 / 6109 / 10397) — Tooltip im internen Feature-Guide-Dialog
+2. **In-App Toasts/Dialoge** (videoStillGenerating, toastBackgroundGeneration, minimizeMsg) — nur sichtbar während Video-Generierung
+3. **`soraLf.*` Namespace** — die komplette interne UI für `/sora2-longform` (durch das Coming-Soon-Gate für neue User abgeschirmt)
+4. **`sora2Gate.*` Namespace** — explizit für das Coming-Soon-Modal (gewollt)
 
-**Schwächen vs. Sora 2:**
-- Schwächer bei Text-Rendering im Video
-- Maximal 10s pro Clip (Sora 2 Pro: 12s)
-- Keine native Audio-Generierung (Sora 2 erzeugt SFX automatisch)
-- Etwas weniger "filmisch" bei Wide-Shots
+## Was wir konkret bereinigen sollten
 
-**Verdict:** **Kling 3 Omni ist 85–90% der Sora-2-Qualität bei rechtlicher Sauberkeit und oft besserer Motion.** Für Charakter-Content & Produktvideos sogar überlegen. Für reine "Cinematic Wide-Shots mit Audio" ist Sora 2 noch vorne.
+### 1. Internal Feature-Guide-Texte entschärfen
+Die `featureGuide.descriptions.soraLongForm`-Texte sehen ungrandfathered User potenziell, wenn sie das Feature in der Hub-Übersicht antippen. Umformulierung:
+- **EN:** „Generate long-form cinematic video content" (statt „with Sora 2")
+- **DE:** „Generiere Long-Form Cinematic Videocontent"
+- **ES:** „Genera contenido de video largo y cinematográfico"
 
----
+### 2. Generic Toast-Texte (3 Sprachen × 3 Strings = 9 Stellen)
+Diese erscheinen während laufender Generierung — auch bei Kling/Wan/Hailuo-Renders sieht der User aktuell „You'll find it under **Sora AI Videos**". Ändern zu:
+- **EN:** „You'll find it under **AI Videos**" / „Generation continues in the background. You'll find the finished video under **AI Videos**."
+- **DE:** „Du findest es unter **KI-Videos**"
+- **ES:** „Lo encontrarás en **Videos de IA**"
 
-## Implementierung — Was wir bauen
+Das ist neutraler und korrekter (gilt für alle Modelle).
 
-### 1. "Grandfathering"-Mechanik (User-Cutoff)
+### 3. Was wir NICHT anfassen
+- `soraLf.*` Namespace (interne Studio-UI — nur Grandfathered-User sehen das Studio überhaupt)
+- `sora2Gate.*` Namespace (gewollt, erklärt explizit den Coming-Soon-Status)
+- `soraVideoStudio` interne UI (durch Gate geschützt)
 
-**DB-Migration:**
-- Neue Spalte `profiles.sora2_grandfathered BOOLEAN DEFAULT false`
-- One-Shot-Update: Alle existierenden User (created_at < NOW()) → `sora2_grandfathered = true`
-- Neue Signups → automatisch `false`
+## Optional: Marketing-Story aktiv stärken (Bonus)
 
-**Helper-Hook:** `useSora2Access()` 
-- Liest `profiles.sora2_grandfathered`
-- Returns `{ hasAccess: boolean, isLoading: boolean }`
+Falls du möchtest, ergänzen wir parallel auf der **Landing-Page** in `MissionFeatures` oder `FeatureGrid` einen neuen USP-Block:
 
-### 2. "Coming Soon"-Overlay für Neu-User
+> **„6 lizensierte Premium-KI-Modelle"**  
+> Kling 3 Omni · Wan 2.5 · Luma Ray 2 · Hailuo 2.3 · Seedance 2 · Veo
 
-Neue Komponente `<ComingSoonGate>`:
-- Wraps Sora 2 Studio + Long-Form Creator
-- Zeigt für Nicht-Grandfathered-User:
-  - Großes Banner: "Sora 2 — Coming Soon 🎬"
-  - Subtext: "OpenAI Sora 2 wird derzeit für die offizielle Integration vorbereitet"
-  - CTA: "Probiere stattdessen Kling 3 Omni — die Premium-Alternative" → Link zu `/kling-video-studio`
-  - Optional: Email-Liste „Benachrichtige mich, sobald verfügbar" (in DB-Tabelle `sora2_waitlist`)
-- Grandfathered-User sehen normales Studio ohne Änderungen
+Damit bauen wir aktiv die neue Erzählung auf, die Sora 2 ersetzt.
 
-**Betroffene Routen:**
-- `/sora-video-studio`
-- `/sora2-longform`
-- `director-cut-sora-enhance` Button im Director's Cut → Disable + Tooltip für Neu-User
+## Geplante Änderungen
 
-### 3. AI Video Studio Hub anpassen
-
-In `/ai-video-studio` (Hub):
-- **Sora 2 Card:** Badge „Coming Soon" für Neu-User, Click → Coming-Soon-Page; für Grandfathered-User normaler Link
-- **Kling 3 Omni Card:** Neues Badge „⭐ Recommended" + Position als #1 in der Liste
-- **Reihenfolge-Update:** Kling 3 → Wan 2.5 → Hailuo → Luma → Seedance → Sora 2 (für Neu-User unten/coming-soon)
-
-### 4. Marketing-Page (Pricing/Landing)
-
-- „Sora 2"-Erwähnungen auf Landing-Page entfernen oder ersetzen durch „Premium Cinema Engine"
-- Hero-Showcase: Kling 3 Omni Demo-Video statt Sora-Demo
-- Feature-Liste: „6 lizensierte Premium-KI-Modelle" als USP
-
-### 5. Kling 3 Omni — Stärkung
-
-- Im Kling Studio: Hinweis-Banner „Premium-Empfehlung der Redaktion"
-- Default-Einstellungen optimieren (10s, beste Auflösung, kinematischer Look)
-- Preset-Library erweitern (3–5 neue Cinematic-Presets)
-- VideoPromptOptimizer: Kling-spezifische Cinematic-Enrichment-Templates
-
-### 6. Smart-Upgrade-Hook erweitern
-
-`useFeatureGate` erkennt Sora-2-Feature für Neu-User:
-- Statt Upgrade-Modal → Coming-Soon-Modal mit Kling-Empfehlung
-- Tracking via PostHog: `sora2_blocked_view`, `kling_redirect_clicked`
-
-### 7. Localization
-
-Neue Keys (DE/EN/ES) für:
-- Coming-Soon-Banner-Texte
-- Kling-Empfehlungs-Copy
-- Waitlist-Bestätigung
-
----
-
-## Was wir bewusst NICHT tun
-
-- ❌ Sora 2 komplett entfernen (würde Grandfathered-User bestrafen)
-- ❌ Streak-Belohnungen ändern (sind generisch „AI Video Credits", keine Modell-Bindung)
-- ❌ Bestehende generierte Videos verstecken (bleiben in Mediathek)
-
----
-
-## Aufwand: ~2h
-
-| Schritt | Zeit |
+| Datei | Änderung |
 |---|---|
-| DB-Migration + Grandfathering-Backfill | 15 min |
-| `useSora2Access` Hook + `ComingSoonGate` Komponente | 25 min |
-| Sora-Studios mit Gate wrappen (3 Routes) | 20 min |
-| AI Video Studio Hub: Reihenfolge + Badges | 20 min |
-| Kling 3 Studio: Recommended-Banner + Presets | 20 min |
-| Marketing-Page-Updates | 15 min |
-| Localization (DE/EN/ES) | 10 min |
-| E2E-Test (Neu-User vs. Grandfathered) | 15 min |
+| `src/lib/translations.ts` | 3× `soraLongForm` Description (EN/DE/ES) — „Sora 2" entfernt |
+| `src/lib/translations.ts` | 9× generische Toast-Strings — „Sora AI Videos" → „AI Videos" / „KI-Videos" / „Videos de IA" |
+| **Optional:** `src/components/landing/MissionFeatures.tsx` oder `FeatureGrid.tsx` | Neuer „6 lizensierte Modelle"-USP-Block |
+| **Optional:** `src/lib/translations.ts` | Neue Keys für USP-Block (DE/EN/ES) |
 
----
+## Aufwand
+- **Pflicht-Cleanup:** ~10 Min
+- **Mit optionalem USP-Block:** ~25 Min
 
-## Reihenfolge nach Approval
+## Frage an dich
 
-1. DB-Migration + Backfill bestehender User
-2. Hook + ComingSoonGate-Komponente
-3. Sora-2-Routes wrappen
-4. Hub-Reorder + Kling-Stärkung
-5. Marketing-Cleanup
-6. Localization + Test
+Zwei Entscheidungen, dann lege ich los:
+
+1. **Nur Cleanup** (Pflicht-Punkte 1+2) **oder Cleanup + USP-Block** auf der Landing-Page?
+2. Falls USP-Block: in **`MissionFeatures`** (passt thematisch — "Why this tool wins") oder **`FeatureGrid`** (visueller Showcase)?
 
