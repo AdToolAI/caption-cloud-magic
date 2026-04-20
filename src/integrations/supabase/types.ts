@@ -531,6 +531,51 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_response_cache: {
+        Row: {
+          created_at: string
+          endpoint: string
+          expires_at: string
+          hit_count: number
+          id: string
+          language: string | null
+          last_hit_at: string | null
+          model: string | null
+          prompt_embedding: string | null
+          prompt_hash: string
+          prompt_text: string
+          response_data: Json
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          expires_at?: string
+          hit_count?: number
+          id?: string
+          language?: string | null
+          last_hit_at?: string | null
+          model?: string | null
+          prompt_embedding?: string | null
+          prompt_hash: string
+          prompt_text: string
+          response_data: Json
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          expires_at?: string
+          hit_count?: number
+          id?: string
+          language?: string | null
+          last_hit_at?: string | null
+          model?: string | null
+          prompt_embedding?: string | null
+          prompt_hash?: string
+          prompt_text?: string
+          response_data?: Json
+        }
+        Relationships: []
+      }
       ai_video_generations: {
         Row: {
           artlist_job_id: string | null
@@ -1608,6 +1653,33 @@ export type Database = {
           min_hit_count?: number | null
           policy_name?: string
           priority_templates?: string[] | null
+        }
+        Relationships: []
+      }
+      cache_stats: {
+        Row: {
+          cache_type: string
+          endpoint: string
+          hit: boolean
+          id: string
+          latency_ms: number | null
+          recorded_at: string
+        }
+        Insert: {
+          cache_type: string
+          endpoint: string
+          hit: boolean
+          id?: string
+          latency_ms?: number | null
+          recorded_at?: string
+        }
+        Update: {
+          cache_type?: string
+          endpoint?: string
+          hit?: boolean
+          id?: string
+          latency_ms?: number | null
+          recorded_at?: string
         }
         Relationships: []
       }
@@ -11526,6 +11598,19 @@ export type Database = {
       }
     }
     Views: {
+      cache_stats_recent: {
+        Row: {
+          avg_latency_ms: number | null
+          cache_type: string | null
+          endpoint: string | null
+          hit_rate_pct: number | null
+          hits: number | null
+          last_recorded_at: string | null
+          misses: number | null
+          total_requests: number | null
+        }
+        Relationships: []
+      }
       lambda_health_recent: {
         Row: {
           avg_duration_ms: number | null
@@ -11676,6 +11761,7 @@ export type Database = {
           variant_b_id: string
         }[]
       }
+      cleanup_expired_ai_cache: { Args: never; Returns: number }
       cleanup_expired_oauth_states: { Args: never; Returns: undefined }
       cleanup_expired_verification_tokens: { Args: never; Returns: undefined }
       cleanup_inactive_sessions: { Args: never; Returns: undefined }
@@ -11797,6 +11883,21 @@ export type Database = {
       is_workspace_owner: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
+      }
+      match_ai_cache: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+          query_endpoint: string
+          query_language?: string
+        }
+        Returns: {
+          hit_count: number
+          id: string
+          response_data: Json
+          similarity: number
+        }[]
       }
       owns_composer_project: { Args: { _project_id: string }; Returns: boolean }
       record_streak_activity: {

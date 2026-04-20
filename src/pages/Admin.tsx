@@ -3,7 +3,8 @@ import { SystemMonitor } from '@/components/admin/SystemMonitor';
 import { ConversionFunnel } from '@/components/admin/ConversionFunnel';
 import { EmailDashboard } from '@/pages/admin/EmailDashboard';
 import { ProviderHealth } from '@/pages/admin/ProviderHealth';
-import { Activity, TrendingUp, Mail, Gauge } from 'lucide-react';
+import { CacheHealth } from '@/pages/admin/CacheHealth';
+import { Activity, TrendingUp, Mail, Gauge, Database } from 'lucide-react';
 
 export default function Admin() {
   return (
@@ -33,6 +34,10 @@ export default function Admin() {
             <Gauge className="h-4 w-4" />
             Provider Health
           </TabsTrigger>
+          <TabsTrigger value="cache-health" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Cache Health
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="funnel">
@@ -49,6 +54,10 @@ export default function Admin() {
 
         <TabsContent value="provider-health">
           <ProviderHealth />
+        </TabsContent>
+
+        <TabsContent value="cache-health">
+          <CacheHealth />
         </TabsContent>
       </Tabs>
     </div>
