@@ -225,12 +225,12 @@ export function AISuperuserAdmin() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Pass-Rate</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">Pass-Rate (letzte 5)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-500">
-              {runs.length > 0
-                ? Math.round((runs.filter((r) => r.status === 'pass').length / runs.length) * 100)
+              {scenarios.length > 0
+                ? Math.round(scenarios.reduce((sum, s) => sum + s.passRate, 0) / scenarios.length)
                 : 0}%
             </div>
           </CardContent>
