@@ -194,6 +194,53 @@ async function ensureTestUser(): Promise<TestContext> {
   // 4. Seed demo post_metrics (idempotent)
   await adminClient.rpc("seed_ai_superuser_demo_data", { _user_id: userId });
 
+  // 4b. Seed demo project + comments (idempotent) for analyze-comments
+  const DEMO_PROJECT_NAME = "AI Superuser Demo Project";
+  const { data: existingProject } = await adminClient
+    .from("projects")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("name", DEMO_PROJECT_NAME)
+    .maybeSingle();
+
+  let demoProjectId: string;
+  if (existingProject?.id) {
+    demoProjectId = existingProject.id;
+  } else {
+    const { data: newProject, error: projErr } = await adminClient
+      .from("projects")
+      .insert({ user_id: userId, name: DEMO_PROJECT_NAME })
+      .select("id")
+      .single();
+    if (projErr || !newProject) throw new Error(`Failed to seed demo project: ${projErr?.message}`);
+    demoProjectId = newProject.id;
+  }
+
+  // Ensure at least 2 demo comments exist for that project
+  const { count: commentCount } = await adminClient
+    .from("comments")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", demoProjectId);
+
+  if (!commentCount || commentCount < 2) {
+    await adminClient.from("comments").insert([
+      {
+        project_id: demoProjectId,
+        username: "test_user_1",
+        text: "Love this content! When is the next post coming?",
+        external_comment_id: "ai-superuser-demo-1",
+        created_at_platform: new Date(Date.now() - 86400000).toISOString(),
+      },
+      {
+        project_id: demoProjectId,
+        username: "test_user_2",
+        text: "Great tips, very helpful 🙏",
+        external_comment_id: "ai-superuser-demo-2",
+        created_at_platform: new Date(Date.now() - 3600000).toISOString(),
+      },
+    ]);
+  }
+
   // 5. Sign in to get a fresh JWT
   const userClient = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -206,7 +253,7 @@ async function ensureTestUser(): Promise<TestContext> {
     throw new Error(`Failed to sign in test user: ${signInErr?.message || "no session"}`);
   }
 
-  return { userId: userId!, userJwt: signIn.session.access_token };
+  return { userId: userId!, userJwt: signIn.session.access_token, demoProjectId };
 }
 
 async function hashSchema(obj: unknown): Promise<string> {
