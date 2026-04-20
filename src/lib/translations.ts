@@ -17635,6 +17635,78 @@ Object.assign(translations.es, {
   },
 });
 
+// ============================================================
+// Sora 2 "Coming Soon" Gate translations (sora2Gate namespace)
+// ============================================================
+Object.assign(translations.en, {
+  sora2Gate: {
+    badge: 'Premium Cinema Engine',
+    title: 'Sora 2 — Coming Soon',
+    subtitle: 'OpenAI Sora 2 is being prepared for official integration. In the meantime, we recommend our flagship cinematic model below.',
+    recommendedAlternative: 'Recommended alternative — available now',
+    klingTitle: 'Kling 3 Omni — Premium Cinematic Engine',
+    klingDescription: 'Officially licensed by Kuaishou. Industry-leading motion realism, native audio generation and camera-move controls. 85–90% of Sora 2\'s quality, 100% legal certainty.',
+    feat1: 'Realistic motion & physics',
+    feat2: 'Native audio generation',
+    feat3: 'Image-to-Video & Video-to-Video',
+    feat4: 'Camera-move controls',
+    tryKling: 'Open Kling 3 Studio',
+    waitlistTitle: 'Notify me when Sora 2 launches',
+    waitlistDescription: 'We\'ll send you an email the moment official Sora 2 access is enabled on your account.',
+    waitlistButton: 'Join waitlist',
+    waitlistJoined: 'You\'re on the waitlist — we\'ll let you know!',
+    waitlistJoinedShort: 'You\'re in!',
+    waitlistError: 'Could not join the waitlist. Please try again.',
+    waitlistNoEmail: 'No email on file — please update your profile.',
+  },
+});
+
+Object.assign(translations.de, {
+  sora2Gate: {
+    badge: 'Premium Cinema Engine',
+    title: 'Sora 2 — Bald verfügbar',
+    subtitle: 'OpenAI Sora 2 wird derzeit für die offizielle Integration vorbereitet. In der Zwischenzeit empfehlen wir unser Flaggschiff-Modell.',
+    recommendedAlternative: 'Empfohlene Alternative — sofort verfügbar',
+    klingTitle: 'Kling 3 Omni — Premium Cinema Engine',
+    klingDescription: 'Offiziell von Kuaishou lizenziert. Branchenführender Bewegungs-Realismus, native Audio-Generierung und Kamera-Steuerung. 85–90% der Sora-2-Qualität, 100% Rechtssicherheit.',
+    feat1: 'Realistische Bewegung & Physik',
+    feat2: 'Native Audio-Generierung',
+    feat3: 'Image-to-Video & Video-to-Video',
+    feat4: 'Kamera-Bewegungs-Steuerung',
+    tryKling: 'Kling 3 Studio öffnen',
+    waitlistTitle: 'Benachrichtige mich beim Launch',
+    waitlistDescription: 'Wir senden dir eine E-Mail, sobald offizieller Sora-2-Zugang für dein Konto freigeschaltet ist.',
+    waitlistButton: 'Auf die Warteliste',
+    waitlistJoined: 'Du stehst auf der Warteliste — wir melden uns!',
+    waitlistJoinedShort: 'Eingetragen',
+    waitlistError: 'Konnte dich nicht eintragen. Bitte erneut versuchen.',
+    waitlistNoEmail: 'Keine E-Mail hinterlegt — bitte Profil aktualisieren.',
+  },
+});
+
+Object.assign(translations.es, {
+  sora2Gate: {
+    badge: 'Premium Cinema Engine',
+    title: 'Sora 2 — Próximamente',
+    subtitle: 'OpenAI Sora 2 se está preparando para la integración oficial. Mientras tanto, recomendamos nuestro modelo cinematográfico estrella.',
+    recommendedAlternative: 'Alternativa recomendada — disponible ahora',
+    klingTitle: 'Kling 3 Omni — Premium Cinema Engine',
+    klingDescription: 'Licencia oficial de Kuaishou. Realismo de movimiento líder en la industria, generación de audio nativa y controles de cámara. 85–90% de la calidad de Sora 2, 100% seguridad legal.',
+    feat1: 'Movimiento y física realistas',
+    feat2: 'Generación de audio nativa',
+    feat3: 'Image-to-Video & Video-to-Video',
+    feat4: 'Controles de movimiento de cámara',
+    tryKling: 'Abrir Kling 3 Studio',
+    waitlistTitle: 'Notifícame cuando se lance',
+    waitlistDescription: 'Te enviaremos un correo en cuanto el acceso oficial a Sora 2 esté activado en tu cuenta.',
+    waitlistButton: 'Unirme a la lista',
+    waitlistJoined: 'Estás en la lista de espera, ¡te avisaremos!',
+    waitlistJoinedShort: '¡Listo!',
+    waitlistError: 'No se pudo unir a la lista. Inténtalo de nuevo.',
+    waitlistNoEmail: 'No hay correo en tu perfil — actualízalo.',
+  },
+});
+
 
 // ─── News Hub Translations ───
 Object.assign(translations.en, {
