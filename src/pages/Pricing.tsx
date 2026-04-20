@@ -13,6 +13,8 @@ import { translations } from "@/lib/translations";
 import { getCurrencyForLanguage } from "@/lib/currency";
 import { useUrlCoupon } from "@/hooks/useUrlCoupon";
 import { CouponBanner } from "@/components/pricing/CouponBanner";
+import { useSearchParams } from "react-router-dom";
+import { Lock } from "lucide-react";
 
 const Pricing = () => {
   const navigate = useNavigate();
@@ -20,6 +22,8 @@ const Pricing = () => {
   const { t, language } = useTranslation();
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const { couponCode, clearCoupon } = useUrlCoupon();
+  const [searchParams] = useSearchParams();
+  const isReactivation = searchParams.get("reactivate") === "1";
 
   const handlePlanClick = async (planType: 'basic' | 'pro' | 'enterprise') => {
     if (!user) {
@@ -167,6 +171,19 @@ const Pricing = () => {
       />
       
       <main className="flex-1 container mx-auto px-4 py-20">
+        {/* Reactivation banner — shown when account was paused after trial */}
+        {isReactivation && (
+          <div className="max-w-3xl mx-auto mb-12 rounded-2xl border border-primary/40 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 px-6 py-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center flex-shrink-0">
+              <Lock className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-foreground">{t("trial.reactivateHeadline")}</h2>
+              <p className="text-sm text-muted-foreground">{t("trial.reactivateSub")}</p>
+            </div>
+          </div>
+        )}
+
         {/* Auto-applied URL coupon (e.g. win-back emails) */}
         {couponCode && (
           <CouponBanner code={couponCode} onRemove={clearCoupon} />
