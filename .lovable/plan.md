@@ -1,60 +1,95 @@
 
 
 ## Ziel
-Statt am Tag 15 sofortiger Pause → 3-Tage Grace-Period mit verstärkter Warnung, dann erst Pause am Tag 18.
+**Smart In-App Upgrade-Prompts** während des aktiven Trials & für Free/Basic-User. Höhere Conversion als Email-only durch kontextbezogene Trigger und 1-Klick-Checkout mit `TRIAL20` Coupon.
 
-## Änderungen
+## Status Quo (Code-Inspection)
+- ✅ `useUpgradeTrigger` Context existiert bereits (mit Cooldown-Logik je Source)
+- ✅ `UpgradeMount` mit 3 Watchern (`CreditThresholdWatcher`, `StreakMilestoneUpsellWatcher`, `UsageRecommendationWatcher`)
+- ✅ `useFeatureGate` Hook für Feature-Walls
+- ✅ `SmartUpgradeModal` als zentrales Modal
+- ✅ URL-Coupon-System (`/pricing?coupon=TRIAL20`) bereits funktional
+- ✅ `useTrialStatus` Hook liefert `daysRemaining`, `inGracePeriod`
+- ❌ **Fehlt**: Trial-spezifische Trigger (Day 7/10/13)
+- ❌ **Fehlt**: `TRIAL20` Stripe Coupon
+- ❌ **Fehlt**: Feature-Discovery-Tracking (z. B. "3. Mal Director's Cut genutzt")
 
-### 1. `useTrialStatus` Hook erweitern
-Neuer Status-Wert `grace` + Felder:
-- `inGracePeriod: boolean` — true wenn `trial_ends_at` in Vergangenheit, aber `< trial_ends_at + 3 days`
-- `graceDaysRemaining: number` — Tage bis Pause (0–3)
+## Architektur — was neu hinzukommt
 
-Logik:
-- `now < trial_ends_at` → `active`, Banner zeigt Trial-Restzeit
-- `trial_ends_at <= now < trial_ends_at + 3d` → `grace`, Banner zeigt "Trial endet in X Tagen — jetzt upgraden"
-- `now >= trial_ends_at + 3d` AND keine Subscription → Pause (via Edge Function gesetzt)
+### 1. Stripe Coupon `TRIAL20`
+20% Rabatt auf ersten Monat (forever, da Trial-User noch nie gezahlt haben).
+Promotion-Code `TRIAL20` für URL-Auto-Apply.
 
-### 2. `check-trial-status` Edge Function anpassen
-Aktuelle Query: `trial_ends_at < now()` → pausiert sofort.
-Neue Query: `trial_ends_at < now() - INTERVAL '3 days'` → pausiert erst nach Grace-Period.
+### 2. Neuer Watcher: `TrialUpgradeWatcher`
+Triggert während aktivem Trial an strategischen Punkten:
+- **Day 7** (Halbzeit): "Du nutzt das System aktiv — sichere dir 20% auf Pro"
+- **Day 10**: "Noch 4 Tage Enterprise-Trial — danach automatisches Downgrade"
+- **Day 13**: "Letzter Tag! Verliere keine Funktionalität — jetzt mit `TRIAL20`"
+- Während Grace-Period: "Konto wird in X Tagen pausiert — jetzt 20% sparen"
+- Suppression: max. 1 Prompt pro 48h (separater Cooldown), Skip wenn schon konvertiert
 
-Zusätzlich: Während der Grace-Period bleibt:
-- `trial_status = 'active'` (User hat noch Zugriff!)
-- `account_paused = false`
-- `plan_code = 'enterprise'` (volle Funktionalität)
+### 3. Neuer Watcher: `FeatureDiscoveryWatcher`
+Tracked Power-Feature-Nutzung in `localStorage` + DB-Counter:
+- Director's Cut, Sora Long-Form, Video Composer → nach 3. Nutzung Modal
+- "Du nutzt Director's Cut intensiv — Pro gibt dir unbegrenzte Renders"
+- Tabelle `feature_usage_events` (user_id, feature_key, count, last_used_at)
 
-Erst nach Grace-Period:
-- `trial_status = 'expired'`
-- `account_paused = true`
-- `plan_code = 'free'` + Wallet auf 0
+### 4. SmartUpgradeModal: Trial-Variant erweitern
+Neue Variant-Texte für Source `trial_progress`:
+- Headline je nach Tag (7/10/13/grace)
+- Coupon-Code-Banner: "Deine Vergünstigung: TRIAL20 (20% Rabatt) — 1 Klick zum Checkout"
+- CTA-Link führt zu `/pricing?coupon=TRIAL20&plan=pro`
+- Tracking: `upgrade_prompt_shown` mit `trial_day` Metadata
 
-### 3. `TrialBanner` 3 Visual States
-- **Normal** (>3 Tage): Gold, Sparkles-Icon, "X Tage Enterprise-Trial verbleibend"
-- **Urgent** (≤3 Tage Trial): Rot/Destructive, Clock-Icon, "Nur noch X Tage!"
-- **Grace** (Trial vorbei, in 3-Tage-Grace): Stark pulsierend rot, AlertTriangle-Icon, "⚠ Trial abgelaufen — Konto wird in X Tagen pausiert"
+### 5. Conversion-Tracking
+Neue Spalte in `profiles`: `upgrade_prompts_dismissed JSONB DEFAULT '{}'`
+Format: `{"trial_progress_day7": "2026-04-22T...", "feature_discovery_directors_cut": "..."}`
+Verhindert wiederholtes Zeigen nach Dismiss.
 
-### 4. Grace-Period Reminder-Email (optional, gleiche Edge Function)
-Am ersten Tag der Grace-Period (Day 15): Email "Dein Trial ist abgelaufen — du hast noch 3 Tage Zugriff" mit Pricing-CTA. Verhindert dass User unbemerkt pausiert wird.
-
-Tracking via neuer JSONB-Spalte `grace_email_sent_at` ODER einfacher: in `activation_emails_sent` JSONB einen Key `grace_warning` setzen.
-
-### 5. i18n-Keys ergänzen
-Neue Keys (DE/EN/ES):
-- `trial.graceTitle` — "Trial abgelaufen — Grace-Period aktiv"
-- `trial.graceBanner` — "Konto wird in {days} Tagen pausiert"
-- `trial.graceCta` — "Jetzt upgraden & Pause vermeiden"
-
-## Was NICHT geändert wird
-- ❌ `handle_new_user` (Trial-Start unverändert: 14 Tage)
-- ❌ `AccountPausedGate` (greift weiterhin nur bei `account_paused=true`, also nach Grace)
-- ❌ Cron-Schedule (bleibt täglich 09:00 UTC)
+PostHog Events:
+- `upgrade_prompt_shown` (mit source, trial_day, recommended_plan)
+- `upgrade_prompt_clicked` (CTA → Pricing)
+- `upgrade_prompt_dismissed`
+- `upgrade_completed_via_trial_prompt` (Stripe-Webhook setzt Flag)
 
 ## Dateien
-1. `supabase/functions/check-trial-status/index.ts` — Query + Email-Logik
-2. `src/hooks/useTrialStatus.ts` — Grace-Period-Berechnung
-3. `src/components/trial/TrialBanner.tsx` — 3rd visual state
-4. `src/lib/translations.ts` — 3 neue Keys × 3 Sprachen
 
-Aufwand: ~25 Min, keine DB-Migration nötig.
+### Neu
+1. `src/components/upgrade/TrialUpgradeWatcher.tsx` — Day-7/10/13/grace Trigger
+2. `src/components/upgrade/FeatureDiscoveryWatcher.tsx` — Power-Feature-Counter
+3. `src/lib/featureUsageTracker.ts` — Helper für `trackFeatureUsage(feature_key)`
+4. `supabase/migrations/...sql` — `feature_usage_events` Tabelle + `upgrade_prompts_dismissed` Spalte
+
+### Edit
+1. `src/components/upgrade/UpgradeMount.tsx` — 2 neue Watcher mounten
+2. `src/components/upgrade/SmartUpgradeModal.tsx` — Trial-Progress-Variant + Coupon-Banner
+3. `src/hooks/useUpgradeTrigger.tsx` — Neue Sources `trial_progress` + `feature_discovery`
+4. `src/lib/translations.ts` — i18n-Keys für Trial-Modal-Variants (DE/EN/ES)
+5. Power-Feature-Komponenten (Director's Cut, Sora, Composer) — `trackFeatureUsage()` Aufruf
+
+### Stripe (via Tool)
+1. Coupon `TRIAL20` erstellen (20% off, forever, applies to subscriptions)
+2. Promotion-Code `TRIAL20` aktivieren
+
+## Was NICHT gebaut wird
+- ❌ Kein neues Pricing-Modal (nutzt bestehende Pricing-Page mit `?coupon=`)
+- ❌ Keine Stripe-Tax-Änderung
+- ❌ Kein Cancel-Funnel (das wäre Option C)
+- ❌ Keine Änderung an `useTrialStatus` (Lese-Zugriff reicht)
+
+## Edge Cases
+- **User dismissed Day 7 → Day 10 zeigt erneut**: OK, neuer Anlass
+- **Trial-User zahlt bereits**: `currentPlan !== 'free'` UND `trial_status === 'converted'` → keine Prompts
+- **Grace-Period überlappt mit Day 13**: Grace-Variant gewinnt (akuter)
+- **Feature-Discovery + Trial-Progress gleichzeitig**: Trial-Cooldown (48h) verhindert Doppel-Show
+
+## Reihenfolge (~75 Min)
+1. Stripe Coupon `TRIAL20` erstellen
+2. Migration: `feature_usage_events` + `upgrade_prompts_dismissed`
+3. `TrialUpgradeWatcher` + Source `trial_progress` in Context
+4. `FeatureDiscoveryWatcher` + `featureUsageTracker.ts`
+5. `SmartUpgradeModal` Trial-Variant + Coupon-Banner
+6. `UpgradeMount` erweitern + i18n-Keys
+7. `trackFeatureUsage()` in 3 Power-Features einbauen
+8. End-to-End Test (Trial-User auf Day 7 setzen → Modal triggern → Pricing mit Coupon)
 
