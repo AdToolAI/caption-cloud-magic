@@ -3,6 +3,20 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { identifyUser, resetUser, trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
+import { translations, type Language } from '@/lib/translations';
+
+const getLang = (): Language => {
+  const saved = (localStorage.getItem('adtool-ai-lang') || 'de').toLowerCase().slice(0, 2);
+  return (saved === 'en' || saved === 'de' || saved === 'es') ? (saved as Language) : 'de';
+};
+
+const tr = (key: string): string => {
+  const lang = getLang();
+  const keys = key.split('.');
+  let value: any = translations[lang];
+  for (const k of keys) value = value?.[k];
+  return typeof value === 'string' ? value : key;
+};
 
 interface AuthContextType {
   user: User | null;
@@ -195,17 +209,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     
     if (error) {
-      toast.error(error.message);
+      toast.error(error.message || tr('auth.signupErrorGeneric'));
     } else {
-      toast.success('Account erstellt!', {
-        description: 'Bitte prüfen Sie Ihre E-Mail für den Verifizierungslink.'
+      toast.success(tr('auth.signupSuccessTitle'), {
+        description: tr('auth.signupSuccessDesc'),
       });
       
       if (data.user) {
         localStorage.setItem('signup_date', new Date().toISOString());
         
         // Read user's preferred language for localized verification email
-        const language = (localStorage.getItem('adtool-ai-lang') || 'de').toLowerCase().slice(0, 2);
+        const language = getLang();
 
         // Send custom verification email via Edge Function
         try {
