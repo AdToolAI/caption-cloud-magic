@@ -1,112 +1,150 @@
 
 
-## Plan: Kapazitäts-Hardening Phase 1
+## Plan: Kapazitäts-Hardening Phase 2 — 2.000+ concurrent users
 
-Drei Module, die deine Kapazität von ~500 auf ~1.500 concurrent users heben — ohne dass du auf Probleme reagierst, sondern sie verhinderst.
+Ziel: Von aktuell ~1.500 → **2.000–3.000+ concurrent users** (entspricht ~2–3 Mio Besucher/Monat).
 
----
+### Wo wir stehen
 
-### Modul 1: Lambda 3 → 6 parallel (mit Safety-Net)
-
-**Was sich ändert:**
-- Max parallele Lambda-Renders: 3 → 6
-- Auto-Retry bei transienten Failures (Memory/Timeout): bis zu 2 Versuche
-- Circuit Breaker: Bei >30% Fehlerquote in 10 Min automatisch zurück auf 3
-- Memory-Spike-Detection: Lambda-Logs werden auf OOM gescannt → automatischer Fallback
-
-**Technisch:**
-- `mem://infrastructure/aws-lambda/rendering-concurrency-stability-policy` updaten (3 → 6)
-- `_shared/aws-lambda.ts`: neue `MAX_CONCURRENT_RENDERS=6` Konstante
-- Neue Tabelle `lambda_health_metrics` (timestamp, success/fail, memory_used, duration)
-- Neue Edge Function `lambda-circuit-breaker` (cron alle 5 Min): wertet Metriken aus, setzt `system_config.lambda_max_concurrent`
-- `render-queue-manager` liest `system_config.lambda_max_concurrent` statt Hardcoded-Wert
-
-**Was du gewinnst:** 2x mehr parallele Renders ohne erhöhtes Risiko (Safety-Net greift automatisch).
-
----
-
-### Modul 2: Render-Queue mit User-facing Status
-
-**Was du baust:**
-Wenn ein User auf „Render starten" klickt und alle 6 Slots belegt sind, sieht er statt einem leeren Spinner:
-
-> 🎬 Du bist Position 3 in der Warteschlange  
-> ⏱ Geschätzte Wartezeit: ~4 Min  
-> [Status-Balken füllt sich live]
-
-**Technisch:**
-- `RenderQueuePanel.tsx` erweitern: aktuelle Position + ETA berechnen
-- `useRenderQueue.ts`: neue Methode `getQueuePosition(jobId)` → zählt vor mir liegende Jobs
-- ETA-Formel: `(position × avg_render_duration_letzte_24h)` — basierend auf historischen Daten aus `render_queue_stats`
-- Realtime-Subscription bereits vorhanden (`render-queue-changes`) — nutzen wir, um Position live zu updaten
-- Neue Komponente `<QueuePositionBadge>` für die Anzeige im `RenderOverlay.tsx` und `RenderQueuePanel.tsx`
-
-**Was du gewinnst:** User wissen, was los ist → weniger Support-Anfragen, weniger Abbrüche.
-
----
-
-### Modul 3: Provider-Quota-Monitoring + Email-Alerts
-
-**Was du bekommst:**
-Neuer Tab im Admin-Dashboard: **„Provider Health"** mit Live-Auslastung:
-
-```
-┌──────────────────────────────────────────┐
-│ 🟢 Replicate     67% / 600 req per min   │
-│ 🟢 Gemini        23% / 1000 req per min  │
-│ 🟢 ElevenLabs    12% / 5 concurrent      │
-│ 🟡 OpenAI Sora   84% / 100 req per hr    │ ← Warning
-│ 🟢 AWS Lambda    50% / 6 parallel        │
-└──────────────────────────────────────────┘
-```
-
-**Technisch:**
-- Neue Tabelle `provider_quota_log`: `provider, timestamp, requests_used, requests_limit, response_time_ms`
-- Edge Functions, die Provider aufrufen, loggen jeden Call (Wrapper in `_shared/provider-tracker.ts`)
-- Neue Edge Function `provider-quota-aggregator` (cron alle 1 Min): aggregiert Last-Minute-Daten
-- Neue Komponente `src/pages/admin/ProviderHealth.tsx` mit 5 Cards (Replicate, Gemini, ElevenLabs, OpenAI, Lambda)
-- **Email-Alert bei >80%**: Neue Edge Function `provider-quota-alerter` (cron alle 5 Min): wenn ein Provider über 80% steht → Email an Admins via `send-transactional-email` mit Template `provider-quota-warning`
-- Cooldown: 1 Email pro Provider pro Stunde (verhindert Email-Spam)
-
-**Was du gewinnst:** Du weißt **vorher**, wann du einen Plan upgraden musst — nicht erst, wenn User „Service nicht verfügbar"-Fehler bekommen.
-
----
-
-### Datenbank-Änderungen (3 neue Tabellen)
-
-| Tabelle | Zweck | RLS |
+| Komponente | Aktuell | Limit bei 2.000 Usern |
 |---|---|---|
-| `system_config` | Single-Row config (z.B. `lambda_max_concurrent`) | Admin only |
-| `lambda_health_metrics` | Render-Erfolg/Fehler-Tracking | Admin read, system write |
-| `provider_quota_log` | API-Call-Tracking pro Provider | Admin read, system write |
+| DB Connections | Supavisor Pooling ✅ | OK bis ~2.000 |
+| Edge Functions | Auto-scaling ✅ | OK bis ~5.000 |
+| Lambda Renders | 6 parallel ✅ | Queue wird bei Spitzen lang |
+| **Read-Heavy Queries** | Direkt aus DB | **🔴 BOTTLENECK** |
+| **Statische Assets** | Direkt aus Browser | **🔴 BOTTLENECK** |
+| **Wiederholte AI-Calls** | Jedes Mal neu | **🔴 BOTTLENECK** |
+| Compute Instance | Standard | **🟡 Upgrade nötig** |
 
 ---
 
-### Neue Edge Functions (4)
+### Was wir bauen — 4 Module
 
-1. `lambda-circuit-breaker` — Cron alle 5 Min, justiert Lambda-Concurrency
-2. `provider-quota-aggregator` — Cron alle 1 Min, aggregiert Provider-Calls
-3. `provider-quota-alerter` — Cron alle 5 Min, schickt Warnungen
-4. `_shared/provider-tracker.ts` — Wrapper-Modul (kein eigenes Deploy)
+#### Modul 1: Redis-Cache für Hot Queries 🔥
+**Problem:** Jeder User-Page-Load triggert 5–10 DB-Queries für Daten, die sich selten ändern (Dashboard-Stats, Trend-Radar, Posting-Times, News-Feed). Bei 2.000 Usern = 10.000–20.000 DB-Queries/Sekunde.
+
+**Lösung:** Upstash Redis als Cache-Layer (serverless, pay-per-request).
+- `dashboard-summary` → Cache 60s pro User
+- `trend-radar` → Cache 5 Min global  
+- `news-hub` → Cache 15 Min global
+- `posting-times` → Cache 1h pro Sprache (bereits vorhanden, erweitern)
+- `provider-quota-stats` → Cache 30s
+
+**Impact:** -85% DB-Last → Headroom für 5x mehr User.  
+**Kosten:** ~$10–20/Monat bei deinem Volumen.
 
 ---
 
-### Wichtig zu wissen
+#### Modul 2: CDN-Caching für statische Assets 🚀
+**Problem:** Bilder, Videos, Thumbnails, Fonts werden direkt aus Supabase Storage geladen. Bei 2.000 Usern = Bandbreiten-Spitzen.
 
-- **Kein Code-Refactoring nötig** in bestehenden Edge Functions — nur 1-Zeilen-Imports vom neuen `provider-tracker.ts`
-- **Kosten:** Lambda-Hochskalierung von 3→6 = ggf. höhere AWS-Rechnung bei Spitzen (linear), aber: Du zahlst nur, was läuft
-- **Reversibel:** Falls Probleme → `system_config.lambda_max_concurrent = 3` setzen, fertig
-- **User merken nichts** außer: schnellere Renders (Modul 1) + bessere Status-Anzeige (Modul 2)
+**Lösung:**
+- **Cloudflare CDN** vor `caption-cloud-magic.lovable.app` und Custom Domains (`captiongenie.app`, `useadtool.ai`)
+- Storage-URLs (Thumbnails, Avatare, generierte Bilder) durch Cache-Layer routen
+- Cache-Headers in Edge Functions: `Cache-Control: public, max-age=3600` für statische Antworten
+- Image-Optimization: WebP-Auto-Konvertierung via Cloudflare
+
+**Impact:** -90% Bandbreiten-Last auf Supabase, schnellere Ladezeiten weltweit.  
+**Kosten:** Cloudflare Free-Plan reicht aus.
 
 ---
 
-### Zeitplan
+#### Modul 3: AI-Response-Caching mit Semantic Search 🧠
+**Problem:** Viele User stellen ähnliche Prompts (z.B. „Erstelle Caption für Instagram Reel über Fitness"). Aktuell: jedes Mal API-Call an Gemini/OpenAI = teuer + langsam + Rate-Limit-Risiko.
 
-Alles in einem Rutsch — nach Plan-Freigabe:
-1. DB-Migration (3 Tabellen + system_config-Seed)
-2. Edge Functions deployen (4 Stück)
-3. Frontend (RenderOverlay-Update + neuer Admin-Tab „Provider Health")
-4. Cron-Jobs aktivieren
+**Lösung:**
+- Tabelle `ai_response_cache` mit `prompt_hash`, `prompt_embedding` (vector), `response`, `created_at`
+- Vor jedem AI-Call: Embedding generieren, ähnliche Prompts suchen (Cosine Similarity > 0.95)
+- Bei Match → gecachte Antwort zurückgeben (mit kleiner Variation für Frische)
+- TTL: 24h pro Prompt
 
-Du kannst direkt nach Fertigstellung in `/admin` → „Provider Health" klicken.
+**Wo aktiv:**
+- `generate-caption` (häufigster Endpoint)
+- `generate-hashtags`
+- `posting-times-api`
+- `trend-radar` (bereits gecached, erweitern)
+
+**Impact:** -60% AI-Provider-Calls → 2–3x mehr Headroom bei OpenAI/Gemini Rate Limits.  
+**Kosten:** Eingespart > zusätzliche Embedding-Kosten.
+
+---
+
+#### Modul 4: Lambda 6 → 10 + Compute-Upgrade ⚡
+**Problem:** Bei 2.000 Usern könnten 30–50 gleichzeitige Render-Requests auflaufen → lange Queue.
+
+**Lösung:**
+- `lambda_max_concurrent`: 6 → **10** (mit Safety-Net auf 6 fallback)
+- `lambda_max_concurrent_safe`: 3 → **6** (höherer Floor)
+- Circuit Breaker bleibt aktiv, aber mit höheren Schwellen
+- **Lovable Cloud Compute Upgrade**: Du gehst in **Backend → Advanced settings → Upgrade instance** und wählst die nächst-größere Instance-Klasse (mehr CPU/RAM für DB)
+
+**Impact:** Queue-Länge bei Spitzen halbiert sich, DB-Latenz sinkt um 30–50%.  
+**Kosten:** AWS Lambda linear (~+30%), Compute-Upgrade je nach Plan.
+
+---
+
+### Datenbank-Änderungen
+
+| Tabelle | Zweck |
+|---|---|
+| `ai_response_cache` | Semantic-Cache für AI-Antworten (mit pgvector) |
+| `cache_stats` | Cache-Hit-Rate-Tracking pro Endpoint |
+| `system_config` (Update) | Neue Werte für Lambda 10/6 |
+
+---
+
+### Neue Edge Functions
+
+1. `_shared/redis-cache.ts` — Wrapper für Upstash Redis (Get/Set/Invalidate)
+2. `_shared/ai-semantic-cache.ts` — Embedding + Similarity-Search-Logik
+3. `cache-invalidator` (Cron alle 1h) — Löscht abgelaufene Cache-Entries
+4. `cache-stats-aggregator` — Aggregiert Hit-Rates für Admin-Dashboard
+
+---
+
+### Admin-Dashboard-Erweiterung
+
+Neuer Tab **„Cache Health"** im `/admin`:
+- Redis Hit-Rate pro Endpoint (Ziel: >80%)
+- AI-Semantic-Cache-Hits (Ziel: >40%)
+- CDN-Bandbreite-Einsparung
+- Top-10 ungeacachte Hot-Queries (Optimierungspotenzial)
+
+---
+
+### Was du dafür brauchst
+
+| Anbieter | Was | Kosten/Monat |
+|---|---|---|
+| **Upstash Redis** | Account erstellen → API-Token | $0–20 |
+| **Cloudflare** | Account + Domain hinzufügen → DNS umstellen | $0 (Free Plan) |
+| **Lovable Cloud** | Compute Instance Upgrade | siehe Plan |
+
+Ich frage dich nach den Secrets (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`), sobald wir starten.
+
+---
+
+### Was du gewinnst
+
+| Metric | Vorher | Nachher |
+|---|---|---|
+| Concurrent Users | 1.500 | **3.000+** |
+| Monatliche Besucher | 1M | **3M+** |
+| AI-Provider-Last | 100% | 40% |
+| DB-Query-Last | 100% | 15% |
+| Page-Load-Zeit (global) | 1.5s | 0.4s |
+| Render-Queue bei Spitzen | 30s wait | <10s wait |
+
+---
+
+### Reihenfolge der Implementierung
+
+1. **Redis-Cache + Hot-Query-Caching** (größter Impact, geringster Aufwand)
+2. **AI-Semantic-Cache** (DB + Edge Functions)
+3. **Lambda 6→10 + system_config Update**
+4. **Cache-Health-Dashboard**
+5. **CDN-Setup-Guide** (du musst Cloudflare manuell einrichten, ich liefere Anleitung)
+6. **Compute-Upgrade-Hinweis** im Admin-Panel
+
+Alles in einem Rutsch nach Plan-Freigabe.
 
