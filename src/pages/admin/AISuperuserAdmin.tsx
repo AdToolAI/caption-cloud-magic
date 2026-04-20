@@ -30,8 +30,15 @@ const ACTIVE_SCENARIOS = new Set<string>([
 // Latency color thresholds (ms) — KI-Calls können legitim 5-10s dauern
 const latencyClass = (ms: number | null | undefined): string => {
   if (!ms) return 'text-muted-foreground';
-  if (ms < 3000) return 'text-muted-foreground';
-  if (ms < 8000) return 'text-yellow-600 dark:text-yellow-400';
+  if (ms < 5000) return 'text-muted-foreground';
+  if (ms < 10000) return 'text-yellow-600 dark:text-yellow-400';
+  return 'text-destructive';
+};
+
+// Aggregierte Latenz (Summe aller Szenarien) — andere Maßstäbe als Einzel-Calls
+const totalLatencyClass = (totalMs: number): string => {
+  if (totalMs < 30000) return 'text-green-500';
+  if (totalMs < 60000) return 'text-yellow-600 dark:text-yellow-400';
   return 'text-destructive';
 };
 
@@ -286,9 +293,19 @@ export function AISuperuserAdmin() {
             <CardTitle className="text-sm text-muted-foreground" title="Summe der Latenzen aller Szenarien im letzten Komplett-Test">Letzter Run (gesamt)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-3xl font-bold ${latencyClass(scenarios.reduce((sum, s) => sum + (s.lastRun?.latency_ms || 0), 0) / Math.max(scenarios.length, 1) * scenarios.length / 3)}`}>
-              {(scenarios.reduce((sum, s) => sum + (s.lastRun?.latency_ms || 0), 0) / 1000).toFixed(1)}s
-            </div>
+            {(() => {
+              const totalMs = scenarios.reduce((sum, s) => sum + (s.lastRun?.latency_ms || 0), 0);
+              return (
+                <>
+                  <div className={`text-3xl font-bold ${totalLatencyClass(totalMs)}`}>
+                    {(totalMs / 1000).toFixed(1)}s
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Summe aller {scenarios.length} Szenarien — &lt; 30s ist normal
+                  </div>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
         <Card>
@@ -389,7 +406,14 @@ export function AISuperuserAdmin() {
                     {s.lastRun ? formatDistanceToNow(new Date(s.lastRun.started_at), { addSuffix: true, locale: de }) : '-'}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={s.passRate >= 80 ? 'default' : s.passRate >= 50 ? 'secondary' : 'destructive'}>
+                    <Badge
+                      variant={s.passRate >= 80 ? 'default' : s.passRate >= 50 ? 'secondary' : 'destructive'}
+                      title={
+                        s.lastRun?.status === 'pass' && s.passRate < 100
+                          ? 'Letzter Run grün — historische Fail-Runs noch im 5-Run-Window. Klicke „Komplett zurücksetzen" für 100%.'
+                          : undefined
+                      }
+                    >
                       {Math.round(s.passRate)}%
                     </Badge>
                   </TableCell>
