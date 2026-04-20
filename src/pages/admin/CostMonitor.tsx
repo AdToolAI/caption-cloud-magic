@@ -28,12 +28,6 @@ export function CostMonitor() {
   const load = async (d: number) => {
     setLoading(true);
     try {
-      const { data: snap, error } = await supabase.functions.invoke('admin-cost-snapshot', {
-        method: 'GET',
-        // @ts-ignore - query passed via path workaround
-        body: undefined,
-      });
-      // supabase-js v2 doesn't pass query params for GET. Use direct fetch.
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-cost-snapshot?days=${d}`;
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(url, {
