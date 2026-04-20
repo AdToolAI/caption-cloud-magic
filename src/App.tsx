@@ -291,6 +291,7 @@ function AppLayout() {
                     <Route path="*" element={<Navigate to="/home" replace />} />
               </Routes>
             </Suspense>
+            </AccountPausedGate>
           </ErrorBoundary>
         </main>
       </div>
