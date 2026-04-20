@@ -33,18 +33,19 @@ async function processStage(
 ): Promise<{ sent: number; skipped: number }> {
   const days = STAGE_DAYS[stage];
   const now = Date.now();
-  // Window: users created between [days+1, days] days ago (24h window)
+  // Window anchored to email_verified_at (not created_at) so day_0 only fires AFTER verification
   const lower = new Date(now - (days + 1) * 86400000).toISOString();
   const upper = new Date(now - days * 86400000).toISOString();
   const activeCutoff = new Date(now - 24 * 3600000).toISOString();
 
   const { data: users, error } = await supabase
     .from("profiles")
-    .select("id, email, language, created_at, last_active_at, activation_emails_sent, trial_status, email_verified")
+    .select("id, email, language, created_at, email_verified_at, last_active_at, activation_emails_sent, trial_status, email_verified")
     .eq("trial_status", "active")
     .eq("email_verified", true)
-    .gte("created_at", lower)
-    .lt("created_at", upper)
+    .not("email_verified_at", "is", null)
+    .gte("email_verified_at", lower)
+    .lt("email_verified_at", upper)
     .limit(500);
 
   if (error) {
