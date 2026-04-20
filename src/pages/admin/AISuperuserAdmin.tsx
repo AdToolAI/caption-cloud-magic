@@ -357,7 +357,7 @@ export function AISuperuserAdmin() {
                 <TableHead>Szenario</TableHead>
                 <TableHead>Letzter Run</TableHead>
                 <TableHead>Pass-Rate</TableHead>
-                <TableHead>Latenz</TableHead>
+                <TableHead title="Echte Edge-Function-Latenz inkl. KI-Modell-Antwortzeit. 5–10 s sind bei Bild-/Multi-Step-Generierung normal.">Latenz</TableHead>
                 <TableHead>Runs</TableHead>
                 <TableHead></TableHead>
               </TableRow>
