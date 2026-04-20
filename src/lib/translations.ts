@@ -1770,7 +1770,7 @@ export const translations: Record<Language, any> = {
       universalCreator: "All-in-one content creation workspace",
       universalVideo: "Create videos with templates and AI",
       directorsCut: "Advanced video editing with pro features",
-      soraLongForm: "Generate long-form video content with Sora 2",
+      soraLongForm: "Generate long-form cinematic video content",
       aiVideoStudio: "AI-powered video generation and editing",
       backgroundReplacer: "Replace backgrounds in product photos with AI",
       teamWorkspace: "Collaborative workspace for team content creation",
@@ -6106,7 +6106,7 @@ export const translations: Record<Language, any> = {
       universalCreator: "All-in-One Content-Erstellungs-Workspace",
       universalVideo: "Erstelle Videos mit Templates und KI",
       directorsCut: "Fortgeschrittene Videobearbeitung mit Pro-Features",
-      soraLongForm: "Generiere Long-Form Videocontent mit Sora 2",
+      soraLongForm: "Generiere Long-Form Cinematic Videocontent",
       aiVideoStudio: "KI-gestützte Videogenerierung und -bearbeitung",
       backgroundReplacer: "Ersetze Hintergründe in Produktfotos mit KI",
       teamWorkspace: "Kollaborativer Workspace für Team-Content",
@@ -10394,7 +10394,7 @@ export const translations: Record<Language, any> = {
       universalCreator: "Espacio de trabajo todo-en-uno para creación de contenido",
       universalVideo: "Crea videos con plantillas e IA",
       directorsCut: "Edición de video avanzada con funciones pro",
-      soraLongForm: "Genera contenido de video largo con Sora 2",
+      soraLongForm: "Genera contenido de video largo y cinematográfico",
       aiVideoStudio: "Generación y edición de video con IA",
       backgroundReplacer: "Reemplaza fondos en fotos de productos con IA",
       teamWorkspace: "Espacio colaborativo para creación de contenido en equipo",
@@ -14150,7 +14150,7 @@ translations.en.uvc = {
   continueBtn: 'Continue',
   // Reset dialog
   videoStillGenerating: 'Video is still generating',
-  videoStillGeneratingDesc: 'Generation continues in the background. You\'ll find the finished video under Sora AI Videos.',
+  videoStillGeneratingDesc: 'Generation continues in the background. You\'ll find the finished video under AI Videos.',
   cancel: 'Cancel',
   startNewVideoAnyway: 'Start new video anyway',
   // Error bar
@@ -14165,7 +14165,7 @@ translations.en.uvc = {
   toastVideoCreated: '🎬 Video created successfully!',
   toastConsultationRequired: 'Consultation is required in Full-Service mode',
   toastSwitchedToManual: 'Switched to manual mode',
-  toastBackgroundGeneration: '🎬 Your video is being generated in the background. You\'ll find it under Sora AI Videos when it\'s ready.',
+  toastBackgroundGeneration: '🎬 Your video is being generated in the background. You\'ll find it under AI Videos when it\'s ready.',
   toastExportSuccess: '🎬 {count} video(s) successfully exported!',
   toastDiagProfile: '🔍 Diagnostic profile {profile} being tested... ({count}/{max})',
   toastMaxRetries: 'All diagnostic profiles (A–O) tested – the error persists. Please contact support.',
@@ -14391,7 +14391,7 @@ translations.en.uvc = {
   previewExport: 'Export',
   previewScenes: '{count} scenes • {duration} total duration',
   // Minimize
-  minimizeMsg: '🎬 Your video is being generated in the background. You\'ll find it under Sora AI Videos when it\'s ready.',
+  minimizeMsg: '🎬 Your video is being generated in the background. You\'ll find it under AI Videos when it\'s ready.',
 };
 
 translations.de.uvc = {
@@ -14546,7 +14546,7 @@ translations.de.uvc = {
   continueBtn: 'Fortfahren',
   // Reset dialog
   videoStillGenerating: 'Video wird noch generiert',
-  videoStillGeneratingDesc: 'Die Generierung läuft im Hintergrund weiter. Du findest das fertige Video später unter Sora AI Videos.',
+  videoStillGeneratingDesc: 'Die Generierung läuft im Hintergrund weiter. Du findest das fertige Video später unter KI-Videos.',
   cancel: 'Abbrechen',
   startNewVideoAnyway: 'Trotzdem neues Video starten',
   // Error bar
@@ -14561,7 +14561,7 @@ translations.de.uvc = {
   toastVideoCreated: '🎬 Video erfolgreich erstellt!',
   toastConsultationRequired: 'Im Full-Service-Modus ist die Beratung erforderlich',
   toastSwitchedToManual: 'Zum manuellen Modus gewechselt',
-  toastBackgroundGeneration: '🎬 Dein Video wird im Hintergrund fertig generiert. Du findest es unter Sora AI Videos, sobald es bereit ist.',
+  toastBackgroundGeneration: '🎬 Dein Video wird im Hintergrund fertig generiert. Du findest es unter KI-Videos, sobald es bereit ist.',
   toastExportSuccess: '🎬 {count} Video(s) erfolgreich exportiert!',
   toastDiagProfile: '🔍 Diagnose-Profil {profile} wird getestet... ({count}/{max})',
   toastMaxRetries: 'Alle Diagnoseprofile (A–O) getestet – der Fehler tritt weiterhin auf. Bitte kontaktiere den Support.',
@@ -14787,7 +14787,7 @@ translations.de.uvc = {
   previewExport: 'Exportieren',
   previewScenes: '{count} Szenen • {duration} Gesamtdauer',
   // Minimize
-  minimizeMsg: '🎬 Dein Video wird im Hintergrund fertig generiert. Du findest es unter Sora AI Videos, sobald es bereit ist.',
+  minimizeMsg: '🎬 Dein Video wird im Hintergrund fertig generiert. Du findest es unter KI-Videos, sobald es bereit ist.',
 };
 
 translations.es.uvc = {
@@ -14942,7 +14942,7 @@ translations.es.uvc = {
   continueBtn: 'Continuar',
   // Reset dialog
   videoStillGenerating: 'El video aún se está generando',
-  videoStillGeneratingDesc: 'La generación continúa en segundo plano. Encontrarás el video terminado en Sora AI Videos.',
+  videoStillGeneratingDesc: 'La generación continúa en segundo plano. Encontrarás el video terminado en Videos de IA.',
   cancel: 'Cancelar',
   startNewVideoAnyway: 'Iniciar nuevo video de todos modos',
   // Error bar
@@ -14957,7 +14957,7 @@ translations.es.uvc = {
   toastVideoCreated: '🎬 ¡Video creado exitosamente!',
   toastConsultationRequired: 'La consulta es obligatoria en modo Full-Service',
   toastSwitchedToManual: 'Cambiado a modo manual',
-  toastBackgroundGeneration: '🎬 Tu video se está generando en segundo plano. Lo encontrarás en Sora AI Videos cuando esté listo.',
+  toastBackgroundGeneration: '🎬 Tu video se está generando en segundo plano. Lo encontrarás en Videos de IA cuando esté listo.',
   toastExportSuccess: '🎬 ¡{count} video(s) exportado(s) exitosamente!',
   toastDiagProfile: '🔍 Probando perfil de diagnóstico {profile}... ({count}/{max})',
   toastMaxRetries: 'Todos los perfiles de diagnóstico (A–O) probados – el error persiste. Contacta al soporte.',
@@ -15183,7 +15183,7 @@ translations.es.uvc = {
   previewExport: 'Exportar',
   previewScenes: '{count} escenas • {duration} duración total',
   // Minimize
-  minimizeMsg: '🎬 Tu video se está generando en segundo plano. Lo encontrarás en Sora AI Videos cuando esté listo.',
+  minimizeMsg: '🎬 Tu video se está generando en segundo plano. Lo encontrarás en Videos de IA cuando esté listo.',
 };
 
 // ============================================================
