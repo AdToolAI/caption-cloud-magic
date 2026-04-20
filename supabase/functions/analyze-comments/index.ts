@@ -86,8 +86,10 @@ Deno.serve(async (req) => {
     // Filter comments that need analysis (no analysis or older than 24h)
     const now = new Date();
     const commentsToAnalyze = comments.filter(c => {
-      if (!c.comment_analysis || c.comment_analysis.length === 0) return true;
-      const analysis = c.comment_analysis[0];
+      const analyses = c.comment_analysis;
+      if (!analyses || !Array.isArray(analyses) || analyses.length === 0) return true;
+      const analysis = analyses[0];
+      if (!analysis?.updated_at) return true;
       const updatedAt = new Date(analysis.updated_at);
       const hoursSince = (now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60);
       return hoursSince > 24;

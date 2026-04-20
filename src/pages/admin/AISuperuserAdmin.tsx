@@ -15,19 +15,25 @@ import { de } from 'date-fns/locale';
 // supabase/functions/ai-superuser-test-runner. Anything else is treated as
 // orphaned (e.g. removed scenarios with leftover historical runs).
 const ACTIVE_SCENARIOS = new Set<string>([
-  'Caption Generation (DE)',
   'Caption Generation (EN)',
-  'Caption Generation (ES)',
   'Bio Generation (DE)',
   'Bio Generation (ES)',
   'Image Generation',
   'Campaign Generation',
-  'Performance Insights',
-  'Hashtag Suggestions',
-  'Posting Time Optimizer',
+  'Performance Analytics',
+  'Hashtag Analysis',
+  'Posting Times Recommendation',
   'Comments Analysis',
-  'Trend Radar',
+  'Trend Radar Fetch',
 ]);
+
+// Latency color thresholds (ms) — KI-Calls können legitim 5-10s dauern
+const latencyClass = (ms: number | null | undefined): string => {
+  if (!ms) return 'text-muted-foreground';
+  if (ms < 3000) return 'text-muted-foreground';
+  if (ms < 8000) return 'text-yellow-600 dark:text-yellow-400';
+  return 'text-destructive';
+};
 
 interface Run {
   id: string;
@@ -266,7 +272,17 @@ export function AISuperuserAdmin() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground" title="Summe der Latenzen aller Szenarien im letzten Komplett-Test">Letzter Run (gesamt)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-3xl font-bold ${latencyClass(scenarios.reduce((sum, s) => sum + (s.lastRun?.latency_ms || 0), 0) / Math.max(scenarios.length, 1) * scenarios.length / 3)}`}>
+              {(scenarios.reduce((sum, s) => sum + (s.lastRun?.latency_ms || 0), 0) / 1000).toFixed(1)}s
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground">Szenarien</CardTitle>
@@ -351,7 +367,7 @@ export function AISuperuserAdmin() {
                 <TableHead>Szenario</TableHead>
                 <TableHead>Letzter Run</TableHead>
                 <TableHead>Pass-Rate</TableHead>
-                <TableHead>Latenz</TableHead>
+                <TableHead title="Echte Edge-Function-Latenz inkl. KI-Modell-Antwortzeit. 5–10 s sind bei Bild-/Multi-Step-Generierung normal.">Latenz</TableHead>
                 <TableHead>Runs</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -369,7 +385,7 @@ export function AISuperuserAdmin() {
                       {Math.round(s.passRate)}%
                     </Badge>
                   </TableCell>
-                  <TableCell>{s.lastRun?.latency_ms ? `${s.lastRun.latency_ms}ms` : '-'}</TableCell>
+                  <TableCell className={latencyClass(s.lastRun?.latency_ms)}>{s.lastRun?.latency_ms ? `${s.lastRun.latency_ms}ms` : '-'}</TableCell>
                   <TableCell>{s.totalRuns}</TableCell>
                   <TableCell>
                     {s.lastRun && (
