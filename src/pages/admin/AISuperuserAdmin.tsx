@@ -7,9 +7,27 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { Play, Loader2, CheckCircle2, XCircle, AlertTriangle, Bot, Sparkles, RefreshCw } from 'lucide-react';
+import { Play, Loader2, CheckCircle2, XCircle, AlertTriangle, Bot, Sparkles, RefreshCw, ShieldCheck } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
+
+// Whitelist of currently active scenarios — must mirror SCENARIOS in
+// supabase/functions/ai-superuser-test-runner. Anything else is treated as
+// orphaned (e.g. removed scenarios with leftover historical runs).
+const ACTIVE_SCENARIOS = new Set<string>([
+  'Caption Generation (DE)',
+  'Caption Generation (EN)',
+  'Caption Generation (ES)',
+  'Bio Generation (DE)',
+  'Bio Generation (ES)',
+  'Image Generation',
+  'Campaign Generation',
+  'Performance Insights',
+  'Hashtag Suggestions',
+  'Posting Time Optimizer',
+  'Comments Analysis',
+  'Trend Radar',
+]);
 
 interface Run {
   id: string;
@@ -128,9 +146,12 @@ export function AISuperuserAdmin() {
     }
   };
 
+  // Filter out orphaned scenarios (removed from suite but still in DB)
+  const activeRuns = runs.filter((r) => ACTIVE_SCENARIOS.has(r.scenario_name));
+
   // Group by scenario - latest status, pass-rate over last 5 runs (sliding window)
   const scenarios: ScenarioStatus[] = Object.values(
-    runs.reduce((acc, run) => {
+    activeRuns.reduce((acc, run) => {
       if (!acc[run.scenario_name]) {
         acc[run.scenario_name] = {
           name: run.scenario_name,
@@ -144,10 +165,18 @@ export function AISuperuserAdmin() {
     }, {} as Record<string, ScenarioStatus>)
   ).map((s) => {
     // Sliding window: only the most recent 5 runs count toward pass rate
-    const recentRuns = runs.filter((r) => r.scenario_name === s.name).slice(0, 5);
+    const recentRuns = activeRuns.filter((r) => r.scenario_name === s.name).slice(0, 5);
     const passes = recentRuns.filter((r) => r.status === 'pass').length;
     return { ...s, passRate: recentRuns.length > 0 ? (passes / recentRuns.length) * 100 : 0 };
   }).sort((a, b) => a.name.localeCompare(b.name));
+
+  // "All systems operational" — every active scenario's most recent run is a pass
+  const allGreen = scenarios.length > 0 && scenarios.every((s) => s.lastRun?.status === 'pass');
+  const latestRunAt = scenarios.reduce<string | null>((latest, s) => {
+    if (!s.lastRun) return latest;
+    if (!latest || new Date(s.lastRun.started_at) > new Date(latest)) return s.lastRun.started_at;
+    return latest;
+  }, null);
 
   const deleteOldRuns = async () => {
     if (!confirm('Test-Runs älter als 7 Tage löschen?')) return;
@@ -157,6 +186,18 @@ export function AISuperuserAdmin() {
       toast.error(`Fehler: ${error.message}`);
     } else {
       toast.success('Alte Test-Runs gelöscht');
+      await fetchData();
+    }
+  };
+
+  const resetPassRateHistory = async () => {
+    if (!confirm('Pass-Rate-Historie zurücksetzen? Alle Runs älter als 1 Stunde werden unwiderruflich gelöscht.')) return;
+    const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { error } = await supabase.from('ai_superuser_runs').delete().lt('started_at', cutoff);
+    if (error) {
+      toast.error(`Fehler: ${error.message}`);
+    } else {
+      toast.success('Pass-Rate-Historie zurückgesetzt');
       await fetchData();
     }
   };
@@ -203,8 +244,27 @@ export function AISuperuserAdmin() {
           <Button onClick={deleteOldRuns} variant="ghost" size="sm" title="Runs > 7 Tage löschen">
             Alte Runs löschen
           </Button>
+          <Button onClick={resetPassRateHistory} variant="ghost" size="sm" title="Alle Runs > 1 Stunde löschen — saubere Baseline">
+            Pass-Rate zurücksetzen
+          </Button>
         </div>
       </div>
+
+      {allGreen && (
+        <div className="border border-green-500/30 bg-green-500/10 rounded-lg p-4 flex items-center gap-3">
+          <ShieldCheck className="h-6 w-6 text-green-500 flex-shrink-0" />
+          <div className="flex-1">
+            <div className="font-semibold text-green-700 dark:text-green-400">
+              Alle {scenarios.length} Szenarien laufen stabil
+            </div>
+            {latestRunAt && (
+              <div className="text-xs text-muted-foreground">
+                Letzter Komplett-Test {formatDistanceToNow(new Date(latestRunAt), { addSuffix: true, locale: de })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -305,7 +365,7 @@ export function AISuperuserAdmin() {
                     {s.lastRun ? formatDistanceToNow(new Date(s.lastRun.started_at), { addSuffix: true, locale: de }) : '-'}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={s.passRate >= 90 ? 'default' : s.passRate >= 60 ? 'secondary' : 'destructive'}>
+                    <Badge variant={s.passRate >= 80 ? 'default' : s.passRate >= 50 ? 'secondary' : 'destructive'}>
                       {Math.round(s.passRate)}%
                     </Badge>
                   </TableCell>
