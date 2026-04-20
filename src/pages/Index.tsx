@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { BlackTieHero } from "@/components/landing/BlackTieHero";
 import { MissionFeatures } from "@/components/landing/MissionFeatures";
 import { FeatureGrid } from "@/components/landing/FeatureGrid";
+import { AIModelsArsenal } from "@/components/landing/AIModelsArsenal";
 
 import { PricingSection } from "@/components/landing/PricingSection";
 import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
@@ -89,6 +90,9 @@ const Index = () => {
 
           {/* Mission Features - Why This Tool Wins */}
           <MissionFeatures />
+
+          {/* AI Models Arsenal - 6 licensed premium models */}
+          <AIModelsArsenal />
 
           {/* Feature Grid */}
           <FeatureGrid />
