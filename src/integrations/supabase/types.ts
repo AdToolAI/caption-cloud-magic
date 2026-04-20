@@ -576,6 +576,104 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_superuser_anomalies: {
+        Row: {
+          affected_scenarios: string[]
+          ai_analysis: string | null
+          auto_bug_report_id: string | null
+          created_at: string
+          detected_at: string
+          id: string
+          metric_data: Json | null
+          pattern_description: string
+          resolved_at: string | null
+          severity: string
+        }
+        Insert: {
+          affected_scenarios?: string[]
+          ai_analysis?: string | null
+          auto_bug_report_id?: string | null
+          created_at?: string
+          detected_at?: string
+          id?: string
+          metric_data?: Json | null
+          pattern_description: string
+          resolved_at?: string | null
+          severity: string
+        }
+        Update: {
+          affected_scenarios?: string[]
+          ai_analysis?: string | null
+          auto_bug_report_id?: string | null
+          created_at?: string
+          detected_at?: string
+          id?: string
+          metric_data?: Json | null
+          pattern_description?: string
+          resolved_at?: string | null
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_superuser_anomalies_auto_bug_report_id_fkey"
+            columns: ["auto_bug_report_id"]
+            isOneToOne: false
+            referencedRelation: "bug_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_superuser_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          credits_consumed: number | null
+          error_message: string | null
+          full_request_json: Json | null
+          full_response_json: Json | null
+          http_status: number | null
+          id: string
+          latency_ms: number | null
+          response_schema_hash: string | null
+          scenario_name: string
+          started_at: string
+          status: string
+          triggered_by: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          credits_consumed?: number | null
+          error_message?: string | null
+          full_request_json?: Json | null
+          full_response_json?: Json | null
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          response_schema_hash?: string | null
+          scenario_name: string
+          started_at?: string
+          status: string
+          triggered_by?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          credits_consumed?: number | null
+          error_message?: string | null
+          full_request_json?: Json | null
+          full_response_json?: Json | null
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          response_schema_hash?: string | null
+          scenario_name?: string
+          started_at?: string
+          status?: string
+          triggered_by?: string
+        }
+        Relationships: []
+      }
       ai_video_generations: {
         Row: {
           artlist_job_id: string | null
@@ -6720,6 +6818,7 @@ export type Database = {
           email_verified: boolean | null
           email_verified_at: string | null
           id: string
+          is_test_account: boolean
           language: string | null
           last_active_at: string | null
           level_auto_pause_until: string | null
@@ -6768,6 +6867,7 @@ export type Database = {
           email_verified?: boolean | null
           email_verified_at?: string | null
           id: string
+          is_test_account?: boolean
           language?: string | null
           last_active_at?: string | null
           level_auto_pause_until?: string | null
@@ -6816,6 +6916,7 @@ export type Database = {
           email_verified?: boolean | null
           email_verified_at?: string | null
           id?: string
+          is_test_account?: boolean
           language?: string | null
           last_active_at?: string | null
           level_auto_pause_until?: string | null
