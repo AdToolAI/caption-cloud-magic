@@ -1,46 +1,48 @@
 
 
-## Email-Verifizierung — Final Polish
+## Plan: User `dusatkojr@web.de` erneut registrieren ermöglichen
 
-### Was noch fehlt für Produktionsreife
+### Aktuelle Situation in der Datenbank
+- **User existiert** in `auth.users` (ID `45dc5d43-…b8f6`), erstellt am 19.04.2026
+- **`email_confirmed_at` ist NULL** → Verifizierung wurde nie abgeschlossen
+- **Verifizierungstoken existiert**, läuft am 20.04.2026 22:15 UTC ab
+- **Kein Login** je erfolgt (`last_sign_in_at = NULL`)
+- **Keine Edge-Function-Logs** für diesen User → die Verifizierungs-Mail kam vermutlich nie an (Resend-Domain noch nicht voll verifiziert ODER Spam-Ordner)
 
-#### 1. Toast-Texte in `useAuth.signUp()` lokalisieren
-- Aktuell hardcoded Deutsch: „Account erstellt! Bitte prüfen Sie Ihre E-Mail…"
-- Lösung: `useTranslation()`-Hook verfügbar machen oder `i18n.t()` direkt in `signUp` nutzen
-- Neue i18n-Keys: `auth.signupSuccessTitle`, `auth.signupSuccessDesc`, `auth.signupErrorGeneric`
+### Empfohlene Vorgehensweise: 2 Optionen
 
-#### 2. Dedizierte „Check your email"-Hinweis-Seite
-- Neue Route: `/auth/check-email` mit Mail-Adresse als Query-Param (`?email=user@example.com`)
-- Inhalt:
-  - Großes Mail-Icon + „Wir haben dir eine E-Mail gesendet"
-  - „Prüfe **user@example.com** (auch Spam-Ordner)"
-  - Resend-Button (mit 60s Countdown, ruft `send-verification-email` auf)
-  - „Andere E-Mail nutzen" → zurück zu `/auth`
-- In `Auth.tsx`: nach erfolgreichem Signup → `navigate('/auth/check-email?email=...')`
-- Vollständig DE/EN/ES lokalisiert
+#### Option A (empfohlen): Account komplett löschen → User kann frisch registrieren
+Sauberster Weg, da der User dann auch den Welcome-Bonus regulär bekommt und der gesamte Flow neu durchlaufen wird.
 
-#### 3. Resend-Domain-Verifizierung dokumentieren (kein Code, nur Hinweis)
-- Falls Mails nicht ankommen: Domain `useadtool.ai` muss in Resend-Dashboard mit DNS-Records (SPF, DKIM, DMARC) verifiziert sein
-- Ohne Domain-Verifizierung sendet Resend nur an die eigene Account-E-Mail (Free-Plan-Limit)
-- Reine Info — kein Code-Change nötig
+**Aktionen:**
+1. `DELETE FROM public.email_verification_tokens WHERE user_id = '45dc5d43-…'`
+2. `DELETE FROM public.profiles WHERE id = '45dc5d43-…'` (falls Cascade nicht greift)
+3. `DELETE FROM public.wallets WHERE user_id = '45dc5d43-…'` (Trial-Wallet wurde via Trigger angelegt)
+4. Auth-User löschen via Edge Function mit Service-Role (`supabase.auth.admin.deleteUser('45dc5d43-…')`) — entweder über eine bestehende Admin-Function oder eine kurze Einmal-Aktion
 
-### Geänderte/neue Dateien
-- `src/hooks/useAuth.tsx` → Toasts via `i18n.t()` statt hardcoded
-- `src/pages/CheckEmail.tsx` (neu) → Hinweis-Seite mit Resend-Button
-- `src/pages/Auth.tsx` → nach Signup zu `/auth/check-email` navigieren
-- `src/App.tsx` → neue Route `/auth/check-email` registrieren
-- `src/lib/translations.ts` → neue Keys: `auth.signupSuccess*`, `checkEmail.*`
+→ Danach kann sich der User unter `dusatkojr@web.de` komplett neu registrieren.
 
-### Was unverändert bleibt
-- Edge Functions `send-verification-email` und `verify-email`
-- Tabelle `email_verification_tokens`
-- Resend-Integration und Cooldown-Logik
-- `EmailVerificationGate` und `/verify-email`-Seite
+#### Option B: Account behalten, nur neuen Verifizierungslink senden
+Schneller, aber: User muss auf der bestehenden Auth-Seite einloggen, landet im `EmailVerificationGate` und kann dort „Mail erneut senden" klicken.
 
-### Test-Plan nach Implementierung
-1. Mit einer **fremden E-Mail-Adresse** registrieren (nicht die in Resend hinterlegte)
-2. Prüfen: kommt die Mail an? (Posteingang + Spam)
-3. Falls nein → Resend-Domain-Setup in Resend-Dashboard prüfen
-4. Verifizierungs-Link klicken → Erfolg-Seite + Welcome-Bonus gutgeschrieben
-5. Sprache wechseln (DE/EN/ES) und Signup wiederholen — Mail-Sprache prüfen
+**Aktionen:**
+1. Token-Zeile auf `created_at = now() - 2 minutes` setzen, damit der 60s-Backend-Cooldown nicht greift
+2. User wird gebeten, auf `/auth` einzuloggen → automatisch zu `/auth/check-email` weitergeleitet → „Resend"-Button drücken
+
+### Zusätzlich dringend zu prüfen (gemeinsame Ursache)
+
+**Verdacht:** Mails von Resend kommen nicht an, weil:
+1. Die Domain `useadtool.ai` ist möglicherweise im Resend-Dashboard **noch nicht voll verifiziert** (SPF, DKIM, DMARC)
+2. Oder die Mail liegt im **Spam-Ordner** des Users (`@web.de` ist als Provider strikt)
+
+→ Vor jedem weiteren Test: kurz im Resend-Dashboard checken, ob `useadtool.ai` als „Verified" markiert ist und alle 3 DNS-Records grün sind.
+
+### Empfehlung
+**Option A** umsetzen — sauberer Reset, User kann komplett neu starten und der gesamte Flow (Signup → Mail → Verify → Welcome-Bonus → `/auth/check-email`) wird end-to-end frisch durchlaufen, was gleichzeitig auch ein guter Test ist.
+
+### Was Lovable nach Plan-Approval tun wird
+1. Eine kurze SQL-Migration ausführen, die alle Datenbank-Spuren des Users entfernt (Tokens, Profile, Wallet)
+2. Eine kleine Einmal-Edge-Function (oder direkten Admin-API-Call) starten, der `auth.users`-Eintrag löscht
+3. Bestätigung in den Chat: „User gelöscht — bitte jetzt unter `dusatkojr@web.de` neu registrieren"
+4. Resend-Domain-Status kurz erinnern, falls die neue Mail wieder nicht ankommt
 
