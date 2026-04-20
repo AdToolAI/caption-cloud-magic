@@ -1,41 +1,60 @@
 
 
-## Kontext
-Smart In-App Upgrade-Prompts sind implementiert (Watcher, Modal, Coupon, Tracking). Stripe `TRIAL20` Coupon existiert (ID `xJBfKkra`), aber der **Promotion-Code** `TRIAL20` (für Auto-Apply via URL `?coupon=TRIAL20`) ist noch nicht angelegt — ohne diesen funktioniert die 1-Klick-Conversion nicht.
+## Email-Verifizierung fertigstellen — Plan
 
-Außerdem fehlen einige naheliegende nächste Schritte für ein vollständiges Conversion-System.
+### Was bereits existiert ✅
+- Edge Function `send-verification-email` (Resend API, deutsche HTML-Vorlage)
+- Edge Function `verify-email` (Token-Verifikation + `auth.admin.updateUserById`)
+- Tabelle `email_verification_tokens` (mit `id, user_id, token, email, expires_at, verified_at, created_at`)
+- Seite `/verify-email` (zeigt Loading/Success/Error-Status)
+- `EmailVerificationGate` (blockt geschützte Routen für unverifizierte Nutzer)
+- Aufruf bei Signup in `useAuth.signUp()`
 
-## Empfohlene nächste Schritte (Reihenfolge nach Impact)
+### Was fehlt / Probleme ⚠️
 
-### 1. Stripe Promotion-Code `TRIAL20` aktivieren (BLOCKER, ~2 Min)
-Ohne Promotion-Code erkennt Stripe Checkout den URL-Parameter `?coupon=TRIAL20` nicht und der Rabatt wird nicht angewendet — die gesamten neuen Prompts laufen ins Leere bzgl. Conversion.
+1. **Doppelt-Mail-Konflikt:** `supabase.auth.signUp()` triggert Supabases native Confirm-Email PARALLEL zu unserer Resend-Mail → User bekommen 2 verschiedene Mails mit 2 verschiedenen Links.
+2. **Sprache hardcodiert auf Deutsch:** App ist EN/DE/ES, aber alle E-Mail-Texte und VerifyEmail-Seitentexte sind nur Deutsch.
+3. **Welcome-Bonus-Trigger:** `grant-welcome-bonus` (Edge Function) sollte erst nach Verifizierung greifen — aktuell unklar verkettet.
+4. **Resend-Cooldown im Backend fehlt:** Frontend hat 60s Countdown, aber Backend prüft nicht → Spam möglich.
 
-- Promotion-Code `TRIAL20` an Coupon `xJBfKkra` koppeln
-- `active: true`, ohne Ablaufdatum (oder optional `expires_at` 30 Tage)
-- `max_redemptions` optional begrenzen (z. B. 500)
+### Umsetzung
 
-### 2. End-to-End-Verifikation der Trigger (~10 Min)
-- Trial-User künstlich auf Day 7/10/13 setzen (DB: `trial_ends_at` zurückdatieren) → Modal triggert
-- Power-Feature 3× öffnen (Director's Cut) → Discovery-Modal triggert
-- Klick auf CTA → `/pricing?plan=pro&coupon=TRIAL20` → Coupon im Checkout sichtbar
-- Dismiss → Cooldown greift (kein Re-Show innerhalb 48h / 72h)
+#### 1. Native Supabase-Confirm-Email deaktivieren
+Im Supabase-Auth-Setting `mailer_autoconfirm = false` BEIBEHALTEN, aber das **native Confirmation-Email-Template entweder deaktivieren oder leeren**, damit nur unsere Resend-Mail rausgeht. Lösung: Im `supabase/config.toml` `[auth.email] enable_confirmations = false` setzen — der Account wird mit `email_confirmed_at = NULL` angelegt, und unsere `verify-email`-Function setzt das Flag manuell via Admin API.
 
-### 3. Conversion-Tracking-Dashboard (Optional, ~30 Min)
-Mini-Admin-Widget auf bestehender Admin-Page mit Metriken aus PostHog-Events:
-- `upgrade_prompt_shown` pro Source (letzte 30 Tage)
-- Conversion-Rate je Source (shown → clicked → completed)
-- Top-performende Variant (halfway / ending_soon / last_day / grace)
+#### 2. Mehrsprachigkeit (DE/EN/ES)
+- **`send-verification-email`:** `language` aus `profiles.language` lesen (oder aus Request-Body) und 3 HTML-Templates rendern (Subject + Body in DE/EN/ES). Same Pattern wie `process-activation-emails/templates.ts`.
+- **`/verify-email` Page:** alle Strings auf `useTranslation()` umstellen mit i18n-Keys (`verify_email.loading`, `verify_email.success`, etc.).
+- **`EmailVerificationGate`:** ebenfalls auf `t()` umstellen.
 
-### 4. Email-Backup für Trial-Day-7/13 (Optional, ~20 Min)
-Edge-Function-Cron, der einmalig per Email nudged falls In-App-Prompt nicht gesehen wurde (Fallback-Channel für inaktive User). Nutzt Resend (bereits konfiguriert).
+#### 3. Backend-Cooldown gegen Spam
+In `send-verification-email`: vor dem Senden prüfen, ob letzter Token jünger als 60s ist (`created_at > now() - 60s`) → 429 zurückgeben.
 
-### 5. A/B-Test-Slot für Coupon-Höhe (Optional, später)
-Vorbereitung für späteren Test `TRIAL20` vs. `TRIAL30` vs. kein Coupon — würde aber neue Coupons + Variant-Logik im Modal erfordern. Erst sinnvoll nach 100+ Conversions.
+#### 4. Welcome-Bonus-Verkettung
+In `verify-email`-Function nach erfolgreicher Verifikation `grant-welcome-bonus` aufrufen (idempotent). Aktuell unklar, ob der Bonus auch ohne Verifizierung gewährt wird.
 
-## Empfehlung
-**Schritt 1 sofort + Schritt 2 direkt im Anschluss.** Schritte 3-5 als separate Folge-Tasks, da sie eigenständige Features sind.
+#### 5. Auth.tsx Hinweis verbessern
+Nach Signup zur Hinweis-Seite navigieren, die klar sagt: „Wir haben dir eine Verifizierungs-E-Mail an [email] gesendet. Bitte bestätige sie, um loszulegen." Aktuell kommt nur ein Toast.
 
-Wenn du zustimmst, lege ich im nächsten Schritt:
-1. Den Promotion-Code `TRIAL20` in Stripe an
-2. Setze einen Test-Trial-User auf Day 13 (per SQL) und verifiziere das Modal in der Preview
+### Technische Details
+
+**Geänderte/neue Dateien:**
+- `supabase/config.toml` → `[auth.email] enable_confirmations = false`
+- `supabase/functions/send-verification-email/index.ts` → Sprache-Lookup + 3 Templates + 60s-Cooldown + `cleanupOldTokens`
+- `supabase/functions/send-verification-email/templates.ts` (neu) → DE/EN/ES HTML-Renderer (analog `process-activation-emails`)
+- `supabase/functions/verify-email/index.ts` → nach erfolgreicher Verifizierung `grant-welcome-bonus` aufrufen
+- `src/pages/VerifyEmail.tsx` → `useTranslation()` für alle Strings
+- `src/components/auth/EmailVerificationGate.tsx` → `useTranslation()` für alle Strings
+- `src/i18n/locales/{en,de,es}.json` → neue Keys: `verify_email.*`, `email_gate.*`
+- `src/hooks/useAuth.tsx` → `signUp()` übergibt `language` aus `i18n.language` an `send-verification-email`-Body
+
+**Datenbank:** keine Schema-Änderungen nötig (Tabelle existiert bereits korrekt).
+
+**Sicherheit:** Token-Cooldown via Server-Check, RLS auf `email_verification_tokens` (Service-Role-only), Token läuft nach 24h ab.
+
+### Was unverändert bleibt
+- Tabelle `email_verification_tokens`
+- Resend-Integration (RESEND_API_KEY ist gesetzt)
+- Routing für `/verify-email`
+- Auth-Flow (Login, Signup-Form, MFA)
 
