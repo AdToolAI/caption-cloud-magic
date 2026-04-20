@@ -255,11 +255,11 @@ export function AISuperuserAdmin() {
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
             Komplett-Test
           </Button>
-          <Button onClick={deleteOldRuns} variant="ghost" size="sm" title="Runs > 7 Tage löschen">
-            Alte Runs löschen
+          <Button onClick={trimHistory} variant="ghost" size="sm" title="Behält die letzten 5 Runs pro Szenario">
+            Historie kürzen (letzte 5 behalten)
           </Button>
-          <Button onClick={resetPassRateHistory} variant="ghost" size="sm" title="Alle Runs > 1 Stunde löschen — saubere Baseline">
-            Pass-Rate zurücksetzen
+          <Button onClick={resetPassRateHistory} variant="ghost" size="sm" title="Behält nur den letzten Run pro Szenario — Pass-Rate startet sofort bei 100% wenn grün">
+            Komplett zurücksetzen (nur letzten Run behalten)
           </Button>
         </div>
       </div>
