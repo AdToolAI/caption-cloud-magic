@@ -94,6 +94,23 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`[verify-email] Email verified successfully for user: ${tokenData.user_id}`);
 
+    // Trigger welcome bonus (idempotent — function checks already_granted internally)
+    try {
+      const bonusRes = await fetch(`${supabaseUrl}/functions/v1/grant-welcome-bonus`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseServiceKey}`,
+          "apikey": supabaseServiceKey,
+        },
+        body: JSON.stringify({ user_id: tokenData.user_id }),
+      });
+      const bonusJson = await bonusRes.json().catch(() => ({}));
+      console.log(`[verify-email] Welcome bonus result:`, bonusJson);
+    } catch (bonusErr) {
+      console.error("[verify-email] Welcome bonus call failed (non-fatal):", bonusErr);
+    }
+
     return new Response(
       JSON.stringify({ success: true, message: "Email verified successfully" }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
