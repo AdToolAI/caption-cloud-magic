@@ -11034,6 +11034,33 @@ export type Database = {
           },
         ]
       }
+      winback_email_log: {
+        Row: {
+          email_message_id: string | null
+          id: string
+          metadata: Json | null
+          sent_at: string
+          stage: string
+          user_id: string
+        }
+        Insert: {
+          email_message_id?: string | null
+          id?: string
+          metadata?: Json | null
+          sent_at?: string
+          stage: string
+          user_id: string
+        }
+        Update: {
+          email_message_id?: string | null
+          id?: string
+          metadata?: Json | null
+          sent_at?: string
+          stage?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       workspace_invitations: {
         Row: {
           created_at: string
