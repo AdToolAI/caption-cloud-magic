@@ -375,7 +375,7 @@ export function AISuperuserAdmin() {
                       {Math.round(s.passRate)}%
                     </Badge>
                   </TableCell>
-                  <TableCell>{s.lastRun?.latency_ms ? `${s.lastRun.latency_ms}ms` : '-'}</TableCell>
+                  <TableCell className={latencyClass(s.lastRun?.latency_ms)}>{s.lastRun?.latency_ms ? `${s.lastRun.latency_ms}ms` : '-'}</TableCell>
                   <TableCell>{s.totalRuns}</TableCell>
                   <TableCell>
                     {s.lastRun && (
