@@ -6,6 +6,7 @@
  */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { ADMIN_ALERT_EMAIL } from '../_shared/admin-config.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -120,7 +121,7 @@ serve(async (req) => {
       try {
         await supabase.functions.invoke('send-transactional-email', {
           body: {
-            to: Deno.env.get('ADMIN_ALERT_EMAIL') ?? 'meta-reviewer@useadtool.ai',
+            to: ADMIN_ALERT_EMAIL,
             subject: `⚠️ Provider Quota Alert: ${alert.name} bei ${alert.percent}%`,
             html: `<h2>Provider Quota Warnung</h2>
               <p><strong>${alert.name}</strong> ist bei <strong>${alert.percent}%</strong> Auslastung.</p>

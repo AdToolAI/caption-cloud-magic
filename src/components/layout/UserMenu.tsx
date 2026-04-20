@@ -58,7 +58,7 @@ export function UserMenu() {
             )}
           </Link>
         </DropdownMenuItem>
-        {user.email === 'bestofproducts4@gmail.com' && (
+        {user.email === 'bestofproducts4u@gmail.com' && (
           <DropdownMenuItem asChild>
             <Link to="/instagram-publishing" className="flex items-center gap-2 cursor-pointer">
               <Share2 className="h-4 w-4" />
