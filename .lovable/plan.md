@@ -1,59 +1,67 @@
 
 
-User-Anpassung: **20% Rabatt-Coupon (statt 50%) für 3 Monate** in der Day-30 Win-Back-Email.
+## Klarstellung: Email-Versand-Pfad
 
-## C2 Win-Back-Kampagne — Final-Spec
+Du hast recht — wir nutzen bereits **Resend** (siehe `send-password-reset-email/index.ts` mit `import { Resend } from "resend"`). Es macht keinen Sinn, parallel Lovable Emails einzurichten. Der Plan wird angepasst:
 
-### Belohnungs-Struktur
-- **Tag 14 inaktiv:** $5 AI-Video-Credits (in `ai_video_wallets`)
-- **Tag 30 inaktiv:** Stripe-Coupon **20% off, 3 Monate** (Code: `WINBACK20`)
+## C2 Win-Back via Resend (statt Lovable Emails)
 
-### Implementierung
+### Was bleibt gleich
+- $5 AI-Video-Credits an Tag 14 (in `ai_video_wallets`)
+- 20% Stripe-Coupon `WINBACK20` (3 Monate) an Tag 30
+- Pg_cron daily 11:00 UTC
+- Idempotenz via `winback_email_log`
+- Push-Notifications parallel
+- Auto-Stop bei Reaktivierung in den letzten 7 Tagen
 
-**1. Stripe-Coupon erstellen**
-- Name: "Win-Back 20% Off"
-- 20% percent_off, duration `repeating`, 3 Monate
-- Promotion-Code: `WINBACK20`
+### Was sich ändert (vs. vorheriger Plan)
+- **Kein** `email_domain--setup_email_infra`, **kein** `scaffold_transactional_email`, **keine** pgmq-Queues
+- Email-Versand direkt via **Resend SDK** im Stil von `send-password-reset-email`
+- HTML-Templates inline in der Edge Function (gleiches AdTool-Branding: `#0a0a0f` BG, `#F5C76A` Gold, Inter)
+- Domain `support@useadtool.ai` (bereits verifiziert, da bestehend genutzt)
+
+### Implementierungs-Schritte
+
+**1. Stripe-Coupon `WINBACK20`** (20% off, 3 Monate, repeating) via `stripe--create_coupon`
 
 **2. DB-Migration**
-- Tabelle `winback_email_log` (user_id, stage `day_14|day_30`, sent_at, unique constraint auf `(user_id, stage)`)
-- RLS: Service-Role schreibt, User liest nur eigene Logs
+- `winback_email_log` (user_id, stage `day_14|day_30`, sent_at, UNIQUE(user_id, stage))
+- RLS: nur Service-Role schreibt
 
-**3. Edge Function `process-winback-emails`**
-- Cron: täglich 11:00 UTC via pg_cron
-- **Day-14-Branch:** User mit `last_sign_in_at` zwischen 13–15 Tagen
-  - Grant: $5 in `ai_video_wallets` via `ai_video_transactions` (type=`bonus`, description="Win-back reward Day 14")
-  - Email "Wir vermissen dich" + Push parallel
-  - Log in `winback_email_log` (ON CONFLICT prevents Doppelversand)
-- **Day-30-Branch:** User zwischen 29–31 Tagen
-  - Email "Letzte Chance" mit Code `WINBACK20` (20% off, 3 Monate)
-  - CTA → `/pricing?coupon=WINBACK20`
-  - Push parallel + Log
-- **Auto-Stop:** User in den letzten 7 Tagen aktiv → kein Mailing
-- **Suppression-Check:** Automatisch via `send-transactional-email`
+**3. Edge Function `process-winback-emails`** (Resend-basiert)
+- Auth: Service-Role + optional Cron-Secret Header
+- Day-14-Branch:
+  - Query: User mit `last_sign_in_at` zwischen 13–15 Tagen, noch kein Day-14-Log
+  - Grant $5 in `ai_video_wallets` + Insert in `ai_video_transactions` (type=`bonus`, description="Win-back reward Day 14")
+  - Sende Email via Resend (`from: "AdTool <support@useadtool.ai>"`)
+  - Web-Push parallel (falls Subscription)
+  - Insert in `winback_email_log` (ON CONFLICT DO NOTHING)
+- Day-30-Branch: gleiche Logik, mit Coupon-Code `WINBACK20`
+- Auto-Stop bei `last_sign_in_at` < 7 Tage
+- Sprache aus `profiles.language` für Template-Auswahl
 
-**4. Email-Templates (DE/EN/ES)**
-- `winback-day-14`: "Wir vermissen dich" + "$5 für deinen nächsten KI-Clip" + CTA → `/ai-video-studio`
-- `winback-day-30`: "Letzte Chance" + "20% Rabatt für 3 Monate" + Code `WINBACK20` + CTA → `/pricing`
-- Sprache aus `profiles.language`
-- React-Email-Templates in `_shared/transactional-email-templates/`
+**4. HTML-Templates** (3 Sprachen × 2 Stages = 6 Varianten, alle inline)
+- Day-14 DE/EN/ES: "Wir vermissen dich" / "We miss you" / "Te extrañamos" + "$5 für deinen nächsten KI-Clip" + CTA → `/ai-video-studio`
+- Day-30 DE/EN/ES: "Letzte Chance" / "Last chance" / "Última oportunidad" + Coupon `WINBACK20` + CTA → `/pricing?coupon=WINBACK20`
+- Branding wie `send-password-reset-email`: dunkler BG, Gold-Logo, Footer mit Links
 
-**5. Tracking**
-- PostHog: `winback_email_sent` (mit stage), `winback_reactivated`
+**5. Pg_cron-Schedule** täglich 11:00 UTC ruft Edge Function via `pg_net` + Vault-Secret auf
 
-### Voraussetzungen-Check (vor Start)
-1. Email-Domain-Status prüfen → ggf. Setup-Dialog
-2. Email-Infrastruktur (`setup_email_infra`) ggf. provisionieren
-3. Transactional-Email scaffold falls nicht vorhanden
+**6. Tracking** (PostHog)
+- `winback_email_sent` (mit stage)
+- `winback_reactivated` (User loggt sich nach Email ein)
+
+### Voraussetzung-Check
+- ✅ `RESEND_API_KEY` ist bereits konfiguriert
+- ✅ Domain `useadtool.ai` ist bereits in Resend verifiziert (genutzt von `send-password-reset-email`)
+- → **Keine Email-Infra-Setup-Schritte nötig**
+
+### Aufwand: ~1h (statt 1.5h, da kein Email-Infra-Setup)
 
 ### Reihenfolge nach Approval
-1. Email-Domain & Infra prüfen/aufsetzen
-2. DB-Migration (`winback_email_log`)
-3. Stripe-Coupon `WINBACK20` erstellen
-4. 2 Email-Templates × 3 Sprachen (DE/EN/ES)
-5. Edge Function `process-winback-emails`
-6. Pg_cron-Schedule (11:00 UTC daily)
-7. End-to-End-Test mit Test-User
-
-### Aufwand: ~1.5h
+1. DB-Migration `winback_email_log`
+2. Stripe-Coupon `WINBACK20`
+3. Edge Function `process-winback-emails` (mit allen 6 Templates inline)
+4. Pg_cron-Schedule
+5. Manueller Test mit Test-User
 
