@@ -1770,7 +1770,7 @@ export const translations: Record<Language, any> = {
       universalCreator: "All-in-one content creation workspace",
       universalVideo: "Create videos with templates and AI",
       directorsCut: "Advanced video editing with pro features",
-      soraLongForm: "Generate long-form video content with Sora 2",
+      soraLongForm: "Generate long-form cinematic video content",
       aiVideoStudio: "AI-powered video generation and editing",
       backgroundReplacer: "Replace backgrounds in product photos with AI",
       teamWorkspace: "Collaborative workspace for team content creation",
