@@ -42,8 +42,8 @@ const latencyClass = (ms: number | null | undefined): string => {
 
 // Aggregierte Latenz (Summe aller Szenarien) — andere Maßstäbe als Einzel-Calls
 const totalLatencyClass = (totalMs: number): string => {
-  if (totalMs < 30000) return 'text-green-500';
-  if (totalMs < 60000) return 'text-yellow-600 dark:text-yellow-400';
+  if (totalMs < 45000) return 'text-green-500';
+  if (totalMs < 75000) return 'text-yellow-600 dark:text-yellow-400';
   return 'text-destructive';
 };
 
