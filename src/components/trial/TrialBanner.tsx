@@ -1,17 +1,44 @@
-import { Sparkles, Clock } from "lucide-react";
+import { Sparkles, Clock, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTrialStatus } from "@/hooks/useTrialStatus";
 import { useTranslation } from "@/hooks/useTranslation";
 
 /**
- * Slim gold banner showing remaining days of the 14-day Enterprise trial.
- * Hidden when trial is converted/expired or user has no trial.
+ * Banner showing trial state. Three visual modes:
+ *  - Normal (>3 days left): gold, Sparkles
+ *  - Urgent (<=3 days left): destructive, Clock
+ *  - Grace (trial expired, in grace period): pulsing destructive, AlertTriangle
  */
 export function TrialBanner() {
-  const { status, daysRemaining, loading } = useTrialStatus();
+  const { status, daysRemaining, inGracePeriod, graceDaysRemaining, loading } = useTrialStatus();
   const { t } = useTranslation();
 
-  if (loading || status !== "active" || daysRemaining <= 0) return null;
+  if (loading) return null;
+
+  // Grace period takes precedence
+  if (inGracePeriod || status === "grace") {
+    return (
+      <div className="relative w-full border-b bg-gradient-to-r from-destructive/25 via-destructive/20 to-destructive/25 border-destructive/50 animate-pulse">
+        <div className="container flex items-center justify-between gap-3 py-2 text-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
+            <span className="truncate">
+              <strong className="text-destructive">⚠ {t("trial.graceTitle")}</strong>{" "}
+              {t("trial.graceBanner", { days: graceDaysRemaining })}
+            </span>
+          </div>
+          <Link
+            to="/pricing"
+            className="flex-shrink-0 inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-destructive text-destructive-foreground text-xs font-semibold hover:bg-destructive/90 transition-colors"
+          >
+            {t("trial.graceCta")}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (status !== "active" || daysRemaining <= 0) return null;
 
   const isUrgent = daysRemaining <= 3;
 
