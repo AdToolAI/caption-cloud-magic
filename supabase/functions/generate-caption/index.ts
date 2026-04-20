@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { ErrorResponses, createErrorResponse } from '../_shared/errorHandler.ts';
 import { withTelemetry } from '../_shared/telemetry.ts';
+import { lookupAiCache, storeAiCache } from '../_shared/ai-semantic-cache.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -114,6 +115,31 @@ Format your response exactly like this:
 CAPTION: [your caption here in ${languageNames[language] || 'English'}]
 HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5`;
 
+    // Phase 2: Check AI semantic cache before calling provider
+    const cacheKey = `${platform}|${tone}|${topic}|${maxLength}|${hashtagCount}`;
+    const cached = await lookupAiCache<{ caption: string; hashtags: string[] }>({
+      endpoint: 'generate-caption',
+      promptText: cacheKey,
+      language,
+      ttlHours: 24,
+    });
+
+    if (cached.hit && cached.data) {
+      console.log(`[generate-caption] Cache hit (similarity: ${cached.similarity})`);
+      // Persist to user's history
+      await supabase.from('captions').insert({
+        user_id: user.id,
+        topic, tone, platform,
+        caption_text: cached.data.caption,
+        hashtags: cached.data.hashtags,
+        language,
+      });
+      return new Response(
+        JSON.stringify({ ...cached.data, requestId, cached: true }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const systemPromptLanguage: Record<string, string> = {
       en: 'You are a professional social media caption writer. Always write in English.',
       de: 'Du bist ein professioneller Social-Media-Texter. Schreibe IMMER auf Deutsch.',
@@ -193,6 +219,12 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5`;
     if (insertError) {
       console.error('Insert error:', insertError);
     }
+
+    // Phase 2: Store in AI semantic cache for future requests
+    storeAiCache(
+      { endpoint: 'generate-caption', promptText: cacheKey, language, model: 'google/gemini-2.5-flash', ttlHours: 24 },
+      { caption, hashtags }
+    ).catch((e) => console.warn('[generate-caption] Cache store failed:', e));
 
     return new Response(
       JSON.stringify({
