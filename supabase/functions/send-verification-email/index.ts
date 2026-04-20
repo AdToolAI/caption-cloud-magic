@@ -22,6 +22,31 @@ interface SendVerificationRequest {
   email: string;
   userId: string;
   language?: string;
+  appUrl?: string;
+}
+
+const ALLOWED_ORIGINS = new Set<string>([
+  "https://useadtool.ai",
+  "https://www.useadtool.ai",
+  "https://captiongenie.app",
+  "https://www.captiongenie.app",
+  "https://caption-cloud-magic.lovable.app",
+]);
+
+const DEFAULT_APP_URL = "https://useadtool.ai";
+
+function resolveAppUrl(candidate?: string | null): string {
+  if (!candidate) return DEFAULT_APP_URL;
+  try {
+    const u = new URL(candidate);
+    const origin = `${u.protocol}//${u.host}`;
+    if (ALLOWED_ORIGINS.has(origin)) return origin;
+    // Allow lovable.app preview subdomains
+    if (u.host.endsWith(".lovable.app")) return origin;
+    return DEFAULT_APP_URL;
+  } catch {
+    return DEFAULT_APP_URL;
+  }
 }
 
 function normalizeLanguage(lang?: string | null): EmailLanguage {
@@ -36,7 +61,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, userId, language: bodyLang }: SendVerificationRequest = await req.json();
+    const { email, userId, language: bodyLang, appUrl: bodyAppUrl }: SendVerificationRequest = await req.json();
 
     if (!email || !userId) {
       return new Response(
@@ -136,8 +161,11 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Failed to store verification token");
     }
 
-    const appUrl = Deno.env.get("APP_URL") || Deno.env.get("APP_BASE_URL") || "https://useadtool.ai";
+    // Prefer client-supplied origin (validated against allow-list), then env, then default.
+    const envAppUrl = Deno.env.get("APP_URL") || Deno.env.get("APP_BASE_URL");
+    const appUrl = resolveAppUrl(bodyAppUrl) || resolveAppUrl(envAppUrl) || DEFAULT_APP_URL;
     const verificationUrl = `${appUrl}/verify-email?token=${verificationToken}`;
+    console.log(`[send-verification-email] Using appUrl=${appUrl} (bodyAppUrl=${bodyAppUrl ?? "n/a"})`);
 
     const html = renderVerificationEmail(language, verificationUrl, email);
     const subject = getSubject(language);

@@ -38,7 +38,7 @@ const CheckEmail = () => {
         return;
       }
       const { error } = await supabase.functions.invoke("send-verification-email", {
-        body: { email, userId: user.id, language },
+        body: { email, userId: user.id, language, appUrl: window.location.origin },
       });
       if (error) throw error;
       toast.success(t("checkEmail.resentTitle"), {

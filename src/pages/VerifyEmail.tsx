@@ -64,7 +64,7 @@ const VerifyEmail = () => {
 
     try {
       const { error } = await supabase.functions.invoke("send-verification-email", {
-        body: { email: user.email, userId: user.id, language }
+        body: { email: user.email, userId: user.id, language, appUrl: window.location.origin }
       });
 
       if (error) throw error;

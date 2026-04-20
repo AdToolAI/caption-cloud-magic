@@ -204,7 +204,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/`
+        emailRedirectTo: `${window.location.origin}/verify-email`
       }
     });
     
@@ -224,7 +224,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Send custom verification email via Edge Function
         try {
           await supabase.functions.invoke('send-verification-email', {
-            body: { email, userId: data.user.id, language }
+            body: { email, userId: data.user.id, language, appUrl: window.location.origin }
           });
         } catch (emailError) {
           console.error('Failed to send verification email:', emailError);

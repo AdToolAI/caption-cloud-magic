@@ -40,8 +40,9 @@ async function processStage(
 
   const { data: users, error } = await supabase
     .from("profiles")
-    .select("id, email, language, created_at, last_active_at, activation_emails_sent, trial_status")
+    .select("id, email, language, created_at, last_active_at, activation_emails_sent, trial_status, email_verified")
     .eq("trial_status", "active")
+    .eq("email_verified", true)
     .gte("created_at", lower)
     .lt("created_at", upper)
     .limit(500);
