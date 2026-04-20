@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "https://esm.sh/resend@2.0.0";
+import { sendEmail } from "../_shared/email-send.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,11 +58,9 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const resendApiKey = Deno.env.get('RESEND_API_KEY')!;
     const posthogApiKey = Deno.env.get('POSTHOG_API_KEY');
-    
+
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const resend = new Resend(resendApiKey);
 
     console.log('[Monitoring Alerts] Starting alert check cycle...');
 
@@ -97,7 +95,7 @@ serve(async (req) => {
       console.log(`[Monitoring Alerts] ${triggeredAlerts.length} alerts triggered`);
       
       for (const alert of triggeredAlerts) {
-        await handleAlert(supabase, resend, alert);
+        await handleAlert(supabase, alert);
       }
     } else {
       console.log('[Monitoring Alerts] All systems operational ✅');
@@ -293,7 +291,6 @@ async function checkRateLimitHitRate(): Promise<AlertCheck> {
 
 async function handleAlert(
   supabase: any,
-  resend: any,
   alert: AlertCheck
 ): Promise<void> {
   // Check if alert already exists and is unresolved
@@ -367,14 +364,20 @@ async function handleAlert(
       <p><small>This is an automated monitoring alert from your application.</small></p>
     `;
 
-    await resend.emails.send({
-      from: 'Monitoring Alerts <alerts@resend.dev>',
-      to: adminEmails,
-      subject: `🚨 ${alert.severity.toUpperCase()}: ${alert.alertType}`,
-      html: emailBody,
-    });
+    // Send to each admin individually so suppression-list works per-recipient
+    let sentCount = 0;
+    for (const adminEmail of adminEmails) {
+      const result = await sendEmail({
+        to: adminEmail,
+        subject: `🚨 ${alert.severity.toUpperCase()}: ${alert.alertType}`,
+        html: emailBody,
+        template: `monitoring_alert_${alert.alertType}`,
+        category: "system",
+      });
+      if (result.ok) sentCount++;
+    }
 
-    console.log(`[Alert] Email sent to ${adminEmails.length} admin(s)`);
+    console.log(`[Alert] Email sent to ${sentCount}/${adminEmails.length} admin(s)`);
   } catch (emailError) {
     console.error('[Alert] Failed to send email:', emailError);
   }

@@ -693,3 +693,9 @@ verify_jwt = false
 
 [functions.send-verification-email]
 verify_jwt = false
+
+[functions.resend-webhook]
+verify_jwt = false
+
+[functions.email-unsubscribe]
+verify_jwt = false

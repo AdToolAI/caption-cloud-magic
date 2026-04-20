@@ -1,13 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "https://esm.sh/resend@2.0.0";
+import { sendEmail } from "../_shared/email-send.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 interface ExpiringToken {
   user_id: string;
@@ -144,11 +142,7 @@ serve(async (req) => {
         : `⚠️ Social Media Token läuft bald ab - AdTool`;
 
       try {
-        const emailResponse = await resend.emails.send({
-          from: "AdTool <support@useadtool.ai>",
-          to: [email],
-          subject,
-          html: `
+        const tokenHtml = `
             <!DOCTYPE html>
             <html>
             <head>
@@ -157,50 +151,53 @@ serve(async (req) => {
             </head>
             <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #050816; color: #ffffff; margin: 0; padding: 0;">
               <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-                <!-- Header -->
                 <div style="text-align: center; margin-bottom: 40px;">
                   <h1 style="font-size: 28px; margin: 0; background: linear-gradient(135deg, #F5C76A, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
                     AdTool
                   </h1>
                 </div>
-                
-                <!-- Content Card -->
-                <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; backdrop-filter: blur(10px);">
+                <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px;">
                   <h2 style="color: #F5C76A; margin: 0 0 16px 0; font-size: 22px;">
                     ${hasExpired ? '🚨 Token abgelaufen!' : '⚠️ Token läuft bald ab'}
                   </h2>
-                  
                   <p style="color: #a0aec0; line-height: 1.6; margin: 0 0 24px 0;">
-                    ${hasExpired 
+                    ${hasExpired
                       ? 'Einer oder mehrere deiner Social Media Tokens sind abgelaufen. Bitte verbinde die betroffenen Accounts erneut, um weiterhin automatisch posten zu können.'
                       : 'Einer oder mehrere deiner Social Media Tokens laufen bald ab. Erneuere die Verbindung rechtzeitig, um Unterbrechungen zu vermeiden.'}
                   </p>
-                  
                   <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 16px; margin-bottom: 24px;">
                     <p style="color: #ffffff; margin: 0; line-height: 1.8;">
                       ${tokenList}
                     </p>
                   </div>
-                  
-                  <a href="https://8e97f8e1-59d6-4796-9a44-4c05ca0bfc66.lovableproject.com/settings/social-media" 
+                  <a href="https://useadtool.ai/settings/social-media"
                      style="display: inline-block; background: linear-gradient(135deg, #F5C76A, #d4a84a); color: #050816; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 16px;">
                     Verbindungen erneuern →
                   </a>
                 </div>
-                
-                <!-- Footer -->
                 <div style="text-align: center; margin-top: 40px; color: #6b7280; font-size: 12px;">
                   <p style="margin: 0 0 8px 0;">Diese Email wurde automatisch von AdTool gesendet.</p>
                   <p style="margin: 0;">© ${new Date().getFullYear()} AdTool. Alle Rechte vorbehalten.</p>
                 </div>
               </div>
             </body>
-            </html>
-          `,
+            </html>`;
+
+        const result = await sendEmail({
+          to: email,
+          subject,
+          html: tokenHtml,
+          template: "token_expiry",
+          category: "transactional",
         });
 
-        console.log(`[Token Expiry Notifier] Email sent to ${email}:`, emailResponse);
-        emailsSent.push(email);
+        if (result.ok || result.skipped) {
+          console.log(`[Token Expiry Notifier] Email handled for ${email}: ${result.skipped ? 'suppressed' : result.resendId}`);
+          if (result.ok) emailsSent.push(email);
+        } else {
+          console.error(`[Token Expiry Notifier] Failed to send email to ${email}:`, result.error);
+          emailsFailed.push(email);
+        }
       } catch (emailError) {
         console.error(`[Token Expiry Notifier] Failed to send email to ${email}:`, emailError);
         emailsFailed.push(email);

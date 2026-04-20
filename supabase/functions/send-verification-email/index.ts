@@ -1,13 +1,12 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { Resend } from "https://esm.sh/resend@2.0.0";
 import {
   type EmailLanguage,
   getSubject,
   renderVerificationEmail,
 } from "./templates.ts";
+import { sendEmail } from "../_shared/email-send.ts";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -170,26 +169,35 @@ const handler = async (req: Request): Promise<Response> => {
     const html = renderVerificationEmail(language, verificationUrl, email);
     const subject = getSubject(language);
 
-    const { data, error } = await resend.emails.send({
-      from: "AdTool AI <support@useadtool.ai>",
-      to: [email],
+    const result = await sendEmail({
+      to: email,
       subject,
       html,
+      template: "verify",
+      category: "transactional",
     });
 
-    if (error) {
-      console.error("[send-verification-email] Resend error:", error);
-      throw new Error(error.message);
+    if (!result.ok) {
+      if (result.skipped) {
+        console.log(`[send-verification-email] Skipped (suppressed): ${email}`);
+        return new Response(
+          JSON.stringify({ success: false, suppressed: true, reason: result.reason }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+      console.error("[send-verification-email] Send error:", result.error);
+      throw new Error(result.error || "send failed");
     }
 
-    console.log(`[send-verification-email] Email sent (lang=${language}): ${data?.id}`);
+    console.log(`[send-verification-email] Email sent (lang=${language}): ${result.resendId}`);
 
     return new Response(
-      JSON.stringify({ success: true, messageId: data?.id, language }),
+      JSON.stringify({ success: true, messageId: result.resendId, language }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
 
   } catch (error: any) {
+
     console.error("[send-verification-email] Error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
