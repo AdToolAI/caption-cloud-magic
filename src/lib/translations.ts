@@ -2682,7 +2682,20 @@ export const translations: Record<Language, any> = {
       faq: "FAQ",
       community: "Community"
     },
-    
+
+    // Trial / Pause
+    trial: {
+      day: "day",
+      days: "days",
+      bannerSuffix: "left in your Enterprise trial",
+      upgradeCta: "Upgrade",
+      pausedTitle: "Your account is paused",
+      pausedDescription: "Your 14-day Enterprise trial has ended. Choose a plan to keep creating, generating and publishing.",
+      pausedCta: "Choose a plan",
+      reactivateHeadline: "Reactivate your account",
+      reactivateSub: "Pick a plan to unlock your account again."
+    },
+
     // Authentication
     auth: {
       login: "Sign In",
@@ -7021,7 +7034,20 @@ export const translations: Record<Language, any> = {
       faq: "FAQ",
       community: "Community"
     },
-    
+
+    // Trial / Pause
+    trial: {
+      day: "Tag",
+      days: "Tage",
+      bannerSuffix: "deines Enterprise-Trials verbleibend",
+      upgradeCta: "Upgraden",
+      pausedTitle: "Dein Konto ist pausiert",
+      pausedDescription: "Dein 14-Tage Enterprise-Trial ist beendet. Wähle einen Plan, um weiter zu erstellen, generieren und zu veröffentlichen.",
+      pausedCta: "Plan wählen",
+      reactivateHeadline: "Konto reaktivieren",
+      reactivateSub: "Wähle einen Plan, um dein Konto wieder freizuschalten."
+    },
+
     // Authentication
     auth: {
       login: "Anmelden",
@@ -11138,7 +11164,20 @@ export const translations: Record<Language, any> = {
       faq: "FAQ",
       community: "Comunidad"
     },
-    
+
+    // Trial / Pause
+    trial: {
+      day: "día",
+      days: "días",
+      bannerSuffix: "restantes de tu prueba Enterprise",
+      upgradeCta: "Mejorar",
+      pausedTitle: "Tu cuenta está en pausa",
+      pausedDescription: "Tu prueba Enterprise de 14 días ha terminado. Elige un plan para seguir creando, generando y publicando.",
+      pausedCta: "Elegir plan",
+      reactivateHeadline: "Reactivar tu cuenta",
+      reactivateSub: "Elige un plan para desbloquear tu cuenta de nuevo."
+    },
+
     // Authentication
     auth: {
       login: "Iniciar Sesión",
