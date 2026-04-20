@@ -15,19 +15,25 @@ import { de } from 'date-fns/locale';
 // supabase/functions/ai-superuser-test-runner. Anything else is treated as
 // orphaned (e.g. removed scenarios with leftover historical runs).
 const ACTIVE_SCENARIOS = new Set<string>([
-  'Caption Generation (DE)',
   'Caption Generation (EN)',
-  'Caption Generation (ES)',
   'Bio Generation (DE)',
   'Bio Generation (ES)',
   'Image Generation',
   'Campaign Generation',
-  'Performance Insights',
-  'Hashtag Suggestions',
-  'Posting Time Optimizer',
+  'Performance Analytics',
+  'Hashtag Analysis',
+  'Posting Times Recommendation',
   'Comments Analysis',
-  'Trend Radar',
+  'Trend Radar Fetch',
 ]);
+
+// Latency color thresholds (ms) — KI-Calls können legitim 5-10s dauern
+const latencyClass = (ms: number | null | undefined): string => {
+  if (!ms) return 'text-muted-foreground';
+  if (ms < 3000) return 'text-muted-foreground';
+  if (ms < 8000) return 'text-yellow-600 dark:text-yellow-400';
+  return 'text-destructive';
+};
 
 interface Run {
   id: string;
