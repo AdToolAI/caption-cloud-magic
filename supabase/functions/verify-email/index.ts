@@ -86,10 +86,13 @@ const handler = async (req: Request): Promise<Response> => {
       .update({ verified_at: new Date().toISOString() })
       .eq("token", token);
 
-    // Update profile email_verified flag
+    // Update profile email_verified flag + timestamp (anchor for activation drip)
     await supabaseAdmin
       .from("profiles")
-      .update({ email_verified: true })
+      .update({
+        email_verified: true,
+        email_verified_at: new Date().toISOString(),
+      })
       .eq("id", tokenData.user_id);
 
     console.log(`[verify-email] Email verified successfully for user: ${tokenData.user_id}`);

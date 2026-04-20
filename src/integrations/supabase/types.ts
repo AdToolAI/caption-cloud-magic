@@ -6484,6 +6484,7 @@ export type Database = {
           drip_emails_enabled: boolean
           email: string
           email_verified: boolean | null
+          email_verified_at: string | null
           id: string
           language: string | null
           last_active_at: string | null
@@ -6514,6 +6515,7 @@ export type Database = {
           unsubscribe_token: string
           updated_at: string | null
           upgrade_prompts_dismissed: Json
+          verify_reminder_sent_at: string | null
           welcome_bonus_granted_at: string | null
           welcome_bonus_seen_at: string | null
         }
@@ -6530,6 +6532,7 @@ export type Database = {
           drip_emails_enabled?: boolean
           email: string
           email_verified?: boolean | null
+          email_verified_at?: string | null
           id: string
           language?: string | null
           last_active_at?: string | null
@@ -6560,6 +6563,7 @@ export type Database = {
           unsubscribe_token?: string
           updated_at?: string | null
           upgrade_prompts_dismissed?: Json
+          verify_reminder_sent_at?: string | null
           welcome_bonus_granted_at?: string | null
           welcome_bonus_seen_at?: string | null
         }
@@ -6576,6 +6580,7 @@ export type Database = {
           drip_emails_enabled?: boolean
           email?: string
           email_verified?: boolean | null
+          email_verified_at?: string | null
           id?: string
           language?: string | null
           last_active_at?: string | null
@@ -6606,6 +6611,7 @@ export type Database = {
           unsubscribe_token?: string
           updated_at?: string | null
           upgrade_prompts_dismissed?: Json
+          verify_reminder_sent_at?: string | null
           welcome_bonus_granted_at?: string | null
           welcome_bonus_seen_at?: string | null
         }
@@ -11511,6 +11517,7 @@ export type Database = {
           success: boolean
         }[]
       }
+      get_conversion_funnel: { Args: { days?: number }; Returns: Json }
       get_template_performance_summary: {
         Args: { p_days?: number; p_template_id: string }
         Returns: {
