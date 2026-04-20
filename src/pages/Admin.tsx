@@ -5,7 +5,8 @@ import { EmailDashboard } from '@/pages/admin/EmailDashboard';
 import { ProviderHealth } from '@/pages/admin/ProviderHealth';
 import { CacheHealth } from '@/pages/admin/CacheHealth';
 import { CostMonitor } from '@/pages/admin/CostMonitor';
-import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign } from 'lucide-react';
+import Alerts from '@/pages/admin/Alerts';
+import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell } from 'lucide-react';
 
 export default function Admin() {
   return (
@@ -43,6 +44,10 @@ export default function Admin() {
             <DollarSign className="h-4 w-4" />
             Cost Monitor
           </TabsTrigger>
+          <TabsTrigger value="alerts" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Alerts
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="funnel">
@@ -67,6 +72,10 @@ export default function Admin() {
 
         <TabsContent value="cost-monitor">
           <CostMonitor />
+        </TabsContent>
+
+        <TabsContent value="alerts">
+          <Alerts />
         </TabsContent>
       </Tabs>
     </div>
