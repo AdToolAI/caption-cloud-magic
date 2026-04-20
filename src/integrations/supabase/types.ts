@@ -4485,6 +4485,66 @@ export type Database = {
         }
         Relationships: []
       }
+      email_send_log: {
+        Row: {
+          category: string
+          created_at: string
+          error: string | null
+          from_email: string
+          id: string
+          resend_id: string | null
+          status: string
+          subject: string
+          template: string | null
+          to_email: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          error?: string | null
+          from_email: string
+          id?: string
+          resend_id?: string | null
+          status: string
+          subject: string
+          template?: string | null
+          to_email: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          error?: string | null
+          from_email?: string
+          id?: string
+          resend_id?: string | null
+          status?: string
+          subject?: string
+          template?: string | null
+          to_email?: string
+        }
+        Relationships: []
+      }
+      email_suppression_list: {
+        Row: {
+          details: Json | null
+          email: string
+          reason: string
+          suppressed_at: string
+        }
+        Insert: {
+          details?: Json | null
+          email: string
+          reason: string
+          suppressed_at?: string
+        }
+        Update: {
+          details?: Json | null
+          email?: string
+          reason?: string
+          suppressed_at?: string
+        }
+        Relationships: []
+      }
       email_verification_tokens: {
         Row: {
           created_at: string
