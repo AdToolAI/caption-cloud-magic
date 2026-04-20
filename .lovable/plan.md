@@ -1,83 +1,91 @@
 
 
-# Plan: Whitelist-Sync + Comments-Crash-Fix + Latenz-Klarstellung
+# Plan: Lösch-Buttons reparieren — DELETE-Policy + sofortige Wirkung
 
-## Was die Daten wirklich zeigen
+## Diagnose
 
-Letzte 3 Komplett-Runs liefen **alle 10 von 10 grün** — bis auf Comments Analysis, das jetzt einen anderen 500er wirft (`Cannot read properties of undefined (reading 'updated_at')`). Die UI zeigt aber nur 6 Szenarien statt 10, weil die **Whitelist im Frontend andere Namen verwendet als der Test-Runner** wirklich schreibt. Dadurch werden Caption (DE/ES), Hashtag, Posting Times, Performance und Trend Radar aus der Liste gefiltert.
+Zwei voneinander unabhängige Bugs blockieren das Löschen:
 
-### Zur Latenz-Frage: Das ist normal
+### Bug 1 — Fehlende RLS-DELETE-Policy (Hauptursache)
+Auf `ai_superuser_runs` existieren nur diese Policies:
+| Policy | Operation |
+|---|---|
+| Admins can view all superuser runs | SELECT |
+| Service role can insert superuser runs | INSERT |
+| Service role can update superuser runs | UPDATE |
 
-| Szenario | Latenz | Bewertung |
-|---|---|---|
-| Caption / Trend Radar | 0.3–1 s | Sehr schnell (Cache/leichte Calls) |
-| Bio / Hashtag / Posting | 0.7–3 s | Normal für Gemini Flash |
-| Performance Analytics | 1.4–2 s | Normal |
-| Campaign Generation | 5–5.5 s | Normal (mehrere Gemini-Calls hintereinander) |
-| Image Generation | 6.5–9.3 s | Normal für KI-Bildgenerierung |
+**Es gibt keine DELETE-Policy.** Bei aktiver RLS bedeutet das: Jeder Admin-DELETE aus dem Browser löscht **0 Zeilen ohne Fehler** — Supabase gibt einfach `null` Error + leeres Result zurück. Der Toast zeigt „erfolgreich", weil unser Code nur auf `error` prüft, nicht auf die Anzahl gelöschter Zeilen.
 
-**Es gibt kein Latenz-Problem.** Die hohen Werte kommen nur von Image und Campaign — und das ist die echte Zeit, die KI-Modelle für Bilder bzw. Multi-Step-Generierung brauchen. Schneller geht's mit den aktuellen Modellen nicht. Die UI sortiert und zeigt das nur prominenter, weil es im Vordergrund steht.
+### Bug 2 — Cutoffs greifen nicht
+Aktuelle Daten: alle 50 Runs sind in den letzten 30 Minuten entstanden. Selbst mit funktionierender DELETE-Policy würde:
+- „Alte Runs löschen" (>7 Tage) → 0 Zeilen treffen
+- „Pass-Rate zurücksetzen" (>1 Stunde) → 0 Zeilen treffen
 
-## Fix 1 — Whitelist mit echten Szenarien-Namen synchronisieren
+Du brauchst eine Möglichkeit, die **aktuelle** Historie zu leeren ohne den letzten Run zu zerstören.
 
-In `src/pages/admin/AISuperuserAdmin.tsx` die `ACTIVE_SCENARIOS`-Set ersetzen durch die tatsächlich vom Runner geschriebenen Namen:
+## Fixes
 
-```ts
-const ACTIVE_SCENARIOS = new Set<string>([
-  'Caption Generation (EN)',
-  'Bio Generation (DE)',
-  'Bio Generation (ES)',
-  'Image Generation',
-  'Campaign Generation',
-  'Performance Analytics',
-  'Hashtag Analysis',
-  'Posting Times Recommendation',
-  'Comments Analysis',
-  'Trend Radar Fetch',
-]);
+### Fix 1 — DELETE-Policy für Admins anlegen (Migration)
+```sql
+CREATE POLICY "Admins can delete superuser runs"
+ON public.ai_superuser_runs
+FOR DELETE
+TO authenticated
+USING (has_role(auth.uid(), 'admin'::app_role));
+```
+Gleicher Fix für die Anomalien-Tabelle, damit Admins auch dort aufräumen können:
+```sql
+CREATE POLICY "Admins can delete superuser anomalies"
+ON public.ai_superuser_anomalies
+FOR DELETE
+TO authenticated
+USING (has_role(auth.uid(), 'admin'::app_role));
 ```
 
-Damit erscheinen alle 10 aktiven Szenarien im Dashboard statt nur 6.
+### Fix 2 — Buttons schreiben um auf „behalte nur die letzten N Runs"
+Aktuell hängen die Buttons an Zeit-Cutoffs, die bei frischer Historie nichts treffen. Stattdessen:
 
-## Fix 2 — Comments Analysis 500er beheben
-
-In `supabase/functions/analyze-comments/index.ts` die `comment_analysis`-Behandlung defensiv machen:
-
-```ts
-const commentsToAnalyze = comments.filter(c => {
-  const analyses = c.comment_analysis;
-  if (!analyses || !Array.isArray(analyses) || analyses.length === 0) return true;
-  const analysis = analyses[0];
-  if (!analysis?.updated_at) return true;          // <- defensiver Guard
-  const updatedAt = new Date(analysis.updated_at);
-  const hoursSince = (now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60);
-  return hoursSince > 24;
-});
+- **„Alte Runs löschen"** → behält **die letzten 5 Runs pro Szenario**, löscht den Rest. Nutzt eine RPC-Function damit die Logik in der DB lebt:
+```sql
+CREATE OR REPLACE FUNCTION public.cleanup_superuser_runs(keep_per_scenario int DEFAULT 5)
+RETURNS int LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE deleted_count int;
+BEGIN
+  IF NOT has_role(auth.uid(), 'admin'::app_role) THEN
+    RAISE EXCEPTION 'Forbidden';
+  END IF;
+  WITH ranked AS (
+    SELECT id, row_number() OVER (PARTITION BY scenario_name ORDER BY started_at DESC) AS rn
+    FROM public.ai_superuser_runs
+  )
+  DELETE FROM public.ai_superuser_runs
+  WHERE id IN (SELECT id FROM ranked WHERE rn > keep_per_scenario);
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RETURN deleted_count;
+END $$;
 ```
 
-Das ist ein echter App-Bug — kein Test-Runner-Problem. Wenn ein Kommentar in der Datenbank steht aber noch nie analysiert wurde, crasht die Live-App genauso. Genau dafür ist der KI-Superuser da.
+- **„Pass-Rate zurücksetzen"** → bleibt drastischer: **alles außer dem letzten Run pro Szenario löschen** (`keep_per_scenario = 1`). So startet die Pass-Rate sofort bei 100 % wenn der letzte Run grün war.
 
-## Fix 3 — Latenz-Spalte mit Kontext ergänzen
-
-Im Dashboard kleine Hilfe einbauen damit klar ist, dass 5–9 s bei KI-Calls normal sind:
-
-- Latenz-Zelle in der Tabelle bekommt Farbcode:
-  - `< 3000 ms` → grau (Standard)
-  - `3000–8000 ms` → gelb-orange (Hinweis: KI-typisch)
-  - `> 8000 ms` → rot (genauer hinschauen)
-- Tooltip auf der Spalten-Überschrift: *„Echte Edge-Function-Latenz inkl. KI-Modell-Antwortzeit. 5–10 s sind bei Bild-/Multi-Step-Generierung normal."*
-- In den **Summary-Cards** oben einen **„Letzter Komplett-Test (gesamt)"**-Wert hinzufügen, der die Summe der letzten 10 Latenzen zeigt → so siehst du ob ein **Trend** entsteht (z.B. von 25 s auf 50 s steigend = Problem).
+### Fix 3 — Frontend ehrlich machen
+In `AISuperuserAdmin.tsx`:
+- Beide Buttons rufen `supabase.rpc('cleanup_superuser_runs', { keep_per_scenario: 5 / 1 })` auf
+- Toast zeigt **die echte Anzahl** gelöschter Zeilen (`X Runs gelöscht`)
+- Bei `data === 0` zeigt der Toast „Keine Runs zum Löschen — bereits sauber"
+- Buttons werden umbenannt für Klarheit:
+  - „Alte Runs löschen" → **„Historie kürzen (letzte 5 behalten)"**
+  - „Pass-Rate zurücksetzen" → **„Komplett zurücksetzen (nur letzten Run behalten)"**
 
 ## Reihenfolge
 
-1. `AISuperuserAdmin.tsx`: Whitelist auf echte Namen umstellen + Latenz-Farbcode + Tooltip + „Letzter Run gesamt"-Card
-2. `analyze-comments/index.ts`: Defensiver Guard für `updated_at`
-3. Komplett-Test ausführen → Erwartung: **10/10 grün**, alle 10 Szenarien sichtbar
+1. Migration: DELETE-Policies für `ai_superuser_runs` + `ai_superuser_anomalies` + RPC `cleanup_superuser_runs`
+2. `AISuperuserAdmin.tsx`: Beide Buttons auf RPC umbauen, Labels anpassen, echte Lösch-Anzahl anzeigen
+3. Verifikation: Du klickst „Komplett zurücksetzen" → Erwartung: Toast zeigt z.B. „40 Runs gelöscht", Pass-Rate-Spalte zeigt 100 % bei allen grünen Szenarien
 
 ## Erwartetes Ergebnis
 
-- ✅ Alle 10 Szenarien sichtbar (statt 6)
-- ✅ Comments Analysis auf grün
-- ✅ Latenz wird mit Farbcode kontextualisiert — kein Rätselraten mehr
-- ✅ Pass-Rate-Card zeigt nach Reset 100%
+- ✅ Lösch-Buttons funktionieren wirklich (statt stumm zu scheitern)
+- ✅ Toast zeigt echte Anzahl gelöschter Zeilen — keine falschen Erfolgsmeldungen mehr
+- ✅ Pass-Rate-Reset wirkt sofort, unabhängig vom Alter der Runs
+- ✅ Bonus: Comments Analysis fix wird sichtbar sobald die alten Fail-Runs weg sind
 
