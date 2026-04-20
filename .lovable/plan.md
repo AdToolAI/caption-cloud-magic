@@ -1,41 +1,47 @@
 
 
-## Plan: Edge Functions deployen + Logging fixen
+## Plan: Email-Admin-Dashboard
 
-### Diagnose
+Du hast jetzt ein voll funktionierendes Email-System mit Bounce-Handling, Suppression-Liste und Send-Logging. Was fehlt: **eine UI um das alles zu sehen und zu verwalten.** Ohne Dashboard musst du jedes Mal SQL ausführen lassen — mit Dashboard siehst du auf einen Blick was läuft.
 
-| Problem | Ursache | Fix |
-|---|---|---|
-| Webhook → 404 NOT_FOUND | `resend-webhook` Function nicht deployed ODER `verify_jwt=true` blockt | Function explizit deployen + `verify_jwt=false` setzen |
-| `email_send_log` leer trotz erfolgreicher Sends | `_shared/email-send.ts` ist nur ein Modul — Funktionen die es importieren wurden evtl. seit der Wrapper-Einführung nicht redeployed | Alle Mail-sendenden Functions redeployen |
+### Was du bekommst
 
-### Schritt 1: `supabase/config.toml` ergänzen
+Eine neue Admin-Seite **`/admin/emails`** (eingebettet ins bestehende Admin-Dashboard als dritter Tab neben „Conversion Funnel" und „System Monitor"). Nur für Admins zugänglich (über bestehende `has_role(auth.uid(), 'admin')`-Prüfung).
 
-`verify_jwt = false` für `resend-webhook` setzen — Resend kann keinen JWT mitschicken, Authentizität läuft über die Svix-HMAC-Signatur (bereits im Code implementiert).
+### Aufbau (ein Screen, drei Bereiche)
 
-### Schritt 2: Edge Functions deployen
+**1. KPI-Kacheln oben** — letzte 7 Tage (umschaltbar 24h / 7d / 30d):
+- Versendete Mails (grün)
+- Suppressed/Geblockt (gelb)
+- Failed/DLQ (rot)
+- Bounces + Complaints aus der Suppression-Liste (separat, da long-term)
+- Bounce-Rate in % (Industriestandard: <2% gut, >5% kritisch)
 
-Die folgenden Functions deployen, damit alle den neuen Wrapper aktiv haben:
-- `resend-webhook` (kritisch — 404 fixen)
-- `send-verification-email` (damit Bounce-Test funktioniert)
-- `send-password-reset-email`
-- `send-support-ticket`
-- alle weiteren `send-*-email` Functions die existieren
+**2. Send-Log-Tabelle** mit Filtern:
+- Filter: Zeitraum, Template (`verification`, `password-reset`, `support`, `drip-*` etc.), Status (`sent` / `suppressed` / `failed` / `dlq`)
+- Spalten: Zeitstempel, Template, Empfänger, Status (farbiges Badge), Fehler-Message (bei Failures)
+- Pagination (50 pro Seite)
+- Deduplizierung per `message_id` (eine Mail = eine Zeile, neuester Status gewinnt)
 
-### Schritt 3: End-to-End-Test
+**3. Suppression-Liste** mit Verwaltung:
+- Tabelle: Email, Grund (`bounce` / `complaint` / `manual`), hinzugefügt am, Metadata
+- Suchfeld (Email)
+- **Aktion: Adresse entfernen** (mit Bestätigungs-Dialog) — z.B. wenn ein Kunde nach Mailbox-Wechsel wieder Mails bekommen will
+- **Aktion: Manuell hinzufügen** (für Spam-Beschwerden die nicht über Resend kamen)
 
-1. Im Resend-Dashboard auf das fehlgeschlagene `email.bounced`-Event klicken → **„Replay"** → Webhook nochmal feuern lassen
-2. Ich prüfe parallel:
-   - Logs der `resend-webhook` Edge Function → muss `[resend-webhook] suppressed (bounce): bounced+test1@resend.dev` zeigen
-   - `SELECT * FROM email_suppression_list` → muss neuen Eintrag haben
-   - `SELECT * FROM email_send_log ORDER BY created_at DESC LIMIT 10` → muss den ursprünglichen `sent`-Eintrag zeigen
-3. Falls grün → Re-Send-Block-Test: nochmal Signup mit gleicher Adresse → Log muss `status='suppressed'` zeigen
+### Technisch
 
-### Schritt 4: Aufräumen
+| Datei | Was passiert |
+|---|---|
+| `src/pages/admin/EmailDashboard.tsx` | Neue Seite mit den drei Bereichen |
+| `src/pages/Admin.tsx` | Dritter Tab „Email Monitor" (Mail-Icon) hinzufügen |
+| `src/components/admin/email/*` | KPI-Kacheln, LogTable, SuppressionManager als kleine Komponenten |
+| RLS-Check | `email_send_log` und `email_suppression_list` brauchen SELECT-Policy für Admin-Rolle (prüfen, ggf. ergänzen) |
+| Neue Edge Function `admin-suppression-manage` | Für Insert/Delete auf `email_suppression_list` (mit Admin-Rollen-Check) — keine direkten Client-Mutations auf der Tabelle |
 
-Falls `email_send_log` immer noch leer bleibt obwohl Functions neu deployed wurden, prüfe ich ob die Functions, die Mails senden, tatsächlich den neuen `sendEmail`-Wrapper benutzen oder noch direkt `resend.emails.send()` aufrufen — und migriere die letzten Hold-Outs.
+Design: bestehender James-Bond-2028-Stil (Glassmorphism, Gold-Akzente, dunkler Hintergrund) — passt zum Rest des Admin-Bereichs.
 
-### Was du tun musst
+### Was du machen musst
 
-Nichts. Sobald du den Plan freigibst, mache ich alles selbst — Config setzen, deployen, Replay triggern (bzw. dich kurz bitten den Replay-Button im Resend-Dashboard zu klicken), Datenbank checken.
+Nichts. Plan freigeben → ich baue alles, deploye die Edge Function und du kannst direkt in `/admin` auf den neuen Tab klicken.
 
