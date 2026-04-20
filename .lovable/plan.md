@@ -1,46 +1,77 @@
 
+# Plan: AI Superuser zeigt weiter nur 10 Szenarien, weil das Backend noch auf altem Stand läuft
 
-# Plan: 5 fehlende Szenarien im AI-Superuser-Dashboard sichtbar machen
+## Diagnose
 
-## Problem
+Das Problem sitzt aktuell nicht mehr im Admin-Frontend:
 
-Das Backend (`ai-superuser-test-runner`) führt seit dem letzten Deploy **15 Szenarien** aus. Das Frontend (`src/pages/admin/AISuperuserAdmin.tsx`) hat aber eine harte Whitelist (`ACTIVE_SCENARIOS`) mit nur den ursprünglichen 10 Namen. Die 5 neuen Phase-2-Szenarien werden als „orphaned" verworfen und **erscheinen nicht in der Tabelle** — auch wenn sie laufen und Daten in `ai_superuser_runs` schreiben.
+- `src/pages/admin/AISuperuserAdmin.tsx` enthält bereits alle 15 Szenarien in `ACTIVE_SCENARIOS`
+- Die UI zählt dynamisch mit `scenarios.length`
+- Trotzdem zeigen die letzten echten Läufe nur 10 Szenarien
 
-Deshalb siehst du immer noch „Alle 10 Szenarien laufen stabil" im grünen Banner und nur 10 Zeilen in der Status-Tabelle.
+Die entscheidende Evidenz kommt aus den Backend-Daten und Logs:
 
-## Fix
+- In `public.ai_superuser_runs` tauchen in den letzten Läufen nur 10 `scenario_name`-Werte auf
+- Die Logs von `ai-superuser-test-runner` zeigen explizit:
+  - `Starting 10 scenarios in mode=full`
 
-### 1. Whitelist erweitern (`AISuperuserAdmin.tsx`)
-Die 5 neuen Namen ergänzen — exakt so wie sie im Backend definiert sind:
+Das heißt: Die Datei im Codebase hat 15 Szenarien, aber die aktuell laufende Backend-Funktion ist noch eine ältere Deployment-Version mit nur 10.
 
-```
-- 'Trial Lifecycle Check'
-- 'Calendar Publish Dispatcher'
-- 'Stripe Webhook Reachability'
-- 'Social Health Check'
-- 'Consistency Watcher'
-```
+## Umsetzung
 
-### 2. Verifikation nach dem Edit
-- „Komplett zurücksetzen" drücken → leert alte Runs
-- „Komplett-Test" auslösen → erwartet **15 Zeilen** in der Status-Tabelle
-- Banner sollte „Alle 15 Szenarien laufen stabil" zeigen
-- Summen-Card „Letzter Run (gesamt)" steigt von ~30s auf ~35–45s (5 zusätzliche `fast` Health-Checks à ~1–3s)
+### 1. `ai-superuser-test-runner` neu deployen
+Die aktuell im Projekt liegende Version von `supabase/functions/ai-superuser-test-runner/index.ts` enthält bereits diese 5 zusätzlichen Szenarien:
 
-### 3. Optionaler Bonus — Schwelle „normal" anpassen
-Die Card-Beschreibung sagt aktuell „< 30s ist normal". Mit 15 statt 10 Szenarien aktualisieren wir auf „< 45s ist normal", damit die Card nicht fälschlich orange wird:
+- `Trial Lifecycle Check`
+- `Calendar Publish Dispatcher`
+- `Stripe Webhook Reachability`
+- `Social Health Check`
+- `Consistency Watcher`
 
-- `totalLatencyClass`: Schwellen von 30s/60s → 45s/75s heben
-- Card-Untertitel: „Summe aller 15 Szenarien — < 45s ist normal"
+Diese Version muss erneut auf Lovable Cloud deployed werden, damit die aktive Laufzeitversion nicht mehr bei 10 stoppt.
 
-## Geänderte Dateien
+### 2. Volltest erneut ausführen
+Nach dem Redeploy:
 
-- `src/pages/admin/AISuperuserAdmin.tsx` (Whitelist + Schwellen + Untertitel)
+- im Admin den `Komplett-Test` starten
+- erwarten: Log `Starting 15 scenarios in mode=full`
+- erwarten: 15 verschiedene `scenario_name`-Einträge in `ai_superuser_runs`
+
+### 3. UI-Verifikation
+Danach muss der KI-Superuser automatisch korrekt rendern:
+
+- grüner Banner: `Alle 15 Szenarien laufen stabil`
+- Tabelle: 15 Zeilen
+- Kennzahl `Szenarien`: 15
+- Gesamtlatenz mit den bereits angehobenen Schwellenwerten bewerten
+
+## Zusätzliche Absicherung
+
+Damit Frontend und Backend künftig nicht wieder auseinanderlaufen, wird der Szenario-Katalog an einer Stelle zentralisiert.
+
+### Empfohlene Härtung
+Eine dieser zwei Varianten umsetzen:
+
+#### Variante A — Shared Config
+- gemeinsame Szenario-Liste in einer geteilten Datei definieren
+- Admin-UI und Test-Runner importieren beide dieselbe Quelle
+
+#### Variante B — Backend als Source of Truth
+- `ai-superuser-test-runner` liefert zusätzlich die aktive Szenario-Liste zurück
+- Admin-UI rendert anhand dieser Liste statt einer harten Whitelist
+
+Variante A ist für Wartbarkeit sauberer, Variante B ist robuster gegen Deploy-Drift.
+
+## Betroffene Dateien
+
+- `supabase/functions/ai-superuser-test-runner/index.ts`
+- optional zur Härtung:
+  - `src/pages/admin/AISuperuserAdmin.tsx`
+  - neue gemeinsame Konfigurationsdatei für Szenarien
 
 ## Erwartetes Ergebnis
 
-- ✅ 15 Szenarien sichtbar in der Status-Tabelle
-- ✅ Banner zeigt „Alle 15 Szenarien laufen stabil"
-- ✅ Pass-Rate-Übersicht enthält die neuen 5 System-Health-Checks
-- ✅ Keine fälschlichen Orange-/Rot-Markierungen wegen veralteter Latenz-Schwellen
-
+- 15 Szenarien werden wirklich ausgeführt
+- 15 Szenarien werden im Admin angezeigt
+- kein Widerspruch mehr zwischen Codebase, Logs und UI
+- künftige Szenario-Erweiterungen brechen nicht mehr durch doppelte Pflege auseinander
