@@ -184,28 +184,36 @@ export function AISuperuserAdmin() {
     return latest;
   }, null);
 
-  const deleteOldRuns = async () => {
-    if (!confirm('Test-Runs älter als 7 Tage löschen?')) return;
-    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { error } = await supabase.from('ai_superuser_runs').delete().lt('started_at', cutoff);
+  const trimHistory = async () => {
+    if (!confirm('Historie kürzen? Behält die letzten 5 Runs pro Szenario, löscht den Rest.')) return;
+    const { data, error } = await supabase.rpc('cleanup_superuser_runs', { keep_per_scenario: 5 });
     if (error) {
       toast.error(`Fehler: ${error.message}`);
-    } else {
-      toast.success('Alte Test-Runs gelöscht');
-      await fetchData();
+      return;
     }
+    const count = (data as number) ?? 0;
+    if (count === 0) {
+      toast.success('Keine Runs zum Löschen — bereits sauber');
+    } else {
+      toast.success(`${count} Run${count === 1 ? '' : 's'} gelöscht`);
+    }
+    await fetchData();
   };
 
   const resetPassRateHistory = async () => {
-    if (!confirm('Pass-Rate-Historie zurücksetzen? Alle Runs älter als 1 Stunde werden unwiderruflich gelöscht.')) return;
-    const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { error } = await supabase.from('ai_superuser_runs').delete().lt('started_at', cutoff);
+    if (!confirm('Komplett zurücksetzen? Behält nur den letzten Run pro Szenario, alles andere wird unwiderruflich gelöscht.')) return;
+    const { data, error } = await supabase.rpc('cleanup_superuser_runs', { keep_per_scenario: 1 });
     if (error) {
       toast.error(`Fehler: ${error.message}`);
-    } else {
-      toast.success('Pass-Rate-Historie zurückgesetzt');
-      await fetchData();
+      return;
     }
+    const count = (data as number) ?? 0;
+    if (count === 0) {
+      toast.success('Keine Runs zum Löschen — bereits sauber');
+    } else {
+      toast.success(`${count} Run${count === 1 ? '' : 's'} gelöscht — Pass-Rate zurückgesetzt`);
+    }
+    await fetchData();
   };
 
   const StatusIcon = ({ status }: { status: string }) => {
