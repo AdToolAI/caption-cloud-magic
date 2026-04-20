@@ -11,12 +11,15 @@ import { useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { translations } from "@/lib/translations";
 import { getCurrencyForLanguage } from "@/lib/currency";
+import { useUrlCoupon } from "@/hooks/useUrlCoupon";
+import { CouponBanner } from "@/components/pricing/CouponBanner";
 
 const Pricing = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t, language } = useTranslation();
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const { couponCode, clearCoupon } = useUrlCoupon();
 
   const handlePlanClick = async (planType: 'basic' | 'pro' | 'enterprise') => {
     if (!user) {
@@ -28,7 +31,10 @@ const Pricing = () => {
     try {
       const plan = pricingPlans[planType];
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { priceId: plan.priceId }
+        body: {
+          priceId: plan.priceId,
+          ...(couponCode ? { promoCode: couponCode } : {}),
+        },
       });
 
       if (error) throw error;
@@ -161,6 +167,11 @@ const Pricing = () => {
       />
       
       <main className="flex-1 container mx-auto px-4 py-20">
+        {/* Auto-applied URL coupon (e.g. win-back emails) */}
+        {couponCode && (
+          <CouponBanner code={couponCode} onRemove={clearCoupon} />
+        )}
+
         {/* Header Section */}
         <div className="text-center max-w-3xl mx-auto mb-20 space-y-4">
           <div className="inline-block px-5 py-2 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 text-primary rounded-full text-sm font-bold mb-6 shadow-lg shadow-primary/10">
