@@ -3574,6 +3574,7 @@ export type Database = {
           total_cost_euros: number
           updated_at: string
           user_id: string
+          video_mode: string | null
         }
         Insert: {
           assembly_config?: Json
@@ -3590,6 +3591,7 @@ export type Database = {
           total_cost_euros?: number
           updated_at?: string
           user_id: string
+          video_mode?: string | null
         }
         Update: {
           assembly_config?: Json
@@ -3606,6 +3608,7 @@ export type Database = {
           total_cost_euros?: number
           updated_at?: string
           user_id?: string
+          video_mode?: string | null
         }
         Relationships: []
       }
@@ -3620,6 +3623,7 @@ export type Database = {
           cost_euros: number
           created_at: string
           duration_seconds: number
+          effects: Json | null
           id: string
           order_index: number
           project_id: string
@@ -3645,6 +3649,7 @@ export type Database = {
           cost_euros?: number
           created_at?: string
           duration_seconds?: number
+          effects?: Json | null
           id?: string
           order_index?: number
           project_id: string
@@ -3670,6 +3675,7 @@ export type Database = {
           cost_euros?: number
           created_at?: string
           duration_seconds?: number
+          effects?: Json | null
           id?: string
           order_index?: number
           project_id?: string
