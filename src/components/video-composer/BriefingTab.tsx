@@ -233,8 +233,11 @@ export default function BriefingTab({
   const storyMeta = (() => {
     if (category !== 'storytelling') return { protagonist: '', conflict: '' };
     const raw = briefing.targetAudience || '';
-    const protagonist = raw.match(/Protagonist:\s*([^|]*)/)?.[1]?.trim() || '';
-    const conflict = raw.match(/Conflict:\s*([^|]*)/)?.[1]?.trim() || '';
+    // Match content between "Protagonist: " and " |" (or end of string).
+    // Do NOT trim — trimming strips trailing spaces while the user is typing,
+    // making it impossible to type multi-word entries with spaces.
+    const protagonist = raw.match(/Protagonist: ([^|]*?)(?: \||$)/)?.[1] ?? '';
+    const conflict = raw.match(/Conflict: ([^|]*?)(?: \||$)/)?.[1] ?? '';
     return { protagonist, conflict };
   })();
 
