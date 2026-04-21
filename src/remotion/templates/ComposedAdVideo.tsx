@@ -118,25 +118,39 @@ type ComposedAdVideoProps = z.infer<typeof ComposedAdVideoSchema>;
 // Plain scene renderer — no manual transitions, TransitionSeries handles all overlap/fade math.
 const Scene: React.FC<{
   videoUrl: string;
+  isImage?: boolean;
+  durationInFrames: number;
+  sceneIndex: number;
   textOverlay?: ComposedAdVideoProps['scenes'][0]['textOverlay'];
   kineticText: boolean;
-}> = ({ videoUrl, textOverlay, kineticText }) => {
+  effects?: SceneEffectConfig[];
+}> = ({ videoUrl, isImage, durationInFrames, sceneIndex, textOverlay, kineticText, effects }) => {
   const frame = useCurrentFrame();
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
       {videoUrl && (
-        <Video
-          src={videoUrl}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          muted
-          // Lock playback rate to 1.0 — prevents implicit speed warping when
-          // Sequence/Video durations diverge.
-          playbackRate={1}
-          // Use Remotion default pauseWhenBuffering=true (matches DirectorsCut/
-          // UniversalCreator) so audio stays glitch-free at scene boundaries.
-        />
+        isImage ? (
+          <KenBurnsImage
+            src={videoUrl}
+            durationInFrames={durationInFrames}
+            variant={pickKenBurnsVariant(sceneIndex)}
+          />
+        ) : (
+          <Video
+            src={videoUrl}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            muted
+            // Lock playback rate to 1.0 — prevents implicit speed warping when
+            // Sequence/Video durations diverge.
+            playbackRate={1}
+            // Use Remotion default pauseWhenBuffering=true (matches DirectorsCut/
+            // UniversalCreator) so audio stays glitch-free at scene boundaries.
+          />
+        )
       )}
+      {/* Procedural visual effects — Lambda-safe, replaces deprecated Lottie layer */}
+      <SceneEffectsLayer effects={effects} />
       {textOverlay?.text && (
         kineticText ? (
           <KineticText
