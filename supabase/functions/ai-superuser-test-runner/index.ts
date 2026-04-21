@@ -24,6 +24,8 @@ interface Scenario {
   expectedKeys?: string[];
   /** If true, skip if function does not exist (404) — treat as warning instead of fail */
   optional?: boolean;
+  /** If set, the scenario passes when the response matches this expected failure (used for security-protected endpoints like signature-guarded webhooks) */
+  expectFailure?: { status: number; bodyIncludes?: string };
 }
 
 interface TestContext {
@@ -150,6 +152,9 @@ const SCENARIOS: Scenario[] = [
     fn: "stripe-webhook",
     body: { type: "ai_superuser_ping", _test: true },
     optional: true,
+    // Webhook correctly rejects unsigned requests with HTTP 400 "No signature".
+    // That proves the endpoint is reachable AND signature-protected → treat as pass.
+    expectFailure: { status: 400, bodyIncludes: "No signature" },
   },
   {
     name: "Social Health Check",
@@ -348,6 +353,20 @@ async function runScenario(scenario: Scenario, ctx: TestContext, triggeredBy: st
     if (response.status === 404 && scenario.optional) {
       status = "warning";
       errorMessage = `Function '${scenario.fn}' not deployed (optional)`;
+    } else if (scenario.expectFailure) {
+      // Reachability check: pass when response matches the expected guarded failure
+      const matchesStatus = response.status === scenario.expectFailure.status;
+      const matchesBody = !scenario.expectFailure.bodyIncludes
+        || text.toLowerCase().includes(scenario.expectFailure.bodyIncludes.toLowerCase());
+      if (matchesStatus && matchesBody) {
+        status = "pass";
+        schemaHash = await hashSchema(responseData);
+      } else {
+        status = "fail";
+        errorMessage = `Reachability check failed — expected HTTP ${scenario.expectFailure.status}`
+          + (scenario.expectFailure.bodyIncludes ? ` with body containing "${scenario.expectFailure.bodyIncludes}"` : "")
+          + `, got HTTP ${response.status}: ${text.substring(0, 200)}`;
+      }
     } else if (!response.ok) {
       status = "fail";
       errorMessage = `HTTP ${response.status}: ${text.substring(0, 300)}`;
