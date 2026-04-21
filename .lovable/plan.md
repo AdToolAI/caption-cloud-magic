@@ -1,101 +1,66 @@
 
-## Bugfix: KI-Bild-Szenen werden im Vollvideo als schwarze Frames behandelt
 
-### Ursache
-Der Full-Preview-Player erkennt Bildszenen aktuell fast ausschließlich über `uploadType === 'image'`.
+## Feature: Szenen per Drag & Drop sortieren (Storyboard + Clips)
 
-Das ist fragil, weil bei frisch generierten KI-Bild-Szenen die lokale UI-State-Aktualisierung in `ClipsTab.tsx` nur `clipStatus` und `clipUrl` setzt — **nicht** `uploadType`. Gleichzeitig pollt `pollScenes()` nur diese Felder aus der DB:
+### Idee
+Statt nur ▲/▼-Buttons sollen Szenen direkt mit der Maus an die gewünschte Position gezogen werden können — sowohl im **Storyboard-Tab** als auch im **Clips-Tab**. Buttons bleiben als Fallback (Tastatur, Touch, Accessibility) erhalten.
 
-```ts
-.select('id, clip_status, clip_url, duration_seconds')
-```
+### Umsetzung
 
-Dadurch entsteht dieser Zustand:
-- Szene hat `clipSource: 'ai-image'`
-- Szene hat `clipUrl`
-- aber lokal fehlt `uploadType: 'image'`
+#### 1) Drag-&-Drop-Library: `@dnd-kit`
+Installiere `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`.
 
-Der Preview-Player behandelt sie dann als Video statt als Bild:
-- `<img>` wird nicht gerendert
-- beide `<video>`-Slots bleiben effektiv leer
-- Ergebnis: schwarzes Vollvideo
+Warum `@dnd-kit` und nicht z. B. `react-beautiful-dnd`:
+- Aktiv gepflegt, React-18-/19-kompatibel
+- Voll Touch- und Keyboard-zugänglich (Pfeiltasten + Space funktionieren weiter)
+- Kein Konflikt mit existierenden Click-Handlern (Buttons in der Karte bleiben klickbar)
+- Kleines Bundle (~10 KB gzipped)
 
-### Was ich ändern würde
+#### 2) Wiederverwendbarer `SortableSceneItem`-Wrapper
+**Neue Datei:** `src/components/video-composer/SortableSceneItem.tsx`
 
-#### 1) Bildszenen robust erkennen — nicht nur über `uploadType`
-**Datei:** `src/components/video-composer/ComposerSequencePreview.tsx`
+Dünner Wrapper um `useSortable()`, der:
+- die Karte als Drag-Item registriert
+- einen sichtbaren **Drag-Handle** (`GripVertical`-Icon) links an der Karte rendert — nur dieser Bereich startet das Ziehen, damit Klicks auf Buttons/Inputs in der Karte nicht versehentlich Drags auslösen
+- während des Ziehens die Karte leicht hebt (Schatten + 1.02-Scale + reduzierte Opacity am Originalplatz)
 
-Ein zentrales `isImageScene` ableiten, z. B. über:
-- `scene.uploadType === 'image'`
-- **oder** `scene.clipSource === 'ai-image'`
+#### 3) Integration im Storyboard-Tab
+**Datei:** `src/components/video-composer/StoryboardTab.tsx`
 
-Dann diese Logik überall im Player verwenden:
-- `currentScene`-Erkennung
-- `mediaUrl`
-- `preloadSlot()`
-- Image/Video-Transitions
-- Scrubbing
-- sichtbares `<img>` vs. `<video>`
+- `<DndContext>` + `<SortableContext>` um die Scene-Liste legen
+- Jede `SceneCard` in `SortableSceneItem` einwickeln
+- `onDragEnd` ruft die bestehende `moveScene`-Logik mit `arrayMove(scenes, oldIndex, newIndex)` auf und persistiert via `onUpdateScenes` (Auto-Save greift wie bisher)
+- Bestehende ▲/▼-Buttons in `SceneCard` bleiben unverändert
 
-Damit funktionieren KI-Bild-Szenen auch dann korrekt, wenn `uploadType` lokal noch nicht synchronisiert wurde.
-
-#### 2) Polling um `upload_type` erweitern
+#### 4) Integration im Clips-Tab
 **Datei:** `src/components/video-composer/ClipsTab.tsx`
 
-Die Poll-Abfrage erweitern auf:
-```ts
-.select('id, clip_status, clip_url, duration_seconds, upload_type')
-```
+- Gleiches Muster: `<DndContext>` + `<SortableContext>` um die Clip-Karten-Liste
+- Zusätzlich kleiner Order-Badge (#1, #2, …) links neben dem Drag-Handle für schnelle Orientierung
+- Reorder-Handler analog zum Storyboard-Tab; bestehender debounced Auto-Save in `useComposerPersistence` schreibt `order_index` per Two-Phase-Write korrekt zurück
+- Während aktiver Generierung (`clipStatus === 'generating'`): Drag bleibt erlaubt, weil Polling per Scene-`id` matcht — die laufende Edge-Function ist von der Reihenfolge unabhängig
 
-Und beim Mergen in die lokale Scene-State auch `uploadType` aktualisieren:
-```ts
-uploadType: dbScene.upload_type || scene.uploadType
-```
+#### 5) UX-Feinheiten
+- **Drag-Handle sichtbar**: kleiner `GripVertical`-Icon-Button mit `cursor-grab` / `active:cursor-grabbing`
+- **Drop-Indikator**: `@dnd-kit/sortable` animiert die Lücke automatisch — keine extra CSS-Arbeit nötig
+- **Scrolling**: Bei langen Listen wird automatisch gescrollt, wenn man eine Karte an den oberen/unteren Rand zieht (Built-in)
+- **Tastatur-Support**: Fokus auf Drag-Handle → Space hebt an → Pfeiltasten verschieben → Space legt ab. Voll barrierefrei.
+- **Touch**: Funktioniert auf Mobile/Tablet via `PointerSensor` mit kleiner Distanzschwelle (5 px), damit normales Scrollen nicht versehentlich Drags startet.
 
-So wird die UI nach DB-Sync sauber korrigiert.
-
-#### 3) Sofortige lokale Rückgabe für KI-Bilder vollständig übernehmen
-**Datei:** `src/components/video-composer/ClipsTab.tsx`
-
-Wenn `compose-video-clips` für `ai-image` direkt `status: 'ready'` + `clipUrl` zurückgibt, lokal zusätzlich sofort setzen:
-```ts
-uploadType: scene.clipSource === 'ai-image' ? 'image' : scene.uploadType
-```
-
-Dann funktioniert der Wechsel zu „Voiceover & Untertitel“ direkt ohne Reload oder Poll-Abwarten.
-
-#### 4) Thumbnail-Komponenten gegen denselben Fehler härten
-**Dateien:**
-- `src/components/video-composer/SceneClipProgress.tsx`
-- `src/components/video-composer/SceneCard.tsx`
-
-Auch dort nicht nur `uploadType === 'image'` prüfen, sondern denselben robusten Bild-Check verwenden. So bleiben Clips-Ansicht und Vollvideo logisch konsistent.
-
-### Empfohlene konkrete Logik
-Einheitliche Regel:
-```ts
-const isImageScene = (scene: ComposerScene | undefined) =>
-  !!scene && (scene.uploadType === 'image' || scene.clipSource === 'ai-image');
-```
-
-Für Bild-URLs:
-```ts
-const imageUrl = scene?.clipUrl || scene?.uploadUrl;
-```
-
-### Erwartetes Ergebnis nach dem Fix
-- KI-Bild-Szenen werden im Full Preview als echte Bilder angezeigt
-- kein schwarzer Player mehr bei `ai-image`-Storyboard-Projekten
-- Verhalten funktioniert direkt nach Generierung, nicht erst nach Reload
-- Clips-Tab, Scene Cards und Vollvideo behandeln Bildszenen überall gleich
+### Was bewusst nicht passiert
+- **Keine DB-Schema-Änderung.** `composer_scenes.order_index` bleibt wie es ist; die existierende Two-Phase-Write-Persistenz handhabt Umsortierungen bereits sauber.
+- **Buttons werden nicht entfernt.** ▲/▼ bleiben als sekundäre, immer sichtbare Option (besonders nützlich auf Touch-Geräten ohne Drag-Erfahrung).
+- **Kein Drag zwischen Tabs.** Innerhalb der jeweiligen Liste reicht.
 
 ### Verifikation
-1. Briefing → „KI Bild-Szenen“ wählen
-2. Storyboard generieren
-3. Im Clips-Tab alle Bilder generieren
-4. Direkt zu „Voiceover & Untertitel“ wechseln, ohne Reload
-5. Full Preview muss alle Szenen als Bilder zeigen, nicht schwarz
-6. Scrubbing, Play/Pause und Szenenwechsel müssen weiterhin funktionieren
+1. Storyboard-Tab → Szene per Drag-Handle ziehen → Reihenfolge ändert sich live
+2. Clips-Tab → dito; bereits generierte Clip-Vorschauen wandern korrekt mit
+3. Reload → neue Reihenfolge bleibt persistent
+4. Während Generierung umsortieren → fertige Clips landen bei der richtigen Szene
+5. Tastatur-Test: Tab zum Drag-Handle → Space → Pfeiltaste runter → Space → Position geändert
+6. Mobile/Touch: Long-Press auf Handle → ziehen funktioniert
 
-### Risiko
-Niedrig. Es ist eine gezielte UI-/State-Synchronisationskorrektur ohne Datenbankschema-Änderung.
+### Risiko & Aufwand
+- **Risiko: Niedrig.** Neue Library, aber gut isoliert in einem Wrapper. Bestehende Logik unverändert.
+- **Aufwand:** ~15 Minuten — 1 neue Datei (SortableSceneItem), 2 Datei-Anpassungen (StoryboardTab, ClipsTab), 1 Dependency-Install.
+
