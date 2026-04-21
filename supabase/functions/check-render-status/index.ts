@@ -6,22 +6,36 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function jsonResponse(body: Record<string, unknown>, status: number) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { renderId } = await req.json();
-
-    if (!renderId) {
-      throw new Error('Render ID is required');
+    // Parse body safely
+    let renderId: string | undefined;
+    try {
+      const body = await req.json();
+      renderId = body?.renderId;
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, 400);
     }
 
-    // Get user from auth token
+    if (!renderId) {
+      return jsonResponse({ error: 'Render ID is required' }, 400);
+    }
+
+    // Auth header check
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('Missing authorization header');
+      return jsonResponse({ error: 'Missing authorization header' }, 401);
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -35,7 +49,7 @@ serve(async (req) => {
     // Verify user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error('Unauthorized');
+      return jsonResponse({ error: 'Unauthorized' }, 401);
     }
 
     // Get render job status (RLS ensures user can only access their own renders)
@@ -44,38 +58,28 @@ serve(async (req) => {
       .select('*')
       .eq('render_id', renderId)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      throw new Error(`Failed to fetch render status: ${error.message}`);
+      console.error('DB error fetching render status:', error);
+      return jsonResponse({ error: `Failed to fetch render status: ${error.message}` }, 500);
     }
 
     if (!data) {
-      throw new Error('Render job not found or access denied');
+      return jsonResponse({ error: 'Render job not found or access denied' }, 404);
     }
 
-    return new Response(
-      JSON.stringify({
-        status: data.status,
-        downloadUrl: data.video_url,
-        error: data.error_message,
-        startedAt: data.started_at,
-        completedAt: data.completed_at,
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return jsonResponse({
+      status: data.status,
+      downloadUrl: data.video_url,
+      error: data.error_message,
+      startedAt: data.started_at,
+      completedAt: data.completed_at,
+    }, 200);
 
   } catch (error) {
-    console.error('Error checking render status:', error);
+    console.error('Unexpected error checking render status:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return jsonResponse({ error: errorMessage }, 500);
   }
 });
