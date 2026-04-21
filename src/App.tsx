@@ -109,6 +109,7 @@ const FeatureFlagDemo = lazy(() => import("./pages/FeatureFlagDemo"));
 const UsageReports = lazy(() => import("./pages/Analytics/UsageReports"));
 const PlatformAnalytics = lazy(() => import("./pages/Analytics/PlatformAnalytics"));
 const Admin = lazy(() => import("./pages/Admin"));
+const LambdaHealth = lazy(() => import("./pages/admin/LambdaHealth"));
 
 const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
 const KlingVideoStudio = lazy(() => import("./pages/KlingVideoStudio"));
@@ -278,6 +279,11 @@ function AppLayout() {
           <Route path="/admin/analytics" element={
             <ProtectedRoute requireRole="admin">
               <AdminAnalytics />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/lambda-health" element={
+            <ProtectedRoute requireRole="admin">
+              <LambdaHealth />
             </ProtectedRoute>
           } />
           
