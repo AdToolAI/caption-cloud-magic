@@ -12,9 +12,14 @@ interface SceneClipProgressProps {
  * video on ready, and friendly placeholder when pending.
  */
 export function SceneClipProgress({ scene, index }: SceneClipProgressProps) {
+  // Robust image detection: covers AI-image scenes whose uploadType
+  // hasn't synced yet but whose clipSource already identifies them.
+  const isImageScene =
+    scene.uploadType === 'image' || scene.clipSource === 'ai-image';
+
   // READY → show video / image
   if (scene.clipUrl && scene.clipStatus === 'ready') {
-    if (scene.uploadType === 'image') {
+    if (isImageScene) {
       return (
         <div className="relative w-full h-full">
           <img src={scene.clipUrl} alt={`Szene ${index + 1}`} className="w-full h-full object-cover" />

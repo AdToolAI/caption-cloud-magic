@@ -232,10 +232,18 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
       const updatedScenes = optimistic.map(scene => {
         const result = data?.results?.find((r: any) => r.sceneId === scene.id);
         if (result) {
+          const isAiImage = scene.clipSource === 'ai-image';
           return {
             ...scene,
             clipStatus: result.status as any,
             clipUrl: result.clipUrl || scene.clipUrl,
+            // For ai-image scenes that resolve immediately to 'ready', mark
+            // uploadType 'image' so the preview player picks the <img> path
+            // without waiting for a DB poll cycle.
+            uploadType:
+              isAiImage && result.status === 'ready'
+                ? 'image'
+                : scene.uploadType,
             replicatePredictionId: result.predictionId || scene.replicatePredictionId,
           };
         }
@@ -310,11 +318,18 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
 
       const result = data?.results?.[0];
       if (result) {
-        const updatedScenes = pScenes.map(s =>
-          s.id === targetScene.id
-            ? { ...s, clipStatus: result.status, clipUrl: result.clipUrl || s.clipUrl, replicatePredictionId: result.predictionId || s.replicatePredictionId }
-            : s
-        );
+        const updatedScenes = pScenes.map(s => {
+          if (s.id !== targetScene.id) return s;
+          const isAiImage = s.clipSource === 'ai-image';
+          return {
+            ...s,
+            clipStatus: result.status,
+            clipUrl: result.clipUrl || s.clipUrl,
+            uploadType:
+              isAiImage && result.status === 'ready' ? 'image' : s.uploadType,
+            replicatePredictionId: result.predictionId || s.replicatePredictionId,
+          };
+        });
         onUpdateScenes(updatedScenes);
       }
       toast({ title: 'Generierung gestartet', description: `Szene ${(targetScene.orderIndex ?? 0) + 1}` });
