@@ -387,31 +387,55 @@ Generate the storyboard using the create_storyboard function.`;
       return prompt.replace(/[.\s,]*$/, '') + visualStyleHint;
     };
 
-    const scenes = parsed.scenes.map((s: any, index: number) => ({
-      id: `scene_${Date.now()}_${index}`,
-      projectId: "",
-      orderIndex: index,
-      sceneType: s.sceneType || "custom",
-      durationSeconds: Math.max(3, Math.min(15, s.durationSeconds || 5)),
-      clipSource: "ai-hailuo",
-      aiPrompt: appendStyle(s.aiPrompt || ""),
-      stockKeywords: s.stockKeywords || "",
-      clipStatus: "pending",
-      textOverlay: {
-        text: s.textOverlayText || "",
-        position: s.textPosition || "bottom",
-        animation: s.textAnimation || "fade-in",
-        fontSize: 48,
-        color: "#FFFFFF",
-      },
-      transitionType: s.transitionType || "fade",
-      transitionDuration: 0.5,
-      retryCount: 0,
-      costEuros: 1.2, // Default Hailuo cost
-      ...(s.characterShot && s.characterShot.shotType
-        ? { characterShot: { characterId: s.characterShot.characterId || "", shotType: s.characterShot.shotType } }
-        : {}),
-    }));
+    // Determine default clipSource based on videoMode:
+    // - 'video' → ai-hailuo (existing default)
+    // - 'image' → ai-image (Gemini stills + Ken-Burns)
+    // - 'mixed' → hook + cta as ai-hailuo (premium hero shots), rest as ai-image
+    const videoMode: VideoMode = briefing.videoMode || 'video';
+    const brandColor = briefing.brandColors?.[0];
+
+    const pickClipSource = (sceneType: string, idx: number, total: number): string => {
+      if (videoMode === 'image') return 'ai-image';
+      if (videoMode === 'mixed') {
+        const isHero = sceneType === 'hook' || sceneType === 'cta' || idx === 0 || idx === total - 1;
+        return isHero ? 'ai-hailuo' : 'ai-image';
+      }
+      return 'ai-hailuo';
+    };
+
+    const scenes = parsed.scenes.map((s: any, index: number, arr: any[]) => {
+      const aiEffects = sanitizeEffects(s.effects);
+      const finalEffects = aiEffects.length > 0
+        ? aiEffects.map(e => ({ ...e, color: e.color || brandColor }))
+        : getDefaultEffects(s.sceneType || 'custom', visualStyleId, brandColor);
+      const clipSource = pickClipSource(s.sceneType || 'custom', index, arr.length);
+      return {
+        id: `scene_${Date.now()}_${index}`,
+        projectId: "",
+        orderIndex: index,
+        sceneType: s.sceneType || "custom",
+        durationSeconds: Math.max(3, Math.min(15, s.durationSeconds || 5)),
+        clipSource,
+        aiPrompt: appendStyle(s.aiPrompt || ""),
+        stockKeywords: s.stockKeywords || "",
+        clipStatus: "pending",
+        textOverlay: {
+          text: s.textOverlayText || "",
+          position: s.textPosition || "bottom",
+          animation: s.textAnimation || "fade-in",
+          fontSize: 48,
+          color: "#FFFFFF",
+        },
+        transitionType: s.transitionType || "fade",
+        transitionDuration: 0.5,
+        retryCount: 0,
+        costEuros: clipSource === 'ai-image' ? 0.05 : 1.2,
+        effects: finalEffects,
+        ...(s.characterShot && s.characterShot.shotType
+          ? { characterShot: { characterId: s.characterShot.characterId || "", shotType: s.characterShot.shotType } }
+          : {}),
+      };
+    });
 
     return new Response(JSON.stringify({ scenes, sceneCount: scenes.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
