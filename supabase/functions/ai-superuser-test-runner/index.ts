@@ -27,6 +27,8 @@ interface Scenario {
   optional?: boolean;
   /** If set, the scenario passes when the response matches this expected failure (used for security-protected endpoints like signature-guarded webhooks) */
   expectFailure?: { status: number; bodyIncludes?: string };
+  /** If true, any HTTP response with status < 500 counts as pass (endpoint is reachable). Use for webhooks/endpoints where the response shape varies but reachability is what we care about. */
+  expectReachable?: boolean;
   /** Direct external HTTP call (bypasses Supabase functions). Useful for provider reachability checks. */
   directCall?: {
     url: string;
@@ -204,14 +206,14 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
-    name: "OpenAI / Sora Reachability",
+    name: "Sora 2 (via Replicate) Reachability",
     category: "fast",
     optional: true,
-    secretEnv: "OPENAI_API_KEY",
+    secretEnv: "REPLICATE_API_KEY",
     directCall: {
-      url: "https://api.openai.com/v1/models",
+      url: "https://api.replicate.com/v1/models/openai/sora-2",
       method: "GET",
-      headers: { Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY") || ""}` },
+      headers: { Authorization: `Token ${Deno.env.get("REPLICATE_API_KEY") || ""}` },
     },
   },
   {
@@ -240,8 +242,8 @@ const SCENARIOS: Scenario[] = [
     fn: "remotion-webhook",
     body: { _test: true },
     optional: true,
-    // Webhook should reject unsigned/invalid POST → reachability proven by any 4xx
-    expectFailure: { status: 400 },
+    // Webhook accepts any POST (no signature guard); we only verify the endpoint responds (any non-5xx)
+    expectReachable: true,
   },
   {
     name: "Render Queue Manager",
@@ -486,6 +488,15 @@ async function runScenario(scenario: Scenario, ctx: TestContext, triggeredBy: st
         errorMessage = `Reachability check failed — expected HTTP ${scenario.expectFailure.status}`
           + (scenario.expectFailure.bodyIncludes ? ` with body containing "${scenario.expectFailure.bodyIncludes}"` : "")
           + `, got HTTP ${response.status}: ${text.substring(0, 200)}`;
+      }
+    } else if (scenario.expectReachable) {
+      // Loose reachability: any non-5xx status means the endpoint is alive
+      if (response.status < 500) {
+        status = "pass";
+        schemaHash = await hashSchema(responseData);
+      } else {
+        status = "fail";
+        errorMessage = `Endpoint unreachable — HTTP ${response.status}: ${text.substring(0, 200)}`;
       }
     } else if (!response.ok) {
       status = "fail";

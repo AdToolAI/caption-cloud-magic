@@ -33,7 +33,7 @@ const ACTIVE_SCENARIOS = new Set<string>([
   // Phase 3 — Provider Reachability
   'Replicate API Health',
   'ElevenLabs Quota Check',
-  'OpenAI / Sora Reachability',
+  'Sora 2 (via Replicate) Reachability',
   'Lovable AI Gateway Reachability',
   // Phase 3 — Render Pipeline Health
   'Lambda Render Webhook Reachability',
