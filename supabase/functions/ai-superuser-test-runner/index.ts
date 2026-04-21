@@ -19,13 +19,23 @@ const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 interface Scenario {
   name: string;
   category: "fast" | "slow";
-  fn: string;
-  body: Record<string, unknown> | ((ctx: TestContext) => Record<string, unknown>);
+  /** Edge function name to invoke (omit if using directCall) */
+  fn?: string;
+  body?: Record<string, unknown> | ((ctx: TestContext) => Record<string, unknown>);
   expectedKeys?: string[];
   /** If true, skip if function does not exist (404) — treat as warning instead of fail */
   optional?: boolean;
   /** If set, the scenario passes when the response matches this expected failure (used for security-protected endpoints like signature-guarded webhooks) */
   expectFailure?: { status: number; bodyIncludes?: string };
+  /** Direct external HTTP call (bypasses Supabase functions). Useful for provider reachability checks. */
+  directCall?: {
+    url: string;
+    method: "GET" | "POST" | "HEAD";
+    headers?: Record<string, string>;
+    body?: unknown;
+  };
+  /** Required env var (secret). If missing, scenario is reported as warning ("key not configured") instead of fail. */
+  secretEnv?: string;
 }
 
 interface TestContext {
@@ -170,6 +180,91 @@ const SCENARIOS: Scenario[] = [
     body: {},
     optional: true,
   },
+  // ─── Phase 3: Provider Reachability (Block A) ───
+  {
+    name: "Replicate API Health",
+    category: "fast",
+    optional: true,
+    secretEnv: "REPLICATE_API_KEY",
+    directCall: {
+      url: "https://api.replicate.com/v1/account",
+      method: "GET",
+      headers: { Authorization: `Token ${Deno.env.get("REPLICATE_API_KEY") || ""}` },
+    },
+  },
+  {
+    name: "ElevenLabs Quota Check",
+    category: "fast",
+    optional: true,
+    secretEnv: "ELEVENLABS_API_KEY",
+    directCall: {
+      url: "https://api.elevenlabs.io/v1/user/subscription",
+      method: "GET",
+      headers: { "xi-api-key": Deno.env.get("ELEVENLABS_API_KEY") || "" },
+    },
+  },
+  {
+    name: "OpenAI / Sora Reachability",
+    category: "fast",
+    optional: true,
+    secretEnv: "OPENAI_API_KEY",
+    directCall: {
+      url: "https://api.openai.com/v1/models",
+      method: "GET",
+      headers: { Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY") || ""}` },
+    },
+  },
+  {
+    name: "Lovable AI Gateway Reachability",
+    category: "fast",
+    optional: true,
+    secretEnv: "LOVABLE_API_KEY",
+    directCall: {
+      url: "https://ai.gateway.lovable.dev/v1/chat/completions",
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY") || ""}`,
+        "Content-Type": "application/json",
+      },
+      body: {
+        model: "google/gemini-2.5-flash-lite",
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 5,
+      },
+    },
+  },
+  // ─── Phase 3: Render Pipeline Health (Block B) ───
+  {
+    name: "Lambda Render Webhook Reachability",
+    category: "fast",
+    fn: "remotion-webhook",
+    body: { _test: true },
+    optional: true,
+    // Webhook should reject unsigned/invalid POST → reachability proven by any 4xx
+    expectFailure: { status: 400 },
+  },
+  {
+    name: "Render Queue Manager",
+    category: "fast",
+    fn: "render-queue-manager",
+    body: { dry_run: true },
+    optional: true,
+  },
+  {
+    name: "Health-Check Aggregator",
+    category: "fast",
+    fn: "health-check",
+    body: {},
+    optional: true,
+  },
+  // ─── Phase 3: Storage Integrity (Block C) ───
+  {
+    name: "Storage Bucket Health",
+    category: "fast",
+    fn: "storage-bucket-health",
+    body: {},
+    optional: true,
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────
@@ -308,14 +403,14 @@ async function hashSchema(obj: unknown): Promise<string> {
 
 async function runScenario(scenario: Scenario, ctx: TestContext, triggeredBy: string): Promise<void> {
   const startTime = Date.now();
-  const requestBody = typeof scenario.body === "function" ? scenario.body(ctx) : scenario.body;
+  const requestBody = typeof scenario.body === "function" ? scenario.body(ctx) : (scenario.body ?? null);
 
   const { data: runRow } = await adminClient
     .from("ai_superuser_runs")
     .insert({
       scenario_name: scenario.name,
       status: "running",
-      full_request_json: requestBody,
+      full_request_json: requestBody ?? scenario.directCall ?? {},
       triggered_by: triggeredBy,
     })
     .select("id")
@@ -328,19 +423,44 @@ async function runScenario(scenario: Scenario, ctx: TestContext, triggeredBy: st
   let responseData: unknown = null;
   let schemaHash: string | null = null;
 
+  // Pre-flight: warn (not fail) if a required provider key is not configured
+  if (scenario.secretEnv && !Deno.env.get(scenario.secretEnv)) {
+    status = "warning";
+    errorMessage = `${scenario.secretEnv} not configured — provider reachability skipped`;
+    const latencyMs = Date.now() - startTime;
+    if (runId) {
+      await adminClient.from("ai_superuser_runs").update({
+        status, latency_ms: latencyMs, http_status: null,
+        error_message: errorMessage, response_schema_hash: null,
+        full_response_json: null, completed_at: new Date().toISOString(),
+      }).eq("id", runId);
+    }
+    console.log(`[Superuser] ${scenario.name}: warning (missing ${scenario.secretEnv})`);
+    return;
+  }
+
   try {
-    const url = `${SUPABASE_URL}/functions/v1/${scenario.fn}`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Use real user JWT for auth-protected functions
-        "Authorization": `Bearer ${ctx.userJwt}`,
-        "apikey": ANON_KEY,
-        "X-AI-Superuser": "true",
-      },
-      body: JSON.stringify(requestBody),
-    });
+    let response: Response;
+    if (scenario.directCall) {
+      response = await fetch(scenario.directCall.url, {
+        method: scenario.directCall.method,
+        headers: scenario.directCall.headers || {},
+        body: scenario.directCall.body ? JSON.stringify(scenario.directCall.body) : undefined,
+      });
+    } else {
+      const url = `${SUPABASE_URL}/functions/v1/${scenario.fn}`;
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // Use real user JWT for auth-protected functions
+          "Authorization": `Bearer ${ctx.userJwt}`,
+          "apikey": ANON_KEY,
+          "X-AI-Superuser": "true",
+        },
+        body: JSON.stringify(requestBody ?? {}),
+      });
+    }
 
     httpStatus = response.status;
     const text = await response.text();
