@@ -71,11 +71,13 @@ serve(async (req) => {
     const authUrl = buildAuthUrl(state);
 
     const tiktokEnv = Deno.env.get('TIKTOK_ENV') || 'production';
+    const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI');
     console.log(`Redirecting to TikTok OAuth (${tiktokEnv}):`, {
       userId: user.id,
       state,
       returnTo: safeReturnTo,
-      env: tiktokEnv
+      env: tiktokEnv,
+      redirect_uri: redirectUri
     });
 
     return new Response(
