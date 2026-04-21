@@ -14,7 +14,11 @@ const CRITICAL_FUNCTIONS = [
   'get-credits',
   'render-with-remotion',
   'generate-caption',
-  
+  // TikTok integration functions
+  'tiktok-sync',
+  'tiktok-oauth-start',
+  'tiktok-health',
+  'publish-to-tiktok',
 ];
 
 Deno.serve(async (req) => {
