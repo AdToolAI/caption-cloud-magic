@@ -705,3 +705,6 @@ verify_jwt = false
 
 [functions.email-unsubscribe]
 verify_jwt = false
+
+[functions.lambda-health-monitor]
+verify_jwt = false
