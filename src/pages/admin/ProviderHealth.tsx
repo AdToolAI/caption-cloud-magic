@@ -63,7 +63,7 @@ export const ProviderHealth = () => {
         supabase.from('system_config').select('value').eq('key', 'lambda_max_concurrent').maybeSingle(),
         supabase.from('render_queue').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
       ]);
-      const max = Number(cfgRow?.value ?? 6);
+      const max = Number(cfgRow?.value ?? 25);
       setLambdaInfo({ active: activeRenders ?? 0, max });
 
       setRows(built);
