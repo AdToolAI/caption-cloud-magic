@@ -15,6 +15,16 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Warmup ping early-return (no auth required)
+  try {
+    const body = await req.clone().json().catch(() => ({}));
+    if (body?.warmup) {
+      return new Response(JSON.stringify({ warmed: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+  } catch (_) { /* ignore */ }
+
   try {
     const accessToken = Deno.env.get('TIKTOK_ACCESS_TOKEN');
 
