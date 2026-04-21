@@ -21,6 +21,22 @@ import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { SortableSceneItem } from './SortableSceneItem';
 
 interface ClipsTabProps {
   scenes: ComposerScene[];
@@ -55,6 +71,22 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
   const dismissRerollHint = () => {
     setRerollHintDismissed(true);
     try { localStorage.setItem('composer-reroll-hint-dismissed', '1'); } catch {}
+  };
+
+  // Drag & drop sensors for reordering scenes within the Clips tab
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = scenes.findIndex((s) => s.id === active.id);
+    const newIndex = scenes.findIndex((s) => s.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const reordered = arrayMove(scenes, oldIndex, newIndex);
+    onUpdateScenes(reordered.map((s, i) => ({ ...s, orderIndex: i })));
   };
 
   const allReady = scenes.every((s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && s.uploadUrl));
@@ -478,9 +510,11 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
       </AlertDialog>
 
       {/* Clip Cards */}
-      <div className="grid gap-3">
-        {scenes.map((scene, i) => {
-          const status = statusConfig[scene.clipStatus] || statusConfig.pending;
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+          <div className="grid gap-3">
+            {scenes.map((scene, i) => {
+              const status = statusConfig[scene.clipStatus] || statusConfig.pending;
           const sceneQuality = scene.clipQuality || 'standard';
           const costPerClip = scene.clipSource.startsWith('ai-')
             ? getClipCost(scene.clipSource, sceneQuality, scene.durationSeconds)
@@ -492,7 +526,14 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           const isThisGenerating = singleGenerating[scene.id] || scene.clipStatus === 'generating';
 
           return (
-            <Card key={scene.id} className="border-border/40 bg-card/80 overflow-hidden">
+            <SortableSceneItem
+              key={scene.id}
+              id={scene.id}
+              badge={
+                <span className="text-[10px] font-mono text-muted-foreground/70 px-1">#{i + 1}</span>
+              }
+            >
+            <Card className="border-border/40 bg-card/80 overflow-hidden">
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-stretch gap-3">
                   {/* Larger preview slot */}
@@ -710,9 +751,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                 )}
               </CardContent>
             </Card>
+            </SortableSceneItem>
           );
         })}
-      </div>
+          </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }
