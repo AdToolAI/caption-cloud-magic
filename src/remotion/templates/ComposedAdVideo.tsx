@@ -281,8 +281,12 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
               >
                 <Scene
                   videoUrl={scene.videoUrl}
+                  isImage={scene.isImage}
+                  durationInFrames={sceneFrames[i]}
+                  sceneIndex={i}
                   textOverlay={scene.textOverlay}
                   kineticText={kineticText}
+                  effects={scene.effects}
                 />
               </TransitionSeries.Sequence>
               {i < scenes.length - 1 && (
