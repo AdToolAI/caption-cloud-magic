@@ -6,6 +6,22 @@ import SceneCard from './SceneCard';
 import type { ComposerScene, ClipSource, ComposerCharacter } from '@/types/video-composer';
 import { DEFAULT_TEXT_OVERLAY, getClipCost, getClipRate } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { SortableSceneItem } from './SortableSceneItem';
 
 interface StoryboardTabProps {
   scenes: ComposerScene[];
@@ -76,6 +92,21 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
     const [moved] = updated.splice(fromIndex, 1);
     updated.splice(toIndex, 0, moved);
     onUpdateScenes(updated.map((s, i) => ({ ...s, orderIndex: i })));
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = scenes.findIndex((s) => s.id === active.id);
+    const newIndex = scenes.findIndex((s) => s.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const reordered = arrayMove(scenes, oldIndex, newIndex);
+    onUpdateScenes(reordered.map((s, i) => ({ ...s, orderIndex: i })));
   };
 
   const totalDuration = scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
@@ -164,23 +195,28 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {scenes.map((scene, index) => (
-            <SceneCard
-              key={scene.id}
-              scene={scene}
-              index={index}
-              totalScenes={scenes.length}
-              projectId={projectId}
-              characters={characters}
-              onUpdate={(updates) => updateScene(scene.id, updates)}
-              onDelete={() => deleteScene(scene.id)}
-              onMoveUp={() => moveScene(index, index - 1)}
-              onMoveDown={() => moveScene(index, index + 1)}
-              language={language}
-            />
-          ))}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-3">
+              {scenes.map((scene, index) => (
+                <SortableSceneItem key={scene.id} id={scene.id}>
+                  <SceneCard
+                    scene={scene}
+                    index={index}
+                    totalScenes={scenes.length}
+                    projectId={projectId}
+                    characters={characters}
+                    onUpdate={(updates) => updateScene(scene.id, updates)}
+                    onDelete={() => deleteScene(scene.id)}
+                    onMoveUp={() => moveScene(index, index - 1)}
+                    onMoveDown={() => moveScene(index, index + 1)}
+                    language={language}
+                  />
+                </SortableSceneItem>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   );
