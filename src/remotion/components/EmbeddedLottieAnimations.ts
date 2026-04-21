@@ -1,8 +1,5 @@
 /**
  * 🚫 LOTTIE DEPRECATED — STUB FILE
- * 
- * Die Embedded-Lottie-Animationen wurden entfernt.
- * Diese Datei existiert nur noch als No-Op-Stub für Backward-Compat.
  */
 
 import type { LottieAnimationData } from '../utils/premiumLottieLoader';
@@ -27,10 +24,10 @@ export const VISEME_FRAME_MAP: Record<string, MouthFrameConfig> = {
 
 const NULL_ANIM: LottieAnimationData = {};
 
-export function createEmbeddedIdleAnimation(_color?: string): LottieAnimationData { return NULL_ANIM; }
-export function createEmbeddedWavingAnimation(_color?: string): LottieAnimationData { return NULL_ANIM; }
-export function createEmbeddedThinkingAnimation(_color?: string): LottieAnimationData { return NULL_ANIM; }
-export function createEmbeddedCelebratingAnimation(_color?: string): LottieAnimationData { return NULL_ANIM; }
-export function createEmbeddedPointingAnimation(_color?: string): LottieAnimationData { return NULL_ANIM; }
-export function createEmbeddedExplainingAnimation(_color?: string): LottieAnimationData { return NULL_ANIM; }
-export function createEmbeddedMouthShapesAnimation(_color?: string): LottieAnimationData { return NULL_ANIM; }
+export const createEmbeddedIdleAnimation = (_color?: string, _skin?: string): LottieAnimationData => NULL_ANIM;
+export const createEmbeddedWavingAnimation = (_color?: string, _skin?: string): LottieAnimationData => NULL_ANIM;
+export const createEmbeddedThinkingAnimation = (_color?: string, _skin?: string): LottieAnimationData => NULL_ANIM;
+export const createEmbeddedCelebratingAnimation = (_color?: string, _skin?: string): LottieAnimationData => NULL_ANIM;
+export const createEmbeddedPointingAnimation = (_color?: string, _skin?: string): LottieAnimationData => NULL_ANIM;
+export const createEmbeddedExplainingAnimation = (_color?: string, _skin?: string): LottieAnimationData => NULL_ANIM;
+export const createEmbeddedMouthShapesAnimation = (_color?: string, _skin?: string): LottieAnimationData => NULL_ANIM;
