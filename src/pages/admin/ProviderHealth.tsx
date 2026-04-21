@@ -234,7 +234,8 @@ export const ProviderHealth = () => {
           <p>• Jeder API-Call wird in <code className="text-xs bg-muted px-1 py-0.5 rounded">provider_quota_log</code> erfasst.</p>
           <p>• Aggregation läuft jede Minute, Anzeige aktualisiert alle 30 Sekunden.</p>
           <p>• Bei <strong>≥80% Auslastung</strong> wird automatisch eine E-Mail-Warnung an Admins gesendet (Cooldown 60 Min).</p>
-          <p>• Lambda-Concurrency wird vom <strong>Circuit Breaker</strong> automatisch zwischen 3 und 6 angepasst.</p>
+          <p>• Lambda-Concurrency wird vom <strong>Circuit Breaker</strong> automatisch zwischen <strong>{lambdaInfo?.safe ?? 15}</strong> (Safe) und <strong>{lambdaInfo?.max ?? 25}</strong> (Normal) angepasst.</p>
+          <p>• <strong>Kill-Switch</strong> (oben rechts, nur Admin): drosselt im Notfall sofort auf <strong>10</strong> parallele Renders.</p>
         </CardContent>
       </Card>
     </div>
