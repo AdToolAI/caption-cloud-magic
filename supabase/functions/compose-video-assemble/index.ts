@@ -157,13 +157,25 @@ serve(async (req) => {
     // 6. Build Remotion input props — pass DB transition choice through to renderer
     const ALLOWED_TRANSITIONS = new Set(['none', 'fade', 'crossfade', 'wipe', 'slide', 'zoom']);
 
+    // ── Image vs Video detection ────────────────────────────────────
+    // AI-image scenes (e.g. *.png from gemini/flux) must NOT be probed as MP4
+    // (would fail) and must be flagged so the renderer routes them through
+    // <KenBurnsImage> instead of <Video> (which crashes with "Code 4 - Media
+    // playback error" on a PNG URL).
+    const isImageScene = (s: any) =>
+      s?.clip_source === 'ai-image' ||
+      s?.upload_type === 'image' ||
+      /\.(png|jpe?g|webp|avif|gif)(\?|$)/i.test(s?.clip_url || '');
+
     // ── Probe REAL mp4 durations to prevent rubber-band stretching ──
     // Hailuo & co. report nominal durations (e.g. "7s") but produce 5.875s files at 24fps.
     // <TransitionSeries.Sequence durationInFrames={210}> would then stretch the 5.875s
     // video to 7s → visible speed warp at every transition. Probe each clip's real
     // duration via mp4 mvhd box parsing and pass it to the renderer so it can clamp.
+    // Image scenes are skipped entirely — they have no decoded duration.
     const probedDurations = await Promise.all(
       (scenes || []).map(async (s: any) => {
+        if (isImageScene(s)) return null;
         try {
           const dur = await probeMp4Duration(s.clip_url);
           if (dur && dur > 0) {
@@ -184,15 +196,18 @@ serve(async (req) => {
         ? Math.max(0, Number(s.transition_duration))
         : 0.4;
       const nominalDuration = s.duration_seconds || 5;
+      const sceneIsImage = isImageScene(s);
       const realDuration = probedDurations[idx];
       // Use REAL video duration if available — this is the single most important
       // anti-rubber-band fix. Without it, Sequence/Video length mismatch causes
-      // Remotion to time-warp the video.
-      const effectiveDuration = realDuration && realDuration > 0
-        ? realDuration
-        : nominalDuration;
+      // Remotion to time-warp the video. Image scenes always use nominal duration.
+      const effectiveDuration = sceneIsImage
+        ? nominalDuration
+        : (realDuration && realDuration > 0 ? realDuration : nominalDuration);
       return {
         videoUrl: s.clip_url,
+        // Flag for the renderer: route through <KenBurnsImage> instead of <Video>.
+        isImage: sceneIsImage,
         // Single source of truth: durationSeconds IS the real (probed) length
         // when available. The renderer takes this 1:1 — no further clamping.
         durationSeconds: effectiveDuration,
