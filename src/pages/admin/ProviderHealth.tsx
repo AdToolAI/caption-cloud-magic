@@ -100,6 +100,23 @@ export const ProviderHealth = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const handleKillSwitch = async () => {
+    setKilling(true);
+    try {
+      const { error } = await supabase
+        .from('system_config')
+        .update({ value: 10, updated_at: new Date().toISOString() })
+        .eq('key', 'lambda_max_concurrent');
+      if (error) throw error;
+      toast.success('Kill-Switch aktiviert: lambda_max_concurrent = 10');
+      await load();
+    } catch (e: any) {
+      toast.error(`Kill-Switch fehlgeschlagen: ${e?.message ?? 'unbekannt'}`);
+    } finally {
+      setKilling(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -109,7 +126,35 @@ export const ProviderHealth = () => {
             Live-Auslastung externer Anbieter • Stand: {lastUpdate.toLocaleTimeString('de-DE')}
           </p>
         </div>
-        {loading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+        <div className="flex items-center gap-3">
+          {loading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+          {isAdmin && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={killing} className="gap-2">
+                  <ShieldAlert className="w-4 h-4" />
+                  Notfall: Lambda auf 10 zurück
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Kill-Switch aktivieren?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Setzt <code className="font-mono">lambda_max_concurrent</code> sofort auf <strong>10</strong>.
+                    Neue Renders werden stark gedrosselt — laufende Jobs nicht abgebrochen.
+                    Nutzen nur im Notfall (z. B. AWS-Throttling, Massenfehler).
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleKillSwitch}>
+                    Ja, drosseln auf 10
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
