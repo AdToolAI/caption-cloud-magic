@@ -1,86 +1,101 @@
 
+## Bugfix: KI-Bild-Szenen werden im Vollvideo als schwarze Frames behandelt
 
-## Bugfix: Schwarze Szenen statt KI-Bilder + fehlender Übersetzungs-Key
+### Ursache
+Der Full-Preview-Player erkennt Bildszenen aktuell fast ausschließlich über `uploadType === 'image'`.
 
-### Problem 1: Bilder werden generiert, aber nicht angezeigt
-
-Die Edge-Function `generate-composer-image-scene` läuft erfolgreich (200, ~14-19s) und schreibt das Bild korrekt in die DB:
-
-```ts
-.update({
-  clip_url: publicUrl,        // ← Bild-URL landet hier
-  clip_status: 'ready',
-  upload_type: 'image',       // ← korrekt gesetzt
-})
-```
-
-Aber der Player `ComposerSequencePreview.tsx` zeigt nur dann ein Bild an, wenn die URL in `uploadUrl` steht:
+Das ist fragil, weil bei frisch generierten KI-Bild-Szenen die lokale UI-State-Aktualisierung in `ClipsTab.tsx` nur `clipStatus` und `clipUrl` setzt — **nicht** `uploadType`. Gleichzeitig pollt `pollScenes()` nur diese Felder aus der DB:
 
 ```ts
-// Zeile 57-63: Filter
-const playable = scenes.filter(
-  s => s.clipUrl || (s.uploadType === 'image' && s.uploadUrl),
-);
-
-// Zeile 130: Welche URL wird angezeigt?
-const isImage = currentScene?.uploadType === 'image';
-const mediaUrl = isImage ? currentScene?.uploadUrl : currentScene?.clipUrl;
-//                          ^^^^^^^^^^^^^^^^^^^^^^^ 
-// Bei AI-Image ist uploadUrl undefined → mediaUrl = undefined
-//                          → <img src={undefined}> → schwarz
+.select('id, clip_status, clip_url, duration_seconds')
 ```
 
-Bei AI-generierten Bildern ist `uploadType = 'image'` UND `clipUrl` gesetzt, aber `uploadUrl` bleibt leer (es war ja kein User-Upload). Die Bedingung `isImage ? uploadUrl : clipUrl` greift dann auf `undefined` zu → schwarz.
+Dadurch entsteht dieser Zustand:
+- Szene hat `clipSource: 'ai-image'`
+- Szene hat `clipUrl`
+- aber lokal fehlt `uploadType: 'image'`
 
-### Fix 1: Player liest IMMER aus `clipUrl` für AI-Image-Szenen
+Der Preview-Player behandelt sie dann als Video statt als Bild:
+- `<img>` wird nicht gerendert
+- beide `<video>`-Slots bleiben effektiv leer
+- Ergebnis: schwarzes Vollvideo
 
+### Was ich ändern würde
+
+#### 1) Bildszenen robust erkennen — nicht nur über `uploadType`
 **Datei:** `src/components/video-composer/ComposerSequencePreview.tsx`
 
-Eine Zeile ändern (Zeile 130):
+Ein zentrales `isImageScene` ableiten, z. B. über:
+- `scene.uploadType === 'image'`
+- **oder** `scene.clipSource === 'ai-image'`
+
+Dann diese Logik überall im Player verwenden:
+- `currentScene`-Erkennung
+- `mediaUrl`
+- `preloadSlot()`
+- Image/Video-Transitions
+- Scrubbing
+- sichtbares `<img>` vs. `<video>`
+
+Damit funktionieren KI-Bild-Szenen auch dann korrekt, wenn `uploadType` lokal noch nicht synchronisiert wurde.
+
+#### 2) Polling um `upload_type` erweitern
+**Datei:** `src/components/video-composer/ClipsTab.tsx`
+
+Die Poll-Abfrage erweitern auf:
 ```ts
-// Vorher
-const mediaUrl = isImage ? currentScene?.uploadUrl : currentScene?.clipUrl;
-// Nachher — clipUrl als primäre Quelle, uploadUrl nur als Fallback für reine Uploads
-const mediaUrl = isImage 
-  ? (currentScene?.clipUrl || currentScene?.uploadUrl) 
-  : currentScene?.clipUrl;
+.select('id, clip_status, clip_url, duration_seconds, upload_type')
 ```
 
-Und für Konsistenz im `playable`-Filter (Zeile 57-63): bereits `s.clipUrl` ist Teil der Bedingung, daher passt das schon — die Szene erscheint im Player, nur die `<img>` zeigt das Falsche an.
-
-### Problem 2: Roher i18n-Key sichtbar (`videoComposer.sceneOf`)
-
-Im Screenshot steht oben links `videoComposer.sceneOf` als Klartext. Der Key existiert in keiner der 3 Sprachen in `src/lib/translations.ts` (EN/DE/ES).
-
-### Fix 2: Übersetzungs-Key in allen 3 Sprachen ergänzen
-
-**Datei:** `src/lib/translations.ts`
-
-In allen 3 Sprachblöcken (EN/DE/ES) im `videoComposer.*`-Bereich neben den existierenden Composer-Keys (z. B. neben `subtitlesShortLabel`):
-
+Und beim Mergen in die lokale Scene-State auch `uploadType` aktualisieren:
 ```ts
-// EN
-sceneOf: "Scene {current} of {total}",
-// DE
-sceneOf: "Szene {current} von {total}",
-// ES
-sceneOf: "Escena {current} de {total}",
+uploadType: dbScene.upload_type || scene.uploadType
 ```
 
-Der `useTranslation`-Hook unterstützt bereits Variablen-Interpolation (wie in anderen Keys mit `{count}` etc. zu sehen).
+So wird die UI nach DB-Sync sauber korrigiert.
+
+#### 3) Sofortige lokale Rückgabe für KI-Bilder vollständig übernehmen
+**Datei:** `src/components/video-composer/ClipsTab.tsx`
+
+Wenn `compose-video-clips` für `ai-image` direkt `status: 'ready'` + `clipUrl` zurückgibt, lokal zusätzlich sofort setzen:
+```ts
+uploadType: scene.clipSource === 'ai-image' ? 'image' : scene.uploadType
+```
+
+Dann funktioniert der Wechsel zu „Voiceover & Untertitel“ direkt ohne Reload oder Poll-Abwarten.
+
+#### 4) Thumbnail-Komponenten gegen denselben Fehler härten
+**Dateien:**
+- `src/components/video-composer/SceneClipProgress.tsx`
+- `src/components/video-composer/SceneCard.tsx`
+
+Auch dort nicht nur `uploadType === 'image'` prüfen, sondern denselben robusten Bild-Check verwenden. So bleiben Clips-Ansicht und Vollvideo logisch konsistent.
+
+### Empfohlene konkrete Logik
+Einheitliche Regel:
+```ts
+const isImageScene = (scene: ComposerScene | undefined) =>
+  !!scene && (scene.uploadType === 'image' || scene.clipSource === 'ai-image');
+```
+
+Für Bild-URLs:
+```ts
+const imageUrl = scene?.clipUrl || scene?.uploadUrl;
+```
+
+### Erwartetes Ergebnis nach dem Fix
+- KI-Bild-Szenen werden im Full Preview als echte Bilder angezeigt
+- kein schwarzer Player mehr bei `ai-image`-Storyboard-Projekten
+- Verhalten funktioniert direkt nach Generierung, nicht erst nach Reload
+- Clips-Tab, Scene Cards und Vollvideo behandeln Bildszenen überall gleich
 
 ### Verifikation
-
-1. Briefing → „KI Bild-Szenen" wählen → Storyboard generieren
-2. Clips-Tab → „Clips generieren" → 3 erfolgreiche `generate-composer-image-scene`-Calls (bereits in den Edge-Logs sichtbar ✓)
-3. Vorschau → Bilder werden angezeigt (statt Schwarz)
-4. Oben links steht z. B. „Szene 2 von 3" statt `videoComposer.sceneOf`
+1. Briefing → „KI Bild-Szenen“ wählen
+2. Storyboard generieren
+3. Im Clips-Tab alle Bilder generieren
+4. Direkt zu „Voiceover & Untertitel“ wechseln, ohne Reload
+5. Full Preview muss alle Szenen als Bilder zeigen, nicht schwarz
+6. Scrubbing, Play/Pause und Szenenwechsel müssen weiterhin funktionieren
 
 ### Risiko
-
-Sehr niedrig. Beide sind reine UI-Korrekturen. Bestehende Upload-Bilder funktionieren weiterhin (Fallback-Kette `clipUrl || uploadUrl`).
-
-### Aufwand
-
-~3 Minuten — eine Zeile im Player + 3 Übersetzungs-Keys.
-
+Niedrig. Es ist eine gezielte UI-/State-Synchronisationskorrektur ohne Datenbankschema-Änderung.
