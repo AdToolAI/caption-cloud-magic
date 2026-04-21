@@ -51,6 +51,11 @@ const ACTIVE_SCENARIOS = new Set<string>([
   'Subscription Status Check',
   // Phase 4 — Job Queue Health (Block F)
   'AI Queue Worker Reachability',
+  // Phase 5 — Final Coverage (Block G)
+  'Calendar Dispatcher Reachability',
+  'Web Push Notifications Reachability',
+  'Cloud Storage OAuth Reachability',
+  'Render Status Polling Reachability',
 ]);
 
 // Latency color thresholds (ms) — KI-Calls können legitim 5-10s dauern
@@ -63,8 +68,8 @@ const latencyClass = (ms: number | null | undefined): string => {
 
 // Aggregierte Latenz (Summe aller Szenarien) — andere Maßstäbe als Einzel-Calls
 const totalLatencyClass = (totalMs: number): string => {
-  if (totalMs < 80000) return 'text-green-500';
-  if (totalMs < 120000) return 'text-yellow-600 dark:text-yellow-400';
+  if (totalMs < 90000) return 'text-green-500';
+  if (totalMs < 130000) return 'text-yellow-600 dark:text-yellow-400';
   return 'text-destructive';
 };
 

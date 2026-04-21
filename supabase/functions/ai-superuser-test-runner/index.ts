@@ -326,6 +326,39 @@ const SCENARIOS: Scenario[] = [
     optional: true,
     expectReachable: true,
   },
+  // ─── Phase 5: Final Coverage (Block G) ───
+  {
+    name: "Calendar Dispatcher Reachability",
+    category: "fast",
+    fn: "calendar-publish-dispatcher",
+    body: {},
+    optional: true,
+    expectReachable: true,
+  },
+  {
+    name: "Web Push Notifications Reachability",
+    category: "fast",
+    fn: "send-push-notification",
+    body: { action: "get_vapid_key" },
+    optional: true,
+    expectReachable: true,
+  },
+  {
+    name: "Cloud Storage OAuth Reachability",
+    category: "fast",
+    fn: "cloud-storage-oauth",
+    body: {},
+    optional: true,
+    expectReachable: true,
+  },
+  {
+    name: "Render Status Polling Reachability",
+    category: "fast",
+    fn: "check-render-status",
+    body: { renderId: "ai-superuser-dummy-render-id" },
+    optional: true,
+    expectReachable: true,
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────
