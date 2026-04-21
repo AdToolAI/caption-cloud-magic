@@ -1,42 +1,55 @@
 
 
-## Bugfix: Leerzeichen in „Protagonist" und „Konflikt" werden geschluckt
+## Bugfix: Storyboard-Edge-Function ist defekt → „Image Mode" wird ignoriert
 
-### Das Problem
+### Symptom
+User wählt im Briefing **„KI Bild-Szenen"** (Image-Mode), aber im generierten Storyboard ist trotzdem **„KI (Hailuo)"** als Quelle aktiv.
 
-In `BriefingTab.tsx` werden beide Felder gemeinsam in `briefing.targetAudience` gespeichert (Format: `"Protagonist: ... | Conflict: ..."`). Beim Re-Render wird der Wert per Regex zurückgelesen — und dabei steht ein `.trim()` am Ende:
+### Root Cause
+`supabase/functions/compose-video-storyboard/index.ts` hat in den Zeilen **335-345** Code-Rest-Müll von einem unsauberen Edit:
 
 ```ts
-const protagonist = raw.match(/Protagonist:\s*([^|]*)/)?.[1]?.trim() || '';
-const conflict    = raw.match(/Conflict:\s*([^|]*)/)?.[1]?.trim() || '';
+        }),
+      });
+                },                          // ← Zombie-Code
+                required: ["scenes"],       // ← Zombie-Code
+                additionalProperties: false,// ← Zombie-Code
+              },                            // ← Zombie-Code
+            },                              // ← Zombie-Code
+          },                                // ← Zombie-Code
+        ],                                  // ← Zombie-Code
+        tool_choice: {...},                 // ← Zombie-Code
+      }),                                   // ← Zombie-Code
+    });                                     // ← Zombie-Code
 ```
 
-Da das `<Input>` controlled ist (`value={storyMeta.protagonist}`), passiert bei jedem Tastendruck:
+Diese 11 Zombie-Zeilen kommen **nach** dem korrekt geschlossenen `fetch(...)`-Call — sie sind syntaktisch valide JS-Object-Literale ohne Bezug, aber sie machen die Function entweder kaputt oder lassen sie auf ein älteres Deployment zurückfallen, das `videoMode` noch nicht kennt. Resultat: die Function liefert `clipSource: 'ai-hailuo'` (Default), egal was der User wählt.
 
-1. User tippt `"Maya "` (mit Space am Ende)
-2. State wird auf `"Protagonist: Maya  | Conflict: ..."` gesetzt
-3. Re-Render → Regex liest aus → `.trim()` macht daraus `"Maya"`
-4. Input zeigt wieder `"Maya"` — der Space ist weg
+Das ist auch der Grund, warum keine **Effekte** und keine **Mixed/Image-Szenen** im UI erscheinen — die ganze Phase-3-Logik läuft nie durch.
 
-→ **Es ist unmöglich, irgendwo ein Leerzeichen am Ende eines Wortes zu setzen**, was beim Tippen jedes mehr-Wort-Satzes nervt.
+### Fix
+**Datei:** `supabase/functions/compose-video-storyboard/index.ts`
 
-### Der Fix
+**Aktion:** Zeilen **336-345** komplett löschen (die 11 Zombie-Zeilen nach dem ersten `});`-Block in Zeile 335).
 
-`.trim()` aus dem Lese-Pfad entfernen — der Regex `[^|]*` schließt das `|`-Trennzeichen bereits sauber aus, also ist Trimming hier unnötig. Stattdessen wird beim Speichern in `targetAudience` gepuffert (mit Leerzeichen-Padding um `|` für saubere Persistenz).
+Vor dem Fix endet der gültige Code in Zeile 335 mit:
+```
+        }),
+      });
+```
+Dann muss direkt Zeile 347 (`if (!response.ok) {`) folgen — keine Zwischenzeilen.
 
-**Geänderte Datei:** `src/components/video-composer/BriefingTab.tsx` (Zeilen 232-245)
-
-Konkrete Änderung:
-- Lese-Regex behält Leerzeichen bei (kein `.trim()` mehr beim Lesen)
-- Schreib-Funktion bleibt wie sie ist (Format `"Protagonist: X | Conflict: Y"` ist stabil)
-- Falls beim finalen Submit (Storyboard-Generierung) trailing Spaces unschön wären, kann die Konsumenten-Seite trimmen — der Editor selbst darf nicht trimmen, solange der User tippt.
+### Verifikation nach dem Fix
+1. Edge function wird automatisch redeployt
+2. Im Briefing **„KI Bild-Szenen"** wählen
+3. Storyboard generieren → alle Szenen sollten als **„KI Bild (Gemini)"** markiert sein, nicht als „KI (Hailuo)"
+4. Bei **„Mixed Mode"** → erste + letzte Szene = Hailuo, mittlere = Gemini
+5. Effekt-Badges (`Wand2`-Icon mit z. B. „GlowOrbs", „LightRays") erscheinen unter jeder Szene
 
 ### Risiko & Rollback
-
-- **Risiko: Sehr niedrig.** Reine UX-Korrektur, keine DB-/API-Änderung.
+- **Risiko: Sehr niedrig.** Reine Code-Bereinigung von toten Zeilen. Keine Schema- oder API-Änderung.
 - **Rollback:** Git-Revert der einen Datei.
 
 ### Aufwand
-
-~2 Minuten Implementierung, sofort testbar im Briefing-Tab unter Kategorie „Storytelling".
+~2 Minuten — eine Datei, eine `line_replace`-Operation.
 
