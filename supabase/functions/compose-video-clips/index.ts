@@ -16,6 +16,7 @@ const CLIP_COSTS: Record<string, Record<Quality, number>> = {
   'ai-hailuo': { standard: 0.15, pro: 0.20 },
   'ai-kling':  { standard: 0.15, pro: 0.21 },
   'ai-sora':   { standard: 0.25, pro: 0.53 },
+  'ai-image':  { standard: 0.01, pro: 0.015 },
 };
 
 interface ComposerCharacter {
@@ -336,6 +337,49 @@ serve(async (req) => {
 
           results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
 
+        } else if (scene.clipSource === 'ai-image') {
+          // AI Image (Gemini Nano Banana 2 / Pro) — synchronous, cheap (~€0.01)
+          // Routed to dedicated edge function. The function uploads to
+          // composer-uploads bucket and updates scene clip_url + status itself.
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .eq('id', scene.id);
+
+          const enrichedPrompt = enrichPrompt(scene.aiPrompt, scene.characterShot);
+
+          const imgResp = await fetch(`${supabaseUrl}/functions/v1/generate-composer-image-scene`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authHeader, // forward user JWT
+            },
+            body: JSON.stringify({
+              projectId,
+              sceneId: scene.id,
+              prompt: enrichedPrompt,
+              visualStyle,
+              quality,
+            }),
+          });
+
+          if (!imgResp.ok) {
+            const errBody = await imgResp.text();
+            console.error(`[compose-video-clips] image scene ${scene.id} failed:`, imgResp.status, errBody);
+            await supabaseAdmin
+              .from('composer_scenes')
+              .update({ clip_status: 'failed', updated_at: new Date().toISOString() })
+              .eq('id', scene.id);
+            results.push({ sceneId: scene.id, status: 'failed', error: `Image generation failed (${imgResp.status})` });
+          } else {
+            const imgData = await imgResp.json();
+            results.push({
+              sceneId: scene.id,
+              status: 'ready',
+              clipUrl: imgData.clipUrl,
+            });
+          }
+
         } else {
           // Unknown source, skip
           results.push({ sceneId: scene.id, status: 'skipped', error: `Unknown clip source: ${scene.clipSource}` });
@@ -351,25 +395,30 @@ serve(async (req) => {
       }
     }
 
-    // Deduct credits ONLY for AI scenes that actually started generating
-    const generatingResults = results.filter(r => r.status === 'generating');
-    const generatingCount = generatingResults.length;
+    // Deduct credits for AI scenes that started generating (video) OR
+    // synchronously completed (ai-image returns status='ready' immediately).
+    const billableResults = results.filter(r => {
+      if (r.status !== 'generating' && r.status !== 'ready') return false;
+      const scene = scenes.find(s => s.id === r.sceneId);
+      return scene?.clipSource.startsWith('ai-');
+    });
+    const generatingCount = results.filter(r => r.status === 'generating').length;
     let actualCost = 0;
-    for (const r of generatingResults) {
+    for (const r of billableResults) {
       const scene = scenes.find(s => s.id === r.sceneId);
       if (!scene) continue;
       const q: Quality = scene.clipQuality === 'pro' ? 'pro' : 'standard';
       actualCost += scene.durationSeconds * (CLIP_COSTS[scene.clipSource]?.[q] ?? 0);
     }
 
-    if (generatingCount > 0 && actualCost > 0) {
+    if (billableResults.length > 0 && actualCost > 0) {
       try {
         await supabaseAdmin.rpc('deduct_ai_video_credits', {
           p_user_id: user.id,
           p_amount: actualCost,
           p_generation_id: projectId,
         });
-        console.log(`[compose-video-clips] Deducted €${actualCost.toFixed(2)} for ${generatingCount} AI clips`);
+        console.log(`[compose-video-clips] Deducted €${actualCost.toFixed(2)} for ${billableResults.length} AI scenes (${generatingCount} async)`);
       } catch (creditErr) {
         console.error('[compose-video-clips] Credit deduction failed:', creditErr);
       }
