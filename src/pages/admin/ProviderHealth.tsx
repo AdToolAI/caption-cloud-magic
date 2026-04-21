@@ -2,8 +2,22 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Activity, AlertTriangle, CheckCircle2, Cpu, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Activity, AlertTriangle, CheckCircle2, Cpu, Loader2, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserRoles } from '@/hooks/useUserRoles';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface ProviderRow {
   provider: string;
@@ -31,9 +45,11 @@ function statusFromPercent(p: number) {
 }
 
 export const ProviderHealth = () => {
+  const { isAdmin } = useUserRoles();
   const [rows, setRows] = useState<ProviderRow[]>([]);
-  const [lambdaInfo, setLambdaInfo] = useState<{ active: number; max: number } | null>(null);
+  const [lambdaInfo, setLambdaInfo] = useState<{ active: number; max: number; safe: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [killing, setKilling] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   const load = async () => {
@@ -58,13 +74,16 @@ export const ProviderHealth = () => {
         };
       });
 
-      // Lambda capacity
-      const [{ data: cfgRow }, { count: activeRenders }] = await Promise.all([
-        supabase.from('system_config').select('value').eq('key', 'lambda_max_concurrent').maybeSingle(),
+      // Lambda capacity (read both NORMAL + SAFE so the UI stays in sync with future phase changes)
+      const [{ data: cfgRows }, { count: activeRenders }] = await Promise.all([
+        supabase.from('system_config').select('key, value').in('key', ['lambda_max_concurrent', 'lambda_max_concurrent_safe']),
         supabase.from('render_queue').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
       ]);
-      const max = Number(cfgRow?.value ?? 25);
-      setLambdaInfo({ active: activeRenders ?? 0, max });
+      const cfgMap: Record<string, any> = {};
+      (cfgRows ?? []).forEach((r: any) => { cfgMap[r.key] = r.value; });
+      const max = Number(cfgMap.lambda_max_concurrent ?? 25);
+      const safe = Number(cfgMap.lambda_max_concurrent_safe ?? 15);
+      setLambdaInfo({ active: activeRenders ?? 0, max, safe });
 
       setRows(built);
       setLastUpdate(new Date());
@@ -81,6 +100,23 @@ export const ProviderHealth = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const handleKillSwitch = async () => {
+    setKilling(true);
+    try {
+      const { error } = await supabase
+        .from('system_config')
+        .update({ value: 10, updated_at: new Date().toISOString() })
+        .eq('key', 'lambda_max_concurrent');
+      if (error) throw error;
+      toast.success('Kill-Switch aktiviert: lambda_max_concurrent = 10');
+      await load();
+    } catch (e: any) {
+      toast.error(`Kill-Switch fehlgeschlagen: ${e?.message ?? 'unbekannt'}`);
+    } finally {
+      setKilling(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -90,7 +126,35 @@ export const ProviderHealth = () => {
             Live-Auslastung externer Anbieter • Stand: {lastUpdate.toLocaleTimeString('de-DE')}
           </p>
         </div>
-        {loading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+        <div className="flex items-center gap-3">
+          {loading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+          {isAdmin && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={killing} className="gap-2">
+                  <ShieldAlert className="w-4 h-4" />
+                  Notfall: Lambda auf 10 zurück
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Kill-Switch aktivieren?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Setzt <code className="font-mono">lambda_max_concurrent</code> sofort auf <strong>10</strong>.
+                    Neue Renders werden stark gedrosselt — laufende Jobs nicht abgebrochen.
+                    Nutzen nur im Notfall (z. B. AWS-Throttling, Massenfehler).
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleKillSwitch}>
+                    Ja, drosseln auf 10
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -170,7 +234,8 @@ export const ProviderHealth = () => {
           <p>• Jeder API-Call wird in <code className="text-xs bg-muted px-1 py-0.5 rounded">provider_quota_log</code> erfasst.</p>
           <p>• Aggregation läuft jede Minute, Anzeige aktualisiert alle 30 Sekunden.</p>
           <p>• Bei <strong>≥80% Auslastung</strong> wird automatisch eine E-Mail-Warnung an Admins gesendet (Cooldown 60 Min).</p>
-          <p>• Lambda-Concurrency wird vom <strong>Circuit Breaker</strong> automatisch zwischen 3 und 6 angepasst.</p>
+          <p>• Lambda-Concurrency wird vom <strong>Circuit Breaker</strong> automatisch zwischen <strong>{lambdaInfo?.safe ?? 15}</strong> (Safe) und <strong>{lambdaInfo?.max ?? 25}</strong> (Normal) angepasst.</p>
+          <p>• <strong>Kill-Switch</strong> (oben rechts, nur Admin): drosselt im Notfall sofort auf <strong>10</strong> parallele Renders.</p>
         </CardContent>
       </Card>
     </div>
