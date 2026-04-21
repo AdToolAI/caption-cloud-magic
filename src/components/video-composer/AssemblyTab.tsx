@@ -4,12 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Download, Palette, Type, CheckCircle, AlertCircle, Sparkles, FolderOpen, Scissors } from 'lucide-react';
+import { Loader2, Download, Palette, Type, CheckCircle, AlertCircle, Sparkles, FolderOpen, Scissors, Film } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import ColorGradingSelector from './ColorGradingSelector';
 import WatermarkEditor from './WatermarkEditor';
+import ComposerSequencePreview from './ComposerSequencePreview';
 import type { AssemblyConfig, ComposerScene, WatermarkConfig } from '@/types/video-composer';
 import { DEFAULT_WATERMARK_CONFIG, getClipCost } from '@/types/video-composer';
 import { persistAssemblyConfig } from '@/hooks/useComposerPersistence';
@@ -360,6 +361,29 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         value={assemblyConfig.watermark ?? DEFAULT_WATERMARK_CONFIG}
         onChange={(wm: WatermarkConfig) => onUpdateAssembly({ watermark: wm })}
       />
+
+      {/* Full Video Preview — uses the same sequence player as the Voiceover tab.
+          Image scenes get Ken-Burns; videos play with crossfades; voiceover audio plays in sync. */}
+      <Card className="border-border/40 bg-card/80">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Film className="h-4 w-4 text-primary" />
+            {t('videoComposer.previewFullVideo')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ComposerSequencePreview
+            scenes={scenes}
+            subtitles={assemblyConfig.subtitles}
+            voiceoverUrl={assemblyConfig.voiceover?.audioUrl ?? null}
+            globalTextOverlays={
+              assemblyConfig.textOverlaysEnabled === false
+                ? []
+                : (assemblyConfig.globalTextOverlays ?? [])
+            }
+          />
+        </CardContent>
+      </Card>
 
       {/* Cost Summary */}
       <Card className="border-primary/30 bg-primary/5">
