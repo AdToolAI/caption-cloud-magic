@@ -494,9 +494,11 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
       </AlertDialog>
 
       {/* Clip Cards */}
-      <div className="grid gap-3">
-        {scenes.map((scene, i) => {
-          const status = statusConfig[scene.clipStatus] || statusConfig.pending;
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+          <div className="grid gap-3">
+            {scenes.map((scene, i) => {
+              const status = statusConfig[scene.clipStatus] || statusConfig.pending;
           const sceneQuality = scene.clipQuality || 'standard';
           const costPerClip = scene.clipSource.startsWith('ai-')
             ? getClipCost(scene.clipSource, sceneQuality, scene.durationSeconds)
