@@ -267,6 +267,65 @@ const SCENARIOS: Scenario[] = [
     body: {},
     optional: true,
   },
+  // ─── Phase 4: Social Publishing Health (Block D) ───
+  {
+    name: "Instagram Health",
+    category: "fast",
+    fn: "health-ig",
+    body: {},
+    optional: true,
+    expectReachable: true,
+  },
+  {
+    name: "TikTok Health",
+    category: "fast",
+    fn: "tiktok-health",
+    body: {},
+    optional: true,
+    expectReachable: true,
+  },
+  {
+    name: "YouTube Health",
+    category: "fast",
+    fn: "health-yt",
+    body: {},
+    optional: true,
+    expectReachable: true,
+  },
+  {
+    name: "X / Twitter Health",
+    category: "fast",
+    fn: "health-x",
+    body: {},
+    optional: true,
+    expectReachable: true,
+  },
+  // ─── Phase 4: Credit & Billing Integrity (Block E) ───
+  {
+    name: "Credit Preflight Reachability",
+    category: "fast",
+    fn: "credit-preflight",
+    body: { feature_code: "caption_generation", estimated_cost: 1 },
+    optional: true,
+    expectReachable: true,
+  },
+  {
+    name: "Subscription Status Check",
+    category: "fast",
+    fn: "check-subscription",
+    body: {},
+    optional: true,
+    expectReachable: true,
+  },
+  // ─── Phase 4: Job Queue Health (Block F) ───
+  {
+    name: "AI Queue Worker Reachability",
+    category: "fast",
+    fn: "ai-queue-worker",
+    body: { status_check: true },
+    optional: true,
+    expectReachable: true,
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────
