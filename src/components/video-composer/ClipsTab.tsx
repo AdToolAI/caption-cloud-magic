@@ -76,7 +76,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
     if (!projectId) return;
     const { data } = await supabase
       .from('composer_scenes')
-      .select('id, clip_status, clip_url, duration_seconds')
+      .select('id, clip_status, clip_url, duration_seconds, upload_type')
       .eq('project_id', projectId);
 
     if (!data) return;
@@ -91,7 +91,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
 
     const updatedScenes = scenes.map((scene, idx) => {
       const dbScene = data.find((d: any) => d.id === scene.id);
-      if (dbScene && (dbScene.clip_status !== scene.clipStatus || dbScene.clip_url !== scene.clipUrl)) {
+      if (
+        dbScene &&
+        (dbScene.clip_status !== scene.clipStatus ||
+          dbScene.clip_url !== scene.clipUrl ||
+          (dbScene.upload_type && dbScene.upload_type !== scene.uploadType))
+      ) {
         changed = true;
         // Toast on transition generating → ready
         if (scene.clipStatus === 'generating' && dbScene.clip_status === 'ready') {
@@ -104,7 +109,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           toast({ title: `Szene ${idx + 1} fehlgeschlagen`, variant: 'destructive' });
         }
         newPrev[scene.id] = dbScene.clip_status;
-        return { ...scene, clipStatus: dbScene.clip_status as ComposerScene['clipStatus'], clipUrl: dbScene.clip_url || scene.clipUrl };
+        return {
+          ...scene,
+          clipStatus: dbScene.clip_status as ComposerScene['clipStatus'],
+          clipUrl: dbScene.clip_url || scene.clipUrl,
+          uploadType: (dbScene.upload_type as ComposerScene['uploadType']) || scene.uploadType,
+        };
       }
       return scene;
     });
@@ -222,10 +232,18 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
       const updatedScenes = optimistic.map(scene => {
         const result = data?.results?.find((r: any) => r.sceneId === scene.id);
         if (result) {
+          const isAiImage = scene.clipSource === 'ai-image';
           return {
             ...scene,
             clipStatus: result.status as any,
             clipUrl: result.clipUrl || scene.clipUrl,
+            // For ai-image scenes that resolve immediately to 'ready', mark
+            // uploadType 'image' so the preview player picks the <img> path
+            // without waiting for a DB poll cycle.
+            uploadType:
+              isAiImage && result.status === 'ready'
+                ? 'image'
+                : scene.uploadType,
             replicatePredictionId: result.predictionId || scene.replicatePredictionId,
           };
         }
@@ -300,11 +318,18 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
 
       const result = data?.results?.[0];
       if (result) {
-        const updatedScenes = pScenes.map(s =>
-          s.id === targetScene.id
-            ? { ...s, clipStatus: result.status, clipUrl: result.clipUrl || s.clipUrl, replicatePredictionId: result.predictionId || s.replicatePredictionId }
-            : s
-        );
+        const updatedScenes = pScenes.map(s => {
+          if (s.id !== targetScene.id) return s;
+          const isAiImage = s.clipSource === 'ai-image';
+          return {
+            ...s,
+            clipStatus: result.status,
+            clipUrl: result.clipUrl || s.clipUrl,
+            uploadType:
+              isAiImage && result.status === 'ready' ? 'image' : s.uploadType,
+            replicatePredictionId: result.predictionId || s.replicatePredictionId,
+          };
+        });
         onUpdateScenes(updatedScenes);
       }
       toast({ title: 'Generierung gestartet', description: `Szene ${(targetScene.orderIndex ?? 0) + 1}` });

@@ -54,10 +54,18 @@ export default function ComposerSequencePreview({
 }: Props) {
   const { t } = useTranslation();
 
+  // Robust image-scene detection: a scene counts as an image when either
+  // uploadType is 'image' OR clipSource is 'ai-image' (the latter handles
+  // the case where local state hasn't synced uploadType yet after generation).
+  const isImageScene = (s: ComposerScene | undefined): boolean =>
+    !!s && (s.uploadType === 'image' || s.clipSource === 'ai-image');
+  const getImageUrl = (s: ComposerScene | undefined): string | undefined =>
+    s?.clipUrl || s?.uploadUrl;
+
   const playable = useMemo(
     () =>
       scenes.filter(
-        s => s.clipUrl || (s.uploadType === 'image' && s.uploadUrl),
+        s => s.clipUrl || (isImageScene(s) && (s.clipUrl || s.uploadUrl)),
       ),
     [scenes],
   );
@@ -126,10 +134,8 @@ export default function ComposerSequencePreview({
   useEffect(() => { sceneIdxRef.current = sceneIdx; }, [sceneIdx]);
 
   const currentScene = playable[sceneIdx];
-  const isImage = currentScene?.uploadType === 'image';
-  const mediaUrl = isImage
-    ? (currentScene?.clipUrl || currentScene?.uploadUrl)
-    : currentScene?.clipUrl;
+  const isImage = isImageScene(currentScene);
+  const mediaUrl = isImage ? getImageUrl(currentScene) : currentScene?.clipUrl;
 
   const scheduleTimer = useCallback((cb: () => void, ms: number): number => {
     const id = window.setTimeout(() => {
@@ -187,7 +193,7 @@ export default function ComposerSequencePreview({
       slotMapRef.current[slot] = -1;
       return;
     }
-    if (target.uploadType === 'image' || !target.clipUrl) {
+    if (isImageScene(target) || !target.clipUrl) {
       slotMapRef.current[slot] = -1;
       return;
     }
@@ -262,8 +268,8 @@ export default function ComposerSequencePreview({
 
     const currentIdx = sceneIdxRef.current;
     const fromScene = list[currentIdx];
-    const fromIsImage = fromScene?.uploadType === 'image';
-    const toIsImage = nextScene.uploadType === 'image';
+    const fromIsImage = isImageScene(fromScene);
+    const toIsImage = isImageScene(nextScene);
 
     transitioningRef.current = true;
     advancedRef.current = false;
@@ -483,7 +489,7 @@ export default function ComposerSequencePreview({
     setSceneIdx(idx);
     setGlobalTime(val);
 
-    if (target.uploadType === 'image') {
+    if (isImageScene(target)) {
       imageStartRef.current = playing ? performance.now() - localTime * 1000 : null;
       // Hide both video slots.
       setOpacityForSlot('A', 0);
