@@ -21,6 +21,22 @@ import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { SortableSceneItem } from './SortableSceneItem';
 
 interface ClipsTabProps {
   scenes: ComposerScene[];
