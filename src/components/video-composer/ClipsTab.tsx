@@ -73,6 +73,22 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
     try { localStorage.setItem('composer-reroll-hint-dismissed', '1'); } catch {}
   };
 
+  // Drag & drop sensors for reordering scenes within the Clips tab
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = scenes.findIndex((s) => s.id === active.id);
+    const newIndex = scenes.findIndex((s) => s.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const reordered = arrayMove(scenes, oldIndex, newIndex);
+    onUpdateScenes(reordered.map((s, i) => ({ ...s, orderIndex: i })));
+  };
+
   const allReady = scenes.every((s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && s.uploadUrl));
   const readyCount = scenes.filter((s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && s.uploadUrl)).length;
   const generatingCount = scenes.filter((s) => s.clipStatus === 'generating').length;
