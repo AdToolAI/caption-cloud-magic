@@ -1,66 +1,33 @@
 
 
-## Bugfix: Rohe i18n-Keys im Music-Tab („videoComposer.musicSearchLabel" etc.)
+## Bugfix: Genre & Mood sollen leer starten (keine Kollision mit Suche)
 
 ### Problem
-Im Music-Tab werden drei rohe Übersetzungs-Keys angezeigt:
-- `videoComposer.musicSearchLabel`
-- `videoComposer.musicSearchPlaceholder`
-- `videoComposer.musicSearchHint`
-
-### Ursache
-In `AudioTab.tsx` (Zeilen 245, 256, 260) steht z. B.:
-```tsx
-{t('videoComposer.musicSearchLabel') || 'Suchen (Titel, Künstler, Stichwort)'}
-```
-
-Der `||`-Fallback funktioniert hier **nicht**, weil `useTranslation().t()` bei einem fehlenden Key den Key selbst als nicht-leeren String zurückgibt — und nicht-leere Strings sind truthy. Folge: Der Key wird gerendert.
-
-In `src/lib/translations.ts` fehlen diese drei Keys in **allen drei Sprachblöcken** (EN/DE/ES). Außerdem wird in der gleichen Datei in Zeile 301 `searchByQuery` referenziert — auch dieser Key sollte vorsichtshalber ergänzt werden.
+Beim Aktivieren von „Hintergrundmusik" werden Genre auf `electronic` und Mood auf `energetic` vorbelegt. Diese Werte werden bei jeder Suche **immer** als Filter an `search-stock-music` mitgesendet (`AudioTab.tsx` Zeile 146) — auch wenn der Nutzer im Freitext „Fantasy" sucht. Ergebnis: die Suche wird durch die voreingestellten Filter eingeengt und liefert teils irrelevante Treffer.
 
 ### Fix
-**Datei:** `src/lib/translations.ts`
 
-Im `videoComposer.*`-Bereich aller drei Sprachen (EN/DE/ES) — neben den vorhandenen Keys wie `backgroundMusic`, `genre`, `mood`, `searchMusic` — diese vier Keys ergänzen:
+**Datei:** `src/components/video-composer/AudioTab.tsx`
 
-**DE**
-```ts
-musicSearchLabel: 'Suchen (Titel, Künstler, Stichwort)',
-musicSearchPlaceholder: 'z.B. Beach Sunset, Lofi Chill, Hans Zimmer...',
-musicSearchHint: 'Leer lassen, um nach Genre + Stimmung zu suchen.',
-searchByQuery: 'Suche „{query}"',
-```
+1. **Default leer setzen** (Zeile 233): Beim Aktivieren des Music-Switches `genre: ''` und `mood: ''` statt `'electronic'` / `'energetic'`.
 
-**EN**
-```ts
-musicSearchLabel: 'Search (title, artist, keyword)',
-musicSearchPlaceholder: 'e.g. Beach Sunset, Lofi Chill, Hans Zimmer...',
-musicSearchHint: 'Leave empty to search by genre + mood.',
-searchByQuery: 'Search "{query}"',
-```
+2. **Selects zeigen Placeholder** (Zeilen 267–296): Beide `<Select>`-Komponenten erhalten:
+   - `<SelectValue placeholder="Beliebig" />` (lokalisiert via neuem Key `videoComposer.anyOption`)
+   - Eine zusätzliche „Beliebig"-Option mit Wert `''`, sodass der Nutzer aktiv zurücksetzen kann
 
-**ES**
-```ts
-musicSearchLabel: 'Buscar (título, artista, palabra clave)',
-musicSearchPlaceholder: 'p. ej. Beach Sunset, Lofi Chill, Hans Zimmer...',
-musicSearchHint: 'Déjalo vacío para buscar por género + estado de ánimo.',
-searchByQuery: 'Buscar "{query}"',
-```
+3. **Suche respektiert leere Filter** (Zeilen 144–146):
+   - `effectiveQuery`: Wenn Freitext leer **und** beide Filter leer → klare Toast-Meldung „Bitte Suchbegriff oder Genre/Stimmung wählen" statt einer leeren Query
+   - Im Body: `genre` und `mood` nur mitsenden wenn nicht leer (`...(music.genre && { genre: music.genre })`)
 
-Optional, da der `||`-Fallback ohnehin trügerisch ist, in `AudioTab.tsx` Zeile 301 die String-Interpolation umstellen auf:
-```ts
-t('videoComposer.searchByQuery', { query: musicQuery.trim() })
-```
-(passend zum bestehenden `{count}`-Pattern, das `useTranslation` schon unterstützt).
+4. **Übersetzungs-Key ergänzen** in `src/lib/translations.ts` für DE/EN/ES:
+   - `anyOption`: „Beliebig" / „Any" / „Cualquiera"
 
-### Verifikation
-1. Music-Tab öffnen → statt `videoComposer.musicSearchLabel` steht „Suchen (Titel, Künstler, Stichwort)"
-2. Placeholder im Input zeigt echten Beispieltext
-3. Hint unter dem Input zeigt deutsche/englische/spanische Erklärung
-4. Sprache umschalten (DE → EN → ES) → alle drei Texte folgen korrekt
-5. Suchquery eingeben → Button-Label zeigt z. B. „Suche „Hans Zimmer"" statt rohem Key
+### Verhalten danach
+- Music-Switch aktivieren → Genre + Stimmung stehen auf „Beliebig"
+- Freitext „Fantasy" eingeben → Suche läuft **nur** über den Begriff, ohne Genre-Filter
+- Optional Genre/Stimmung wählen → wird zusätzlich als Filter mitgegeben
+- Alles leer + Suche klicken → Hinweis-Toast statt leerer Query
 
 ### Risiko & Aufwand
-- **Risiko: Sehr niedrig.** Reine Übersetzungs-Ergänzung, keine Logik-Änderung.
-- **Aufwand:** ~2 Minuten — eine Datei (`translations.ts`), 4 Keys × 3 Sprachen.
+Sehr niedrig. ~3 Min, eine UI-Datei + 3 Übersetzungs-Strings. Keine API- oder DB-Änderung; `search-stock-music` ignoriert fehlende `genre`/`mood`-Felder bereits.
 
