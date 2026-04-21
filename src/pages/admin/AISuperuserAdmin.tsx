@@ -30,6 +30,17 @@ const ACTIVE_SCENARIOS = new Set<string>([
   'Stripe Webhook Reachability',
   'Social Health Check',
   'Consistency Watcher',
+  // Phase 3 — Provider Reachability
+  'Replicate API Health',
+  'ElevenLabs Quota Check',
+  'OpenAI / Sora Reachability',
+  'Lovable AI Gateway Reachability',
+  // Phase 3 — Render Pipeline Health
+  'Lambda Render Webhook Reachability',
+  'Render Queue Manager',
+  'Health-Check Aggregator',
+  // Phase 3 — Storage Integrity
+  'Storage Bucket Health',
 ]);
 
 // Latency color thresholds (ms) — KI-Calls können legitim 5-10s dauern
@@ -42,8 +53,8 @@ const latencyClass = (ms: number | null | undefined): string => {
 
 // Aggregierte Latenz (Summe aller Szenarien) — andere Maßstäbe als Einzel-Calls
 const totalLatencyClass = (totalMs: number): string => {
-  if (totalMs < 45000) return 'text-green-500';
-  if (totalMs < 75000) return 'text-yellow-600 dark:text-yellow-400';
+  if (totalMs < 60000) return 'text-green-500';
+  if (totalMs < 100000) return 'text-yellow-600 dark:text-yellow-400';
   return 'text-destructive';
 };
 
@@ -306,7 +317,7 @@ export function AISuperuserAdmin() {
                     {(totalMs / 1000).toFixed(1)}s
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    Summe aller {scenarios.length} Szenarien — &lt; 45s ist normal
+                    Summe aller {scenarios.length} Szenarien — &lt; 60s ist normal
                   </div>
                 </>
               );
