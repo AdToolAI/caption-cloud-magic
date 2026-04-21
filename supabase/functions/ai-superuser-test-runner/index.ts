@@ -353,6 +353,20 @@ async function runScenario(scenario: Scenario, ctx: TestContext, triggeredBy: st
     if (response.status === 404 && scenario.optional) {
       status = "warning";
       errorMessage = `Function '${scenario.fn}' not deployed (optional)`;
+    } else if (scenario.expectFailure) {
+      // Reachability check: pass when response matches the expected guarded failure
+      const matchesStatus = response.status === scenario.expectFailure.status;
+      const matchesBody = !scenario.expectFailure.bodyIncludes
+        || text.toLowerCase().includes(scenario.expectFailure.bodyIncludes.toLowerCase());
+      if (matchesStatus && matchesBody) {
+        status = "pass";
+        schemaHash = await hashSchema(responseData);
+      } else {
+        status = "fail";
+        errorMessage = `Reachability check failed — expected HTTP ${scenario.expectFailure.status}`
+          + (scenario.expectFailure.bodyIncludes ? ` with body containing "${scenario.expectFailure.bodyIncludes}"` : "")
+          + `, got HTTP ${response.status}: ${text.substring(0, 200)}`;
+      }
     } else if (!response.ok) {
       status = "fail";
       errorMessage = `HTTP ${response.status}: ${text.substring(0, 300)}`;
