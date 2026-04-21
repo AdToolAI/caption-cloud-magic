@@ -127,7 +127,9 @@ export default function ComposerSequencePreview({
 
   const currentScene = playable[sceneIdx];
   const isImage = currentScene?.uploadType === 'image';
-  const mediaUrl = isImage ? currentScene?.uploadUrl : currentScene?.clipUrl;
+  const mediaUrl = isImage
+    ? (currentScene?.clipUrl || currentScene?.uploadUrl)
+    : currentScene?.clipUrl;
 
   const scheduleTimer = useCallback((cb: () => void, ms: number): number => {
     const id = window.setTimeout(() => {
