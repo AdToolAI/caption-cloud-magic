@@ -16,6 +16,7 @@ const CLIP_COSTS: Record<string, Record<Quality, number>> = {
   'ai-hailuo': { standard: 0.15, pro: 0.20 },
   'ai-kling':  { standard: 0.15, pro: 0.21 },
   'ai-sora':   { standard: 0.25, pro: 0.53 },
+  'ai-image':  { standard: 0.01, pro: 0.015 },
 };
 
 interface ComposerCharacter {
@@ -335,6 +336,49 @@ serve(async (req) => {
             .eq('id', scene.id);
 
           results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
+
+        } else if (scene.clipSource === 'ai-image') {
+          // AI Image (Gemini Nano Banana 2 / Pro) — synchronous, cheap (~€0.01)
+          // Routed to dedicated edge function. The function uploads to
+          // composer-uploads bucket and updates scene clip_url + status itself.
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .eq('id', scene.id);
+
+          const enrichedPrompt = enrichPrompt(scene.aiPrompt, scene.characterShot);
+
+          const imgResp = await fetch(`${supabaseUrl}/functions/v1/generate-composer-image-scene`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authHeader, // forward user JWT
+            },
+            body: JSON.stringify({
+              projectId,
+              sceneId: scene.id,
+              prompt: enrichedPrompt,
+              visualStyle,
+              quality,
+            }),
+          });
+
+          if (!imgResp.ok) {
+            const errBody = await imgResp.text();
+            console.error(`[compose-video-clips] image scene ${scene.id} failed:`, imgResp.status, errBody);
+            await supabaseAdmin
+              .from('composer_scenes')
+              .update({ clip_status: 'failed', updated_at: new Date().toISOString() })
+              .eq('id', scene.id);
+            results.push({ sceneId: scene.id, status: 'failed', error: `Image generation failed (${imgResp.status})` });
+          } else {
+            const imgData = await imgResp.json();
+            results.push({
+              sceneId: scene.id,
+              status: 'ready',
+              clipUrl: imgData.clipUrl,
+            });
+          }
 
         } else {
           // Unknown source, skip
