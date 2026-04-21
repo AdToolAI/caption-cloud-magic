@@ -1,77 +1,61 @@
 
-# Plan: AI Superuser zeigt weiter nur 10 Szenarien, weil das Backend noch auf altem Stand läuft
 
-## Diagnose
+# Plan: Stripe Webhook Reachability Test korrekt machen
 
-Das Problem sitzt aktuell nicht mehr im Admin-Frontend:
+## Problem
 
-- `src/pages/admin/AISuperuserAdmin.tsx` enthält bereits alle 15 Szenarien in `ACTIVE_SCENARIOS`
-- Die UI zählt dynamisch mit `scenarios.length`
-- Trotzdem zeigen die letzten echten Läufe nur 10 Szenarien
+Der Test im AI-Superuser-Runner ruft `stripe-webhook` mit einem leeren Test-Payload und ohne `stripe-signature`-Header auf. Die Funktion lehnt das richtigerweise mit `HTTP 400 "No signature"` ab — das ist Sicherheitsverhalten, kein Bug. Der Test wertet das aber als `fail`, daher 0% Pass-Rate.
 
-Die entscheidende Evidenz kommt aus den Backend-Daten und Logs:
+Den Signatur-Check zu lockern wäre ein Sicherheitsproblem. Stattdessen ändern wir den Test so, dass er prüft, ob der Webhook-Endpoint **erreichbar und korrekt geschützt** ist.
 
-- In `public.ai_superuser_runs` tauchen in den letzten Läufen nur 10 `scenario_name`-Werte auf
-- Die Logs von `ai-superuser-test-runner` zeigen explizit:
-  - `Starting 10 scenarios in mode=full`
+## Lösung — „Reachability + Signature-Guard" prüfen statt Erfolg
 
-Das heißt: Die Datei im Codebase hat 15 Szenarien, aber die aktuell laufende Backend-Funktion ist noch eine ältere Deployment-Version mit nur 10.
+Die Definition von „gesund" ändern wir so:
+
+- Endpoint antwortet überhaupt (kein 502/504/Timeout) → erreichbar
+- Endpoint lehnt unsignierte Calls mit **HTTP 400 „No signature"** ab → Signaturschutz aktiv
+- Beides zusammen = `pass`
+- Alles andere (5xx, Timeout, 200 ohne Signatur) = `fail` mit aussagekräftiger Fehlermeldung
+
+Damit ist der Test:
+- ehrlich (testet was wirklich gewünscht ist: „Webhook ist live und sicher")
+- ohne Stripe-Test-Mode-Signaturen auskommend
+- ohne Sicherheits-Backdoor
 
 ## Umsetzung
 
-### 1. `ai-superuser-test-runner` neu deployen
-Die aktuell im Projekt liegende Version von `supabase/functions/ai-superuser-test-runner/index.ts` enthält bereits diese 5 zusätzlichen Szenarien:
+### 1. Spezial-Handling für „Stripe Webhook Reachability" im Runner
+In `supabase/functions/ai-superuser-test-runner/index.ts`:
 
-- `Trial Lifecycle Check`
-- `Calendar Publish Dispatcher`
-- `Stripe Webhook Reachability`
-- `Social Health Check`
-- `Consistency Watcher`
+- Statt das generische `invokeFn` zu nutzen, fügen wir einen kleinen Sonderfall hinzu (oder ein `expectStatus`-Feld am Szenario)
+- Für dieses Szenario gilt: **HTTP 400 mit Body enthält „No signature" → pass**
+- Andere 4xx/5xx → `fail`
 
-Diese Version muss erneut auf Lovable Cloud deployed werden, damit die aktive Laufzeitversion nicht mehr bei 10 stoppt.
+Konkret entweder:
+- **Variante A** (minimal-invasiv): Inline-Check nur für dieses eine Szenario.
+- **Variante B** (sauberer): Neues optionales Feld `expectFailure: { status: 400, bodyIncludes: "No signature" }` im Szenario-Objekt — wiederverwendbar für künftige Reachability-Checks (z. B. Webhook für Meta, TikTok).
 
-### 2. Volltest erneut ausführen
-Nach dem Redeploy:
+Empfehlung: **Variante B**, weil wir schon absehen können, dass es ähnliche signaturgeschützte Endpoints gibt (Replicate-Webhook, Render-Webhooks usw.).
 
-- im Admin den `Komplett-Test` starten
-- erwarten: Log `Starting 15 scenarios in mode=full`
-- erwarten: 15 verschiedene `scenario_name`-Einträge in `ai_superuser_runs`
+### 2. Latenz-Schwelle bleibt
+1015 ms ist absolut OK für einen Cold-Start-Edge-Call mit Stripe-SDK-Init.
 
-### 3. UI-Verifikation
-Danach muss der KI-Superuser automatisch korrekt rendern:
+### 3. Verifikation
+- „Komplett-Test" erneut auslösen
+- Erwartung: `Stripe Webhook Reachability` → grün, 100 % Pass-Rate
+- Andere 14 Szenarien bleiben unverändert grün
+- Banner: „Alle 15 Szenarien laufen stabil"
 
-- grüner Banner: `Alle 15 Szenarien laufen stabil`
-- Tabelle: 15 Zeilen
-- Kennzahl `Szenarien`: 15
-- Gesamtlatenz mit den bereits angehobenen Schwellenwerten bewerten
-
-## Zusätzliche Absicherung
-
-Damit Frontend und Backend künftig nicht wieder auseinanderlaufen, wird der Szenario-Katalog an einer Stelle zentralisiert.
-
-### Empfohlene Härtung
-Eine dieser zwei Varianten umsetzen:
-
-#### Variante A — Shared Config
-- gemeinsame Szenario-Liste in einer geteilten Datei definieren
-- Admin-UI und Test-Runner importieren beide dieselbe Quelle
-
-#### Variante B — Backend als Source of Truth
-- `ai-superuser-test-runner` liefert zusätzlich die aktive Szenario-Liste zurück
-- Admin-UI rendert anhand dieser Liste statt einer harten Whitelist
-
-Variante A ist für Wartbarkeit sauberer, Variante B ist robuster gegen Deploy-Drift.
-
-## Betroffene Dateien
+## Geänderte Dateien
 
 - `supabase/functions/ai-superuser-test-runner/index.ts`
-- optional zur Härtung:
-  - `src/pages/admin/AISuperuserAdmin.tsx`
-  - neue gemeinsame Konfigurationsdatei für Szenarien
+  - neues optionales Feld `expectFailure` im Szenario-Typ
+  - Auswertung im Test-Loop ergänzen
+  - Szenario „Stripe Webhook Reachability" mit `expectFailure: { status: 400, bodyIncludes: "No signature" }` markieren
 
 ## Erwartetes Ergebnis
 
-- 15 Szenarien werden wirklich ausgeführt
-- 15 Szenarien werden im Admin angezeigt
-- kein Widerspruch mehr zwischen Codebase, Logs und UI
-- künftige Szenario-Erweiterungen brechen nicht mehr durch doppelte Pflege auseinander
+- Stripe-Webhook-Test wird grün, ohne dass die Signatur-Sicherheit aufgeweicht wird
+- Wiederverwendbares Muster `expectFailure` für künftige geschützte Endpoints
+- 15/15 Szenarien stabil, keine falschen Roten mehr im Dashboard
+
