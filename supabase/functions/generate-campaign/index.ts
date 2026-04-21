@@ -1,6 +1,6 @@
 // Synchronous Campaign Generation - v5.0
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { withRateLimit } from '../_shared/rate-limiter.ts';
 import { withTelemetry, trackAIJobEvent } from '../_shared/telemetry.ts';

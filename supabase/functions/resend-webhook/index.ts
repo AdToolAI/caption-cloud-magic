@@ -8,7 +8,7 @@
 //
 // Optional signature verification via RESEND_WEBHOOK_SECRET (Svix).
 
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { suppressEmail } from "../_shared/email-send.ts";
 
 const corsHeaders = {

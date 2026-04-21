@@ -4,7 +4,7 @@
  * Designed for 1000+ concurrent users
  */
 
-import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { trackAIJobEvent } from '../_shared/telemetry.ts';
 import { getSupabaseClient } from '../_shared/db-client.ts';
 
