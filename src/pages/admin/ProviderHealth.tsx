@@ -74,13 +74,16 @@ export const ProviderHealth = () => {
         };
       });
 
-      // Lambda capacity
-      const [{ data: cfgRow }, { count: activeRenders }] = await Promise.all([
-        supabase.from('system_config').select('value').eq('key', 'lambda_max_concurrent').maybeSingle(),
+      // Lambda capacity (read both NORMAL + SAFE so the UI stays in sync with future phase changes)
+      const [{ data: cfgRows }, { count: activeRenders }] = await Promise.all([
+        supabase.from('system_config').select('key, value').in('key', ['lambda_max_concurrent', 'lambda_max_concurrent_safe']),
         supabase.from('render_queue').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
       ]);
-      const max = Number(cfgRow?.value ?? 25);
-      setLambdaInfo({ active: activeRenders ?? 0, max });
+      const cfgMap: Record<string, any> = {};
+      (cfgRows ?? []).forEach((r: any) => { cfgMap[r.key] = r.value; });
+      const max = Number(cfgMap.lambda_max_concurrent ?? 25);
+      const safe = Number(cfgMap.lambda_max_concurrent_safe ?? 15);
+      setLambdaInfo({ active: activeRenders ?? 0, max, safe });
 
       setRows(built);
       setLastUpdate(new Date());
