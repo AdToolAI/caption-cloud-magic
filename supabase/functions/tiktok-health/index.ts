@@ -13,6 +13,7 @@ serve(async (req) => {
   const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY');
   const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET');
   const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI');
+  const env = Deno.env.get('TIKTOK_ENV') || 'production';
 
   return new Response(
     JSON.stringify({
@@ -20,7 +21,10 @@ serve(async (req) => {
       hasClientSecret: !!clientSecret,
       hasRedirectUri: !!redirectUri,
       clientKeyPreview: clientKey ? `${clientKey.substring(0, 4)}***${clientKey.substring(clientKey.length - 4)}` : null,
-      configured: !!clientKey && !!clientSecret && !!redirectUri
+      redirect_uri: redirectUri || null,
+      environment: env,
+      configured: !!clientKey && !!clientSecret && !!redirectUri,
+      note: 'Compare redirect_uri value byte-for-byte with the URI registered in the TikTok Developer Portal (Login Kit). They must match exactly.'
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );

@@ -8,17 +8,58 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 
 export default function Integrations() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const [userPlan, setUserPlan] = useState<string>("free");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
       loadUserPlan();
     }
   }, [user]);
+
+  // Handle OAuth callback errors/success from URL params
+  useEffect(() => {
+    const error = searchParams.get('error');
+    const connected = searchParams.get('connected');
+    const status = searchParams.get('status');
+
+    if (error === 'tiktok_oauth_failed') {
+      toast({
+        title: 'TikTok-Verbindung fehlgeschlagen',
+        description:
+          'Die Verbindung mit TikTok konnte nicht hergestellt werden. Bitte versuche es erneut. Falls das Problem bestehen bleibt, kontaktiere den Support.',
+        variant: 'destructive',
+      });
+    } else if (error === 'tiktok_oauth_denied') {
+      toast({
+        title: 'TikTok-Autorisierung abgebrochen',
+        description:
+          'Du hast die Autorisierung in TikTok abgelehnt. Klicke erneut auf „Verbinden", um es noch einmal zu versuchen.',
+        variant: 'destructive',
+      });
+    } else if (connected === 'tiktok' && status === 'success') {
+      toast({
+        title: 'TikTok erfolgreich verbunden',
+        description: 'Dein TikTok-Account ist jetzt verknüpft.',
+      });
+    }
+
+    // Clean URL params after handling
+    if (error || connected) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('error');
+      newParams.delete('connected');
+      newParams.delete('status');
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const loadUserPlan = async () => {
     if (!user) return;

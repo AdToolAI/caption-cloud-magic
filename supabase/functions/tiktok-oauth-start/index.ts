@@ -70,11 +70,12 @@ serve(async (req) => {
     // Build TikTok auth URL
     const authUrl = buildAuthUrl(state);
 
-    console.log('Redirecting to TikTok OAuth (Sandbox):', {
+    const tiktokEnv = Deno.env.get('TIKTOK_ENV') || 'production';
+    console.log(`Redirecting to TikTok OAuth (${tiktokEnv}):`, {
       userId: user.id,
       state,
       returnTo: safeReturnTo,
-      env: Deno.env.get('TIKTOK_ENV')
+      env: tiktokEnv
     });
 
     return new Response(
