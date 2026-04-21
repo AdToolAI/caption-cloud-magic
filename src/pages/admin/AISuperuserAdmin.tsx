@@ -41,6 +41,16 @@ const ACTIVE_SCENARIOS = new Set<string>([
   'Health-Check Aggregator',
   // Phase 3 — Storage Integrity
   'Storage Bucket Health',
+  // Phase 4 — Social Publishing Health (Block D)
+  'Instagram Health',
+  'TikTok Health',
+  'YouTube Health',
+  'X / Twitter Health',
+  // Phase 4 — Credit & Billing Integrity (Block E)
+  'Credit Preflight Reachability',
+  'Subscription Status Check',
+  // Phase 4 — Job Queue Health (Block F)
+  'AI Queue Worker Reachability',
 ]);
 
 // Latency color thresholds (ms) — KI-Calls können legitim 5-10s dauern
@@ -53,8 +63,8 @@ const latencyClass = (ms: number | null | undefined): string => {
 
 // Aggregierte Latenz (Summe aller Szenarien) — andere Maßstäbe als Einzel-Calls
 const totalLatencyClass = (totalMs: number): string => {
-  if (totalMs < 60000) return 'text-green-500';
-  if (totalMs < 100000) return 'text-yellow-600 dark:text-yellow-400';
+  if (totalMs < 80000) return 'text-green-500';
+  if (totalMs < 120000) return 'text-yellow-600 dark:text-yellow-400';
   return 'text-destructive';
 };
 
