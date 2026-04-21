@@ -1,66 +1,66 @@
 
 
-## Feature: Szenen per Drag & Drop sortieren (Storyboard + Clips)
+## Bugfix: Rohe i18n-Keys im Music-Tab („videoComposer.musicSearchLabel" etc.)
 
-### Idee
-Statt nur ▲/▼-Buttons sollen Szenen direkt mit der Maus an die gewünschte Position gezogen werden können — sowohl im **Storyboard-Tab** als auch im **Clips-Tab**. Buttons bleiben als Fallback (Tastatur, Touch, Accessibility) erhalten.
+### Problem
+Im Music-Tab werden drei rohe Übersetzungs-Keys angezeigt:
+- `videoComposer.musicSearchLabel`
+- `videoComposer.musicSearchPlaceholder`
+- `videoComposer.musicSearchHint`
 
-### Umsetzung
+### Ursache
+In `AudioTab.tsx` (Zeilen 245, 256, 260) steht z. B.:
+```tsx
+{t('videoComposer.musicSearchLabel') || 'Suchen (Titel, Künstler, Stichwort)'}
+```
 
-#### 1) Drag-&-Drop-Library: `@dnd-kit`
-Installiere `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`.
+Der `||`-Fallback funktioniert hier **nicht**, weil `useTranslation().t()` bei einem fehlenden Key den Key selbst als nicht-leeren String zurückgibt — und nicht-leere Strings sind truthy. Folge: Der Key wird gerendert.
 
-Warum `@dnd-kit` und nicht z. B. `react-beautiful-dnd`:
-- Aktiv gepflegt, React-18-/19-kompatibel
-- Voll Touch- und Keyboard-zugänglich (Pfeiltasten + Space funktionieren weiter)
-- Kein Konflikt mit existierenden Click-Handlern (Buttons in der Karte bleiben klickbar)
-- Kleines Bundle (~10 KB gzipped)
+In `src/lib/translations.ts` fehlen diese drei Keys in **allen drei Sprachblöcken** (EN/DE/ES). Außerdem wird in der gleichen Datei in Zeile 301 `searchByQuery` referenziert — auch dieser Key sollte vorsichtshalber ergänzt werden.
 
-#### 2) Wiederverwendbarer `SortableSceneItem`-Wrapper
-**Neue Datei:** `src/components/video-composer/SortableSceneItem.tsx`
+### Fix
+**Datei:** `src/lib/translations.ts`
 
-Dünner Wrapper um `useSortable()`, der:
-- die Karte als Drag-Item registriert
-- einen sichtbaren **Drag-Handle** (`GripVertical`-Icon) links an der Karte rendert — nur dieser Bereich startet das Ziehen, damit Klicks auf Buttons/Inputs in der Karte nicht versehentlich Drags auslösen
-- während des Ziehens die Karte leicht hebt (Schatten + 1.02-Scale + reduzierte Opacity am Originalplatz)
+Im `videoComposer.*`-Bereich aller drei Sprachen (EN/DE/ES) — neben den vorhandenen Keys wie `backgroundMusic`, `genre`, `mood`, `searchMusic` — diese vier Keys ergänzen:
 
-#### 3) Integration im Storyboard-Tab
-**Datei:** `src/components/video-composer/StoryboardTab.tsx`
+**DE**
+```ts
+musicSearchLabel: 'Suchen (Titel, Künstler, Stichwort)',
+musicSearchPlaceholder: 'z.B. Beach Sunset, Lofi Chill, Hans Zimmer...',
+musicSearchHint: 'Leer lassen, um nach Genre + Stimmung zu suchen.',
+searchByQuery: 'Suche „{query}"',
+```
 
-- `<DndContext>` + `<SortableContext>` um die Scene-Liste legen
-- Jede `SceneCard` in `SortableSceneItem` einwickeln
-- `onDragEnd` ruft die bestehende `moveScene`-Logik mit `arrayMove(scenes, oldIndex, newIndex)` auf und persistiert via `onUpdateScenes` (Auto-Save greift wie bisher)
-- Bestehende ▲/▼-Buttons in `SceneCard` bleiben unverändert
+**EN**
+```ts
+musicSearchLabel: 'Search (title, artist, keyword)',
+musicSearchPlaceholder: 'e.g. Beach Sunset, Lofi Chill, Hans Zimmer...',
+musicSearchHint: 'Leave empty to search by genre + mood.',
+searchByQuery: 'Search "{query}"',
+```
 
-#### 4) Integration im Clips-Tab
-**Datei:** `src/components/video-composer/ClipsTab.tsx`
+**ES**
+```ts
+musicSearchLabel: 'Buscar (título, artista, palabra clave)',
+musicSearchPlaceholder: 'p. ej. Beach Sunset, Lofi Chill, Hans Zimmer...',
+musicSearchHint: 'Déjalo vacío para buscar por género + estado de ánimo.',
+searchByQuery: 'Buscar "{query}"',
+```
 
-- Gleiches Muster: `<DndContext>` + `<SortableContext>` um die Clip-Karten-Liste
-- Zusätzlich kleiner Order-Badge (#1, #2, …) links neben dem Drag-Handle für schnelle Orientierung
-- Reorder-Handler analog zum Storyboard-Tab; bestehender debounced Auto-Save in `useComposerPersistence` schreibt `order_index` per Two-Phase-Write korrekt zurück
-- Während aktiver Generierung (`clipStatus === 'generating'`): Drag bleibt erlaubt, weil Polling per Scene-`id` matcht — die laufende Edge-Function ist von der Reihenfolge unabhängig
-
-#### 5) UX-Feinheiten
-- **Drag-Handle sichtbar**: kleiner `GripVertical`-Icon-Button mit `cursor-grab` / `active:cursor-grabbing`
-- **Drop-Indikator**: `@dnd-kit/sortable` animiert die Lücke automatisch — keine extra CSS-Arbeit nötig
-- **Scrolling**: Bei langen Listen wird automatisch gescrollt, wenn man eine Karte an den oberen/unteren Rand zieht (Built-in)
-- **Tastatur-Support**: Fokus auf Drag-Handle → Space hebt an → Pfeiltasten verschieben → Space legt ab. Voll barrierefrei.
-- **Touch**: Funktioniert auf Mobile/Tablet via `PointerSensor` mit kleiner Distanzschwelle (5 px), damit normales Scrollen nicht versehentlich Drags startet.
-
-### Was bewusst nicht passiert
-- **Keine DB-Schema-Änderung.** `composer_scenes.order_index` bleibt wie es ist; die existierende Two-Phase-Write-Persistenz handhabt Umsortierungen bereits sauber.
-- **Buttons werden nicht entfernt.** ▲/▼ bleiben als sekundäre, immer sichtbare Option (besonders nützlich auf Touch-Geräten ohne Drag-Erfahrung).
-- **Kein Drag zwischen Tabs.** Innerhalb der jeweiligen Liste reicht.
+Optional, da der `||`-Fallback ohnehin trügerisch ist, in `AudioTab.tsx` Zeile 301 die String-Interpolation umstellen auf:
+```ts
+t('videoComposer.searchByQuery', { query: musicQuery.trim() })
+```
+(passend zum bestehenden `{count}`-Pattern, das `useTranslation` schon unterstützt).
 
 ### Verifikation
-1. Storyboard-Tab → Szene per Drag-Handle ziehen → Reihenfolge ändert sich live
-2. Clips-Tab → dito; bereits generierte Clip-Vorschauen wandern korrekt mit
-3. Reload → neue Reihenfolge bleibt persistent
-4. Während Generierung umsortieren → fertige Clips landen bei der richtigen Szene
-5. Tastatur-Test: Tab zum Drag-Handle → Space → Pfeiltaste runter → Space → Position geändert
-6. Mobile/Touch: Long-Press auf Handle → ziehen funktioniert
+1. Music-Tab öffnen → statt `videoComposer.musicSearchLabel` steht „Suchen (Titel, Künstler, Stichwort)"
+2. Placeholder im Input zeigt echten Beispieltext
+3. Hint unter dem Input zeigt deutsche/englische/spanische Erklärung
+4. Sprache umschalten (DE → EN → ES) → alle drei Texte folgen korrekt
+5. Suchquery eingeben → Button-Label zeigt z. B. „Suche „Hans Zimmer"" statt rohem Key
 
 ### Risiko & Aufwand
-- **Risiko: Niedrig.** Neue Library, aber gut isoliert in einem Wrapper. Bestehende Logik unverändert.
-- **Aufwand:** ~15 Minuten — 1 neue Datei (SortableSceneItem), 2 Datei-Anpassungen (StoryboardTab, ClipsTab), 1 Dependency-Install.
+- **Risiko: Sehr niedrig.** Reine Übersetzungs-Ergänzung, keine Logik-Änderung.
+- **Aufwand:** ~2 Minuten — eine Datei (`translations.ts`), 4 Keys × 3 Sprachen.
 
