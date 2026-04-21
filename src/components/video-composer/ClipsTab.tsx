@@ -76,7 +76,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
     if (!projectId) return;
     const { data } = await supabase
       .from('composer_scenes')
-      .select('id, clip_status, clip_url, duration_seconds')
+      .select('id, clip_status, clip_url, duration_seconds, upload_type')
       .eq('project_id', projectId);
 
     if (!data) return;
@@ -91,7 +91,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
 
     const updatedScenes = scenes.map((scene, idx) => {
       const dbScene = data.find((d: any) => d.id === scene.id);
-      if (dbScene && (dbScene.clip_status !== scene.clipStatus || dbScene.clip_url !== scene.clipUrl)) {
+      if (
+        dbScene &&
+        (dbScene.clip_status !== scene.clipStatus ||
+          dbScene.clip_url !== scene.clipUrl ||
+          (dbScene.upload_type && dbScene.upload_type !== scene.uploadType))
+      ) {
         changed = true;
         // Toast on transition generating → ready
         if (scene.clipStatus === 'generating' && dbScene.clip_status === 'ready') {
@@ -104,7 +109,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           toast({ title: `Szene ${idx + 1} fehlgeschlagen`, variant: 'destructive' });
         }
         newPrev[scene.id] = dbScene.clip_status;
-        return { ...scene, clipStatus: dbScene.clip_status as ComposerScene['clipStatus'], clipUrl: dbScene.clip_url || scene.clipUrl };
+        return {
+          ...scene,
+          clipStatus: dbScene.clip_status as ComposerScene['clipStatus'],
+          clipUrl: dbScene.clip_url || scene.clipUrl,
+          uploadType: (dbScene.upload_type as ComposerScene['uploadType']) || scene.uploadType,
+        };
       }
       return scene;
     });
