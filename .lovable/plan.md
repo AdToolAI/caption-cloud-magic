@@ -1,60 +1,64 @@
 
 
-# Plan: Storage Bucket Health Check auf echte Bucket-Namen ausrichten
+# Plan: Phase 4 — Letzte sinnvolle Erweiterungen für den Superuser
 
-## Diagnose
+## Aktueller Stand: 23/23 grün, 96 % Pass-Rate
 
-Der Test in `supabase/functions/storage-bucket-health/index.ts` prüft auf 5 hartcodierte Bucket-Namen:
+Der Superuser deckt jetzt:
+- 10 Content/Analytics-Generatoren (Caption, Bio, Trends, Performance, Hashtags, Posting Times, Image, Campaign, Comments)
+- 5 System-Health-Funktionen (Trial, Calendar Dispatcher, Stripe Webhook, Social Health, Consistency)
+- 4 Provider-Reachabilities (Replicate, ElevenLabs, Sora via Replicate, Lovable AI)
+- 3 Render-Pipelines (Lambda Webhook, Render Queue, Health-Aggregator)
+- 1 Storage-Health
 
-```ts
-["background-projects", "media-library", "video-renders", "ai-videos", "brand-assets"]
-```
+## Was wirklich noch fehlt — 6 lohnende Erweiterungen
 
-Tatsächlich existieren in der Datenbank (22 Buckets insgesamt):
+Ich habe die ~280 Edge-Funktionen gegen die kritischen User-Flows abgeglichen. Diese 6 Bereiche sind **echte Lücken**, nicht nur Nice-to-Have:
 
-| Erwartet | Real existiert? | Tatsächlicher Name |
-|---|---|---|
-| `background-projects` | ✅ ja | — |
-| `media-library` | ❌ nein | `media-assets` |
-| `video-renders` | ❌ nein | `universal-videos` (Final-Renders) |
-| `ai-videos` | ✅ ja | — |
-| `brand-assets` | ❌ nein | `brand-logos` |
+### Block D — Social Publishing Health (4 neue)
+Wenn das bricht, können User nicht mehr posten — direkt umsatzrelevant. Alle bestehen bereits als Health-Endpoints, müssen nur eingebunden werden:
 
-→ 3 von 5 Bucket-Namen sind falsch. Der Test ist deswegen rot — kein echter Storage-Ausfall.
+1. **Instagram Health** — `health-ig` (Token-Check + Graph API v24 Reachability)
+2. **TikTok Health** — `tiktok-health` (Sandbox-Status + Token-Validität)
+3. **YouTube Health** — `health-yt` (OAuth-Refresh-Pfad)
+4. **X / Twitter Health** — `health-x` (Basic API Token-Check)
 
-## Lösung
+Alle existieren bereits als Edge-Funktion und sind dafür gebaut. Keine Implementierung nötig — nur in `SCENARIOS` aufnehmen.
 
-Die `REQUIRED_BUCKETS` Liste an die echte Realität anpassen, mit Fokus auf die wirklich kritischen Buckets für die Plattform:
+### Block E — Credit & Billing Integrity (2 neue)
+Credit-Bugs sind die Top-Quelle für Refund-Tickets:
 
-```ts
-const REQUIRED_BUCKETS = [
-  "background-projects",   // Smart Background, Picture Studio
-  "media-assets",          // Mediathek (Hauptspeicher)
-  "ai-videos",             // AI Video Studios (Sora, Kling, etc.)
-  "universal-videos",      // Universal Video Creator Renders
-  "video-assets",          // Director's Cut Source-Videos
-  "audio-assets",          // Voiceover & Music
-  "brand-logos",           // Brand Identity
-  "thumbnails",            // Video-Thumbnails
-];
-```
+5. **Credit Preflight Reachability** — `credit-preflight` mit Dry-Run-Body, prüft dass die Reservierungs-Logik antwortet
+6. **Subscription Status Check** — `check-subscription` für den Test-User, prüft dass Stripe-Sync funktioniert
 
-Begründung der Auswahl: Genau die 8 Buckets, deren Ausfall direkt User-sichtbare Fehler verursacht (Upload bricht ab, Video lädt nicht, Avatar fehlt). Buckets wie `audio-temp`, `bug-screenshots` oder `image-captions` sind nicht systemkritisch.
+### Block F — Job Queue Health (1 neue)
+7. **AI Queue Worker Reachability** — `ai-queue-worker` im Status-Mode, prüft dass der Worker antwortet und kein Backlog >100 Jobs existiert
+
+## Bewusst NICHT aufgenommen
+
+- **Cron-only Funktionen** (`tick-strategy-posts`, `process-drip-emails`, `cache-warming`) — laufen ohnehin geplant, eigene Logs reichen
+- **Webhooks von Drittanbietern** (`replicate-webhook`, `resend-webhook`, `sora-scene-webhook`) — gleiche Mechanik wie Stripe/Lambda, schon abgedeckt
+- **Twitch-Funktionen** (~14 Stück) — Nischenintegration, niedrige User-Anzahl
+- **Director's Cut Sub-Funktionen** (~25 Stück) — werden über `render-queue-manager` indirekt mitgetestet
+- **Echte Generierungen von Sora/Kling/Hailuo/Wan/Luma/Seedance** — würden ~3–5 € pro Komplett-Test kosten. Reachability via Replicate-Call (bereits drin) deckt 90 % ab.
 
 ## Geänderte Dateien
 
-- `supabase/functions/storage-bucket-health/index.ts` — `REQUIRED_BUCKETS` Array auf die 8 real existierenden, kritischen Bucket-Namen anpassen
+- `supabase/functions/ai-superuser-test-runner/index.ts` — 7 neue Einträge in `SCENARIOS`, alle `optional: true`, alle in Block D/E/F gruppiert mit Kommentar-Headern
+- `src/pages/admin/AISuperuserAdmin.tsx` — `ACTIVE_SCENARIOS` Whitelist um die 7 Namen ergänzen, Latenz-Schwelle auf 80s grün / 120s gelb anheben (7 zusätzliche Calls × ~1–2s)
 
 ## Verifikation
 
-Nach Deploy „Komplett-Test" auslösen. Erwartung:
-
-- Storage Bucket Health → **grün** (alle 8 Buckets vorhanden)
-- 23/23 Szenarien stabil
+„Komplett-Test" auslösen. Erwartung:
+- **30 Szenarien** sichtbar (23 + 7)
+- Alle grün oder klare Warnings (z. B. wenn ein Social-Token noch nicht verbunden ist → gelbe Warnung statt Fail)
+- Gesamtlatenz: ~55–80s
+- Pass-Rate bleibt ≥ 95 %
 
 ## Erwartetes Ergebnis
 
-- Test prüft die wirklich existierenden, kritischen Buckets
-- Falls künftig ein kritischer Bucket gelöscht wird (z. B. versehentlich), schlägt der Test sofort an
-- Keine Phantom-Fehler mehr durch nicht-existente Bucket-Namen
+- Erstmals Sichtbarkeit auf alle 5 Social-Publishing-Pfade (IG, TikTok, YT, X, FB indirekt über Social-Health)
+- Credit-System unter aktiver Überwachung
+- Job-Queue-Backlog wird sofort sichtbar, nicht erst über User-Beschwerden
+- Damit ist der Superuser auf einem Level, ab dem weitere Tests nur noch echtes Geld kosten würden
 
