@@ -47,7 +47,6 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@remotion/cli": "4.0.441",
     "@remotion/lambda": "4.0.441",
-    "@remotion/lottie": "4.0.441",
     "@remotion/player": "4.0.441",
     "@remotion/transitions": "4.0.441",
     "@rive-app/canvas": "^2.32.2",
