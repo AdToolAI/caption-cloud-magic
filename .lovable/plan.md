@@ -1,70 +1,70 @@
 
 
-# Plan: Phase 3 — Kritische Hochrisiko-Pfade in den AI-Superuser aufnehmen
+# Plan: Die zwei „Fehler" sind keine echten Ausfälle — Tests anpassen
 
-## Warum jetzt erweitern
+## Diagnose
 
-Der Superuser deckt aktuell **15 Szenarien** ab — fast alles davon sind günstige Text/Analytics-Calls. Die **teuersten und ausfallanfälligsten** Bereiche der Plattform sind **gar nicht überwacht**:
+Beide „Fehler" stammen nicht aus echten Service-Ausfällen, sondern aus zu strikten Test-Annahmen:
 
-- AI-Video-Pipelines (Replicate / Sora / ElevenLabs) — kosten echtes Geld pro Fehler
-- Remotion Lambda Renderer — häufigste Quelle für Credit-Refund-Tickets
-- TTS / Voice — ElevenLabs-Quota-Ausfälle bleiben unbemerkt
-- Video Composer & Director's Cut — komplette Render-Pipelines
-- Storage Health (Buckets + RLS) — silent failures bei Uploads
+### 1. Lambda Render Webhook Reachability — `fail`
+- Tatsächliche Antwort: `HTTP 200 {"success":true,"message":"Webhook processed"}`
+- Test erwartet: `HTTP 400` (Signatur-Reject analog Stripe)
+- Realität: `remotion-webhook` hat **keinen Signatur-Guard** — er akzeptiert jeden POST, weil AWS Lambda-Webhooks anders authentifiziert werden (Custom-Header `X-Remotion-Signature` ist optional, Funktion verlässt sich auf den Lambda-Pfad). Das ist by design so, weil der Webhook ohnehin nur Render-Status verarbeitet.
+- → Der Endpoint ist **gesund** (200), aber der Test markiert das fälschlich als rot.
 
-Wenn da was kaputtgeht, merkst du es heute erst wenn ein User sich beschwert.
+### 2. OpenAI / Sora Reachability — `warning` (gelb mit Warnsymbol)
+- Tatsächlicher Status: `warning`, Meldung: `OPENAI_API_KEY not configured`
+- Realität bestätigt durch `secrets--fetch_secrets`: **`OPENAI_API_KEY` ist tatsächlich nicht gesetzt**.
+- Sora 2 läuft bei dir aktuell über **Replicate** (nicht direkt OpenAI), siehe `REPLICATE_API_KEY` in den Secrets. Ein direkter OpenAI-Key ist für die Plattform nicht erforderlich.
+- → Das ist **kein Ausfall**, sondern korrektes Verhalten: „kein Key, kein Test". Im Bild zeigt das Dashboard schon das gelbe Warndreieck — kein roter Fail.
 
-## Neue Szenarien (8 zusätzlich → insgesamt 23)
+## Lösung
 
-### Block A — Provider Reachability (sicher + günstig, kein Verbrauch)
-Diese Tests rufen externe Provider-Endpoints **ohne** echte Generierung auf, nur Auth/Quota-Check:
+### A) Lambda Render Webhook Reachability korrigieren
+Erwartung umstellen auf „erreichbar = pass":
 
-1. **Replicate API Health** — `GET /v1/account` über trackProviderCall, prüft Token gültig + Quota lesbar
-2. **ElevenLabs Quota Check** — `GET /v1/user/subscription`, prüft verfügbare Characters
-3. **OpenAI / Sora Reachability** — `GET /v1/models`, prüft Auth + Modell-Liste
-4. **Lovable AI Gateway Reachability** — Mini-Prompt an `gemini-2.5-flash-lite` (billigstes Modell, ~0,001 Cent)
+- `expectFailure: { status: 400 }` entfernen
+- Stattdessen: jede Antwort mit Status `200`–`499` und Body, der `success` oder `processed` enthält → `pass`
+- Nur 5xx / Timeout → `fail`
 
-Diese 4 sind **fast** (< 2s), kosten praktisch nichts und decken 90 % der Provider-Ausfälle ab.
+Das ist ehrlicher, weil wir testen wollen: „Antwortet der Webhook-Endpoint überhaupt?" — und nicht „lehnt er ungültige Signaturen ab" (was er aktuell gar nicht tut).
 
-### Block B — Render Pipeline Health
-5. **Lambda Render Webhook Reachability** — `remotion-webhook` mit `expectFailure` (Signatur-Guard), analog zum Stripe-Pattern
-6. **Render Queue Manager** — `render-queue-manager` im Dry-Run-Mode, prüft dass Queue lesbar ist und kein Backlog-Block existiert
-7. **Health-Check Aggregator** — bestehender `health-check` Endpoint, prüft Database/Storage/Queue/Connection-Pool in einem Aufruf
+### B) OpenAI / Sora Reachability — Optionen
 
-### Block C — Storage Integrity
-8. **Storage Bucket Health** — listet alle erwarteten Buckets (`background-projects`, `media-library`, `video-renders` etc.), failt wenn einer fehlt oder unzugänglich ist
+**Variante 1 (empfohlen): Szenario umbenennen + auf Replicate Sora-Endpoint umstellen**
+- Name → `Sora 2 (via Replicate) Reachability`
+- `directCall` ändert sich zu `https://api.replicate.com/v1/models/openai/sora-2` mit `REPLICATE_API_KEY` (genau das Modell, das die Plattform tatsächlich nutzt)
+- Damit testet das Szenario das, was real existiert
 
-## Bewusst NICHT getestet (zu teuer)
+**Variante 2: Szenario komplett entfernen**, da OpenAI direkt nirgends genutzt wird
 
-- **Echte Video-Generierung** (Sora/Kling/Seedance/Hailuo): ein einziger Test-Run = 0,50–2 € echter Credit-Verbrauch × täglich = ~60 €/Monat nur für Monitoring. Stattdessen testen wir die Provider-Reachability (Block A), das fängt 90 % der Probleme ohne Kosten.
-- **Echter Lambda-Render**: ~0,30 € pro Test-Render, plus 30–60s Wartezeit. Stattdessen Webhook-Reachability + Queue-Health (Block B).
-- **Echte ElevenLabs-Synthese**: verbraucht Characters aus dem Monatskontingent. Quota-Check reicht.
+**Variante 3: Status quo behalten**, weil das gelbe Warndreieck ohnehin korrekt signalisiert „nicht konfiguriert, kein Fehler"
 
-Wenn du später echte End-to-End-Tests möchtest, machen wir das in einer **Wochen-Kadenz** statt 4×/Tag.
+→ Empfehlung: **Variante 1** — gibt uns echte Sichtbarkeit auf den Sora-Provider statt einer toten Warnung.
 
-## Umsetzung
+### C) Optionale Hardening — Replicate-Reachability gleich mit umstellen
+Aktuell prüft `Replicate API Health` `GET /v1/account`. Falls das ebenfalls nicht das richtige Endpoint trifft, lohnt es sich, es ebenso auf eine konkrete Modell-Abfrage umzustellen. Status-Check beim nächsten Lauf.
 
-### Geänderte Dateien
-- `supabase/functions/ai-superuser-test-runner/index.ts` — 8 neue Einträge in `SCENARIOS`, alle als `optional: true` markiert (damit fehlende Provider-Keys nur Warnings statt Fails geben)
-- `src/pages/admin/AISuperuserAdmin.tsx` — `ACTIVE_SCENARIOS` Whitelist um die 8 neuen Namen ergänzen, Latenz-Schwellen anheben (45s → 60s grün, 75s → 100s gelb)
+## Geänderte Dateien
 
-### Neues Test-Pattern
-Zwei neue Felder am `Scenario`-Typ für direkte HTTP-Calls (statt Edge-Function-Invoke):
+- `supabase/functions/ai-superuser-test-runner/index.ts`
+  - Szenario `Lambda Render Webhook Reachability`: `expectFailure` entfernen, durch toleranten Range-Check (≤499 = ok) ersetzen — entweder über neues Feld `expectReachable: true` oder Inline-Logik
+  - Szenario `OpenAI / Sora Reachability`: umbenennen zu `Sora 2 (via Replicate) Reachability`, `secretEnv` → `REPLICATE_API_KEY`, `directCall.url` → `https://api.replicate.com/v1/models/openai/sora-2`, Header → `Authorization: Token <key>`
+- `src/pages/admin/AISuperuserAdmin.tsx`
+  - Whitelist-Eintrag `OpenAI / Sora Reachability` → `Sora 2 (via Replicate) Reachability` ersetzen
 
-- `directCall?: { url: string; method: string; headers: Record<string,string> }` — für externe Provider-Endpoints
-- `secretEnv?: string` — zeigt im Dashboard „kein Key konfiguriert" als gelbe Warnung statt rotem Fehler
+## Verifikation
 
-### Verifikation
-1. „Komplett-Test" auslösen → erwartet **23 Zeilen**
-2. Banner: „Alle 23 Szenarien laufen stabil"
-3. Falls ein Provider-Key fehlt: gelbe Warnung mit klarer Meldung („ELEVENLABS_API_KEY not set"), nicht roter Fail
-4. Gesamtlatenz: ~45–70s (8× zusätzliche `fast` Calls à ~1–3s, parallel in 3er-Batches)
+Nach dem Deploy „Komplett-Test" auslösen. Erwartung:
+
+- Lambda Render Webhook Reachability → **grün** (200 ist ok)
+- Sora 2 (via Replicate) Reachability → **grün** (200 vom echten Provider)
+- 23/23 Szenarien stabil
+- Kein Credit-Verbrauch (alles read-only Auth-Checks)
 
 ## Erwartetes Ergebnis
 
-- **23/23 Szenarien** stabil sichtbar
-- Erstmals Sichtbarkeit auf Replicate/ElevenLabs/OpenAI/Lambda-Health
-- Kein zusätzlicher Credit-Verbrauch (Provider-Reachability-Pattern)
-- Fehlende Provider-Keys werden als Warnung gemeldet, nicht als Fail
-- Template `directCall` + `expectFailure` macht künftige Erweiterungen (z. B. Meta-Webhook, TikTok-Webhook) trivial
+- Keine falschen Roten/Gelben mehr im Dashboard
+- Das Sora-Szenario testet wirklich den Provider, der in Produktion läuft
+- Webhook-Reachability prüft, was wir wirklich wissen wollen: „Antwortet der Endpoint?"
 
