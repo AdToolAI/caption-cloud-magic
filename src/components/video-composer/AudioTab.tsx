@@ -298,7 +298,7 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
 
             <Button onClick={handleSearchMusic} disabled={searchingMusic} variant="outline" className="w-full gap-2">
               {searchingMusic ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              {searchingMusic ? t('videoComposer.searching') : (musicQuery.trim() ? (t('videoComposer.searchByQuery') || `Suche „${musicQuery.trim()}"`) : t('videoComposer.searchMusic'))}
+              {searchingMusic ? t('videoComposer.searching') : (musicQuery.trim() ? t('videoComposer.searchByQuery', { query: musicQuery.trim() }) : t('videoComposer.searchMusic'))}
             </Button>
 
             {musicResults.length > 0 && (
