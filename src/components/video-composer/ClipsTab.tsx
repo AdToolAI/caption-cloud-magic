@@ -510,7 +510,14 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           const isThisGenerating = singleGenerating[scene.id] || scene.clipStatus === 'generating';
 
           return (
-            <Card key={scene.id} className="border-border/40 bg-card/80 overflow-hidden">
+            <SortableSceneItem
+              key={scene.id}
+              id={scene.id}
+              badge={
+                <span className="text-[10px] font-mono text-muted-foreground/70 px-1">#{i + 1}</span>
+              }
+            >
+            <Card className="border-border/40 bg-card/80 overflow-hidden">
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-stretch gap-3">
                   {/* Larger preview slot */}
@@ -728,9 +735,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                 )}
               </CardContent>
             </Card>
+            </SortableSceneItem>
           );
         })}
-      </div>
+          </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }
