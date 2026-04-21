@@ -24,6 +24,8 @@ interface Scenario {
   expectedKeys?: string[];
   /** If true, skip if function does not exist (404) — treat as warning instead of fail */
   optional?: boolean;
+  /** If set, the scenario passes when the response matches this expected failure (used for security-protected endpoints like signature-guarded webhooks) */
+  expectFailure?: { status: number; bodyIncludes?: string };
 }
 
 interface TestContext {
