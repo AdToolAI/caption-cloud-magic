@@ -1,69 +1,73 @@
 
 
-# Option B: Vercel-Rewrite für TikTok Callback
+# 🎉 TikTok App APPROVED — Finale Aktivierung
 
-Du bekommst exakt die gleiche Geschwindigkeit und keine Einschränkungen. Hier warum:
+## Status
 
-## Performance-Frage geklärt
+| Item | Status |
+|------|--------|
+| TikTok App Review | ✅ Approved (E-Mail bestätigt) |
+| 3 Redirect URIs in Live | ✅ `useadtool.ai`, `api.useadtool.ai`, `lbunafpxuskwmsrraqxl.supabase.co` |
+| Cloudflare Worker `tiktok-oauth-proxy` | ✅ Aktiv |
+| `api.useadtool.ai` Custom Domain | ✅ Live |
+| Health-Endpoint Response | ⚠️ `redirect_uri` zeigt noch alten Wert (`useadtool.ai/...`) |
 
-| Aspekt | Direkt zu Supabase | Über Vercel-Rewrite |
-|---|---|---|
-| TikTok → Callback-Request | 1 Hop | 1 Hop (Vercel proxied transparent) |
-| Latenz-Aufschlag | 0 ms | ~20-40 ms (einmalig, nur beim OAuth-Callback) |
-| Häufigkeit | 1× pro User-Verbindung | 1× pro User-Verbindung |
-| Auswirkung auf normalen App-Betrieb | — | **Null** (Rewrite gilt nur für `/api/oauth/tiktok/callback`) |
-| Funktionseinschränkung | keine | keine |
+## Was JETZT zu tun ist (vollautomatisch durch mich)
 
-**Ergebnis:** Der User merkt davon nichts. Die +20-40 ms passieren einmalig beim Drücken von „Authorize" in TikTok — vor dem Redirect zurück zur App. Reine OAuth-Callback-Sache, keine Auswirkung auf Renders, Uploads, Posts oder UI.
+### 1. Secret `TIKTOK_REDIRECT_URI` aktualisieren
+Neuer Wert: `https://api.useadtool.ai/api/oauth/tiktok/callback`
+→ Update-Dialog erscheint, du bestätigst mit einem Klick.
 
-## Was ich umsetze
+### 2. Health-URL Re-Test (du, 30 Sek)
+Nach Secret-Update: `https://api.useadtool.ai/api/oauth/tiktok/health` aufrufen.
+Erwartet: `redirect_uri` zeigt jetzt `api.useadtool.ai/api/oauth/tiktok/callback`.
+Screenshot bestätigt 1:1-Match mit TikTok-Portal.
 
-### 1. `vercel.json` erweitern
-Neuer Rewrite für `/api/oauth/tiktok/callback` → Supabase Edge Function. Der bestehende SPA-Catch-All `/(.*) → /index.html` bleibt unverändert; spezifischere Rewrites werden zuerst gematcht.
+### 3. `vercel.json` aufräumen
+Die 3 toten TikTok-Rewrites entfernen (greifen nie — Hosting läuft via Lovable Edge, nicht Vercel). Headers + SPA-Fallback bleiben unverändert.
 
-### 2. `TIKTOK_REDIRECT_URI` Secret aktualisieren
-Neuer Wert (exakt was im TikTok Portal steht):
-```
-https://useadtool.ai/api/oauth/tiktok/callback
-```
-Du bestätigst den neuen Wert via Secret-Update-Dialog.
+### 4. `tiktok-oauth-start` Log-Fix
+Zeile 78: irreführender „Sandbox"-Text dynamisch (`${tiktokEnv}`) — Cleanup für künftige Debug-Sessions.
 
-### 3. `tiktok-health` erweitern
-Gibt jetzt den vollständigen `redirect_uri`-String zurück, damit du im Browser unter `https://useadtool.ai/api/oauth/tiktok/health` sofort sehen kannst, was wir an TikTok senden — 1:1 Vergleich mit dem Portal-Eintrag.
+### 5. End-to-End TikTok Connect Test
+Du klickst auf der Integrations-Seite **"Connect TikTok"**. Ich beobachte parallel:
+- Edge Function Logs `tiktok-oauth-start` (Auth-URL-Generierung mit neuer Redirect-URI)
+- Edge Function Logs `tiktok-oauth-callback` (Token-Exchange + DB-Insert via Worker-Proxy)
+- Tabelle `social_connections` (neue Zeile mit `provider='tiktok'`)
+- Tabelle `social_profiles` (neue Profile-Daten)
 
-### 4. `tiktok-oauth-start/index.ts` Log-Fix
-Zeile 78: `"Redirecting to TikTok OAuth (Sandbox):"` → `"Redirecting to TikTok OAuth (${env}):"` — irreführender „Sandbox"-Text raus, weil wir Production sind.
+**Erwartetes Endergebnis:** Grüner Toast „TikTok erfolgreich verbunden", Account erscheint in Linked Accounts mit Display-Name + Follower-Count.
 
-### 5. `Integrations.tsx` — User-freundliche Error-Toasts
-Bei Rückkehr mit `?error=tiktok_oauth_failed` oder `?error=tiktok_oauth_denied`: klarer Toast statt stiller Fehler. Das macht künftige Debug-Cases mit Kunden viel einfacher.
+### 6. Fallback-Strategie dokumentieren (Memory)
+`mem://infrastructure/hosting/cloudflare-tiktok-proxy` anlegen mit:
+- **3 approved Redirect URIs** (Subdomain primär, direkt Supabase als Backup, Root als Dead-Config)
+- Cloudflare Worker Setup (`tiktok-oauth-proxy`, Account `bestofproducts4u.workers.dev`, Custom Domain Binding)
+- Fallback-Switch: Bei Subdomain-Ausfall → Secret auf direkte Supabase-URL umschalten (Sekunden, ohne Re-Review)
+- TikTok App Review Notes: URI-Changes erfordern Review (1-5 Werktage), zukünftig nur bereits genehmigte URIs verwenden
+- Worker Routes auf `useadtool.ai/*` greifen NICHT, `vercel.json` wirkungslos auf Routing — nicht als Lösung vorschlagen
+- Workers.dev Root-URL liefert 404 by design
 
-## Verification nach Umsetzung
+## Geänderte/Neue Dateien
 
-1. `tiktok-health` aufrufen → muss `redirect_uri: "https://useadtool.ai/api/oauth/tiktok/callback"` zurückgeben
-2. `vercel.json` Rewrite live testen: `curl -I https://useadtool.ai/api/oauth/tiktok/callback?test=1` → muss zur Supabase-Function durchschlagen (302 oder 400, aber nicht 404)
-3. Du klickst im UI: **Integrations → Connect TikTok** → echter Login → Authorize → Redirect zurück → grüner Toast „TikTok verbunden"
-4. `tiktok-oauth-callback` Logs zeigen erfolgreichen Token-Exchange
+| Datei | Änderung |
+|-------|----------|
+| Secret `TIKTOK_REDIRECT_URI` | Wert auf `https://api.useadtool.ai/api/oauth/tiktok/callback` (Dialog) |
+| `vercel.json` | 3 tote TikTok-Rewrites entfernen |
+| `supabase/functions/tiktok-oauth-start/index.ts` | Log-Text `${tiktokEnv}` dynamisch |
+| `mem://infrastructure/hosting/cloudflare-tiktok-proxy` | Neu — komplette Architektur dokumentiert |
 
-## Geänderte Dateien
+## Was du jetzt tust
 
-- `vercel.json` — neuer Rewrite-Eintrag (über dem SPA-Catch-All)
-- `supabase/functions/tiktok-health/index.ts` — `redirect_uri` im Response
-- `supabase/functions/tiktok-oauth-start/index.ts` — Log-Text dynamisch
-- `src/pages/Integrations.tsx` — Error-Toast-Handler
-- Secret-Update: `TIKTOK_REDIRECT_URI` → neuer Wert wird im Update-Dialog bestätigt
+1. **„OK, mach den Plan"** schreiben → ich starte Secret-Update-Dialog, code-Cleanup, Memory anlegen
+2. Nach Secret-Bestätigung: Health-URL kurz prüfen (Screenshot)
+3. Auf Integrations-Seite **„Connect TikTok"** klicken → ich beobachte Logs in Echtzeit
+4. Bei Erfolg: gemeinsam feiern 🥂
 
-## Was du danach tun musst
+## Falls etwas schiefgeht
 
-1. Secret-Update bestätigen (Dialog erscheint automatisch)
-2. Frontend „Update" im Publish-Dialog drücken (für `vercel.json` Rewrite — Edge Functions deployen automatisch)
-3. Auf `https://useadtool.ai/api/oauth/tiktok/health` prüfen, ob die URI 1:1 stimmt
-4. **Connect TikTok** im UI testen → muss durchlaufen
-
-## Rollback-Plan (falls je nötig)
-
-Falls TikTok Production trotzdem ein Problem macht: Rewrite aus `vercel.json` entfernen, Secret zurück auf Supabase-URL — alles in 1 Minute reversibel.
-
-## Kosten
-
-Null. Vercel Rewrites sind im Plan inkludiert, keine extra Edge-Function-Calls, keine zusätzlichen Supabase-Invocations.
+| Problem | Sekunden-Lösung |
+|---------|-----------------|
+| Cloudflare Worker Subdomain hat Hänger | Secret auf direkte Supabase-URL umschalten (kein Re-Review nötig — bereits approved) |
+| Token-Exchange schlägt fehl | Edge Function Logs zeigen Klartext-Error, ich diagnostiziere live |
+| State-Mismatch beim Callback | DB-Tabelle `oauth_states` prüfen, CSRF-Token validieren |
 
