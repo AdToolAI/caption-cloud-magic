@@ -138,12 +138,28 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
   // Search background music
   const handleSearchMusic = async () => {
     if (!music) return;
+    const trimmedQuery = musicQuery.trim();
+    const hasGenre = !!music.genre;
+    const hasMood = !!music.mood;
+
+    if (!trimmedQuery && !hasGenre && !hasMood) {
+      toast({
+        title: t('videoComposer.musicSearchError'),
+        description: t('videoComposer.musicSearchHint'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSearchingMusic(true);
     try {
-      // Free-text query takes precedence; fallback to genre+mood combo
-      const effectiveQuery = musicQuery.trim() || `${music.genre} ${music.mood}`;
+      const effectiveQuery = trimmedQuery || [music.genre, music.mood].filter(Boolean).join(' ');
       const { data, error } = await supabase.functions.invoke('search-stock-music', {
-        body: { query: effectiveQuery, mood: music.mood, genre: music.genre },
+        body: {
+          query: effectiveQuery,
+          ...(hasGenre && { genre: music.genre }),
+          ...(hasMood && { mood: music.mood }),
+        },
       });
       if (error) throw error;
       const tracks: MusicTrack[] = (data?.results || []).map((tr: any) => ({
@@ -230,7 +246,7 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
               onCheckedChange={(checked) =>
                 onUpdateAssembly({
                   music: checked
-                    ? { enabled: true, trackUrl: '', trackName: '', genre: 'electronic', mood: 'energetic', volume: 30, isUpload: false }
+                    ? { enabled: true, trackUrl: '', trackName: '', genre: '', mood: '', volume: 30, isUpload: false }
                     : null,
                 })
               }
@@ -265,13 +281,14 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
               <div className="space-y-1.5">
                 <Label className="text-xs">{t('videoComposer.genre')}</Label>
                 <Select
-                  value={music.genre}
-                  onValueChange={(v) => onUpdateAssembly({ music: { ...music, genre: v } })}
+                  value={music.genre || '__any__'}
+                  onValueChange={(v) => onUpdateAssembly({ music: { ...music, genre: v === '__any__' ? '' : v } })}
                 >
                   <SelectTrigger className="bg-background/50">
-                    <SelectValue />
+                    <SelectValue placeholder={t('videoComposer.anyOption')} />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__any__">{t('videoComposer.anyOption')}</SelectItem>
                     {['electronic', 'cinematic', 'corporate', 'pop', 'ambient', 'hip-hop'].map((g) => (
                       <SelectItem key={g} value={g} className="capitalize">{g}</SelectItem>
                     ))}
@@ -281,13 +298,14 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
               <div className="space-y-1.5">
                 <Label className="text-xs">{t('videoComposer.mood')}</Label>
                 <Select
-                  value={music.mood}
-                  onValueChange={(v) => onUpdateAssembly({ music: { ...music, mood: v } })}
+                  value={music.mood || '__any__'}
+                  onValueChange={(v) => onUpdateAssembly({ music: { ...music, mood: v === '__any__' ? '' : v } })}
                 >
                   <SelectTrigger className="bg-background/50">
-                    <SelectValue />
+                    <SelectValue placeholder={t('videoComposer.anyOption')} />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__any__">{t('videoComposer.anyOption')}</SelectItem>
                     {['energetic', 'calm', 'dramatic', 'happy', 'dark', 'inspiring'].map((m) => (
                       <SelectItem key={m} value={m} className="capitalize">{m}</SelectItem>
                     ))}
