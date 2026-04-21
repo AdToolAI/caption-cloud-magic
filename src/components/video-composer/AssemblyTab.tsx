@@ -362,6 +362,29 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         onChange={(wm: WatermarkConfig) => onUpdateAssembly({ watermark: wm })}
       />
 
+      {/* Full Video Preview — uses the same sequence player as the Voiceover tab.
+          Image scenes get Ken-Burns; videos play with crossfades; voiceover audio plays in sync. */}
+      <Card className="border-border/40 bg-card/80">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Film className="h-4 w-4 text-primary" />
+            {t('videoComposer.previewFullVideo')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ComposerSequencePreview
+            scenes={scenes}
+            subtitles={assemblyConfig.subtitles}
+            voiceoverUrl={assemblyConfig.voiceover?.audioUrl ?? null}
+            globalTextOverlays={
+              assemblyConfig.textOverlaysEnabled === false
+                ? []
+                : (assemblyConfig.globalTextOverlays ?? [])
+            }
+          />
+        </CardContent>
+      </Card>
+
       {/* Cost Summary */}
       <Card className="border-primary/30 bg-primary/5">
         <CardContent className="py-4">
