@@ -152,6 +152,9 @@ const SCENARIOS: Scenario[] = [
     fn: "stripe-webhook",
     body: { type: "ai_superuser_ping", _test: true },
     optional: true,
+    // Webhook correctly rejects unsigned requests with HTTP 400 "No signature".
+    // That proves the endpoint is reachable AND signature-protected → treat as pass.
+    expectFailure: { status: 400, bodyIncludes: "No signature" },
   },
   {
     name: "Social Health Check",
