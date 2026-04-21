@@ -333,16 +333,6 @@ Generate the storyboard using the create_storyboard function.`;
         tool_choice: { type: "function", function: { name: "create_storyboard" } },
       }),
     });
-                },
-                required: ["scenes"],
-                additionalProperties: false,
-              },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "create_storyboard" } },
-      }),
-    });
 
     if (!response.ok) {
       if (response.status === 429) {
