@@ -1,48 +1,131 @@
 
 
-# Plan: `check-render-status` — 404 statt 500 bei „Render nicht gefunden"
+# Plan: Sichere Skalierung auf 100–200 parallele Renders
 
-## Diagnose
+## Strategie: 4 Stufen über 4 Wochen, mit automatischem Rückfall
 
-Die Edge-Funktion `check-render-status` wirft bei jedem Fehler `throw new Error(...)` und antwortet pauschal mit **HTTP 500**. Das passiert bei:
+Statt direkt auf 200 zu springen, gehen wir kontrolliert in Stufen hoch. Jede Stufe wird **mindestens 5–7 Tage** beobachtet. Der Circuit Breaker greift bei Problemen automatisch ein — kein manueller Eingriff nötig.
 
-- Dummy-renderId nicht gefunden → 500
-- User nicht authentifiziert → 500
-- Render existiert nicht oder gehört anderem User → 500
+```text
+Woche 1:  10 → 25   (sicherer Start, 2,5×)
+Woche 2:  25 → 50   (deckt Marketing-Push ab)
+Woche 3:  50 → 100  (skaliert für 1.000+ User)
+Woche 4: 100 → 200  (Remotion-Maximum)
+```
 
-Der Superuser-Test sendet absichtlich eine Dummy-renderId (`ai-superuser-dummy-render-id`) und erwartet via `expectReachable: true`, dass die Funktion „lebt" (HTTP < 500). Da sie aber 500 zurückgibt, schlägt der Test fehl — **obwohl die Funktion korrekt arbeitet**.
+## Phase 0 — Vorbereitung (sofort, vor jeder Erhöhung)
 
-Das ist semantisch auch falsch: „Render nicht gefunden" ist ein Client-Fehler (404), kein Server-Fehler (500). HTTP 500 sollte echten Bugs vorbehalten sein.
+Drei Dinge müssen **bevor** wir hochskalieren stabil laufen:
 
-## Lösung
+1. **UI-Bug fixen** in `src/pages/admin/ProviderHealth.tsx` Zeile 65 — Fallback `?? 6` durch `?? 25` ersetzen, damit Admin-Dashboard echten DB-Wert zeigt
+2. **Circuit Breaker schärfen** in `supabase/functions/lambda-circuit-breaker/index.ts`:
+   - Schwellwert dynamisch: bei höherer Konkurrenz strengeres Threshold (15 % statt 30 %)
+   - Min. Sample-Size von 5 auf 10 erhöhen (verhindert Fehlalarme)
+3. **Monitoring-Alert einrichten** — Slack/Email-Benachrichtigung bei:
+   - Circuit Breaker tripped (sofortige Warnung)
+   - `lambda_health_metrics` >5 OOM-Einträge in 1 Stunde
+   - Render-Queue-Backlog >20 Jobs für >10 Min
 
-`supabase/functions/check-render-status/index.ts` so anpassen, dass die HTTP-Status-Codes der tatsächlichen Fehlerart entsprechen:
+## Phase A — Woche 1: 10 → 25 parallel
 
-| Situation | Status vorher | Status nachher |
+**Änderungen:**
+- DB: `lambda_max_concurrent` = 25
+- DB: `lambda_max_concurrent_safe` = 15 (Fallback bei Problemen)
+- AWS: Reserved Concurrency auf 30 setzen (kleines Polster)
+
+**Erfolgskriterien (nach 7 Tagen):**
+- Fehlerrate <10 %
+- Keine OOM-Errors in `lambda_health_metrics`
+- Circuit Breaker hat 0× ausgelöst
+- Durchschnittliche Render-Zeit unverändert
+
+→ Wenn alle 4 Kriterien erfüllt: weiter zu Phase B. Sonst: bleiben und Ursache analysieren.
+
+## Phase B — Woche 2: 25 → 50 parallel
+
+**Änderungen:**
+- DB: `lambda_max_concurrent` = 50
+- DB: `lambda_max_concurrent_safe` = 30
+- AWS: Reserved Concurrency auf 60
+- **Neu**: Pro-Lambda-Logging erweitern (Cold-Start-Zeit, Memory-Peak) → in `lambda_health_metrics`
+
+**Zusätzlich**: Stresstest-Endpoint einbauen (`stress-test-lambda` Edge Function), der gezielt 30 Test-Renders parallel anstößt — manuell aus Admin-UI auslösbar, um Skalierung zu validieren ohne echte User zu betreffen.
+
+**Erfolgskriterien:** wie Phase A + Cold-Start-Zeit <3 s im Schnitt
+
+## Phase C — Woche 3: 50 → 100 parallel
+
+**Änderungen:**
+- DB: `lambda_max_concurrent` = 100
+- DB: `lambda_max_concurrent_safe` = 50
+- AWS: Reserved Concurrency auf 120
+- **Neu**: Render-Queue-Manager-Optimierung — statt sequenziell jeweils 1 Job triggern, **Batch-Trigger von 5 Jobs gleichzeitig** in `supabase/functions/render-queue-manager/index.ts`. Verhindert künstliches Bottleneck im Queue-Manager bei Lastspitzen.
+- **Neu**: S3-Bucket-Lifecycle-Policy prüfen (alte Renders nach 30 Tagen archivieren) → verhindert Disk-Space-Probleme
+
+**Erfolgskriterien:** wie Phase B + Webhook-Latenz <500 ms
+
+## Phase D — Woche 4: 100 → 200 parallel (Remotion-Maximum)
+
+**Änderungen:**
+- DB: `lambda_max_concurrent` = 200
+- DB: `lambda_max_concurrent_safe` = 100
+- AWS: Reserved Concurrency auf 250
+- **Architektur-Erweiterung**: Pre-warmed Lambda Instances für Peak-Zeiten (10 Instances zwischen 18:00–22:00 UTC dauerhaft warm halten) → eliminiert Cold-Starts in Stoßzeiten
+
+**Erfolgskriterien:** stabil über 7 Tage = Skalierungsziel erreicht
+
+## Sicherheitsnetze (gelten ab Phase A dauerhaft)
+
+| Mechanismus | Wann es greift | Reaktion |
 |---|---|---|
-| Kein Auth-Header | 500 | **401** |
-| User nicht authentifiziert | 500 | **401** |
-| `renderId` fehlt im Body | 500 | **400** |
-| Render-Job nicht gefunden | 500 | **404** |
-| Echter DB-/Server-Fehler | 500 | **500** (bleibt) |
-
-Konkret: Statt `throw new Error(...)` wird typisierte Response mit passendem Status zurückgegeben. Der bestehende Try/Catch fängt nur noch unerwartete Exceptions ab.
+| **Circuit Breaker** | Fehlerrate >15 % in 10 Min | Auto-Fallback auf `_safe` Wert |
+| **Render-Queue-Limit** | Queue >50 Jobs | Neue Jobs warten, kein Crash |
+| **Per-User-Limit** | User startet >3 Renders parallel | 4. Render geht in Queue |
+| **AWS Hard Cap** | Account-Limit erreicht | AWS rejected automatisch |
+| **Manueller Kill-Switch** | Notfall im Admin-UI | DB-Update auf 10, sofortige Rückkehr |
 
 ## Geänderte Dateien
 
-- `supabase/functions/check-render-status/index.ts` — Refactor der Fehlerbehandlung auf semantisch korrekte HTTP-Codes (401/400/404/500)
+**Phase 0 (sofort):**
+- `src/pages/admin/ProviderHealth.tsx` — UI-Fallback fixen
+- `supabase/functions/lambda-circuit-breaker/index.ts` — strengeres Threshold + größerer Sample
+- DB: `system_config` Updates (Phase A Werte)
 
-## Verifikation
+**Phase B:**
+- `supabase/functions/_shared/aws-lambda.ts` — erweitertes Logging
+- Neue Edge Function: `supabase/functions/stress-test-lambda/index.ts`
+- Admin-UI: Stresstest-Button in `src/pages/admin/ProviderHealth.tsx`
 
-Nach Deploy „Komplett-Test" auslösen. Erwartung:
+**Phase C:**
+- `supabase/functions/render-queue-manager/index.ts` — Batch-Trigger statt sequenziell
 
-- **Render Status Polling Reachability** → grün (404 zählt jetzt als „endpoint lebt", da < 500)
-- 34/34 Szenarien stabil
-- Echte Client-Aufrufe (gültige renderId) funktionieren unverändert weiter
+**Phase D:**
+- AWS Lambda Konfiguration: Provisioned Concurrency Block
 
-## Erwartetes Ergebnis
+## Was das praktisch bedeutet
 
-- Korrekte HTTP-Semantik (4xx für Client-Fehler, 5xx für Server-Fehler)
-- Test wird grün ohne dass der Test selbst geändert werden muss
-- Sentry/Monitoring-Tools zeigen künftig nur noch echte Server-Bugs als 5xx — nicht mehr „User hat falsche renderId"
+Bei voller Skalierung (200 parallel):
+- **Peak-Kapazität**: ~12.000 Renders/Stunde (bei 60 s Durchschnitts-Render-Zeit)
+- **Aktive User-Equivalent**: ~5.000–10.000 gleichzeitige App-User
+- **Wartezeit bei Lastspitze**: <30 s statt aktuell mehreren Minuten
+- **Kosten**: nur bei tatsächlicher Nutzung — Reserve = kostenlos
+
+## Risiken & wie wir sie eindämmen
+
+| Risiko | Wahrscheinlichkeit | Eindämmung |
+|---|---|---|
+| OOM-Errors bei Memory-intensiven Renders | Mittel | `lambda_health_metrics` zeigt OOM sofort → Circuit Breaker |
+| AWS Account-Limit erreicht | Niedrig | Reserved Concurrency setzen Hard Cap weit unter AWS-Default 1000 |
+| S3 Disk-Space voll | Niedrig | Lifecycle-Policy in Phase C |
+| Webhook-Storm bei 200 parallelen Renders | Mittel | Webhook-Endpoint hat schon Idempotency, zusätzlich Rate Limit prüfen |
+| Kosten-Explosion durch Bug | Niedrig | AWS Budget Alert bei 2× normalem Tagesbudget |
+
+## Wann abbrechen?
+
+Wenn in **irgendeiner Phase** eines der Erfolgskriterien nicht erfüllt wird:
+1. Sofort auf vorherige Stufe zurück (DB-Update, kein Deploy nötig)
+2. Root-Cause-Analyse über `analyze-superuser-anomalies` KI-Funktion
+3. Erst weiter wenn Ursache behoben
+
+Die Skalierung ist **jederzeit umkehrbar** mit einem einzigen SQL-UPDATE — kein Code-Rollback, kein Deploy, kein Risiko.
 
