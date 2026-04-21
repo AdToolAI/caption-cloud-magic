@@ -45,9 +45,11 @@ function statusFromPercent(p: number) {
 }
 
 export const ProviderHealth = () => {
+  const { isAdmin } = useUserRoles();
   const [rows, setRows] = useState<ProviderRow[]>([]);
-  const [lambdaInfo, setLambdaInfo] = useState<{ active: number; max: number } | null>(null);
+  const [lambdaInfo, setLambdaInfo] = useState<{ active: number; max: number; safe: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [killing, setKilling] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   const load = async () => {
