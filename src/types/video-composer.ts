@@ -2,8 +2,9 @@
 
 import type { TextOverlay as DirectorCutTextOverlay } from '@/types/directors-cut';
 import type { ComposerVisualStyle } from '@/config/composerVisualStyles';
+import type { SceneEffectConfig, SceneEffectId } from '@/remotion/components/effects';
 
-export type { ComposerVisualStyle };
+export type { ComposerVisualStyle, SceneEffectConfig, SceneEffectId };
 
 /**
  * Re-exported global text overlay shape (shared with Director's Cut).
@@ -18,7 +19,9 @@ export type ComposerStatus = 'draft' | 'storyboard' | 'generating' | 'assembling
 
 export type SceneType = 'hook' | 'problem' | 'solution' | 'demo' | 'social-proof' | 'cta' | 'custom';
 
-export type ClipSource = 'ai-hailuo' | 'ai-kling' | 'ai-sora' | 'stock' | 'upload';
+export type ClipSource = 'ai-hailuo' | 'ai-kling' | 'ai-sora' | 'ai-image' | 'stock' | 'upload';
+
+export type VideoMode = 'video' | 'image' | 'mixed';
 
 export type ClipQuality = 'standard' | 'pro';
 
@@ -91,6 +94,13 @@ export interface ComposerBriefing {
   visualStyle?: ComposerVisualStyle;
   /** Recurring characters that should look consistent across scenes. */
   characters?: ComposerCharacter[];
+  /**
+   * Video generation mode:
+   * - 'video' (default): AI video clips (Hailuo/Kling/Sora) — premium quality
+   * - 'image': AI-generated still images with Ken-Burns animation — ~6x cheaper
+   * - 'mixed': Hero scenes as video, supporting scenes as image
+   */
+  videoMode?: VideoMode;
 }
 
 export interface ComposerScene {
@@ -117,6 +127,11 @@ export interface ComposerScene {
   replicatePredictionId?: string;
   retryCount: number;
   costEuros: number;
+  /**
+   * AI-selected (or user-overridden) visual effects layered above this scene's
+   * clip / image. Frame-deterministic, Lambda-safe.
+   */
+  effects?: SceneEffectConfig[];
 }
 
 export type SubtitlePosition = 'top' | 'bottom';
@@ -306,6 +321,7 @@ export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> 
   'ai-hailuo': { de: 'KI (Hailuo)', en: 'AI (Hailuo)' },
   'ai-kling': { de: 'KI (Kling)', en: 'AI (Kling)' },
   'ai-sora': { de: 'KI (Sora)', en: 'AI (Sora)' },
+  'ai-image': { de: 'KI Bild (Gemini)', en: 'AI Image (Gemini)' },
   stock: { de: 'Stock Video', en: 'Stock Video' },
   upload: { de: 'Eigener Upload', en: 'Own Upload' },
 };
@@ -313,10 +329,12 @@ export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> 
 // Estimated costs per clip source × quality tier — EUR per second
 // Standard = lower resolution (Hailuo 768p / Kling 720p / Sora std)
 // Pro = higher resolution (Hailuo 1080p / Kling 1080p / Sora pro)
+// AI Image = flat ~5 credits per scene regardless of duration → ~€0.05/sec equivalent
 export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> = {
   'ai-hailuo': { standard: 0.15, pro: 0.20 },
   'ai-kling':  { standard: 0.15, pro: 0.21 },
   'ai-sora':   { standard: 0.25, pro: 0.53 },
+  'ai-image':  { standard: 0.01, pro: 0.015 }, // ~€0.05-0.07 per 5s scene
   stock:       { standard: 0, pro: 0 },
   upload:      { standard: 0, pro: 0 },
 };
@@ -326,6 +344,7 @@ export const QUALITY_LABELS: Record<ClipSource, Record<ClipQuality, string>> = {
   'ai-hailuo': { standard: 'Standard 768p', pro: 'Pro 1080p' },
   'ai-kling':  { standard: 'Standard 720p', pro: 'Pro 1080p' },
   'ai-sora':   { standard: 'Standard',      pro: 'Pro' },
+  'ai-image':  { standard: 'Nano Banana 2', pro: 'Gemini 3 Pro' },
   stock:       { standard: '-', pro: '-' },
   upload:      { standard: '-', pro: '-' },
 };

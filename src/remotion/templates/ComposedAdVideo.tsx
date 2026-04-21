@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { KineticText } from '../components/KineticText';
 import { ColorGrading } from '../components/ColorGrading';
 import { TextOverlayRenderer } from '../components/TextOverlayRenderer';
+import { KenBurnsImage, pickKenBurnsVariant } from '../components/KenBurnsImage';
+import { SceneEffectsLayer, type SceneEffectConfig } from '../components/effects';
 import {
   SUBTITLE_FONT_SIZE_MAP,
   SUBTITLE_DEFAULT_BG,
@@ -51,14 +53,30 @@ const GlobalTextOverlaySchema = z.object({
   }),
 });
 
+// Per-scene effect schema (mirrors src/remotion/components/effects/index.tsx)
+const SceneEffectSchema = z.object({
+  id: z.enum([
+    'glow-orbs',
+    'light-rays',
+    'particle-field',
+    'gradient-pulse',
+    'edge-glow',
+    'chromatic-aberration',
+  ]),
+  color: z.string().optional(),
+  intensity: z.number().optional(),
+});
+
 // Schema
 export const ComposedAdVideoSchema = z.object({
   scenes: z.array(z.object({
     videoUrl: z.string(),
-    // SINGLE SOURCE OF TRUTH: this is the EFFECTIVE duration the edge function
-    // has already probed/clamped against the real mp4 length. The renderer
-    // takes it 1:1 — no further math. This guarantees Audio/Video geometry
-    // stays in lock-step and eliminates the rubber-band effect at transitions.
+    /** When true, `videoUrl` is treated as a still image and rendered with Ken-Burns. */
+    isImage: z.boolean().optional(),
+    /** SINGLE SOURCE OF TRUTH: this is the EFFECTIVE duration the edge function
+     * has already probed/clamped against the real mp4 length. The renderer
+     * takes it 1:1 — no further math. This guarantees Audio/Video geometry
+     * stays in lock-step and eliminates the rubber-band effect at transitions. */
     durationSeconds: z.number(),
     textOverlay: z.object({
       text: z.string(),
@@ -70,6 +88,8 @@ export const ComposedAdVideoSchema = z.object({
     }).optional(),
     transitionType: z.enum(['none', 'fade', 'crossfade', 'wipe', 'slide', 'zoom']).optional(),
     transitionDuration: z.number().optional(),
+    /** Optional layered visual effects (Lambda-safe procedural Glow/Rays/Particles). */
+    effects: z.array(SceneEffectSchema).optional(),
   })),
   colorGrading: z.enum(['none', 'cinematic-warm', 'cool-blue', 'vintage-film', 'high-contrast', 'moody-dark']).default('none'),
   kineticText: z.boolean().default(false),
@@ -98,25 +118,39 @@ type ComposedAdVideoProps = z.infer<typeof ComposedAdVideoSchema>;
 // Plain scene renderer — no manual transitions, TransitionSeries handles all overlap/fade math.
 const Scene: React.FC<{
   videoUrl: string;
+  isImage?: boolean;
+  durationInFrames: number;
+  sceneIndex: number;
   textOverlay?: ComposedAdVideoProps['scenes'][0]['textOverlay'];
   kineticText: boolean;
-}> = ({ videoUrl, textOverlay, kineticText }) => {
+  effects?: SceneEffectConfig[];
+}> = ({ videoUrl, isImage, durationInFrames, sceneIndex, textOverlay, kineticText, effects }) => {
   const frame = useCurrentFrame();
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
       {videoUrl && (
-        <Video
-          src={videoUrl}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          muted
-          // Lock playback rate to 1.0 — prevents implicit speed warping when
-          // Sequence/Video durations diverge.
-          playbackRate={1}
-          // Use Remotion default pauseWhenBuffering=true (matches DirectorsCut/
-          // UniversalCreator) so audio stays glitch-free at scene boundaries.
-        />
+        isImage ? (
+          <KenBurnsImage
+            src={videoUrl}
+            durationInFrames={durationInFrames}
+            variant={pickKenBurnsVariant(sceneIndex)}
+          />
+        ) : (
+          <Video
+            src={videoUrl}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            muted
+            // Lock playback rate to 1.0 — prevents implicit speed warping when
+            // Sequence/Video durations diverge.
+            playbackRate={1}
+            // Use Remotion default pauseWhenBuffering=true (matches DirectorsCut/
+            // UniversalCreator) so audio stays glitch-free at scene boundaries.
+          />
+        )
       )}
+      {/* Procedural visual effects — Lambda-safe, replaces deprecated Lottie layer */}
+      <SceneEffectsLayer effects={effects} />
       {textOverlay?.text && (
         kineticText ? (
           <KineticText
@@ -247,8 +281,12 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
               >
                 <Scene
                   videoUrl={scene.videoUrl}
+                  isImage={scene.isImage}
+                  durationInFrames={sceneFrames[i]}
+                  sceneIndex={i}
                   textOverlay={scene.textOverlay}
                   kineticText={kineticText}
+                  effects={scene.effects}
                 />
               </TransitionSeries.Sequence>
               {i < scenes.length - 1 && (
