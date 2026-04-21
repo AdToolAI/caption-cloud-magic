@@ -1,118 +1,89 @@
 
 
-# Option A.1 + A.2 — TikTok Sync-Test + Warmer-Erweiterung
+# Lambda Health Dashboard — Plan
 
-## Status der drei Sub-Optionen
+## Ziel
+Admin-UI-Cockpit unter `/admin/lambda-health`, das die Lambda-Render-Performance live visualisiert — kein SQL mehr nötig.
 
-| Sub | Aufgabe | Status |
-|-----|---------|--------|
-| A.1 | TikTok Sync-Test mit captiongenie.app | ⏳ Noch zu testen |
-| A.2 | Warmer-Liste um TikTok erweitern | ⏳ Noch zu tun |
-| A.3 | Posting-Times-Cache language-aware für TikTok | ✅ **Bereits erledigt** — TikTok ist in `posting-times-api` (Z.145) und `generate-posting-slots` (Z.16) als Plattform definiert; Cache-Key enthält `lang` (Z.358). Nichts zu ändern. |
+## Datenquellen (alle vorhanden ✅)
 
-## A.1 — TikTok Sync-Test (Live-Verifikation)
+| Quelle | Verwendung |
+|--------|-----------|
+| `lambda_health_metrics` (status, duration_ms, memory_used_mb, error_message, created_at) | Failure-Rate, Erfolgsquote, Trend, Memory |
+| `system_config` (lambda_max_concurrent, lambda_max_concurrent_safe) | Aktuelle Concurrency + Circuit-Breaker-Status |
+| `render_cost_history` (actual_cost, duration_sec) | AWS-Kosten-Schätzung |
 
-**Was wir testen:**
-1. `tiktok-sync` Edge Function aufrufen (mit deiner Auth)
-2. Prüfen, ob Token-Refresh-Logik korrekt durchläuft
-3. Prüfen, ob `getUserInfo` Daten zurückgibt (Display-Name, Avatar)
-4. DB-Updates verifizieren in `social_profiles` und `social_connections`
+## Backend: 1 neue Edge Function
 
-**Wie:**
-- `supabase--curl_edge_functions` POST `/tiktok-sync` (nutzt deinen Auth-Token automatisch)
-- `supabase--read_query` auf `social_connections` + `social_profiles` für captiongenie.app
-- `supabase--edge_function_logs` für `tiktok-sync` zur Verifikation des Flows
+**`supabase/functions/lambda-health-stats/index.ts`** (verify_jwt + admin-Role-Check)
 
-**Erwartetes Ergebnis:**
-- HTTP 200 mit `{ success: true, profile: {...}, synced_at }`
-- `social_connections.last_sync_at` = jetzt
-- `social_profiles.display_name`, `avatar_url` gesetzt
-- Logs zeigen sauberen Flow ohne Token-Refresh-Errors
-
-**Bekannte Limitierung (kein Fehler):** `follower_count`, `following_count`, `video_count` bleiben 0, da Sandbox/Login-Kit diese Felder nicht freigibt — bestätigt mit grünem TikTok-Hinweis in der UI.
-
-## A.2 — Edge Function Warmer erweitern
-
-**Datei:** `supabase/functions/edge-function-warmer/index.ts`
-
-**Änderung:** TikTok-relevante Functions zur `CRITICAL_FUNCTIONS` Liste hinzufügen. Konkret:
-- `tiktok-sync` — wird nach jedem Connect und für Scheduled-Sync genutzt
-- `tiktok-oauth-start` — kalt → langsamer Connect-Klick
-- `tiktok-health` — wird im Health-Check beim Connect-Flow genutzt
-- `publish-to-tiktok` — wird für Direct-Posts ohne Vorlauf benötigt
-
-**Begründung pro Function:**
-
-| Function | Kalt-Start-Impact | Häufigkeit |
-|----------|-------------------|------------|
-| `tiktok-sync` | ~2-3s Latenz beim ersten Sync nach Connect | Bei Connect + alle 6h via cron |
-| `tiktok-oauth-start` | ~1-2s Latenz beim Connect-Klick | Pro neuem Connect |
-| `tiktok-health` | ~1s Latenz beim Pre-Connect-Check | Pro Connect |
-| `publish-to-tiktok` | ~2s Latenz beim ersten Direct-Post | Pro Veröffentlichung |
-
-**Code-Diff (Vorschau):**
+Returns JSON:
 ```ts
-const CRITICAL_FUNCTIONS = [
-  'check-subscription',
-  'planner-list',
-  'calendar-timeline-slots',
-  'generate-campaign',
-  'posting-times-api',
-  'sync-social-posts-v2',
-  'get-credits',
-  'render-with-remotion',
-  'generate-caption',
-  // NEU:
-  'tiktok-sync',
-  'tiktok-oauth-start',
-  'tiktok-health',
-  'publish-to-tiktok',
-];
-```
-
-**Wichtig:** Der Warmer schickt `{ warmup: true }` als Body. Wir verifizieren in den 4 TikTok-Functions, dass dieser Warmup-Aufruf nicht crasht (z.B. wenn Auth-Header fehlt). Falls eine Function bei Warmup-Calls 500 zurückgibt, fügen wir am Anfang einen Early-Return hinzu:
-```ts
-const body = await req.json().catch(() => ({}));
-if (body?.warmup) {
-  return new Response(JSON.stringify({ warmed: true }), { headers: corsHeaders });
+{
+  concurrency: { current, safe, normal, circuit_breaker_active },
+  failure_rate: { last_1h, last_24h, last_7d },
+  outcomes: { success, failed, oom, timeout },         // letzte 24h für Donut
+  trend_7d: [{ hour, total, success, failed }],        // 168 Buckets
+  cost: { last_24h_usd, last_7d_usd, avg_per_render_usd, total_seconds_24h },
+  recent_errors: [{ created_at, error_message, render_id }]  // letzte 10
 }
 ```
 
-## Reihenfolge der Schritte (nach Approval)
+Nutzt Lambda-Pricing aus `src/lib/cost/pricing.ts` (`PROVIDER_PRICING_USD['aws-lambda'].perMinute = 0.0167`).
 
-1. **A.1 — Sync-Test ausführen** (3 Schritte parallel)
-   - `curl_edge_functions` POST `/tiktok-sync`
-   - `read_query` auf `social_profiles` + `social_connections`
-   - `edge_function_logs` für `tiktok-sync`
-   - Ergebnis als Tabelle präsentieren
+## Frontend: 1 neue Seite + 5 Widgets
 
-2. **A.2 — Warmer erweitern**
-   - `edge-function-warmer/index.ts` Liste um 4 TikTok-Functions ergänzen
-   - In jeder der 4 TikTok-Functions sicherstellen, dass `{ warmup: true }` Early-Return funktioniert (falls noch nicht vorhanden)
-   - Deploy via `supabase--deploy_edge_functions`
-   - Warmer manuell auslösen via `curl_edge_functions` und Logs prüfen
+**`src/pages/admin/LambdaHealth.tsx`** — Container mit Auto-Refresh (30s via React Query)
 
-3. **Verification**
-   - Warmer-Logs zeigen alle 13 Functions mit `OK (XXXms)`
-   - Memory-Update (optional): `mem://infrastructure/hosting/cloudflare-tiktok-proxy` mit „verified working + warmer integrated" finalisieren
+Komponenten (`src/components/admin/lambda-health/`):
+
+1. **`ConcurrencyStatusCard.tsx`** — Aktuelle Concurrency + Circuit-Breaker-Badge (grün „Normal 25" / rot „Tripped → 15")
+2. **`FailureRateCards.tsx`** — 3 KPI-Karten (1h / 24h / 7d) mit Color-Coding (<5% grün, 5-15% gelb, >15% rot)
+3. **`OutcomesDonut.tsx`** — Recharts Donut: success / failed / oom / timeout (24h)
+4. **`RenderTrendChart.tsx`** — Recharts AreaChart: Renders pro Stunde, 7 Tage, success vs failed gestapelt
+5. **`CostEstimateCard.tsx`** — Geschätzte AWS-Kosten 24h / 7d + Ø-Kosten/Render + Free-Tier-Indikator
+6. **`RecentErrorsTable.tsx`** — Letzte 10 Errors mit Timestamp, Render-ID, Error-Message
+
+James Bond 2028 Style (Glassmorphism, Gold-Akzente) — konsistent zum Rest der Admin-UI.
+
+## Routing & Navigation
+
+**`src/App.tsx`** — neue protected Route hinzufügen:
+```tsx
+const LambdaHealth = lazy(() => import("./pages/admin/LambdaHealth"));
+<Route path="/admin/lambda-health" element={
+  <ProtectedRoute requireRole="admin"><LambdaHealth /></ProtectedRoute>
+} />
+```
+
+**`src/pages/Admin.tsx`** — neuer Tab „Lambda Health" mit Icon `Server` (lucide-react), der direkt auf `/admin/lambda-health` linkt oder die Komponente inline rendert (inline = konsistent mit anderen Tabs).
+
+## Sicherheit
+
+- Edge Function prüft `has_role(auth.uid(), 'admin')` über bestehende Postgres-Function — Non-Admins erhalten 403
+- Frontend-Route via `<ProtectedRoute requireRole="admin">` (bestehender Schutz)
 
 ## Geänderte/Neue Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `supabase/functions/edge-function-warmer/index.ts` | 4 TikTok-Functions zur `CRITICAL_FUNCTIONS` Liste |
-| `supabase/functions/tiktok-sync/index.ts` | Early-Return bei `{ warmup: true }` (falls noch nicht vorhanden) |
-| `supabase/functions/tiktok-oauth-start/index.ts` | Early-Return bei `{ warmup: true }` (falls noch nicht vorhanden) |
-| `supabase/functions/tiktok-health/index.ts` | Early-Return bei `{ warmup: true }` (falls noch nicht vorhanden) |
-| `supabase/functions/publish-to-tiktok/index.ts` | Early-Return bei `{ warmup: true }` (falls noch nicht vorhanden) |
+| `supabase/functions/lambda-health-stats/index.ts` | **NEU** — Aggregations-Endpoint |
+| `src/pages/admin/LambdaHealth.tsx` | **NEU** — Container-Seite |
+| `src/components/admin/lambda-health/ConcurrencyStatusCard.tsx` | **NEU** |
+| `src/components/admin/lambda-health/FailureRateCards.tsx` | **NEU** |
+| `src/components/admin/lambda-health/OutcomesDonut.tsx` | **NEU** |
+| `src/components/admin/lambda-health/RenderTrendChart.tsx` | **NEU** |
+| `src/components/admin/lambda-health/CostEstimateCard.tsx` | **NEU** |
+| `src/components/admin/lambda-health/RecentErrorsTable.tsx` | **NEU** |
+| `src/App.tsx` | Lazy-Import + Route `/admin/lambda-health` |
+| `src/pages/Admin.tsx` | Neuer Tab „Lambda Health" |
 
 ## Risiko & Rollback
 
-- **Risiko:** Sehr niedrig. Warmer-Liste ist additiv. Early-Returns sind defensiv.
-- **Rollback:** 4 Einträge aus `CRITICAL_FUNCTIONS` Array entfernen → 30s Fix.
+- **Risiko:** Sehr niedrig — rein additive Read-Only-Funktionalität, keine DB-Migrationen nötig
+- **Rollback:** Route + Tab + Edge-Function entfernen → 2 Min
 
-## Was du tust
+## Was du als Nächstes tust
 
-- **„OK, mach"** → ich starte mit A.1 (Sync-Test) und gehe direkt in A.2 über
-- **„Nur A.1"** oder **„Nur A.2"** → ich mache nur den gewählten Teil
+Approve den Plan → ich switche in Default-Mode und baue alles in einem Rutsch (Edge-Function + 7 Komponenten + Route).
 
