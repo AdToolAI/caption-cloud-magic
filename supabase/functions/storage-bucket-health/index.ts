@@ -7,11 +7,14 @@ const corsHeaders = {
 
 // Critical buckets that must exist for the platform to work
 const REQUIRED_BUCKETS = [
-  "background-projects",
-  "media-library",
-  "video-renders",
-  "ai-videos",
-  "brand-assets",
+  "background-projects", // Smart Background, Picture Studio
+  "media-assets",        // Mediathek (Hauptspeicher)
+  "ai-videos",           // AI Video Studios (Sora, Kling, etc.)
+  "universal-videos",    // Universal Video Creator Renders
+  "video-assets",        // Director's Cut Source-Videos
+  "audio-assets",        // Voiceover & Music
+  "brand-logos",         // Brand Identity
+  "thumbnails",          // Video-Thumbnails
 ];
 
 Deno.serve(async (req) => {
