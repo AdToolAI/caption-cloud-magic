@@ -1904,6 +1904,7 @@ export const translations: Record<Language, any> = {
       musicSearchPlaceholder: "e.g. Beach Sunset, Lofi Chill, Hans Zimmer...",
       musicSearchHint: "Leave empty to search by genre + mood.",
       searchByQuery: 'Search "{query}"',
+      anyOption: "Any",
       uploadOwnMusic: "Upload your own music",
       musicFormats: "MP3, WAV, OGG, M4A — up to 20MB",
       musicUploaded: "Music uploaded",
