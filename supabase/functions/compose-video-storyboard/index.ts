@@ -1,5 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
+import {
+  ALL_EFFECT_IDS,
+  EFFECT_DESCRIPTIONS,
+  getDefaultEffects,
+  sanitizeEffects,
+  type SceneEffectId,
+} from "../_shared/composer-effects.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +21,8 @@ interface ComposerCharacter {
   signatureItems: string;
 }
 
+type VideoMode = 'video' | 'image' | 'mixed';
+
 interface Briefing {
   mode: string;
   productName: string;
@@ -26,6 +35,7 @@ interface Briefing {
   brandColors: string[];
   visualStyle?: string;
   characters?: ComposerCharacter[];
+  videoMode?: VideoMode;
 }
 
 const CATEGORY_STRUCTURES: Record<string, string> = {
