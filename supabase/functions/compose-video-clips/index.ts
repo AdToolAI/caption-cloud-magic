@@ -395,25 +395,30 @@ serve(async (req) => {
       }
     }
 
-    // Deduct credits ONLY for AI scenes that actually started generating
-    const generatingResults = results.filter(r => r.status === 'generating');
-    const generatingCount = generatingResults.length;
+    // Deduct credits for AI scenes that started generating (video) OR
+    // synchronously completed (ai-image returns status='ready' immediately).
+    const billableResults = results.filter(r => {
+      if (r.status !== 'generating' && r.status !== 'ready') return false;
+      const scene = scenes.find(s => s.id === r.sceneId);
+      return scene?.clipSource.startsWith('ai-');
+    });
+    const generatingCount = results.filter(r => r.status === 'generating').length;
     let actualCost = 0;
-    for (const r of generatingResults) {
+    for (const r of billableResults) {
       const scene = scenes.find(s => s.id === r.sceneId);
       if (!scene) continue;
       const q: Quality = scene.clipQuality === 'pro' ? 'pro' : 'standard';
       actualCost += scene.durationSeconds * (CLIP_COSTS[scene.clipSource]?.[q] ?? 0);
     }
 
-    if (generatingCount > 0 && actualCost > 0) {
+    if (billableResults.length > 0 && actualCost > 0) {
       try {
         await supabaseAdmin.rpc('deduct_ai_video_credits', {
           p_user_id: user.id,
           p_amount: actualCost,
           p_generation_id: projectId,
         });
-        console.log(`[compose-video-clips] Deducted €${actualCost.toFixed(2)} for ${generatingCount} AI clips`);
+        console.log(`[compose-video-clips] Deducted €${actualCost.toFixed(2)} for ${billableResults.length} AI scenes (${generatingCount} async)`);
       } catch (creditErr) {
         console.error('[compose-video-clips] Credit deduction failed:', creditErr);
       }
