@@ -1,27 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
-import type { LottieAnimationData } from '@remotion/lottie';
-import { 
-  useCurrentFrame, 
-  useVideoConfig, 
-  AbsoluteFill,
-  delayRender,
-  continueRender,
-} from 'remotion';
-import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
-import { FALLBACK_ANIMATIONS } from '../data/lottie-library';
-import { sanitizeForLottiePlayer } from '../utils/premiumLottieLoader';
+/**
+ * MorphTransition — SVG-only after Lottie removal
+ * 
+ * Pure SVG/CSS transitions: wipe, morph, zoom, fade, slide, radial, blinds, confetti, sparkle.
+ * 100% Lambda-safe — no asset loading, no @remotion/lottie dependency.
+ */
 
-// r44: Lazy-load Lottie to prevent top-level delayRender in Lambda
-let MorphLottieComponent: React.ComponentType<any> | null = null;
-let morphLottiePromise: Promise<void> | null = null;
-const loadMorphLottie = (): Promise<void> => {
-  if (MorphLottieComponent) return Promise.resolve();
-  if (morphLottiePromise) return morphLottiePromise;
-  morphLottiePromise = import('@remotion/lottie').then(mod => {
-    MorphLottieComponent = mod.Lottie;
-  }).catch(() => { MorphLottieComponent = null; });
-  return morphLottiePromise;
-};
+import React from 'react';
+import { useCurrentFrame, useVideoConfig, AbsoluteFill } from 'remotion';
+import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 
 interface MorphTransitionProps {
   type: 'wipe' | 'morph' | 'zoom' | 'fade' | 'slide' | 'confetti' | 'sparkle' | 'radial' | 'blinds';
@@ -30,32 +16,7 @@ interface MorphTransitionProps {
   color?: string;
 }
 
-/** Detect Lambda/serverless */
-const isLambdaEnvironment = (): boolean => {
-  try {
-    return typeof process !== 'undefined' && (
-      !!(process.env?.AWS_LAMBDA_FUNCTION_NAME) ||
-      !!(process.env?.LAMBDA_TASK_ROOT) ||
-      !!(process.env?.AWS_EXECUTION_ENV)
-    );
-  } catch {
-    return false;
-  }
-};
-
-/** fetch() with AbortController timeout */
-const fetchWithTimeout = async (url: string, timeoutMs = 5000): Promise<Response> => {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    return res;
-  } finally {
-    clearTimeout(id);
-  }
-};
-
-// Enhanced SVG-based transitions
+// Enhanced SVG-based transitions (pure presentational, deterministic per progress)
 const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: string }>> = {
   wipe: ({ progress, primaryColor }) => (
     <div
@@ -71,11 +32,10 @@ const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: 
       }}
     />
   ),
-  
+
   morph: ({ progress, primaryColor }) => {
     const blobScale = 1 + Math.sin(progress * Math.PI) * 0.5;
     const blobOpacity = Math.sin(progress * Math.PI) * 0.6;
-    
     return (
       <svg
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
@@ -96,7 +56,7 @@ const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: 
       </svg>
     );
   },
-  
+
   zoom: ({ progress }) => {
     const scale = 1 + progress * 0.15;
     const vignette = Math.sin(progress * Math.PI) * 0.3;
@@ -104,25 +64,25 @@ const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: 
       <div style={{ position: 'absolute', inset: 0, transform: `scale(${scale})`, boxShadow: `inset 0 0 ${200 * vignette}px ${100 * vignette}px rgba(0,0,0,${vignette})`, pointerEvents: 'none' }} />
     );
   },
-  
+
   fade: ({ progress }) => (
     <div style={{ position: 'absolute', inset: 0, backgroundColor: '#000', opacity: Math.sin(progress * Math.PI) * 0.4, pointerEvents: 'none' }} />
   ),
-  
+
   slide: ({ progress, primaryColor }) => {
     const translateX = safeInterpolate(progress, [0, 0.5, 1], [-100, 0, 100]);
     return (
       <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(90deg, transparent 0%, ${primaryColor}30 50%, transparent 100%)`, transform: `translateX(${translateX}%)`, pointerEvents: 'none', opacity: Math.sin(progress * Math.PI) }} />
     );
   },
-  
+
   radial: ({ progress, primaryColor }) => {
     const radius = progress * 150;
     return (
       <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 50% 50%, transparent ${radius - 10}%, ${primaryColor}40 ${radius}%, ${primaryColor}20 ${radius + 10}%, transparent ${radius + 20}%)`, pointerEvents: 'none', opacity: Math.sin(progress * Math.PI) }} />
     );
   },
-  
+
   blinds: ({ progress, primaryColor }) => {
     const blinds = Array.from({ length: 8 }, (_, i) => ({ delay: i * 0.05, y: i * 12.5 }));
     return (
@@ -137,14 +97,22 @@ const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: 
       </AbsoluteFill>
     );
   },
-  
+
   confetti: ({ progress, primaryColor }) => {
-    const particles = Array.from({ length: 25 }, (_, i) => ({
-      x: 10 + Math.random() * 80, startY: -10, endY: 110, size: 6 + Math.random() * 14,
-      rotation: Math.random() * 720, speed: 0.8 + Math.random() * 0.4,
-      color: i % 4 === 0 ? primaryColor : i % 4 === 1 ? '#10B981' : i % 4 === 2 ? '#8B5CF6' : '#EC4899',
-      shape: i % 3,
-    }));
+    // Deterministic confetti — derive positions from index, NOT Math.random()
+    const particles = Array.from({ length: 25 }, (_, i) => {
+      const seed = i * 73;
+      return {
+        x: 10 + ((seed * 13) % 80),
+        startY: -10,
+        endY: 110,
+        size: 6 + ((seed * 7) % 14),
+        rotation: (seed * 11) % 720,
+        speed: 0.8 + ((seed * 5) % 40) / 100,
+        color: i % 4 === 0 ? primaryColor : i % 4 === 1 ? '#10B981' : i % 4 === 2 ? '#8B5CF6' : '#EC4899',
+        shape: i % 3,
+      };
+    });
     return (
       <AbsoluteFill style={{ pointerEvents: 'none', overflow: 'hidden' }}>
         {particles.map((p, i) => {
@@ -157,12 +125,18 @@ const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: 
       </AbsoluteFill>
     );
   },
-  
+
   sparkle: ({ progress, primaryColor }) => {
-    const sparkles = Array.from({ length: 15 }, (_, i) => ({
-      x: 15 + (i % 5) * 18 + Math.random() * 8, y: 10 + Math.floor(i / 5) * 30 + Math.random() * 15,
-      delay: i * 0.04, size: 3 + Math.random() * 6,
-    }));
+    // Deterministic sparkles
+    const sparkles = Array.from({ length: 15 }, (_, i) => {
+      const seed = i * 53;
+      return {
+        x: 15 + (i % 5) * 18 + ((seed * 3) % 8),
+        y: 10 + Math.floor(i / 5) * 30 + ((seed * 7) % 15),
+        delay: i * 0.04,
+        size: 3 + ((seed * 11) % 6),
+      };
+    });
     return (
       <AbsoluteFill style={{ pointerEvents: 'none' }}>
         {sparkles.map((s, i) => {
@@ -190,99 +164,16 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
-  const [animationData, setAnimationData] = useState<LottieAnimationData | null>(null);
-  const [handle] = useState(() => delayRender('Loading transition'));
-  const [useFallback, setUseFallback] = useState(false);
-  const continuedRef = useRef(false);
-
-  const safelyContinue = () => {
-    if (!continuedRef.current) {
-      continuedRef.current = true;
-      continueRender(handle);
-    }
-  };
-
-  const getLottieUrl = (transitionType: string): string | null => {
-    if (transitionType === 'confetti') return FALLBACK_ANIMATIONS.icons.confetti;
-    if (transitionType === 'sparkle') return FALLBACK_ANIMATIONS.transitions.sparkle;
-    return null;
-  };
-
-  const lottieUrl = getLottieUrl(type);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    // ── r34: Lambda shortcut — no CDN fetch, use SVG fallback ──
-    if (isLambdaEnvironment()) {
-      console.log(`[MorphTransition] ⚡ Lambda detected — using SVG fallback for ${type}`);
-      setUseFallback(true);
-      safelyContinue();
-      return;
-    }
-
-    // ── r34: Safety timer — force continue after 8s ──
-    const safetyTimer = setTimeout(() => {
-      if (!cancelled) {
-        console.warn(`[MorphTransition] ⏱️ Safety timer (8s) — forcing SVG fallback for ${type}`);
-        setUseFallback(true);
-        safelyContinue();
-      }
-    }, 8_000);
-
-    const loadAnimation = async () => {
-      // r44: Load Lottie component dynamically (non-Lambda only)
-      if (!isLambdaEnvironment()) {
-        try { await loadMorphLottie(); } catch {}
-      }
-
-      if (!lottieUrl) {
-        setUseFallback(true);
-        safelyContinue();
-        return;
-      }
-
-      try {
-        // r34: 5s fetch timeout
-        const response = await fetchWithTimeout(lottieUrl, 5000);
-        if (!response.ok) throw new Error('Failed to fetch');
-        const data = await response.json();
-        
-        if (!cancelled) {
-          const sanitized = sanitizeForLottiePlayer(data);
-          if (sanitized) {
-            setAnimationData(sanitized);
-          } else {
-            setUseFallback(true);
-          }
-          safelyContinue();
-        }
-      } catch (err) {
-        console.warn('Transition Lottie failed, using SVG:', err);
-        if (!cancelled) {
-          setUseFallback(true);
-          safelyContinue();
-        }
-      }
-    };
-
-    loadAnimation();
-
-    return () => {
-      cancelled = true;
-      clearTimeout(safetyTimer);
-    };
-  }, [lottieUrl, handle]);
 
   // Calculate transition progress
   let progress = 0;
   const safeTransitionFrames = safeDuration(transitionFrames, 25);
   const safeTotalDuration = safeDuration(durationInFrames, 60);
-  
+
   if (position === 'entry' || position === 'both') {
     progress = safeInterpolate(frame, [0, safeTransitionFrames], [0, 1]);
   }
-  
+
   if (position === 'exit' || position === 'both') {
     const safeExitStart = Math.min(
       Math.max(safeTransitionFrames + 1, safeTotalDuration - safeTransitionFrames),
@@ -296,21 +187,8 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
 
   if (progress <= 0) return null;
 
-  // Use Lottie animation if available AND passes strict sanitizer AND component loaded
-  const sanitizedData = animationData ? sanitizeForLottiePlayer(animationData) : null;
-  if (sanitizedData && !useFallback && MorphLottieComponent && (type === 'confetti' || type === 'sparkle')) {
-    return (
-      <AbsoluteFill style={{ pointerEvents: 'none', zIndex: 1000 }}>
-        <div style={{ position: 'absolute', inset: 0, opacity: Math.sin(progress * Math.PI) }}>
-          <MorphLottieComponent animationData={sanitizedData} style={{ width: '100%', height: '100%' }} loop playbackRate={1.2} />
-        </div>
-      </AbsoluteFill>
-    );
-  }
-
-  // Use enhanced SVG transitions
   const SVGTransition = SVGTransitions[type] || SVGTransitions.morph;
-  
+
   return (
     <AbsoluteFill style={{ pointerEvents: 'none', zIndex: 1000 }}>
       <SVGTransition progress={progress} primaryColor={color} />
