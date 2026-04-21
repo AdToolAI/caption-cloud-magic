@@ -1,73 +1,118 @@
 
 
-# 🎉 TikTok App APPROVED — Finale Aktivierung
+# Option A.1 + A.2 — TikTok Sync-Test + Warmer-Erweiterung
 
-## Status
+## Status der drei Sub-Optionen
 
-| Item | Status |
-|------|--------|
-| TikTok App Review | ✅ Approved (E-Mail bestätigt) |
-| 3 Redirect URIs in Live | ✅ `useadtool.ai`, `api.useadtool.ai`, `lbunafpxuskwmsrraqxl.supabase.co` |
-| Cloudflare Worker `tiktok-oauth-proxy` | ✅ Aktiv |
-| `api.useadtool.ai` Custom Domain | ✅ Live |
-| Health-Endpoint Response | ⚠️ `redirect_uri` zeigt noch alten Wert (`useadtool.ai/...`) |
+| Sub | Aufgabe | Status |
+|-----|---------|--------|
+| A.1 | TikTok Sync-Test mit captiongenie.app | ⏳ Noch zu testen |
+| A.2 | Warmer-Liste um TikTok erweitern | ⏳ Noch zu tun |
+| A.3 | Posting-Times-Cache language-aware für TikTok | ✅ **Bereits erledigt** — TikTok ist in `posting-times-api` (Z.145) und `generate-posting-slots` (Z.16) als Plattform definiert; Cache-Key enthält `lang` (Z.358). Nichts zu ändern. |
 
-## Was JETZT zu tun ist (vollautomatisch durch mich)
+## A.1 — TikTok Sync-Test (Live-Verifikation)
 
-### 1. Secret `TIKTOK_REDIRECT_URI` aktualisieren
-Neuer Wert: `https://api.useadtool.ai/api/oauth/tiktok/callback`
-→ Update-Dialog erscheint, du bestätigst mit einem Klick.
+**Was wir testen:**
+1. `tiktok-sync` Edge Function aufrufen (mit deiner Auth)
+2. Prüfen, ob Token-Refresh-Logik korrekt durchläuft
+3. Prüfen, ob `getUserInfo` Daten zurückgibt (Display-Name, Avatar)
+4. DB-Updates verifizieren in `social_profiles` und `social_connections`
 
-### 2. Health-URL Re-Test (du, 30 Sek)
-Nach Secret-Update: `https://api.useadtool.ai/api/oauth/tiktok/health` aufrufen.
-Erwartet: `redirect_uri` zeigt jetzt `api.useadtool.ai/api/oauth/tiktok/callback`.
-Screenshot bestätigt 1:1-Match mit TikTok-Portal.
+**Wie:**
+- `supabase--curl_edge_functions` POST `/tiktok-sync` (nutzt deinen Auth-Token automatisch)
+- `supabase--read_query` auf `social_connections` + `social_profiles` für captiongenie.app
+- `supabase--edge_function_logs` für `tiktok-sync` zur Verifikation des Flows
 
-### 3. `vercel.json` aufräumen
-Die 3 toten TikTok-Rewrites entfernen (greifen nie — Hosting läuft via Lovable Edge, nicht Vercel). Headers + SPA-Fallback bleiben unverändert.
+**Erwartetes Ergebnis:**
+- HTTP 200 mit `{ success: true, profile: {...}, synced_at }`
+- `social_connections.last_sync_at` = jetzt
+- `social_profiles.display_name`, `avatar_url` gesetzt
+- Logs zeigen sauberen Flow ohne Token-Refresh-Errors
 
-### 4. `tiktok-oauth-start` Log-Fix
-Zeile 78: irreführender „Sandbox"-Text dynamisch (`${tiktokEnv}`) — Cleanup für künftige Debug-Sessions.
+**Bekannte Limitierung (kein Fehler):** `follower_count`, `following_count`, `video_count` bleiben 0, da Sandbox/Login-Kit diese Felder nicht freigibt — bestätigt mit grünem TikTok-Hinweis in der UI.
 
-### 5. End-to-End TikTok Connect Test
-Du klickst auf der Integrations-Seite **"Connect TikTok"**. Ich beobachte parallel:
-- Edge Function Logs `tiktok-oauth-start` (Auth-URL-Generierung mit neuer Redirect-URI)
-- Edge Function Logs `tiktok-oauth-callback` (Token-Exchange + DB-Insert via Worker-Proxy)
-- Tabelle `social_connections` (neue Zeile mit `provider='tiktok'`)
-- Tabelle `social_profiles` (neue Profile-Daten)
+## A.2 — Edge Function Warmer erweitern
 
-**Erwartetes Endergebnis:** Grüner Toast „TikTok erfolgreich verbunden", Account erscheint in Linked Accounts mit Display-Name + Follower-Count.
+**Datei:** `supabase/functions/edge-function-warmer/index.ts`
 
-### 6. Fallback-Strategie dokumentieren (Memory)
-`mem://infrastructure/hosting/cloudflare-tiktok-proxy` anlegen mit:
-- **3 approved Redirect URIs** (Subdomain primär, direkt Supabase als Backup, Root als Dead-Config)
-- Cloudflare Worker Setup (`tiktok-oauth-proxy`, Account `bestofproducts4u.workers.dev`, Custom Domain Binding)
-- Fallback-Switch: Bei Subdomain-Ausfall → Secret auf direkte Supabase-URL umschalten (Sekunden, ohne Re-Review)
-- TikTok App Review Notes: URI-Changes erfordern Review (1-5 Werktage), zukünftig nur bereits genehmigte URIs verwenden
-- Worker Routes auf `useadtool.ai/*` greifen NICHT, `vercel.json` wirkungslos auf Routing — nicht als Lösung vorschlagen
-- Workers.dev Root-URL liefert 404 by design
+**Änderung:** TikTok-relevante Functions zur `CRITICAL_FUNCTIONS` Liste hinzufügen. Konkret:
+- `tiktok-sync` — wird nach jedem Connect und für Scheduled-Sync genutzt
+- `tiktok-oauth-start` — kalt → langsamer Connect-Klick
+- `tiktok-health` — wird im Health-Check beim Connect-Flow genutzt
+- `publish-to-tiktok` — wird für Direct-Posts ohne Vorlauf benötigt
+
+**Begründung pro Function:**
+
+| Function | Kalt-Start-Impact | Häufigkeit |
+|----------|-------------------|------------|
+| `tiktok-sync` | ~2-3s Latenz beim ersten Sync nach Connect | Bei Connect + alle 6h via cron |
+| `tiktok-oauth-start` | ~1-2s Latenz beim Connect-Klick | Pro neuem Connect |
+| `tiktok-health` | ~1s Latenz beim Pre-Connect-Check | Pro Connect |
+| `publish-to-tiktok` | ~2s Latenz beim ersten Direct-Post | Pro Veröffentlichung |
+
+**Code-Diff (Vorschau):**
+```ts
+const CRITICAL_FUNCTIONS = [
+  'check-subscription',
+  'planner-list',
+  'calendar-timeline-slots',
+  'generate-campaign',
+  'posting-times-api',
+  'sync-social-posts-v2',
+  'get-credits',
+  'render-with-remotion',
+  'generate-caption',
+  // NEU:
+  'tiktok-sync',
+  'tiktok-oauth-start',
+  'tiktok-health',
+  'publish-to-tiktok',
+];
+```
+
+**Wichtig:** Der Warmer schickt `{ warmup: true }` als Body. Wir verifizieren in den 4 TikTok-Functions, dass dieser Warmup-Aufruf nicht crasht (z.B. wenn Auth-Header fehlt). Falls eine Function bei Warmup-Calls 500 zurückgibt, fügen wir am Anfang einen Early-Return hinzu:
+```ts
+const body = await req.json().catch(() => ({}));
+if (body?.warmup) {
+  return new Response(JSON.stringify({ warmed: true }), { headers: corsHeaders });
+}
+```
+
+## Reihenfolge der Schritte (nach Approval)
+
+1. **A.1 — Sync-Test ausführen** (3 Schritte parallel)
+   - `curl_edge_functions` POST `/tiktok-sync`
+   - `read_query` auf `social_profiles` + `social_connections`
+   - `edge_function_logs` für `tiktok-sync`
+   - Ergebnis als Tabelle präsentieren
+
+2. **A.2 — Warmer erweitern**
+   - `edge-function-warmer/index.ts` Liste um 4 TikTok-Functions ergänzen
+   - In jeder der 4 TikTok-Functions sicherstellen, dass `{ warmup: true }` Early-Return funktioniert (falls noch nicht vorhanden)
+   - Deploy via `supabase--deploy_edge_functions`
+   - Warmer manuell auslösen via `curl_edge_functions` und Logs prüfen
+
+3. **Verification**
+   - Warmer-Logs zeigen alle 13 Functions mit `OK (XXXms)`
+   - Memory-Update (optional): `mem://infrastructure/hosting/cloudflare-tiktok-proxy` mit „verified working + warmer integrated" finalisieren
 
 ## Geänderte/Neue Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| Secret `TIKTOK_REDIRECT_URI` | Wert auf `https://api.useadtool.ai/api/oauth/tiktok/callback` (Dialog) |
-| `vercel.json` | 3 tote TikTok-Rewrites entfernen |
-| `supabase/functions/tiktok-oauth-start/index.ts` | Log-Text `${tiktokEnv}` dynamisch |
-| `mem://infrastructure/hosting/cloudflare-tiktok-proxy` | Neu — komplette Architektur dokumentiert |
+| `supabase/functions/edge-function-warmer/index.ts` | 4 TikTok-Functions zur `CRITICAL_FUNCTIONS` Liste |
+| `supabase/functions/tiktok-sync/index.ts` | Early-Return bei `{ warmup: true }` (falls noch nicht vorhanden) |
+| `supabase/functions/tiktok-oauth-start/index.ts` | Early-Return bei `{ warmup: true }` (falls noch nicht vorhanden) |
+| `supabase/functions/tiktok-health/index.ts` | Early-Return bei `{ warmup: true }` (falls noch nicht vorhanden) |
+| `supabase/functions/publish-to-tiktok/index.ts` | Early-Return bei `{ warmup: true }` (falls noch nicht vorhanden) |
 
-## Was du jetzt tust
+## Risiko & Rollback
 
-1. **„OK, mach den Plan"** schreiben → ich starte Secret-Update-Dialog, code-Cleanup, Memory anlegen
-2. Nach Secret-Bestätigung: Health-URL kurz prüfen (Screenshot)
-3. Auf Integrations-Seite **„Connect TikTok"** klicken → ich beobachte Logs in Echtzeit
-4. Bei Erfolg: gemeinsam feiern 🥂
+- **Risiko:** Sehr niedrig. Warmer-Liste ist additiv. Early-Returns sind defensiv.
+- **Rollback:** 4 Einträge aus `CRITICAL_FUNCTIONS` Array entfernen → 30s Fix.
 
-## Falls etwas schiefgeht
+## Was du tust
 
-| Problem | Sekunden-Lösung |
-|---------|-----------------|
-| Cloudflare Worker Subdomain hat Hänger | Secret auf direkte Supabase-URL umschalten (kein Re-Review nötig — bereits approved) |
-| Token-Exchange schlägt fehl | Edge Function Logs zeigen Klartext-Error, ich diagnostiziere live |
-| State-Mismatch beim Callback | DB-Tabelle `oauth_states` prüfen, CSRF-Token validieren |
+- **„OK, mach"** → ich starte mit A.1 (Sync-Test) und gehe direkt in A.2 über
+- **„Nur A.1"** oder **„Nur A.2"** → ich mache nur den gewählten Teil
 
