@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import {
   ChevronUp, ChevronDown, Trash2, GripVertical,
-  Sparkles, Upload, Video,
+  Sparkles, Upload, Video, Image as ImageIcon, Wand2,
 } from 'lucide-react';
 import type {
   ComposerScene,
@@ -139,26 +139,49 @@ export default function SceneCard({
 
             {/* Clip source */}
             <div className="flex flex-wrap gap-2">
-              {(['ai-hailuo', 'ai-kling', 'stock', 'upload'] as ClipSource[]).map((src) => {
+              {(['ai-hailuo', 'ai-kling', 'ai-image', 'stock', 'upload'] as ClipSource[]).map((src) => {
                 const label =
                   src === 'upload'
                     ? 'Eigenes Video'
                     : CLIP_SOURCE_LABELS[src]?.de || src;
+                const isImage = src === 'ai-image';
                 return (
                   <button
                     key={src}
                     onClick={() => onUpdate({ clipSource: src })}
-                    className={`px-2 py-1 rounded text-[10px] border transition-all ${
+                    className={`px-2 py-1 rounded text-[10px] border transition-all flex items-center gap-1 ${
                       scene.clipSource === src
-                        ? 'border-primary bg-primary/10 text-primary'
+                        ? isImage
+                          ? 'border-green-500/60 bg-green-500/10 text-green-300'
+                          : 'border-primary bg-primary/10 text-primary'
                         : 'border-border/40 text-muted-foreground hover:border-border'
                     }`}
                   >
+                    {isImage && <ImageIcon className="h-2.5 w-2.5" />}
                     {label}
                   </button>
                 );
               })}
             </div>
+
+            {/* Effects badges (AI-selected procedural effects layered above the clip) */}
+            {scene.effects && scene.effects.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 items-center">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1">
+                  <Wand2 className="h-2.5 w-2.5" />
+                  Effekte
+                </span>
+                {scene.effects.map((eff, i) => (
+                  <Badge
+                    key={`${eff.id}-${i}`}
+                    variant="outline"
+                    className="text-[9px] px-1.5 py-0 h-4 border-amber-500/30 bg-amber-500/5 text-amber-300/90"
+                  >
+                    {eff.id}
+                  </Badge>
+                ))}
+              </div>
+            )}
 
             {/* Quality Tier — only for AI sources */}
             {scene.clipSource.startsWith('ai-') && (

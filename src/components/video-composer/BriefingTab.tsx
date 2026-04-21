@@ -33,6 +33,8 @@ import type {
 } from '@/types/video-composer';
 import { VISUAL_STYLES } from '@/config/composerVisualStyles';
 import CharacterManager from './CharacterManager';
+import VideoModeSelector from './VideoModeSelector';
+import type { VideoMode } from '@/types/video-composer';
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string; desc: string }[] = [
   { value: '16:9', label: '16:9', desc: 'YouTube / Landscape' },
@@ -571,6 +573,13 @@ export default function BriefingTab({
           </div>
         </CardContent>
       </Card>
+
+      {/* Video Mode — choose between AI video, AI image, or mixed scenes */}
+      <VideoModeSelector
+        value={briefing.videoMode || 'video'}
+        language={language}
+        onChange={(mode: VideoMode) => onUpdateBriefing({ videoMode: mode })}
+      />
 
       {/* Recurring Characters — drives consistency across scenes */}
       <CharacterManager
