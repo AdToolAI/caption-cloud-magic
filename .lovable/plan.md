@@ -1,55 +1,86 @@
 
 
-## Bugfix: Storyboard-Edge-Function ist defekt → „Image Mode" wird ignoriert
+## Bugfix: Schwarze Szenen statt KI-Bilder + fehlender Übersetzungs-Key
 
-### Symptom
-User wählt im Briefing **„KI Bild-Szenen"** (Image-Mode), aber im generierten Storyboard ist trotzdem **„KI (Hailuo)"** als Quelle aktiv.
+### Problem 1: Bilder werden generiert, aber nicht angezeigt
 
-### Root Cause
-`supabase/functions/compose-video-storyboard/index.ts` hat in den Zeilen **335-345** Code-Rest-Müll von einem unsauberen Edit:
+Die Edge-Function `generate-composer-image-scene` läuft erfolgreich (200, ~14-19s) und schreibt das Bild korrekt in die DB:
 
 ```ts
-        }),
-      });
-                },                          // ← Zombie-Code
-                required: ["scenes"],       // ← Zombie-Code
-                additionalProperties: false,// ← Zombie-Code
-              },                            // ← Zombie-Code
-            },                              // ← Zombie-Code
-          },                                // ← Zombie-Code
-        ],                                  // ← Zombie-Code
-        tool_choice: {...},                 // ← Zombie-Code
-      }),                                   // ← Zombie-Code
-    });                                     // ← Zombie-Code
+.update({
+  clip_url: publicUrl,        // ← Bild-URL landet hier
+  clip_status: 'ready',
+  upload_type: 'image',       // ← korrekt gesetzt
+})
 ```
 
-Diese 11 Zombie-Zeilen kommen **nach** dem korrekt geschlossenen `fetch(...)`-Call — sie sind syntaktisch valide JS-Object-Literale ohne Bezug, aber sie machen die Function entweder kaputt oder lassen sie auf ein älteres Deployment zurückfallen, das `videoMode` noch nicht kennt. Resultat: die Function liefert `clipSource: 'ai-hailuo'` (Default), egal was der User wählt.
+Aber der Player `ComposerSequencePreview.tsx` zeigt nur dann ein Bild an, wenn die URL in `uploadUrl` steht:
 
-Das ist auch der Grund, warum keine **Effekte** und keine **Mixed/Image-Szenen** im UI erscheinen — die ganze Phase-3-Logik läuft nie durch.
+```ts
+// Zeile 57-63: Filter
+const playable = scenes.filter(
+  s => s.clipUrl || (s.uploadType === 'image' && s.uploadUrl),
+);
 
-### Fix
-**Datei:** `supabase/functions/compose-video-storyboard/index.ts`
-
-**Aktion:** Zeilen **336-345** komplett löschen (die 11 Zombie-Zeilen nach dem ersten `});`-Block in Zeile 335).
-
-Vor dem Fix endet der gültige Code in Zeile 335 mit:
+// Zeile 130: Welche URL wird angezeigt?
+const isImage = currentScene?.uploadType === 'image';
+const mediaUrl = isImage ? currentScene?.uploadUrl : currentScene?.clipUrl;
+//                          ^^^^^^^^^^^^^^^^^^^^^^^ 
+// Bei AI-Image ist uploadUrl undefined → mediaUrl = undefined
+//                          → <img src={undefined}> → schwarz
 ```
-        }),
-      });
+
+Bei AI-generierten Bildern ist `uploadType = 'image'` UND `clipUrl` gesetzt, aber `uploadUrl` bleibt leer (es war ja kein User-Upload). Die Bedingung `isImage ? uploadUrl : clipUrl` greift dann auf `undefined` zu → schwarz.
+
+### Fix 1: Player liest IMMER aus `clipUrl` für AI-Image-Szenen
+
+**Datei:** `src/components/video-composer/ComposerSequencePreview.tsx`
+
+Eine Zeile ändern (Zeile 130):
+```ts
+// Vorher
+const mediaUrl = isImage ? currentScene?.uploadUrl : currentScene?.clipUrl;
+// Nachher — clipUrl als primäre Quelle, uploadUrl nur als Fallback für reine Uploads
+const mediaUrl = isImage 
+  ? (currentScene?.clipUrl || currentScene?.uploadUrl) 
+  : currentScene?.clipUrl;
 ```
-Dann muss direkt Zeile 347 (`if (!response.ok) {`) folgen — keine Zwischenzeilen.
 
-### Verifikation nach dem Fix
-1. Edge function wird automatisch redeployt
-2. Im Briefing **„KI Bild-Szenen"** wählen
-3. Storyboard generieren → alle Szenen sollten als **„KI Bild (Gemini)"** markiert sein, nicht als „KI (Hailuo)"
-4. Bei **„Mixed Mode"** → erste + letzte Szene = Hailuo, mittlere = Gemini
-5. Effekt-Badges (`Wand2`-Icon mit z. B. „GlowOrbs", „LightRays") erscheinen unter jeder Szene
+Und für Konsistenz im `playable`-Filter (Zeile 57-63): bereits `s.clipUrl` ist Teil der Bedingung, daher passt das schon — die Szene erscheint im Player, nur die `<img>` zeigt das Falsche an.
 
-### Risiko & Rollback
-- **Risiko: Sehr niedrig.** Reine Code-Bereinigung von toten Zeilen. Keine Schema- oder API-Änderung.
-- **Rollback:** Git-Revert der einen Datei.
+### Problem 2: Roher i18n-Key sichtbar (`videoComposer.sceneOf`)
+
+Im Screenshot steht oben links `videoComposer.sceneOf` als Klartext. Der Key existiert in keiner der 3 Sprachen in `src/lib/translations.ts` (EN/DE/ES).
+
+### Fix 2: Übersetzungs-Key in allen 3 Sprachen ergänzen
+
+**Datei:** `src/lib/translations.ts`
+
+In allen 3 Sprachblöcken (EN/DE/ES) im `videoComposer.*`-Bereich neben den existierenden Composer-Keys (z. B. neben `subtitlesShortLabel`):
+
+```ts
+// EN
+sceneOf: "Scene {current} of {total}",
+// DE
+sceneOf: "Szene {current} von {total}",
+// ES
+sceneOf: "Escena {current} de {total}",
+```
+
+Der `useTranslation`-Hook unterstützt bereits Variablen-Interpolation (wie in anderen Keys mit `{count}` etc. zu sehen).
+
+### Verifikation
+
+1. Briefing → „KI Bild-Szenen" wählen → Storyboard generieren
+2. Clips-Tab → „Clips generieren" → 3 erfolgreiche `generate-composer-image-scene`-Calls (bereits in den Edge-Logs sichtbar ✓)
+3. Vorschau → Bilder werden angezeigt (statt Schwarz)
+4. Oben links steht z. B. „Szene 2 von 3" statt `videoComposer.sceneOf`
+
+### Risiko
+
+Sehr niedrig. Beide sind reine UI-Korrekturen. Bestehende Upload-Bilder funktionieren weiterhin (Fallback-Kette `clipUrl || uploadUrl`).
 
 ### Aufwand
-~2 Minuten — eine Datei, eine `line_replace`-Operation.
+
+~3 Minuten — eine Zeile im Player + 3 Übersetzungs-Keys.
 
