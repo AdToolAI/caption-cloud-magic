@@ -1,94 +1,69 @@
 
 
-# Status-Check: Lambda-Skalierungsplan
+# Option B: Vercel-Rewrite für TikTok Callback
 
-Kurze ehrliche Antwort: **Nein, nicht zu 100%.** Phase 0 und Phase A sind teilweise umgesetzt, ab Phase B steht noch alles aus. Hier der genaue Stand pro Punkt — und was zu tun ist, um es **wirklich auf 100%** zu bringen.
+Du bekommst exakt die gleiche Geschwindigkeit und keine Einschränkungen. Hier warum:
 
-## Aktueller Umsetzungsstand
+## Performance-Frage geklärt
 
-### ✅ Erledigt
-
-| Punkt | Status | Beleg |
+| Aspekt | Direkt zu Supabase | Über Vercel-Rewrite |
 |---|---|---|
-| Circuit Breaker schärfen — Threshold 15%, MIN_SAMPLE=10 | ✅ erledigt | `lambda-circuit-breaker/index.ts` Zeilen 44-46 (THRESHOLD=0.15, MIN_SAMPLE=10) |
-| DB-Defaults Phase A | ✅ erledigt | Code zeigt `NORMAL=25`, `SAFE=15` als Fallbacks |
-| Render-Queue-Manager existiert | ✅ erledigt | Sequenzielle Verarbeitung läuft |
+| TikTok → Callback-Request | 1 Hop | 1 Hop (Vercel proxied transparent) |
+| Latenz-Aufschlag | 0 ms | ~20-40 ms (einmalig, nur beim OAuth-Callback) |
+| Häufigkeit | 1× pro User-Verbindung | 1× pro User-Verbindung |
+| Auswirkung auf normalen App-Betrieb | — | **Null** (Rewrite gilt nur für `/api/oauth/tiktok/callback`) |
+| Funktionseinschränkung | keine | keine |
 
-### ⚠️ Teilweise / Inkonsistent
+**Ergebnis:** Der User merkt davon nichts. Die +20-40 ms passieren einmalig beim Drücken von „Authorize" in TikTok — vor dem Redirect zurück zur App. Reine OAuth-Callback-Sache, keine Auswirkung auf Renders, Uploads, Posts oder UI.
 
-| Punkt | Problem |
-|---|---|
-| **UI-Fallback `?? 6`** | Im Plan steht „Zeile 65 ?? 6 → ?? 25 fixen". **Aktueller Code hat schon `?? 25`** (Zeile 65). Ist also fertig — ABER: in `ProviderHealth.tsx` steht im Erklär-Block am Ende noch der alte Text *„Lambda-Concurrency wird vom Circuit Breaker automatisch zwischen 3 und 6 angepasst"*. Das stimmt nicht mehr — muss auf 15 ↔ 25 aktualisiert werden. |
-| **DB `system_config` Werte** | Müssen verifiziert werden — Code hat zwar Fallbacks auf 25/15, aber unklar ob die Werte in der DB tatsächlich gesetzt sind. Muss per Read-Query geprüft werden. |
-| **AWS Reserved Concurrency = 30** | Außerhalb meines Zugriffs. Nur in AWS Console manuell setzbar. Status unbekannt. |
+## Was ich umsetze
 
-### ❌ Noch offen (Phase 0 + alle weiteren Phasen)
+### 1. `vercel.json` erweitern
+Neuer Rewrite für `/api/oauth/tiktok/callback` → Supabase Edge Function. Der bestehende SPA-Catch-All `/(.*) → /index.html` bleibt unverändert; spezifischere Rewrites werden zuerst gematcht.
 
-- **Monitoring-Alerts** für Circuit Breaker / OOM / Queue-Backlog → keine Edge Function dafür existiert
-- **Manueller Kill-Switch im Admin-UI** → fehlt komplett
-- **Phase B**: erweitertes Lambda-Logging (Cold-Start, Memory-Peak), `stress-test-lambda` Edge Function, Stresstest-Button
-- **Phase C**: Batch-Trigger im `render-queue-manager` (aktuell strikt sequenziell, Zeilen 24-32 holen `.limit(1)`), S3-Lifecycle-Policy
-- **Phase D**: Pre-warmed Lambda Instances (AWS-seitig)
-
-## Was ich jetzt vorschlage: Phase 0 wirklich auf 100% bringen
-
-Bevor wir an Phase B denken, schließen wir Phase 0 sauber ab. Vier kompakte Schritte:
-
-### Schritt 1 — DB-Werte verifizieren & setzen
-
-Per Read-Query aktuelle Werte aus `system_config` lesen, dann gezielt Updates für die Phase-A-Konfiguration:
-
+### 2. `TIKTOK_REDIRECT_URI` Secret aktualisieren
+Neuer Wert (exakt was im TikTok Portal steht):
 ```
-lambda_max_concurrent           = 25
-lambda_max_concurrent_safe      = 15
-lambda_circuit_breaker_threshold = 0.15
-lambda_circuit_breaker_window_min = 10
-lambda_circuit_breaker_min_sample = 10
+https://useadtool.ai/api/oauth/tiktok/callback
 ```
+Du bestätigst den neuen Wert via Secret-Update-Dialog.
 
-Falls Keys fehlen → INSERT, falls vorhanden → UPDATE.
+### 3. `tiktok-health` erweitern
+Gibt jetzt den vollständigen `redirect_uri`-String zurück, damit du im Browser unter `https://useadtool.ai/api/oauth/tiktok/health` sofort sehen kannst, was wir an TikTok senden — 1:1 Vergleich mit dem Portal-Eintrag.
 
-### Schritt 2 — UI-Konsistenz herstellen
+### 4. `tiktok-oauth-start/index.ts` Log-Fix
+Zeile 78: `"Redirecting to TikTok OAuth (Sandbox):"` → `"Redirecting to TikTok OAuth (${env}):"` — irreführender „Sandbox"-Text raus, weil wir Production sind.
 
-In `src/pages/admin/ProviderHealth.tsx`:
-- Erklär-Text am Ende: *„zwischen 3 und 6"* → *„zwischen `lambda_max_concurrent_safe` und `lambda_max_concurrent` (aktuell 15 ↔ 25)"*
-- Werte dynamisch aus DB ziehen statt hartcodieren, damit der Text bei Phase B/C/D nicht erneut angefasst werden muss
+### 5. `Integrations.tsx` — User-freundliche Error-Toasts
+Bei Rückkehr mit `?error=tiktok_oauth_failed` oder `?error=tiktok_oauth_denied`: klarer Toast statt stiller Fehler. Das macht künftige Debug-Cases mit Kunden viel einfacher.
 
-### Schritt 3 — Kill-Switch ins Admin-UI
+## Verification nach Umsetzung
 
-Neuer Button in `ProviderHealth.tsx` („Notfall: auf 10 zurück"):
-- Schreibt `lambda_max_concurrent = 10` in `system_config`
-- Toast-Bestätigung
-- Nur sichtbar für Admin-Rolle (`has_role(auth.uid(), 'admin')`)
+1. `tiktok-health` aufrufen → muss `redirect_uri: "https://useadtool.ai/api/oauth/tiktok/callback"` zurückgeben
+2. `vercel.json` Rewrite live testen: `curl -I https://useadtool.ai/api/oauth/tiktok/callback?test=1` → muss zur Supabase-Function durchschlagen (302 oder 400, aber nicht 404)
+3. Du klickst im UI: **Integrations → Connect TikTok** → echter Login → Authorize → Redirect zurück → grüner Toast „TikTok verbunden"
+4. `tiktok-oauth-callback` Logs zeigen erfolgreichen Token-Exchange
 
-### Schritt 4 — Monitoring-Alert (Edge Function `lambda-health-monitor`)
+## Geänderte Dateien
 
-Neue Edge Function als Cron (alle 5 Min), die diese drei Bedingungen prüft und bei Trigger eine E-Mail an Admins schickt (über bestehende Resend-Integration falls vorhanden, sonst nur DB-Log in `alert_notifications`):
+- `vercel.json` — neuer Rewrite-Eintrag (über dem SPA-Catch-All)
+- `supabase/functions/tiktok-health/index.ts` — `redirect_uri` im Response
+- `supabase/functions/tiktok-oauth-start/index.ts` — Log-Text dynamisch
+- `src/pages/Integrations.tsx` — Error-Toast-Handler
+- Secret-Update: `TIKTOK_REDIRECT_URI` → neuer Wert wird im Update-Dialog bestätigt
 
-| Bedingung | Schwelle |
-|---|---|
-| Circuit Breaker tripped | `system_config.lambda_max_concurrent` < `lambda_max_concurrent_safe` |
-| OOM-Errors | ≥5 Einträge mit `status='oom'` in letzter Stunde |
-| Queue-Backlog | ≥20 Jobs `status='queued'` älter als 10 Min |
+## Was du danach tun musst
 
-Cooldown 60 Min pro Alert-Typ, um Spam zu vermeiden.
+1. Secret-Update bestätigen (Dialog erscheint automatisch)
+2. Frontend „Update" im Publish-Dialog drücken (für `vercel.json` Rewrite — Edge Functions deployen automatisch)
+3. Auf `https://useadtool.ai/api/oauth/tiktok/health` prüfen, ob die URI 1:1 stimmt
+4. **Connect TikTok** im UI testen → muss durchlaufen
 
-## Geänderte Dateien (für die endgültige Phase-0-Komplettierung)
+## Rollback-Plan (falls je nötig)
 
-1. `src/pages/admin/ProviderHealth.tsx` — Kill-Switch-Button + dynamische Werte im Erklär-Text
-2. `supabase/functions/lambda-health-monitor/index.ts` — neue Cron-Function (Alerting)
-3. `supabase/config.toml` — Eintrag für neue Function (verify_jwt = false)
-4. DB-Updates: `system_config` Phase-A-Werte explizit setzen
-5. DB: pg_cron-Eintrag, der `lambda-health-monitor` alle 5 Min triggert
+Falls TikTok Production trotzdem ein Problem macht: Rewrite aus `vercel.json` entfernen, Secret zurück auf Supabase-URL — alles in 1 Minute reversibel.
 
-## Wichtig: Was ICH nicht machen kann
+## Kosten
 
-- **AWS Reserved Concurrency** auf 30 setzen → musst du im AWS Console machen (Lambda → `remotion-render-...` → Configuration → Concurrency → Reserve account concurrency = 30)
-- **AWS Budget Alert** einrichten → AWS Console → Billing → Budgets
-
-Sag mir kurz Bescheid, wenn du das AWS-seitig erledigt hast — dann sind wir Phase-0-komplett und können nach 7 Tagen sauberer Metriken Phase B starten.
-
-## Nach Approval
-
-Sobald genehmigt: ich verifiziere die DB-Werte, setze sie ggf., baue Kill-Switch + Health-Monitor, deploye die neue Function und richte den Cron-Job ein. Danach läuft Phase 0 wirklich auf 100%.
+Null. Vercel Rewrites sind im Plan inkludiert, keine extra Edge-Function-Calls, keine zusätzlichen Supabase-Invocations.
 
