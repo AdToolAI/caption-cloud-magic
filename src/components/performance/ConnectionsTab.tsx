@@ -363,11 +363,22 @@ export const ConnectionsTab = () => {
       // Facebook now uses generic oauth-callback without ?provider query param
       const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback`;
       
+      // If the existing instagram connection signals missing page scopes
+      // (user previously denied them in the Meta dialog), force Meta to
+      // re-show the full consent screen instead of silently reusing the
+      // declined decisions.
+      const existingIg = connections.find((c) => c.provider === 'instagram');
+      const missingScopes: string[] = existingIg?.account_metadata?.missing_page_scopes ?? [];
+      const forceReconsent = providerId === 'instagram' && missingScopes.length > 0;
+      const reconsentSuffix = forceReconsent
+        ? `&auth_type=rerequest&auth_nonce=${crypto.randomUUID().replace(/-/g, '')}`
+        : '';
+
       const oauthUrls: Record<string, string> = {
         // Instagram uses the SAME Facebook OAuth dialog as the facebook flow
         // (state.provider already encodes which provider this is). Only the
         // scopes are extended with instagram_basic + instagram_content_publish.
-        instagram: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_content_publish&state=${encodeURIComponent(state)}`,
+        instagram: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_content_publish&state=${encodeURIComponent(state)}${reconsentSuffix}`,
         facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_read_engagement,pages_manage_metadata,pages_show_list,pages_read_user_content,pages_manage_posts,pages_manage_engagement&state=${encodeURIComponent(state)}`,
         tiktok: `/api/oauth/tiktok/start?user_id=${user.id}`,
         linkedin: `/api/oauth/linkedin/start?user_id=${user.id}`,
