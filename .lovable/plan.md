@@ -1,95 +1,70 @@
 
 
-## Instagram OAuth: Echten Login-Flow für Reviewer & Endnutzer einbauen
+## Instagram-Disconnect: Permissions bei Meta widerrufen → voller Dialog beim Reconnect
 
-### Das Kernproblem (vom Kunden korrekt erkannt)
+### Warum Facebook „funktioniert" und Instagram nicht
 
-Aktuell macht „Instagram verbinden" **keinen** OAuth-Login. Stattdessen ruft die App `connect-instagram-performance` auf, die deinen **eigenen Master-Token** aus `app_secrets` kopiert und in die `social_connections` des klickenden Users schreibt. Folge:
+Du hast den entscheidenden Unterschied richtig erkannt: Beim Facebook-Reconnect siehst du den vollen Permission-Dialog. Das liegt daran, dass Facebook-Verbindungen über `pages/me/permissions` sauber widerrufen werden (oder du es manuell in deinen FB-Settings entfernt hast). Bei Instagram löscht unser „Disconnect" aktuell **nur die DB-Row** — Meta merkt nichts davon und zeigt beim nächsten Connect „Continue as Samuel" statt des vollen Dialogs.
 
-- Im Screencast sieht Meta keinen Permission-Dialog → **`instagram_basic` abgelehnt**
-- Auch keine Veröffentlichung mit User-Tokens → **`instagram_content_publish` abgelehnt**
-- Jeder User würde technisch denselben (deinen) Account verbinden — Meta-Policy-Verstoß
+### Was wir ändern (3 Punkte)
 
-Der Facebook-Button macht es richtig: echter Meta-OAuth-Dialog mit Scopes. Instagram muss **denselben Flow** zeigen — Instagram Business Login via Facebook OAuth.
+#### 1. Instagram-Disconnect ruft Meta DELETE-Endpoint auf
+**Datei:** `supabase/functions/oauth-disconnect/index.ts` (oder dort wo Disconnect liegt — falls die Logik in `ConnectionsTab.tsx` direkt sitzt, neue Edge Function `instagram-oauth-revoke`)
 
-### Was sich ändert
-
-#### 1. Frontend: Instagram-Button zeigt echten Meta-OAuth-Dialog
-Datei: `src/components/performance/ConnectionsTab.tsx`
-- Den Sonderfall-Block (Zeile 250–283), der `connect-instagram-performance` aufruft, **entfernen**
-- Stattdessen: Instagram-Button startet `instagram-oauth-start` (neue Edge Function), die eine echte Meta-OAuth-URL liefert und den Browser dorthin weiterleitet
-- Der OAuth-Dialog zeigt dann sichtbar: „AdTool AI möchte auf dein Instagram-Konto zugreifen" mit Scopes `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement`, `business_management`
-
-#### 2. Neue Edge Function: `instagram-oauth-start`
-- Generiert State + CSRF, speichert in `oauth_states`
-- Baut Meta-OAuth-URL mit Instagram-Scopes
-- Redirect-URI: `…/functions/v1/oauth-callback?provider=instagram`
-
-#### 3. Edge Function: `oauth-callback` erweitern für Instagram-Branch
-- Token-Tausch: Code → Short-Lived Token → Long-Lived Token (60 Tage)
-- `GET /me/accounts` → Facebook-Pages des Users abrufen
-- Pro Page: `?fields=instagram_business_account{id,username,profile_picture_url,followers_count}` → IG-Account-Info
-- Falls mehrere IG-Accounts: erstmal den ersten nehmen (Account-Picker später nachrüstbar)
-- Speichern in `social_connections`: `provider='instagram'`, **echte User-Tokens** (verschlüsselt), `account_id` = IG Business Account ID, `account_name` = IG-Username, `account_metadata` = `{profile_picture_url, followers_count, page_id, page_access_token_encrypted}`
-
-#### 4. Profil-Daten sichtbar in der UI
-Datei: `src/components/performance/ConnectionsTab.tsx` (Zeilen 780+)
-- Connection-Card erweitern: zeigt Instagram-Profilbild, `@username`, Follower-Count, Account-Typ-Badge
-- Beweist Meta im Screencast: `instagram_basic` wird aktiv konsumiert
-
-#### 5. Englisch-Toggle für Reviewer
-Datei: `src/pages/Integrations.tsx`
-- URL-Parameter `?lang=en` erkennen → i18n hart auf Englisch setzen
-- Reviewer-URL: `useadtool.ai/integrations?lang=en`
-
-#### 6. Backwards-Compatibility / Cleanup
-- `connect-instagram-performance` bleibt deployed (legacy), wird aber nicht mehr aufgerufen
-- Nicht löschen, falls Admin-Tools darauf basieren — nur aus dem Frontend-Flow rausnehmen
-
-### Was Meta dann im Screencast sieht
-
-```
-1. User landet auf useadtool.ai/integrations?lang=en (English UI)
-2. User klickt "Connect Instagram"
-3. → Browser springt zu facebook.com/v24.0/dialog/oauth
-4. → Permission-Dialog: "AdTool AI is requesting access to:
-   - View your Instagram account profile (instagram_basic)
-   - Publish content on your behalf (instagram_content_publish)
-   - View your Facebook Pages (pages_show_list)"
-5. User klickt "Allow"
-6. → Redirect zurück zu useadtool.ai/integrations?connected=instagram
-7. UI zeigt: Profilbild + @username + Follower-Count + "Connected" Badge
+Vor dem Löschen der `social_connections`-Row:
+```ts
+DELETE https://graph.facebook.com/v24.0/{user-id}/permissions?access_token={user_token}
 ```
 
-Genau dieser Flow ist das, was Meta für **`instagram_basic`** Approval verlangt.
+Das widerruft **alle App-Permissions** für diesen User bei Meta. Beim nächsten Connect erscheint zwingend der volle Permission-Dialog — exakt wie beim Facebook-Flow, ohne dass irgendwelche speziellen OAuth-Parameter nötig sind.
 
-### Migration für bestehende User
+Falls der Token bereits abgelaufen ist (oder Meta den Call verweigert): Wir loggen die Warnung, löschen aber trotzdem die DB-Row. So bleibt Disconnect immer funktionsfähig.
 
-User, die aktuell mit dem Master-Token „verbunden" sind (wie auf deinem Screenshot `@captiongenie_socialmanager`), müssen **einmalig neu verbinden**:
-- Beim Laden der ConnectionsTab: prüfen ob `account_metadata.account_type === 'business'` UND `account_name === '@captiongenie_socialmanager'` → Banner zeigen: „Bitte Instagram neu verbinden für die offizielle Anbindung"
-- Nach echtem OAuth wird das Banner automatisch ausgeblendet
+#### 2. `account_type`-Bug im Callback fixen
+**Datei:** `supabase/functions/oauth-callback/index.ts` (Zeile ~617)
 
-### Reihenfolge der Umsetzung (Dependencies)
+Meta Graph API v24 akzeptiert `account_type` nicht mehr → Profil-Fetch crasht → Verbindung wird nie gespeichert → UI zeigt nichts an.
 
-```text
-1. Edge Function: instagram-oauth-start  ──┐
-2. oauth-callback erweitern (IG-Branch)   ─┼─→ Backend ready
-3. Frontend-Button umbauen                 │
-4. UI: Profil-Card mit Bild/Followers      ├─→ Frontend ready
-5. ?lang=en Toggle                         │
-6. Migration-Banner für Alt-Verbindungen   ┘
-7. Reviewer-Drehbuch + Submission-Text     ─→ Du nimmst Screencast auf
+```ts
+// Vorher (crasht):
+?fields=id,username,profile_picture_url,account_type,media_count,followers_count
+
+// Nachher:
+?fields=id,username,profile_picture_url,media_count,followers_count
 ```
 
-### Was du nach dem Code-Deploy brauchst
+`account_type` setzen wir hartcodiert auf `'BUSINESS'` in den Metadaten (alle IG-Accounts via FB Pages sind per Definition Business/Creator).
 
-Ich liefere dir nach Implementierung:
-- **Screencast-Drehbuch** (English, ~75 Sek, exakte Klicks + Texteinblendungen)
-- **Submission-Text auf Englisch** für Meta App Dashboard inkl. Server-to-Server-Hinweis
-- **Test-Account-Info** für den Reviewer (bestehender `meta-reviewer@useadtool.ai` reicht, muss aber selbst eine IG-Verbindung machen können)
+#### 3. Echte Fehlermeldung ans Frontend
+**Datei:** `supabase/functions/oauth-callback/index.ts` (Zeile ~222)
+
+Damit du beim nächsten Fehler sofort die Ursache siehst statt „OAuth connection failed":
+```ts
+&message=${encodeURIComponent(errorMessage)}
+```
+
+### Was du danach erlebst (genau wie bei Facebook)
+
+1. Klick auf „Disconnect Instagram" → Permissions werden bei Meta widerrufen + DB-Row gelöscht
+2. Klick auf „Connect Instagram" → **Voller Permission-Dialog** mit allen 5 Scopes erscheint (perfekt für Screencast)
+3. „Allow" → Redirect zurück
+4. Card zeigt: Profilbild, `@username`, Follower-Count, „Connected" ✅
+
+Genauso wie beim Facebook-Reconnect.
+
+### Bonus für Meta App Review
+
+Mit diesem Fix kannst du im Screencast **live demonstrieren**:
+- „Hier disconnecte ich" → Permissions werden bei Meta gelöscht
+- „Hier connecte ich neu" → Voller Dialog erscheint reproduzierbar
+- Reviewer sieht: User hat **echte Kontrolle** über die App-Permissions (Meta-Policy-Anforderung)
 
 ### Risiko & Aufwand
-- **Risiko: mittel.** Echter OAuth-Flow ersetzt einen funktionierenden Hack — bestehende User müssen einmalig neu verbinden. Bestehende Veröffentlichungen über `IG_PAGE_ACCESS_TOKEN` (z.B. `instagram-publish` Edge Function) bleiben unberührt.
-- **Aufwand:** ~25 Min Coding (1 neue Edge Function, 1 Edge Function erweitern, 2 Frontend-Dateien). Du brauchst danach ~10 Min für Screencast.
-- **Keine Meta-App-Settings-Änderung nötig** — Redirect-URI `…/oauth-callback` ist bereits in deiner Meta-App registriert (Facebook nutzt sie schon).
+
+- **Risiko: minimal.** Ein zusätzlicher API-Call vor dem DB-Delete + 2 Field-String-Korrekturen. Falls Meta-Revoke fehlschlägt, läuft Disconnect trotzdem durch (graceful fallback).
+- **Aufwand:** ~5 Min Code, 3 Dateien (`oauth-disconnect`/Disconnect-Handler, `oauth-callback`).
+
+### Nach dem Deploy
+
+Direkt testbar: Disconnecten → Reconnecten → voller Dialog. Falls dein aktueller Token (vom kaputten Versuch) noch existiert: einmalig in deinen [Facebook App-Settings](https://www.facebook.com/settings?tab=applications) entfernen, danach läuft alles automatisch.
 
