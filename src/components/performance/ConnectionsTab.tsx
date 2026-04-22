@@ -101,8 +101,14 @@ export const ConnectionsTab = () => {
               });
               await fetchConnections();
               
-              // For Facebook: Show page selection dialog instead of immediate sync
+              // For Facebook AND Instagram: Show page selection dialog instead of immediate sync.
+              // Instagram now uses the same staged flow as Facebook — the IG Business
+              // account is resolved from the chosen Facebook Page.
               if (connected === 'facebook') {
+                setPageSelectMode('facebook');
+                setShowPageSelectDialog(true);
+              } else if (connected === 'instagram') {
+                setPageSelectMode('instagram');
                 setShowPageSelectDialog(true);
               } else {
                 await handleSync(newConnection.id, connected);
