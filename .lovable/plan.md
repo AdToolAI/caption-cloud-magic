@@ -1,72 +1,108 @@
 
+## Instagram-Page-Select sauber reparieren
 
-## Auto-Select bei nur einer passenden Seite — damit der Connect-Flow im Video durchgängig funktioniert
+### Aktuell bestätigtes Problem
+Der Instagram-OAuth-Callback legt die Verbindung nur als `instagram_pending` an, und danach findet die App keine auswählbare Seite für die Finalisierung.
 
-### Ziel
-Nach erfolgreichem Meta-OAuth soll Instagram **ohne manuellen Page-Select-Schritt** automatisch verbunden werden, wenn der Account nur **eine einzige passende Facebook-Seite mit verknüpftem Instagram-Business** hat. Damit ist der Flow visuell **identisch zum Facebook-Flow** im Video:
+Aus dem aktuellen Stand ist klar:
+- die Instagram-Connection wird angelegt
+- sie bleibt auf `selection_required: true`
+- der Auto-Resolve findet `0` IG-fähige Seiten
+- der Dialog zeigt denselben Fehlertext sowohl bei
+  - fehlendem Page-Zugriff als auch bei
+  - fehlender Instagram-Verknüpfung
+
+Damit ist die Fehlermeldung momentan zu unscharf, und die Backend-Logik ist zu strikt.
+
+### Wahrscheinliche Ursache im Code
+Die aktuelle Implementierung prüft nur auf `instagram_business_account` und behandelt `0 Seiten`, `0 IG-Verknüpfungen` und „Meta hat die Page-Rechte nicht wirklich geliefert“ praktisch gleich. Dadurch landet der Nutzer immer wieder in derselben Sackgasse, obwohl er im Meta-Dialog Seiten angeklickt hat.
+
+## Was umgesetzt wird
+
+### 1. Page-Discovery robuster machen
+**Dateien:**
+- `supabase/functions/facebook-list-pages/index.ts`
+- `supabase/functions/oauth-callback/index.ts`
+
+**Änderung:**
+- Beim Laden der Pages nicht nur `instagram_business_account`, sondern auch alternative Meta-Link-Felder berücksichtigen, falls Meta die Verknüpfung anders zurückliefert.
+- Zusätzlich unterscheiden zwischen:
+  - `no_pages_access` → `/me/accounts` liefert gar keine Seiten
+  - `pages_found_but_no_instagram_link` → Seiten da, aber keine IG-Verknüpfung
+  - `single_instagram_page` → Auto-Select möglich
+  - `multiple_instagram_pages` → Dialog anzeigen
+
+### 2. Granted Permissions explizit prüfen
+**Dateien:**
+- `supabase/functions/oauth-callback/index.ts`
+- `supabase/functions/facebook-list-pages/index.ts`
+
+**Änderung:**
+- Nach dem Meta-Login `/me/permissions` auswerten
+- fehlende Scopes wie `pages_show_list`, `pages_read_engagement`, `instagram_basic` klar erkennen
+- die Information in `account_metadata` hinterlegen, damit die UI weiß, ob wirklich ein Link-Problem oder ein Berechtigungsproblem vorliegt
+
+### 3. Re-Consent zuverlässig erzwingen, wenn Page-Rechte fehlen
+**Datei:**
+- `src/components/performance/ConnectionsTab.tsx`
+
+**Änderung:**
+- Wenn die letzte Instagram-Verbindung fehlende Page-Scopes zeigt, den nächsten Connect-Versuch mit `auth_type=rerequest` starten
+- damit Meta den Berechtigungsdialog erneut vollständig zeigt, statt frühere Ablehnungen still weiterzuverwenden
+
+### 4. Dialog-UX korrigieren
+**Datei:**
+- `src/components/performance/FacebookPageSelectDialog.tsx`
+
+**Änderung:**
+- nicht mehr pauschal „Keine Facebook-Seite mit verknüpftem Instagram Business-Konto gefunden“ anzeigen
+- stattdessen drei getrennte Hinweise:
+  1. **Keine Seitenfreigabe erhalten**
+  2. **Seiten gefunden, aber kein verknüpftes Instagram-Profil**
+  3. **Seiten gefunden** → Liste anzeigen
+- optionaler CTA: „Instagram erneut verbinden“
+
+### 5. Finalisierung für Instagram-Select absichern
+**Datei:**
+- `supabase/functions/facebook-select-page/index.ts`
+
+**Änderung:**
+- dieselbe erweiterte IG-Link-Erkennung wie in der Listing-/Callback-Logik verwenden
+- damit eine Seite, die in der Liste als gültig erscheint, auch wirklich finalisiert werden kann
+
+## Erwartetes Ergebnis
+Nach dem Fix gibt es keinen irreführenden Sammelfehler mehr:
 
 ```text
-Klick „Connect Instagram"
-→ Meta-Continue
+Meta-Login
 → Rückkehr in die App
-→ Verbindung steht (ohne Zwischendialog)
+→ entweder:
+   A) Auto-Connect bei genau 1 gültiger Seite
+   B) Page-Select mit echten auswählbaren Seiten
+   C) klarer Hinweis: Rechte fehlen / IG nicht verknüpft
 ```
 
-### Was geändert wird
+## Betroffene Dateien
+- `supabase/functions/oauth-callback/index.ts`
+- `supabase/functions/facebook-list-pages/index.ts`
+- `supabase/functions/facebook-select-page/index.ts`
+- `src/components/performance/FacebookPageSelectDialog.tsx`
+- `src/components/performance/ConnectionsTab.tsx`
 
-#### 1. Auto-Resolve direkt nach OAuth-Callback
-**Datei:** `supabase/functions/oauth-callback/index.ts`
+## Technische Details
+- Kein Datenbank-Schema-Change nötig
+- Bestehende `social_connections`-Zeilen bleiben nutzbar
+- Die Reparatur ist hauptsächlich:
+  - bessere Meta-Antwort-Auswertung
+  - bessere Fehlerklassifizierung
+  - gezielter Re-Consent statt blindem Retry
 
-- Für `provider=instagram` nach Token-Exchange:
-  - Direkt `/me/accounts?fields=id,name,access_token,instagram_business_account` aufrufen
-  - Pages filtern auf solche **mit** `instagram_business_account.id`
-- Drei Fälle:
-  - **Genau 1 IG-fähige Page** → automatisch `facebook-select-page`-Logik inline ausführen, Verbindung sofort finalisieren, Redirect mit `connected=instagram&status=success&auto_selected=true`
-  - **Mehrere IG-fähige Pages** → wie bisher pending + `selection_required=true`, Page-Select-Dialog erscheint
-  - **0 IG-fähige Pages** → klare Fehlermeldung „Keine Facebook-Seite mit verknüpftem Instagram-Business gefunden"
-
-#### 2. UI zeigt sauberen Erfolgs-Toast bei Auto-Select
-**Datei:** `src/components/performance/ConnectionsTab.tsx`
-
-- Wenn `auto_selected=true` in der Callback-URL:
-  - Kein Page-Select-Dialog öffnen
-  - Direkt Erfolgs-Toast: „Instagram verbunden: @username"
-  - `social-health` und Connection-Liste invalidieren
-
-#### 3. Page-Select-Dialog bleibt als Fallback
-- Für Accounts mit mehreren Seiten weiterhin verfügbar (kein Verlust an Funktionalität)
-- Logik aus `facebook-select-page` wird im Callback **wiederverwendet** (gleiche IG-Lookup- und Profile-Fetch-Sequenz), nicht dupliziert — Helper extrahieren
-
-### Erwartetes Ergebnis im Video
-```text
-Klick „Connect Instagram"
-→ Meta-Login/Continue
-→ Rückkehr in die App
-→ Toast: „Instagram verbunden: @samuelxyz"
-→ Verbindung erscheint sofort grün/connected
-```
-
-Visuell **identisch zum Facebook-Flow**, kein zusätzlicher Klick nötig.
-
-### Betroffene Dateien
-- `supabase/functions/oauth-callback/index.ts` — Auto-Resolve-Logik für Instagram bei genau 1 passender Page
-- `supabase/functions/facebook-select-page/index.ts` — IG-Resolve-Logik in einen wiederverwendbaren Helper extrahieren (oder inline duplizieren, falls einfacher)
-- `src/components/performance/ConnectionsTab.tsx` — Handling für `auto_selected=true` Query-Param
-
-### Nicht betroffen
-- Manueller Disconnect/Revoke bleibt
-- `FacebookPageSelectDialog` bleibt als Fallback für Multi-Page-Accounts
-- Permission-Anforderungen bleiben identisch (alle 6 Toggles)
-
-### Voraussetzung
-Im Meta-Dialog müssen weiterhin **alle 6 Toggles** aktiv sein (`pages_show_list`, `pages_read_engagement`, `pages_manage_metadata`, `pages_manage_posts`, `instagram_basic`, `instagram_content_publish`). Ohne `pages_show_list` liefert `/me/accounts` keine Pages und der Auto-Select kann nicht greifen — dann zeigen wir den klaren Fehler aus Punkt 1, Fall 3.
-
-### Risiko
-Gering. Wir nutzen die bereits funktionierende `facebook-select-page`-Logik, führen sie nur einen Schritt früher aus, wenn die Auswahl eindeutig ist.
-
-### Test
-1. Instagram trennen
-2. „Connect Instagram" klicken, im Meta-Dialog alle Toggles AN, deine Seite mit verknüpftem IG auswählen
-3. Erwartung: Rückkehr in die App → sofort Erfolgs-Toast, **kein** Page-Select-Dialog
-4. Verbindung ist aktiv, Sync und echte Daten funktionieren
-
+## Test nach Umsetzung
+1. Bestehende Instagram-Connection trennen
+2. Instagram neu verbinden
+3. Im Meta-Dialog alle nötigen Toggles aktivieren
+4. Erwartung:
+   - bei genau 1 gültiger Seite: sofort verbunden
+   - bei mehreren: korrekte Seitenauswahl
+   - bei fehlenden Rechten: klarer Re-Consent-Hinweis statt falscher „keine Seite gefunden“-Meldung
+5. Danach Sync starten und prüfen, dass echte IG-Daten geladen werden
