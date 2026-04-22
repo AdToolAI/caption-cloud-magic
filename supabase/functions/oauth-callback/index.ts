@@ -133,12 +133,23 @@ serve(async (req) => {
             igAutoSelected = true;
             console.log('[oauth-callback] IG auto-selected single page:', autoResolved.id);
           } else {
-            // Multiple IG-capable pages → fall back to staged Page Select flow.
+            // Multiple/zero IG-capable pages → fall back to staged Page Select flow.
             accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
           }
         } catch (autoErr) {
           console.warn('[oauth-callback] IG auto-resolve failed, falling back to pending:', autoErr);
           accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
+        }
+        // Always attach permission diagnostics so the UI can decide whether
+        // to force a re-consent on the next attempt.
+        try {
+          const perms = await fetchMetaPermissions(tokenData.access_token);
+          (accountInfo as any).granted_scopes = perms.granted;
+          (accountInfo as any).declined_scopes = perms.declined;
+          const required = ['pages_show_list', 'instagram_basic'];
+          (accountInfo as any).missing_page_scopes = required.filter((s) => !perms.granted.includes(s));
+        } catch (e) {
+          console.warn('[oauth-callback] permission probe failed:', e);
         }
         break;
       case 'facebook':
