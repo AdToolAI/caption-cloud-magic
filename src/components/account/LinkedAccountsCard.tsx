@@ -83,6 +83,30 @@ export const LinkedAccountsCard = () => {
     try {
       const credential = getCredential(platform);
       if (!credential?.connection_id) return;
+
+      // For Instagram: call the revoke edge function so Meta actually drops
+      // the consent (otherwise the next OAuth shows "Continue as ..." instead
+      // of the full permission dialog).
+      if (platform === 'instagram') {
+        const { data, error } = await supabase.functions.invoke('instagram-oauth-revoke', {
+          body: { connectionId: credential.connection_id },
+        });
+        if (error) throw error;
+
+        setCredentials((prev) =>
+          prev.map((c) =>
+            c.platform === platform ? { ...c, is_connected: false } : c
+          )
+        );
+
+        if (data?.revoked) {
+          toast.success(`${PLATFORMS[platform].name} ${t("accountLinked.disconnected")} — Meta permissions revoked. Next connect will show the full review flow.`);
+        } else {
+          toast.success(`${PLATFORMS[platform].name} ${t("accountLinked.disconnected")}${data?.revokeError ? ` (Meta revoke skipped: ${data.revokeError})` : ''}`);
+        }
+        return;
+      }
+
       const { error } = await supabase
         .from("social_connections")
         .delete()
