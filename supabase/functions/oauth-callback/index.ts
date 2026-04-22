@@ -392,6 +392,68 @@ async function getMetaUserInfoForPending(accessToken: string, provider: string) 
   };
 }
 
+/**
+ * Auto-resolve the Instagram Business account when the user manages exactly
+ * one Facebook Page that is linked to an Instagram Business account.
+ *
+ * Returns an accountInfo-shaped object ready to upsert into social_connections
+ * (with all the page/IG metadata already filled in), or null when auto-select
+ * is not appropriate (0 or 2+ IG-capable pages, or any API failure that
+ * should fall back to the manual Page Select Dialog).
+ *
+ * Mirrors the logic in supabase/functions/facebook-select-page/index.ts.
+ */
+async function tryAutoResolveInstagram(userAccessToken: string): Promise<any | null> {
+  // 1. List pages with their linked IG business account in one call.
+  const pagesRes = await fetch(
+    `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,category,picture{url},access_token,instagram_business_account&access_token=${userAccessToken}`
+  );
+  if (!pagesRes.ok) {
+    const err = await pagesRes.text();
+    console.warn('[tryAutoResolveInstagram] /me/accounts failed:', err);
+    return null;
+  }
+  const pagesJson = await pagesRes.json();
+  const pages: any[] = pagesJson?.data || [];
+  const igPages = pages.filter((p) => p?.instagram_business_account?.id);
+
+  if (igPages.length !== 1) {
+    console.log('[tryAutoResolveInstagram] IG-capable page count:', igPages.length);
+    return null;
+  }
+
+  const page = igPages[0];
+  const igUserId = page.instagram_business_account.id;
+  const pageAccessToken = page.access_token;
+
+  // 2. Fetch IG profile (proves instagram_basic is consumed for App Review).
+  const profileRes = await fetch(
+    `https://graph.facebook.com/v24.0/${igUserId}?fields=id,username,profile_picture_url,media_count,followers_count&access_token=${pageAccessToken}`
+  );
+  if (!profileRes.ok) {
+    const err = await profileRes.text();
+    console.warn('[tryAutoResolveInstagram] IG profile fetch failed:', err);
+    return null;
+  }
+  const profile = await profileRes.json();
+
+  // 3. Encrypt the page access token (used by publish/sync functions).
+  const encryptedPageToken = await encryptToken(pageAccessToken);
+
+  return {
+    id: igUserId,
+    name: profile.username ? `@${profile.username}` : igUserId,
+    account_type: 'BUSINESS',
+    profile_picture_url: profile.profile_picture_url || null,
+    followers_count: profile.followers_count ?? null,
+    media_count: profile.media_count ?? null,
+    page_id: page.id,
+    page_access_token_encrypted: encryptedPageToken,
+    // Explicitly NOT setting selection_required so the metadata block in the
+    // upsert does not flag this connection as pending.
+  };
+}
+
 async function exchangeTikTokToken(code: string) {
   const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY');
   const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET');
