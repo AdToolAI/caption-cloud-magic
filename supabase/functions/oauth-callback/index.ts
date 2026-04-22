@@ -110,9 +110,8 @@ serve(async (req) => {
     switch (provider) {
       case 'instagram':
         tokenData = await exchangeMetaToken(code);
-        // Instagram now uses real Facebook OAuth → fetch IG Business account, profile pic, followers
-        accountInfo = await getInstagramBusinessAccountInfo(tokenData.access_token);
-        // Upgrade to long-lived token (60 days) for IG Business
+        // Upgrade to long-lived token (60 days) BEFORE storing so the user
+        // has time to pick a page without the short-lived token expiring.
         try {
           const longLived = await exchangeForLongLivedToken(tokenData.access_token);
           tokenData.access_token = longLived.access_token;
@@ -120,6 +119,11 @@ serve(async (req) => {
         } catch (e) {
           console.warn('[oauth-callback] Long-lived token exchange failed, keeping short-lived:', e);
         }
+        // Mirror the Facebook flow: store ONLY the Meta user grant in a
+        // pending state. The actual IG Business account is selected in the UI
+        // via the Page Select Dialog (instagram mode), which then calls
+        // facebook-select-page to finalize the connection.
+        accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
         break;
       case 'facebook':
         tokenData = await exchangeMetaToken(code);
