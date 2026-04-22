@@ -1,70 +1,65 @@
 
 
-## Instagram-Disconnect: Permissions bei Meta widerrufen → voller Dialog beim Reconnect
+## Vollen Permission-Dialog erzwingen — `auth_type=rerequest` + Browser-Cache umgehen
 
-### Warum Facebook „funktioniert" und Instagram nicht
+### Was du gerade siehst (und warum)
 
-Du hast den entscheidenden Unterschied richtig erkannt: Beim Facebook-Reconnect siehst du den vollen Permission-Dialog. Das liegt daran, dass Facebook-Verbindungen über `pages/me/permissions` sauber widerrufen werden (oder du es manuell in deinen FB-Settings entfernt hast). Bei Instagram löscht unser „Disconnect" aktuell **nur die DB-Row** — Meta merkt nichts davon und zeigt beim nächsten Connect „Continue as Samuel" statt des vollen Dialogs.
-
-### Was wir ändern (3 Punkte)
-
-#### 1. Instagram-Disconnect ruft Meta DELETE-Endpoint auf
-**Datei:** `supabase/functions/oauth-disconnect/index.ts` (oder dort wo Disconnect liegt — falls die Logik in `ConnectionsTab.tsx` direkt sitzt, neue Edge Function `instagram-oauth-revoke`)
-
-Vor dem Löschen der `social_connections`-Row:
-```ts
-DELETE https://graph.facebook.com/v24.0/{user-id}/permissions?access_token={user_token}
+```
+┌────────────────────────────────────────────────┐
+│ You previously logged into AdTool AI           │
+│ Integration with Facebook.                      │
+│ Would you like to continue?                     │
+│  [ Continue as Samuel ]                         │
+│  [ Cancel ]                                     │
+└────────────────────────────────────────────────┘
 ```
 
-Das widerruft **alle App-Permissions** für diesen User bei Meta. Beim nächsten Connect erscheint zwingend der volle Permission-Dialog — exakt wie beim Facebook-Flow, ohne dass irgendwelche speziellen OAuth-Parameter nötig sind.
+Das ist Metas **„Re-Login Screen"**, nicht der Permission-Dialog. Er erscheint, weil:
 
-Falls der Token bereits abgelaufen ist (oder Meta den Call verweigert): Wir loggen die Warnung, löschen aber trotzdem die DB-Row. So bleibt Disconnect immer funktionsfähig.
+1. Du hast vorher **nicht auf Disconnect geklickt** → unsere Revoke-Function lief nie (Logs sind leer)
+2. Selbst wenn du disconnected hättest: Meta zeigt diesen Screen für jede App, die der User schon mal autorisiert hat, **es sei denn** wir setzen `auth_type=rerequest` → dann zeigt Meta zwingend die volle Scope-Liste
 
-#### 2. `account_type`-Bug im Callback fixen
-**Datei:** `supabase/functions/oauth-callback/index.ts` (Zeile ~617)
+### Fix: 2 OAuth-Parameter, die Meta zum vollen Dialog zwingen
 
-Meta Graph API v24 akzeptiert `account_type` nicht mehr → Profil-Fetch crasht → Verbindung wird nie gespeichert → UI zeigt nichts an.
+**Datei:** `supabase/functions/instagram-oauth-start/index.ts` (vor Zeile 110, beim Bauen der `authUrl`)
 
 ```ts
-// Vorher (crasht):
-?fields=id,username,profile_picture_url,account_type,media_count,followers_count
-
-// Nachher:
-?fields=id,username,profile_picture_url,media_count,followers_count
+authUrl.searchParams.set('auth_type', 'rerequest');
+authUrl.searchParams.set('display', 'page');
 ```
 
-`account_type` setzen wir hartcodiert auf `'BUSINESS'` in den Metadaten (alle IG-Accounts via FB Pages sind per Definition Business/Creator).
+- **`auth_type=rerequest`** → Meta-offizieller Parameter, der **immer** den Permission-Dialog mit allen 5 Scopes zeigt (auch wenn der User schon zugestimmt hat). Genau dafür gemacht: Apps, die im Review-Prozess sind, nutzen diesen Parameter
+- **`display=page`** → erzwingt die volle Permission-Seite statt des kompakten „Continue as"-Popups
 
-#### 3. Echte Fehlermeldung ans Frontend
-**Datei:** `supabase/functions/oauth-callback/index.ts` (Zeile ~222)
+### Was du danach siehst (perfekt für Screencast)
 
-Damit du beim nächsten Fehler sofort die Ursache siehst statt „OAuth connection failed":
-```ts
-&message=${encodeURIComponent(errorMessage)}
+```
+┌──────────────────────────────────────────────────────┐
+│  AdTool AI Integration is requesting access to:      │
+│                                                      │
+│  ✓ View your Facebook Pages                          │
+│  ✓ View your Instagram account profile               │
+│  ✓ Publish content on your behalf                    │
+│  ✓ Read engagement on your Pages                     │
+│  ✓ Manage your business assets                       │
+│                                                      │
+│              [ Allow ]    [ Cancel ]                 │
+└──────────────────────────────────────────────────────┘
 ```
 
-### Was du danach erlebst (genau wie bei Facebook)
+Genau dieser Screen ist das, was Meta im Review-Video sehen muss.
 
-1. Klick auf „Disconnect Instagram" → Permissions werden bei Meta widerrufen + DB-Row gelöscht
-2. Klick auf „Connect Instagram" → **Voller Permission-Dialog** mit allen 5 Scopes erscheint (perfekt für Screencast)
-3. „Allow" → Redirect zurück
-4. Card zeigt: Profilbild, `@username`, Follower-Count, „Connected" ✅
+### Workflow für die Screencast-Aufnahme
 
-Genauso wie beim Facebook-Reconnect.
-
-### Bonus für Meta App Review
-
-Mit diesem Fix kannst du im Screencast **live demonstrieren**:
-- „Hier disconnecte ich" → Permissions werden bei Meta gelöscht
-- „Hier connecte ich neu" → Voller Dialog erscheint reproduzierbar
-- Reviewer sieht: User hat **echte Kontrolle** über die App-Permissions (Meta-Policy-Anforderung)
+1. **Im Cloud-Browser:** auf „Disconnect Instagram" klicken (jetzt funktioniert die Revoke-Function sauber)
+2. **Optional zur Sicherheit:** in den [Facebook App-Settings](https://www.facebook.com/settings?tab=applications) die App-Verbindung manuell entfernen
+3. Aufnahme starten → „Connect Instagram" → **voller Permission-Dialog erscheint**
+4. „Allow" → Card zeigt Profilbild + Username + Followers ✅
 
 ### Risiko & Aufwand
-
-- **Risiko: minimal.** Ein zusätzlicher API-Call vor dem DB-Delete + 2 Field-String-Korrekturen. Falls Meta-Revoke fehlschlägt, läuft Disconnect trotzdem durch (graceful fallback).
-- **Aufwand:** ~5 Min Code, 3 Dateien (`oauth-disconnect`/Disconnect-Handler, `oauth-callback`).
+- **Risiko: keines.** 2 zusätzliche URL-Parameter im OAuth-Start. Ändert nichts am Token-Tausch oder der DB.
+- **Aufwand:** ~30 Sekunden Code, 1 Datei, 2 Zeilen.
 
 ### Nach dem Deploy
-
-Direkt testbar: Disconnecten → Reconnecten → voller Dialog. Falls dein aktueller Token (vom kaputten Versuch) noch existiert: einmalig in deinen [Facebook App-Settings](https://www.facebook.com/settings?tab=applications) entfernen, danach läuft alles automatisch.
+Direkt testbar: Disconnect → Connect → voller Dialog garantiert.
 
