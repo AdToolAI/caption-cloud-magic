@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { User, Settings, CreditCard, HelpCircle, LogOut, Coins, Tag, Share2 } from "lucide-react";
+import { User, Settings, CreditCard, HelpCircle, LogOut, Coins, Tag, Share2, Link2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,6 +77,12 @@ export function UserMenu() {
           <Link to="/billing" className="flex items-center gap-2 cursor-pointer">
             <CreditCard className="h-4 w-4" />
             <span>{t("header.billing")}</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/integrations" className="flex items-center gap-2 cursor-pointer">
+            <Link2 className="h-4 w-4" />
+            <span>{t("nav.integrations")}</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
