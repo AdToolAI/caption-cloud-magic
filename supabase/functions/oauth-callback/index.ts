@@ -106,6 +106,10 @@ serve(async (req) => {
 
     let tokenData;
     let accountInfo;
+    // Tracks whether we successfully auto-resolved a single IG-capable Page
+    // during the Instagram OAuth flow. When true, we redirect with
+    // auto_selected=true so the UI skips the Page Select Dialog.
+    let igAutoSelected = false;
 
     switch (provider) {
       case 'instagram':
@@ -119,11 +123,23 @@ serve(async (req) => {
         } catch (e) {
           console.warn('[oauth-callback] Long-lived token exchange failed, keeping short-lived:', e);
         }
-        // Mirror the Facebook flow: store ONLY the Meta user grant in a
-        // pending state. The actual IG Business account is selected in the UI
-        // via the Page Select Dialog (instagram mode), which then calls
-        // facebook-select-page to finalize the connection.
-        accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
+        // Try to auto-resolve when the user manages exactly one Facebook Page
+        // with a linked Instagram Business account. This makes the UX
+        // identical to the Facebook flow (no extra Page Select Dialog).
+        try {
+          const autoResolved = await tryAutoResolveInstagram(tokenData.access_token);
+          if (autoResolved) {
+            accountInfo = autoResolved;
+            igAutoSelected = true;
+            console.log('[oauth-callback] IG auto-selected single page:', autoResolved.id);
+          } else {
+            // Multiple IG-capable pages → fall back to staged Page Select flow.
+            accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
+          }
+        } catch (autoErr) {
+          console.warn('[oauth-callback] IG auto-resolve failed, falling back to pending:', autoErr);
+          accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
+        }
         break;
       case 'facebook':
         tokenData = await exchangeMetaToken(code);
