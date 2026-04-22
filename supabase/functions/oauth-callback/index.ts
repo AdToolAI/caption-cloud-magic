@@ -106,6 +106,10 @@ serve(async (req) => {
 
     let tokenData;
     let accountInfo;
+    // Tracks whether we successfully auto-resolved a single IG-capable Page
+    // during the Instagram OAuth flow. When true, we redirect with
+    // auto_selected=true so the UI skips the Page Select Dialog.
+    let igAutoSelected = false;
 
     switch (provider) {
       case 'instagram':
@@ -119,11 +123,23 @@ serve(async (req) => {
         } catch (e) {
           console.warn('[oauth-callback] Long-lived token exchange failed, keeping short-lived:', e);
         }
-        // Mirror the Facebook flow: store ONLY the Meta user grant in a
-        // pending state. The actual IG Business account is selected in the UI
-        // via the Page Select Dialog (instagram mode), which then calls
-        // facebook-select-page to finalize the connection.
-        accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
+        // Try to auto-resolve when the user manages exactly one Facebook Page
+        // with a linked Instagram Business account. This makes the UX
+        // identical to the Facebook flow (no extra Page Select Dialog).
+        try {
+          const autoResolved = await tryAutoResolveInstagram(tokenData.access_token);
+          if (autoResolved) {
+            accountInfo = autoResolved;
+            igAutoSelected = true;
+            console.log('[oauth-callback] IG auto-selected single page:', autoResolved.id);
+          } else {
+            // Multiple IG-capable pages → fall back to staged Page Select flow.
+            accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
+          }
+        } catch (autoErr) {
+          console.warn('[oauth-callback] IG auto-resolve failed, falling back to pending:', autoErr);
+          accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
+        }
         break;
       case 'facebook':
         tokenData = await exchangeMetaToken(code);
@@ -219,7 +235,8 @@ serve(async (req) => {
     // Use dynamic redirect URL from stored state, fallback to APP_URL
     const redirectUrl = storedState.redirect_url || Deno.env.get('APP_URL') || 'https://useadtool.ai';
     const baseUrl = redirectUrl.replace(/\/integrations.*$/, '').replace(/\/performance.*$/, '');
-    return Response.redirect(`${baseUrl}/integrations?provider=${provider}&status=success&tab=connections`, 302);
+    const autoFlag = igAutoSelected ? '&auto_selected=true' : '';
+    return Response.redirect(`${baseUrl}/integrations?provider=${provider}&status=success&tab=connections${autoFlag}`, 302);
 
   } catch (error) {
     console.error('OAuth callback error:', error);
@@ -372,6 +389,68 @@ async function getMetaUserInfoForPending(accessToken: string, provider: string) 
       : fbUserData.name,
     account_type: provider === 'instagram' ? 'instagram_pending' : 'facebook_user',
     selection_required: true,
+  };
+}
+
+/**
+ * Auto-resolve the Instagram Business account when the user manages exactly
+ * one Facebook Page that is linked to an Instagram Business account.
+ *
+ * Returns an accountInfo-shaped object ready to upsert into social_connections
+ * (with all the page/IG metadata already filled in), or null when auto-select
+ * is not appropriate (0 or 2+ IG-capable pages, or any API failure that
+ * should fall back to the manual Page Select Dialog).
+ *
+ * Mirrors the logic in supabase/functions/facebook-select-page/index.ts.
+ */
+async function tryAutoResolveInstagram(userAccessToken: string): Promise<any | null> {
+  // 1. List pages with their linked IG business account in one call.
+  const pagesRes = await fetch(
+    `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,category,picture{url},access_token,instagram_business_account&access_token=${userAccessToken}`
+  );
+  if (!pagesRes.ok) {
+    const err = await pagesRes.text();
+    console.warn('[tryAutoResolveInstagram] /me/accounts failed:', err);
+    return null;
+  }
+  const pagesJson = await pagesRes.json();
+  const pages: any[] = pagesJson?.data || [];
+  const igPages = pages.filter((p) => p?.instagram_business_account?.id);
+
+  if (igPages.length !== 1) {
+    console.log('[tryAutoResolveInstagram] IG-capable page count:', igPages.length);
+    return null;
+  }
+
+  const page = igPages[0];
+  const igUserId = page.instagram_business_account.id;
+  const pageAccessToken = page.access_token;
+
+  // 2. Fetch IG profile (proves instagram_basic is consumed for App Review).
+  const profileRes = await fetch(
+    `https://graph.facebook.com/v24.0/${igUserId}?fields=id,username,profile_picture_url,media_count,followers_count&access_token=${pageAccessToken}`
+  );
+  if (!profileRes.ok) {
+    const err = await profileRes.text();
+    console.warn('[tryAutoResolveInstagram] IG profile fetch failed:', err);
+    return null;
+  }
+  const profile = await profileRes.json();
+
+  // 3. Encrypt the page access token (used by publish/sync functions).
+  const encryptedPageToken = await encryptToken(pageAccessToken);
+
+  return {
+    id: igUserId,
+    name: profile.username ? `@${profile.username}` : igUserId,
+    account_type: 'BUSINESS',
+    profile_picture_url: profile.profile_picture_url || null,
+    followers_count: profile.followers_count ?? null,
+    media_count: profile.media_count ?? null,
+    page_id: page.id,
+    page_access_token_encrypted: encryptedPageToken,
+    // Explicitly NOT setting selection_required so the metadata block in the
+    // upsert does not flag this connection as pending.
   };
 }
 

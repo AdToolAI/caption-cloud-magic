@@ -52,6 +52,7 @@ export const ConnectionsTab = () => {
       const connected = params.get('connected') || params.get('provider');
       const status = params.get('status');
       const error = params.get('error');
+      const autoSelected = params.get('auto_selected') === 'true';
 
       if (connected && status === 'error') {
         // OAuth callback returned an error
@@ -95,16 +96,22 @@ export const ConnectionsTab = () => {
             
             if (newConnection) {
               console.log(`✅ Connection verified, starting auto-sync...`);
+              const successDescription = connected === 'instagram' && autoSelected && newConnection.account_name
+                ? `Instagram verbunden: ${newConnection.account_name}`
+                : `Successfully connected to ${connected}`;
               toast({
                 title: t('common.success'),
-                description: `Successfully connected to ${connected}`
+                description: successDescription,
               });
               await fetchConnections();
               
-              // For Facebook AND Instagram: Show page selection dialog instead of immediate sync.
-              // Instagram now uses the same staged flow as Facebook — the IG Business
-              // account is resolved from the chosen Facebook Page.
-              if (connected === 'facebook') {
+              // Auto-selected Instagram (single IG-capable page) → skip the
+              // Page Select Dialog entirely and behave like the Facebook flow
+              // when only one page is available.
+              if (connected === 'instagram' && autoSelected) {
+                await handleSync(newConnection.id, connected);
+              } else if (connected === 'facebook') {
+                // For Facebook AND Instagram (multi-page): show page selection dialog.
                 setPageSelectMode('facebook');
                 setShowPageSelectDialog(true);
               } else if (connected === 'instagram') {
