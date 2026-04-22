@@ -1073,6 +1073,11 @@ export const ConnectionsTab = () => {
         onOpenChange={setShowPageSelectDialog}
         onPageSelected={fetchConnections}
         mode={pageSelectMode}
+        onReconnect={() => {
+          // Force a fresh consent dialog so Meta does not silently reuse
+          // the previously declined page-scope decisions.
+          handleConnect(pageSelectMode, pageSelectMode === 'instagram' ? 'Instagram' : 'Facebook');
+        }}
       />
     </div>
   );
