@@ -1,4 +1,4 @@
-const TIKTOK_ENV = Deno.env.get('TIKTOK_ENV') || 'sandbox';
+const TIKTOK_ENV = Deno.env.get('TIKTOK_ENV') || 'production';
 const OAUTH_BASE = 'https://open.tiktokapis.com/v2/oauth';
 const API_BASE = 'https://open.tiktokapis.com/v2';
 
