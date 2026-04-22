@@ -7,13 +7,25 @@ const corsHeaders = {
 };
 
 /**
- * Revokes the user's Meta/Instagram permissions BEFORE we delete the local
- * social_connections row. Calling DELETE /{user-id}/permissions on the Graph
- * API tells Meta to forget the prior consent, so the next OAuth attempt
- * shows the FULL permission dialog again (instead of "Continue as ...").
+ * Performs a HARD RESET of the Meta app authorization:
  *
- * Failure of the revoke call is non-fatal — we still drop the DB row so the
- * user can always disconnect, even if their token already expired.
+ *   1. Tries to call DELETE /{meta-user-id}/permissions on the Graph API for
+ *      every Meta-related token we still have (instagram + facebook), so Meta
+ *      forgets the previous consent.
+ *   2. Deletes BOTH `instagram` and `facebook` rows from social_connections —
+ *      Meta treats them as one shared app grant, so a partial cleanup is what
+ *      keeps showing the "You previously logged into ..." short-circuit screen
+ *      on reconnect.
+ *
+ * Response shape (used by the frontend to decide whether to warn the user):
+ *   {
+ *     success: true,
+ *     revoked: boolean,            // ANY meta revoke succeeded
+ *     revokeError: string | null,
+ *     deletedProviders: string[],  // which DB rows were actually removed
+ *     hardResetComplete: boolean,  // revoke + DB cleanup both succeeded
+ *     metaUserResolved: boolean,
+ *   }
  */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -43,6 +55,8 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Optional: connectionId is no longer required — we always do a hard reset
+    // across all Meta providers. We still accept it for backwards compat / logs.
     let connectionId: string | null = null;
     try {
       const body = await req.json();
@@ -51,102 +65,137 @@ Deno.serve(async (req) => {
       // optional
     }
 
-    // Find the IG connection (by id or by provider) — token is stored in access_token_hash
-    const query = supabase
-      .from('social_connections')
-      .select('id, provider, access_token_hash, account_id, account_metadata')
-      .eq('user_id', user.id)
-      .eq('provider', 'instagram');
+    console.log('[instagram-oauth-revoke] HARD RESET requested for user', user.id, { connectionId });
 
-    const { data: connections, error: fetchErr } = connectionId
-      ? await query.eq('id', connectionId).limit(1)
-      : await query.limit(1);
+    // Pull EVERY Meta-related connection (ig + fb) for this user
+    const { data: metaConnections, error: fetchErr } = await supabase
+      .from('social_connections')
+      .select('id, provider, access_token_hash, account_id')
+      .eq('user_id', user.id)
+      .in('provider', ['instagram', 'facebook']);
 
     if (fetchErr) {
       console.error('[instagram-oauth-revoke] Lookup failed:', fetchErr);
       throw fetchErr;
     }
 
-    const connection = connections?.[0];
     let revoked = false;
     let revokeError: string | null = null;
     let metaUserResolved = false;
 
-    if (connection?.access_token_hash) {
+    // Try to revoke via Meta using whichever token still works
+    for (const connection of metaConnections ?? []) {
+      if (!connection.access_token_hash) continue;
       try {
         const userToken = await decryptToken(connection.access_token_hash);
-        console.log('[instagram-oauth-revoke] Token decrypted successfully, length:', userToken.length);
+        console.log(
+          '[instagram-oauth-revoke] Attempting revoke via',
+          connection.provider,
+          'token (len:', userToken.length, ')'
+        );
 
-        // Step 1: discover the Meta user id (the token owner) — required for the
-        // permissions endpoint. The IG business account id won't work here.
         const meRes = await fetch(
           `https://graph.facebook.com/v24.0/me?fields=id&access_token=${encodeURIComponent(userToken)}`
         );
 
-        if (meRes.ok) {
-          const me = await meRes.json();
-          const metaUserId = me?.id;
-          metaUserResolved = !!metaUserId;
-
-          if (metaUserId) {
-            console.log('[instagram-oauth-revoke] Resolved Meta user id:', metaUserId);
-
-            // Step 2: revoke ALL app permissions for this Meta user
-            const revokeRes = await fetch(
-              `https://graph.facebook.com/v24.0/${metaUserId}/permissions?access_token=${encodeURIComponent(userToken)}`,
-              { method: 'DELETE' }
-            );
-
-            const revokeBody = await revokeRes.text();
-
-            if (revokeRes.ok) {
-              revoked = true;
-              console.log('[instagram-oauth-revoke] ✅ Permissions revoked for Meta user', metaUserId, 'response:', revokeBody);
-            } else {
-              revokeError = `Revoke ${revokeRes.status}: ${revokeBody}`;
-              console.warn('[instagram-oauth-revoke] ❌ Revoke call failed:', revokeError);
-            }
-          } else {
-            revokeError = 'Could not resolve Meta user id from token';
-            console.warn('[instagram-oauth-revoke]', revokeError);
-          }
-        } else {
+        if (!meRes.ok) {
           const meBody = await meRes.text();
           revokeError = `/me ${meRes.status}: ${meBody}`;
-          console.warn('[instagram-oauth-revoke] /me call failed:', revokeError);
+          console.warn('[instagram-oauth-revoke] /me failed for', connection.provider, ':', revokeError);
+          continue;
+        }
+
+        const me = await meRes.json();
+        const metaUserId = me?.id;
+        if (!metaUserId) {
+          revokeError = 'Meta /me returned no id';
+          console.warn('[instagram-oauth-revoke]', revokeError);
+          continue;
+        }
+        metaUserResolved = true;
+        console.log('[instagram-oauth-revoke] Resolved Meta user id:', metaUserId, 'via', connection.provider);
+
+        const revokeRes = await fetch(
+          `https://graph.facebook.com/v24.0/${metaUserId}/permissions?access_token=${encodeURIComponent(userToken)}`,
+          { method: 'DELETE' }
+        );
+        const revokeBody = await revokeRes.text();
+
+        if (revokeRes.ok) {
+          revoked = true;
+          revokeError = null;
+          console.log(
+            '[instagram-oauth-revoke] ✅ Permissions revoked for Meta user',
+            metaUserId,
+            'via',
+            connection.provider,
+            'response:',
+            revokeBody
+          );
+          break; // one successful revoke is enough — Meta drops the whole app grant
+        } else {
+          revokeError = `Revoke ${revokeRes.status}: ${revokeBody}`;
+          console.warn(
+            '[instagram-oauth-revoke] ❌ Revoke call failed via',
+            connection.provider,
+            ':',
+            revokeError
+          );
         }
       } catch (decryptErr) {
-        revokeError = decryptErr instanceof Error ? decryptErr.message : 'decrypt failed';
-        console.warn('[instagram-oauth-revoke] Could not decrypt token (continuing with DB delete):', revokeError);
+        const msg = decryptErr instanceof Error ? decryptErr.message : 'decrypt failed';
+        revokeError = msg;
+        console.warn(
+          '[instagram-oauth-revoke] Could not decrypt/use token for',
+          connection.provider,
+          '(continuing):',
+          msg
+        );
       }
-    } else {
-      revokeError = 'No connection or access_token_hash found — skipping Meta revoke';
-      console.log('[instagram-oauth-revoke]', revokeError);
     }
 
-    // Always delete the local row, even if the Meta call failed (graceful fallback)
-    let connectionDeleted = false;
-    if (connection?.id) {
-      const { error: deleteErr } = await supabase
+    // Always delete BOTH instagram and facebook rows for this user.
+    // Meta sees them as a shared app grant; keeping fb around is what causes
+    // the "Continue as ..." short-circuit on Instagram reconnect.
+    const deletedProviders: string[] = [];
+    for (const provider of ['instagram', 'facebook'] as const) {
+      const { data: deleted, error: deleteErr } = await supabase
         .from('social_connections')
         .delete()
-        .eq('id', connection.id)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .eq('provider', provider)
+        .select('id');
 
       if (deleteErr) {
-        console.error('[instagram-oauth-revoke] DB delete failed:', deleteErr);
-        throw deleteErr;
+        console.error('[instagram-oauth-revoke] DB delete failed for', provider, ':', deleteErr);
+        // Don't throw — keep going so we delete what we can.
+        continue;
       }
-      connectionDeleted = true;
+      if (deleted && deleted.length > 0) {
+        deletedProviders.push(provider);
+      }
     }
+
+    const hardResetComplete = revoked && deletedProviders.length > 0;
+    console.log('[instagram-oauth-revoke] Hard reset summary:', {
+      user_id: user.id,
+      revoked,
+      revokeError,
+      deletedProviders,
+      hardResetComplete,
+      metaUserResolved,
+    });
 
     return new Response(
       JSON.stringify({
         success: true,
         revoked,
         revokeError,
-        connectionDeleted,
+        deletedProviders,
+        hardResetComplete,
         metaUserResolved,
+        // backwards-compat for older frontend code
+        connectionDeleted: deletedProviders.length > 0,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
