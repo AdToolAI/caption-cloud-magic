@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { encryptToken } from '../_shared/crypto.ts';
+import { verifyPageInstagramLink } from '../_shared/meta-page-discovery.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -94,24 +95,9 @@ Deno.serve(async (req) => {
     }
 
     // === Instagram finalization ===
-    // Resolve the Instagram Business account linked to the chosen page.
-    // Try both classic and alternative link fields Meta may return.
-    const igLookupRes = await fetch(
-      `https://graph.facebook.com/v24.0/${page_id}?fields=instagram_business_account,connected_instagram_account&access_token=${page_access_token}`
-    );
-
-    if (!igLookupRes.ok) {
-      const errBody = await igLookupRes.text();
-      console.error('[facebook-select-page] IG lookup failed:', errBody);
-      return new Response(
-        JSON.stringify({ error: 'Failed to look up linked Instagram account.' }),
-        { status: 502, headers: { ...CORS, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const igLookup = await igLookupRes.json();
-    const igUserId = igLookup?.instagram_business_account?.id
-      || igLookup?.connected_instagram_account?.id;
+    // Use the same per-page verification helper as the listing/auto-resolve
+    // path so a page shown as valid in the dialog will also finalize cleanly.
+    const igUserId = await verifyPageInstagramLink(page_id, page_access_token);
 
     if (!igUserId) {
       return new Response(
