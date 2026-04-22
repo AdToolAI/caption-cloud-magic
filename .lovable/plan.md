@@ -1,59 +1,95 @@
 
 
-## TikTok-Fehler `non_sandbox_target` — produktiver Client wird als Sandbox behandelt
+## Instagram OAuth: Echten Login-Flow für Reviewer & Endnutzer einbauen
 
-### Symptom
-Der Kunde startet OAuth → TikTok zeigt:
-> „Es ist etwas schiefgelaufen. Die Anmeldung mit TikTok war nicht möglich. Wenn du Entwickler bist, bringe Folgendes in Ordnung: **`non_sandbox_target`**"
+### Das Kernproblem (vom Kunden korrekt erkannt)
 
-### Was bedeutet `non_sandbox_target`?
-TikTok-Eigendiagnose: „Du nutzt einen **produktiven Client_Key**, aber mindestens ein OAuth-Parameter (Scopes oder Redirect-URI) ist nur in der **Sandbox-Konfiguration** der App freigegeben — nicht in der Production-Konfiguration." Da die App seit April 2026 Production-Status hat (Memory: `platform-portal-and-review-requirements`), darf nichts mehr aus Sandbox-Listen verwendet werden.
+Aktuell macht „Instagram verbinden" **keinen** OAuth-Login. Stattdessen ruft die App `connect-instagram-performance` auf, die deinen **eigenen Master-Token** aus `app_secrets` kopiert und in die `social_connections` des klickenden Users schreibt. Folge:
 
-### Ursache (zwei Stellen)
+- Im Screencast sieht Meta keinen Permission-Dialog → **`instagram_basic` abgelehnt**
+- Auch keine Veröffentlichung mit User-Tokens → **`instagram_content_publish` abgelehnt**
+- Jeder User würde technisch denselben (deinen) Account verbinden — Meta-Policy-Verstoß
 
-**1. Defaultwert im Shared-Modul ist `sandbox`** — `supabase/functions/_shared/tiktok-api.ts` Zeile 1:
-```ts
-const TIKTOK_ENV = Deno.env.get('TIKTOK_ENV') || 'sandbox';
+Der Facebook-Button macht es richtig: echter Meta-OAuth-Dialog mit Scopes. Instagram muss **denselben Flow** zeigen — Instagram Business Login via Facebook OAuth.
+
+### Was sich ändert
+
+#### 1. Frontend: Instagram-Button zeigt echten Meta-OAuth-Dialog
+Datei: `src/components/performance/ConnectionsTab.tsx`
+- Den Sonderfall-Block (Zeile 250–283), der `connect-instagram-performance` aufruft, **entfernen**
+- Stattdessen: Instagram-Button startet `instagram-oauth-start` (neue Edge Function), die eine echte Meta-OAuth-URL liefert und den Browser dorthin weiterleitet
+- Der OAuth-Dialog zeigt dann sichtbar: „AdTool AI möchte auf dein Instagram-Konto zugreifen" mit Scopes `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement`, `business_management`
+
+#### 2. Neue Edge Function: `instagram-oauth-start`
+- Generiert State + CSRF, speichert in `oauth_states`
+- Baut Meta-OAuth-URL mit Instagram-Scopes
+- Redirect-URI: `…/functions/v1/oauth-callback?provider=instagram`
+
+#### 3. Edge Function: `oauth-callback` erweitern für Instagram-Branch
+- Token-Tausch: Code → Short-Lived Token → Long-Lived Token (60 Tage)
+- `GET /me/accounts` → Facebook-Pages des Users abrufen
+- Pro Page: `?fields=instagram_business_account{id,username,profile_picture_url,followers_count}` → IG-Account-Info
+- Falls mehrere IG-Accounts: erstmal den ersten nehmen (Account-Picker später nachrüstbar)
+- Speichern in `social_connections`: `provider='instagram'`, **echte User-Tokens** (verschlüsselt), `account_id` = IG Business Account ID, `account_name` = IG-Username, `account_metadata` = `{profile_picture_url, followers_count, page_id, page_access_token_encrypted}`
+
+#### 4. Profil-Daten sichtbar in der UI
+Datei: `src/components/performance/ConnectionsTab.tsx` (Zeilen 780+)
+- Connection-Card erweitern: zeigt Instagram-Profilbild, `@username`, Follower-Count, Account-Typ-Badge
+- Beweist Meta im Screencast: `instagram_basic` wird aktiv konsumiert
+
+#### 5. Englisch-Toggle für Reviewer
+Datei: `src/pages/Integrations.tsx`
+- URL-Parameter `?lang=en` erkennen → i18n hart auf Englisch setzen
+- Reviewer-URL: `useadtool.ai/integrations?lang=en`
+
+#### 6. Backwards-Compatibility / Cleanup
+- `connect-instagram-performance` bleibt deployed (legacy), wird aber nicht mehr aufgerufen
+- Nicht löschen, falls Admin-Tools darauf basieren — nur aus dem Frontend-Flow rausnehmen
+
+### Was Meta dann im Screencast sieht
+
 ```
-Falls das Secret `TIKTOK_ENV` aus irgendeinem Grund nicht gesetzt ist (z. B. nach Edge-Function-Restart, Cold-Start-Race), greift der Fallback `'sandbox'`. Die anderen TikTok-Funktionen (`tiktok-oauth-start`, `tiktok-health`) defaulten korrekt auf `'production'` — nur das Shared-Modul ist inkonsistent.
-
-**2. Auth-URL nutzt veraltete Sandbox-Hostroute** — `tiktok-api.ts` Zeile 144:
-```ts
-const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize');
+1. User landet auf useadtool.ai/integrations?lang=en (English UI)
+2. User klickt "Connect Instagram"
+3. → Browser springt zu facebook.com/v24.0/dialog/oauth
+4. → Permission-Dialog: "AdTool AI is requesting access to:
+   - View your Instagram account profile (instagram_basic)
+   - Publish content on your behalf (instagram_content_publish)
+   - View your Facebook Pages (pages_show_list)"
+5. User klickt "Allow"
+6. → Redirect zurück zu useadtool.ai/integrations?connected=instagram
+7. UI zeigt: Profilbild + @username + Follower-Count + "Connected" Badge
 ```
-Diese URL **ohne** Trailing Slash wird von TikTok in Production teilweise auf den Sandbox-Endpoint geroutet (TikTok hat das im Februar 2026 stillschweigend geändert). Korrekt für Production ist `https://www.tiktok.com/v2/auth/authorize/` mit Trailing Slash — exakt so im aktuellen TikTok Login Kit Doc.
 
-### Fix
+Genau dieser Flow ist das, was Meta für **`instagram_basic`** Approval verlangt.
 
-**Datei:** `supabase/functions/_shared/tiktok-api.ts`
+### Migration für bestehende User
 
-1. **Default auf `production` umstellen** (Zeile 1) — konsistent mit den anderen Funktionen:
-   ```ts
-   const TIKTOK_ENV = Deno.env.get('TIKTOK_ENV') || 'production';
-   ```
+User, die aktuell mit dem Master-Token „verbunden" sind (wie auf deinem Screenshot `@captiongenie_socialmanager`), müssen **einmalig neu verbinden**:
+- Beim Laden der ConnectionsTab: prüfen ob `account_metadata.account_type === 'business'` UND `account_name === '@captiongenie_socialmanager'` → Banner zeigen: „Bitte Instagram neu verbinden für die offizielle Anbindung"
+- Nach echtem OAuth wird das Banner automatisch ausgeblendet
 
-2. **Auth-URL mit Trailing Slash** (Zeile 144) — TikTok-konformer Production-Endpoint:
-   ```ts
-   const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
-   ```
+### Reihenfolge der Umsetzung (Dependencies)
 
-3. **Sandbox-Kommentar entfernen** (Zeile 106) — der Hinweis „guaranteed in sandbox mode" stimmt nicht mehr; in Production sind `follower_count`, `following_count`, `video_count` ebenfalls verfügbar (Memory: Production approved). Wir lassen die Felder weiterhin defensiv auf 0 fallen, kommentieren den Block aber sauber.
+```text
+1. Edge Function: instagram-oauth-start  ──┐
+2. oauth-callback erweitern (IG-Branch)   ─┼─→ Backend ready
+3. Frontend-Button umbauen                 │
+4. UI: Profil-Card mit Bild/Followers      ├─→ Frontend ready
+5. ?lang=en Toggle                         │
+6. Migration-Banner für Alt-Verbindungen   ┘
+7. Reviewer-Drehbuch + Submission-Text     ─→ Du nimmst Screencast auf
+```
 
-**Keine Änderungen nötig an:**
-- `tiktok-oauth-start` — defaultet bereits korrekt
-- `tiktok-oauth-callback` — nutzt Shared-Modul, profitiert automatisch
-- Cloudflare-Worker / Redirect-URI — korrekt konfiguriert (siehe Memory)
-- TikTok-App-Settings — kein Re-Review nötig, da nur Code-seitige Korrektur
+### Was du nach dem Code-Deploy brauchst
 
-### Verifikation
-1. Edge Functions deployen (automatisch nach Save)
-2. Kunde lädt `useadtool.ai/integrations` → klickt „TikTok verbinden"
-3. TikTok-Auth-Seite öffnet sich **ohne** `non_sandbox_target`-Fehler
-4. Login mit beliebigem TikTok-Account (kein Sandbox-Test-User mehr nötig)
-5. Redirect zurück zu `/integrations?connected=tiktok&status=success`
-6. Logs in `tiktok-oauth-start` zeigen `Environment: production`
+Ich liefere dir nach Implementierung:
+- **Screencast-Drehbuch** (English, ~75 Sek, exakte Klicks + Texteinblendungen)
+- **Submission-Text auf Englisch** für Meta App Dashboard inkl. Server-to-Server-Hinweis
+- **Test-Account-Info** für den Reviewer (bestehender `meta-reviewer@useadtool.ai` reicht, muss aber selbst eine IG-Verbindung machen können)
 
 ### Risiko & Aufwand
-- **Risiko: minimal.** Reine Konfig-Korrektur in einer geteilten Datei, keine API-Schema- oder DB-Änderung. Falls TikTok wider Erwarten den alten URL-Pfad noch akzeptiert, funktionierte die Verbindung vorher schon — wir verschlechtern nichts.
-- **Aufwand:** ~2 Min — 1 Datei (`_shared/tiktok-api.ts`), 3 kleine Edits.
+- **Risiko: mittel.** Echter OAuth-Flow ersetzt einen funktionierenden Hack — bestehende User müssen einmalig neu verbinden. Bestehende Veröffentlichungen über `IG_PAGE_ACCESS_TOKEN` (z.B. `instagram-publish` Edge Function) bleiben unberührt.
+- **Aufwand:** ~25 Min Coding (1 neue Edge Function, 1 Edge Function erweitern, 2 Frontend-Dateien). Du brauchst danach ~10 Min für Screencast.
+- **Keine Meta-App-Settings-Änderung nötig** — Redirect-URI `…/oauth-callback` ist bereits in deiner Meta-App registriert (Facebook nutzt sie schon).
 
