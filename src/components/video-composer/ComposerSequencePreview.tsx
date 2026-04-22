@@ -546,30 +546,38 @@ export default function ComposerSequencePreview({
   // template so the editor preview is WYSIWYG with the final render.
   const VO_LEAD_IN_SECONDS = 0.4;
 
+  // Auto-unmute when a voiceover becomes available — VO is the primary
+  // audio track and should be hearable by default (video stays muted via slot refs).
+  useEffect(() => {
+    if (voiceoverUrl) setMuted(false);
+  }, [voiceoverUrl]);
+
+  // Unified audio sync — re-evaluates on globalTime so audio.play() fires
+  // automatically once the lead-in threshold is crossed (no scrub needed).
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !voiceoverUrl) return;
     audio.muted = muted;
+
     const targetAudioTime = Math.max(0, globalTime - VO_LEAD_IN_SECONDS);
-    if (playing && globalTime >= VO_LEAD_IN_SECONDS) {
-      if (Math.abs(audio.currentTime - targetAudioTime) > 0.25) {
+    if (Math.abs(audio.currentTime - targetAudioTime) > 0.25) {
+      try {
         audio.currentTime = Math.min(targetAudioTime, audio.duration || targetAudioTime);
+      } catch {}
+    }
+
+    if (playing) {
+      if (globalTime < VO_LEAD_IN_SECONDS) {
+        // Hold audio at 0 during the 0.4s breath; browser pre-decodes.
+        try { audio.currentTime = 0; } catch {}
+        audio.pause();
+      } else {
+        audio.play().catch(() => {});
       }
-      audio.play().catch(() => {});
     } else {
       audio.pause();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, voiceoverUrl, muted]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !voiceoverUrl) return;
-    const targetAudioTime = Math.max(0, globalTime - VO_LEAD_IN_SECONDS);
-    if (Math.abs(audio.currentTime - targetAudioTime) > 0.4) {
-      audio.currentTime = Math.min(targetAudioTime, audio.duration || targetAudioTime);
-    }
-  }, [globalTime, voiceoverUrl]);
+  }, [playing, voiceoverUrl, muted, globalTime]);
 
   const activeSubtitle = useMemo(() => {
     if (!subtitles?.enabled || !subtitles.segments?.length) return null;
