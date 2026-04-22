@@ -23,7 +23,7 @@ import { OnboardingStepper } from "@/features/onboarding/Stepper";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { EmailVerificationGate } from "@/components/auth/EmailVerificationGate";
 import { AICompanionWidget } from "@/components/ai-companion/AICompanionWidget";
-import { BugReporter } from "@/components/BugReporter";
+
 import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedChecklist";
 import { ProductTour } from "@/components/onboarding/ProductTour";
 import { UpgradeTriggerProvider } from "@/hooks/useUpgradeTrigger";
@@ -323,7 +323,6 @@ const AppContent = () => {
               <CommandBar />
               <CommandPalette />
               <AICompanionWidget />
-              <BugReporter />
               <UpgradeMount />
               <EmailVerificationGate>
                 <AppLayout />
