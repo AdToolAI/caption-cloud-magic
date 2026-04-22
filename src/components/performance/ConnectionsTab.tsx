@@ -255,71 +255,13 @@ export const ConnectionsTab = () => {
         return;
       }
 
-      // Instagram: Real Meta OAuth flow (instagram_basic + instagram_content_publish)
-      // The user sees the Facebook consent dialog with all IG scopes — required by Meta App Review.
-      if (providerId === 'instagram') {
-        try {
-          const { data: session } = await supabase.auth.getSession();
-          const authHeaders = {
-            Authorization: `Bearer ${session.session?.access_token}`,
-          };
-
-          // STEP 1: Auto Hard-Reset of the Meta app grant BEFORE starting OAuth.
-          // Without this, Meta short-circuits the consent dialog with
-          // "You previously logged into AdTool AI Integration with Facebook"
-          // and never re-prompts for instagram scopes. Best-effort: we continue
-          // even if revoke fails, because the user might not have a live token left.
-          toast({
-            title: 'Resetting Meta authorization…',
-            description: 'Clearing the previous app grant so Meta shows the full permission dialog.',
-          });
-
-          let hardResetComplete = false;
-          try {
-            const { data: revokeData, error: revokeError } = await supabase.functions.invoke(
-              'instagram-oauth-revoke',
-              { headers: authHeaders, body: {} }
-            );
-            if (revokeError) {
-              console.warn('[instagram] auto hard-reset failed (continuing):', revokeError);
-            } else {
-              hardResetComplete = !!revokeData?.hardResetComplete;
-              console.log('[instagram] auto hard-reset result:', revokeData);
-            }
-          } catch (revokeErr) {
-            console.warn('[instagram] auto hard-reset threw (continuing):', revokeErr);
-          }
-
-          if (!hardResetComplete) {
-            toast({
-              title: 'Meta may still cache this app',
-              description:
-                'If you skip the permission dialog, please log out of facebook.com once and try again.',
-            });
-          }
-
-          // STEP 2: Start the real OAuth flow
-          const { data, error } = await supabase.functions.invoke('instagram-oauth-start', {
-            headers: authHeaders,
-            body: { returnTo: window.location.href },
-          });
-
-          if (error) throw error;
-
-          if (data?.authUrl) {
-            window.location.href = data.authUrl;
-          } else {
-            throw new Error('No auth URL received');
-          }
-        } catch (error: any) {
-          toast({
-            title: t('common.error'),
-            description: error.message || `Failed to start ${providerName} connection`,
-            variant: 'destructive'
-          });
-        }
-        return;
-      }
+      // Instagram: use the EXACT same frontend OAuth builder as Facebook.
+      // Only differences vs Facebook:
+      //   - state.provider = 'instagram' (so the callback knows which provider it is)
+      //   - additional scopes: instagram_basic + instagram_content_publish
+      // Everything else (client_id, redirect_uri, dialog endpoint, state shape)
+      // mirrors Facebook 1:1 so the user sees the identical Meta flow that
+      // already works for Facebook today. No auto hard-reset, no rerequest.
 
       // TikTok: Use new backend OAuth flow
       if (providerId === 'tiktok') {
@@ -415,10 +357,10 @@ export const ConnectionsTab = () => {
       const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback`;
       
       const oauthUrls: Record<string, string> = {
-        instagram: (() => {
-          const fullRedirectUri = `${redirectUri}?provider=instagram`;
-          return `https://api.instagram.com/oauth/authorize?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(fullRedirectUri)}&scope=user_profile,user_media&response_type=code&state=${encodeURIComponent(state)}`;
-        })(),
+        // Instagram uses the SAME Facebook OAuth dialog as the facebook flow
+        // (state.provider already encodes which provider this is). Only the
+        // scopes are extended with instagram_basic + instagram_content_publish.
+        instagram: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_content_publish&state=${encodeURIComponent(state)}`,
         facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_read_engagement,pages_manage_metadata,pages_show_list,pages_read_user_content,pages_manage_posts,pages_manage_engagement&state=${encodeURIComponent(state)}`,
         tiktok: `/api/oauth/tiktok/start?user_id=${user.id}`,
         linkedin: `/api/oauth/linkedin/start?user_id=${user.id}`,
