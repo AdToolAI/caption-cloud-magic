@@ -2259,7 +2259,8 @@ export const translations: Record<Language, any> = {
       tipOfTheDay: "Tip of the Day",
       tipContent: "Post today 6-8 PM for maximum engagement",
       connectedAccounts: "connected",
-      nextPost: "Next Post"
+      nextPost: "Next Post",
+      nextSuggestion: "Next Suggestion"
     },
       quickActions: {
         quickSchedule: "Quick Schedule",
@@ -2634,7 +2635,60 @@ export const translations: Record<Language, any> = {
         title: "No Heatmap Data Yet",
         body: "Connect your account and post for 7 days – then we'll calculate your best times.",
         cta: "Connect Accounts"
-      }
+      },
+      cardTitle: "Best-Time Heatmap",
+      viewDetails: "View Details",
+      live: "Live",
+      tooltipBest: "Best time to post!",
+      tooltipGood: "Good time",
+      tooltipPoor: "Less optimal",
+      tooltipScore: "Score",
+      legendBest: "Best time (≥70)",
+      legendGood: "Good time (50-70)",
+      legendHeuristic: "Heuristic (<50)",
+      dayShort: { sun: "Sun", mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat" }
+    },
+
+    strategy: {
+      modeToggle: "Strategy Mode",
+      aiCopilotTagline: "Your AI co-pilot — fresh suggestions every week, automatic.",
+      levelBeginner: "Beginner",
+      levelIntermediate: "Intermediate",
+      levelAdvanced: "Pro",
+      levelDetails: "Level details",
+      postsPerWeek: "{count} posts/week",
+      levelLine: "Level: {level} · {count} posts/week",
+      aiSuggestionsCount: "{count} AI suggestions",
+      regenerate: "Regenerate",
+      creatorLevelTitle: "Your creator level",
+      progressTo: "Progress to {level}",
+      publishedPosts28d: "Published posts (28d)",
+      avgEngagementRate: "Avg engagement rate",
+      strategyCompletion: "Strategy completion",
+      readyToUpgrade: "Ready to upgrade — auto-promotes Sunday.",
+      maxLevelReached: "You're at the highest level. 🚀",
+      adjustLevelManually: "Adjust level manually",
+      manualPauseNote: "Manual selection pauses auto-upgrade for 14 days.",
+      selectBeginner: "Beginner · 3 posts/week",
+      selectIntermediate: "Intermediate · 5 posts/week",
+      selectAdvanced: "Pro · 7 posts/week",
+      noSuggestions: "No suggestions yet. Generate your first weekly strategy.",
+      generateWeeklyStrategy: "Generate weekly strategy",
+      toastEnabled: "Strategy mode enabled",
+      toastDisabled: "Strategy mode disabled",
+      toastToggleError: "Failed to toggle",
+      toastRegenerated: "New weekly strategy generated",
+      toastRegenerateError: "Generation failed",
+      toastDismissed: "Suggestion dismissed",
+      toastRescheduled: "Rescheduled",
+      toastCompleted: "Marked as done",
+      toastUpdated: "Suggestion updated",
+      toastUpdateError: "Update failed",
+      toastSubmittedToCalendar: "Added to calendar",
+      toastSubmitError: "Submission failed",
+      toastLevelUpdated: "Level updated",
+      toastLevelError: "Failed to update",
+      noWorkspace: "No workspace found"
     },
     
     // Features Section
@@ -6705,7 +6759,8 @@ export const translations: Record<Language, any> = {
       tipOfTheDay: "Tipp des Tages",
       tipContent: "Poste heute 18–20 Uhr für maximales Engagement",
       connectedAccounts: "verbunden",
-      nextPost: "Nächster Post"
+      nextPost: "Nächster Post",
+      nextSuggestion: "Nächster Vorschlag"
     },
       quickActions: {
         quickSchedule: "Schnell planen",
@@ -7057,7 +7112,60 @@ export const translations: Record<Language, any> = {
       empty: {
         title: "Beste Posting-Zeiten",
         body: "Sobald du deinen Account verbindest und 7 Tage postest, berechnen wir deine optimalen Zeiten."
-      }
+      },
+      cardTitle: "Best-Time Heatmap",
+      viewDetails: "Details anzeigen",
+      live: "Live",
+      tooltipBest: "Beste Zeit zum Posten!",
+      tooltipGood: "Gute Zeit",
+      tooltipPoor: "Weniger optimal",
+      tooltipScore: "Score",
+      legendBest: "Beste Zeit (≥70)",
+      legendGood: "Gute Zeit (50-70)",
+      legendHeuristic: "Heuristik (<50)",
+      dayShort: { sun: "So", mon: "Mo", tue: "Di", wed: "Mi", thu: "Do", fri: "Fr", sat: "Sa" }
+    },
+
+    strategy: {
+      modeToggle: "Strategie-Modus",
+      aiCopilotTagline: "Dein KI-Co-Pilot — neue Vorschläge jede Woche, automatisch.",
+      levelBeginner: "Anfänger",
+      levelIntermediate: "Fortgeschritten",
+      levelAdvanced: "Profi",
+      levelDetails: "Level-Details",
+      postsPerWeek: "{count} Posts/Woche",
+      levelLine: "Level: {level} · {count} Posts/Woche",
+      aiSuggestionsCount: "{count} KI-Vorschläge",
+      regenerate: "Neu generieren",
+      creatorLevelTitle: "Dein Creator-Level",
+      progressTo: "Fortschritt zu {level}",
+      publishedPosts28d: "Veröffentlichte Posts (28d)",
+      avgEngagementRate: "Ø Engagement-Rate",
+      strategyCompletion: "Strategie-Erledigt",
+      readyToUpgrade: "Bereit zum Upgrade — wird Sonntag automatisch hochgestuft.",
+      maxLevelReached: "Du bist bereits auf höchstem Level. 🚀",
+      adjustLevelManually: "Level manuell anpassen",
+      manualPauseNote: "Manuelle Auswahl pausiert Auto-Upgrade für 14 Tage.",
+      selectBeginner: "Anfänger · 3 Posts/Woche",
+      selectIntermediate: "Fortgeschritten · 5 Posts/Woche",
+      selectAdvanced: "Profi · 7 Posts/Woche",
+      noSuggestions: "Noch keine Vorschläge. Generiere deine erste Wochen-Strategie.",
+      generateWeeklyStrategy: "Wochen-Strategie generieren",
+      toastEnabled: "Strategie-Modus aktiviert",
+      toastDisabled: "Strategie-Modus deaktiviert",
+      toastToggleError: "Fehler beim Umschalten",
+      toastRegenerated: "Neue Wochen-Strategie generiert",
+      toastRegenerateError: "Generierung fehlgeschlagen",
+      toastDismissed: "Vorschlag verworfen",
+      toastRescheduled: "Neu geplant",
+      toastCompleted: "Als erledigt markiert",
+      toastUpdated: "Vorschlag aktualisiert",
+      toastUpdateError: "Update fehlgeschlagen",
+      toastSubmittedToCalendar: "In Kalender übernommen",
+      toastSubmitError: "Übernahme fehlgeschlagen",
+      toastLevelUpdated: "Level aktualisiert",
+      toastLevelError: "Fehler beim Aktualisieren",
+      noWorkspace: "Kein Workspace gefunden"
     },
 
     footer: {
@@ -11091,8 +11199,10 @@ export const translations: Record<Language, any> = {
     dashboard: {
       statusBar: {
         tipOfTheDay: "Consejo del Día",
+        tipContent: "Publica hoy de 18-20h para máximo engagement",
         connectedAccounts: "conectados",
-        nextPost: "Próximo Post"
+        nextPost: "Próximo Post",
+        nextSuggestion: "Próxima Sugerencia"
       },
       quickActions: {
         quickSchedule: "Planificar Rápido",
@@ -11282,7 +11392,60 @@ export const translations: Record<Language, any> = {
       empty: {
         title: "Mejores Horarios de Publicación",
         body: "Una vez que conectes tu cuenta y publiques durante 7 días, calcularemos tus mejores horarios."
-      }
+      },
+      cardTitle: "Heatmap de Mejores Horarios",
+      viewDetails: "Ver detalles",
+      live: "En vivo",
+      tooltipBest: "¡Mejor momento para publicar!",
+      tooltipGood: "Buen momento",
+      tooltipPoor: "Menos óptimo",
+      tooltipScore: "Puntuación",
+      legendBest: "Mejor momento (≥70)",
+      legendGood: "Buen momento (50-70)",
+      legendHeuristic: "Heurística (<50)",
+      dayShort: { sun: "Dom", mon: "Lun", tue: "Mar", wed: "Mié", thu: "Jue", fri: "Vie", sat: "Sáb" }
+    },
+
+    strategy: {
+      modeToggle: "Modo Estrategia",
+      aiCopilotTagline: "Tu copiloto de IA — sugerencias nuevas cada semana, automático.",
+      levelBeginner: "Principiante",
+      levelIntermediate: "Intermedio",
+      levelAdvanced: "Pro",
+      levelDetails: "Detalles del nivel",
+      postsPerWeek: "{count} posts/semana",
+      levelLine: "Nivel: {level} · {count} posts/semana",
+      aiSuggestionsCount: "{count} sugerencias IA",
+      regenerate: "Regenerar",
+      creatorLevelTitle: "Tu nivel de creador",
+      progressTo: "Progreso a {level}",
+      publishedPosts28d: "Posts publicados (28d)",
+      avgEngagementRate: "Tasa de engagement promedio",
+      strategyCompletion: "Estrategia completada",
+      readyToUpgrade: "Listo para promocionar — sube automáticamente el domingo.",
+      maxLevelReached: "Estás en el nivel más alto. 🚀",
+      adjustLevelManually: "Ajustar nivel manualmente",
+      manualPauseNote: "La selección manual pausa el auto-upgrade por 14 días.",
+      selectBeginner: "Principiante · 3 posts/semana",
+      selectIntermediate: "Intermedio · 5 posts/semana",
+      selectAdvanced: "Pro · 7 posts/semana",
+      noSuggestions: "Aún no hay sugerencias. Genera tu primera estrategia semanal.",
+      generateWeeklyStrategy: "Generar estrategia semanal",
+      toastEnabled: "Modo Estrategia activado",
+      toastDisabled: "Modo Estrategia desactivado",
+      toastToggleError: "Error al cambiar",
+      toastRegenerated: "Nueva estrategia semanal generada",
+      toastRegenerateError: "Falló la generación",
+      toastDismissed: "Sugerencia descartada",
+      toastRescheduled: "Reprogramado",
+      toastCompleted: "Marcado como hecho",
+      toastUpdated: "Sugerencia actualizada",
+      toastUpdateError: "Falló la actualización",
+      toastSubmittedToCalendar: "Añadido al calendario",
+      toastSubmitError: "Error al enviar",
+      toastLevelUpdated: "Nivel actualizado",
+      toastLevelError: "Error al actualizar",
+      noWorkspace: "No se encontró workspace"
     },
     
     // Features Section

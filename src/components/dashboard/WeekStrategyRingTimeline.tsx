@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { addDays, isSameDay, format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, es, enUS } from "date-fns/locale";
 import { Instagram, Music, Linkedin, Facebook, Twitter, Youtube, Sparkles, RefreshCw, TrendingUp, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { useStrategyMode, type StrategyPost, type CreatorLevel } from "@/hooks/useStrategyMode";
 import { PlatformRingDialog } from "./PlatformRingDialog";
-
-const LEVEL_LABEL: Record<CreatorLevel, string> = {
-  beginner: "Anfänger",
-  intermediate: "Fortgeschritten",
-  advanced: "Profi",
-};
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface Props {
   weekStart: string;
@@ -100,6 +95,14 @@ function getRingState(p: StrategyPost): RingState {
 }
 
 export function WeekStrategyRingTimeline({ weekStart }: Props) {
+  const { t, language } = useTranslation();
+  const dateLocale = language === "de" ? de : language === "es" ? es : enUS;
+  const LEVEL_LABEL: Record<CreatorLevel, string> = {
+    beginner: t("strategy.levelBeginner"),
+    intermediate: t("strategy.levelIntermediate"),
+    advanced: t("strategy.levelAdvanced"),
+  };
+
   const {
     posts,
     isLoadingPosts,
@@ -135,35 +138,35 @@ export function WeekStrategyRingTimeline({ weekStart }: Props) {
               <PopoverTrigger asChild>
                 <button
                   className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/5 px-2.5 py-1 text-xs font-medium text-warning hover:bg-warning/10 transition-colors"
-                  aria-label="Level-Details"
+                  aria-label={t("strategy.levelDetails")}
                 >
                   <TrendingUp className="h-3 w-3" />
-                  Level: {LEVEL_LABEL[experienceLevel]} · {postsPerWeek} Posts/Woche
+                  {t("strategy.levelLine", { level: LEVEL_LABEL[experienceLevel], count: postsPerWeek })}
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-80" align="start">
                 <div className="space-y-3">
                   <div>
-                    <div className="text-sm font-semibold">Dein Creator-Level</div>
+                    <div className="text-sm font-semibold">{t("strategy.creatorLevelTitle")}</div>
                     <div className="text-xs text-muted-foreground">
-                      {LEVEL_LABEL[experienceLevel]} · {postsPerWeek} Posts/Woche
+                      {LEVEL_LABEL[experienceLevel]} · {t("strategy.postsPerWeek", { count: postsPerWeek })}
                     </div>
                   </div>
 
                   {levelProgress ? (
                     <div className="space-y-2 rounded-lg border border-border/40 p-2.5">
                       <div className="text-xs font-medium">
-                        Fortschritt zu <span className="text-warning">{LEVEL_LABEL[levelProgress.nextLevel]}</span>
+                        {t("strategy.progressTo", { level: LEVEL_LABEL[levelProgress.nextLevel] })}
                       </div>
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                          <span>Veröffentlichte Posts (28d)</span>
+                          <span>{t("strategy.publishedPosts28d")}</span>
                           <span>{levelProgress.postsPublished} / {levelProgress.thresholds.posts}</span>
                         </div>
                         <Progress value={Math.min(100, (levelProgress.postsPublished / levelProgress.thresholds.posts) * 100)} className="h-1.5" />
 
                         <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
-                          <span>Ø Engagement-Rate</span>
+                          <span>{t("strategy.avgEngagementRate")}</span>
                           <span>{levelProgress.avgEr.toFixed(1)}% / {levelProgress.thresholds.er}%</span>
                         </div>
                         <Progress value={Math.min(100, (levelProgress.avgEr / levelProgress.thresholds.er) * 100)} className="h-1.5" />
@@ -171,12 +174,12 @@ export function WeekStrategyRingTimeline({ weekStart }: Props) {
                     </div>
                   ) : (
                     <div className="rounded-lg border border-border/40 p-2.5 text-xs text-muted-foreground">
-                      Du bist bereits auf höchstem Level. 🚀
+                      {t("strategy.maxLevelReached")}
                     </div>
                   )}
 
                   <div>
-                    <div className="text-[11px] text-muted-foreground mb-1">Level manuell anpassen</div>
+                    <div className="text-[11px] text-muted-foreground mb-1">{t("strategy.adjustLevelManually")}</div>
                     <Select
                       value={experienceLevel}
                       onValueChange={(v) => setLevel(v as CreatorLevel)}
@@ -186,9 +189,9 @@ export function WeekStrategyRingTimeline({ weekStart }: Props) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="beginner">Anfänger · 3 Posts/Woche</SelectItem>
-                        <SelectItem value="intermediate">Fortgeschritten · 5 Posts/Woche</SelectItem>
-                        <SelectItem value="advanced">Profi · 7 Posts/Woche</SelectItem>
+                        <SelectItem value="beginner">{t("strategy.selectBeginner")}</SelectItem>
+                        <SelectItem value="intermediate">{t("strategy.selectIntermediate")}</SelectItem>
+                        <SelectItem value="advanced">{t("strategy.selectAdvanced")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -198,13 +201,13 @@ export function WeekStrategyRingTimeline({ weekStart }: Props) {
 
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Sparkles className="h-3.5 w-3.5 text-warning" />
-              <span>{posts.length} KI-Vorschläge</span>
+              <span>{t("strategy.aiSuggestionsCount", { count: posts.length })}</span>
             </div>
           </div>
 
           <Button variant="ghost" size="sm" onClick={() => regenerate()} disabled={isRegenerating}>
             <RefreshCw className={cn("h-3.5 w-3.5 mr-1", isRegenerating && "animate-spin")} />
-            Neu generieren
+            {t("strategy.regenerate")}
           </Button>
         </div>
 
@@ -225,7 +228,7 @@ export function WeekStrategyRingTimeline({ weekStart }: Props) {
               <div key={day.date.toISOString()} className="flex flex-col items-center gap-2 min-w-0">
                 {/* Weekday */}
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {format(day.date, "EEE", { locale: de })}
+                  {format(day.date, "EEE", { locale: dateLocale })}
                 </span>
 
                 {/* Day number — sits on the rail */}
@@ -295,11 +298,11 @@ export function WeekStrategyRingTimeline({ weekStart }: Props) {
         {!isLoadingPosts && posts.length === 0 && (
           <div className="text-center py-6">
             <p className="text-sm text-muted-foreground mb-3">
-              Noch keine Vorschläge. Generiere deine erste Wochen-Strategie.
+              {t("strategy.noSuggestions")}
             </p>
             <Button onClick={() => regenerate()} disabled={isRegenerating}>
               <Sparkles className="h-4 w-4 mr-2" />
-              Wochen-Strategie generieren
+              {t("strategy.generateWeeklyStrategy")}
             </Button>
           </div>
         )}

@@ -6,6 +6,7 @@ import { TrendingUp, ArrowRight, Zap } from "lucide-react";
 import { HeatmapEmptyState } from "@/features/analytics/EmptyStates";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface BestTimeHeatmapProps {
   heatmap: Record<string, number[][]>;
@@ -16,7 +17,8 @@ interface BestTimeHeatmapProps {
 // Pulse cell component with animation
 function PulseCell({ score, day, hour, isNearOptimal }: { score: number; day: string; hour: number; isNearOptimal: boolean }) {
   const [isHovered, setIsHovered] = useState(false);
-  
+  const { t, language } = useTranslation();
+
   const getColorClass = (score: number) => {
     if (score >= 80) return "bg-success/80 text-white shadow-success/30";
     if (score >= 70) return "bg-success/60 text-white shadow-success/20";
@@ -24,6 +26,16 @@ function PulseCell({ score, day, hour, isNearOptimal }: { score: number; day: st
     if (score >= 50) return "bg-warning/50 text-foreground";
     return "bg-white/5 text-muted-foreground";
   };
+
+  const hourLabel = language === "de"
+    ? `${day} ${hour}:00 Uhr`
+    : `${day} ${hour}:00`;
+
+  const qualityLabel = score >= 70
+    ? `🎯 ${t("heatmap.tooltipBest")}`
+    : score >= 50
+      ? `✓ ${t("heatmap.tooltipGood")}`
+      : t("heatmap.tooltipPoor");
 
   return (
     <Tooltip>
@@ -55,11 +67,11 @@ function PulseCell({ score, day, hour, isNearOptimal }: { score: number; day: st
         <div className="p-1">
           <p className="font-medium flex items-center gap-1">
             {score >= 70 && <Zap className="h-3 w-3 text-success" />}
-            {day} {hour}:00 Uhr
+            {hourLabel}
           </p>
-          <p className="text-sm">Score: <span className="font-bold">{score}</span></p>
+          <p className="text-sm">{t("heatmap.tooltipScore")}: <span className="font-bold">{score}</span></p>
           <p className="text-xs text-muted-foreground">
-            {score >= 70 ? "🎯 Beste Zeit zum Posten!" : score >= 50 ? "✓ Gute Zeit" : "Weniger optimal"}
+            {qualityLabel}
           </p>
         </div>
       </TooltipContent>
@@ -68,7 +80,17 @@ function PulseCell({ score, day, hour, isNearOptimal }: { score: number; day: st
 }
 
 export function BestTimeHeatmap({ heatmap, loading, onViewDetails }: BestTimeHeatmapProps) {
-  const days = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const { t } = useTranslation();
+  const dayShort = t("heatmap.dayShort") as Record<string, string>;
+  const days = [
+    dayShort?.sun ?? "Sun",
+    dayShort?.mon ?? "Mon",
+    dayShort?.tue ?? "Tue",
+    dayShort?.wed ?? "Wed",
+    dayShort?.thu ?? "Thu",
+    dayShort?.fri ?? "Fri",
+    dayShort?.sat ?? "Sat",
+  ];
   const hours = Array.from({ length: 24 }, (_, i) => i);
   
   // Check if current hour is near optimal time
@@ -83,7 +105,7 @@ export function BestTimeHeatmap({ heatmap, loading, onViewDetails }: BestTimeHea
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            Best-Time Heatmap
+            {t("heatmap.cardTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -117,13 +139,13 @@ export function BestTimeHeatmap({ heatmap, loading, onViewDetails }: BestTimeHea
               >
                 <TrendingUp className="h-5 w-5 text-primary" />
               </motion.div>
-              <span>Best-Time Heatmap</span>
+              <span>{t("heatmap.cardTitle")}</span>
               <motion.span
                 animate={{ opacity: [0.5, 1, 0.5] }}
                 transition={{ duration: 2, repeat: Infinity }}
                 className="text-xs px-2 py-0.5 rounded-full bg-accent/20 text-accent font-medium"
               >
-                Live
+                {t("heatmap.live")}
               </motion.span>
             </div>
             {onViewDetails && (
@@ -133,7 +155,7 @@ export function BestTimeHeatmap({ heatmap, loading, onViewDetails }: BestTimeHea
                 onClick={onViewDetails}
                 className="border-primary/30 hover:bg-primary/10 hover:border-primary"
               >
-                Details anzeigen
+                {t("heatmap.viewDetails")}
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             )}
@@ -236,15 +258,15 @@ export function BestTimeHeatmap({ heatmap, loading, onViewDetails }: BestTimeHea
                         transition={{ duration: 2, repeat: Infinity }}
                         className="w-5 h-5 rounded bg-success/80"
                       />
-                      <span>Beste Zeit (≥70)</span>
+                      <span>{t("heatmap.legendBest")}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-5 h-5 rounded bg-warning/60"></div>
-                      <span>Gute Zeit (50-70)</span>
+                      <span>{t("heatmap.legendGood")}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-5 h-5 rounded bg-white/5 border border-white/10"></div>
-                      <span>Heuristik (&lt;50)</span>
+                      <span>{t("heatmap.legendHeuristic")}</span>
                     </div>
                   </motion.div>
                 </TabsContent>
