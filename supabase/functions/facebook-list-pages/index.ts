@@ -20,6 +20,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Optional body: { provider: 'facebook' | 'instagram' }
+    let provider: 'facebook' | 'instagram' = 'facebook';
+    try {
+      const body = await req.json();
+      if (body?.provider === 'instagram' || body?.provider === 'facebook') {
+        provider = body.provider;
+      }
+    } catch (_) {
+      // body optional
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -39,27 +50,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get Facebook connection
+    // Get the Meta connection for this provider (instagram OR facebook).
+    // Both providers share the same Meta user grant.
     const { data: connection, error: connError } = await supabase
       .from('social_connections')
       .select('*')
       .eq('user_id', user.id)
-      .eq('provider', 'facebook')
+      .eq('provider', provider)
       .maybeSingle();
 
     if (connError || !connection) {
-      return new Response(JSON.stringify({ error: 'No Facebook connection found' }), {
+      return new Response(JSON.stringify({ error: `No ${provider} connection found` }), {
         status: 404,
         headers: { ...CORS, 'Content-Type': 'application/json' },
       });
     }
 
-    // Decrypt access token
+    // Decrypt the user access token
     const accessToken = await decryptToken(connection.access_token_hash);
 
-    // Call Facebook Graph API to list pages
+    // Always include instagram_business_account so we can flag IG-capable pages
+    // even in facebook mode (cheap, single field).
     const fbResponse = await fetch(
-      `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,category,picture{url},access_token&access_token=${accessToken}`
+      `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,category,picture{url},access_token,instagram_business_account&access_token=${accessToken}`
     );
 
     if (!fbResponse.ok) {
@@ -73,13 +86,21 @@ Deno.serve(async (req) => {
 
     const fbData = await fbResponse.json();
 
-    const pages = (fbData.data || []).map((page: any) => ({
+    let pages = (fbData.data || []).map((page: any) => ({
       id: page.id,
       name: page.name,
       category: page.category || 'Page',
       picture_url: page.picture?.data?.url || null,
       access_token: page.access_token,
+      has_instagram: !!page.instagram_business_account?.id,
+      instagram_business_account_id: page.instagram_business_account?.id || null,
     }));
+
+    // For instagram mode: keep all pages but sort IG-capable ones first
+    // (the dialog disables non-IG pages so the user understands which to pick).
+    if (provider === 'instagram') {
+      pages = pages.sort((a: any, b: any) => Number(b.has_instagram) - Number(a.has_instagram));
+    }
 
     return new Response(JSON.stringify({ success: true, pages }), {
       headers: { ...CORS, 'Content-Type': 'application/json' },
