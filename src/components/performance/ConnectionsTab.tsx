@@ -247,38 +247,32 @@ export const ConnectionsTab = () => {
         return;
       }
 
-      // Special handler for Instagram: Use backend function to access app_secrets
+      // Instagram: Real Meta OAuth flow (instagram_basic + instagram_content_publish)
+      // The user sees the Facebook consent dialog with all IG scopes — required by Meta App Review.
       if (providerId === 'instagram') {
-        setLoading(true);
-        
         try {
-          const { data, error } = await supabase.functions.invoke(
-            'connect-instagram-performance',
-            {
-              headers: {
-                Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-              }
-            }
-          );
-          
-          if (error) throw error;
-          
-          toast({
-            title: t('common.success'),
-            description: `${providerName} ${t('socialIntegrations.successConnected')}`
+          const { data: session } = await supabase.auth.getSession();
+          const { data, error } = await supabase.functions.invoke('instagram-oauth-start', {
+            headers: {
+              Authorization: `Bearer ${session.session?.access_token}`
+            },
+            body: { returnTo: window.location.href }
           });
-          
-          await fetchConnections();
+
+          if (error) throw error;
+
+          if (data?.authUrl) {
+            window.location.href = data.authUrl;
+          } else {
+            throw new Error('No auth URL received');
+          }
         } catch (error: any) {
           toast({
             title: t('common.error'),
-            description: error.message || `Failed to connect ${providerName}`,
+            description: error.message || `Failed to start ${providerName} connection`,
             variant: 'destructive'
           });
-        } finally {
-          setLoading(false);
         }
-        
         return;
       }
 
