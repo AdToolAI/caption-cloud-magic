@@ -1,84 +1,82 @@
 
 
-## Hard-Reset automatisch vor jedem Instagram-Connect
+## Instagram-Connect direkt auf das funktionierende Facebook-Muster bringen
 
-### Was ich in den Logs gefunden habe
+### Deine Frage, kurz beantwortet
+Ja — für dein Video ist es **deutlich sinnvoller**, Instagram **exakt auf die bereits funktionierende Facebook-Pipeline** zu legen, statt parallel an einem neuen Hard-Reset/Edit-Settings-Pfad zu basteln.
 
-**Entscheidend:** Es gibt **keine** Logs für `instagram-oauth-revoke`. Der Hard-Reset wird also gar nicht ausgeführt, bevor du auf "Connect Instagram" klickst.
+Bei Facebook siehst du:
+- Klick auf **Connect Facebook**
+- sauberer Meta-Login/Continue
+- Rückkehr in die App
+- **Page-Select-Dialog**
+- fertige Verbindung
 
-Was passiert tatsächlich:
+Genau dieses Verhalten holen wir 1:1 für Instagram.
 
+### Was geändert wird
+
+#### 1. Instagram nutzt denselben Start-Mechanismus wie Facebook
+**Datei:** `src/components/performance/ConnectionsTab.tsx`
+
+- `handleConnect('instagram')` ruft **nicht mehr** `instagram-oauth-start` + `instagram-oauth-revoke` auf.
+- Stattdessen wird der **gleiche Frontend-OAuth-Builder** wie für Facebook verwendet (gleiche `client_id`, gleiche `redirect_uri`, gleicher `state`-Mechanismus, identischer Authorize-Call).
+- Einziger Unterschied: das `provider`-Feld im `state` ist `instagram` und die Scopes enthalten zusätzlich:
+  - `instagram_basic`
+  - `instagram_content_publish`
+- Kein automatischer Hard-Reset, kein `auth_type=rerequest`, kein extra `auth_nonce`. Genau wie Facebook.
+
+#### 2. Callback exakt wie Facebook behandeln
+**Datei:** `supabase/functions/oauth-callback/index.ts`
+
+- Für `provider=instagram` wird derselbe Pfad wie für `provider=facebook` durchlaufen:
+  - Token-Exchange
+  - Speichern als **pending** Verbindung mit `selection_required: true`
+  - Rückleitung in die App mit `connected=instagram&status=success`
+- Keine automatische `/me/accounts`-Auflösung mehr im Callback.
+
+#### 3. Page-Select-Dialog wie bei Facebook öffnen
+**Datei:** `src/components/performance/ConnectionsTab.tsx` + `FacebookPageSelectDialog.tsx`
+
+- Nach Rückkehr aus dem OAuth-Flow erkennt die UI `connected=instagram` + `selection_required=true` und öffnet **denselben Dialog** wie für Facebook (Modus `instagram`).
+- Nutzer wählt eine Facebook-Seite mit verknüpftem Instagram-Business-Konto.
+- `facebook-select-page` finalisiert die Instagram-Verbindung (bereits vorhanden).
+
+#### 4. Hard-Reset/Revoke wird vom Connect-Flow entkoppelt
+- `instagram-oauth-revoke` bleibt als **manueller Disconnect-Pfad** erhalten.
+- Wird aber **nicht mehr automatisch** beim Connect ausgelöst.
+- `instagram-oauth-start` wird vom Connect-Flow **nicht mehr aufgerufen** (Funktion bleibt für eventuelle spätere Verwendung bestehen).
+
+### Erwartetes Ergebnis im Video
 ```text
-Du klickst direkt auf "Connect Instagram"
-→ instagram-oauth-start läuft (Logs zeigen das)
-→ Meta sieht: App-Grant existiert noch
-→ Meta zeigt "You previously logged into AdTool AI Integration with Facebook"
-→ Du klickst "Continue as Samuel"
-→ Meta gibt sofort Code zurück, kein Consent-Dialog
+Klick auf Connect Instagram
+→ Meta-Login/Continue (genau wie bei Facebook)
+→ Rückkehr in die App
+→ Page-Select-Dialog erscheint
+→ Seite mit verknüpftem Instagram-Business wählen
+→ Instagram-Verbindung steht
 ```
 
-Der ganze Hard-Reset-Code, den wir gebaut haben, wird **nie ausgelöst**, weil er nur beim manuellen Disconnect läuft — und das hast du in der Praxis nicht jedes Mal vorher gemacht.
+Visuell **nicht unterscheidbar** vom funktionierenden Facebook-Flow.
 
-Deshalb ändert sich für dich nichts: Meta erkennt den App-Grant bei jedem Connect-Versuch wieder und überspringt den Consent-Pfad.
-
-### Was ich ändern werde
-
-#### 1. Auto-Hard-Reset in `handleConnect` für Instagram
-**Datei:** `src/components/performance/ConnectionsTab.tsx`
-
-Wenn du auf **Connect Instagram** klickst, läuft ab jetzt **vor** dem Aufruf von `instagram-oauth-start` automatisch:
-
-- `supabase.functions.invoke('instagram-oauth-revoke')`
-- wartet auf `hardResetComplete` / `revoked`
-- erst danach: Redirect zur Meta-Authorize-URL
-
-So wird Metas App-Grant garantiert revoked, bevor der OAuth-Flow neu startet.
-
-#### 2. Sichtbarer Status für den Reset
-- Toast / Inline-Status: „Resetting Meta authorization…“
-- bei erfolgreichem Revoke: weiter zur OAuth-URL
-- bei Fehler beim Revoke (z. B. Token nicht mehr gültig): klare Meldung, dass Meta die App noch kennen könnte, und der Connect-Button versucht es trotzdem
-
-#### 3. Sicherheitsnetz im Backend
-**Datei:** `supabase/functions/instagram-oauth-start/index.ts`
-
-Zusätzlich zum Frontend-Reset führt `instagram-oauth-start` selbst noch einmal eine **Best-Effort Revoke-Routine** aus:
-
-- vor dem Bauen der Authorize-URL
-- nutzt die noch in der DB liegenden Meta-Tokens (instagram + facebook)
-- ruft `DELETE /{meta-user-id}/permissions` auf
-- löscht beide Rows (`instagram` + `facebook`) aus `social_connections`
-
-Damit ist der Hard-Reset garantiert, selbst wenn der Frontend-Call das aus irgendeinem Grund auslässt.
-
-#### 4. Klarer UX-Hinweis bei „You previously logged into …"
-**Datei:** `src/components/performance/ConnectionsTab.tsx`
-
-Wenn nach dem Connect-Flow Meta trotzdem ohne Consent zurückspringt (erkennbar daran, dass die neue Connection sofort als „instagram_pending“ ankommt, ohne dass eine echte Permission-Auswahl stattfand), zeigen wir einen Hinweis:
-
-> „Meta hat die App-Berechtigung im Browser noch zwischengespeichert. Bitte logge dich kurz auf facebook.com aus und versuche es erneut, um den vollen Berechtigungsdialog zu sehen."
-
-Das ist der einzige zuverlässige Weg, Metas browserseitige Session-Caching zu umgehen.
-
-### Wichtige Erwartung
-
-- Der Hard-Reset auf Meta-Seite ist jetzt **immer aktiv**, nicht mehr nur beim manuellen Disconnect.
-- Der „Continue as …"-Screen kann von Meta **trotzdem** als erste Hürde gezeigt werden, weil deine **Browser-Session** auf facebook.com weiterhin eingeloggt ist. Das kontrolliert Meta, nicht wir.
-- Entscheidend ist: nach dem „Continue"-Klick muss der **Berechtigungsdialog** kommen — und genau das setzt voraus, dass der App-Grant bei Meta entfernt wurde, was wir jetzt erzwingen.
+### Wichtiger Hinweis (Trade-off)
+- Der „You previously logged into …"-Screen kann von Meta trotzdem angezeigt werden — aber **das passiert bei Facebook ja auch** und stört dort nicht.
+- Solange die Verbindung danach sauber im Page-Select-Dialog endet, ist das für dein Video genau der gewünschte Ablauf.
+- Den aggressiven Hard-Reset/Re-Consent-Pfad können wir **später** wieder aktivieren, wenn er für App Review nötig wird. Für **jetzt** zählt: gleicher sichtbarer Flow wie Facebook.
 
 ### Betroffene Dateien
-- `src/components/performance/ConnectionsTab.tsx`
-- `supabase/functions/instagram-oauth-start/index.ts`
-- evtl. minimale Helper-Extraktion für die Revoke-Routine, damit sie sowohl in `instagram-oauth-revoke` als auch in `instagram-oauth-start` nutzbar ist
+- `src/components/performance/ConnectionsTab.tsx` — Instagram-Connect auf Facebook-Builder umstellen, Auto-Revoke entfernen
+- `supabase/functions/oauth-callback/index.ts` — Instagram-Pfad identisch zu Facebook-Pfad halten (pending + selection_required)
+- keine Änderungen an `FacebookPageSelectDialog.tsx`, `facebook-list-pages`, `facebook-select-page` (bereits vorbereitet)
 
 ### Risiko
-Gering. Der Hard-Reset existiert bereits — er wird nur jetzt automatisch im Connect-Flow ausgelöst statt nur beim expliziten Disconnect.
+Gering. Wir entfernen Komplexität und legen Instagram auf einen **bereits funktionierenden** Flow.
 
 ### Test nach Umsetzung
-1. **Direkt** auf „Connect Instagram" klicken (kein vorheriges manuelles Disconnect)
-2. prüfen, dass im Hintergrund der Auto-Hard-Reset läuft (Toast „Resetting Meta authorization…")
-3. erst danach öffnet sich der Meta-Flow
-4. wenn nach „Continue as Samuel" immer noch direkt zurückgesprungen wird: einmal auf facebook.com ausloggen und Schritt 1 wiederholen
-5. der Berechtigungsdialog sollte dann kommen
-6. nach Rückkehr in die App muss automatisch der Page-Select-Dialog im Instagram-Modus erscheinen
+1. Instagram trennen
+2. **Connect Instagram** klicken
+3. Meta-Flow durchlaufen wie bei Facebook
+4. zurück in der App: Page-Select-Dialog erscheint
+5. Seite mit IG-Business wählen → Verbindung steht
+6. Ablauf ist visuell identisch zu Facebook → bereit fürs Video
 
