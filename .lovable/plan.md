@@ -1,90 +1,92 @@
 
 
-## Bugfix: Rendering bricht bei KI-Bild-Szenen ab + fehlende Vollvideo-Vorschau im Export-Tab
+## Voiceover-Lead-In: kleine Pause vor dem ersten Wort
 
-### Was passiert
-1. **Rendering schlägt fehl** mit `Code 4 - Media playback error` auf einer `.png`-URL.
-2. Im Export-Tab gibt es **keine Live-Vorschau** des fertigen Vollvideos — nur die kleine Watermark-Positionsbox (das schwarze Kästchen oben).
+### Problem
+Im gerenderten Composer-Video startet das Voiceover exakt bei Frame 0 — gleichzeitig mit dem ersten Bild. Folgen:
+- Das erste Wort wird oft leicht abgeschnitten (Audio-Decoder/Encoder-Anlauf)
+- Es wirkt abrupt, weil keine Atempause vor dem Sprechen liegt
 
-### Ursache
-
-**Zu (1):** Die Edge Function `compose-video-assemble` schickt jede Szene als `videoUrl` an Remotion — egal ob die Szene ein KI-generiertes Bild (`.png`) oder ein Video (`.mp4`) ist. Im Remotion-Template `ComposedAdVideo.tsx` (Zeile 140) wird daraus immer ein `<Video src={...} />`, das PNG-Dateien nicht abspielen kann → Error Code 4.
-
-Das Template hat zwar bereits einen `isImage`-Pfad mit `<KenBurnsImage>` (Zeilen 133–138), nur wird das Flag aktuell **nie gesetzt**, weil die Edge Function die Bild-Erkennung beim Scene-Mapping vergisst.
-
-**Zu (2):** Im Export/Assembly-Tab existiert nur die Watermark-Vorschau-Box (kleines `AdTool AI`-Stempelfeld) und nach erfolgreichem Render der MP4-Player. Eine Vollvideo-Vorschau **vor** dem Render ist nicht eingebaut. Das Komponenten-Bauteil dafür (`ComposerSequencePreview`) existiert bereits und wird im Voiceover-/Untertitel-Tab benutzt — es fehlt nur im Export-Tab.
+Aktuell in `src/remotion/templates/ComposedAdVideo.tsx` (Zeilen 393–402):
+```tsx
+<Sequence from={-fps} durationInFrames={durationInFrames + fps}>
+  <Audio src={voiceoverUrl} startFrom={0} ... />
+</Sequence>
+```
+Das `from={-fps}` ist nur ein Pre-Buffer für den Decoder — der hörbare Audio-Start liegt trotzdem bei Frame 0.
 
 ### Fix
 
-#### A) Bild-Szenen werden korrekt als Bilder gerendert
+#### 1) Festes Lead-In von 0,4 s vor dem Voiceover (Remotion-Template)
 
-**Datei:** `supabase/functions/compose-video-assemble/index.ts`
+**Datei:** `src/remotion/templates/ComposedAdVideo.tsx` (Zeilen 393–403)
 
-1. **Bild-Erkennung beim Scene-Build** (rund um Zeile 180):
-   Erkenne, ob eine Szene ein Bild ist:
-   ```ts
-   const isImageScene = (s: any) =>
-     s.clip_source === 'ai-image' ||
-     s.upload_type === 'image' ||
-     /\.(png|jpe?g|webp|avif|gif)(\?|$)/i.test(s.clip_url || '');
-   ```
-
-2. **Probing überspringen für Bilder** (Zeilen 165–178): `probeMp4Duration` nur für Videos aufrufen — Bilder werden sonst sinnlos angefasst und liefern `null`, was harmlos ist, aber unnötig Zeit kostet.
-
-3. **`isImage`-Flag mitschicken** im `remotionScenes`-Mapping (Zeile 194 ff.):
-   ```ts
-   return {
-     videoUrl: s.clip_url,
-     isImage: isImageScene(s),
-     durationSeconds: isImageScene(s) ? nominalDuration : effectiveDuration,
-     // … Rest unverändert
-   };
-   ```
-   Bilder behalten die nominale Dauer (kein Real-Probing).
-
-**Datei:** `src/remotion/templates/ComposedAdVideo.tsx`
-
-Keine Logik-Änderung nötig — der `isImage`-Pfad existiert bereits und nutzt `KenBurnsImage`. Wir bestätigen nur, dass das Schema `isImage` schon erlaubt (Zeile 75 — bereits vorhanden).
-
-#### B) Vollvideo-Vorschau im Export-Tab anzeigen
-
-**Datei:** `src/components/video-composer/AssemblyTab.tsx`
-
-Über dem „Kosten-Zusammenfassung"-Block eine echte Live-Vorschau einbauen, die **dieselbe** robuste `ComposerSequencePreview`-Komponente wiederverwendet, die schon im Voiceover-Tab läuft (kennt Bild- + Video-Szenen, hat bereits Crossfade-Logik):
+Voiceover-Sequence erst bei Frame `VO_LEAD_IN_FRAMES` starten, Pre-Buffer bleibt erhalten:
 
 ```tsx
-<Card className="border-border/40 bg-card/80">
-  <CardHeader className="pb-3">
-    <CardTitle className="text-base flex items-center gap-2">
-      <Film className="h-4 w-4 text-primary" />
-      {t('videoComposer.previewFullVideo')}
-    </CardTitle>
-  </CardHeader>
-  <CardContent>
-    <ComposerSequencePreview
-      scenes={scenes}
-      subtitles={assemblyConfig.subtitles}
-      globalTextOverlays={assemblyConfig.globalTextOverlays}
-      voiceoverUrl={assemblyConfig.voiceover?.audioUrl}
+const VO_LEAD_IN_FRAMES = Math.round(fps * 0.4); // 0,4 s Atempause
+
+{voEnabled && (
+  <Sequence
+    from={VO_LEAD_IN_FRAMES - fps}                 // Pre-Buffer-Start (1 s vor hörbarem VO)
+    durationInFrames={durationInFrames - VO_LEAD_IN_FRAMES + fps}
+  >
+    <Audio
+      key="composer-voiceover-stable"
+      src={voiceoverUrl as string}
+      volume={1}
+      loop={false}
+      startFrom={fps}                              // Ersten Pre-Buffer-Sekundenrahmen überspringen,
+                                                   // damit der hörbare Anfang bei Frame VO_LEAD_IN_FRAMES liegt
     />
-  </CardContent>
-</Card>
+  </Sequence>
+)}
 ```
 
-Vorteile:
-- Nutzer sieht das Vollvideo **vor** dem (kostenpflichtigen) Render
-- Bild-Szenen erscheinen via vorhandener `isImageScene`-Erkennung in `ComposerSequencePreview` korrekt als Bilder
-- Watermark-Mini-Vorschau bleibt als Positionierungs-Helfer im `WatermarkEditor` erhalten
+Wirkung: Bei 30 fps beginnt das Voiceover hörbar erst bei Frame 12 (≈ 0,4 s). Der Decoder hat weiterhin 1 s Vorlauf zum Initialisieren — Stutter ade, abgeschnittenes erstes Wort ade.
+
+#### 2) Lead-In zur Komposition addieren (Edge Function)
+
+**Datei:** `supabase/functions/compose-video-assemble/index.ts` (rund um Zeile 244 ff.)
+
+Die VO-Safety-Net-Logik muss das Lead-In mitrechnen, damit das Video nicht endet, bevor das VO ausgesprochen ist:
+
+```ts
+const VO_LEAD_IN_SECONDS = 0.4;
+const voDurationSeconds = Number(assemblyConfig?.voiceover?.durationSeconds) || 0;
+if (voiceoverEnabled && voDurationSeconds > 0) {
+  const voTotalFrames = Math.ceil((voDurationSeconds + VO_LEAD_IN_SECONDS) * fps);
+  if (voTotalFrames > durationInFrames) {
+    // bestehende Logik: Komposition entsprechend verlängern
+    durationInFrames = voTotalFrames;
+  }
+}
+```
+
+#### 3) Live-Vorschau im Editor mitziehen (WYSIWYG-Parität)
+
+**Datei:** `src/components/video-composer/ComposerSequencePreview.tsx` (Zeilen 544–566)
+
+Audio-Sync mit gleichem Offset, damit die Editor-Vorschau identisch zum Final-Render klingt:
+
+```tsx
+const VO_LEAD_IN_SECONDS = 0.4;
+// in beiden useEffects:
+const targetAudioTime = Math.max(0, globalTime - VO_LEAD_IN_SECONDS);
+audio.currentTime = Math.min(targetAudioTime, audio.duration || targetAudioTime);
+// pause/play ebenfalls erst ab globalTime >= VO_LEAD_IN_SECONDS
+if (playing && globalTime >= VO_LEAD_IN_SECONDS) audio.play();
+else audio.pause();
+```
 
 ### Verifikation
-1. Briefing → Modus „KI-Bilder" → Storyboard → Clips generieren → Export-Tab
-2. Vollvideo-Vorschau zeigt **alle Szenen als Bilder** (Ken-Burns-Pan), nicht schwarz
-3. „Video rendern" klicken → Render läuft erfolgreich durch (kein Code-4-Fehler mehr)
-4. Fertiges MP4 zeigt Bilder mit sanften Crossfades und Voiceover/Musik in Sync
-5. Gemischte Projekte (Video + Bild + Upload) → Render und Vorschau funktionieren beide
-6. Watermark-Positions-Vorschau im Export-Tab funktioniert weiterhin
+1. Composer → Voiceover generieren → Vorschau im Voiceover-Tab: ~0,4 s Stille, dann sauberes erstes Wort
+2. Export-Tab → Live-Vorschau zeigt dasselbe Verhalten
+3. Render starten → Final-MP4: erstes Wort vollständig hörbar, kein abrupter Start
+4. Längere VOs (>10 s) → Komposition wird automatisch um Lead-In verlängert, nichts wird abgeschnitten
+5. Gemischte Szenen (Bild + Video) → unverändert
 
 ### Risiko & Aufwand
-- **Risiko: niedrig.** Der Bilderpfad in Remotion (`KenBurnsImage`) ist seit Wochen produktiv (UniversalCreator/DirectorsCut). Wir aktivieren ihn nur für den Composer.
-- **Aufwand:** ~10 Min — 2 Dateien (Edge Function + AssemblyTab), keine DB-Änderung, keine neuen Abhängigkeiten.
+- **Risiko: niedrig.** Reine Timing-Verschiebung, keine Schema-Änderung.
+- **Aufwand:** ~5 Min — 3 Dateien (Template, Edge Function, Preview), keine DB-/API-Änderung.
 
