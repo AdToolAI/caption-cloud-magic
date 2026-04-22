@@ -245,11 +245,14 @@ serve(async (req) => {
 
     // Voiceover sync safety net: if a VO duration is recorded and longer than the
     // composed timeline, extend so it plays to completion.
+    // VO_LEAD_IN (2026-04-22): account for the 0.4s breath added by the template
+    // so the composition is long enough to play the VO to its end.
+    const VO_LEAD_IN_SECONDS = 0.4;
     const voDurationSeconds = Number(assemblyConfig?.voiceover?.durationSeconds) || 0;
     if (voDurationSeconds > 0) {
-      const voFrames = Math.ceil(voDurationSeconds * fps);
+      const voFrames = Math.ceil((voDurationSeconds + VO_LEAD_IN_SECONDS) * fps);
       if (voFrames > durationInFrames) {
-        console.log('[compose-video-assemble] Extending duration for VO sync:', { videoFrames: durationInFrames, voFrames });
+        console.log('[compose-video-assemble] Extending duration for VO sync (incl. lead-in):', { videoFrames: durationInFrames, voFrames, leadInSeconds: VO_LEAD_IN_SECONDS });
         durationInFrames = voFrames;
       }
     }
