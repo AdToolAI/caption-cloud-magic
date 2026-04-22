@@ -13,10 +13,18 @@ import { toast } from "@/hooks/use-toast";
 
 export default function Integrations() {
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, setLanguage } = useTranslation();
   const [userPlan, setUserPlan] = useState<string>("free");
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  // Force a specific UI language when ?lang= is present (used by Meta App Reviewers with ?lang=en)
+  useEffect(() => {
+    const langParam = searchParams.get('lang');
+    if (langParam === 'en' || langParam === 'de' || langParam === 'es') {
+      setLanguage(langParam as any);
+    }
+  }, [searchParams, setLanguage]);
 
   useEffect(() => {
     if (user) {
