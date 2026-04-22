@@ -113,9 +113,12 @@ Deno.serve(async (req) => {
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('scope', scopes);
     authUrl.searchParams.set('state', state);
-    // Force the full permission dialog (all scopes visible) instead of "Continue as ..." re-login screen.
+    // Force a full re-authentication so Meta does NOT short-circuit into the
+    // "Continue as ..." screen. Combined with a fresh auth_nonce this bypasses
+    // Meta's session cache and shows the full permission dialog again.
     // Required for Meta App Review screencast.
-    authUrl.searchParams.set('auth_type', 'rerequest');
+    authUrl.searchParams.set('auth_type', 'reauthenticate');
+    authUrl.searchParams.set('auth_nonce', crypto.randomUUID().replace(/-/g, ''));
     authUrl.searchParams.set('display', 'page');
 
     console.log('[instagram-oauth-start] Authorize URL built for user', user.id);
