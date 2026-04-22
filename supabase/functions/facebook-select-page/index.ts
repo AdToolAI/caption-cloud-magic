@@ -95,8 +95,9 @@ Deno.serve(async (req) => {
 
     // === Instagram finalization ===
     // Resolve the Instagram Business account linked to the chosen page.
+    // Try both classic and alternative link fields Meta may return.
     const igLookupRes = await fetch(
-      `https://graph.facebook.com/v24.0/${page_id}?fields=instagram_business_account&access_token=${page_access_token}`
+      `https://graph.facebook.com/v24.0/${page_id}?fields=instagram_business_account,connected_instagram_account&access_token=${page_access_token}`
     );
 
     if (!igLookupRes.ok) {
@@ -109,7 +110,8 @@ Deno.serve(async (req) => {
     }
 
     const igLookup = await igLookupRes.json();
-    const igUserId = igLookup?.instagram_business_account?.id;
+    const igUserId = igLookup?.instagram_business_account?.id
+      || igLookup?.connected_instagram_account?.id;
 
     if (!igUserId) {
       return new Response(
