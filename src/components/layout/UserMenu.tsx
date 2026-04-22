@@ -79,6 +79,12 @@ export function UserMenu() {
             <span>{t("header.billing")}</span>
           </Link>
         </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/integrations" className="flex items-center gap-2 cursor-pointer">
+            <Link2 className="h-4 w-4" />
+            <span>{t("nav.integrations")}</span>
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to="/pricing" className="flex items-center gap-2 cursor-pointer">
