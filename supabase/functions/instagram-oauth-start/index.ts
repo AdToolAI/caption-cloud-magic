@@ -113,6 +113,10 @@ Deno.serve(async (req) => {
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('scope', scopes);
     authUrl.searchParams.set('state', state);
+    // Force the full permission dialog (all scopes visible) instead of "Continue as ..." re-login screen.
+    // Required for Meta App Review screencast.
+    authUrl.searchParams.set('auth_type', 'rerequest');
+    authUrl.searchParams.set('display', 'page');
 
     console.log('[instagram-oauth-start] Authorize URL built for user', user.id);
 
