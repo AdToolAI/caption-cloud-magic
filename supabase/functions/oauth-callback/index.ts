@@ -341,6 +341,40 @@ async function getMetaAccountInfo(accessToken: string, provider: string) {
   };
 }
 
+/**
+ * Fetch Meta user info and return it as a "pending selection" account record.
+ * Used by both Facebook and Instagram now — the actual page (and for IG, the
+ * linked instagram_business_account) is chosen in the UI via the Page Select
+ * Dialog, mirroring the Facebook flow exactly.
+ */
+async function getMetaUserInfoForPending(accessToken: string, provider: string) {
+  const fbUserResponse = await fetch(
+    `https://graph.facebook.com/v24.0/me?fields=id,name&access_token=${accessToken}`
+  );
+
+  if (!fbUserResponse.ok) {
+    const errorText = await fbUserResponse.text();
+    console.error(`Failed to fetch Meta user info for ${provider}:`, errorText);
+    throw new Error('Failed to fetch Meta user info');
+  }
+
+  const fbUserData = await fbUserResponse.json();
+
+  console.log(`Meta User found for ${provider} (pending selection):`, {
+    id: fbUserData.id,
+    name: fbUserData.name,
+  });
+
+  return {
+    id: fbUserData.id,
+    name: provider === 'instagram'
+      ? `${fbUserData.name} (select Instagram account)`
+      : fbUserData.name,
+    account_type: provider === 'instagram' ? 'instagram_pending' : 'facebook_user',
+    selection_required: true,
+  };
+}
+
 async function exchangeTikTokToken(code: string) {
   const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY');
   const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET');
