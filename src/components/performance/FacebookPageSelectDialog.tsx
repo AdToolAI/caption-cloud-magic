@@ -151,7 +151,8 @@ export const FacebookPageSelectDialog = ({
   const iconBg = isInstagram ? "bg-pink-600" : "bg-blue-600";
 
   // Decide which empty-state message to show based on the classified status
-  // returned by facebook-list-pages.
+  // returned by facebook-list-pages (which now does real per-page IG
+  // verification, not just the inline /me/accounts hint).
   const renderEmptyState = () => {
     const showReconnect = !!onReconnect;
 
@@ -161,12 +162,12 @@ export const FacebookPageSelectDialog = ({
     if (resultStatus === 'no_pages_access' || (missingScopes.length > 0 && pages.length === 0)) {
       title = 'Keine Seitenfreigabe erhalten';
       body =
-        'Meta hat keine Facebook-Seiten freigegeben. Verbinde erneut und aktiviere im Meta-Dialog ALLE Toggles (insbesondere „Zugriff auf Seiten“ und „Instagram“).' +
+        'Meta hat keine Facebook-Seiten freigegeben. Verbinde erneut und aktiviere im Meta-Dialog ALLE Toggles (insbesondere „Zugriff auf Seiten" und „Instagram").' +
         (missingScopes.length ? ` Fehlende Berechtigungen: ${missingScopes.join(', ')}.` : '');
     } else if (resultStatus === 'pages_found_but_no_instagram_link') {
-      title = 'Kein verknüpftes Instagram-Profil';
+      title = 'Kein verknüpftes Instagram-Profil bestätigt';
       body =
-        'Es wurden Facebook-Seiten gefunden, aber keine ist mit einem Instagram Business-Konto verknüpft. Öffne deine Facebook-Seite → Einstellungen → Verknüpfte Konten und verbinde dort dein Instagram (Professional-Account).';
+        'Wir haben deine Facebook-Seiten gefunden und einzeln bei Meta geprüft, aber für keine Seite ein verknüpftes Instagram Business-Konto bestätigt bekommen. Öffne deine Facebook-Seite → Einstellungen → Verknüpfte Konten und verbinde dort dein Instagram (Professional-Account). Danach „Instagram erneut verbinden".';
     } else {
       title = isInstagram ? 'Keine Instagram-fähige Seite gefunden' : 'Keine Facebook-Seiten gefunden';
       body = isInstagram
@@ -215,7 +216,11 @@ export const FacebookPageSelectDialog = ({
         {loading ? (
           <div className="flex flex-col items-center justify-center py-8 gap-3">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Seiten werden geladen…</p>
+            <p className="text-sm text-muted-foreground">
+              {isInstagram
+                ? 'Verknüpfte Instagram-Konten werden bei Meta geprüft…'
+                : 'Seiten werden geladen…'}
+            </p>
           </div>
         ) : pages.length === 0 ? (
           renderEmptyState()
