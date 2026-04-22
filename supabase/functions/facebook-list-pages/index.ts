@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { decryptToken } from '../_shared/crypto.ts';
 import {
-  discoverMetaPages,
+  discoverMetaPagesWithDiagnostics,
   classifyDiscoveryResult,
   fetchMetaGrantedScopes,
   requiredPageScopesFor,
@@ -75,12 +75,15 @@ Deno.serve(async (req) => {
     const required = requiredPageScopesFor(provider);
     const missingScopes = required.filter((s) => !granted.includes(s));
 
-    // 2. Real per-page verification (this is the actual bugfix).
+    // 2. Real per-page verification with diagnostics.
     let pages;
+    let diagnostics;
     try {
-      pages = await discoverMetaPages(accessToken, {
+      const result = await discoverMetaPagesWithDiagnostics(accessToken, {
         verifyInstagram: provider === 'instagram',
       });
+      pages = result.pages;
+      diagnostics = result.diagnostics;
     } catch (e: any) {
       console.error('[facebook-list-pages] discoverMetaPages failed:', e);
       return new Response(JSON.stringify({
@@ -96,11 +99,37 @@ Deno.serve(async (req) => {
       });
     }
 
-    const resultStatus = classifyDiscoveryResult(pages, provider, missingScopes);
+    const resultStatus = classifyDiscoveryResult(pages, provider, missingScopes, diagnostics);
 
     // For Instagram: keep all pages but sort IG-capable ones first.
     if (provider === 'instagram') {
       pages = pages.sort((a, b) => Number(b.has_instagram) - Number(a.has_instagram));
+    }
+
+    // Persist diagnostics to account_metadata so the UI / support can see why
+    // discovery yielded what it did, without re-running it.
+    try {
+      await supabase
+        .from('social_connections')
+        .update({
+          account_metadata: {
+            ...(connection.account_metadata || {}),
+            meta_page_discovery_status: resultStatus,
+            meta_pages_found_count: diagnostics.pages_found_count,
+            meta_verified_instagram_count: diagnostics.verified_instagram_count,
+            meta_page_verify_failures: diagnostics.page_verify_failures,
+            meta_pages_with_token_count: diagnostics.pages_with_token_count,
+            meta_pages_with_inline_ig_count: diagnostics.pages_with_inline_ig_count,
+            meta_list_error: diagnostics.list_error,
+            meta_last_discovery_at: diagnostics.ran_at,
+            granted_scopes: granted,
+            declined_scopes: declined,
+            missing_page_scopes: missingScopes,
+          },
+        })
+        .eq('id', connection.id);
+    } catch (persistErr) {
+      console.warn('[facebook-list-pages] failed to persist diagnostics:', persistErr);
     }
 
     return new Response(JSON.stringify({
@@ -110,6 +139,7 @@ Deno.serve(async (req) => {
       granted_scopes: granted,
       declined_scopes: declined,
       missing_scopes: missingScopes,
+      diagnostics,
     }), {
       headers: { ...CORS, 'Content-Type': 'application/json' },
     });
