@@ -624,7 +624,45 @@ export const ConnectionsTab = () => {
 
     try {
       const connection = connections.find(c => c.id === connectionId);
-      
+
+      // Instagram: revoke Meta permissions FIRST so the next reconnect shows
+      // the full permission dialog (matches the Facebook reconnect behaviour
+      // and is required for the Meta App Review screencast).
+      if (connection?.provider === 'instagram') {
+        const { data: session } = await supabase.auth.getSession();
+        const { data: revokeData, error: revokeError } = await supabase.functions.invoke(
+          'instagram-oauth-revoke',
+          {
+            body: { connectionId },
+            headers: {
+              Authorization: `Bearer ${session.session?.access_token}`,
+            },
+          }
+        );
+        if (revokeError) {
+          // Soft-fail: still attempt the local delete below
+          console.warn('[ConnectionsTab] Instagram revoke failed:', revokeError);
+        } else if (revokeData?.connectionDeleted) {
+          // Edge function already removed the row — skip the local delete
+          await emit({
+            event_type: 'performance.account.disconnected',
+            source: 'connections_tab',
+            payload: {
+              provider: connection?.provider,
+              account_name: connection?.account_name,
+              meta_revoked: !!revokeData?.revoked,
+            },
+          }, { silent: true });
+
+          toast({
+            title: t('common.success'),
+            description: 'Account disconnected successfully',
+          });
+          fetchConnections();
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from('social_connections')
         .delete()
