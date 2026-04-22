@@ -552,3 +552,95 @@ async function getYouTubeAccountInfo(accessToken: string) {
     name: data.items[0].snippet.title
   };
 }
+
+/**
+ * Exchange a short-lived Meta user access token for a long-lived (~60 days) one.
+ * Required for Instagram Business publishing reliability.
+ */
+async function exchangeForLongLivedToken(shortLivedToken: string) {
+  const clientId = Deno.env.get('META_APP_ID');
+  const clientSecret = Deno.env.get('META_APP_SECRET');
+
+  const url = `https://graph.facebook.com/v24.0/oauth/access_token?` +
+    `grant_type=fb_exchange_token&` +
+    `client_id=${clientId}&` +
+    `client_secret=${clientSecret}&` +
+    `fb_exchange_token=${shortLivedToken}`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Long-lived token exchange failed: ${body}`);
+  }
+  const data = await response.json();
+  return {
+    access_token: data.access_token,
+    expires_at: data.expires_in
+      ? new Date(Date.now() + data.expires_in * 1000).toISOString()
+      : null,
+  };
+}
+
+/**
+ * Discover the user's Instagram Business account via their Facebook Pages.
+ * Returns IG profile info (id, username, profile picture, followers) needed
+ * to satisfy Meta's `instagram_basic` review (data must be visibly consumed).
+ */
+async function getInstagramBusinessAccountInfo(accessToken: string) {
+  // 1. List the user's Facebook Pages
+  const pagesRes = await fetch(
+    `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${accessToken}`
+  );
+
+  if (!pagesRes.ok) {
+    const body = await pagesRes.text();
+    console.error('[oauth-callback] Failed to fetch FB pages for IG:', body);
+    throw new Error(`Failed to fetch Facebook Pages: ${body}`);
+  }
+
+  const pagesData = await pagesRes.json();
+  const pages = pagesData.data || [];
+
+  // 2. Find the first Page that has an Instagram Business account linked
+  const pageWithIg = pages.find((p: any) => p.instagram_business_account?.id);
+  if (!pageWithIg) {
+    throw new Error(
+      'No Instagram Business account found on your Facebook Pages. Please connect an Instagram Business or Creator account to a Facebook Page first.'
+    );
+  }
+
+  const igUserId = pageWithIg.instagram_business_account.id;
+  const pageAccessToken = pageWithIg.access_token;
+
+  // 3. Fetch the IG Business profile data — proves instagram_basic is consumed
+  const profileRes = await fetch(
+    `https://graph.facebook.com/v24.0/${igUserId}?fields=id,username,profile_picture_url,account_type,media_count,followers_count&access_token=${pageAccessToken}`
+  );
+
+  if (!profileRes.ok) {
+    const body = await profileRes.text();
+    console.error('[oauth-callback] IG profile fetch failed:', body);
+    throw new Error(`Failed to fetch Instagram profile: ${body}`);
+  }
+
+  const profile = await profileRes.json();
+  console.log('[oauth-callback] IG Business profile loaded:', {
+    id: profile.id,
+    username: profile.username,
+    followers: profile.followers_count,
+  });
+
+  // Encrypt the page access token (used later by instagram-publish edge function)
+  const pageTokenEncrypted = await encryptToken(pageAccessToken);
+
+  return {
+    id: igUserId,
+    name: profile.username ? `@${profile.username}` : igUserId,
+    account_type: profile.account_type || 'BUSINESS',
+    profile_picture_url: profile.profile_picture_url || null,
+    followers_count: profile.followers_count ?? null,
+    media_count: profile.media_count ?? null,
+    page_id: pageWithIg.id,
+    page_access_token_encrypted: pageTokenEncrypted,
+  };
+}
