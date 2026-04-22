@@ -1086,6 +1086,7 @@ export const ConnectionsTab = () => {
         open={showPageSelectDialog}
         onOpenChange={setShowPageSelectDialog}
         onPageSelected={fetchConnections}
+        mode={pageSelectMode}
       />
     </div>
   );
