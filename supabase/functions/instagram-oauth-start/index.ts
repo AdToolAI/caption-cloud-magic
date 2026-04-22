@@ -56,6 +56,52 @@ Deno.serve(async (req) => {
       throw new Error('META_APP_ID not configured');
     }
 
+    // ----- Best-effort BACKEND hard-reset of the Meta app grant -----
+    // Safety net in case the frontend skipped the explicit revoke call.
+    // Meta otherwise short-circuits the consent dialog with the
+    // "You previously logged into ..." screen, which is exactly what
+    // we are trying to avoid for Instagram reconnects.
+    try {
+      const { data: metaConnections } = await supabase
+        .from('social_connections')
+        .select('id, provider, access_token_hash')
+        .eq('user_id', user.id)
+        .in('provider', ['instagram', 'facebook']);
+
+      for (const conn of metaConnections ?? []) {
+        if (!conn.access_token_hash) continue;
+        try {
+          const userToken = await decryptToken(conn.access_token_hash);
+          const meRes = await fetch(
+            `https://graph.facebook.com/v24.0/me?fields=id&access_token=${encodeURIComponent(userToken)}`
+          );
+          if (!meRes.ok) continue;
+          const me = await meRes.json();
+          const metaUserId = me?.id;
+          if (!metaUserId) continue;
+          const revokeRes = await fetch(
+            `https://graph.facebook.com/v24.0/${metaUserId}/permissions?access_token=${encodeURIComponent(userToken)}`,
+            { method: 'DELETE' }
+          );
+          if (revokeRes.ok) {
+            console.log('[instagram-oauth-start] backend revoke OK via', conn.provider);
+            break;
+          }
+        } catch (e) {
+          console.warn('[instagram-oauth-start] backend revoke skip', conn.provider, e);
+        }
+      }
+
+      // Always purge stale ig + fb rows so the new connection starts clean.
+      await supabase
+        .from('social_connections')
+        .delete()
+        .eq('user_id', user.id)
+        .in('provider', ['instagram', 'facebook']);
+    } catch (resetErr) {
+      console.warn('[instagram-oauth-start] backend hard-reset failed (continuing):', resetErr);
+    }
+
     // Use the same callback path as Facebook (already registered in Meta App settings)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
