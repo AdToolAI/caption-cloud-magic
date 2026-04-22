@@ -51,10 +51,10 @@ Deno.serve(async (req) => {
       // optional
     }
 
-    // Find the IG connection (by id or by provider)
+    // Find the IG connection (by id or by provider) — token is stored in access_token_hash
     const query = supabase
       .from('social_connections')
-      .select('id, provider, access_token, account_id, account_metadata')
+      .select('id, provider, access_token_hash, account_id, account_metadata')
       .eq('user_id', user.id)
       .eq('provider', 'instagram');
 
@@ -70,10 +70,12 @@ Deno.serve(async (req) => {
     const connection = connections?.[0];
     let revoked = false;
     let revokeError: string | null = null;
+    let metaUserResolved = false;
 
-    if (connection?.access_token) {
+    if (connection?.access_token_hash) {
       try {
-        const userToken = await decryptToken(connection.access_token);
+        const userToken = await decryptToken(connection.access_token_hash);
+        console.log('[instagram-oauth-revoke] Token decrypted successfully, length:', userToken.length);
 
         // Step 1: discover the Meta user id (the token owner) — required for the
         // permissions endpoint. The IG business account id won't work here.
@@ -84,27 +86,33 @@ Deno.serve(async (req) => {
         if (meRes.ok) {
           const me = await meRes.json();
           const metaUserId = me?.id;
+          metaUserResolved = !!metaUserId;
 
           if (metaUserId) {
+            console.log('[instagram-oauth-revoke] Resolved Meta user id:', metaUserId);
+
             // Step 2: revoke ALL app permissions for this Meta user
             const revokeRes = await fetch(
               `https://graph.facebook.com/v24.0/${metaUserId}/permissions?access_token=${encodeURIComponent(userToken)}`,
               { method: 'DELETE' }
             );
 
+            const revokeBody = await revokeRes.text();
+
             if (revokeRes.ok) {
               revoked = true;
-              console.log('[instagram-oauth-revoke] Permissions revoked for Meta user', metaUserId);
+              console.log('[instagram-oauth-revoke] ✅ Permissions revoked for Meta user', metaUserId, 'response:', revokeBody);
             } else {
-              revokeError = await revokeRes.text();
-              console.warn('[instagram-oauth-revoke] Revoke call failed:', revokeError);
+              revokeError = `Revoke ${revokeRes.status}: ${revokeBody}`;
+              console.warn('[instagram-oauth-revoke] ❌ Revoke call failed:', revokeError);
             }
           } else {
             revokeError = 'Could not resolve Meta user id from token';
             console.warn('[instagram-oauth-revoke]', revokeError);
           }
         } else {
-          revokeError = await meRes.text();
+          const meBody = await meRes.text();
+          revokeError = `/me ${meRes.status}: ${meBody}`;
           console.warn('[instagram-oauth-revoke] /me call failed:', revokeError);
         }
       } catch (decryptErr) {
@@ -112,11 +120,12 @@ Deno.serve(async (req) => {
         console.warn('[instagram-oauth-revoke] Could not decrypt token (continuing with DB delete):', revokeError);
       }
     } else {
-      revokeError = 'No connection or token found — skipping Meta revoke';
+      revokeError = 'No connection or access_token_hash found — skipping Meta revoke';
       console.log('[instagram-oauth-revoke]', revokeError);
     }
 
     // Always delete the local row, even if the Meta call failed (graceful fallback)
+    let connectionDeleted = false;
     if (connection?.id) {
       const { error: deleteErr } = await supabase
         .from('social_connections')
@@ -128,6 +137,7 @@ Deno.serve(async (req) => {
         console.error('[instagram-oauth-revoke] DB delete failed:', deleteErr);
         throw deleteErr;
       }
+      connectionDeleted = true;
     }
 
     return new Response(
@@ -135,7 +145,8 @@ Deno.serve(async (req) => {
         success: true,
         revoked,
         revokeError,
-        connectionDeleted: !!connection?.id,
+        connectionDeleted,
+        metaUserResolved,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
