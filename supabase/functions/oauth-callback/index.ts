@@ -133,12 +133,23 @@ serve(async (req) => {
             igAutoSelected = true;
             console.log('[oauth-callback] IG auto-selected single page:', autoResolved.id);
           } else {
-            // Multiple IG-capable pages → fall back to staged Page Select flow.
+            // Multiple/zero IG-capable pages → fall back to staged Page Select flow.
             accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
           }
         } catch (autoErr) {
           console.warn('[oauth-callback] IG auto-resolve failed, falling back to pending:', autoErr);
           accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
+        }
+        // Always attach permission diagnostics so the UI can decide whether
+        // to force a re-consent on the next attempt.
+        try {
+          const perms = await fetchMetaPermissions(tokenData.access_token);
+          (accountInfo as any).granted_scopes = perms.granted;
+          (accountInfo as any).declined_scopes = perms.declined;
+          const required = ['pages_show_list', 'instagram_basic'];
+          (accountInfo as any).missing_page_scopes = required.filter((s) => !perms.granted.includes(s));
+        } catch (e) {
+          console.warn('[oauth-callback] permission probe failed:', e);
         }
         break;
       case 'facebook':
@@ -197,6 +208,9 @@ serve(async (req) => {
           ...(accountInfo as any).media_count !== undefined ? { media_count: (accountInfo as any).media_count } : {},
           ...(accountInfo as any).page_id ? { page_id: (accountInfo as any).page_id } : {},
           ...(accountInfo as any).page_access_token_encrypted ? { page_access_token_encrypted: (accountInfo as any).page_access_token_encrypted } : {},
+          ...(accountInfo as any).granted_scopes ? { granted_scopes: (accountInfo as any).granted_scopes } : {},
+          ...(accountInfo as any).declined_scopes ? { declined_scopes: (accountInfo as any).declined_scopes } : {},
+          ...(accountInfo as any).missing_page_scopes ? { missing_page_scopes: (accountInfo as any).missing_page_scopes } : {},
           ...(provider === 'instagram' ? { connected_via: 'oauth_user_token' } : {}),
         }
       }, {
@@ -405,8 +419,9 @@ async function getMetaUserInfoForPending(accessToken: string, provider: string) 
  */
 async function tryAutoResolveInstagram(userAccessToken: string): Promise<any | null> {
   // 1. List pages with their linked IG business account in one call.
+  // Include both classic and alternative IG link fields.
   const pagesRes = await fetch(
-    `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,category,picture{url},access_token,instagram_business_account&access_token=${userAccessToken}`
+    `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,category,picture{url},access_token,instagram_business_account,connected_instagram_account&access_token=${userAccessToken}`
   );
   if (!pagesRes.ok) {
     const err = await pagesRes.text();
@@ -415,7 +430,12 @@ async function tryAutoResolveInstagram(userAccessToken: string): Promise<any | n
   }
   const pagesJson = await pagesRes.json();
   const pages: any[] = pagesJson?.data || [];
-  const igPages = pages.filter((p) => p?.instagram_business_account?.id);
+  const igPages = pages
+    .map((p) => ({
+      ...p,
+      _ig_id: p?.instagram_business_account?.id || p?.connected_instagram_account?.id || null,
+    }))
+    .filter((p) => p._ig_id);
 
   if (igPages.length !== 1) {
     console.log('[tryAutoResolveInstagram] IG-capable page count:', igPages.length);
@@ -423,7 +443,7 @@ async function tryAutoResolveInstagram(userAccessToken: string): Promise<any | n
   }
 
   const page = igPages[0];
-  const igUserId = page.instagram_business_account.id;
+  const igUserId = page._ig_id;
   const pageAccessToken = page.access_token;
 
   // 2. Fetch IG profile (proves instagram_basic is consumed for App Review).
@@ -452,6 +472,30 @@ async function tryAutoResolveInstagram(userAccessToken: string): Promise<any | n
     // Explicitly NOT setting selection_required so the metadata block in the
     // upsert does not flag this connection as pending.
   };
+}
+
+/**
+ * Fetch granted/declined Meta permissions for the current user token.
+ * Used to surface page-scope rejections to the UI so it can force a
+ * re-consent dialog on the next connect attempt.
+ */
+async function fetchMetaPermissions(
+  userAccessToken: string,
+): Promise<{ granted: string[]; declined: string[] }> {
+  const res = await fetch(
+    `https://graph.facebook.com/v24.0/me/permissions?access_token=${userAccessToken}`
+  );
+  if (!res.ok) {
+    return { granted: [], declined: [] };
+  }
+  const json = await res.json();
+  const granted: string[] = [];
+  const declined: string[] = [];
+  for (const p of json?.data ?? []) {
+    if (p.status === 'granted') granted.push(p.permission);
+    else declined.push(p.permission);
+  }
+  return { granted, declined };
 }
 
 async function exchangeTikTokToken(code: string) {

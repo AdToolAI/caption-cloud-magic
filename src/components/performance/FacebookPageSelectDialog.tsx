@@ -30,6 +30,13 @@ interface FacebookPageSelectDialogProps {
   onOpenChange: (open: boolean) => void;
   onPageSelected: () => void;
   mode?: DialogMode;
+  /**
+   * Optional handler used by the "Erneut verbinden" CTA shown when Meta did
+   * not return any usable Page (missing scopes or no IG link). It should
+   * trigger the same OAuth flow the user just came from, ideally with
+   * forced re-consent.
+   */
+  onReconnect?: () => void;
 }
 
 export const FacebookPageSelectDialog = ({
@@ -37,11 +44,14 @@ export const FacebookPageSelectDialog = ({
   onOpenChange,
   onPageSelected,
   mode = "facebook",
+  onReconnect,
 }: FacebookPageSelectDialogProps) => {
   const { toast } = useToast();
   const [pages, setPages] = useState<FacebookPage[]>([]);
   const [loading, setLoading] = useState(false);
   const [selecting, setSelecting] = useState<string | null>(null);
+  const [resultStatus, setResultStatus] = useState<string | null>(null);
+  const [missingScopes, setMissingScopes] = useState<string[]>([]);
 
   const isInstagram = mode === "instagram";
 
@@ -67,6 +77,8 @@ export const FacebookPageSelectDialog = ({
       if (data?.pages) {
         setPages(data.pages);
       }
+      setResultStatus(data?.status ?? null);
+      setMissingScopes(Array.isArray(data?.missing_scopes) ? data.missing_scopes : []);
     } catch (error: any) {
       console.error(`Failed to fetch ${mode} pages:`, error);
       toast({
@@ -138,6 +150,51 @@ export const FacebookPageSelectDialog = ({
   const Icon = isInstagram ? Instagram : Facebook;
   const iconBg = isInstagram ? "bg-pink-600" : "bg-blue-600";
 
+  // Decide which empty-state message to show based on the classified status
+  // returned by facebook-list-pages.
+  const renderEmptyState = () => {
+    const showReconnect = !!onReconnect;
+
+    let title: string;
+    let body: string;
+
+    if (resultStatus === 'no_pages_access' || (missingScopes.length > 0 && pages.length === 0)) {
+      title = 'Keine Seitenfreigabe erhalten';
+      body =
+        'Meta hat keine Facebook-Seiten freigegeben. Verbinde erneut und aktiviere im Meta-Dialog ALLE Toggles (insbesondere „Zugriff auf Seiten“ und „Instagram“).' +
+        (missingScopes.length ? ` Fehlende Berechtigungen: ${missingScopes.join(', ')}.` : '');
+    } else if (resultStatus === 'pages_found_but_no_instagram_link') {
+      title = 'Kein verknüpftes Instagram-Profil';
+      body =
+        'Es wurden Facebook-Seiten gefunden, aber keine ist mit einem Instagram Business-Konto verknüpft. Öffne deine Facebook-Seite → Einstellungen → Verknüpfte Konten und verbinde dort dein Instagram (Professional-Account).';
+    } else {
+      title = isInstagram ? 'Keine Instagram-fähige Seite gefunden' : 'Keine Facebook-Seiten gefunden';
+      body = isInstagram
+        ? 'Verknüpfe zuerst dein Instagram Business-Konto mit einer Facebook-Seite und versuche es erneut.'
+        : 'Stelle sicher, dass dein Facebook-Konto mindestens eine Seite verwaltet.';
+    }
+
+    return (
+      <div className="py-6 text-center space-y-3">
+        <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground" />
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-xs text-muted-foreground px-2">{body}</p>
+        {showReconnect && (
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => {
+              onOpenChange(false);
+              onReconnect?.();
+            }}
+          >
+            {isInstagram ? 'Instagram erneut verbinden' : 'Facebook erneut verbinden'}
+          </Button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -161,14 +218,7 @@ export const FacebookPageSelectDialog = ({
             <p className="text-sm text-muted-foreground">Seiten werden geladen…</p>
           </div>
         ) : pages.length === 0 ? (
-          <div className="py-8 text-center space-y-2">
-            <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              {isInstagram
-                ? "Keine Facebook-Seite mit verknüpftem Instagram Business-Konto gefunden. Verknüpfe zuerst dein Instagram Business-Konto mit einer Facebook-Seite."
-                : "Keine Facebook-Seiten gefunden. Stelle sicher, dass dein Facebook-Konto mindestens eine Seite verwaltet."}
-            </p>
-          </div>
+          renderEmptyState()
         ) : (
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {pages.map((page) => {
