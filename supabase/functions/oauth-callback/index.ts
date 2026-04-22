@@ -220,8 +220,9 @@ serve(async (req) => {
   } catch (error) {
     console.error('OAuth callback error:', error);
     const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';
+    const errorMessage = error instanceof Error ? error.message : 'OAuth connection failed';
     return Response.redirect(
-      `${appUrl}/performance?error=${encodeURIComponent('OAuth connection failed')}`,
+      `${appUrl}/integrations?status=error&tab=connections&message=${encodeURIComponent(errorMessage)}`,
       302
     );
   }
@@ -612,9 +613,12 @@ async function getInstagramBusinessAccountInfo(accessToken: string) {
   const igUserId = pageWithIg.instagram_business_account.id;
   const pageAccessToken = pageWithIg.access_token;
 
-  // 3. Fetch the IG Business profile data — proves instagram_basic is consumed
+  // 3. Fetch the IG Business profile data — proves instagram_basic is consumed.
+  // NOTE: `account_type` is no longer a valid field on /{ig-business-id} in
+  // Graph API v24. Including it crashes the whole request with (#100).
+  // All accounts reachable via /me/accounts are by definition BUSINESS/CREATOR.
   const profileRes = await fetch(
-    `https://graph.facebook.com/v24.0/${igUserId}?fields=id,username,profile_picture_url,account_type,media_count,followers_count&access_token=${pageAccessToken}`
+    `https://graph.facebook.com/v24.0/${igUserId}?fields=id,username,profile_picture_url,media_count,followers_count&access_token=${pageAccessToken}`
   );
 
   if (!profileRes.ok) {
@@ -636,7 +640,8 @@ async function getInstagramBusinessAccountInfo(accessToken: string) {
   return {
     id: igUserId,
     name: profile.username ? `@${profile.username}` : igUserId,
-    account_type: profile.account_type || 'BUSINESS',
+    // Hardcoded: only Business/Creator accounts are reachable via /me/accounts.
+    account_type: 'BUSINESS',
     profile_picture_url: profile.profile_picture_url || null,
     followers_count: profile.followers_count ?? null,
     media_count: profile.media_count ?? null,
