@@ -132,10 +132,11 @@ export const ConnectionsTab = () => {
         window.history.replaceState({}, '', window.location.pathname + '?tab=connections');
       } else if (connected) {
         // Legacy callback format (backwards compatibility)
-        // For Facebook: always show page selection dialog
-        if (connected === 'facebook') {
+        // Facebook AND Instagram: always show page selection dialog
+        if (connected === 'facebook' || connected === 'instagram') {
           setTimeout(async () => {
             await fetchConnections();
+            setPageSelectMode(connected as 'facebook' | 'instagram');
             setShowPageSelectDialog(true);
           }, 1500);
         } else {
