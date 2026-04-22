@@ -8,8 +8,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Facebook, Loader2, CheckCircle2 } from "lucide-react";
+import { Facebook, Instagram, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FacebookPage {
@@ -18,29 +19,37 @@ interface FacebookPage {
   category: string;
   picture_url: string | null;
   access_token: string;
+  has_instagram?: boolean;
+  instagram_business_account_id?: string | null;
 }
+
+type DialogMode = "facebook" | "instagram";
 
 interface FacebookPageSelectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPageSelected: () => void;
+  mode?: DialogMode;
 }
 
 export const FacebookPageSelectDialog = ({
   open,
   onOpenChange,
   onPageSelected,
+  mode = "facebook",
 }: FacebookPageSelectDialogProps) => {
   const { toast } = useToast();
   const [pages, setPages] = useState<FacebookPage[]>([]);
   const [loading, setLoading] = useState(false);
   const [selecting, setSelecting] = useState<string | null>(null);
 
+  const isInstagram = mode === "instagram";
+
   useEffect(() => {
     if (open) {
       fetchPages();
     }
-  }, [open]);
+  }, [open, mode]);
 
   const fetchPages = async () => {
     setLoading(true);
@@ -50,6 +59,7 @@ export const FacebookPageSelectDialog = ({
         headers: {
           Authorization: `Bearer ${session.session?.access_token}`,
         },
+        body: { provider: mode },
       });
 
       if (error) throw error;
@@ -58,10 +68,12 @@ export const FacebookPageSelectDialog = ({
         setPages(data.pages);
       }
     } catch (error: any) {
-      console.error("Failed to fetch Facebook pages:", error);
+      console.error(`Failed to fetch ${mode} pages:`, error);
       toast({
         title: "Fehler",
-        description: "Facebook-Seiten konnten nicht geladen werden.",
+        description: isInstagram
+          ? "Instagram-fähige Facebook-Seiten konnten nicht geladen werden."
+          : "Facebook-Seiten konnten nicht geladen werden.",
         variant: "destructive",
       });
     } finally {
@@ -70,6 +82,15 @@ export const FacebookPageSelectDialog = ({
   };
 
   const handleSelectPage = async (page: FacebookPage) => {
+    if (isInstagram && !page.has_instagram) {
+      toast({
+        title: "Kein Instagram verknüpft",
+        description: `"${page.name}" hat kein verknüpftes Instagram Business-Konto.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSelecting(page.id);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -77,12 +98,12 @@ export const FacebookPageSelectDialog = ({
 
       const { data: session } = await supabase.auth.getSession();
 
-      // Call edge function to save page selection with encrypted page access token
       const { data, error } = await supabase.functions.invoke("facebook-select-page", {
         headers: {
           Authorization: `Bearer ${session.session?.access_token}`,
         },
         body: {
+          provider: mode,
           page_id: page.id,
           page_name: page.name,
           page_category: page.category,
@@ -94,8 +115,10 @@ export const FacebookPageSelectDialog = ({
       if (error) throw error;
 
       toast({
-        title: "Seite ausgewählt",
-        description: `"${page.name}" wurde als Facebook-Seite verbunden.`,
+        title: isInstagram ? "Instagram verbunden" : "Seite ausgewählt",
+        description: isInstagram
+          ? `Instagram-Konto von "${page.name}" wurde verbunden.`
+          : `"${page.name}" wurde als Facebook-Seite verbunden.`,
       });
 
       onOpenChange(false);
@@ -104,7 +127,7 @@ export const FacebookPageSelectDialog = ({
       console.error("Failed to select page:", error);
       toast({
         title: "Fehler",
-        description: "Seite konnte nicht gespeichert werden.",
+        description: error?.message || "Auswahl konnte nicht gespeichert werden.",
         variant: "destructive",
       });
     } finally {
@@ -112,18 +135,23 @@ export const FacebookPageSelectDialog = ({
     }
   };
 
+  const Icon = isInstagram ? Instagram : Facebook;
+  const iconBg = isInstagram ? "bg-pink-600" : "bg-blue-600";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-blue-600">
-              <Facebook className="h-4 w-4 text-white" />
+            <div className={`p-1.5 rounded-lg ${iconBg}`}>
+              <Icon className="h-4 w-4 text-white" />
             </div>
-            Facebook-Seite auswählen
+            {isInstagram ? "Instagram-Konto auswählen" : "Facebook-Seite auswählen"}
           </DialogTitle>
           <DialogDescription>
-            Wähle die Facebook-Seite, die du mit CaptionGenie verbinden möchtest.
+            {isInstagram
+              ? "Wähle die Facebook-Seite, deren verknüpftes Instagram Business-Konto verbunden werden soll."
+              : "Wähle die Facebook-Seite, die du mit CaptionGenie verbinden möchtest."}
           </DialogDescription>
         </DialogHeader>
 
@@ -133,39 +161,59 @@ export const FacebookPageSelectDialog = ({
             <p className="text-sm text-muted-foreground">Seiten werden geladen…</p>
           </div>
         ) : pages.length === 0 ? (
-          <div className="py-8 text-center">
+          <div className="py-8 text-center space-y-2">
+            <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              Keine Facebook-Seiten gefunden. Stelle sicher, dass dein Facebook-Konto mindestens eine Seite verwaltet.
+              {isInstagram
+                ? "Keine Facebook-Seite mit verknüpftem Instagram Business-Konto gefunden. Verknüpfe zuerst dein Instagram Business-Konto mit einer Facebook-Seite."
+                : "Keine Facebook-Seiten gefunden. Stelle sicher, dass dein Facebook-Konto mindestens eine Seite verwaltet."}
             </p>
           </div>
         ) : (
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {pages.map((page) => (
-              <button
-                key={page.id}
-                onClick={() => handleSelectPage(page)}
-                disabled={selecting !== null}
-                className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/50 hover:border-primary/30 transition-all duration-200 text-left disabled:opacity-50"
-              >
-                <Avatar className="h-10 w-10">
-                  {page.picture_url ? (
-                    <AvatarImage src={page.picture_url} alt={page.name} />
-                  ) : null}
-                  <AvatarFallback className="bg-blue-100 text-blue-700 text-sm font-semibold">
-                    {page.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{page.name}</p>
-                  <p className="text-xs text-muted-foreground">{page.category}</p>
-                </div>
-                {selecting === page.id ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                ) : (
-                  <CheckCircle2 className="h-5 w-5 text-muted-foreground/30" />
-                )}
-              </button>
-            ))}
+            {pages.map((page) => {
+              const disabled = selecting !== null || (isInstagram && !page.has_instagram);
+              return (
+                <button
+                  key={page.id}
+                  onClick={() => handleSelectPage(page)}
+                  disabled={disabled}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/50 hover:border-primary/30 transition-all duration-200 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Avatar className="h-10 w-10">
+                    {page.picture_url ? (
+                      <AvatarImage src={page.picture_url} alt={page.name} />
+                    ) : null}
+                    <AvatarFallback className="bg-blue-100 text-blue-700 text-sm font-semibold">
+                      {page.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{page.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-muted-foreground truncate">{page.category}</p>
+                      {isInstagram && (
+                        page.has_instagram ? (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1">
+                            <Instagram className="h-2.5 w-2.5" />
+                            IG verknüpft
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">
+                            kein IG
+                          </Badge>
+                        )
+                      )}
+                    </div>
+                  </div>
+                  {selecting === page.id ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  ) : (
+                    <CheckCircle2 className={`h-5 w-5 ${isInstagram && !page.has_instagram ? "text-muted-foreground/20" : "text-muted-foreground/30"}`} />
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 
