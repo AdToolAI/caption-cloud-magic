@@ -238,7 +238,7 @@ async function exchangeMetaToken(code: string) {
   });
 
   const response = await fetch(
-    `https://graph.facebook.com/v18.0/oauth/access_token?` +
+    `https://graph.facebook.com/v24.0/oauth/access_token?` +
     `client_id=${clientId}&` +
     `client_secret=${clientSecret}&` +
     `code=${code}&` +
