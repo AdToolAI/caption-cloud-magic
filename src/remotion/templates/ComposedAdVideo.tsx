@@ -391,21 +391,22 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
           to initialize before the first frame is rendered, eliminating
           initial cold-start audio glitches. */}
       {voEnabled && (() => {
-        // VO_LEAD_IN (2026-04-22): 0.4s breath before the first spoken word.
-        // Prevents clipped first word + abrupt onset. Pre-buffer (1s) is preserved
-        // so the audio decoder still warms up before the audible start.
+        // VO_LEAD_IN (2026-04-22b): 0.4s breath before the first spoken word.
+        // The 12-frame silence at the start gives the MP3 decoder enough warm-up
+        // time, so we drop the prior 1s pre-buffer (which incorrectly skipped
+        // ~2s of audio because of a startFrom/from offset miscalculation that
+        // ate the entire first sentence in the rendered MP4).
         const VO_LEAD_IN_FRAMES = Math.round(fps * 0.4);
         return (
           <Sequence
-            from={VO_LEAD_IN_FRAMES - fps}
-            durationInFrames={durationInFrames - VO_LEAD_IN_FRAMES + fps}
+            from={VO_LEAD_IN_FRAMES}
+            durationInFrames={durationInFrames - VO_LEAD_IN_FRAMES}
           >
             <Audio
               key="composer-voiceover-stable"
               src={voiceoverUrl as string}
               volume={1}
               loop={false}
-              startFrom={fps}
             />
           </Sequence>
         );
