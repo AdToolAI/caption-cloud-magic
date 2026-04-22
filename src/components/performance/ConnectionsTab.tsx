@@ -357,10 +357,10 @@ export const ConnectionsTab = () => {
       const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback`;
       
       const oauthUrls: Record<string, string> = {
-        instagram: (() => {
-          const fullRedirectUri = `${redirectUri}?provider=instagram`;
-          return `https://api.instagram.com/oauth/authorize?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(fullRedirectUri)}&scope=user_profile,user_media&response_type=code&state=${encodeURIComponent(state)}`;
-        })(),
+        // Instagram uses the SAME Facebook OAuth dialog as the facebook flow
+        // (state.provider already encodes which provider this is). Only the
+        // scopes are extended with instagram_basic + instagram_content_publish.
+        instagram: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_content_publish&state=${encodeURIComponent(state)}`,
         facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_read_engagement,pages_manage_metadata,pages_show_list,pages_read_user_content,pages_manage_posts,pages_manage_engagement&state=${encodeURIComponent(state)}`,
         tiktok: `/api/oauth/tiktok/start?user_id=${user.id}`,
         linkedin: `/api/oauth/linkedin/start?user_id=${user.id}`,
