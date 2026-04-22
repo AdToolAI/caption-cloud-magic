@@ -39,6 +39,7 @@ export const ConnectionsTab = () => {
   const [userPlan, setUserPlan] = useState<string>('free');
   const [xCallbackError, setXCallbackError] = useState<string | null>(null);
   const [showPageSelectDialog, setShowPageSelectDialog] = useState(false);
+  const [pageSelectMode, setPageSelectMode] = useState<"facebook" | "instagram">("facebook");
 
   useEffect(() => {
     const initializeAndHandleCallback = async () => {
