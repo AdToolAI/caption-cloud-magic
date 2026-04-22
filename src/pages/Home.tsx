@@ -593,7 +593,7 @@ const Home = () => {
             const hh = String(d.getHours()).padStart(2, "0");
             const mins = String(d.getMinutes()).padStart(2, "0");
             nextLabel = `${dd}.${mm}. ${hh}:${mins}`;
-            prefix = "Nächster Vorschlag";
+            prefix = t("dashboard.statusBar.nextSuggestion");
             nextPostInfo = {
               platform: stratNext.platform,
               contentIdea: stratNext.content_idea,
@@ -644,12 +644,12 @@ const Home = () => {
         {user && (
             <Section 
               title={t("dashboard.sections.thisWeek")}
-              description={sm.enabled ? "Dein KI-Co-Pilot — neue Vorschläge jede Woche, automatisch." : t("dashboard.sections.thisWeekDescription")}
+              description={sm.enabled ? t("strategy.aiCopilotTagline") : t("dashboard.sections.thisWeekDescription")}
               action={
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                     <Sparkles className={cn("h-3.5 w-3.5", sm.enabled && "text-warning")} />
-                    Strategie-Modus
+                    {t("strategy.modeToggle")}
                     <Switch
                       checked={sm.enabled}
                       onCheckedChange={(v) => sm.toggle(v)}
