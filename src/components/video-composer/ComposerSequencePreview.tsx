@@ -542,13 +542,18 @@ export default function ComposerSequencePreview({
   }, [globalTime, totalDuration, onTimeUpdate]);
 
   // ── Voiceover audio sync ──────────────────────────────────────
+  // VO_LEAD_IN (2026-04-22): mirror the 0.4s breath added by the Remotion
+  // template so the editor preview is WYSIWYG with the final render.
+  const VO_LEAD_IN_SECONDS = 0.4;
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !voiceoverUrl) return;
     audio.muted = muted;
-    if (playing) {
-      if (Math.abs(audio.currentTime - globalTime) > 0.25) {
-        audio.currentTime = Math.min(globalTime, audio.duration || globalTime);
+    const targetAudioTime = Math.max(0, globalTime - VO_LEAD_IN_SECONDS);
+    if (playing && globalTime >= VO_LEAD_IN_SECONDS) {
+      if (Math.abs(audio.currentTime - targetAudioTime) > 0.25) {
+        audio.currentTime = Math.min(targetAudioTime, audio.duration || targetAudioTime);
       }
       audio.play().catch(() => {});
     } else {
@@ -560,8 +565,9 @@ export default function ComposerSequencePreview({
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !voiceoverUrl) return;
-    if (Math.abs(audio.currentTime - globalTime) > 0.4) {
-      audio.currentTime = Math.min(globalTime, audio.duration || globalTime);
+    const targetAudioTime = Math.max(0, globalTime - VO_LEAD_IN_SECONDS);
+    if (Math.abs(audio.currentTime - targetAudioTime) > 0.4) {
+      audio.currentTime = Math.min(targetAudioTime, audio.duration || targetAudioTime);
     }
   }, [globalTime, voiceoverUrl]);
 
