@@ -1,84 +1,175 @@
 
+## Instagram auf dieselbe Verbindungslogik wie Facebook umstellen
 
-## Englische UI: Deutsche Wörter auf Dashboard/Home ersetzen
+Ja — die Pipeline lässt sich übertragen. Der wichtigste Unterschied aktuell ist:
 
-### Was du siehst (Screenshots)
+- **Facebook** speichert nach OAuth erst nur den Meta/Facebook-User-Grant und zeigt **danach** den Page-Chooser.
+- **Instagram** versucht im Callback schon sofort die finale IG-Business-Verbindung zu bauen, indem direkt über `/me/accounts` die erste passende Seite/IG-Verknüpfung aufgelöst wird.
 
-Screenshot 1 (Status-Pills): `Unlimited` (ok), `NÄCHSTER VORSCHLAG` ← hardcoded DE
-Screenshot 2 (This Week): `Strategie-Modus`, `Plan in Calendar →` (in EN ok, aber Toggle-Label DE), `Level: Anfänger · 3 Posts/Woche`, `3 KI-Vorschläge`, `Neu generieren`, „Dein KI-Co-Pilot — neue Vorschläge jede Woche, automatisch."
-Screenshot 3 (Heatmap): `Best Posting Times` (Section-Title — eigentlich okay), Card-Title `Best-Time Heatmap`, `Details anzeigen`, Tooltip „Beste Zeit zum Posten / Gute Zeit / Weniger optimal", Tag-Spalte `So Mo Di Mi Do Fr Sa`, Stunden-Tooltip `… Uhr`, Legend `Beste Zeit (≥70) / Gute Zeit (50-70) / Heuristik (<50)`
+Dadurch fühlt sich Facebook stabil an, während Instagram viel stärker vom bereits gemerkten Meta-App-Grant und der automatischen Kontenauflösung abhängt.
 
-### Ursache
-Mehrere Komponenten haben Strings hardcoded statt über `t(...)` aus `src/lib/translations.ts` zu laden — das fällt erst auf, sobald die UI-Sprache nicht DE ist.
+## Ziel
+Instagram soll denselben Ablauf wie Facebook bekommen:
 
-### Änderungen
-
-**1. `src/lib/translations.ts`** — neue Keys in **EN, DE, ES** unter passenden Namespaces:
-
-```
-homePage.strategyModeToggle: "Strategy Mode" / "Strategie-Modus" / "Modo Estrategia"
-homePage.aiCopilotTagline: "Your AI co-pilot — fresh suggestions every week, automatic." / DE / ES
-
-dashboard.statusBar.nextSuggestion: "Next Suggestion" / "Nächster Vorschlag" / "Próxima Sugerencia"
-
-heatmap.cardTitle: "Best-Time Heatmap"  (gleich in allen 3)
-heatmap.viewDetails: "View Details" / "Details anzeigen" / "Ver detalles"
-heatmap.live: "Live"
-heatmap.tooltipBest: "Best time to post!" / "Beste Zeit zum Posten!" / "¡Mejor momento para publicar!"
-heatmap.tooltipGood: "Good time" / "Gute Zeit" / "Buen momento"
-heatmap.tooltipPoor: "Less optimal" / "Weniger optimal" / "Menos óptimo"
-heatmap.tooltipHourSuffix: ":00" (kein "Uhr" in EN/ES)
-heatmap.legendBest: "Best time (≥70)" / "Beste Zeit (≥70)" / "Mejor momento (≥70)"
-heatmap.legendGood: "Good time (50-70)" / "Gute Zeit (50-70)" / "Buen momento (50-70)"
-heatmap.legendHeuristic: "Heuristic (<50)" / "Heuristik (<50)" / "Heurística (<50)"
-heatmap.dayShort: { sun, mon, tue, wed, thu, fri, sat } in EN/DE/ES
-
-strategy.levelBeginner: "Beginner" / "Anfänger" / "Principiante"
-strategy.levelIntermediate: "Intermediate" / "Fortgeschritten" / "Intermedio"
-strategy.levelAdvanced: "Pro" / "Profi" / "Pro"
-strategy.postsPerWeek: "{count} posts/week" / "{count} Posts/Woche" / "{count} posts/semana"
-strategy.levelLine: "Level: {level} · {count} posts/week" (mit Plural je Sprache)
-strategy.aiSuggestionsCount: "{count} AI suggestions" / "{count} KI-Vorschläge" / "{count} sugerencias IA"
-strategy.regenerate: "Regenerate" / "Neu generieren" / "Regenerar"
-strategy.creatorLevelTitle: "Your creator level" / "Dein Creator-Level" / "Tu nivel de creador"
-strategy.progressTo: "Progress to {level}" / "Fortschritt zu {level}" / "Progreso a {level}"
-strategy.publishedPosts28d: "Published posts (28d)"
-strategy.engagementRate: "Avg engagement rate"
-strategy.maxLevelReached: "You're at the highest level. 🚀"
-strategy.adjustLevelManually: "Adjust level manually"
-strategy.noSuggestions: "No suggestions yet. Generate your first weekly strategy."
-strategy.generateWeeklyStrategy: "Generate weekly strategy"
-strategy.toastEnabled / toastDisabled: "Strategy mode enabled/disabled"
+```text
+Connect Instagram
+→ Meta/Facebook Login/Continue
+→ zurück in die App
+→ Seitenauswahl
+→ aus gewählter Seite verknüpftes Instagram Business laden
+→ Instagram-Verbindung speichern
 ```
 
-**2. `src/pages/Home.tsx`**
-- Zeile 596: `prefix = "Nächster Vorschlag"` → `t("dashboard.statusBar.nextSuggestion")`
-- Zeile 647: deutsche Tagline → `t("homePage.aiCopilotTagline")`
-- Zeile 652: `Strategie-Modus` → `t("homePage.strategyModeToggle")`
+## Was ich ändern werde
 
-**3. `src/components/dashboard/BestTimeHeatmap.tsx`**
-- `useTranslation()` einbinden
-- Zeile 62: hardcoded Tooltip-Text → `t("heatmap.tooltipBest|Good|Poor")`
-- Zeile 58: `{day} {hour}:00 Uhr` → in EN/ES ohne „Uhr", z. B. `${day} ${hour}:00` (sprachabhängig oder einfach „Uhr" entfernen)
-- Zeilen 86 & 120: `Best-Time Heatmap` → `t("heatmap.cardTitle")`
-- Zeile 71 `days = ["So", "Mo", …]` → aus `t("heatmap.dayShort.*")`
-- Zeile 136: `Details anzeigen` → `t("heatmap.viewDetails")`
-- Zeilen 239/243/247: Legend-Texte → `t("heatmap.legendBest|Good|Heuristic")`
+### 1. Instagram-Callback auf „pending selection“ umstellen
+**Datei:** `supabase/functions/oauth-callback/index.ts`
 
-**4. `src/components/dashboard/WeekStrategyRingTimeline.tsx`** und **`WeekStrategyTimeline.tsx`** (parallel, identische Fixes)
-- `LEVEL_LABEL` auf `t("strategy.levelBeginner|Intermediate|Advanced")` umstellen (per Hook im Component-Body, nicht als Modul-Konstante)
-- „Posts/Woche", „KI-Vorschläge", „Neu generieren", „Dein Creator-Level", „Fortschritt zu", „Veröffentlichte Posts (28d)", „Ø Engagement-Rate", „Du bist bereits auf höchstem Level", „Level manuell anpassen", `SelectItem`-Labels, „Noch keine Vorschläge…", „Wochen-Strategie generieren" → alle über `t(...)`
+Statt bei `provider=instagram` sofort `getInstagramBusinessAccountInfo(...)` aufzurufen und die erste passende Seite automatisch zu nehmen, stelle ich den Flow auf das Facebook-Muster um:
 
-**5. `src/hooks/useStrategyMode.ts`**
-- Zeile 189: `toast.success("Strategie-Modus aktiviert/deaktiviert")` → `t("strategy.toastEnabled|toastDisabled")` (Hook nutzt `useTranslation`)
+- nach Token-Exchange wird zunächst nur der **Meta-User-Zugang** gespeichert
+- die Instagram-Verbindung wird mit `selection_required: true` angelegt
+- zusätzlich speichere ich in `account_metadata`, dass es ein **Instagram-Connect im Auswahlzustand** ist
 
-### Was ich bewusst nicht ändere
-- `Best Posting Times` als Section-Title ist bereits über `t("dashboard.sections.bestTimes")` lokalisiert — bleibt.
-- `Plan in Calendar` & `Unlimited` sind bereits korrekt englisch.
-- Wochentags-Format in der Strategy-Timeline (`format(date, "EEE", { locale: de })`) wird auf dynamisches Locale (date-fns) umgestellt entsprechend `useTranslation().language`.
+Beispielrichtung:
+- `account_type: 'instagram_pending'`
+- `selection_required: true`
+- optional `connection_stage: 'awaiting_page_selection'`
 
-### Risiko & Aufwand
-- Risiko: gering. Reine String-/Lokalisierungs-Änderung, keine Logik.
-- 6 Dateien, ~20–25 neue Translation-Keys × 3 Sprachen.
-- Nach Deploy direkt prüfbar: UI auf EN umschalten → keine deutschen Wörter mehr auf `/home`.
+Damit wird Instagram nicht mehr im Callback „blind fertiggebaut“.
 
+### 2. Instagram-Seitenauswahl wie bei Facebook einführen
+**Betroffene Dateien:**
+- `src/components/performance/FacebookPageSelectDialog.tsx`
+- `supabase/functions/facebook-list-pages/index.ts`
+- `supabase/functions/facebook-select-page/index.ts`
+
+Ich übertrage das bestehende Facebook-Pattern auf Instagram:
+
+#### Variante der Umsetzung
+Ich generalisiere den bestehenden Facebook-Dialog zu einem Meta-Dialog statt zwei komplett getrennte UIs zu pflegen.
+
+Der Dialog bekommt einen Modus:
+- `mode="facebook"`
+- `mode="instagram"`
+
+#### Verhalten im Instagram-Modus
+- listet Facebook-Seiten des verbundenen Meta-Users
+- markiert oder filtert nur Seiten, die ein `instagram_business_account` haben
+- zeigt klare Meldung, wenn eine Seite **kein** verknüpftes Instagram-Business-Konto hat
+
+### 3. Instagram-Finalisierung aus der gewählten Facebook-Seite ableiten
+**Neue oder angepasste Serverlogik:**
+- entweder neues `instagram-select-page`
+- oder bestehendes `facebook-select-page` zu einer Meta-Funktion erweitern
+
+Bei Auswahl einer Seite passiert dann serverseitig:
+
+1. Page Access Token der gewählten Seite verwenden
+2. `instagram_business_account` der Seite laden
+3. IG-Profil über Graph laden:
+   - `id`
+   - `username`
+   - `profile_picture_url`
+   - `followers_count`
+   - `media_count`
+4. Page Access Token verschlüsselt speichern
+5. bestehende `instagram`-Connection fertig aktualisieren:
+   - `account_id = ig_business_id`
+   - `account_name = @username`
+   - `selection_required = false`
+   - `connected_via = 'oauth_user_token'`
+   - `page_id`
+   - `page_access_token_encrypted`
+
+Damit entsteht dieselbe saubere Zweistufen-Logik wie bei Facebook.
+
+### 4. Connect-UI auf denselben Ablauf umstellen
+**Datei:** `src/components/performance/ConnectionsTab.tsx`
+
+Nach erfolgreichem Instagram-Callback soll die App:
+
+- nicht sofort syncen
+- nicht davon ausgehen, dass die Verbindung final fertig ist
+- stattdessen den neuen Auswahl-Dialog öffnen, genau wie bei Facebook
+
+Also:
+- `connected === 'instagram' && status === 'success'`
+- wenn `selection_required === true` → Dialog öffnen
+- erst nach Seitenauswahl als vollständig verbunden markieren
+
+### 5. Revoke-/Disconnect-Flow kompatibel halten
+**Dateien:**
+- `supabase/functions/instagram-oauth-revoke/index.ts`
+- ggf. `src/components/account/LinkedAccountsCard.tsx`
+- ggf. `src/components/performance/ConnectionsTab.tsx`
+
+Der Hard-Reset bleibt bestehen, aber ich passe ihn an den neuen staged Flow an:
+
+- auch „pending“ Instagram-Verbindungen werden korrekt entfernt
+- Meta-App-Grant bleibt beim Disconnect weiterhin sauber widerrufen
+- UI meldet klar, ob nur lokal gelöscht oder Meta-seitig wirklich zurückgesetzt wurde
+
+## Warum Facebook „funktioniert“, Instagram aber nicht
+Weil Facebook aktuell diesen robusteren Ablauf hat:
+
+```text
+OAuth erfolgreich
+→ User-Token speichern
+→ Nutzer wählt Seite explizit
+→ Seite wird final verbunden
+```
+
+Instagram macht derzeit eher das:
+
+```text
+OAuth erfolgreich
+→ sofort automatisch erste passende IG-Page-Verknüpfung suchen
+→ direkt final speichern
+```
+
+Das ist fehleranfälliger und gibt dem Nutzer keinen sichtbaren Zwischenschritt wie bei Facebook.
+
+## Wichtige Erwartung
+Ich kann die **App-Pipeline** exakt an Facebook angleichen.
+
+Was ich **nicht garantieren** kann:
+- dass Meta/Facebook den allerersten externen Screen visuell immer exakt gleich zeigt
+
+Der Screen
+```text
+You previously logged into ...
+```
+kommt von Meta selbst. Den kontrollieren wir nicht vollständig.
+
+Aber:
+- der **Flow in unserer App**
+- die **Schrittfolge**
+- die **Seitenauswahl**
+- die **finale Instagram-Auflösung**
+
+kann ich auf dieselbe robuste Logik wie Facebook umstellen.
+
+## Betroffene Dateien
+- `supabase/functions/oauth-callback/index.ts`
+- `src/components/performance/ConnectionsTab.tsx`
+- `src/components/performance/FacebookPageSelectDialog.tsx`
+- `supabase/functions/facebook-list-pages/index.ts`
+- `supabase/functions/facebook-select-page/index.ts`
+- ggf. neue Funktion für Instagram-Finalisierung statt Facebook-Select zu überladen
+- ggf. kleine Anpassung in `supabase/functions/instagram-oauth-start/index.ts`
+
+## Risiko
+- gering bis mittel
+- keine Migration notwendig, solange der Auswahlzustand in `account_metadata` gespeichert wird
+- größter Vorteil: Instagram wird nicht mehr im Callback automatisch „erraten“, sondern wie Facebook sauber finalisiert
+
+## Test nach Umsetzung
+1. Instagram trennen
+2. erneut auf **Connect Instagram**
+3. Meta/Facebook-Dialog durchlaufen
+4. zurück zur App
+5. prüfen, dass jetzt ein **Seitenauswahl-Dialog** erscheint
+6. Seite mit verknüpftem Instagram-Business wählen
+7. prüfen, dass danach die Instagram-Verbindung korrekt gespeichert und angezeigt wird
+8. prüfen, dass Fälle ohne verknüpftes IG-Konto sauber abgefangen werden
