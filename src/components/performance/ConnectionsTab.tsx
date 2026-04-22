@@ -625,10 +625,11 @@ export const ConnectionsTab = () => {
     try {
       const connection = connections.find(c => c.id === connectionId);
 
-      // Instagram: revoke Meta permissions FIRST so the next reconnect shows
-      // the full permission dialog (matches the Facebook reconnect behaviour
-      // and is required for the Meta App Review screencast).
-      if (connection?.provider === 'instagram') {
+      // Meta hard-reset (Instagram + Facebook share one app grant). The revoke
+      // edge function calls DELETE /{meta-user-id}/permissions and removes BOTH
+      // ig + fb rows so the next reconnect actually shows Meta's full consent
+      // dialog instead of the cached "Continue as ..." short-circuit.
+      if (connection?.provider === 'instagram' || connection?.provider === 'facebook') {
         const { data: session } = await supabase.auth.getSession();
         const { data: revokeData, error: revokeError } = await supabase.functions.invoke(
           'instagram-oauth-revoke',
@@ -641,9 +642,9 @@ export const ConnectionsTab = () => {
         );
         if (revokeError) {
           // Soft-fail: still attempt the local delete below
-          console.warn('[ConnectionsTab] Instagram revoke failed:', revokeError);
-        } else if (revokeData?.connectionDeleted) {
-          // Edge function already removed the row — skip the local delete
+          console.warn('[ConnectionsTab] Meta revoke failed:', revokeError);
+        } else if (revokeData?.connectionDeleted || (revokeData?.deletedProviders?.length ?? 0) > 0) {
+          // Edge function already removed the row(s) — skip the local delete
           await emit({
             event_type: 'performance.account.disconnected',
             source: 'connections_tab',
@@ -651,13 +652,28 @@ export const ConnectionsTab = () => {
               provider: connection?.provider,
               account_name: connection?.account_name,
               meta_revoked: !!revokeData?.revoked,
+              hard_reset_complete: !!revokeData?.hardResetComplete,
+              deleted_providers: revokeData?.deletedProviders ?? [],
             },
           }, { silent: true });
 
-          toast({
-            title: t('common.success'),
-            description: 'Account disconnected successfully',
-          });
+          if (revokeData?.hardResetComplete) {
+            toast({
+              title: t('common.success'),
+              description: `Meta app grant fully revoked (${(revokeData.deletedProviders ?? []).join(', ') || 'cleared'}). Next connect will show the full permission dialog.`,
+            });
+          } else if (revokeData?.revoked) {
+            toast({
+              title: t('common.success'),
+              description: 'Meta permissions revoked. Local cleanup partial.',
+            });
+          } else {
+            toast({
+              title: t('common.warning') || 'Warning',
+              description: `Disconnected locally, but Meta still remembers this app${revokeData?.revokeError ? ` (${revokeData.revokeError})` : ''}. The next connect may skip the consent dialog.`,
+              variant: 'destructive',
+            });
+          }
           fetchConnections();
           return;
         }

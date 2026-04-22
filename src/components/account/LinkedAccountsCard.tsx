@@ -84,25 +84,38 @@ export const LinkedAccountsCard = () => {
       const credential = getCredential(platform);
       if (!credential?.connection_id) return;
 
-      // For Instagram: call the revoke edge function so Meta actually drops
-      // the consent (otherwise the next OAuth shows "Continue as ..." instead
-      // of the full permission dialog).
-      if (platform === 'instagram') {
+      // Instagram (and Facebook — same Meta app grant): hard-reset both via
+      // the revoke edge function. This calls DELETE /{meta-user-id}/permissions
+      // on Graph API and removes both `instagram` + `facebook` rows so the next
+      // reconnect actually shows Meta's full permission dialog.
+      if (platform === 'instagram' || platform === 'facebook') {
         const { data, error } = await supabase.functions.invoke('instagram-oauth-revoke', {
           body: { connectionId: credential.connection_id },
         });
         if (error) throw error;
 
+        const deleted: string[] = data?.deletedProviders ?? [];
+        // Reflect the hard reset locally — both ig + fb may have been removed.
         setCredentials((prev) =>
           prev.map((c) =>
-            c.platform === platform ? { ...c, is_connected: false } : c
+            deleted.includes(c.platform) ? { ...c, is_connected: false } : c
           )
         );
 
-        if (data?.revoked) {
-          toast.success(`${PLATFORMS[platform].name} ${t("accountLinked.disconnected")} — Meta permissions revoked. Next connect will show the full review flow.`);
+        if (data?.hardResetComplete) {
+          toast.success(
+            `${PLATFORMS[platform].name} ${t("accountLinked.disconnected")} — Meta app grant fully revoked (${deleted.join(', ') || 'none'}). Next connect will show the full permission dialog.`
+          );
+        } else if (data?.revoked) {
+          toast.success(
+            `${PLATFORMS[platform].name} ${t("accountLinked.disconnected")} — Meta permissions revoked, local cleanup partial.`
+          );
         } else {
-          toast.success(`${PLATFORMS[platform].name} ${t("accountLinked.disconnected")}${data?.revokeError ? ` (Meta revoke skipped: ${data.revokeError})` : ''}`);
+          // No actual Meta-side revoke happened. Warn the user instead of
+          // pretending the next reconnect will be clean.
+          toast.warning(
+            `${PLATFORMS[platform].name} ${t("accountLinked.disconnected")} locally, but Meta still remembers this app${data?.revokeError ? ` (${data.revokeError})` : ''}. The next connect may skip the consent dialog.`
+          );
         }
         return;
       }
