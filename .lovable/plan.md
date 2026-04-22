@@ -1,147 +1,164 @@
 
-## Instagram meldet fälschlich „keine Instagram-fähigen Seiten“ – gezielter Fix
+## Instagram-Page-Discovery gezielt nachschärfen
 
-### Was das eigentliche Problem ist
-Der aktuelle Flow erkennt eine Seite nur dann als „Instagram-fähig“, wenn Meta bereits direkt in der `/me/accounts`-Antwort ein verknüpftes `instagram_business_account` oder `connected_instagram_account` mitsendet.
+### Was jetzt klar ist
+Der aktuelle Fix für die Inline-IG-Felder greift bereits, aber der Fehler bleibt bestehen. Die neuesten Daten zeigen:
 
-Genau das ist hier sehr wahrscheinlich die falsche Annahme:
-- Im Meta-Dialog wurden Instagram-Accounts und Seiten ausgewählt.
-- Trotzdem meldet die App „keine Instagram-fähigen Seiten“.
-- Das spricht dafür, dass Meta die Verknüpfung **nicht zuverlässig inline in `/me/accounts`** liefert, obwohl die Verknüpfung existiert.
+- die Instagram-Verbindung wird erfolgreich als `instagram_pending` gespeichert
+- die nötigen bisherigen Scopes sind bereits vorhanden (`pages_show_list`, `pages_read_engagement`, `instagram_basic`, etc.)
+- `missing_page_scopes` ist leer
+- trotzdem meldet `tryAutoResolveInstagram` weiterhin `verified IG-capable page count: 0`
 
-Die App klassifiziert dadurch reale, gültige Seiten als „nicht IG-fähig“.
+Damit ist das Problem sehr wahrscheinlich **nicht mehr**:
+- fehlende Toggles im Consent-Dialog
+- nur ein UI-Fehlertext
+- nur fehlende Inline-Felder in `/me/accounts`
 
-### Ziel
-Die Erkennung muss nicht mehr nur auf der groben `/me/accounts`-Antwort basieren, sondern jede gefundene Seite zusätzlich per **Seiten-Detail-Request** prüfen. Dadurch werden echte verknüpfte Instagram-Business-Accounts korrekt erkannt.
+Der wahrscheinliche Engpass liegt jetzt tiefer in der Meta-Auswertung:
+1. entweder liefert `/me/accounts` für diesen Account gar keine nutzbaren Seiten zurück  
+2. oder die Seiten kommen zurück, aber Meta liefert für diese Seiten weder eine nutzbare IG-Verknüpfung noch verwertbare Page-Tokens  
+3. oder die Seite ist business-verwaltet und wird unter neueren Graph-Versionen nur eingeschränkt geliefert
+
+Web-/Doku-Hinweise deuten zusätzlich darauf hin, dass Meta bei business-gebundenen Seiten inzwischen teils restriktiver ist.
+
+## Ziel
+Den Fehler nicht mehr „blind“ als „keine Instagram-fähige Seite“ zu behandeln, sondern den echten Backend-Fall sauber zu erkennen und den Resolver entsprechend robuster zu machen.
 
 ## Umsetzung
 
-### 1. Robuste Meta-Page-Discovery als gemeinsame Logik bauen
+### 1. Meta-Discovery hart instrumentieren
+**Datei:** `supabase/functions/_shared/meta-page-discovery.ts`
+
+Es werden gezielte Diagnosefelder und Logs ergänzt:
+
+- Anzahl Seiten aus `/me/accounts`
+- für jede Seite:
+  - `id`, `name`
+  - ob `access_token` vorhanden ist
+  - ob Inline-IG-Felder vorhanden sind
+  - Ergebnis des Detail-Checks
+  - konkreter Fehlerbody bei fehlgeschlagenem Page-Node-Request
+- Rückgabe um Debug-Metadaten erweitern, z. B.:
+  - `pages_found_count`
+  - `verified_instagram_count`
+  - `page_verify_failures`
+  - `meta_discovery_mode`
+
+Damit wird sichtbar, **ob überhaupt Seiten kommen** oder **ob die Verifikation scheitert**.
+
+### 2. Statusmodell präzisieren
 **Dateien:**
+- `supabase/functions/_shared/meta-page-discovery.ts`
 - `supabase/functions/facebook-list-pages/index.ts`
 - `supabase/functions/oauth-callback/index.ts`
-- `supabase/functions/facebook-select-page/index.ts`
 
-**Änderung:**
-Eine gemeinsame Discovery-Logik verwenden:
+Die aktuelle Klassifizierung wird erweitert, damit diese Fälle getrennt werden:
 
 ```text
-/me/accounts
-→ alle Seiten laden
-→ pro Seite mit page access token prüfen:
-   /{page_id}?fields=instagram_business_account,connected_instagram_account
-→ daraus has_instagram / instagram_business_account_id ableiten
+no_pages_found
+pages_found_but_verification_failed
+pages_found_but_no_instagram_link
+single_instagram_page
+multiple_instagram_pages
+meta_pages_hidden_or_unavailable
 ```
 
 Wichtig:
-- Nicht mehr nur die Inline-Felder aus `/me/accounts` vertrauen
-- Bei Instagram immer einen zweiten Prüf-Schritt pro Seite machen
-- Prüfungen parallel mit `Promise.allSettled` ausführen, damit es trotz mehrerer Seiten schnell bleibt
+- `pages_found_but_no_instagram_link` nur dann, wenn Seiten wirklich da sind und Meta explizit keine IG-Verknüpfung bestätigt
+- `pages_found_but_verification_failed`, wenn die Detail-Requests pro Seite fehlschlagen
+- `meta_pages_hidden_or_unavailable`, wenn Scopes okay sind, aber `/me/accounts` trotzdem leer bleibt
 
-### 2. `facebook-list-pages` auf echte Verifikation umstellen
-**Datei:**
+### 3. OAuth-Callback und Listing auf dieselben Debug-Daten umstellen
+**Dateien:**
+- `supabase/functions/oauth-callback/index.ts`
 - `supabase/functions/facebook-list-pages/index.ts`
 
-**Änderung:**
-- Erst alle Pages über `/me/accounts` laden
-- Dann für Instagram jede Seite einzeln gegen den Page-Node prüfen
-- Erst danach `has_instagram` und `status` berechnen
+Beide Pfade sollen dieselbe Discovery-Antwort verwenden und zusätzlich die Diagnose in `account_metadata` mit ablegen, z. B.:
 
-Neue Erwartung:
-- `pages_found_but_no_instagram_link` nur dann zurückgeben, wenn die zweite Prüfung wirklich für alle Seiten negativ war
-- Wenn mindestens eine Seite positiv ist, diese korrekt in der Liste anzeigen
-- Wenn nur eine Seite positiv ist, `single_instagram_page`
-- Wenn mehrere positiv sind, `multiple_instagram_pages`
+- `meta_page_discovery_status`
+- `meta_pages_found_count`
+- `meta_verified_instagram_count`
+- `meta_page_verify_failures`
+- `meta_last_discovery_at`
 
-### 3. Auto-Resolve im OAuth-Callback auf dieselbe Logik umstellen
-**Datei:**
-- `supabase/functions/oauth-callback/index.ts`
+So sieht die UI später exakt, **warum** keine Seite gefunden wurde.
 
-**Änderung:**
-`tryAutoResolveInstagram()` darf nicht mehr nur auf die Inline-IG-Felder aus `/me/accounts` schauen.
+### 4. Falls nötig: Meta-Scope für business-verwaltete Seiten ergänzen
+**Datei:** `src/components/performance/ConnectionsTab.tsx`
 
-Stattdessen:
-- dieselbe verlässliche Seitenprüfung verwenden wie in `facebook-list-pages`
-- wenn genau eine Seite nach echter Verifikation IG-fähig ist:
-  - sofort auto-select
-- wenn mehrere oder keine:
-  - sauber in den manuellen Auswahlflow fallen
+Wenn die neue Diagnose zeigt, dass `/me/accounts` trotz vorhandener Standard-Scopes leer bleibt, wird der Instagram-OAuth-Flow optional um einen zusätzlichen Meta-Scope erweitert, der für business-verwaltete Seiten relevant sein kann.
 
-Damit werden Auto-Connect und manueller Dialog endlich konsistent.
+Dabei:
+- nur für Instagram-Connect
+- zusammen mit `auth_type=rerequest`
+- klar getrennt von der normalen Re-Consent-Logik
 
-### 4. `facebook-select-page` auf denselben Resolver vereinheitlichen
-**Datei:**
-- `supabase/functions/facebook-select-page/index.ts`
+So kann geprüft werden, ob Meta die Seiten nur wegen neuerer Business-Einschränkungen nicht zurückgibt.
 
-**Änderung:**
-Die Funktion ist bereits näher an der richtigen Lösung, weil sie pro Seite prüft. Diese Logik soll mit derselben Discovery-/Resolver-Strategie vereinheitlicht werden, damit:
+### 5. Dialog-UX auf echte Backend-Ursache umstellen
+**Datei:** `src/components/performance/FacebookPageSelectDialog.tsx`
 
-- Listing
-- Auto-Resolve
-- finale Auswahl
+Der Dialog soll nicht mehr pauschal behaupten, es gäbe keine IG-fähige Seite, sondern je nach Status:
 
-alle exakt dieselbe Meta-Auswertung benutzen.
+1. **Meta gibt keine Seiten zurück**
+   - Hinweis: Seiten wurden der App von Meta nicht bereitgestellt
+2. **Seiten gefunden, aber Verifikation fehlgeschlagen**
+   - Hinweis: Meta hat die Seiten geliefert, aber die Detailprüfung schlug fehl
+3. **Seiten gefunden, aber keine IG-Verknüpfung bestätigt**
+   - aktueller IG-Link-Hinweis bleibt
+4. **Seiten vorhanden**
+   - echte Auswahl anzeigen
 
-So wird verhindert, dass:
-- eine Seite im Dialog als „ungültig“ erscheint,
-- aber beim finalen Auswählen eigentlich funktionieren würde.
+Optional zusätzlich:
+- kleines Diagnose-Detail im UI für Support/debugging, z. B. „0 Seiten von Meta zurückgegeben“ oder „3 Seiten gefunden, 3 Verifikationen fehlgeschlagen“
 
-### 5. Dialog-UX an den echten Prüfstatus anpassen
-**Datei:**
-- `src/components/performance/FacebookPageSelectDialog.tsx`
+### 6. Finale Auswahl auf dieselbe Fehlerdiagnose bringen
+**Datei:** `supabase/functions/facebook-select-page/index.ts`
 
-**Änderung:**
-Den leeren Fehlerzustand nur noch dann zeigen, wenn die Backend-Prüfung wirklich abgeschlossen ist.
+Auch beim finalen Select sollen die Detailfehler klarer zurückgegeben werden:
+- nicht nur `kein verknüpftes Instagram Business-Konto`
+- sondern unterscheiden zwischen
+  - Page-Node nicht lesbar
+  - IG-Link fehlt
+  - IG-Profil-Request fehlgeschlagen
 
-Optional verbessern:
-- während der Verifikation Text wie „Verknüpfte Instagram-Konten werden geprüft…“
-- wenn Seiten existieren, aber keine erfolgreich verifiziert werden:
-  - klare Meldung, dass die Seiten gefunden wurden, aber Meta für keine Seite ein verknüpftes IG-Business-Konto bestätigt hat
-- wenn Seiten verifiziert werden:
-  - echte Liste anzeigen, statt pauschal „keine Instagram-fähige Seite gefunden“
+## Erwartetes Ergebnis
+Nach dem Fix gibt es zwei mögliche Ausgänge:
 
-## Warum das sehr wahrscheinlich die richtige Lösung ist
-Die Screenshots zeigen, dass Meta im Consent-Flow sowohl:
-- Instagram Professional Accounts
-- als auch die Pages
+```text
+A) Meta liefert die Seite korrekt
+→ Auto-Resolve oder Select funktioniert endlich
 
-bereits kennt und auswählbar macht. Das Problem liegt daher sehr wahrscheinlich **nicht** daran, dass es gar keine Verknüpfung gibt, sondern daran, dass der aktuelle Code die Verknüpfung an der falschen Stelle prüft.
+B) Meta liefert die Seite technisch nicht an die App
+→ klare, genaue Fehlermeldung statt irreführendem „keine Instagram-fähige Seite“
+→ sichtbarer Hinweis, ob Business-/Meta-Scope das Problem ist
+```
 
 ## Betroffene Dateien
+- `supabase/functions/_shared/meta-page-discovery.ts`
 - `supabase/functions/facebook-list-pages/index.ts`
 - `supabase/functions/oauth-callback/index.ts`
 - `supabase/functions/facebook-select-page/index.ts`
 - `src/components/performance/FacebookPageSelectDialog.tsx`
-
-Optional, falls zur Wiederverwendung sinnvoll:
-- `supabase/functions/_shared/meta-page-discovery.ts`
+- `src/components/performance/ConnectionsTab.tsx`
 
 ## Technische Details
 - Kein Datenbank-Schema-Change nötig
 - Kein Auth-Umbau nötig
-- Kein UI-Redesign nötig
-- Kernfix ist eine robustere Meta-API-Auswertung
-- Bestehende `missing_scopes`-Logik bleibt sinnvoll, ist aber nicht die Hauptursache dieses Fehlers
+- Kernarbeit ist:
+  - tiefere Meta-Diagnostik
+  - sauberere Statusklassifikation
+  - optionaler Business-Fallback im OAuth-Scope
+- Der nächste Fix basiert dann auf echten Meta-Rückgaben statt Vermutungen
 
-## Ergebnis nach dem Fix
-Der Flow soll danach so aussehen:
-
-```text
-Instagram verbinden
-→ Meta OAuth
-→ Rückkehr in die App
-→ echte Seitenprüfung pro Facebook-Seite
-→ entweder:
-   A) genau 1 verknüpfte IG-Seite → sofort verbunden
-   B) mehrere verknüpfte IG-Seiten → korrekte Auswahl im Dialog
-   C) keine verknüpfte IG-Seite → klare, echte Fehlermeldung
-```
-
-## Test
+## Test nach Umsetzung
 1. Bestehende Instagram-Verbindung trennen
 2. Instagram neu verbinden
-3. Im Meta-Dialog Instagram-Konten und Seiten auswählen, alle Toggles aktiv lassen
+3. Im Meta-Dialog alle Seiten und Instagram-Optionen aktiv lassen
 4. Erwartung:
-   - die App erkennt die verknüpfte Seite jetzt korrekt
-   - kein falscher „keine Instagram-fähige Seite“-Fehler mehr
-5. Danach Sync starten und prüfen, dass echte Instagram-Daten geladen werden
+   - entweder Seite wird korrekt erkannt
+   - oder die UI zeigt den exakten technischen Grund
+5. Danach anhand der neuen Logs prüfen:
+   - wie viele Seiten `/me/accounts` liefert
+   - ob Page-Detail-Requests fehlschlagen
+   - ob ein Business-/Meta-Scope-Fallback nötig ist
