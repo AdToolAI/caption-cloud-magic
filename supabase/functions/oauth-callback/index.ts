@@ -171,7 +171,13 @@ serve(async (req) => {
         last_sync_at: null,
         account_metadata: {
           ...(accountInfo as any).account_type ? { account_type: (accountInfo as any).account_type } : {},
-          ...(accountInfo as any).selection_required ? { selection_required: true } : {}
+          ...(accountInfo as any).selection_required ? { selection_required: true } : {},
+          ...(accountInfo as any).profile_picture_url ? { profile_picture_url: (accountInfo as any).profile_picture_url } : {},
+          ...(accountInfo as any).followers_count !== undefined ? { followers_count: (accountInfo as any).followers_count } : {},
+          ...(accountInfo as any).media_count !== undefined ? { media_count: (accountInfo as any).media_count } : {},
+          ...(accountInfo as any).page_id ? { page_id: (accountInfo as any).page_id } : {},
+          ...(accountInfo as any).page_access_token_encrypted ? { page_access_token_encrypted: (accountInfo as any).page_access_token_encrypted } : {},
+          ...(provider === 'instagram' ? { connected_via: 'oauth_user_token' } : {}),
         }
       }, {
         onConflict: 'user_id,provider,account_id'
