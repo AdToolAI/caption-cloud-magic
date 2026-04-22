@@ -235,7 +235,8 @@ serve(async (req) => {
     // Use dynamic redirect URL from stored state, fallback to APP_URL
     const redirectUrl = storedState.redirect_url || Deno.env.get('APP_URL') || 'https://useadtool.ai';
     const baseUrl = redirectUrl.replace(/\/integrations.*$/, '').replace(/\/performance.*$/, '');
-    return Response.redirect(`${baseUrl}/integrations?provider=${provider}&status=success&tab=connections`, 302);
+    const autoFlag = igAutoSelected ? '&auto_selected=true' : '';
+    return Response.redirect(`${baseUrl}/integrations?provider=${provider}&status=success&tab=connections${autoFlag}`, 302);
 
   } catch (error) {
     console.error('OAuth callback error:', error);
