@@ -247,38 +247,32 @@ export const ConnectionsTab = () => {
         return;
       }
 
-      // Special handler for Instagram: Use backend function to access app_secrets
+      // Instagram: Real Meta OAuth flow (instagram_basic + instagram_content_publish)
+      // The user sees the Facebook consent dialog with all IG scopes — required by Meta App Review.
       if (providerId === 'instagram') {
-        setLoading(true);
-        
         try {
-          const { data, error } = await supabase.functions.invoke(
-            'connect-instagram-performance',
-            {
-              headers: {
-                Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-              }
-            }
-          );
-          
-          if (error) throw error;
-          
-          toast({
-            title: t('common.success'),
-            description: `${providerName} ${t('socialIntegrations.successConnected')}`
+          const { data: session } = await supabase.auth.getSession();
+          const { data, error } = await supabase.functions.invoke('instagram-oauth-start', {
+            headers: {
+              Authorization: `Bearer ${session.session?.access_token}`
+            },
+            body: { returnTo: window.location.href }
           });
-          
-          await fetchConnections();
+
+          if (error) throw error;
+
+          if (data?.authUrl) {
+            window.location.href = data.authUrl;
+          } else {
+            throw new Error('No auth URL received');
+          }
         } catch (error: any) {
           toast({
             title: t('common.error'),
-            description: error.message || `Failed to connect ${providerName}`,
+            description: error.message || `Failed to start ${providerName} connection`,
             variant: 'destructive'
           });
-        } finally {
-          setLoading(false);
         }
-        
         return;
       }
 
@@ -793,12 +787,75 @@ export const ConnectionsTab = () => {
 
                     {connected && connection ? (
                       <div className="space-y-2 text-sm">
+                        {/* Instagram: legacy master-token migration banner */}
+                        {provider.id === 'instagram' &&
+                         connection.account_name === '@captiongenie_socialmanager' &&
+                         connection.account_metadata?.connected_via !== 'oauth_user_token' && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-800 flex items-start gap-2 mb-2 dark:bg-amber-950/30 dark:border-amber-800/50 dark:text-amber-200">
+                            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <strong>{t('socialIntegrations.reconnectRequired')}</strong>
+                              <p className="mt-1">{t('socialIntegrations.reconnectReason')}</p>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="mt-2 h-7 text-xs"
+                                onClick={async () => {
+                                  await handleDisconnect(connection.id);
+                                  await handleConnect(provider.id, provider.name);
+                                }}
+                              >
+                                {t('socialIntegrations.reconnectNow')}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Instagram: profile preview (proves instagram_basic is consumed) */}
+                        {provider.id === 'instagram' &&
+                         connection.account_metadata?.connected_via === 'oauth_user_token' && (
+                          <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/30 mb-2">
+                            {connection.account_metadata?.profile_picture_url ? (
+                              <img
+                                src={connection.account_metadata.profile_picture_url}
+                                alt={`${connection.account_name} profile picture`}
+                                className="h-12 w-12 rounded-full object-cover border border-border"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                                <Instagram className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium truncate">{connection.account_name}</span>
+                                {connection.account_metadata?.account_type && (
+                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">
+                                    {String(connection.account_metadata.account_type).toLowerCase()}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                                {connection.account_metadata?.followers_count !== undefined &&
+                                 connection.account_metadata?.followers_count !== null && (
+                                  <span>{Number(connection.account_metadata.followers_count).toLocaleString()} {t('socialIntegrations.followers')}</span>
+                                )}
+                                {connection.account_metadata?.media_count !== undefined &&
+                                 connection.account_metadata?.media_count !== null && (
+                                  <span>{Number(connection.account_metadata.media_count).toLocaleString()} {t('socialIntegrations.posts')}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">{t('performance.connections.lastSync')}</span>
                           <span>{connection.last_sync_at ? new Date(connection.last_sync_at).toLocaleDateString() : 'Never'}</span>
                         </div>
                         
-                        {provider.id === 'instagram' && (
+                        {provider.id === 'instagram' && connection.account_metadata?.connected_via !== 'oauth_user_token' && (
                           <Button 
                             variant="outline" 
                             size="sm" 

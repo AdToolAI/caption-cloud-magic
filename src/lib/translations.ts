@@ -17831,6 +17831,11 @@ Object.assign(translations.en, {
     changePage: 'Change Page',
     pageSelectionRequired: 'Page selection required',
     syncNow: 'Sync Now',
+    followers: 'followers',
+    posts: 'posts',
+    reconnectRequired: 'Please reconnect Instagram',
+    reconnectReason: 'Your Instagram connection uses a legacy shared token. Reconnect now using the official Instagram Business login to enable per-user publishing.',
+    reconnectNow: 'Reconnect now',
   },
 });
 
@@ -17870,6 +17875,11 @@ Object.assign(translations.de, {
     changePage: 'Seite wechseln',
     pageSelectionRequired: 'Seitenauswahl erforderlich',
     syncNow: 'Jetzt synchronisieren',
+    followers: 'Follower',
+    posts: 'Posts',
+    reconnectRequired: 'Instagram bitte neu verbinden',
+    reconnectReason: 'Deine Instagram-Verbindung nutzt noch einen geteilten Alt-Token. Verbinde dich jetzt erneut über den offiziellen Instagram-Business-Login, damit Posts mit deinem eigenen Account veröffentlicht werden.',
+    reconnectNow: 'Jetzt neu verbinden',
   },
 });
 
@@ -17909,6 +17919,11 @@ Object.assign(translations.es, {
     changePage: 'Cambiar página',
     pageSelectionRequired: 'Selección de página requerida',
     syncNow: 'Sincronizar ahora',
+    followers: 'seguidores',
+    posts: 'publicaciones',
+    reconnectRequired: 'Por favor reconecta Instagram',
+    reconnectReason: 'Tu conexión de Instagram usa un token compartido antiguo. Reconéctate ahora mediante el login oficial de Instagram Business para habilitar la publicación por usuario.',
+    reconnectNow: 'Reconectar ahora',
   },
 });
 
