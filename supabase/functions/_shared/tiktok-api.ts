@@ -103,7 +103,7 @@ export function needsRefresh(expiresAt: string): boolean {
 
 // Get User Info
 export async function getUserInfo(accessToken: string): Promise<TikTokUserInfo> {
-  // Only request fields that are guaranteed to be available in sandbox mode
+  // Request basic profile fields; counts may be unavailable for new accounts and default to 0 below
   const fields = [
     'open_id',
     'display_name',
@@ -141,7 +141,7 @@ export function buildAuthUrl(state: string): string {
   const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY')!;
   const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI')!;
   
-  const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize');
+  const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
   authUrl.searchParams.set('client_key', clientKey);
   authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('scope', 'user.info.basic,video.upload,video.publish'); // Add video upload permissions
