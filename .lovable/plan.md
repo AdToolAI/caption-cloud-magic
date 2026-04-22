@@ -1,114 +1,114 @@
 
-## Instagram OAuth: vollen Review-Flow wirklich erzwingen
+## Meta/Instagram-Reconnect korrekt erzwingen
 
 ### Wahrscheinliche Hauptursache
-Der entscheidende Bug sitzt aktuell im Disconnect/Revoke-Flow:
+Das Screenshot-Textbild ist entscheidend:
 
-- `supabase/functions/instagram-oauth-revoke/index.ts` liest `access_token`
-- im Projekt werden Tokens aber überall als `access_token_hash` gespeichert
-
-Dadurch wird bei „Disconnect Instagram“ sehr wahrscheinlich **nur die DB-Verbindung gelöscht**, aber Meta bekommt **keinen echten Permission-Revoke**. Ergebnis: Beim nächsten Connect erkennt Meta die App weiter als bereits autorisiert und zeigt wieder nur die verkürzte „You previously logged into…”-Seite.
-
-Zusätzlich ist `auth_type=rerequest` nicht ideal für diesen Fall:
-- `rerequest` ist für erneut angefragte/abgelehnte Berechtigungen
-- für einen wirklich frischen Login-/Identitäts-Schritt ist `reauthenticate` passender
-
-### Was ich ändern werde
-
-#### 1. Revoke-Funktion wirklich funktionsfähig machen
-**Datei:** `supabase/functions/instagram-oauth-revoke/index.ts`
-
-Änderungen:
-- `access_token` → `access_token_hash`
-- den gespeicherten Token korrekt mit `decryptToken(connection.access_token_hash)` entschlüsseln
-- optional vor/nach dem Revoke sauber loggen:
-  - ob `/me` aufgelöst werden konnte
-  - ob `DELETE /{user-id}/permissions` erfolgreich war
-- Response präzisieren, damit das Frontend klar weiß:
-  - `revoked: true/false`
-  - `revokeError`
-  - `connectionDeleted`
-
-Ziel:
-Der Disconnect muss Meta die Berechtigungen **wirklich entziehen**, nicht nur lokal die Verbindung löschen.
-
-#### 2. Instagram-Start auf echten Re-Auth umstellen
-**Datei:** `supabase/functions/instagram-oauth-start/index.ts`
-
-Änderungen:
-- `auth_type=rerequest` ersetzen durch `auth_type=reauthenticate`
-- zusätzlich einen frischen `auth_nonce` mitsenden
-- `display=page` beibehalten
-
-Beispielrichtung:
-```ts
-authUrl.searchParams.set('auth_type', 'reauthenticate');
-authUrl.searchParams.set('auth_nonce', crypto.randomUUID().replace(/-/g, ''));
-authUrl.searchParams.set('display', 'page');
+```text
+You previously logged into AdTool AI Integration with Facebook.
 ```
 
-Ziel:
-Meta soll den Flow weniger aggressiv abkürzen und nicht direkt in den bereits-cached Kurzdialog springen.
+Das ist kein Instagram-spezifischer Screen, sondern der gemeinsame Meta/Facebook-App-Grant. Deshalb bringt `reauthenticate` nur die Passwort-Abfrage zurück, aber nicht den eigentlichen Consent-Flow. Meta erkennt die App weiterhin als bereits autorisiert.
 
-#### 3. Beide Disconnect-Einstiege vereinheitlichen
-**Dateien:**
-- `src/components/performance/ConnectionsTab.tsx`
-- `src/components/account/LinkedAccountsCard.tsx`
+Zusätzlich ist der aktuelle Disconnect technisch zu weich:
+- `instagram-oauth-revoke` löscht lokal weiter, auch wenn der Meta-Revoke fehlschlägt
+- dadurch glaubt die UI an einen „sauberen“ Disconnect, obwohl Meta den App-Grant evtl. behalten hat
+- bei Meta ist der Grant praktisch app-weit für Facebook/Instagram, nicht nur „eine Instagram-Row in der DB“
 
-Aktueller Stand:
-- `ConnectionsTab` nutzt bereits `instagram-oauth-revoke`
-- `LinkedAccountsCard` löscht weiterhin direkt die `social_connections`-Row
+## Was ich ändern werde
+
+### 1. Meta-Disconnect als echten App-Reset behandeln
+**Datei:** `supabase/functions/instagram-oauth-revoke/index.ts`
 
 Änderung:
-- auch in `LinkedAccountsCard` für Instagram immer dieselbe Revoke-Function verwenden
-- damit der Bug nicht je nach Einstiegsort wieder auftritt
+- Revoke nicht mehr nur als Soft-Fallback behandeln
+- zusätzlich alle Meta-bezogenen Verbindungen des Users konsistent bereinigen:
+  - `instagram`
+  - `facebook`
+- Response erweitern um:
+  - `revoked`
+  - `revokeError`
+  - `deletedProviders: ['instagram', 'facebook']`
+  - `hardResetComplete`
 
-#### 4. Frontend-Feedback für Review-Fälle verbessern
+Ziel:
+Wenn Instagram „neu“ verbunden werden soll, darf kein alter Meta-App-Grant im System und keine alte Meta-Verbindung mehr übrig sein.
+
+### 2. Frontend nur noch „clean reconnect“ zulassen
 **Dateien:**
+- `src/components/account/LinkedAccountsCard.tsx`
 - `src/components/performance/ConnectionsTab.tsx`
-- ggf. `src/components/account/LinkedAccountsCard.tsx`
 
-Änderungen:
-- wenn Meta-Revoke fehlschlägt, klare Meldung statt stillem Fallback
-- bei erfolgreichem Disconnect optional Hinweis:
-  - „Meta permissions revoked successfully. Next connect should show full review flow.”
+Änderung:
+- bei Instagram-Disconnect die Rückmeldung aus dem Revoke-Call strikt auswerten
+- wenn `revoked !== true`, keine Erfolgsmeldung „voller Flow kommt jetzt“, sondern klare Warnung
+- bei aktivem Facebook/Instagram-Meta-Altzustand vor neuem Connect Hinweis bzw. Block:
+  - zuerst sauberer Meta-Reset
+  - dann neuer Instagram-Connect
 
-So sieht man direkt, ob der nächste Connect wirklich ein sauberer Test ist.
+Ziel:
+Kein falscher Erfolgszustand mehr, wenn Meta den alten Grant in Wahrheit behalten hat.
 
-### Erwartetes Verhalten nach dem Fix
+### 3. Prompt-Strategie von Login-Fokus auf Consent-Fokus umstellen
+**Datei:** `supabase/functions/instagram-oauth-start/index.ts`
 
-#### Disconnect
-1. Instagram trennen
-2. Edge Function widerruft Meta-Permissions tatsächlich
-3. lokale Verbindung wird gelöscht
+Aktuell:
+- `auth_type=reauthenticate` erzwingt primär Passwort/Login
 
-#### Reconnect
-1. „Connect Instagram“
-2. Meta erzwingt wieder den Re-Auth-/Consent-Schritt
-3. danach erscheint der eigentliche Berechtigungs-Dialog deutlich zuverlässiger
-4. nach Zustimmung wird die Verbindung gespeichert und in der UI angezeigt
+Neu:
+- auf consent-orientierte Strategie umstellen:
+  - `auth_type=rerequest`
+  - `auth_nonce` behalten
+  - `display=page` behalten
 
-### Wichtige Erwartungssteuerung
-Meta kontrolliert die externen Seiten selbst. Es kann sein, dass **vor** der eigentlichen Berechtigungsseite weiterhin ein kurzer Identitäts-/Bestätigungs-Schritt erscheint. Entscheidend ist:
-- nach echtem Revoke
-- plus `reauthenticate`
-- darf der Flow **nicht mehr direkt still zurückspringen**, sondern muss wieder in die vollständige Genehmigungsstrecke gehen
+Ziel:
+Nicht noch einmal nur die Identität bestätigen, sondern Meta möglichst in den Berechtigungs-/Consent-Pfad drücken.
 
-Wenn Meta weiterhin eine Vorstufe zeigt, ist das Meta-UI — aber der vollständige Permission-Teil muss danach wieder erscheinen.
+### 4. Meta-Flow sauber instrumentieren
+**Dateien:**
+- `supabase/functions/instagram-oauth-start/index.ts`
+- `supabase/functions/instagram-oauth-revoke/index.ts`
+- optional `supabase/functions/oauth-callback/index.ts`
 
-### Technische Details
-- Keine Datenbankmigration nötig
+Änderung:
+- klarere Logs/Statusfelder für:
+  - Revoke erfolgreich ja/nein
+  - welche Meta-Verbindungen gelöscht wurden
+  - ob der Reconnect nach einem bestätigten Hard-Reset gestartet wurde
+- optional Redirect/Toast-Hinweis nach Callback:
+  - „Reconnect came from clean Meta reset“
+  - oder „Meta reused prior app authorization“
+
+Ziel:
+Beim nächsten Test ist sofort sichtbar, ob wirklich ein frischer Ausgangszustand erreicht wurde.
+
+## Wichtige Erwartung
+Der kleine „Continue as …“-Screen kann bei Meta als erste Hürde trotzdem noch erscheinen. Entscheidend ist nicht dieser erste Screen allein, sondern ob danach:
+- der echte Berechtigungsdialog kommt
+- oder Meta sofort still zurück in die App springt
+
+Der Fix zielt genau auf dieses Problem: den gemerkten Meta-App-Grant wirklich zu löschen statt nur lokal die Instagram-Verbindung zu entfernen.
+
+## Technische Details
+- Keine Änderung an Redirect-URIs oder Backend-Konfiguration
+- Keine Änderung an der OAuth-Callback-URL nötig
 - Betroffene Dateien:
   - `supabase/functions/instagram-oauth-revoke/index.ts`
   - `supabase/functions/instagram-oauth-start/index.ts`
   - `src/components/account/LinkedAccountsCard.tsx`
-  - optional kleine Anpassung in `src/components/performance/ConnectionsTab.tsx`
-- Risiko: gering
-- Wahrscheinlichster Fix-Hebel: der falsche Token-Feldname in der Revoke-Function
+  - `src/components/performance/ConnectionsTab.tsx`
+  - optional `supabase/functions/oauth-callback/index.ts`
 
-### Testablauf nach Umsetzung
-1. Instagram disconnecten
-2. prüfen, dass der Revoke erfolgreich gemeldet wird
-3. erneut verbinden
-4. bestätigen, dass der Flow nicht mehr nur lokal „weiterwinkt“, sondern wieder durch den vollständigen Meta-Genehmigungsweg läuft
-5. anschließend kontrollieren, dass die Verbindung wieder korrekt in der Integrationsansicht erscheint
+## Test nach Umsetzung
+1. Instagram trennen
+2. prüfen, dass der Revoke explizit als erfolgreicher Meta-Reset gemeldet wird
+3. sicherstellen, dass auch alte Facebook-Meta-Verbindungen bereinigt wurden
+4. Instagram erneut verbinden
+5. prüfen, dass nach dem Continue-/Login-Schritt nicht direkt still zurückgesprungen wird, sondern der Berechtigungsdialog folgt
+6. falls der Flow nur in Preview anders ist: zusätzlich auf der veröffentlichten URL testen, ohne weitere Code-Änderungen an OAuth-Konfiguration
+
+## Risiko
+Gering bis mittel:
+- gering für Frontend/Statushandling
+- mittel beim Meta-Reset, weil Facebook- und Instagram-Verbindungen bewusst gemeinsam als gemeinsamer Meta-Grant behandelt werden
+- genau das ist hier aber sehr wahrscheinlich notwendig, weil das Problem sichtbar auf der Facebook/Meta-App-Autorisierungsebene sitzt
