@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { toast } from "sonner";
 
 export type StrategyPostStatus = "pending" | "completed" | "missed" | "dismissed" | "rescheduled";
@@ -48,6 +49,7 @@ const POSTS_PER_WEEK_FOR_LEVEL: Record<CreatorLevel, number> = {
 
 export function useStrategyMode() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const qc = useQueryClient();
 
   // Read profile flag
@@ -186,9 +188,9 @@ export function useStrategyMode() {
     onSuccess: (next) => {
       qc.invalidateQueries({ queryKey: ["strategy-mode-profile"] });
       qc.invalidateQueries({ queryKey: ["strategy-posts"] });
-      toast.success(next ? "Strategie-Modus aktiviert" : "Strategie-Modus deaktiviert");
+      toast.success(next ? t("strategy.toastEnabled") : t("strategy.toastDisabled"));
     },
-    onError: (e: any) => toast.error(e?.message || "Fehler beim Umschalten"),
+    onError: (e: any) => toast.error(e?.message || t("strategy.toastToggleError")),
   });
 
   const regenerateMutation = useMutation({
@@ -200,9 +202,9 @@ export function useStrategyMode() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["strategy-posts"] });
-      toast.success("Neue Wochen-Strategie generiert");
+      toast.success(t("strategy.toastRegenerated"));
     },
-    onError: (e: any) => toast.error(e?.message || "Generierung fehlgeschlagen"),
+    onError: (e: any) => toast.error(e?.message || t("strategy.toastRegenerateError")),
   });
 
   const dismissMutation = useMutation({
@@ -215,7 +217,7 @@ export function useStrategyMode() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["strategy-posts"] });
-      toast.success("Vorschlag verworfen");
+      toast.success(t("strategy.toastDismissed"));
     },
   });
 
@@ -240,7 +242,7 @@ export function useStrategyMode() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["strategy-posts"] });
-      toast.success("Neu geplant");
+      toast.success(t("strategy.toastRescheduled"));
     },
   });
 
@@ -254,7 +256,7 @@ export function useStrategyMode() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["strategy-posts"] });
-      toast.success("Als erledigt markiert");
+      toast.success(t("strategy.toastCompleted"));
     },
   });
 
@@ -269,9 +271,9 @@ export function useStrategyMode() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["strategy-posts"] });
-      toast.success("Vorschlag aktualisiert");
+      toast.success(t("strategy.toastUpdated"));
     },
-    onError: (e: any) => toast.error(e?.message || "Update fehlgeschlagen"),
+    onError: (e: any) => toast.error(e?.message || t("strategy.toastUpdateError")),
   });
 
   // Submit to calendar — creates a calendar_events entry and links it back
@@ -299,7 +301,7 @@ export function useStrategyMode() {
         .limit(1)
         .maybeSingle();
       const workspaceId = ws?.workspace_id;
-      if (!workspaceId) throw new Error("Kein Workspace gefunden");
+      if (!workspaceId) throw new Error(t("strategy.noWorkspace"));
 
       const scheduled = overrides.scheduled_at || post.scheduled_at;
       const mediaUrls = overrides.media_urls ?? [];
@@ -347,9 +349,9 @@ export function useStrategyMode() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["strategy-posts"] });
-      toast.success("In Kalender übernommen");
+      toast.success(t("strategy.toastSubmittedToCalendar"));
     },
-    onError: (e: any) => toast.error(e?.message || "Übernahme fehlgeschlagen"),
+    onError: (e: any) => toast.error(e?.message || t("strategy.toastSubmitError")),
   });
 
   // Manual level override (also pauses auto-upgrade for 14 days)
@@ -384,9 +386,9 @@ export function useStrategyMode() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["onboarding-profile"] });
       qc.invalidateQueries({ queryKey: ["creator-level-progress"] });
-      toast.success("Level aktualisiert");
+      toast.success(t("strategy.toastLevelUpdated"));
     },
-    onError: (e: any) => toast.error(e?.message || "Fehler beim Aktualisieren"),
+    onError: (e: any) => toast.error(e?.message || t("strategy.toastLevelError")),
   });
 
   // Compute progress to next level
