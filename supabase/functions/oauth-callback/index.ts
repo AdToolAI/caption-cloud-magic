@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 import { encryptToken } from '../_shared/crypto.ts';
+import { discoverMetaPages } from '../_shared/meta-page-discovery.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -418,32 +419,25 @@ async function getMetaUserInfoForPending(accessToken: string, provider: string) 
  * Mirrors the logic in supabase/functions/facebook-select-page/index.ts.
  */
 async function tryAutoResolveInstagram(userAccessToken: string): Promise<any | null> {
-  // 1. List pages with their linked IG business account in one call.
-  // Include both classic and alternative IG link fields.
-  const pagesRes = await fetch(
-    `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,category,picture{url},access_token,instagram_business_account,connected_instagram_account&access_token=${userAccessToken}`
-  );
-  if (!pagesRes.ok) {
-    const err = await pagesRes.text();
-    console.warn('[tryAutoResolveInstagram] /me/accounts failed:', err);
+  // Use the SAME real per-page verification as facebook-list-pages.
+  // Meta is unreliable about returning IG link fields inline in /me/accounts,
+  // so we always verify each page individually via the page node.
+  let pages;
+  try {
+    pages = await discoverMetaPages(userAccessToken, { verifyInstagram: true });
+  } catch (e) {
+    console.warn('[tryAutoResolveInstagram] discoverMetaPages failed:', e);
     return null;
   }
-  const pagesJson = await pagesRes.json();
-  const pages: any[] = pagesJson?.data || [];
-  const igPages = pages
-    .map((p) => ({
-      ...p,
-      _ig_id: p?.instagram_business_account?.id || p?.connected_instagram_account?.id || null,
-    }))
-    .filter((p) => p._ig_id);
 
+  const igPages = pages.filter((p) => p.has_instagram && p.instagram_business_account_id);
   if (igPages.length !== 1) {
-    console.log('[tryAutoResolveInstagram] IG-capable page count:', igPages.length);
+    console.log('[tryAutoResolveInstagram] verified IG-capable page count:', igPages.length);
     return null;
   }
 
   const page = igPages[0];
-  const igUserId = page._ig_id;
+  const igUserId = page.instagram_business_account_id!;
   const pageAccessToken = page.access_token;
 
   // 2. Fetch IG profile (proves instagram_basic is consumed for App Review).
