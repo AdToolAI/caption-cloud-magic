@@ -39,6 +39,7 @@ export const ConnectionsTab = () => {
   const [userPlan, setUserPlan] = useState<string>('free');
   const [xCallbackError, setXCallbackError] = useState<string | null>(null);
   const [showPageSelectDialog, setShowPageSelectDialog] = useState(false);
+  const [pageSelectMode, setPageSelectMode] = useState<"facebook" | "instagram">("facebook");
 
   useEffect(() => {
     const initializeAndHandleCallback = async () => {
@@ -100,8 +101,14 @@ export const ConnectionsTab = () => {
               });
               await fetchConnections();
               
-              // For Facebook: Show page selection dialog instead of immediate sync
+              // For Facebook AND Instagram: Show page selection dialog instead of immediate sync.
+              // Instagram now uses the same staged flow as Facebook — the IG Business
+              // account is resolved from the chosen Facebook Page.
               if (connected === 'facebook') {
+                setPageSelectMode('facebook');
+                setShowPageSelectDialog(true);
+              } else if (connected === 'instagram') {
+                setPageSelectMode('instagram');
                 setShowPageSelectDialog(true);
               } else {
                 await handleSync(newConnection.id, connected);
@@ -125,10 +132,11 @@ export const ConnectionsTab = () => {
         window.history.replaceState({}, '', window.location.pathname + '?tab=connections');
       } else if (connected) {
         // Legacy callback format (backwards compatibility)
-        // For Facebook: always show page selection dialog
-        if (connected === 'facebook') {
+        // Facebook AND Instagram: always show page selection dialog
+        if (connected === 'facebook' || connected === 'instagram') {
           setTimeout(async () => {
             await fetchConnections();
+            setPageSelectMode(connected as 'facebook' | 'instagram');
             setShowPageSelectDialog(true);
           }, 1500);
         } else {
@@ -963,7 +971,7 @@ export const ConnectionsTab = () => {
                             variant="default" 
                             size="sm" 
                             className="w-full gap-2 mb-2"
-                            onClick={() => setShowPageSelectDialog(true)}
+                            onClick={() => { setPageSelectMode('facebook'); setShowPageSelectDialog(true); }}
                           >
                             <Facebook className="h-3 w-3" />
                             {t('socialIntegrations.selectPage')}
@@ -975,9 +983,36 @@ export const ConnectionsTab = () => {
                             variant="outline" 
                             size="sm" 
                             className="w-full gap-2 mb-2"
-                            onClick={() => setShowPageSelectDialog(true)}
+                            onClick={() => { setPageSelectMode('facebook'); setShowPageSelectDialog(true); }}
                           >
                             <Facebook className="h-3 w-3" />
+                            {t('socialIntegrations.changePage')}
+                          </Button>
+                        )}
+
+                        {/* Instagram page selection button (mirrors Facebook flow) */}
+                        {provider.id === 'instagram' && connection.account_metadata?.selection_required && (
+                          <Button 
+                            variant="default" 
+                            size="sm" 
+                            className="w-full gap-2 mb-2"
+                            onClick={() => { setPageSelectMode('instagram'); setShowPageSelectDialog(true); }}
+                          >
+                            <Instagram className="h-3 w-3" />
+                            {t('socialIntegrations.selectPage')}
+                          </Button>
+                        )}
+
+                        {provider.id === 'instagram' &&
+                         !connection.account_metadata?.selection_required &&
+                         connection.account_metadata?.connected_via === 'oauth_user_token' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full gap-2 mb-2"
+                            onClick={() => { setPageSelectMode('instagram'); setShowPageSelectDialog(true); }}
+                          >
+                            <Instagram className="h-3 w-3" />
                             {t('socialIntegrations.changePage')}
                           </Button>
                         )}
@@ -988,7 +1023,7 @@ export const ConnectionsTab = () => {
                             size="sm" 
                             className="flex-1" 
                             onClick={() => handleSync(connection.id, provider.id)}
-                            disabled={loading || provider.id === 'linkedin' || (provider.id === 'facebook' && connection.account_metadata?.selection_required)}
+                            disabled={loading || provider.id === 'linkedin' || ((provider.id === 'facebook' || provider.id === 'instagram') && connection.account_metadata?.selection_required)}
                           >
                             {t('socialIntegrations.syncNow')}
                           </Button>
@@ -1051,6 +1086,7 @@ export const ConnectionsTab = () => {
         open={showPageSelectDialog}
         onOpenChange={setShowPageSelectDialog}
         onPageSelected={fetchConnections}
+        mode={pageSelectMode}
       />
     </div>
   );
