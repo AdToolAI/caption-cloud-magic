@@ -261,6 +261,15 @@ export const FacebookPageSelectDialog = ({
               ? "Wähle die Facebook-Seite, deren verknüpftes Instagram Business-Konto verbunden werden soll."
               : "Wähle die Facebook-Seite, die du mit CaptionGenie verbinden möchtest."}
           </DialogDescription>
+          {isInstagram && (
+            <p className="text-[11px] text-muted-foreground/80 mt-2 leading-relaxed">
+              <strong>Hinweis für Meta App Review:</strong> Falls Meta nur den
+              kurzen „Continue as …"-Bildschirm anzeigt, trenne Instagram
+              vorher vollständig und nimm den Flow in einer frischen Meta-Sitzung
+              (am besten ausgeloggt) erneut auf — der Reviewer muss den
+              kompletten Berechtigungsdialog inklusive Page-Auswahl sehen.
+            </p>
+          )}
         </DialogHeader>
 
         {loading ? (

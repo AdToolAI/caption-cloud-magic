@@ -266,13 +266,53 @@ export const ConnectionsTab = () => {
         return;
       }
 
-      // Instagram: use the EXACT same frontend OAuth builder as Facebook.
-      // Only differences vs Facebook:
-      //   - state.provider = 'instagram' (so the callback knows which provider it is)
-      //   - additional scopes: instagram_basic + instagram_content_publish
-      // Everything else (client_id, redirect_uri, dialog endpoint, state shape)
-      // mirrors Facebook 1:1 so the user sees the identical Meta flow that
-      // already works for Facebook today. No auto hard-reset, no rerequest.
+      // Instagram: ALWAYS go through the dedicated backend start function.
+      // `instagram-oauth-start` performs a Meta hard-reset (revoke previous
+      // app grant + delete stale ig/fb rows) and then builds the OAuth URL
+      // with `auth_type=rerequest`, a fresh `auth_nonce` and `display=page`
+      // on Graph API v24. This is what makes Meta reliably show the FULL
+      // permission dialog (Page selection + Instagram + scopes) instead of
+      // the abbreviated "Continue as ..." short-circuit screen — required
+      // for the Meta App Review screencast (Policy 1.9).
+      //
+      // We deliberately bypass the local frontend OAuth URL builder below
+      // for Instagram so there is exactly ONE source of truth for IG OAuth.
+      if (providerId === 'instagram') {
+        try {
+          const { data: session } = await supabase.auth.getSession();
+          if (!session.session?.access_token) {
+            toast({
+              title: t('socialIntegrations.authRequired') || 'Auth required',
+              description: t('socialIntegrations.pleaseReLogin') || 'Please log in again',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          const { data, error } = await supabase.functions.invoke('instagram-oauth-start', {
+            headers: {
+              Authorization: `Bearer ${session.session.access_token}`,
+            },
+            body: { returnTo: window.location.href },
+          });
+
+          if (error) throw error;
+
+          if (data?.authUrl) {
+            window.location.href = data.authUrl;
+          } else {
+            throw new Error('No auth URL received from instagram-oauth-start');
+          }
+        } catch (error: any) {
+          console.error('[ConnectionsTab] instagram-oauth-start failed:', error);
+          toast({
+            title: t('common.error'),
+            description: error?.message || 'Failed to start Instagram connection',
+            variant: 'destructive',
+          });
+        }
+        return;
+      }
 
       // TikTok: Use new backend OAuth flow
       if (providerId === 'tiktok') {
@@ -367,41 +407,12 @@ export const ConnectionsTab = () => {
       // Facebook now uses generic oauth-callback without ?provider query param
       const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback`;
       
-      // Instagram: always request business_management upfront. Meta requires
-      // it for business-managed pages, and without it /me/accounts often
-      // returns an empty list — costing the user a full failed connect cycle.
-      // Reference: Meta Dev Community + Stack Overflow ("Solved: All I had to
-      // do was add the business_management permission").
-      const existingIg = connections.find((c) => c.provider === 'instagram');
-      const missingScopes: string[] = existingIg?.account_metadata?.missing_page_scopes ?? [];
-      const discoveryStatus: string | undefined = existingIg?.account_metadata?.meta_page_discovery_status;
-      const pagesFoundCount: number = existingIg?.account_metadata?.meta_pages_found_count ?? -1;
-      const previousDiscoveryFailed =
-        providerId === 'instagram' &&
-        (discoveryStatus === 'meta_pages_hidden_or_unavailable' || pagesFoundCount === 0);
-      // Force re-consent when:
-      //  - the caller explicitly asks for it (the "Erneut verbinden" CTA)
-      //  - the user previously declined required page scopes
-      //  - a previous discovery returned zero pages (Meta short-circuit risk)
-      // For Instagram, ALWAYS force the full Meta consent dialog.
-      // Required for Meta App Review screencast (Policy 1.9): the reviewer
-      // must see the complete permission dialog with page selection, not
-      // the abbreviated "Continue as ..." short-circuit screen.
-      const forceReconsent = providerId === 'instagram';
-      const reconsentSuffix = forceReconsent
-        ? `&auth_type=rerequest&auth_nonce=${crypto.randomUUID().replace(/-/g, '')}`
-        : '';
-
-      const igScopes =
-        'pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_content_publish,business_management';
-
+      // NOTE: Instagram is intentionally NOT in this map anymore.
+      // The Instagram flow exits early above and is handled exclusively by
+      // the `instagram-oauth-start` Edge Function (single source of truth).
+      // Do not re-add an `instagram:` entry here — it would silently bypass
+      // the backend hard-reset + forced re-consent and break Meta App Review.
       const oauthUrls: Record<string, string> = {
-        // Instagram uses the SAME Facebook OAuth dialog as the facebook flow
-        // (state.provider already encodes which provider this is). Only the
-        // scopes are extended with instagram_basic + instagram_content_publish,
-        // and optionally business_management when prior discovery showed Meta
-        // hid pages from the app.
-        instagram: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${igScopes}&state=${encodeURIComponent(state)}${reconsentSuffix}`,
         facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_read_engagement,pages_manage_metadata,pages_show_list,pages_read_user_content,pages_manage_posts,pages_manage_engagement&state=${encodeURIComponent(state)}`,
         tiktok: `/api/oauth/tiktok/start?user_id=${user.id}`,
         linkedin: `/api/oauth/linkedin/start?user_id=${user.id}`,
