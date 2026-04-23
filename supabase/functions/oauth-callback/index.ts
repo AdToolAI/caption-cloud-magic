@@ -463,19 +463,32 @@ async function getMetaUserInfoForPending(accessToken: string, provider: string) 
  *
  * Mirrors the logic in supabase/functions/facebook-select-page/index.ts.
  */
-async function tryAutoResolveInstagram(userAccessToken: string): Promise<any | null> {
+async function tryAutoResolveInstagram(
+  userAccessToken: string,
+): Promise<{ account: any; diagnostics: DiscoveryDiagnostics } | null> {
   // Use the SAME real per-page verification as facebook-list-pages.
   // Meta is unreliable about returning IG link fields inline in /me/accounts,
   // so we always verify each page individually via the page node.
   let pages;
+  let diagnostics: DiscoveryDiagnostics;
   try {
-    pages = await discoverMetaPages(userAccessToken, { verifyInstagram: true });
+    const result = await discoverMetaPagesWithDiagnostics(userAccessToken, {
+      verifyInstagram: true,
+    });
+    pages = result.pages;
+    diagnostics = result.diagnostics;
   } catch (e) {
     console.warn('[tryAutoResolveInstagram] discoverMetaPages failed:', e);
     return null;
   }
 
   const igPages = pages.filter((p) => p.has_instagram && p.instagram_business_account_id);
+  console.log('[tryAutoResolveInstagram] diagnostics summary:', {
+    pages_found: diagnostics.pages_found_count,
+    verified_ig: diagnostics.verified_instagram_count,
+    failures: diagnostics.page_verify_failures.length,
+    list_error: diagnostics.list_error,
+  });
   if (igPages.length !== 1) {
     console.log('[tryAutoResolveInstagram] verified IG-capable page count:', igPages.length);
     return null;
@@ -500,16 +513,19 @@ async function tryAutoResolveInstagram(userAccessToken: string): Promise<any | n
   const encryptedPageToken = await encryptToken(pageAccessToken);
 
   return {
-    id: igUserId,
-    name: profile.username ? `@${profile.username}` : igUserId,
-    account_type: 'BUSINESS',
-    profile_picture_url: profile.profile_picture_url || null,
-    followers_count: profile.followers_count ?? null,
-    media_count: profile.media_count ?? null,
-    page_id: page.id,
-    page_access_token_encrypted: encryptedPageToken,
-    // Explicitly NOT setting selection_required so the metadata block in the
-    // upsert does not flag this connection as pending.
+    account: {
+      id: igUserId,
+      name: profile.username ? `@${profile.username}` : igUserId,
+      account_type: 'BUSINESS',
+      profile_picture_url: profile.profile_picture_url || null,
+      followers_count: profile.followers_count ?? null,
+      media_count: profile.media_count ?? null,
+      page_id: page.id,
+      page_access_token_encrypted: encryptedPageToken,
+      // Explicitly NOT setting selection_required so the metadata block in the
+      // upsert does not flag this connection as pending.
+    },
+    diagnostics,
   };
 }
 
