@@ -316,6 +316,7 @@ serve(async (req) => {
 
           const klingInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt),
+            negative_prompt: NEGATIVE_PROMPT_PARAM,
             duration: Math.min(scene.durationSeconds, 10),
             aspect_ratio: "16:9",
             mode: quality === 'pro' ? 'pro' : 'standard',
