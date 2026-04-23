@@ -37,10 +37,13 @@ const MODEL_BY_QUALITY: Record<Quality, string> = {
   pro: "google/gemini-3-pro-image-preview",
 };
 
-// Negative clause — same philosophy as compose-video-clips: never burn text
-// into the image, no isolated product shots on plain backgrounds.
-const NEGATIVE_SUFFIX =
-  ", no on-screen text, no captions, no subtitles, no watermarks, no logos, no written words, no typography, no signs with readable text, no UI overlays, no isolated product on plain background, clean cinematic composition";
+// IMPORTANT: Gemini image models have no `negative_prompt` parameter, and they
+// also treat words like "text", "captions", "logo" as concepts to render even
+// when prefixed with "no". So we DO NOT list forbidden words here. Instead we
+// strip any old negative suffix from incoming prompts and append a short
+// positive cue that biases the model toward clean, environment-rich frames.
+const POSITIVE_CLEAN_CUE =
+  ", clean photographic composition, natural environment";
 
 function buildPrompt(rawPrompt: string, visualStyle?: string, aspectRatio?: string): string {
   const base = (rawPrompt || "cinematic still frame").trim();
@@ -48,15 +51,18 @@ function buildPrompt(rawPrompt: string, visualStyle?: string, aspectRatio?: stri
   const aspectHint = aspectRatio
     ? `, composed for ${aspectRatio} aspect ratio`
     : "";
-  // Avoid double-appending if AI prompt already ended with negative clause.
-  const lower = base.toLowerCase();
-  let result = base.replace(/[,.\s]*$/, "");
+  // Strip any "no on-screen text..." suffix that the wizard may have appended —
+  // those words trigger the very thing we want to avoid in diffusion models.
+  let result = base.replace(/,?\s*no on-screen text[\s\S]*$/i, "").trim().replace(/[,.\s]*$/, "");
+  const lower = result.toLowerCase();
   if (styleHint) {
     const probe = styleHint.replace(/^,\s*/, "").slice(0, 30).toLowerCase();
     if (!lower.includes(probe)) result += styleHint;
   }
   result += aspectHint;
-  if (!lower.includes("no on-screen text")) result += NEGATIVE_SUFFIX;
+  if (!lower.includes("clean photographic composition")) {
+    result += POSITIVE_CLEAN_CUE;
+  }
   return result;
 }
 
