@@ -262,13 +262,22 @@ export const FacebookPageSelectDialog = ({
               : "Wähle die Facebook-Seite, die du mit CaptionGenie verbinden möchtest."}
           </DialogDescription>
           {isInstagram && (
-            <p className="text-[11px] text-muted-foreground/80 mt-2 leading-relaxed">
-              <strong>Hinweis für Meta App Review:</strong> Falls Meta nur den
-              kurzen „Continue as …"-Bildschirm anzeigt, trenne Instagram
-              vorher vollständig und nimm den Flow in einer frischen Meta-Sitzung
-              (am besten ausgeloggt) erneut auf — der Reviewer muss den
-              kompletten Berechtigungsdialog inklusive Page-Auswahl sehen.
-            </p>
+            <div className="text-[11px] text-muted-foreground/80 mt-2 leading-relaxed space-y-1.5 rounded-md border border-border/60 bg-muted/30 p-2.5">
+              <p className="font-semibold text-foreground/90">
+                Hinweis für Meta App Review (Screencast):
+              </p>
+              <ol className="list-decimal list-outside ml-4 space-y-1">
+                <li>Aufnahme auf der <strong>veröffentlichten App-URL</strong> starten (nicht im Preview).</li>
+                <li>Vorher bei Facebook/Meta <strong>vollständig ausloggen</strong>.</li>
+                <li>Flow im <strong>Inkognito-/Privatfenster</strong> starten.</li>
+                <li>Connect → Berechtigungen → Page-Auswahl → erfolgreiche Verbindung → echte Instagram-Nutzung im selben Take aufnehmen.</li>
+              </ol>
+              <p className="text-muted-foreground/70">
+                Wenn Meta nur die Kurzversion zeigt, liegt das an einer
+                bestehenden Meta-Sitzung — nicht an der App. Eine frische
+                Session erzwingt den vollständigen Dialog zuverlässig.
+              </p>
+            </div>
           )}
         </DialogHeader>
 
