@@ -3820,6 +3820,57 @@ export const translations: Record<Language, any> = {
           playHint: "Click for sound"
         }
       },
+      socialProof: {
+        creators: "10,000+ Creators",
+        worksWith: "Works with"
+      },
+      liveDemo: {
+        badge: "Live demo",
+        title: "See the difference",
+        subtitle: "Real captions. Real results. Switch industries to see what changes.",
+        before: "Before",
+        after: "With AdTool AI",
+        basicPost: "Basic post",
+        adtoolPost: "AI-optimized",
+        cases: {
+          restaurant: {
+            industry: "Restaurant",
+            metric: "+312%",
+            before: "New menu out now. Come visit us!",
+            after: "Truffle pasta. Hand-rolled this morning. Open till midnight tonight — book a table or walk in. 🍝 #PastaNight #Foodies"
+          },
+          fitness: {
+            industry: "Fitness Coach",
+            metric: "+248%",
+            before: "Workout of the day. Let's go!",
+            after: "5 moves. 12 minutes. Zero equipment. Save this for your Monday — your future self will thank you. 💪 #FitnessReels #HomeWorkout"
+          },
+          fashion: {
+            industry: "Fashion Brand",
+            metric: "+189%",
+            before: "New collection available. Shop now.",
+            after: "Drop 03 just landed. Linen, silk, structured tailoring — built for the long game. Sizes selling fast. 👗 #SlowFashion #DropDay"
+          }
+        }
+      },
+      testimonials: {
+        badge: "What creators say",
+        t1: {
+          quote: "AdTool saves me 12 hours every week. The AI understands my brand better than my old copywriter — and ships content in seconds.",
+          name: "Sarah M.",
+          role: "Marketing Director, FashionCo"
+        },
+        t2: {
+          quote: "I went from 3 posts a week to 12 — without burning out. Engagement is up 43% and my clients ask which agency I use.",
+          name: "Marco R.",
+          role: "Independent Creator"
+        },
+        t3: {
+          quote: "We tested 6 tools. AdTool is the only one that actually sounds like our brand. Game over.",
+          name: "Lisa K.",
+          role: "Head of Social, TechStart"
+        }
+      },
       featureGrid: {
         title1: "Everything you need for ",
         title2: "Social Media Success",
