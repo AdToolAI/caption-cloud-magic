@@ -15,6 +15,7 @@ import { LiveDemoShowcase } from "@/components/landing/LiveDemoShowcase";
 import { TestimonialSpotlight } from "@/components/landing/TestimonialSpotlight";
 
 import { PricingSection } from "@/components/landing/PricingSection";
+import { TrialPromiseStrip } from "@/components/landing/TrialPromiseStrip";
 import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
 import { FAQ } from "@/components/FAQ";
 
@@ -88,6 +89,13 @@ const Index = () => {
         />
       
         <main className="flex-1">
+          {/* Trial Promise Strip — top of page, above hero */}
+          <section className="px-4 pt-6">
+            <div className="container max-w-7xl mx-auto">
+              <TrialPromiseStrip />
+            </div>
+          </section>
+
           {/* Hero Section - Black Tie */}
           <BlackTieHero />
 
