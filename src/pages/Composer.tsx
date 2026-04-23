@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,21 @@ export default function Composer() {
     categoryId: '22',
   });
   const [activeTab, setActiveTab] = useState("standard");
+
+  // Safe media URL resolver — handles real File/Blob and virtual files (with .url) from MediaLibrary
+  const composerMediaUrl = useMemo(() => {
+    const first = selectedMedia[0] as (File & { url?: string }) | undefined;
+    if (!first) return importedMediaUrl || '';
+    if (first.url) return first.url;
+    if (first instanceof Blob) return URL.createObjectURL(first);
+    return importedMediaUrl || '';
+  }, [selectedMedia, importedMediaUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (composerMediaUrl?.startsWith('blob:')) URL.revokeObjectURL(composerMediaUrl);
+    };
+  }, [composerMediaUrl]);
 
   // Parse text content into structured data for preview
   const parseTextToStructured = (text: string) => {
@@ -858,7 +873,7 @@ export default function Composer() {
               {/* Direct Social Media Publishing Tab */}
               <TabsContent value="social" className="mt-6">
                 <PublishToSocialTab
-                  videoUrl={selectedMedia[0] ? URL.createObjectURL(selectedMedia[0]) : importedMediaUrl || ''}
+                  videoUrl={composerMediaUrl}
                   defaultCaption={textContent}
                   defaultHashtags={postData?.hashtags || []}
                   onPublished={() => {
