@@ -283,6 +283,7 @@ serve(async (req) => {
 
           const hailuoInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt),
+            negative_prompt: NEGATIVE_PROMPT_PARAM,
             duration: duration,
             resolution: resolution,
           };
