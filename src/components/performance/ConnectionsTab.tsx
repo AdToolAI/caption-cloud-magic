@@ -221,7 +221,11 @@ export const ConnectionsTab = () => {
     }
   };
 
-  const handleConnect = async (providerId: string, providerName: string) => {
+  const handleConnect = async (
+    providerId: string,
+    providerName: string,
+    options: { forceReconsent?: boolean } = {}
+  ) => {
     console.log('=== handleConnect START ===', { 
       providerId, 
       providerName, 
@@ -363,29 +367,31 @@ export const ConnectionsTab = () => {
       // Facebook now uses generic oauth-callback without ?provider query param
       const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback`;
       
-      // If the existing instagram connection signals missing page scopes
-      // (user previously denied them in the Meta dialog), force Meta to
-      // re-show the full consent screen instead of silently reusing the
-      // declined decisions.
+      // Instagram: always request business_management upfront. Meta requires
+      // it for business-managed pages, and without it /me/accounts often
+      // returns an empty list — costing the user a full failed connect cycle.
+      // Reference: Meta Dev Community + Stack Overflow ("Solved: All I had to
+      // do was add the business_management permission").
       const existingIg = connections.find((c) => c.provider === 'instagram');
       const missingScopes: string[] = existingIg?.account_metadata?.missing_page_scopes ?? [];
       const discoveryStatus: string | undefined = existingIg?.account_metadata?.meta_page_discovery_status;
       const pagesFoundCount: number = existingIg?.account_metadata?.meta_pages_found_count ?? -1;
-      // If a previous discovery showed Meta returned ZERO pages despite scopes being ok,
-      // request the additional business_management scope on the next attempt — this often
-      // unblocks business-managed pages that Meta otherwise hides from the app.
-      const needsBusinessScope =
+      const previousDiscoveryFailed =
         providerId === 'instagram' &&
         (discoveryStatus === 'meta_pages_hidden_or_unavailable' || pagesFoundCount === 0);
+      // Force re-consent when:
+      //  - the caller explicitly asks for it (the "Erneut verbinden" CTA)
+      //  - the user previously declined required page scopes
+      //  - a previous discovery returned zero pages (Meta short-circuit risk)
       const forceReconsent =
-        providerId === 'instagram' && (missingScopes.length > 0 || needsBusinessScope);
+        providerId === 'instagram' &&
+        (options.forceReconsent === true || missingScopes.length > 0 || previousDiscoveryFailed);
       const reconsentSuffix = forceReconsent
         ? `&auth_type=rerequest&auth_nonce=${crypto.randomUUID().replace(/-/g, '')}`
         : '';
 
-      const igScopes = needsBusinessScope
-        ? 'pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_content_publish,business_management'
-        : 'pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_content_publish';
+      const igScopes =
+        'pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_content_publish,business_management';
 
       const oauthUrls: Record<string, string> = {
         // Instagram uses the SAME Facebook OAuth dialog as the facebook flow
@@ -1100,9 +1106,14 @@ export const ConnectionsTab = () => {
         onPageSelected={fetchConnections}
         mode={pageSelectMode}
         onReconnect={() => {
-          // Force a fresh consent dialog so Meta does not silently reuse
-          // the previously declined page-scope decisions.
-          handleConnect(pageSelectMode, pageSelectMode === 'instagram' ? 'Instagram' : 'Facebook');
+          // Force a fresh consent dialog (auth_type=rerequest + new nonce
+          // inside handleConnect) so Meta cannot silently reuse the previous
+          // grant and skip the page-selection step.
+          handleConnect(
+            pageSelectMode,
+            pageSelectMode === 'instagram' ? 'Instagram' : 'Facebook',
+            { forceReconsent: true }
+          );
         }}
       />
     </div>

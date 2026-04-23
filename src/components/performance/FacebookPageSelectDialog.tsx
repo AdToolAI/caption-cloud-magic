@@ -160,16 +160,30 @@ export const FacebookPageSelectDialog = ({
 
     let title: string;
     let body: string;
+    // Concrete Meta-side checklist shown only for the "0 pages from Meta"
+    // case — these are the four conditions Meta requires before /me/accounts
+    // will return any usable page for an Instagram connect flow.
+    let checklist: string[] | null = null;
+
+    const pagesHidden =
+      resultStatus === 'meta_pages_hidden_or_unavailable' ||
+      (resultStatus === null && diagnostics?.pages_found_count === 0);
 
     if (resultStatus === 'no_pages_access' || (missingScopes.length > 0 && pages.length === 0)) {
       title = 'Keine Seitenfreigabe erhalten';
       body =
         'Meta hat keine Facebook-Seiten freigegeben. Verbinde erneut und aktiviere im Meta-Dialog ALLE Toggles (insbesondere „Zugriff auf Seiten" und „Instagram").' +
         (missingScopes.length ? ` Fehlende Berechtigungen: ${missingScopes.join(', ')}.` : '');
-    } else if (resultStatus === 'meta_pages_hidden_or_unavailable') {
+    } else if (pagesHidden) {
       title = 'Meta hat keine Seiten an die App übergeben';
       body =
-        'Deine Berechtigungen sind ok, aber Meta hat für diesen Account keine Seiten an die App ausgeliefert. Das passiert häufig bei business-verwalteten Seiten. Klicke „Erneut verbinden" — wir fordern dann zusätzlich die Business-Berechtigung an.';
+        'Deine Berechtigungen sind ok, aber Meta hat für diesen Account keine Seiten an die App ausgeliefert. Das passiert fast immer aus einem dieser vier Gründe:';
+      checklist = [
+        'Dein Instagram-Konto ist ein Business- oder Creator-Konto (nicht „Privat"). Prüfe das in der Instagram-App unter Einstellungen → Konto.',
+        'Dein Instagram-Konto ist in den Einstellungen deiner Facebook-Seite mit dieser Seite verknüpft (Facebook-Seite → Einstellungen → Verknüpfte Konten → Instagram).',
+        'Die Facebook-Seite wird von genau dem Facebook-Account verwaltet, mit dem du dich gerade angemeldet hast.',
+        'Im Meta-Berechtigungsdialog musst du beim Re-Connect mindestens eine Page-Checkbox aktivieren — nicht nur das Instagram-Konto.',
+      ];
     } else if (resultStatus === 'pages_found_but_verification_failed') {
       title = 'Seiten gefunden, aber Verifikation fehlgeschlagen';
       body =
@@ -194,20 +208,39 @@ export const FacebookPageSelectDialog = ({
         <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground" />
         <p className="text-sm font-medium">{title}</p>
         <p className="text-xs text-muted-foreground px-2">{body}</p>
+        {checklist && (
+          <ol className="text-left text-xs text-muted-foreground space-y-2 px-4 list-decimal list-outside ml-2">
+            {checklist.map((item, i) => (
+              <li key={i} className="leading-relaxed">{item}</li>
+            ))}
+          </ol>
+        )}
         {diagSummary && (
           <p className="text-[10px] text-muted-foreground/70 font-mono px-2">{diagSummary}</p>
         )}
         {showReconnect && (
-          <Button
-            size="sm"
-            variant="default"
-            onClick={() => {
-              onOpenChange(false);
-              onReconnect?.();
-            }}
-          >
-            {isInstagram ? 'Instagram erneut verbinden' : 'Facebook erneut verbinden'}
-          </Button>
+          <div className="flex flex-col items-center gap-2 pt-1">
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => {
+                onOpenChange(false);
+                onReconnect?.();
+              }}
+            >
+              {isInstagram ? 'Instagram erneut verbinden (mit Business-Berechtigung)' : 'Facebook erneut verbinden'}
+            </Button>
+            {isInstagram && pagesHidden && (
+              <a
+                href="https://www.facebook.com/business/help/898752960195806"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                Meta-Hilfe: Instagram mit Facebook-Seite verbinden
+              </a>
+            )}
+          </div>
         )}
       </div>
     );
