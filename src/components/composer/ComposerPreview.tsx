@@ -6,7 +6,7 @@ import { InstagramPostPreview } from "@/components/post-generator/InstagramPostP
 import { LinkedInPostPreview } from "@/components/post-generator/LinkedInPostPreview";
 import { XPostPreview } from "@/components/post-generator/XPostPreview";
 import { TikTokPostPreview } from "@/components/post-generator/TikTokPostPreview";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Provider } from "@/types/publish";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -44,8 +44,15 @@ export function ComposerPreview({
     if (selectedMedia.length === 0) return null;
     const file = selectedMedia[0] as File & { url?: string };
     if (file.url) return file.url;
-    return URL.createObjectURL(file);
+    if (file instanceof Blob) return URL.createObjectURL(file);
+    return null;
   }, [selectedMedia]);
+
+  useEffect(() => {
+    return () => {
+      if (mediaPreviewUrl?.startsWith('blob:')) URL.revokeObjectURL(mediaPreviewUrl);
+    };
+  }, [mediaPreviewUrl]);
 
   const activePlatform = selectedPlatform || selectedChannels[0] || null;
 

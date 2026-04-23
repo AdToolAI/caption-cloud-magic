@@ -873,7 +873,7 @@ export default function Composer() {
               {/* Direct Social Media Publishing Tab */}
               <TabsContent value="social" className="mt-6">
                 <PublishToSocialTab
-                  videoUrl={selectedMedia[0] ? URL.createObjectURL(selectedMedia[0]) : importedMediaUrl || ''}
+                  videoUrl={composerMediaUrl}
                   defaultCaption={textContent}
                   defaultHashtags={postData?.hashtags || []}
                   onPublished={() => {
