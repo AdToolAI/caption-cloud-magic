@@ -199,17 +199,18 @@ serve(async (req) => {
     const enrichPrompt = (prompt?: string, shot?: { characterId: string; shotType: CharacterShotType }): string => {
       const base = (prompt || "cinematic footage").trim();
       const withChar = injectCharacter(base, shot);
-      const lower = withChar.toLowerCase();
-      let result = withChar;
-      const cleaned = result.replace(/,?\s*no on-screen text[\s\S]*$/i, "").trim().replace(/[,.]\s*$/, "");
+      // Strip any old "no on-screen text..." negative suffix that the wizard/storyboard
+      // may have appended — those words trigger the very thing we want to avoid.
+      let result = withChar.replace(/,?\s*no on-screen text[\s\S]*$/i, "").trim().replace(/[,.]\s*$/, "");
+      const lower = result.toLowerCase();
       if (STYLE_HINT) {
         const probe = STYLE_HINT.replace(/^,\s*/, "").slice(0, 30).toLowerCase();
-        result = lower.includes(probe) ? cleaned : cleaned + STYLE_HINT;
-      } else {
-        result = cleaned;
+        if (!lower.includes(probe)) result += STYLE_HINT;
       }
-      if (!(result.toLowerCase().includes("no subtitles") && result.toLowerCase().includes("no captions") && result.toLowerCase().includes("no on-screen text"))) {
-        result = result.replace(/[,.]\s*$/, "") + NEGATIVE_TEXT_SUFFIX;
+      // Append a short positive cue (no negation words!) to bias the model
+      // toward clean, text-free, environment-rich frames.
+      if (!lower.includes("clean cinematic composition")) {
+        result = result.replace(/[,.]\s*$/, "") + POSITIVE_CLEAN_CUE;
       }
       return result;
     };
