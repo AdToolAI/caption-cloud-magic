@@ -97,14 +97,25 @@ Deno.serve(async (req) => {
     // === Instagram finalization ===
     // Use the same per-page verification helper as the listing/auto-resolve
     // path so a page shown as valid in the dialog will also finalize cleanly.
-    const igUserId = await verifyPageInstagramLink(page_id, page_access_token);
+    const verifyResult = await verifyPageInstagramLink(page_id, page_access_token);
+    const igUserId = verifyResult.ig_id;
 
     if (!igUserId) {
+      // Distinguish the failure mode so the UI can act on it.
+      const code = verifyResult.error || 'unknown';
+      let userMessage: string;
+      if (code === 'no_instagram_link_on_page') {
+        userMessage =
+          'Diese Facebook-Seite hat kein verknüpftes Instagram Business-Konto. Verknüpfe zuerst dein Instagram-Konto in den Facebook-Seiteneinstellungen.';
+      } else if (code === 'missing_page_access_token') {
+        userMessage =
+          'Für diese Seite wurde kein gültiges Page Access Token von Meta zurückgegeben. Bitte trenne die Verbindung und verbinde Instagram erneut.';
+      } else {
+        userMessage =
+          'Meta konnte die Seite gerade nicht prüfen (Page-Node nicht lesbar). Bitte versuche es in einem Moment erneut oder verbinde Instagram neu.';
+      }
       return new Response(
-        JSON.stringify({
-          error:
-            'Diese Facebook-Seite hat kein verknüpftes Instagram Business-Konto. Verknüpfe zuerst dein Instagram-Konto in den Facebook-Seiteneinstellungen.',
-        }),
+        JSON.stringify({ error: userMessage, code }),
         { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } }
       );
     }
@@ -118,7 +129,12 @@ Deno.serve(async (req) => {
       const errBody = await profileRes.text();
       console.error('[facebook-select-page] IG profile fetch failed:', errBody);
       return new Response(
-        JSON.stringify({ error: 'Failed to load Instagram profile.' }),
+        JSON.stringify({
+          error:
+            'Instagram-Profil konnte nicht geladen werden. Meta hat den Profil-Request abgelehnt.',
+          code: 'ig_profile_fetch_failed',
+          details: errBody.slice(0, 300),
+        }),
         { status: 502, headers: { ...CORS, 'Content-Type': 'application/json' } }
       );
     }
