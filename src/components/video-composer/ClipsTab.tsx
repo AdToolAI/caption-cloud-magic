@@ -533,17 +533,17 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                 <span className="text-[10px] font-mono text-muted-foreground/70 px-1">#{i + 1}</span>
               }
             >
-            <Card className="border-border/40 bg-card/80 overflow-hidden">
-              <CardContent className="p-3 space-y-2">
-                <div className="flex items-stretch gap-3">
+            <Card className="border-border/40 bg-card/80 overflow-hidden w-full max-w-full">
+              <CardContent className="p-3 space-y-2 overflow-hidden">
+                <div className="flex items-stretch gap-3 min-w-0 w-full">
                   {/* Larger preview slot */}
                   <div className="w-36 h-20 rounded border border-border/30 flex-shrink-0 overflow-hidden">
                     <SceneClipProgress scene={scene} index={i} />
                   </div>
 
                   {/* Info */}
-                  <div className="flex-1 min-w-0 flex flex-col justify-between">
-                    <div>
+                  <div className="flex-1 min-w-0 flex flex-col justify-between overflow-hidden">
+                    <div className="min-w-0 overflow-hidden">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-xs font-medium">Szene {i + 1}</span>
                         <Badge variant="secondary" className="text-[10px]">
@@ -559,10 +559,25 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                           {status.label}
                         </span>
                       </div>
-                      <p className="text-[11px] text-foreground/80 truncate">
+                      <p
+                        className="text-[11px] text-foreground/80 overflow-hidden text-ellipsis break-words"
+                        style={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                        }}
+                        title={scene.aiPrompt || scene.stockKeywords || ''}
+                      >
                         {scene.aiPrompt || scene.stockKeywords || (isUpload ? 'Eigener Upload' : 'Kein Prompt')}
                       </p>
-                      <p className="text-[10px] text-muted-foreground/70 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <p
+                        className="text-[10px] text-muted-foreground/70 mt-0.5 flex items-center gap-1.5 flex-wrap overflow-hidden"
+                        style={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 1,
+                          WebkitBoxOrient: 'vertical',
+                        }}
+                      >
                         <span>{CLIP_SOURCE_LABELS[scene.clipSource]?.de}</span>
                         {isAi && (
                           <span className={`px-1.5 py-0 rounded text-[9px] border ${
