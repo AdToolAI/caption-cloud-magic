@@ -12802,6 +12802,57 @@ export const translations: Record<Language, any> = {
           playHint: "Clic para sonido"
         }
       },
+      socialProof: {
+        creators: "10.000+ Creadores",
+        worksWith: "Funciona con"
+      },
+      liveDemo: {
+        badge: "Demo en vivo",
+        title: "Mira la diferencia",
+        subtitle: "Captions reales. Resultados reales. Cambia de industria y mira qué pasa.",
+        before: "Antes",
+        after: "Con AdTool AI",
+        basicPost: "Post básico",
+        adtoolPost: "Optimizado por IA",
+        cases: {
+          restaurant: {
+            industry: "Restaurante",
+            metric: "+312%",
+            before: "Nueva carta disponible. ¡Visítanos!",
+            after: "Pasta de trufa. Hecha a mano esta mañana. Abierto hasta medianoche — reserva mesa o ven directo. 🍝 #PastaNight #Foodies"
+          },
+          fitness: {
+            industry: "Coach Fitness",
+            metric: "+248%",
+            before: "Entrenamiento del día. ¡Vamos!",
+            after: "5 movimientos. 12 minutos. Cero equipo. Guarda esto para tu lunes — tu yo del futuro te lo agradecerá. 💪 #FitnessReels #HomeWorkout"
+          },
+          fashion: {
+            industry: "Marca de Moda",
+            metric: "+189%",
+            before: "Nueva colección disponible. Compra ya.",
+            after: "Drop 03 ha llegado. Lino, seda, sastrería estructurada — hecho para durar. Tallas volando. 👗 #SlowFashion #DropDay"
+          }
+        }
+      },
+      testimonials: {
+        badge: "Lo que dicen los creadores",
+        t1: {
+          quote: "AdTool me ahorra 12 horas por semana. La IA entiende mi marca mejor que mi antiguo copywriter — y entrega contenido en segundos.",
+          name: "Sarah M.",
+          role: "Marketing Director, FashionCo"
+        },
+        t2: {
+          quote: "Pasé de 3 a 12 posts por semana — sin agotarme. La interacción subió 43% y los clientes preguntan qué agencia uso.",
+          name: "Marco R.",
+          role: "Creador Independiente"
+        },
+        t3: {
+          quote: "Probamos 6 herramientas. AdTool es la única que realmente suena como nuestra marca. Fin del juego.",
+          name: "Lisa K.",
+          role: "Head of Social, TechStart"
+        }
+      },
       featureGrid: {
         title1: "Todo lo que necesitas para ",
         title2: "Éxito en Redes Sociales",
