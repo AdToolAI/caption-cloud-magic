@@ -383,9 +383,11 @@ export const ConnectionsTab = () => {
       //  - the caller explicitly asks for it (the "Erneut verbinden" CTA)
       //  - the user previously declined required page scopes
       //  - a previous discovery returned zero pages (Meta short-circuit risk)
-      const forceReconsent =
-        providerId === 'instagram' &&
-        (options.forceReconsent === true || missingScopes.length > 0 || previousDiscoveryFailed);
+      // For Instagram, ALWAYS force the full Meta consent dialog.
+      // Required for Meta App Review screencast (Policy 1.9): the reviewer
+      // must see the complete permission dialog with page selection, not
+      // the abbreviated "Continue as ..." short-circuit screen.
+      const forceReconsent = providerId === 'instagram';
       const reconsentSuffix = forceReconsent
         ? `&auth_type=rerequest&auth_nonce=${crypto.randomUUID().replace(/-/g, '')}`
         : '';
