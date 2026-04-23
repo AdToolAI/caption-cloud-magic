@@ -153,12 +153,13 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const webhookUrl = `${supabaseUrl}/functions/v1/compose-clip-webhook`;
 
-    // Append a negative-text suffix to AI prompts so models don't burn captions/watermarks
-    // into the generated clip (would conflict with our manual overlay system).
-    // Hard guard: NEVER allow burned-in text, captions, subtitles or any written
-    // language in the generated clip — they would conflict with our overlay /
-    // subtitle system in the "Voice & Subtitles" tab.
-    const NEGATIVE_TEXT_SUFFIX = ", no on-screen text, no captions, no subtitles, no watermarks, no logos, no written words, no typography, no signs with readable text, no UI overlays, no lower thirds, no isolated product on plain background, no floating product, no product rotating in empty space, clean visuals only";
+    // IMPORTANT: We do NOT append negative words to the positive prompt.
+    // Diffusion video models (Hailuo, Kling) treat words like "text", "captions",
+    // "logos" as concepts to render, even when prefixed with "no". Instead we use
+    // the dedicated `negative_prompt` API parameter (see hailuoInput / klingInput).
+    // The positive prompt only carries a short positive cue.
+    const NEGATIVE_PROMPT_PARAM = "text, captions, subtitles, watermark, logo, typography, written words, letters, signs with readable text, UI overlay, lower thirds, isolated product, plain white background, floating product, rotating product, blurry, low quality";
+    const POSITIVE_CLEAN_CUE = ", clean cinematic composition, natural environment";
     const STYLE_HINT = getVisualStyleHint(visualStyle);
 
     // Build a quick character lookup for the safety-net injection
@@ -198,17 +199,18 @@ serve(async (req) => {
     const enrichPrompt = (prompt?: string, shot?: { characterId: string; shotType: CharacterShotType }): string => {
       const base = (prompt || "cinematic footage").trim();
       const withChar = injectCharacter(base, shot);
-      const lower = withChar.toLowerCase();
-      let result = withChar;
-      const cleaned = result.replace(/,?\s*no on-screen text[\s\S]*$/i, "").trim().replace(/[,.]\s*$/, "");
+      // Strip any old "no on-screen text..." negative suffix that the wizard/storyboard
+      // may have appended — those words trigger the very thing we want to avoid.
+      let result = withChar.replace(/,?\s*no on-screen text[\s\S]*$/i, "").trim().replace(/[,.]\s*$/, "");
+      const lower = result.toLowerCase();
       if (STYLE_HINT) {
         const probe = STYLE_HINT.replace(/^,\s*/, "").slice(0, 30).toLowerCase();
-        result = lower.includes(probe) ? cleaned : cleaned + STYLE_HINT;
-      } else {
-        result = cleaned;
+        if (!lower.includes(probe)) result += STYLE_HINT;
       }
-      if (!(result.toLowerCase().includes("no subtitles") && result.toLowerCase().includes("no captions") && result.toLowerCase().includes("no on-screen text"))) {
-        result = result.replace(/[,.]\s*$/, "") + NEGATIVE_TEXT_SUFFIX;
+      // Append a short positive cue (no negation words!) to bias the model
+      // toward clean, text-free, environment-rich frames.
+      if (!lower.includes("clean cinematic composition")) {
+        result = result.replace(/[,.]\s*$/, "") + POSITIVE_CLEAN_CUE;
       }
       return result;
     };
@@ -281,6 +283,7 @@ serve(async (req) => {
 
           const hailuoInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt),
+            negative_prompt: NEGATIVE_PROMPT_PARAM,
             duration: duration,
             resolution: resolution,
           };
@@ -313,6 +316,7 @@ serve(async (req) => {
 
           const klingInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt),
+            negative_prompt: NEGATIVE_PROMPT_PARAM,
             duration: Math.min(scene.durationSeconds, 10),
             aspect_ratio: "16:9",
             mode: quality === 'pro' ? 'pro' : 'standard',
