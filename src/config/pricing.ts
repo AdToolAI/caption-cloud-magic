@@ -93,11 +93,11 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     id: 'pro',
     label: 'Pro',
     name: 'Pro',
-    price: { EUR: 34.95, USD: 34.95 },
+    price: { EUR: 19.99, USD: 19.99 },
     currency: '€',
     credits: 2500,
-    priceId: 'price_1SLqd6DRu4kfSFxjM1v5wUrp',
-    productId: 'prod_TIRWOmhxlzFCwW',
+    priceId: 'price_1TPTYEDRu4kfSFxj0eWG34YP',
+    productId: 'prod_UOG4wbiQjDONAj',
     checkoutUrl: '',
     features: {
       posting: true,
@@ -168,7 +168,7 @@ export type PlanType = PlanId;
 export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
   if (productId === 'prod_TIRSoTyzmRpbpT') return { name: 'Basic', price: 14.95, currency: '€' };
-  if (productId === 'prod_TIRWOmhxlzFCwW') return { name: 'Pro', price: 34.95, currency: '€' };
+  if (productId === 'prod_TIRWOmhxlzFCwW' || productId === 'prod_UOG4wbiQjDONAj' || productId === 'prod_UOG5TjlcpNNZLZ') return { name: 'Pro', price: 19.99, currency: '€' };
   if (productId === 'prod_TIRYBu4fdR2BEw') return { name: 'Enterprise', price: 69.95, currency: '€' };
   return { name: 'Free', price: 0, currency: '€' };
 };

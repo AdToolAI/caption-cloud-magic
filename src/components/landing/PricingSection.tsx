@@ -73,13 +73,20 @@ export const PricingSection = () => {
                   <p className="text-sm text-muted-foreground mb-3 max-w-md">
                     {t("landing.pricing.singlePlanDescription")}
                   </p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl md:text-5xl font-bold text-foreground">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-lg text-muted-foreground/60 line-through tabular-nums">
                       {currencySymbol}29.99
+                    </span>
+                    <span className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-gold-dark bg-clip-text text-transparent tabular-nums">
+                      {currencySymbol}19.99
                     </span>
                     <span className="text-muted-foreground">
                       {t("landing.pricing.perMonth")}
                     </span>
+                  </div>
+                  <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-primary/80 font-medium">
+                    <span className="w-1 h-1 rounded-full bg-primary animate-pulse" />
+                    {t("landing.pricing.launchBadge")}
                   </div>
                 </div>
               </div>
