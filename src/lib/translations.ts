@@ -3932,6 +3932,8 @@ export const translations: Record<Language, any> = {
         singlePlanTitle: "Pro",
         singlePlanDescription: "Everything you need to grow on social — captions, images, posting, Director's Cut and AI video credits.",
         trialNote: "14-day trial · No auto-subscription · Cancel anytime",
+        subscribe: "Subscribe now",
+        subscribeNote: "Activate your Pro subscription · Cancel anytime",
         trialPromise: {
           title: "Our trial promise",
           p1Title: "14 days free",
@@ -8530,6 +8532,8 @@ export const translations: Record<Language, any> = {
         singlePlanTitle: "Pro",
         singlePlanDescription: "Alles, was du für Wachstum auf Social brauchst — Captions, Bilder, Posting, Director's Cut und AI-Video-Credits.",
         trialNote: "14 Tage testen · Kein Auto-Abo · Jederzeit kündbar",
+        subscribe: "Jetzt abonnieren",
+        subscribeNote: "Pro-Abo aktivieren · Jederzeit kündbar",
         trialPromise: {
           title: "Unser Trial-Versprechen",
           p1Title: "14 Tage kostenlos",
@@ -12914,6 +12918,8 @@ export const translations: Record<Language, any> = {
         singlePlanTitle: "Pro",
         singlePlanDescription: "Todo lo que necesitas para crecer en redes — captions, imágenes, publicación, Director's Cut y créditos de AI video.",
         trialNote: "14 días de prueba · Sin suscripción automática · Cancela cuando quieras",
+        subscribe: "Suscribirse ahora",
+        subscribeNote: "Activa tu suscripción Pro · Cancela cuando quieras",
         trialPromise: {
           title: "Nuestra promesa de prueba",
           p1Title: "14 días gratis",
