@@ -58,6 +58,21 @@ export default function Composer() {
   });
   const [activeTab, setActiveTab] = useState("standard");
 
+  // Safe media URL resolver — handles real File/Blob and virtual files (with .url) from MediaLibrary
+  const composerMediaUrl = useMemo(() => {
+    const first = selectedMedia[0] as (File & { url?: string }) | undefined;
+    if (!first) return importedMediaUrl || '';
+    if (first.url) return first.url;
+    if (first instanceof Blob) return URL.createObjectURL(first);
+    return importedMediaUrl || '';
+  }, [selectedMedia, importedMediaUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (composerMediaUrl?.startsWith('blob:')) URL.revokeObjectURL(composerMediaUrl);
+    };
+  }, [composerMediaUrl]);
+
   // Parse text content into structured data for preview
   const parseTextToStructured = (text: string) => {
     if (!text.trim()) return null;
