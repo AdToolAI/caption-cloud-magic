@@ -4,7 +4,7 @@ import { sendEmail } from "../_shared/email-send.ts";
 
 type Lang = "de" | "en" | "es";
 
-const GRACE_PERIOD_DAYS = 3;
+const GRACE_PERIOD_DAYS = 14;
 
 // ---------- Email copy ----------
 
@@ -12,21 +12,21 @@ const trialExpiredCopy: Record<Lang, { subject: string; heading: string; intro: 
   de: {
     subject: "Dein 14-Tage Enterprise-Trial ist abgelaufen 🔒",
     heading: "Dein Trial ist beendet",
-    intro: "Dein 14-Tage Enterprise-Trial ist heute abgelaufen, und auch deine 3-Tage Grace-Period ist vorbei. Damit du wieder posten, generieren und veröffentlichen kannst, wähle jetzt einen Plan – schon ab €19/Monat.",
+    intro: "Dein 14-Tage Enterprise-Trial ist heute abgelaufen, und auch deine 14-Tage Grace-Period ist vorbei. Damit du wieder posten, generieren und veröffentlichen kannst, wähle jetzt einen Plan – schon ab €19/Monat.",
     cta: "Plan wählen & freischalten",
     footnote: "Deine Daten und Assets bleiben gespeichert. Du verlierst nichts.",
   },
   en: {
     subject: "Your 14-day Enterprise trial has ended 🔒",
     heading: "Your trial has ended",
-    intro: "Your 14-day Enterprise trial expired and your 3-day grace period is over. To resume creating, generating and publishing, pick a plan – starting at €19/month.",
+    intro: "Your 14-day Enterprise trial expired and your 14-day grace period is over. To resume creating, generating and publishing, pick a plan – starting at €19/month.",
     cta: "Choose plan & unlock",
     footnote: "Your data and assets stay safe. Nothing is lost.",
   },
   es: {
     subject: "Tu prueba Enterprise de 14 días ha terminado 🔒",
     heading: "Tu prueba ha terminado",
-    intro: "Tu prueba Enterprise de 14 días expiró y tu período de gracia de 3 días terminó. Para seguir creando, generando y publicando, elige un plan – desde €19/mes.",
+    intro: "Tu prueba Enterprise de 14 días expiró y tu período de gracia de 14 días terminó. Para seguir creando, generando y publicando, elige un plan – desde €19/mes.",
     cta: "Elegir plan y desbloquear",
     footnote: "Tus datos y assets siguen seguros. No pierdes nada.",
   },
@@ -34,25 +34,25 @@ const trialExpiredCopy: Record<Lang, { subject: string; heading: string; intro: 
 
 const graceWarningCopy: Record<Lang, { subject: string; heading: string; intro: string; cta: string; footnote: string }> = {
   de: {
-    subject: "⚠ Dein Trial ist abgelaufen — du hast noch 3 Tage Zugriff",
-    heading: "Trial vorbei — 3 Tage Grace-Period läuft",
-    intro: "Dein 14-Tage Enterprise-Trial ist abgelaufen. Wir geben dir 3 zusätzliche Tage, um in Ruhe einen Plan zu wählen. Danach wird dein Konto pausiert, bis du abonnierst. Deine Daten bleiben sicher.",
+    subject: "⚠ Dein Trial ist abgelaufen — du hast noch 14 Tage Zugriff",
+    heading: "Trial vorbei — 14 Tage Grace-Period läuft",
+    intro: "Dein 14-Tage Enterprise-Trial ist abgelaufen. Wir geben dir 14 zusätzliche Tage, um in Ruhe einen Plan zu wählen. Danach wird dein Konto pausiert, bis du abonnierst. Deine Daten bleiben sicher.",
     cta: "Jetzt Plan wählen",
-    footnote: "Tipp: Mit einem Plan-Abschluss innerhalb der nächsten 3 Tage vermeidest du jede Unterbrechung.",
+    footnote: "Tipp: Mit einem Plan-Abschluss innerhalb der nächsten 14 Tage vermeidest du jede Unterbrechung.",
   },
   en: {
-    subject: "⚠ Your trial has ended — you have 3 days left to upgrade",
-    heading: "Trial over — 3-day grace period started",
-    intro: "Your 14-day Enterprise trial has expired. We're giving you 3 extra days to pick a plan at your own pace. After that, your account will be paused until you subscribe. Your data stays safe.",
+    subject: "⚠ Your trial has ended — you have 14 days left to upgrade",
+    heading: "Trial over — 14-day grace period started",
+    intro: "Your 14-day Enterprise trial has expired. We're giving you 14 extra days to pick a plan at your own pace. After that, your account will be paused until you subscribe. Your data stays safe.",
     cta: "Choose plan now",
-    footnote: "Tip: Subscribe within the next 3 days to avoid any interruption.",
+    footnote: "Tip: Subscribe within the next 14 days to avoid any interruption.",
   },
   es: {
-    subject: "⚠ Tu prueba ha terminado — te quedan 3 días",
-    heading: "Prueba terminada — período de gracia de 3 días",
-    intro: "Tu prueba Enterprise de 14 días ha expirado. Te damos 3 días adicionales para elegir un plan con calma. Después, tu cuenta será pausada hasta que te suscribas. Tus datos están seguros.",
+    subject: "⚠ Tu prueba ha terminado — te quedan 14 días",
+    heading: "Prueba terminada — período de gracia de 14 días",
+    intro: "Tu prueba Enterprise de 14 días ha expirado. Te damos 14 días adicionales para elegir un plan con calma. Después, tu cuenta será pausada hasta que te suscribas. Tus datos están seguros.",
     cta: "Elegir plan ahora",
-    footnote: "Consejo: Suscríbete en los próximos 3 días para evitar cualquier interrupción.",
+    footnote: "Consejo: Suscríbete en los próximos 14 días para evitar cualquier interrupción.",
   },
 };
 
