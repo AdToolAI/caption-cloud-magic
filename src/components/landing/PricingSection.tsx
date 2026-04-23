@@ -6,7 +6,6 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { getCurrencyForLanguage } from "@/lib/currency";
 import { CompetitorComparisonCard } from "./CompetitorComparisonCard";
 import { AIVideoTopupHintCard } from "./AIVideoTopupHintCard";
-import { TrialPromiseStrip } from "./TrialPromiseStrip";
 
 export const PricingSection = () => {
   const { t, language } = useTranslation();
@@ -45,9 +44,6 @@ export const PricingSection = () => {
             {t("landing.pricing.subtitle")}
           </p>
         </motion.div>
-
-        {/* Trial promise strip — 4 key promises */}
-        <TrialPromiseStrip />
 
         {/* Asymmetric grid: Pro card 2/3, sidebar 1/3 */}
         <div className="grid md:grid-cols-3 gap-6 md:gap-8">
