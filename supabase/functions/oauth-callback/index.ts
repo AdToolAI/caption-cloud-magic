@@ -1,7 +1,10 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 import { encryptToken } from '../_shared/crypto.ts';
-import { discoverMetaPages } from '../_shared/meta-page-discovery.ts';
+import {
+  discoverMetaPagesWithDiagnostics,
+  type DiscoveryDiagnostics,
+} from '../_shared/meta-page-discovery.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -127,12 +130,14 @@ serve(async (req) => {
         // Try to auto-resolve when the user manages exactly one Facebook Page
         // with a linked Instagram Business account. This makes the UX
         // identical to the Facebook flow (no extra Page Select Dialog).
+        let igDiagnostics: DiscoveryDiagnostics | null = null;
         try {
           const autoResolved = await tryAutoResolveInstagram(tokenData.access_token);
           if (autoResolved) {
-            accountInfo = autoResolved;
+            accountInfo = autoResolved.account;
+            igDiagnostics = autoResolved.diagnostics;
             igAutoSelected = true;
-            console.log('[oauth-callback] IG auto-selected single page:', autoResolved.id);
+            console.log('[oauth-callback] IG auto-selected single page:', autoResolved.account.id);
           } else {
             // Multiple/zero IG-capable pages → fall back to staged Page Select flow.
             accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
@@ -140,6 +145,38 @@ serve(async (req) => {
         } catch (autoErr) {
           console.warn('[oauth-callback] IG auto-resolve failed, falling back to pending:', autoErr);
           accountInfo = await getMetaUserInfoForPending(tokenData.access_token, 'instagram');
+        }
+        // If auto-resolve didn't run diagnostics (because it threw before
+        // discovery), or returned without picking a page, run discovery once
+        // more purely for diagnostics so we can persist them on the connection.
+        if (!igDiagnostics) {
+          try {
+            const probe = await discoverMetaPagesWithDiagnostics(tokenData.access_token, {
+              verifyInstagram: true,
+            });
+            igDiagnostics = probe.diagnostics;
+          } catch (e) {
+            console.warn('[oauth-callback] diagnostics-only discovery failed:', e);
+          }
+        }
+        if (igDiagnostics) {
+          (accountInfo as any).meta_page_discovery_status = igAutoSelected
+            ? 'single_instagram_page'
+            : (igDiagnostics.pages_found_count === 0
+                ? 'meta_pages_hidden_or_unavailable'
+                : (igDiagnostics.verified_instagram_count === 0
+                    ? (igDiagnostics.page_verify_failures.length >= igDiagnostics.pages_found_count
+                        && igDiagnostics.page_verify_failures.every((f) => f.error !== 'no_instagram_link_on_page')
+                        ? 'pages_found_but_verification_failed'
+                        : 'pages_found_but_no_instagram_link')
+                    : 'multiple_instagram_pages'));
+          (accountInfo as any).meta_pages_found_count = igDiagnostics.pages_found_count;
+          (accountInfo as any).meta_verified_instagram_count = igDiagnostics.verified_instagram_count;
+          (accountInfo as any).meta_page_verify_failures = igDiagnostics.page_verify_failures;
+          (accountInfo as any).meta_pages_with_token_count = igDiagnostics.pages_with_token_count;
+          (accountInfo as any).meta_pages_with_inline_ig_count = igDiagnostics.pages_with_inline_ig_count;
+          (accountInfo as any).meta_list_error = igDiagnostics.list_error;
+          (accountInfo as any).meta_last_discovery_at = igDiagnostics.ran_at;
         }
         // Always attach permission diagnostics so the UI can decide whether
         // to force a re-consent on the next attempt.
@@ -212,6 +249,14 @@ serve(async (req) => {
           ...(accountInfo as any).granted_scopes ? { granted_scopes: (accountInfo as any).granted_scopes } : {},
           ...(accountInfo as any).declined_scopes ? { declined_scopes: (accountInfo as any).declined_scopes } : {},
           ...(accountInfo as any).missing_page_scopes ? { missing_page_scopes: (accountInfo as any).missing_page_scopes } : {},
+          ...(accountInfo as any).meta_page_discovery_status ? { meta_page_discovery_status: (accountInfo as any).meta_page_discovery_status } : {},
+          ...(accountInfo as any).meta_pages_found_count !== undefined ? { meta_pages_found_count: (accountInfo as any).meta_pages_found_count } : {},
+          ...(accountInfo as any).meta_verified_instagram_count !== undefined ? { meta_verified_instagram_count: (accountInfo as any).meta_verified_instagram_count } : {},
+          ...(accountInfo as any).meta_page_verify_failures ? { meta_page_verify_failures: (accountInfo as any).meta_page_verify_failures } : {},
+          ...(accountInfo as any).meta_pages_with_token_count !== undefined ? { meta_pages_with_token_count: (accountInfo as any).meta_pages_with_token_count } : {},
+          ...(accountInfo as any).meta_pages_with_inline_ig_count !== undefined ? { meta_pages_with_inline_ig_count: (accountInfo as any).meta_pages_with_inline_ig_count } : {},
+          ...(accountInfo as any).meta_list_error ? { meta_list_error: (accountInfo as any).meta_list_error } : {},
+          ...(accountInfo as any).meta_last_discovery_at ? { meta_last_discovery_at: (accountInfo as any).meta_last_discovery_at } : {},
           ...(provider === 'instagram' ? { connected_via: 'oauth_user_token' } : {}),
         }
       }, {
@@ -418,19 +463,32 @@ async function getMetaUserInfoForPending(accessToken: string, provider: string) 
  *
  * Mirrors the logic in supabase/functions/facebook-select-page/index.ts.
  */
-async function tryAutoResolveInstagram(userAccessToken: string): Promise<any | null> {
+async function tryAutoResolveInstagram(
+  userAccessToken: string,
+): Promise<{ account: any; diagnostics: DiscoveryDiagnostics } | null> {
   // Use the SAME real per-page verification as facebook-list-pages.
   // Meta is unreliable about returning IG link fields inline in /me/accounts,
   // so we always verify each page individually via the page node.
   let pages;
+  let diagnostics: DiscoveryDiagnostics;
   try {
-    pages = await discoverMetaPages(userAccessToken, { verifyInstagram: true });
+    const result = await discoverMetaPagesWithDiagnostics(userAccessToken, {
+      verifyInstagram: true,
+    });
+    pages = result.pages;
+    diagnostics = result.diagnostics;
   } catch (e) {
     console.warn('[tryAutoResolveInstagram] discoverMetaPages failed:', e);
     return null;
   }
 
   const igPages = pages.filter((p) => p.has_instagram && p.instagram_business_account_id);
+  console.log('[tryAutoResolveInstagram] diagnostics summary:', {
+    pages_found: diagnostics.pages_found_count,
+    verified_ig: diagnostics.verified_instagram_count,
+    failures: diagnostics.page_verify_failures.length,
+    list_error: diagnostics.list_error,
+  });
   if (igPages.length !== 1) {
     console.log('[tryAutoResolveInstagram] verified IG-capable page count:', igPages.length);
     return null;
@@ -455,16 +513,19 @@ async function tryAutoResolveInstagram(userAccessToken: string): Promise<any | n
   const encryptedPageToken = await encryptToken(pageAccessToken);
 
   return {
-    id: igUserId,
-    name: profile.username ? `@${profile.username}` : igUserId,
-    account_type: 'BUSINESS',
-    profile_picture_url: profile.profile_picture_url || null,
-    followers_count: profile.followers_count ?? null,
-    media_count: profile.media_count ?? null,
-    page_id: page.id,
-    page_access_token_encrypted: encryptedPageToken,
-    // Explicitly NOT setting selection_required so the metadata block in the
-    // upsert does not flag this connection as pending.
+    account: {
+      id: igUserId,
+      name: profile.username ? `@${profile.username}` : igUserId,
+      account_type: 'BUSINESS',
+      profile_picture_url: profile.profile_picture_url || null,
+      followers_count: profile.followers_count ?? null,
+      media_count: profile.media_count ?? null,
+      page_id: page.id,
+      page_access_token_encrypted: encryptedPageToken,
+      // Explicitly NOT setting selection_required so the metadata block in the
+      // upsert does not flag this connection as pending.
+    },
+    diagnostics,
   };
 }
 

@@ -52,6 +52,7 @@ export const FacebookPageSelectDialog = ({
   const [selecting, setSelecting] = useState<string | null>(null);
   const [resultStatus, setResultStatus] = useState<string | null>(null);
   const [missingScopes, setMissingScopes] = useState<string[]>([]);
+  const [diagnostics, setDiagnostics] = useState<any>(null);
 
   const isInstagram = mode === "instagram";
 
@@ -79,6 +80,7 @@ export const FacebookPageSelectDialog = ({
       }
       setResultStatus(data?.status ?? null);
       setMissingScopes(Array.isArray(data?.missing_scopes) ? data.missing_scopes : []);
+      setDiagnostics(data?.diagnostics ?? null);
     } catch (error: any) {
       console.error(`Failed to fetch ${mode} pages:`, error);
       toast({
@@ -164,6 +166,14 @@ export const FacebookPageSelectDialog = ({
       body =
         'Meta hat keine Facebook-Seiten freigegeben. Verbinde erneut und aktiviere im Meta-Dialog ALLE Toggles (insbesondere „Zugriff auf Seiten" und „Instagram").' +
         (missingScopes.length ? ` Fehlende Berechtigungen: ${missingScopes.join(', ')}.` : '');
+    } else if (resultStatus === 'meta_pages_hidden_or_unavailable') {
+      title = 'Meta hat keine Seiten an die App übergeben';
+      body =
+        'Deine Berechtigungen sind ok, aber Meta hat für diesen Account keine Seiten an die App ausgeliefert. Das passiert häufig bei business-verwalteten Seiten. Klicke „Erneut verbinden" — wir fordern dann zusätzlich die Business-Berechtigung an.';
+    } else if (resultStatus === 'pages_found_but_verification_failed') {
+      title = 'Seiten gefunden, aber Verifikation fehlgeschlagen';
+      body =
+        'Meta hat deine Seiten zwar geliefert, aber die einzelnen Detail-Prüfungen (Page Node) wurden abgelehnt. Bitte verbinde Instagram erneut, damit ein frisches Token ausgestellt wird.';
     } else if (resultStatus === 'pages_found_but_no_instagram_link') {
       title = 'Kein verknüpftes Instagram-Profil bestätigt';
       body =
@@ -175,11 +185,18 @@ export const FacebookPageSelectDialog = ({
         : 'Stelle sicher, dass dein Facebook-Konto mindestens eine Seite verwaltet.';
     }
 
+    const diagSummary = diagnostics
+      ? `${diagnostics.pages_found_count ?? 0} Seiten von Meta · ${diagnostics.verified_instagram_count ?? 0} mit IG verifiziert · ${(diagnostics.page_verify_failures?.length ?? 0)} Verifikationsfehler`
+      : null;
+
     return (
       <div className="py-6 text-center space-y-3">
         <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground" />
         <p className="text-sm font-medium">{title}</p>
         <p className="text-xs text-muted-foreground px-2">{body}</p>
+        {diagSummary && (
+          <p className="text-[10px] text-muted-foreground/70 font-mono px-2">{diagSummary}</p>
+        )}
         {showReconnect && (
           <Button
             size="sm"
