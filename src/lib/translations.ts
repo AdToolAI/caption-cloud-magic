@@ -8419,8 +8419,58 @@ export const translations: Record<Language, any> = {
           playHint: "Klicken für Ton"
         }
       },
+      socialProof: {
+        creators: "10.000+ Creator",
+        worksWith: "Funktioniert mit"
+      },
+      liveDemo: {
+        badge: "Live-Demo",
+        title: "Sieh den Unterschied",
+        subtitle: "Echte Captions. Echte Ergebnisse. Wechsle die Branche und sieh was passiert.",
+        before: "Vorher",
+        after: "Mit AdTool AI",
+        basicPost: "Standard-Post",
+        adtoolPost: "KI-optimiert",
+        cases: {
+          restaurant: {
+            industry: "Restaurant",
+            metric: "+312%",
+            before: "Neue Karte ist da. Kommt vorbei!",
+            after: "Trüffelpasta. Heute Morgen frisch gerollt. Heute geöffnet bis Mitternacht — Tisch reservieren oder einfach reinschauen. 🍝 #PastaNight #Foodies"
+          },
+          fitness: {
+            industry: "Fitness-Coach",
+            metric: "+248%",
+            before: "Workout des Tages. Los geht's!",
+            after: "5 Übungen. 12 Minuten. Kein Equipment. Speichere das für deinen Montag — dein zukünftiges Ich dankt es dir. 💪 #FitnessReels #HomeWorkout"
+          },
+          fashion: {
+            industry: "Fashion-Brand",
+            metric: "+189%",
+            before: "Neue Kollektion verfügbar. Jetzt shoppen.",
+            after: "Drop 03 ist gelandet. Leinen, Seide, klare Schnitte — gemacht für die lange Strecke. Größen werden knapp. 👗 #SlowFashion #DropDay"
+          }
+        }
+      },
+      testimonials: {
+        badge: "Was Creator sagen",
+        t1: {
+          quote: "AdTool spart mir 12 Stunden pro Woche. Die KI versteht meine Brand besser als mein alter Texter — und liefert Content in Sekunden.",
+          name: "Sarah M.",
+          role: "Marketing Director, FashionCo"
+        },
+        t2: {
+          quote: "Ich poste jetzt 12 statt 3 Mal pro Woche — ohne auszubrennen. Engagement ist um 43% gestiegen und Kunden fragen, welche Agentur ich nutze.",
+          name: "Marco R.",
+          role: "Selbstständiger Creator"
+        },
+        t3: {
+          quote: "Wir haben 6 Tools getestet. AdTool ist das einzige, das wirklich nach unserer Marke klingt. Spiel vorbei.",
+          name: "Lisa K.",
+          role: "Head of Social, TechStart"
+        }
+      },
       featureGrid: {
-        title1: "Alles was du brauchst für ",
         title2: "Social Media Erfolg",
         subtitle: "Eine komplette Toolsuite für professionelles Social Media Marketing.",
         contentPlanning: "Content Planung",
