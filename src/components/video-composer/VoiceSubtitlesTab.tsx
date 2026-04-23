@@ -382,6 +382,24 @@ export default function VoiceSubtitlesTab({
     });
 
     onUpdateAssembly({ globalTextOverlays: migrated });
+
+    // ── Clear legacy per-scene text_overlay so the renderer can't double-burn it.
+    // Without this, the backend keeps reading the old DB column and burns the
+    // hook into the final render even when the user has overlays disabled.
+    (async () => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const sceneIds = legacy.map(s => s.id).filter(Boolean);
+        if (sceneIds.length > 0) {
+          await supabase
+            .from('composer_scenes')
+            .update({ text_overlay: { text: '', position: 'bottom', animation: 'fade-in', fontSize: 48, color: '#FFFFFF' } as any })
+            .in('id', sceneIds);
+        }
+      } catch (e) {
+        console.warn('[VoiceSubtitlesTab] Failed to clear legacy text_overlay rows:', e);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
