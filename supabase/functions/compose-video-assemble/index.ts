@@ -189,6 +189,12 @@ serve(async (req) => {
       })
     );
 
+    // ── PER-SCENE TEXT OVERLAY GATE (2026-04-23) ──
+    // The legacy `text_overlay` DB column is only honored when the global
+    // `textOverlaysEnabled` toggle is on. Otherwise we drop it so the renderer
+    // never burns in storyboard-generated hooks/CTAs the user disabled.
+    const overlaysFeatureEnabled = assemblyConfig?.textOverlaysEnabled !== false;
+
     const remotionScenes = (scenes || []).map((s: any, idx: number) => {
       const rawType = (s.transition_type || 'fade').toString().toLowerCase();
       const transitionType = ALLOWED_TRANSITIONS.has(rawType) ? rawType : 'fade';
@@ -204,6 +210,10 @@ serve(async (req) => {
       const effectiveDuration = sceneIsImage
         ? nominalDuration
         : (realDuration && realDuration > 0 ? realDuration : nominalDuration);
+
+      const overlayText = (s.text_overlay?.text || '').trim();
+      const includeOverlay = overlaysFeatureEnabled && overlayText.length > 0;
+
       return {
         videoUrl: s.clip_url,
         // Flag for the renderer: route through <KenBurnsImage> instead of <Video>.
@@ -211,8 +221,8 @@ serve(async (req) => {
         // Single source of truth: durationSeconds IS the real (probed) length
         // when available. The renderer takes this 1:1 — no further clamping.
         durationSeconds: effectiveDuration,
-        textOverlay: s.text_overlay ? {
-          text: s.text_overlay.text || '',
+        textOverlay: includeOverlay ? {
+          text: overlayText,
           position: s.text_overlay.position || 'bottom',
           animation: s.text_overlay.animation || 'fade-in',
           fontSize: s.text_overlay.fontSize || 48,

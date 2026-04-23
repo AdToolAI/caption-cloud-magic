@@ -126,9 +126,11 @@ serve(async (req) => {
 
 Hard rules:
 - Each scene 3-15 seconds; total ≈ ${briefing.duration}s; create ${targetSceneCount} scenes (±1)
-- Text overlays in ${langLabel} (max 8 words, punchy)
 - Transitions in English (enum)
-${category === 'storytelling' ? '\n🚨 STORYTELLING MODE — TEXT OVERLAY BAN (ABSOLUTE): textOverlayText MUST be "" (empty string) for EVERY scene. textAnimation MUST be "none". No exceptions. No dates, no place names, no dialogue cards, no chapter titles. The story is told purely visually.\n' : ''}
+
+🚨 TEXT OVERLAY BAN (ABSOLUTE — applies to ALL categories):
+textOverlayText MUST be "" (empty string) for EVERY single scene. textAnimation MUST be "none".
+Reason: text overlays, hooks, CTAs and subtitles are added LATER in the editor by the user — never by the storyboard AI. The storyboard only describes footage, never on-screen text. No exceptions, no dates, no place names, no dialogue cards, no chapter titles, no hooks, no CTAs.
 
 🚨 NO BURNED-IN TEXT RULE (ABSOLUTE — overrides everything else):
 The video clips are generated independently and we apply our OWN subtitles, captions and text overlays in a later editing step. Therefore the AI-generated footage MUST NEVER contain any readable text, captions, subtitles, watermarks, logos, signs with words, UI overlays, lower-thirds, typography or written language of any kind. Every aiPrompt MUST end with the exact negative clause defined in rule 10 below. Never quote on-screen text inside the prompt.
@@ -277,7 +279,7 @@ Generate the storyboard using the create_storyboard function.`;
                         },
                         textOverlayText: {
                           type: "string",
-                          description: `Short overlay text in ${langLabel} (max 8 words). Empty string if no text needed.${category === 'storytelling' ? ' 🚨 For category="storytelling": MUST always be an empty string "". No exceptions.' : ''}`,
+                          description: `🚨 MUST always be an empty string "". The storyboard AI never writes burned-in text. The user adds text overlays / hooks / CTAs later in the editor. No exceptions, regardless of category.`,
                         },
                         textPosition: {
                           type: "string",
