@@ -249,6 +249,14 @@ serve(async (req) => {
           ...(accountInfo as any).granted_scopes ? { granted_scopes: (accountInfo as any).granted_scopes } : {},
           ...(accountInfo as any).declined_scopes ? { declined_scopes: (accountInfo as any).declined_scopes } : {},
           ...(accountInfo as any).missing_page_scopes ? { missing_page_scopes: (accountInfo as any).missing_page_scopes } : {},
+          ...(accountInfo as any).meta_page_discovery_status ? { meta_page_discovery_status: (accountInfo as any).meta_page_discovery_status } : {},
+          ...(accountInfo as any).meta_pages_found_count !== undefined ? { meta_pages_found_count: (accountInfo as any).meta_pages_found_count } : {},
+          ...(accountInfo as any).meta_verified_instagram_count !== undefined ? { meta_verified_instagram_count: (accountInfo as any).meta_verified_instagram_count } : {},
+          ...(accountInfo as any).meta_page_verify_failures ? { meta_page_verify_failures: (accountInfo as any).meta_page_verify_failures } : {},
+          ...(accountInfo as any).meta_pages_with_token_count !== undefined ? { meta_pages_with_token_count: (accountInfo as any).meta_pages_with_token_count } : {},
+          ...(accountInfo as any).meta_pages_with_inline_ig_count !== undefined ? { meta_pages_with_inline_ig_count: (accountInfo as any).meta_pages_with_inline_ig_count } : {},
+          ...(accountInfo as any).meta_list_error ? { meta_list_error: (accountInfo as any).meta_list_error } : {},
+          ...(accountInfo as any).meta_last_discovery_at ? { meta_last_discovery_at: (accountInfo as any).meta_last_discovery_at } : {},
           ...(provider === 'instagram' ? { connected_via: 'oauth_user_token' } : {}),
         }
       }, {
