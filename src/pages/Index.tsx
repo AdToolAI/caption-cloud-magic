@@ -7,9 +7,12 @@ import { useAuth } from "@/hooks/useAuth";
 
 // James Bond 2028 Landing Components
 import { BlackTieHero } from "@/components/landing/BlackTieHero";
+import { SocialProofStrip } from "@/components/landing/SocialProofStrip";
 import { MissionFeatures } from "@/components/landing/MissionFeatures";
 import { FeatureGrid } from "@/components/landing/FeatureGrid";
 import { AIModelsArsenal } from "@/components/landing/AIModelsArsenal";
+import { LiveDemoShowcase } from "@/components/landing/LiveDemoShowcase";
+import { TestimonialSpotlight } from "@/components/landing/TestimonialSpotlight";
 
 import { PricingSection } from "@/components/landing/PricingSection";
 import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
@@ -88,14 +91,23 @@ const Index = () => {
           {/* Hero Section - Black Tie */}
           <BlackTieHero />
 
+          {/* Social Proof Strip */}
+          <SocialProofStrip />
+
           {/* Mission Features - Why This Tool Wins */}
           <MissionFeatures />
+
+          {/* Live Demo Showcase - Before/After */}
+          <LiveDemoShowcase />
 
           {/* AI Models Arsenal - 6 licensed premium models */}
           <AIModelsArsenal />
 
           {/* Feature Grid */}
           <FeatureGrid />
+
+          {/* Testimonial Spotlight */}
+          <TestimonialSpotlight />
 
           {/* Pricing Section */}
           <PricingSection />

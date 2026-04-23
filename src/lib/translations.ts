@@ -3820,6 +3820,57 @@ export const translations: Record<Language, any> = {
           playHint: "Click for sound"
         }
       },
+      socialProof: {
+        creators: "10,000+ Creators",
+        worksWith: "Works with"
+      },
+      liveDemo: {
+        badge: "Live demo",
+        title: "See the difference",
+        subtitle: "Real captions. Real results. Switch industries to see what changes.",
+        before: "Before",
+        after: "With AdTool AI",
+        basicPost: "Basic post",
+        adtoolPost: "AI-optimized",
+        cases: {
+          restaurant: {
+            industry: "Restaurant",
+            metric: "+312%",
+            before: "New menu out now. Come visit us!",
+            after: "Truffle pasta. Hand-rolled this morning. Open till midnight tonight — book a table or walk in. 🍝 #PastaNight #Foodies"
+          },
+          fitness: {
+            industry: "Fitness Coach",
+            metric: "+248%",
+            before: "Workout of the day. Let's go!",
+            after: "5 moves. 12 minutes. Zero equipment. Save this for your Monday — your future self will thank you. 💪 #FitnessReels #HomeWorkout"
+          },
+          fashion: {
+            industry: "Fashion Brand",
+            metric: "+189%",
+            before: "New collection available. Shop now.",
+            after: "Drop 03 just landed. Linen, silk, structured tailoring — built for the long game. Sizes selling fast. 👗 #SlowFashion #DropDay"
+          }
+        }
+      },
+      testimonials: {
+        badge: "What creators say",
+        t1: {
+          quote: "AdTool saves me 12 hours every week. The AI understands my brand better than my old copywriter — and ships content in seconds.",
+          name: "Sarah M.",
+          role: "Marketing Director, FashionCo"
+        },
+        t2: {
+          quote: "I went from 3 posts a week to 12 — without burning out. Engagement is up 43% and my clients ask which agency I use.",
+          name: "Marco R.",
+          role: "Independent Creator"
+        },
+        t3: {
+          quote: "We tested 6 tools. AdTool is the only one that actually sounds like our brand. Game over.",
+          name: "Lisa K.",
+          role: "Head of Social, TechStart"
+        }
+      },
       featureGrid: {
         title1: "Everything you need for ",
         title2: "Social Media Success",
@@ -8368,8 +8419,58 @@ export const translations: Record<Language, any> = {
           playHint: "Klicken für Ton"
         }
       },
+      socialProof: {
+        creators: "10.000+ Creator",
+        worksWith: "Funktioniert mit"
+      },
+      liveDemo: {
+        badge: "Live-Demo",
+        title: "Sieh den Unterschied",
+        subtitle: "Echte Captions. Echte Ergebnisse. Wechsle die Branche und sieh was passiert.",
+        before: "Vorher",
+        after: "Mit AdTool AI",
+        basicPost: "Standard-Post",
+        adtoolPost: "KI-optimiert",
+        cases: {
+          restaurant: {
+            industry: "Restaurant",
+            metric: "+312%",
+            before: "Neue Karte ist da. Kommt vorbei!",
+            after: "Trüffelpasta. Heute Morgen frisch gerollt. Heute geöffnet bis Mitternacht — Tisch reservieren oder einfach reinschauen. 🍝 #PastaNight #Foodies"
+          },
+          fitness: {
+            industry: "Fitness-Coach",
+            metric: "+248%",
+            before: "Workout des Tages. Los geht's!",
+            after: "5 Übungen. 12 Minuten. Kein Equipment. Speichere das für deinen Montag — dein zukünftiges Ich dankt es dir. 💪 #FitnessReels #HomeWorkout"
+          },
+          fashion: {
+            industry: "Fashion-Brand",
+            metric: "+189%",
+            before: "Neue Kollektion verfügbar. Jetzt shoppen.",
+            after: "Drop 03 ist gelandet. Leinen, Seide, klare Schnitte — gemacht für die lange Strecke. Größen werden knapp. 👗 #SlowFashion #DropDay"
+          }
+        }
+      },
+      testimonials: {
+        badge: "Was Creator sagen",
+        t1: {
+          quote: "AdTool spart mir 12 Stunden pro Woche. Die KI versteht meine Brand besser als mein alter Texter — und liefert Content in Sekunden.",
+          name: "Sarah M.",
+          role: "Marketing Director, FashionCo"
+        },
+        t2: {
+          quote: "Ich poste jetzt 12 statt 3 Mal pro Woche — ohne auszubrennen. Engagement ist um 43% gestiegen und Kunden fragen, welche Agentur ich nutze.",
+          name: "Marco R.",
+          role: "Selbstständiger Creator"
+        },
+        t3: {
+          quote: "Wir haben 6 Tools getestet. AdTool ist das einzige, das wirklich nach unserer Marke klingt. Spiel vorbei.",
+          name: "Lisa K.",
+          role: "Head of Social, TechStart"
+        }
+      },
       featureGrid: {
-        title1: "Alles was du brauchst für ",
         title2: "Social Media Erfolg",
         subtitle: "Eine komplette Toolsuite für professionelles Social Media Marketing.",
         contentPlanning: "Content Planung",
@@ -12699,6 +12800,57 @@ export const translations: Record<Language, any> = {
           pillBestTime: "Mejor hora",
           pillReach: "Alcance",
           playHint: "Clic para sonido"
+        }
+      },
+      socialProof: {
+        creators: "10.000+ Creadores",
+        worksWith: "Funciona con"
+      },
+      liveDemo: {
+        badge: "Demo en vivo",
+        title: "Mira la diferencia",
+        subtitle: "Captions reales. Resultados reales. Cambia de industria y mira qué pasa.",
+        before: "Antes",
+        after: "Con AdTool AI",
+        basicPost: "Post básico",
+        adtoolPost: "Optimizado por IA",
+        cases: {
+          restaurant: {
+            industry: "Restaurante",
+            metric: "+312%",
+            before: "Nueva carta disponible. ¡Visítanos!",
+            after: "Pasta de trufa. Hecha a mano esta mañana. Abierto hasta medianoche — reserva mesa o ven directo. 🍝 #PastaNight #Foodies"
+          },
+          fitness: {
+            industry: "Coach Fitness",
+            metric: "+248%",
+            before: "Entrenamiento del día. ¡Vamos!",
+            after: "5 movimientos. 12 minutos. Cero equipo. Guarda esto para tu lunes — tu yo del futuro te lo agradecerá. 💪 #FitnessReels #HomeWorkout"
+          },
+          fashion: {
+            industry: "Marca de Moda",
+            metric: "+189%",
+            before: "Nueva colección disponible. Compra ya.",
+            after: "Drop 03 ha llegado. Lino, seda, sastrería estructurada — hecho para durar. Tallas volando. 👗 #SlowFashion #DropDay"
+          }
+        }
+      },
+      testimonials: {
+        badge: "Lo que dicen los creadores",
+        t1: {
+          quote: "AdTool me ahorra 12 horas por semana. La IA entiende mi marca mejor que mi antiguo copywriter — y entrega contenido en segundos.",
+          name: "Sarah M.",
+          role: "Marketing Director, FashionCo"
+        },
+        t2: {
+          quote: "Pasé de 3 a 12 posts por semana — sin agotarme. La interacción subió 43% y los clientes preguntan qué agencia uso.",
+          name: "Marco R.",
+          role: "Creador Independiente"
+        },
+        t3: {
+          quote: "Probamos 6 herramientas. AdTool es la única que realmente suena como nuestra marca. Fin del juego.",
+          name: "Lisa K.",
+          role: "Head of Social, TechStart"
         }
       },
       featureGrid: {
