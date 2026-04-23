@@ -31,7 +31,7 @@ export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
 export const STRIPE_PRODUCT_MAP: Record<PlanId, string> = {
   free: '', // Free plan has no product
   basic: 'prod_TIRSoTyzmRpbpT',
-  pro: 'prod_TIRWOmhxlzFCwW',
+  pro: 'prod_UOG4wbiQjDONAj', // Pro Plan (Launch €19.99)
   enterprise: 'prod_TIRYBu4fdR2BEw'
 };
 
