@@ -14,7 +14,6 @@ import { AIModelsArsenal } from "@/components/landing/AIModelsArsenal";
 import { LiveDemoShowcase } from "@/components/landing/LiveDemoShowcase";
 import { TestimonialSpotlight } from "@/components/landing/TestimonialSpotlight";
 
-import { PricingSection } from "@/components/landing/PricingSection";
 import { TrialPromiseStrip } from "@/components/landing/TrialPromiseStrip";
 import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
 import { FAQ } from "@/components/FAQ";
@@ -116,9 +115,6 @@ const Index = () => {
 
           {/* Testimonial Spotlight */}
           <TestimonialSpotlight />
-
-          {/* Pricing Section */}
-          <PricingSection />
 
           {/* FAQ Section */}
           <section id="faq" className="py-24 px-4 bg-card/30">
