@@ -3799,9 +3799,10 @@ export const translations: Record<Language, any> = {
     // Landing Page
     landing: {
       hero: {
+        badge: "Powered by AI · For Modern Marketers",
         headline1: "Effective Marketing.",
         headline2: "Smart Campaigns.",
-        subline: "Your AI-powered marketing arsenal for social media. Create, plan and analyze content like a pro.",
+        subline: "Your AI-powered marketing toolkit for social media. Create, plan and analyze content like a pro.",
         pricingHint: "From €29.99/month · 14-day free trial · No credit card required",
         ctaPrimary: "Start for free",
         ctaSecondary: "Watch demo",
@@ -3814,7 +3815,7 @@ export const translations: Record<Language, any> = {
       featureGrid: {
         title1: "Everything you need for ",
         title2: "Social Media Success",
-        subtitle: "A complete arsenal of tools for professional social media marketing.",
+        subtitle: "A complete suite of tools for professional social media marketing.",
         contentPlanning: "Content Planning",
         contentPlanningDesc: "Plan and automate your posts for all platforms",
         analyticsDashboard: "Analytics Dashboard",
@@ -3829,7 +3830,7 @@ export const translations: Record<Language, any> = {
         goalTrackingDesc: "Set and achieve your marketing goals"
       },
       mission: {
-        badge: "Mission Control",
+        badge: "Why AdTool",
         title1: "Why this tool ",
         title2: "wins the game",
         subtitle: "Three steps to more effective marketing – systematic, data-driven, scalable.",
@@ -3842,7 +3843,7 @@ export const translations: Record<Language, any> = {
         learnMore: "Learn more"
       },
       aiModels: {
-        badge: "AI Arsenal",
+        badge: "Premium AI Stack",
         title1: "6 licensed ",
         title2: "Premium AI Models",
         subtitle: "Switch between the world's best video generation models — all licensed, all production-ready.",
@@ -3864,7 +3865,7 @@ export const translations: Record<Language, any> = {
         credits50: "50 Credits",
         credits150: "150 Credits",
         unlimited: "Unlimited",
-        badge: "Recommended by MI6",
+        badge: "Most Popular",
         start: "Start free trial",
         upgradePro: "Start free trial",
         contact: "Contact",
@@ -3913,7 +3914,7 @@ export const translations: Record<Language, any> = {
         }
       },
       footer: {
-        brandDescription: "Your AI-powered marketing arsenal for social media success. Create, plan and analyze like a pro.",
+        brandDescription: "Your AI-powered marketing toolkit for social media success. Create, plan and analyze like a pro.",
         product: "Product",
         resources: "Resources",
         company: "Company",
@@ -8326,9 +8327,10 @@ export const translations: Record<Language, any> = {
     // Landing Page
     landing: {
       hero: {
+        badge: "Powered by AI · Für moderne Marketer",
         headline1: "Effektives Marketing.",
         headline2: "Smarte Kampagnen.",
-        subline: "Dein KI-gestütztes Marketing-Arsenal für Social Media. Erstelle, plane und analysiere Content wie ein Profi.",
+        subline: "Dein KI-gestütztes Marketing-Toolkit für Social Media. Erstelle, plane und analysiere Content wie ein Profi.",
         pricingHint: "Ab 29,99 €/Monat · 14 Tage kostenlos · Keine Kreditkarte nötig",
         ctaPrimary: "Kostenlos starten",
         ctaSecondary: "Demo ansehen",
@@ -8341,7 +8343,7 @@ export const translations: Record<Language, any> = {
       featureGrid: {
         title1: "Alles was du brauchst für ",
         title2: "Social Media Erfolg",
-        subtitle: "Ein komplettes Arsenal an Tools für professionelles Social Media Marketing.",
+        subtitle: "Eine komplette Toolsuite für professionelles Social Media Marketing.",
         contentPlanning: "Content Planung",
         contentPlanningDesc: "Plane und automatisiere deine Posts für alle Plattformen",
         analyticsDashboard: "Analytics Dashboard",
@@ -8356,7 +8358,7 @@ export const translations: Record<Language, any> = {
         goalTrackingDesc: "Setze und erreiche deine Marketing-Ziele"
       },
       mission: {
-        badge: "Mission Control",
+        badge: "Warum AdTool",
         title1: "Why this tool ",
         title2: "wins the game",
         subtitle: "Drei Schritte zu effektiverem Marketing – systematisch, datengetrieben, skalierbar.",
@@ -8369,7 +8371,7 @@ export const translations: Record<Language, any> = {
         learnMore: "Mehr erfahren"
       },
       aiModels: {
-        badge: "KI-Arsenal",
+        badge: "Premium KI-Stack",
         title1: "6 lizensierte ",
         title2: "Premium-KI-Modelle",
         subtitle: "Wechsle zwischen den besten Video-Modellen der Welt — alle lizensiert, alle produktionsbereit.",
@@ -8391,7 +8393,7 @@ export const translations: Record<Language, any> = {
         credits50: "50 Credits",
         credits150: "150 Credits",
         unlimited: "Unlimited",
-        badge: "Empfohlen vom MI6",
+        badge: "Beliebteste Wahl",
         start: "Kostenlos testen",
         upgradePro: "Kostenlos testen",
         contact: "Kontakt",
@@ -8440,7 +8442,7 @@ export const translations: Record<Language, any> = {
         }
       },
       footer: {
-        brandDescription: "Dein KI-gestütztes Marketing-Arsenal für Social Media Erfolg. Erstelle, plane und analysiere wie ein Profi.",
+        brandDescription: "Dein KI-gestütztes Marketing-Toolkit für Social Media Erfolg. Erstelle, plane und analysiere wie ein Profi.",
         product: "Produkt",
         resources: "Ressourcen",
         company: "Unternehmen",
@@ -12638,9 +12640,10 @@ export const translations: Record<Language, any> = {
     // Landing Page
     landing: {
       hero: {
+        badge: "Powered by AI · Para marketers modernos",
         headline1: "Marketing Efectivo.",
         headline2: "Campañas Inteligentes.",
-        subline: "Tu arsenal de marketing impulsado por IA para redes sociales. Crea, planifica y analiza contenido como un profesional.",
+        subline: "Tu kit de marketing impulsado por IA para redes sociales. Crea, planifica y analiza contenido como un profesional.",
         pricingHint: "Desde 29,99 €/mes · 14 días gratis · Sin tarjeta de crédito",
         ctaPrimary: "Empezar gratis",
         ctaSecondary: "Ver demo",
@@ -12653,7 +12656,7 @@ export const translations: Record<Language, any> = {
       featureGrid: {
         title1: "Todo lo que necesitas para ",
         title2: "Éxito en Redes Sociales",
-        subtitle: "Un arsenal completo de herramientas para marketing profesional en redes sociales.",
+        subtitle: "Un conjunto completo de herramientas para marketing profesional en redes sociales.",
         contentPlanning: "Planificación de Contenido",
         contentPlanningDesc: "Planifica y automatiza tus posts para todas las plataformas",
         analyticsDashboard: "Panel de Analytics",
@@ -12668,7 +12671,7 @@ export const translations: Record<Language, any> = {
         goalTrackingDesc: "Establece y alcanza tus objetivos de marketing"
       },
       mission: {
-        badge: "Mission Control",
+        badge: "Por qué AdTool",
         title1: "Por qué esta herramienta ",
         title2: "gana el juego",
         subtitle: "Tres pasos hacia un marketing más efectivo – sistemático, basado en datos, escalable.",
@@ -12681,7 +12684,7 @@ export const translations: Record<Language, any> = {
         learnMore: "Saber más"
       },
       aiModels: {
-        badge: "Arsenal IA",
+        badge: "Stack IA Premium",
         title1: "6 modelos ",
         title2: "Premium de IA con licencia",
         subtitle: "Cambia entre los mejores modelos de video del mundo — todos con licencia, listos para producción.",
@@ -12703,7 +12706,7 @@ export const translations: Record<Language, any> = {
         credits50: "50 Créditos",
         credits150: "150 Créditos",
         unlimited: "Ilimitado",
-        badge: "Recomendado por MI6",
+        badge: "Más Popular",
         start: "Probar gratis",
         upgradePro: "Probar gratis",
         contact: "Contacto",
@@ -12752,7 +12755,7 @@ export const translations: Record<Language, any> = {
         }
       },
       footer: {
-        brandDescription: "Tu arsenal de marketing impulsado por IA para el éxito en redes sociales. Crea, planifica y analiza como un profesional.",
+        brandDescription: "Tu kit de marketing impulsado por IA para el éxito en redes sociales. Crea, planifica y analiza como un profesional.",
         product: "Producto",
         resources: "Recursos",
         company: "Empresa",
