@@ -153,12 +153,13 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const webhookUrl = `${supabaseUrl}/functions/v1/compose-clip-webhook`;
 
-    // Append a negative-text suffix to AI prompts so models don't burn captions/watermarks
-    // into the generated clip (would conflict with our manual overlay system).
-    // Hard guard: NEVER allow burned-in text, captions, subtitles or any written
-    // language in the generated clip — they would conflict with our overlay /
-    // subtitle system in the "Voice & Subtitles" tab.
-    const NEGATIVE_TEXT_SUFFIX = ", no on-screen text, no captions, no subtitles, no watermarks, no logos, no written words, no typography, no signs with readable text, no UI overlays, no lower thirds, no isolated product on plain background, no floating product, no product rotating in empty space, clean visuals only";
+    // IMPORTANT: We do NOT append negative words to the positive prompt.
+    // Diffusion video models (Hailuo, Kling) treat words like "text", "captions",
+    // "logos" as concepts to render, even when prefixed with "no". Instead we use
+    // the dedicated `negative_prompt` API parameter (see hailuoInput / klingInput).
+    // The positive prompt only carries a short positive cue.
+    const NEGATIVE_PROMPT_PARAM = "text, captions, subtitles, watermark, logo, typography, written words, letters, signs with readable text, UI overlay, lower thirds, isolated product, plain white background, floating product, rotating product, blurry, low quality";
+    const POSITIVE_CLEAN_CUE = ", clean cinematic composition, natural environment";
     const STYLE_HINT = getVisualStyleHint(visualStyle);
 
     // Build a quick character lookup for the safety-net injection
