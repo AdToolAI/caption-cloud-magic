@@ -12918,6 +12918,8 @@ export const translations: Record<Language, any> = {
         singlePlanTitle: "Pro",
         singlePlanDescription: "Todo lo que necesitas para crecer en redes — captions, imágenes, publicación, Director's Cut y créditos de AI video.",
         trialNote: "14 días de prueba · Sin suscripción automática · Cancela cuando quieras",
+        subscribe: "Suscribirse ahora",
+        subscribeNote: "Activa tu suscripción Pro · Cancela cuando quieras",
         trialPromise: {
           title: "Nuestra promesa de prueba",
           p1Title: "14 días gratis",
