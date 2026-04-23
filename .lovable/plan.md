@@ -1,68 +1,79 @@
 
 
-## Instagram-Discovery: Root-Cause-Pfad konsequent anwenden + dem Nutzer den richtigen nächsten Schritt zeigen
+## Vollständigen Meta-Consent-Dialog erzwingen — für funktionierenden Review-Screencast
 
-### Was die Logs eindeutig sagen
-```text
-[meta-page-discovery] /me/accounts returned 0 page(s): []
-diagnostics: { pages_found_count: 0, list_error: null }
-```
-Meta liefert `/me/accounts` **leer zurück, ohne Fehler**. Genau dieses Symptom ist in den offiziellen Meta-Devforen + auf Stack Overflow gut dokumentiert — und die akzeptierte Lösung lautet exakt:
+### Problem
+Aktuell zeigt Meta beim Instagram-Connect den abgekürzten „Continue as Samuel"-Bildschirm statt des vollen Permission-Dialogs. Das passiert, weil Meta dem User die App-Berechtigung erinnert und den Consent-Screen überspringt.
 
-> *„Solved: All I had to do was add the `business_management` permission.“*
+**Für Meta App Review ist das ein Showstopper.** Die offizielle Doku (Screen Recordings Guide) verlangt explizit:
+> *„Capture the entire login flow, from logged-out to logged-in"* + *„show the app user granting your app the permission you are demonstrating"*
 
-Genau dieser Scope wird bei uns bereits nachgefordert — aber **erst beim nächsten Connect-Versuch**, weil die Trigger-Bedingung (`pages_found_count === 0`) erst durch den ersten Fehlversuch in den Metadaten landet. Im aktuellen Screenshot hat der Nutzer den **Erneut-Verbinden-Button noch nicht geklickt**, also wurde der Fix noch nie ausgelöst.
+Der Reviewer muss im Screencast den **kompletten Permission-Dialog mit Page-Auswahl** sehen — sonst Rejection unter Policy 1.9.
 
-### Was wir jetzt tun
+### Gute Nachricht
+Funktional ist alles in Ordnung:
+- Page-Auswahl funktioniert ✅
+- IG-Verifikation funktioniert ✅
+- Backend-Discovery liefert die Pages ✅
 
-#### 1. Business-Scope auch beim allerersten Instagram-Connect anbieten
+Es geht **nur** um die OAuth-URL-Konstruktion im Frontend.
+
+### Lösung
+`auth_type=rerequest` + frischen `auth_nonce` **immer** beim Instagram-Connect mitschicken — nicht nur als Recovery-Fallback.
+
 **Datei:** `src/components/performance/ConnectionsTab.tsx`
 
-- `business_management` immer in die Standard-Instagram-Scopes aufnehmen, statt nur als Fallback nach erstem Misserfolg.
-- Begründung: Meta verlangt ihn bei business-verwalteten Seiten *zwingend*. Das jetzt sofort mitzufordern erspart dem Nutzer einen kompletten Fehlversuch.
-- `auth_type=rerequest` weiterhin nur dann setzen, wenn echte Re-Consent-Gründe vorliegen (declined scopes oder vorheriger Fehlschlag) — beim ersten Mal nicht.
+Änderung in `handleConnect`:
+- `forceReconsent` für Instagram **immer** auf `true` setzen
+- Dadurch hängt jeder Instagram-OAuth-URL `auth_type=rerequest&auth_nonce=<uuid>` an
+- Meta zeigt damit garantiert den vollen Berechtigungsdialog mit:
+  - Page-Toggles
+  - Instagram-Konto-Auswahl
+  - Liste aller angefragten Permissions
+  - "Edit Settings"-Option
 
-#### 2. „Erneut verbinden“-Button im Dialog wirklich den Re-Consent-Pfad nutzen
-**Datei:** `src/components/performance/FacebookPageSelectDialog.tsx`
+Konkrete Änderung:
+```text
+forceReconsent =
+  providerId === 'instagram'   // immer true für IG
+```
 
-- Aktuell schließt der Button nur den Dialog und ruft den normalen Connect-Flow erneut auf.
-- Künftig muss er den vollen Re-Consent-Pfad explizit erzwingen: `auth_type=rerequest`, neuer `auth_nonce`, alle Scopes inklusive `business_management`.
-- Damit zeigt Meta den vollständigen Berechtigungsdialog mit Page-Toggles und Instagram-Auswahl garantiert noch einmal — auch wenn der Nutzer vorher schon einmal zugestimmt hatte.
+Für Facebook bleibt es beim Standardverhalten (kein rerequest), weil dort nur Pages relevant sind und der Page-Picker sowieso erscheint.
 
-#### 3. Kontextspezifische Hilfe im Dialog je nach Meta-Diagnose
-**Datei:** `src/components/performance/FacebookPageSelectDialog.tsx`
+### Warum das Meta-konform ist
+- `auth_type=rerequest` ist ein **offiziell dokumentierter** Meta-Parameter
+- Er ist nicht „aggressiv" — er entspricht exakt dem, was Meta für Re-Consent-Flows vorsieht
+- Apps wie Buffer, Hootsuite, Later nutzen denselben Mechanismus
+- Der `auth_nonce` umgeht zusätzlich das Meta-Session-Caching
 
-Bei `meta_pages_hidden_or_unavailable` / `pages_found_count = 0` zusätzlich zum bisherigen Hinweis konkret darstellen, **was der Nutzer auf Meta-Seite prüfen muss**, damit Pages überhaupt geliefert werden:
+### Was sich für den User ändert
+- **Bestehender User**: sieht beim nächsten IG-Connect einmalig wieder den vollen Dialog (kein „Continue as ...")
+- **Neuer User**: sieht von Anfang an den vollen Dialog
+- **Funktional**: identisch — Page-Auswahl, Verbindung, Sync funktionieren weiter wie gehabt
 
-1. Instagram muss ein **Business**- oder **Creator**-Konto sein (kein Privat-Profil).
-2. Instagram muss in den Facebook-Page-Einstellungen mit einer **Facebook-Seite** verknüpft sein.
-3. Die Facebook-Seite muss von **demselben Facebook-Account** verwaltet werden, mit dem man sich gerade einloggt.
-4. Im Meta-Consent-Dialog **muss mindestens eine Page-Checkbox aktiv** angeklickt werden — nicht nur das Instagram-Konto.
+### Bonus für den Review-Screencast
+Mit dem garantierten Vollconsent kannst du jetzt einen sauberen Screencast aufnehmen, der **alle** von Meta verlangten Schritte zeigt:
+1. Logged-out State
+2. Login mit eigenem Account
+3. Klick auf „Connect Instagram"
+4. **Voller Permission-Dialog** (jetzt garantiert) mit allen 6 angefragten Berechtigungen
+5. Page-Auswahl
+6. Erfolgreiche Verbindung
+7. Sync + echte IG-Daten anzeigen
 
-Mit deutlichem CTA:
-- Primär: *„Instagram erneut verbinden (mit Business-Berechtigung)“*
-- Sekundär: Link zur Meta-Hilfeseite *„Instagram mit Facebook-Seite verbinden“*.
-
-#### 4. Diagnose-Zeile nicht reduzieren
-Die kleine technische Diagnoselzeile (`0 Seiten von Meta · 0 mit IG verifiziert · 0 Verifikationsfehler`) bleibt erhalten — sie ist genau das Signal, das uns dieses Mal sofort gezeigt hat, wo das Problem liegt.
-
-### Erwartetes Ergebnis
-- **Best Case:** Beim nächsten Klick auf „Instagram erneut verbinden“ schickt die App `business_management` + `auth_type=rerequest` → Meta zeigt den vollständigen Page-Auswahldialog noch einmal → die verknüpfte Page kommt in `/me/accounts` an → Auto-Connect oder Page-Select klappt.
-- **Andernfalls:** Der Nutzer sieht jetzt eine konkrete, handlungsorientierte Liste, was auf Meta-Seite (Account-Typ, Page-Verknüpfung, Page-Owner) zu prüfen ist — statt einer vagen Fehlermeldung.
-
-### Betroffene Dateien
-- `src/components/performance/ConnectionsTab.tsx`
-- `src/components/performance/FacebookPageSelectDialog.tsx`
+### Betroffene Datei
+- `src/components/performance/ConnectionsTab.tsx` (1 Zeile geändert)
 
 ### Technische Details
-- Kein Backend-/Schema-Change nötig — die Edge Functions (`oauth-callback`, `facebook-list-pages`, `facebook-select-page`) sind bereits korrekt instrumentiert.
-- Kein neuer Edge-Function-Deploy nötig.
-- Reine Frontend-Änderung an OAuth-URL-Konstruktion + Dialog-UX.
+- Kein Backend-Change
+- Kein Edge-Function-Deploy
+- Kein Schema-Change
+- Reine 1-Zeilen-OAuth-URL-Anpassung
 
 ### Test
-1. Im aktuellen Dialog auf **„Instagram erneut verbinden“** klicken.
-2. Erwartung: Meta-Dialog erscheint **erneut komplett** (nicht der „bereits zugestimmt“-Shortcut), mit Page- und Instagram-Auswahl + jetzt zusätzlich Business-Berechtigung.
-3. Alle Toggles aktiv lassen, mindestens eine Page anklicken, bestätigen.
-4. Erwartung: zurück in der App entweder sofortiger Auto-Connect (genau 1 Page) oder echte Auswahlliste.
-5. Falls weiterhin 0 Pages: die neue Hilfeliste prüft genau die 4 Meta-seitigen Voraussetzungen ab.
+1. Instagram trennen
+2. „Connect Instagram" klicken
+3. Erwartung: **voller** Meta-Permission-Dialog (kein „Continue as ...")
+4. Page wählen → Verbindung steht
+5. Screencast in dieser Konfiguration aufnehmen → Meta App Review einreichen
 
