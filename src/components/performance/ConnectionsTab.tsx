@@ -369,16 +369,31 @@ export const ConnectionsTab = () => {
       // declined decisions.
       const existingIg = connections.find((c) => c.provider === 'instagram');
       const missingScopes: string[] = existingIg?.account_metadata?.missing_page_scopes ?? [];
-      const forceReconsent = providerId === 'instagram' && missingScopes.length > 0;
+      const discoveryStatus: string | undefined = existingIg?.account_metadata?.meta_page_discovery_status;
+      const pagesFoundCount: number = existingIg?.account_metadata?.meta_pages_found_count ?? -1;
+      // If a previous discovery showed Meta returned ZERO pages despite scopes being ok,
+      // request the additional business_management scope on the next attempt — this often
+      // unblocks business-managed pages that Meta otherwise hides from the app.
+      const needsBusinessScope =
+        providerId === 'instagram' &&
+        (discoveryStatus === 'meta_pages_hidden_or_unavailable' || pagesFoundCount === 0);
+      const forceReconsent =
+        providerId === 'instagram' && (missingScopes.length > 0 || needsBusinessScope);
       const reconsentSuffix = forceReconsent
         ? `&auth_type=rerequest&auth_nonce=${crypto.randomUUID().replace(/-/g, '')}`
         : '';
 
+      const igScopes = needsBusinessScope
+        ? 'pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_content_publish,business_management'
+        : 'pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_content_publish';
+
       const oauthUrls: Record<string, string> = {
         // Instagram uses the SAME Facebook OAuth dialog as the facebook flow
         // (state.provider already encodes which provider this is). Only the
-        // scopes are extended with instagram_basic + instagram_content_publish.
-        instagram: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_content_publish&state=${encodeURIComponent(state)}${reconsentSuffix}`,
+        // scopes are extended with instagram_basic + instagram_content_publish,
+        // and optionally business_management when prior discovery showed Meta
+        // hid pages from the app.
+        instagram: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${igScopes}&state=${encodeURIComponent(state)}${reconsentSuffix}`,
         facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_read_engagement,pages_manage_metadata,pages_show_list,pages_read_user_content,pages_manage_posts,pages_manage_engagement&state=${encodeURIComponent(state)}`,
         tiktok: `/api/oauth/tiktok/start?user_id=${user.id}`,
         linkedin: `/api/oauth/linkedin/start?user_id=${user.id}`,
