@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Sparkles, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
-import { GadgetCardDynamic } from "./GadgetCardDynamic";
+import { SithCommandDeck } from "./SithCommandDeck";
 
 export const BlackTieHero = () => {
   const { t } = useTranslation();
@@ -113,30 +113,14 @@ export const BlackTieHero = () => {
             </motion.div>
           </motion.div>
 
-          {/* Right Column - Dynamic Gadget Card */}
+          {/* Right Column - Sith Command Deck (3D Laptop) */}
           <motion.div
-            initial={{ opacity: 0, x: 50, rotateY: -10 }}
-            animate={{ opacity: 1, x: 0, rotateY: 0 }}
-            transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
-            className="relative hidden lg:flex justify-center"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.3, ease: "easeOut" }}
+            className="relative hidden lg:flex items-center justify-center"
           >
-            {/* Floating Glow Effect */}
-            <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 via-accent/10 to-transparent blur-3xl rounded-full" />
-            
-            {/* Dynamic Gadget Card with Real Translations */}
-            <GadgetCardDynamic />
-
-            {/* Floating Decoration Elements */}
-            <motion.div 
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -top-4 -right-4 w-20 h-20 bg-gradient-to-br from-primary/30 to-transparent rounded-full blur-xl"
-            />
-            <motion.div 
-              animate={{ y: [0, 10, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -bottom-4 -left-4 w-24 h-24 bg-gradient-to-br from-accent/20 to-transparent rounded-full blur-xl"
-            />
+            <SithCommandDeck />
           </motion.div>
         </div>
       </div>
