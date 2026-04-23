@@ -224,10 +224,14 @@ const Pricing = () => {
                     disabled={proLoading}
                     className="bg-gradient-to-r from-primary to-gold-dark text-primary-foreground font-semibold shadow-[var(--shadow-glow-gold)] hover:shadow-[0_0_50px_hsla(43,90%,68%,0.5)] transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border-0 h-12 px-8"
                   >
-                    {proLoading ? t("pricingDetails.loading") : t("landing.pricing.start")}
+                    {proLoading
+                      ? t("pricingDetails.loading")
+                      : user
+                        ? t("landing.pricing.subscribe")
+                        : t("landing.pricing.start")}
                   </Button>
                   <p className="text-xs text-muted-foreground sm:text-right max-w-xs">
-                    {t("landing.pricing.trialNote")}
+                    {user ? t("landing.pricing.subscribeNote") : t("landing.pricing.trialNote")}
                   </p>
                 </div>
               </div>
