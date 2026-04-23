@@ -1,156 +1,90 @@
 
-## Instagram-Review-Flow: Problem korrekt einordnen und nur noch die wirklich wirksamen Schritte umsetzen
 
-### Was der aktuelle Stand zeigt
-Der Code ist inzwischen bereits auf dem stärksten verfügbaren Flow:
+## Composer-Crash nach TikTok-Connect beheben — `Failed to execute 'createObjectURL'`
 
-- Instagram nutzt den dedizierten Backend-Start `instagram-oauth-start`
-- dort werden alte Meta-Grants best-effort widerrufen
-- die URL enthält bereits:
-  - `auth_type=rerequest`
-  - frischen `auth_nonce`
-  - `display=page`
-  - die relevanten Scopes inkl. `business_management`
+### Root Cause
+Der Kunde landet nach erfolgreichem TikTok-OAuth zurück in der App. Im **Composer** (`src/pages/Composer.tsx`, Zeile 861) wird beim Rendern des „Social"-Tabs aufgerufen:
 
-Trotzdem zeigt Meta weiterhin den verkürzten Einstieg.
-
-Der neue Screenshot ist dabei wichtig: Er zeigt bereits eine echte Permission-Seite mit den angeforderten Rechten. Das heißt:
-- die App fragt die Permissions sichtbar an
-- der offene Rest ist nicht mehr primär unsere URL-Konstruktion
-- der verbleibende Unterschied entsteht sehr wahrscheinlich durch Meta-Session-/Review-Verhalten, nicht durch fehlende App-Parameter
-
-### Wahrscheinliche Root Cause
-Es gibt jetzt zwei realistische Ursachen, die wir getrennt behandeln müssen:
-
-1. **Meta-Session-Caching**
-   - Wenn bei Facebook/Meta bereits eine Sitzung aktiv ist, kann Meta den Login-Teil trotzdem abkürzen.
-   - Das lässt sich aus der App nur begrenzt beeinflussen.
-
-2. **Preview-/Published-Umgebung**
-   - OAuth kann sich im Preview anders verhalten als auf der veröffentlichten URL.
-   - Für Review-relevante Tests ist die veröffentlichte URL die belastbare Referenz.
-
-### Ziel
-Nicht noch mehr am OAuth-Link “raten”, sondern:
-- den tatsächlichen Redirect-/Dialog-Pfad sichtbar machen
-- Review-sichere Nutzung über die veröffentlichte URL absichern
-- optional einen echten Review-Modus ergänzen, falls ein zusätzlicher Meta-Reauth-Schritt noch sinnvoll getestet werden soll
-
-## Umsetzung
-
-### 1. Instagram-Flow gezielt instrumentieren
-**Dateien:**
-- `src/components/performance/ConnectionsTab.tsx`
-- `supabase/functions/instagram-oauth-start/index.ts`
-- optional `supabase/functions/oauth-callback/index.ts`
-
-Zusätzliche Diagnose-Logs einbauen, damit beim nächsten Versuch eindeutig sichtbar ist:
-- welche `authUrl` final erzeugt wurde
-- ob der Flow wirklich über `instagram-oauth-start` lief
-- ob die App im Preview oder auf der veröffentlichten Domain gestartet wurde
-- welche Redirect-URL nach dem Callback verwendet wurde
-
-Ziel:
-```text
-Nicht mehr vermuten, sondern exakt sehen:
-Frontend -> instagram-oauth-start -> Meta dialog URL -> oauth-callback -> App redirect
+```tsx
+videoUrl={selectedMedia[0] ? URL.createObjectURL(selectedMedia[0]) : importedMediaUrl || ''}
 ```
 
-### 2. Review-Modus als expliziten Spezialpfad ergänzen
-**Datei:** `src/components/performance/ConnectionsTab.tsx`
+`selectedMedia[0]` ist aber **nicht immer** ein echter `File`/`Blob`. Beim Import aus der MediaLibrary erzeugt der Composer in Zeilen 218–238 ein **virtuelles Objekt**:
 
-Einen klaren, separaten Instagram-CTA für Review-Aufnahmen ergänzen, z. B.:
-- „Instagram für Review verbinden“
-
-Dieser Pfad soll:
-- nur für Instagram gelten
-- den bestehenden Backend-Start weiter nutzen
-- optional zusätzlich einen härteren Reauth-Intent mitschicken (falls Meta ihn berücksichtigt)
-- dem Nutzer vor Redirect einen klaren Hinweis zeigen:
-  - in frischer/incognito Meta-Session starten
-  - idealerweise vorher komplett bei Facebook ausloggen
-  - Review auf veröffentlichter URL aufnehmen
-
-Wichtig: der normale Connect-Flow bleibt unverändert; Review-Flow ist bewusst separat.
-
-### 3. Review-Hinweis im Dialog von “generisch” auf “verbindlich” anheben
-**Datei:** `src/components/performance/FacebookPageSelectDialog.tsx`
-
-Den bisherigen Hinweis zu einer klaren Review-Anleitung ausbauen:
-
-- Der aktuelle Screen mit der Rechtematrix zählt bereits als Permission-Screen.
-- Wenn Meta keinen separaten Login-Screen zeigt, liegt das meist an einer bestehenden Meta-Sitzung.
-- Für den Screencast deshalb:
-  1. veröffentlichte URL verwenden
-  2. Meta/Facebook vorher vollständig ausloggen
-  3. Flow in Inkognito/privatem Fenster starten
-  4. dann Connect → Permissions → Page-Auswahl → erfolgreiche Verbindung → echte Nutzung aufnehmen
-
-### 4. Published-URL als bevorzugten Review-Pfad in der UI verankern
-**Datei:** `src/components/performance/ConnectionsTab.tsx`
-
-Einen kleinen Hinweis oder Link ergänzen, dass OAuth-/Review-Tests für Meta auf der veröffentlichten App erfolgen sollen, nicht primär im Preview.
-
-Begründung:
-- Preview und veröffentlichte Umgebung können sich bei OAuth unterschiedlich verhalten
-- für Meta Review ist die veröffentlichte Umgebung die relevante Zielumgebung
-
-### 5. Kein weiterer “Parameter-Spam” im OAuth-Link
-Bewusst **nicht** umsetzen:
-- weitere zufällige URL-Parameter ohne klare Wirkung
-- mehrfach widersprüchliche Frontend-/Backend-Logik
-- erneute direkte Frontend-Konstruktion der Instagram-URL
-
-Der aktuelle Backend-Flow bleibt Single Source of Truth.
-
-## Erwartetes Ergebnis
-Nach der Nachschärfung gibt es zwei klare Ergebnisse:
-
-### A. Für die technische Diagnose
-Wir sehen beim nächsten Lauf eindeutig,
-- ob wirklich der Backend-Flow genutzt wurde
-- welche Meta-URL geöffnet wurde
-- ob das Verhalten nur im Preview auftritt
-
-### B. Für den Review
-Der Nutzer bekommt einen belastbaren Aufnahme-Pfad:
-- veröffentlichte URL
-- frische Meta-Session
-- sichtbarer Permission-Screen
-- sichtbare Page-Auswahl
-- erfolgreicher Connect + Feature-Nutzung
-
-## Wichtige Einschätzung
-Der aktuelle Screenshot zeigt bereits eine Seite, auf der die angefragten Berechtigungen sichtbar gelistet sind. Das spricht dafür, dass der verbleibende Unterschied eher der **Login-/Session-Teil von Meta** ist als ein fehlender Permission-Request unserer App.
-
-Wenn Meta den Nutzer schon kennt, kann die App den “vollständigen Login von Null an” nicht zuverlässig erzwingen. Deshalb ist der nächste sinnvolle Schritt nicht noch mehr OAuth-Code-Tuning, sondern:
-- Flow sauber instrumentieren
-- Review-Modus klar ausweisen
-- Review konsequent auf der veröffentlichten URL in frischer Meta-Session aufnehmen
-
-## Betroffene Dateien
-- `src/components/performance/ConnectionsTab.tsx`
-- `src/components/performance/FacebookPageSelectDialog.tsx`
-- `supabase/functions/instagram-oauth-start/index.ts`
-- optional `supabase/functions/oauth-callback/index.ts`
-
-## Technische Details
-```text
-Ist-Zustand:
-Frontend -> instagram-oauth-start -> Meta OAuth URL mit rerequest/auth_nonce/display=page
-
-Neue Verbesserung:
-gleicher Flow + präzise Logging/Instrumentation + dedizierter Review-Modus + Published-URL-Hinweis
+```ts
+const virtualFile = { name, type, size, url: data.mediaUrl } as File & { url: string };
+setSelectedMedia([virtualFile]);
 ```
 
-## Test nach Umsetzung
-1. Projekt auf veröffentlichter URL öffnen
-2. Meta/Facebook vollständig ausloggen
-3. Inkognito-Fenster verwenden
-4. „Instagram für Review verbinden“ starten
-5. Erwartung:
-   - Permission-Screen erscheint
-   - danach Page-Auswahl
-   - Verbindung erfolgreich
-   - danach echte Instagram-Nutzung/Sync im Screencast zeigen
-6. Falls Preview weiterhin abweicht, gilt das als Umgebungsunterschied, nicht als App-Code-Fehler
+Das ist nur ein Plain Object mit `as File` gecastet. `URL.createObjectURL(...)` akzeptiert ausschließlich echte `Blob`/`File`/`MediaSource` und wirft exakt den Browser-Fehler:
+
+> `Failed to execute 'createObjectURL' on 'URL': Overload resolution failed.`
+
+Der Fehler bubbled hoch in den `ErrorBoundary` → Kunde sieht „Etwas ist schiefgelaufen". Mit TikTok hat das nichts zu tun — der Crash ist nur **danach** sichtbar, weil der Composer-State nach dem Redirect den importierten Media-Eintrag noch enthält.
+
+Zusätzlich: `URL.createObjectURL` wird bei jedem Render neu aufgerufen → Memory Leak.
+
+### Fix
+
+**Datei 1: `src/pages/Composer.tsx`**
+
+Statt direkt `URL.createObjectURL(selectedMedia[0])` aufzurufen, eine `useMemo`-basierte sichere Resolver-Funktion einführen, die:
+1. zuerst prüft, ob das Item bereits ein `url`-Feld hat (virtuelles File aus der MediaLibrary) → diese URL verwenden
+2. dann prüft, ob es ein echter `Blob`/`File` ist (`instanceof Blob`) → `URL.createObjectURL()` nutzen
+3. sonst auf `importedMediaUrl` oder leeren String zurückfallen
+4. die erzeugte Object-URL bei Cleanup wieder freigeben (`URL.revokeObjectURL`)
+
+```tsx
+const composerMediaUrl = useMemo(() => {
+  const first = selectedMedia[0] as (File & { url?: string }) | undefined;
+  if (!first) return importedMediaUrl || '';
+  if (first.url) return first.url;                       // virtuelles File aus MediaLibrary
+  if (first instanceof Blob) return URL.createObjectURL(first);
+  return importedMediaUrl || '';
+}, [selectedMedia, importedMediaUrl]);
+
+useEffect(() => {
+  return () => {
+    if (composerMediaUrl?.startsWith('blob:')) URL.revokeObjectURL(composerMediaUrl);
+  };
+}, [composerMediaUrl]);
+```
+
+Dann in Zeile 861 nur noch `videoUrl={composerMediaUrl}` verwenden.
+
+**Datei 2: `src/components/composer/ComposerPreview.tsx`** (gleiches Muster, härten)
+
+In Zeile 43–48 zusätzlich den `instanceof Blob`-Check ergänzen, damit auch dort kein Crash auftritt, falls künftig ein nicht-Blob-Item reinkommt:
+
+```tsx
+const mediaPreviewUrl = useMemo(() => {
+  if (selectedMedia.length === 0) return null;
+  const file = selectedMedia[0] as File & { url?: string };
+  if (file.url) return file.url;
+  if (file instanceof Blob) return URL.createObjectURL(file);
+  return null;
+}, [selectedMedia]);
+```
+
+Und Cleanup-Effect ergänzen, der die `blob:`-URL bei Unmount/Wechsel revoked.
+
+### Was nicht geändert wird
+- TikTok-OAuth-Flow (funktioniert korrekt — Kunde war ja erfolgreich verbunden)
+- ConnectionsTab (kein `createObjectURL`-Bug)
+- ErrorBoundary selbst (das ist genau das, was es soll — Crash abfangen)
+
+### Erwartetes Ergebnis
+- Kein Crash mehr nach TikTok-Connect, wenn der Composer importierte Media im State hat
+- Robust für alle Media-Quellen (File-Upload, MediaLibrary-Import, AI-generated)
+- Keine Memory Leaks durch nicht-revoked Object-URLs
+
+### Betroffene Dateien
+- `src/pages/Composer.tsx` (Zeilen ~42–50 und ~861)
+- `src/components/composer/ComposerPreview.tsx` (Zeilen 43–48)
+
+### Test nach Umsetzung
+1. MediaLibrary-Item in den Composer importieren
+2. Auf den „Social"-Tab klicken → kein Crash
+3. TikTok neu verbinden → zurück in der App → kein Crash
+4. Echten Datei-Upload im Composer machen → Preview funktioniert weiter
+
