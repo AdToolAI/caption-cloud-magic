@@ -53,9 +53,17 @@ export const BlackTieHero = () => {
             </h1>
 
             {/* Subline */}
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+            <p className="text-lg md:text-xl text-muted-foreground mb-4 max-w-xl mx-auto lg:mx-0 leading-relaxed">
               {t('landing.hero.subline')}
             </p>
+
+            {/* Subtle pricing hint - service info, not a banner */}
+            <a
+              href="#pricing"
+              className="inline-block text-sm text-muted-foreground/70 hover:text-primary transition-colors duration-300 mb-8"
+            >
+              {t('landing.hero.pricingHint')}
+            </a>
 
             {/* CTA Group */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
