@@ -4,7 +4,7 @@ import { sendEmail } from "../_shared/email-send.ts";
 
 type Lang = "de" | "en" | "es";
 
-const GRACE_PERIOD_DAYS = 3;
+const GRACE_PERIOD_DAYS = 14;
 
 // ---------- Email copy ----------
 

@@ -14,7 +14,7 @@ export interface TrialInfo {
   loading: boolean;
 }
 
-const GRACE_PERIOD_DAYS = 3;
+const GRACE_PERIOD_DAYS = 14;
 
 const DEFAULT: TrialInfo = {
   status: "converted",
