@@ -1,118 +1,156 @@
 
-## Instagram-Review-Flow wirklich auf den vollständigen Meta-Consent umstellen
+## Instagram-Review-Flow: Problem korrekt einordnen und nur noch die wirklich wirksamen Schritte umsetzen
 
-### Was aktuell schiefläuft
-Der abgekürzte Bildschirm erscheint weiterhin, obwohl `auth_type=rerequest` bereits im Frontend gesetzt wird. Der Code zeigt warum:
+### Was der aktuelle Stand zeigt
+Der Code ist inzwischen bereits auf dem stärksten verfügbaren Flow:
 
-- `src/components/performance/ConnectionsTab.tsx` baut für Instagram noch **direkt** eine Facebook-OAuth-URL im Browser
-- dabei wird **nicht** der stärkere Backend-Flow `supabase/functions/instagram-oauth-start/index.ts` genutzt
-- genau dort liegt aber bereits die robustere Logik:
-  - Backend-Hard-Reset der alten Meta-App-Freigabe
-  - Löschen alter `instagram`/`facebook` Verbindungen
+- Instagram nutzt den dedizierten Backend-Start `instagram-oauth-start`
+- dort werden alte Meta-Grants best-effort widerrufen
+- die URL enthält bereits:
   - `auth_type=rerequest`
-  - frischer `auth_nonce`
+  - frischen `auth_nonce`
   - `display=page`
-  - Graph API v24
+  - die relevanten Scopes inkl. `business_management`
 
-Das heißt: der wichtigste Fix existiert schon im Backend, wird vom aktuellen Instagram-Connect aber umgangen.
+Trotzdem zeigt Meta weiterhin den verkürzten Einstieg.
 
-## Ziel
-Der Instagram-Connect muss immer über den dedizierten Backend-Start laufen, damit Meta nicht mehr den verkürzten „Continue as …“-Pfad aus dem gecachten Alt-Grant nimmt.
+Der neue Screenshot ist dabei wichtig: Er zeigt bereits eine echte Permission-Seite mit den angeforderten Rechten. Das heißt:
+- die App fragt die Permissions sichtbar an
+- der offene Rest ist nicht mehr primär unsere URL-Konstruktion
+- der verbleibende Unterschied entsteht sehr wahrscheinlich durch Meta-Session-/Review-Verhalten, nicht durch fehlende App-Parameter
+
+### Wahrscheinliche Root Cause
+Es gibt jetzt zwei realistische Ursachen, die wir getrennt behandeln müssen:
+
+1. **Meta-Session-Caching**
+   - Wenn bei Facebook/Meta bereits eine Sitzung aktiv ist, kann Meta den Login-Teil trotzdem abkürzen.
+   - Das lässt sich aus der App nur begrenzt beeinflussen.
+
+2. **Preview-/Published-Umgebung**
+   - OAuth kann sich im Preview anders verhalten als auf der veröffentlichten URL.
+   - Für Review-relevante Tests ist die veröffentlichte URL die belastbare Referenz.
+
+### Ziel
+Nicht noch mehr am OAuth-Link “raten”, sondern:
+- den tatsächlichen Redirect-/Dialog-Pfad sichtbar machen
+- Review-sichere Nutzung über die veröffentlichte URL absichern
+- optional einen echten Review-Modus ergänzen, falls ein zusätzlicher Meta-Reauth-Schritt noch sinnvoll getestet werden soll
 
 ## Umsetzung
 
-### 1. Instagram im Frontend auf den Backend-Start umstellen
-**Datei:** `src/components/performance/ConnectionsTab.tsx`
-
-Den aktuellen direkten Instagram-OAuth-Link entfernen bzw. für Instagram nicht mehr verwenden.
-
-Stattdessen soll `handleConnect('instagram', ...)`:
-- die aktuelle Session holen
-- `instagram-oauth-start` per Edge-Function aufrufen
-- `returnTo` übergeben
-- die zurückgegebene `authUrl` öffnen
-
-Wichtig:
-- Facebook bleibt beim bestehenden Flow
-- nur Instagram wird auf den dedizierten Startpfad umgestellt
-
-### 2. Alle Instagram-Reconnect-Pfade auf denselben Start zwingen
+### 1. Instagram-Flow gezielt instrumentieren
 **Dateien:**
 - `src/components/performance/ConnectionsTab.tsx`
-- optional prüfen: `src/components/account/LinkedAccountsCard.tsx`
+- `supabase/functions/instagram-oauth-start/index.ts`
+- optional `supabase/functions/oauth-callback/index.ts`
 
-Sicherstellen, dass wirklich **jeder** Instagram-Reconnect denselben Backend-Start nutzt:
-- normaler „Connect Instagram“-Button
-- „Instagram erneut verbinden“-CTA im Page-Select-Dialog
-- Disconnect → Reconnect-Fälle
-- evtl. Account/Settings-Karten mit eigenem Reconnect
+Zusätzliche Diagnose-Logs einbauen, damit beim nächsten Versuch eindeutig sichtbar ist:
+- welche `authUrl` final erzeugt wurde
+- ob der Flow wirklich über `instagram-oauth-start` lief
+- ob die App im Preview oder auf der veröffentlichten Domain gestartet wurde
+- welche Redirect-URL nach dem Callback verwendet wurde
 
-So gibt es keinen Pfad mehr, der versehentlich wieder den verkürzten Direkt-Link benutzt.
+Ziel:
+```text
+Nicht mehr vermuten, sondern exakt sehen:
+Frontend -> instagram-oauth-start -> Meta dialog URL -> oauth-callback -> App redirect
+```
 
-### 3. Doppelte / widersprüchliche Frontend-IG-OAuth-Logik bereinigen
+### 2. Review-Modus als expliziten Spezialpfad ergänzen
 **Datei:** `src/components/performance/ConnectionsTab.tsx`
 
-Die lokale Instagram-URL-Konstruktion mit:
-- `v18.0`
-- `scope=...`
-- `auth_type=rerequest`
-- `auth_nonce`
-soll entfernt oder klar deaktiviert werden, damit künftig nur noch **eine** Wahrheit existiert: `instagram-oauth-start`.
+Einen klaren, separaten Instagram-CTA für Review-Aufnahmen ergänzen, z. B.:
+- „Instagram für Review verbinden“
 
-Das verhindert, dass spätere Änderungen wieder am Backend vorbeigehen.
+Dieser Pfad soll:
+- nur für Instagram gelten
+- den bestehenden Backend-Start weiter nutzen
+- optional zusätzlich einen härteren Reauth-Intent mitschicken (falls Meta ihn berücksichtigt)
+- dem Nutzer vor Redirect einen klaren Hinweis zeigen:
+  - in frischer/incognito Meta-Session starten
+  - idealerweise vorher komplett bei Facebook ausloggen
+  - Review auf veröffentlichter URL aufnehmen
 
-### 4. Disconnect-Hinweis für Review-Fall schärfen
-**Datei:** `src/components/performance/ConnectionsTab.tsx`
+Wichtig: der normale Connect-Flow bleibt unverändert; Review-Flow ist bewusst separat.
 
-Die bestehende Disconnect-Logik nutzt bereits `instagram-oauth-revoke`. Der Hinweis danach sollte noch klarer machen:
-
-- Für den Review-Screencast zuerst trennen
-- dann neu verbinden
-- idealerweise in einer frischen / ausgeloggten Meta-Sitzung aufnehmen
-
-So ist auch der Nutzerfluss für den Reviewer nachvollziehbar.
-
-### 5. Optionalen Review-Hinweis im Dialog ergänzen
+### 3. Review-Hinweis im Dialog von “generisch” auf “verbindlich” anheben
 **Datei:** `src/components/performance/FacebookPageSelectDialog.tsx`
 
-Kleine Hinweiszeile für den Review-Fall:
-- Falls Meta weiterhin nur die Kurzversion zeigt, zuerst vollständig trennen und den Flow in frischer Meta-Session erneut starten
-- Fokus: Reviewer muss Permission-/Page-Auswahl sichtbar sehen
+Den bisherigen Hinweis zu einer klaren Review-Anleitung ausbauen:
 
-Das ist kein technischer Fix, aber reduziert Missverständnisse beim finalen Test.
+- Der aktuelle Screen mit der Rechtematrix zählt bereits als Permission-Screen.
+- Wenn Meta keinen separaten Login-Screen zeigt, liegt das meist an einer bestehenden Meta-Sitzung.
+- Für den Screencast deshalb:
+  1. veröffentlichte URL verwenden
+  2. Meta/Facebook vorher vollständig ausloggen
+  3. Flow in Inkognito/privatem Fenster starten
+  4. dann Connect → Permissions → Page-Auswahl → erfolgreiche Verbindung → echte Nutzung aufnehmen
+
+### 4. Published-URL als bevorzugten Review-Pfad in der UI verankern
+**Datei:** `src/components/performance/ConnectionsTab.tsx`
+
+Einen kleinen Hinweis oder Link ergänzen, dass OAuth-/Review-Tests für Meta auf der veröffentlichten App erfolgen sollen, nicht primär im Preview.
+
+Begründung:
+- Preview und veröffentlichte Umgebung können sich bei OAuth unterschiedlich verhalten
+- für Meta Review ist die veröffentlichte Umgebung die relevante Zielumgebung
+
+### 5. Kein weiterer “Parameter-Spam” im OAuth-Link
+Bewusst **nicht** umsetzen:
+- weitere zufällige URL-Parameter ohne klare Wirkung
+- mehrfach widersprüchliche Frontend-/Backend-Logik
+- erneute direkte Frontend-Konstruktion der Instagram-URL
+
+Der aktuelle Backend-Flow bleibt Single Source of Truth.
 
 ## Erwartetes Ergebnis
-Nach der Umstellung läuft Instagram nicht mehr über den schwächeren Direkt-Link, sondern immer über den Backend-Flow mit Hard-Reset + Re-Consent.
+Nach der Nachschärfung gibt es zwei klare Ergebnisse:
 
-Erwarteter Effekt:
-- deutlich höhere Chance auf den vollständigen Meta-Dialog
-- keine versehentliche Rückkehr zum verkürzten „Continue as …“-Screen durch den Frontend-Link
-- konsistenter Review-tauglicher Flow
+### A. Für die technische Diagnose
+Wir sehen beim nächsten Lauf eindeutig,
+- ob wirklich der Backend-Flow genutzt wurde
+- welche Meta-URL geöffnet wurde
+- ob das Verhalten nur im Preview auftritt
+
+### B. Für den Review
+Der Nutzer bekommt einen belastbaren Aufnahme-Pfad:
+- veröffentlichte URL
+- frische Meta-Session
+- sichtbarer Permission-Screen
+- sichtbare Page-Auswahl
+- erfolgreicher Connect + Feature-Nutzung
+
+## Wichtige Einschätzung
+Der aktuelle Screenshot zeigt bereits eine Seite, auf der die angefragten Berechtigungen sichtbar gelistet sind. Das spricht dafür, dass der verbleibende Unterschied eher der **Login-/Session-Teil von Meta** ist als ein fehlender Permission-Request unserer App.
+
+Wenn Meta den Nutzer schon kennt, kann die App den “vollständigen Login von Null an” nicht zuverlässig erzwingen. Deshalb ist der nächste sinnvolle Schritt nicht noch mehr OAuth-Code-Tuning, sondern:
+- Flow sauber instrumentieren
+- Review-Modus klar ausweisen
+- Review konsequent auf der veröffentlichten URL in frischer Meta-Session aufnehmen
 
 ## Betroffene Dateien
 - `src/components/performance/ConnectionsTab.tsx`
 - `src/components/performance/FacebookPageSelectDialog.tsx`
-- optional Prüfung/Anpassung: `src/components/account/LinkedAccountsCard.tsx`
+- `supabase/functions/instagram-oauth-start/index.ts`
+- optional `supabase/functions/oauth-callback/index.ts`
 
 ## Technische Details
 ```text
-Aktuell:
-Frontend -> direkte facebook.com OAuth-URL
+Ist-Zustand:
+Frontend -> instagram-oauth-start -> Meta OAuth URL mit rerequest/auth_nonce/display=page
 
-Soll:
-Frontend -> instagram-oauth-start -> Backend hard reset + authUrl -> Redirect zu Meta
+Neue Verbesserung:
+gleicher Flow + präzise Logging/Instrumentation + dedizierter Review-Modus + Published-URL-Hinweis
 ```
 
-Der entscheidende Punkt ist nicht noch ein weiterer Query-Parameter im Frontend, sondern dass der Instagram-Flow den vorhandenen Backend-Start endlich wirklich benutzt.
-
 ## Test nach Umsetzung
-1. Instagram/Facebook-Verbindung trennen
-2. prüfen, dass der Hard-Reset erfolgreich lief
-3. Instagram neu verbinden
-4. Erwartung:
-   - Redirect kommt aus `instagram-oauth-start`
-   - voller Meta-Consent erscheint deutlich zuverlässiger
-   - danach Page-Auswahl funktioniert weiter
-5. Für den Review-Screencast:
-   - logged-out bzw. frische Meta-Session
-   - kompletter Flow sichtbar aufnehmen
+1. Projekt auf veröffentlichter URL öffnen
+2. Meta/Facebook vollständig ausloggen
+3. Inkognito-Fenster verwenden
+4. „Instagram für Review verbinden“ starten
+5. Erwartung:
+   - Permission-Screen erscheint
+   - danach Page-Auswahl
+   - Verbindung erfolgreich
+   - danach echte Instagram-Nutzung/Sync im Screencast zeigen
+6. Falls Preview weiterhin abweicht, gilt das als Umgebungsunterschied, nicht als App-Code-Fehler
