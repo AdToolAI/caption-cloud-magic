@@ -3803,7 +3803,7 @@ export const translations: Record<Language, any> = {
         headline1: "Effective Marketing.",
         headline2: "Smart Campaigns.",
         subline: "Your AI-powered marketing toolkit for social media. Create, plan and analyze content like a pro.",
-        pricingHint: "From €19.99/month · 14-day free trial · No credit card required",
+        pricingHint: "From €19.99/month · 14-day trial · No auto-subscription",
         ctaPrimary: "Start for free",
         ctaSecondary: "Watch demo",
         stats: {
@@ -3872,7 +3872,18 @@ export const translations: Record<Language, any> = {
         contact: "Contact",
         singlePlanTitle: "Pro",
         singlePlanDescription: "Everything you need to grow on social — captions, images, posting, Director's Cut and AI video credits.",
-        trialNote: "14-day free trial · €10 AI video credits included · No credit card required",
+        trialNote: "14-day trial · No auto-subscription · Cancel anytime",
+        trialPromise: {
+          title: "Our trial promise",
+          p1Title: "14 days free",
+          p1Desc: "Full Enterprise access — try every feature.",
+          p2Title: "€10 welcome bonus",
+          p2Desc: "One-time AI video credits to get you started.",
+          p3Title: "No auto-subscription",
+          p3Desc: "We never charge you automatically — you decide.",
+          p4Title: "+14 days grace period",
+          p4Desc: "Extra time before your account is paused.",
+        },
         proFeatures: {
           f1: "Unlimited AI captions in 25+ languages",
           f2: "AI image studio + smart background replace",
@@ -3880,7 +3891,7 @@ export const translations: Record<Language, any> = {
           f4: "Auto-posting to Instagram, TikTok, YouTube, Facebook",
           f5: "Brand Kit, content calendar & analytics",
           f6: "AI video generation (Sora, Kling, Seedance, Luma…)",
-          f7: "€10 AI video credits per month included"
+          f7: "AI video credits via top-up packs (€10 / €50 / €100)"
         },
         competitorTitle: "Better value than the competition",
         competitorSubtitle: "AdTool includes AI video, Director's Cut & Smart Studio.",
@@ -8332,7 +8343,7 @@ export const translations: Record<Language, any> = {
         headline1: "Effektives Marketing.",
         headline2: "Smarte Kampagnen.",
         subline: "Dein KI-gestütztes Marketing-Toolkit für Social Media. Erstelle, plane und analysiere Content wie ein Profi.",
-        pricingHint: "Ab 19,99 €/Monat · 14 Tage kostenlos · Keine Kreditkarte nötig",
+        pricingHint: "Ab 19,99 €/Monat · 14 Tage testen · Kein Auto-Abo",
         ctaPrimary: "Kostenlos starten",
         ctaSecondary: "Demo ansehen",
         stats: {
@@ -8401,7 +8412,18 @@ export const translations: Record<Language, any> = {
         contact: "Kontakt",
         singlePlanTitle: "Pro",
         singlePlanDescription: "Alles, was du für Wachstum auf Social brauchst — Captions, Bilder, Posting, Director's Cut und AI-Video-Credits.",
-        trialNote: "14 Tage kostenlos · 10 € AI-Video-Guthaben inklusive · Keine Kreditkarte nötig",
+        trialNote: "14 Tage testen · Kein Auto-Abo · Jederzeit kündbar",
+        trialPromise: {
+          title: "Unser Trial-Versprechen",
+          p1Title: "14 Tage kostenlos",
+          p1Desc: "Voller Enterprise-Zugriff — alle Features testen.",
+          p2Title: "10 € Welcome-Bonus",
+          p2Desc: "Einmaliges AI-Video-Guthaben für den Start.",
+          p3Title: "Kein Auto-Abo",
+          p3Desc: "Wir buchen nie automatisch ab — du entscheidest.",
+          p4Title: "+14 Tage Schonfrist",
+          p4Desc: "Zusätzliche Zeit, bevor dein Konto pausiert wird.",
+        },
         proFeatures: {
           f1: "Unbegrenzte KI-Captions in 25+ Sprachen",
           f2: "AI Picture Studio + Smart Background Replace",
@@ -8409,7 +8431,7 @@ export const translations: Record<Language, any> = {
           f4: "Auto-Posting zu Instagram, TikTok, YouTube, Facebook",
           f5: "Brand Kit, Content-Kalender & Analytics",
           f6: "AI-Video-Generierung (Sora, Kling, Seedance, Luma…)",
-          f7: "10 € AI-Video-Guthaben pro Monat inklusive"
+          f7: "AI-Video-Credits via Top-up-Packs (10 € / 50 € / 100 €)"
         },
         competitorTitle: "Mehr Leistung als die Konkurrenz",
         competitorSubtitle: "AdTool inkl. AI-Video, Director's Cut & Smart Studio.",
@@ -12646,7 +12668,7 @@ export const translations: Record<Language, any> = {
         headline1: "Marketing Efectivo.",
         headline2: "Campañas Inteligentes.",
         subline: "Tu kit de marketing impulsado por IA para redes sociales. Crea, planifica y analiza contenido como un profesional.",
-        pricingHint: "Desde 19,99 €/mes · 14 días gratis · Sin tarjeta de crédito",
+        pricingHint: "Desde 19,99 €/mes · 14 días de prueba · Sin suscripción automática",
         ctaPrimary: "Empezar gratis",
         ctaSecondary: "Ver demo",
         stats: {
@@ -12715,7 +12737,18 @@ export const translations: Record<Language, any> = {
         contact: "Contacto",
         singlePlanTitle: "Pro",
         singlePlanDescription: "Todo lo que necesitas para crecer en redes — captions, imágenes, publicación, Director's Cut y créditos de AI video.",
-        trialNote: "14 días gratis · 10 € en créditos AI video incluidos · Sin tarjeta de crédito",
+        trialNote: "14 días de prueba · Sin suscripción automática · Cancela cuando quieras",
+        trialPromise: {
+          title: "Nuestra promesa de prueba",
+          p1Title: "14 días gratis",
+          p1Desc: "Acceso Enterprise completo — prueba todas las funciones.",
+          p2Title: "10 € de bono de bienvenida",
+          p2Desc: "Créditos únicos de AI video para empezar.",
+          p3Title: "Sin suscripción automática",
+          p3Desc: "Nunca te cobramos automáticamente — tú decides.",
+          p4Title: "+14 días de gracia",
+          p4Desc: "Tiempo adicional antes de pausar tu cuenta.",
+        },
         proFeatures: {
           f1: "Captions IA ilimitadas en 25+ idiomas",
           f2: "AI Picture Studio + reemplazo de fondo inteligente",
@@ -12723,7 +12756,7 @@ export const translations: Record<Language, any> = {
           f4: "Auto-publicación en Instagram, TikTok, YouTube, Facebook",
           f5: "Brand Kit, calendario de contenido y analytics",
           f6: "Generación de video IA (Sora, Kling, Seedance, Luma…)",
-          f7: "10 € de créditos AI video al mes incluidos"
+          f7: "Créditos de AI video con packs (10 € / 50 € / 100 €)"
         },
         competitorTitle: "Mejor valor que la competencia",
         competitorSubtitle: "AdTool incluye AI video, Director's Cut y Smart Studio.",
