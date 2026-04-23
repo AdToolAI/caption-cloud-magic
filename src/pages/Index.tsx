@@ -90,8 +90,8 @@ const Index = () => {
       
         <main className="flex-1">
           {/* Trial Promise Strip — top of page, above hero */}
-          <section className="px-4 pt-6">
-            <div className="container max-w-7xl mx-auto">
+          <section className="px-4 pt-4 pb-0">
+            <div className="container max-w-7xl mx-auto [&>div]:mb-0">
               <TrialPromiseStrip />
             </div>
           </section>

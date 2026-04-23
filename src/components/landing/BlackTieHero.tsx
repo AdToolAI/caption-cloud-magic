@@ -9,7 +9,7 @@ export const BlackTieHero = () => {
   const { t } = useTranslation();
 
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden py-20 md:py-32 px-4">
+    <section className="relative min-h-screen flex items-center overflow-hidden pt-6 pb-20 md:pt-8 md:pb-32 px-4">
       {/* Background Effects */}
       <div className="absolute inset-0 bg-[var(--gradient-hero)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,hsl(var(--background))_70%)]" />
