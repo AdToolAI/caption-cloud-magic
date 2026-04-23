@@ -407,41 +407,12 @@ export const ConnectionsTab = () => {
       // Facebook now uses generic oauth-callback without ?provider query param
       const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback`;
       
-      // Instagram: always request business_management upfront. Meta requires
-      // it for business-managed pages, and without it /me/accounts often
-      // returns an empty list — costing the user a full failed connect cycle.
-      // Reference: Meta Dev Community + Stack Overflow ("Solved: All I had to
-      // do was add the business_management permission").
-      const existingIg = connections.find((c) => c.provider === 'instagram');
-      const missingScopes: string[] = existingIg?.account_metadata?.missing_page_scopes ?? [];
-      const discoveryStatus: string | undefined = existingIg?.account_metadata?.meta_page_discovery_status;
-      const pagesFoundCount: number = existingIg?.account_metadata?.meta_pages_found_count ?? -1;
-      const previousDiscoveryFailed =
-        providerId === 'instagram' &&
-        (discoveryStatus === 'meta_pages_hidden_or_unavailable' || pagesFoundCount === 0);
-      // Force re-consent when:
-      //  - the caller explicitly asks for it (the "Erneut verbinden" CTA)
-      //  - the user previously declined required page scopes
-      //  - a previous discovery returned zero pages (Meta short-circuit risk)
-      // For Instagram, ALWAYS force the full Meta consent dialog.
-      // Required for Meta App Review screencast (Policy 1.9): the reviewer
-      // must see the complete permission dialog with page selection, not
-      // the abbreviated "Continue as ..." short-circuit screen.
-      const forceReconsent = providerId === 'instagram';
-      const reconsentSuffix = forceReconsent
-        ? `&auth_type=rerequest&auth_nonce=${crypto.randomUUID().replace(/-/g, '')}`
-        : '';
+      // NOTE: Instagram is intentionally NOT in this map anymore.
+      // The Instagram flow exits early above and is handled exclusively by
+      // the `instagram-oauth-start` Edge Function (single source of truth).
+      // Do not re-add an `instagram:` entry here — it would silently bypass
+      // the backend hard-reset + forced re-consent and break Meta App Review.
 
-      const igScopes =
-        'pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_content_publish,business_management';
-
-      const oauthUrls: Record<string, string> = {
-        // Instagram uses the SAME Facebook OAuth dialog as the facebook flow
-        // (state.provider already encodes which provider this is). Only the
-        // scopes are extended with instagram_basic + instagram_content_publish,
-        // and optionally business_management when prior discovery showed Meta
-        // hid pages from the app.
-        instagram: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${igScopes}&state=${encodeURIComponent(state)}${reconsentSuffix}`,
         facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_read_engagement,pages_manage_metadata,pages_show_list,pages_read_user_content,pages_manage_posts,pages_manage_engagement&state=${encodeURIComponent(state)}`,
         tiktok: `/api/oauth/tiktok/start?user_id=${user.id}`,
         linkedin: `/api/oauth/linkedin/start?user_id=${user.id}`,
