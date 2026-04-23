@@ -3810,6 +3810,14 @@ export const translations: Record<Language, any> = {
           creators: "Creators",
           posts: "Posts created",
           engagement: "Engagement"
+        },
+        deck: {
+          headerPlan: "Pro",
+          headerCredits: "credits",
+          pillEngagement: "Engagement",
+          pillBestTime: "Best time",
+          pillReach: "Reach",
+          playHint: "Click for sound"
         }
       },
       featureGrid: {
@@ -8350,6 +8358,14 @@ export const translations: Record<Language, any> = {
           creators: "Creator",
           posts: "Posts erstellt",
           engagement: "Engagement"
+        },
+        deck: {
+          headerPlan: "Pro",
+          headerCredits: "Credits",
+          pillEngagement: "Engagement",
+          pillBestTime: "Beste Zeit",
+          pillReach: "Reichweite",
+          playHint: "Klicken für Ton"
         }
       },
       featureGrid: {
@@ -12675,6 +12691,14 @@ export const translations: Record<Language, any> = {
           creators: "Creadores",
           posts: "Posts creados",
           engagement: "Interacción"
+        },
+        deck: {
+          headerPlan: "Pro",
+          headerCredits: "créditos",
+          pillEngagement: "Interacción",
+          pillBestTime: "Mejor hora",
+          pillReach: "Alcance",
+          playHint: "Clic para sonido"
         }
       },
       featureGrid: {
