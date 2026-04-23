@@ -266,13 +266,53 @@ export const ConnectionsTab = () => {
         return;
       }
 
-      // Instagram: use the EXACT same frontend OAuth builder as Facebook.
-      // Only differences vs Facebook:
-      //   - state.provider = 'instagram' (so the callback knows which provider it is)
-      //   - additional scopes: instagram_basic + instagram_content_publish
-      // Everything else (client_id, redirect_uri, dialog endpoint, state shape)
-      // mirrors Facebook 1:1 so the user sees the identical Meta flow that
-      // already works for Facebook today. No auto hard-reset, no rerequest.
+      // Instagram: ALWAYS go through the dedicated backend start function.
+      // `instagram-oauth-start` performs a Meta hard-reset (revoke previous
+      // app grant + delete stale ig/fb rows) and then builds the OAuth URL
+      // with `auth_type=rerequest`, a fresh `auth_nonce` and `display=page`
+      // on Graph API v24. This is what makes Meta reliably show the FULL
+      // permission dialog (Page selection + Instagram + scopes) instead of
+      // the abbreviated "Continue as ..." short-circuit screen — required
+      // for the Meta App Review screencast (Policy 1.9).
+      //
+      // We deliberately bypass the local frontend OAuth URL builder below
+      // for Instagram so there is exactly ONE source of truth for IG OAuth.
+      if (providerId === 'instagram') {
+        try {
+          const { data: session } = await supabase.auth.getSession();
+          if (!session.session?.access_token) {
+            toast({
+              title: t('socialIntegrations.authRequired') || 'Auth required',
+              description: t('socialIntegrations.pleaseReLogin') || 'Please log in again',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          const { data, error } = await supabase.functions.invoke('instagram-oauth-start', {
+            headers: {
+              Authorization: `Bearer ${session.session.access_token}`,
+            },
+            body: { returnTo: window.location.href },
+          });
+
+          if (error) throw error;
+
+          if (data?.authUrl) {
+            window.location.href = data.authUrl;
+          } else {
+            throw new Error('No auth URL received from instagram-oauth-start');
+          }
+        } catch (error: any) {
+          console.error('[ConnectionsTab] instagram-oauth-start failed:', error);
+          toast({
+            title: t('common.error'),
+            description: error?.message || 'Failed to start Instagram connection',
+            variant: 'destructive',
+          });
+        }
+        return;
+      }
 
       // TikTok: Use new backend OAuth flow
       if (providerId === 'tiktok') {
