@@ -412,7 +412,7 @@ export const ConnectionsTab = () => {
       // the `instagram-oauth-start` Edge Function (single source of truth).
       // Do not re-add an `instagram:` entry here — it would silently bypass
       // the backend hard-reset + forced re-consent and break Meta App Review.
-
+      const oauthUrls: Record<string, string> = {
         facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_read_engagement,pages_manage_metadata,pages_show_list,pages_read_user_content,pages_manage_posts,pages_manage_engagement&state=${encodeURIComponent(state)}`,
         tiktok: `/api/oauth/tiktok/start?user_id=${user.id}`,
         linkedin: `/api/oauth/linkedin/start?user_id=${user.id}`,
