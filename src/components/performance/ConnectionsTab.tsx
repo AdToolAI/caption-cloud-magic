@@ -224,13 +224,24 @@ export const ConnectionsTab = () => {
   const handleConnect = async (
     providerId: string,
     providerName: string,
-    options: { forceReconsent?: boolean } = {}
+    options: { forceReconsent?: boolean; forReview?: boolean } = {}
   ) => {
-    console.log('=== handleConnect START ===', { 
-      providerId, 
-      providerName, 
-      userPlan, 
-      connectionsCount: connections.length 
+    // Diagnostic instrumentation — makes it possible to see in the browser
+    // console exactly which path Instagram OAuth took (frontend builder vs.
+    // backend `instagram-oauth-start`) and whether we are running on the
+    // preview or the published environment. Critical for Meta App Review
+    // root-cause analysis when Meta keeps short-circuiting the consent.
+    const isPreviewHost = /id-preview--|lovableproject\.com|sandbox\.lovable\.dev/i.test(window.location.hostname);
+    console.log('=== handleConnect START ===', {
+      providerId,
+      providerName,
+      userPlan,
+      connectionsCount: connections.length,
+      forReview: !!options.forReview,
+      forceReconsent: !!options.forceReconsent,
+      host: window.location.hostname,
+      env: isPreviewHost ? 'preview' : 'published',
+      origin: window.location.origin,
     });
     
     // Check plan limits
@@ -278,6 +289,22 @@ export const ConnectionsTab = () => {
       // We deliberately bypass the local frontend OAuth URL builder below
       // for Instagram so there is exactly ONE source of truth for IG OAuth.
       if (providerId === 'instagram') {
+        // Review-mode: explicit warning + harder reauth intent so the App
+        // Reviewer's screencast captures the FULL Meta dialog (not the
+        // cached "Continue as ..." short-circuit).
+        if (options.forReview) {
+          const proceed = window.confirm(
+            'Meta App Review – Instagram-Aufnahme\n\n' +
+            'Damit Meta den vollständigen Berechtigungsdialog zeigt:\n\n' +
+            '1. Öffne die VERÖFFENTLICHTE App-URL (nicht die Preview).\n' +
+            '2. Logge dich vorher KOMPLETT bei Facebook/Meta aus.\n' +
+            '3. Nutze ein INKOGNITO-Fenster.\n' +
+            '4. Starte die Bildschirmaufnahme JETZT.\n\n' +
+            'Fortfahren und Instagram-Verbindung starten?'
+          );
+          if (!proceed) return;
+        }
+
         try {
           const { data: session } = await supabase.auth.getSession();
           if (!session.session?.access_token) {
@@ -289,16 +316,29 @@ export const ConnectionsTab = () => {
             return;
           }
 
+          console.log('[ConnectionsTab] → invoking instagram-oauth-start', {
+            forReview: !!options.forReview,
+            returnTo: window.location.href,
+          });
+
           const { data, error } = await supabase.functions.invoke('instagram-oauth-start', {
             headers: {
               Authorization: `Bearer ${session.session.access_token}`,
             },
-            body: { returnTo: window.location.href },
+            body: {
+              returnTo: window.location.href,
+              forReview: !!options.forReview,
+            },
           });
 
           if (error) throw error;
 
           if (data?.authUrl) {
+            console.log('[ConnectionsTab] ← instagram-oauth-start authUrl received', {
+              authUrlPreview: String(data.authUrl).slice(0, 120) + '…',
+              hasReauthenticate: String(data.authUrl).includes('reauthenticate'),
+              hasRerequest: String(data.authUrl).includes('rerequest'),
+            });
             window.location.href = data.authUrl;
           } else {
             throw new Error('No auth URL received from instagram-oauth-start');
@@ -1069,9 +1109,45 @@ export const ConnectionsTab = () => {
                         </div>
                       </div>
                     ) : (
-                      <Button onClick={() => handleConnect(provider.id, provider.name)} className="w-full">
-                        {t('performance.connections.connect')}
-                      </Button>
+                      <div className="space-y-2">
+                        <Button onClick={() => handleConnect(provider.id, provider.name)} className="w-full">
+                          {t('performance.connections.connect')}
+                        </Button>
+                        {/* Dedicated Meta App Review path for Instagram. Uses
+                            the same backend hard-reset flow but warns the
+                            user up-front to record on the published URL in
+                            an incognito window with a fresh Meta session. */}
+                        {provider.id === 'instagram' && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full gap-2"
+                              onClick={() =>
+                                handleConnect(provider.id, provider.name, {
+                                  forReview: true,
+                                  forceReconsent: true,
+                                })
+                              }
+                            >
+                              <Instagram className="h-3 w-3" />
+                              Instagram für Review verbinden
+                            </Button>
+                            <p className="text-[10px] text-muted-foreground leading-relaxed px-1">
+                              Für die Meta-App-Review-Aufnahme bitte die{" "}
+                              <a
+                                href="https://caption-cloud-magic.lovable.app/integrations"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline underline-offset-2 hover:text-foreground"
+                              >
+                                veröffentlichte App-URL
+                              </a>{" "}
+                              in einem Inkognito-Fenster mit ausgeloggter Meta-Sitzung verwenden.
+                            </p>
+                          </>
+                        )}
+                      </div>
                     )}
                   </CardContent>
                 </Card>

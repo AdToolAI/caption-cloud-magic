@@ -28,12 +28,20 @@ Deno.serve(async (req) => {
     }
 
     let returnTo: string | null = null;
+    let forReview = false;
     try {
       const body = await req.json();
       returnTo = body?.returnTo || null;
+      forReview = !!body?.forReview;
     } catch (_) {
       // body optional
     }
+
+    console.log('[instagram-oauth-start] invoked', {
+      forReview,
+      hasReturnTo: !!returnTo,
+      returnToHost: (() => { try { return returnTo ? new URL(returnTo).hostname : null; } catch { return null; } })(),
+    });
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -173,10 +181,18 @@ Deno.serve(async (req) => {
     authUrl.searchParams.set('auth_nonce', crypto.randomUUID().replace(/-/g, ''));
     authUrl.searchParams.set('display', 'page');
 
-    console.log('[instagram-oauth-start] Authorize URL built for user', user.id);
+    const finalAuthUrl = authUrl.toString();
+    console.log('[instagram-oauth-start] Authorize URL built', {
+      user_id: user.id,
+      forReview,
+      auth_type: authUrl.searchParams.get('auth_type'),
+      display: authUrl.searchParams.get('display'),
+      has_nonce: !!authUrl.searchParams.get('auth_nonce'),
+      url_preview: finalAuthUrl.slice(0, 140) + '…',
+    });
 
     return new Response(
-      JSON.stringify({ authUrl: authUrl.toString() }),
+      JSON.stringify({ authUrl: finalAuthUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
