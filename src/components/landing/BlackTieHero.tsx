@@ -9,7 +9,7 @@ export const BlackTieHero = () => {
   const { t } = useTranslation();
 
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden pt-6 pb-20 md:pt-8 md:pb-32 px-4">
+    <section className="relative flex items-center overflow-hidden pt-2 pb-8 md:pt-4 md:pb-12 px-4">
       {/* Background Effects */}
       <div className="absolute inset-0 bg-[var(--gradient-hero)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,hsl(var(--background))_70%)]" />
@@ -21,7 +21,7 @@ export const BlackTieHero = () => {
         backgroundSize: '60px 60px'
       }} />
 
-      <div className="container relative z-10 max-w-7xl mx-auto">
+      <div className="container relative z-10 max-w-7xl mx-auto origin-top scale-[0.85] md:scale-[0.85]">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Left Column - Content */}
           <motion.div
