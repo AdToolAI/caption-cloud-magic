@@ -38,7 +38,7 @@ export const BlackTieHero = () => {
               className="inline-flex items-center gap-2 bg-card/50 backdrop-blur-md border border-border/50 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6"
             >
               <Sparkles className="h-4 w-4" />
-              <span>Powered by AI · For Agents Only</span>
+              <span>{t('landing.hero.badge')}</span>
             </motion.div>
 
             {/* Headline - Elegant Serif with Gold Gradient */}
