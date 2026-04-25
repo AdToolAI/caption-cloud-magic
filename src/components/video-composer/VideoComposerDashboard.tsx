@@ -361,6 +361,51 @@ export default function VideoComposerDashboard() {
     { id: 'export' as TabId, label: t('videoComposer.export'), icon: Download },
   ];
 
+  // Workflow accessibility & completion logic for the step sidebar
+  const isStepAccessible = useCallback((id: string) => {
+    const idx = TAB_ORDER.indexOf(id as TabId);
+    if (idx <= 0) return true;
+    if (idx === 1) return !!project.briefing.productName;
+    return project.scenes.length > 0;
+  }, [project.briefing.productName, project.scenes.length]);
+
+  const isStepDone = useCallback((id: string) => {
+    switch (id) {
+      case 'briefing':
+        return !!project.briefing.productName;
+      case 'storyboard':
+        return project.scenes.length > 0;
+      case 'clips':
+        return project.scenes.length > 0 && project.scenes.every(
+          (s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && !!s.uploadUrl)
+        );
+      case 'text':
+        return !!project.assemblyConfig.voiceover || project.scenes.some((s) => !!s.textOverlay?.text);
+      case 'audio':
+        return !!project.assemblyConfig.music;
+      case 'export':
+        return !!project.outputUrl;
+      default:
+        return false;
+    }
+  }, [project]);
+
+  const STEP_HINTS: Record<TabId, string> = {
+    briefing: 'Produkt, Zielgruppe & Tonalität',
+    storyboard: 'Szenen planen & anordnen',
+    clips: 'AI-Clips generieren',
+    text: 'Voiceover & Untertitel',
+    audio: 'Musik & Sound-Mix',
+    export: 'Render & Download',
+  };
+
+  const STEPS: StepItem[] = TABS.map((t) => ({
+    id: t.id,
+    label: t.label,
+    hint: STEP_HINTS[t.id],
+    icon: t.icon,
+  }));
+
   useEffect(() => {
     saveDraft(project);
   }, [project]);
