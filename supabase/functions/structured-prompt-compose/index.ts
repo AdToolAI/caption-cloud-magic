@@ -178,9 +178,9 @@ serve(async (req) => {
   try {
     const body = (await req.json()) as ComposeBody;
 
-    if (!body.mode || !["compose", "suggest", "condense"].includes(body.mode)) {
+    if (!body.mode || !["compose", "suggest", "condense", "inspire"].includes(body.mode)) {
       return new Response(
-        JSON.stringify({ error: "mode must be 'compose' | 'suggest' | 'condense'" }),
+        JSON.stringify({ error: "mode must be 'compose' | 'suggest' | 'condense' | 'inspire'" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
