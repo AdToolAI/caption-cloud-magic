@@ -584,6 +584,12 @@ export default function VideoComposerDashboard() {
                 setScenes(scenes);
                 setActiveTab('storyboard');
               }}
+              brandKitId={project.brandKitId ?? null}
+              brandKitAutoSync={project.brandKitAutoSync ?? false}
+              assemblyConfig={project.assemblyConfig}
+              onChangeBrandKit={(id) => setProject((p) => ({ ...p, brandKitId: id }))}
+              onChangeBrandKitAutoSync={(sync) => setProject((p) => ({ ...p, brandKitAutoSync: sync }))}
+              onApplyAssembly={(next) => setProject((p) => ({ ...p, assemblyConfig: next }))}
             />
           </TabsContent>
 
