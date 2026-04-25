@@ -23,6 +23,8 @@ import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } fr
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
 import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
+import { resolveMentions } from '@/lib/motion-studio/mentionParser';
+import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import {
   DndContext,
   closestCenter,
