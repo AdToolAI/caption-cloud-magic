@@ -222,9 +222,13 @@ export default function MotionStudioHub() {
             ))}
           </section>
 
-          {/* Quick actions */}
-          <section className="space-y-4">
-            <h2 className="text-2xl font-semibold">Module</h2>
+          {/* Cost Comparison + Quick actions */}
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <CostComparisonWidget />
+            </div>
+            <div className="lg:col-span-2 space-y-4">
+              <h2 className="text-2xl font-semibold">Module</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {QUICK_ACTIONS.map((a) => (
                 <Link key={a.href} to={a.href} className="group">
