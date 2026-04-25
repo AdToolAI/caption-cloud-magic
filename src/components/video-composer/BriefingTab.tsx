@@ -35,8 +35,9 @@ import { VISUAL_STYLES } from '@/config/composerVisualStyles';
 import CharacterManager from './CharacterManager';
 import VideoModeSelector from './VideoModeSelector';
 import LibraryPicker, { type LibraryItem } from '@/components/motion-studio/LibraryPicker';
+import BrandKitApplyPanel from './BrandKitApplyPanel';
 import { Library } from 'lucide-react';
-import type { VideoMode } from '@/types/video-composer';
+import type { VideoMode, AssemblyConfig } from '@/types/video-composer';
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string; desc: string }[] = [
   { value: '16:9', label: '16:9', desc: 'YouTube / Landscape' },
