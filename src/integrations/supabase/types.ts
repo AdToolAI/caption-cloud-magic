@@ -3561,6 +3561,8 @@ export type Database = {
       composer_projects: {
         Row: {
           assembly_config: Json
+          brand_kit_auto_sync: boolean
+          brand_kit_id: string | null
           briefing: Json
           category: string
           created_at: string
@@ -3578,6 +3580,8 @@ export type Database = {
         }
         Insert: {
           assembly_config?: Json
+          brand_kit_auto_sync?: boolean
+          brand_kit_id?: string | null
           briefing?: Json
           category?: string
           created_at?: string
@@ -3595,6 +3599,8 @@ export type Database = {
         }
         Update: {
           assembly_config?: Json
+          brand_kit_auto_sync?: boolean
+          brand_kit_id?: string | null
           briefing?: Json
           category?: string
           created_at?: string
@@ -3610,7 +3616,15 @@ export type Database = {
           user_id?: string
           video_mode?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "composer_projects_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       composer_scenes: {
         Row: {
@@ -10614,6 +10628,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_audio_library: {
+        Row: {
+          artist: string | null
+          bpm: number | null
+          created_at: string
+          duration_sec: number | null
+          external_id: string | null
+          genre: string | null
+          id: string
+          is_favorite: boolean
+          mood: string | null
+          preview_url: string | null
+          source: string
+          tags: string[]
+          thumbnail_url: string | null
+          title: string
+          type: string
+          updated_at: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          artist?: string | null
+          bpm?: number | null
+          created_at?: string
+          duration_sec?: number | null
+          external_id?: string | null
+          genre?: string | null
+          id?: string
+          is_favorite?: boolean
+          mood?: string | null
+          preview_url?: string | null
+          source: string
+          tags?: string[]
+          thumbnail_url?: string | null
+          title: string
+          type: string
+          updated_at?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          artist?: string | null
+          bpm?: number | null
+          created_at?: string
+          duration_sec?: number | null
+          external_id?: string | null
+          genre?: string | null
+          id?: string
+          is_favorite?: boolean
+          mood?: string | null
+          preview_url?: string | null
+          source?: string
+          tags?: string[]
+          thumbnail_url?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_behavior_events: {
         Row: {
