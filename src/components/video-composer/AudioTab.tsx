@@ -51,11 +51,32 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
   // Beat sync state
   const [analyzingBeats, setAnalyzingBeats] = useState(false);
 
+  // Library browser
+  const [libraryOpen, setLibraryOpen] = useState(false);
+
   // Upload state
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLibrarySelect = useCallback((track: LibraryTrack) => {
+    if (!music) return;
+    musicAudioRef.current?.pause();
+    setMusicPlaying(null);
+    onUpdateAssembly({
+      music: {
+        ...music,
+        trackUrl: track.url,
+        trackName: `${track.title} — ${track.artist}`,
+        isUpload: false,
+        ...(track.mood && { mood: track.mood }),
+        ...(track.genre && { genre: track.genre }),
+      },
+    });
+    setLibraryOpen(false);
+    toast({ title: t('videoComposer.trackSelected'), description: track.title });
+  }, [music, onUpdateAssembly, t]);
 
   // Handle music file upload
   const handleMusicUpload = useCallback(async (file: File | null) => {
