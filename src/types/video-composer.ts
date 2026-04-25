@@ -175,6 +175,11 @@ export interface ComposerScene {
     negative?: string;
   };
   promptMode?: 'free' | 'structured';
+  /**
+   * Block K-P2 — User-defined slot order (excluding `negative`, which is
+   * always pinned at the end). Persisted in `composer_scenes.prompt_slot_order`.
+   */
+  promptSlotOrder?: Array<'subject' | 'action' | 'setting' | 'timeWeather' | 'style'>;
   appliedStylePresetId?: string;
 }
 
