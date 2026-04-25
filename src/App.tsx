@@ -120,6 +120,7 @@ const LumaVideoStudio = lazy(() => import("./pages/LumaVideoStudio"));
 const SoraVideoStudio = lazy(() => import("./pages/SoraVideoStudio"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 const VideoComposer = lazy(() => import("./pages/VideoComposer"));
+const MotionStudioLibrary = lazy(() => import("./pages/MotionStudio/Library"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const VideoTranslator = lazy(() => import("./pages/VideoTranslator"));
