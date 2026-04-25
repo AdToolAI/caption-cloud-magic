@@ -346,6 +346,16 @@ export default function CharacterEditor({
           </Button>
         </div>
       </DialogContent>
+
+      <LibraryUploadConsentDialog
+        open={showConsentDialog}
+        onOpenChange={(o) => {
+          setShowConsentDialog(o);
+          if (!o) setPendingFile(null);
+        }}
+        onAccepted={handleConsentAccepted}
+        context="character"
+      />
     </Dialog>
   );
 }
