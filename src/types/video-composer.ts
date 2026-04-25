@@ -19,7 +19,9 @@ export type ComposerStatus = 'draft' | 'storyboard' | 'generating' | 'assembling
 
 export type SceneType = 'hook' | 'problem' | 'solution' | 'demo' | 'social-proof' | 'cta' | 'custom';
 
-export type ClipSource = 'ai-hailuo' | 'ai-kling' | 'ai-sora' | 'ai-image' | 'stock' | 'upload';
+export type ClipSource = 'ai-hailuo' | 'ai-kling' | 'ai-sora' | 'ai-image' | 'stock' | 'stock-image' | 'upload';
+
+export type StockMediaSource = 'pixabay' | 'pexels';
 
 export type VideoMode = 'video' | 'image' | 'mixed';
 
@@ -143,6 +145,10 @@ export interface ComposerScene {
     mood?: string;
     filmStock?: string;
   };
+  /** Stock media metadata when clipSource === 'stock' or 'stock-image'. */
+  stockMediaThumb?: string;
+  stockMediaSource?: StockMediaSource;
+  stockMediaAuthor?: { name: string; url?: string };
 }
 
 export type SubtitlePosition = 'top' | 'bottom';
