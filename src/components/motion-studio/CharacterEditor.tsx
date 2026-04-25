@@ -201,19 +201,13 @@ export default function CharacterEditor({
           <div className="space-y-2">
             <Label className="text-xs">Referenzbild (optional, sehr empfohlen)</Label>
 
-            {!confirmedRights && !character && (
+            {!hasConsent && !character && (
               <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
-                <input
-                  type="checkbox"
-                  id="rights-confirm"
-                  checked={confirmedRights}
-                  onChange={(e) => setConfirmedRights(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <label htmlFor="rights-confirm" className="text-[11px] text-muted-foreground leading-snug">
-                  Ich bestätige, dass ich die Rechte am hochgeladenen Bild besitze und es für
-                  AI-Video-Generierung verwenden darf.
-                </label>
+                <ShieldCheck className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Beim ersten Upload bestätigst du einmalig die Bildrechte (DSGVO &
+                  Persönlichkeitsrechte). Danach läuft jeder weitere Upload ohne Rückfrage.
+                </p>
               </div>
             )}
 
@@ -241,12 +235,8 @@ export default function CharacterEditor({
               </div>
             ) : (
               <div
-                onClick={() => confirmedRights && !uploading && inputRef.current?.click()}
-                className={`relative border border-dashed rounded-md p-4 text-center transition cursor-pointer ${
-                  confirmedRights
-                    ? 'border-border/60 hover:border-primary/40 hover:bg-background/50'
-                    : 'border-border/30 opacity-50 cursor-not-allowed'
-                }`}
+                onClick={() => !uploading && inputRef.current?.click()}
+                className="relative border border-dashed border-border/60 rounded-md p-4 text-center transition cursor-pointer hover:border-primary/40 hover:bg-background/50"
               >
                 <input
                   ref={inputRef}
