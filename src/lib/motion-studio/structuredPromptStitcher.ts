@@ -121,37 +121,63 @@ export function hasAnySlot(slots: PromptSlots | undefined): boolean {
 /**
  * Stitch slots into a free-text prompt deterministically (no AI).
  *
- * Order: Subject → Action → Setting → Time/Weather → Style → Negative.
+ * Default order: Subject → Action → Setting → Time/Weather → Style → Negative.
+ * An optional `order` overrides the order of all slots EXCEPT `negative`,
+ * which is always emitted last (some video models only respect the negative
+ * tag when it sits at the very end).
+ *
  * Used when the user toggles Structured → Free, and as the *fallback*
  * client-side preview before the edge function returns its enriched version.
  */
-export function stitchSlots(slots: PromptSlots | undefined): string {
+export function stitchSlots(
+  slots: PromptSlots | undefined,
+  order?: Array<keyof PromptSlots>
+): string {
   if (!slots) return '';
+
+  // Build ordered key list: custom order (minus negative) + any missing
+  // reorderable keys + negative pinned at end.
+  const reorderable: Array<keyof PromptSlots> = ['subject', 'action', 'setting', 'timeWeather', 'style'];
+  const ordered: Array<keyof PromptSlots> = [];
+  if (order && order.length > 0) {
+    for (const k of order) {
+      if (k !== 'negative' && reorderable.includes(k) && !ordered.includes(k)) {
+        ordered.push(k);
+      }
+    }
+  }
+  for (const k of reorderable) {
+    if (!ordered.includes(k)) ordered.push(k);
+  }
+
   const parts: string[] = [];
 
-  const subject = slots.subject?.trim();
-  const action = slots.action?.trim();
-  if (subject && action) {
-    parts.push(`${subject} ${action}`);
-  } else if (subject) {
-    parts.push(subject);
-  } else if (action) {
-    parts.push(action);
-  }
+  // Subject + Action are merged when adjacent (preserves natural English).
+  for (let i = 0; i < ordered.length; i++) {
+    const key = ordered[i];
+    const value = slots[key]?.trim();
+    if (!value) continue;
 
-  const setting = slots.setting?.trim();
-  if (setting) {
-    const needsPrefix = !/^(in|at|inside|outside|on)\b/i.test(setting);
-    parts.push(needsPrefix ? `in ${setting}` : setting);
-  }
+    // Special case: subject + action adjacent → join without comma.
+    if (
+      key === 'subject' &&
+      ordered[i + 1] === 'action' &&
+      slots.action?.trim()
+    ) {
+      parts.push(`${value} ${slots.action.trim()}`);
+      i++; // skip next iteration (action consumed)
+      continue;
+    }
 
-  const time = slots.timeWeather?.trim();
-  if (time) parts.push(time);
-
-  const style = slots.style?.trim();
-  if (style) {
-    const needsPrefix = !/^(shot|filmed|in the style|cinematic|like)\b/i.test(style);
-    parts.push(needsPrefix ? `shot in the style of ${style}` : style);
+    if (key === 'setting') {
+      const needsPrefix = !/^(in|at|inside|outside|on)\b/i.test(value);
+      parts.push(needsPrefix ? `in ${value}` : value);
+    } else if (key === 'style') {
+      const needsPrefix = !/^(shot|filmed|in the style|cinematic|like)\b/i.test(value);
+      parts.push(needsPrefix ? `shot in the style of ${value}` : value);
+    } else {
+      parts.push(value);
+    }
   }
 
   const base = parts.join(', ');
