@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Upload, X, Sparkles, User, Lightbulb } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { VoicePicker } from '@/components/motion-studio/VoicePicker';
 import {
   EMPTY_CHARACTER_DRAFT,
   type CharacterDraft,
@@ -277,6 +278,17 @@ export default function CharacterEditor({
               daran.
             </p>
           </div>
+
+          {/* Voice */}
+          <VoicePicker
+            value={draft.voice_id}
+            onChange={(voiceId) => setDraft((d) => ({ ...d, voice_id: voiceId }))}
+            previewText={
+              draft.description
+                ? `Hello, I am ${draft.name || 'your character'}. ${draft.description.split(',')[0]}.`
+                : undefined
+            }
+          />
 
           {/* Tags */}
           <div className="space-y-1.5">
