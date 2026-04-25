@@ -3697,6 +3697,7 @@ export type Database = {
       composer_scenes: {
         Row: {
           ai_prompt: string | null
+          applied_style_preset_id: string | null
           character_shot: Json | null
           clip_quality: string
           clip_source: string
@@ -3714,6 +3715,8 @@ export type Database = {
           mentioned_location_ids: string[] | null
           order_index: number
           project_id: string
+          prompt_mode: string | null
+          prompt_slots: Json | null
           reference_image_url: string | null
           replicate_prediction_id: string | null
           retry_count: number
@@ -3728,6 +3731,7 @@ export type Database = {
         }
         Insert: {
           ai_prompt?: string | null
+          applied_style_preset_id?: string | null
           character_shot?: Json | null
           clip_quality?: string
           clip_source?: string
@@ -3745,6 +3749,8 @@ export type Database = {
           mentioned_location_ids?: string[] | null
           order_index?: number
           project_id: string
+          prompt_mode?: string | null
+          prompt_slots?: Json | null
           reference_image_url?: string | null
           replicate_prediction_id?: string | null
           retry_count?: number
@@ -3759,6 +3765,7 @@ export type Database = {
         }
         Update: {
           ai_prompt?: string | null
+          applied_style_preset_id?: string | null
           character_shot?: Json | null
           clip_quality?: string
           clip_source?: string
@@ -3776,6 +3783,8 @@ export type Database = {
           mentioned_location_ids?: string[] | null
           order_index?: number
           project_id?: string
+          prompt_mode?: string | null
+          prompt_slots?: Json | null
           reference_image_url?: string | null
           replicate_prediction_id?: string | null
           retry_count?: number
@@ -3789,6 +3798,13 @@ export type Database = {
           upload_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "composer_scenes_applied_style_preset_id_fkey"
+            columns: ["applied_style_preset_id"]
+            isOneToOne: false
+            referencedRelation: "motion_studio_style_presets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "composer_scenes_continuity_source_scene_id_fkey"
             columns: ["continuity_source_scene_id"]
@@ -5975,6 +5991,51 @@ export type Database = {
           updated_at?: string
           usage_count?: number
           user_id?: string
+        }
+        Relationships: []
+      }
+      motion_studio_style_presets: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          director_modifiers: Json
+          id: string
+          is_public: boolean
+          name: string
+          preview_thumb_url: string | null
+          slots: Json
+          updated_at: string
+          usage_count: number
+          user_id: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          director_modifiers?: Json
+          id?: string
+          is_public?: boolean
+          name: string
+          preview_thumb_url?: string | null
+          slots?: Json
+          updated_at?: string
+          usage_count?: number
+          user_id?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          director_modifiers?: Json
+          id?: string
+          is_public?: boolean
+          name?: string
+          preview_thumb_url?: string | null
+          slots?: Json
+          updated_at?: string
+          usage_count?: number
+          user_id?: string | null
         }
         Relationships: []
       }
