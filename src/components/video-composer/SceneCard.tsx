@@ -33,8 +33,16 @@ import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
 import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
+import StructuredPromptBuilder from '@/components/motion-studio/StructuredPromptBuilder';
+import StylePresetPicker from '@/components/motion-studio/StylePresetPicker';
 import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
+import {
+  stitchSlots,
+  naiveSplitToSlots,
+  hasAnySlot,
+  type PromptSlots,
+} from '@/lib/motion-studio/structuredPromptStitcher';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 
 interface SceneCardProps {
@@ -90,6 +98,29 @@ export default function SceneCard({
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
   // Stock browser open state
   const [stockBrowserOpen, setStockBrowserOpen] = useState(false);
+  // Block K — Style Preset Picker open state
+  const [stylePickerOpen, setStylePickerOpen] = useState(false);
+
+  const promptMode: 'free' | 'structured' = scene.promptMode ?? 'free';
+  const promptSlots: PromptSlots = scene.promptSlots ?? {};
+
+  const togglePromptMode = () => {
+    if (promptMode === 'free') {
+      // Free → Structured: naive split (KI-Extractor optional, später)
+      const nextSlots = hasAnySlot(promptSlots) ? promptSlots : naiveSplitToSlots(scene.aiPrompt || '');
+      onUpdate({ promptMode: 'structured', promptSlots: nextSlots });
+    } else {
+      // Structured → Free: deterministic stitch
+      const stitched = stitchSlots(promptSlots);
+      onUpdate({ promptMode: 'free', aiPrompt: stitched || scene.aiPrompt });
+    }
+  };
+
+  const handleSlotsChange = (next: PromptSlots) => {
+    const stitched = stitchSlots(next);
+    onUpdate({ promptSlots: next, aiPrompt: stitched });
+  };
+
 
   const handleStockSelect = (item: StockMediaItem) => {
     onUpdate({
@@ -266,27 +297,72 @@ export default function SceneCard({
                         ? 'Prompt IA (EN) — editable'
                         : 'AI Prompt (EN) — editable'}
                     </Label>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 px-2 text-[9px] gap-1 text-primary/80 hover:text-primary"
+                      onClick={togglePromptMode}
+                      title={lang === 'de' ? 'Modus wechseln' : lang === 'es' ? 'Cambiar modo' : 'Switch mode'}
+                    >
+                      {promptMode === 'free'
+                        ? (lang === 'de' ? '🧱 Strukturiert' : lang === 'es' ? '🧱 Estructurado' : '🧱 Structured')
+                        : (lang === 'de' ? '📝 Freitext' : lang === 'es' ? '📝 Texto libre' : '📝 Free text')}
+                    </Button>
                   </div>
-                  <PromptMentionEditor
-                    value={scene.aiPrompt || ''}
-                    onChange={(v) => onUpdate({ aiPrompt: v })}
-                    placeholder={
-                      lang === 'de'
-                        ? 'Describe the scene… nutze @charakter und @location aus deiner Library'
-                        : lang === 'es'
-                        ? 'Describe la escena… usa @personaje y @ubicación de tu biblioteca'
-                        : 'Describe the scene visually… use @character and @location from your library'
-                    }
-                    rows={3}
-                  />
-                  <p className="text-[10px] leading-relaxed text-muted-foreground/80 italic">
-                    {lang === 'de'
-                      ? 'ℹ️ Tippe @ um Charaktere & Locations zu taggen. Untertitel werden automatisch ausgeschlossen — füge sie im Tab „Voiceover & Untertitel" hinzu.'
-                      : lang === 'es'
-                      ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones. Los subtítulos se excluyen automáticamente — añádelos en la pestaña "Voz y subtítulos".'
-                      : 'ℹ️ Type @ to tag characters & locations. Subtitles are automatically excluded — add them in the "Voice & Subtitles" tab.'}
-                  </p>
+
+                  {promptMode === 'free' ? (
+                    <>
+                      <PromptMentionEditor
+                        value={scene.aiPrompt || ''}
+                        onChange={(v) => onUpdate({ aiPrompt: v })}
+                        placeholder={
+                          lang === 'de'
+                            ? 'Describe the scene… nutze @charakter und @location aus deiner Library'
+                            : lang === 'es'
+                            ? 'Describe la escena… usa @personaje y @ubicación de tu biblioteca'
+                            : 'Describe the scene visually… use @character and @location from your library'
+                        }
+                        rows={3}
+                      />
+                      <p className="text-[10px] leading-relaxed text-muted-foreground/80 italic">
+                        {lang === 'de'
+                          ? 'ℹ️ Tippe @ um Charaktere & Locations zu taggen. Untertitel werden automatisch ausgeschlossen — füge sie im Tab „Voiceover & Untertitel" hinzu.'
+                          : lang === 'es'
+                          ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones. Los subtítulos se excluyen automáticamente — añádelos en la pestaña "Voz y subtítulos".'
+                          : 'ℹ️ Type @ to tag characters & locations. Subtitles are automatically excluded — add them in the "Voice & Subtitles" tab.'}
+                      </p>
+                    </>
+                  ) : (
+                    <StructuredPromptBuilder
+                      slots={promptSlots}
+                      onChange={handleSlotsChange}
+                      clipSource={scene.clipSource}
+                      contextHint={scene.aiPrompt}
+                      composedPrompt={stitchSlots(promptSlots)}
+                      language={lang}
+                      onOpenStylePresets={() => setStylePickerOpen(true)}
+                      onSavePreset={() => setStylePickerOpen(true)}
+                    />
+                  )}
                 </div>
+
+                <StylePresetPicker
+                  open={stylePickerOpen}
+                  onOpenChange={setStylePickerOpen}
+                  currentSlots={promptSlots}
+                  currentModifiers={scene.directorModifiers || {}}
+                  onApply={(preset) => {
+                    onUpdate({
+                      promptMode: 'structured',
+                      promptSlots: preset.slots,
+                      directorModifiers: preset.director_modifiers,
+                      appliedStylePresetId: preset.id,
+                      aiPrompt: stitchSlots(preset.slots),
+                    });
+                  }}
+                  language={lang}
+                />
+
 
                 <DirectorPresetPicker
                   modifiers={scene.directorModifiers || {}}
