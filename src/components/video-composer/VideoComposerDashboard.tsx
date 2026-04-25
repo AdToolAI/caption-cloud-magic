@@ -640,7 +640,9 @@ export default function VideoComposerDashboard() {
               scenes={project.scenes}
             />
           </TabsContent>
-        </Tabs>
+            </Tabs>
+          </div>
+        </div>
       </div>
 
       {/* Reset Confirmation Dialog */}
