@@ -265,18 +265,30 @@ export default function SceneCard({
                   onChange={(directorModifiers) => onUpdate({ directorModifiers })}
                 />
 
-                {scene.directorModifiers && Object.values(scene.directorModifiers).some(Boolean) && (
-                  <div className="rounded-md border border-dashed border-primary/30 bg-background/40 p-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <Label className="text-[10px] text-muted-foreground">
-                        {lang === 'de' ? 'Finaler Prompt (Vorschau)' : lang === 'es' ? 'Prompt final (vista previa)' : 'Final prompt (preview)'}
-                      </Label>
+                {(() => {
+                  const hasMods = scene.directorModifiers && Object.values(scene.directorModifiers).some(Boolean);
+                  const resolved = resolveMentions(scene.aiPrompt || '', libCharacters, libLocations);
+                  const hasMentions = resolved.matches.length > 0;
+                  if (!hasMods && !hasMentions) return null;
+                  const finalPrompt = applyDirectorModifiers(resolved.prompt, scene.directorModifiers || {});
+                  return (
+                    <div className="rounded-md border border-dashed border-primary/30 bg-background/40 p-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <Label className="text-[10px] text-muted-foreground">
+                          {lang === 'de' ? 'Finaler Prompt (Vorschau)' : lang === 'es' ? 'Prompt final (vista previa)' : 'Final prompt (preview)'}
+                        </Label>
+                        {resolved.referenceImageUrl && (
+                          <Badge variant="outline" className="text-[8px] h-3 px-1 border-primary/40 text-primary">
+                            i2v ref
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-[10px] font-mono leading-relaxed text-foreground/80 break-words whitespace-pre-line">
+                        {finalPrompt}
+                      </p>
                     </div>
-                    <p className="text-[10px] font-mono leading-relaxed text-foreground/80 break-words">
-                      {applyDirectorModifiers(scene.aiPrompt || '', scene.directorModifiers)}
-                    </p>
-                  </div>
-                )}
+                  );
+                })()}
 
                 <SceneReferenceImageUpload
                   projectId={projectId}
