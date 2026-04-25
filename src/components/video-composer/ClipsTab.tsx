@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Search, Film, DollarSign, Sparkles, Lightbulb, X } from 'lucide-react';
+import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Search, Film, DollarSign, Sparkles, Lightbulb, X, Link2 } from 'lucide-react';
+import { useFrameContinuity } from '@/hooks/useFrameContinuity';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -58,6 +59,40 @@ const statusConfig: Record<string, { color: string; bg: string; label: string }>
 export default function ClipsTab({ scenes, projectId, visualStyle, characters, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [singleGenerating, setSingleGenerating] = useState<Record<string, boolean>>({});
+  const { extractLastFrame, extractingSceneId } = useFrameContinuity();
+
+  /**
+   * Frame-to-Shot Continuity:
+   * Extrahiert den letzten Frame der aktuellen Szene und setzt ihn als
+   * `referenceImageUrl` der nachfolgenden Szene → nahtlose Bild-Übergänge
+   * bei AI-Generierung (i2v).
+   */
+  const handleApplyContinuityToNext = useCallback(
+    async (currentScene: ComposerScene, nextScene: ComposerScene) => {
+      if (!currentScene.clipUrl) {
+        toast({ title: 'Kein Clip vorhanden', description: 'Generiere zuerst diese Szene.' });
+        return;
+      }
+      const result = await extractLastFrame({
+        videoUrl: currentScene.clipUrl,
+        sceneId: currentScene.id,
+        projectId,
+        durationSeconds: currentScene.durationSeconds,
+      });
+      if (!result) return;
+      const updated = scenes.map((s) =>
+        s.id === nextScene.id
+          ? { ...s, referenceImageUrl: result.lastFrameUrl, clipStatus: 'pending' as const }
+          : s
+      );
+      onUpdateScenes(updated);
+      toast({
+        title: 'Continuity aktiviert ✨',
+        description: `Szene ${scenes.findIndex(s => s.id === nextScene.id) + 1} startet jetzt nahtlos.`,
+      });
+    },
+    [scenes, projectId, extractLastFrame, onUpdateScenes]
+  );
   const [stockSearch, setStockSearch] = useState<Record<string, string>>({});
   const [stockResults, setStockResults] = useState<Record<string, any[]>>({});
   const [searchingStock, setSearchingStock] = useState<Record<string, boolean>>({});
@@ -657,6 +692,32 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                         Neu generieren €{costPerClip.toFixed(2)}
                       </Button>
                     )}
+                    {/* Frame-to-Shot Continuity → use last frame as next scene's start */}
+                    {scene.clipStatus === 'ready' && scene.clipUrl && (() => {
+                      const next = scenes[i + 1];
+                      if (!next) return null;
+                      const nextIsAi = next.clipSource.startsWith('ai-');
+                      if (!nextIsAi) return null;
+                      const isExtracting = extractingSceneId === scene.id;
+                      const alreadyApplied = !!next.referenceImageUrl;
+                      return (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 text-[10px] h-7 px-2 border-primary/40 text-primary hover:bg-primary/10"
+                          title="Letzten Frame dieser Szene als Startbild der nächsten Szene nutzen — für nahtlose Übergänge."
+                          disabled={isExtracting || alreadyApplied}
+                          onClick={() => handleApplyContinuityToNext(scene, next)}
+                        >
+                          {isExtracting ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Link2 className="h-3 w-3" />
+                          )}
+                          {alreadyApplied ? 'Continuity ✓' : 'Continuity → #' + (i + 2)}
+                        </Button>
+                      );
+                    })()}
                     {/* Generating disabled marker */}
                     {scene.clipStatus === 'generating' && (
                       <Button size="sm" disabled className="gap-1 text-[10px] h-7 px-2">
