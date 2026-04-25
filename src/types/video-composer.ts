@@ -159,6 +159,23 @@ export interface ComposerScene {
   stockMediaThumb?: string;
   stockMediaSource?: StockMediaSource;
   stockMediaAuthor?: { name: string; url?: string };
+  /**
+   * Block K — Structured Prompt Composer.
+   * `promptSlots` holds the 6-slot representation; `promptMode` decides which
+   * editor the user sees ('free' = textarea, 'structured' = slot grid).
+   * `appliedStylePresetId` records which style preset was last applied for
+   * usage stats / re-apply UX.
+   */
+  promptSlots?: {
+    subject?: string;
+    action?: string;
+    setting?: string;
+    timeWeather?: string;
+    style?: string;
+    negative?: string;
+  };
+  promptMode?: 'free' | 'structured';
+  appliedStylePresetId?: string;
 }
 
 export type SubtitlePosition = 'top' | 'bottom';
