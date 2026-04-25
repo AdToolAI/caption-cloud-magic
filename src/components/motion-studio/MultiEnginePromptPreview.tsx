@@ -34,6 +34,8 @@ interface MultiEnginePromptPreviewProps {
   language: 'de' | 'en' | 'es';
   /** Initial active tab — usually the scene's current `clipSource`. */
   defaultModel?: PromptModelKey;
+  /** User-defined slot order (Negative always at end). */
+  order?: Array<keyof PromptSlots>;
 }
 
 const MODEL_ORDER: PromptModelKey[] = [
