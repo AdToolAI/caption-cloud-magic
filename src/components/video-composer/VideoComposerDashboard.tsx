@@ -457,6 +457,15 @@ export default function VideoComposerDashboard() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setShowTemplatePicker(true)}
+              className="gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Template</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setShowResetDialog(true)}
               className="gap-2"
               aria-label={t('videoComposer.newProject')}
