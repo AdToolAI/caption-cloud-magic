@@ -272,6 +272,7 @@ export default function VideoComposerDashboard() {
 
     const newScenes: ComposerScene[] = sceneSuggestions.map((s, idx) => ({
       id: `tpl-${tpl.id}-${idx}-${Date.now()}`,
+      projectId: '',
       orderIndex: idx,
       sceneType: (s.sceneType ?? 'custom') as ComposerScene['sceneType'],
       durationSeconds: s.durationSeconds ?? 5,
