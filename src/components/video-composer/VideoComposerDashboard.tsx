@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle, RotateCcw, Mic } from 'lucide-react';
+import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle, RotateCcw, Mic, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -34,6 +34,9 @@ import { getClipCost } from '@/types/video-composer';
 import { useComposerPersistence, persistAssemblyConfig } from '@/hooks/useComposerPersistence';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
+import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
+import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export';
 
@@ -126,7 +129,10 @@ export default function VideoComposerDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  // Auto-open template picker when starting fresh (no draft on mount)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(() => !loadDraft());
   const { ensureProjectPersisted } = useComposerPersistence();
+  const incrementTemplateUsage = useIncrementTemplateUsage();
   const didInitialSyncRef = useRef(false);
 
   // DB sync on mount: if the loaded draft has a project.id, hydrate scenes from DB
@@ -254,7 +260,68 @@ export default function VideoComposerDashboard() {
     setActiveTab('briefing');
     setError(null);
     setShowResetDialog(false);
+    setShowTemplatePicker(true);
   }, []);
+
+  const handleStartBlank = useCallback(() => {
+    setShowTemplatePicker(false);
+  }, []);
+
+  const applyTemplate = useCallback((tpl: MotionStudioTemplate) => {
+    const sceneSuggestions = Array.isArray(tpl.scene_suggestions) ? tpl.scene_suggestions : [];
+
+    const newScenes: ComposerScene[] = sceneSuggestions.map((s, idx) => ({
+      id: `tpl-${tpl.id}-${idx}-${Date.now()}`,
+      projectId: '',
+      orderIndex: idx,
+      sceneType: (s.sceneType ?? 'custom') as ComposerScene['sceneType'],
+      durationSeconds: s.durationSeconds ?? 5,
+      clipSource: (s.clipSource ?? 'ai-hailuo') as ClipSource,
+      clipQuality: (s.clipQuality ?? 'standard') as ClipQuality,
+      aiPrompt: s.aiPrompt,
+      clipStatus: 'pending' as ClipStatus,
+      textOverlay: {
+        text: '',
+        position: 'bottom',
+        animation: 'fade-in',
+        fontSize: 48,
+        color: '#FFFFFF',
+      },
+      transitionType: (s.transitionType ?? 'fade') as ComposerScene['transitionType'],
+      transitionDuration: s.transitionDuration ?? 0.5,
+      retryCount: 0,
+      costEuros: 0,
+      directorModifiers: {},
+    }));
+
+    setProject({
+      ...defaultProject,
+      title: tpl.name,
+      category: tpl.category,
+      briefing: {
+        ...defaultProject.briefing,
+        ...tpl.briefing_defaults,
+        // briefing_defaults may set duration/aspectRatio; ensure required strings still exist
+        productName: defaultProject.briefing.productName,
+        productDescription: defaultProject.briefing.productDescription,
+        usps: defaultProject.briefing.usps,
+        targetAudience: defaultProject.briefing.targetAudience,
+        brandColors: defaultProject.briefing.brandColors,
+        characters: defaultProject.briefing.characters,
+      },
+      scenes: newScenes,
+    });
+    setActiveTab('briefing');
+    setShowTemplatePicker(false);
+
+    // Fire-and-forget usage counter
+    incrementTemplateUsage.mutate(tpl.id);
+
+    toast({
+      title: 'Template übernommen',
+      description: `"${tpl.name}" mit ${newScenes.length} Szenen geladen. Vervollständige jetzt das Briefing.`,
+    });
+  }, [incrementTemplateUsage]);
 
   // One-shot DB re-fetch when user switches BACK to the Clips tab
   const handleTabChange = useCallback(async (next: TabId) => {
@@ -390,6 +457,15 @@ export default function VideoComposerDashboard() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setShowTemplatePicker(true)}
+              className="gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Template</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setShowResetDialog(true)}
               className="gap-2"
               aria-label={t('videoComposer.newProject')}
@@ -512,6 +588,13 @@ export default function VideoComposerDashboard() {
       </div>
 
       {/* Reset Confirmation Dialog */}
+      <MotionStudioTemplatePicker
+        open={showTemplatePicker}
+        onOpenChange={setShowTemplatePicker}
+        onSelectTemplate={applyTemplate}
+        onStartBlank={handleStartBlank}
+      />
+
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>

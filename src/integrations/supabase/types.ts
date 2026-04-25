@@ -5875,6 +5875,83 @@ export type Database = {
         }
         Relationships: []
       }
+      motion_studio_templates: {
+        Row: {
+          aspect_ratio: string
+          briefing_defaults: Json
+          category: string
+          created_at: string
+          description: string
+          duration_seconds: number
+          id: string
+          is_active: boolean
+          is_featured: boolean
+          name: string
+          preview_video_url: string | null
+          scene_suggestions: Json
+          sort_order: number
+          style: string
+          tags: string[]
+          thumbnail_url: string | null
+          updated_at: string
+          usage_count: number
+          use_case: string
+          workspace_id: string | null
+        }
+        Insert: {
+          aspect_ratio?: string
+          briefing_defaults?: Json
+          category?: string
+          created_at?: string
+          description?: string
+          duration_seconds?: number
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean
+          name: string
+          preview_video_url?: string | null
+          scene_suggestions?: Json
+          sort_order?: number
+          style?: string
+          tags?: string[]
+          thumbnail_url?: string | null
+          updated_at?: string
+          usage_count?: number
+          use_case: string
+          workspace_id?: string | null
+        }
+        Update: {
+          aspect_ratio?: string
+          briefing_defaults?: Json
+          category?: string
+          created_at?: string
+          description?: string
+          duration_seconds?: number
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean
+          name?: string
+          preview_video_url?: string | null
+          scene_suggestions?: Json
+          sort_order?: number
+          style?: string
+          tags?: string[]
+          thumbnail_url?: string | null
+          updated_at?: string
+          usage_count?: number
+          use_case?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_studio_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       news_hub_articles: {
         Row: {
           batch_id: string | null
