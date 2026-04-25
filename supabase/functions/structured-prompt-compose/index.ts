@@ -26,7 +26,7 @@ const corsHeaders = {
 type SlotKey = "subject" | "action" | "setting" | "timeWeather" | "style" | "negative";
 
 interface ComposeBody {
-  mode: "compose" | "suggest" | "condense";
+  mode: "compose" | "suggest" | "condense" | "inspire";
   slots?: Partial<Record<SlotKey, string>>;
   slot?: SlotKey;
   contextHint?: string;
@@ -41,6 +41,8 @@ interface ComposeBody {
   /** condense mode: max words/chars allowed in output. */
   targetLimit?: number;
   promptText?: string;
+  /** inspire mode: optional seed style to riff on (e.g. "cinematic drama"). */
+  seedStyle?: string;
 }
 
 const MODEL_STYLE_HINT: Record<string, string> = {
