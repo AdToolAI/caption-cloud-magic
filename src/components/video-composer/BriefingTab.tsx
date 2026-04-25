@@ -148,6 +148,26 @@ export default function BriefingTab({
   const { t } = useTranslation();
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
+
+  const handleLibraryPick = (item: LibraryItem) => {
+    if (item.kind !== 'character') return;
+    const c = item.data;
+    const existing = briefing.characters || [];
+    const libIdToken = `lib:${c.id}`;
+    if (existing.some((x) => x.id === libIdToken)) {
+      toast({ title: `„${c.name}" ist bereits hinzugefügt` });
+      return;
+    }
+    const snapshot: ComposerCharacter = {
+      id: libIdToken,
+      name: c.name,
+      appearance: c.description,
+      signatureItems: c.signature_items || '',
+    };
+    onUpdateBriefing({ characters: [...existing, snapshot] });
+    toast({ title: `„${c.name}" aus Library hinzugefügt` });
+  };
   const TIPS_KEY = 'video-composer-briefing-tips-collapsed';
   const [tipsCollapsed, setTipsCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(TIPS_KEY) === '1'; } catch { return false; }
