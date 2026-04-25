@@ -5,9 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Upload, X, Sparkles, User, Lightbulb } from 'lucide-react';
+import { Loader2, Upload, X, Sparkles, User, Lightbulb, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useLegalConsent } from '@/hooks/useLegalConsent';
+import LibraryUploadConsentDialog from '@/components/motion-studio/LibraryUploadConsentDialog';
 import { VoicePicker } from '@/components/motion-studio/VoicePicker';
 import {
   EMPTY_CHARACTER_DRAFT,
@@ -37,11 +39,13 @@ export default function CharacterEditor({
   onSaved,
 }: CharacterEditorProps) {
   const { createCharacter, updateCharacter, uploadLibraryImage } = useMotionStudioLibrary();
+  const { hasAccepted: hasConsent } = useLegalConsent('motion_studio_library_upload');
   const [draft, setDraft] = useState<CharacterDraft>(EMPTY_CHARACTER_DRAFT);
   const [tagInput, setTagInput] = useState('');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [confirmedRights, setConfirmedRights] = useState(false);
+  const [showConsentDialog, setShowConsentDialog] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Reset bei jedem Öffnen
@@ -57,14 +61,30 @@ export default function CharacterEditor({
           voice_id: character.voice_id,
           tags: character.tags,
         });
-        setConfirmedRights(true);
       } else {
         setDraft(EMPTY_CHARACTER_DRAFT);
-        setConfirmedRights(false);
       }
       setTagInput('');
+      setPendingFile(null);
     }
   }, [open, character]);
+
+  const performUpload = useCallback(
+    async (file: File) => {
+      setUploading(true);
+      try {
+        const tmpId = character?.id ?? `tmp-${Date.now()}`;
+        const url = await uploadLibraryImage(file, 'character', tmpId);
+        if (url) {
+          setDraft((d) => ({ ...d, reference_image_url: url }));
+          toast.success('Referenzbild hochgeladen');
+        }
+      } finally {
+        setUploading(false);
+      }
+    },
+    [character?.id, uploadLibraryImage]
+  );
 
   const handleFileUpload = useCallback(
     async (file: File | null) => {
@@ -77,26 +97,24 @@ export default function CharacterEditor({
         toast.error(`Datei zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB · max 20 MB).`);
         return;
       }
-      if (!confirmedRights) {
-        toast.error('Bitte bestätige zuerst die Bildrechte.');
+      // Block E (Legal) — gate uploads behind persistent consent
+      if (!hasConsent) {
+        setPendingFile(file);
+        setShowConsentDialog(true);
         return;
       }
-
-      setUploading(true);
-      try {
-        // Tmp-ID falls Charakter noch nicht existiert
-        const tmpId = character?.id ?? `tmp-${Date.now()}`;
-        const url = await uploadLibraryImage(file, 'character', tmpId);
-        if (url) {
-          setDraft((d) => ({ ...d, reference_image_url: url }));
-          toast.success('Referenzbild hochgeladen');
-        }
-      } finally {
-        setUploading(false);
-      }
+      await performUpload(file);
     },
-    [character?.id, uploadLibraryImage, confirmedRights]
+    [hasConsent, performUpload]
   );
+
+  const handleConsentAccepted = useCallback(async () => {
+    if (pendingFile) {
+      const file = pendingFile;
+      setPendingFile(null);
+      await performUpload(file);
+    }
+  }, [pendingFile, performUpload]);
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
@@ -183,19 +201,13 @@ export default function CharacterEditor({
           <div className="space-y-2">
             <Label className="text-xs">Referenzbild (optional, sehr empfohlen)</Label>
 
-            {!confirmedRights && !character && (
+            {!hasConsent && !character && (
               <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
-                <input
-                  type="checkbox"
-                  id="rights-confirm"
-                  checked={confirmedRights}
-                  onChange={(e) => setConfirmedRights(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <label htmlFor="rights-confirm" className="text-[11px] text-muted-foreground leading-snug">
-                  Ich bestätige, dass ich die Rechte am hochgeladenen Bild besitze und es für
-                  AI-Video-Generierung verwenden darf.
-                </label>
+                <ShieldCheck className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Beim ersten Upload bestätigst du einmalig die Bildrechte (DSGVO &
+                  Persönlichkeitsrechte). Danach läuft jeder weitere Upload ohne Rückfrage.
+                </p>
               </div>
             )}
 
@@ -223,12 +235,8 @@ export default function CharacterEditor({
               </div>
             ) : (
               <div
-                onClick={() => confirmedRights && !uploading && inputRef.current?.click()}
-                className={`relative border border-dashed rounded-md p-4 text-center transition cursor-pointer ${
-                  confirmedRights
-                    ? 'border-border/60 hover:border-primary/40 hover:bg-background/50'
-                    : 'border-border/30 opacity-50 cursor-not-allowed'
-                }`}
+                onClick={() => !uploading && inputRef.current?.click()}
+                className="relative border border-dashed border-border/60 rounded-md p-4 text-center transition cursor-pointer hover:border-primary/40 hover:bg-background/50"
               >
                 <input
                   ref={inputRef}
@@ -338,6 +346,16 @@ export default function CharacterEditor({
           </Button>
         </div>
       </DialogContent>
+
+      <LibraryUploadConsentDialog
+        open={showConsentDialog}
+        onOpenChange={(o) => {
+          setShowConsentDialog(o);
+          if (!o) setPendingFile(null);
+        }}
+        onAccepted={handleConsentAccepted}
+        context="character"
+      />
     </Dialog>
   );
 }

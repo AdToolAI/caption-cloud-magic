@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Upload, X, Sparkles, MapPin, Lightbulb } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useLegalConsent } from '@/hooks/useLegalConsent';
+import LibraryUploadConsentDialog from '@/components/motion-studio/LibraryUploadConsentDialog';
 import {
   EMPTY_LOCATION_DRAFT,
   type LocationDraft,
@@ -31,10 +33,13 @@ export default function LocationEditor({
   onSaved,
 }: LocationEditorProps) {
   const { createLocation, updateLocation, uploadLibraryImage } = useMotionStudioLibrary();
+  const { hasAccepted: hasConsent } = useLegalConsent('motion_studio_library_upload');
   const [draft, setDraft] = useState<LocationDraft>(EMPTY_LOCATION_DRAFT);
   const [tagInput, setTagInput] = useState('');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showConsentDialog, setShowConsentDialog] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -51,20 +56,12 @@ export default function LocationEditor({
         setDraft(EMPTY_LOCATION_DRAFT);
       }
       setTagInput('');
+      setPendingFile(null);
     }
   }, [open, location]);
 
-  const handleFileUpload = useCallback(
-    async (file: File | null) => {
-      if (!file) return;
-      if (!ACCEPTED.includes(file.type)) {
-        toast.error('Bitte JPG, PNG oder WEBP wählen.');
-        return;
-      }
-      if (file.size > MAX_BYTES) {
-        toast.error(`Datei zu groß (max 20 MB).`);
-        return;
-      }
+  const performUpload = useCallback(
+    async (file: File) => {
       setUploading(true);
       try {
         const tmpId = location?.id ?? `tmp-${Date.now()}`;
@@ -79,6 +76,35 @@ export default function LocationEditor({
     },
     [location?.id, uploadLibraryImage]
   );
+
+  const handleFileUpload = useCallback(
+    async (file: File | null) => {
+      if (!file) return;
+      if (!ACCEPTED.includes(file.type)) {
+        toast.error('Bitte JPG, PNG oder WEBP wählen.');
+        return;
+      }
+      if (file.size > MAX_BYTES) {
+        toast.error(`Datei zu groß (max 20 MB).`);
+        return;
+      }
+      if (!hasConsent) {
+        setPendingFile(file);
+        setShowConsentDialog(true);
+        return;
+      }
+      await performUpload(file);
+    },
+    [hasConsent, performUpload]
+  );
+
+  const handleConsentAccepted = useCallback(async () => {
+    if (pendingFile) {
+      const file = pendingFile;
+      setPendingFile(null);
+      await performUpload(file);
+    }
+  }, [pendingFile, performUpload]);
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
@@ -156,6 +182,15 @@ export default function LocationEditor({
 
           <div className="space-y-2">
             <Label className="text-xs">Referenzbild (optional)</Label>
+            {!hasConsent && !location && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
+                <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Beim ersten Upload bestätigst du einmalig die Bildrechte. Danach läuft jeder
+                  weitere Upload ohne Rückfrage.
+                </p>
+              </div>
+            )}
             {draft.reference_image_url ? (
               <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-background/50 p-3">
                 <img
@@ -272,6 +307,16 @@ export default function LocationEditor({
           </Button>
         </div>
       </DialogContent>
+
+      <LibraryUploadConsentDialog
+        open={showConsentDialog}
+        onOpenChange={(o) => {
+          setShowConsentDialog(o);
+          if (!o) setPendingFile(null);
+        }}
+        onAccepted={handleConsentAccepted}
+        context="location"
+      />
     </Dialog>
   );
 }

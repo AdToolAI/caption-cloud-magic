@@ -5793,9 +5793,13 @@ export type Database = {
       }
       motion_studio_characters: {
         Row: {
+          consent_recorded_at: string | null
+          consent_version: string | null
           created_at: string
+          depicts_real_person: boolean
           description: string
           id: string
+          is_ai_generated: boolean
           name: string
           reference_image_seed: string | null
           reference_image_url: string | null
@@ -5807,9 +5811,13 @@ export type Database = {
           voice_id: string | null
         }
         Insert: {
+          consent_recorded_at?: string | null
+          consent_version?: string | null
           created_at?: string
+          depicts_real_person?: boolean
           description?: string
           id?: string
+          is_ai_generated?: boolean
           name: string
           reference_image_seed?: string | null
           reference_image_url?: string | null
@@ -5821,9 +5829,13 @@ export type Database = {
           voice_id?: string | null
         }
         Update: {
+          consent_recorded_at?: string | null
+          consent_version?: string | null
           created_at?: string
+          depicts_real_person?: boolean
           description?: string
           id?: string
+          is_ai_generated?: boolean
           name?: string
           reference_image_seed?: string | null
           reference_image_url?: string | null
@@ -5838,9 +5850,12 @@ export type Database = {
       }
       motion_studio_locations: {
         Row: {
+          consent_recorded_at: string | null
+          consent_version: string | null
           created_at: string
           description: string
           id: string
+          is_ai_generated: boolean
           lighting_notes: string | null
           name: string
           reference_image_url: string | null
@@ -5850,9 +5865,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          consent_recorded_at?: string | null
+          consent_version?: string | null
           created_at?: string
           description?: string
           id?: string
+          is_ai_generated?: boolean
           lighting_notes?: string | null
           name: string
           reference_image_url?: string | null
@@ -5862,9 +5880,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          consent_recorded_at?: string | null
+          consent_version?: string | null
           created_at?: string
           description?: string
           id?: string
+          is_ai_generated?: boolean
           lighting_notes?: string | null
           name?: string
           reference_image_url?: string | null
@@ -10716,6 +10737,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_legal_consents: {
+        Row: {
+          accepted_at: string
+          consent_type: string
+          consent_version: string
+          id: string
+          metadata: Json
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string
+          consent_type: string
+          consent_version: string
+          id?: string
+          metadata?: Json
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string
+          consent_type?: string
+          consent_version?: string
+          id?: string
+          metadata?: Json
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_metrics_daily: {
         Row: {
