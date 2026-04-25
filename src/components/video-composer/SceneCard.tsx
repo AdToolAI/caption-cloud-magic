@@ -1,4 +1,4 @@
-// (no useState needed after overlay editor moved to TextSubtitlesTab)
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,6 +28,7 @@ import type {
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALITY_LABELS } from '@/types/video-composer';
 
 import SceneMediaUpload from './SceneMediaUpload';
+import StockMediaBrowser, { type StockMediaItem } from './StockMediaBrowser';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
 import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
@@ -42,6 +43,8 @@ interface SceneCardProps {
   totalScenes: number;
   projectId?: string;
   characters?: ComposerCharacter[];
+  /** Aspect ratio from briefing — used to filter Stock Library results. */
+  preferredAspect?: '16:9' | '9:16' | '1:1' | '4:5';
   onUpdate: (updates: Partial<ComposerScene>) => void;
   onDelete: () => void;
   onMoveUp: () => void;
@@ -69,6 +72,7 @@ export default function SceneCard({
   totalScenes,
   projectId,
   characters,
+  preferredAspect,
   onUpdate,
   onDelete,
   onMoveUp,
@@ -76,13 +80,28 @@ export default function SceneCard({
   language,
 }: SceneCardProps) {
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
-  const clipSourceIcon = scene.clipSource.startsWith('ai-') ? Sparkles : scene.clipSource === 'stock' ? Video : Upload;
+  const isStock = scene.clipSource === 'stock' || scene.clipSource === 'stock-image';
+  const clipSourceIcon = scene.clipSource.startsWith('ai-') ? Sparkles : isStock ? Video : Upload;
   const ClipIcon = clipSourceIcon;
   const activeChar = scene.characterShot
     ? characters?.find((c) => c.id === scene.characterShot!.characterId)
     : undefined;
   // Library for live mention resolution preview
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
+  // Stock browser open state
+  const [stockBrowserOpen, setStockBrowserOpen] = useState(false);
+
+  const handleStockSelect = (item: StockMediaItem) => {
+    onUpdate({
+      clipSource: item.type === 'video' ? 'stock' : 'stock-image',
+      clipUrl: item.url,
+      clipStatus: 'ready',
+      stockMediaThumb: item.thumbnailUrl || undefined,
+      stockMediaSource: item.source === 'upload' ? undefined : item.source,
+      stockMediaAuthor: item.authorName ? { name: item.authorName, url: item.authorUrl } : undefined,
+      uploadType: item.type,
+    });
+  };
 
   return (
     <Card className="border-border/40 bg-card/80 group">
@@ -146,25 +165,35 @@ export default function SceneCard({
 
             {/* Clip source */}
             <div className="flex flex-wrap gap-2">
-              {(['ai-hailuo', 'ai-kling', 'ai-image', 'stock', 'upload'] as ClipSource[]).map((src) => {
+              {(['ai-hailuo', 'ai-kling', 'ai-image', 'stock', 'stock-image', 'upload'] as ClipSource[]).map((src) => {
                 const label =
                   src === 'upload'
                     ? 'Eigenes Video'
                     : CLIP_SOURCE_LABELS[src]?.de || src;
-                const isImage = src === 'ai-image';
+                const isAiImage = src === 'ai-image';
+                const isStockImage = src === 'stock-image';
+                const isStockVideo = src === 'stock';
+                const handleClick = () => {
+                  if (isStockVideo || isStockImage) {
+                    onUpdate({ clipSource: src });
+                    setStockBrowserOpen(true);
+                  } else {
+                    onUpdate({ clipSource: src });
+                  }
+                };
                 return (
                   <button
                     key={src}
-                    onClick={() => onUpdate({ clipSource: src })}
+                    onClick={handleClick}
                     className={`px-2 py-1 rounded text-[10px] border transition-all flex items-center gap-1 ${
                       scene.clipSource === src
-                        ? isImage
+                        ? isAiImage || isStockImage
                           ? 'border-green-500/60 bg-green-500/10 text-green-300'
                           : 'border-primary bg-primary/10 text-primary'
                         : 'border-border/40 text-muted-foreground hover:border-border'
                     }`}
                   >
-                    {isImage && <ImageIcon className="h-2.5 w-2.5" />}
+                    {(isAiImage || isStockImage) && <ImageIcon className="h-2.5 w-2.5" />}
                     {label}
                   </button>
                 );
@@ -299,18 +328,47 @@ export default function SceneCard({
               </div>
             )}
 
-            {scene.clipSource === 'stock' && (
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Stock-Suchbegriffe</Label>
+            {(scene.clipSource === 'stock' || scene.clipSource === 'stock-image') && (
+              <div className="space-y-2 rounded-md border border-border/40 bg-background/40 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {scene.stockMediaThumb || scene.clipUrl ? (
+                      <img
+                        src={scene.stockMediaThumb || scene.clipUrl}
+                        alt="stock thumbnail"
+                        className="w-10 h-7 rounded object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-7 rounded bg-muted/40 flex items-center justify-center flex-shrink-0">
+                        {scene.clipSource === 'stock' ? <Video className="h-3 w-3 text-muted-foreground" /> : <ImageIcon className="h-3 w-3 text-muted-foreground" />}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {scene.clipUrl
+                          ? (scene.stockMediaAuthor?.name
+                              ? `${scene.stockMediaSource} · ${scene.stockMediaAuthor.name}`
+                              : 'Stock ausgewählt')
+                          : (scene.clipSource === 'stock' ? 'Kein Video gewählt' : 'Kein Bild gewählt')}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[10px] gap-1"
+                    onClick={() => setStockBrowserOpen(true)}
+                  >
+                    <Video className="h-3 w-3" />
+                    Bibliothek öffnen
+                  </Button>
+                </div>
                 <Input
                   value={scene.stockKeywords || ''}
                   onChange={(e) => onUpdate({ stockKeywords: e.target.value })}
-                  placeholder="z.B. business meeting, happy team"
-                  className="text-xs bg-background/50"
+                  placeholder="Optional: Suchbegriffe für AI-Auto-Pick"
+                  className="text-xs bg-background/50 h-7"
                 />
-                <p className="text-[9px] text-muted-foreground/70">
-                  Wir suchen automatisch passende Stock-Videos im Clips-Tab.
-                </p>
               </div>
             )}
 
@@ -344,7 +402,7 @@ export default function SceneCard({
 
           {/* Thumbnail preview */}
           <div className="w-24 h-16 rounded bg-muted/30 border border-border/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
-            {(scene.uploadType === 'image' || scene.clipSource === 'ai-image') && (scene.clipUrl || scene.uploadUrl) ? (
+            {(scene.uploadType === 'image' || scene.clipSource === 'ai-image' || scene.clipSource === 'stock-image') && (scene.clipUrl || scene.uploadUrl) ? (
               <img src={scene.clipUrl || scene.uploadUrl} alt="" className="w-full h-full object-cover" />
             ) : scene.clipUrl ? (
               <video src={scene.clipUrl} className="w-full h-full object-cover" muted />
@@ -356,6 +414,15 @@ export default function SceneCard({
           </div>
         </div>
       </CardContent>
+
+      {/* Stock Media Browser modal */}
+      <StockMediaBrowser
+        open={stockBrowserOpen}
+        onOpenChange={setStockBrowserOpen}
+        initialType={scene.clipSource === 'stock-image' ? 'image' : 'video'}
+        preferredAspect={preferredAspect}
+        onSelect={handleStockSelect}
+      />
     </Card>
   );
 }

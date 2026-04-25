@@ -601,6 +601,7 @@ export default function VideoComposerDashboard() {
               language={project.language}
               projectId={project.id}
               characters={project.briefing?.characters}
+              preferredAspect={project.briefing?.aspectRatio}
             />
           </TabsContent>
 

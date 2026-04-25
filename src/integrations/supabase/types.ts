@@ -10845,6 +10845,63 @@ export type Database = {
         }
         Relationships: []
       }
+      user_media_library: {
+        Row: {
+          author_name: string | null
+          author_url: string | null
+          category: string | null
+          created_at: string
+          duration_sec: number | null
+          external_id: string | null
+          height: number | null
+          id: string
+          is_favorite: boolean
+          source: string
+          tags: string[] | null
+          thumbnail_url: string | null
+          type: string
+          url: string
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          author_name?: string | null
+          author_url?: string | null
+          category?: string | null
+          created_at?: string
+          duration_sec?: number | null
+          external_id?: string | null
+          height?: number | null
+          id?: string
+          is_favorite?: boolean
+          source: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          type: string
+          url: string
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          author_name?: string | null
+          author_url?: string | null
+          category?: string | null
+          created_at?: string
+          duration_sec?: number | null
+          external_id?: string | null
+          height?: number | null
+          id?: string
+          is_favorite?: boolean
+          source?: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          type?: string
+          url?: string
+          user_id?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
       user_metrics_daily: {
         Row: {
           auto_replies_sent: number

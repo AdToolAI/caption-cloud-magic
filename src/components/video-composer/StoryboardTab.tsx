@@ -30,9 +30,10 @@ interface StoryboardTabProps {
   language: string;
   projectId?: string;
   characters?: ComposerCharacter[];
+  preferredAspect?: '16:9' | '9:16' | '1:1' | '4:5';
 }
 
-export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, language, projectId, characters }: StoryboardTabProps) {
+export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, language, projectId, characters, preferredAspect }: StoryboardTabProps) {
   const { t } = useTranslation();
   const TIPS_KEY = 'video-composer-storyboard-tips-collapsed';
   const [tipsCollapsed, setTipsCollapsed] = useState<boolean>(() => {
@@ -206,6 +207,7 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
                     totalScenes={scenes.length}
                     projectId={projectId}
                     characters={characters}
+                    preferredAspect={preferredAspect}
                     onUpdate={(updates) => updateScene(scene.id, updates)}
                     onDelete={() => deleteScene(scene.id)}
                     onMoveUp={() => moveScene(index, index - 1)}

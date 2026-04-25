@@ -19,7 +19,9 @@ export type ComposerStatus = 'draft' | 'storyboard' | 'generating' | 'assembling
 
 export type SceneType = 'hook' | 'problem' | 'solution' | 'demo' | 'social-proof' | 'cta' | 'custom';
 
-export type ClipSource = 'ai-hailuo' | 'ai-kling' | 'ai-sora' | 'ai-image' | 'stock' | 'upload';
+export type ClipSource = 'ai-hailuo' | 'ai-kling' | 'ai-sora' | 'ai-image' | 'stock' | 'stock-image' | 'upload';
+
+export type StockMediaSource = 'pixabay' | 'pexels';
 
 export type VideoMode = 'video' | 'image' | 'mixed';
 
@@ -143,6 +145,10 @@ export interface ComposerScene {
     mood?: string;
     filmStock?: string;
   };
+  /** Stock media metadata when clipSource === 'stock' or 'stock-image'. */
+  stockMediaThumb?: string;
+  stockMediaSource?: StockMediaSource;
+  stockMediaAuthor?: { name: string; url?: string };
 }
 
 export type SubtitlePosition = 'top' | 'bottom';
@@ -334,6 +340,7 @@ export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> 
   'ai-sora': { de: 'KI (Sora)', en: 'AI (Sora)' },
   'ai-image': { de: 'KI Bild (Gemini)', en: 'AI Image (Gemini)' },
   stock: { de: 'Stock Video', en: 'Stock Video' },
+  'stock-image': { de: 'Stock Bild', en: 'Stock Image' },
   upload: { de: 'Eigener Upload', en: 'Own Upload' },
 };
 
@@ -346,8 +353,9 @@ export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> 
   'ai-kling':  { standard: 0.15, pro: 0.21 },
   'ai-sora':   { standard: 0.25, pro: 0.53 },
   'ai-image':  { standard: 0.01, pro: 0.015 }, // ~€0.05-0.07 per 5s scene
-  stock:       { standard: 0, pro: 0 },
-  upload:      { standard: 0, pro: 0 },
+  stock:        { standard: 0, pro: 0 },
+  'stock-image': { standard: 0, pro: 0 },
+  upload:       { standard: 0, pro: 0 },
 };
 
 // Quality tier labels & resolution hints
@@ -356,8 +364,9 @@ export const QUALITY_LABELS: Record<ClipSource, Record<ClipQuality, string>> = {
   'ai-kling':  { standard: 'Standard 720p', pro: 'Pro 1080p' },
   'ai-sora':   { standard: 'Standard',      pro: 'Pro' },
   'ai-image':  { standard: 'Nano Banana 2', pro: 'Gemini 3 Pro' },
-  stock:       { standard: '-', pro: '-' },
-  upload:      { standard: '-', pro: '-' },
+  stock:        { standard: '-', pro: '-' },
+  'stock-image': { standard: '-', pro: '-' },
+  upload:       { standard: '-', pro: '-' },
 };
 
 /** Returns total cost for a clip in EUR. */
