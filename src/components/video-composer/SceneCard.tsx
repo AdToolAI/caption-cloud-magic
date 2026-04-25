@@ -115,6 +115,15 @@ export default function SceneCard({
 
   const promptMode: 'free' | 'structured' = scene.promptMode ?? 'free';
   const promptSlots: PromptSlots = scene.promptSlots ?? {};
+  const promptSlotOrder = scene.promptSlotOrder;
+
+  // K-P1 — Cmd/Ctrl + Shift + S toggles Free ↔ Structured for the focused card.
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const isMac = useMemo(
+    () => typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform),
+    []
+  );
+  const shortcutLabel = isMac ? '⌘⇧S' : 'Ctrl+Shift+S';
 
   const togglePromptMode = () => {
     if (promptMode === 'free') {
@@ -122,15 +131,37 @@ export default function SceneCard({
       const nextSlots = hasAnySlot(promptSlots) ? promptSlots : naiveSplitToSlots(scene.aiPrompt || '');
       onUpdate({ promptMode: 'structured', promptSlots: nextSlots });
     } else {
-      // Structured → Free: deterministic stitch
-      const stitched = stitchSlots(promptSlots);
+      // Structured → Free: deterministic stitch (respect custom slot order)
+      const stitched = stitchSlots(promptSlots, promptSlotOrder);
       onUpdate({ promptMode: 'free', aiPrompt: stitched || scene.aiPrompt });
     }
   };
 
+  useEffect(() => {
+    if (!scene.clipSource.startsWith('ai-')) return;
+    const handler = (e: KeyboardEvent) => {
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod || !e.shiftKey) return;
+      if (e.key.toLowerCase() !== 's') return;
+      // Only fire when focus is inside this card
+      if (!cardRef.current?.contains(document.activeElement)) return;
+      e.preventDefault();
+      togglePromptMode();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promptMode, promptSlots, promptSlotOrder, scene.aiPrompt, scene.clipSource, isMac]);
+
   const handleSlotsChange = (next: PromptSlots) => {
-    const stitched = stitchSlots(next);
+    const stitched = stitchSlots(next, promptSlotOrder);
     onUpdate({ promptSlots: next, aiPrompt: stitched });
+  };
+
+  const handleOrderChange = (order: Array<keyof PromptSlots>) => {
+    const safeOrder = order.filter((k) => k !== 'negative') as NonNullable<typeof scene.promptSlotOrder>;
+    const stitched = stitchSlots(promptSlots, safeOrder);
+    onUpdate({ promptSlotOrder: safeOrder, aiPrompt: stitched });
   };
 
   // Block K-5 — Inspire Me: roll a random scene idea via the edge function.
