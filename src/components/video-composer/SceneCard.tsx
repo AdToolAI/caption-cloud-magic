@@ -31,7 +31,10 @@ import SceneMediaUpload from './SceneMediaUpload';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
 import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
+import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
+import { resolveMentions } from '@/lib/motion-studio/mentionParser';
+import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 
 interface SceneCardProps {
   scene: ComposerScene;
@@ -78,6 +81,8 @@ export default function SceneCard({
   const activeChar = scene.characterShot
     ? characters?.find((c) => c.id === scene.characterShot!.characterId)
     : undefined;
+  // Library for live mention resolution preview
+  const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
 
   return (
     <Card className="border-border/40 bg-card/80 group">
@@ -233,19 +238,24 @@ export default function SceneCard({
                         : 'AI Prompt (EN) — editable'}
                     </Label>
                   </div>
-                  <Textarea
+                  <PromptMentionEditor
                     value={scene.aiPrompt || ''}
-                    onChange={(e) => onUpdate({ aiPrompt: e.target.value })}
-                    placeholder="Describe the scene visually in English..."
+                    onChange={(v) => onUpdate({ aiPrompt: v })}
+                    placeholder={
+                      lang === 'de'
+                        ? 'Describe the scene… nutze @charakter und @location aus deiner Library'
+                        : lang === 'es'
+                        ? 'Describe la escena… usa @personaje y @ubicación de tu biblioteca'
+                        : 'Describe the scene visually… use @character and @location from your library'
+                    }
                     rows={3}
-                    className="text-xs bg-background/50 resize-none"
                   />
                   <p className="text-[10px] leading-relaxed text-muted-foreground/80 italic">
                     {lang === 'de'
-                      ? 'ℹ️ Untertitel, Captions und eingebrannte Texte werden automatisch ausgeschlossen — füge sie später im Tab „Voiceover & Untertitel" hinzu.'
+                      ? 'ℹ️ Tippe @ um Charaktere & Locations zu taggen. Untertitel werden automatisch ausgeschlossen — füge sie im Tab „Voiceover & Untertitel" hinzu.'
                       : lang === 'es'
-                      ? 'ℹ️ Subtítulos, captions y textos incrustados se excluyen automáticamente — añádelos luego en la pestaña "Voz y subtítulos".'
-                      : 'ℹ️ Subtitles, captions and burned-in text are automatically excluded — add them later in the "Voice & Subtitles" tab.'}
+                      ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones. Los subtítulos se excluyen automáticamente — añádelos en la pestaña "Voz y subtítulos".'
+                      : 'ℹ️ Type @ to tag characters & locations. Subtitles are automatically excluded — add them in the "Voice & Subtitles" tab.'}
                   </p>
                 </div>
 
@@ -255,18 +265,30 @@ export default function SceneCard({
                   onChange={(directorModifiers) => onUpdate({ directorModifiers })}
                 />
 
-                {scene.directorModifiers && Object.values(scene.directorModifiers).some(Boolean) && (
-                  <div className="rounded-md border border-dashed border-primary/30 bg-background/40 p-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <Label className="text-[10px] text-muted-foreground">
-                        {lang === 'de' ? 'Finaler Prompt (Vorschau)' : lang === 'es' ? 'Prompt final (vista previa)' : 'Final prompt (preview)'}
-                      </Label>
+                {(() => {
+                  const hasMods = scene.directorModifiers && Object.values(scene.directorModifiers).some(Boolean);
+                  const resolved = resolveMentions(scene.aiPrompt || '', libCharacters, libLocations);
+                  const hasMentions = resolved.matches.length > 0;
+                  if (!hasMods && !hasMentions) return null;
+                  const finalPrompt = applyDirectorModifiers(resolved.prompt, scene.directorModifiers || {});
+                  return (
+                    <div className="rounded-md border border-dashed border-primary/30 bg-background/40 p-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <Label className="text-[10px] text-muted-foreground">
+                          {lang === 'de' ? 'Finaler Prompt (Vorschau)' : lang === 'es' ? 'Prompt final (vista previa)' : 'Final prompt (preview)'}
+                        </Label>
+                        {resolved.referenceImageUrl && (
+                          <Badge variant="outline" className="text-[8px] h-3 px-1 border-primary/40 text-primary">
+                            i2v ref
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-[10px] font-mono leading-relaxed text-foreground/80 break-words whitespace-pre-line">
+                        {finalPrompt}
+                      </p>
                     </div>
-                    <p className="text-[10px] font-mono leading-relaxed text-foreground/80 break-words">
-                      {applyDirectorModifiers(scene.aiPrompt || '', scene.directorModifiers)}
-                    </p>
-                  </div>
-                )}
+                  );
+                })()}
 
                 <SceneReferenceImageUpload
                   projectId={projectId}
