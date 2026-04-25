@@ -710,6 +710,18 @@ export default function BriefingTab({
         </CardContent>
       </Card>
 
+      {/* Brand Kit Auto-Apply */}
+      {assemblyConfig && onChangeBrandKit && onChangeBrandKitAutoSync && onApplyAssembly && (
+        <BrandKitApplyPanel
+          brandKitId={brandKitId ?? null}
+          autoSync={brandKitAutoSync ?? false}
+          assemblyConfig={assemblyConfig}
+          onChangeBrandKit={onChangeBrandKit}
+          onChangeAutoSync={onChangeBrandKitAutoSync}
+          onApplyAssembly={onApplyAssembly}
+        />
+      )}
+
       {/* Action */}
       <div className="flex justify-end">
         <Button
