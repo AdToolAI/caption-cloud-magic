@@ -1,93 +1,120 @@
-## Block B — Cost Comparison Widget (Remotion vs Shotstack)
+## Block G — Stock Music & SFX Library auf Artlist-Niveau
 
-**Ziel:** Nutzer sehen *vor* dem Render live, was ein Render in beiden Engines kostet, welche günstiger ist und können bewusst die Engine wählen. Backend ist bereits vollständig vorhanden — es fehlt nur die UI-Integration.
-
----
-
-### Bestandsaufnahme (was bereits da ist)
-
-| Komponente | Status |
-|---|---|
-| Edge Function `estimate-render-cost` | ✅ Live, funktioniert |
-| Hook `useRenderCostEstimation` | ✅ Vorhanden |
-| Component `CostComparison.tsx` | ✅ Gebaut, aber **nirgends importiert** |
-| Hook `useRenderEngine` (localStorage) | ✅ Vorhanden |
-| DB-Tabelle `render_cost_factors` | ✅ Mit Daten (Remotion: 5 + 0.10/s, Shotstack: 10 + 0.15/s) |
-
-**Lücke:** Das Widget hängt in der Luft — nicht in den Composer-Workflow eingebunden.
-
----
+### Bestandsaufnahme
+- ✅ Jamendo-Suche läuft via `search-stock-music` Edge Function im `AudioTab.tsx`
+- ✅ `AIMusicSuggester` Komponente vorhanden (aber nicht im Composer eingebunden)
+- ❌ Keine kuratierten Mood-Kategorien als Quick-Picks (Artlist-Style: "Cinematic", "Corporate", "Upbeat" Karten)
+- ❌ Keine "My Music"-Bibliothek (gespeicherte Favoriten/Uploads)
+- ❌ Kein SFX-Tab (Sound-Effekte separat von Musik)
+- ❌ Keine Wellenform-Vorschau
 
 ### Umsetzung
 
-#### 1. Neuer Wrapper-Component: `CostEstimationPanel.tsx`
-Ein Composer-spezifischer Wrapper, der `CostComparison` mit Live-Daten füttert:
+**1. Neue Tabelle `user_audio_library`** (Favoriten + Uploads zentral)
+```sql
+- id, user_id, type ('music' | 'sfx' | 'voice')
+- title, artist, source ('jamendo' | 'upload' | 'pixabay_sfx')
+- external_id, url, duration_sec
+- mood, genre, tags[], bpm
+- thumbnail_url, is_favorite
+- created_at, updated_at
+- RLS: nur Owner
+```
 
-- **Inputs:** `scenes: ComposerScene[]`, `aspectRatio`, `currentEngine`, `onEngineChange`
-- **Berechnet:**
-  - `durationSec` = Summe aller `scene.durationSeconds`
-  - `resolution` = '1080p' (Default — später aus AssemblyConfig)
-  - `complexity` = abgeleitet aus Szenen-Anzahl + Effekten (`simple` <3 Szenen, `medium` 3-6, `complex` >6 oder mit Color Grading/Watermark)
-- **Ruft** `estimateCost()` aus `useRenderCostEstimation` bei jeder relevanten Änderung (debounced, 500ms)
-- **Zeigt:**
-  - Bestehendes `<CostComparison>` Widget (Side-by-side Bars)
-  - Wallet-Balance-Check via `useCredits` mit Warnung wenn Balance < empfohlener Engine
-  - "Empfohlen"-Badge auf der günstigeren Engine
-  - 2 Buttons "Use Remotion" / "Use Shotstack" → updaten `useRenderEngine`
-  - Breakdown-Akkordion (Basis-, Dauer-, Auflösungs-, Komplexitäts-Kosten) via `getCostBreakdown`
-  - Optional: `historicalAverage` wenn `templateId` vorhanden (Hint: "Ähnliche Renders kosteten im Schnitt X")
+**2. Neue Edge Function `search-stock-sfx`** (Pixabay SFX API — kostenlos, kein Key nötig falls gewünscht oder Freesound API mit Key)
+- Tags-basierte Suche (whoosh, click, impact, …)
+- Liefert preview_url + download_url + duration
 
-#### 2. Integration in `AssemblyTab.tsx`
-- Import `CostEstimationPanel` und `useRenderEngine`
-- Einbau **direkt über** dem "Video rendern"-Button als Card mit Header "💰 Kosten-Schätzung"
-- Engine-Auswahl wird in `handleRender` ausgewertet → derzeit wird Render-Engine implizit gewählt; jetzt explizit aus `renderEngine` Hook übergeben (falls Render-Pipeline das unterstützt; sonst nur informativ + localStorage für künftige Renders)
+**3. Neue Komponente `MusicLibraryBrowser.tsx`** (ersetzt Such-only-UI im AudioTab)
+- 3 Tabs: **Stock** (Jamendo) | **SFX** (Pixabay) | **My Library** (user_audio_library)
+- **Quick-Mood-Picker oben:** 8 kuratierte Karten (Cinematic, Corporate, Upbeat, Dramatic, Calm, Trailer, Vlog, Beach) → setzt Mood + Genre + triggert Suche
+- **Wellenform-Vorschau** via WaveSurfer.js (nur on-demand laden)
+- **Favorite-Stern** auf jeder Karte → speichert in user_audio_library
+- **AIMusicSuggester** als 4. Tab "AI Pick" eingebunden
+- Pagination: 20 Tracks pro Seite
 
-#### 3. Edge-Function-Härtung (`estimate-render-cost/index.ts`)
-- Aktuell wirft die Function bei fehlendem `Authorization`-Header — das blockiert den Live-Estimate-Workflow. Da Cost-Schätzung keine sensiblen Daten liefert, prüfen wir: Header weiterhin verlangt (User-bezogenes Logging), aber **Fehlerbehandlung im Hook** ergänzen, damit die UI bei Fehlern einen Fallback-Hinweis zeigt statt zu crashen.
-- **Kein Schema-Change nötig** — Tabelle und Daten bestehen bereits.
+**4. SFX-Layer im AssemblyConfig**
+- Erweitere `AssemblyConfig.sfxTracks?: { url, sceneIndex, volume, offsetMs }[]`
+- Pro Szene: "+ SFX hinzufügen" Button → öffnet SFX-Tab des Browsers
+- Render-Pipeline (`render-composer-video`) muss SFX-Layer in Remotion einbinden (Audio-Mix mit Crossfade)
 
-#### 4. Lokalisierung (EN/DE/ES)
-Neue Translation-Keys in den 3 Sprachdateien:
-- `videoComposer.cost.title` — "Cost Estimation" / "Kosten-Schätzung" / "Estimación de coste"
-- `videoComposer.cost.recommended` — "Recommended (cheaper)" / "Empfohlen (günstiger)" / "Recomendado (más barato)"
-- `videoComposer.cost.useThis` — "Use this engine"
-- `videoComposer.cost.lowBalanceWarning` — "Your balance ({{balance}} credits) is below the estimated cost"
-- `videoComposer.cost.breakdown` — "Cost breakdown"
-- `videoComposer.cost.historical` — "Similar renders averaged {{avg}} credits"
+**5. Lokalisierung** — neue Keys in EN/DE/ES:
+- `videoComposer.audio.tabs.stock/sfx/library/aiPick`
+- `videoComposer.audio.moods.cinematic/corporate/...`
+- `videoComposer.audio.favorite/saved/sfxLayer`
 
-#### 5. UX-Details (James Bond 2028 Look)
-- Card mit goldenem Border-Glow (analog zu `EnterpriseStatusDisplay`-Pattern)
-- Aktive Engine bekommt goldenen Ring, inaktive ist abgedimmt
-- Loading-Skeleton während `estimateCost` läuft
-- Bei Fehlern: dezenter Toast + Fallback "Cost estimation unavailable" — kein blockierender Error
-
----
-
-### Nicht im Scope (bewusst ausgeklammert)
-- ❌ Änderung der `render_cost_factors`-Werte (DB ist befüllt)
-- ❌ Neue Tabelle `render_cost_history` Logging (kommt mit dem nächsten Render-Webhook automatisch — separates Feature)
-- ❌ Echte Engine-Switch in der Render-Pipeline (Composer rendert aktuell mit Remotion Lambda; Shotstack-Pipeline ist separates Thema). **Block B = nur Schätzung + Engine-Präferenz speichern + Transparenz.** Wenn Du willst, dass die Engine-Wahl tatsächlich den Render-Pfad ändert, mache ich das als eigenständigen Block.
+### Geänderte/neue Dateien (Block G)
+- **Neu:** `src/components/video-composer/MusicLibraryBrowser.tsx`
+- **Neu:** `src/components/video-composer/SfxLayerEditor.tsx`
+- **Neu:** `supabase/functions/search-stock-sfx/index.ts`
+- **Neu:** Migration `user_audio_library` Tabelle
+- **Modifiziert:** `AudioTab.tsx` — ersetzt rohen Search-Block durch `MusicLibraryBrowser`
+- **Modifiziert:** `src/types/video-composer.ts` — `sfxTracks` ergänzen
+- **Modifiziert:** Render-Pipeline für SFX-Mix (folgt nach G in eigenem Schritt — siehe Scope-Hinweis)
 
 ---
 
-### Geänderte / neue Dateien
+## Block H — Brand Kit Auto-Apply auf Composer
 
-**Neu:**
-- `src/components/video-composer/CostEstimationPanel.tsx`
+### Bestandsaufnahme
+- ✅ Tabelle `brand_kits` mit logo_url, primary_color, secondary_color, accent_color, font_pairing (jsonb), brand_name
+- ✅ `BrandKitSelector.tsx` existiert (aber nicht im Composer integriert)
+- ✅ Composer hat bereits `WatermarkEditor` und `globalTextOverlays` — Auto-Apply ist eine UI-Glue-Aufgabe
+- ❌ Keine Verbindung zwischen Brand Kit und Composer-Projekt
 
-**Modifiziert:**
-- `src/components/video-composer/AssemblyTab.tsx` — Widget einbauen, `useRenderEngine` integrieren
-- `src/locales/en.json`, `src/locales/de.json`, `src/locales/es.json` — neue Keys
+### Umsetzung
 
-**Unverändert (bereits fertig):**
-- `src/components/render/CostComparison.tsx`
-- `src/hooks/useRenderCostEstimation.ts`
-- `src/hooks/useRenderEngine.ts`
-- `supabase/functions/estimate-render-cost/index.ts`
+**1. Migration:** Spalte `brand_kit_id uuid REFERENCES brand_kits(id)` zu `video_composer_projects` hinzufügen.
+
+**2. Neue Komponente `BrandKitApplyPanel.tsx`** (im BriefingTab oder AssemblyTab)
+- BrandKitSelector mit Auto-Apply-Switch
+- Vorschau: zeigt Logo + Primary/Secondary/Accent als Swatches + Font-Beispiel
+- Button **"Auf alle Szenen anwenden"** — triggert applyBrandKit()
+
+**3. Hook `useBrandKitAutoApply.ts`**
+```typescript
+applyBrandKit(kit, project) → updated AssemblyConfig:
+  - watermark.logoUrl = kit.logo_url
+  - watermark.enabled = true (falls noch nicht)
+  - globalTextOverlays[*].color = kit.primary_color
+  - globalTextOverlays[*].fontFamily = kit.font_pairing.heading
+  - colorGrading = (falls kit.mood vorhanden, mappen z.B. cinematic→cinematic-warm)
+  - intro/outro: Logo-Card automatisch generieren falls leer
+```
+
+**4. Reactive Sync (Optional, opt-in)**
+- Switch "Brand-Änderungen automatisch übernehmen"
+- Bei aktivem Switch: useEffect → bei brand_kits-Updates re-apply
+- Default off, damit User manuelle Änderungen nicht überschrieben werden
+
+**5. Visual Feedback**
+- Goldener Border um Composer-Elemente die "Brand-locked" sind
+- "Brand applied" Badge oben in Composer-Header
+- "Brand-Konflikt" Warnung wenn User manuell Farbe ändert die vom Brand abweicht
+
+**6. Lokalisierung** EN/DE/ES:
+- `videoComposer.brandKit.title/applyAll/preview/locked/conflictWarning/autoSync`
+
+### Geänderte/neue Dateien (Block H)
+- **Neu:** `src/components/video-composer/BrandKitApplyPanel.tsx`
+- **Neu:** `src/hooks/useBrandKitAutoApply.ts`
+- **Neu:** Migration: `brand_kit_id` Spalte zu `video_composer_projects`
+- **Modifiziert:** `BriefingTab.tsx` — BrandKitApplyPanel einbauen (nach Library-Picker)
+- **Modifiziert:** `AssemblyTab.tsx` — "Brand applied" Badge anzeigen
+- **Modifiziert:** `MotionStudioStepSidebar.tsx` — neue optionale Step "Brand" zwischen Briefing und Storyboard
 
 ---
 
-### Aufwand
-**~1 Tag** — wie ursprünglich geschätzt. Der Großteil der Arbeit (Backend + Edge Function + DB) ist bereits erledigt; es ist primär UI-Glue + Lokalisierung.
+## Nicht im Scope (bewusst ausgeklammert)
+- ❌ Echte SFX-Renderintegration in Remotion-Lambda (Block G liefert UI + Datenmodell; Render-Pipeline-Update wäre eigener Block "G+")
+- ❌ Brand Kit Editor selbst (existiert bereits an anderer Stelle — wir nutzen nur)
+- ❌ Stock Footage / Stock Bilder (Block I, separater Plan)
+- ❌ Export-Presets für TikTok/YouTube (Block I)
 
-Nach Freigabe setze ich das in einem Rutsch um.
+---
+
+## Aufwand
+- **Block G:** ~1 Tag (Browser-UI + Lib-Tabelle + SFX Edge Function; Render-Integration von SFX als Folge-Block)
+- **Block H:** ~0.5 Tag (reine UI-Glue, alle Daten existieren)
+
+**Reihenfolge:** Erst H (kürzer, sofort sichtbarer Wert), dann G. Nach Freigabe setze ich beide nacheinander um.
