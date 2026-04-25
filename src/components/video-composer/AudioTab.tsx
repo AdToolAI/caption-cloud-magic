@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
-import { ArrowRight, Loader2, Music, Pause, Play, Search, Upload, UploadCloud, Volume2, X, Zap } from 'lucide-react';
+import { ArrowRight, Library, Loader2, Music, Pause, Play, Search, Upload, UploadCloud, Volume2, X, Zap } from 'lucide-react';
+import MusicLibraryBrowser, { type LibraryTrack } from './MusicLibraryBrowser';
 import {
   Select,
   SelectContent,
@@ -50,11 +51,32 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
   // Beat sync state
   const [analyzingBeats, setAnalyzingBeats] = useState(false);
 
+  // Library browser
+  const [libraryOpen, setLibraryOpen] = useState(false);
+
   // Upload state
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLibrarySelect = useCallback((track: LibraryTrack) => {
+    if (!music) return;
+    musicAudioRef.current?.pause();
+    setMusicPlaying(null);
+    onUpdateAssembly({
+      music: {
+        ...music,
+        trackUrl: track.url,
+        trackName: `${track.title} — ${track.artist}`,
+        isUpload: false,
+        ...(track.mood && { mood: track.mood }),
+        ...(track.genre && { genre: track.genre }),
+      },
+    });
+    setLibraryOpen(false);
+    toast({ title: t('videoComposer.trackSelected'), description: track.title });
+  }, [music, onUpdateAssembly, t]);
 
   // Handle music file upload
   const handleMusicUpload = useCallback(async (file: File | null) => {
@@ -234,6 +256,14 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
+      <MusicLibraryBrowser
+        open={libraryOpen}
+        onOpenChange={setLibraryOpen}
+        initialType="music"
+        allowedTypes={['music', 'sfx']}
+        onSelect={handleLibrarySelect}
+      />
+
       {/* Background Music */}
       <Card className="border-border/40 bg-card/80">
         <CardHeader className="pb-3">
@@ -255,6 +285,26 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
         </CardHeader>
         {music?.enabled && (
           <CardContent className="space-y-4">
+            {/* Library browser CTA — Artlist-style entry point */}
+            <Button
+              onClick={() => setLibraryOpen(true)}
+              className="w-full gap-2 bg-gradient-to-r from-primary/90 to-primary hover:from-primary hover:to-primary/90 text-primary-foreground font-semibold h-11"
+            >
+              <Library className="h-4 w-4" />
+              {t('videoComposer.audio.openLibrary') || 'Browse Music & SFX Library'}
+            </Button>
+
+            <div className="relative py-1">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border/40" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-card px-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {t('videoComposer.audio.orQuickSearch') || 'or quick search'}
+                </span>
+              </div>
+            </div>
+
             {/* Free-text search */}
             <div className="space-y-1.5">
               <Label className="text-xs flex items-center gap-1">
