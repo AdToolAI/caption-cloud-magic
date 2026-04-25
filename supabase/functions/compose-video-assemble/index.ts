@@ -99,8 +99,11 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) throw new Error('Unauthorized');
 
-    const { projectId } = await req.json();
+    const { projectId, aspectOverride, exportId } = await req.json();
     if (!projectId) throw new Error('projectId is required');
+    // Allowed override values match mediaProfilePresets aspect strings
+    const ALLOWED_ASPECTS = new Set(['16:9', '9:16', '1:1', '4:5']);
+    const aspectOverrideValid = aspectOverride && ALLOWED_ASPECTS.has(aspectOverride) ? aspectOverride : null;
 
     console.log('[compose-video-assemble] Starting assembly for project:', projectId);
 
@@ -147,12 +150,15 @@ serve(async (req) => {
     const assemblyConfig = (project.assembly_config as any) || {};
     const briefing = (project.briefing as any) || {};
 
-    // 5. Determine dimensions from aspect ratio
-    const aspectRatio = briefing.aspectRatio || '16:9';
+    // 5. Determine dimensions from aspect ratio (with optional preset override)
+    const aspectRatio = aspectOverrideValid || briefing.aspectRatio || '16:9';
     let width = 1920, height = 1080;
     if (aspectRatio === '9:16') { width = 1080; height = 1920; }
     else if (aspectRatio === '1:1') { width = 1080; height = 1080; }
     else if (aspectRatio === '4:5') { width = 1080; height = 1350; }
+    if (aspectOverrideValid) {
+      console.log('[compose-video-assemble] Aspect override applied:', aspectOverrideValid, `→ ${width}x${height}`);
+    }
 
     // 6. Build Remotion input props — pass DB transition choice through to renderer
     const ALLOWED_TRANSITIONS = new Set(['none', 'fade', 'crossfade', 'wipe', 'slide', 'zoom']);
