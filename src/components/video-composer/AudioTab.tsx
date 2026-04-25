@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
-import { ArrowRight, Loader2, Music, Pause, Play, Search, Upload, UploadCloud, Volume2, X, Zap } from 'lucide-react';
+import { ArrowRight, Library, Loader2, Music, Pause, Play, Search, Upload, UploadCloud, Volume2, X, Zap } from 'lucide-react';
+import MusicLibraryBrowser, { type LibraryTrack } from './MusicLibraryBrowser';
 import {
   Select,
   SelectContent,
