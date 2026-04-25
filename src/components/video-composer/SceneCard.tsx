@@ -195,7 +195,7 @@ export default function SceneCard({
       onUpdate({
         promptMode: 'structured',
         promptSlots: newSlots,
-        aiPrompt: stitchSlots(newSlots),
+        aiPrompt: stitchSlots(newSlots, promptSlotOrder),
         // If the seed brought director modifiers along, apply them too.
         ...(seed?.director_modifiers
           ? { directorModifiers: seed.director_modifiers }
@@ -440,7 +440,7 @@ export default function SceneCard({
                       onChange={handleSlotsChange}
                       clipSource={scene.clipSource}
                       contextHint={scene.aiPrompt}
-                      composedPrompt={stitchSlots(promptSlots)}
+                      composedPrompt={stitchSlots(promptSlots, promptSlotOrder)}
                       language={lang}
                       onOpenStylePresets={() => setStylePickerOpen(true)}
                       onSavePreset={() => setStylePickerOpen(true)}
@@ -491,7 +491,7 @@ export default function SceneCard({
                       promptSlots: preset.slots,
                       directorModifiers: preset.director_modifiers,
                       appliedStylePresetId: preset.id,
-                      aiPrompt: stitchSlots(preset.slots),
+                      aiPrompt: stitchSlots(preset.slots, promptSlotOrder),
                     });
                   }}
                   language={lang}
