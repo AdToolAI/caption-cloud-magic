@@ -213,7 +213,7 @@ serve(async (req) => {
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: body.mode === "suggest" ? 0.85 : 0.4,
+        temperature: body.mode === "suggest" ? 0.85 : body.mode === "inspire" ? 1.05 : 0.4,
       }),
     });
 
