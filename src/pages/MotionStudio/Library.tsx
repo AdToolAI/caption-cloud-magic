@@ -14,6 +14,7 @@ import {
   ImageIcon,
   Sparkles,
   ArrowLeft,
+  Mic,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
@@ -270,11 +271,23 @@ function CharacterGrid({
           <div className="p-3 space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <h3 className="font-semibold text-sm truncate">{c.name}</h3>
-              {c.usage_count > 0 && (
-                <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0">
-                  {c.usage_count}× verwendet
-                </Badge>
-              )}
+              <div className="flex items-center gap-1 shrink-0">
+                {c.voice_id && (
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] h-4 px-1.5 gap-0.5 border-primary/40 text-primary"
+                    title="Voice zugewiesen"
+                  >
+                    <Mic className="h-2.5 w-2.5" />
+                    Voice
+                  </Badge>
+                )}
+                {c.usage_count > 0 && (
+                  <Badge variant="outline" className="text-[9px] h-4 px-1.5">
+                    {c.usage_count}×
+                  </Badge>
+                )}
+              </div>
             </div>
             <p className="text-[11px] text-muted-foreground line-clamp-2 leading-snug">
               {c.description || 'Keine Beschreibung'}
