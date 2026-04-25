@@ -403,8 +403,18 @@ serve(async (req) => {
         project_id: projectId,
         composer_project_id: projectId,
         source: 'composer',
+        export_id: exportId || null,
       },
     };
+
+    // If this is a preset export, link the render id to the export row
+    if (exportId) {
+      await supabase
+        .from('composer_exports')
+        .update({ render_id: renderId, status: 'rendering' })
+        .eq('id', exportId)
+        .eq('user_id', user.id);
+    }
 
     const hasAudio = !!inputProps.voiceoverUrl || !!inputProps.backgroundMusicUrl;
 
