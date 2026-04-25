@@ -260,6 +260,35 @@ serve(async (req) => {
       );
     }
 
+    if (body.mode === "inspire") {
+      // Robust JSON extraction: model may wrap with ```json fences.
+      let jsonText = raw;
+      const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+      if (fenceMatch) jsonText = fenceMatch[1].trim();
+      const firstBrace = jsonText.indexOf("{");
+      const lastBrace = jsonText.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        jsonText = jsonText.slice(firstBrace, lastBrace + 1);
+      }
+      let slots: Record<string, string> = {};
+      try {
+        const parsed = JSON.parse(jsonText);
+        for (const k of ["subject", "action", "setting", "timeWeather", "style", "negative"]) {
+          if (typeof parsed[k] === "string") slots[k] = parsed[k].trim();
+        }
+      } catch (e) {
+        console.error("[structured-prompt-compose] inspire JSON parse failed", e, raw);
+        return new Response(
+          JSON.stringify({ error: "Failed to parse inspire JSON", raw }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ slots }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // compose / condense → return as `prompt`
     const { count, unit } = countTokens(raw, targetModel);
     const warnings: string[] = [];
