@@ -182,6 +182,15 @@ export default function LocationEditor({
 
           <div className="space-y-2">
             <Label className="text-xs">Referenzbild (optional)</Label>
+            {!hasConsent && !location && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
+                <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Beim ersten Upload bestätigst du einmalig die Bildrechte. Danach läuft jeder
+                  weitere Upload ohne Rückfrage.
+                </p>
+              </div>
+            )}
             {draft.reference_image_url ? (
               <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-background/50 p-3">
                 <img
