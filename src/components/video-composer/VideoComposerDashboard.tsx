@@ -129,7 +129,10 @@ export default function VideoComposerDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  // Auto-open template picker when starting fresh (no draft on mount)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(() => !loadDraft());
   const { ensureProjectPersisted } = useComposerPersistence();
+  const incrementTemplateUsage = useIncrementTemplateUsage();
   const didInitialSyncRef = useRef(false);
 
   // DB sync on mount: if the loaded draft has a project.id, hydrate scenes from DB
