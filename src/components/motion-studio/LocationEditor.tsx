@@ -307,6 +307,16 @@ export default function LocationEditor({
           </Button>
         </div>
       </DialogContent>
+
+      <LibraryUploadConsentDialog
+        open={showConsentDialog}
+        onOpenChange={(o) => {
+          setShowConsentDialog(o);
+          if (!o) setPendingFile(null);
+        }}
+        onAccepted={handleConsentAccepted}
+        context="location"
+      />
     </Dialog>
   );
 }
