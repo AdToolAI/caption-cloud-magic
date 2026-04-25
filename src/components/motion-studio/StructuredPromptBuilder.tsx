@@ -339,10 +339,11 @@ export default function StructuredPromptBuilder({
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
-    const from = reorderableIds.indexOf(active.id as keyof PromptSlots);
-    const to = reorderableIds.indexOf(over.id as keyof PromptSlots);
+    const ids = reorderableIds as Array<keyof PromptSlots>;
+    const from = ids.indexOf(active.id as keyof PromptSlots);
+    const to = ids.indexOf(over.id as keyof PromptSlots);
     if (from < 0 || to < 0) return;
-    const nextReorderable = arrayMove(reorderableIds, from, to);
+    const nextReorderable = arrayMove(ids, from, to);
     onOrderChange?.(nextReorderable);
   };
 
