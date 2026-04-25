@@ -229,38 +229,39 @@ export default function MotionStudioHub() {
             </div>
             <div className="lg:col-span-2 space-y-4">
               <h2 className="text-2xl font-semibold">Module</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {QUICK_ACTIONS.map((a) => (
-                <Link key={a.href} to={a.href} className="group">
-                  <Card
-                    className={`relative p-6 h-full overflow-hidden transition-all hover:scale-[1.01] hover:shadow-2xl border-border/50 backdrop-blur-xl bg-card/60`}
-                  >
-                    <div
-                      className={`absolute inset-0 bg-gradient-to-br ${a.accent} opacity-50 group-hover:opacity-80 transition-opacity`}
-                    />
-                    <div className="relative space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="h-12 w-12 rounded-xl bg-background/80 backdrop-blur flex items-center justify-center">
-                          <a.icon className="h-6 w-6 text-primary" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {QUICK_ACTIONS.map((a) => (
+                  <Link key={a.href} to={a.href} className="group">
+                    <Card
+                      className={`relative p-6 h-full overflow-hidden transition-all hover:scale-[1.01] hover:shadow-2xl border-border/50 backdrop-blur-xl bg-card/60`}
+                    >
+                      <div
+                        className={`absolute inset-0 bg-gradient-to-br ${a.accent} opacity-50 group-hover:opacity-80 transition-opacity`}
+                      />
+                      <div className="relative space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="h-12 w-12 rounded-xl bg-background/80 backdrop-blur flex items-center justify-center">
+                            <a.icon className="h-6 w-6 text-primary" />
+                          </div>
+                          {a.badge && (
+                            <Badge className="bg-primary/20 text-primary border-primary/30">
+                              {a.badge}
+                            </Badge>
+                          )}
                         </div>
-                        {a.badge && (
-                          <Badge className="bg-primary/20 text-primary border-primary/30">
-                            {a.badge}
-                          </Badge>
-                        )}
+                        <div>
+                          <h3 className="text-lg font-semibold">{a.title}</h3>
+                          <p className="text-sm text-muted-foreground mt-1">{a.desc}</p>
+                        </div>
+                        <div className="flex items-center text-sm text-primary group-hover:gap-2 transition-all">
+                          Öffnen
+                          <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-lg font-semibold">{a.title}</h3>
-                        <p className="text-sm text-muted-foreground mt-1">{a.desc}</p>
-                      </div>
-                      <div className="flex items-center text-sm text-primary group-hover:gap-2 transition-all">
-                        Öffnen
-                        <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
-              ))}
+                    </Card>
+                  </Link>
+                ))}
+              </div>
             </div>
           </section>
 
