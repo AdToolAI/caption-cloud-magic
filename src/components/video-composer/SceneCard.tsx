@@ -33,8 +33,16 @@ import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
 import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
+import StructuredPromptBuilder from '@/components/motion-studio/StructuredPromptBuilder';
+import StylePresetPicker from '@/components/motion-studio/StylePresetPicker';
 import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
+import {
+  stitchSlots,
+  naiveSplitToSlots,
+  hasAnySlot,
+  type PromptSlots,
+} from '@/lib/motion-studio/structuredPromptStitcher';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 
 interface SceneCardProps {
