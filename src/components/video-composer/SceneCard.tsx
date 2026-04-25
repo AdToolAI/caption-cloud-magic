@@ -30,6 +30,8 @@ import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALIT
 import SceneMediaUpload from './SceneMediaUpload';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
+import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
+import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
 
 interface SceneCardProps {
   scene: ComposerScene;
