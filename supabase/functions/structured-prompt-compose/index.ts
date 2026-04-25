@@ -26,7 +26,7 @@ const corsHeaders = {
 type SlotKey = "subject" | "action" | "setting" | "timeWeather" | "style" | "negative";
 
 interface ComposeBody {
-  mode: "compose" | "suggest" | "condense";
+  mode: "compose" | "suggest" | "condense" | "inspire";
   slots?: Partial<Record<SlotKey, string>>;
   slot?: SlotKey;
   contextHint?: string;
@@ -41,6 +41,8 @@ interface ComposeBody {
   /** condense mode: max words/chars allowed in output. */
   targetLimit?: number;
   promptText?: string;
+  /** inspire mode: optional seed style to riff on (e.g. "cinematic drama"). */
+  seedStyle?: string;
 }
 
 const MODEL_STYLE_HINT: Record<string, string> = {
@@ -80,6 +82,22 @@ The user provides 6 structured slots. Your job:
 Given the user's other slot values and a free-text context hint, write ONE concise suggestion (in ENGLISH, ≤ 25 words) for the requested slot only.
 Do not duplicate content already in other slots. Do not add quotes or labels.
 Output ONLY the suggestion, plain text, single line.`;
+  }
+
+  if (mode === "inspire") {
+    return `You are an expert AI cinematographer pitching a fresh, vivid one-shot scene idea.
+
+Invent ONE original cinematic moment (NOT generic, NOT a cliché). Mix uncommon subject matter with strong visual style.
+Return STRICT JSON only — no markdown fences, no commentary — matching this shape:
+{
+  "subject":     "...",
+  "action":      "...",
+  "setting":     "...",
+  "timeWeather": "...",
+  "style":       "...",
+  "negative":    "no text, no logos, no subtitles"
+}
+All values in ENGLISH. Each field ≤ 18 words. The 6 fields together should describe ONE coherent shot a director could film.`;
   }
 
   // condense
@@ -122,6 +140,18 @@ function buildUserPrompt(body: ComposeBody): string {
     ].join("\n");
   }
 
+  if (body.mode === "inspire") {
+    const seed = body.seedStyle?.trim();
+    return [
+      `Source language: ${body.language ?? "en"}`,
+      `Target model: ${body.targetModel ?? "ai-sora"}`,
+      seed ? `Seed style to riff on: ${seed}` : `No seed — invent freely.`,
+      `Context hint (avoid duplicating): ${body.contextHint ?? "(none)"}`,
+      "",
+      "Return strict JSON with the 6 slot fields described in the system prompt.",
+    ].join("\n");
+  }
+
   // condense
   return [
     `Target limit: ${body.targetLimit ?? 400} units`,
@@ -148,9 +178,9 @@ serve(async (req) => {
   try {
     const body = (await req.json()) as ComposeBody;
 
-    if (!body.mode || !["compose", "suggest", "condense"].includes(body.mode)) {
+    if (!body.mode || !["compose", "suggest", "condense", "inspire"].includes(body.mode)) {
       return new Response(
-        JSON.stringify({ error: "mode must be 'compose' | 'suggest' | 'condense'" }),
+        JSON.stringify({ error: "mode must be 'compose' | 'suggest' | 'condense' | 'inspire'" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -183,7 +213,7 @@ serve(async (req) => {
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: body.mode === "suggest" ? 0.85 : 0.4,
+        temperature: body.mode === "suggest" ? 0.85 : body.mode === "inspire" ? 1.05 : 0.4,
       }),
     });
 
@@ -226,6 +256,35 @@ serve(async (req) => {
       const suggestion = raw.replace(/^["'`]+|["'`]+$/g, "").trim();
       return new Response(
         JSON.stringify({ suggestion }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (body.mode === "inspire") {
+      // Robust JSON extraction: model may wrap with ```json fences.
+      let jsonText = raw;
+      const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+      if (fenceMatch) jsonText = fenceMatch[1].trim();
+      const firstBrace = jsonText.indexOf("{");
+      const lastBrace = jsonText.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        jsonText = jsonText.slice(firstBrace, lastBrace + 1);
+      }
+      let slots: Record<string, string> = {};
+      try {
+        const parsed = JSON.parse(jsonText);
+        for (const k of ["subject", "action", "setting", "timeWeather", "style", "negative"]) {
+          if (typeof parsed[k] === "string") slots[k] = parsed[k].trim();
+        }
+      } catch (e) {
+        console.error("[structured-prompt-compose] inspire JSON parse failed", e, raw);
+        return new Response(
+          JSON.stringify({ error: "Failed to parse inspire JSON", raw }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ slots }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

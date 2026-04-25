@@ -35,6 +35,7 @@ import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicke
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import StructuredPromptBuilder from '@/components/motion-studio/StructuredPromptBuilder';
 import StylePresetPicker from '@/components/motion-studio/StylePresetPicker';
+import MultiEnginePromptPreview from '@/components/motion-studio/MultiEnginePromptPreview';
 import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
 import {
@@ -43,7 +44,11 @@ import {
   hasAnySlot,
   type PromptSlots,
 } from '@/lib/motion-studio/structuredPromptStitcher';
+import { clipSourceToModelKey } from '@/lib/motion-studio/promptTokenLimits';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useStylePresets } from '@/hooks/useStylePresets';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface SceneCardProps {
   scene: ComposerScene;
@@ -100,6 +105,13 @@ export default function SceneCard({
   const [stockBrowserOpen, setStockBrowserOpen] = useState(false);
   // Block K — Style Preset Picker open state
   const [stylePickerOpen, setStylePickerOpen] = useState(false);
+  // Block K-5 — Inspire-Me loading flag
+  const [inspiring, setInspiring] = useState(false);
+  // Block K-6 — Multi-Engine Preview open state
+  const [multiEngineOpen, setMultiEngineOpen] = useState(false);
+
+  // Block K-5: pull system presets to seed inspire variation
+  const { systemPresets } = useStylePresets();
 
   const promptMode: 'free' | 'structured' = scene.promptMode ?? 'free';
   const promptSlots: PromptSlots = scene.promptSlots ?? {};
@@ -119,6 +131,65 @@ export default function SceneCard({
   const handleSlotsChange = (next: PromptSlots) => {
     const stitched = stitchSlots(next);
     onUpdate({ promptSlots: next, aiPrompt: stitched });
+  };
+
+  // Block K-5 — Inspire Me: roll a random scene idea via the edge function.
+  // Optionally seeds the AI with a random system preset's name for variation.
+  const handleInspireMe = async () => {
+    setInspiring(true);
+    try {
+      const seed =
+        systemPresets && systemPresets.length > 0
+          ? systemPresets[Math.floor(Math.random() * systemPresets.length)]
+          : null;
+      const targetModel = clipSourceToModelKey(scene.clipSource) ?? 'ai-sora';
+      const { data, error } = await supabase.functions.invoke(
+        'structured-prompt-compose',
+        {
+          body: {
+            mode: 'inspire',
+            language: lang,
+            targetModel,
+            seedStyle: seed?.name,
+            contextHint: scene.aiPrompt?.slice(0, 400) ?? '',
+          },
+        }
+      );
+      if (error) throw error;
+      const newSlots: PromptSlots | undefined = data?.slots;
+      if (!newSlots || Object.keys(newSlots).length === 0) {
+        throw new Error('Empty inspire response');
+      }
+      // Apply slots + flip to structured mode + sync free-text via stitcher.
+      onUpdate({
+        promptMode: 'structured',
+        promptSlots: newSlots,
+        aiPrompt: stitchSlots(newSlots),
+        // If the seed brought director modifiers along, apply them too.
+        ...(seed?.director_modifiers
+          ? { directorModifiers: seed.director_modifiers }
+          : {}),
+      });
+      toast({
+        title: lang === 'de' ? '🎲 Neue Szenenidee' : lang === 'es' ? '🎲 Nueva idea de escena' : '🎲 Fresh scene idea',
+        description: seed?.name
+          ? lang === 'de'
+            ? `Inspiriert von „${seed.name}"`
+            : lang === 'es'
+            ? `Inspirado en "${seed.name}"`
+            : `Inspired by "${seed.name}"`
+          : undefined,
+      });
+    } catch (e: any) {
+      console.error('[SceneCard] inspire failed', e);
+      toast({
+        title: lang === 'de' ? 'Inspire fehlgeschlagen' : lang === 'es' ? 'Falló la inspiración' : 'Inspire failed',
+        description: e?.message ?? '',
+        variant: 'destructive',
+      });
+    } finally {
+      setInspiring(false);
+    }
   };
 
 
@@ -342,9 +413,41 @@ export default function SceneCard({
                       language={lang}
                       onOpenStylePresets={() => setStylePickerOpen(true)}
                       onSavePreset={() => setStylePickerOpen(true)}
+                      onInspireMe={inspiring ? undefined : handleInspireMe}
                     />
                   )}
                 </div>
+
+                {/* Block K-6 — Multi-Engine Preview (only in structured mode with content) */}
+                {promptMode === 'structured' && hasAnySlot(promptSlots) && (
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => setMultiEngineOpen((v) => !v)}
+                      className="text-[10px] text-primary/80 hover:text-primary flex items-center gap-1"
+                    >
+                      <Sparkles className="h-2.5 w-2.5" />
+                      {multiEngineOpen
+                        ? lang === 'de'
+                          ? 'Multi-Engine ausblenden'
+                          : lang === 'es'
+                          ? 'Ocultar multi-motor'
+                          : 'Hide multi-engine'
+                        : lang === 'de'
+                        ? 'Multi-Engine Vorschau anzeigen'
+                        : lang === 'es'
+                        ? 'Mostrar vista multi-motor'
+                        : 'Show multi-engine preview'}
+                    </button>
+                    {multiEngineOpen && (
+                      <MultiEnginePromptPreview
+                        slots={promptSlots}
+                        language={lang}
+                        defaultModel={clipSourceToModelKey(scene.clipSource) ?? 'ai-sora'}
+                      />
+                    )}
+                  </div>
+                )}
 
                 <StylePresetPicker
                   open={stylePickerOpen}
