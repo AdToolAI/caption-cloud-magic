@@ -66,6 +66,76 @@ serve(async (req) => {
         })
         .eq('id', sceneId);
 
+      // 🎬 BLOCK F — Continuity Auto-Trigger
+      // Fire-and-forget: extract last frame so the NEXT scene can chain off it.
+      // We do this only if the next scene exists and has no reference image yet.
+      try {
+        const { data: currentScene } = await supabase
+          .from('composer_scenes')
+          .select('scene_index, duration_seconds')
+          .eq('id', sceneId)
+          .single();
+
+        if (currentScene) {
+          const { data: nextScene } = await supabase
+            .from('composer_scenes')
+            .select('id, reference_image_url')
+            .eq('project_id', projectId)
+            .eq('scene_index', (currentScene.scene_index ?? 0) + 1)
+            .maybeSingle();
+
+          // Always extract the last frame for the current scene (so it's cached
+          // for later "use as ref" actions). Skip auto-chain if the next scene
+          // already has its own reference image.
+          const shouldChain = nextScene && !nextScene.reference_image_url;
+
+          // Don't await — let it run in background so the webhook responds fast.
+          const extractPromise = supabase.functions.invoke('extract-video-last-frame', {
+            body: {
+              videoUrl: permanentUrl,
+              durationSeconds: currentScene.duration_seconds ?? 5,
+              sceneId,
+              projectId,
+            },
+          }).then(async ({ data, error }) => {
+            if (error) {
+              console.error('[compose-clip-webhook] extract-frame failed:', error);
+              return;
+            }
+            const frameUrl = (data as any)?.lastFrameUrl;
+            if (frameUrl && shouldChain && nextScene) {
+              await supabase
+                .from('composer_scenes')
+                .update({
+                  reference_image_url: frameUrl,
+                  reference_source: 'continuity_auto',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', nextScene.id);
+              console.log(
+                `[compose-clip-webhook] 🔗 Continuity chained: scene ${sceneId} → ${nextScene.id}`
+              );
+            } else if (frameUrl) {
+              console.log(
+                `[compose-clip-webhook] 📸 Last frame cached for scene ${sceneId} (no chain)`
+              );
+            }
+          }).catch((e) => {
+            console.error('[compose-clip-webhook] extract-frame threw:', e);
+          });
+
+          // EdgeRuntime keeps the background task alive after the response.
+          // @ts-ignore — Deno Deploy / Supabase edge runtime API
+          if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+            // @ts-ignore
+            EdgeRuntime.waitUntil(extractPromise);
+          }
+        }
+      } catch (chainErr) {
+        // Never fail the webhook because of continuity issues
+        console.error('[compose-clip-webhook] continuity chain error:', chainErr);
+      }
+
     } else if (status === 'failed') {
       console.error(`[compose-clip-webhook] Clip failed:`, predError);
 
