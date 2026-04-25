@@ -32,7 +32,7 @@ export function useLegalConsent(type: ConsentType) {
     }
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('user_legal_consents')
         .select('id')
         .eq('user_id', user.id)
