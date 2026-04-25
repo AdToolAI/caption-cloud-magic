@@ -56,7 +56,7 @@ export function useLegalConsent(type: ConsentType) {
   const recordConsent = useCallback(
     async (metadata: Record<string, unknown> = {}) => {
       if (!user) return false;
-      const { error } = await supabase.from('user_legal_consents').insert({
+      const { error } = await (supabase as any).from('user_legal_consents').insert({
         user_id: user.id,
         consent_type: type,
         consent_version: requiredVersion,
