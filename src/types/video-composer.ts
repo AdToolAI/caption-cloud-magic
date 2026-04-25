@@ -19,7 +19,17 @@ export type ComposerStatus = 'draft' | 'storyboard' | 'generating' | 'assembling
 
 export type SceneType = 'hook' | 'problem' | 'solution' | 'demo' | 'social-proof' | 'cta' | 'custom';
 
-export type ClipSource = 'ai-hailuo' | 'ai-kling' | 'ai-sora' | 'ai-image' | 'stock' | 'stock-image' | 'upload';
+export type ClipSource =
+  | 'ai-hailuo'
+  | 'ai-kling'
+  | 'ai-sora'
+  | 'ai-wan'
+  | 'ai-seedance'
+  | 'ai-luma'
+  | 'ai-image'
+  | 'stock'
+  | 'stock-image'
+  | 'upload';
 
 export type StockMediaSource = 'pixabay' | 'pexels';
 
