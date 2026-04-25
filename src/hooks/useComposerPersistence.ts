@@ -29,6 +29,22 @@ export async function persistAssemblyConfig(
   }
 }
 
+/** Persist brand kit selection + auto-sync flag for a composer project. */
+export async function persistBrandKit(
+  projectId: string,
+  brandKitId: string | null,
+  autoSync: boolean
+): Promise<void> {
+  if (!projectId) return;
+  const { error } = await supabase
+    .from('composer_projects')
+    .update({ brand_kit_id: brandKitId, brand_kit_auto_sync: autoSync } as any)
+    .eq('id', projectId);
+  if (error) {
+    console.warn('[persistence] persistBrandKit failed:', error);
+  }
+}
+
 export interface PersistableProject {
   id?: string;
   title: string;
@@ -39,6 +55,8 @@ export interface PersistableProject {
   assemblyConfig: AssemblyConfig;
   totalCostEuros: number;
   language: string;
+  brandKitId?: string | null;
+  brandKitAutoSync?: boolean;
 }
 
 export interface PersistResult {
@@ -72,7 +90,9 @@ export function useComposerPersistence() {
             assembly_config: project.assemblyConfig as any,
             total_cost_euros: project.totalCostEuros || 0,
             language: project.language || 'de',
-          })
+            brand_kit_id: project.brandKitId ?? null,
+            brand_kit_auto_sync: project.brandKitAutoSync ?? false,
+          } as any)
           .select('id')
           .single();
 

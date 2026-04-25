@@ -35,8 +35,9 @@ import { VISUAL_STYLES } from '@/config/composerVisualStyles';
 import CharacterManager from './CharacterManager';
 import VideoModeSelector from './VideoModeSelector';
 import LibraryPicker, { type LibraryItem } from '@/components/motion-studio/LibraryPicker';
+import BrandKitApplyPanel from './BrandKitApplyPanel';
 import { Library } from 'lucide-react';
-import type { VideoMode } from '@/types/video-composer';
+import type { VideoMode, AssemblyConfig } from '@/types/video-composer';
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string; desc: string }[] = [
   { value: '16:9', label: '16:9', desc: 'YouTube / Landscape' },
@@ -54,6 +55,12 @@ interface BriefingTabProps {
   onUpdateProject: (p: Record<string, any>) => void;
   onGoToStoryboard: () => void;
   onScenesGenerated: (scenes: ComposerScene[]) => void;
+  brandKitId?: string | null;
+  brandKitAutoSync?: boolean;
+  assemblyConfig?: AssemblyConfig;
+  onChangeBrandKit?: (id: string | null) => void;
+  onChangeBrandKitAutoSync?: (sync: boolean) => void;
+  onApplyAssembly?: (next: AssemblyConfig) => void;
 }
 
 /**
@@ -144,6 +151,12 @@ export default function BriefingTab({
   onUpdateProject,
   onGoToStoryboard,
   onScenesGenerated,
+  brandKitId,
+  brandKitAutoSync,
+  assemblyConfig,
+  onChangeBrandKit,
+  onChangeBrandKitAutoSync,
+  onApplyAssembly,
 }: BriefingTabProps) {
   const { t } = useTranslation();
   const [uspInput, setUspInput] = useState('');
@@ -696,6 +709,18 @@ export default function BriefingTab({
           </div>
         </CardContent>
       </Card>
+
+      {/* Brand Kit Auto-Apply */}
+      {assemblyConfig && onChangeBrandKit && onChangeBrandKitAutoSync && onApplyAssembly && (
+        <BrandKitApplyPanel
+          brandKitId={brandKitId ?? null}
+          autoSync={brandKitAutoSync ?? false}
+          assemblyConfig={assemblyConfig}
+          onChangeBrandKit={onChangeBrandKit}
+          onChangeAutoSync={onChangeBrandKitAutoSync}
+          onApplyAssembly={onApplyAssembly}
+        />
+      )}
 
       {/* Action */}
       <div className="flex justify-end">
