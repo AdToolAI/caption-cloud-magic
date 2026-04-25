@@ -237,7 +237,7 @@ export default function SceneCard({
   };
 
   return (
-    <Card className="border-border/40 bg-card/80 group">
+    <Card ref={cardRef as any} className="border-border/40 bg-card/80 group">
       <CardContent className="p-4">
         <div className="flex gap-3">
           {/* Drag handle + order */}
