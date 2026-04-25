@@ -11,6 +11,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import ColorGradingSelector from './ColorGradingSelector';
 import WatermarkEditor from './WatermarkEditor';
 import ComposerSequencePreview from './ComposerSequencePreview';
+import CostEstimationPanel from './CostEstimationPanel';
 import type { AssemblyConfig, ComposerScene, WatermarkConfig } from '@/types/video-composer';
 import { DEFAULT_WATERMARK_CONFIG, getClipCost } from '@/types/video-composer';
 import { persistAssemblyConfig } from '@/hooks/useComposerPersistence';
@@ -526,6 +527,15 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Cost Estimation — radical price transparency before render */}
+      {!videoUrl && renderStatus !== 'completed' && (
+        <CostEstimationPanel
+          scenes={scenes}
+          assemblyConfig={assemblyConfig}
+          templateId={project?.template_id || project?.templateId}
+        />
       )}
 
       {/* Render Button */}
