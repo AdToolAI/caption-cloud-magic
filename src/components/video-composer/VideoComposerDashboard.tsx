@@ -260,7 +260,67 @@ export default function VideoComposerDashboard() {
     setActiveTab('briefing');
     setError(null);
     setShowResetDialog(false);
+    setShowTemplatePicker(true);
   }, []);
+
+  const handleStartBlank = useCallback(() => {
+    setShowTemplatePicker(false);
+  }, []);
+
+  const applyTemplate = useCallback((tpl: MotionStudioTemplate) => {
+    const sceneSuggestions = Array.isArray(tpl.scene_suggestions) ? tpl.scene_suggestions : [];
+
+    const newScenes: ComposerScene[] = sceneSuggestions.map((s, idx) => ({
+      id: `tpl-${tpl.id}-${idx}-${Date.now()}`,
+      orderIndex: idx,
+      sceneType: (s.sceneType ?? 'custom') as ComposerScene['sceneType'],
+      durationSeconds: s.durationSeconds ?? 5,
+      clipSource: (s.clipSource ?? 'ai-hailuo') as ClipSource,
+      clipQuality: (s.clipQuality ?? 'standard') as ClipQuality,
+      aiPrompt: s.aiPrompt,
+      clipStatus: 'pending' as ClipStatus,
+      textOverlay: {
+        text: '',
+        position: 'bottom',
+        animation: 'fade-in',
+        fontSize: 48,
+        color: '#FFFFFF',
+      },
+      transitionType: (s.transitionType ?? 'fade') as ComposerScene['transitionType'],
+      transitionDuration: s.transitionDuration ?? 0.5,
+      retryCount: 0,
+      costEuros: 0,
+      directorModifiers: {},
+    }));
+
+    setProject({
+      ...defaultProject,
+      title: tpl.name,
+      category: tpl.category,
+      briefing: {
+        ...defaultProject.briefing,
+        ...tpl.briefing_defaults,
+        // briefing_defaults may set duration/aspectRatio; ensure required strings still exist
+        productName: defaultProject.briefing.productName,
+        productDescription: defaultProject.briefing.productDescription,
+        usps: defaultProject.briefing.usps,
+        targetAudience: defaultProject.briefing.targetAudience,
+        brandColors: defaultProject.briefing.brandColors,
+        characters: defaultProject.briefing.characters,
+      },
+      scenes: newScenes,
+    });
+    setActiveTab('briefing');
+    setShowTemplatePicker(false);
+
+    // Fire-and-forget usage counter
+    incrementTemplateUsage.mutate(tpl.id);
+
+    toast({
+      title: 'Template übernommen',
+      description: `"${tpl.name}" mit ${newScenes.length} Szenen geladen. Vervollständige jetzt das Briefing.`,
+    });
+  }, [incrementTemplateUsage]);
 
   // One-shot DB re-fetch when user switches BACK to the Clips tab
   const handleTabChange = useCallback(async (next: TabId) => {
