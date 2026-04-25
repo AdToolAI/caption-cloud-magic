@@ -35,6 +35,7 @@ import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicke
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import StructuredPromptBuilder from '@/components/motion-studio/StructuredPromptBuilder';
 import StylePresetPicker from '@/components/motion-studio/StylePresetPicker';
+import MultiEnginePromptPreview from '@/components/motion-studio/MultiEnginePromptPreview';
 import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
 import {
@@ -43,7 +44,11 @@ import {
   hasAnySlot,
   type PromptSlots,
 } from '@/lib/motion-studio/structuredPromptStitcher';
+import { clipSourceToModelKey } from '@/lib/motion-studio/promptTokenLimits';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useStylePresets } from '@/hooks/useStylePresets';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface SceneCardProps {
   scene: ComposerScene;
