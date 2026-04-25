@@ -345,49 +345,45 @@ export const SCENE_TYPE_LABELS: Record<SceneType, { de: string; en: string; es: 
 
 // Clip source labels
 export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> = {
-  'ai-hailuo': { de: 'KI (Hailuo)', en: 'AI (Hailuo)' },
-  'ai-kling': { de: 'KI (Kling)', en: 'AI (Kling)' },
-  'ai-sora': { de: 'KI (Sora)', en: 'AI (Sora)' },
-  'ai-image': { de: 'KI Bild (Gemini)', en: 'AI Image (Gemini)' },
-  stock: { de: 'Stock Video', en: 'Stock Video' },
+  'ai-hailuo':   { de: 'KI (Hailuo)', en: 'AI (Hailuo)' },
+  'ai-kling':    { de: 'KI (Kling)', en: 'AI (Kling)' },
+  'ai-sora':     { de: 'KI (Sora)', en: 'AI (Sora)' },
+  'ai-wan':      { de: 'KI (Wan 2.5)', en: 'AI (Wan 2.5)' },
+  'ai-seedance': { de: 'KI (Seedance)', en: 'AI (Seedance)' },
+  'ai-luma':     { de: 'KI (Luma Ray 2)', en: 'AI (Luma Ray 2)' },
+  'ai-image':    { de: 'KI Bild (Gemini)', en: 'AI Image (Gemini)' },
+  stock:         { de: 'Stock Video', en: 'Stock Video' },
   'stock-image': { de: 'Stock Bild', en: 'Stock Image' },
-  upload: { de: 'Eigener Upload', en: 'Own Upload' },
+  upload:        { de: 'Eigener Upload', en: 'Own Upload' },
 };
 
 // Estimated costs per clip source × quality tier — EUR per second
-// Standard = lower resolution (Hailuo 768p / Kling 720p / Sora std)
-// Pro = higher resolution (Hailuo 1080p / Kling 1080p / Sora pro)
-// AI Image = flat ~5 credits per scene regardless of duration → ~€0.05/sec equivalent
 export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> = {
-  'ai-hailuo': { standard: 0.15, pro: 0.20 },
-  'ai-kling':  { standard: 0.15, pro: 0.21 },
-  'ai-sora':   { standard: 0.25, pro: 0.53 },
-  'ai-image':  { standard: 0.01, pro: 0.015 }, // ~€0.05-0.07 per 5s scene
-  stock:        { standard: 0, pro: 0 },
+  'ai-hailuo':   { standard: 0.15, pro: 0.20 },
+  'ai-kling':    { standard: 0.15, pro: 0.21 },
+  'ai-sora':     { standard: 0.25, pro: 0.53 },
+  'ai-wan':      { standard: 0.10, pro: 0.18 },
+  'ai-seedance': { standard: 0.12, pro: 0.20 },
+  'ai-luma':     { standard: 0.20, pro: 0.32 },
+  'ai-image':    { standard: 0.01, pro: 0.015 },
+  stock:         { standard: 0, pro: 0 },
   'stock-image': { standard: 0, pro: 0 },
-  upload:       { standard: 0, pro: 0 },
+  upload:        { standard: 0, pro: 0 },
 };
 
 // Quality tier labels & resolution hints
 export const QUALITY_LABELS: Record<ClipSource, Record<ClipQuality, string>> = {
-  'ai-hailuo': { standard: 'Standard 768p', pro: 'Pro 1080p' },
-  'ai-kling':  { standard: 'Standard 720p', pro: 'Pro 1080p' },
-  'ai-sora':   { standard: 'Standard',      pro: 'Pro' },
-  'ai-image':  { standard: 'Nano Banana 2', pro: 'Gemini 3 Pro' },
-  stock:        { standard: '-', pro: '-' },
+  'ai-hailuo':   { standard: 'Standard 768p', pro: 'Pro 1080p' },
+  'ai-kling':    { standard: 'Standard 720p', pro: 'Pro 1080p' },
+  'ai-sora':     { standard: 'Standard',      pro: 'Pro' },
+  'ai-wan':      { standard: 'Standard 720p', pro: 'Pro 1080p' },
+  'ai-seedance': { standard: 'Standard 720p', pro: 'Pro 1080p' },
+  'ai-luma':     { standard: 'Ray 2 720p',    pro: 'Ray 2 720p+' },
+  'ai-image':    { standard: 'Nano Banana 2', pro: 'Gemini 3 Pro' },
+  stock:         { standard: '-', pro: '-' },
   'stock-image': { standard: '-', pro: '-' },
-  upload:       { standard: '-', pro: '-' },
+  upload:        { standard: '-', pro: '-' },
 };
-
-/** Returns total cost for a clip in EUR. */
-export function getClipCost(source: ClipSource, quality: ClipQuality, durationSec: number): number {
-  return (CLIP_SOURCE_COSTS[source]?.[quality] ?? 0) * durationSec;
-}
-
-/** Returns the per-second rate. */
-export function getClipRate(source: ClipSource, quality: ClipQuality): number {
-  return CLIP_SOURCE_COSTS[source]?.[quality] ?? 0;
-}
 
 export const CATEGORY_LABELS: Record<ComposerCategory, { de: string; en: string; es: string }> = {
   'product-ad': { de: 'Produktvideo', en: 'Product Ad', es: 'Anuncio de Producto' },
