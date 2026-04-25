@@ -1,4 +1,4 @@
-// (no useState needed after overlay editor moved to TextSubtitlesTab)
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,6 +28,7 @@ import type {
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALITY_LABELS } from '@/types/video-composer';
 
 import SceneMediaUpload from './SceneMediaUpload';
+import StockMediaBrowser, { type StockMediaItem } from './StockMediaBrowser';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
 import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
@@ -42,6 +43,8 @@ interface SceneCardProps {
   totalScenes: number;
   projectId?: string;
   characters?: ComposerCharacter[];
+  /** Aspect ratio from briefing — used to filter Stock Library results. */
+  preferredAspect?: '16:9' | '9:16' | '1:1' | '4:5';
   onUpdate: (updates: Partial<ComposerScene>) => void;
   onDelete: () => void;
   onMoveUp: () => void;
