@@ -3558,6 +3558,158 @@ export type Database = {
         }
         Relationships: []
       }
+      compare_lab_outputs: {
+        Row: {
+          ai_judge_score: number | null
+          completed_at: string | null
+          cost_euros: number | null
+          created_at: string
+          duration_seconds: number | null
+          engine: string
+          error_message: string | null
+          generation_id: string | null
+          id: string
+          is_ai_pick: boolean
+          is_user_winner: boolean
+          metadata: Json | null
+          model: string
+          run_id: string
+          status: string
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+          user_note: string | null
+          user_rating: number | null
+          video_url: string | null
+        }
+        Insert: {
+          ai_judge_score?: number | null
+          completed_at?: string | null
+          cost_euros?: number | null
+          created_at?: string
+          duration_seconds?: number | null
+          engine: string
+          error_message?: string | null
+          generation_id?: string | null
+          id?: string
+          is_ai_pick?: boolean
+          is_user_winner?: boolean
+          metadata?: Json | null
+          model: string
+          run_id: string
+          status?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+          user_note?: string | null
+          user_rating?: number | null
+          video_url?: string | null
+        }
+        Update: {
+          ai_judge_score?: number | null
+          completed_at?: string | null
+          cost_euros?: number | null
+          created_at?: string
+          duration_seconds?: number | null
+          engine?: string
+          error_message?: string | null
+          generation_id?: string | null
+          id?: string
+          is_ai_pick?: boolean
+          is_user_winner?: boolean
+          metadata?: Json | null
+          model?: string
+          run_id?: string
+          status?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+          user_note?: string | null
+          user_rating?: number | null
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compare_lab_outputs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "compare_lab_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compare_lab_runs: {
+        Row: {
+          ai_judge_completed_at: string | null
+          ai_judge_reasoning: string | null
+          ai_judge_scores: Json | null
+          ai_judge_winner_engine: string | null
+          aspect_ratio: string
+          completed_at: string | null
+          composer_scene_id: string | null
+          created_at: string
+          currency: string
+          duration_seconds: number
+          engines: string[]
+          id: string
+          metadata: Json | null
+          prompt: string
+          prompt_slots: Json | null
+          source_image_url: string | null
+          status: string
+          total_cost_euros: number | null
+          updated_at: string
+          user_id: string
+          user_winner_engine: string | null
+        }
+        Insert: {
+          ai_judge_completed_at?: string | null
+          ai_judge_reasoning?: string | null
+          ai_judge_scores?: Json | null
+          ai_judge_winner_engine?: string | null
+          aspect_ratio?: string
+          completed_at?: string | null
+          composer_scene_id?: string | null
+          created_at?: string
+          currency?: string
+          duration_seconds?: number
+          engines?: string[]
+          id?: string
+          metadata?: Json | null
+          prompt: string
+          prompt_slots?: Json | null
+          source_image_url?: string | null
+          status?: string
+          total_cost_euros?: number | null
+          updated_at?: string
+          user_id: string
+          user_winner_engine?: string | null
+        }
+        Update: {
+          ai_judge_completed_at?: string | null
+          ai_judge_reasoning?: string | null
+          ai_judge_scores?: Json | null
+          ai_judge_winner_engine?: string | null
+          aspect_ratio?: string
+          completed_at?: string | null
+          composer_scene_id?: string | null
+          created_at?: string
+          currency?: string
+          duration_seconds?: number
+          engines?: string[]
+          id?: string
+          metadata?: Json | null
+          prompt?: string
+          prompt_slots?: Json | null
+          source_image_url?: string | null
+          status?: string
+          total_cost_euros?: number | null
+          updated_at?: string
+          user_id?: string
+          user_winner_engine?: string | null
+        }
+        Relationships: []
+      }
       composer_exports: {
         Row: {
           actual_cost_euros: number | null
