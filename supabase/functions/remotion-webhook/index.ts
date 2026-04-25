@@ -257,6 +257,18 @@ serve(async (req) => {
                 console.log('✅ Composer video saved to Media Library');
               }
             }
+
+            // ── Preset export sync: if this render belongs to a composer_exports row, mark it completed
+            const exportId = customData?.export_id;
+            if (exportId) {
+              await supabaseAdmin.from('composer_exports').update({
+                status: 'completed',
+                video_url: finalOutputUrl,
+                actual_cost_euros: 0.10,
+                completed_at: new Date().toISOString(),
+              }).eq('id', exportId);
+              console.log('✅ composer_exports marked completed:', exportId);
+            }
           }
 
           // Update universal_video_progress — PRIMARY via progressId, fallback via renderId scan
@@ -422,6 +434,15 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           }).eq('id', composerProjectId);
           console.log('✅ composer_projects marked failed:', composerProjectId);
+
+          // Preset export failure sync
+          const exportId = customData?.export_id;
+          if (exportId) {
+            await supabaseAdmin.from('composer_exports').update({
+              status: 'failed',
+              error_message: errorMessage.substring(0, 500),
+            }).eq('id', exportId);
+          }
         }
 
         // r28: Update universal_video_progress — MERGE errorCategory into result_data

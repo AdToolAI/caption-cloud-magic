@@ -3558,6 +3558,74 @@ export type Database = {
         }
         Relationships: []
       }
+      composer_exports: {
+        Row: {
+          actual_cost_euros: number | null
+          aspect_ratio: string
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          estimated_cost_euros: number | null
+          height: number
+          id: string
+          platform: string
+          preset_key: string
+          project_id: string
+          render_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          video_url: string | null
+          width: number
+        }
+        Insert: {
+          actual_cost_euros?: number | null
+          aspect_ratio: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          estimated_cost_euros?: number | null
+          height: number
+          id?: string
+          platform: string
+          preset_key: string
+          project_id: string
+          render_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          video_url?: string | null
+          width: number
+        }
+        Update: {
+          actual_cost_euros?: number | null
+          aspect_ratio?: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          estimated_cost_euros?: number | null
+          height?: number
+          id?: string
+          platform?: string
+          preset_key?: string
+          project_id?: string
+          render_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          video_url?: string | null
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composer_exports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       composer_projects: {
         Row: {
           assembly_config: Json

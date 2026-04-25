@@ -12,6 +12,7 @@ import ColorGradingSelector from './ColorGradingSelector';
 import WatermarkEditor from './WatermarkEditor';
 import ComposerSequencePreview from './ComposerSequencePreview';
 import CostEstimationPanel from './CostEstimationPanel';
+import ExportPresetPanel from './ExportPresetPanel';
 import type { AssemblyConfig, ComposerScene, WatermarkConfig } from '@/types/video-composer';
 import { DEFAULT_WATERMARK_CONFIG, getClipCost } from '@/types/video-composer';
 import { persistAssemblyConfig } from '@/hooks/useComposerPersistence';
@@ -514,6 +515,17 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* ─── PLATFORM EXPORT PRESETS ─────────────────────────────────
+          Once the master video has been rendered, give the user a
+          one-click way to produce TikTok / Reels / YouTube versions. */}
+      {project?.id && (renderStatus === 'completed' || !!videoUrl) && (
+        <ExportPresetPanel
+          projectId={project.id}
+          masterReady={renderStatus === 'completed' || !!videoUrl}
+          currentAspect={(project?.briefing as any)?.aspectRatio}
+        />
       )}
 
       {/* Long-running notice */}
