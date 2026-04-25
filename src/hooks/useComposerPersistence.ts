@@ -161,6 +161,10 @@ export function useComposerPersistence() {
               cost_euros: scene.costEuros,
               character_shot: (scene.characterShot ?? null) as any,
               director_modifiers: (scene.directorModifiers ?? {}) as any,
+              prompt_slots: (scene.promptSlots ?? null) as any,
+              prompt_mode: scene.promptMode ?? null,
+              prompt_slot_order: (scene.promptSlotOrder ?? null) as any,
+              applied_style_preset_id: scene.appliedStylePresetId ?? null,
             } as any)
             .eq('id', scene.id);
 
@@ -193,6 +197,10 @@ export function useComposerPersistence() {
               retry_count: scene.retryCount || 0,
               character_shot: (scene.characterShot ?? null) as any,
               director_modifiers: (scene.directorModifiers ?? {}) as any,
+              prompt_slots: (scene.promptSlots ?? null) as any,
+              prompt_mode: scene.promptMode ?? null,
+              prompt_slot_order: (scene.promptSlotOrder ?? null) as any,
+              applied_style_preset_id: scene.appliedStylePresetId ?? null,
             } as any)
             .select('id')
             .single();
