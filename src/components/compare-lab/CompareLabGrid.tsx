@@ -283,7 +283,7 @@ function OutputCard({
       className={cn(
         "bg-card/60 backdrop-blur-xl border-white/10 overflow-hidden transition-all",
         isWinner && "ring-2 ring-primary",
-        isAIPick && !isWinner && "ring-2 ring-yellow-500/60",
+        isAIPick && !isWinner && "ring-2 ring-accent/60",
       )}
     >
       <div className="aspect-video bg-muted/30 relative">
@@ -309,7 +309,7 @@ function OutputCard({
           />
         )}
         {isAIPick && (
-          <div className="absolute top-2 right-2 bg-yellow-500/90 text-yellow-950 text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1">
+          <div className="absolute top-2 right-2 bg-accent text-accent-foreground text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1">
             <Crown className="h-3 w-3" /> AI Pick
           </div>
         )}
@@ -351,8 +351,8 @@ function OutputCard({
                   className={cn(
                     "h-3.5 w-3.5 transition-colors",
                     (output.user_rating ?? 0) >= n
-                      ? "fill-yellow-500 text-yellow-500"
-                      : "text-muted-foreground hover:text-yellow-500/60"
+                      ? "fill-accent text-accent"
+                      : "text-muted-foreground hover:text-accent/60"
                   )}
                 />
               </button>
