@@ -385,6 +385,16 @@ export const QUALITY_LABELS: Record<ClipSource, Record<ClipQuality, string>> = {
   upload:        { standard: '-', pro: '-' },
 };
 
+/** Returns total cost for a clip in EUR. */
+export function getClipCost(source: ClipSource, quality: ClipQuality, durationSec: number): number {
+  return (CLIP_SOURCE_COSTS[source]?.[quality] ?? 0) * durationSec;
+}
+
+/** Returns the per-second rate. */
+export function getClipRate(source: ClipSource, quality: ClipQuality): number {
+  return CLIP_SOURCE_COSTS[source]?.[quality] ?? 0;
+}
+
 export const CATEGORY_LABELS: Record<ComposerCategory, { de: string; en: string; es: string }> = {
   'product-ad': { de: 'Produktvideo', en: 'Product Ad', es: 'Anuncio de Producto' },
   'corporate-ad': { de: 'Unternehmenswerbung', en: 'Corporate Ad', es: 'Anuncio Corporativo' },
