@@ -90,7 +90,9 @@ export function useComposerPersistence() {
             assembly_config: project.assemblyConfig as any,
             total_cost_euros: project.totalCostEuros || 0,
             language: project.language || 'de',
-          })
+            brand_kit_id: project.brandKitId ?? null,
+            brand_kit_auto_sync: project.brandKitAutoSync ?? false,
+          } as any)
           .select('id')
           .single();
 
