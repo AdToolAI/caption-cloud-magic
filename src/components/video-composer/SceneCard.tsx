@@ -404,7 +404,7 @@ export default function SceneCard({
                       variant="ghost"
                       className="h-5 px-2 text-[9px] gap-1 text-primary/80 hover:text-primary"
                       onClick={togglePromptMode}
-                      title={lang === 'de' ? 'Modus wechseln' : lang === 'es' ? 'Cambiar modo' : 'Switch mode'}
+                      title={`${lang === 'de' ? 'Modus wechseln' : lang === 'es' ? 'Cambiar modo' : 'Switch mode'} (${shortcutLabel})`}
                     >
                       {promptMode === 'free'
                         ? (lang === 'de' ? '🧱 Strukturiert' : lang === 'es' ? '🧱 Estructurado' : '🧱 Structured')
@@ -442,6 +442,8 @@ export default function SceneCard({
                       contextHint={scene.aiPrompt}
                       composedPrompt={stitchSlots(promptSlots, promptSlotOrder)}
                       language={lang}
+                      order={promptSlotOrder}
+                      onOrderChange={handleOrderChange}
                       onOpenStylePresets={() => setStylePickerOpen(true)}
                       onSavePreset={() => setStylePickerOpen(true)}
                       onInspireMe={inspiring ? undefined : handleInspireMe}
