@@ -387,6 +387,105 @@ serve(async (req) => {
             });
           }
 
+        } else if (scene.clipSource === 'ai-wan') {
+          // Wan 2.5 via Replicate — supports i2v when reference image present
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .eq('id', scene.id);
+
+          const wanModel = scene.referenceImageUrl
+            ? 'wan-video/wan-2.5-i2v'
+            : 'wan-video/wan-2.5-t2v';
+          const wanInput: Record<string, unknown> = {
+            prompt: enrichPrompt(scene.aiPrompt),
+            negative_prompt: NEGATIVE_PROMPT_PARAM,
+            duration: Math.min(Math.max(scene.durationSeconds, 5), 10),
+            aspect_ratio: '16:9',
+            resolution: quality === 'pro' ? '1080p' : '720p',
+          };
+          if (scene.referenceImageUrl) {
+            wanInput.image = scene.referenceImageUrl;
+            console.log(`[compose-video-clips] Wan scene ${scene.id} uses i2v reference`);
+          }
+
+          const prediction = await replicate.predictions.create({
+            model: wanModel,
+            input: wanInput,
+            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook_events_filter: ["completed"],
+          });
+
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ replicate_prediction_id: prediction.id })
+            .eq('id', scene.id);
+
+          results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
+
+        } else if (scene.clipSource === 'ai-seedance') {
+          // Seedance 1 Lite via Replicate
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .eq('id', scene.id);
+
+          const seedInput: Record<string, unknown> = {
+            prompt: enrichPrompt(scene.aiPrompt),
+            duration: Math.min(Math.max(scene.durationSeconds, 5), 10),
+            aspect_ratio: '16:9',
+            resolution: quality === 'pro' ? '1080p' : '720p',
+          };
+          if (scene.referenceImageUrl) {
+            seedInput.image = scene.referenceImageUrl;
+            console.log(`[compose-video-clips] Seedance scene ${scene.id} uses i2v reference`);
+          }
+
+          const prediction = await replicate.predictions.create({
+            model: 'bytedance/seedance-1-lite',
+            input: seedInput,
+            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook_events_filter: ["completed"],
+          });
+
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ replicate_prediction_id: prediction.id })
+            .eq('id', scene.id);
+
+          results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
+
+        } else if (scene.clipSource === 'ai-luma') {
+          // Luma Ray 2 via Replicate — supports start_image
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .eq('id', scene.id);
+
+          const lumaInput: Record<string, unknown> = {
+            prompt: enrichPrompt(scene.aiPrompt),
+            duration: Math.min(Math.max(scene.durationSeconds, 5), 10),
+            aspect_ratio: '16:9',
+          };
+          if (scene.referenceImageUrl) {
+            lumaInput.start_image = scene.referenceImageUrl;
+            console.log(`[compose-video-clips] Luma scene ${scene.id} uses keyframe reference`);
+          }
+
+          const prediction = await replicate.predictions.create({
+            model: 'luma/ray-2-720p',
+            input: lumaInput,
+            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook_events_filter: ["completed"],
+          });
+
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ replicate_prediction_id: prediction.id })
+            .eq('id', scene.id);
+
+          results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
+
         } else {
           // Unknown source, skip
           results.push({ sceneId: scene.id, status: 'skipped', error: `Unknown clip source: ${scene.clipSource}` });
