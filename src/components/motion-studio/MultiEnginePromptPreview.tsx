@@ -60,6 +60,7 @@ export default function MultiEnginePromptPreview({
   slots,
   language,
   defaultModel = 'ai-sora',
+  order,
 }: MultiEnginePromptPreviewProps) {
   const [active, setActive] = useState<PromptModelKey>(defaultModel);
   const [results, setResults] = useState<Record<PromptModelKey, ModelResult>>(
