@@ -140,6 +140,18 @@ function buildUserPrompt(body: ComposeBody): string {
     ].join("\n");
   }
 
+  if (body.mode === "inspire") {
+    const seed = body.seedStyle?.trim();
+    return [
+      `Source language: ${body.language ?? "en"}`,
+      `Target model: ${body.targetModel ?? "ai-sora"}`,
+      seed ? `Seed style to riff on: ${seed}` : `No seed — invent freely.`,
+      `Context hint (avoid duplicating): ${body.contextHint ?? "(none)"}`,
+      "",
+      "Return strict JSON with the 6 slot fields described in the system prompt.",
+    ].join("\n");
+  }
+
   // condense
   return [
     `Target limit: ${body.targetLimit ?? 400} units`,
