@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle, RotateCcw, Mic } from 'lucide-react';
+import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle, RotateCcw, Mic, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -34,6 +34,9 @@ import { getClipCost } from '@/types/video-composer';
 import { useComposerPersistence, persistAssemblyConfig } from '@/hooks/useComposerPersistence';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
+import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
+import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export';
 
