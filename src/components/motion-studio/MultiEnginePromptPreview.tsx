@@ -34,6 +34,8 @@ interface MultiEnginePromptPreviewProps {
   language: 'de' | 'en' | 'es';
   /** Initial active tab — usually the scene's current `clipSource`. */
   defaultModel?: PromptModelKey;
+  /** User-defined slot order (Negative always at end). */
+  order?: Array<keyof PromptSlots>;
 }
 
 const MODEL_ORDER: PromptModelKey[] = [
@@ -58,6 +60,7 @@ export default function MultiEnginePromptPreview({
   slots,
   language,
   defaultModel = 'ai-sora',
+  order,
 }: MultiEnginePromptPreviewProps) {
   const [active, setActive] = useState<PromptModelKey>(defaultModel);
   const [results, setResults] = useState<Record<PromptModelKey, ModelResult>>(
@@ -68,11 +71,11 @@ export default function MultiEnginePromptPreview({
       )
   );
 
-  // Slot signature — recompose if slots change.
-  const signature = JSON.stringify(slots);
+  // Slot+order signature — recompose if either changes.
+  const signature = JSON.stringify({ slots, order });
 
   useEffect(() => {
-    // Reset cache when slots change.
+    // Reset cache when slots/order change.
     setResults(
       MODEL_ORDER.reduce(
         (acc, k) => ({ ...acc, [k]: { state: 'idle' } }),
@@ -98,6 +101,7 @@ export default function MultiEnginePromptPreview({
           body: {
             mode: 'compose',
             slots,
+            slotOrder: order,
             language,
             targetModel: model,
           },
@@ -114,7 +118,7 @@ export default function MultiEnginePromptPreview({
       console.error('[MultiEnginePromptPreview] compose failed', model, e);
       // Fallback to local deterministic stitch so the user still sees
       // *something* per model.
-      const fallback = stitchSlots(slots);
+      const fallback = stitchSlots(slots, order);
       setResults((prev) => ({
         ...prev,
         [model]: {

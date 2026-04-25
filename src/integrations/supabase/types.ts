@@ -3716,6 +3716,7 @@ export type Database = {
           order_index: number
           project_id: string
           prompt_mode: string | null
+          prompt_slot_order: string[] | null
           prompt_slots: Json | null
           reference_image_url: string | null
           replicate_prediction_id: string | null
@@ -3750,6 +3751,7 @@ export type Database = {
           order_index?: number
           project_id: string
           prompt_mode?: string | null
+          prompt_slot_order?: string[] | null
           prompt_slots?: Json | null
           reference_image_url?: string | null
           replicate_prediction_id?: string | null
@@ -3784,6 +3786,7 @@ export type Database = {
           order_index?: number
           project_id?: string
           prompt_mode?: string | null
+          prompt_slot_order?: string[] | null
           prompt_slots?: Json | null
           reference_image_url?: string | null
           replicate_prediction_id?: string | null

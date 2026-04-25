@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -115,6 +115,15 @@ export default function SceneCard({
 
   const promptMode: 'free' | 'structured' = scene.promptMode ?? 'free';
   const promptSlots: PromptSlots = scene.promptSlots ?? {};
+  const promptSlotOrder = scene.promptSlotOrder;
+
+  // K-P1 — Cmd/Ctrl + Shift + S toggles Free ↔ Structured for the focused card.
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const isMac = useMemo(
+    () => typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform),
+    []
+  );
+  const shortcutLabel = isMac ? '⌘⇧S' : 'Ctrl+Shift+S';
 
   const togglePromptMode = () => {
     if (promptMode === 'free') {
@@ -122,15 +131,37 @@ export default function SceneCard({
       const nextSlots = hasAnySlot(promptSlots) ? promptSlots : naiveSplitToSlots(scene.aiPrompt || '');
       onUpdate({ promptMode: 'structured', promptSlots: nextSlots });
     } else {
-      // Structured → Free: deterministic stitch
-      const stitched = stitchSlots(promptSlots);
+      // Structured → Free: deterministic stitch (respect custom slot order)
+      const stitched = stitchSlots(promptSlots, promptSlotOrder);
       onUpdate({ promptMode: 'free', aiPrompt: stitched || scene.aiPrompt });
     }
   };
 
+  useEffect(() => {
+    if (!scene.clipSource.startsWith('ai-')) return;
+    const handler = (e: KeyboardEvent) => {
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod || !e.shiftKey) return;
+      if (e.key.toLowerCase() !== 's') return;
+      // Only fire when focus is inside this card
+      if (!cardRef.current?.contains(document.activeElement)) return;
+      e.preventDefault();
+      togglePromptMode();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promptMode, promptSlots, promptSlotOrder, scene.aiPrompt, scene.clipSource, isMac]);
+
   const handleSlotsChange = (next: PromptSlots) => {
-    const stitched = stitchSlots(next);
+    const stitched = stitchSlots(next, promptSlotOrder);
     onUpdate({ promptSlots: next, aiPrompt: stitched });
+  };
+
+  const handleOrderChange = (order: Array<keyof PromptSlots>) => {
+    const safeOrder = order.filter((k) => k !== 'negative') as NonNullable<typeof scene.promptSlotOrder>;
+    const stitched = stitchSlots(promptSlots, safeOrder);
+    onUpdate({ promptSlotOrder: safeOrder, aiPrompt: stitched });
   };
 
   // Block K-5 — Inspire Me: roll a random scene idea via the edge function.
@@ -164,7 +195,7 @@ export default function SceneCard({
       onUpdate({
         promptMode: 'structured',
         promptSlots: newSlots,
-        aiPrompt: stitchSlots(newSlots),
+        aiPrompt: stitchSlots(newSlots, promptSlotOrder),
         // If the seed brought director modifiers along, apply them too.
         ...(seed?.director_modifiers
           ? { directorModifiers: seed.director_modifiers }
@@ -206,7 +237,7 @@ export default function SceneCard({
   };
 
   return (
-    <Card className="border-border/40 bg-card/80 group">
+    <Card ref={cardRef as any} className="border-border/40 bg-card/80 group">
       <CardContent className="p-4">
         <div className="flex gap-3">
           {/* Drag handle + order */}
@@ -373,7 +404,7 @@ export default function SceneCard({
                       variant="ghost"
                       className="h-5 px-2 text-[9px] gap-1 text-primary/80 hover:text-primary"
                       onClick={togglePromptMode}
-                      title={lang === 'de' ? 'Modus wechseln' : lang === 'es' ? 'Cambiar modo' : 'Switch mode'}
+                      title={`${lang === 'de' ? 'Modus wechseln' : lang === 'es' ? 'Cambiar modo' : 'Switch mode'} (${shortcutLabel})`}
                     >
                       {promptMode === 'free'
                         ? (lang === 'de' ? '🧱 Strukturiert' : lang === 'es' ? '🧱 Estructurado' : '🧱 Structured')
@@ -409,8 +440,10 @@ export default function SceneCard({
                       onChange={handleSlotsChange}
                       clipSource={scene.clipSource}
                       contextHint={scene.aiPrompt}
-                      composedPrompt={stitchSlots(promptSlots)}
+                      composedPrompt={stitchSlots(promptSlots, promptSlotOrder)}
                       language={lang}
+                      order={promptSlotOrder}
+                      onOrderChange={handleOrderChange}
                       onOpenStylePresets={() => setStylePickerOpen(true)}
                       onSavePreset={() => setStylePickerOpen(true)}
                       onInspireMe={inspiring ? undefined : handleInspireMe}
@@ -443,6 +476,7 @@ export default function SceneCard({
                       <MultiEnginePromptPreview
                         slots={promptSlots}
                         language={lang}
+                        order={promptSlotOrder}
                         defaultModel={clipSourceToModelKey(scene.clipSource) ?? 'ai-sora'}
                       />
                     )}
@@ -460,7 +494,7 @@ export default function SceneCard({
                       promptSlots: preset.slots,
                       directorModifiers: preset.director_modifiers,
                       appliedStylePresetId: preset.id,
-                      aiPrompt: stitchSlots(preset.slots),
+                      aiPrompt: stitchSlots(preset.slots, promptSlotOrder),
                     });
                   }}
                   language={lang}

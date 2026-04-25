@@ -28,6 +28,8 @@ type SlotKey = "subject" | "action" | "setting" | "timeWeather" | "style" | "neg
 interface ComposeBody {
   mode: "compose" | "suggest" | "condense" | "inspire";
   slots?: Partial<Record<SlotKey, string>>;
+  /** Block K-P2 — user-defined slot order (Negative always at end). */
+  slotOrder?: SlotKey[];
   slot?: SlotKey;
   contextHint?: string;
   language?: string;
@@ -111,17 +113,29 @@ Output ONLY the shortened prompt as plain text.`;
 function buildUserPrompt(body: ComposeBody): string {
   if (body.mode === "compose") {
     const s = body.slots ?? {};
+    const reorderable: SlotKey[] = ["subject", "action", "setting", "timeWeather", "style"];
+    const customOrder = (body.slotOrder ?? []).filter(
+      (k): k is SlotKey => reorderable.includes(k)
+    );
+    const ordered: SlotKey[] = [];
+    for (const k of customOrder) if (!ordered.includes(k)) ordered.push(k);
+    for (const k of reorderable) if (!ordered.includes(k)) ordered.push(k);
+    ordered.push("negative");
+
+    const labels: Record<SlotKey, string> = {
+      subject: "Subject",
+      action: "Action",
+      setting: "Setting",
+      timeWeather: "Time/Weather",
+      style: "Style",
+      negative: "Negative",
+    };
     const lines: string[] = [
       `Source language: ${body.language ?? "en"}`,
       `Target model: ${body.targetModel ?? "ai-sora"}`,
       "",
-      "Slots:",
-      `- Subject: ${s.subject ?? "(empty)"}`,
-      `- Action: ${s.action ?? "(empty)"}`,
-      `- Setting: ${s.setting ?? "(empty)"}`,
-      `- Time/Weather: ${s.timeWeather ?? "(empty)"}`,
-      `- Style: ${s.style ?? "(empty)"}`,
-      `- Negative: ${s.negative ?? "(empty)"}`,
+      "Slots (compose in this exact order, Negative always last):",
+      ...ordered.map((k) => `- ${labels[k]}: ${s[k] ?? "(empty)"}`),
     ];
     return lines.join("\n");
   }
