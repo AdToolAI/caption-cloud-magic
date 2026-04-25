@@ -31,7 +31,10 @@ import SceneMediaUpload from './SceneMediaUpload';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
 import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
+import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
+import { resolveMentions } from '@/lib/motion-studio/mentionParser';
+import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 
 interface SceneCardProps {
   scene: ComposerScene;
