@@ -81,6 +81,8 @@ export default function SceneCard({
   const activeChar = scene.characterShot
     ? characters?.find((c) => c.id === scene.characterShot!.characterId)
     : undefined;
+  // Library for live mention resolution preview
+  const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
 
   return (
     <Card className="border-border/40 bg-card/80 group">
@@ -236,19 +238,24 @@ export default function SceneCard({
                         : 'AI Prompt (EN) — editable'}
                     </Label>
                   </div>
-                  <Textarea
+                  <PromptMentionEditor
                     value={scene.aiPrompt || ''}
-                    onChange={(e) => onUpdate({ aiPrompt: e.target.value })}
-                    placeholder="Describe the scene visually in English..."
+                    onChange={(v) => onUpdate({ aiPrompt: v })}
+                    placeholder={
+                      lang === 'de'
+                        ? 'Describe the scene… nutze @charakter und @location aus deiner Library'
+                        : lang === 'es'
+                        ? 'Describe la escena… usa @personaje y @ubicación de tu biblioteca'
+                        : 'Describe the scene visually… use @character and @location from your library'
+                    }
                     rows={3}
-                    className="text-xs bg-background/50 resize-none"
                   />
                   <p className="text-[10px] leading-relaxed text-muted-foreground/80 italic">
                     {lang === 'de'
-                      ? 'ℹ️ Untertitel, Captions und eingebrannte Texte werden automatisch ausgeschlossen — füge sie später im Tab „Voiceover & Untertitel" hinzu.'
+                      ? 'ℹ️ Tippe @ um Charaktere & Locations zu taggen. Untertitel werden automatisch ausgeschlossen — füge sie im Tab „Voiceover & Untertitel" hinzu.'
                       : lang === 'es'
-                      ? 'ℹ️ Subtítulos, captions y textos incrustados se excluyen automáticamente — añádelos luego en la pestaña "Voz y subtítulos".'
-                      : 'ℹ️ Subtitles, captions and burned-in text are automatically excluded — add them later in the "Voice & Subtitles" tab.'}
+                      ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones. Los subtítulos se excluyen automáticamente — añádelos en la pestaña "Voz y subtítulos".'
+                      : 'ℹ️ Type @ to tag characters & locations. Subtitles are automatically excluded — add them in the "Voice & Subtitles" tab.'}
                   </p>
                 </div>
 
