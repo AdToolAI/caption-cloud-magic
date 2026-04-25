@@ -105,6 +105,13 @@ export default function SceneCard({
   const [stockBrowserOpen, setStockBrowserOpen] = useState(false);
   // Block K — Style Preset Picker open state
   const [stylePickerOpen, setStylePickerOpen] = useState(false);
+  // Block K-5 — Inspire-Me loading flag
+  const [inspiring, setInspiring] = useState(false);
+  // Block K-6 — Multi-Engine Preview open state
+  const [multiEngineOpen, setMultiEngineOpen] = useState(false);
+
+  // Block K-5: pull system presets to seed inspire variation
+  const { systemPresets } = useStylePresets();
 
   const promptMode: 'free' | 'structured' = scene.promptMode ?? 'free';
   const promptSlots: PromptSlots = scene.promptSlots ?? {};
@@ -124,6 +131,65 @@ export default function SceneCard({
   const handleSlotsChange = (next: PromptSlots) => {
     const stitched = stitchSlots(next);
     onUpdate({ promptSlots: next, aiPrompt: stitched });
+  };
+
+  // Block K-5 — Inspire Me: roll a random scene idea via the edge function.
+  // Optionally seeds the AI with a random system preset's name for variation.
+  const handleInspireMe = async () => {
+    setInspiring(true);
+    try {
+      const seed =
+        systemPresets && systemPresets.length > 0
+          ? systemPresets[Math.floor(Math.random() * systemPresets.length)]
+          : null;
+      const targetModel = clipSourceToModelKey(scene.clipSource) ?? 'ai-sora';
+      const { data, error } = await supabase.functions.invoke(
+        'structured-prompt-compose',
+        {
+          body: {
+            mode: 'inspire',
+            language: lang,
+            targetModel,
+            seedStyle: seed?.name,
+            contextHint: scene.aiPrompt?.slice(0, 400) ?? '',
+          },
+        }
+      );
+      if (error) throw error;
+      const newSlots: PromptSlots | undefined = data?.slots;
+      if (!newSlots || Object.keys(newSlots).length === 0) {
+        throw new Error('Empty inspire response');
+      }
+      // Apply slots + flip to structured mode + sync free-text via stitcher.
+      onUpdate({
+        promptMode: 'structured',
+        promptSlots: newSlots,
+        aiPrompt: stitchSlots(newSlots),
+        // If the seed brought director modifiers along, apply them too.
+        ...(seed?.director_modifiers
+          ? { directorModifiers: seed.director_modifiers }
+          : {}),
+      });
+      toast({
+        title: lang === 'de' ? '🎲 Neue Szenenidee' : lang === 'es' ? '🎲 Nueva idea de escena' : '🎲 Fresh scene idea',
+        description: seed?.name
+          ? lang === 'de'
+            ? `Inspiriert von „${seed.name}"`
+            : lang === 'es'
+            ? `Inspirado en "${seed.name}"`
+            : `Inspired by "${seed.name}"`
+          : undefined,
+      });
+    } catch (e: any) {
+      console.error('[SceneCard] inspire failed', e);
+      toast({
+        title: lang === 'de' ? 'Inspire fehlgeschlagen' : lang === 'es' ? 'Falló la inspiración' : 'Inspire failed',
+        description: e?.message ?? '',
+        variant: 'destructive',
+      });
+    } finally {
+      setInspiring(false);
+    }
   };
 
 
