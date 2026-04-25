@@ -84,6 +84,22 @@ Do not duplicate content already in other slots. Do not add quotes or labels.
 Output ONLY the suggestion, plain text, single line.`;
   }
 
+  if (mode === "inspire") {
+    return `You are an expert AI cinematographer pitching a fresh, vivid one-shot scene idea.
+
+Invent ONE original cinematic moment (NOT generic, NOT a cliché). Mix uncommon subject matter with strong visual style.
+Return STRICT JSON only — no markdown fences, no commentary — matching this shape:
+{
+  "subject":     "...",
+  "action":      "...",
+  "setting":     "...",
+  "timeWeather": "...",
+  "style":       "...",
+  "negative":    "no text, no logos, no subtitles"
+}
+All values in ENGLISH. Each field ≤ 18 words. The 6 fields together should describe ONE coherent shot a director could film.`;
+  }
+
   // condense
   return `You are an expert AI video prompt engineer.
 
