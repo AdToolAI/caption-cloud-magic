@@ -6,16 +6,40 @@
 // / Style / Negative — each with an inline ✨ AI-Suggest button (powered by
 // the `structured-prompt-compose` edge function in `mode: 'suggest'`).
 //
-// The component owns NO state — all changes are forwarded to the parent so
-// the SceneCard remains the single source of truth for `promptSlots`.
+// Polishing (Block K-Polish):
+// - K-P2: drag-reorder via @dnd-kit/sortable (Negative pinned to end)
+// - K-P3: per-slot 3-step in-memory undo (history popover)
+// - K-P4: tabIndex={-1} on action buttons → Tab cycles only through inputs
+//
+// The component owns NO state for slot values — all changes are forwarded to
+// the parent so the SceneCard remains the single source of truth for
+// `promptSlots` and `promptSlotOrder`.
 
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Loader2, Dices, Save, Wand2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Sparkles, Loader2, Dices, Save, Wand2, GripVertical, Undo2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -41,6 +65,10 @@ interface StructuredPromptBuilderProps {
   /** Currently composed prompt (final stitched + enriched) — for token bar. */
   composedPrompt: string;
   language: string;
+  /** Optional: user-defined slot order. Negative is always pinned last. */
+  order?: Array<keyof PromptSlots>;
+  /** Persist a new order (without negative — it's added back automatically). */
+  onOrderChange?: (order: Array<keyof PromptSlots>) => void;
   onInspireMe?: () => void;
   onSavePreset?: () => void;
   onOpenStylePresets?: () => void;
@@ -49,6 +77,156 @@ interface StructuredPromptBuilderProps {
 const t = (lang: string, de: string, en: string, es: string) =>
   lang === 'de' ? de : lang === 'es' ? es : en;
 
+// Negative slot is always pinned at the end (some models only respect it
+// when it's the trailing instruction).
+const REORDERABLE_KEYS = SLOT_KEYS.filter((k) => k !== 'negative');
+
+function resolveOrder(custom?: Array<keyof PromptSlots>): Array<keyof PromptSlots> {
+  if (!custom || custom.length === 0) return SLOT_KEYS;
+  const validReorderable = custom.filter(
+    (k): k is keyof PromptSlots => REORDERABLE_KEYS.includes(k as any)
+  );
+  // Append any reorderable keys missing from the custom order (forward-compat).
+  for (const k of REORDERABLE_KEYS) {
+    if (!validReorderable.includes(k)) validReorderable.push(k);
+  }
+  return [...validReorderable, 'negative'];
+}
+
+interface SlotRowProps {
+  slotKey: keyof PromptSlots;
+  value: string;
+  language: string;
+  isSuggesting: boolean;
+  history: string[];
+  onUpdate: (key: keyof PromptSlots, value: string) => void;
+  onRequestSuggestion: (key: keyof PromptSlots) => void;
+  onRestoreHistory: (key: keyof PromptSlots, value: string) => void;
+  draggable: boolean;
+}
+
+function SlotRow({
+  slotKey,
+  value,
+  language,
+  isSuggesting,
+  history,
+  onUpdate,
+  onRequestSuggestion,
+  onRestoreHistory,
+  draggable,
+}: SlotRowProps) {
+  const meta = SLOT_META[slotKey];
+  const InputComp: any = meta.multiline ? Textarea : Input;
+
+  const sortable = useSortable({ id: slotKey, disabled: !draggable });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = sortable;
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 30 : 'auto',
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="space-y-0.5">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+          {draggable && (
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label={t(language, 'Slot verschieben', 'Reorder slot', 'Reordenar campo')}
+              className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground touch-none"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="h-3 w-3" />
+            </button>
+          )}
+          {!draggable && <span className="w-3" />}
+          <span>{meta.icon}</span>
+          <span>{meta.label[language as 'de' | 'en' | 'es'] ?? meta.label.en}</span>
+          {!draggable && (
+            <Badge variant="outline" className="h-3.5 px-1 text-[8px] uppercase">
+              {t(language, 'Ende', 'End', 'Final')}
+            </Badge>
+          )}
+        </Label>
+        <div className="flex items-center gap-0.5">
+          {history.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  tabIndex={-1}
+                  aria-label={t(language, 'Verlauf', 'History', 'Historial')}
+                  className="h-5 px-1 text-[9px] text-muted-foreground hover:text-foreground"
+                  title={t(language, 'Letzte Werte', 'Recent values', 'Valores recientes')}
+                >
+                  <Undo2 className="h-2.5 w-2.5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                side="top"
+                className="w-64 p-1.5 space-y-1"
+              >
+                <div className="text-[10px] text-muted-foreground px-1.5 py-0.5">
+                  {t(language, 'Letzte Werte', 'Recent values', 'Valores recientes')}
+                </div>
+                {history.map((h, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => onRestoreHistory(slotKey, h)}
+                    className="w-full text-left text-[10px] px-1.5 py-1 rounded hover:bg-muted line-clamp-2"
+                    title={h}
+                  >
+                    {h}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            tabIndex={-1}
+            aria-label={t(language, 'KI-Vorschlag', 'AI suggestion', 'Sugerencia IA')}
+            className="h-5 px-1.5 text-[9px] gap-1 text-primary/70 hover:text-primary"
+            onClick={() => onRequestSuggestion(slotKey)}
+            disabled={isSuggesting}
+          >
+            {isSuggesting ? (
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+            ) : (
+              <Sparkles className="h-2.5 w-2.5" />
+            )}
+            {t(language, 'KI', 'AI', 'IA')}
+          </Button>
+        </div>
+      </div>
+      <InputComp
+        value={value}
+        onChange={(e: any) => onUpdate(slotKey, e.target.value)}
+        placeholder={meta.placeholder[language as 'de' | 'en' | 'es'] ?? meta.placeholder.en}
+        className="h-8 text-[11px] py-1 px-2"
+        rows={meta.multiline ? 2 : undefined}
+      />
+    </div>
+  );
+}
+
 export default function StructuredPromptBuilder({
   slots,
   onChange,
@@ -56,18 +234,52 @@ export default function StructuredPromptBuilder({
   contextHint,
   composedPrompt,
   language,
+  order,
+  onOrderChange,
   onInspireMe,
   onSavePreset,
   onOpenStylePresets,
 }: StructuredPromptBuilderProps) {
   const [suggestingSlot, setSuggestingSlot] = useState<keyof PromptSlots | null>(null);
+  // K-P3: per-slot in-memory undo history (max 3 entries, newest first).
+  const [history, setHistory] = useState<Record<string, string[]>>({});
+  // Track previous values to push to history when an external change overwrites.
+  const previousSlotsRef = useRef<PromptSlots>(slots);
 
   const modelKey: PromptModelKey = clipSourceToModelKey(clipSource) ?? 'ai-sora';
   const limit = MODEL_PROMPT_LIMITS[modelKey];
   const status = evaluatePromptLength(composedPrompt, modelKey);
 
+  const effectiveOrder = useMemo(() => resolveOrder(order), [order]);
+  const reorderableIds = useMemo(
+    () => effectiveOrder.filter((k) => k !== 'negative'),
+    [effectiveOrder]
+  );
+
+  const pushHistory = (key: keyof PromptSlots, oldValue: string) => {
+    if (!oldValue.trim()) return;
+    setHistory((prev) => {
+      const arr = prev[key] ?? [];
+      if (arr[0] === oldValue) return prev; // skip duplicates
+      const next = [oldValue, ...arr.filter((v) => v !== oldValue)].slice(0, 3);
+      return { ...prev, [key]: next };
+    });
+  };
+
   const updateSlot = (key: keyof PromptSlots, value: string) => {
-    onChange({ ...slots, [key]: value });
+    const old = previousSlotsRef.current[key] ?? '';
+    if (old && old !== value) pushHistory(key, old);
+    const next = { ...slots, [key]: value };
+    previousSlotsRef.current = next;
+    onChange(next);
+  };
+
+  const restoreHistory = (key: keyof PromptSlots, value: string) => {
+    const current = slots[key] ?? '';
+    if (current && current !== value) pushHistory(key, current);
+    const next = { ...slots, [key]: value };
+    previousSlotsRef.current = next;
+    onChange(next);
   };
 
   const requestSuggestion = async (key: keyof PromptSlots) => {
@@ -118,6 +330,22 @@ export default function StructuredPromptBuilder({
       ? 'bg-amber-500'
       : 'bg-primary';
 
+  // K-P2: drag handlers
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const from = reorderableIds.indexOf(active.id as keyof PromptSlots);
+    const to = reorderableIds.indexOf(over.id as keyof PromptSlots);
+    if (from < 0 || to < 0) return;
+    const nextReorderable = arrayMove(reorderableIds, from, to);
+    onOrderChange?.(nextReorderable);
+  };
+
   return (
     <div className="space-y-2 rounded-md border border-primary/30 bg-gradient-to-br from-primary/5 to-background/40 p-2">
       {/* Header */}
@@ -163,46 +391,27 @@ export default function StructuredPromptBuilder({
         </div>
       </div>
 
-      {/* Slots */}
-      <div className="grid gap-1.5">
-        {SLOT_KEYS.map((key) => {
-          const meta = SLOT_META[key];
-          const value = slots[key] ?? '';
-          const isSuggesting = suggestingSlot === key;
-          const InputComp = meta.multiline ? Textarea : Input;
-          return (
-            <div key={key} className="space-y-0.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
-                  <span>{meta.icon}</span>
-                  <span>{meta.label[language as 'de' | 'en' | 'es'] ?? meta.label.en}</span>
-                </Label>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-5 px-1.5 text-[9px] gap-1 text-primary/70 hover:text-primary"
-                  onClick={() => requestSuggestion(key)}
-                  disabled={isSuggesting}
-                >
-                  {isSuggesting ? (
-                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-2.5 w-2.5" />
-                  )}
-                  {t(language, 'KI', 'AI', 'IA')}
-                </Button>
-              </div>
-              <InputComp
-                value={value}
-                onChange={(e: any) => updateSlot(key, e.target.value)}
-                placeholder={meta.placeholder[language as 'de' | 'en' | 'es'] ?? meta.placeholder.en}
-                className="h-8 text-[11px] py-1 px-2"
-                rows={meta.multiline ? 2 : undefined}
+      {/* Slots — drag-reorderable except Negative */}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={reorderableIds} strategy={verticalListSortingStrategy}>
+          <div className="grid gap-1.5">
+            {effectiveOrder.map((key) => (
+              <SlotRow
+                key={key}
+                slotKey={key}
+                value={slots[key] ?? ''}
+                language={language}
+                isSuggesting={suggestingSlot === key}
+                history={history[key] ?? []}
+                onUpdate={updateSlot}
+                onRequestSuggestion={requestSuggestion}
+                onRestoreHistory={restoreHistory}
+                draggable={key !== 'negative'}
               />
-            </div>
-          );
-        })}
-      </div>
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Token Bar — live preview of composed prompt length vs model limit */}
       <div className="space-y-1 pt-1 border-t border-border/50">
