@@ -35,6 +35,7 @@ import { useComposerPersistence, persistAssemblyConfig } from '@/hooks/useCompos
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
+import MotionStudioStepSidebar, { type StepItem } from './MotionStudioStepSidebar';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
@@ -360,6 +361,51 @@ export default function VideoComposerDashboard() {
     { id: 'export' as TabId, label: t('videoComposer.export'), icon: Download },
   ];
 
+  // Workflow accessibility & completion logic for the step sidebar
+  const isStepAccessible = useCallback((id: string) => {
+    const idx = TAB_ORDER.indexOf(id as TabId);
+    if (idx <= 0) return true;
+    if (idx === 1) return !!project.briefing.productName;
+    return project.scenes.length > 0;
+  }, [project.briefing.productName, project.scenes.length]);
+
+  const isStepDone = useCallback((id: string) => {
+    switch (id) {
+      case 'briefing':
+        return !!project.briefing.productName;
+      case 'storyboard':
+        return project.scenes.length > 0;
+      case 'clips':
+        return project.scenes.length > 0 && project.scenes.every(
+          (s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && !!s.uploadUrl)
+        );
+      case 'text':
+        return !!project.assemblyConfig.voiceover || project.scenes.some((s) => !!s.textOverlay?.text);
+      case 'audio':
+        return !!project.assemblyConfig.music;
+      case 'export':
+        return !!project.outputUrl;
+      default:
+        return false;
+    }
+  }, [project]);
+
+  const STEP_HINTS: Record<TabId, string> = {
+    briefing: 'Produkt, Zielgruppe & Tonalität',
+    storyboard: 'Szenen planen & anordnen',
+    clips: 'AI-Clips generieren',
+    text: 'Voiceover & Untertitel',
+    audio: 'Musik & Sound-Mix',
+    export: 'Render & Download',
+  };
+
+  const STEPS: StepItem[] = TABS.map((t) => ({
+    id: t.id,
+    label: t.label,
+    hint: STEP_HINTS[t.id],
+    icon: t.icon,
+  }));
+
   useEffect(() => {
     saveDraft(project);
   }, [project]);
@@ -492,26 +538,36 @@ export default function VideoComposerDashboard() {
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabId)}>
-          <TabsList className="grid grid-cols-6 w-full max-w-3xl mx-auto mb-6 bg-card border border-border/40">
-            {TABS.map((tab, i) => {
-              const Icon = tab.icon;
-              const isAccessible = i === 0 ||
-                (i === 1 && project.briefing.productName) ||
-                (i >= 2 && project.scenes.length > 0);
-              return (
-                <TabsTrigger
-                  key={tab.id}
-                  value={tab.id}
-                  disabled={!isAccessible}
-                  className="flex items-center gap-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary disabled:opacity-30"
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
+        <div className="flex gap-6">
+          <MotionStudioStepSidebar
+            steps={STEPS}
+            activeStep={activeTab}
+            isStepDone={isStepDone}
+            isStepAccessible={isStepAccessible}
+            onSelect={(id) => handleTabChange(id as TabId)}
+          />
+
+          <div className="flex-1 min-w-0">
+            <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabId)}>
+              <TabsList className="lg:hidden grid grid-cols-6 w-full max-w-3xl mx-auto mb-6 bg-card border border-border/40">
+                {TABS.map((tab, i) => {
+                  const Icon = tab.icon;
+                  const isAccessible = i === 0 ||
+                    (i === 1 && project.briefing.productName) ||
+                    (i >= 2 && project.scenes.length > 0);
+                  return (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      disabled={!isAccessible}
+                      className="flex items-center gap-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary disabled:opacity-30"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
 
           <TabsContent value="briefing">
             <BriefingTab
@@ -584,7 +640,9 @@ export default function VideoComposerDashboard() {
               scenes={project.scenes}
             />
           </TabsContent>
-        </Tabs>
+            </Tabs>
+          </div>
+        </div>
       </div>
 
       {/* Reset Confirmation Dialog */}
