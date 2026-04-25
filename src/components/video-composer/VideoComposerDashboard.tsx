@@ -588,6 +588,13 @@ export default function VideoComposerDashboard() {
       </div>
 
       {/* Reset Confirmation Dialog */}
+      <MotionStudioTemplatePicker
+        open={showTemplatePicker}
+        onOpenChange={setShowTemplatePicker}
+        onSelectTemplate={applyTemplate}
+        onStartBlank={handleStartBlank}
+      />
+
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
