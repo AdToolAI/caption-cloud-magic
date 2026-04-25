@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Upload, X, Sparkles, MapPin, Lightbulb } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useLegalConsent } from '@/hooks/useLegalConsent';
+import LibraryUploadConsentDialog from '@/components/motion-studio/LibraryUploadConsentDialog';
 import {
   EMPTY_LOCATION_DRAFT,
   type LocationDraft,
