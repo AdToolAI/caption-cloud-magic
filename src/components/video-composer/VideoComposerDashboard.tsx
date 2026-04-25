@@ -52,6 +52,8 @@ interface LocalProject {
   totalCostEuros: number;
   language: string;
   outputUrl?: string;
+  brandKitId?: string | null;
+  brandKitAutoSync?: boolean;
 }
 
 const STORAGE_KEY = 'video-composer-draft';
