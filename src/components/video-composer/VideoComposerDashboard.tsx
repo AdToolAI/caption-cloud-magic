@@ -197,6 +197,7 @@ export default function VideoComposerDashboard() {
             replicatePredictionId: row.replicate_prediction_id ?? local?.replicatePredictionId,
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
+            directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
           };
         });
 

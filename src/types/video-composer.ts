@@ -132,6 +132,17 @@ export interface ComposerScene {
    * clip / image. Frame-deterministic, Lambda-safe.
    */
   effects?: SceneEffectConfig[];
+  /**
+   * Director Presets — camera/lens/lighting/mood/film-stock modifier IDs that
+   * are appended to the AI prompt before generation (Phase 3).
+   */
+  directorModifiers?: {
+    camera?: string;
+    lens?: string;
+    lighting?: string;
+    mood?: string;
+    filmStock?: string;
+  };
 }
 
 export type SubtitlePosition = 'top' | 'bottom';

@@ -22,6 +22,7 @@ import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
+import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
 import {
   DndContext,
   closestCenter,
@@ -268,7 +269,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           id: s.id,
           clipSource: s.clipSource,
           clipQuality: s.clipQuality || 'standard',
-          aiPrompt: s.aiPrompt,
+          // Director Presets (Phase 3): merge cinematography modifiers into the AI prompt
+          aiPrompt: s.directorModifiers
+            ? applyDirectorModifiers(s.aiPrompt || '', s.directorModifiers)
+            : s.aiPrompt,
           stockKeywords: s.stockKeywords,
           uploadUrl: s.uploadUrl,
           referenceImageUrl: s.referenceImageUrl,
@@ -372,7 +376,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             id: targetScene.id,
             clipSource: targetScene.clipSource,
             clipQuality: targetScene.clipQuality || 'standard',
-            aiPrompt: targetScene.aiPrompt,
+            // Director Presets (Phase 3): merge cinematography modifiers into the AI prompt
+            aiPrompt: targetScene.directorModifiers
+              ? applyDirectorModifiers(targetScene.aiPrompt || '', targetScene.directorModifiers)
+              : targetScene.aiPrompt,
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
             referenceImageUrl: targetScene.referenceImageUrl,

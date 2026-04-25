@@ -30,6 +30,8 @@ import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALIT
 import SceneMediaUpload from './SceneMediaUpload';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
+import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
+import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
 
 interface SceneCardProps {
   scene: ComposerScene;
@@ -246,6 +248,26 @@ export default function SceneCard({
                       : 'ℹ️ Subtitles, captions and burned-in text are automatically excluded — add them later in the "Voice & Subtitles" tab.'}
                   </p>
                 </div>
+
+                <DirectorPresetPicker
+                  modifiers={scene.directorModifiers || {}}
+                  basePrompt={scene.aiPrompt || ''}
+                  onChange={(directorModifiers) => onUpdate({ directorModifiers })}
+                />
+
+                {scene.directorModifiers && Object.values(scene.directorModifiers).some(Boolean) && (
+                  <div className="rounded-md border border-dashed border-primary/30 bg-background/40 p-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <Label className="text-[10px] text-muted-foreground">
+                        {lang === 'de' ? 'Finaler Prompt (Vorschau)' : lang === 'es' ? 'Prompt final (vista previa)' : 'Final prompt (preview)'}
+                      </Label>
+                    </div>
+                    <p className="text-[10px] font-mono leading-relaxed text-foreground/80 break-words">
+                      {applyDirectorModifiers(scene.aiPrompt || '', scene.directorModifiers)}
+                    </p>
+                  </div>
+                )}
+
                 <SceneReferenceImageUpload
                   projectId={projectId}
                   sceneId={scene.id}
