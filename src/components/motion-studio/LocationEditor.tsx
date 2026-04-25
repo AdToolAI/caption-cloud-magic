@@ -33,10 +33,13 @@ export default function LocationEditor({
   onSaved,
 }: LocationEditorProps) {
   const { createLocation, updateLocation, uploadLibraryImage } = useMotionStudioLibrary();
+  const { hasAccepted: hasConsent } = useLegalConsent('motion_studio_library_upload');
   const [draft, setDraft] = useState<LocationDraft>(EMPTY_LOCATION_DRAFT);
   const [tagInput, setTagInput] = useState('');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showConsentDialog, setShowConsentDialog] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -53,20 +56,12 @@ export default function LocationEditor({
         setDraft(EMPTY_LOCATION_DRAFT);
       }
       setTagInput('');
+      setPendingFile(null);
     }
   }, [open, location]);
 
-  const handleFileUpload = useCallback(
-    async (file: File | null) => {
-      if (!file) return;
-      if (!ACCEPTED.includes(file.type)) {
-        toast.error('Bitte JPG, PNG oder WEBP wählen.');
-        return;
-      }
-      if (file.size > MAX_BYTES) {
-        toast.error(`Datei zu groß (max 20 MB).`);
-        return;
-      }
+  const performUpload = useCallback(
+    async (file: File) => {
       setUploading(true);
       try {
         const tmpId = location?.id ?? `tmp-${Date.now()}`;
@@ -81,6 +76,35 @@ export default function LocationEditor({
     },
     [location?.id, uploadLibraryImage]
   );
+
+  const handleFileUpload = useCallback(
+    async (file: File | null) => {
+      if (!file) return;
+      if (!ACCEPTED.includes(file.type)) {
+        toast.error('Bitte JPG, PNG oder WEBP wählen.');
+        return;
+      }
+      if (file.size > MAX_BYTES) {
+        toast.error(`Datei zu groß (max 20 MB).`);
+        return;
+      }
+      if (!hasConsent) {
+        setPendingFile(file);
+        setShowConsentDialog(true);
+        return;
+      }
+      await performUpload(file);
+    },
+    [hasConsent, performUpload]
+  );
+
+  const handleConsentAccepted = useCallback(async () => {
+    if (pendingFile) {
+      const file = pendingFile;
+      setPendingFile(null);
+      await performUpload(file);
+    }
+  }, [pendingFile, performUpload]);
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
