@@ -26,6 +26,7 @@ import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { CostComparisonWidget } from '@/components/motion-studio/CostComparisonWidget';
 
 interface RecentProject {
   id: string;
@@ -181,7 +182,7 @@ export default function MotionStudioHub() {
                 </h1>
                 <p className="text-muted-foreground mt-2 max-w-2xl">
                   Alles, was du für professionelle KI-Videoproduktion brauchst – Library, Voices, Composer
-                  und alle Generierungs-Engines an einem Ort. Auf Augenhöhe mit Artlist, mit transparenter Preisgestaltung.
+                  und alle Generierungs-Engines an einem Ort. Studio-Power mit transparenter Pay-per-Use-Preisgestaltung.
                 </p>
               </div>
               <div className="flex gap-2">
