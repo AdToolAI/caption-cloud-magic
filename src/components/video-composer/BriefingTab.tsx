@@ -55,6 +55,12 @@ interface BriefingTabProps {
   onUpdateProject: (p: Record<string, any>) => void;
   onGoToStoryboard: () => void;
   onScenesGenerated: (scenes: ComposerScene[]) => void;
+  brandKitId?: string | null;
+  brandKitAutoSync?: boolean;
+  assemblyConfig?: AssemblyConfig;
+  onChangeBrandKit?: (id: string | null) => void;
+  onChangeBrandKitAutoSync?: (sync: boolean) => void;
+  onApplyAssembly?: (next: AssemblyConfig) => void;
 }
 
 /**
