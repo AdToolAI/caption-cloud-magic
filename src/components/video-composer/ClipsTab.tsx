@@ -377,6 +377,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
         onUpdateScenes(optimistic);
       }
 
+      // Phase 4 — resolve @character / @location mentions
+      const resolvedSingle = resolveMentions(targetScene.aiPrompt || '', libCharacters, libLocations);
+      const finalSinglePrompt = targetScene.directorModifiers
+        ? applyDirectorModifiers(resolvedSingle.prompt, targetScene.directorModifiers)
+        : resolvedSingle.prompt;
+
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
         body: {
           projectId: pid,
@@ -386,13 +392,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             id: targetScene.id,
             clipSource: targetScene.clipSource,
             clipQuality: targetScene.clipQuality || 'standard',
-            // Director Presets (Phase 3): merge cinematography modifiers into the AI prompt
-            aiPrompt: targetScene.directorModifiers
-              ? applyDirectorModifiers(targetScene.aiPrompt || '', targetScene.directorModifiers)
-              : targetScene.aiPrompt,
+            aiPrompt: finalSinglePrompt,
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
-            referenceImageUrl: targetScene.referenceImageUrl,
+            referenceImageUrl: targetScene.referenceImageUrl || resolvedSingle.referenceImageUrl,
             durationSeconds: targetScene.durationSeconds,
             characterShot: targetScene.characterShot,
           }],
