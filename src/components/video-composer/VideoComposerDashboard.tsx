@@ -207,6 +207,10 @@ export default function VideoComposerDashboard() {
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
+            promptSlots: ((row as any).prompt_slots as any) ?? local?.promptSlots,
+            promptMode: ((row as any).prompt_mode as any) ?? local?.promptMode,
+            promptSlotOrder: ((row as any).prompt_slot_order as any) ?? local?.promptSlotOrder,
+            appliedStylePresetId: ((row as any).applied_style_preset_id as any) ?? local?.appliedStylePresetId,
           };
         });
 
