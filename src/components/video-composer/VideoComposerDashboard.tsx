@@ -35,6 +35,7 @@ import { useComposerPersistence, persistAssemblyConfig } from '@/hooks/useCompos
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
+import MotionStudioStepSidebar, { type StepItem } from './MotionStudioStepSidebar';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
