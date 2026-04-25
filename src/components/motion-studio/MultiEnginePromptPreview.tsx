@@ -101,6 +101,7 @@ export default function MultiEnginePromptPreview({
           body: {
             mode: 'compose',
             slots,
+            slotOrder: order,
             language,
             targetModel: model,
           },
@@ -117,7 +118,7 @@ export default function MultiEnginePromptPreview({
       console.error('[MultiEnginePromptPreview] compose failed', model, e);
       // Fallback to local deterministic stitch so the user still sees
       // *something* per model.
-      const fallback = stitchSlots(slots);
+      const fallback = stitchSlots(slots, order);
       setResults((prev) => ({
         ...prev,
         [model]: {
