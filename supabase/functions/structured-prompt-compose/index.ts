@@ -28,6 +28,8 @@ type SlotKey = "subject" | "action" | "setting" | "timeWeather" | "style" | "neg
 interface ComposeBody {
   mode: "compose" | "suggest" | "condense" | "inspire";
   slots?: Partial<Record<SlotKey, string>>;
+  /** Block K-P2 — user-defined slot order (Negative always at end). */
+  slotOrder?: SlotKey[];
   slot?: SlotKey;
   contextHint?: string;
   language?: string;
