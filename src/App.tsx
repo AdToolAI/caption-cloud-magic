@@ -120,6 +120,7 @@ const LumaVideoStudio = lazy(() => import("./pages/LumaVideoStudio"));
 const SoraVideoStudio = lazy(() => import("./pages/SoraVideoStudio"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 const VideoComposer = lazy(() => import("./pages/VideoComposer"));
+const MotionStudioLibrary = lazy(() => import("./pages/MotionStudio/Library"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const VideoTranslator = lazy(() => import("./pages/VideoTranslator"));
@@ -251,6 +252,7 @@ function AppLayout() {
           <Route path="/audio-studio" element={<AudioStudio />} />
            <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
            <Route path="/video-composer" element={<VideoComposer />} />
+           <Route path="/motion-studio/library" element={<MotionStudioLibrary />} />
            <Route path="/video-translator" element={<VideoTranslator />} />
            <Route path="/community" element={<Community />} />
            <Route path="/gaming" element={<GamingHub />} />

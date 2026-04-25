@@ -3620,11 +3620,16 @@ export type Database = {
           clip_source: string
           clip_status: string
           clip_url: string | null
+          continuity_source_scene_id: string | null
           cost_euros: number
           created_at: string
+          director_modifiers: Json | null
           duration_seconds: number
           effects: Json | null
           id: string
+          last_frame_url: string | null
+          mentioned_character_ids: string[] | null
+          mentioned_location_ids: string[] | null
           order_index: number
           project_id: string
           reference_image_url: string | null
@@ -3646,11 +3651,16 @@ export type Database = {
           clip_source?: string
           clip_status?: string
           clip_url?: string | null
+          continuity_source_scene_id?: string | null
           cost_euros?: number
           created_at?: string
+          director_modifiers?: Json | null
           duration_seconds?: number
           effects?: Json | null
           id?: string
+          last_frame_url?: string | null
+          mentioned_character_ids?: string[] | null
+          mentioned_location_ids?: string[] | null
           order_index?: number
           project_id: string
           reference_image_url?: string | null
@@ -3672,11 +3682,16 @@ export type Database = {
           clip_source?: string
           clip_status?: string
           clip_url?: string | null
+          continuity_source_scene_id?: string | null
           cost_euros?: number
           created_at?: string
+          director_modifiers?: Json | null
           duration_seconds?: number
           effects?: Json | null
           id?: string
+          last_frame_url?: string | null
+          mentioned_character_ids?: string[] | null
+          mentioned_location_ids?: string[] | null
           order_index?: number
           project_id?: string
           reference_image_url?: string | null
@@ -3692,6 +3707,13 @@ export type Database = {
           upload_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "composer_scenes_continuity_source_scene_id_fkey"
+            columns: ["continuity_source_scene_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scenes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "composer_scenes_project_id_fkey"
             columns: ["project_id"]
@@ -5768,6 +5790,90 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      motion_studio_characters: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          name: string
+          reference_image_seed: string | null
+          reference_image_url: string | null
+          signature_items: string | null
+          tags: string[] | null
+          updated_at: string
+          usage_count: number
+          user_id: string
+          voice_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          name: string
+          reference_image_seed?: string | null
+          reference_image_url?: string | null
+          signature_items?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+          voice_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          name?: string
+          reference_image_seed?: string | null
+          reference_image_url?: string | null
+          signature_items?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+          voice_id?: string | null
+        }
+        Relationships: []
+      }
+      motion_studio_locations: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          lighting_notes: string | null
+          name: string
+          reference_image_url: string | null
+          tags: string[] | null
+          updated_at: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          lighting_notes?: string | null
+          name: string
+          reference_image_url?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          lighting_notes?: string | null
+          name?: string
+          reference_image_url?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: []
       }
       news_hub_articles: {
         Row: {
