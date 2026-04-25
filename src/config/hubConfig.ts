@@ -82,6 +82,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/sora-long-form", titleKey: "Sora 2 Long-Form", descKey: "hubItemDesc.soraLongForm", icon: Film },
       { route: "/ai-video-studio", titleKey: "AI Video Studio", descKey: "hubItemDesc.aiVideoStudio", icon: Sparkles },
       { route: "/video-composer", titleKey: "videoComposer.title", descKey: "hubItemDesc.videoComposer", icon: Scissors },
+      { route: "/motion-studio/library", titleKey: "Motion Studio Library", descKey: "Wiederverwendbare Charaktere & Locations für deine AI-Videos", icon: Users },
       { route: "/video-translator", titleKey: "vidTrans.hubTitle", descKey: "hubItemDesc.videoTranslator", icon: Languages },
       { route: "/picture-studio", titleKey: "KI Picture Studio", descKey: "hubItemDesc.backgroundReplacer", icon: Layers },
     ],
