@@ -72,7 +72,7 @@ serve(async (req) => {
       try {
         const { data: currentScene } = await supabase
           .from('composer_scenes')
-          .select('scene_index, duration_seconds')
+          .select('order_index, duration_seconds')
           .eq('id', sceneId)
           .single();
 
@@ -81,7 +81,7 @@ serve(async (req) => {
             .from('composer_scenes')
             .select('id, reference_image_url')
             .eq('project_id', projectId)
-            .eq('scene_index', (currentScene.scene_index ?? 0) + 1)
+            .eq('order_index', (currentScene.order_index ?? 0) + 1)
             .maybeSingle();
 
           // Always extract the last frame for the current scene (so it's cached
@@ -108,7 +108,7 @@ serve(async (req) => {
                 .from('composer_scenes')
                 .update({
                   reference_image_url: frameUrl,
-                  reference_source: 'continuity_auto',
+                  continuity_source_scene_id: sceneId,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', nextScene.id);
