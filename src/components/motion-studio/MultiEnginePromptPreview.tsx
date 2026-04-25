@@ -71,11 +71,11 @@ export default function MultiEnginePromptPreview({
       )
   );
 
-  // Slot signature — recompose if slots change.
-  const signature = JSON.stringify(slots);
+  // Slot+order signature — recompose if either changes.
+  const signature = JSON.stringify({ slots, order });
 
   useEffect(() => {
-    // Reset cache when slots change.
+    // Reset cache when slots/order change.
     setResults(
       MODEL_ORDER.reduce(
         (acc, k) => ({ ...acc, [k]: { state: 'idle' } }),
