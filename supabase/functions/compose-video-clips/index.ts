@@ -13,10 +13,13 @@ type Quality = 'standard' | 'pro';
 
 // Cost per second by source × quality tier — synced with client (src/types/video-composer.ts)
 const CLIP_COSTS: Record<string, Record<Quality, number>> = {
-  'ai-hailuo': { standard: 0.15, pro: 0.20 },
-  'ai-kling':  { standard: 0.15, pro: 0.21 },
-  'ai-sora':   { standard: 0.25, pro: 0.53 },
-  'ai-image':  { standard: 0.01, pro: 0.015 },
+  'ai-hailuo':   { standard: 0.15, pro: 0.20 },
+  'ai-kling':    { standard: 0.15, pro: 0.21 },
+  'ai-sora':     { standard: 0.25, pro: 0.53 },
+  'ai-wan':      { standard: 0.10, pro: 0.18 },
+  'ai-seedance': { standard: 0.12, pro: 0.20 },
+  'ai-luma':     { standard: 0.20, pro: 0.32 },
+  'ai-image':    { standard: 0.01, pro: 0.015 },
 };
 
 interface ComposerCharacter {
