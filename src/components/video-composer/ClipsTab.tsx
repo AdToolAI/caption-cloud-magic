@@ -63,6 +63,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [singleGenerating, setSingleGenerating] = useState<Record<string, boolean>>({});
   const { extractLastFrame, extractingSceneId } = useFrameContinuity();
+  // Library for @-mention resolution at generation time
+  const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
 
   /**
    * Frame-to-Shot Continuity:
@@ -267,20 +269,26 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
 
       const scenesPayload = pScenes
         .filter(s => s.clipStatus !== 'ready' && !(s.clipSource === 'upload' && s.uploadUrl))
-        .map(s => ({
-          id: s.id,
-          clipSource: s.clipSource,
-          clipQuality: s.clipQuality || 'standard',
-          // Director Presets (Phase 3): merge cinematography modifiers into the AI prompt
-          aiPrompt: s.directorModifiers
-            ? applyDirectorModifiers(s.aiPrompt || '', s.directorModifiers)
-            : s.aiPrompt,
-          stockKeywords: s.stockKeywords,
-          uploadUrl: s.uploadUrl,
-          referenceImageUrl: s.referenceImageUrl,
-          durationSeconds: s.durationSeconds,
-          characterShot: s.characterShot,
-        }));
+        .map(s => {
+          // Phase 4 — resolve @character / @location mentions against library
+          const resolved = resolveMentions(s.aiPrompt || '', libCharacters, libLocations);
+          // Phase 3 — apply director modifiers on top of the resolved prompt
+          const finalPrompt = s.directorModifiers
+            ? applyDirectorModifiers(resolved.prompt, s.directorModifiers)
+            : resolved.prompt;
+          return {
+            id: s.id,
+            clipSource: s.clipSource,
+            clipQuality: s.clipQuality || 'standard',
+            aiPrompt: finalPrompt,
+            stockKeywords: s.stockKeywords,
+            uploadUrl: s.uploadUrl,
+            // Prefer scene-level reference, fall back to single-mention auto-ref
+            referenceImageUrl: s.referenceImageUrl || resolved.referenceImageUrl,
+            durationSeconds: s.durationSeconds,
+            characterShot: s.characterShot,
+          };
+        });
 
       if (scenesPayload.length === 0) {
         toast({ title: 'Alle Clips sind bereits fertig!' });
