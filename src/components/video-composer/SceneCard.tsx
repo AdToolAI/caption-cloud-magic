@@ -98,6 +98,29 @@ export default function SceneCard({
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
   // Stock browser open state
   const [stockBrowserOpen, setStockBrowserOpen] = useState(false);
+  // Block K — Style Preset Picker open state
+  const [stylePickerOpen, setStylePickerOpen] = useState(false);
+
+  const promptMode: 'free' | 'structured' = scene.promptMode ?? 'free';
+  const promptSlots: PromptSlots = scene.promptSlots ?? {};
+
+  const togglePromptMode = () => {
+    if (promptMode === 'free') {
+      // Free → Structured: naive split (KI-Extractor optional, später)
+      const nextSlots = hasAnySlot(promptSlots) ? promptSlots : naiveSplitToSlots(scene.aiPrompt || '');
+      onUpdate({ promptMode: 'structured', promptSlots: nextSlots });
+    } else {
+      // Structured → Free: deterministic stitch
+      const stitched = stitchSlots(promptSlots);
+      onUpdate({ promptMode: 'free', aiPrompt: stitched || scene.aiPrompt });
+    }
+  };
+
+  const handleSlotsChange = (next: PromptSlots) => {
+    const stitched = stitchSlots(next);
+    onUpdate({ promptSlots: next, aiPrompt: stitched });
+  };
+
 
   const handleStockSelect = (item: StockMediaItem) => {
     onUpdate({
