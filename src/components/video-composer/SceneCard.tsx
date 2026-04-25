@@ -165,25 +165,35 @@ export default function SceneCard({
 
             {/* Clip source */}
             <div className="flex flex-wrap gap-2">
-              {(['ai-hailuo', 'ai-kling', 'ai-image', 'stock', 'upload'] as ClipSource[]).map((src) => {
+              {(['ai-hailuo', 'ai-kling', 'ai-image', 'stock', 'stock-image', 'upload'] as ClipSource[]).map((src) => {
                 const label =
                   src === 'upload'
                     ? 'Eigenes Video'
                     : CLIP_SOURCE_LABELS[src]?.de || src;
-                const isImage = src === 'ai-image';
+                const isAiImage = src === 'ai-image';
+                const isStockImage = src === 'stock-image';
+                const isStockVideo = src === 'stock';
+                const handleClick = () => {
+                  if (isStockVideo || isStockImage) {
+                    onUpdate({ clipSource: src });
+                    setStockBrowserOpen(true);
+                  } else {
+                    onUpdate({ clipSource: src });
+                  }
+                };
                 return (
                   <button
                     key={src}
-                    onClick={() => onUpdate({ clipSource: src })}
+                    onClick={handleClick}
                     className={`px-2 py-1 rounded text-[10px] border transition-all flex items-center gap-1 ${
                       scene.clipSource === src
-                        ? isImage
+                        ? isAiImage || isStockImage
                           ? 'border-green-500/60 bg-green-500/10 text-green-300'
                           : 'border-primary bg-primary/10 text-primary'
                         : 'border-border/40 text-muted-foreground hover:border-border'
                     }`}
                   >
-                    {isImage && <ImageIcon className="h-2.5 w-2.5" />}
+                    {(isAiImage || isStockImage) && <ImageIcon className="h-2.5 w-2.5" />}
                     {label}
                   </button>
                 );
