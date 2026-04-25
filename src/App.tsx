@@ -93,6 +93,7 @@ const ContentProjects = lazy(() => import("./pages/ContentProjects"));
 const UniversalCreator = lazy(() => import("./pages/UniversalCreator"));
 const UniversalVideoCreator = lazy(() => import("./pages/UniversalVideoCreator"));
 const UniversalDirectorsCut = lazy(() => import("./pages/DirectorsCut"));
+const CompareLab = lazy(() => import("./pages/CompareLab"));
 
 
 const PersonalizedDashboard = lazy(() => import("./pages/PersonalizedDashboard"));
@@ -250,6 +251,7 @@ function AppLayout() {
          <Route path="/hailuo-video-studio" element={<HailuoVideoStudio />} />
           <Route path="/luma-video-studio" element={<LumaVideoStudio />} />
           <Route path="/sora-video-studio" element={<SoraVideoStudio />} />
+          <Route path="/compare-lab" element={<ProtectedRoute><CompareLab /></ProtectedRoute>} />
           <Route path="/audio-studio" element={<AudioStudio />} />
            <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
            <Route path="/video-composer" element={<VideoComposer />} />

@@ -69,6 +69,14 @@ const QUICK_ACTIONS = [
     accent: 'from-primary/20 to-accent/10',
     badge: null,
   },
+  {
+    title: 'Compare Lab',
+    desc: 'Ein Prompt — bis zu 6 Engines parallel. AI-Judge wählt den Sieger.',
+    icon: Sparkles,
+    href: '/compare-lab',
+    accent: 'from-accent/30 to-primary/10',
+    badge: 'NEW',
+  },
 ] as const;
 
 const TOOLBOX_ITEMS = [
