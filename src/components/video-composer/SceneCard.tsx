@@ -72,6 +72,7 @@ export default function SceneCard({
   totalScenes,
   projectId,
   characters,
+  preferredAspect,
   onUpdate,
   onDelete,
   onMoveUp,
@@ -79,13 +80,28 @@ export default function SceneCard({
   language,
 }: SceneCardProps) {
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
-  const clipSourceIcon = scene.clipSource.startsWith('ai-') ? Sparkles : scene.clipSource === 'stock' ? Video : Upload;
+  const isStock = scene.clipSource === 'stock' || scene.clipSource === 'stock-image';
+  const clipSourceIcon = scene.clipSource.startsWith('ai-') ? Sparkles : isStock ? Video : Upload;
   const ClipIcon = clipSourceIcon;
   const activeChar = scene.characterShot
     ? characters?.find((c) => c.id === scene.characterShot!.characterId)
     : undefined;
   // Library for live mention resolution preview
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
+  // Stock browser open state
+  const [stockBrowserOpen, setStockBrowserOpen] = useState(false);
+
+  const handleStockSelect = (item: StockMediaItem) => {
+    onUpdate({
+      clipSource: item.type === 'video' ? 'stock' : 'stock-image',
+      clipUrl: item.url,
+      clipStatus: 'ready',
+      stockMediaThumb: item.thumbnailUrl || undefined,
+      stockMediaSource: item.source === 'upload' ? undefined : item.source,
+      stockMediaAuthor: item.authorName ? { name: item.authorName, url: item.authorUrl } : undefined,
+      uploadType: item.type,
+    });
+  };
 
   return (
     <Card className="border-border/40 bg-card/80 group">
