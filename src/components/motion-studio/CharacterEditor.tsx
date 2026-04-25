@@ -39,11 +39,13 @@ export default function CharacterEditor({
   onSaved,
 }: CharacterEditorProps) {
   const { createCharacter, updateCharacter, uploadLibraryImage } = useMotionStudioLibrary();
+  const { hasAccepted: hasConsent } = useLegalConsent('motion_studio_library_upload');
   const [draft, setDraft] = useState<CharacterDraft>(EMPTY_CHARACTER_DRAFT);
   const [tagInput, setTagInput] = useState('');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [confirmedRights, setConfirmedRights] = useState(false);
+  const [showConsentDialog, setShowConsentDialog] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Reset bei jedem Öffnen
@@ -59,14 +61,30 @@ export default function CharacterEditor({
           voice_id: character.voice_id,
           tags: character.tags,
         });
-        setConfirmedRights(true);
       } else {
         setDraft(EMPTY_CHARACTER_DRAFT);
-        setConfirmedRights(false);
       }
       setTagInput('');
+      setPendingFile(null);
     }
   }, [open, character]);
+
+  const performUpload = useCallback(
+    async (file: File) => {
+      setUploading(true);
+      try {
+        const tmpId = character?.id ?? `tmp-${Date.now()}`;
+        const url = await uploadLibraryImage(file, 'character', tmpId);
+        if (url) {
+          setDraft((d) => ({ ...d, reference_image_url: url }));
+          toast.success('Referenzbild hochgeladen');
+        }
+      } finally {
+        setUploading(false);
+      }
+    },
+    [character?.id, uploadLibraryImage]
+  );
 
   const handleFileUpload = useCallback(
     async (file: File | null) => {
@@ -79,26 +97,24 @@ export default function CharacterEditor({
         toast.error(`Datei zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB · max 20 MB).`);
         return;
       }
-      if (!confirmedRights) {
-        toast.error('Bitte bestätige zuerst die Bildrechte.');
+      // Block E (Legal) — gate uploads behind persistent consent
+      if (!hasConsent) {
+        setPendingFile(file);
+        setShowConsentDialog(true);
         return;
       }
-
-      setUploading(true);
-      try {
-        // Tmp-ID falls Charakter noch nicht existiert
-        const tmpId = character?.id ?? `tmp-${Date.now()}`;
-        const url = await uploadLibraryImage(file, 'character', tmpId);
-        if (url) {
-          setDraft((d) => ({ ...d, reference_image_url: url }));
-          toast.success('Referenzbild hochgeladen');
-        }
-      } finally {
-        setUploading(false);
-      }
+      await performUpload(file);
     },
-    [character?.id, uploadLibraryImage, confirmedRights]
+    [hasConsent, performUpload]
   );
+
+  const handleConsentAccepted = useCallback(async () => {
+    if (pendingFile) {
+      const file = pendingFile;
+      setPendingFile(null);
+      await performUpload(file);
+    }
+  }, [pendingFile, performUpload]);
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
