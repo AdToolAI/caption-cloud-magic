@@ -328,18 +328,47 @@ export default function SceneCard({
               </div>
             )}
 
-            {scene.clipSource === 'stock' && (
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Stock-Suchbegriffe</Label>
+            {(scene.clipSource === 'stock' || scene.clipSource === 'stock-image') && (
+              <div className="space-y-2 rounded-md border border-border/40 bg-background/40 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {scene.stockMediaThumb || scene.clipUrl ? (
+                      <img
+                        src={scene.stockMediaThumb || scene.clipUrl}
+                        alt="stock thumbnail"
+                        className="w-10 h-7 rounded object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-7 rounded bg-muted/40 flex items-center justify-center flex-shrink-0">
+                        {scene.clipSource === 'stock' ? <Video className="h-3 w-3 text-muted-foreground" /> : <ImageIcon className="h-3 w-3 text-muted-foreground" />}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {scene.clipUrl
+                          ? (scene.stockMediaAuthor?.name
+                              ? `${scene.stockMediaSource} · ${scene.stockMediaAuthor.name}`
+                              : 'Stock ausgewählt')
+                          : (scene.clipSource === 'stock' ? 'Kein Video gewählt' : 'Kein Bild gewählt')}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[10px] gap-1"
+                    onClick={() => setStockBrowserOpen(true)}
+                  >
+                    <Video className="h-3 w-3" />
+                    Bibliothek öffnen
+                  </Button>
+                </div>
                 <Input
                   value={scene.stockKeywords || ''}
                   onChange={(e) => onUpdate({ stockKeywords: e.target.value })}
-                  placeholder="z.B. business meeting, happy team"
-                  className="text-xs bg-background/50"
+                  placeholder="Optional: Suchbegriffe für AI-Auto-Pick"
+                  className="text-xs bg-background/50 h-7"
                 />
-                <p className="text-[9px] text-muted-foreground/70">
-                  Wir suchen automatisch passende Stock-Videos im Clips-Tab.
-                </p>
               </div>
             )}
 
