@@ -413,9 +413,41 @@ export default function SceneCard({
                       language={lang}
                       onOpenStylePresets={() => setStylePickerOpen(true)}
                       onSavePreset={() => setStylePickerOpen(true)}
+                      onInspireMe={inspiring ? undefined : handleInspireMe}
                     />
                   )}
                 </div>
+
+                {/* Block K-6 — Multi-Engine Preview (only in structured mode with content) */}
+                {promptMode === 'structured' && hasAnySlot(promptSlots) && (
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => setMultiEngineOpen((v) => !v)}
+                      className="text-[10px] text-primary/80 hover:text-primary flex items-center gap-1"
+                    >
+                      <Sparkles className="h-2.5 w-2.5" />
+                      {multiEngineOpen
+                        ? lang === 'de'
+                          ? 'Multi-Engine ausblenden'
+                          : lang === 'es'
+                          ? 'Ocultar multi-motor'
+                          : 'Hide multi-engine'
+                        : lang === 'de'
+                        ? 'Multi-Engine Vorschau anzeigen'
+                        : lang === 'es'
+                        ? 'Mostrar vista multi-motor'
+                        : 'Show multi-engine preview'}
+                    </button>
+                    {multiEngineOpen && (
+                      <MultiEnginePromptPreview
+                        slots={promptSlots}
+                        language={lang}
+                        defaultModel={clipSourceToModelKey(scene.clipSource) ?? 'ai-sora'}
+                      />
+                    )}
+                  </div>
+                )}
 
                 <StylePresetPicker
                   open={stylePickerOpen}
