@@ -402,7 +402,7 @@ export default function SceneCard({
 
           {/* Thumbnail preview */}
           <div className="w-24 h-16 rounded bg-muted/30 border border-border/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
-            {(scene.uploadType === 'image' || scene.clipSource === 'ai-image') && (scene.clipUrl || scene.uploadUrl) ? (
+            {(scene.uploadType === 'image' || scene.clipSource === 'ai-image' || scene.clipSource === 'stock-image') && (scene.clipUrl || scene.uploadUrl) ? (
               <img src={scene.clipUrl || scene.uploadUrl} alt="" className="w-full h-full object-cover" />
             ) : scene.clipUrl ? (
               <video src={scene.clipUrl} className="w-full h-full object-cover" muted />
@@ -414,6 +414,15 @@ export default function SceneCard({
           </div>
         </div>
       </CardContent>
+
+      {/* Stock Media Browser modal */}
+      <StockMediaBrowser
+        open={stockBrowserOpen}
+        onOpenChange={setStockBrowserOpen}
+        initialType={scene.clipSource === 'stock-image' ? 'image' : 'video'}
+        preferredAspect={preferredAspect}
+        onSelect={handleStockSelect}
+      />
     </Card>
   );
 }
