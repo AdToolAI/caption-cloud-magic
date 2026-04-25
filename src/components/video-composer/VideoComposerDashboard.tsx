@@ -538,26 +538,36 @@ export default function VideoComposerDashboard() {
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabId)}>
-          <TabsList className="grid grid-cols-6 w-full max-w-3xl mx-auto mb-6 bg-card border border-border/40">
-            {TABS.map((tab, i) => {
-              const Icon = tab.icon;
-              const isAccessible = i === 0 ||
-                (i === 1 && project.briefing.productName) ||
-                (i >= 2 && project.scenes.length > 0);
-              return (
-                <TabsTrigger
-                  key={tab.id}
-                  value={tab.id}
-                  disabled={!isAccessible}
-                  className="flex items-center gap-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary disabled:opacity-30"
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
+        <div className="flex gap-6">
+          <MotionStudioStepSidebar
+            steps={STEPS}
+            activeStep={activeTab}
+            isStepDone={isStepDone}
+            isStepAccessible={isStepAccessible}
+            onSelect={(id) => handleTabChange(id as TabId)}
+          />
+
+          <div className="flex-1 min-w-0">
+            <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabId)}>
+              <TabsList className="lg:hidden grid grid-cols-6 w-full max-w-3xl mx-auto mb-6 bg-card border border-border/40">
+                {TABS.map((tab, i) => {
+                  const Icon = tab.icon;
+                  const isAccessible = i === 0 ||
+                    (i === 1 && project.briefing.productName) ||
+                    (i >= 2 && project.scenes.length > 0);
+                  return (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      disabled={!isAccessible}
+                      className="flex items-center gap-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary disabled:opacity-30"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
 
           <TabsContent value="briefing">
             <BriefingTab
