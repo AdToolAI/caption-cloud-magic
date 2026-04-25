@@ -59,6 +59,40 @@ const statusConfig: Record<string, { color: string; bg: string; label: string }>
 export default function ClipsTab({ scenes, projectId, visualStyle, characters, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [singleGenerating, setSingleGenerating] = useState<Record<string, boolean>>({});
+  const { extractLastFrame, extractingSceneId } = useFrameContinuity();
+
+  /**
+   * Frame-to-Shot Continuity:
+   * Extrahiert den letzten Frame der aktuellen Szene und setzt ihn als
+   * `referenceImageUrl` der nachfolgenden Szene → nahtlose Bild-Übergänge
+   * bei AI-Generierung (i2v).
+   */
+  const handleApplyContinuityToNext = useCallback(
+    async (currentScene: ComposerScene, nextScene: ComposerScene) => {
+      if (!currentScene.clipUrl) {
+        toast({ title: 'Kein Clip vorhanden', description: 'Generiere zuerst diese Szene.' });
+        return;
+      }
+      const result = await extractLastFrame({
+        videoUrl: currentScene.clipUrl,
+        sceneId: currentScene.id,
+        projectId,
+        durationSeconds: currentScene.durationSeconds,
+      });
+      if (!result) return;
+      const updated = scenes.map((s) =>
+        s.id === nextScene.id
+          ? { ...s, referenceImageUrl: result.lastFrameUrl, clipStatus: 'pending' as const }
+          : s
+      );
+      onUpdateScenes(updated);
+      toast({
+        title: 'Continuity aktiviert ✨',
+        description: `Szene ${scenes.findIndex(s => s.id === nextScene.id) + 1} startet jetzt nahtlos.`,
+      });
+    },
+    [scenes, projectId, extractLastFrame, onUpdateScenes]
+  );
   const [stockSearch, setStockSearch] = useState<Record<string, string>>({});
   const [stockResults, setStockResults] = useState<Record<string, any[]>>({});
   const [searchingStock, setSearchingStock] = useState<Record<string, boolean>>({});
