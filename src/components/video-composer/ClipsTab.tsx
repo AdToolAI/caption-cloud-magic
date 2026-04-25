@@ -692,6 +692,32 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                         Neu generieren €{costPerClip.toFixed(2)}
                       </Button>
                     )}
+                    {/* Frame-to-Shot Continuity → use last frame as next scene's start */}
+                    {scene.clipStatus === 'ready' && scene.clipUrl && (() => {
+                      const next = scenes[i + 1];
+                      if (!next) return null;
+                      const nextIsAi = next.clipSource.startsWith('ai-');
+                      if (!nextIsAi) return null;
+                      const isExtracting = extractingSceneId === scene.id;
+                      const alreadyApplied = !!next.referenceImageUrl;
+                      return (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 text-[10px] h-7 px-2 border-primary/40 text-primary hover:bg-primary/10"
+                          title="Letzten Frame dieser Szene als Startbild der nächsten Szene nutzen — für nahtlose Übergänge."
+                          disabled={isExtracting || alreadyApplied}
+                          onClick={() => handleApplyContinuityToNext(scene, next)}
+                        >
+                          {isExtracting ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Link2 className="h-3 w-3" />
+                          )}
+                          {alreadyApplied ? 'Continuity ✓' : 'Continuity → #' + (i + 2)}
+                        </Button>
+                      );
+                    })()}
                     {/* Generating disabled marker */}
                     {scene.clipStatus === 'generating' && (
                       <Button size="sm" disabled className="gap-1 text-[10px] h-7 px-2">
