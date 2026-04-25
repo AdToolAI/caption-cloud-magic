@@ -269,7 +269,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           id: s.id,
           clipSource: s.clipSource,
           clipQuality: s.clipQuality || 'standard',
-          aiPrompt: s.aiPrompt,
+          // Director Presets (Phase 3): merge cinematography modifiers into the AI prompt
+          aiPrompt: s.directorModifiers
+            ? applyDirectorModifiers(s.aiPrompt || '', s.directorModifiers)
+            : s.aiPrompt,
           stockKeywords: s.stockKeywords,
           uploadUrl: s.uploadUrl,
           referenceImageUrl: s.referenceImageUrl,
