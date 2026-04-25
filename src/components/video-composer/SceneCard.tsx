@@ -476,6 +476,7 @@ export default function SceneCard({
                       <MultiEnginePromptPreview
                         slots={promptSlots}
                         language={lang}
+                        order={promptSlotOrder}
                         defaultModel={clipSourceToModelKey(scene.clipSource) ?? 'ai-sora'}
                       />
                     )}
