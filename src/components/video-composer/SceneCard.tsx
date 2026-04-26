@@ -489,6 +489,26 @@ export default function SceneCard({
                   </div>
                 )}
 
+                {/* Block L — Inline Compare Lab launcher */}
+                {(scene.aiPrompt?.trim() || hasAnySlot(promptSlots)) && (
+                  <div className="pt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCompareLabOpen(true)}
+                      className="h-7 text-[10px] gap-1.5"
+                    >
+                      <Beaker className="h-3 w-3" />
+                      {lang === 'de'
+                        ? 'Auf Engines vergleichen'
+                        : lang === 'es'
+                        ? 'Comparar en motores'
+                        : 'Compare on engines'}
+                    </Button>
+                  </div>
+                )}
+
                 <StylePresetPicker
                   open={stylePickerOpen}
                   onOpenChange={setStylePickerOpen}
