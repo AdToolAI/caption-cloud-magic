@@ -418,7 +418,7 @@ export default function SceneCard({
             )}
             {/* Clip source */}
             <div className="flex flex-wrap gap-2">
-              {(['ai-hailuo', 'ai-kling', 'ai-image', 'stock', 'stock-image', 'upload'] as ClipSource[]).map((src) => {
+              {(['ai-hailuo', 'ai-kling', 'ai-veo', 'ai-image', 'stock', 'stock-image', 'upload'] as ClipSource[]).map((src) => {
                 const label =
                   src === 'upload'
                     ? 'Eigenes Video'
