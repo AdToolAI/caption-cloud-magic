@@ -16,6 +16,7 @@ import {
 import {
   ChevronUp, ChevronDown, Trash2, GripVertical,
   Sparkles, Upload, Video, Image as ImageIcon, Wand2, Beaker,
+  ArrowRight, ArrowLeft, Link2,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -66,6 +67,11 @@ interface SceneCardProps {
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  /**
+   * Block M — opens the Hybrid Extend dialog for this scene.
+   * Parent owns the dialog state because it needs to refetch scenes after success.
+   */
+  onHybridExtend?: (mode: 'forward' | 'backward') => void;
   language: string;
 }
 
@@ -94,6 +100,7 @@ export default function SceneCard({
   onDelete,
   onMoveUp,
   onMoveDown,
+  onHybridExtend,
   language,
 }: SceneCardProps) {
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
