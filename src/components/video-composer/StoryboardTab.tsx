@@ -58,6 +58,19 @@ export default function StoryboardTab({
     try { localStorage.setItem(TIPS_KEY, tipsCollapsed ? '1' : '0'); } catch { /* ignore */ }
   }, [tipsCollapsed]);
 
+  // Block M — Hybrid Extend dialog state
+  const [hybridDialog, setHybridDialog] = useState<{
+    open: boolean;
+    scene: ComposerScene | null;
+    mode: 'forward' | 'backward';
+  }>({ open: false, scene: null, mode: 'forward' });
+
+  const openHybridDialog = (scene: ComposerScene, mode: 'forward' | 'backward') => {
+    setHybridDialog({ open: true, scene, mode });
+  };
+
+  const dialogLang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
+
   const addScene = () => {
     const newScene: ComposerScene = {
       id: `scene_${Date.now()}`,
