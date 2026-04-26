@@ -628,12 +628,16 @@ export type Database = {
           completed_at: string | null
           created_at: string
           credits_consumed: number | null
+          credits_refunded: number | null
           error_message: string | null
+          frames_rendered: number | null
           full_request_json: Json | null
           full_response_json: Json | null
           http_status: number | null
           id: string
           latency_ms: number | null
+          module: string
+          render_url: string | null
           response_schema_hash: string | null
           scenario_name: string
           started_at: string
@@ -644,12 +648,16 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           credits_consumed?: number | null
+          credits_refunded?: number | null
           error_message?: string | null
+          frames_rendered?: number | null
           full_request_json?: Json | null
           full_response_json?: Json | null
           http_status?: number | null
           id?: string
           latency_ms?: number | null
+          module?: string
+          render_url?: string | null
           response_schema_hash?: string | null
           scenario_name: string
           started_at?: string
@@ -660,12 +668,16 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           credits_consumed?: number | null
+          credits_refunded?: number | null
           error_message?: string | null
+          frames_rendered?: number | null
           full_request_json?: Json | null
           full_response_json?: Json | null
           http_status?: number | null
           id?: string
           latency_ms?: number | null
+          module?: string
+          render_url?: string | null
           response_schema_hash?: string | null
           scenario_name?: string
           started_at?: string
@@ -3841,6 +3853,7 @@ export type Database = {
           category: string
           created_at: string
           id: string
+          is_test_run: boolean
           language: string
           output_url: string | null
           smart_reframe_enabled: boolean
@@ -3862,6 +3875,7 @@ export type Database = {
           category?: string
           created_at?: string
           id?: string
+          is_test_run?: boolean
           language?: string
           output_url?: string | null
           smart_reframe_enabled?: boolean
@@ -3883,6 +3897,7 @@ export type Database = {
           category?: string
           created_at?: string
           id?: string
+          is_test_run?: boolean
           language?: string
           output_url?: string | null
           smart_reframe_enabled?: boolean
