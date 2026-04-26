@@ -3928,6 +3928,8 @@ export type Database = {
           text_overlay: Json
           transition_duration: number
           transition_type: string
+          trim_end_sec: number | null
+          trim_start_sec: number | null
           updated_at: string
           upload_type: string | null
           upload_url: string | null
@@ -3963,6 +3965,8 @@ export type Database = {
           text_overlay?: Json
           transition_duration?: number
           transition_type?: string
+          trim_end_sec?: number | null
+          trim_start_sec?: number | null
           updated_at?: string
           upload_type?: string | null
           upload_url?: string | null
@@ -3998,6 +4002,8 @@ export type Database = {
           text_overlay?: Json
           transition_duration?: number
           transition_type?: string
+          trim_end_sec?: number | null
+          trim_start_sec?: number | null
           updated_at?: string
           upload_type?: string | null
           upload_url?: string | null

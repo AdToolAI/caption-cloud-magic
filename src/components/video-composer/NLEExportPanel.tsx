@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, FileCode, FileText, Package, Loader2, Clock, AlertTriangle } from 'lucide-react';
+import { Download, FileCode, FileText, Package, Loader2, Clock, AlertTriangle, Upload } from 'lucide-react';
 import { useNLEExport, type NLEExportRecord } from '@/hooks/useNLEExport';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { NLEImportDiffDialog, type NLEDiffPayload } from './NLEImportDiffDialog';
 
 interface NLEExportPanelProps {
   projectId?: string;
@@ -41,7 +42,42 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
     exportEDL,
     exportBundle,
     reDownload,
+    previewImport,
+    applyImport,
   } = useNLEExport(projectId);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [diff, setDiff] = useState<NLEDiffPayload | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+
+  const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImportFile(file);
+    setPreviewing(true);
+    setDiff(null);
+    setDialogOpen(true);
+    const result = await previewImport(file);
+    setPreviewing(false);
+    if (result?.diff) setDiff(result.diff);
+    else setDialogOpen(false);
+  };
+
+  const handleConfirmApply = async () => {
+    if (!importFile) return;
+    setApplying(true);
+    const result = await applyImport(importFile);
+    setApplying(false);
+    if (result) {
+      setDialogOpen(false);
+      setImportFile(null);
+      setDiff(null);
+    }
+  };
 
   const disabled = !projectId;
 
@@ -108,6 +144,38 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
           <strong>EDL</strong> ist Legacy (Avid). <strong>Bundle</strong> packt alle Medien lokal in ein ZIP — ideal zum Verschicken oder Offline-Schnitt.
         </p>
 
+        {/* Roundtrip Re-Import */}
+        <div className="pt-2 border-t border-border/40 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Upload className="h-3 w-3" />
+            Roundtrip — geänderte Sequenz importieren
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".fcpxml,application/xml,text/xml"
+            className="hidden"
+            onChange={handleFilePick}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={disabled || previewing}
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full justify-start"
+          >
+            {previewing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4" />
+            )}
+            FCPXML hochladen & Diff prüfen
+          </Button>
+          <p className="text-[10px] text-muted-foreground/80 leading-relaxed">
+            Lade die in Resolve/Premiere geänderte <code>.fcpxml</code> hoch — wir zeigen dir alle Trims, Reorder & gelöschten Szenen vor der Übernahme.
+          </p>
+        </div>
+
         {/* History */}
         {history.length > 0 && (
           <div className="space-y-2 pt-2 border-t border-border/40">
@@ -134,7 +202,7 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
                           <span className="text-muted-foreground">{formatRelative(rec.created_at)}</span>
                           {rec.warnings && rec.warnings.length > 0 && (
                             <AlertTriangle
-                              className="h-3 w-3 text-amber-500"
+                              className="h-3 w-3 text-warning"
                               aria-label={`${rec.warnings.length} Hinweis(e)`}
                             />
                           )}
@@ -168,6 +236,20 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
           </p>
         )}
       </CardContent>
+
+      <NLEImportDiffDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setImportFile(null);
+            setDiff(null);
+          }
+        }}
+        diff={diff}
+        onConfirm={handleConfirmApply}
+        applying={applying}
+      />
     </Card>
   );
 };
