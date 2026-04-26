@@ -37,6 +37,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
 import MotionStudioStepSidebar, { type StepItem } from './MotionStudioStepSidebar';
+import AutoDirectorWizard from './AutoDirectorWizard';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
@@ -135,6 +136,7 @@ export default function VideoComposerDashboard() {
   const [showResetDialog, setShowResetDialog] = useState(false);
   // Auto-open template picker when starting fresh (no draft on mount)
   const [showTemplatePicker, setShowTemplatePicker] = useState(() => !loadDraft());
+  const [showAutoDirector, setShowAutoDirector] = useState(false);
   const { ensureProjectPersisted } = useComposerPersistence();
   const incrementTemplateUsage = useIncrementTemplateUsage();
   const didInitialSyncRef = useRef(false);
@@ -577,6 +579,15 @@ export default function VideoComposerDashboard() {
               </p>
             </div>
             <Button
+              variant="default"
+              size="sm"
+              onClick={() => setShowAutoDirector(true)}
+              className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:opacity-90"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Auto-Director</span>
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               onClick={() => setShowTemplatePicker(true)}
@@ -738,6 +749,12 @@ export default function VideoComposerDashboard() {
         onOpenChange={setShowTemplatePicker}
         onSelectTemplate={applyTemplate}
         onStartBlank={handleStartBlank}
+      />
+
+      <AutoDirectorWizard
+        open={showAutoDirector}
+        onOpenChange={setShowAutoDirector}
+        defaultLanguage={project.language}
       />
 
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>

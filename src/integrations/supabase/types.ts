@@ -3831,6 +3831,7 @@ export type Database = {
       composer_projects: {
         Row: {
           assembly_config: Json
+          auto_director_config: Json | null
           brand_kit_auto_sync: boolean
           brand_kit_id: string | null
           briefing: Json
@@ -3850,6 +3851,7 @@ export type Database = {
         }
         Insert: {
           assembly_config?: Json
+          auto_director_config?: Json | null
           brand_kit_auto_sync?: boolean
           brand_kit_id?: string | null
           briefing?: Json
@@ -3869,6 +3871,7 @@ export type Database = {
         }
         Update: {
           assembly_config?: Json
+          auto_director_config?: Json | null
           brand_kit_auto_sync?: boolean
           brand_kit_id?: string | null
           briefing?: Json
