@@ -154,7 +154,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
               {diff.deleted.length > 0 && (
                 <Section
                   title="Fehlend in FCPXML — werden NICHT gelöscht"
-                  icon={<Trash2 className="h-4 w-4 text-amber-500" />}
+                  icon={<Trash2 className="h-4 w-4 text-warning" />}
                   tone="warning"
                 >
                   <p className="text-xs text-muted-foreground mb-2">
@@ -175,7 +175,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
               {diff.unknownAssets.length > 0 && (
                 <Section
                   title="Unbekannte Clips im FCPXML"
-                  icon={<AlertTriangle className="h-4 w-4 text-amber-500" />}
+                  icon={<AlertTriangle className="h-4 w-4 text-warning" />}
                   tone="warning"
                 >
                   <p className="text-xs text-muted-foreground mb-2">
@@ -196,7 +196,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
               {diff.warnings.length > 0 && (
                 <Section
                   title="Hinweise"
-                  icon={<AlertTriangle className="h-4 w-4 text-amber-500" />}
+                  icon={<AlertTriangle className="h-4 w-4 text-warning" />}
                   tone="warning"
                 >
                   <ul className="space-y-1">
@@ -258,7 +258,7 @@ const SummaryCard: React.FC<{
     tone === 'primary'
       ? 'border-primary/40 bg-primary/5 text-primary'
       : tone === 'warning'
-      ? 'border-amber-500/40 bg-amber-500/5 text-amber-600 dark:text-amber-400'
+      ? 'border-warning/40 bg-warning/5 text-warning'
       : 'border-border/40 bg-muted/30 text-muted-foreground';
   return (
     <div className={`rounded-md border px-2 py-2 ${toneClass}`}>
@@ -279,7 +279,7 @@ const Section: React.FC<{
 }> = ({ title, icon, tone, children }) => (
   <div
     className={`rounded-md border p-3 space-y-2 ${
-      tone === 'warning' ? 'border-amber-500/30 bg-amber-500/5' : 'border-border/40'
+      tone === 'warning' ? 'border-warning/30 bg-warning/5' : 'border-border/40'
     }`}
   >
     <div className="flex items-center gap-2 text-sm font-medium">
