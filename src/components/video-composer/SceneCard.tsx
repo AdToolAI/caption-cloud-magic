@@ -697,7 +697,8 @@ export default function SceneCard({
               if (videoUrl) {
                 onUpdate({
                   clipSource: 'upload',
-                  uploadedClipUrl: videoUrl,
+                  uploadUrl: videoUrl,
+                  uploadType: 'video',
                 });
                 toast({
                   title: lang === 'de' ? 'Sieger übernommen' : lang === 'es' ? 'Ganador aplicado' : 'Winner applied',
