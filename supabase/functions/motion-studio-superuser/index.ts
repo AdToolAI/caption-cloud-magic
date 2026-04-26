@@ -86,15 +86,13 @@ const SCENARIOS: Scenario[] = [
     name: "MS-3: Auto-Director Compose",
     category: "fast",
     fn: "auto-director-compose",
-    body: (ctx) => ({
-      projectId: ctx.testProjectId,
-      briefing: {
-        topic: "Premium coffee subscription launch",
-        audience: "Urban professionals 25-40",
-        tone: "energetic",
-        platform: "instagram",
-        duration: 15,
-      },
+    body: () => ({
+      stage: "plan",
+      idea: "Premium coffee subscription launch for urban professionals",
+      mood: "cinematic",
+      targetDurationSec: 15,
+      enginePreference: "auto",
+      language: "en",
     }),
     expectedKeys: ["scenes"],
   },
@@ -118,10 +116,12 @@ const SCENARIOS: Scenario[] = [
     custom: async () => {
       const { data, error } = await adminClient.storage.listBuckets();
       if (error) return { ok: false, message: error.message };
-      const found = data?.some((b) => b.name === "composer-clips" || b.name === "stock-media");
+      const found = data?.some((b) =>
+        ["composer-uploads", "composer-frames", "composer-clips", "stock-media"].includes(b.name),
+      );
       return found
         ? { ok: true, data: { buckets: data.length } }
-        : { ok: false, message: "composer-clips/stock-media bucket missing" };
+        : { ok: false, message: "No composer upload/frame bucket found" };
     },
   },
   {
@@ -131,7 +131,7 @@ const SCENARIOS: Scenario[] = [
       const { data, error } = await adminClient.storage.listBuckets();
       if (error) return { ok: false, message: error.message };
       const audioBuckets = data?.filter((b) =>
-        ["voiceover-audio", "audio-library", "music-library", "composer-music"].includes(b.name)
+        ["voiceover-audio", "background-music", "audio-assets", "audio-studio"].includes(b.name),
       );
       return (audioBuckets?.length ?? 0) > 0
         ? { ok: true, data: { audioBuckets: audioBuckets!.map((b) => b.name) } }
@@ -174,24 +174,44 @@ const SCENARIOS: Scenario[] = [
     name: "MS-9: Brand Consistency Analysis",
     category: "fast",
     fn: "analyze-brand-consistency",
-    body: (ctx) => ({
-      projectId: ctx.testProjectId,
-      content: "Premium coffee. Crafted for the bold. Subscribe today and elevate every morning.",
-    }),
+    body: async (ctx) => {
+      // Look up the test user's brand kit (seeded in setup)
+      const { data: kit } = await adminClient
+        .from("brand_kits")
+        .select("id")
+        .eq("user_id", ctx.userId)
+        .limit(1)
+        .maybeSingle();
+      return {
+        brandKitId: kit?.id ?? "00000000-0000-0000-0000-000000000000",
+        contentType: "caption",
+        contentId: ctx.testProjectId,
+        content: "Premium coffee. Crafted for the bold. Subscribe today and elevate every morning.",
+      };
+    },
     expectReachable: true,
   },
   {
     name: "MS-10: Brand Voice Analysis",
     category: "fast",
     fn: "analyze-brand-voice",
-    body: () => ({
-      samples: [
-        "Premium coffee. Crafted for the bold.",
-        "Wake up to greatness. Every morning, redefined.",
-        "Your daily ritual deserves better.",
-      ],
-      language: "en",
-    }),
+    body: async (ctx) => {
+      const { data: kit } = await adminClient
+        .from("brand_kits")
+        .select("id")
+        .eq("user_id", ctx.userId)
+        .limit(1)
+        .maybeSingle();
+      return {
+        brandKitId: kit?.id ?? "00000000-0000-0000-0000-000000000000",
+        samples: [
+          { text: "Premium coffee. Crafted for the bold.", platform: "instagram" },
+          { text: "Wake up to greatness. Every morning, redefined.", platform: "instagram" },
+          { text: "Your daily ritual deserves better.", platform: "tiktok" },
+        ],
+        language: "en",
+      };
+    },
     expectReachable: true,
   },
   {
@@ -199,8 +219,7 @@ const SCENARIOS: Scenario[] = [
     category: "fast",
     fn: "analyze-scene-subject",
     body: (ctx) => ({
-      sceneId: ctx.testSceneId ?? "00000000-0000-0000-0000-000000000000",
-      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+      projectId: ctx.testProjectId,
       sourceAspect: "16:9",
       targetAspect: "9:16",
     }),
@@ -212,8 +231,7 @@ const SCENARIOS: Scenario[] = [
     category: "fast",
     fn: "analyze-scene-subject",
     body: () => ({
-      sceneId: "00000000-0000-0000-0000-000000000000",
-      videoUrl: "https://invalid.example.com/does-not-exist.mp4",
+      projectId: "00000000-0000-0000-0000-000000000000",
       sourceAspect: "16:9",
       targetAspect: "9:16",
     }),
