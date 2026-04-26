@@ -37,6 +37,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
 import MotionStudioStepSidebar, { type StepItem } from './MotionStudioStepSidebar';
+import AutoDirectorWizard from './AutoDirectorWizard';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
