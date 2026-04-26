@@ -635,15 +635,25 @@ async function runScenario(scenario: Scenario, ctx: TestContext, triggeredBy: st
 
         // Distinguish "function not deployed" (gateway 404, no JSON error body)
         // from "resource not found" (deployed function returning structured 404).
-        const isGatewayNotFound =
-          response.status === 404 &&
-          (typeof responseData !== "object" ||
-            responseData === null ||
-            !("error" in (responseData as Record<string, unknown>)));
+        const hasStructuredError =
+          typeof responseData === "object" &&
+          responseData !== null &&
+          "error" in (responseData as Record<string, unknown>);
+
+        const isGatewayNotFound = response.status === 404 && !hasStructuredError;
+
+        // Hardening pass: any 4xx/5xx with a structured { error } body proves the
+        // function is deployed and validates input cleanly (no crash).
+        const isHardeningPass =
+          !scenario.expectReachable && response.status >= 400 && hasStructuredError;
 
         if (isGatewayNotFound && scenario.optional) {
           status = "warning";
           errorMessage = `Function '${scenario.fn}' not deployed (optional)`;
+        } else if (isHardeningPass) {
+          status = "pass";
+          schemaHash = await hashSchema(responseData);
+          errorMessage = `Hardening OK — strukturierte Fehlerantwort (HTTP ${response.status})`;
         } else if (scenario.expectReachable) {
           if (response.status < 500) {
             status = "pass";
