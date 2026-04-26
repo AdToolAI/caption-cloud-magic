@@ -3843,6 +3843,7 @@ export type Database = {
           id: string
           language: string
           output_url: string | null
+          smart_reframe_enabled: boolean
           status: string
           storyboard: Json
           thumbnail_url: string | null
@@ -3863,6 +3864,7 @@ export type Database = {
           id?: string
           language?: string
           output_url?: string | null
+          smart_reframe_enabled?: boolean
           status?: string
           storyboard?: Json
           thumbnail_url?: string | null
@@ -3883,6 +3885,7 @@ export type Database = {
           id?: string
           language?: string
           output_url?: string | null
+          smart_reframe_enabled?: boolean
           status?: string
           storyboard?: Json
           thumbnail_url?: string | null
@@ -3939,6 +3942,7 @@ export type Database = {
           retry_count: number
           scene_type: string
           stock_keywords: string | null
+          subject_track: Json | null
           talking_head_aspect: string | null
           talking_head_resolution: string | null
           text_overlay: Json
@@ -3986,6 +3990,7 @@ export type Database = {
           retry_count?: number
           scene_type?: string
           stock_keywords?: string | null
+          subject_track?: Json | null
           talking_head_aspect?: string | null
           talking_head_resolution?: string | null
           text_overlay?: Json
@@ -4033,6 +4038,7 @@ export type Database = {
           retry_count?: number
           scene_type?: string
           stock_keywords?: string | null
+          subject_track?: Json | null
           talking_head_aspect?: string | null
           talking_head_resolution?: string | null
           text_overlay?: Json
