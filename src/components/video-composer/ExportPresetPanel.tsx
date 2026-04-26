@@ -70,6 +70,31 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
   const [loading, setLoading] = useState(true);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
+  const [smartReframe, setSmartReframe] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  // Load saved smart_reframe_enabled preference
+  useEffect(() => {
+    if (!projectId) return;
+    supabase
+      .from('composer_projects')
+      .select('smart_reframe_enabled')
+      .eq('id', projectId)
+      .single()
+      .then(({ data }) => {
+        if (data && typeof (data as any).smart_reframe_enabled === 'boolean') {
+          setSmartReframe((data as any).smart_reframe_enabled);
+        }
+      });
+  }, [projectId]);
+
+  const persistSmartReframe = async (next: boolean) => {
+    setSmartReframe(next);
+    await supabase
+      .from('composer_projects')
+      .update({ smart_reframe_enabled: next } as any)
+      .eq('id', projectId);
+  };
 
   useEffect(() => {
     if (!projectId) return;
