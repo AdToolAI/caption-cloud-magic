@@ -42,7 +42,42 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
     exportEDL,
     exportBundle,
     reDownload,
+    previewImport,
+    applyImport,
   } = useNLEExport(projectId);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [diff, setDiff] = useState<NLEDiffPayload | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+
+  const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImportFile(file);
+    setPreviewing(true);
+    setDiff(null);
+    setDialogOpen(true);
+    const result = await previewImport(file);
+    setPreviewing(false);
+    if (result?.diff) setDiff(result.diff);
+    else setDialogOpen(false);
+  };
+
+  const handleConfirmApply = async () => {
+    if (!importFile) return;
+    setApplying(true);
+    const result = await applyImport(importFile);
+    setApplying(false);
+    if (result) {
+      setDialogOpen(false);
+      setImportFile(null);
+      setDiff(null);
+    }
+  };
 
   const disabled = !projectId;
 
