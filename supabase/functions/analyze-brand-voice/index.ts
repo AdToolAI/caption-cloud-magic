@@ -101,7 +101,6 @@ Gib NUR valides JSON zurück, keine Erklärungen außerhalb des JSON.`;
       .from('brand_kits')
       .update({ 
         brand_voice: voiceProfile,
-        updated_at: new Date().toISOString()
       })
       .eq('id', brandKitId)
       .eq('user_id', userId);
