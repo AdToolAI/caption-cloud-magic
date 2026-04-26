@@ -3906,7 +3906,11 @@ export type Database = {
         Row: {
           ai_prompt: string | null
           applied_style_preset_id: string | null
+          character_audio_url: string | null
+          character_image_url: string | null
+          character_script: string | null
           character_shot: Json | null
+          character_voice_id: string | null
           clip_quality: string
           clip_source: string
           clip_status: string
@@ -3935,6 +3939,8 @@ export type Database = {
           retry_count: number
           scene_type: string
           stock_keywords: string | null
+          talking_head_aspect: string | null
+          talking_head_resolution: string | null
           text_overlay: Json
           transition_duration: number
           transition_type: string
@@ -3947,7 +3953,11 @@ export type Database = {
         Insert: {
           ai_prompt?: string | null
           applied_style_preset_id?: string | null
+          character_audio_url?: string | null
+          character_image_url?: string | null
+          character_script?: string | null
           character_shot?: Json | null
+          character_voice_id?: string | null
           clip_quality?: string
           clip_source?: string
           clip_status?: string
@@ -3976,6 +3986,8 @@ export type Database = {
           retry_count?: number
           scene_type?: string
           stock_keywords?: string | null
+          talking_head_aspect?: string | null
+          talking_head_resolution?: string | null
           text_overlay?: Json
           transition_duration?: number
           transition_type?: string
@@ -3988,7 +4000,11 @@ export type Database = {
         Update: {
           ai_prompt?: string | null
           applied_style_preset_id?: string | null
+          character_audio_url?: string | null
+          character_image_url?: string | null
+          character_script?: string | null
           character_shot?: Json | null
+          character_voice_id?: string | null
           clip_quality?: string
           clip_source?: string
           clip_status?: string
@@ -4017,6 +4033,8 @@ export type Database = {
           retry_count?: number
           scene_type?: string
           stock_keywords?: string | null
+          talking_head_aspect?: string | null
+          talking_head_resolution?: string | null
           text_overlay?: Json
           transition_duration?: number
           transition_type?: string
