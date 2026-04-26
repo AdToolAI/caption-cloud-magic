@@ -11,7 +11,8 @@ import { BugReportsAdmin } from '@/pages/admin/BugReportsAdmin';
 import { AISuperuserAdmin } from '@/pages/admin/AISuperuserAdmin';
 import { MotionStudioSuperuserPanel } from '@/components/admin/MotionStudioSuperuserPanel';
 import LambdaHealth from '@/pages/admin/LambdaHealth';
-import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film } from 'lucide-react';
+import { MarketplaceReviewPanel } from '@/components/admin/MarketplaceReviewPanel';
+import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store } from 'lucide-react';
 
 export default function Admin() {
   return (
@@ -40,6 +41,10 @@ export default function Admin() {
           <TabsTrigger value="motion-studio-superuser" className="flex items-center gap-2">
             <Film className="h-4 w-4" />
             Motion Studio Bot
+          </TabsTrigger>
+          <TabsTrigger value="marketplace-review" className="flex items-center gap-2">
+            <Store className="h-4 w-4" />
+            Marketplace Review
           </TabsTrigger>
           <TabsTrigger value="lambda-health" className="flex items-center gap-2">
             <Server className="h-4 w-4" />
@@ -89,6 +94,10 @@ export default function Admin() {
 
         <TabsContent value="motion-studio-superuser">
           <MotionStudioSuperuserPanel />
+        </TabsContent>
+
+        <TabsContent value="marketplace-review">
+          <MarketplaceReviewPanel />
         </TabsContent>
 
         <TabsContent value="lambda-health">

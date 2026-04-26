@@ -6,7 +6,7 @@ import {
   FolderOpen, Mic2, Video, Film, Edit, Layers, Languages,
   Users, Palette,
   ShieldCheck, Settings,
-  Gamepad2, Radio, Scissors,
+  Gamepad2, Radio, Scissors, Store, Coins as CoinsIcon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -85,6 +85,8 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/motion-studio/library", titleKey: "Motion Studio Library", descKey: "Wiederverwendbare Charaktere & Locations für deine AI-Videos", icon: Users },
       { route: "/video-translator", titleKey: "vidTrans.hubTitle", descKey: "hubItemDesc.videoTranslator", icon: Languages },
       { route: "/picture-studio", titleKey: "KI Picture Studio", descKey: "hubItemDesc.backgroundReplacer", icon: Layers },
+      { route: "/marketplace", titleKey: "Template Marketplace", descKey: "Community-Templates entdecken & kaufen", icon: Store },
+      { route: "/creator-studio", titleKey: "Creator Studio", descKey: "Eigene Templates verkaufen & Earnings tracken", icon: CoinsIcon },
     ],
   },
   {
