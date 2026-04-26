@@ -699,7 +699,12 @@ export default function SceneCard({
             )}
 
             {(scene.clipSource === 'stock' || scene.clipSource === 'stock-image') && (
-              <div className="space-y-2 rounded-md border border-border/40 bg-background/40 p-2">
+              <div className="space-y-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2">
+                <div className="flex items-center gap-1.5 text-[10px] text-emerald-300/90">
+                  <span>🎁</span>
+                  <span className="font-medium">Free Stock Library</span>
+                  <span className="text-emerald-300/60">· Pexels × Pixabay · 0 Credits</span>
+                </div>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0">
                     {scene.stockMediaThumb || scene.clipUrl ? (
@@ -726,7 +731,7 @@ export default function SceneCard({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-7 text-[10px] gap-1"
+                    className="h-7 text-[10px] gap-1 border-emerald-500/40 hover:bg-emerald-500/10 hover:border-emerald-500/70"
                     onClick={() => setStockBrowserOpen(true)}
                   >
                     <Video className="h-3 w-3" />
