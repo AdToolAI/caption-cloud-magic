@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,14 +20,31 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ArrowRight, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Sparkles,
+  Loader2,
+  AlertTriangle,
+  Link2,
+  Palette,
+} from 'lucide-react';
 import {
   useHybridExtend,
   HYBRID_BACKWARD_CAPABLE,
+  HYBRID_BRIDGE_CAPABLE,
   type HybridMode,
   type HybridEngine,
 } from '@/hooks/useHybridExtend';
 import { CLIP_SOURCE_LABELS, getClipCost, type ClipQuality } from '@/types/video-composer';
+
+/** Minimal scene shape needed by the dialog for the bridge target picker. */
+export interface HybridDialogScene {
+  id: string;
+  orderIndex: number;
+  clipUrl?: string;
+  sceneType?: string;
+}
 
 interface HybridExtendDialogProps {
   open: boolean;
@@ -36,6 +53,8 @@ interface HybridExtendDialogProps {
   sourceSceneId: string;
   sourceClipUrl?: string;
   defaultMode?: HybridMode;
+  /** Other scenes in the project (used as bridge target candidates). */
+  availableScenes?: HybridDialogScene[];
   /** Called after a successful extend so the caller can refetch the storyboard. */
   onSuccess?: (newSceneId: string) => void;
   language?: 'de' | 'en' | 'es';
@@ -45,12 +64,20 @@ const ENGINES: HybridEngine[] = ['ai-kling', 'ai-luma', 'ai-hailuo', 'ai-wan', '
 
 const T = {
   de: {
-    title: 'Szene verlängern (Hybrid)',
-    desc: 'Generiere eine neue Szene, die optisch nahtlos an die Quelle anschließt.',
-    forward: 'Forward (nach hinten)',
-    backward: 'Backward (nach vorn)',
+    title: 'Hybrid Production',
+    desc: 'Verbinde, verlängere oder referenziere existierende Szenen.',
+    forward: 'Forward',
+    backward: 'Backward',
+    bridge: 'Bridge',
+    styleRef: 'Style-Ref',
     engine: 'AI Engine',
     backwardOnly: 'Nur Kling & Luma unterstützen Backward Extend',
+    bridgeOnly: 'Bridge benötigt Kling oder Luma (start + end image)',
+    styleRefHint: 'Nutzt den letzten Frame der Quelle als Stil-Anker für eine neue Szene mit eigenem Prompt.',
+    bridgeHint: 'Generiert eine Übergangsszene zwischen Quelle und Ziel (morpht von Frame zu Frame).',
+    targetScene: 'Ziel-Szene',
+    targetPlaceholder: 'Wähle die Szene, in die übergeleitet wird …',
+    noTargets: 'Keine weiteren fertigen Szenen verfügbar.',
     quality: 'Qualität',
     standard: 'Standard',
     pro: 'Pro',
@@ -62,15 +89,22 @@ const T = {
     cancel: 'Abbrechen',
     generate: 'Generieren',
     generating: 'Wird erstellt …',
-    noPrompt: 'Bitte einen Prompt eingeben.',
   },
   en: {
-    title: 'Extend Scene (Hybrid)',
-    desc: 'Generate a new scene that seamlessly connects to the source clip.',
-    forward: 'Forward (after)',
-    backward: 'Backward (before)',
+    title: 'Hybrid Production',
+    desc: 'Connect, extend or reference existing scenes.',
+    forward: 'Forward',
+    backward: 'Backward',
+    bridge: 'Bridge',
+    styleRef: 'Style-Ref',
     engine: 'AI Engine',
     backwardOnly: 'Only Kling & Luma support backward extend',
+    bridgeOnly: 'Bridge requires Kling or Luma (start + end image)',
+    styleRefHint: 'Uses the last frame of the source as a style anchor for a new scene with its own prompt.',
+    bridgeHint: 'Generates a transition scene between source and target (morphs frame to frame).',
+    targetScene: 'Target scene',
+    targetPlaceholder: 'Pick the scene to morph into …',
+    noTargets: 'No other completed scenes available.',
     quality: 'Quality',
     standard: 'Standard',
     pro: 'Pro',
@@ -82,15 +116,22 @@ const T = {
     cancel: 'Cancel',
     generate: 'Generate',
     generating: 'Generating …',
-    noPrompt: 'Please enter a prompt.',
   },
   es: {
-    title: 'Extender Escena (Híbrido)',
-    desc: 'Genera una nueva escena que conecta de forma natural con el clip fuente.',
-    forward: 'Forward (después)',
-    backward: 'Backward (antes)',
+    title: 'Producción Híbrida',
+    desc: 'Conecta, extiende o referencia escenas existentes.',
+    forward: 'Forward',
+    backward: 'Backward',
+    bridge: 'Bridge',
+    styleRef: 'Style-Ref',
     engine: 'Motor AI',
     backwardOnly: 'Sólo Kling y Luma admiten extensión backward',
+    bridgeOnly: 'Bridge requiere Kling o Luma (start + end image)',
+    styleRefHint: 'Usa el último frame de la fuente como ancla de estilo para una nueva escena con su propio prompt.',
+    bridgeHint: 'Genera una escena de transición entre fuente y destino (morphing frame a frame).',
+    targetScene: 'Escena destino',
+    targetPlaceholder: 'Elige la escena a la que transicionar …',
+    noTargets: 'No hay otras escenas completadas disponibles.',
     quality: 'Calidad',
     standard: 'Estándar',
     pro: 'Pro',
@@ -102,7 +143,6 @@ const T = {
     cancel: 'Cancelar',
     generate: 'Generar',
     generating: 'Generando …',
-    noPrompt: 'Introduce un prompt.',
   },
 } as const;
 
@@ -113,6 +153,7 @@ export default function HybridExtendDialog({
   sourceSceneId,
   sourceClipUrl,
   defaultMode = 'forward',
+  availableScenes = [],
   onSuccess,
   language = 'de',
 }: HybridExtendDialogProps) {
@@ -122,21 +163,44 @@ export default function HybridExtendDialog({
   const [quality, setQuality] = useState<ClipQuality>('standard');
   const [duration, setDuration] = useState(5);
   const [prompt, setPrompt] = useState('');
+  const [targetSceneId, setTargetSceneId] = useState<string>('');
 
   const { extendScene, isExtending } = useHybridExtend();
 
-  // Auto-switch engine if backward + non-capable selected
+  // Sync mode when defaultMode changes (parent may open dialog for different actions)
+  useEffect(() => {
+    if (open) setMode(defaultMode);
+  }, [defaultMode, open]);
+
+  // Bridge / backward auto-fix engine
   const effectiveEngine: HybridEngine = useMemo(() => {
-    if (mode === 'backward' && !HYBRID_BACKWARD_CAPABLE.includes(engine)) {
-      return 'ai-kling';
-    }
+    if (mode === 'backward' && !HYBRID_BACKWARD_CAPABLE.includes(engine)) return 'ai-kling';
+    if (mode === 'bridge' && !HYBRID_BRIDGE_CAPABLE.includes(engine)) return 'ai-kling';
     return engine;
   }, [mode, engine]);
+
+  // Bridge target candidates: any other scene with a clip_url
+  const bridgeTargets = useMemo(
+    () =>
+      availableScenes
+        .filter((s) => s.id !== sourceSceneId && !!s.clipUrl)
+        .sort((a, b) => a.orderIndex - b.orderIndex),
+    [availableScenes, sourceSceneId]
+  );
+
+  // Auto-select first available bridge target when entering bridge mode
+  useEffect(() => {
+    if (mode === 'bridge' && !targetSceneId && bridgeTargets.length > 0) {
+      setTargetSceneId(bridgeTargets[0].id);
+    }
+  }, [mode, targetSceneId, bridgeTargets]);
 
   const cost = getClipCost(effectiveEngine, quality, duration);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
+    if (mode === 'bridge' && !targetSceneId) return;
+
     const result = await extendScene({
       projectId,
       sourceSceneId,
@@ -145,6 +209,7 @@ export default function HybridExtendDialog({
       quality,
       prompt: prompt.trim(),
       durationSeconds: duration,
+      targetSceneId: mode === 'bridge' ? targetSceneId : undefined,
     });
     if (result) {
       onSuccess?.(result.newSceneId);
@@ -152,6 +217,12 @@ export default function HybridExtendDialog({
       setPrompt('');
     }
   };
+
+  const generateDisabled =
+    isExtending ||
+    !prompt.trim() ||
+    !sourceClipUrl ||
+    (mode === 'bridge' && !targetSceneId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -165,12 +236,18 @@ export default function HybridExtendDialog({
         </DialogHeader>
 
         <Tabs value={mode} onValueChange={(v) => setMode(v as HybridMode)} className="mt-2">
-          <TabsList className="grid grid-cols-2 w-full">
-            <TabsTrigger value="forward" className="gap-2">
-              <ArrowRight className="w-4 h-4" /> {t.forward}
+          <TabsList className="grid grid-cols-4 w-full">
+            <TabsTrigger value="forward" className="gap-1.5 text-xs">
+              <ArrowRight className="w-3.5 h-3.5" /> {t.forward}
             </TabsTrigger>
-            <TabsTrigger value="backward" className="gap-2">
-              <ArrowLeft className="w-4 h-4" /> {t.backward}
+            <TabsTrigger value="backward" className="gap-1.5 text-xs">
+              <ArrowLeft className="w-3.5 h-3.5" /> {t.backward}
+            </TabsTrigger>
+            <TabsTrigger value="bridge" className="gap-1.5 text-xs">
+              <Link2 className="w-3.5 h-3.5" /> {t.bridge}
+            </TabsTrigger>
+            <TabsTrigger value="style-ref" className="gap-1.5 text-xs">
+              <Palette className="w-3.5 h-3.5" /> {t.styleRef}
             </TabsTrigger>
           </TabsList>
 
@@ -179,20 +256,67 @@ export default function HybridExtendDialog({
               t={t}
               engine={engine}
               setEngine={setEngine}
-              mode="forward"
+              allowed={ENGINES}
             />
           </TabsContent>
 
           <TabsContent value="backward" className="space-y-4 pt-4">
-            <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2 text-xs text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{t.backwardOnly}</span>
-            </div>
+            <HintBox tone="amber" icon={<AlertTriangle className="w-4 h-4" />}>
+              {t.backwardOnly}
+            </HintBox>
             <EngineSelectorRow
               t={t}
               engine={effectiveEngine}
               setEngine={setEngine}
-              mode="backward"
+              allowed={HYBRID_BACKWARD_CAPABLE}
+            />
+          </TabsContent>
+
+          <TabsContent value="bridge" className="space-y-4 pt-4">
+            <HintBox tone="primary" icon={<Link2 className="w-4 h-4" />}>
+              {t.bridgeHint}
+            </HintBox>
+            <HintBox tone="amber" icon={<AlertTriangle className="w-4 h-4" />}>
+              {t.bridgeOnly}
+            </HintBox>
+
+            <div className="space-y-2">
+              <Label>{t.targetScene}</Label>
+              {bridgeTargets.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">{t.noTargets}</p>
+              ) : (
+                <Select value={targetSceneId} onValueChange={setTargetSceneId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t.targetPlaceholder} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bridgeTargets.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        #{s.orderIndex + 1} — {s.sceneType ?? 'scene'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            <EngineSelectorRow
+              t={t}
+              engine={effectiveEngine}
+              setEngine={setEngine}
+              allowed={HYBRID_BRIDGE_CAPABLE}
+            />
+          </TabsContent>
+
+          <TabsContent value="style-ref" className="space-y-4 pt-4">
+            <HintBox tone="primary" icon={<Palette className="w-4 h-4" />}>
+              {t.styleRefHint}
+            </HintBox>
+            <EngineSelectorRow
+              t={t}
+              engine={engine}
+              setEngine={setEngine}
+              allowed={ENGINES}
             />
           </TabsContent>
         </Tabs>
@@ -251,10 +375,7 @@ export default function HybridExtendDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isExtending}>
             {t.cancel}
           </Button>
-          <Button
-            onClick={handleGenerate}
-            disabled={isExtending || !prompt.trim() || !sourceClipUrl}
-          >
+          <Button onClick={handleGenerate} disabled={generateDisabled}>
             {isExtending ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -273,16 +394,37 @@ export default function HybridExtendDialog({
   );
 }
 
+function HintBox({
+  tone,
+  icon,
+  children,
+}: {
+  tone: 'amber' | 'primary';
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const cls =
+    tone === 'amber'
+      ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+      : 'bg-primary/10 border-primary/30 text-primary';
+  return (
+    <div className={`flex items-start gap-2 rounded-lg border p-2 text-xs ${cls}`}>
+      <span className="shrink-0 mt-0.5">{icon}</span>
+      <span>{children}</span>
+    </div>
+  );
+}
+
 function EngineSelectorRow({
   t,
   engine,
   setEngine,
-  mode,
+  allowed,
 }: {
   t: (typeof T)[keyof typeof T];
   engine: HybridEngine;
   setEngine: (e: HybridEngine) => void;
-  mode: HybridMode;
+  allowed: HybridEngine[];
 }) {
   return (
     <div className="space-y-2">
@@ -293,13 +435,15 @@ function EngineSelectorRow({
         </SelectTrigger>
         <SelectContent>
           {ENGINES.map((eng) => {
-            const disabled = mode === 'backward' && !HYBRID_BACKWARD_CAPABLE.includes(eng);
+            const disabled = !allowed.includes(eng);
             return (
               <SelectItem key={eng} value={eng} disabled={disabled}>
                 <div className="flex items-center gap-2">
                   {CLIP_SOURCE_LABELS[eng].de}
                   {disabled && (
-                    <Badge variant="outline" className="text-xs">forward only</Badge>
+                    <Badge variant="outline" className="text-xs">
+                      n/a
+                    </Badge>
                   )}
                 </div>
               </SelectItem>
