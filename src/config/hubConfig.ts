@@ -6,7 +6,7 @@ import {
   FolderOpen, Mic2, Video, Film, Edit, Layers, Languages,
   Users, Palette,
   ShieldCheck, Settings,
-  Gamepad2, Radio, Scissors,
+  Gamepad2, Radio, Scissors, Store, Coins as CoinsIcon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
