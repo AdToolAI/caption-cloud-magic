@@ -42,6 +42,10 @@ export default function Admin() {
             <Film className="h-4 w-4" />
             Motion Studio Bot
           </TabsTrigger>
+          <TabsTrigger value="marketplace-review" className="flex items-center gap-2">
+            <Store className="h-4 w-4" />
+            Marketplace Review
+          </TabsTrigger>
           <TabsTrigger value="lambda-health" className="flex items-center gap-2">
             <Server className="h-4 w-4" />
             Lambda Health
