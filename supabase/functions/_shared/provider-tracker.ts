@@ -110,7 +110,7 @@ export async function trackLambdaRender(params: {
   functionName?: string;
 }) {
   try {
-    const client = getClient();
+    const client = getClient() as any;
     if (!client) return;
     await client.from('lambda_health_metrics').insert({
       render_id: params.renderId,
