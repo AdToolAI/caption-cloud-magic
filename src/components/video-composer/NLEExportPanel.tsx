@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, FileCode, FileText, Package, Loader2, Clock, AlertTriangle } from 'lucide-react';
+import { Download, FileCode, FileText, Package, Loader2, Clock, AlertTriangle, Upload } from 'lucide-react';
 import { useNLEExport, type NLEExportRecord } from '@/hooks/useNLEExport';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { NLEImportDiffDialog, type NLEDiffPayload } from './NLEImportDiffDialog';
 
 interface NLEExportPanelProps {
   projectId?: string;
