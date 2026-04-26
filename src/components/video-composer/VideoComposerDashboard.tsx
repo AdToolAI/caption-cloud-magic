@@ -751,6 +751,12 @@ export default function VideoComposerDashboard() {
         onStartBlank={handleStartBlank}
       />
 
+      <AutoDirectorWizard
+        open={showAutoDirector}
+        onOpenChange={setShowAutoDirector}
+        defaultLanguage={project.language}
+      />
+
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
