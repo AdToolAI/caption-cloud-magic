@@ -10,7 +10,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X, FolderOpen, Wallet, Zap, Crown, Gem } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useAICall } from "@/hooks/useAICall";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAIVideoWallet } from "@/hooks/useAIVideoWallet";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,6 +45,10 @@ const TIER_META: Record<QualityTier, { label: string; model: string; icon: any; 
 
 export function ImageGenerator() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { wallet } = useAIVideoWallet();
+  const { t } = useTranslation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { executeAICall, loading: legacyLoading, status } = useAICall();
   const { wallet } = useAIVideoWallet();
