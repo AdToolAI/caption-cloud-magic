@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -7,16 +7,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X, FolderOpen } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X, FolderOpen, Wallet, Zap, Crown, Gem } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAICall } from "@/hooks/useAICall";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useAIVideoWallet } from "@/hooks/useAIVideoWallet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageCard } from "./ImageCard";
 import { StudioLightbox } from "./StudioLightbox";
 import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
-import { FEATURE_COSTS, ESTIMATED_COSTS } from "@/lib/featureCosts";
 import { getCachedState, setCachedState } from "./imageGeneratorCache";
 
 interface GeneratedImage {
@@ -27,10 +28,27 @@ interface GeneratedImage {
   aspectRatio: string;
 }
 
+type QualityTier = 'standard' | 'fast' | 'pro' | 'ultra';
+
+const TIER_COSTS: Record<QualityTier, number> = {
+  standard: 0,    // Gemini via Lovable AI Gateway — gratis im Abo
+  fast: 0.04,     // Seedream 4
+  pro: 0.08,      // Imagen 4 Ultra
+  ultra: 0.20,    // Nano Banana 2
+};
+
+const TIER_META: Record<QualityTier, { label: string; model: string; icon: any; gradient: string }> = {
+  standard: { label: 'Standard', model: 'Gemini (im Abo)', icon: Sparkles, gradient: 'from-emerald-500/20 to-teal-500/20' },
+  fast: { label: 'Fast', model: 'Seedream 4', icon: Zap, gradient: 'from-blue-500/20 to-cyan-500/20' },
+  pro: { label: 'Pro', model: 'Imagen 4 Ultra', icon: Crown, gradient: 'from-purple-500/20 to-pink-500/20' },
+  ultra: { label: 'Ultra', model: 'Nano Banana 2', icon: Gem, gradient: 'from-amber-500/20 to-orange-500/20' },
+};
+
 export function ImageGenerator() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { executeAICall, loading, status } = useAICall();
+  const { executeAICall, loading: legacyLoading, status } = useAICall();
+  const { wallet } = useAIVideoWallet();
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,19 +91,35 @@ export function ImageGenerator() {
   const [prompt, setPrompt] = useState(cached?.prompt ?? "");
   const [style, setStyle] = useState(cached?.style ?? "realistic");
   const [aspectRatio, setAspectRatio] = useState(cached?.aspectRatio ?? "1:1");
-  const [quality, setQuality] = useState<'fast' | 'pro'>(cached?.quality ?? 'fast');
+  const [tier, setTier] = useState<QualityTier>('standard');
   const [editMode, setEditMode] = useState(cached?.editMode ?? false);
   const [referenceImage, setReferenceImage] = useState<string | null>(cached?.referenceImage ?? null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
-  
+  const [replicateLoading, setReplicateLoading] = useState(false);
+
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [selectedImageForAlbum, setSelectedImageForAlbum] = useState<GeneratedImage | null>(null);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [justGenerated, setJustGenerated] = useState(false);
 
+  const loading = legacyLoading || replicateLoading;
+  const cost = TIER_COSTS[tier];
+  const currency = wallet?.currency || 'EUR';
+  const currencySymbol = currency === 'USD' ? '$' : '€';
+  const balance = wallet?.balance_euros ?? 0;
+  const hasInsufficientCredits = cost > 0 && balance < cost;
+
   useEffect(() => {
-    setCachedState({ prompt, style, aspectRatio, quality, editMode, referenceImage, generatedImages });
-  }, [prompt, style, aspectRatio, quality, editMode, referenceImage, generatedImages]);
+    setCachedState({
+      prompt,
+      style,
+      aspectRatio,
+      quality: tier === 'standard' || tier === 'fast' ? 'fast' : 'pro',
+      editMode,
+      referenceImage,
+      generatedImages,
+    });
+  }, [prompt, style, aspectRatio, tier, editMode, referenceImage, generatedImages]);
 
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -109,92 +143,130 @@ export function ImageGenerator() {
       return;
     }
 
-    try {
-      const result = await executeAICall({
-        featureCode: FEATURE_COSTS.STUDIO_IMAGE_GENERATE,
-        estimatedCost: ESTIMATED_COSTS.studio_image_generate,
-        apiCall: async () => {
-          const { data, error } = await supabase.functions.invoke('generate-studio-image', {
-            body: {
-              prompt: prompt.trim(),
-              style,
-              aspectRatio,
-              quality,
-              editMode,
-              referenceImageUrl: editMode ? referenceImage : undefined,
-            }
-          });
+    if (hasInsufficientCredits) {
+      toast.error(`Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`);
+      navigate('/ai-video-purchase-credits');
+      return;
+    }
 
-          if (error) {
-            const fnError: any = error;
-            if (fnError.context && typeof fnError.context.json === 'function') {
-              try {
-                const body = await fnError.context.json();
-                const normalized: any = new Error(body?.error || fnError.message);
-                normalized.status = body?.code || fnError.context?.status || 500;
-                normalized.step = body?.step;
-                normalized.attemptedModels = body?.attemptedModels;
-                throw normalized;
-              } catch (parseErr: any) {
-                if (parseErr.status) throw parseErr;
+    if (tier === 'standard') {
+      // Bestehender Lovable-AI-Gateway-Pfad (gratis im Abo)
+      try {
+        const result = await executeAICall({
+          featureCode: 'studio_image_generate',
+          estimatedCost: 0,
+          apiCall: async () => {
+            const { data, error } = await supabase.functions.invoke('generate-studio-image', {
+              body: {
+                prompt: prompt.trim(),
+                style,
+                aspectRatio,
+                quality: 'fast',
+                editMode,
+                referenceImageUrl: editMode ? referenceImage : undefined,
               }
+            });
+            if (error) throw error;
+            if (data?.ok === false) {
+              const err: any = new Error(data.error || 'Generation failed');
+              err.status = data.code || 500;
+              throw err;
             }
-            throw error;
+            if (data?.error) throw new Error(data.error);
+            return data;
           }
-          if (data?.ok === false) {
-            const normalized: any = new Error(data.error || 'Generation failed');
-            normalized.status = data.code || 500;
-            normalized.step = data.step;
-            throw normalized;
-          }
-          if (data?.error) throw new Error(data.error);
-          return data;
+        });
+
+        if (result?.image) {
+          await handleGenerationSuccess(result.image);
+        }
+      } catch (error: any) {
+        if (error.code !== 'INSUFFICIENT_CREDITS') {
+          toast.error(error.message || t('picStudio.imageGenerationError'));
+        }
+      }
+      return;
+    }
+
+    // Premium tier — Replicate via €-Wallet
+    setReplicateLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-image-replicate', {
+        body: {
+          prompt: prompt.trim(),
+          tier,
+          aspectRatio,
+          style,
+          referenceImageUrl: editMode ? referenceImage : undefined,
         }
       });
 
-      if (result?.image) {
-        const imgUrl = result.image.previewUrl || result.image.url;
-        const imageId = result.image.id;
-        setGeneratedImages(prev => [
-          { ...result.image, url: imgUrl, prompt: prompt.trim(), style, aspectRatio: aspectRatio },
-          ...prev,
-        ]);
-        toast.success(t('picStudio.imageGenerated'));
-        setJustGenerated(true);
-
-        if (imageId && user) {
+      if (error) {
+        const fnError: any = error;
+        if (fnError.context && typeof fnError.context.json === 'function') {
           try {
-            let { data: systemAlbum } = await supabase
-              .from('studio_albums')
-              .select('id')
-              .eq('user_id', user.id)
-              .eq('is_system', true)
-              .eq('name', 'KI Picture Studio')
-              .maybeSingle();
-
-            if (!systemAlbum) {
-              const { data: newAlbum } = await supabase
-                .from('studio_albums')
-                .insert({ user_id: user.id, name: 'KI Picture Studio', is_system: true })
-                .select('id')
-                .single();
-              systemAlbum = newAlbum;
+            const body = await fnError.context.json();
+            if (body?.code === 'INSUFFICIENT_CREDITS' || body?.code === 'NO_WALLET') {
+              toast.error(body.error);
+              navigate('/ai-video-purchase-credits');
+              return;
             }
-
-            if (systemAlbum) {
-              await supabase
-                .from('studio_images')
-                .update({ album_id: systemAlbum.id })
-                .eq('id', imageId);
-            }
-          } catch (err) {
-            console.error('Auto-assign to system album failed:', err);
+            throw new Error(body?.error || fnError.message);
+          } catch (e: any) {
+            throw e;
           }
         }
+        throw error;
+      }
+
+      if (data?.image) {
+        await handleGenerationSuccess(data.image);
+        toast.success(`Bild generiert! Verbleibend: ${currencySymbol}${(data.newBalance ?? 0).toFixed(2)}`);
       }
     } catch (error: any) {
-      if (error.code !== 'INSUFFICIENT_CREDITS') {
-        toast.error(error.message || t('picStudio.imageGenerationError'));
+      toast.error(error.message || 'Bildgenerierung fehlgeschlagen');
+    } finally {
+      setReplicateLoading(false);
+    }
+  };
+
+  const handleGenerationSuccess = async (image: any) => {
+    const imgUrl = image.previewUrl || image.url;
+    const imageId = image.id;
+    setGeneratedImages(prev => [
+      { ...image, url: imgUrl, prompt: prompt.trim(), style, aspectRatio },
+      ...prev,
+    ]);
+    if (tier === 'standard') toast.success(t('picStudio.imageGenerated'));
+    setJustGenerated(true);
+
+    if (imageId && user) {
+      try {
+        let { data: systemAlbum } = await supabase
+          .from('studio_albums')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('is_system', true)
+          .eq('name', 'KI Picture Studio')
+          .maybeSingle();
+
+        if (!systemAlbum) {
+          const { data: newAlbum } = await supabase
+            .from('studio_albums')
+            .insert({ user_id: user.id, name: 'KI Picture Studio', is_system: true })
+            .select('id')
+            .single();
+          systemAlbum = newAlbum;
+        }
+
+        if (systemAlbum) {
+          await supabase
+            .from('studio_images')
+            .update({ album_id: systemAlbum.id })
+            .eq('id', imageId);
+        }
+      } catch (err) {
+        console.error('Auto-assign to system album failed:', err);
       }
     }
   };
@@ -237,6 +309,24 @@ export function ImageGenerator() {
 
   return (
     <div className="space-y-6">
+      {/* Wallet-Header */}
+      <Card className="border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
+        <CardContent className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Wallet className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">AI Credits</p>
+              <p className="text-lg font-semibold">{currencySymbol}{balance.toFixed(2)}</p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => navigate('/ai-video-purchase-credits')}>
+            Aufladen
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
         <CardContent className="p-6 space-y-5">
           <div className="space-y-2">
@@ -252,7 +342,41 @@ export function ImageGenerator() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Quality-Tier-Picker */}
+          <div className="space-y-2">
+            <Label>Qualität & Modell</Label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {(Object.keys(TIER_META) as QualityTier[]).map((t) => {
+                const meta = TIER_META[t];
+                const Icon = meta.icon;
+                const tierCost = TIER_COSTS[t];
+                const isSelected = tier === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTier(t)}
+                    className={`relative p-3 rounded-lg border text-left transition-all ${
+                      isSelected
+                        ? 'border-primary bg-gradient-to-br ' + meta.gradient + ' shadow-md'
+                        : 'border-border/50 bg-background/30 hover:border-border'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Icon className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <span className="font-semibold text-sm">{meta.label}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mb-1.5">{meta.model}</p>
+                    <Badge variant={tierCost === 0 ? 'secondary' : 'outline'} className="text-[10px] h-5">
+                      {tierCost === 0 ? 'Gratis im Abo' : `${currencySymbol}${tierCost.toFixed(2)}/Bild`}
+                    </Badge>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>{t('picStudio.styleLabel')}</Label>
               <Select value={style} onValueChange={setStyle}>
@@ -274,14 +398,6 @@ export function ImageGenerator() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>{t('picStudio.qualityLabel')}</Label>
-              <div className="flex items-center gap-3 h-10">
-                <span className={`text-sm ${quality === 'fast' ? 'text-foreground' : 'text-muted-foreground'}`}>{t('picStudio.qualityFast')}</span>
-                <Switch checked={quality === 'pro'} onCheckedChange={(v) => setQuality(v ? 'pro' : 'fast')} />
-                <span className={`text-sm ${quality === 'pro' ? 'text-foreground' : 'text-muted-foreground'}`}>{t('picStudio.qualityPro')}</span>
-              </div>
             </div>
           </div>
 
@@ -334,6 +450,9 @@ export function ImageGenerator() {
               <>
                 <Sparkles className="h-4 w-4 mr-2" />
                 {t('picStudio.generateImage')}
+                {cost > 0 && (
+                  <span className="ml-2 text-xs opacity-90">· {currencySymbol}{cost.toFixed(2)}</span>
+                )}
               </>
             )}
           </Button>
