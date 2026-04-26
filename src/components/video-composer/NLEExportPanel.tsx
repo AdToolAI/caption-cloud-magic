@@ -135,7 +135,7 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
                           {rec.warnings && rec.warnings.length > 0 && (
                             <AlertTriangle
                               className="h-3 w-3 text-amber-500"
-                              titleAccess={`${rec.warnings.length} Hinweis(e)`}
+                              aria-label={`${rec.warnings.length} Hinweis(e)`}
                             />
                           )}
                         </div>
