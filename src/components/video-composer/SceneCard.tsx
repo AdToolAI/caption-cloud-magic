@@ -16,7 +16,7 @@ import {
 import {
   ChevronUp, ChevronDown, Trash2, GripVertical,
   Sparkles, Upload, Video, Image as ImageIcon, Wand2, Beaker,
-  ArrowRight, ArrowLeft, Link2,
+  ArrowRight, ArrowLeft, Link2, Palette,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -71,7 +71,9 @@ interface SceneCardProps {
    * Block M — opens the Hybrid Extend dialog for this scene.
    * Parent owns the dialog state because it needs to refetch scenes after success.
    */
-  onHybridExtend?: (mode: 'forward' | 'backward') => void;
+  onHybridExtend?: (mode: 'forward' | 'backward' | 'bridge' | 'style-ref') => void;
+  /** True if at least one OTHER scene in the project has a clip_url (enables Bridge button). */
+  hasOtherReadyScenes?: boolean;
   language: string;
 }
 
@@ -101,6 +103,7 @@ export default function SceneCard({
   onMoveUp,
   onMoveDown,
   onHybridExtend,
+  hasOtherReadyScenes,
   language,
 }: SceneCardProps) {
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
@@ -304,11 +307,21 @@ export default function SceneCard({
                         : 'Hybrid scene: frame-anchored to source'
                     }
                   >
-                    <Link2 className="h-2.5 w-2.5" />
+                    {scene.hybridMode === 'bridge' ? (
+                      <Link2 className="h-2.5 w-2.5" />
+                    ) : scene.hybridMode === 'style-ref' ? (
+                      <Palette className="h-2.5 w-2.5" />
+                    ) : (
+                      <Link2 className="h-2.5 w-2.5" />
+                    )}
                     {scene.hybridMode === 'forward'
-                      ? (lang === 'de' ? 'Forward' : lang === 'es' ? 'Forward' : 'Forward')
+                      ? 'Forward'
                       : scene.hybridMode === 'backward'
-                      ? (lang === 'de' ? 'Backward' : lang === 'es' ? 'Backward' : 'Backward')
+                      ? 'Backward'
+                      : scene.hybridMode === 'bridge'
+                      ? 'Bridge'
+                      : scene.hybridMode === 'style-ref'
+                      ? 'Style'
                       : scene.hybridMode}
                   </Badge>
                 )}
@@ -329,9 +342,9 @@ export default function SceneCard({
               className="w-full"
             />
 
-            {/* Block M — Hybrid Extend actions (only when source clip is ready) */}
+            {/* Block M — Hybrid Production actions (only when source clip is ready) */}
             {onHybridExtend && scene.clipStatus === 'ready' && scene.clipUrl && (
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
                 <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70">
                   {lang === 'de' ? 'Hybrid' : lang === 'es' ? 'Híbrido' : 'Hybrid'}
                 </span>
@@ -349,7 +362,7 @@ export default function SceneCard({
                   }
                 >
                   <ArrowLeft className="h-3 w-3" />
-                  {lang === 'de' ? 'Backward' : 'Backward'}
+                  Backward
                 </Button>
                 <Button
                   size="sm"
@@ -365,7 +378,41 @@ export default function SceneCard({
                   }
                 >
                   <ArrowRight className="h-3 w-3" />
-                  {lang === 'de' ? 'Forward' : 'Forward'}
+                  Forward
+                </Button>
+                {hasOtherReadyScenes && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[10px] gap-1.5"
+                    onClick={() => onHybridExtend('bridge')}
+                    title={
+                      lang === 'de'
+                        ? 'Bridge zu anderer Szene (morphender Übergang)'
+                        : lang === 'es'
+                        ? 'Bridge hacia otra escena (transición con morphing)'
+                        : 'Bridge to another scene (morphing transition)'
+                    }
+                  >
+                    <Link2 className="h-3 w-3" />
+                    Bridge
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-[10px] gap-1.5"
+                  onClick={() => onHybridExtend('style-ref')}
+                  title={
+                    lang === 'de'
+                      ? 'Neue Szene mit Stil dieser Szene'
+                      : lang === 'es'
+                      ? 'Nueva escena con estilo de esta escena'
+                      : 'New scene using this scene as style anchor'
+                  }
+                >
+                  <Palette className="h-3 w-3" />
+                  Style-Ref
                 </Button>
               </div>
             )}
