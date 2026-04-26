@@ -136,15 +136,60 @@ export default function AudioStudio() {
         <AudioStudioHeroHeader />
 
         <AnimatePresence mode="wait">
-          {!audioUrl ? (
+          {showMusicGen ? (
+            <motion.div
+              key="music-gen-standalone"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mt-8 space-y-4"
+            >
+              <Button
+                variant="ghost"
+                onClick={() => setShowMusicGen(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ← Zurück zum Audio Studio
+              </Button>
+              <MusicGeneratorPanel
+                onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
+              />
+            </motion.div>
+          ) : !audioUrl ? (
             <motion.div
               key="upload"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="mt-8"
+              className="mt-8 space-y-6"
             >
-              {/* Upload Zone */}
+              {/* AI Music Generator Teaser */}
+              <Card 
+                onClick={() => setShowMusicGen(true)}
+                className="relative overflow-hidden cursor-pointer backdrop-blur-xl bg-gradient-to-br from-primary/10 via-card/60 to-cyan-500/10 border-primary/30 hover:border-primary/60 hover:shadow-[0_0_40px_rgba(var(--primary),0.25)] transition-all p-5 group"
+              >
+                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/15 rounded-full blur-[60px] pointer-events-none" />
+                <div className="relative flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-cyan-500 flex items-center justify-center shrink-0">
+                    <Music2 className="w-7 h-7 text-primary-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-xs font-bold tracking-wider text-primary">NEU</span>
+                      <h3 className="text-lg font-bold">AI Music Generator</h3>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">Studio-Qualität</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Generiere kommerziell nutzbare Musik aus Text — ab €0.10. Cinematic, Lo-Fi, Corporate, Electronic & mehr.
+                    </p>
+                  </div>
+                  <Button className="bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90 shrink-0 hidden sm:flex">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Track erstellen
+                  </Button>
+                </div>
+              </Card>
+
               <Card
                 {...getRootProps()}
                 className={`
