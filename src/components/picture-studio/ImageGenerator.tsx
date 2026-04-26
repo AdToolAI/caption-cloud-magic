@@ -150,40 +150,34 @@ export function ImageGenerator() {
     }
 
     if (tier === 'standard') {
-      // Bestehender Lovable-AI-Gateway-Pfad (gratis im Abo)
+      // Lovable AI Gateway (Gemini) — gratis im Abo, kein Credit-Abzug
+      setReplicateLoading(true);
       try {
-        const result = await executeAICall({
-          featureCode: 'studio_image_generate',
-          estimatedCost: 0,
-          apiCall: async () => {
-            const { data, error } = await supabase.functions.invoke('generate-studio-image', {
-              body: {
-                prompt: prompt.trim(),
-                style,
-                aspectRatio,
-                quality: 'fast',
-                editMode,
-                referenceImageUrl: editMode ? referenceImage : undefined,
-              }
-            });
-            if (error) throw error;
-            if (data?.ok === false) {
-              const err: any = new Error(data.error || 'Generation failed');
-              err.status = data.code || 500;
-              throw err;
-            }
-            if (data?.error) throw new Error(data.error);
-            return data;
+        const { data, error } = await supabase.functions.invoke('generate-studio-image', {
+          body: {
+            prompt: prompt.trim(),
+            style,
+            aspectRatio,
+            quality: 'fast',
+            editMode,
+            referenceImageUrl: editMode ? referenceImage : undefined,
           }
         });
 
-        if (result?.image) {
-          await handleGenerationSuccess(result.image);
+        if (error) throw error;
+        if (data?.ok === false) {
+          throw new Error(data.error || 'Generation failed');
+        }
+        if (data?.error) throw new Error(data.error);
+
+        if (data?.image) {
+          await handleGenerationSuccess(data.image);
+          toast.success(t('picStudio.imageGenerated'));
         }
       } catch (error: any) {
-        if (error.code !== 'INSUFFICIENT_CREDITS') {
-          toast.error(error.message || t('picStudio.imageGenerationError'));
-        }
+        toast.error(error.message || t('picStudio.imageGenerationError'));
+      } finally {
+        setReplicateLoading(false);
       }
       return;
     }
