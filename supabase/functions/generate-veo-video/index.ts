@@ -7,19 +7,33 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Pricing in EUR/USD per second (≥70% Marge gegenüber Replicate)
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'veo-3.1-lite': { EUR: 0.40, USD: 0.40 },
-  'veo-3.1': { EUR: 0.65, USD: 0.65 },
+  'veo-3.1-lite-720p': { EUR: 0.20, USD: 0.20 },
+  'veo-3.1-lite-1080p': { EUR: 0.30, USD: 0.30 },
+  'veo-3.1-fast': { EUR: 0.55, USD: 0.55 },
+  'veo-3.1-pro': { EUR: 1.40, USD: 1.40 },
 };
 
 const REPLICATE_MODELS: Record<string, string> = {
-  'veo-3.1-lite': 'google/veo-3.1-fast',
-  'veo-3.1': 'google/veo-3.1',
+  'veo-3.1-lite-720p': 'google/veo-3.1-fast',
+  'veo-3.1-lite-1080p': 'google/veo-3.1-fast',
+  'veo-3.1-fast': 'google/veo-3.1-fast',
+  'veo-3.1-pro': 'google/veo-3.1',
 };
+
+const MODEL_RESOLUTION: Record<string, '720p' | '1080p'> = {
+  'veo-3.1-lite-720p': '720p',
+  'veo-3.1-lite-1080p': '1080p',
+  'veo-3.1-fast': '1080p',
+  'veo-3.1-pro': '1080p',
+};
+
+type VeoModelId = 'veo-3.1-lite-720p' | 'veo-3.1-lite-1080p' | 'veo-3.1-fast' | 'veo-3.1-pro';
 
 interface GenerateRequest {
   prompt: string;
-  model: 'veo-3.1-lite' | 'veo-3.1';
+  model: VeoModelId;
   duration: number;
   aspectRatio: '16:9' | '9:16';
   startImageUrl?: string;
