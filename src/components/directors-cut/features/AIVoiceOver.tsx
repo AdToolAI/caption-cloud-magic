@@ -363,6 +363,17 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
           </div>
         </div>
       )}
+
+      <VoiceCloneDialog
+        open={cloneDialogOpen}
+        onOpenChange={(open) => {
+          setCloneDialogOpen(open);
+          if (!open) {
+            // Re-fetch voices when dialog closes (catches successful clones)
+            loadVoices();
+          }
+        }}
+      />
     </Card>
   );
 }
