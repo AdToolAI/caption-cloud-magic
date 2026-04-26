@@ -240,6 +240,11 @@ export default function StoryboardTab({
                     onDelete={() => deleteScene(scene.id)}
                     onMoveUp={() => moveScene(index, index - 1)}
                     onMoveDown={() => moveScene(index, index + 1)}
+                    onHybridExtend={
+                      projectId
+                        ? (mode) => openHybridDialog(scene, mode)
+                        : undefined
+                    }
                     language={language}
                   />
                 </SortableSceneItem>
@@ -247,6 +252,25 @@ export default function StoryboardTab({
             </div>
           </SortableContext>
         </DndContext>
+      )}
+
+      {/* Block M — Hybrid Extend dialog */}
+      {projectId && hybridDialog.scene && (
+        <HybridExtendDialog
+          open={hybridDialog.open}
+          onOpenChange={(open) =>
+            setHybridDialog((prev) => ({ ...prev, open }))
+          }
+          projectId={projectId}
+          sourceSceneId={hybridDialog.scene.id}
+          sourceClipUrl={hybridDialog.scene.clipUrl}
+          defaultMode={hybridDialog.mode}
+          language={dialogLang}
+          onSuccess={() => {
+            // Server inserts the new scene row; refetch to surface it
+            void onRefetchScenes?.();
+          }}
+        />
       )}
     </div>
   );
