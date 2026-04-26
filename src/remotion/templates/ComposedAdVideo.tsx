@@ -90,6 +90,14 @@ export const ComposedAdVideoSchema = z.object({
     transitionDuration: z.number().optional(),
     /** Optional layered visual effects (Lambda-safe procedural Glow/Rays/Particles). */
     effects: z.array(SceneEffectSchema).optional(),
+    /** Block R: Smart Reframe — interpolated objectPosition track (already projected
+     *  for the target aspect by the edge function). When omitted the renderer
+     *  falls back to centered crop (objectPosition: 50% 50%). */
+    positionTrack: z.array(z.object({
+      t: z.number(),
+      xPct: z.number(),
+      yPct: z.number(),
+    })).optional(),
   })),
   colorGrading: z.enum(['none', 'cinematic-warm', 'cool-blue', 'vintage-film', 'high-contrast', 'moody-dark']).default('none'),
   kineticText: z.boolean().default(false),
