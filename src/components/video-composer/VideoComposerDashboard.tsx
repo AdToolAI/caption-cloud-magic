@@ -750,6 +750,10 @@ export default function VideoComposerDashboard() {
         open={showTemplatePicker}
         onOpenChange={setShowTemplatePicker}
         onSelectTemplate={applyTemplate}
+        onSelectTrending={(tpl, trendingId) => {
+          applyTemplate(tpl);
+          incrementTrendingUse.mutate(trendingId);
+        }}
         onStartBlank={handleStartBlank}
       />
 
