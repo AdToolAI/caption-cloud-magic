@@ -110,34 +110,66 @@ async function detectSubjectInImage(
     tool_choice: { type: "function", function: { name: "report_subject" } },
   };
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  // Retry loop: max 2 attempts, 10s timeout per attempt.
+  const MAX_ATTEMPTS = 2;
+  const TIMEOUT_MS = 10_000;
 
-  if (!res.ok) {
-    console.warn("[analyze-scene-subject] AI gateway", res.status, await res.text().catch(() => ""));
-    return null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        console.warn(`[analyze-scene-subject] AI gateway attempt ${attempt}/${MAX_ATTEMPTS} status=${res.status}`, errText.slice(0, 200));
+        // 429/402 are not retry-friendly — bail immediately.
+        if (res.status === 429 || res.status === 402) return null;
+        if (attempt < MAX_ATTEMPTS) continue;
+        return null;
+      }
+
+      const json = await res.json();
+      const call = json?.choices?.[0]?.message?.tool_calls?.[0];
+      if (!call) {
+        if (attempt < MAX_ATTEMPTS) continue;
+        return null;
+      }
+
+      try {
+        const args = JSON.parse(call.function?.arguments || "{}");
+        const x = Math.max(0, Math.min(1, Number(args.x)));
+        const y = Math.max(0, Math.min(1, Number(args.y)));
+        const conf = Math.max(0, Math.min(1, Number(args.confidence ?? 0.7)));
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          if (attempt < MAX_ATTEMPTS) continue;
+          return null;
+        }
+        return { t, x, y, conf, label: typeof args.label === "string" ? args.label.slice(0, 32) : undefined };
+      } catch {
+        if (attempt < MAX_ATTEMPTS) continue;
+        return null;
+      }
+    } catch (e) {
+      clearTimeout(timer);
+      const isAbort = (e as Error)?.name === "AbortError";
+      console.warn(`[analyze-scene-subject] attempt ${attempt}/${MAX_ATTEMPTS} ${isAbort ? "TIMEOUT" : "error"}:`, (e as Error).message);
+      if (attempt < MAX_ATTEMPTS) continue;
+      return null;
+    }
   }
 
-  const json = await res.json();
-  const call = json?.choices?.[0]?.message?.tool_calls?.[0];
-  if (!call) return null;
-
-  try {
-    const args = JSON.parse(call.function?.arguments || "{}");
-    const x = Math.max(0, Math.min(1, Number(args.x)));
-    const y = Math.max(0, Math.min(1, Number(args.y)));
-    const conf = Math.max(0, Math.min(1, Number(args.confidence ?? 0.7)));
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-    return { t, x, y, conf, label: typeof args.label === "string" ? args.label.slice(0, 32) : undefined };
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 serve(async (req) => {
