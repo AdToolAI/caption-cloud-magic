@@ -201,6 +201,52 @@ serve(async (req) => {
     // never burns in storyboard-generated hooks/CTAs the user disabled.
     const overlaysFeatureEnabled = assemblyConfig?.textOverlaysEnabled !== false;
 
+    // ── Block R: Smart Reframe — compute objectPosition track per scene ──
+    // The DB stores subject_track as { source_aspect, points: [{t,x,y,conf}] }
+    // measured against the original (master) frame. When exporting to a
+    // different aspect we project the same x,y into the new canvas — but the
+    // renderer only needs `objectPosition` (CSS), which is a per-axis 0..1
+    // value. With `objectFit: 'cover'`, the axis that is overscanned is the
+    // one that varies; the other axis is locked at 0.5. We pre-compute the
+    // active axis (horizontal vs vertical) by comparing source vs target
+    // aspect ratio and emit a normalized position-track.
+    const aspectToNum = (a: string): number => {
+      const [w, h] = a.split(':').map(Number);
+      return (w && h) ? w / h : 16 / 9;
+    };
+    const targetAspectNum = aspectToNum(aspectRatio);
+    const smartReframeOn = (project as any).smart_reframe_enabled !== false;
+
+    const buildPositionTrack = (
+      track: any,
+      sceneDuration: number,
+    ): Array<{ t: number; xPct: number; yPct: number }> | null => {
+      if (!smartReframeOn || !track) return null;
+      const points = Array.isArray(track.points) ? track.points : [];
+      if (points.length === 0) return null;
+
+      const sourceAspectNum = aspectToNum(track.source_aspect || '16:9');
+      // Within ±2% the aspect is essentially identical → no smart reframe needed
+      if (Math.abs(sourceAspectNum - targetAspectNum) < 0.02) return null;
+
+      // When source is wider than target → letterboxed horizontally → vary X
+      // When source is taller than target → letterboxed vertically → vary Y
+      const varyX = sourceAspectNum > targetAspectNum;
+      return points
+        .filter((p: any) => Number.isFinite(Number(p.t)) && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)))
+        .map((p: any) => {
+          const t = Math.max(0, Math.min(sceneDuration, Number(p.t)));
+          const x = Math.max(0, Math.min(1, Number(p.x)));
+          const y = Math.max(0, Math.min(1, Number(p.y)));
+          return {
+            t,
+            xPct: varyX ? x : 0.5,
+            yPct: varyX ? 0.5 : y,
+          };
+        })
+        .sort((a: any, b: any) => a.t - b.t);
+    };
+
     const remotionScenes = (scenes || []).map((s: any, idx: number) => {
       const rawType = (s.transition_type || 'fade').toString().toLowerCase();
       const transitionType = ALLOWED_TRANSITIONS.has(rawType) ? rawType : 'fade';
@@ -220,6 +266,8 @@ serve(async (req) => {
       const overlayText = (s.text_overlay?.text || '').trim();
       const includeOverlay = overlaysFeatureEnabled && overlayText.length > 0;
 
+      const positionTrack = buildPositionTrack(s.subject_track, effectiveDuration);
+
       return {
         videoUrl: s.clip_url,
         // Flag for the renderer: route through <KenBurnsImage> instead of <Video>.
@@ -237,6 +285,8 @@ serve(async (req) => {
         } : undefined,
         transitionType,
         transitionDuration,
+        // Block R: Smart Reframe position-track (only when source≠target aspect)
+        positionTrack: positionTrack && positionTrack.length > 0 ? positionTrack : undefined,
       };
     });
 
