@@ -62,10 +62,13 @@ export default function StoryboardTab({
   const [hybridDialog, setHybridDialog] = useState<{
     open: boolean;
     scene: ComposerScene | null;
-    mode: 'forward' | 'backward';
+    mode: 'forward' | 'backward' | 'bridge' | 'style-ref';
   }>({ open: false, scene: null, mode: 'forward' });
 
-  const openHybridDialog = (scene: ComposerScene, mode: 'forward' | 'backward') => {
+  const openHybridDialog = (
+    scene: ComposerScene,
+    mode: 'forward' | 'backward' | 'bridge' | 'style-ref'
+  ) => {
     setHybridDialog({ open: true, scene, mode });
   };
 
