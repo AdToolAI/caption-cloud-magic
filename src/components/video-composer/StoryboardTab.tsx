@@ -165,6 +165,14 @@ export default function StoryboardTab({
           </Button>
           <Button
             size="sm"
+            variant="outline"
+            onClick={() => setTalkingHeadOpen(true)}
+            className="gap-1 text-xs border-primary/40 text-primary hover:bg-primary/10"
+          >
+            <Mic className="h-3.5 w-3.5" /> Talking-Head
+          </Button>
+          <Button
+            size="sm"
             onClick={onGoToClips}
             disabled={scenes.length === 0}
             className="gap-1 text-xs"
