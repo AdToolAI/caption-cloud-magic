@@ -404,30 +404,54 @@ async function ensureTestProject(userId: string): Promise<{ projectId: string; s
     projectId = created.id;
   }
 
-  const { data: scene } = await adminClient
-    .from("composer_scenes")
-    .select("id")
-    .eq("project_id", projectId)
-    .order("order_index", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  // Ensure at least 2 scenes with usable clip URLs (required by NLE exports MS-16/17)
+  const PUBLIC_TEST_CLIP =
+    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
 
-  let sceneId: string | null = scene?.id ?? null;
-  if (!sceneId) {
-    const { data: newScene } = await adminClient
-      .from("composer_scenes")
-      .insert({
+  const { data: existingScenes } = await adminClient
+    .from("composer_scenes")
+    .select("id, clip_url, upload_url, order_index")
+    .eq("project_id", projectId)
+    .order("order_index", { ascending: true });
+
+  const ready = (existingScenes ?? []).filter((s) => s.clip_url || s.upload_url);
+  let sceneId: string | null = ready[0]?.id ?? existingScenes?.[0]?.id ?? null;
+
+  if (ready.length < 2) {
+    const toInsert = [];
+    if (!ready.find((s) => s.order_index === 0)) {
+      toInsert.push({
         project_id: projectId,
         order_index: 0,
         scene_type: "intro",
         duration_seconds: 3,
         clip_source: "ai-image",
         ai_prompt: "Cinematic espresso cup on marble",
-        clip_status: "pending",
-      })
-      .select("id")
-      .single();
-    sceneId = newScene?.id ?? null;
+        clip_status: "ready",
+        clip_url: PUBLIC_TEST_CLIP,
+      });
+    }
+    if (!ready.find((s) => s.order_index === 1)) {
+      toInsert.push({
+        project_id: projectId,
+        order_index: 1,
+        scene_type: "main",
+        duration_seconds: 3,
+        clip_source: "ai-image",
+        ai_prompt: "Steam rising from coffee in slow motion",
+        clip_status: "ready",
+        clip_url: PUBLIC_TEST_CLIP,
+      });
+    }
+    if (toInsert.length > 0) {
+      const { data: inserted } = await adminClient
+        .from("composer_scenes")
+        .insert(toInsert)
+        .select("id");
+      if (!sceneId && inserted && inserted.length > 0) sceneId = inserted[0].id;
+    }
+  }
+
   }
 
   return { projectId, sceneId };
