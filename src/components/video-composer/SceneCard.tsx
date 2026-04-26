@@ -103,6 +103,7 @@ export default function SceneCard({
   onMoveUp,
   onMoveDown,
   onHybridExtend,
+  hasOtherReadyScenes,
   language,
 }: SceneCardProps) {
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
