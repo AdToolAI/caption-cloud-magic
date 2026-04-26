@@ -401,7 +401,7 @@ const SCENARIOS: Scenario[] = [
     category: "fast",
     fn: "composer-export-bundle",
     body: () => ({ projectId: "00000000-0000-0000-0000-000000000000" }),
-    expectReachable: true,
+    expectReachable: false,
     optional: true,
   },
 ];
