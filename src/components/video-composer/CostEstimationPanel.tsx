@@ -299,6 +299,22 @@ export default function CostEstimationPanel({
           percent={shotstackPct}
         />
 
+        {/* Free Stock Library savings banner */}
+        {stockStats.sceneCount > 0 && (
+          <div className="flex items-start gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3">
+            <span className="text-base leading-none mt-0.5">🎁</span>
+            <div className="flex-1 text-xs">
+              <p className="font-medium text-emerald-300">
+                {stockStats.sceneCount} Stock-{stockStats.sceneCount === 1 ? 'Szene' : 'Szenen'} ·{' '}
+                <span className="tabular-nums">~{stockStats.savedCredits} Credits</span> gespart
+                <span className="text-emerald-300/70"> (≈ €{stockStats.savedEuros})</span>
+              </p>
+              <p className="text-muted-foreground mt-0.5">
+                Free Stock Library statt KI-Generierung — verglichen mit Veo 3.1 Lite (€0.20/s).
+              </p>
+            </div>
+          </div>
+        )}
         {/* Wallet balance warning */}
         {insufficientForRecommended && (
           <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
