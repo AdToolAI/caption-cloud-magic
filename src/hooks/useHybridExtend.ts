@@ -60,6 +60,18 @@ export function useHybridExtend() {
           );
           return null;
         }
+        if (params.mode === 'bridge') {
+          if (!HYBRID_BRIDGE_CAPABLE.includes(params.engine)) {
+            toast.error(
+              `Bridge ist nur mit ${HYBRID_BRIDGE_CAPABLE.join(', ')} möglich.`
+            );
+            return null;
+          }
+          if (!params.targetSceneId) {
+            toast.error('Bridge benötigt eine Ziel-Szene.');
+            return null;
+          }
+        }
 
         const { data, error } = await supabase.functions.invoke(
           'hybrid-extend-scene',
@@ -70,11 +82,15 @@ export function useHybridExtend() {
         if (data?.error) throw new Error(data.error);
         if (!data?.newSceneId) throw new Error('Keine neue Szene zurückgegeben');
 
-        toast.success(
+        const successMsg =
           params.mode === 'forward'
             ? 'Szene wird verlängert ✨'
-            : 'Vorszene wird generiert ✨'
-        );
+            : params.mode === 'backward'
+            ? 'Vorszene wird generiert ✨'
+            : params.mode === 'bridge'
+            ? 'Bridge-Szene wird generiert 🌉'
+            : 'Style-Reference wird generiert 🎨';
+        toast.success(successMsg);
         return data as HybridExtendResult;
       } catch (err) {
         const msg =
