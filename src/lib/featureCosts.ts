@@ -30,7 +30,7 @@ export const FEATURE_COSTS = {
   EXPLAINER_SCENE_ANIMATE: 'explainer_scene_animate',
   EXPLAINER_CHARACTER_ANIMATE: 'explainer_character_animate',
   
-  // KI Picture Studio
+  // KI Picture Studio (gratis im Abo via Lovable AI Gateway, oder über AI Credits Wallet bei Premium-Modellen)
   STUDIO_IMAGE_GENERATE: 'studio_image_generate',
   
   // AI Video Composer
