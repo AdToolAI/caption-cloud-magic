@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Loader2, Download, CheckCircle, AlertCircle, Share2,
-  Instagram, Youtube, Music2, Sparkles, Smartphone, Monitor, Square
+  Instagram, Youtube, Music2, Sparkles, Smartphone, Monitor, Square, Layers
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 
 interface PresetDef {
   key: string;
@@ -20,8 +22,6 @@ interface PresetDef {
   description: string;
 }
 
-// One-click platform export presets — re-renders the same composer project
-// at the chosen aspect ratio via compose-video-assemble (with aspectOverride).
 const PRESETS: PresetDef[] = [
   { key: 'tiktok-9-16', platform: 'tiktok', label: 'TikTok',
     aspect: '9:16', width: 1080, height: 1920, icon: Music2,
@@ -66,8 +66,9 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
   const [exports, setExports] = useState<ExportRow[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
 
-  // Initial fetch + realtime subscription so completed renders appear instantly
   useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
@@ -96,9 +97,61 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
     };
   }, [projectId]);
 
+  const toggleSelect = (key: string) => {
+    setSelectedKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelectedKeys(new Set(PRESETS.map(p => p.key)));
+  const clearAll = () => setSelectedKeys(new Set());
+
+  const batchCost = useMemo(() => selectedKeys.size * COST_PER_EXPORT, [selectedKeys]);
+
+  const handleBatchExport = async () => {
+    if (!masterReady) {
+      toast({ title: 'Bitte zuerst rendern', description: 'Erstelle erst dein Hauptvideo.', variant: 'destructive' });
+      return;
+    }
+    if (selectedKeys.size === 0) return;
+
+    setBatchLoading(true);
+    try {
+      const selectedPresets = PRESETS.filter(p => selectedKeys.has(p.key)).map(p => ({
+        key: p.key,
+        platform: p.platform,
+        aspect: p.aspect,
+        width: p.width,
+        height: p.height,
+        label: p.label,
+      }));
+
+      const { data, error } = await supabase.functions.invoke('render-multi-format-batch', {
+        body: { projectId, presets: selectedPresets },
+      });
+
+      if (error || !data?.success) {
+        throw new Error(error?.message || data?.error || 'Batch-Export fehlgeschlagen');
+      }
+
+      toast({
+        title: `${data.triggered} Formate werden gerendert 🚀`,
+        description: `Geschätzte Kosten: €${data.totalCost.toFixed(2)}. Die Versionen erscheinen automatisch, sobald sie fertig sind.`,
+      });
+      clearAll();
+    } catch (err: any) {
+      toast({ title: 'Batch-Export fehlgeschlagen', description: err.message, variant: 'destructive' });
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
   const handleExport = async (preset: PresetDef) => {
     if (!masterReady) {
-      toast({ title: 'Bitte zuerst rendern', description: 'Erstelle erst dein Hauptvideo, bevor du Plattform-Versionen exportierst.', variant: 'destructive' });
+      toast({ title: 'Bitte zuerst rendern', description: 'Erstelle erst dein Hauptvideo.', variant: 'destructive' });
       return;
     }
     setActiveKey(preset.key);
@@ -106,7 +159,6 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Nicht eingeloggt');
 
-      // 1. Create export row first → we get an id we can pass to the renderer
       const { data: row, error: insertErr } = await supabase
         .from('composer_exports')
         .insert({
@@ -124,7 +176,6 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
         .single();
       if (insertErr || !row) throw new Error(insertErr?.message || 'Export konnte nicht angelegt werden');
 
-      // 2. Trigger composer assembly with aspectOverride
       const { data, error } = await supabase.functions.invoke('compose-video-assemble', {
         body: { projectId, aspectOverride: preset.aspect, exportId: row.id },
       });
@@ -147,7 +198,6 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
     }
   };
 
-  // Latest export per preset key, for status pill rendering
   const latestByKey = new Map<string, ExportRow>();
   for (const e of exports) {
     if (!latestByKey.has(e.preset_key)) latestByKey.set(e.preset_key, e);
@@ -156,16 +206,31 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
   return (
     <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card">
       <CardHeader className="pb-3 border-b border-border/40">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Share2 className="h-4 w-4 text-primary" />
-          Plattform-Versionen
-          <Badge variant="secondary" className="ml-2 text-[10px] font-normal">
-            One-Click Export
-          </Badge>
-        </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">
-          Erstelle in einem Klick optimierte Versionen für TikTok, Reels, YouTube & Co. (€{COST_PER_EXPORT.toFixed(2)} pro Export)
-        </p>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Share2 className="h-4 w-4 text-primary" />
+              Plattform-Versionen
+              <Badge variant="secondary" className="ml-2 text-[10px] font-normal">
+                Multi-Format Export
+              </Badge>
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Wähle mehrere Formate aus und exportiere sie in einem Klick (€{COST_PER_EXPORT.toFixed(2)} pro Export)
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-[11px]"
+              onClick={selectedKeys.size === PRESETS.length ? clearAll : selectAll}
+              disabled={!masterReady}
+            >
+              {selectedKeys.size === PRESETS.length ? 'Auswahl löschen' : 'Alle auswählen'}
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="py-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -176,14 +241,28 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
             const isDone = latest?.status === 'completed' && latest.video_url;
             const isFailed = latest?.status === 'failed';
             const isCurrent = currentAspect === preset.aspect;
+            const isSelected = selectedKeys.has(preset.key);
             const Icon = preset.icon;
 
             return (
               <div
                 key={preset.key}
-                className="group relative border border-border/40 rounded-xl bg-card/60 p-3 hover:border-primary/40 hover:bg-card transition-all"
+                className={cn(
+                  "group relative border rounded-xl bg-card/60 p-3 transition-all cursor-pointer",
+                  isSelected
+                    ? "border-primary/60 bg-primary/5 ring-1 ring-primary/30"
+                    : "border-border/40 hover:border-primary/40 hover:bg-card"
+                )}
+                onClick={() => masterReady && toggleSelect(preset.key)}
               >
                 <div className="flex items-start gap-2.5 mb-2.5">
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => toggleSelect(preset.key)}
+                    onClick={(e) => e.stopPropagation()}
+                    disabled={!masterReady}
+                    className="mt-1"
+                  />
                   <div className="h-9 w-9 rounded-lg bg-muted/60 flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
                     <Icon className="h-4 w-4 text-foreground/80 group-hover:text-primary" />
                   </div>
@@ -200,9 +279,8 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
                   </div>
                 </div>
 
-                {/* Status / Action row */}
                 {isDone ? (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <Badge variant="outline" className="text-[10px] h-5 gap-1 border-emerald-500/40 text-emerald-500 bg-emerald-500/5">
                       <CheckCircle className="h-3 w-3" /> Fertig
                     </Badge>
@@ -218,7 +296,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
                     Rendert…
                   </Button>
                 ) : isFailed ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
                     <Badge variant="outline" className="text-[10px] h-5 gap-1 border-destructive/40 text-destructive bg-destructive/5">
                       <AlertCircle className="h-3 w-3" /> Fehlgeschlagen
                     </Badge>
@@ -233,23 +311,65 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
                   </div>
                 ) : (
                   <Button
-                    size="sm" variant="outline"
-                    onClick={() => handleExport(preset)}
+                    size="sm" variant="ghost"
+                    onClick={(e) => { e.stopPropagation(); handleExport(preset); }}
                     disabled={isActive || !masterReady}
-                    className="w-full h-8 text-xs gap-1.5 group-hover:border-primary/40"
+                    className="w-full h-7 text-[11px] text-muted-foreground hover:text-foreground"
                   >
                     {isActive ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
                     ) : (
-                      <Sparkles className="h-3 w-3 group-hover:text-primary" />
+                      <Sparkles className="h-3 w-3 mr-1" />
                     )}
-                    Exportieren
+                    Einzeln exportieren
                   </Button>
                 )}
               </div>
             );
           })}
         </div>
+
+        {/* Sticky Batch Action Bar */}
+        {selectedKeys.size > 0 && (
+          <div className="mt-4 p-3 rounded-xl border border-primary/40 bg-primary/5 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-lg bg-primary/15 flex items-center justify-center">
+                <Layers className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">
+                  {selectedKeys.size} Formate ausgewählt
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Geschätzte Kosten: <span className="font-medium text-foreground">€{batchCost.toFixed(2)}</span> · Parallele Verarbeitung
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="ghost" onClick={clearAll} disabled={batchLoading}>
+                Abbrechen
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleBatchExport}
+                disabled={batchLoading || !masterReady}
+                className="gap-1.5 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+              >
+                {batchLoading ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Starte…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {selectedKeys.size} Versionen exportieren
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
 
         {!masterReady && (
           <p className="text-[10px] text-muted-foreground mt-3 text-center">
