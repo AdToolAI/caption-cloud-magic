@@ -49,7 +49,7 @@ const PIPELINE_STAGES = [
  { key: "Integrity", icon: ShieldCheck, scenarios: ["MS-18"] },
 ] as const;
 
-const ALL_SCENARIO_NAMES = [
+const ALL_SCENARIOS = [
  "MS-1: Project Create",
  "MS-2: Briefing Schema Validation",
  "MS-3: Auto-Director Compose",
