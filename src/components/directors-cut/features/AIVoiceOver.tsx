@@ -8,12 +8,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mic, Sparkles, Play, Volume2, Pause, Loader2, Info } from 'lucide-react';
+import { Mic, Sparkles, Play, Volume2, Pause, Loader2, Info, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
+import { VoiceCloneDialog } from '@/components/voice/VoiceCloneDialog';
 
 interface AIVoiceOverProps {
   settings: {
