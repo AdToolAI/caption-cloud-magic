@@ -647,12 +647,15 @@ export default function VideoComposerDashboard() {
           </TabsContent>
 
           <TabsContent value="export">
-            <AssemblyTab
-              project={project}
-              assemblyConfig={project.assemblyConfig}
-              onUpdateAssembly={updateAssembly}
-              scenes={project.scenes}
-            />
+            <div className="space-y-6">
+              <AssemblyTab
+                project={project}
+                assemblyConfig={project.assemblyConfig}
+                onUpdateAssembly={updateAssembly}
+                scenes={project.scenes}
+              />
+              <NLEExportPanel projectId={project.id} />
+            </div>
           </TabsContent>
             </Tabs>
           </div>
