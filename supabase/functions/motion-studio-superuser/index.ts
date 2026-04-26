@@ -455,6 +455,29 @@ async function ensureTestProject(userId: string): Promise<{ projectId: string; s
   return { projectId, sceneId };
 }
 
+async function ensureTestBrandKit(userId: string): Promise<void> {
+  const { data: existing } = await adminClient
+    .from("brand_kits")
+    .select("id")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+  if (existing?.id) return;
+
+  await adminClient.from("brand_kits").insert({
+    user_id: userId,
+    brand_name: "Motion Studio Test Brand",
+    primary_color: "#D4AF37",
+    secondary_color: "#0A0A0A",
+    accent_color: "#FFFFFF",
+    mood: "premium",
+    brand_tone: "confident",
+    brand_values: ["quality", "craftsmanship", "boldness"],
+    keywords: ["premium", "coffee", "lifestyle"],
+    is_active: true,
+  });
+}
+
 // ============================================================================
 // RUNNER
 // ============================================================================
