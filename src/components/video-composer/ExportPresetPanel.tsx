@@ -3,9 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Loader2, Download, CheckCircle, AlertCircle, Share2,
-  Instagram, Youtube, Music2, Sparkles, Smartphone, Monitor, Square, Layers
+  Instagram, Youtube, Music2, Sparkles, Smartphone, Monitor, Square, Layers, Crosshair
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
