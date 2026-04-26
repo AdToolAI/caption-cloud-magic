@@ -96,6 +96,10 @@ export default function Admin() {
           <MotionStudioSuperuserPanel />
         </TabsContent>
 
+        <TabsContent value="marketplace-review">
+          <MarketplaceReviewPanel />
+        </TabsContent>
+
         <TabsContent value="lambda-health">
           <LambdaHealth />
         </TabsContent>
