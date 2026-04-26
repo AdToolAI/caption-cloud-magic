@@ -56,24 +56,28 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
   );
   const [voices, setVoices] = useState<VoiceMeta[]>([]);
   const [loadingVoices, setLoadingVoices] = useState(true);
+  const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Load voices dynamically (premium + account)
+  // Load voices dynamically (premium + account + cloned)
+  const loadVoices = async () => {
+    setLoadingVoices(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('list-voices', { body: { language: 'all' } });
+      if (error) throw error;
+      const sorted = sortVoicesPremiumFirst<VoiceMeta>(data?.voices || []);
+      setVoices(sorted);
+    } catch (err) {
+      console.error('Failed to load voices:', err);
+      toast.error('Stimmen konnten nicht geladen werden');
+    } finally {
+      setLoadingVoices(false);
+    }
+  };
+
   useEffect(() => {
-    (async () => {
-      setLoadingVoices(true);
-      try {
-        const { data, error } = await supabase.functions.invoke('list-voices', { body: { language: 'all' } });
-        if (error) throw error;
-        const sorted = sortVoicesPremiumFirst<VoiceMeta>(data?.voices || []);
-        setVoices(sorted);
-      } catch (err) {
-        console.error('Failed to load voices:', err);
-        toast.error('Stimmen konnten nicht geladen werden');
-      } finally {
-        setLoadingVoices(false);
-      }
-    })();
+    loadVoices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const voicesForLang = (lang: 'de' | 'en' | 'es') =>
