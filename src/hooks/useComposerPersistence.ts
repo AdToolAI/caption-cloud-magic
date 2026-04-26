@@ -165,6 +165,12 @@ export function useComposerPersistence() {
               prompt_mode: scene.promptMode ?? null,
               prompt_slot_order: (scene.promptSlotOrder ?? null) as any,
               applied_style_preset_id: scene.appliedStylePresetId ?? null,
+              // Block M — Hybrid Production
+              hybrid_mode: scene.hybridMode ?? null,
+              first_frame_url: scene.firstFrameUrl ?? null,
+              last_frame_url: scene.lastFrameUrl ?? null,
+              end_reference_image_url: scene.endReferenceImageUrl ?? null,
+              hybrid_target_scene_id: scene.hybridTargetSceneId ?? null,
             } as any)
             .eq('id', scene.id);
 
@@ -201,6 +207,12 @@ export function useComposerPersistence() {
               prompt_mode: scene.promptMode ?? null,
               prompt_slot_order: (scene.promptSlotOrder ?? null) as any,
               applied_style_preset_id: scene.appliedStylePresetId ?? null,
+              // Block M — Hybrid Production
+              hybrid_mode: scene.hybridMode ?? null,
+              first_frame_url: scene.firstFrameUrl ?? null,
+              last_frame_url: scene.lastFrameUrl ?? null,
+              end_reference_image_url: scene.endReferenceImageUrl ?? null,
+              hybrid_target_scene_id: scene.hybridTargetSceneId ?? null,
             } as any)
             .select('id')
             .single();
