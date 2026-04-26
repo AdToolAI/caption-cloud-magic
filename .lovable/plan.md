@@ -1,68 +1,69 @@
-## Diagnose: Was die Tests wirklich zeigen
+## Diagnose
 
-### Block A — Echte Bugs im Motion Studio Superuser (6 Failures, alle in unserer Verantwortung)
+Die 3 verbleibenden roten Szenarien (**Performance Analytics**, **Posting Times Recommendation**, **Campaign Generation**) sind **keine Code-Bugs**. Verifizierung:
 
-| Szenario | Root Cause | Fix |
-|---|---|---|
-| **MS-3 Auto-Director Compose** | Die Function lehnt mit `idea must be at least 5 characters` ab, obwohl wir 60+ Zeichen senden — vermutlich wird `body.idea` durch eine Body-Wrapping-Schicht gestrippt oder die Function liest das Falsche Feld. | Defensives Logging in `auto-director-compose` (raw body dump bei `INVALID_INPUT`); im Superuser explizit `JSON.stringify` mit Content-Length-Header senden; ggf. das Trim-Limit auf 4 Zeichen senken. |
-| **MS-5 Stock Media Bucket Health** | Sucht nach `composer-clips` + `stock-media` — beide existieren nicht. Existierend: `composer-uploads`, `composer-frames`, `composer-nle-exports`. | Erwartete Bucket-Liste auf real existierende Buckets korrigieren (`composer-uploads`, `composer-frames`). Optional: Migration zum Anlegen von `composer-clips` falls semantisch benötigt. |
-| **MS-8 Trending Templates Available** | `composer_template_suggestions` ist leer — `aggregate-trending-templates` wurde nie ausgeführt. | (1) Einmaliger Seed-Run von `aggregate-trending-templates` über admin-trigger. (2) Statt hartem Fail bei 0 Templates → "warning" mit Hinweis "aggregator pending first run". |
-| **MS-9 Brand Consistency Analysis** | `Brand kit not found` — `ensureTestProject` legt kein Brand Kit für den Test-User an. | Neue Funktion `ensureTestBrandKit(userId)` im Setup, die einen Default-Brand-Kit (Logo, Farben, Voice-Sample) seedet. |
-| **MS-10 Brand Voice Analysis** | `Cannot read properties of undefined (reading 'map')` — `analyze-brand-voice` crasht beim fehlenden Brand-Kit-Lookup, weil `samples` ohne Kit nicht gemapped werden können. | (1) Brand Kit aus MS-9 wiederverwenden. (2) Defensiver Null-Guard in `analyze-brand-voice` (early return mit 404 statt Crash). |
-| **MS-16/17 NLE Export FCPXML/EDL** | `No scenes with usable clips` — Test-Projekt hat nur eine `pending` Szene ohne Clip-URL. | `ensureTestProject` muss mindestens 2 Szenen mit dummy-`clip_url` (kurzes öffentliches MP4) und `clip_status='ready'` seedet. |
+- **Direkter Curl-Test** der 3 Funktionen → alle liefern **HTTP 200** mit korrekten, vollständigen Antworten (Best Times, Recommendations, Campaign-Wochenplan).
+- **DB-Logs** der letzten Runs zeigen für alle 3 ausschließlich:
+  ```
+  HTTP 503: {"code":"SUPABASE_EDGE_RUNTIME_ERROR","message":"Service is temporarily unavailable"}
+  ```
+- Latenzen: **58ms / 62ms / 735ms** → klassisches Edge-Worker-Cold-Start- bzw. Throttle-Symptom wenn der Runner viele Funktionen gleichzeitig feuert.
 
-### Block B — Anomalie-Engine glättet plattformweite 503-Wellen
+Das Problem: Der Test-Runner behandelt **transiente 503er als harten Fail**, obwohl die Funktion bei einem Retry sofort wieder antwortet.
 
-Die KI-Analyse zeigt 39 offene Anomalien, weil eine gestrige globale Lovable-Cloud-Edge-Runtime-Störung **systemweit** 503er produziert hat. Das ist kein Bug von uns, aber unser Anomalie-Detektor sollte nicht jede Plattform-Störung als Code-Bug zählen.
+## Lösung: Transparenter Retry für 503/504/502
 
-**Fix:** In `analyze-superuser-anomalies` einen Filter ergänzen:
-- Wenn ein 503 `SUPABASE_EDGE_RUNTIME_ERROR` in **≥5 verschiedenen Funktionen innerhalb derselben 10-Minuten-Welle** auftritt → als **single platform-incident** zusammenfassen (nicht 39 Einzel-Anomalien).
-- Anomalien automatisch auflösen, wenn das Szenario in den letzten 3 Runs wieder grün ist.
+### Änderung 1 — `supabase/functions/ai-superuser-test-runner/index.ts`
 
-### Block C — Trending Aggregator Seed + pg_cron
+In der Scenario-Execution-Schleife (rund um Zeile 555–610) einen **automatischen Retry-Wrapper für transiente 5xx-Edge-Runtime-Fehler** einbauen:
 
-- Einmaliger Seed-Run von `aggregate-trending-templates` per `supabase.functions.invoke`.
-- `pg_cron`-Eintrag: wöchentlich Sonntag 03:00 UTC.
+```ts
+// Pseudocode
+async function invokeWithRetry(fn: string, body: unknown, maxAttempts = 3) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const res = await fetch(...);
+    const text = await res.text();
+    
+    // Retry nur bei transienten Plattform-Fehlern
+    const isTransient = 
+      (res.status === 503 || res.status === 504 || res.status === 502) &&
+      text.includes('SUPABASE_EDGE_RUNTIME_ERROR');
+    
+    if (isTransient && attempt < maxAttempts) {
+      await sleep(500 * attempt); // 500ms, 1000ms backoff
+      continue;
+    }
+    return { res, text };
+  }
+}
+```
 
----
+- **Max 3 Versuche** mit linearem Backoff (500ms, 1000ms).
+- Greift **nur** bei `503/504/502 + SUPABASE_EDGE_RUNTIME_ERROR`-Body — andere 5xx (echte Code-Fehler) werden **nicht** retryed.
+- Wenn nach 3 Retries immer noch 503: Status wird auf **`warning`** gesetzt (statt `fail`) mit Hinweis `"Platform throttling — retried 3x"`. So unterscheiden wir klar zwischen Plattform-Hiccups und echten Bugs.
 
-## Geplante Änderungen
+### Änderung 2 — Sequenzielle statt parallele Execution für sensitive Szenarien
 
-### 1. `supabase/functions/motion-studio-superuser/index.ts`
-- **MS-5**: Bucket-Liste auf `["composer-uploads", "composer-frames", "composer-nle-exports"]` korrigieren.
-- **MS-8**: Hartes Fail → `warning` mit Hinweis "first aggregator run pending".
-- **`ensureTestBrandKit(userId)`** neu hinzufügen — seedet Logo-URL, Primary/Secondary Color, Voice-Sample (3 kurze Texte).
-- **`ensureTestProject`** erweitern — 2 Szenen mit `clip_url` (öffentliches Test-MP4), `clip_status='ready'`, `duration_seconds=3`.
+Aktuell läuft `runAllScenarios` mit `Promise.all` über alle Szenarien. Das verursacht den 503-Burst.
 
-### 2. `supabase/functions/auto-director-compose/index.ts`
-- Bei `INVALID_INPUT`: Raw-Body in `console.error` loggen (für Debug).
-- Idea-Limit auf 4 Zeichen senken (5 ist zu strikt für QA).
+- **Throttle auf max 4 parallele Szenarien** (statt all-at-once) mit einer kleinen `pLimit`-artigen Helper-Funktion.
+- Reduziert Edge-Worker-Last drastisch und eliminiert die Hauptursache der transienten 503er.
 
-### 3. `supabase/functions/analyze-brand-voice/index.ts`
-- Null-Guard: Wenn `brandKit` nicht gefunden → 404 mit klarer Message statt Crash.
-- Wenn `samples` undefined → leeres Array Default.
+### Änderung 3 — Anomalie-Engine entlasten
 
-### 4. `supabase/functions/analyze-superuser-anomalies/index.ts`
-- Cluster-Logik: 503 + `SUPABASE_EDGE_RUNTIME_ERROR` + ≥5 Funktionen in 10min → 1 Platform-Incident-Anomalie statt N.
-- Auto-Resolve: Wenn letzte 3 Runs des Szenarios grün → Anomalie schließen.
+Da 503-Wellen jetzt im Test-Runner abgefangen werden, sieht `analyze-superuser-anomalies` weniger False-Positives. Optional ergänzend: **automatisches Schließen alter Anomalien**, deren letzter Run gerade `pass` oder `warning` war (keine Code-Änderung nötig, ist bereits geplant in der vorherigen Iteration).
 
-### 5. Trending Aggregator
-- Einmal manuell triggern via `supabase--curl_edge_functions`.
-- Migration: `pg_cron`-Job für wöchentliche Ausführung.
+## Erwartetes Ergebnis
 
-### 6. UI: `MotionStudioSuperuserPanel.tsx`
-- Banner "ℹ️ MS-8 ist eine Warning bis der erste Aggregator-Run gelaufen ist" entfernen, sobald Templates da sind.
+- **3 rote Szenarien → grün** (oder im Worst Case `warning` bei realen Plattform-Problemen — aber nicht mehr `fail`).
+- Pass-Rate des KI Superusers steigt von **~85% → ~98%**.
+- Kein Maskieren echter Bugs: Nicht-transiente Fehler (HTTP 4xx, andere 5xx, Validation-Errors) bleiben weiterhin `fail`.
 
----
+## Geänderte Dateien
 
-## Erwartetes Ergebnis nach Umsetzung
-
-- Motion Studio Superuser Pass-Rate: **18/18 (100%)** statt aktuell 12/18 (67%).
-- Anomalien-Liste: von **39 → ~5** (echte Code-Bugs, keine Plattform-Wellen).
-- `composer_template_suggestions` enthält die ersten Trending-Einträge.
+- `supabase/functions/ai-superuser-test-runner/index.ts` (Retry-Wrapper + Throttle)
 
 ## Was NICHT geändert wird
 
-- KI Superuser Test Runner (separate Codebase, läuft stabil).
-- Globale Platform-503-Welle ist Lovable-Cloud-seitig, nicht reparierbar von uns.
-- Build-Errors-Liste: typischerweise "alle Functions wurden gecheckt"-Hinweis, nicht echte Errors. Falls beim nächsten Build doch echte Typescript-Fehler auftauchen, fixen wir die punktuell.
+- Die 3 Edge-Functions selbst (`analyze-performance`, `analyze-posting-times`, `generate-campaign`) — sie funktionieren einwandfrei.
+- Motion Studio Superuser bleibt unangetastet.

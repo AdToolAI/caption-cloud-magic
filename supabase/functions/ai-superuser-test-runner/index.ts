@@ -533,38 +533,83 @@ async function runScenario(scenario: Scenario, ctx: TestContext, triggeredBy: st
     return;
   }
 
+  // Retry-Wrapper: transient platform 5xx errors (Edge Runtime overload) get up to 3 attempts
+  // with linear backoff. Real code errors (4xx, non-runtime 5xx) are NOT retried.
+  const MAX_ATTEMPTS = 3;
+  let attempt = 0;
+  let transientRetries = 0;
+  let lastTransientError: string | null = null;
+
   try {
     let response: Response;
-    if (scenario.directCall) {
-      response = await fetch(scenario.directCall.url, {
-        method: scenario.directCall.method,
-        headers: scenario.directCall.headers || {},
-        body: scenario.directCall.body ? JSON.stringify(scenario.directCall.body) : undefined,
-      });
-    } else {
-      const url = `${SUPABASE_URL}/functions/v1/${scenario.fn}`;
-      response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // Use real user JWT for auth-protected functions
-          "Authorization": `Bearer ${ctx.userJwt}`,
-          "apikey": ANON_KEY,
-          "X-AI-Superuser": "true",
-        },
-        body: JSON.stringify(requestBody ?? {}),
-      });
+    let text: string;
+
+    while (true) {
+      attempt++;
+      if (scenario.directCall) {
+        response = await fetch(scenario.directCall.url, {
+          method: scenario.directCall.method,
+          headers: scenario.directCall.headers || {},
+          body: scenario.directCall.body ? JSON.stringify(scenario.directCall.body) : undefined,
+        });
+      } else {
+        const url = `${SUPABASE_URL}/functions/v1/${scenario.fn}`;
+        response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // Use real user JWT for auth-protected functions
+            "Authorization": `Bearer ${ctx.userJwt}`,
+            "apikey": ANON_KEY,
+            "X-AI-Superuser": "true",
+          },
+          body: JSON.stringify(requestBody ?? {}),
+        });
+      }
+
+      text = await response.text();
+
+      // Detect transient platform errors (Supabase Edge Runtime overload / cold-start hiccups)
+      const isTransientPlatformError =
+        (response.status === 502 || response.status === 503 || response.status === 504) &&
+        (text.includes("SUPABASE_EDGE_RUNTIME_ERROR") ||
+          text.includes("BOOT_ERROR") ||
+          text.includes("WORKER_LIMIT") ||
+          text.toLowerCase().includes("temporarily unavailable"));
+
+      if (isTransientPlatformError && attempt < MAX_ATTEMPTS) {
+        transientRetries++;
+        lastTransientError = `HTTP ${response.status}: ${text.substring(0, 150)}`;
+        const backoffMs = 500 * attempt; // 500ms, 1000ms
+        console.log(
+          `[Superuser] ${scenario.name}: transient HTTP ${response.status} on attempt ${attempt}, retrying in ${backoffMs}ms`
+        );
+        await new Promise((r) => setTimeout(r, backoffMs));
+        continue;
+      }
+
+      break;
     }
 
     httpStatus = response.status;
-    const text = await response.text();
     try {
       responseData = JSON.parse(text);
     } catch {
       responseData = { raw: text.substring(0, 500) };
     }
 
-    if (response.status === 404 && scenario.optional) {
+    // After all retries exhausted: still a transient platform error? -> warning, not fail
+    const finalIsTransient =
+      (response.status === 502 || response.status === 503 || response.status === 504) &&
+      (text.includes("SUPABASE_EDGE_RUNTIME_ERROR") ||
+        text.includes("BOOT_ERROR") ||
+        text.includes("WORKER_LIMIT") ||
+        text.toLowerCase().includes("temporarily unavailable"));
+
+    if (finalIsTransient) {
+      status = "warning";
+      errorMessage = `Platform throttling — HTTP ${response.status} after ${attempt} attempts (transient, not a code bug)`;
+    } else if (response.status === 404 && scenario.optional) {
       status = "warning";
       errorMessage = `Function '${scenario.fn}' not deployed (optional)`;
     } else if (scenario.expectFailure) {
@@ -646,11 +691,15 @@ Deno.serve(async (req) => {
 
     console.log(`[Superuser] Starting ${scenarios.length} scenarios in mode=${mode}`);
 
-    // Run scenarios in parallel batches of 3
-    const batchSize = 3;
+    // Run scenarios in parallel batches of 2 (reduced from 3 to avoid 503 bursts on Edge Runtime)
+    const batchSize = 2;
     for (let i = 0; i < scenarios.length; i += batchSize) {
       const batch = scenarios.slice(i, i + batchSize);
       await Promise.all(batch.map((s) => runScenario(s, ctx, triggeredBy)));
+      // Small inter-batch pause to let Edge Runtime breathe
+      if (i + batchSize < scenarios.length) {
+        await new Promise((r) => setTimeout(r, 250));
+      }
     }
 
     // Aggregate result (last 60s)
