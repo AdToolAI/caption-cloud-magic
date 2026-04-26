@@ -3778,6 +3778,56 @@ export type Database = {
           },
         ]
       }
+      composer_nle_exports: {
+        Row: {
+          created_at: string
+          expires_at: string
+          file_size_bytes: number
+          format: string
+          id: string
+          project_id: string
+          scene_count: number
+          storage_path: string
+          total_duration_sec: number
+          user_id: string
+          warnings: Json
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          file_size_bytes?: number
+          format: string
+          id?: string
+          project_id: string
+          scene_count?: number
+          storage_path: string
+          total_duration_sec?: number
+          user_id: string
+          warnings?: Json
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          file_size_bytes?: number
+          format?: string
+          id?: string
+          project_id?: string
+          scene_count?: number
+          storage_path?: string
+          total_duration_sec?: number
+          user_id?: string
+          warnings?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composer_nle_exports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       composer_projects: {
         Row: {
           assembly_config: Json
