@@ -144,6 +144,38 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
           <strong>EDL</strong> ist Legacy (Avid). <strong>Bundle</strong> packt alle Medien lokal in ein ZIP — ideal zum Verschicken oder Offline-Schnitt.
         </p>
 
+        {/* Roundtrip Re-Import */}
+        <div className="pt-2 border-t border-border/40 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Upload className="h-3 w-3" />
+            Roundtrip — geänderte Sequenz importieren
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".fcpxml,application/xml,text/xml"
+            className="hidden"
+            onChange={handleFilePick}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={disabled || previewing}
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full justify-start"
+          >
+            {previewing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4" />
+            )}
+            FCPXML hochladen & Diff prüfen
+          </Button>
+          <p className="text-[10px] text-muted-foreground/80 leading-relaxed">
+            Lade die in Resolve/Premiere geänderte <code>.fcpxml</code> hoch — wir zeigen dir alle Trims, Reorder & gelöschten Szenen vor der Übernahme.
+          </p>
+        </div>
+
         {/* History */}
         {history.length > 0 && (
           <div className="space-y-2 pt-2 border-t border-border/40">
