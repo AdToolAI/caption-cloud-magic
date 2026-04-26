@@ -7,19 +7,33 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Pricing in EUR/USD per second (≥70% Marge gegenüber Replicate)
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'veo-3.1-lite': { EUR: 0.40, USD: 0.40 },
-  'veo-3.1': { EUR: 0.65, USD: 0.65 },
+  'veo-3.1-lite-720p': { EUR: 0.20, USD: 0.20 },
+  'veo-3.1-lite-1080p': { EUR: 0.30, USD: 0.30 },
+  'veo-3.1-fast': { EUR: 0.55, USD: 0.55 },
+  'veo-3.1-pro': { EUR: 1.40, USD: 1.40 },
 };
 
 const REPLICATE_MODELS: Record<string, string> = {
-  'veo-3.1-lite': 'google/veo-3.1-fast',
-  'veo-3.1': 'google/veo-3.1',
+  'veo-3.1-lite-720p': 'google/veo-3.1-fast',
+  'veo-3.1-lite-1080p': 'google/veo-3.1-fast',
+  'veo-3.1-fast': 'google/veo-3.1-fast',
+  'veo-3.1-pro': 'google/veo-3.1',
 };
+
+const MODEL_RESOLUTION: Record<string, '720p' | '1080p'> = {
+  'veo-3.1-lite-720p': '720p',
+  'veo-3.1-lite-1080p': '1080p',
+  'veo-3.1-fast': '1080p',
+  'veo-3.1-pro': '1080p',
+};
+
+type VeoModelId = 'veo-3.1-lite-720p' | 'veo-3.1-lite-1080p' | 'veo-3.1-fast' | 'veo-3.1-pro';
 
 interface GenerateRequest {
   prompt: string;
-  model: 'veo-3.1-lite' | 'veo-3.1';
+  model: VeoModelId;
   duration: number;
   aspectRatio: '16:9' | '9:16';
   startImageUrl?: string;
@@ -142,7 +156,7 @@ serve(async (req) => {
     console.log(`[generate-veo-video] Cost: ${currencySymbol}${totalCost.toFixed(2)}, Balance: ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
 
     // Generation row
-    const resolution = model === 'veo-3.1' ? '1080p' : '720p';
+    const resolution = MODEL_RESOLUTION[model] || '720p';
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
@@ -196,6 +210,11 @@ serve(async (req) => {
       aspect_ratio: aspectRatio,
       generate_audio: generateAudio,
     };
+
+    // Lite-Varianten: explizite Auflösung an Replicate übergeben (nur bei veo-3.1-fast Model)
+    if (model === 'veo-3.1-lite-720p' || model === 'veo-3.1-lite-1080p') {
+      replicateInput.resolution = MODEL_RESOLUTION[model];
+    }
 
     if (negativePrompt && negativePrompt.trim()) {
       replicateInput.negative_prompt = negativePrompt.trim();
