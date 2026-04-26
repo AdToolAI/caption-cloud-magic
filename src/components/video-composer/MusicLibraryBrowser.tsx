@@ -335,11 +335,18 @@ export default function MusicLibraryBrowser({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
+        <DialogHeader className="space-y-1.5">
           <DialogTitle className="flex items-center gap-2">
-            <MusicIcon className="h-5 w-5 text-primary" />
-            {t('videoComposer.audio.libraryTitle') || 'Music & SFX Library'}
+            <span className="text-lg leading-none">🎁</span>
+            <MusicIcon className="h-5 w-5 text-emerald-400" />
+            <span>Free Audio Library</span>
+            <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 text-[10px] font-semibold uppercase tracking-wider border border-emerald-500/30">
+              0 Credits
+            </span>
           </DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            Pixabay × Mixkit · Royalty-free Musik & Sound-Effekte — ohne Credit-Verbrauch
+          </p>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(v) => { setTab(v as any); setResults([]); setQuery(''); setActiveMood(null); setActiveSfxCat(null); }} className="flex-1 flex flex-col overflow-hidden">

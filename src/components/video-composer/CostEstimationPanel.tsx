@@ -64,6 +64,25 @@ export default function CostEstimationPanel({
     [scenes]
   );
 
+  // ── Stock-First Savings: count scenes that use free stock instead of paid AI ─
+  const stockStats = useMemo(() => {
+    const stockScenes = scenes.filter(
+      (s) => s.clipSource === 'stock' || s.clipSource === 'stock-image'
+    );
+    const stockSeconds = stockScenes.reduce((sum, s) => sum + (s.durationSeconds || 0), 0);
+    // Compare against Veo 3.1 Lite 720p baseline (€0.20/s = 20 Credits/s) — the
+    // cheapest paid AI scene generation. Cost-savings shown to the user.
+    const SAVED_CREDITS_PER_SEC = 20;
+    const savedCredits = Math.round(stockSeconds * SAVED_CREDITS_PER_SEC);
+    const savedEuros = (stockSeconds * 0.2).toFixed(2);
+    return {
+      sceneCount: stockScenes.length,
+      seconds: stockSeconds,
+      savedCredits,
+      savedEuros,
+    };
+  }, [scenes]);
+
   const resolution: Resolution = '1080p';
 
   const complexity: Complexity = useMemo(() => {
@@ -280,6 +299,22 @@ export default function CostEstimationPanel({
           percent={shotstackPct}
         />
 
+        {/* Free Stock Library savings banner */}
+        {stockStats.sceneCount > 0 && (
+          <div className="flex items-start gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3">
+            <span className="text-base leading-none mt-0.5">🎁</span>
+            <div className="flex-1 text-xs">
+              <p className="font-medium text-emerald-300">
+                {stockStats.sceneCount} Stock-{stockStats.sceneCount === 1 ? 'Szene' : 'Szenen'} ·{' '}
+                <span className="tabular-nums">~{stockStats.savedCredits} Credits</span> gespart
+                <span className="text-emerald-300/70"> (≈ €{stockStats.savedEuros})</span>
+              </p>
+              <p className="text-muted-foreground mt-0.5">
+                Free Stock Library statt KI-Generierung — verglichen mit Veo 3.1 Lite (€0.20/s).
+              </p>
+            </div>
+          </div>
+        )}
         {/* Wallet balance warning */}
         {insufficientForRecommended && (
           <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
