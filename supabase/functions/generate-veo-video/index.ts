@@ -211,6 +211,11 @@ serve(async (req) => {
       generate_audio: generateAudio,
     };
 
+    // Lite-Varianten: explizite Auflösung an Replicate übergeben (nur bei veo-3.1-fast Model)
+    if (model === 'veo-3.1-lite-720p' || model === 'veo-3.1-lite-1080p') {
+      replicateInput.resolution = MODEL_RESOLUTION[model];
+    }
+
     if (negativePrompt && negativePrompt.trim()) {
       replicateInput.negative_prompt = negativePrompt.trim();
     }
