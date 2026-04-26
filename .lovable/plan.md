@@ -1,83 +1,125 @@
 
-# Session M-2 — Bridge & Style-Reference (Block M Abschluss)
+# 🎯 Marktführer-Parität Roadmap — Blocks O → P → Q
 
-Erweitert das bestehende Hybrid-Extend-System um zwei neue Modi. Schema (`hybrid_mode` mit `'bridge'` und `'style-ref'`, `end_reference_image_url`, `hybrid_target_scene_id`) sowie die `end_image`-Logik in `compose-video-clips` (Kling 2.1 + Luma Ray-2) **sind bereits vorhanden** — wir nutzen die bestehende Infrastruktur weiter.
-
-## Use-Cases
-
-### 🌉 Bridge (Morphing-Übergang)
-Generiert zwischen zwei existierenden Szenen A und B eine neue Szene, die optisch von Frame-A-Last → Frame-B-First morpht.
-- **Engines**: nur **Kling** und **Luma** (brauchen `start_image` + `end_image`)
-- Neue Szene wird **zwischen** A und B eingefügt (alle nachfolgenden `order_index` werden geshiftet)
-- `hybrid_mode = 'bridge'`, `continuity_source_scene_id = A.id`, `hybrid_target_scene_id = B.id`
-
-### 🎨 Style-Reference
-Nutzt den **letzten Frame** einer Referenzszene als visuellen Stil-Anker (`reference_image_url`) für eine komplett neue Szene mit eigenem Prompt — kein nahtloser Anschluss, sondern Style-Transfer.
-- **Engines**: alle (nur `start_image`/`first_frame_image` nötig)
-- Neue Szene wird **am Ende** angehängt
-- `hybrid_mode = 'style-ref'`, `continuity_source_scene_id = ref.id`
-
-> Hinweis: Replicate's `kwaivgi/kling-v2.1` unterstützt aktuell **kein** dediziertes `reference_video`-Feld. Style-Ref nutzt daher den Last-Frame als Image-Anker (qualitativ ähnlicher Effekt, deutlich günstiger).
+Nach dem Audit habe ich **bestehende Infrastruktur identifiziert**, die wir wiederverwenden können — das spart ~40% Aufwand vs. Greenfield. Plan in 3 Sessions, jede deploybar & testbar.
 
 ---
 
-## Implementierung
+## 📦 Session 1 — Block O: AI Auto-Director (1-Click Movie) (~3.5h)
 
-### 1. Backend — `hybrid-extend-scene` erweitern (kein neues Edge-Function nötig)
-- Akzeptiere `mode: 'forward' | 'backward' | 'bridge' | 'style-ref'`
-- **Bridge**: zusätzlicher Pflicht-Param `targetSceneId`
-  - Validiere: beide Szenen gehören zum Projekt, beide haben `clip_url`
-  - Engine muss in `BACKWARD_CAPABLE` (Kling/Luma) sein
-  - Extrahiere parallel: `last_frame` von A, `first_frame` von B (über bestehendes `extract-video-frames`)
-  - Insert neue Szene **zwischen** A und B: `order_index = A.order + 1`, vorher zwei-Phasen-Shift aller Szenen mit `order_index >= A.order + 1` (gleiche Negative-Space-Technik wie im FCPXML-Import, um Unique-Index-Konflikte zu vermeiden)
-  - Setze `reference_image_url = anchorA`, `end_reference_image_url = anchorB`, `hybrid_target_scene_id = B.id`
-- **Style-Ref**: nutzt `sourceSceneId` als Referenz, extrahiert `last_frame`, append am Ende, kein `end_image`
+**Ziel**: User gibt **eine Idee + Stimmung + Dauer** ein → System erstellt automatisch Storyboard, generiert alle Clips parallel, fügt Voiceover/Musik/Untertitel hinzu, rendert das fertige Video. Wettbewerb: Pika 2.0, Runway Gen-3 Auto.
 
-### 2. Hook — `useHybridExtend.ts`
-- Erweitere `HybridMode` um `'bridge' | 'style-ref'`
-- Param `targetSceneId?: string` für Bridge
-- Bridge-Validierung: zeige Toast wenn Engine nicht Kling/Luma
+### Bestehende Bausteine (wiederverwenden)
+- ✅ `compose-video-clips` (parallele Clip-Generation)
+- ✅ `generate-script-inline` (Skript-Erstellung mit Lovable AI)
+- ✅ `compose-video-assemble` (Final-Render)
+- ✅ Storyboard-Schema (`composer_scenes`)
 
-### 3. UI — `HybridExtendDialog.tsx`
-- TabsList von 2 auf **4 Tabs** erweitern: Forward / Backward / **Bridge** / **Style-Ref**
-- **Bridge-Tab**:
-  - Select „Ziel-Szene" (Liste aller anderen Szenen mit `clip_url`, sortiert nach `order_index`)
-  - Engine-Selector beschränkt auf Kling/Luma (Disabled-Hint wie bei Backward)
-  - Cost-Preview gleich wie Backward
-- **Style-Ref-Tab**:
-  - Hinweis-Box: „Nutzt den Stil der Quelle, generiert eine neue Szene"
-  - Engine-Selector: alle 5 Engines erlaubt
-  - Prompt ist der primäre Input (Style wird nur referenziert)
-- i18n: alle neuen Strings in DE/EN/ES (Bridge, Style-Ref, Ziel-Szene, Hinweise)
+### Neu zu bauen
+- **`auto-director-compose`** (neue Edge Function): Orchestrator
+  1. Gemini 2.5 Pro generiert Szenen-Plan (Anzahl, Dauer, Prompts pro Szene, Engine-Empfehlung)
+  2. Insert aller Szenen mit `status='pending'` in `composer_scenes`
+  3. Trigger `compose-video-clips` (parallel)
+  4. Optional: trigger `synthesize-voiceover` + `select-background-music`
+  5. Auto-Trigger `compose-video-assemble` wenn alle Clips ready
+- **`AutoDirectorWizard.tsx`** (3-Step Modal in Composer):
+  - Step 1: Idee + Stimmung (Cinematic/Hype/Calm/Corporate) + Ziel-Dauer (15s/30s/60s)
+  - Step 2: KI generiert Plan-Preview (Szenen mit Prompts) → User kann anpassen/regenerieren
+  - Step 3: Engine-Mix (Auto/Premium/Budget) + Voice + Musik → "Movie generieren"
+- **DB**: Neue Spalte `composer_projects.auto_director_config` (JSONB für Reproduzierbarkeit)
+- **UI-Integration**: Neuer prominenter "✨ Auto-Director" CTA in `VideoComposerDashboard.tsx` Header + Empty-State
 
-### 4. Storyboard-Integration — `StoryboardTab.tsx` & `SceneCard.tsx`
-- Übergebe `availableScenes` (Array aller Szenen mit `clip_url`) an `HybridExtendDialog` für die Ziel-Szenen-Auswahl
-- `SceneCard.tsx`: 
-  - **Bridge-Button** (🌉 Icon) erscheint, wenn die Szene **nicht die letzte** ist und mind. eine andere Szene mit `clip_url` existiert → öffnet Dialog im Bridge-Tab mit Quelle = aktuelle Szene
-  - **Style-Ref-Button** (🎨 Icon) immer sichtbar wenn `clip_url` vorhanden → öffnet Dialog im Style-Ref-Tab
-  - Continuity-Badge erweitern: `bridge` zeigt „🌉 Bridge", `style-ref` zeigt „🎨 Style"
-
-### 5. Persistence — `useComposerPersistence.ts`
-- Mapping ist bereits da (`hybridMode`, `hybridTargetSceneId`, `endReferenceImageUrl`) — nur sicherstellen, dass `'bridge'` und `'style-ref'` als gültige Werte durchgereicht werden (Type schon entsprechend gesetzt).
-
-### 6. Refund-Sicherheit
-- `compose-video-clips` deduktet/refunded Credits bereits selbst → Bridge & Style-Ref erben das automatisch.
-- `markSceneFailed` in `hybrid-extend-scene` deckt Frame-Extraktions-Fehler ab.
+### Engines & Cost-Estimate
+- Standard: 4 Szenen à 5s mit Hailuo (~0.8€) + Voiceover (~0.05€) + Render = **~1€ pro Auto-Movie**
+- Live-Cost-Preview im Wizard, Refund-Sicherheit über bestehendes `compose-video-clips`
 
 ---
 
-## Geänderte / neue Dateien
-- `supabase/functions/hybrid-extend-scene/index.ts` (Modified — Bridge + Style-Ref Branches)
-- `src/hooks/useHybridExtend.ts` (Modified — `HybridMode` Union + `targetSceneId`)
-- `src/components/video-composer/HybridExtendDialog.tsx` (Modified — 4 Tabs + Ziel-Szenen-Selector + i18n)
-- `src/components/video-composer/SceneCard.tsx` (Modified — Bridge/Style-Ref Buttons + Badges)
-- `src/components/video-composer/StoryboardTab.tsx` (Modified — `availableScenes` Prop weiterreichen)
+## 📤 Session 2 — Block P: Multi-Format Smart Export (~2h)
 
-**Keine Migration nötig** — Schema unterstützt bereits alle 4 hybrid_mode Werte.
+**Ziel**: Ein Composer-Projekt → **simultanes Rendering in 16:9, 9:16, 1:1** (TikTok + YouTube + Instagram-Feed in einem Klick). Wettbewerb: HeyGen, Submagic.
+
+### Bestehende Bausteine
+- ✅ `ExportPresetPanel.tsx` (6 Presets, Single-Trigger)
+- ✅ `compose-video-assemble` mit `aspectOverride` Support
+- ✅ Composer-Export-Tabelle (`composer_exports`)
+
+### Neu / Erweiterung
+- **`ExportPresetPanel.tsx` Refactor**:
+  - Multi-Select Checkboxen statt Single-Click
+  - "Smart Crop"-Toggle: Center vs. AI-Subject-Tracking (Phase 2)
+  - "Alle ausgewählten exportieren" Batch-Button mit Cost-Sum-Preview
+  - Live-Status-Grid (jedes Format: Pending/Rendering/Ready mit Download)
+- **`render-multi-format-batch`** (neue Edge Function — wrapper über bestehende `render-multi-format`):
+  - Akzeptiert `presetKeys: string[]`
+  - Triggert N parallele `compose-video-assemble` Jobs (max 3 concurrent — Lambda-Limit)
+  - Schreibt N Rows in `composer_exports` mit `batch_id`
+- **Smart-Reframe (Phase 1, deterministisch)**: Center-Crop mit konfigurierbarem `safeAreaTop/Bottom` per Preset (TikTok-UI berücksichtigen)
+- **Smart-Reframe (Phase 2, optional spätere Session)**: AI-Subject-Detection via Gemini Vision für intelligentes Pan&Scan
+
+### Erwartete Wirkung
+Reduziert manuelles Re-Editing für Cross-Posting von 30min auf 30s. Killer-Feature für Social-Media-Manager.
 
 ---
 
-## Geschätzter Aufwand
-~2 h. Nach Approval implementiere ich alles in einem Durchgang.
+## 🎤 Session 3 — Block Q: Talking-Head / Lip-Sync (~3h)
 
-**Soll ich loslegen?**
+**Ziel**: User uploaded Foto eines Charakters + schreibt Skript → System generiert Lip-Sync-Video mit echter Stimme. Wettbewerb: HeyGen, D-ID, Synthesia.
+
+### Provider-Wahl: **Hedra Character-3** (Replicate)
+- Beste Qualität für Foto→Talking-Head (vs. Sync.so, das primär Lip-Sync auf existierenden Videos macht)
+- Replicate-Integration, gleiche Patterns wie Kling/Luma → **kein neuer API-Provider nötig**
+- Cost: ~0.15€/Sek bei 720p
+- *(Alternative Sync.so für Lip-Sync auf bestehende Composer-Clips können wir in Phase 2 ergänzen)*
+
+### Implementierung
+- **`generate-talking-head`** (neue Edge Function):
+  - Input: `imageUrl`, `audioUrl` (oder `text` + `voiceId` → ElevenLabs TTS first), `aspectRatio`
+  - Replicate `hedra/character-3` Aufruf
+  - Speichert Output in `library` Bucket, schreibt in `composer_scenes` als `talking-head` Szenen-Typ
+  - Webhook-basiert (gleicher Pattern wie `compose-clip-webhook`)
+- **DB-Migration**:
+  - Neuer Wert in `composer_scenes.media_type` enum: `'talking-head'`
+  - Neue Spalten: `character_image_url`, `character_audio_url`, `character_voice_id`
+- **`TalkingHeadDialog.tsx`**:
+  - Tab 1: Charakter-Foto upload (oder aus Charakter-Bibliothek wählen — `character_assets` Tabelle existiert bereits)
+  - Tab 2: Skript-Editor + Voice-Picker (ElevenLabs presets + User-Cloned-Voices)
+  - Live Cost-Preview, Generieren-Button
+- **Integration**: Neuer "🎤 Talking-Head"-Button in `SceneCard.tsx` (für neue Szenen) + im Storyboard-Tab "Add Scene"-Menu
+
+### Voice-Cloning Integration (Bonus, ~30min)
+- Composer-Voice-Picker erweitern: zeigt User's gecloneten Stimmen aus bestehender `clone-voice` Function
+- Neuer "+ Clone neue Stimme"-Button → öffnet existierenden Clone-Flow inline
+
+---
+
+## 📊 Roadmap Übersicht (für nach Q)
+
+| Block | Feature | Aufwand | Priorität |
+|-------|---------|---------|-----------|
+| **O** ✨ | AI Auto-Director (1-Click) | 3.5h | 🔥 HOCH |
+| **P** 📤 | Multi-Format Export | 2h | 🔥 HOCH |
+| **Q** 🎤 | Talking-Head + Voice-Clone UI | 3h | 🔥 HOCH |
+| R | Smart Reframe (AI Subject Tracking) | 2h | MID |
+| S | Performance-Loop (Top-Performing Templates auto-suggest) | 3h | MID |
+| T | Realtime Collaboration (presence, comments) | 5h | LOW |
+| U | Brand Memory (Auto-Apply Brand Kit pro Projekt) | 1.5h | EASY-WIN |
+
+---
+
+## 🚀 Vorgeschlagene Reihenfolge
+
+**Diese Session**: Block O (Auto-Director) — größter UX-Hebel, macht das Tool für Erstnutzer "magisch"
+
+Danach: P → Q in separaten Genehmigungen, je ~2-3h.
+
+### Geänderte / neue Dateien für Block O
+- `supabase/migrations/..._auto_director_config.sql` (Neu)
+- `supabase/functions/auto-director-compose/index.ts` (Neu)
+- `src/components/video-composer/AutoDirectorWizard.tsx` (Neu)
+- `src/hooks/useAutoDirector.ts` (Neu)
+- `src/components/video-composer/VideoComposerDashboard.tsx` (Modified — CTA hinzufügen)
+- `src/types/video-composer.ts` (Modified — `autoDirectorConfig` Type)
+- i18n DE/EN/ES für Wizard-Strings
+
+**Soll ich mit Block O starten?**
