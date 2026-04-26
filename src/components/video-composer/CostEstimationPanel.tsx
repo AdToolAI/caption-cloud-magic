@@ -64,6 +64,25 @@ export default function CostEstimationPanel({
     [scenes]
   );
 
+  // ── Stock-First Savings: count scenes that use free stock instead of paid AI ─
+  const stockStats = useMemo(() => {
+    const stockScenes = scenes.filter(
+      (s) => s.clipSource === 'stock' || s.clipSource === 'stock-image'
+    );
+    const stockSeconds = stockScenes.reduce((sum, s) => sum + (s.durationSeconds || 0), 0);
+    // Compare against Veo 3.1 Lite 720p baseline (€0.20/s = 20 Credits/s) — the
+    // cheapest paid AI scene generation. Cost-savings shown to the user.
+    const SAVED_CREDITS_PER_SEC = 20;
+    const savedCredits = Math.round(stockSeconds * SAVED_CREDITS_PER_SEC);
+    const savedEuros = (stockSeconds * 0.2).toFixed(2);
+    return {
+      sceneCount: stockScenes.length,
+      seconds: stockSeconds,
+      savedCredits,
+      savedEuros,
+    };
+  }, [scenes]);
+
   const resolution: Resolution = '1080p';
 
   const complexity: Complexity = useMemo(() => {
