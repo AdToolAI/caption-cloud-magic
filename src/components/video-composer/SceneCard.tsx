@@ -342,9 +342,9 @@ export default function SceneCard({
               className="w-full"
             />
 
-            {/* Block M — Hybrid Extend actions (only when source clip is ready) */}
+            {/* Block M — Hybrid Production actions (only when source clip is ready) */}
             {onHybridExtend && scene.clipStatus === 'ready' && scene.clipUrl && (
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
                 <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70">
                   {lang === 'de' ? 'Hybrid' : lang === 'es' ? 'Híbrido' : 'Hybrid'}
                 </span>
@@ -362,7 +362,7 @@ export default function SceneCard({
                   }
                 >
                   <ArrowLeft className="h-3 w-3" />
-                  {lang === 'de' ? 'Backward' : 'Backward'}
+                  Backward
                 </Button>
                 <Button
                   size="sm"
@@ -378,7 +378,41 @@ export default function SceneCard({
                   }
                 >
                   <ArrowRight className="h-3 w-3" />
-                  {lang === 'de' ? 'Forward' : 'Forward'}
+                  Forward
+                </Button>
+                {hasOtherReadyScenes && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[10px] gap-1.5"
+                    onClick={() => onHybridExtend('bridge')}
+                    title={
+                      lang === 'de'
+                        ? 'Bridge zu anderer Szene (morphender Übergang)'
+                        : lang === 'es'
+                        ? 'Bridge hacia otra escena (transición con morphing)'
+                        : 'Bridge to another scene (morphing transition)'
+                    }
+                  >
+                    <Link2 className="h-3 w-3" />
+                    Bridge
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-[10px] gap-1.5"
+                  onClick={() => onHybridExtend('style-ref')}
+                  title={
+                    lang === 'de'
+                      ? 'Neue Szene mit Stil dieser Szene'
+                      : lang === 'es'
+                      ? 'Nueva escena con estilo de esta escena'
+                      : 'New scene using this scene as style anchor'
+                  }
+                >
+                  <Palette className="h-3 w-3" />
+                  Style-Ref
                 </Button>
               </div>
             )}
