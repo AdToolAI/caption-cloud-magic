@@ -252,6 +252,69 @@ export default function VideoComposerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Block M — Refetch scenes from DB on demand (e.g. after a Hybrid Extend
+   * inserts a new scene server-side via the orchestrator). Keeps any local
+   * unsaved field by overlaying DB rows onto the existing local store.
+   */
+  const refetchScenesFromDb = useCallback(async () => {
+    const projectId = project.id;
+    if (!projectId) return;
+    try {
+      const { data, error: dbError } = await supabase
+        .from('composer_scenes')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('order_index', { ascending: true });
+      if (dbError) throw dbError;
+      if (!data) return;
+
+      setProject(prev => {
+        const localById = new Map(prev.scenes.map(s => [s.id, s]));
+        const dbScenes: ComposerScene[] = data.map((row: any) => {
+          const local = localById.get(row.id);
+          return {
+            id: row.id,
+            projectId: row.project_id,
+            orderIndex: row.order_index,
+            sceneType: row.scene_type,
+            durationSeconds: row.duration_seconds,
+            clipSource: row.clip_source as ClipSource,
+            clipQuality: (row.clip_quality || 'standard') as ClipQuality,
+            aiPrompt: row.ai_prompt ?? local?.aiPrompt,
+            stockKeywords: row.stock_keywords ?? local?.stockKeywords,
+            uploadUrl: row.upload_url ?? local?.uploadUrl,
+            uploadType: row.upload_type ?? local?.uploadType,
+            referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
+            clipUrl: row.clip_url ?? undefined,
+            clipStatus: (row.clip_status || 'pending') as ClipStatus,
+            textOverlay: row.text_overlay ?? local?.textOverlay ?? {
+              text: '', position: 'bottom', animation: 'fade-in', fontSize: 48, color: '#FFFFFF',
+            },
+            transitionType: row.transition_type ?? local?.transitionType ?? 'fade',
+            transitionDuration: row.transition_duration ?? local?.transitionDuration ?? 0.5,
+            replicatePredictionId: row.replicate_prediction_id ?? local?.replicatePredictionId,
+            retryCount: row.retry_count ?? 0,
+            costEuros: Number(row.cost_euros ?? 0),
+            directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
+            promptSlots: ((row as any).prompt_slots as any) ?? local?.promptSlots,
+            promptMode: ((row as any).prompt_mode as any) ?? local?.promptMode,
+            promptSlotOrder: ((row as any).prompt_slot_order as any) ?? local?.promptSlotOrder,
+            appliedStylePresetId: ((row as any).applied_style_preset_id as any) ?? local?.appliedStylePresetId,
+            hybridMode: ((row as any).hybrid_mode as any) ?? local?.hybridMode,
+            firstFrameUrl: ((row as any).first_frame_url as any) ?? local?.firstFrameUrl,
+            lastFrameUrl: ((row as any).last_frame_url as any) ?? local?.lastFrameUrl,
+            endReferenceImageUrl: ((row as any).end_reference_image_url as any) ?? local?.endReferenceImageUrl,
+            hybridTargetSceneId: ((row as any).hybrid_target_scene_id as any) ?? local?.hybridTargetSceneId,
+          };
+        });
+        return { ...prev, scenes: dbScenes };
+      });
+    } catch (err) {
+      console.warn('[VideoComposerDashboard] refetchScenesFromDb failed:', err);
+    }
+  }, [project.id]);
+
   const persistAndGoToClips = useCallback(async () => {
     setIsPersisting(true);
     try {
