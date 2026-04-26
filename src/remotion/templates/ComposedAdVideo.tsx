@@ -132,8 +132,39 @@ const Scene: React.FC<{
   textOverlay?: ComposedAdVideoProps['scenes'][0]['textOverlay'];
   kineticText: boolean;
   effects?: SceneEffectConfig[];
-}> = ({ videoUrl, isImage, durationInFrames, sceneIndex, textOverlay, kineticText, effects }) => {
+  positionTrack?: ComposedAdVideoProps['scenes'][0]['positionTrack'];
+}> = ({ videoUrl, isImage, durationInFrames, sceneIndex, textOverlay, kineticText, effects, positionTrack }) => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  // Block R: Smart Reframe — interpolate objectPosition over time.
+  // Edge function already projected x/y into the target-aspect space, so we
+  // just pick the active axis values and interpolate linearly between points.
+  let objectPosition = '50% 50%';
+  if (positionTrack && positionTrack.length > 0) {
+    const tSeconds = frame / fps;
+    const sorted = [...positionTrack].sort((a, b) => a.t - b.t);
+    let xPct = sorted[0].xPct;
+    let yPct = sorted[0].yPct;
+    if (tSeconds <= sorted[0].t) {
+      xPct = sorted[0].xPct; yPct = sorted[0].yPct;
+    } else if (tSeconds >= sorted[sorted.length - 1].t) {
+      xPct = sorted[sorted.length - 1].xPct;
+      yPct = sorted[sorted.length - 1].yPct;
+    } else {
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const a = sorted[i], b = sorted[i + 1];
+        if (tSeconds >= a.t && tSeconds <= b.t) {
+          const span = Math.max(0.001, b.t - a.t);
+          const k = (tSeconds - a.t) / span;
+          xPct = a.xPct + (b.xPct - a.xPct) * k;
+          yPct = a.yPct + (b.yPct - a.yPct) * k;
+          break;
+        }
+      }
+    }
+    objectPosition = `${(xPct * 100).toFixed(1)}% ${(yPct * 100).toFixed(1)}%`;
+  }
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
@@ -147,7 +178,7 @@ const Scene: React.FC<{
         ) : (
           <Video
             src={videoUrl}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition }}
             muted
             // Lock playback rate to 1.0 — prevents implicit speed warping when
             // Sequence/Video durations diverge.
