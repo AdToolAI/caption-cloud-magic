@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import SceneCard from './SceneCard';
+import HybridExtendDialog from './HybridExtendDialog';
 import type { ComposerScene, ClipSource, ComposerCharacter } from '@/types/video-composer';
 import { DEFAULT_TEXT_OVERLAY, getClipCost, getClipRate } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -31,9 +32,23 @@ interface StoryboardTabProps {
   projectId?: string;
   characters?: ComposerCharacter[];
   preferredAspect?: '16:9' | '9:16' | '1:1' | '4:5';
+  /**
+   * Block M — Hybrid Extend uses the server-side orchestrator which inserts
+   * a new scene row directly. The dashboard must refetch from DB to surface it.
+   */
+  onRefetchScenes?: () => void | Promise<void>;
 }
 
-export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, language, projectId, characters, preferredAspect }: StoryboardTabProps) {
+export default function StoryboardTab({
+  scenes,
+  onUpdateScenes,
+  onGoToClips,
+  language,
+  projectId,
+  characters,
+  preferredAspect,
+  onRefetchScenes,
+}: StoryboardTabProps) {
   const { t } = useTranslation();
   const TIPS_KEY = 'video-composer-storyboard-tips-collapsed';
   const [tipsCollapsed, setTipsCollapsed] = useState<boolean>(() => {
