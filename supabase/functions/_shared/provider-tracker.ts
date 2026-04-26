@@ -132,14 +132,14 @@ export async function trackLambdaRender(params: {
  */
 export async function getSystemConfig<T = unknown>(key: string, fallback: T): Promise<T> {
   try {
-    const client = getClient();
+    const client = getClient() as any;
     if (!client) return fallback;
     const { data } = await client
       .from('system_config')
       .select('value')
       .eq('key', key)
       .maybeSingle();
-    return (data?.value as T) ?? fallback;
+    return ((data?.value as T) ?? fallback) as T;
   } catch {
     return fallback;
   }
