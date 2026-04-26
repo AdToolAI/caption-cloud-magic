@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, CreditCard, History, Video, Film, Wand2, Clapperboard, Eye, Camera, ShieldAlert } from 'lucide-react';
+import { Sparkles, CreditCard, History, Video, Film, Wand2, Clapperboard, Eye, Camera, ShieldAlert, Volume2 } from 'lucide-react';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
@@ -94,6 +94,8 @@ export default function AIVideoStudio() {
   const recommendedLabel = language === 'de' ? '⭐ Empfohlen' : language === 'es' ? '⭐ Recomendado' : '⭐ Recommended';
   const comingSoonLabel = language === 'de' ? 'Bald verfügbar' : language === 'es' ? 'Próximamente' : 'Coming Soon';
 
+  const audioNativeLabel = language === 'de' ? '🎵 Native Audio' : language === 'es' ? '🎵 Audio Nativo' : '🎵 Native Audio';
+
   const providers = [
     {
       name: 'Kling 3.0',
@@ -106,6 +108,18 @@ export default function AIVideoStudio() {
       link: '/kling-video-studio',
       icon: Film,
       topBadge: { label: recommendedLabel, variant: 'default' as const },
+    },
+    {
+      name: 'Veo 3.1 Lite',
+      provider: 'Google',
+      description: language === 'de' ? 'Native Audio + Video in einem Pass — Sound, Stimme & Effekte direkt aus dem Prompt' : language === 'es' ? 'Audio + video nativo en un solo pase — sonido, voz y efectos desde el prompt' : 'Native audio + video in one pass — sound, speech & FX directly from your prompt',
+      features: ['Text-to-Video', 'Image-to-Video', 'Native Audio', 'SynthID'],
+      pricing: `${currSymbol}0.40–0.65/s`,
+      maxDuration: '8s',
+      quality: '1080p',
+      link: '/veo-video-studio',
+      icon: Volume2,
+      topBadge: { label: audioNativeLabel, variant: 'default' as const },
     },
     {
       name: 'Wan 2.5',
@@ -256,7 +270,7 @@ export default function AIVideoStudio() {
                 AI Video Studio
               </h1>
               <p className="text-muted-foreground mt-1 text-sm md:text-base">
-                {language === 'de' ? '6 KI-Modelle. Endlose kreative Möglichkeiten.' : language === 'es' ? '6 modelos de IA. Posibilidades creativas infinitas.' : '6 AI models. Endless creative possibilities.'}
+                {language === 'de' ? '7 KI-Modelle. Endlose kreative Möglichkeiten.' : language === 'es' ? '7 modelos de IA. Posibilidades creativas infinitas.' : '7 AI models. Endless creative possibilities.'}
               </p>
             </div>
             {/* Wallet Badge */}
