@@ -268,10 +268,20 @@ RULES:
 - Output language for any text_overlay: ${req.language ?? 'de'}.
 - Add a short text_overlay (3-6 words) ONLY on hook and cta scenes.`;
 
+  // Brand Memory: inject brand context if available so generated prompts feel on-brand
+  const brandBlock = brandContext
+    ? `\n\nBRAND CONTEXT (apply naturally to visuals — color accents, mood, tone):
+- Brand: ${brandContext.brandName ?? '(unnamed)'}
+- Primary color: ${brandContext.primaryColor ?? 'n/a'}${brandContext.secondaryColor ? `, secondary: ${brandContext.secondaryColor}` : ''}
+- Brand mood: ${brandContext.mood ?? 'n/a'}
+- Brand tone: ${brandContext.brandTone ?? 'n/a'}
+${brandContext.brandValues.length ? `- Values: ${brandContext.brandValues.join(', ')}` : ''}`
+    : '';
+
   const userPrompt = `Idea: "${req.idea}"
 Mood: ${req.mood}
 Total duration target: ${targetSec}s
-Engine preference: ${enginePref}
+Engine preference: ${enginePref}${brandBlock}
 
 Create the storyboard now.`;
 
