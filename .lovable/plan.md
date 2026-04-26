@@ -1,69 +1,34 @@
-## Diagnose
+## Problem
 
-Die 3 verbleibenden roten Szenarien (**Performance Analytics**, **Posting Times Recommendation**, **Campaign Generation**) sind **keine Code-Bugs**. Verifizierung:
+Der Build schlägt fehl, aber die Lovable-UI zeigt nur die abgeschnittene Liste der geprüften Edge-Function-Dateien — **nicht die eigentlichen Fehlermeldungen**. Meine bisherigen Fixes (`provider-tracker.ts` Casts auf `any`, `concurrency: null` in `remotion-payload.ts`) sind bereits drin, aber offensichtlich greift noch ein anderer Fehler in einer der ~400 Edge Functions.
 
-- **Direkter Curl-Test** der 3 Funktionen → alle liefern **HTTP 200** mit korrekten, vollständigen Antworten (Best Times, Recommendations, Campaign-Wochenplan).
-- **DB-Logs** der letzten Runs zeigen für alle 3 ausschließlich:
-  ```
-  HTTP 503: {"code":"SUPABASE_EDGE_RUNTIME_ERROR","message":"Service is temporarily unavailable"}
-  ```
-- Latenzen: **58ms / 62ms / 735ms** → klassisches Edge-Worker-Cold-Start- bzw. Throttle-Symptom wenn der Runner viele Funktionen gleichzeitig feuert.
+Bevor ich blind weiter Code ändere, müssen wir die **echten Fehlermeldungen** sehen.
 
-Das Problem: Der Test-Runner behandelt **transiente 503er als harten Fail**, obwohl die Funktion bei einem Retry sofort wieder antwortet.
+## Plan
 
-## Lösung: Transparenter Retry für 503/504/502
+### Schritt 1 — Diagnose: Echte Fehler sichtbar machen
+- `deno check` lokal über alle Shared-Files + die zuletzt geänderten Funktionen (`motion-studio-superuser`, `ai-superuser-test-runner`, `analyze-superuser-anomalies`, `analyze-brand-voice`, `auto-director-compose`) laufen lassen.
+- Ausgabe komplett einsammeln (nicht abschneiden), um die exakten Dateien + Zeilen mit TS-Fehlern zu identifizieren.
+- Parallel: `supabase--deploy_edge_functions` für die zuletzt geänderten Funktionen aufrufen — die Deploy-Logs zeigen oft präzisere Fehler als der globale Check.
 
-### Änderung 1 — `supabase/functions/ai-superuser-test-runner/index.ts`
+### Schritt 2 — Hypothesen prüfen (was am wahrscheinlichsten kaputt ist)
+Die wahrscheinlichsten Quellen, basierend auf dem Verlauf:
+1. **`motion-studio-superuser/index.ts`** — In der vorherigen Iteration wurde ein Syntax-Fix erwähnt (extra `}`); möglicherweise gibt es noch ein TS-Issue mit den neuen Helpern (`ensureTestBrandKit`, `PUBLIC_TEST_CLIP`-Insert).
+2. **`ai-superuser-test-runner/index.ts`** — Retry-Wrapper + Throttling neu hinzugefügt; ggf. Typing-Issue bei `invokeWithRetry` (z. B. `unknown` → `string` Konvertierung der Body, oder `Promise<{res, text}>`-Rückgabe ohne Type).
+3. **Generated Supabase types** — Falls neue Tabellen erwartet werden, die noch nicht in `types.ts` sind, müssen wir alle Zugriffe konsistent als `any` casten.
 
-In der Scenario-Execution-Schleife (rund um Zeile 555–610) einen **automatischen Retry-Wrapper für transiente 5xx-Edge-Runtime-Fehler** einbauen:
+### Schritt 3 — Gezielter Fix
+- Pro identifiziertem Fehler: minimale Änderung (Cast, fehlender Import, fehlendes Property), keine Architektur-Refactors.
+- Bei Bedarf `concurrency: null` und Casts auch in den Funktionen anwenden, die `remotion-payload` direkt konsumieren.
 
-```ts
-// Pseudocode
-async function invokeWithRetry(fn: string, body: unknown, maxAttempts = 3) {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const res = await fetch(...);
-    const text = await res.text();
-    
-    // Retry nur bei transienten Plattform-Fehlern
-    const isTransient = 
-      (res.status === 503 || res.status === 504 || res.status === 502) &&
-      text.includes('SUPABASE_EDGE_RUNTIME_ERROR');
-    
-    if (isTransient && attempt < maxAttempts) {
-      await sleep(500 * attempt); // 500ms, 1000ms backoff
-      continue;
-    }
-    return { res, text };
-  }
-}
-```
+### Schritt 4 — Verifikation
+- `supabase--deploy_edge_functions` nochmal für die gefixten Funktionen.
+- Bei Erfolg: Statusmeldung „Build grün", keine Folge-Edits.
 
-- **Max 3 Versuche** mit linearem Backoff (500ms, 1000ms).
-- Greift **nur** bei `503/504/502 + SUPABASE_EDGE_RUNTIME_ERROR`-Body — andere 5xx (echte Code-Fehler) werden **nicht** retryed.
-- Wenn nach 3 Retries immer noch 503: Status wird auf **`warning`** gesetzt (statt `fail`) mit Hinweis `"Platform throttling — retried 3x"`. So unterscheiden wir klar zwischen Plattform-Hiccups und echten Bugs.
-
-### Änderung 2 — Sequenzielle statt parallele Execution für sensitive Szenarien
-
-Aktuell läuft `runAllScenarios` mit `Promise.all` über alle Szenarien. Das verursacht den 503-Burst.
-
-- **Throttle auf max 4 parallele Szenarien** (statt all-at-once) mit einer kleinen `pLimit`-artigen Helper-Funktion.
-- Reduziert Edge-Worker-Last drastisch und eliminiert die Hauptursache der transienten 503er.
-
-### Änderung 3 — Anomalie-Engine entlasten
-
-Da 503-Wellen jetzt im Test-Runner abgefangen werden, sieht `analyze-superuser-anomalies` weniger False-Positives. Optional ergänzend: **automatisches Schließen alter Anomalien**, deren letzter Run gerade `pass` oder `warning` war (keine Code-Änderung nötig, ist bereits geplant in der vorherigen Iteration).
+## Was ich NICHT tun werde
+- Keine spekulativen Refactors anderer Edge Functions.
+- Keine weiteren Casts in Files, die nichts mit dem Fehler zu tun haben.
+- Keine Änderung an `src/integrations/supabase/types.ts` (auto-generiert).
 
 ## Erwartetes Ergebnis
-
-- **3 rote Szenarien → grün** (oder im Worst Case `warning` bei realen Plattform-Problemen — aber nicht mehr `fail`).
-- Pass-Rate des KI Superusers steigt von **~85% → ~98%**.
-- Kein Maskieren echter Bugs: Nicht-transiente Fehler (HTTP 4xx, andere 5xx, Validation-Errors) bleiben weiterhin `fail`.
-
-## Geänderte Dateien
-
-- `supabase/functions/ai-superuser-test-runner/index.ts` (Retry-Wrapper + Throttle)
-
-## Was NICHT geändert wird
-
-- Die 3 Edge-Functions selbst (`analyze-performance`, `analyze-posting-times`, `generate-campaign`) — sie funktionieren einwandfrei.
-- Motion Studio Superuser bleibt unangetastet.
+Build wird grün, ohne weitere Iteration. Die Motion-Studio- und KI-Superuser-Pipelines bleiben funktional unverändert.
