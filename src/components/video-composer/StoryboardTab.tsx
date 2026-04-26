@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic } from 'lucide-react';
 import SceneCard from './SceneCard';
 import HybridExtendDialog from './HybridExtendDialog';
+import TalkingHeadDialog from './TalkingHeadDialog';
 import type { ComposerScene, ClipSource, ComposerCharacter } from '@/types/video-composer';
 import { DEFAULT_TEXT_OVERLAY, getClipCost, getClipRate } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -64,6 +65,9 @@ export default function StoryboardTab({
     scene: ComposerScene | null;
     mode: 'forward' | 'backward' | 'bridge' | 'style-ref';
   }>({ open: false, scene: null, mode: 'forward' });
+
+  // Block Q — Talking-Head dialog state
+  const [talkingHeadOpen, setTalkingHeadOpen] = useState(false);
 
   const openHybridDialog = (
     scene: ComposerScene,
@@ -158,6 +162,14 @@ export default function StoryboardTab({
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={addScene} className="gap-1 text-xs">
             <Plus className="h-3.5 w-3.5" /> Szene
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setTalkingHeadOpen(true)}
+            className="gap-1 text-xs border-primary/40 text-primary hover:bg-primary/10"
+          >
+            <Mic className="h-3.5 w-3.5" /> Talking-Head
           </Button>
           <Button
             size="sm"
@@ -288,6 +300,16 @@ export default function StoryboardTab({
           }}
         />
       )}
+
+      {/* Block Q — Talking-Head dialog */}
+      <TalkingHeadDialog
+        open={talkingHeadOpen}
+        onOpenChange={setTalkingHeadOpen}
+        projectId={projectId}
+        onSuccess={() => {
+          void onRefetchScenes?.();
+        }}
+      />
     </div>
   );
 }
