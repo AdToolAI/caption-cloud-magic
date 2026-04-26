@@ -136,6 +136,7 @@ export default function VideoComposerDashboard() {
   const [showResetDialog, setShowResetDialog] = useState(false);
   // Auto-open template picker when starting fresh (no draft on mount)
   const [showTemplatePicker, setShowTemplatePicker] = useState(() => !loadDraft());
+  const [showAutoDirector, setShowAutoDirector] = useState(false);
   const { ensureProjectPersisted } = useComposerPersistence();
   const incrementTemplateUsage = useIncrementTemplateUsage();
   const didInitialSyncRef = useRef(false);
