@@ -156,7 +156,7 @@ serve(async (req) => {
     console.log(`[generate-veo-video] Cost: ${currencySymbol}${totalCost.toFixed(2)}, Balance: ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
 
     // Generation row
-    const resolution = model === 'veo-3.1' ? '1080p' : '720p';
+    const resolution = MODEL_RESOLUTION[model] || '720p';
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
