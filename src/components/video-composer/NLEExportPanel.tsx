@@ -236,6 +236,20 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
           </p>
         )}
       </CardContent>
+
+      <NLEImportDiffDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setImportFile(null);
+            setDiff(null);
+          }
+        }}
+        diff={diff}
+        onConfirm={handleConfirmApply}
+        applying={applying}
+      />
     </Card>
   );
 };
