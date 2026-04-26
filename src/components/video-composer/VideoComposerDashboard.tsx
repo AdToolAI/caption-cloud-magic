@@ -39,6 +39,7 @@ import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
 import MotionStudioStepSidebar, { type StepItem } from './MotionStudioStepSidebar';
 import AutoDirectorWizard from './AutoDirectorWizard';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
+import { useIncrementTrendingUse } from '@/hooks/useTrendingTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export';
