@@ -209,11 +209,12 @@ const SCENARIOS: Scenario[] = [
         .limit(1)
         .maybeSingle();
       return {
-        brandKitId: kit?.id ?? "00000000-0000-0000-0000-000000000000",
-        samples: [
-          { text: "Premium coffee. Crafted for the bold.", platform: "instagram" },
-          { text: "Wake up to greatness. Every morning, redefined.", platform: "instagram" },
-          { text: "Your daily ritual deserves better.", platform: "tiktok" },
+        brandKitId: kit?.id,
+        // analyze-brand-voice expects `textSamples: string[]`
+        textSamples: [
+          "Premium coffee. Crafted for the bold.",
+          "Wake up to greatness. Every morning, redefined.",
+          "Your daily ritual deserves better.",
         ],
         language: "en",
       };
