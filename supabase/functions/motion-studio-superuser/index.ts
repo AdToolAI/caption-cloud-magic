@@ -35,7 +35,7 @@ interface Scenario {
   fn?: string;
   /** When set, scenario performs a custom DB/logic check */
   custom?: (ctx: TestContext) => Promise<{ ok: boolean; message?: string; data?: unknown }>;
-  body?: Record<string, unknown> | ((ctx: TestContext) => Record<string, unknown>);
+  body?: Record<string, unknown> | ((ctx: TestContext) => Record<string, unknown> | Promise<Record<string, unknown>>);
   expectedKeys?: string[];
   /** If true, status<500 is OK (reachability check) */
   expectReachable?: boolean;
@@ -444,7 +444,7 @@ async function hashSchema(obj: unknown): Promise<string> {
 async function runScenario(scenario: Scenario, ctx: TestContext, triggeredBy: string): Promise<void> {
   const startTime = Date.now();
   const requestBody =
-    typeof scenario.body === "function" ? scenario.body(ctx) : (scenario.body ?? null);
+    typeof scenario.body === "function" ? await scenario.body(ctx) : (scenario.body ?? null);
 
   const { data: runRow } = await adminClient
     .from("ai_superuser_runs")
