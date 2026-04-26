@@ -416,9 +416,9 @@ export default function SceneCard({
                 </Button>
               </div>
             )}
-            {/* Clip source */}
+            {/* Clip source — Stock first as Free Tier hero */}
             <div className="flex flex-wrap gap-2">
-              {(['ai-hailuo', 'ai-kling', 'ai-veo', 'ai-image', 'stock', 'stock-image', 'upload'] as ClipSource[]).map((src) => {
+              {(['stock', 'stock-image', 'ai-hailuo', 'ai-kling', 'ai-veo', 'ai-image', 'upload'] as ClipSource[]).map((src) => {
                 const label =
                   src === 'upload'
                     ? 'Eigenes Video'
@@ -426,8 +426,10 @@ export default function SceneCard({
                 const isAiImage = src === 'ai-image';
                 const isStockImage = src === 'stock-image';
                 const isStockVideo = src === 'stock';
+                const isStock = isStockVideo || isStockImage;
+                const isSelected = scene.clipSource === src;
                 const handleClick = () => {
-                  if (isStockVideo || isStockImage) {
+                  if (isStock) {
                     onUpdate({ clipSource: src });
                     setStockBrowserOpen(true);
                   } else {
@@ -438,16 +440,31 @@ export default function SceneCard({
                   <button
                     key={src}
                     onClick={handleClick}
+                    title={
+                      isStock
+                        ? '🎁 Kostenlos · 2M+ Stock-Assets von Pexels & Pixabay — 0 Credits'
+                        : undefined
+                    }
                     className={`px-2 py-1 rounded text-[10px] border transition-all flex items-center gap-1 ${
-                      scene.clipSource === src
-                        ? isAiImage || isStockImage
-                          ? 'border-green-500/60 bg-green-500/10 text-green-300'
-                          : 'border-primary bg-primary/10 text-primary'
-                        : 'border-border/40 text-muted-foreground hover:border-border'
+                      isSelected
+                        ? isStock
+                          ? 'border-emerald-500/70 bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+                          : isAiImage
+                            ? 'border-green-500/60 bg-green-500/10 text-green-300'
+                            : 'border-primary bg-primary/10 text-primary'
+                        : isStock
+                          ? 'border-emerald-500/40 bg-emerald-500/5 text-emerald-300/90 hover:border-emerald-500/70 hover:bg-emerald-500/10'
+                          : 'border-border/40 text-muted-foreground hover:border-border'
                     }`}
                   >
+                    {isStock && <span className="leading-none">🎁</span>}
                     {(isAiImage || isStockImage) && <ImageIcon className="h-2.5 w-2.5" />}
                     {label}
+                    {isStock && (
+                      <span className="ml-0.5 px-1 rounded bg-emerald-500/20 text-emerald-200 text-[8px] font-semibold uppercase tracking-wide">
+                        Free
+                      </span>
+                    )}
                   </button>
                 );
               })}
