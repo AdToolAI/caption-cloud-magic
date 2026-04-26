@@ -358,7 +358,16 @@ export default function StockMediaBrowser({
 
                       {/* Source attribution */}
                       <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                        <Badge variant="outline" className="text-[9px] h-4 px-1 bg-black/70 border-white/30 text-white capitalize">
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] h-4 px-1 border-0 capitalize text-white ${
+                            item.source === 'pexels'
+                              ? 'bg-teal-600/85'
+                              : item.source === 'pixabay'
+                                ? 'bg-emerald-600/85'
+                                : 'bg-black/70'
+                          }`}
+                        >
                           {item.source}
                         </Badge>
                         {item.authorUrl && (
