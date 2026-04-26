@@ -662,6 +662,58 @@ export default function SceneCard({
         preferredAspect={preferredAspect}
         onSelect={handleStockSelect}
       />
+
+      {/* Block L — Inline Compare Lab Dialog */}
+      <Dialog open={compareLabOpen} onOpenChange={setCompareLabOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Beaker className="h-5 w-5 text-primary" />
+              {lang === 'de'
+                ? `Compare Lab — Szene ${index + 1}`
+                : lang === 'es'
+                ? `Compare Lab — Escena ${index + 1}`
+                : `Compare Lab — Scene ${index + 1}`}
+            </DialogTitle>
+            <DialogDescription>
+              {lang === 'de'
+                ? 'Vergleiche denselben Prompt parallel auf bis zu 6 KI-Video-Engines. Wähle einen Sieger und übernimm ihn in deine Szene.'
+                : lang === 'es'
+                ? 'Compara el mismo prompt en hasta 6 motores de vídeo IA en paralelo. Elige un ganador y aplícalo a tu escena.'
+                : 'Compare the same prompt across up to 6 AI video engines in parallel. Pick a winner and apply it to your scene.'}
+            </DialogDescription>
+          </DialogHeader>
+          <CompareLabGrid
+            initialPrompt={
+              promptMode === 'structured'
+                ? stitchSlots(promptSlots, promptSlotOrder)
+                : (scene.aiPrompt ?? '')
+            }
+            initialAspectRatio={
+              preferredAspect === '4:5' ? '1:1' : (preferredAspect ?? '16:9') as '16:9' | '9:16' | '1:1'
+            }
+            composerSceneId={scene.id}
+            onWinnerSelected={(_engine, videoUrl) => {
+              if (videoUrl) {
+                onUpdate({
+                  clipSource: 'upload',
+                  uploadedClipUrl: videoUrl,
+                });
+                toast({
+                  title: lang === 'de' ? 'Sieger übernommen' : lang === 'es' ? 'Ganador aplicado' : 'Winner applied',
+                  description:
+                    lang === 'de'
+                      ? 'Das gewählte Video wurde der Szene zugewiesen.'
+                      : lang === 'es'
+                      ? 'El vídeo seleccionado se asignó a la escena.'
+                      : 'The selected video has been assigned to the scene.',
+                });
+                setCompareLabOpen(false);
+              }
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
