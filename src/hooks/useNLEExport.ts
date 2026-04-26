@@ -131,6 +131,55 @@ export function useNLEExport(projectId?: string) {
     }
   }, []);
 
+  const previewImport = useCallback(
+    async (file: File) => {
+      if (!projectId) {
+        toast.error('Kein Projekt ausgewählt');
+        return null;
+      }
+      try {
+        const fcpxmlContent = await file.text();
+        const { data, error } = await supabase.functions.invoke('composer-import-fcpxml', {
+          body: { projectId, fcpxmlContent, apply: false },
+        });
+        if (error) throw new Error(error.message);
+        if (!data?.success) throw new Error(data?.error || 'Import-Vorschau fehlgeschlagen');
+        return data;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Import-Vorschau fehlgeschlagen';
+        toast.error(msg);
+        return null;
+      }
+    },
+    [projectId],
+  );
+
+  const applyImport = useCallback(
+    async (file: File) => {
+      if (!projectId) return null;
+      const toastId = toast.loading('Änderungen werden übernommen…');
+      try {
+        const fcpxmlContent = await file.text();
+        const { data, error } = await supabase.functions.invoke('composer-import-fcpxml', {
+          body: { projectId, fcpxmlContent, apply: true },
+        });
+        if (error) throw new Error(error.message);
+        if (!data?.success) throw new Error(data?.error || 'Import fehlgeschlagen');
+        const a = data.applied;
+        toast.success(
+          `Übernommen: ${a?.reordered ?? 0} umsortiert, ${a?.trimmed ?? 0} getrimmt`,
+          { id: toastId },
+        );
+        return data;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Import fehlgeschlagen';
+        toast.error(msg, { id: toastId });
+        return null;
+      }
+    },
+    [projectId],
+  );
+
   return {
     exporting,
     history,
@@ -140,5 +189,7 @@ export function useNLEExport(projectId?: string) {
     exportBundle: (opts?: { fps?: number }) => runExport('bundle', opts),
     reDownload,
     refreshHistory: loadHistory,
+    previewImport,
+    applyImport,
   };
 }
