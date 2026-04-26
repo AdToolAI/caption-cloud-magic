@@ -2,7 +2,7 @@
 // Keep IDs in sync with supabase/functions/_shared/premium-voices.ts
 
 export type VoiceLanguage = 'de' | 'en' | 'es';
-export type VoiceTier = 'premium' | 'standard' | 'custom';
+export type VoiceTier = 'premium' | 'standard' | 'custom' | 'cloned';
 
 export interface VoiceMeta {
   id: string;
