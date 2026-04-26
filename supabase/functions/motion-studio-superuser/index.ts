@@ -324,6 +324,84 @@ const SCENARIOS: Scenario[] = [
       return { ok: true, data: { orphans: 0 } };
     },
   },
+
+  // -------- Phase 6: Audio / Voice Pipeline --------
+  {
+    name: "MS-19: Voiceover Script Generation",
+    category: "fast",
+    fn: "generate-voiceover-script",
+    body: () => ({
+      idea: "Premium coffee subscription for urban professionals",
+      targetDuration: 15,
+      tone: "professional",
+      language: "en",
+    }),
+    expectReachable: true,
+    secretEnv: "LOVABLE_API_KEY",
+  },
+  {
+    name: "MS-20: ElevenLabs Voice List",
+    category: "fast",
+    fn: "list-voices",
+    body: () => ({ language: "en" }),
+    expectReachable: true,
+    secretEnv: "ELEVENLABS_API_KEY",
+  },
+  {
+    name: "MS-21: Stock Music Search",
+    category: "fast",
+    fn: "search-stock-music",
+    body: () => ({ query: "upbeat", mood: "energetisch", genre: "pop" }),
+    expectReachable: true,
+    secretEnv: "JAMENDO_CLIENT_ID",
+  },
+
+  // -------- Phase 7: Stock Asset Pipeline --------
+  {
+    name: "MS-22: Stock Video Search",
+    category: "fast",
+    fn: "search-stock-videos",
+    body: () => ({ query: "ocean", perPage: 5 }),
+    expectedKeys: ["videos"],
+  },
+  {
+    name: "MS-23: Stock Image Search",
+    category: "fast",
+    fn: "search-stock-images",
+    body: () => ({ query: "coffee", perPage: 5 }),
+    expectedKeys: ["images"],
+  },
+
+  // -------- Phase 8: Composer Import & Templates --------
+  {
+    name: "MS-24: FCPXML Re-Import (Round-Trip)",
+    category: "fast",
+    fn: "composer-import-fcpxml",
+    body: (ctx) => ({
+      projectId: ctx.testProjectId,
+      apply: false,
+      fcpxmlContent:
+        '<?xml version="1.0" encoding="UTF-8"?><fcpxml version="1.10"><resources></resources><library><event name="MS"><project name="MS"><sequence><spine></spine></sequence></project></event></library></fcpxml>',
+    }),
+    expectReachable: true,
+  },
+  {
+    name: "MS-25: Trending Templates Schema",
+    category: "fast",
+    fn: "get-video-templates",
+    body: () => ({}),
+    expectedKeys: ["templates"],
+  },
+
+  // -------- Phase 9: Asset Bundle Export --------
+  {
+    name: "MS-26: Composer Bundle Export Hardening",
+    category: "fast",
+    fn: "composer-export-bundle",
+    body: () => ({ projectId: "00000000-0000-0000-0000-000000000000" }),
+    expectReachable: true,
+    optional: true,
+  },
 ];
 
 // ============================================================================
