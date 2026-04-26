@@ -1,161 +1,95 @@
-# 🏪 Template-Marketplace mit Revenue-Share
+## Ziel
 
-User-generated Motion-Studio-Templates verkaufen sich gegen Credits. Creators verdienen 70%, Plattform 30%. Free-Templates landen sofort öffentlich, Premium muss durch Admin-Review.
-
----
-
-## 1. Datenmodell (1 Migration)
-
-### Erweiterung `motion_studio_templates`
-- `creator_user_id uuid` (FK → auth.users) — wer hat es gebaut
-- `marketplace_status text` — `draft` | `pending_review` | `published` | `rejected` | `unlisted`
-- `pricing_type text` — `free` | `premium`
-- `price_credits integer` (default 0) — z.B. 50–500
-- `revenue_share_percent integer` (default 70) — Creator-Anteil (admin-tunable)
-- `total_revenue_credits bigint` (default 0) — Lifetime Earnings
-- `total_purchases integer` (default 0)
-- `average_rating numeric(3,2)`, `total_ratings integer`
-- `rejection_reason text`, `reviewed_by uuid`, `reviewed_at timestamptz`
-- `published_at timestamptz`
-
-### Neue Tabelle `template_purchases`
-Kauf-Ledger (idempotent, ein Kauf pro User pro Template = lifetime access):
-- `id`, `template_id`, `buyer_user_id`, `creator_user_id`
-- `price_credits`, `creator_earned_credits`, `platform_fee_credits`
-- `purchased_at`, `refunded_at`
-- UNIQUE(`template_id`, `buyer_user_id`) — Re-Use ohne Doppelzahlung
-
-### Neue Tabelle `template_ratings_marketplace`
-- `template_id`, `user_id`, `rating (1–5)`, `review_text`, `created_at`
-- UNIQUE(`template_id`, `user_id`)
-- Trigger aktualisiert `average_rating`/`total_ratings` auf Template
-
-### Neue Tabelle `creator_earnings_ledger`
-Audit-Trail aller Credit-Gutschriften für Creator-Wallets:
-- `creator_user_id`, `template_id`, `purchase_id`, `credits_earned`, `created_at`
-
-### RLS-Policies
-- **SELECT**: Templates mit `marketplace_status='published'` für alle authenticated; `draft`/`pending_review` nur für `creator_user_id` + Admins
-- **INSERT** (Creator-Submit): `creator_user_id = auth.uid()`, `marketplace_status` muss `draft` oder `pending_review` sein
-- **UPDATE** (eigene Drafts): nur `creator_user_id`, nur erlaubte Felder; Status-Sprünge via Edge-Function
-- **Admin**: `has_role(auth.uid(), 'admin')` darf alles
-- `template_purchases` SELECT: nur eigene Käufe oder Admin; INSERT nur via Edge-Function (RPC)
-
-### DB-Funktion `purchase_template(template_id)` (SECURITY DEFINER)
-Atomar:
-1. Template laden, prüfen `published` + `pricing_type`
-2. Existierenden Kauf prüfen → wenn vorhanden: no-op, return success
-3. Free → Eintrag in `template_purchases` mit `0` Credits
-4. Premium:
-   - `wallets.balance >= price_credits` prüfen → sonst `INSUFFICIENT_CREDITS`
-   - Buyer-Wallet `-price_credits`
-   - Creator-Wallet `+round(price * revenue_share/100)` Credits
-   - `template_purchases` Insert + `creator_earnings_ledger` Insert
-   - `total_revenue_credits` + `total_purchases` updaten
+Das **bestehende €-basierte AI Video Wallet** (`ai_video_wallets`, `balance_euros`, RPCs `deduct_ai_video_credits` / `refund_ai_video_credits`) wird **erweitert um AI-Bilder**. Kein neues System, keine Migration der alten `wallets`-Tabelle. Frontend zeigt überall denselben €-Saldo — egal ob für Sora, Kling, Luma oder jetzt für Bilder.
 
 ---
 
-## 2. Edge-Functions (4 neu)
+## 1. Naming & UI-Sprache
 
-### `submit-template-to-marketplace`
-- Input: `templateId`, `pricingType`, `priceCredits` (validiert 0 oder 25–1000)
-- Validiert: Creator besitzt Template, hat Thumbnail + Preview-Video, mind. 1 Scene
-- `pricing_type='free'` → `marketplace_status='published'` + `published_at=now()` (Auto-Publish)
-- `pricing_type='premium'` → `marketplace_status='pending_review'` (Admin-Queue)
-- Sendet Notification an Creator (Toast „Eingereicht / Live")
+- Wallet wird im UI umbenannt von „AI Video Credits" → **„AI Credits"** (deckt jetzt Video + Bild ab).
+- Tabellenname `ai_video_wallets` bleibt aus Kompatibilitätsgründen technisch bestehen (kein DB-Rename, vermeidet Risiko an 30+ Edge Functions).
+- `useAIVideoWallet` Hook wird zu **`useAICredits`** alias-weitergegeben (alter Name bleibt als Re-Export für Backwards-Compat).
 
-### `review-marketplace-template` (Admin-only)
-- Input: `templateId`, `decision: 'approve'|'reject'`, `rejectionReason?`
-- Setzt `marketplace_status`, `reviewed_by`, `reviewed_at`
-- Bei Approve: `published_at=now()`, optional Notification an Creator
-- Bei Reject: speichert Grund, Creator kann editieren + erneut einreichen
+## 2. Neue Bild-Modelle (Replicate) — Pricing mit 30 % Marge
 
-### `purchase-marketplace-template`
-- Wrapper um `purchase_template(template_id)` RPC
-- Returnt Balance + Erfolg, Error-Codes für UI
-- Triggert Realtime-Event für Creator-Dashboard
+| Tier | Modell | Replicate-Kosten | Endpreis Nutzer |
+|---|---|---|---|
+| **Fast** | Seedream 4 | $0.030 | **€0.04** |
+| **Pro** | Imagen 4 Ultra | $0.060 | **€0.08** |
+| **Ultra** | Nano Banana 2 | $0.067 – $0.151 | **€0.20** (Worst-Case-kalkuliert, immer ≥30 % Marge) |
 
-### `submit-template-rating`
-- Input: `templateId`, `rating`, `reviewText?`
-- Prüft: User hat Template gekauft (free zählt) ODER ist Creator nicht selbst
-- Upsert in `template_ratings_marketplace`
+→ Diese €-Beträge werden via `deduct_ai_video_credits(user_id, amount_euros, generation_id)` abgezogen, exakt wie bei den Videos.
 
----
+## 3. Backend — neue Edge Function `generate-image-replicate`
 
-## 3. Frontend
+Eine neue Edge Function (analog zu `generate-kling-video`) für die drei Replicate-Modelle:
 
-### A) Marketplace-Tab im Composer (`/video-composer` & Motion-Studio Templates-Hub)
-Neue Komponente `MarketplaceTemplateGallery.tsx`:
-- 3 Tabs: **Featured** | **Free** | **Premium**
-- Filter: Use-Case, Style, Aspect-Ratio, Preis-Range, Min-Rating
-- Sort: Trending (purchases letzte 7d), Top-Rated, Newest, Price ↑/↓
-- Card-Erweiterung (`MarketplaceTemplateCard.tsx`):
-  - Creator-Avatar + Name (klickbar → Creator-Profile)
-  - Preis-Badge: 🎁 Free / 💎 50 Credits
-  - ⭐ Rating + Anzahl Reviews
-  - „Owned"-Badge wenn bereits gekauft
-- Detail-Dialog (`TemplatePreviewDialog.tsx`):
-  - Großer Preview-Player, Scene-Suggestions, Tags
-  - Reviews-Liste, „Use Template" / „Buy for X Credits"-Button
-  - Bei Free: Direkt-Use; bei Premium: Confirm-Dialog mit Wallet-Balance
+```
+supabase/functions/generate-image-replicate/index.ts
+```
 
-### B) Creator-Studio (`/creator-studio`, neue Route)
-- **My Templates**: Liste eigener Templates mit Status-Badge (Draft, In Review, Published, Rejected)
-- **Submit Flow** (`SubmitTemplateDialog.tsx`):
-  - Schritt 1: Template aus eigenen Drafts wählen (oder aus Composer-Briefing erstellen)
-  - Schritt 2: Pricing — Toggle Free/Premium, bei Premium: Slider 25–1000 Credits + Earnings-Preview („Du verdienst pro Verkauf X Credits = Y Euro Wert")
-  - Schritt 3: Preview-Check (Thumbnail, Beschreibung, Tags) → Submit
-- **Earnings-Dashboard**:
-  - Total Earned (Credits) + Lifetime Purchases
-  - Chart: Earnings letzte 30 Tage (Recharts)
-  - Tabelle: Top-performing Templates
-  - Hinweis: „Verdienste werden direkt deinem Credit-Wallet gutgeschrieben"
+Flow (identisch zum Video-Pattern):
+1. Auth-Check (JWT)
+2. Wallet-Balance prüfen (`balance_euros >= cost`)
+3. Replicate-API aufrufen (Seedream 4 / Imagen 4 Ultra / Nano Banana 2 — Routing über `model` Param, internes Backend-Mapping)
+4. Bei Erfolg: Bild in `background-projects` Storage speichern + `deduct_ai_video_credits` aufrufen
+5. Bei Fehler: kein Abzug (kein Refund nötig, da pre-charge erst nach Erfolg) — analog zur bestehenden Refund-Automation
 
-### C) Admin Review-Queue (`/admin` → neuer Tab „Marketplace Review")
-- Liste aller `pending_review`-Templates
-- Inline Preview, Creator-Info, Vorgeschlagener Preis
-- Buttons: Approve / Reject (mit Reason-Textarea)
-- Filter: Pending / Recently Reviewed
+Cost-Mapping im Backend:
+```ts
+const IMAGE_COSTS_EUROS = {
+  fast:  0.04, // Seedream 4
+  pro:   0.08, // Imagen 4 Ultra
+  ultra: 0.20, // Nano Banana 2
+};
+```
 
-### D) Sidebar/Nav
-- Neuer Eintrag: 🏪 „Marketplace" → führt zur Gallery
-- Im User-Menü: „Creator Studio"
+Secret nötig: **`REPLICATE_API_TOKEN`** (falls noch nicht gesetzt, frage ich davor an).
 
----
+## 4. Bestehende Function `generate-studio-image` (Lovable AI Gateway / Gemini)
 
-## 4. Integration mit existierender Infrastruktur
+Diese bleibt **unverändert und kostenlos** (im 19,99 € Abo enthalten), da sie über das günstige Lovable AI Gateway läuft. Sie ist der „Schnell & Gratis"-Fallback im Picture Studio.
 
-- **Template-Use-Flow**: Beim Klick auf „Use Template" prüft `useApplyMarketplaceTemplate`-Hook erst `template_purchases` (oder free) → erst dann Briefing-Apply. Bestehende `useMotionStudioTemplates` bleibt für System-Templates.
-- **Wallets**: Wir nutzen das existierende `wallets`-Table — keine separate Currency. Earnings sind regulär ausgebbare Credits (für AI-Generation, Renders etc.). Falls später Cash-Out gewünscht, kann ein „Withdrawal-Request"-Flow nachgerüstet werden.
-- **Notifications**: Web-Push (existiert bereits) für „Template approved", „Neuer Verkauf", „Template rejected".
-- **Realtime**: `template_purchases` zur `supabase_realtime` Publication für live Earnings-Updates im Creator-Dashboard.
+→ Im Picture Studio bekommt der User also:
+- **Standard (Gemini, gratis im Abo)** — bleibt wie heute
+- **Fast / Pro / Ultra (Replicate, kostet €-Credits)** — neu
 
----
+## 5. Frontend — Picture Studio UI
 
-## 5. Lokalisierung (DE/EN/ES)
-~40 neue Keys in `src/lib/translations.ts` für Marketplace-UI, Submit-Flow, Earnings-Dashboard, Admin-Queue, Toast-Messages.
+`src/components/picture-studio/ImageGenerator.tsx` bekommt:
 
----
+1. **Quality-Toggle** mit 4 Stufen statt 2:
+   - `Standard` (gratis, Gemini) — Default
+   - `Fast` (€0.04, Seedream 4)
+   - `Pro` (€0.08, Imagen 4 Ultra)
+   - `Ultra` (€0.20, Nano Banana 2)
+2. **Advanced-Toggle**: Erlaubt Power-User explizite Modellwahl statt Auto-Routing
+3. **Cost-Badge** neben dem Generate-Button (€-Preis sichtbar, wie in `MotionStudio/Hub.tsx`)
+4. **Wallet-Balance-Display** im Studio-Header via `useAICredits`
+5. **Insufficient-Balance-Modal** identisch zu Video-Studios (führt zu `/ai-video-purchase-credits`)
 
-## 6. Memory
-Neue Memory-Datei `mem://features/marketplace/template-revenue-share` mit den Eckdaten (70/30 Split, Tiered Approval, Credits als Currency) + Index-Update.
+## 6. Aufgelöste / aufgeräumte Stellen
 
----
+- `src/lib/featureCosts.ts`: `STUDIO_IMAGE_GENERATE` Eintrag wird entfernt (Bilder laufen nicht mehr über das alte `wallets`-Credit-System)
+- `CreditGuard.tsx` wird im Picture Studio **nicht mehr verwendet** — stattdessen die €-Wallet-Logik wie in den Video-Studios
+- `track-credit-usage` Edge Function bleibt bestehen für Analytics (loggt jetzt auch Bilder)
 
-## Out of Scope (für Phase 2)
-- Stripe-Connect-Cash-Out (Credits → echtes Geld)
-- Template-Versioning & Update-Notifications für Käufer
-- Affiliate-Links für Templates
-- Bundle-Verkäufe (mehrere Templates als Pack)
-- Refund-Flow (manuell via Admin reicht erstmal)
+## 7. Was wir NICHT anfassen
+
+- ❌ Tabelle `wallets` (alte Credits) — bleibt für andere interne Features unangetastet
+- ❌ Bestehende Video-Edge-Functions (Kling, Sora, Luma, Hailuo, Wan, Seedance, Veo) — funktionieren bereits korrekt mit `ai_video_wallets`
+- ❌ `useCredits` Hook — bleibt für andere Features
+- ❌ `credit-preflight` / `credit-reserve` / `credit-commit` / `credit-refund` Edge Functions — bleiben für ihren bestehenden Use Case
+
+## 8. Reihenfolge der Umsetzung
+
+1. Edge Function `generate-image-replicate` anlegen + deployen
+2. `REPLICATE_API_TOKEN` Secret prüfen / anfragen
+3. `useAIVideoWallet` → Re-Export als `useAICredits` (UI-Sprache "AI Credits")
+4. `ImageGenerator.tsx` um 4-Stufen-Toggle + Advanced-Modus + Cost-Badge erweitern
+5. Wallet-Header im Picture Studio zeigen
+6. Aufräumen: `STUDIO_IMAGE_GENERATE` aus `featureCosts.ts`, `CreditGuard` aus Picture-Studio-Pfad
 
 ---
 
-## Geschätzter Umfang
-- 1 SQL-Migration (3 neue Tabellen + Spalten + RLS + RPC)
-- 4 neue Edge-Functions
-- ~8 neue Frontend-Komponenten + 1 neue Route + Admin-Tab
-- 1 neuer Hook (`useMarketplaceTemplates`, `useTemplatePurchase`, `useCreatorEarnings`)
-- Lokalisierung + Memory
-
-Soll ich loslegen?
+**Soll ich so loslegen?**
