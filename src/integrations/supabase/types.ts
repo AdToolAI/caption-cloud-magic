@@ -3714,6 +3714,7 @@ export type Database = {
         Row: {
           actual_cost_euros: number | null
           aspect_ratio: string
+          batch_id: string | null
           completed_at: string | null
           created_at: string
           error_message: string | null
@@ -3733,6 +3734,7 @@ export type Database = {
         Insert: {
           actual_cost_euros?: number | null
           aspect_ratio: string
+          batch_id?: string | null
           completed_at?: string | null
           created_at?: string
           error_message?: string | null
@@ -3752,6 +3754,7 @@ export type Database = {
         Update: {
           actual_cost_euros?: number | null
           aspect_ratio?: string
+          batch_id?: string | null
           completed_at?: string | null
           created_at?: string
           error_message?: string | null
