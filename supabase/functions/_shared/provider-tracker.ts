@@ -77,7 +77,7 @@ export async function trackProviderCall<T>(
       try {
         const client = getClient();
         if (!client) return;
-        client.from('provider_quota_log').insert({
+        (client.from('provider_quota_log') as any).insert({
           provider,
           endpoint,
           status_code: statusCode,
@@ -86,7 +86,7 @@ export async function trackProviderCall<T>(
           rate_limit_remaining: rateLimitRemaining,
           rate_limit_total: options.rateLimitTotal ?? null,
           error_message: errorMessage,
-        }).then(({ error }) => {
+        }).then(({ error }: { error: any }) => {
           if (error) console.error('[provider-tracker] log failed:', error.message);
         });
       } catch (e) {
