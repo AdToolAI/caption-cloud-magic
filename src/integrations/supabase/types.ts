@@ -4612,6 +4612,48 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_earnings_ledger: {
+        Row: {
+          created_at: string
+          creator_user_id: string
+          credits_earned: number
+          id: string
+          purchase_id: string | null
+          template_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          creator_user_id: string
+          credits_earned: number
+          id?: string
+          purchase_id?: string | null
+          template_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          creator_user_id?: string
+          credits_earned?: number
+          id?: string
+          purchase_id?: string | null
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_earnings_ledger_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "template_purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_earnings_ledger_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "motion_studio_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_level_history: {
         Row: {
           created_at: string
@@ -6392,21 +6434,34 @@ export type Database = {
       motion_studio_templates: {
         Row: {
           aspect_ratio: string
+          average_rating: number
           briefing_defaults: Json
           category: string
           created_at: string
+          creator_user_id: string | null
           description: string
           duration_seconds: number
           id: string
           is_active: boolean
           is_featured: boolean
+          marketplace_status: string
           name: string
           preview_video_url: string | null
+          price_credits: number
+          pricing_type: string
+          published_at: string | null
+          rejection_reason: string | null
+          revenue_share_percent: number
+          reviewed_at: string | null
+          reviewed_by: string | null
           scene_suggestions: Json
           sort_order: number
           style: string
           tags: string[]
           thumbnail_url: string | null
+          total_purchases: number
+          total_ratings: number
+          total_revenue_credits: number
           updated_at: string
           usage_count: number
           use_case: string
@@ -6414,21 +6469,34 @@ export type Database = {
         }
         Insert: {
           aspect_ratio?: string
+          average_rating?: number
           briefing_defaults?: Json
           category?: string
           created_at?: string
+          creator_user_id?: string | null
           description?: string
           duration_seconds?: number
           id?: string
           is_active?: boolean
           is_featured?: boolean
+          marketplace_status?: string
           name: string
           preview_video_url?: string | null
+          price_credits?: number
+          pricing_type?: string
+          published_at?: string | null
+          rejection_reason?: string | null
+          revenue_share_percent?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           scene_suggestions?: Json
           sort_order?: number
           style?: string
           tags?: string[]
           thumbnail_url?: string | null
+          total_purchases?: number
+          total_ratings?: number
+          total_revenue_credits?: number
           updated_at?: string
           usage_count?: number
           use_case: string
@@ -6436,21 +6504,34 @@ export type Database = {
         }
         Update: {
           aspect_ratio?: string
+          average_rating?: number
           briefing_defaults?: Json
           category?: string
           created_at?: string
+          creator_user_id?: string | null
           description?: string
           duration_seconds?: number
           id?: string
           is_active?: boolean
           is_featured?: boolean
+          marketplace_status?: string
           name?: string
           preview_video_url?: string | null
+          price_credits?: number
+          pricing_type?: string
+          published_at?: string | null
+          rejection_reason?: string | null
+          revenue_share_percent?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           scene_suggestions?: Json
           sort_order?: number
           style?: string
           tags?: string[]
           thumbnail_url?: string | null
+          total_purchases?: number
+          total_ratings?: number
+          total_revenue_credits?: number
           updated_at?: string
           usage_count?: number
           use_case?: string
@@ -10436,6 +10517,44 @@ export type Database = {
           },
         ]
       }
+      template_marketplace_ratings: {
+        Row: {
+          created_at: string
+          id: string
+          rating: number
+          review_text: string | null
+          template_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          rating: number
+          review_text?: string | null
+          template_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          rating?: number
+          review_text?: string | null
+          template_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_marketplace_ratings_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "motion_studio_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       template_performance_metrics: {
         Row: {
           avg_rating_in_period: number | null
@@ -10500,6 +10619,53 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_purchases: {
+        Row: {
+          buyer_user_id: string
+          creator_earned_credits: number
+          creator_user_id: string | null
+          id: string
+          platform_fee_credits: number
+          price_credits: number
+          pricing_type: string
+          purchased_at: string
+          refunded_at: string | null
+          template_id: string
+        }
+        Insert: {
+          buyer_user_id: string
+          creator_earned_credits?: number
+          creator_user_id?: string | null
+          id?: string
+          platform_fee_credits?: number
+          price_credits?: number
+          pricing_type: string
+          purchased_at?: string
+          refunded_at?: string | null
+          template_id: string
+        }
+        Update: {
+          buyer_user_id?: string
+          creator_earned_credits?: number
+          creator_user_id?: string | null
+          id?: string
+          platform_fee_credits?: number
+          price_credits?: number
+          pricing_type?: string
+          purchased_at?: string
+          refunded_at?: string | null
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_purchases_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "motion_studio_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -13016,6 +13182,7 @@ export type Database = {
         }[]
       }
       owns_composer_project: { Args: { _project_id: string }; Returns: boolean }
+      purchase_template: { Args: { _template_id: string }; Returns: Json }
       record_streak_activity: {
         Args: { p_user_id: string }
         Returns: {
