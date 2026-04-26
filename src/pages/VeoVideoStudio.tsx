@@ -32,7 +32,7 @@ export default function VeoVideoStudio() {
 
   const [prompt, setPrompt] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
-  const [model, setModel] = useState<VeoVideoModel>('veo-3.1-lite');
+  const [model, setModel] = useState<VeoVideoModel>('veo-3.1-lite-720p');
   const [duration, setDuration] = useState(4);
   const [aspectRatio, setAspectRatio] = useState<VeoAspectRatio>('16:9');
   const [generateAudio, setGenerateAudio] = useState(true);
