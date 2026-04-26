@@ -1,34 +1,52 @@
-## Problem
+# Motion Studio Superuser — Fix Plan für die 3 letzten Fehler
 
-Der Build schlägt fehl, aber die Lovable-UI zeigt nur die abgeschnittene Liste der geprüften Edge-Function-Dateien — **nicht die eigentlichen Fehlermeldungen**. Meine bisherigen Fixes (`provider-tracker.ts` Casts auf `any`, `concurrency: null` in `remotion-payload.ts`) sind bereits drin, aber offensichtlich greift noch ein anderer Fehler in einer der ~400 Edge Functions.
+Nach der Diagnose der Edge-Function-Logs sind 3 verschiedene Root-Causes identifiziert. Alle drei sind echte Bugs, keine Plattform-Hiccups.
 
-Bevor ich blind weiter Code ändere, müssen wir die **echten Fehlermeldungen** sehen.
+---
 
-## Plan
+## 🔴 Bug 1: MS-10 Brand Voice Analysis — `HTTP 500: column updated_at not found`
 
-### Schritt 1 — Diagnose: Echte Fehler sichtbar machen
-- `deno check` lokal über alle Shared-Files + die zuletzt geänderten Funktionen (`motion-studio-superuser`, `ai-superuser-test-runner`, `analyze-superuser-anomalies`, `analyze-brand-voice`, `auto-director-compose`) laufen lassen.
-- Ausgabe komplett einsammeln (nicht abschneiden), um die exakten Dateien + Zeilen mit TS-Fehlern zu identifizieren.
-- Parallel: `supabase--deploy_edge_functions` für die zuletzt geänderten Funktionen aufrufen — die Deploy-Logs zeigen oft präzisere Fehler als der globale Check.
+**Root Cause:** `supabase/functions/analyze-brand-voice/index.ts` (Zeile 104) versucht `updated_at: new Date().toISOString()` in die `brand_kits` Tabelle zu schreiben — diese Spalte existiert dort jedoch **nicht** (nur `created_at` ist vorhanden, verifiziert via Schema-Query).
 
-### Schritt 2 — Hypothesen prüfen (was am wahrscheinlichsten kaputt ist)
-Die wahrscheinlichsten Quellen, basierend auf dem Verlauf:
-1. **`motion-studio-superuser/index.ts`** — In der vorherigen Iteration wurde ein Syntax-Fix erwähnt (extra `}`); möglicherweise gibt es noch ein TS-Issue mit den neuen Helpern (`ensureTestBrandKit`, `PUBLIC_TEST_CLIP`-Insert).
-2. **`ai-superuser-test-runner/index.ts`** — Retry-Wrapper + Throttling neu hinzugefügt; ggf. Typing-Issue bei `invokeWithRetry` (z. B. `unknown` → `string` Konvertierung der Body, oder `Promise<{res, text}>`-Rückgabe ohne Type).
-3. **Generated Supabase types** — Falls neue Tabellen erwartet werden, die noch nicht in `types.ts` sind, müssen wir alle Zugriffe konsistent als `any` casten.
+**Fix:**
+- In `analyze-brand-voice/index.ts` das `updated_at` Feld aus dem `.update({...})` Payload entfernen.
+- Nur `brand_voice: voiceProfile` updaten.
 
-### Schritt 3 — Gezielter Fix
-- Pro identifiziertem Fehler: minimale Änderung (Cast, fehlender Import, fehlendes Property), keine Architektur-Refactors.
-- Bei Bedarf `concurrency: null` und Casts auch in den Funktionen anwenden, die `remotion-payload` direkt konsumieren.
+---
 
-### Schritt 4 — Verifikation
-- `supabase--deploy_edge_functions` nochmal für die gefixten Funktionen.
-- Bei Erfolg: Statusmeldung „Build grün", keine Folge-Edits.
+## 🟡 Bug 2: MS-3 Auto-Director Compose — `Missing expected keys: scenes`
 
-## Was ich NICHT tun werde
-- Keine spekulativen Refactors anderer Edge Functions.
-- Keine weiteren Casts in Files, die nichts mit dem Fehler zu tun haben.
-- Keine Änderung an `src/integrations/supabase/types.ts` (auto-generiert).
+**Root Cause:** Der Test sendet `stage: "plan"`. In `auto-director-compose/index.ts` retourniert die `plan`-Stage zwar Scenes, aber der **Test-Runner** (motion-studio-superuser, Zeile 572-579) prüft `expectedKeys: ["scenes"]` direkt auf der Top-Level-Response. Die Plan-Response hat das Feld vermutlich verschachtelt (z. B. unter `data.scenes` oder `preview.scenes`).
 
-## Erwartetes Ergebnis
-Build wird grün, ohne weitere Iteration. Die Motion-Studio- und KI-Superuser-Pipelines bleiben funktional unverändert.
+**Fix-Optionen** (eine wählen nach Inspektion der tatsächlichen Plan-Response):
+- **Option A (bevorzugt):** Die `expectedKeys` in MS-3 anpassen auf den korrekten Top-Level-Key (z. B. `["preview"]` oder `["plan"]`), oder verschachtelte Key-Prüfung implementieren (`scenes` in `responseData.preview`).
+- **Option B:** Den Schema-Check in `motion-studio-superuser` so erweitern, dass er auch in einer Ebene tiefer sucht (rekursiv 1-level).
+
+Vorgehen: Erst kurz Plan-Response-Form via einem Diagnostic-Call verifizieren, dann gezielt fixen.
+
+---
+
+## 🟡 Bug 3: MS-12 Reframe Fallback Hardening — `HTTP 500: Project not found`
+
+**Root Cause:** Der Test sendet bewusst eine ungültige Project-ID (`00000000-...`), um das Fallback-Verhalten zu testen. `analyze-scene-subject/index.ts` (Zeile 205) wirft daraufhin `throw new Error("Project not found")` → HTTP 500. Der Test-Runner mappt `>= 500` als Failure (warning weil `optional: true`), aber **fachlich richtig** wäre HTTP **404** für "Resource not found", damit der Härtungstest grün laufen kann.
+
+**Fix:**
+- In `analyze-scene-subject/index.ts` den "Project not found"-Pfad in eine **strukturierte 404-Response** umwandeln statt eines generischen 500-Throws.
+- Damit wird MS-12 grün (HTTP 404 = `< 500` = `pass`).
+
+---
+
+## 📋 Umsetzungsschritte (nach Approval)
+
+1. **Fix 1 — `analyze-brand-voice/index.ts`:** `updated_at` aus dem brand_kits Update entfernen.
+2. **Fix 2 — `auto-director-compose` Plan-Response inspizieren:** Kurzer Diagnose-Curl auf die Funktion, dann entweder die `expectedKeys` in `motion-studio-superuser/index.ts` korrigieren oder die Plan-Response um ein Top-Level `scenes` Feld erweitern.
+3. **Fix 3 — `analyze-scene-subject/index.ts`:** Den `Project not found`-Throw durch eine `return new Response(JSON.stringify({error:"Project not found"}), {status: 404, headers: corsHeaders})` ersetzen.
+4. **Deploy** der 3 Edge Functions: `analyze-brand-voice`, `auto-director-compose` (falls geändert), `analyze-scene-subject`, `motion-studio-superuser` (falls geändert).
+5. **Verifizieren** durch erneutes Ausführen des Motion Studio Superuser Fast Run — Ziel: 14/14 grün (oder 13/14 mit MS-12 als pass).
+
+## ✅ Erwartetes Ergebnis
+
+- MS-10 → ✅ pass (HTTP 200)
+- MS-3 → ✅ pass (scenes-Key gefunden)
+- MS-12 → ✅ pass (HTTP 404, korrekt für ungültige ID)
+- Erfolgsquote: **14/14 (100 %)** statt aktuell 11/14 (79 %)
