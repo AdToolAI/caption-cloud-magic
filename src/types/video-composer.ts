@@ -181,6 +181,22 @@ export interface ComposerScene {
    */
   promptSlotOrder?: Array<'subject' | 'action' | 'setting' | 'timeWeather' | 'style'>;
   appliedStylePresetId?: string;
+  /**
+   * Block M — Hybrid Production.
+   * `hybridMode` marks how this scene was created from another scene:
+   *   - 'forward'   → continues a source scene (anchored on its last frame)
+   *   - 'backward'  → precedes a source scene (anchored on its first frame)
+   *   - 'bridge'    → morphs between two scenes
+   *   - 'style-ref' → uses another video as a style anchor
+   * `firstFrameUrl` / `endReferenceImageUrl` cache anchor frames so we don't
+   *   re-extract on every regeneration.
+   * `hybridTargetSceneId` points back to the source scene that anchored this one.
+   */
+  hybridMode?: 'forward' | 'backward' | 'bridge' | 'style-ref';
+  firstFrameUrl?: string;
+  lastFrameUrl?: string;
+  endReferenceImageUrl?: string;
+  hybridTargetSceneId?: string;
 }
 
 export type SubtitlePosition = 'top' | 'bottom';
