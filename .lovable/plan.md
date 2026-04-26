@@ -90,10 +90,8 @@ CREATE TABLE composer_template_suggestions (
 
 ## Reihenfolge & Abnahme
 
-1. **Smart-Reframe E2E** zuerst (kleinster Scope, baut Vertrauen in bestehenden Code).
-2. **Voice-Cloning UI** (rein frontend, sofort sichtbarer User-Wert).
-3. **Trending Templates** (größter Block, neue Tabelle + Cron + UI).
+1. ✅ **Smart-Reframe E2E** — Hardening + Clamp deployed.
+2. ✅ **Voice-Cloning UI** — sichtbar im AIVoiceOver-Tab.
+3. ✅ **Trending Templates** — Tabelle, Edge Function, Picker-Tab, Click-to-Clone.
 
-Pro Block: Migration → Edge Function → Frontend → Test mit `curl_edge_functions` und (für Reframe) Log-Check.
-
-**Nicht enthalten:** Block U (Realtime Collab) — folgt nach Option A in einem separaten Schritt.
+**Offen:** Cron-Schedule für `aggregate-trending-templates` (wöchentlich Sonntag 03:00 UTC via pg_cron) + Block U (Realtime Collab).

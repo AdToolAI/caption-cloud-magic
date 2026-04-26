@@ -39,6 +39,7 @@ import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
 import MotionStudioStepSidebar, { type StepItem } from './MotionStudioStepSidebar';
 import AutoDirectorWizard from './AutoDirectorWizard';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
+import { useIncrementTrendingUse } from '@/hooks/useTrendingTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export';
@@ -139,6 +140,7 @@ export default function VideoComposerDashboard() {
   const [showAutoDirector, setShowAutoDirector] = useState(false);
   const { ensureProjectPersisted } = useComposerPersistence();
   const incrementTemplateUsage = useIncrementTemplateUsage();
+  const incrementTrendingUse = useIncrementTrendingUse();
   const didInitialSyncRef = useRef(false);
 
   // DB sync on mount: if the loaded draft has a project.id, hydrate scenes from DB
@@ -748,6 +750,10 @@ export default function VideoComposerDashboard() {
         open={showTemplatePicker}
         onOpenChange={setShowTemplatePicker}
         onSelectTemplate={applyTemplate}
+        onSelectTrending={(tpl, trendingId) => {
+          applyTemplate(tpl);
+          incrementTrendingUse.mutate(trendingId);
+        }}
         onStartBlank={handleStartBlank}
       />
 
