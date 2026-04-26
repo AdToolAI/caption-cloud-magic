@@ -120,6 +120,34 @@ serve(async (req) => {
       console.warn('Failed to fetch account voices, using premium-only:', err);
     }
 
+    // ----- 2b. Mark voices that the current user cloned via our pipeline -----
+    // (look up custom_voices table to upgrade tier from 'custom' → 'cloned')
+    try {
+      const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+      const SUPABASE_ANON = Deno.env.get('SUPABASE_ANON_KEY');
+      const authHeader = req.headers.get('Authorization');
+      if (SUPABASE_URL && SUPABASE_ANON && authHeader) {
+        const userClient = createClient(SUPABASE_URL, SUPABASE_ANON, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: cloned } = await userClient
+          .from('custom_voices')
+          .select('elevenlabs_voice_id, name, language, is_active')
+          .eq('is_active', true);
+        if (cloned && cloned.length > 0) {
+          const clonedIds = new Map(cloned.map((c: any) => [c.elevenlabs_voice_id, c]));
+          accountVoices = accountVoices.map((v: any) => {
+            if (clonedIds.has(v.id)) {
+              return { ...v, tier: 'cloned' as const, isMine: true };
+            }
+            return v;
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[list-voices] custom_voices lookup failed (non-fatal):', e);
+    }
+
     // ----- 3. Merge: premium first, dedupe by id -----
     const seen = new Set(premiumMapped.map((v) => v.id));
     const uniqueAccountVoices = accountVoices.filter((v) => !seen.has(v.id));
