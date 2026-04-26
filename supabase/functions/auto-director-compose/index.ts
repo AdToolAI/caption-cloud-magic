@@ -40,6 +40,16 @@ interface PlanResult {
   scenes: PlannedScene[];
   estimatedCostEuros: number;
   rationale: string;
+  brandContext?: BrandContext | null;
+}
+
+interface BrandContext {
+  brandName: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  mood: string | null;
+  brandTone: string | null;
+  brandValues: string[];
 }
 
 const ENGINE_BY_PREF: Record<EnginePref, string[]> = {
@@ -91,8 +101,9 @@ serve(async (req) => {
 
     // ============== STAGE 1: PLAN ==============
     if (stage === 'plan') {
-      const plan = await generateScenePlan(body);
-      return jsonResponse({ ok: true, plan });
+      const brandContext = await loadActiveBrandContext(supabaseAdmin, user.id);
+      const plan = await generateScenePlan(body, brandContext);
+      return jsonResponse({ ok: true, plan: { ...plan, brandContext } });
     }
 
     // ============== STAGE 2: EXECUTE ==============
@@ -206,7 +217,32 @@ serve(async (req) => {
 // ============================================================================
 // AI PLAN GENERATION via Lovable AI Gateway (Gemini 2.5 Pro with structured tool calling)
 // ============================================================================
-async function generateScenePlan(req: AutoDirectorRequest): Promise<PlanResult> {
+async function loadActiveBrandContext(admin: any, userId: string): Promise<BrandContext | null> {
+  try {
+    const { data, error } = await admin
+      .from('brand_kits')
+      .select('brand_name, primary_color, secondary_color, mood, brand_tone, brand_values')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      brandName: data.brand_name ?? null,
+      primaryColor: data.primary_color ?? null,
+      secondaryColor: data.secondary_color ?? null,
+      mood: data.mood ?? null,
+      brandTone: data.brand_tone ?? null,
+      brandValues: Array.isArray(data.brand_values) ? data.brand_values.slice(0, 5) : [],
+    };
+  } catch (err) {
+    console.warn('[auto-director] loadActiveBrandContext failed:', err);
+    return null;
+  }
+}
+
+async function generateScenePlan(req: AutoDirectorRequest, brandContext?: BrandContext | null): Promise<PlanResult> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
     throw new Error("LOVABLE_API_KEY is not configured");
@@ -232,10 +268,20 @@ RULES:
 - Output language for any text_overlay: ${req.language ?? 'de'}.
 - Add a short text_overlay (3-6 words) ONLY on hook and cta scenes.`;
 
+  // Brand Memory: inject brand context if available so generated prompts feel on-brand
+  const brandBlock = brandContext
+    ? `\n\nBRAND CONTEXT (apply naturally to visuals — color accents, mood, tone):
+- Brand: ${brandContext.brandName ?? '(unnamed)'}
+- Primary color: ${brandContext.primaryColor ?? 'n/a'}${brandContext.secondaryColor ? `, secondary: ${brandContext.secondaryColor}` : ''}
+- Brand mood: ${brandContext.mood ?? 'n/a'}
+- Brand tone: ${brandContext.brandTone ?? 'n/a'}
+${brandContext.brandValues.length ? `- Values: ${brandContext.brandValues.join(', ')}` : ''}`
+    : '';
+
   const userPrompt = `Idea: "${req.idea}"
 Mood: ${req.mood}
 Total duration target: ${targetSec}s
-Engine preference: ${enginePref}
+Engine preference: ${enginePref}${brandBlock}
 
 Create the storyboard now.`;
 
