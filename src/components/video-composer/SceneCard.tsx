@@ -329,6 +329,46 @@ export default function SceneCard({
               className="w-full"
             />
 
+            {/* Block M — Hybrid Extend actions (only when source clip is ready) */}
+            {onHybridExtend && scene.clipStatus === 'ready' && scene.clipUrl && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70">
+                  {lang === 'de' ? 'Hybrid' : lang === 'es' ? 'Híbrido' : 'Hybrid'}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-[10px] gap-1.5"
+                  onClick={() => onHybridExtend('backward')}
+                  title={
+                    lang === 'de'
+                      ? 'Vorszene generieren (Backward Extend)'
+                      : lang === 'es'
+                      ? 'Generar escena previa (Backward Extend)'
+                      : 'Generate preceding scene (Backward Extend)'
+                  }
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  {lang === 'de' ? 'Backward' : 'Backward'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-[10px] gap-1.5"
+                  onClick={() => onHybridExtend('forward')}
+                  title={
+                    lang === 'de'
+                      ? 'Szene verlängern (Forward Extend)'
+                      : lang === 'es'
+                      ? 'Extender escena (Forward Extend)'
+                      : 'Extend scene (Forward Extend)'
+                  }
+                >
+                  <ArrowRight className="h-3 w-3" />
+                  {lang === 'de' ? 'Forward' : 'Forward'}
+                </Button>
+              </div>
+            )}
             {/* Clip source */}
             <div className="flex flex-wrap gap-2">
               {(['ai-hailuo', 'ai-kling', 'ai-image', 'stock', 'stock-image', 'upload'] as ClipSource[]).map((src) => {
