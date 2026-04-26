@@ -676,6 +676,7 @@ export default function VideoComposerDashboard() {
               projectId={project.id}
               characters={project.briefing?.characters}
               preferredAspect={project.briefing?.aspectRatio}
+              onRefetchScenes={refetchScenesFromDb}
             />
           </TabsContent>
 
