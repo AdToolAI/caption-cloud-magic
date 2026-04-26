@@ -75,7 +75,7 @@ export async function trackProviderCall<T>(
     // Fire-and-forget log write
     queueMicrotask(() => {
       try {
-        const client = getClient();
+        const client = getClient() as any;
         if (!client) return;
         client.from('provider_quota_log').insert({
           provider,
@@ -86,8 +86,8 @@ export async function trackProviderCall<T>(
           rate_limit_remaining: rateLimitRemaining,
           rate_limit_total: options.rateLimitTotal ?? null,
           error_message: errorMessage,
-        }).then(({ error }) => {
-          if (error) console.error('[provider-tracker] log failed:', error.message);
+        }).then(({ error }: { error: unknown }) => {
+          if (error) console.error('[provider-tracker] log failed:', (error as Error).message);
         });
       } catch (e) {
         console.error('[provider-tracker] unexpected:', e);
