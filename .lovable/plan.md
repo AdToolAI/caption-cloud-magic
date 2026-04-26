@@ -1,125 +1,98 @@
 
-# 🎯 Marktführer-Parität Roadmap — Blocks O → P → Q
+# 🎯 Markt-Status-Audit — Wo stehen wir nach Block O + P + Q?
 
-Nach dem Audit habe ich **bestehende Infrastruktur identifiziert**, die wir wiederverwenden können — das spart ~40% Aufwand vs. Greenfield. Plan in 3 Sessions, jede deploybar & testbar.
+## ✅ Was wir jetzt haben (Stand heute)
 
----
+Mit Abschluss von **Block I–Q** ist Motion Studio in der **Top-Tier-Liga** angekommen. Hier die nüchterne Bestandsaufnahme:
 
-## 📦 Session 1 — Block O: AI Auto-Director (1-Click Movie) (~3.5h)
-
-**Ziel**: User gibt **eine Idee + Stimmung + Dauer** ein → System erstellt automatisch Storyboard, generiert alle Clips parallel, fügt Voiceover/Musik/Untertitel hinzu, rendert das fertige Video. Wettbewerb: Pika 2.0, Runway Gen-3 Auto.
-
-### Bestehende Bausteine (wiederverwenden)
-- ✅ `compose-video-clips` (parallele Clip-Generation)
-- ✅ `generate-script-inline` (Skript-Erstellung mit Lovable AI)
-- ✅ `compose-video-assemble` (Final-Render)
-- ✅ Storyboard-Schema (`composer_scenes`)
-
-### Neu zu bauen
-- **`auto-director-compose`** (neue Edge Function): Orchestrator
-  1. Gemini 2.5 Pro generiert Szenen-Plan (Anzahl, Dauer, Prompts pro Szene, Engine-Empfehlung)
-  2. Insert aller Szenen mit `status='pending'` in `composer_scenes`
-  3. Trigger `compose-video-clips` (parallel)
-  4. Optional: trigger `synthesize-voiceover` + `select-background-music`
-  5. Auto-Trigger `compose-video-assemble` wenn alle Clips ready
-- **`AutoDirectorWizard.tsx`** (3-Step Modal in Composer):
-  - Step 1: Idee + Stimmung (Cinematic/Hype/Calm/Corporate) + Ziel-Dauer (15s/30s/60s)
-  - Step 2: KI generiert Plan-Preview (Szenen mit Prompts) → User kann anpassen/regenerieren
-  - Step 3: Engine-Mix (Auto/Premium/Budget) + Voice + Musik → "Movie generieren"
-- **DB**: Neue Spalte `composer_projects.auto_director_config` (JSONB für Reproduzierbarkeit)
-- **UI-Integration**: Neuer prominenter "✨ Auto-Director" CTA in `VideoComposerDashboard.tsx` Header + Empty-State
-
-### Engines & Cost-Estimate
-- Standard: 4 Szenen à 5s mit Hailuo (~0.8€) + Voiceover (~0.05€) + Render = **~1€ pro Auto-Movie**
-- Live-Cost-Preview im Wizard, Refund-Sicherheit über bestehendes `compose-video-clips`
+| Bereich | Status | Marktvergleich |
+|---|---|---|
+| **Engine-Vielfalt** | Sora 2, Kling 3.0 Omni, Luma Ray-2, Hailuo 2.3, Wan 2.5, Seedance, Veo | **🥇 Führend** (mehr als Runway, HeyGen, Pika) |
+| **1-Click Auto-Movie** | ✅ Block O — Gemini-Plan → Auto-Generation | ✅ **Parität** mit Pika 2.0 / Runway Gen-3 |
+| **Multi-Format Export** | ✅ Block P — 16:9 + 9:16 + 1:1 simultan | ✅ **Parität** mit HeyGen / Submagic |
+| **Talking-Head / Lip-Sync** | ✅ Block Q — Hedra Character-3 + ElevenLabs | ✅ **Parität** mit HeyGen / D-ID / Synthesia |
+| **Hybrid Production** (Forward/Backward/Bridge/Style-Ref) | ✅ Block M | 🥇 **Alleinstellung** — kein Wettbewerber bietet alle 4 Modi |
+| **NLE-Roundtrip** (FCPXML/EDL Import+Export) | ✅ | 🥇 **Alleinstellung** im AI-Video-Segment |
+| **Director's Cut Editor** (CapCut-Style mit Filter, Speed-Ramping, Subtitle-AI) | ✅ | ✅ Stark, vergleichbar mit CapCut Pro |
+| **Brand-Kit-System** | ✅ Basic (logo, colors, fonts) | ⚠️ Manueller Apply — Wettbewerb (Canva, HeyGen) wendet automatisch an |
+| **Voice-Cloning Integration** | ⚠️ Backend ja, Composer-UI integriert über Talking-Head | ✅ OK, aber nicht in Standard-Voiceover-Tab sichtbar |
 
 ---
 
-## 📤 Session 2 — Block P: Multi-Format Smart Export (~2h)
+## 🔍 Verbleibende Lücken zur absoluten Marktspitze
 
-**Ziel**: Ein Composer-Projekt → **simultanes Rendering in 16:9, 9:16, 1:1** (TikTok + YouTube + Instagram-Feed in einem Klick). Wettbewerb: HeyGen, Submagic.
+Nach Audit gegen **Runway Gen-3, Pika 2.0, HeyGen, Synthesia, Canva Magic Studio, Submagic, Descript** sehe ich noch **4 sinnvolle Blöcke**:
 
-### Bestehende Bausteine
-- ✅ `ExportPresetPanel.tsx` (6 Presets, Single-Trigger)
-- ✅ `compose-video-assemble` mit `aspectOverride` Support
-- ✅ Composer-Export-Tabelle (`composer_exports`)
+### 🔥 Block R — Smart Reframe (AI Subject Tracking) — ~2.5h
+**Lücke**: Multi-Format-Export macht aktuell **Center-Crop**. Wettbewerber (Submagic, Adobe Premiere Auto-Reframe) verfolgen das Hauptmotiv intelligent.
 
-### Neu / Erweiterung
-- **`ExportPresetPanel.tsx` Refactor**:
-  - Multi-Select Checkboxen statt Single-Click
-  - "Smart Crop"-Toggle: Center vs. AI-Subject-Tracking (Phase 2)
-  - "Alle ausgewählten exportieren" Batch-Button mit Cost-Sum-Preview
-  - Live-Status-Grid (jedes Format: Pending/Rendering/Ready mit Download)
-- **`render-multi-format-batch`** (neue Edge Function — wrapper über bestehende `render-multi-format`):
-  - Akzeptiert `presetKeys: string[]`
-  - Triggert N parallele `compose-video-assemble` Jobs (max 3 concurrent — Lambda-Limit)
-  - Schreibt N Rows in `composer_exports` mit `batch_id`
-- **Smart-Reframe (Phase 1, deterministisch)**: Center-Crop mit konfigurierbarem `safeAreaTop/Bottom` per Preset (TikTok-UI berücksichtigen)
-- **Smart-Reframe (Phase 2, optional spätere Session)**: AI-Subject-Detection via Gemini Vision für intelligentes Pan&Scan
+**Plan**:
+- Neue Edge Function `analyze-scene-subject` → Gemini 2.5 Pro Vision analysiert Keyframes und liefert Bounding-Box pro Sekunde
+- `render-multi-format-batch` erweitern: nutzt Subject-Track für dynamisches Crop-Center
+- UI in `ExportPresetPanel.tsx`: Toggle "Smart Subject Track" (default ON für 9:16, OFF für 16:9→1:1)
+- Caching: Subject-Tracks pro Szene in neuer Spalte `composer_scenes.subject_track` (JSONB)
 
-### Erwartete Wirkung
-Reduziert manuelles Re-Editing für Cross-Posting von 30min auf 30s. Killer-Feature für Social-Media-Manager.
+**Impact**: Ein 16:9 Korporate-Video wird zu einem perfekt zentrierten 9:16 TikTok-Clip — der KILLER für Cross-Posting-Workflows.
 
 ---
 
-## 🎤 Session 3 — Block Q: Talking-Head / Lip-Sync (~3h)
+### 💎 Block S — Brand Memory (Auto-Apply Brand Kit) — ~1.5h (EASY-WIN)
+**Lücke**: User muss in jedem Projekt manuell Brand-Kit anwenden. Canva/HeyGen wenden automatisch an.
 
-**Ziel**: User uploaded Foto eines Charakters + schreibt Skript → System generiert Lip-Sync-Video mit echter Stimme. Wettbewerb: HeyGen, D-ID, Synthesia.
+**Plan**:
+- DB: `composer_projects.brand_kit_id` + Trigger, der bei Insert das Default-Brand-Kit des Users setzt
+- Auto-Director-Wizard: zeigt aktive Brand → Logo, Farben, Font werden automatisch in Plan-Generation übergeben (Gemini Prompt erweitert)
+- `BrandKitApplyPanel.tsx`: neuer Toggle "Als Standard für neue Projekte"
+- Talking-Head & Multi-Format respektieren automatisch Brand-Subtitle-Style
 
-### Provider-Wahl: **Hedra Character-3** (Replicate)
-- Beste Qualität für Foto→Talking-Head (vs. Sync.so, das primär Lip-Sync auf existierenden Videos macht)
-- Replicate-Integration, gleiche Patterns wie Kling/Luma → **kein neuer API-Provider nötig**
-- Cost: ~0.15€/Sek bei 720p
-- *(Alternative Sync.so für Lip-Sync auf bestehende Composer-Clips können wir in Phase 2 ergänzen)*
-
-### Implementierung
-- **`generate-talking-head`** (neue Edge Function):
-  - Input: `imageUrl`, `audioUrl` (oder `text` + `voiceId` → ElevenLabs TTS first), `aspectRatio`
-  - Replicate `hedra/character-3` Aufruf
-  - Speichert Output in `library` Bucket, schreibt in `composer_scenes` als `talking-head` Szenen-Typ
-  - Webhook-basiert (gleicher Pattern wie `compose-clip-webhook`)
-- **DB-Migration**:
-  - Neuer Wert in `composer_scenes.media_type` enum: `'talking-head'`
-  - Neue Spalten: `character_image_url`, `character_audio_url`, `character_voice_id`
-- **`TalkingHeadDialog.tsx`**:
-  - Tab 1: Charakter-Foto upload (oder aus Charakter-Bibliothek wählen — `character_assets` Tabelle existiert bereits)
-  - Tab 2: Skript-Editor + Voice-Picker (ElevenLabs presets + User-Cloned-Voices)
-  - Live Cost-Preview, Generieren-Button
-- **Integration**: Neuer "🎤 Talking-Head"-Button in `SceneCard.tsx` (für neue Szenen) + im Storyboard-Tab "Add Scene"-Menu
-
-### Voice-Cloning Integration (Bonus, ~30min)
-- Composer-Voice-Picker erweitern: zeigt User's gecloneten Stimmen aus bestehender `clone-voice` Function
-- Neuer "+ Clone neue Stimme"-Button → öffnet existierenden Clone-Flow inline
+**Impact**: User bauen einmal ihr Brand-Kit, danach ist jedes Video automatisch on-brand. Reduziert Setup-Zeit um ~80%.
 
 ---
 
-## 📊 Roadmap Übersicht (für nach Q)
+### 📊 Block T — Performance-Loop (Top-Performing Templates) — ~3h
+**Lücke**: Wir haben Analytics (`analyze-performance`), nutzen sie aber nicht für Content-Empfehlungen. HeyGen hat "Top performers" Library, Pika lernt aus User-Daten.
 
-| Block | Feature | Aufwand | Priorität |
-|-------|---------|---------|-----------|
-| **O** ✨ | AI Auto-Director (1-Click) | 3.5h | 🔥 HOCH |
-| **P** 📤 | Multi-Format Export | 2h | 🔥 HOCH |
-| **Q** 🎤 | Talking-Head + Voice-Clone UI | 3h | 🔥 HOCH |
-| R | Smart Reframe (AI Subject Tracking) | 2h | MID |
-| S | Performance-Loop (Top-Performing Templates auto-suggest) | 3h | MID |
-| T | Realtime Collaboration (presence, comments) | 5h | LOW |
-| U | Brand Memory (Auto-Apply Brand Kit pro Projekt) | 1.5h | EASY-WIN |
+**Plan**:
+- Aggregations-Job: Top 20 Composer-Projekte pro Plattform (TikTok/Reels/Shorts) nach Engagement-Rate identifizieren
+- Tabelle `composer_template_suggestions` (auto-generated weekly via cron)
+- Neuer Tab im Composer-Dashboard: **"🏆 Trending Templates"** — Click-to-Clone (kopiert Storyboard + Engine-Mix in neues Projekt)
+- Auto-Director nutzt Top-Templates als "Stil-Inspiration" wenn User-Idee dazu passt
+
+**Impact**: Datengetriebene Content-Strategie. Differenzierung gegenüber Tools, die nur generieren ohne zu lernen.
 
 ---
 
-## 🚀 Vorgeschlagene Reihenfolge
+### 🤝 Block U — Realtime Collaboration (Presence + Comments) — ~5h
+**Lücke**: Composer ist aktuell Single-User. HeyGen Teams, Frame.io, Runway Workspaces bieten Live-Collab.
 
-**Diese Session**: Block O (Auto-Director) — größter UX-Hebel, macht das Tool für Erstnutzer "magisch"
+**Plan**:
+- Supabase Realtime Channels pro Projekt → Presence (wer ist online, welche Szene editiert wer)
+- Neue Tabelle `composer_comments` mit Szenen-Anker + Resolved-Status
+- UI: Avatar-Stack im Header, Kommentar-Pin auf SceneCard, Side-Panel mit Comment-Thread
+- Optional: Live-Cursors über Storyboard
+- Permissions: nutzt bestehendes `add-collaborator` System
 
-Danach: P → Q in separaten Genehmigungen, je ~2-3h.
+**Impact**: Ermöglicht Agenturen + Marketing-Teams. **Voraussetzung für Enterprise-Verkauf >5 Sitze.**
 
-### Geänderte / neue Dateien für Block O
-- `supabase/migrations/..._auto_director_config.sql` (Neu)
-- `supabase/functions/auto-director-compose/index.ts` (Neu)
-- `src/components/video-composer/AutoDirectorWizard.tsx` (Neu)
-- `src/hooks/useAutoDirector.ts` (Neu)
-- `src/components/video-composer/VideoComposerDashboard.tsx` (Modified — CTA hinzufügen)
-- `src/types/video-composer.ts` (Modified — `autoDirectorConfig` Type)
-- i18n DE/EN/ES für Wizard-Strings
+---
 
-**Soll ich mit Block O starten?**
+## 📊 Empfohlene Reihenfolge
+
+| Reihenfolge | Block | Aufwand | Begründung |
+|---|---|---|---|
+| **1.** | **S — Brand Memory** | 1.5h | Easy-Win, sofort spürbarer Mehrwert für ALLE User, blockiert nichts |
+| **2.** | **R — Smart Reframe** | 2.5h | Macht Block P (Multi-Format) zum echten Killer-Feature |
+| **3.** | **T — Performance Loop** | 3h | Strategischer Differenzierer, nutzt vorhandene Analytics |
+| **4.** | **U — Realtime Collab** | 5h | Größte Investition, aber Enterprise-Türöffner |
+
+---
+
+## 💡 Mein Vorschlag
+
+Wir starten mit dem **Doppelschlag S → R** in dieser Session:
+- **S (Brand Memory)** liefert sofort UX-Boost mit minimalem Risiko
+- **R (Smart Reframe)** veredelt direkt den letzten Block P
+
+Beide zusammen ~4h — danach hat das Tool **funktionale Vollparität** mit allen Top-3 Wettbewerbern und behält die einzigartigen Stärken (Hybrid Production + NLE-Export + Engine-Vielfalt).
+
+**Soll ich mit S + R starten, oder eine andere Reihenfolge?**
