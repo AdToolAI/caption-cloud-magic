@@ -183,7 +183,20 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
           </div>
 
           <div className="space-y-3">
-            <Label>Sprache & Stimme</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label>Sprache & Stimme</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCloneDialogOpen(true)}
+                className="h-7 px-2 text-xs gap-1 border-primary/30 hover:bg-primary/10 hover:text-primary"
+                title="Eigene Stimme klonen (3+ Audio-Samples)"
+              >
+                <Plus className="h-3 w-3" />
+                Eigene Stimme klonen
+              </Button>
+            </div>
             <Tabs value={selectedLanguageTab} onValueChange={(v) => setSelectedLanguageTab(v as 'de' | 'en' | 'es')}>
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="de">🇩🇪 DE ({voicesForLang('de').length})</TabsTrigger>
@@ -191,56 +204,87 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
                 <TabsTrigger value="es">🇪🇸 ES ({voicesForLang('es').length})</TabsTrigger>
               </TabsList>
 
-              {(['de', 'en', 'es'] as const).map((lang) => (
-                <TabsContent key={lang} value={lang} className="mt-3">
-                  {loadingVoices ? (
-                    <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" /> Lade Stimmen…
-                    </div>
-                  ) : voicesForLang(lang).length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">Keine Stimmen verfügbar</p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
-                      {voicesForLang(lang).map((voice) => (
-                        <div
-                          key={voice.id}
-                          className={`p-3 rounded-lg border text-left transition-all relative ${
-                            settings.voiceId === voice.id
-                              ? 'border-primary bg-primary/10 ring-1 ring-primary'
-                              : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleVoiceSelect(voice.id)}
-                            className="w-full text-left pr-8"
-                          >
-                            <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
-                              <span className="text-base">
-                                {voice.gender === 'female' ? '♀' : voice.gender === 'male' ? '♂' : '◎'}
-                              </span>
-                              <span className="truncate">{voice.name}</span>
-                              {voice.tier === 'premium' && (
-                                <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">
-                                  Premium
-                                </Badge>
-                              )}
-                            </div>
-                            {voice.description && (
-                              <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                                {voice.description}
-                              </div>
-                            )}
-                          </button>
-                          <div className="absolute top-1.5 right-1.5">
-                            <VoicePreviewButton voiceId={voice.id} language={lang} />
-                          </div>
+              {(['de', 'en', 'es'] as const).map((lang) => {
+                const langVoices = voicesForLang(lang);
+                const cloned = langVoices.filter((v) => v.tier === 'cloned');
+                const others = langVoices.filter((v) => v.tier !== 'cloned');
+                const renderVoiceCard = (voice: VoiceMeta) => (
+                  <div
+                    key={voice.id}
+                    className={`p-3 rounded-lg border text-left transition-all relative ${
+                      settings.voiceId === voice.id
+                        ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                        : voice.tier === 'cloned'
+                        ? 'border-amber-500/40 hover:border-amber-500/70 hover:bg-amber-500/5'
+                        : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleVoiceSelect(voice.id)}
+                      className="w-full text-left pr-8"
+                    >
+                      <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
+                        <span className="text-base">
+                          {voice.gender === 'female' ? '♀' : voice.gender === 'male' ? '♂' : '◎'}
+                        </span>
+                        <span className="truncate">{voice.name}</span>
+                        {voice.tier === 'premium' && (
+                          <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">
+                            Premium
+                          </Badge>
+                        )}
+                        {voice.tier === 'cloned' && (
+                          <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-gradient-to-r from-amber-500/20 to-cyan-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                            🎤 Cloned
+                          </Badge>
+                        )}
+                      </div>
+                      {voice.description && (
+                        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                          {voice.description}
                         </div>
-                      ))}
+                      )}
+                    </button>
+                    <div className="absolute top-1.5 right-1.5">
+                      <VoicePreviewButton voiceId={voice.id} language={lang} />
                     </div>
-                  )}
-                </TabsContent>
-              ))}
+                  </div>
+                );
+
+                return (
+                  <TabsContent key={lang} value={lang} className="mt-3">
+                    {loadingVoices ? (
+                      <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" /> Lade Stimmen…
+                      </div>
+                    ) : langVoices.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-6">Keine Stimmen verfügbar</p>
+                    ) : (
+                      <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                        {cloned.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5 px-1">
+                              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                                Meine Stimmen
+                              </span>
+                              <div className="h-px flex-1 bg-gradient-to-r from-amber-500/30 to-transparent" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {cloned.map(renderVoiceCard)}
+                            </div>
+                          </div>
+                        )}
+                        {others.length > 0 && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {others.map(renderVoiceCard)}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </TabsContent>
+                );
+              })}
             </Tabs>
           </div>
 
