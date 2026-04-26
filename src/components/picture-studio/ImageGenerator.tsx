@@ -49,11 +49,7 @@ export function ImageGenerator() {
   const { wallet } = useAIVideoWallet();
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate();
-  const { executeAICall, loading: legacyLoading, status } = useAICall();
-  const { wallet } = useAIVideoWallet();
-  const { t } = useTranslation();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const status = { stage: '', message: '' };
 
   const STYLES = useMemo(() => [
     { value: 'realistic', label: t('picStudio.styleRealistic') },
