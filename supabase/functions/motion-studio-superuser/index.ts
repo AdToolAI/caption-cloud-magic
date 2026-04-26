@@ -94,7 +94,7 @@ const SCENARIOS: Scenario[] = [
       enginePreference: "auto",
       language: "en",
     }),
-    expectedKeys: ["scenes"],
+    expectedKeys: ["plan"],
   },
 
   // -------- Phase 2: Asset Generation --------

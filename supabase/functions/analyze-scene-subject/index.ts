@@ -202,7 +202,12 @@ serve(async (req) => {
       .select("id, user_id, briefing")
       .eq("id", body.projectId)
       .single();
-    if (!project || project.user_id !== user.id) throw new Error("Project not found");
+    if (!project || project.user_id !== user.id) {
+      return new Response(
+        JSON.stringify({ error: "Project not found", code: "PROJECT_NOT_FOUND" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     const sourceAspect = (project.briefing as any)?.aspectRatio || "16:9";
 
