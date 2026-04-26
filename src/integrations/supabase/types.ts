@@ -3911,6 +3911,10 @@ export type Database = {
           director_modifiers: Json | null
           duration_seconds: number
           effects: Json | null
+          end_reference_image_url: string | null
+          first_frame_url: string | null
+          hybrid_mode: string | null
+          hybrid_target_scene_id: string | null
           id: string
           last_frame_url: string | null
           mentioned_character_ids: string[] | null
@@ -3948,6 +3952,10 @@ export type Database = {
           director_modifiers?: Json | null
           duration_seconds?: number
           effects?: Json | null
+          end_reference_image_url?: string | null
+          first_frame_url?: string | null
+          hybrid_mode?: string | null
+          hybrid_target_scene_id?: string | null
           id?: string
           last_frame_url?: string | null
           mentioned_character_ids?: string[] | null
@@ -3985,6 +3993,10 @@ export type Database = {
           director_modifiers?: Json | null
           duration_seconds?: number
           effects?: Json | null
+          end_reference_image_url?: string | null
+          first_frame_url?: string | null
+          hybrid_mode?: string | null
+          hybrid_target_scene_id?: string | null
           id?: string
           last_frame_url?: string | null
           mentioned_character_ids?: string[] | null
@@ -4019,6 +4031,13 @@ export type Database = {
           {
             foreignKeyName: "composer_scenes_continuity_source_scene_id_fkey"
             columns: ["continuity_source_scene_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composer_scenes_hybrid_target_scene_id_fkey"
+            columns: ["hybrid_target_scene_id"]
             isOneToOne: false
             referencedRelation: "composer_scenes"
             referencedColumns: ["id"]

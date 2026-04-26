@@ -1,175 +1,210 @@
 
-# Block N — NLE-Export Pro (Premiere / Resolve / FCP)
+# Block M — Hybrid Production Pro
 
-**Ziel:** Composer-Projekte als professionelle NLE-Sequenzen exportieren, in DaVinci Resolve / Premiere Pro / Final Cut Pro öffnen, dort schneiden — und die Änderungen zurück in den Composer importieren ("Roundtrip").
+**Ziel:** User lädt ein bestehendes Video hoch und nutzt AI, um es zu **verlängern**, **rückwärts zu erweitern**, mit einem zweiten Clip per **Bridge-Übergang** zu verbinden, oder als **Style-Reference** für neue Szenen zu verwenden.
 
-Block M (Hybrid Production) folgt **danach** in einer separaten Session.
+**Audit-Ergebnis:** Die Infrastruktur ist zur Hälfte schon da — `continuity_source_scene_id` und `last_frame_url` existieren bereits in `composer_scenes`, und die Engines `Hailuo`, `Kling`, `Luma` unterstützen die nötigen i2v-Parameter. Sora unterstützt kein i2v und wird für Hybrid-Modi ausgeschlossen (mit klarer UI-Sperre).
+
+---
+
+## Aufteilung in 2 Sessions
+
+### Session M-1 (~3h): Forward + Backward Extend
+Die zwei häufigsten Use-Cases — bauen auf bestehender Infrastruktur auf, niedrigeres Risiko.
+
+### Session M-2 (~2h): Bridge + Style-Reference
+Komplexere Modi (2 Inputs gleichzeitig), nur Kling-Engine.
 
 ---
 
-## Scope (Pro-Variante, in 2 Sessions splittbar)
+# Session M-1 — Extend Forward & Backward
 
-### Session N-1 (zuerst, ~3h): Export
-1. **FCPXML 1.10** — Zielformat für Resolve, Premiere, Final Cut Pro
-2. **EDL (CMX 3600)** — Legacy-Format, kompatibel mit Avid/älteren Workflows
-3. **Asset-Bundle ZIP** — alle Clips + Audio + README + Sequenz-Datei lokal gebündelt
-4. **Export-Panel UI** im Composer-Sidebar (History + Re-Download)
+## Use-Cases
 
-### Session N-2 (danach, ~2h): Roundtrip-Import
-5. **FCPXML-Re-Import** — geänderte Sequenz hochladen, Composer diff't Reorder/Trim/Delete und übernimmt
+### 1. Extend Forward (Verlängern nach hinten)
+- **Input:** Bestehendes Video (Upload ODER schon generierte Szene)
+- **Verarbeitung:** Letzten Frame extrahieren → als `start_image` an i2v-Engine
+- **Output:** Neue Szene direkt nach der Quelle, optisch nahtlos
+- **Engines:** Hailuo (`first_frame_image`), Kling (`start_image`), Luma (`start_image`), Wan (`image`), Seedance (`image`)
+- **UI:** Button "Forward verlängern →" auf jeder SceneCard mit `clipUrl`
 
----
+### 2. Extend Backward (Verlängern nach vorn)
+- **Input:** Bestehendes Video
+- **Verarbeitung:** Ersten Frame extrahieren → als `end_image` (Kling/Luma) bzw. als Prompt-Hint (andere)
+- **Output:** Neue Szene VOR der Quelle, endet im ersten Frame der Quelle
+- **Engines:** Kling (`end_image`), Luma (`end_image`) — andere Engines fallen auf Prompt-only zurück mit Warning
+- **UI:** Button "← Backward verlängern" auf jeder SceneCard mit `clipUrl`
 
 ## Architektur
 
-### 1. Storage-Bucket: `composer-exports` (privat)
-- RLS: `user_id` als erstes Path-Segment (Standard-Pattern)
-- TTL: 7 Tage (cleanup-Cron später optional)
-- Pfad-Schema: `{user_id}/{project_id}/export-{timestamp}.{xml|edl|zip}`
+### DB-Migration
 
-### 2. DB-Tabelle: `composer_exports`
-| Spalte | Typ | Zweck |
-|---|---|---|
-| `id` | uuid | PK |
-| `user_id` | uuid | RLS |
-| `project_id` | uuid | FK composer_projects |
-| `format` | text | `fcpxml` / `edl` / `bundle` |
-| `storage_path` | text | Pfad im Bucket |
-| `file_size_bytes` | bigint | für UI |
-| `scene_count` | int | Snapshot |
-| `total_duration_sec` | numeric | Snapshot |
-| `expires_at` | timestamptz | now() + 7 days |
-| `created_at` | timestamptz | default now() |
+```sql
+ALTER TABLE composer_scenes
+  ADD COLUMN IF NOT EXISTS hybrid_mode text 
+    CHECK (hybrid_mode IN ('forward', 'backward', 'bridge', 'style-ref') OR hybrid_mode IS NULL),
+  ADD COLUMN IF NOT EXISTS first_frame_url text,  -- für Backward-Extend
+  ADD COLUMN IF NOT EXISTS hybrid_target_scene_id uuid 
+    REFERENCES composer_scenes(id) ON DELETE SET NULL;  -- bei Bridge: zweite Quelle
+-- last_frame_url + continuity_source_scene_id existieren bereits
+```
 
-RLS: `auth.uid() = user_id` für SELECT/INSERT/DELETE.
+### Edge Function: `extract-video-frames` (neu)
 
-### 3. Edge Functions (3 neue)
+- **Input:** `{ videoUrl, mode: 'first' | 'last' | 'both' }`
+- **Verarbeitung:** Lädt Video per `fetch`, nutzt **ffmpeg.wasm** über `esm.sh` (Deno-kompatibel) ODER ruft den bereits vorhandenen Frame-Extractor aus `compose-clip-webhook` (siehe Audit) wieder
+- **Output:** `{ firstFrameUrl?, lastFrameUrl? }` — Upload in `motion-studio-library` Bucket unter `{userId}/frames/{sceneId}-{first|last}.jpg`
+- **Caching:** Wenn `first_frame_url` / `last_frame_url` schon gesetzt sind, skip extraction
 
-#### `composer-export-fcpxml`
-- Input: `{ projectId }`
-- Lädt `composer_projects` + `composer_scenes` (geordnet) + `composer_audio_tracks` + `globalTextOverlays`
-- Generiert FCPXML 1.10 (Apple DTD) mit:
-  - `<sequence>` mit Frame-Rate aus Projekt (24/30/60), Auflösung aus `aspectRatio`
-  - `<asset>` pro Clip (Video-URLs aus `clipUrl` / `uploadUrl`)
-  - `<asset-clip>` mit `start`/`offset`/`duration` als rationale Zeiten (z.B. `1500/30s`)
-  - Audio-Tracks als `<asset-clip>` in lane -1, -2, -3
-  - Text-Overlays als `<title>` mit `<text-style>`
-- Upload in `composer-exports` Bucket
-- Insert in `composer_exports` Tabelle
-- Return: `{ downloadUrl, exportId, expiresAt }`
+### Edge Function: `hybrid-extend-scene` (neu, Orchestrator)
 
-#### `composer-export-edl`
-- Vereinfachter Output: CMX 3600 EDL
-- Nur Video-Tracks + 2 Audio-Tracks
-- Kein Text, keine Effekte (EDL-Limit) → README warnt
-- Format:
+- **Input:**
+  ```typescript
+  {
+    projectId: string,
+    sourceSceneId: string,        // existierende Szene mit clipUrl
+    mode: 'forward' | 'backward',
+    engine: 'ai-hailuo' | 'ai-kling' | 'ai-luma' | 'ai-wan' | 'ai-seedance',
+    quality: 'standard' | 'pro',
+    prompt: string,               // beschreibt was passieren soll
+    duration: number,             // 4-12s je nach Engine
+  }
   ```
-  TITLE: Project Name
-  FCM: NON-DROP FRAME
-  001  CLIP_001 V     C        00:00:00:00 00:00:03:12 00:00:00:00 00:00:03:12
-  ```
+- **Flow:**
+  1. Validate ownership + engine compatibility (Backward → nur Kling/Luma support `end_image`)
+  2. Call `extract-video-frames` → bekommt `firstFrameUrl` oder `lastFrameUrl`
+  3. INSERT neue `composer_scenes` Row mit:
+     - `hybrid_mode`: 'forward' / 'backward'
+     - `continuity_source_scene_id`: sourceSceneId
+     - `referenceImageUrl`: extrahierter Frame
+     - `clipSource`: gewählte Engine
+     - `clipStatus`: 'generating'
+     - `orderIndex`: source.orderIndex + 1 (forward) bzw. -0.5 (backward, später Reorder)
+  4. Trigger bestehende Engine-Function (`generate-kling-video`, `generate-hailuo-video`, etc.) mit dem korrekten Image-Param
+  5. Reorder alle nachfolgenden Szenen (forward: shift +1) bzw. vorhergehenden (backward: re-sequence)
+  6. Return `{ newSceneId, estimatedCostEuros }`
 
-#### `composer-export-bundle`
-- Ruft intern `composer-export-fcpxml` + `composer-export-edl` auf
-- Lädt alle Asset-URLs (Clips + Audio) per `fetch` → Blob
-- Packt mit `JSZip` (Deno-kompatibel via esm.sh):
-  ```
-  /sequence.fcpxml
-  /sequence.edl
-  /clips/scene-01-{sceneId}.mp4
-  /clips/scene-02-{sceneId}.mp4
-  /audio/voiceover.mp3
-  /audio/music.mp3
-  /README.md  (Anleitung: "In Resolve: Datei → Importieren → sequence.fcpxml")
-  ```
-- Upload als `.zip` in Bucket
-- **Wichtig:** großes Bundle → Edge-Function-Timeout auf 300s in `supabase/config.toml`
+### Frontend: `HybridExtendDialog.tsx` (neu)
 
-#### `composer-import-fcpxml` (Session N-2)
-- Input: `{ projectId, fcpxmlContent }` (text)
-- Parse mit `fast-xml-parser` (esm.sh)
-- Extrahiert geordnete Liste der `<asset-clip>`-Refs + ihre In/Out-Zeiten
-- Diff gegen aktuelle `composer_scenes`:
-  - **Reorder:** matched per Storage-URL → update `order_index`
-  - **Trim:** in/out unterschiedlich → update `trim_start_sec` / `trim_end_sec`
-  - **Delete:** Szene fehlt im FCPXML → `is_deleted = true` (soft) ODER warn statt löschen
-  - **Unknown asset:** XML referenziert Datei, die nicht im Projekt ist → ignorieren + warnen
-- Return: `{ changesApplied: { reordered, trimmed, deleted }, warnings }`
-- Frontend zeigt Diff-Vorschau **vor** Bestätigung (kein silent overwrite)
+Modal das vom SceneCard-Button geöffnet wird:
+- **Mode-Tabs:** "Forward verlängern" / "Backward verlängern"
+- **Engine-Picker:** Dropdown mit Capability-Badges
+  - Forward: alle 5 i2v-Engines verfügbar
+  - Backward: nur Kling/Luma aktiv, andere ausgegraut mit Tooltip "Engine unterstützt nur Forward-Extend"
+- **Preview:** Thumbnail des extrahierten Frames (links Source, rechts neuer Frame als Anchor)
+- **Prompt-Field:** Mit dem `PromptTokenCounter` aus `motion-studio` (per-engine limits)
+- **Duration-Slider:** 4-12s je nach Engine
+- **Cost-Preview:** `getClipCost(engine, quality, duration)` Live-Berechnung
+- **Generate-Button:** ruft `useHybridExtend()` Hook
 
-### 4. Frontend
+### Frontend: `useHybridExtend.ts` (neu)
 
-#### `src/components/video-composer/NLEExportPanel.tsx` (neu)
-- Lebt im Composer-Sidebar (neuer Tab "Export → NLE" oder Erweiterung des bestehenden ExportPresetPanel)
-- 3 Buttons: "FCPXML", "EDL", "Bundle (ZIP)"
-- Nach Klick: Loading → toast → automatischer Download via `<a href download>`
-- History-Liste der letzten 10 Exporte (mit Re-Download + Ablaufdatum)
-- "Re-Import"-Button (Session N-2): File-Picker für `.fcpxml`, zeigt Diff-Modal
+- `extendScene(params)` → ruft `hybrid-extend-scene` Edge-Function
+- Polling auf neue Szene via Realtime-Subscription auf `composer_scenes`
+- Toast bei Success/Failure mit Credit-Refund-Hinweis bei Fehler
 
-#### `src/components/video-composer/NLEImportDiffDialog.tsx` (Session N-2)
-- Modal mit drei Sektionen: Reordered (alte → neue Position), Trimmed (alte → neue Dauer), Deleted (Liste)
-- Buttons: "Änderungen übernehmen" / "Abbrechen"
+### Frontend: SceneCard.tsx (modifiziert)
 
-#### `src/hooks/useNLEExport.ts` (neu)
-- `exportFCPXML(projectId)`, `exportEDL`, `exportBundle`, `importFCPXML(file)`
-- Polling für Bundle (kann 30-60s dauern)
-- Fehler-Toasts mit klaren Messages
+Zwei neue Buttons im Hover-Overlay (nur sichtbar wenn `clipUrl` gesetzt):
+```
+[← Backward extend] [Forward extend →]
+```
+Jeder öffnet den `HybridExtendDialog` mit vorausgewähltem Mode.
 
-### 5. Lokalisierung
-- DE/EN/ES für alle UI-Strings (Buttons, Toasts, Diff-Labels, README im Bundle bleibt EN für Profi-Workflow)
+### Continuity-Marker auf Karte
+
+Wenn `continuity_source_scene_id` ODER `hybrid_mode` gesetzt → Badge "🔗 Hybrid Forward" / "🔗 Hybrid Backward" auf der Card-Vorschau, mit Tooltip "Verlängert Szene #3"
 
 ---
 
-## Edge Cases & Hardening
+## Files Session M-1
+
+**Neu:**
+- `supabase/migrations/{ts}_hybrid_extend_columns.sql`
+- `supabase/functions/extract-video-frames/index.ts`
+- `supabase/functions/hybrid-extend-scene/index.ts`
+- `src/components/video-composer/HybridExtendDialog.tsx`
+- `src/hooks/useHybridExtend.ts`
+
+**Geändert:**
+- `src/types/video-composer.ts` — neue Felder in `ComposerScene` (`hybridMode`, `firstFrameUrl`, `hybridTargetSceneId`)
+- `src/components/video-composer/SceneCard.tsx` — 2 neue Buttons + Continuity-Badge
+- `src/hooks/useComposerPersistence.ts` — neue Felder in `mapDbSceneToScene` und `mapSceneToDbScene`
+- 3× i18n (DE/EN/ES) — Dialog-Labels, Toasts
+
+---
+
+# Session M-2 — Bridge & Style-Reference
+
+## Use-Case 3: Bridge (Übergang zwischen 2 Clips)
+- **Input:** Quelle A + Quelle B (beide existierende Szenen mit `clipUrl`)
+- **Verarbeitung:** Letzter Frame von A → `start_image`, Erster Frame von B → `end_image`
+- **Output:** Neue Szene zwischen beiden, die optisch von A nach B morpht
+- **Engine:** Nur **Kling** (einziger Provider mit `end_image` UND `start_image` simultan)
+- **UI:** Drag-and-Drop oder Modal mit zwei Szenen-Pickern
+
+## Use-Case 4: Style-Reference (Style-Transfer)
+- **Input:** Existierendes Video als Style-Anker + neuer Prompt
+- **Verarbeitung:** Video wird als `reference_video` an Kling übergeben (Kling 1.6 unterstützt das)
+- **Output:** Neue Szene im selben Look wie das Referenzvideo
+- **Engine:** Nur **Kling** (`reference_video` Param)
+- **UI:** "Als Style-Reference nutzen" Button auf jeder SceneCard → öffnet Dialog mit Prompt-Field
+
+## Architektur Erweiterungen
+
+### `hybrid-extend-scene` erweitern um Modi `bridge` und `style-ref`:
+- Bridge: 2 Frames extrahieren (last von A, first von B), beide an Kling
+- Style-Ref: kein Frame-Extract, nur Video-URL an Kling als `reference_video`
+
+### `HybridExtendDialog` erweitern:
+- Neue Tabs "Bridge" und "Style-Ref"
+- Bridge-Tab: 2 Szenen-Picker (Source A + Source B)
+- Style-Ref-Tab: Prompt + Source-Picker
+
+### Files Session M-2
+**Neu:** —
+**Geändert:**
+- `supabase/functions/hybrid-extend-scene/index.ts` — 2 neue Modi
+- `src/components/video-composer/HybridExtendDialog.tsx` — 2 neue Tabs
+- `src/hooks/useHybridExtend.ts` — 2 neue Methoden
+
+---
+
+# Edge Cases & Hardening
 
 | Case | Lösung |
 |---|---|
-| Szene ohne `clipUrl` (noch nicht generiert) | Skip mit Warning im Toast |
-| Mixed Aspect-Ratios | Sequenz-Auflösung = Projekt-Setting, einzelne Clips werden in NLE skaliert |
-| Speed-Ramping (`speedCurve`) | Nicht in FCPXML 1.10 mappbar → "rate"-Tag mit Durchschnitt + Warning im README |
-| Text-Overlay-Animationen | Statisch in FCPXML, Animation geht verloren → README-Warning |
-| Asset-URL nicht erreichbar (deleted) | Bundle: skip + log; FCPXML/EDL: include URL aber warn |
-| FCPXML > 5 MB | unlikely, aber Streaming-Response statt JSON |
-| Bundle > 500 MB | Hard-Limit, error-toast "Projekt zu groß für Bundle, nutze FCPXML + manuelle Downloads" |
+| Source-Szene ohne `clipUrl` (noch nicht generiert) | Buttons disabled mit Tooltip "Erst Szene generieren" |
+| Sora als Engine ausgewählt | Tab/Option komplett ausgeblendet |
+| Backward + nicht-Kling/Luma | Dropdown-Option ausgegraut + Inline-Warning |
+| Extract-Frame Failure | Fallback: User kann manuell Bild hochladen via `SceneReferenceImageUpload` |
+| Bridge: A und B haben verschiedene Aspect-Ratios | Pre-Check + Warnung "Bridge funktioniert am besten mit gleichem Format" |
+| Style-Ref Video > 10s | Replicate-Limit → trim auf erste 5s automatisch |
+| Insufficient credits | Standard `ai_video_wallets` Check VOR Frame-Extract |
 
 ---
 
-## Sicherheit
-
-- Alle Edge-Functions: `verify_jwt` via Code-Check (`supabase.auth.getUser()`)
-- Storage-RLS: `user_id` muss erstes Path-Segment sein (Pattern aus `background-projects`)
-- Re-Import: Validate, dass `projectId` dem User gehört, **bevor** Diff angewendet wird
-- XML-Parser: `fast-xml-parser` mit `processEntities: true` aber `allowBooleanAttributes: false` (kein XXE)
-
----
-
-## Files (Session N-1, ~7 neue)
-
-**Neu:**
-- `supabase/migrations/{timestamp}_composer_exports.sql` — Tabelle + Bucket + RLS
-- `supabase/functions/composer-export-fcpxml/index.ts`
-- `supabase/functions/composer-export-edl/index.ts`
-- `supabase/functions/composer-export-bundle/index.ts`
-- `src/components/video-composer/NLEExportPanel.tsx`
-- `src/hooks/useNLEExport.ts`
-
-**Geändert:**
-- `src/components/video-composer/VideoComposerDashboard.tsx` — neuer Tab/Section für NLE-Export
-- `supabase/config.toml` — Timeout-Konfig für `composer-export-bundle` (300s)
-- 3× i18n-Files (DE/EN/ES)
-
-## Files (Session N-2, ~3 neue)
-
-- `supabase/functions/composer-import-fcpxml/index.ts`
-- `src/components/video-composer/NLEImportDiffDialog.tsx`
-- (Hook erweitern)
+# Sicherheit
+- `verify_jwt` Validation in beiden neuen Edge-Functions
+- Ownership-Check: `sourceSceneId` MUSS zu `projectId` gehören, das dem User gehört
+- Frame-Storage: `motion-studio-library` Bucket nutzt `auth.uid()` als ersten Path-Segment (RLS schon aktiv)
+- Refund-Mechanismus: Bei Engine-Failure → `refund_ai_video_credits()` aufrufen
 
 ---
 
-## Vorgehen
+# Vorgehen
 
-**Erst Session N-1** komplett implementieren + manuell testen (FCPXML in Resolve öffnen, EDL in Premiere, Bundle entpacken). Wenn alles sauber läuft, **dann Session N-2** (Roundtrip).
+**Erst Session M-1** komplett (Forward + Backward, 5 Engines, UI mit 2 Tabs). Manuell testen:
+1. Existierende Szene generieren
+2. "Forward extend" klicken, Hailuo wählen, Prompt schreiben → neue Szene erscheint nahtlos angehängt
+3. "Backward extend" mit Kling testen
+4. Continuity-Badge sichtbar?
 
-**Danach** beginnt Block M (Hybrid Production Pro) mit Schema-Änderungen am Composer.
+Wenn alles läuft → **Session M-2** (Bridge + Style-Ref mit Kling).
 
-Sag Bescheid, wenn ich loslegen soll mit **Session N-1** — oder ob du noch was anpassen willst (z.B. FCPXML-only und EDL/Bundle weglassen).
+---
+
+**Soll ich mit Session M-1 starten?** Oder möchtest du noch etwas anpassen — z.B.:
+- Engines reduzieren (nur Kling + Luma statt alle 5)?
+- Backward-Extend weglassen (nur Forward in M-1)?
+- Sora trotzdem mit Prompt-Fallback unterstützen?

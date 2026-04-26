@@ -40,6 +40,8 @@ interface ClipScene {
   uploadUrl?: string;
   /** Optional image used as visual guide for AI sources (image-to-video). */
   referenceImageUrl?: string;
+  /** Optional anchor image for the END of the clip (Kling/Luma backward extend / bridge). */
+  endReferenceImageUrl?: string;
   durationSeconds: number;
   characterShot?: { characterId: string; shotType: CharacterShotType };
 }
@@ -324,10 +326,14 @@ serve(async (req) => {
             aspect_ratio: "16:9",
             mode: quality === 'pro' ? 'pro' : 'standard',
           };
-          // Image-to-Video: Kling 2.1 supports start_image
+          // Image-to-Video: Kling 2.1 supports start_image AND end_image
           if (scene.referenceImageUrl) {
             klingInput.start_image = scene.referenceImageUrl;
-            console.log(`[compose-video-clips] Kling scene ${scene.id} uses reference image`);
+            console.log(`[compose-video-clips] Kling scene ${scene.id} uses start_image`);
+          }
+          if (scene.endReferenceImageUrl) {
+            klingInput.end_image = scene.endReferenceImageUrl;
+            console.log(`[compose-video-clips] Kling scene ${scene.id} uses end_image (backward extend / bridge)`);
           }
 
           const prediction = await replicate.predictions.create({
@@ -469,7 +475,11 @@ serve(async (req) => {
           };
           if (scene.referenceImageUrl) {
             lumaInput.start_image = scene.referenceImageUrl;
-            console.log(`[compose-video-clips] Luma scene ${scene.id} uses keyframe reference`);
+            console.log(`[compose-video-clips] Luma scene ${scene.id} uses start_image keyframe`);
+          }
+          if (scene.endReferenceImageUrl) {
+            lumaInput.end_image = scene.endReferenceImageUrl;
+            console.log(`[compose-video-clips] Luma scene ${scene.id} uses end_image keyframe (backward extend / bridge)`);
           }
 
           const prediction = await replicate.predictions.create({
