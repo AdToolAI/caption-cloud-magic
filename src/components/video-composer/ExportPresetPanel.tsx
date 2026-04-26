@@ -156,6 +156,27 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
         label: p.label,
       }));
 
+      // Block R: When Smart Reframe is on AND target aspect differs from master,
+      // ensure subject tracks exist before kicking off the parallel renders.
+      const needsTracking = smartReframe && selectedPresets.some(p => p.aspect !== currentAspect);
+      if (needsTracking) {
+        setAnalyzing(true);
+        try {
+          const { error: analyzeErr } = await supabase.functions.invoke('analyze-scene-subject', {
+            body: { projectId },
+          });
+          if (analyzeErr) {
+            console.warn('[smart-reframe] analyze failed, falling back to center crop', analyzeErr);
+            toast({
+              title: 'Smart Reframe übersprungen',
+              description: 'Subjekt-Tracking fehlgeschlagen — es wird zentriert zugeschnitten.',
+            });
+          }
+        } finally {
+          setAnalyzing(false);
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke('render-multi-format-batch', {
         body: { projectId, presets: selectedPresets },
       });
