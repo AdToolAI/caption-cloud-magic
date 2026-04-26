@@ -30,8 +30,9 @@ interface ReqBody {
   fps?: number;
 }
 
+// deno-lint-ignore no-explicit-any
 export async function buildProjectPayload(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   projectId: string,
   fps: 24 | 30 | 60,
 ): Promise<{ project: NLEProject; warnings: string[] }> {
