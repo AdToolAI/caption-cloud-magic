@@ -101,7 +101,7 @@ export function ImageGenerator() {
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [justGenerated, setJustGenerated] = useState(false);
 
-  const loading = legacyLoading || replicateLoading;
+  const loading = replicateLoading;
   const cost = TIER_COSTS[tier];
   const currency = wallet?.currency || 'EUR';
   const currencySymbol = currency === 'USD' ? '$' : '€';
