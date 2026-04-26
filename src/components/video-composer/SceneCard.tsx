@@ -113,6 +113,8 @@ export default function SceneCard({
   const [inspiring, setInspiring] = useState(false);
   // Block K-6 — Multi-Engine Preview open state
   const [multiEngineOpen, setMultiEngineOpen] = useState(false);
+  // Block L — Inline Compare Lab dialog open state
+  const [compareLabOpen, setCompareLabOpen] = useState(false);
 
   // Block K-5: pull system presets to seed inspire variation
   const { systemPresets } = useStylePresets();
