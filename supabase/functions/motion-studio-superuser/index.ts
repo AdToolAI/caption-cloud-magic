@@ -116,12 +116,14 @@ const SCENARIOS: Scenario[] = [
     custom: async () => {
       const { data, error } = await adminClient.storage.listBuckets();
       if (error) return { ok: false, message: error.message };
-      const found = data?.some((b) =>
-        ["composer-uploads", "composer-frames", "composer-clips", "stock-media"].includes(b.name),
-      );
-      return found
-        ? { ok: true, data: { buckets: data.length } }
-        : { ok: false, message: "No composer upload/frame bucket found" };
+      // Real existing composer buckets in this project
+      const required = ["composer-uploads", "composer-frames", "composer-nle-exports"];
+      const present = data?.map((b) => b.name) ?? [];
+      const missing = required.filter((r) => !present.includes(r));
+      if (missing.length > 0) {
+        return { ok: false, message: `Missing buckets: ${missing.join(", ")}` };
+      }
+      return { ok: true, data: { required, totalBuckets: present.length } };
     },
   },
   {
