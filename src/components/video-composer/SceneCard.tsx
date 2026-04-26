@@ -71,7 +71,9 @@ interface SceneCardProps {
    * Block M — opens the Hybrid Extend dialog for this scene.
    * Parent owns the dialog state because it needs to refetch scenes after success.
    */
-  onHybridExtend?: (mode: 'forward' | 'backward') => void;
+  onHybridExtend?: (mode: 'forward' | 'backward' | 'bridge' | 'style-ref') => void;
+  /** True if at least one OTHER scene in the project has a clip_url (enables Bridge button). */
+  hasOtherReadyScenes?: boolean;
   language: string;
 }
 
