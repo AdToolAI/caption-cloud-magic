@@ -156,6 +156,27 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
         label: p.label,
       }));
 
+      // Block R: When Smart Reframe is on AND target aspect differs from master,
+      // ensure subject tracks exist before kicking off the parallel renders.
+      const needsTracking = smartReframe && selectedPresets.some(p => p.aspect !== currentAspect);
+      if (needsTracking) {
+        setAnalyzing(true);
+        try {
+          const { error: analyzeErr } = await supabase.functions.invoke('analyze-scene-subject', {
+            body: { projectId },
+          });
+          if (analyzeErr) {
+            console.warn('[smart-reframe] analyze failed, falling back to center crop', analyzeErr);
+            toast({
+              title: 'Smart Reframe übersprungen',
+              description: 'Subjekt-Tracking fehlgeschlagen — es wird zentriert zugeschnitten.',
+            });
+          }
+        } finally {
+          setAnalyzing(false);
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke('render-multi-format-batch', {
         body: { projectId, presets: selectedPresets },
       });
@@ -260,6 +281,40 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
         </div>
       </CardHeader>
       <CardContent className="py-4">
+        {/* Block R · Smart Reframe Toggle */}
+        <div className="mb-3 p-2.5 rounded-lg border border-primary/20 bg-primary/5 flex items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <div className="h-7 w-7 rounded-md bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
+              <Crosshair className="h-3.5 w-3.5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Label htmlFor="smart-reframe" className="text-[12px] font-semibold cursor-pointer">
+                  Smart Subject Tracking
+                </Label>
+                <Badge variant="secondary" className="text-[9px] h-4 px-1 font-normal">
+                  AI · Beta
+                </Badge>
+                {analyzing && (
+                  <Badge variant="outline" className="text-[9px] h-4 px-1 gap-1 border-primary/40 text-primary">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    Analysiere…
+                  </Badge>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
+                Folgt dem Hauptmotiv beim Zuschnitt zwischen Formaten — perfekt für 16:9 → 9:16.
+              </p>
+            </div>
+          </div>
+          <Switch
+            id="smart-reframe"
+            checked={smartReframe}
+            onCheckedChange={persistSmartReframe}
+            disabled={analyzing || batchLoading}
+          />
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           {PRESETS.map((preset) => {
             const latest = latestByKey.get(preset.key);
