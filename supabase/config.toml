@@ -720,3 +720,7 @@ timeout_sec = 60
 [functions.composer-export-edl]
 verify_jwt = false
 timeout_sec = 60
+
+[functions.generate-music-track]
+verify_jwt = true
+timeout_sec = 180
