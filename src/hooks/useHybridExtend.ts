@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export type HybridMode = 'forward' | 'backward';
+export type HybridMode = 'forward' | 'backward' | 'bridge' | 'style-ref';
 export type HybridEngine =
   | 'ai-hailuo'
   | 'ai-kling'
@@ -10,8 +10,10 @@ export type HybridEngine =
   | 'ai-wan'
   | 'ai-seedance';
 
-/** Engines that support `end_image` and therefore support backward extend. */
+/** Engines that support `end_image` and therefore support backward extend AND bridge. */
 export const HYBRID_BACKWARD_CAPABLE: HybridEngine[] = ['ai-kling', 'ai-luma'];
+/** Bridge requires both start_image and end_image — same constraint as backward. */
+export const HYBRID_BRIDGE_CAPABLE: HybridEngine[] = HYBRID_BACKWARD_CAPABLE;
 
 export interface HybridExtendParams {
   projectId: string;
@@ -21,6 +23,8 @@ export interface HybridExtendParams {
   quality?: 'standard' | 'pro';
   prompt: string;
   durationSeconds?: number;
+  /** Required when `mode === 'bridge'`: the scene the new clip should morph INTO. */
+  targetSceneId?: string;
 }
 
 export interface HybridExtendResult {
