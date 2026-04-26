@@ -691,11 +691,15 @@ Deno.serve(async (req) => {
 
     console.log(`[Superuser] Starting ${scenarios.length} scenarios in mode=${mode}`);
 
-    // Run scenarios in parallel batches of 3
-    const batchSize = 3;
+    // Run scenarios in parallel batches of 2 (reduced from 3 to avoid 503 bursts on Edge Runtime)
+    const batchSize = 2;
     for (let i = 0; i < scenarios.length; i += batchSize) {
       const batch = scenarios.slice(i, i + batchSize);
       await Promise.all(batch.map((s) => runScenario(s, ctx, triggeredBy)));
+      // Small inter-batch pause to let Edge Runtime breathe
+      if (i + batchSize < scenarios.length) {
+        await new Promise((r) => setTimeout(r, 250));
+      }
     }
 
     // Aggregate result (last 60s)
