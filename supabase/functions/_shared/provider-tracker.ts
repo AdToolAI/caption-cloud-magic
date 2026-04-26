@@ -75,9 +75,9 @@ export async function trackProviderCall<T>(
     // Fire-and-forget log write
     queueMicrotask(() => {
       try {
-        const client = getClient();
+        const client = getClient() as any;
         if (!client) return;
-        (client.from('provider_quota_log') as any).insert({
+        client.from('provider_quota_log').insert({
           provider,
           endpoint,
           status_code: statusCode,
@@ -86,8 +86,8 @@ export async function trackProviderCall<T>(
           rate_limit_remaining: rateLimitRemaining,
           rate_limit_total: options.rateLimitTotal ?? null,
           error_message: errorMessage,
-        }).then(({ error }: { error: any }) => {
-          if (error) console.error('[provider-tracker] log failed:', error.message);
+        }).then(({ error }: { error: unknown }) => {
+          if (error) console.error('[provider-tracker] log failed:', (error as Error).message);
         });
       } catch (e) {
         console.error('[provider-tracker] unexpected:', e);
@@ -110,9 +110,9 @@ export async function trackLambdaRender(params: {
   functionName?: string;
 }) {
   try {
-    const client = getClient();
+    const client = getClient() as any;
     if (!client) return;
-    await (client.from('lambda_health_metrics') as any).insert({
+    await client.from('lambda_health_metrics').insert({
       render_id: params.renderId,
       job_id: params.jobId,
       status: params.status,
@@ -132,14 +132,14 @@ export async function trackLambdaRender(params: {
  */
 export async function getSystemConfig<T = unknown>(key: string, fallback: T): Promise<T> {
   try {
-    const client = getClient();
+    const client = getClient() as any;
     if (!client) return fallback;
-    const { data } = await (client
-      .from('system_config') as any)
+    const { data } = await client
+      .from('system_config')
       .select('value')
       .eq('key', key)
       .maybeSingle();
-    return ((data as any)?.value as T) ?? fallback;
+    return ((data?.value as T) ?? fallback) as T;
   } catch {
     return fallback;
   }
