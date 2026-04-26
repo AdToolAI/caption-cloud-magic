@@ -36,6 +36,8 @@ interface Briefing {
   visualStyle?: string;
   characters?: ComposerCharacter[];
   videoMode?: VideoMode;
+  /** Stock-First hint: prefer free Pexels/Pixabay clips for generic B-roll. */
+  preferStock?: boolean;
 }
 
 const CATEGORY_STRUCTURES: Record<string, string> = {
@@ -385,8 +387,25 @@ Generate the storyboard using the create_storyboard function.`;
     // - 'mixed' → hook + cta as ai-hailuo (premium hero shots), rest as ai-image
     const videoMode: VideoMode = briefing.videoMode || 'video';
     const brandColor = briefing.brandColors?.[0];
+    const preferStock = briefing.preferStock === true;
 
-    const pickClipSource = (sceneType: string, idx: number, total: number): string => {
+    // Stock-First detection: scenes that show generic environments / B-roll /
+    // lifestyle moments WITHOUT the product as visible hero AND WITHOUT a
+    // recurring character anchor are safe candidates for free stock footage.
+    const hasCharacters = (briefing.characters || []).length > 0;
+    const isStockCandidate = (sceneType: string, characterShot: any): boolean => {
+      if (!preferStock) return false;
+      // Never use stock for the hero moments — those drive brand recognition.
+      if (sceneType === 'hook' || sceneType === 'cta' || sceneType === 'demo') return false;
+      // Never use stock when a recurring character is featured in this scene.
+      if (hasCharacters && characterShot?.shotType && characterShot.shotType !== 'absent') return false;
+      // Problem / social-proof / custom B-roll → safe stock candidates.
+      return ['problem', 'social-proof', 'custom'].includes(sceneType);
+    };
+
+    const pickClipSource = (sceneType: string, idx: number, total: number, characterShot: any): string => {
+      // Stock-First takes priority when applicable.
+      if (isStockCandidate(sceneType, characterShot)) return 'stock';
       if (videoMode === 'image') return 'ai-image';
       if (videoMode === 'mixed') {
         const isHero = sceneType === 'hook' || sceneType === 'cta' || idx === 0 || idx === total - 1;
