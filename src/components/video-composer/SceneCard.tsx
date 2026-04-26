@@ -307,11 +307,21 @@ export default function SceneCard({
                         : 'Hybrid scene: frame-anchored to source'
                     }
                   >
-                    <Link2 className="h-2.5 w-2.5" />
+                    {scene.hybridMode === 'bridge' ? (
+                      <Link2 className="h-2.5 w-2.5" />
+                    ) : scene.hybridMode === 'style-ref' ? (
+                      <Palette className="h-2.5 w-2.5" />
+                    ) : (
+                      <Link2 className="h-2.5 w-2.5" />
+                    )}
                     {scene.hybridMode === 'forward'
-                      ? (lang === 'de' ? 'Forward' : lang === 'es' ? 'Forward' : 'Forward')
+                      ? 'Forward'
                       : scene.hybridMode === 'backward'
-                      ? (lang === 'de' ? 'Backward' : lang === 'es' ? 'Backward' : 'Backward')
+                      ? 'Backward'
+                      : scene.hybridMode === 'bridge'
+                      ? 'Bridge'
+                      : scene.hybridMode === 'style-ref'
+                      ? 'Style'
                       : scene.hybridMode}
                   </Badge>
                 )}
