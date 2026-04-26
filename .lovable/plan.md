@@ -1,98 +1,99 @@
 
-# 🎯 Markt-Status-Audit — Wo stehen wir nach Block O + P + Q?
+# Option A — Solides Fundament zuerst
 
-## ✅ Was wir jetzt haben (Stand heute)
-
-Mit Abschluss von **Block I–Q** ist Motion Studio in der **Top-Tier-Liga** angekommen. Hier die nüchterne Bestandsaufnahme:
-
-| Bereich | Status | Marktvergleich |
-|---|---|---|
-| **Engine-Vielfalt** | Sora 2, Kling 3.0 Omni, Luma Ray-2, Hailuo 2.3, Wan 2.5, Seedance, Veo | **🥇 Führend** (mehr als Runway, HeyGen, Pika) |
-| **1-Click Auto-Movie** | ✅ Block O — Gemini-Plan → Auto-Generation | ✅ **Parität** mit Pika 2.0 / Runway Gen-3 |
-| **Multi-Format Export** | ✅ Block P — 16:9 + 9:16 + 1:1 simultan | ✅ **Parität** mit HeyGen / Submagic |
-| **Talking-Head / Lip-Sync** | ✅ Block Q — Hedra Character-3 + ElevenLabs | ✅ **Parität** mit HeyGen / D-ID / Synthesia |
-| **Hybrid Production** (Forward/Backward/Bridge/Style-Ref) | ✅ Block M | 🥇 **Alleinstellung** — kein Wettbewerber bietet alle 4 Modi |
-| **NLE-Roundtrip** (FCPXML/EDL Import+Export) | ✅ | 🥇 **Alleinstellung** im AI-Video-Segment |
-| **Director's Cut Editor** (CapCut-Style mit Filter, Speed-Ramping, Subtitle-AI) | ✅ | ✅ Stark, vergleichbar mit CapCut Pro |
-| **Brand-Kit-System** | ✅ Basic (logo, colors, fonts) | ⚠️ Manueller Apply — Wettbewerb (Canva, HeyGen) wendet automatisch an |
-| **Voice-Cloning Integration** | ⚠️ Backend ja, Composer-UI integriert über Talking-Head | ✅ OK, aber nicht in Standard-Voiceover-Tab sichtbar |
+Drei aufeinanderfolgende Mini-Blöcke, jeweils klein und verifizierbar.
 
 ---
 
-## 🔍 Verbleibende Lücken zur absoluten Marktspitze
+## 1️⃣ Smart-Reframe E2E-Test & Hardening
 
-Nach Audit gegen **Runway Gen-3, Pika 2.0, HeyGen, Synthesia, Canva Magic Studio, Submagic, Descript** sehe ich noch **4 sinnvolle Blöcke**:
+**Ziel:** Block R (Smart Reframe) verifizieren und gegen Edge-Cases absichern.
 
-### 🔥 Block R — Smart Reframe (AI Subject Tracking) — ~2.5h
-**Lücke**: Multi-Format-Export macht aktuell **Center-Crop**. Wettbewerber (Submagic, Adobe Premiere Auto-Reframe) verfolgen das Hauptmotiv intelligent.
+**Vorgehen:**
+- **Edge-Function Test (`analyze-scene-subject`)**: Echtes Test-Projekt aus `composer_projects` ziehen, Funktion via `curl_edge_functions` aufrufen, geliefertes `subject_track` JSONB validieren (normalisierte x/y in [0,1], min. 3 Keypoints/Szene).
+- **Logs-Audit**: `edge_function_logs` für `analyze-scene-subject` und `compose-video-assemble` checken — Token-Verbrauch (Gemini 2.5 Flash Vision), Fehlerraten, Fallback-Häufigkeit.
+- **Hardening**: 
+  - In `analyze-scene-subject`: Timeout pro Frame (10s), Retry-Limit (2), bei Total-Fail explizit `subject_track = null` setzen statt Funktion zu sprengen.
+  - In `ComposedAdVideo.tsx`: Defensive Clamping `objectPosition` auf [0%, 100%] (vermeidet Crashes bei korrupten Tracking-Daten).
+- **UI-Feedback**: In `ExportPresetPanel.tsx` Tooltip ergänzen: „Tracking-Daten älter als 7 Tage werden neu berechnet" + Re-Analyze-Button.
 
-**Plan**:
-- Neue Edge Function `analyze-scene-subject` → Gemini 2.5 Pro Vision analysiert Keyframes und liefert Bounding-Box pro Sekunde
-- `render-multi-format-batch` erweitern: nutzt Subject-Track für dynamisches Crop-Center
-- UI in `ExportPresetPanel.tsx`: Toggle "Smart Subject Track" (default ON für 9:16, OFF für 16:9→1:1)
-- Caching: Subject-Tracks pro Szene in neuer Spalte `composer_scenes.subject_track` (JSONB)
-
-**Impact**: Ein 16:9 Korporate-Video wird zu einem perfekt zentrierten 9:16 TikTok-Clip — der KILLER für Cross-Posting-Workflows.
-
----
-
-### 💎 Block S — Brand Memory (Auto-Apply Brand Kit) — ~1.5h (EASY-WIN)
-**Lücke**: User muss in jedem Projekt manuell Brand-Kit anwenden. Canva/HeyGen wenden automatisch an.
-
-**Plan**:
-- DB: `composer_projects.brand_kit_id` + Trigger, der bei Insert das Default-Brand-Kit des Users setzt
-- Auto-Director-Wizard: zeigt aktive Brand → Logo, Farben, Font werden automatisch in Plan-Generation übergeben (Gemini Prompt erweitert)
-- `BrandKitApplyPanel.tsx`: neuer Toggle "Als Standard für neue Projekte"
-- Talking-Head & Multi-Format respektieren automatisch Brand-Subtitle-Style
-
-**Impact**: User bauen einmal ihr Brand-Kit, danach ist jedes Video automatisch on-brand. Reduziert Setup-Zeit um ~80%.
+**Files:**
+- `supabase/functions/analyze-scene-subject/index.ts` (Hardening)
+- `src/remotion/templates/ComposedAdVideo.tsx` (Clamp)
+- `src/components/video-composer/ExportPresetPanel.tsx` (Re-Analyze UI)
 
 ---
 
-### 📊 Block T — Performance-Loop (Top-Performing Templates) — ~3h
-**Lücke**: Wir haben Analytics (`analyze-performance`), nutzen sie aber nicht für Content-Empfehlungen. HeyGen hat "Top performers" Library, Pika lernt aus User-Daten.
+## 2️⃣ Voice-Cloning im Voiceover-Tab sichtbar machen
 
-**Plan**:
-- Aggregations-Job: Top 20 Composer-Projekte pro Plattform (TikTok/Reels/Shorts) nach Engagement-Rate identifizieren
-- Tabelle `composer_template_suggestions` (auto-generated weekly via cron)
-- Neuer Tab im Composer-Dashboard: **"🏆 Trending Templates"** — Click-to-Clone (kopiert Storyboard + Engine-Mix in neues Projekt)
-- Auto-Director nutzt Top-Templates als "Stil-Inspiration" wenn User-Idee dazu passt
+**Status quo:** Custom Voices werden bereits via `list-voices` geladen (siehe `accountVoices` in der Edge-Function), aber im Director's Cut `AIVoiceOver.tsx` gibt es **keinen UI-Eintrag für Voice-Cloning** — der User muss raten, wo er Voices klont. Der `VoiceCloneDialog` existiert nur isoliert.
 
-**Impact**: Datengetriebene Content-Strategie. Differenzierung gegenüber Tools, die nur generieren ohne zu lernen.
+**Vorgehen:**
+- **Header-Button im `AIVoiceOver.tsx`**: Neben Sprach-Tabs ein „+ Eigene Stimme klonen"-Button, der `VoiceCloneDialog` öffnet.
+- **Custom-Voices-Sektion**: Im Voice-Picker eine separate Tab/Gruppe „🎤 Meine Stimmen" zwischen Premium und Standard-Voices. Filter via `tier === 'cloned'` oder Marker aus `useCustomVoices`.
+- **Tier-Badge**: Custom Voices bekommen ein gold-cyan „Cloned"-Badge (James-Bond-2028 Style), damit der User sie sofort erkennt.
+- **Auto-Refresh**: Nach erfolgreichem `cloneVoice()` `list-voices` re-fetchen, damit die neue Stimme ohne Reload erscheint.
+- **Motion Studio Konsistenz**: Im `VoicePicker.tsx` (Motion Studio) ebenfalls einen „+ Klonen"-Shortcut anbieten, falls keine aktiven Custom Voices.
 
----
-
-### 🤝 Block U — Realtime Collaboration (Presence + Comments) — ~5h
-**Lücke**: Composer ist aktuell Single-User. HeyGen Teams, Frame.io, Runway Workspaces bieten Live-Collab.
-
-**Plan**:
-- Supabase Realtime Channels pro Projekt → Presence (wer ist online, welche Szene editiert wer)
-- Neue Tabelle `composer_comments` mit Szenen-Anker + Resolved-Status
-- UI: Avatar-Stack im Header, Kommentar-Pin auf SceneCard, Side-Panel mit Comment-Thread
-- Optional: Live-Cursors über Storyboard
-- Permissions: nutzt bestehendes `add-collaborator` System
-
-**Impact**: Ermöglicht Agenturen + Marketing-Teams. **Voraussetzung für Enterprise-Verkauf >5 Sitze.**
+**Files:**
+- `src/components/directors-cut/features/AIVoiceOver.tsx` (Klon-Button + Custom-Sektion)
+- `src/components/motion-studio/VoicePicker.tsx` (Klon-Shortcut)
+- `supabase/functions/list-voices/index.ts` (Tier-Marker `cloned` für DB-eigene Voices via `custom_voices`-Lookup)
 
 ---
 
-## 📊 Empfohlene Reihenfolge
+## 3️⃣ Block T — Trending Templates (Performance Loop)
 
-| Reihenfolge | Block | Aufwand | Begründung |
-|---|---|---|---|
-| **1.** | **S — Brand Memory** | 1.5h | Easy-Win, sofort spürbarer Mehrwert für ALLE User, blockiert nichts |
-| **2.** | **R — Smart Reframe** | 2.5h | Macht Block P (Multi-Format) zum echten Killer-Feature |
-| **3.** | **T — Performance Loop** | 3h | Strategischer Differenzierer, nutzt vorhandene Analytics |
-| **4.** | **U — Realtime Collab** | 5h | Größte Investition, aber Enterprise-Türöffner |
+**Ziel:** Top-performende Projekt-Strukturen analytisch erfassen und als „Click-to-Clone"-Templates anbieten.
+
+**Datenmodell (Migration):**
+```sql
+CREATE TABLE composer_template_suggestions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_project_id UUID REFERENCES composer_projects(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  category TEXT,                 -- z. B. 'product-ad', 'tutorial', 'story'
+  scene_count INT,
+  total_duration_sec NUMERIC,
+  performance_score NUMERIC,     -- weighted: views + completion + shares
+  thumbnail_url TEXT,
+  preview_video_url TEXT,
+  structure_json JSONB,          -- abstrahierter Storyboard-Bauplan (ohne PII)
+  is_public BOOLEAN DEFAULT true,
+  use_count INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+-- RLS: SELECT für authenticated bei is_public=true; INSERT/UPDATE nur via service_role.
+```
+
+**Edge Function `aggregate-trending-templates` (cron, weekly):**
+- Liest aus `ab_test_variants`, `template_performance_metrics`, `video_creations` die Top-25 Projekte der letzten 14 Tage.
+- Anonymisiert das Storyboard (entfernt User-spezifische Texte/Logos/Brand-Kit-Refs).
+- Berechnet `performance_score` (z. B. `views*0.3 + completion_rate*0.5 + shares*0.2`).
+- Upsertet in `composer_template_suggestions`.
+
+**UI-Integration:**
+- Neuer Tab „🔥 Trending" in `MotionStudioTemplatePicker.tsx`.
+- Karten zeigen Score, Kategorie, Vorschau-Video; Klick → ruft `auto-director-compose` mit der vorgegebenen Struktur auf und überspringt das Briefing.
+- Inkrementiert `use_count` per RPC.
+
+**Files:**
+- `supabase/migrations/<timestamp>_composer_template_suggestions.sql`
+- `supabase/functions/aggregate-trending-templates/index.ts` (neu)
+- `src/components/video-composer/MotionStudioTemplatePicker.tsx` (Trending-Tab)
+- `src/hooks/useTrendingTemplates.ts` (neu)
+- `supabase/config.toml` (cron-Eintrag, falls über pg_cron statt extern)
+
+**Cron:** Empfehlung — wöchentlich Sonntag 03:00 UTC via Supabase pg_cron oder manuell triggerbar via Admin-Button.
 
 ---
 
-## 💡 Mein Vorschlag
+## Reihenfolge & Abnahme
 
-Wir starten mit dem **Doppelschlag S → R** in dieser Session:
-- **S (Brand Memory)** liefert sofort UX-Boost mit minimalem Risiko
-- **R (Smart Reframe)** veredelt direkt den letzten Block P
+1. **Smart-Reframe E2E** zuerst (kleinster Scope, baut Vertrauen in bestehenden Code).
+2. **Voice-Cloning UI** (rein frontend, sofort sichtbarer User-Wert).
+3. **Trending Templates** (größter Block, neue Tabelle + Cron + UI).
 
-Beide zusammen ~4h — danach hat das Tool **funktionale Vollparität** mit allen Top-3 Wettbewerbern und behält die einzigartigen Stärken (Hybrid Production + NLE-Export + Engine-Vielfalt).
+Pro Block: Migration → Edge Function → Frontend → Test mit `curl_edge_functions` und (für Reframe) Log-Check.
 
-**Soll ich mit S + R starten, oder eine andere Reihenfolge?**
+**Nicht enthalten:** Block U (Realtime Collab) — folgt nach Option A in einem separaten Schritt.
