@@ -285,6 +285,7 @@ export default function StoryboardTab({
           projectId={projectId}
           sourceSceneId={hybridDialog.scene.id}
           sourceClipUrl={hybridDialog.scene.clipUrl}
+          sourceSceneNumber={(hybridDialog.scene.orderIndex ?? 0) + 1}
           defaultMode={hybridDialog.mode}
           availableScenes={scenes
             .filter((s) => !!s.clipUrl)

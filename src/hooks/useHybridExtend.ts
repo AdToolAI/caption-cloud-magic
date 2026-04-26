@@ -84,12 +84,12 @@ export function useHybridExtend() {
 
         const successMsg =
           params.mode === 'forward'
-            ? 'Szene wird verlängert ✨'
+            ? '🎬 Sequel wird gedreht…'
             : params.mode === 'backward'
-            ? 'Vorszene wird generiert ✨'
+            ? '⏮ Prequel wird gedreht…'
             : params.mode === 'bridge'
-            ? 'Bridge-Szene wird generiert 🌉'
-            : 'Style-Reference wird generiert 🎨';
+            ? '🌉 Crossfade wird gefilmt…'
+            : '🎨 Style-Echo wird komponiert…';
         toast.success(successMsg);
         return data as HybridExtendResult;
       } catch (err) {
