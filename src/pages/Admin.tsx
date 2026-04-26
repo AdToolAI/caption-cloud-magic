@@ -11,7 +11,8 @@ import { BugReportsAdmin } from '@/pages/admin/BugReportsAdmin';
 import { AISuperuserAdmin } from '@/pages/admin/AISuperuserAdmin';
 import { MotionStudioSuperuserPanel } from '@/components/admin/MotionStudioSuperuserPanel';
 import LambdaHealth from '@/pages/admin/LambdaHealth';
-import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film } from 'lucide-react';
+import { MarketplaceReviewPanel } from '@/components/admin/MarketplaceReviewPanel';
+import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store } from 'lucide-react';
 
 export default function Admin() {
   return (
