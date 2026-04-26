@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic } from 'lucide-react';
 import SceneCard from './SceneCard';
 import HybridExtendDialog from './HybridExtendDialog';
+import TalkingHeadDialog from './TalkingHeadDialog';
 import type { ComposerScene, ClipSource, ComposerCharacter } from '@/types/video-composer';
 import { DEFAULT_TEXT_OVERLAY, getClipCost, getClipRate } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
