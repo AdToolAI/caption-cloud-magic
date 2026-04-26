@@ -245,6 +245,7 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     overwrite: (partial.overwrite as boolean) ?? true,
     rendererFunctionName: (partial.rendererFunctionName as string | null) ?? null,
     framesPerLambda: (partial.framesPerLambda as number | null) ?? null,
+    concurrency: null,
     privacy: (partial.privacy as string) || 'public',
     audioCodec: partial._silentRender ? null : ((partial.audioCodec as string) || 'aac'),
     x264Preset: (partial.x264Preset as string) || 'medium',
