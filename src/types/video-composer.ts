@@ -26,6 +26,7 @@ export type ClipSource =
   | 'ai-wan'
   | 'ai-seedance'
   | 'ai-luma'
+  | 'ai-veo'
   | 'ai-image'
   | 'stock'
   | 'stock-image'
@@ -389,6 +390,7 @@ export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> 
   'ai-wan':      { de: 'KI (Wan 2.5)', en: 'AI (Wan 2.5)' },
   'ai-seedance': { de: 'KI (Seedance)', en: 'AI (Seedance)' },
   'ai-luma':     { de: 'KI (Luma Ray 2)', en: 'AI (Luma Ray 2)' },
+  'ai-veo':      { de: 'KI (Veo 3.1) 🎵', en: 'AI (Veo 3.1) 🎵' },
   'ai-image':    { de: 'KI Bild (Gemini)', en: 'AI Image (Gemini)' },
   stock:         { de: 'Stock Video', en: 'Stock Video' },
   'stock-image': { de: 'Stock Bild', en: 'Stock Image' },
@@ -403,6 +405,8 @@ export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> 
   'ai-wan':      { standard: 0.10, pro: 0.18 },
   'ai-seedance': { standard: 0.12, pro: 0.20 },
   'ai-luma':     { standard: 0.20, pro: 0.32 },
+  // Veo 3.1: standard = Lite 720p (Replicate $0.05/s → 75% margin), pro = Pro 1080p (Replicate $0.40/s → 71% margin)
+  'ai-veo':      { standard: 0.20, pro: 1.40 },
   'ai-image':    { standard: 0.01, pro: 0.015 },
   stock:         { standard: 0, pro: 0 },
   'stock-image': { standard: 0, pro: 0 },
@@ -417,6 +421,7 @@ export const QUALITY_LABELS: Record<ClipSource, Record<ClipQuality, string>> = {
   'ai-wan':      { standard: 'Standard 720p', pro: 'Pro 1080p' },
   'ai-seedance': { standard: 'Standard 720p', pro: 'Pro 1080p' },
   'ai-luma':     { standard: 'Ray 2 720p',    pro: 'Ray 2 720p+' },
+  'ai-veo':      { standard: 'Lite 720p +Audio', pro: 'Pro 1080p +Audio' },
   'ai-image':    { standard: 'Nano Banana 2', pro: 'Gemini 3 Pro' },
   stock:         { standard: '-', pro: '-' },
   'stock-image': { standard: '-', pro: '-' },
