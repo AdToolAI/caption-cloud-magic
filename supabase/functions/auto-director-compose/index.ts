@@ -101,8 +101,9 @@ serve(async (req) => {
 
     // ============== STAGE 1: PLAN ==============
     if (stage === 'plan') {
-      const plan = await generateScenePlan(body);
-      return jsonResponse({ ok: true, plan });
+      const brandContext = await loadActiveBrandContext(supabaseAdmin, user.id);
+      const plan = await generateScenePlan(body, brandContext);
+      return jsonResponse({ ok: true, plan: { ...plan, brandContext } });
     }
 
     // ============== STAGE 2: EXECUTE ==============
