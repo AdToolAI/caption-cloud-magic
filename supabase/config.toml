@@ -708,3 +708,15 @@ verify_jwt = false
 
 [functions.lambda-health-monitor]
 verify_jwt = false
+
+[functions.composer-export-bundle]
+verify_jwt = false
+timeout_sec = 300
+
+[functions.composer-export-fcpxml]
+verify_jwt = false
+timeout_sec = 60
+
+[functions.composer-export-edl]
+verify_jwt = false
+timeout_sec = 60
