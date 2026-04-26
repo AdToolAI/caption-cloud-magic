@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Headphones, Upload, Wand2, Mic, Music, Volume2, Sparkles, FileAudio, Play, Pause, Library } from 'lucide-react';
+import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, Sparkles, FileAudio, Play, Pause, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AudioStudioHeroHeader } from '@/components/audio-studio/AudioStudioHeroHeader';
@@ -12,6 +12,7 @@ import { FillerWordPanel } from '@/components/audio-studio/FillerWordPanel';
 import { AudioBeforeAfterComparison } from '@/components/audio-studio/AudioBeforeAfterComparison';
 import { SoundLibrary } from '@/components/audio-studio/SoundLibrary';
 import { VoiceLibraryPanel } from '@/components/audio-studio/VoiceLibraryPanel';
+import { MusicGeneratorPanel } from '@/components/audio-studio/MusicGeneratorPanel';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,7 +28,8 @@ export default function AudioStudio() {
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler' | 'compare' | 'library' | 'voices'>('enhance');
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler' | 'compare' | 'library' | 'voices' | 'music'>('enhance');
+  const [showMusicGen, setShowMusicGen] = useState(false);
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
 
@@ -134,15 +136,60 @@ export default function AudioStudio() {
         <AudioStudioHeroHeader />
 
         <AnimatePresence mode="wait">
-          {!audioUrl ? (
+          {showMusicGen ? (
+            <motion.div
+              key="music-gen-standalone"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mt-8 space-y-4"
+            >
+              <Button
+                variant="ghost"
+                onClick={() => setShowMusicGen(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ← Zurück zum Audio Studio
+              </Button>
+              <MusicGeneratorPanel
+                onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
+              />
+            </motion.div>
+          ) : !audioUrl ? (
             <motion.div
               key="upload"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="mt-8"
+              className="mt-8 space-y-6"
             >
-              {/* Upload Zone */}
+              {/* AI Music Generator Teaser */}
+              <Card 
+                onClick={() => setShowMusicGen(true)}
+                className="relative overflow-hidden cursor-pointer backdrop-blur-xl bg-gradient-to-br from-primary/10 via-card/60 to-cyan-500/10 border-primary/30 hover:border-primary/60 hover:shadow-[0_0_40px_rgba(var(--primary),0.25)] transition-all p-5 group"
+              >
+                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/15 rounded-full blur-[60px] pointer-events-none" />
+                <div className="relative flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-cyan-500 flex items-center justify-center shrink-0">
+                    <Music2 className="w-7 h-7 text-primary-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-xs font-bold tracking-wider text-primary">NEU</span>
+                      <h3 className="text-lg font-bold">AI Music Generator</h3>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">Studio-Qualität</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Generiere kommerziell nutzbare Musik aus Text — ab €0.10. Cinematic, Lo-Fi, Corporate, Electronic & mehr.
+                    </p>
+                  </div>
+                  <Button className="bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90 shrink-0 hidden sm:flex">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Track erstellen
+                  </Button>
+                </div>
+              </Card>
+
               <Card
                 {...getRootProps()}
                 className={`
@@ -267,6 +314,7 @@ export default function AudioStudio() {
                   <div className="flex gap-2 flex-wrap">
                     {[
                       { id: 'enhance', label: 'KI-Optimierung', icon: Wand2 },
+                      { id: 'music', label: 'AI Music', icon: Music2 },
                       { id: 'compare', label: 'Vergleich', icon: Volume2, disabled: !enhancedAudioUrl },
                       { id: 'transcript', label: 'Transcript', icon: Mic },
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
@@ -408,11 +456,25 @@ export default function AudioStudio() {
                         <VoiceLibraryPanel />
                       </motion.div>
                     )}
+
+                    {activeTab === 'music' && (
+                      <motion.div
+                        key="music"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <MusicGeneratorPanel
+                          onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
+                          onOpenLibrary={() => setActiveTab('library')}
+                        />
+                      </motion.div>
+                    )}
                   </AnimatePresence>
                 </div>
 
-                {/* Right: AI Sidebar (only when not in enhance tab) */}
-                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && (
+                {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music tab) */}
+                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
