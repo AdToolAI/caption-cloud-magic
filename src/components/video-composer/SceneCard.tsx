@@ -292,6 +292,26 @@ export default function SceneCard({
                 {scene.characterShot && scene.characterShot.shotType !== 'absent' && (
                   <CharacterShotBadge shot={scene.characterShot} characterName={activeChar?.name} />
                 )}
+                {scene.hybridMode && (
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] h-4 px-1.5 gap-1 border-primary/40 text-primary"
+                    title={
+                      lang === 'de'
+                        ? 'Hybrid-Szene: Frame-anker zur Quellszene'
+                        : lang === 'es'
+                        ? 'Escena híbrida: anclada por frame a la escena fuente'
+                        : 'Hybrid scene: frame-anchored to source'
+                    }
+                  >
+                    <Link2 className="h-2.5 w-2.5" />
+                    {scene.hybridMode === 'forward'
+                      ? (lang === 'de' ? 'Forward' : lang === 'es' ? 'Forward' : 'Forward')
+                      : scene.hybridMode === 'backward'
+                      ? (lang === 'de' ? 'Backward' : lang === 'es' ? 'Backward' : 'Backward')
+                      : scene.hybridMode}
+                  </Badge>
+                )}
               </div>
 
               <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={onDelete}>
