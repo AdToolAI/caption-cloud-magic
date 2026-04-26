@@ -163,7 +163,10 @@ const Scene: React.FC<{
         }
       }
     }
-    objectPosition = `${(xPct * 100).toFixed(1)}% ${(yPct * 100).toFixed(1)}%`;
+    // Defensive clamping: corrupt tracking data must never produce invalid CSS.
+    const safeX = Number.isFinite(xPct) ? Math.max(0, Math.min(1, xPct)) : 0.5;
+    const safeY = Number.isFinite(yPct) ? Math.max(0, Math.min(1, yPct)) : 0.5;
+    objectPosition = `${(safeX * 100).toFixed(1)}% ${(safeY * 100).toFixed(1)}%`;
   }
 
   return (
