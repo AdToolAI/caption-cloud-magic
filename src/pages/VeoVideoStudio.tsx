@@ -189,8 +189,8 @@ export default function VeoVideoStudio() {
                     <p className="text-xs text-foreground">
                       🎵 <strong>{language === 'de' ? 'Audio-Native:' : 'Audio-Native:'}</strong>{' '}
                       {language === 'de'
-                        ? 'Beschreibe Geräusche direkt im Prompt (z. B. „glass shattering", „rain on metal roof", „woman whispers ‚hello'") — Veo erzeugt Sound automatisch.'
-                        : 'Describe sounds directly in the prompt (e.g. "glass shattering", "rain on metal roof", "woman whispers \'hello\'") — Veo generates audio automatically.'}
+                        ? 'Beschreibe Geräusche direkt im Prompt (z. B. „glass shattering“, „rain on metal roof“, „woman whispers hello“) — Veo erzeugt Sound automatisch.'
+                        : 'Describe sounds directly in the prompt (e.g. "glass shattering", "rain on metal roof", "woman whispers hello") — Veo generates audio automatically.'}
                     </p>
                   </div>
                 </Card>
