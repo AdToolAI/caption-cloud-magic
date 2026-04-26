@@ -140,6 +140,7 @@ export default function VideoComposerDashboard() {
   const [showAutoDirector, setShowAutoDirector] = useState(false);
   const { ensureProjectPersisted } = useComposerPersistence();
   const incrementTemplateUsage = useIncrementTemplateUsage();
+  const incrementTrendingUse = useIncrementTrendingUse();
   const didInitialSyncRef = useRef(false);
 
   // DB sync on mount: if the loaded draft has a project.id, hydrate scenes from DB
