@@ -456,11 +456,25 @@ export default function AudioStudio() {
                         <VoiceLibraryPanel />
                       </motion.div>
                     )}
+
+                    {activeTab === 'music' && (
+                      <motion.div
+                        key="music"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <MusicGeneratorPanel
+                          onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
+                          onOpenLibrary={() => setActiveTab('library')}
+                        />
+                      </motion.div>
+                    )}
                   </AnimatePresence>
                 </div>
 
-                {/* Right: AI Sidebar (only when not in enhance tab) */}
-                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && (
+                {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music tab) */}
+                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
