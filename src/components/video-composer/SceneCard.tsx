@@ -342,11 +342,11 @@ export default function SceneCard({
               className="w-full"
             />
 
-            {/* Block M — Hybrid Production actions (only when source clip is ready) */}
+            {/* 🎬 Director Mode — Hybrid Production actions (only when source clip is ready) */}
             {onHybridExtend && scene.clipStatus === 'ready' && scene.clipUrl && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70">
-                  {lang === 'de' ? 'Hybrid' : lang === 'es' ? 'Híbrido' : 'Hybrid'}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1 rounded-md border border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 px-2 py-1.5">
+                <span className="text-[9px] uppercase tracking-wider font-semibold text-primary flex items-center gap-1">
+                  🎬 {lang === 'de' ? 'Director Mode' : lang === 'es' ? 'Director Mode' : 'Director Mode'}
                 </span>
                 <Button
                   size="sm"
@@ -355,14 +355,14 @@ export default function SceneCard({
                   onClick={() => onHybridExtend('backward')}
                   title={
                     lang === 'de'
-                      ? 'Vorszene generieren (Backward Extend)'
+                      ? 'Prequel — was passierte vor dieser Szene?'
                       : lang === 'es'
-                      ? 'Generar escena previa (Backward Extend)'
-                      : 'Generate preceding scene (Backward Extend)'
+                      ? 'Prequel — ¿qué pasó antes de esta escena?'
+                      : 'Prequel — what happened before this scene?'
                   }
                 >
                   <ArrowLeft className="h-3 w-3" />
-                  Backward
+                  {lang === 'de' ? 'Prequel' : lang === 'es' ? 'Prequel' : 'Prequel'}
                 </Button>
                 <Button
                   size="sm"
@@ -371,14 +371,14 @@ export default function SceneCard({
                   onClick={() => onHybridExtend('forward')}
                   title={
                     lang === 'de'
-                      ? 'Szene verlängern (Forward Extend)'
+                      ? 'Sequel — wie geht die Szene weiter?'
                       : lang === 'es'
-                      ? 'Extender escena (Forward Extend)'
-                      : 'Extend scene (Forward Extend)'
+                      ? 'Sequel — ¿cómo continúa la escena?'
+                      : 'Sequel — how does the scene continue?'
                   }
                 >
                   <ArrowRight className="h-3 w-3" />
-                  Forward
+                  {lang === 'de' ? 'Sequel' : lang === 'es' ? 'Sequel' : 'Sequel'}
                 </Button>
                 {hasOtherReadyScenes && (
                   <Button
@@ -388,14 +388,14 @@ export default function SceneCard({
                     onClick={() => onHybridExtend('bridge')}
                     title={
                       lang === 'de'
-                        ? 'Bridge zu anderer Szene (morphender Übergang)'
+                        ? 'Crossfade — morphender Übergang in eine andere Szene'
                         : lang === 'es'
-                        ? 'Bridge hacia otra escena (transición con morphing)'
-                        : 'Bridge to another scene (morphing transition)'
+                        ? 'Crossfade — transición con morphing hacia otra escena'
+                        : 'Crossfade — morphing transition to another scene'
                     }
                   >
                     <Link2 className="h-3 w-3" />
-                    Bridge
+                    {lang === 'de' ? 'Crossfade' : lang === 'es' ? 'Crossfade' : 'Crossfade'}
                   </Button>
                 )}
                 <Button
@@ -405,14 +405,14 @@ export default function SceneCard({
                   onClick={() => onHybridExtend('style-ref')}
                   title={
                     lang === 'de'
-                      ? 'Neue Szene mit Stil dieser Szene'
+                      ? 'Style-Echo — neue Szene, gleiche Bildsprache'
                       : lang === 'es'
-                      ? 'Nueva escena con estilo de esta escena'
-                      : 'New scene using this scene as style anchor'
+                      ? 'Style-Echo — nueva escena, mismo lenguaje visual'
+                      : 'Style-Echo — new scene, same visual language'
                   }
                 >
                   <Palette className="h-3 w-3" />
-                  Style-Ref
+                  {lang === 'de' ? 'Style-Echo' : lang === 'es' ? 'Style-Echo' : 'Style-Echo'}
                 </Button>
               </div>
             )}
