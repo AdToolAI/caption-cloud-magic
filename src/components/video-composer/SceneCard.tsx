@@ -16,6 +16,7 @@ import {
 import {
   ChevronUp, ChevronDown, Trash2, GripVertical,
   Sparkles, Upload, Video, Image as ImageIcon, Wand2, Beaker,
+  ArrowRight, ArrowLeft, Link2,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -66,6 +67,11 @@ interface SceneCardProps {
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  /**
+   * Block M — opens the Hybrid Extend dialog for this scene.
+   * Parent owns the dialog state because it needs to refetch scenes after success.
+   */
+  onHybridExtend?: (mode: 'forward' | 'backward') => void;
   language: string;
 }
 
@@ -94,6 +100,7 @@ export default function SceneCard({
   onDelete,
   onMoveUp,
   onMoveDown,
+  onHybridExtend,
   language,
 }: SceneCardProps) {
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
@@ -285,6 +292,26 @@ export default function SceneCard({
                 {scene.characterShot && scene.characterShot.shotType !== 'absent' && (
                   <CharacterShotBadge shot={scene.characterShot} characterName={activeChar?.name} />
                 )}
+                {scene.hybridMode && (
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] h-4 px-1.5 gap-1 border-primary/40 text-primary"
+                    title={
+                      lang === 'de'
+                        ? 'Hybrid-Szene: Frame-anker zur Quellszene'
+                        : lang === 'es'
+                        ? 'Escena híbrida: anclada por frame a la escena fuente'
+                        : 'Hybrid scene: frame-anchored to source'
+                    }
+                  >
+                    <Link2 className="h-2.5 w-2.5" />
+                    {scene.hybridMode === 'forward'
+                      ? (lang === 'de' ? 'Forward' : lang === 'es' ? 'Forward' : 'Forward')
+                      : scene.hybridMode === 'backward'
+                      ? (lang === 'de' ? 'Backward' : lang === 'es' ? 'Backward' : 'Backward')
+                      : scene.hybridMode}
+                  </Badge>
+                )}
               </div>
 
               <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={onDelete}>
@@ -302,6 +329,46 @@ export default function SceneCard({
               className="w-full"
             />
 
+            {/* Block M — Hybrid Extend actions (only when source clip is ready) */}
+            {onHybridExtend && scene.clipStatus === 'ready' && scene.clipUrl && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70">
+                  {lang === 'de' ? 'Hybrid' : lang === 'es' ? 'Híbrido' : 'Hybrid'}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-[10px] gap-1.5"
+                  onClick={() => onHybridExtend('backward')}
+                  title={
+                    lang === 'de'
+                      ? 'Vorszene generieren (Backward Extend)'
+                      : lang === 'es'
+                      ? 'Generar escena previa (Backward Extend)'
+                      : 'Generate preceding scene (Backward Extend)'
+                  }
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  {lang === 'de' ? 'Backward' : 'Backward'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-[10px] gap-1.5"
+                  onClick={() => onHybridExtend('forward')}
+                  title={
+                    lang === 'de'
+                      ? 'Szene verlängern (Forward Extend)'
+                      : lang === 'es'
+                      ? 'Extender escena (Forward Extend)'
+                      : 'Extend scene (Forward Extend)'
+                  }
+                >
+                  <ArrowRight className="h-3 w-3" />
+                  {lang === 'de' ? 'Forward' : 'Forward'}
+                </Button>
+              </div>
+            )}
             {/* Clip source */}
             <div className="flex flex-wrap gap-2">
               {(['ai-hailuo', 'ai-kling', 'ai-image', 'stock', 'stock-image', 'upload'] as ClipSource[]).map((src) => {

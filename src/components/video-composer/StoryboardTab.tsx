@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import SceneCard from './SceneCard';
+import HybridExtendDialog from './HybridExtendDialog';
 import type { ComposerScene, ClipSource, ComposerCharacter } from '@/types/video-composer';
 import { DEFAULT_TEXT_OVERLAY, getClipCost, getClipRate } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -31,9 +32,23 @@ interface StoryboardTabProps {
   projectId?: string;
   characters?: ComposerCharacter[];
   preferredAspect?: '16:9' | '9:16' | '1:1' | '4:5';
+  /**
+   * Block M — Hybrid Extend uses the server-side orchestrator which inserts
+   * a new scene row directly. The dashboard must refetch from DB to surface it.
+   */
+  onRefetchScenes?: () => void | Promise<void>;
 }
 
-export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, language, projectId, characters, preferredAspect }: StoryboardTabProps) {
+export default function StoryboardTab({
+  scenes,
+  onUpdateScenes,
+  onGoToClips,
+  language,
+  projectId,
+  characters,
+  preferredAspect,
+  onRefetchScenes,
+}: StoryboardTabProps) {
   const { t } = useTranslation();
   const TIPS_KEY = 'video-composer-storyboard-tips-collapsed';
   const [tipsCollapsed, setTipsCollapsed] = useState<boolean>(() => {
@@ -42,6 +57,19 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
   useEffect(() => {
     try { localStorage.setItem(TIPS_KEY, tipsCollapsed ? '1' : '0'); } catch { /* ignore */ }
   }, [tipsCollapsed]);
+
+  // Block M — Hybrid Extend dialog state
+  const [hybridDialog, setHybridDialog] = useState<{
+    open: boolean;
+    scene: ComposerScene | null;
+    mode: 'forward' | 'backward';
+  }>({ open: false, scene: null, mode: 'forward' });
+
+  const openHybridDialog = (scene: ComposerScene, mode: 'forward' | 'backward') => {
+    setHybridDialog({ open: true, scene, mode });
+  };
+
+  const dialogLang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
 
   const addScene = () => {
     const newScene: ComposerScene = {
@@ -212,6 +240,11 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
                     onDelete={() => deleteScene(scene.id)}
                     onMoveUp={() => moveScene(index, index - 1)}
                     onMoveDown={() => moveScene(index, index + 1)}
+                    onHybridExtend={
+                      projectId
+                        ? (mode) => openHybridDialog(scene, mode)
+                        : undefined
+                    }
                     language={language}
                   />
                 </SortableSceneItem>
@@ -219,6 +252,25 @@ export default function StoryboardTab({ scenes, onUpdateScenes, onGoToClips, lan
             </div>
           </SortableContext>
         </DndContext>
+      )}
+
+      {/* Block M — Hybrid Extend dialog */}
+      {projectId && hybridDialog.scene && (
+        <HybridExtendDialog
+          open={hybridDialog.open}
+          onOpenChange={(open) =>
+            setHybridDialog((prev) => ({ ...prev, open }))
+          }
+          projectId={projectId}
+          sourceSceneId={hybridDialog.scene.id}
+          sourceClipUrl={hybridDialog.scene.clipUrl}
+          defaultMode={hybridDialog.mode}
+          language={dialogLang}
+          onSuccess={() => {
+            // Server inserts the new scene row; refetch to surface it
+            void onRefetchScenes?.();
+          }}
+        />
       )}
     </div>
   );
