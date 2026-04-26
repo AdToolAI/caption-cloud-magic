@@ -300,6 +300,16 @@ export default function StoryboardTab({
           }}
         />
       )}
+
+      {/* Block Q — Talking-Head dialog */}
+      <TalkingHeadDialog
+        open={talkingHeadOpen}
+        onOpenChange={setTalkingHeadOpen}
+        projectId={projectId}
+        onSuccess={() => {
+          void onRefetchScenes?.();
+        }}
+      />
     </div>
   );
 }
