@@ -452,8 +452,6 @@ async function ensureTestProject(userId: string): Promise<{ projectId: string; s
     }
   }
 
-  }
-
   return { projectId, sceneId };
 }
 
