@@ -202,7 +202,7 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
                           <span className="text-muted-foreground">{formatRelative(rec.created_at)}</span>
                           {rec.warnings && rec.warnings.length > 0 && (
                             <AlertTriangle
-                              className="h-3 w-3 text-amber-500"
+                              className="h-3 w-3 text-warning"
                               aria-label={`${rec.warnings.length} Hinweis(e)`}
                             />
                           )}
