@@ -117,7 +117,7 @@ serve(async (req) => {
 
     if (projectError || !project) throw new Error('Project not found');
 
-    // 2. Load scenes
+    // 2. Load scenes (incl. Block R subject_track for Smart Reframe crop)
     const { data: scenes, error: scenesError } = await supabase
       .from('composer_scenes')
       .select('*')
