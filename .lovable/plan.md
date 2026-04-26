@@ -1,95 +1,90 @@
-## Ziel
+## 🎵 AI Music Generator – Audio Studio Erweiterung
 
-Das **bestehende €-basierte AI Video Wallet** (`ai_video_wallets`, `balance_euros`, RPCs `deduct_ai_video_credits` / `refund_ai_video_credits`) wird **erweitert um AI-Bilder**. Kein neues System, keine Migration der alten `wallets`-Tabelle. Frontend zeigt überall denselben €-Saldo — egal ob für Sora, Kling, Luma oder jetzt für Bilder.
+Füllt die letzte Lücke gegen Artlist AI Music. Nutzt **ElevenLabs Music API** als Hauptengine (Studio-Qualität, bis 5 Min, vollständig kommerziell nutzbar) und **Replicate MusicGen (Meta)** als günstigen Fallback. Beide Keys sind bereits im Projekt konfiguriert.
 
----
+### 🎯 Strategische Entscheidung: Warum nicht Suno?
 
-## 1. Naming & UI-Sprache
+- **Suno**: Keine offizielle Public API, nur inoffizielle Reverse-Engineered Wrapper → rechtlich riskant, Lizenz-Grauzone bei kommerzieller Nutzung
+- **ElevenLabs Music** ✅: Offizielle API, Studio-Qualität, voller kommerzieller Lizenz-Stack, bereits in unserem Tech-Stack (TTS), `ELEVENLABS_API_KEY` schon konfiguriert
+- **Replicate MusicGen (Meta)** ✅: Open-Source-Modell, günstig (~$0.02 / 8s), Fallback für längere/instrumentale Tracks
 
-- Wallet wird im UI umbenannt von „AI Video Credits" → **„AI Credits"** (deckt jetzt Video + Bild ab).
-- Tabellenname `ai_video_wallets` bleibt aus Kompatibilitätsgründen technisch bestehen (kein DB-Rename, vermeidet Risiko an 30+ Edge Functions).
-- `useAIVideoWallet` Hook wird zu **`useAICredits`** alias-weitergegeben (alter Name bleibt als Re-Export für Backwards-Compat).
+### 💰 Pricing (konsistent mit AI Credits System – 30%/70% Marge wie Bilder/Videos)
 
-## 2. Neue Bild-Modelle (Replicate) — Pricing mit 30 % Marge
+| Tier | Engine | Dauer | Kosten ElevenLabs | User-Preis |
+|------|--------|-------|---|---|
+| **Quick** | MusicGen (Replicate) | bis 30s | ~$0.04 | **€0.10** |
+| **Standard** | ElevenLabs Music | bis 60s | ~$0.20 | **€0.35** |
+| **Pro** | ElevenLabs Music | bis 5 Min | ~$0.80 | **€1.40** |
 
-| Tier | Modell | Replicate-Kosten | Endpreis Nutzer |
-|---|---|---|---|
-| **Fast** | Seedream 4 | $0.030 | **€0.04** |
-| **Pro** | Imagen 4 Ultra | $0.060 | **€0.08** |
-| **Ultra** | Nano Banana 2 | $0.067 – $0.151 | **€0.20** (Worst-Case-kalkuliert, immer ≥30 % Marge) |
+Abgerechnet über das bestehende `ai_video_wallets` (Euro-Cent) → konsistent mit Picture Studio und allen Video-Studios. Nutzer sieht "AI Credits".
 
-→ Diese €-Beträge werden via `deduct_ai_video_credits(user_id, amount_euros, generation_id)` abgezogen, exakt wie bei den Videos.
+### 🏗️ Architektur
 
-## 3. Backend — neue Edge Function `generate-image-replicate`
+#### 1. Neue Edge Function: `generate-music-track`
+- **Input**: `{ prompt, duration_seconds, tier: 'quick'|'standard'|'pro', genre?, mood?, instrumental? }`
+- **Flow**:
+  1. Auth check + Wallet-Balance prüfen via RPC
+  2. Tier-Routing: `quick` → Replicate MusicGen, `standard`/`pro` → ElevenLabs `/v1/music`
+  3. Audio-Bytes empfangen → in `audio-studio` Storage Bucket speichern (Pfad: `{user_id}/music/{timestamp}.mp3`)
+  4. Eintrag in `universal_audio_assets` mit `type: 'music'`, `source: 'ai_generated'`, `processing_preset: tier`, prompt im `effect_config`
+  5. `deduct_ai_video_credits` RPC → idempotent über `generation_id`
+  6. Bei Fehler: Refund automatisch (gemäß Memory `failure-credit-refund-automation`)
+- Timeout: 120s in `supabase/config.toml`
 
-Eine neue Edge Function (analog zu `generate-kling-video`) für die drei Replicate-Modelle:
+#### 2. Neue Komponente: `MusicGeneratorPanel.tsx` (`src/components/audio-studio/`)
+- **Hero-Header** im James-Bond-2028 Stil (Glassmorphism, Gold/Cyan)
+- **Prompt-Textarea** mit Beispielen ("Cinematic orchestral build-up", "Lo-fi chill beats with rain")
+- **Genre-Chips**: Cinematic, Electronic, Hip-Hop, Lo-Fi, Corporate, Ambient, Rock, Pop, Classical, Jazz
+- **Mood-Slider**: Energy (Calm ↔ Hype), Brightness (Dark ↔ Bright)
+- **Duration-Slider**: 10s – 300s (mit Tier-Anzeige live)
+- **Instrumental Toggle**: Mit/ohne Vocals
+- **Tier-Selector**: 3 Karten (Quick / Standard / Pro) mit Live-Preis-Badge
+- **Generate Button**: Zeigt Endpreis (z.B. "Generate · 35 Credits")
+- **Result Preview**: Waveform-Player (wiederverwendet `TranscriptWaveformEditor`-Style), Download, "In Bibliothek speichern" (automatisch), "An Beat-Sync senden" → wechselt Tab
 
-```
-supabase/functions/generate-image-replicate/index.ts
-```
+#### 3. Integration in `AudioStudio.tsx`
+- Neuer Tab `'music'` in der bestehenden `activeTab` State-Union (zwischen `enhance` und `library`)
+- Tab-Icon: `Music2` (lucide), Label: "AI Music"
+- Generierte Tracks erscheinen automatisch in **SoundLibrary** und **BeatSyncTimeline** (gleiche Tabelle `universal_audio_assets`)
 
-Flow (identisch zum Video-Pattern):
-1. Auth-Check (JWT)
-2. Wallet-Balance prüfen (`balance_euros >= cost`)
-3. Replicate-API aufrufen (Seedream 4 / Imagen 4 Ultra / Nano Banana 2 — Routing über `model` Param, internes Backend-Mapping)
-4. Bei Erfolg: Bild in `background-projects` Storage speichern + `deduct_ai_video_credits` aufrufen
-5. Bei Fehler: kein Abzug (kein Refund nötig, da pre-charge erst nach Erfolg) — analog zur bestehenden Refund-Automation
+#### 4. Lokalisierung (EN / DE / ES)
+Pro Memory-Regel: UI komplett übersetzt, **Prompt-Beispiele bleiben Englisch** für beste Modell-Qualität.
 
-Cost-Mapping im Backend:
-```ts
-const IMAGE_COSTS_EUROS = {
-  fast:  0.04, // Seedream 4
-  pro:   0.08, // Imagen 4 Ultra
-  ultra: 0.20, // Nano Banana 2
-};
-```
+### 📦 Dateien (Erstellen / Ändern)
 
-Secret nötig: **`REPLICATE_API_TOKEN`** (falls noch nicht gesetzt, frage ich davor an).
+**Neu:**
+- `supabase/functions/generate-music-track/index.ts`
+- `src/components/audio-studio/MusicGeneratorPanel.tsx`
+- `src/hooks/useMusicGeneration.ts` (Wrapper für Edge-Function-Call + Toast + Wallet-Refresh)
 
-## 4. Bestehende Function `generate-studio-image` (Lovable AI Gateway / Gemini)
+**Geändert:**
+- `src/pages/AudioStudio.tsx` → Tab + Routing
+- `src/components/audio-studio/AudioStudioHeroHeader.tsx` → Pill "AI Music Gen" hinzufügen
+- `supabase/config.toml` → Function-Block mit `verify_jwt = true` und 120s Timeout
+- `src/i18n/*.json` (3 Sprachen)
 
-Diese bleibt **unverändert und kostenlos** (im 19,99 € Abo enthalten), da sie über das günstige Lovable AI Gateway läuft. Sie ist der „Schnell & Gratis"-Fallback im Picture Studio.
+### 🔐 Sicherheit & Robustheit
+- JWT-Verifizierung an, User-ID aus Auth-Context (nie aus Body)
+- Storage-Pfad: `{user_id}/music/...` → respektiert RLS-Policy aus Memory `background-projects-rls-path-constraint`
+- Prompt-Sanitization (max 500 chars, Zod-Schema)
+- Rate-Limit: max 10 Generierungen / Stunde / User (Upstash Redis, schon konfiguriert)
+- Idempotenter Refund bei API-Fehler oder Timeout
+- Fallback-Kette: ElevenLabs `429` → automatischer Retry nach 3s, danach Refund + klare Toast-Message
 
-→ Im Picture Studio bekommt der User also:
-- **Standard (Gemini, gratis im Abo)** — bleibt wie heute
-- **Fast / Pro / Ultra (Replicate, kostet €-Credits)** — neu
+### ✅ Akzeptanzkriterien
+1. Nutzer generiert 30s Lo-Fi Track für €0.10 → Track in <15s in Library, abspielbar, downloadbar
+2. Wallet-Balance wird **erst nach erfolgreicher Generierung** abgebucht (Reserve → Commit Pattern)
+3. Track erscheint sofort in `BeatSyncTimeline` für Video-Editing
+4. Bei API-Fail: Credits werden automatisch refunded, Toast zeigt klaren Fehler
+5. Mobile-responsive (1193px Viewport bereits getestet, plus 375px)
+6. Vollständig DE/EN/ES lokalisiert
 
-## 5. Frontend — Picture Studio UI
-
-`src/components/picture-studio/ImageGenerator.tsx` bekommt:
-
-1. **Quality-Toggle** mit 4 Stufen statt 2:
-   - `Standard` (gratis, Gemini) — Default
-   - `Fast` (€0.04, Seedream 4)
-   - `Pro` (€0.08, Imagen 4 Ultra)
-   - `Ultra` (€0.20, Nano Banana 2)
-2. **Advanced-Toggle**: Erlaubt Power-User explizite Modellwahl statt Auto-Routing
-3. **Cost-Badge** neben dem Generate-Button (€-Preis sichtbar, wie in `MotionStudio/Hub.tsx`)
-4. **Wallet-Balance-Display** im Studio-Header via `useAICredits`
-5. **Insufficient-Balance-Modal** identisch zu Video-Studios (führt zu `/ai-video-purchase-credits`)
-
-## 6. Aufgelöste / aufgeräumte Stellen
-
-- `src/lib/featureCosts.ts`: `STUDIO_IMAGE_GENERATE` Eintrag wird entfernt (Bilder laufen nicht mehr über das alte `wallets`-Credit-System)
-- `CreditGuard.tsx` wird im Picture Studio **nicht mehr verwendet** — stattdessen die €-Wallet-Logik wie in den Video-Studios
-- `track-credit-usage` Edge Function bleibt bestehen für Analytics (loggt jetzt auch Bilder)
-
-## 7. Was wir NICHT anfassen
-
-- ❌ Tabelle `wallets` (alte Credits) — bleibt für andere interne Features unangetastet
-- ❌ Bestehende Video-Edge-Functions (Kling, Sora, Luma, Hailuo, Wan, Seedance, Veo) — funktionieren bereits korrekt mit `ai_video_wallets`
-- ❌ `useCredits` Hook — bleibt für andere Features
-- ❌ `credit-preflight` / `credit-reserve` / `credit-commit` / `credit-refund` Edge Functions — bleiben für ihren bestehenden Use Case
-
-## 8. Reihenfolge der Umsetzung
-
-1. Edge Function `generate-image-replicate` anlegen + deployen
-2. `REPLICATE_API_TOKEN` Secret prüfen / anfragen
-3. `useAIVideoWallet` → Re-Export als `useAICredits` (UI-Sprache "AI Credits")
-4. `ImageGenerator.tsx` um 4-Stufen-Toggle + Advanced-Modus + Cost-Badge erweitern
-5. Wallet-Header im Picture Studio zeigen
-6. Aufräumen: `STUDIO_IMAGE_GENERATE` aus `featureCosts.ts`, `CreditGuard` aus Picture-Studio-Pfad
+### 🚀 Nicht im Scope (Phase 2)
+- Stem-Separation (Vocals/Drums/Bass extrahieren)
+- Voice-Cloning für Custom Vocals
+- BPM-Match zu vorhandenem Video (wäre logischer V2-Schritt mit `analyze-music-bpm` Function, die schon existiert)
+- Marketplace für Community-Tracks
 
 ---
 
-**Soll ich so loslegen?**
+**Soll ich loslegen?**
