@@ -315,13 +315,13 @@ export default function SceneCard({
                       <Link2 className="h-2.5 w-2.5" />
                     )}
                     {scene.hybridMode === 'forward'
-                      ? 'Forward'
+                      ? 'Sequel'
                       : scene.hybridMode === 'backward'
-                      ? 'Backward'
+                      ? 'Prequel'
                       : scene.hybridMode === 'bridge'
-                      ? 'Bridge'
+                      ? 'Crossfade'
                       : scene.hybridMode === 'style-ref'
-                      ? 'Style'
+                      ? 'Style-Echo'
                       : scene.hybridMode}
                   </Badge>
                 )}
