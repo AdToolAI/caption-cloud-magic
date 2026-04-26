@@ -134,12 +134,12 @@ export async function getSystemConfig<T = unknown>(key: string, fallback: T): Pr
   try {
     const client = getClient();
     if (!client) return fallback;
-    const { data } = await client
-      .from('system_config')
+    const { data } = await (client
+      .from('system_config') as any)
       .select('value')
       .eq('key', key)
       .maybeSingle();
-    return (data?.value as T) ?? fallback;
+    return ((data as any)?.value as T) ?? fallback;
   } catch {
     return fallback;
   }
