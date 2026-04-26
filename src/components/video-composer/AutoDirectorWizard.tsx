@@ -242,6 +242,36 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
         {/* === STEP 2: PREVIEW PLAN === */}
         {step === 'preview' && plan && (
           <div className="space-y-4 py-4">
+            {plan.brandContext?.brandName && (
+              <Card className="bg-amber-500/5 border-amber-500/30">
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge className="bg-amber-500 text-amber-950 hover:bg-amber-400">
+                      ✨ Brand aktiv
+                    </Badge>
+                    <span className="text-sm font-medium">{plan.brandContext.brandName}</span>
+                    {plan.brandContext.primaryColor && (
+                      <span
+                        className="inline-block h-4 w-4 rounded-full border border-border"
+                        style={{ backgroundColor: plan.brandContext.primaryColor }}
+                        title={plan.brandContext.primaryColor}
+                      />
+                    )}
+                    {plan.brandContext.secondaryColor && (
+                      <span
+                        className="inline-block h-4 w-4 rounded-full border border-border"
+                        style={{ backgroundColor: plan.brandContext.secondaryColor }}
+                        title={plan.brandContext.secondaryColor}
+                      />
+                    )}
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      Wird automatisch auf alle Szenen angewendet
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {plan.rationale && (
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="pt-4">

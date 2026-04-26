@@ -14,10 +14,20 @@ export interface PlannedScene {
   textOverlay?: { text: string; position: 'top' | 'center' | 'bottom' } | null;
 }
 
+export interface AutoDirectorBrandContext {
+  brandName: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  mood: string | null;
+  brandTone: string | null;
+  brandValues: string[];
+}
+
 export interface AutoDirectorPlan {
   scenes: PlannedScene[];
   estimatedCostEuros: number;
   rationale: string;
+  brandContext?: AutoDirectorBrandContext | null;
 }
 
 export interface AutoDirectorPlanInput {
