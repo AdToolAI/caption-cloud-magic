@@ -19,6 +19,7 @@ const CLIP_COSTS: Record<string, Record<Quality, number>> = {
   'ai-wan':      { standard: 0.10, pro: 0.18 },
   'ai-seedance': { standard: 0.12, pro: 0.20 },
   'ai-luma':     { standard: 0.20, pro: 0.32 },
+  'ai-veo':      { standard: 0.20, pro: 1.40 },
   'ai-image':    { standard: 0.01, pro: 0.015 },
 };
 
@@ -485,6 +486,44 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: 'luma/ray-2-720p',
             input: lumaInput,
+            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook_events_filter: ["completed"],
+          });
+
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ replicate_prediction_id: prediction.id })
+            .eq('id', scene.id);
+
+          results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
+
+        } else if (scene.clipSource === 'ai-veo') {
+          // Google Veo 3.1 via Replicate — native audio
+          // standard → google/veo-3.1-fast (Lite, $0.05/s 720p) | pro → google/veo-3.1 (Premium 1080p, $0.40/s)
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .eq('id', scene.id);
+
+          const veoModel = quality === 'pro' ? 'google/veo-3.1' : 'google/veo-3.1-fast';
+          const veoResolution = quality === 'pro' ? '1080p' : '720p';
+          // Veo accepts 4 / 6 / 8 second clips
+          const veoDuration = scene.durationSeconds >= 7 ? 8 : scene.durationSeconds >= 5 ? 6 : 4;
+
+          const veoInput: Record<string, unknown> = {
+            prompt: enrichPrompt(scene.aiPrompt),
+            duration: veoDuration,
+            aspect_ratio: '16:9',
+            resolution: veoResolution,
+          };
+          if (scene.referenceImageUrl) {
+            veoInput.image = scene.referenceImageUrl;
+            console.log(`[compose-video-clips] Veo scene ${scene.id} uses i2v reference (${veoModel})`);
+          }
+
+          const prediction = await replicate.predictions.create({
+            model: veoModel,
+            input: veoInput,
             webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });

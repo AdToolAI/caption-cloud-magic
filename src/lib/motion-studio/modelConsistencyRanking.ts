@@ -31,6 +31,7 @@ const RANKING: Record<string, ConsistencyInfo> = {
   'ai-wan':      { stars: 4, mode: 'i2v variant',  paramName: 'image',             supportsImageInput: true  },
   'ai-seedance': { stars: 4, mode: 'i2v variant',  paramName: 'image',             supportsImageInput: true  },
   'ai-luma':     { stars: 3, mode: 'Keyframe',     paramName: 'start_image',       supportsImageInput: true  },
+  'ai-veo':      { stars: 4, mode: 'i2v + Audio',  paramName: 'image',             supportsImageInput: true  },
   'ai-sora':     { stars: 2, mode: 'Prompt-only',  paramName: '—',                 supportsImageInput: false },
   'ai-image':    { stars: 5, mode: 'Image edit',   paramName: 'reference',         supportsImageInput: true  },
   'stock':       { stars: 1, mode: 'No AI',        paramName: '—',                 supportsImageInput: false },
