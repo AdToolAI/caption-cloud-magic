@@ -230,28 +230,34 @@ export default function StoryboardTab({
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-3">
-              {scenes.map((scene, index) => (
-                <SortableSceneItem key={scene.id} id={scene.id}>
-                  <SceneCard
-                    scene={scene}
-                    index={index}
-                    totalScenes={scenes.length}
-                    projectId={projectId}
-                    characters={characters}
-                    preferredAspect={preferredAspect}
-                    onUpdate={(updates) => updateScene(scene.id, updates)}
-                    onDelete={() => deleteScene(scene.id)}
-                    onMoveUp={() => moveScene(index, index - 1)}
-                    onMoveDown={() => moveScene(index, index + 1)}
-                    onHybridExtend={
-                      projectId
-                        ? (mode) => openHybridDialog(scene, mode)
-                        : undefined
-                    }
-                    language={language}
-                  />
-                </SortableSceneItem>
-              ))}
+              {scenes.map((scene, index) => {
+                const hasOtherReadyScenes = scenes.some(
+                  (s) => s.id !== scene.id && s.clipStatus === 'ready' && !!s.clipUrl
+                );
+                return (
+                  <SortableSceneItem key={scene.id} id={scene.id}>
+                    <SceneCard
+                      scene={scene}
+                      index={index}
+                      totalScenes={scenes.length}
+                      projectId={projectId}
+                      characters={characters}
+                      preferredAspect={preferredAspect}
+                      onUpdate={(updates) => updateScene(scene.id, updates)}
+                      onDelete={() => deleteScene(scene.id)}
+                      onMoveUp={() => moveScene(index, index - 1)}
+                      onMoveDown={() => moveScene(index, index + 1)}
+                      onHybridExtend={
+                        projectId
+                          ? (mode) => openHybridDialog(scene, mode)
+                          : undefined
+                      }
+                      hasOtherReadyScenes={hasOtherReadyScenes}
+                      language={language}
+                    />
+                  </SortableSceneItem>
+                );
+              })}
             </div>
           </SortableContext>
         </DndContext>
@@ -268,9 +274,16 @@ export default function StoryboardTab({
           sourceSceneId={hybridDialog.scene.id}
           sourceClipUrl={hybridDialog.scene.clipUrl}
           defaultMode={hybridDialog.mode}
+          availableScenes={scenes
+            .filter((s) => !!s.clipUrl)
+            .map((s) => ({
+              id: s.id,
+              orderIndex: s.orderIndex,
+              clipUrl: s.clipUrl,
+              sceneType: s.sceneType,
+            }))}
           language={dialogLang}
           onSuccess={() => {
-            // Server inserts the new scene row; refetch to surface it
             void onRefetchScenes?.();
           }}
         />
