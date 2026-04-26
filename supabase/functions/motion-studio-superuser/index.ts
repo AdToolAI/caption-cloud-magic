@@ -553,7 +553,15 @@ async function runScenario(scenario: Scenario, ctx: TestContext, triggeredBy: st
           responseData = { raw: text.substring(0, 500) };
         }
 
-        if (response.status === 404 && scenario.optional) {
+        // Distinguish "function not deployed" (gateway 404, no JSON error body)
+        // from "resource not found" (deployed function returning structured 404).
+        const isGatewayNotFound =
+          response.status === 404 &&
+          (typeof responseData !== "object" ||
+            responseData === null ||
+            !("error" in (responseData as Record<string, unknown>)));
+
+        if (isGatewayNotFound && scenario.optional) {
           status = "warning";
           errorMessage = `Function '${scenario.fn}' not deployed (optional)`;
         } else if (scenario.expectReachable) {

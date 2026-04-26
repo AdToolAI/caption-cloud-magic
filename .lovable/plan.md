@@ -1,52 +1,74 @@
-# Motion Studio Superuser — Fix Plan für die 3 letzten Fehler
+## Problem
 
-Nach der Diagnose der Edge-Function-Logs sind 3 verschiedene Root-Causes identifiziert. Alle drei sind echte Bugs, keine Plattform-Hiccups.
+MS-12 zeigt eine **Warning** mit der Meldung *"Function 'analyze-scene-subject' not deployed (optional)"*, obwohl die Funktion **deployed ist** und korrekt mit HTTP 404 antwortet (282 ms — siehe Screenshot).
 
----
+## Root Cause
 
-## 🔴 Bug 1: MS-10 Brand Voice Analysis — `HTTP 500: column updated_at not found`
+In `supabase/functions/motion-studio-superuser/index.ts` (Zeile 556-558) wird **jede** 404-Response als "Function not deployed" interpretiert:
 
-**Root Cause:** `supabase/functions/analyze-brand-voice/index.ts` (Zeile 104) versucht `updated_at: new Date().toISOString()` in die `brand_kits` Tabelle zu schreiben — diese Spalte existiert dort jedoch **nicht** (nur `created_at` ist vorhanden, verifiziert via Schema-Query).
+```ts
+if (response.status === 404 && scenario.optional) {
+  status = "warning";
+  errorMessage = `Function '${scenario.fn}' not deployed (optional)`;
+}
+```
 
-**Fix:**
-- In `analyze-brand-voice/index.ts` das `updated_at` Feld aus dem `.update({...})` Payload entfernen.
-- Nur `brand_voice: voiceProfile` updaten.
+Das ist falsch, denn:
+- Eine **nicht deployte** Edge Function antwortet mit 404 vom Supabase-Gateway (mit spezifischem Body wie `{"code":"NOT_FOUND","message":"Requested function was not found"}`).
+- Eine **deployte** Function darf legitim 404 für "Resource not found" zurückgeben (genau das, was wir in MS-3 für `analyze-scene-subject` als Fallback-Härtung testen wollen!).
 
----
+## Fix
 
-## 🟡 Bug 2: MS-3 Auto-Director Compose — `Missing expected keys: scenes`
+In `motion-studio-superuser/index.ts` die 404-Logik präzisieren:
 
-**Root Cause:** Der Test sendet `stage: "plan"`. In `auto-director-compose/index.ts` retourniert die `plan`-Stage zwar Scenes, aber der **Test-Runner** (motion-studio-superuser, Zeile 572-579) prüft `expectedKeys: ["scenes"]` direkt auf der Top-Level-Response. Die Plan-Response hat das Feld vermutlich verschachtelt (z. B. unter `data.scenes` oder `preview.scenes`).
+1. **Function-not-deployed-404** nur erkennen, wenn der Response-Body das Supabase-Gateway-Pattern enthält (z. B. `BOOT_ERROR`, `NOT_FOUND` mit Function-Hinweis, oder leerer/HTML-Body).
+2. **Andere 404-Antworten** (mit JSON-Body & `error`-Feld) als gültige `pass` werten — das ist das erwartete Verhalten für Hardening-Tests.
 
-**Fix-Optionen** (eine wählen nach Inspektion der tatsächlichen Plan-Response):
-- **Option A (bevorzugt):** Die `expectedKeys` in MS-3 anpassen auf den korrekten Top-Level-Key (z. B. `["preview"]` oder `["plan"]`), oder verschachtelte Key-Prüfung implementieren (`scenes` in `responseData.preview`).
-- **Option B:** Den Schema-Check in `motion-studio-superuser` so erweitern, dass er auch in einer Ebene tiefer sucht (rekursiv 1-level).
+Konkret Zeile 556-581 ersetzen durch:
 
-Vorgehen: Erst kurz Plan-Response-Form via einem Diagnostic-Call verifizieren, dann gezielt fixen.
+```ts
+const isGatewayNotFound =
+  response.status === 404 &&
+  (typeof responseData !== "object" ||
+    responseData === null ||
+    !("error" in (responseData as Record<string, unknown>)));
 
----
+if (isGatewayNotFound && scenario.optional) {
+  status = "warning";
+  errorMessage = `Function '${scenario.fn}' not deployed (optional)`;
+} else if (scenario.expectReachable) {
+  if (response.status < 500) {
+    status = "pass";
+    schemaHash = await hashSchema(responseData);
+  } else {
+    status = scenario.optional ? "warning" : "fail";
+    errorMessage = `Endpoint unreachable — HTTP ${response.status}: ${text.substring(0, 200)}`;
+  }
+} else if (!response.ok) {
+  status = scenario.optional ? "warning" : "fail";
+  errorMessage = `HTTP ${response.status}: ${text.substring(0, 300)}`;
+} else {
+  schemaHash = await hashSchema(responseData);
+  if (scenario.expectedKeys && responseData && typeof responseData === "object") {
+    const missing = scenario.expectedKeys.filter(
+      (k) => !(k in (responseData as Record<string, unknown>)),
+    );
+    if (missing.length > 0) {
+      status = "warning";
+      errorMessage = `Missing expected keys: ${missing.join(", ")}`;
+    }
+  }
+}
+```
 
-## 🟡 Bug 3: MS-12 Reframe Fallback Hardening — `HTTP 500: Project not found`
+## Umsetzungsschritte
 
-**Root Cause:** Der Test sendet bewusst eine ungültige Project-ID (`00000000-...`), um das Fallback-Verhalten zu testen. `analyze-scene-subject/index.ts` (Zeile 205) wirft daraufhin `throw new Error("Project not found")` → HTTP 500. Der Test-Runner mappt `>= 500` als Failure (warning weil `optional: true`), aber **fachlich richtig** wäre HTTP **404** für "Resource not found", damit der Härtungstest grün laufen kann.
+1. `motion-studio-superuser/index.ts` (Zeile 556-581) wie oben patchen.
+2. Funktion deployen.
+3. Fast Run erneut starten — MS-12 sollte jetzt **grün (pass, HTTP 404)** sein, ohne Warning.
 
-**Fix:**
-- In `analyze-scene-subject/index.ts` den "Project not found"-Pfad in eine **strukturierte 404-Response** umwandeln statt eines generischen 500-Throws.
-- Damit wird MS-12 grün (HTTP 404 = `< 500` = `pass`).
+## Erwartetes Ergebnis
 
----
-
-## 📋 Umsetzungsschritte (nach Approval)
-
-1. **Fix 1 — `analyze-brand-voice/index.ts`:** `updated_at` aus dem brand_kits Update entfernen.
-2. **Fix 2 — `auto-director-compose` Plan-Response inspizieren:** Kurzer Diagnose-Curl auf die Funktion, dann entweder die `expectedKeys` in `motion-studio-superuser/index.ts` korrigieren oder die Plan-Response um ein Top-Level `scenes` Feld erweitern.
-3. **Fix 3 — `analyze-scene-subject/index.ts`:** Den `Project not found`-Throw durch eine `return new Response(JSON.stringify({error:"Project not found"}), {status: 404, headers: corsHeaders})` ersetzen.
-4. **Deploy** der 3 Edge Functions: `analyze-brand-voice`, `auto-director-compose` (falls geändert), `analyze-scene-subject`, `motion-studio-superuser` (falls geändert).
-5. **Verifizieren** durch erneutes Ausführen des Motion Studio Superuser Fast Run — Ziel: 14/14 grün (oder 13/14 mit MS-12 als pass).
-
-## ✅ Erwartetes Ergebnis
-
-- MS-10 → ✅ pass (HTTP 200)
-- MS-3 → ✅ pass (scenes-Key gefunden)
-- MS-12 → ✅ pass (HTTP 404, korrekt für ungültige ID)
-- Erfolgsquote: **14/14 (100 %)** statt aktuell 11/14 (79 %)
+- **Bestanden: 14** (statt 13)
+- **Warnungen: 0** (statt 1)
+- **Fehlgeschlagen: 0**
