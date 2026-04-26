@@ -264,6 +264,7 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
       : {},
     preferLossless: (partial.preferLossless as boolean) ?? false,
     forcePathStyle: (partial.forcePathStyle as boolean) ?? false,
+    concurrency: null,
   };
 
   // r39: Adaptive scheduling with scheduling mode support
