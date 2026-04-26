@@ -66,6 +66,9 @@ export default function StoryboardTab({
     mode: 'forward' | 'backward' | 'bridge' | 'style-ref';
   }>({ open: false, scene: null, mode: 'forward' });
 
+  // Block Q — Talking-Head dialog state
+  const [talkingHeadOpen, setTalkingHeadOpen] = useState(false);
+
   const openHybridDialog = (
     scene: ComposerScene,
     mode: 'forward' | 'backward' | 'bridge' | 'style-ref'
