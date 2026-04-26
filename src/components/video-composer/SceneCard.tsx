@@ -15,8 +15,12 @@ import {
 } from '@/components/ui/select';
 import {
   ChevronUp, ChevronDown, Trash2, GripVertical,
-  Sparkles, Upload, Video, Image as ImageIcon, Wand2,
+  Sparkles, Upload, Video, Image as ImageIcon, Wand2, Beaker,
 } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
+import CompareLabGrid from '@/components/compare-lab/CompareLabGrid';
 import type {
   ComposerScene,
   SceneType,
@@ -109,6 +113,8 @@ export default function SceneCard({
   const [inspiring, setInspiring] = useState(false);
   // Block K-6 — Multi-Engine Preview open state
   const [multiEngineOpen, setMultiEngineOpen] = useState(false);
+  // Block L — Inline Compare Lab dialog open state
+  const [compareLabOpen, setCompareLabOpen] = useState(false);
 
   // Block K-5: pull system presets to seed inspire variation
   const { systemPresets } = useStylePresets();
@@ -483,6 +489,26 @@ export default function SceneCard({
                   </div>
                 )}
 
+                {/* Block L — Inline Compare Lab launcher */}
+                {(scene.aiPrompt?.trim() || hasAnySlot(promptSlots)) && (
+                  <div className="pt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCompareLabOpen(true)}
+                      className="h-7 text-[10px] gap-1.5"
+                    >
+                      <Beaker className="h-3 w-3" />
+                      {lang === 'de'
+                        ? 'Auf Engines vergleichen'
+                        : lang === 'es'
+                        ? 'Comparar en motores'
+                        : 'Compare on engines'}
+                    </Button>
+                  </div>
+                )}
+
                 <StylePresetPicker
                   open={stylePickerOpen}
                   onOpenChange={setStylePickerOpen}
@@ -636,6 +662,59 @@ export default function SceneCard({
         preferredAspect={preferredAspect}
         onSelect={handleStockSelect}
       />
+
+      {/* Block L — Inline Compare Lab Dialog */}
+      <Dialog open={compareLabOpen} onOpenChange={setCompareLabOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Beaker className="h-5 w-5 text-primary" />
+              {lang === 'de'
+                ? `Compare Lab — Szene ${index + 1}`
+                : lang === 'es'
+                ? `Compare Lab — Escena ${index + 1}`
+                : `Compare Lab — Scene ${index + 1}`}
+            </DialogTitle>
+            <DialogDescription>
+              {lang === 'de'
+                ? 'Vergleiche denselben Prompt parallel auf bis zu 6 KI-Video-Engines. Wähle einen Sieger und übernimm ihn in deine Szene.'
+                : lang === 'es'
+                ? 'Compara el mismo prompt en hasta 6 motores de vídeo IA en paralelo. Elige un ganador y aplícalo a tu escena.'
+                : 'Compare the same prompt across up to 6 AI video engines in parallel. Pick a winner and apply it to your scene.'}
+            </DialogDescription>
+          </DialogHeader>
+          <CompareLabGrid
+            initialPrompt={
+              promptMode === 'structured'
+                ? stitchSlots(promptSlots, promptSlotOrder)
+                : (scene.aiPrompt ?? '')
+            }
+            initialAspectRatio={
+              preferredAspect === '4:5' ? '1:1' : (preferredAspect ?? '16:9') as '16:9' | '9:16' | '1:1'
+            }
+            composerSceneId={scene.id}
+            onWinnerSelected={(_engine, videoUrl) => {
+              if (videoUrl) {
+                onUpdate({
+                  clipSource: 'upload',
+                  uploadUrl: videoUrl,
+                  uploadType: 'video',
+                });
+                toast({
+                  title: lang === 'de' ? 'Sieger übernommen' : lang === 'es' ? 'Ganador aplicado' : 'Winner applied',
+                  description:
+                    lang === 'de'
+                      ? 'Das gewählte Video wurde der Szene zugewiesen.'
+                      : lang === 'es'
+                      ? 'El vídeo seleccionado se asignó a la escena.'
+                      : 'The selected video has been assigned to the scene.',
+                });
+                setCompareLabOpen(false);
+              }
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
