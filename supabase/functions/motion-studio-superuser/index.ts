@@ -625,6 +625,7 @@ Deno.serve(async (req) => {
 
     const { userId, userJwt } = await ensureTestUser();
     const { projectId, sceneId } = await ensureTestProject(userId);
+    await ensureTestBrandKit(userId);
 
     const ctx: TestContext = { userId, userJwt, testProjectId: projectId, testSceneId: sceneId };
     console.log(`[MS-Superuser] Ready — user=${userId}, project=${projectId}, mode=${mode}`);
