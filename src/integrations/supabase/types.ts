@@ -4081,6 +4081,81 @@ export type Database = {
           },
         ]
       }
+      composer_template_suggestions: {
+        Row: {
+          aggregation_window_end: string | null
+          aggregation_window_start: string | null
+          category: string | null
+          completion_rate: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_featured: boolean | null
+          is_public: boolean | null
+          performance_score: number | null
+          preview_video_url: string | null
+          scene_count: number | null
+          shares_count: number | null
+          source_project_id: string | null
+          structure_json: Json
+          tags: string[] | null
+          thumbnail_url: string | null
+          title: string
+          total_duration_sec: number | null
+          updated_at: string | null
+          use_count: number | null
+          views_count: number | null
+        }
+        Insert: {
+          aggregation_window_end?: string | null
+          aggregation_window_start?: string | null
+          category?: string | null
+          completion_rate?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_featured?: boolean | null
+          is_public?: boolean | null
+          performance_score?: number | null
+          preview_video_url?: string | null
+          scene_count?: number | null
+          shares_count?: number | null
+          source_project_id?: string | null
+          structure_json?: Json
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          title: string
+          total_duration_sec?: number | null
+          updated_at?: string | null
+          use_count?: number | null
+          views_count?: number | null
+        }
+        Update: {
+          aggregation_window_end?: string | null
+          aggregation_window_start?: string | null
+          category?: string | null
+          completion_rate?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_featured?: boolean | null
+          is_public?: boolean | null
+          performance_score?: number | null
+          preview_video_url?: string | null
+          scene_count?: number | null
+          shares_count?: number | null
+          source_project_id?: string | null
+          structure_json?: Json
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          title?: string
+          total_duration_sec?: number | null
+          updated_at?: string | null
+          use_count?: number | null
+          views_count?: number | null
+        }
+        Relationships: []
+      }
       content_approvals: {
         Row: {
           content_id: string
@@ -12885,6 +12960,10 @@ export type Database = {
       increment_template_usage: {
         Args: { template_id: string }
         Returns: undefined
+      }
+      increment_trending_template_use: {
+        Args: { p_template_id: string }
+        Returns: number
       }
       increment_usage: {
         Args: { date_param: string; user_id_param: string }
