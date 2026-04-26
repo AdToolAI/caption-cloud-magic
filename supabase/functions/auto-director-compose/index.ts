@@ -217,7 +217,32 @@ serve(async (req) => {
 // ============================================================================
 // AI PLAN GENERATION via Lovable AI Gateway (Gemini 2.5 Pro with structured tool calling)
 // ============================================================================
-async function generateScenePlan(req: AutoDirectorRequest): Promise<PlanResult> {
+async function loadActiveBrandContext(admin: any, userId: string): Promise<BrandContext | null> {
+  try {
+    const { data, error } = await admin
+      .from('brand_kits')
+      .select('brand_name, primary_color, secondary_color, mood, brand_tone, brand_values')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      brandName: data.brand_name ?? null,
+      primaryColor: data.primary_color ?? null,
+      secondaryColor: data.secondary_color ?? null,
+      mood: data.mood ?? null,
+      brandTone: data.brand_tone ?? null,
+      brandValues: Array.isArray(data.brand_values) ? data.brand_values.slice(0, 5) : [],
+    };
+  } catch (err) {
+    console.warn('[auto-director] loadActiveBrandContext failed:', err);
+    return null;
+  }
+}
+
+async function generateScenePlan(req: AutoDirectorRequest, brandContext?: BrandContext | null): Promise<PlanResult> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
     throw new Error("LOVABLE_API_KEY is not configured");
