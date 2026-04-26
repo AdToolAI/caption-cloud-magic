@@ -15,8 +15,12 @@ import {
 } from '@/components/ui/select';
 import {
   ChevronUp, ChevronDown, Trash2, GripVertical,
-  Sparkles, Upload, Video, Image as ImageIcon, Wand2,
+  Sparkles, Upload, Video, Image as ImageIcon, Wand2, Beaker,
 } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
+import CompareLabGrid from '@/components/compare-lab/CompareLabGrid';
 import type {
   ComposerScene,
   SceneType,
