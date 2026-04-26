@@ -77,7 +77,7 @@ export async function trackProviderCall<T>(
       try {
         const client = getClient();
         if (!client) return;
-        client.from('provider_quota_log').insert({
+        (client.from('provider_quota_log') as any).insert({
           provider,
           endpoint,
           status_code: statusCode,
@@ -86,7 +86,7 @@ export async function trackProviderCall<T>(
           rate_limit_remaining: rateLimitRemaining,
           rate_limit_total: options.rateLimitTotal ?? null,
           error_message: errorMessage,
-        }).then(({ error }) => {
+        }).then(({ error }: { error: any }) => {
           if (error) console.error('[provider-tracker] log failed:', error.message);
         });
       } catch (e) {
@@ -112,7 +112,7 @@ export async function trackLambdaRender(params: {
   try {
     const client = getClient();
     if (!client) return;
-    await client.from('lambda_health_metrics').insert({
+    await (client.from('lambda_health_metrics') as any).insert({
       render_id: params.renderId,
       job_id: params.jobId,
       status: params.status,
@@ -134,12 +134,12 @@ export async function getSystemConfig<T = unknown>(key: string, fallback: T): Pr
   try {
     const client = getClient();
     if (!client) return fallback;
-    const { data } = await client
-      .from('system_config')
+    const { data } = await (client
+      .from('system_config') as any)
       .select('value')
       .eq('key', key)
       .maybeSingle();
-    return (data?.value as T) ?? fallback;
+    return ((data as any)?.value as T) ?? fallback;
   } catch {
     return fallback;
   }
