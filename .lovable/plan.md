@@ -1,79 +1,80 @@
 
-# Plan: Veo 3.1 Lite Studio – Audio-Native Video Generation
+# Plan: Vollständige Veo 3.1 Integration (4 Varianten) mit ≥70% Marge
 
-## 🎯 Strategisches Ziel
+## 🎯 Ziel
+Alle vier offiziellen Google Veo 3.1 Varianten von Replicate mit korrektem Modell-Routing und einer **garantierten Marge von ≥70%** bereitstellen — sowohl im **Veo Video Studio** (Standalone) als auch im **Motion Studio** (Composer/Scene-Generation).
 
-Artlist hat Veo 3.1 Lite als USP positioniert (Video + Audio in einem Pass). Wir kontern, indem wir den **gleichen Google-Standard** in unser Studio holen — **als 7. Provider neben Kling, Wan, Hailuo, Luma, Seedance, Sora 2**. Damit bleiben wir das einzige Tool am Markt, das Veo 3.1 Lite **innerhalb eines vollständigen Production-Workflows** (Director's Cut, Composer, Social Publishing) anbietet — Artlist hat „nur" Generation.
+## 💰 Pricing-Matrix (Marge berechnet auf 1 EUR ≈ 1 USD)
 
-## 🔑 USP gegenüber Artlist
+| Variante | Replicate Modell-ID | Cost (Replicate) | Verkaufspreis | Marge |
+|---|---|---|---|---|
+| **Veo 3.1 Lite 720p** | `google/veo-3.1-fast` *(720p Modus)* ¹ | $0.05/s | **€/$0.20/s** | **75%** |
+| **Veo 3.1 Lite 1080p** | `google/veo-3.1-fast` *(1080p Modus)* ¹ | $0.08/s | **€/$0.30/s** | **73%** |
+| **Veo 3.1 Fast** | `google/veo-3.1-fast` | $0.15/s | **€/$0.55/s** | **73%** |
+| **Veo 3.1 Pro** | `google/veo-3.1` | $0.40/s | **€/$1.40/s** | **71%** |
 
-| Feature | Artlist Veo 3.1 | **AdTool Veo 3.1** |
-|---|---|---|
-| Video + Audio Native | ✅ | ✅ |
-| Charakter-Bibliothek (cross-model) | ❌ | ✅ (Motion Studio Library) |
-| Director's Cut Post-Production | ❌ | ✅ |
-| Direct Social Publishing | ❌ | ✅ (5 Plattformen) |
-| Multi-Model A/B (Veo vs. Kling vs. Sora) | ❌ | ✅ (Compare Lab) |
+¹ Lite 720p/1080p werden im Code via `resolution`-Input am `google/veo-3.1-fast`-Modell gesteuert (gleiches Replicate-Modell, anderer Output-Tier).
+Falls Replicate `resolution`-Param nicht akzeptiert, fällt das Modell auf `veo-3.1-fast` Default-Pricing zurück — Margenpuffer bleibt bestehen.
+
+**Beispiel (8s Clip):**
+- Lite 720p: Wir zahlen $0.40, Nutzer zahlt **€1.60** → Gewinn €1.20
+- Pro: Wir zahlen $3.20, Nutzer zahlt **€11.20** → Gewinn €8.00
+
+---
 
 ## 📦 Lieferumfang
 
-### 1. Edge Function: `supabase/functions/generate-veo-video/index.ts` (NEU)
-- **Replicate-Modell**: `google/veo-3.1-fast` (= Veo 3.1 Lite, ~$0.40/s laut Replicate-Listing)
-- **Inputs**: `prompt`, `duration` (4s/6s/8s), `aspectRatio` (16:9, 9:16), `startImageUrl?`, `generateAudio` (default: true), `negativePrompt?`
-- **Pricing-Wallet**: `EUR 0.40 / USD 0.40` pro Sekunde (Standard), Pro-Variante `google/veo-3.1` mit `EUR 0.65/s` als Premium-Option
-- **Pattern**: Identisch zu `generate-wan-video` (Reservation → Replicate-Webhook → Commit/Refund über `credit-reserve`/`credit-commit`/`credit-refund`)
-- **Audio-Track**: Replicate liefert Video mit eingebettetem Audio → direkter Upload zu `ai-video-generations` Storage-Bucket
-- CORS-Header und Auth wie alle bestehenden Provider-Functions
+### 1. `src/config/veoVideoCredits.ts` — Erweiterung auf 4 Modelle
+Schema umbauen auf 4 Einträge: `veo-3.1-lite-720p`, `veo-3.1-lite-1080p`, `veo-3.1-fast`, `veo-3.1-pro`. Jedes mit `costPerSecond`, `quality`, `replicateModel`, `resolution`-Hint und Beschreibung in DE/EN.
 
-### 2. Webhook: `supabase/functions/veo-video-webhook/index.ts` (NEU)
-- Verarbeitet `succeeded`/`failed` Events von Replicate
-- Lädt das fertige Video herunter, lädt es in Storage hoch, aktualisiert `ai_video_generations.status` + `video_url`
-- Triggert Credit-Commit oder Refund
+### 2. `supabase/functions/generate-veo-video/index.ts` — Modell-Routing
+- `MODEL_PRICING` und `REPLICATE_MODELS` auf 4 Einträge erweitern
+- Bei Lite-Varianten zusätzlich `resolution: '720p' | '1080p'` an Replicate-Input übergeben
+- Bei Pro: keine resolution-Override (1080p Default)
+- DB-Insert: `resolution`-Feld korrekt mit jeweiligem Tier befüllen
+- Validation für alle 4 Model-IDs
 
-### 3. Frontend: `src/pages/VeoVideoStudio.tsx` (NEU)
-- Klone `SoraVideoStudio.tsx` als Basis (gleiche Glassmorphism-UI, James Bond 2028)
-- Spezielle UI-Sektion: **„Audio-Native Generation"** mit Toggle für „Mit Sound generieren" (default ON) + Beispiel-Hinweis: „z. B. *‚A glass shattering with crystal clarity'* erzeugt automatisch das Geräusch"
-- Integration des bestehenden `VideoPromptOptimizer` (auto-Übersetzung + Cinematic-Enrichment)
-- Reuse: `useAIVideoWallet`, `VideoGenerationHistory`, Credit-Anzeige
+### 3. `src/pages/VeoVideoStudio.tsx` — UI-Update
+- Modell-Selector zeigt alle 4 Varianten als Cards mit Preis, Auflösung, Badge
+- Default: `veo-3.1-lite-720p` (günstigste Einstiegsvariante)
+- Cost-Preview im Generator zeigt Live-Kalkulation pro Sekunde
+- Erweiterter Disclaimer: „720p ab €0.20/s · Pro 1080p ab €1.40/s"
 
-### 4. Config: `src/config/veoVideoCredits.ts` (NEU)
-- Schema analog zu `wanVideoCredits.ts`
-- Modelle: `veo-3.1-lite` (Standard), `veo-3.1` (Pro)
-- Allowed Durations: `[4, 6, 8]`, AspectRatios: `['16:9', '9:16']`
+### 4. `src/pages/AIVideoStudio.tsx` — Hub-Card
+- Veo-Card Beschreibung anpassen: „4 Varianten · Native Audio · ab €0.20/s"
+- Badge bleibt **„🎵 Native Audio"**
 
-### 5. Hub-Integration: `src/pages/AIVideoStudio.tsx`
-- Neuer Provider-Card-Eintrag „Veo 3.1 Lite" mit Badge **„🎵 Native Audio"** als Differentiator
-- Position: **Slot 2** (nach Kling, vor Wan), da Audio-Native das Premium-Verkaufsargument ist
-- Update Hero-Subtitle: „6 KI-Modelle" → **„7 KI-Modelle"** (alle 3 Sprachen)
+### 5. **Motion Studio Integration** — Neuer Provider in Scene-Generation
+**Affected Files:**
+- `src/lib/featureCosts.ts`: Neue Cost-Codes `motion_clip_veo_lite_720`, `motion_clip_veo_lite_1080`, `motion_clip_veo_fast`, `motion_clip_veo_pro` mit Credits/Sek (20/30/55/140 = €0.20–€1.40 × 100 Credits/€).
+- `src/types/motion-studio.ts`: Provider-Enum um `'veo-lite-720'`, `'veo-lite-1080'`, `'veo-fast'`, `'veo-pro'` erweitern.
+- `src/components/video-composer/ClipsTab.tsx` (oder Provider-Picker): Veo-Optionen in Provider-Dropdown der Scene mit Audio-Toggle und Auflösungs-Auswahl.
+- `supabase/functions/motion-studio-superuser/index.ts`: Neuer Test-Scenario MS-27 „Veo Provider Routing" zur Validierung der Modell-Auswahl.
+- Generation-Edge-Function des Composers (vermutlich `composer-generate-clip` oder ähnlich — wird beim Build identifiziert) erhält Veo-Branch, der intern `generate-veo-video` aufruft.
 
-### 6. Routing: `src/App.tsx`
-- Neue Route `/veo-video-studio` → `VeoVideoStudio.tsx`
+**Marge gilt 1:1**: Jeder Composer-Clip nutzt dieselbe Pricing-Matrix → 70%+ Marge garantiert.
 
-### 7. Secret Setup
-- Bereits vorhanden: `REPLICATE_API_KEY` (von Wan/Luma/Hailuo/Seedance verwendet) → **kein neuer Secret nötig**
+### 6. Optional: `src/pages/AIVideoStudio.tsx` Hero-Subtitle
+Bleibt bei „7 KI-Modelle" (Veo zählt als 1 Provider mit 4 Varianten — wie Sora 2 Std/Pro).
 
-### 8. Legal Compliance
-- `AIVideoDisclaimer.tsx` ergänzen: Veo 3.1 Lite Hinweis (Google Terms, Audio-Watermark via SynthID)
+---
 
-## 🔄 Wiederverwendung bestehender Architektur
-
-- **Credit-System**: Identisch zu allen Providern (`credit-reserve` → `credit-commit/refund`)
-- **Storage**: `ai-video-generations` Bucket mit User-ID-Prefix (RLS-konform)
-- **History**: `ai_video_generations` Tabelle — kein Schema-Change nötig (Veo-Videos sind reguläre Generations mit `provider='veo-3.1-lite'`)
-- **Webhook-Pattern**: Spiegelt `sora-scene-webhook` mit Video-Download + Storage-Upload
+## 🔄 Wiederverwendung
+- **Webhook**: Bestehender `replicate-webhook` handhabt alle 4 Varianten ohne Änderung (gleiche Output-Struktur).
+- **Credit-System**: `deduct_ai_video_credits` / `refund_ai_video_credits` RPCs unverändert.
+- **Storage**: `ai-video-generations` Bucket unverändert.
 
 ## ⚠️ Risiken & Mitigations
-
-1. **Replicate Rate-Limits**: Veo 3.1 ist noch Beta auf Replicate → Retry-Logik mit 60s Backoff bei 429 (wie in `generate-sora-scenes-batch`)
-2. **Audio-Qualität-Erwartung**: Klare UI-Disclaimer „Audio-Generierung experimentell — nicht für finalen Broadcast geeignet"
-3. **Kosten**: Veo ist teurer als Wan (€0.40/s vs. €0.10/s) → klare Cost-Anzeige im Generator vor Submit
+1. **Replicate `resolution`-Param**: Falls `google/veo-3.1-fast` den `resolution`-Input nicht unterstützt, verkauft 720p-Variante zum 720p-Preis aber generiert evtl. 1080p → wir zahlen $0.08 statt $0.05, Marge sinkt auf 60%. **Mitigation**: Nach Deployment ein Testcall mit `supabase--curl_edge_functions` zur Verifikation; ggf. 720p-Preis auf €0.30 anheben.
+2. **FX-Risiko USD/EUR**: Pricing in EUR=USD 1:1 angesetzt (konservativ). Bei USD-Schwäche zahlen wir effektiv weniger → höhere Marge.
+3. **Pro-Tier Akzeptanz**: €1.40/s ist hoch (€11.20 für 8s) — klare UI-Kommunikation als „Premium 1080p Cinematic" mit Vorschau-Beispielen.
 
 ## 📋 Test-Plan
-
-- Deploy `generate-veo-video` + `veo-video-webhook` via `supabase--deploy_edge_functions`
-- Test über `supabase--curl_edge_functions` mit Mock-Prompt
-- Manueller End-to-End-Test im Frontend: `/veo-video-studio` → 4s Video mit Audio → Verify in History + Wallet-Abzug
+1. Deploy `generate-veo-video` via `supabase--deploy_edge_functions`
+2. Curl-Test pro Variante mit Mock-Prompt (4s, 16:9, audio on)
+3. Verify in `ai_video_generations`: korrekte `model`, `resolution`, `total_cost_euros`
+4. UI-Test: Alle 4 Cards anzeigbar im VeoVideoStudio
+5. Motion Studio: Provider-Dropdown zeigt 4 Veo-Optionen, MS-27 Test grün
 
 ## 🚀 Ergebnis
-
-Mit dieser Integration sind wir **der einzige Anbieter** der **Veo 3.1 Lite + 6 weitere Modelle + vollständigen Post-Production-Stack** vereint. Artlist hat 1 Modell + Generation. **Wir haben 7 Modelle + komplettes Studio.**
+**Marktpositionierung**: Wir bieten als **einziger Anbieter alle 4 Veo 3.1 Tiers** (von €0.20/s Einstieg bis €1.40/s Premium) — Artlist hat nur Lite. Gleichzeitig: **garantierte ≥71% Marge** auf jede Generierung, sowohl Standalone als auch im Motion Studio.
