@@ -10,14 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Loader2, FileX, Play, Sparkles, Clock, LayoutGrid, Flame, TrendingUp } from 'lucide-react';
+import { Loader2, FileX, Play, Sparkles, Clock, LayoutGrid } from 'lucide-react';
 import { useMotionStudioTemplates } from '@/hooks/useMotionStudioTemplates';
-import {
-  useTrendingTemplates,
-  trendingToMotionStudioTemplate,
-  type TrendingTemplate,
-} from '@/hooks/useTrendingTemplates';
 import {
   USE_CASE_LABELS,
   STYLE_LABELS,
@@ -30,7 +24,6 @@ interface MotionStudioTemplatePickerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectTemplate: (template: MotionStudioTemplate) => void;
-  onSelectTrending?: (template: MotionStudioTemplate, trendingId: string) => void;
   onStartBlank: () => void;
 }
 
@@ -40,16 +33,12 @@ export default function MotionStudioTemplatePicker({
   open,
   onOpenChange,
   onSelectTemplate,
-  onSelectTrending,
   onStartBlank,
 }: MotionStudioTemplatePickerProps) {
   const [styleFilter, setStyleFilter] = useState<string>(ALL_STYLE_FILTER);
-  const [tab, setTab] = useState<'curated' | 'trending'>('curated');
-
   const { data: templates = [], isLoading } = useMotionStudioTemplates(
     styleFilter === ALL_STYLE_FILTER ? {} : { style: styleFilter }
   );
-  const { data: trending = [], isLoading: trendingLoading } = useTrendingTemplates({ limit: 30 });
 
   const styleOptions: { value: string; label: string }[] = [
     { value: ALL_STYLE_FILTER, label: 'Alle Stile' },
@@ -58,12 +47,6 @@ export default function MotionStudioTemplatePicker({
       label,
     })),
   ];
-
-  const handleTrendingPick = (t: TrendingTemplate) => {
-    const mapped = trendingToMotionStudioTemplate(t);
-    if (onSelectTrending) onSelectTrending(mapped, t.id);
-    else onSelectTemplate(mapped);
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -74,117 +57,64 @@ export default function MotionStudioTemplatePicker({
             <DialogTitle className="text-xl">Template wählen</DialogTitle>
           </div>
           <DialogDescription>
-            Starte mit einer kuratierten Vorlage, einem Trending-Template oder einem leeren Projekt.
+            Starte mit einer kuratierten Vorlage oder mit einem leeren Projekt.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex-1">
-          <div className="px-6 pt-3 border-b border-border/40">
-            <TabsList className="bg-muted/40">
-              <TabsTrigger value="curated" className="gap-1.5">
-                <Sparkles className="h-3.5 w-3.5" />
-                Kuratiert
-              </TabsTrigger>
-              <TabsTrigger value="trending" className="gap-1.5">
-                <Flame className="h-3.5 w-3.5 text-orange-500" />
-                Trending
-                {trending.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1.5">
-                    {trending.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            </TabsList>
+        {/* Style filter */}
+        <div className="px-6 py-3 border-b border-border/40 flex flex-wrap gap-2">
+          {styleOptions.map((opt) => (
+            <Button
+              key={opt.value}
+              variant={styleFilter === opt.value ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setStyleFilter(opt.value)}
+              className="h-8"
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+
+        <ScrollArea className="max-h-[60vh]">
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Blank project card – always first */}
+            <Card
+              className="group relative aspect-[4/5] overflow-hidden cursor-pointer border-dashed border-2 hover:border-primary/60 transition-colors flex flex-col items-center justify-center gap-3 bg-muted/20"
+              onClick={onStartBlank}
+            >
+              <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                <FileX className="h-7 w-7 text-primary" />
+              </div>
+              <div className="text-center px-4">
+                <h3 className="font-semibold text-foreground">Leeres Projekt</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Ohne Vorlage von Grund auf starten
+                </p>
+              </div>
+            </Card>
+
+            {isLoading && (
+              <div className="col-span-full flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            )}
+
+            {!isLoading && templates.map((tpl) => (
+              <TemplateCard
+                key={tpl.id}
+                template={tpl}
+                onSelect={() => onSelectTemplate(tpl)}
+              />
+            ))}
+
+            {!isLoading && templates.length === 0 && (
+              <div className="col-span-full text-center py-12 text-muted-foreground text-sm">
+                Keine Templates gefunden.
+              </div>
+            )}
           </div>
-
-          {/* Curated tab */}
-          <TabsContent value="curated" className="m-0">
-            <div className="px-6 py-3 border-b border-border/40 flex flex-wrap gap-2">
-              {styleOptions.map((opt) => (
-                <Button
-                  key={opt.value}
-                  variant={styleFilter === opt.value ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStyleFilter(opt.value)}
-                  className="h-8"
-                >
-                  {opt.label}
-                </Button>
-              ))}
-            </div>
-
-            <ScrollArea className="max-h-[55vh]">
-              <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Blank project card – always first */}
-                <Card
-                  className="group relative aspect-[4/5] overflow-hidden cursor-pointer border-dashed border-2 hover:border-primary/60 transition-colors flex flex-col items-center justify-center gap-3 bg-muted/20"
-                  onClick={onStartBlank}
-                >
-                  <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                    <FileX className="h-7 w-7 text-primary" />
-                  </div>
-                  <div className="text-center px-4">
-                    <h3 className="font-semibold text-foreground">Leeres Projekt</h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Ohne Vorlage von Grund auf starten
-                    </p>
-                  </div>
-                </Card>
-
-                {isLoading && (
-                  <div className="col-span-full flex items-center justify-center py-12">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  </div>
-                )}
-
-                {!isLoading &&
-                  templates.map((tpl) => (
-                    <TemplateCard
-                      key={tpl.id}
-                      template={tpl}
-                      onSelect={() => onSelectTemplate(tpl)}
-                    />
-                  ))}
-
-                {!isLoading && templates.length === 0 && (
-                  <div className="col-span-full text-center py-12 text-muted-foreground text-sm">
-                    Keine Templates gefunden.
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          </TabsContent>
-
-          {/* Trending tab */}
-          <TabsContent value="trending" className="m-0">
-            <div className="px-6 py-3 border-b border-border/40 flex items-center gap-2 text-xs text-muted-foreground">
-              <TrendingUp className="h-3.5 w-3.5 text-orange-500" />
-              Top-performende Strukturen der letzten 14 Tage – anonymisiert &amp; klonbar.
-            </div>
-
-            <ScrollArea className="max-h-[60vh]">
-              <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {trendingLoading && (
-                  <div className="col-span-full flex items-center justify-center py-12">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  </div>
-                )}
-
-                {!trendingLoading &&
-                  trending.map((t) => (
-                    <TrendingCard key={t.id} trending={t} onSelect={() => handleTrendingPick(t)} />
-                  ))}
-
-                {!trendingLoading && trending.length === 0 && (
-                  <div className="col-span-full text-center py-12 text-muted-foreground text-sm">
-                    Noch keine Trending-Templates verfügbar. Sobald Projekte Performance-Daten
-                    sammeln, erscheinen hier die besten Strukturen automatisch.
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
@@ -238,14 +168,17 @@ function TemplateCard({ template, onSelect }: TemplateCardProps) {
           </div>
         )}
 
+        {/* Hover overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/40 to-transparent opacity-90 group-hover:opacity-100 transition-opacity" />
 
+        {/* Featured badge */}
         {template.is_featured && (
           <Badge className="absolute top-2 left-2 bg-primary/90 text-primary-foreground border-0 text-[10px]">
             Featured
           </Badge>
         )}
 
+        {/* Aspect ratio badge */}
         <Badge
           variant="secondary"
           className="absolute top-2 right-2 text-[10px] backdrop-blur-sm bg-background/70"
@@ -254,6 +187,7 @@ function TemplateCard({ template, onSelect }: TemplateCardProps) {
         </Badge>
       </div>
 
+      {/* Info */}
       <div className="p-3 space-y-2 bg-card border-t border-border/40">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold text-sm leading-tight truncate">{template.name}</h3>
@@ -272,89 +206,6 @@ function TemplateCard({ template, onSelect }: TemplateCardProps) {
           </span>
           <span className="ml-auto text-primary/80 capitalize truncate">
             {USE_CASE_LABELS[template.use_case] ?? template.use_case}
-          </span>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function TrendingCard({
-  trending,
-  onSelect,
-}: {
-  trending: TrendingTemplate;
-  onSelect: () => void;
-}) {
-  const aspect = (trending.structure_json?.aspect_ratio as string) ?? '9:16';
-  return (
-    <Card
-      onClick={onSelect}
-      className={cn(
-        'group relative aspect-[4/5] overflow-hidden cursor-pointer',
-        'hover:shadow-lg hover:border-orange-500/50 transition-all',
-        'flex flex-col'
-      )}
-    >
-      <div className="relative flex-1 bg-gradient-to-br from-orange-500/10 via-background to-amber-500/10 overflow-hidden">
-        {trending.preview_video_url ? (
-          <video
-            src={trending.preview_video_url}
-            poster={trending.thumbnail_url ?? undefined}
-            muted
-            loop
-            playsInline
-            onMouseEnter={(e) => e.currentTarget.play().catch(() => undefined)}
-            onMouseLeave={(e) => {
-              e.currentTarget.pause();
-              e.currentTarget.currentTime = 0;
-            }}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        ) : trending.thumbnail_url ? (
-          <img
-            src={trending.thumbnail_url}
-            alt={trending.title}
-            loading="lazy"
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Flame className="h-10 w-10 text-orange-500/50" />
-          </div>
-        )}
-
-        <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/40 to-transparent opacity-90 group-hover:opacity-100 transition-opacity" />
-
-        <Badge className="absolute top-2 left-2 gap-1 bg-orange-500/90 hover:bg-orange-500 text-white border-0 text-[10px]">
-          <Flame className="h-3 w-3" />
-          Trending
-        </Badge>
-
-        <Badge
-          variant="secondary"
-          className="absolute top-2 right-2 text-[10px] backdrop-blur-sm bg-background/70"
-        >
-          {aspect}
-        </Badge>
-      </div>
-
-      <div className="p-3 space-y-2 bg-card border-t border-border/40">
-        <h3 className="font-semibold text-sm leading-tight truncate">{trending.title}</h3>
-        <p className="text-xs text-muted-foreground line-clamp-2 min-h-[2rem]">
-          {trending.description ?? 'Top-performing structure.'}
-        </p>
-        <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1">
-          <span className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {Math.round(trending.total_duration_sec)}s
-          </span>
-          <span className="flex items-center gap-1">
-            <LayoutGrid className="h-3 w-3" />
-            {trending.scene_count} Szenen
-          </span>
-          <span className="ml-auto text-orange-500/90 font-medium">
-            {trending.use_count} Klone
           </span>
         </div>
       </div>
