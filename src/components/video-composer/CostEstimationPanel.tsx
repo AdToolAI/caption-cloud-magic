@@ -23,6 +23,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useRenderCostEstimation, type CostEstimation } from '@/hooks/useRenderCostEstimation';
 import { useRenderEngine } from '@/hooks/useRenderEngine';
 import { useCredits } from '@/hooks/useCredits';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { ComposerScene, AssemblyConfig } from '@/types/video-composer';
 
 interface CostEstimationPanelProps {
@@ -40,18 +41,13 @@ type Complexity = 'simple' | 'medium' | 'complex';
  * a live, side-by-side cost comparison between Remotion (default) and
  * Shotstack render engines. Recommends the cheaper option, lets users pick
  * their preferred engine and warns when wallet balance is too low.
- *
- * Note: The actual render pipeline currently always uses Remotion Lambda.
- * The engine selection is persisted via useRenderEngine and used for future
- * Shotstack pipeline integration. Until then this panel delivers radical
- * price transparency and informed engine choice — the very feature artlist
- * & competitors don't ship.
  */
 export default function CostEstimationPanel({
   scenes,
   assemblyConfig,
   templateId,
 }: CostEstimationPanelProps) {
+  const { t } = useTranslation();
   const { renderEngine, setRenderEngine } = useRenderEngine();
   const { balance, loading: walletLoading } = useCredits();
   const { loading, estimateCost, getCostBreakdown } = useRenderCostEstimation();
@@ -136,12 +132,12 @@ export default function CostEstimationPanel({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Coins className="h-4 w-4 text-primary" />
-            Kosten-Schätzung
+            {t('videoComposer.costEstimateTitle')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Füge Szenen hinzu, um eine Live-Kostenschätzung zu sehen.
+            {t('videoComposer.costEstimateAddScenes')}
           </p>
         </CardContent>
       </Card>
@@ -154,7 +150,7 @@ export default function CostEstimationPanel({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Coins className="h-4 w-4 text-primary animate-pulse" />
-            Kosten werden berechnet …
+            {t('videoComposer.costEstimateCalculating')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -172,13 +168,12 @@ export default function CostEstimationPanel({
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
             <Info className="h-4 w-4" />
-            Kosten-Schätzung momentan nicht verfügbar
+            {t('videoComposer.costEstimateUnavailable')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-xs text-muted-foreground">
-            Du kannst trotzdem rendern — die tatsächlichen Kosten werden nach
-            Abschluss korrekt berechnet.
+            {t('videoComposer.costEstimateUnavailableDesc')}
           </p>
         </CardContent>
       </Card>
@@ -230,12 +225,12 @@ export default function CostEstimationPanel({
             {isRecommended && (
               <Badge variant="default" className="gap-1 text-[10px] h-5">
                 <Sparkles className="h-2.5 w-2.5" />
-                Empfohlen
+                {t('videoComposer.costRecommended')}
               </Badge>
             )}
             {isActive && !isRecommended && (
               <Badge variant="secondary" className="text-[10px] h-5">
-                Ausgewählt
+                {t('videoComposer.costSelected')}
               </Badge>
             )}
           </div>
@@ -255,15 +250,20 @@ export default function CostEstimationPanel({
           {isActive ? (
             <>
               <CheckCircle2 className="h-3 w-3 mr-1" />
-              Diese Engine wird verwendet
+              {t('videoComposer.costEngineActive')}
             </>
           ) : (
-            'Diese Engine wählen'
+            t('videoComposer.costEnginePick')
           )}
         </Button>
       </div>
     );
   };
+
+  const sceneWord =
+    stockStats.sceneCount === 1
+      ? t('videoComposer.sceneWordSingular')
+      : t('videoComposer.sceneWordPlural');
 
   return (
     <Card className="border-primary/30 bg-gradient-to-br from-card via-card to-primary/5 shadow-[0_0_30px_-15px_hsl(var(--primary)/0.4)]">
@@ -271,17 +271,17 @@ export default function CostEstimationPanel({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
             <Coins className="h-4 w-4 text-primary" />
-            Kosten-Schätzung
+            {t('videoComposer.costEstimateTitle')}
           </CardTitle>
           {estimation.savings > 0 && (
             <Badge variant="outline" className="gap-1 text-[10px]">
               <TrendingDown className="h-3 w-3 text-emerald-500" />
-              Spare {estimation.savings} Credits
+              {t('videoComposer.costSaveBadge', { amount: estimation.savings })}
             </Badge>
           )}
         </div>
         <p className="text-xs text-muted-foreground">
-          {durationSec.toFixed(1)}s · {resolution} · Komplexität:{' '}
+          {durationSec.toFixed(1)}s · {resolution} · {t('videoComposer.costComplexity')}:{' '}
           <span className="capitalize">{complexity}</span>
         </p>
       </CardHeader>
@@ -304,28 +304,31 @@ export default function CostEstimationPanel({
           <div className="flex items-start gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3">
             <span className="text-base leading-none mt-0.5">🎁</span>
             <div className="flex-1 text-xs">
-              <p className="font-medium text-emerald-300">
-                {stockStats.sceneCount} Stock-{stockStats.sceneCount === 1 ? 'Szene' : 'Szenen'} ·{' '}
-                <span className="tabular-nums">~{stockStats.savedCredits} Credits</span> gespart
-                <span className="text-emerald-300/70"> (≈ €{stockStats.savedEuros})</span>
+              <p className="font-medium text-emerald-300 tabular-nums">
+                {t('videoComposer.stockSavingsLine', {
+                  count: stockStats.sceneCount,
+                  sceneWord,
+                  credits: stockStats.savedCredits,
+                  euros: stockStats.savedEuros,
+                })}
               </p>
               <p className="text-muted-foreground mt-0.5">
-                Free Stock Library statt KI-Generierung — verglichen mit Veo 3.1 Lite (€0.20/s).
+                {t('videoComposer.stockSavingsHint')}
               </p>
             </div>
           </div>
         )}
+
         {/* Wallet balance warning */}
         {insufficientForRecommended && (
           <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
             <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
             <div className="text-xs">
               <p className="font-medium text-destructive">
-                Dein Guthaben ({currentBalance} Credits) reicht nicht für die
-                Schätzung.
+                {t('videoComposer.costInsufficient', { balance: currentBalance })}
               </p>
               <p className="text-muted-foreground mt-0.5">
-                Bitte lade dein Guthaben auf, bevor du das Rendering startest.
+                {t('videoComposer.costTopUp')}
               </p>
             </div>
           </div>
@@ -333,7 +336,7 @@ export default function CostEstimationPanel({
 
         {!insufficientForRecommended && !walletLoading && (
           <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-            <span>Dein Guthaben</span>
+            <span>{t('videoComposer.costYourBalance')}</span>
             <span className="tabular-nums font-medium text-foreground">
               {currentBalance} Credits
             </span>
@@ -345,7 +348,7 @@ export default function CostEstimationPanel({
           <div className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             <Info className="h-3 w-3" />
             <span>
-              Ähnliche Renders kosteten im Schnitt{' '}
+              {t('videoComposer.costHistorical')}{' '}
               <strong className="text-foreground">
                 {estimation.historicalAverage} Credits
               </strong>
@@ -358,7 +361,7 @@ export default function CostEstimationPanel({
         <Accordion type="single" collapsible className="border-t pt-1">
           <AccordionItem value="breakdown" className="border-0">
             <AccordionTrigger className="py-2 text-xs hover:no-underline">
-              Kosten-Aufschlüsselung anzeigen
+              {t('videoComposer.costBreakdown')}
             </AccordionTrigger>
             <AccordionContent>
               <div className="space-y-1.5 pt-1">

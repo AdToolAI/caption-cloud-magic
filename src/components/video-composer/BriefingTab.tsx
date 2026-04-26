@@ -722,6 +722,50 @@ export default function BriefingTab({
         />
       )}
 
+      {/* Stock-First Toggle (AI mode only) — opt-in cost saver */}
+      {briefing.mode === 'ai' && (
+        <Card className="border-emerald-500/40 bg-gradient-to-br from-emerald-500/5 to-card/80 shadow-[0_0_24px_-12px_hsl(142_76%_45%/0.4)]">
+          <CardContent className="pt-5">
+            <button
+              type="button"
+              onClick={() => onUpdateBriefing({ preferStock: !briefing.preferStock })}
+              className="flex w-full items-start gap-3 text-left"
+              aria-pressed={!!briefing.preferStock}
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-base">
+                🎁
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-sm text-emerald-300">
+                    {t('videoComposer.stockFirstTitle')}
+                  </p>
+                  <Badge variant="outline" className="border-emerald-500/50 bg-emerald-500/10 text-emerald-300 text-[10px] h-5">
+                    {t('videoComposer.stockFirstBadge')}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  {t('videoComposer.stockFirstDesc')}
+                </p>
+              </div>
+              <div
+                className={`mt-1 h-6 w-11 shrink-0 rounded-full border-2 transition-colors ${
+                  briefing.preferStock
+                    ? 'bg-emerald-500 border-emerald-500'
+                    : 'bg-input border-transparent'
+                }`}
+              >
+                <div
+                  className={`h-5 w-5 rounded-full bg-background shadow-md transition-transform ${
+                    briefing.preferStock ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </div>
+            </button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Action */}
       <div className="flex justify-end">
         <Button

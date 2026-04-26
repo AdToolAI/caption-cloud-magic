@@ -114,6 +114,13 @@ export interface ComposerBriefing {
    * - 'mixed': Hero scenes as video, supporting scenes as image
    */
   videoMode?: VideoMode;
+  /**
+   * Stock-First Auto-Director hint:
+   * When true, the storyboard AI prefers free Pexels/Pixabay stock footage for
+   * generic B-roll / establishing / lifestyle scenes (`clipSource = 'stock'`)
+   * instead of paid AI video generation. Default false.
+   */
+  preferStock?: boolean;
 }
 
 export interface ComposerScene {
