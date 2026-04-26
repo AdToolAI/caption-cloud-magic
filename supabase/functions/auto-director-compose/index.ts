@@ -40,6 +40,16 @@ interface PlanResult {
   scenes: PlannedScene[];
   estimatedCostEuros: number;
   rationale: string;
+  brandContext?: BrandContext | null;
+}
+
+interface BrandContext {
+  brandName: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  mood: string | null;
+  brandTone: string | null;
+  brandValues: string[];
 }
 
 const ENGINE_BY_PREF: Record<EnginePref, string[]> = {
