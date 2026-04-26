@@ -212,11 +212,17 @@ export default function StockMediaBrowser({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col bg-card border-border">
-        <DialogHeader>
+        <DialogHeader className="space-y-1.5">
           <DialogTitle className="flex items-center gap-2">
-            <VideoIcon className="h-4 w-4" />
-            {t('videoComposer.stock.browseLibrary') || 'Stock Media Library'}
+            <span className="text-lg leading-none">🎁</span>
+            <span>Free Stock Library</span>
+            <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 text-[10px] font-semibold uppercase tracking-wider border border-emerald-500/30">
+              0 Credits
+            </span>
           </DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            Pexels × Pixabay × Mixkit · 2M+ royalty-free Videos, Bilder, Musik & SFX — ohne Credit-Verbrauch
+          </p>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="flex-1 flex flex-col min-h-0">
