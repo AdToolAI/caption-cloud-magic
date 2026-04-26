@@ -20,6 +20,7 @@ import ClipsTab from './ClipsTab';
 import VoiceSubtitlesTab from './VoiceSubtitlesTab';
 import AudioTab from './AudioTab';
 import AssemblyTab from './AssemblyTab';
+import { NLEExportPanel } from './NLEExportPanel';
 import type {
   ComposerBriefing,
   ComposerScene,
