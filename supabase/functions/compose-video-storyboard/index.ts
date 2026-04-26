@@ -419,7 +419,7 @@ Generate the storyboard using the create_storyboard function.`;
       const finalEffects = aiEffects.length > 0
         ? aiEffects.map(e => ({ ...e, color: e.color || brandColor }))
         : getDefaultEffects(s.sceneType || 'custom', visualStyleId, brandColor);
-      const clipSource = pickClipSource(s.sceneType || 'custom', index, arr.length);
+      const clipSource = pickClipSource(s.sceneType || 'custom', index, arr.length, s.characterShot);
       return {
         id: `scene_${Date.now()}_${index}`,
         projectId: "",
