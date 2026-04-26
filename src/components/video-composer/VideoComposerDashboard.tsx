@@ -212,6 +212,12 @@ export default function VideoComposerDashboard() {
             promptMode: ((row as any).prompt_mode as any) ?? local?.promptMode,
             promptSlotOrder: ((row as any).prompt_slot_order as any) ?? local?.promptSlotOrder,
             appliedStylePresetId: ((row as any).applied_style_preset_id as any) ?? local?.appliedStylePresetId,
+            // Block M — Hybrid Production
+            hybridMode: ((row as any).hybrid_mode as any) ?? local?.hybridMode,
+            firstFrameUrl: ((row as any).first_frame_url as any) ?? local?.firstFrameUrl,
+            lastFrameUrl: ((row as any).last_frame_url as any) ?? local?.lastFrameUrl,
+            endReferenceImageUrl: ((row as any).end_reference_image_url as any) ?? local?.endReferenceImageUrl,
+            hybridTargetSceneId: ((row as any).hybrid_target_scene_id as any) ?? local?.hybridTargetSceneId,
           };
         });
 
