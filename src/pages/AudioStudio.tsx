@@ -314,6 +314,7 @@ export default function AudioStudio() {
                   <div className="flex gap-2 flex-wrap">
                     {[
                       { id: 'enhance', label: 'KI-Optimierung', icon: Wand2 },
+                      { id: 'music', label: 'AI Music', icon: Music2 },
                       { id: 'compare', label: 'Vergleich', icon: Volume2, disabled: !enhancedAudioUrl },
                       { id: 'transcript', label: 'Transcript', icon: Mic },
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
