@@ -177,6 +177,11 @@ export default function AdDirectorWizard({
   const [cutdown15s, setCutdown15s] = useState(false);
   const [cutdown6sHook, setCutdown6sHook] = useState(false);
 
+  // Stage A — Multi-Aspect-Bundling
+  const [aspect9x16, setAspect9x16] = useState(false);
+  const [aspect1x1, setAspect1x1] = useState(false);
+  const [aspect4x5, setAspect4x5] = useState(false);
+
   // Variant flow state
   const [variantsLoading, setVariantsLoading] = useState(false);
   const [variants, setVariants] = useState<ScriptVariant[] | null>(null);
