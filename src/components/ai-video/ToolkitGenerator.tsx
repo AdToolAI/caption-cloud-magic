@@ -20,6 +20,7 @@ import { ModelSelector } from './ModelSelector';
 import { VideoPromptOptimizer } from './VideoPromptOptimizer';
 import { ToolkitCastPicker, buildCastPromptSuffix } from './ToolkitCastPicker';
 import { ShotDirectorPanel } from './ShotDirectorPanel';
+import CinematicStylePresets from './CinematicStylePresets';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { BrandCharacterSelector } from '@/components/brand-characters/BrandCharacterSelector';
 import { useBrandCharacters, buildCharacterPromptInjection, type BrandCharacter } from '@/hooks/useBrandCharacters';
@@ -261,6 +262,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           rows={4}
           className="resize-none bg-background/40 border-border/40 focus:border-primary/40"
         />
+      </Card>
+
+      {/* ── Cinematic Style Presets (one-click director looks) ── */}
+      <Card className="p-4 bg-card/60 backdrop-blur-xl border-border/60">
+        <CinematicStylePresets value={shotSelection} onApply={(sel) => setShotSelection(sel)} />
       </Card>
 
       {/* ── Shot Director (cinematic prompt builder) ── */}

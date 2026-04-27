@@ -38,6 +38,7 @@ import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
 import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
 import SceneShotDirectorPanel from './SceneShotDirectorPanel';
+import CinematicStylePresets from '@/components/ai-video/CinematicStylePresets';
 import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import StructuredPromptBuilder from '@/components/motion-studio/StructuredPromptBuilder';
@@ -684,6 +685,12 @@ export default function SceneCard({
                   modifiers={scene.directorModifiers || {}}
                   basePrompt={scene.aiPrompt || ''}
                   onChange={(directorModifiers) => onUpdate({ directorModifiers })}
+                />
+
+                <CinematicStylePresets
+                  value={scene.shotDirector || {}}
+                  onApply={(sel) => onUpdate({ shotDirector: sel })}
+                  compact
                 />
 
                 <SceneShotDirectorPanel
