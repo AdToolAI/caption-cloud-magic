@@ -162,6 +162,8 @@ export default function BriefingTab({
   onChangeBrandKit,
   onChangeBrandKitAutoSync,
   onApplyAssembly,
+  scenes,
+  onUpdateScenes,
 }: BriefingTabProps) {
   const { t } = useTranslation();
   const [uspInput, setUspInput] = useState('');
