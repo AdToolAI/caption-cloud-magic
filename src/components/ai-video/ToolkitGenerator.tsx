@@ -263,6 +263,13 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         />
       </Card>
 
+      {/* ── Shot Director (cinematic prompt builder) ── */}
+      <ShotDirectorPanel
+        value={shotSelection}
+        onChange={setShotSelection}
+        basePrompt={prompt}
+      />
+
       {/* ── Brand Character Lock (cross-studio persistent character) ── */}
       <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60">
         <BrandCharacterSelector
