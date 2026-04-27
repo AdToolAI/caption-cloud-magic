@@ -24,6 +24,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { SortableSceneItem } from './SortableSceneItem';
+import { CastConsistencyMap } from './CastConsistencyMap';
 
 interface StoryboardTabProps {
   scenes: ComposerScene[];
@@ -227,6 +228,10 @@ export default function StoryboardTab({
           )}
         </div>
       </div>
+
+      {/* Cast Consistency Map — shows which character appears in which scene
+          and the active continuity anchor (reference image / frame chain / prompt). */}
+      <CastConsistencyMap scenes={scenes} characters={characters || []} />
 
       {/* Scene Cards */}
       {scenes.length === 0 ? (
