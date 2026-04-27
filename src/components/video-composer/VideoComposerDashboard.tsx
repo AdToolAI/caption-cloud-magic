@@ -385,6 +385,11 @@ export default function VideoComposerDashboard() {
     try {
       const result = await ensureProjectPersisted(project);
       setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
+      // If this is an Ad Director project, ensure ad_meta is up-to-date even
+      // when the project row already existed (subsequent wizard runs).
+      if (project.adMeta) {
+        persistAdMeta(result.projectId, project.adMeta).catch(() => {});
+      }
       setActiveTab('clips');
     } catch (err: any) {
       console.error('[VideoComposerDashboard] persist failed:', err);
