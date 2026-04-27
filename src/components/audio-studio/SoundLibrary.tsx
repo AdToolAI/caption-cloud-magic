@@ -215,7 +215,9 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync }: SoundLibraryProp
   };
 
   // Get preset label
-  const getPresetLabel = (preset: string | null) => {
+  const getPresetLabel = (sound: SoundLibraryItem) => {
+    if (sound.source === 'ai_generated') return 'AI Music';
+    if (sound.source === 'stem_separation') return sound.processing_preset || 'Stem';
     const labels: Record<string, string> = {
       minimal: 'Minimal',
       podcast: 'Podcast',
@@ -223,7 +225,21 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync }: SoundLibraryProp
       maximal: 'Maximal',
       custom: 'Custom'
     };
-    return labels[preset || ''] || preset || 'Standard';
+    return labels[sound.processing_preset || ''] || sound.processing_preset || 'Standard';
+  };
+
+  const FILTER_TABS: { id: FilterCategory; label: string; icon: typeof Library }[] = [
+    { id: 'all', label: 'Alle', icon: Library },
+    { id: 'enhanced', label: 'Optimiert', icon: Volume2 },
+    { id: 'music', label: 'AI Musik', icon: Music2 },
+    { id: 'stems', label: 'Stems', icon: Scissors },
+  ];
+
+  const counts = {
+    all: sounds.length,
+    enhanced: sounds.filter(s => s.source === 'voicepro').length,
+    music: sounds.filter(s => s.source === 'ai_generated').length,
+    stems: sounds.filter(s => s.source === 'stem_separation').length,
   };
 
   return (
@@ -236,7 +252,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync }: SoundLibraryProp
       />
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-cyan-500/20 flex items-center justify-center">
             <Library className="w-5 h-5 text-primary" />
@@ -257,6 +273,31 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync }: SoundLibraryProp
             className="pl-9 bg-muted/20 border-border/50"
           />
         </div>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex flex-wrap gap-1.5 mb-6">
+        {FILTER_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = category === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setCategory(tab.id)}
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all ${
+                isActive
+                  ? 'border-primary bg-primary/15 text-primary font-medium'
+                  : 'border-border/50 bg-muted/30 text-muted-foreground hover:border-primary/40'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {tab.label}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-primary/20' : 'bg-muted'}`}>
+                {counts[tab.id]}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Sound List */}
