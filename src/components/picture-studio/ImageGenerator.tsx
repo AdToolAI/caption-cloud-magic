@@ -48,8 +48,10 @@ export function ImageGenerator() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { wallet } = useAIVideoWallet();
+  const { data: activeBrandKit } = useActiveBrandKit();
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const styleRefInputRef = useRef<HTMLInputElement>(null);
   const status = { stage: '', message: '' };
 
   const STYLES = useMemo(() => [
