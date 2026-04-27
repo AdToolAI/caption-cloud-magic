@@ -456,6 +456,7 @@ export default function AudioStudio() {
                             setAudioUrl(url);
                             setActiveTab('compare');
                           }}
+                          onSendToBeatSync={(url, title) => handleSendToBeatSync({ url, title })}
                         />
                       </motion.div>
                     )}
