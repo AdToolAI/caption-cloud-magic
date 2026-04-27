@@ -140,7 +140,7 @@ serve(async (req) => {
     console.log(`[generate-wan-video] Cost: ${currencySymbol}${totalCost.toFixed(2)}, Balance: ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
 
     // Create generation record
-    const resolution = model === 'wan-pro' ? '1080p' : '720p';
+    const resolution = (model === 'wan-pro' || model === 'wan-2-6-pro') ? '1080p' : '720p';
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
