@@ -6,7 +6,9 @@
  */
 
 import type { SceneType } from '@/types/video-composer';
-import type { CinematicPresetId } from './cinematicStylePresets';
+
+// Cinematic preset IDs are referenced by string to stay decoupled from the preset module.
+type CinematicPresetId = string;
 
 export type AdFrameworkId =
   | 'problem-solution'
