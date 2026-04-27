@@ -164,6 +164,7 @@ export default function AudioStudio() {
               <MusicGeneratorPanel
                 onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
                 onSendToBeatSync={handleSendToBeatSync}
+                defaultBpm={detectedVideoBpm}
               />
             </motion.div>
           ) : !audioUrl ? (
