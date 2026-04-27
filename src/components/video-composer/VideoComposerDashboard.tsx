@@ -489,6 +489,7 @@ export default function VideoComposerDashboard() {
     }
   }, [project.id]);
 
+  const showCampaignTab = !!project.adMeta;
   const TABS = [
     { id: 'briefing' as TabId, label: t('videoComposer.briefing'), icon: FileText },
     { id: 'storyboard' as TabId, label: t('videoComposer.storyboard'), icon: LayoutGrid },
@@ -496,6 +497,9 @@ export default function VideoComposerDashboard() {
     { id: 'text' as TabId, label: t('videoComposer.voiceSubtitles'), icon: Mic },
     { id: 'audio' as TabId, label: t('videoComposer.music'), icon: Music },
     { id: 'export' as TabId, label: t('videoComposer.export'), icon: Download },
+    ...(showCampaignTab
+      ? [{ id: 'campaign' as TabId, label: 'Kampagne', icon: Megaphone }]
+      : []),
   ];
 
   // Workflow accessibility & completion logic for the step sidebar
