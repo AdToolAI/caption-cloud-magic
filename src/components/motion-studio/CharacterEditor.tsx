@@ -335,7 +335,13 @@ export default function CharacterEditor({
             )}
           </div>
 
-          {/* Beschreibung */}
+          {/* Casting · Multi-Vibe Grid (only available after first save) */}
+          {character && (
+            <div className="rounded-lg border border-border/40 bg-background/30 p-3">
+              <CastingVibeGrid character={character} />
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label className="text-xs">Aussehen (Englisch empfohlen) *</Label>
             <Textarea
