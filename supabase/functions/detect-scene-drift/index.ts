@@ -27,6 +27,10 @@ interface RequestBody {
   candidateImageUrl: string;
   /** ID of the "next" scene — score is persisted on this row. */
   sceneId?: string;
+  /** Optional id of the "previous" (anchor) scene for history logging. */
+  anchorSceneId?: string;
+  /** Optional composer project id for history logging. */
+  projectId?: string;
 }
 
 interface DriftResult {
@@ -188,10 +192,30 @@ serve(async (req) => {
           continuity_drift_score: result.driftScore,
           continuity_drift_label: result.label,
           continuity_checked_at: new Date().toISOString(),
+          last_drift_check_at: new Date().toISOString(),
         })
         .eq("id", body.sceneId);
       if (upErr) {
         console.warn("[drift] persist failed:", upErr);
+      }
+    }
+
+    // Pro-Layer: write a history row when project context is provided
+    if (body.projectId) {
+      const { error: histErr } = await supabase
+        .from("composer_drift_checks")
+        .insert({
+          project_id: body.projectId,
+          anchor_scene_id: body.anchorSceneId ?? null,
+          candidate_scene_id: body.sceneId ?? null,
+          anchor_image_url: body.anchorImageUrl,
+          candidate_image_url: body.candidateImageUrl,
+          drift_score: result.driftScore,
+          label: result.label,
+          recommendation: result.recommendation,
+        });
+      if (histErr) {
+        console.warn("[drift] history insert failed:", histErr);
       }
     }
 

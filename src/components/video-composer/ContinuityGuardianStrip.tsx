@@ -10,11 +10,15 @@ import {
   Zap,
   AlertTriangle,
   Check,
+  Lock,
+  LockOpen,
+  History,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useFrameContinuity } from '@/hooks/useFrameContinuity';
 import { useContinuityDrift, driftSeverity } from '@/hooks/useContinuityDrift';
+import ContinuityHistoryDrawer from './ContinuityHistoryDrawer';
 import type { ComposerScene } from '@/types/video-composer';
 
 interface ContinuityGuardianStripProps {
@@ -49,8 +53,9 @@ export default function ContinuityGuardianStrip({
   onRepairScene,
 }: ContinuityGuardianStripProps) {
   const { extractLastFrame } = useFrameContinuity();
-  const { checkDrift, checkingPairId } = useContinuityDrift();
+  const { checkDrift, checkDriftBatch, setSceneLock, checkingPairId } = useContinuityDrift();
   const [bulkRunning, setBulkRunning] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Only compute pairs where BOTH sides are AI-generated and READY
   const pairs: PairState[] = useMemo(() => {
@@ -111,6 +116,8 @@ export default function ContinuityGuardianStrip({
       anchorImageUrl: anchorUrl,
       candidateImageUrl: candidateUrl,
       sceneId: pair.next.id,
+      anchorSceneId: pair.prev.id,
+      projectId,
     });
     if (!result) return null;
 
@@ -136,17 +143,67 @@ export default function ContinuityGuardianStrip({
     }
     setBulkRunning(true);
     try {
-      // Run sequentially to avoid hammering the gateway
-      let okCount = 0;
-      let warnCount = 0;
-      let brokenCount = 0;
+      // Phase 1: ensure anchor + candidate frames exist (sequential, cheap)
+      const items: Array<{
+        anchorImageUrl: string;
+        candidateImageUrl: string;
+        sceneId: string;
+        anchorSceneId: string;
+        projectId?: string;
+      }> = [];
       for (const p of pairs) {
-        const r = await checkPair(p);
-        if (!r) continue;
-        if (r.driftScore <= 35) okCount++;
-        else if (r.driftScore <= 65) warnCount++;
-        else brokenCount++;
+        let anchorUrl =
+          (p.prev.continuityLocked && p.prev.lockReferenceUrl) ||
+          p.prev.lastFrameUrl;
+        if (!anchorUrl && p.prev.clipUrl) {
+          const r = await extractLastFrame({
+            videoUrl: p.prev.clipUrl,
+            sceneId: p.prev.id,
+            projectId,
+            durationSeconds: p.prev.durationSeconds,
+          });
+          if (r) anchorUrl = r.lastFrameUrl;
+        }
+        let candidateUrl = p.next.referenceImageUrl ?? p.next.firstFrameUrl;
+        if (!candidateUrl && p.next.clipUrl) {
+          const r = await extractLastFrame({
+            videoUrl: p.next.clipUrl,
+            sceneId: p.next.id,
+            projectId,
+            durationSeconds: 0.15,
+          });
+          if (r) candidateUrl = r.lastFrameUrl;
+        }
+        if (anchorUrl && candidateUrl) {
+          items.push({
+            anchorImageUrl: anchorUrl,
+            candidateImageUrl: candidateUrl,
+            sceneId: p.next.id,
+            anchorSceneId: p.prev.id,
+            projectId,
+          });
+        }
       }
+
+      // Phase 2: parallel batch (concurrency 3)
+      const results = await checkDriftBatch(items, 3);
+      let okCount = 0,
+        warnCount = 0,
+        brokenCount = 0;
+      const updated = scenes.map((s) => {
+        const hit = results.find((r) => r.sceneId === s.id);
+        if (!hit?.result) return s;
+        const sc = hit.result.driftScore;
+        if (sc <= 35) okCount++;
+        else if (sc <= 65) warnCount++;
+        else brokenCount++;
+        return {
+          ...s,
+          continuityDriftScore: sc,
+          continuityDriftLabel: hit.result.label,
+        };
+      });
+      onUpdateScenes(updated);
       toast.success(
         `Continuity geprüft: ${okCount} ok · ${warnCount} drift · ${brokenCount} bruch`
       );
@@ -179,6 +236,8 @@ export default function ContinuityGuardianStrip({
     const lockedNext: ComposerScene = {
       ...pair.next,
       referenceImageUrl: anchorUrl,
+      continuityLocked: true,
+      lockReferenceUrl: anchorUrl,
       // Reset score so user sees fresh state after repair
       continuityDriftScore: undefined,
       continuityDriftLabel: undefined,
@@ -186,8 +245,28 @@ export default function ContinuityGuardianStrip({
     onUpdateScenes(
       scenes.map((s) => (s.id === pair.next.id ? lockedNext : s))
     );
+    // Persist lock to DB (best-effort, non-blocking)
+    void setSceneLock(pair.next.id, true, anchorUrl);
     toast.success('Anker-Frame verriegelt — starte Repair-Render…');
     await onRepairScene(lockedNext);
+  };
+
+  const toggleLock = async (scene: ComposerScene) => {
+    const nextLocked = !scene.continuityLocked;
+    const ref = nextLocked
+      ? scene.lockReferenceUrl ?? scene.referenceImageUrl ?? scene.firstFrameUrl ?? null
+      : null;
+    onUpdateScenes(
+      scenes.map((s) =>
+        s.id === scene.id
+          ? { ...s, continuityLocked: nextLocked, lockReferenceUrl: ref ?? undefined }
+          : s
+      )
+    );
+    const ok = await setSceneLock(scene.id, nextLocked, ref);
+    if (ok) {
+      toast.success(nextLocked ? 'Szene verriegelt 🔒' : 'Lock gelöst');
+    }
   };
 
   const repairAllBroken = async () => {
@@ -269,6 +348,17 @@ export default function ContinuityGuardianStrip({
             )}
             Alles prüfen
           </Button>
+          {projectId && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setHistoryOpen(true)}
+              className="gap-1.5"
+            >
+              <History className="h-3.5 w-3.5" />
+              Verlauf
+            </Button>
+          )}
           {summary.warn + summary.broken > 0 && (
             <Button
               size="sm"
@@ -293,9 +383,16 @@ export default function ContinuityGuardianStrip({
             checking={checkingPairId === p.next.id}
             onCheck={() => checkPair(p)}
             onRepair={() => repairPair(p)}
+            onToggleLock={() => toggleLock(p.prev)}
           />
         ))}
       </div>
+
+      <ContinuityHistoryDrawer
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        projectId={projectId}
+      />
     </Card>
   );
 }
@@ -306,16 +403,19 @@ function CutChip({
   checking,
   onCheck,
   onRepair,
+  onToggleLock,
 }: {
   index: number;
   pair: PairState;
   checking: boolean;
   onCheck: () => void;
   onRepair: () => void;
+  onToggleLock: () => void;
 }) {
   const score = pair.next.continuityDriftScore ?? null;
   const label = pair.next.continuityDriftLabel ?? '';
   const sev = driftSeverity(score);
+  const locked = !!pair.prev.continuityLocked;
 
   return (
     <div
@@ -324,15 +424,30 @@ function CutChip({
         sev.bg
       )}
     >
-      <div className="flex items-center justify-between mb-1.5">
+      <div className="flex items-center justify-between mb-1.5 gap-1">
         <span className="text-[10px] font-bold tracking-wider uppercase opacity-70">
           Cut #{index}
         </span>
-        {score != null && (
-          <span className={cn('text-sm font-bold tabular-nums', sev.color)}>
-            {score}
-          </span>
-        )}
+        <div className="flex items-center gap-1">
+          {score != null && (
+            <span className={cn('text-sm font-bold tabular-nums', sev.color)}>
+              {score}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onToggleLock}
+            title={locked ? 'Anker entriegeln' : 'Anker verriegeln'}
+            className={cn(
+              'h-5 w-5 rounded flex items-center justify-center transition',
+              locked
+                ? 'bg-amber-500/25 text-amber-300 hover:bg-amber-500/40'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            )}
+          >
+            {locked ? <Lock className="h-3 w-3" /> : <LockOpen className="h-3 w-3" />}
+          </button>
+        </div>
       </div>
       <div className={cn('text-[11px] font-semibold mb-1', sev.color)}>
         {sev.label}

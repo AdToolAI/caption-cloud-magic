@@ -216,6 +216,13 @@ export interface ComposerScene {
   continuityDriftScore?: number;
   continuityDriftLabel?: string;
   continuityAutoRepair?: boolean;
+  /**
+   * Continuity Pro-Layer: when `continuityLocked` is true the scene's
+   * `lockReferenceUrl` is treated as the immutable anchor for any
+   * downstream re-renders / drift checks.
+   */
+  continuityLocked?: boolean;
+  lockReferenceUrl?: string;
 }
 
 export type SubtitlePosition = 'top' | 'bottom';
