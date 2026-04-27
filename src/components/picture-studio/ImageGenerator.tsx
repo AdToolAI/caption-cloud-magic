@@ -235,7 +235,7 @@ export function ImageGenerator() {
       { ...image, url: imgUrl, prompt: prompt.trim(), style, aspectRatio },
       ...prev,
     ]);
-    if (tier === 'standard') toast.success(t('picStudio.imageGenerated'));
+    if (tier === 'standard' && variantsCount === 1) toast.success(t('picStudio.imageGenerated'));
     setJustGenerated(true);
 
     if (imageId && user) {
