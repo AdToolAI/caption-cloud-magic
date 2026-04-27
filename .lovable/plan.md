@@ -1,104 +1,91 @@
-## Status: Casting & Scene Building — wo wir wirklich stehen
+## Hebel 3: Stock-Library-Moat
 
-Vergleich mit Artlists vier Säulen ihres "Casting & Scene Building"-Pakets:
+Ziel: Eine kuratierte Bibliothek aus **Pexels + Pixabay Stock** und **vorgefertigten Scene-Snippets** (Artlist-Style „Ready-to-use Scenes") direkt in Motion Studio + Studio Mode integrieren — als Wettbewerbsvorteil gegenüber Artlist's Asset-Library.
 
-### Säule 1: Charaktere casten (mehrere Vibes pro Person)
+### Was bereits existiert
+- `search-stock-videos` & `search-stock-images` Edge Functions (Pexels + Pixabay, parallel) ✅
+- `StockMediaBrowser` Komponente (im Video-Composer Clips-Tab) ✅
+- `motion_studio_scene_snippets` Tabelle + `SceneSnippetPicker` (eigene User-Snippets) ✅
 
-| Artlist | Wir |
-|---|---|
-| 1 Beschreibung → 4–8 Visualisierungen → User wählt Vibe | ⚠️ Teilweise: `generate-character-sheet` macht jetzt 4-View-Sheet (Front/3-4/Profile/Expression) eines **einzigen** Looks |
-| Multi-Vibe Picker ("Realistic / Cinematic / Editorial / Documentary") | ❌ Fehlt |
-| Mehrere `reference_image_url`s pro Charakter | ❌ Schema hat nur 1 URL |
-
-**Status: ~40 %** — der Sheet-Generator existiert, aber liefert nur eine ästhetische Variante. Casting bedeutet *mehrere Optionen vergleichen*.
-
-### Säule 2: Locations scouten (umfärben, Objekte platzieren)
-
-| Artlist | Wir |
-|---|---|
-| Location-Library mit Reference-Image | ✅ `motion_studio_locations` |
-| Wände umfärben / Möbel verschieben (Inpaint) | ⚠️ Magic Edit (FLUX Fill Pro) existiert im Picture Studio — aber **nicht** vom Location-Editor aus aufrufbar |
-| Lighting-Varianten (Tag / Nacht / Golden Hour) | ❌ Fehlt |
-| Multi-Angle-Sheet (Wide / Medium / Detail) | ❌ Fehlt |
-
-**Status: ~35 %** — Backend & Inpaint-Engine sind da, nur die Brücke vom Location-Editor zu Magic Edit fehlt.
-
-### Säule 3: Story-Sequenzen mit Kontinuität über mehrere Shots
-
-| Artlist | Wir |
-|---|---|
-| Frame-to-Shot Continuity | ✅ `extract-video-last-frame` + Hook |
-| Hybrid Extend (Bridge zwischen Szenen) | ✅ Stärker als Artlist (4 Modi) |
-| Cast Consistency Map | ✅ Letztes Update — fest im Storyboard |
-| Sora Long-Form Chain (12 s+) | ✅ |
-| Cast & Locations Picker im Toolkit | ✅ `ToolkitCastPicker` |
-
-**Status: ~90 %** — Hier sind wir auf Augenhöhe oder besser.
-
-### Säule 4: Scene Library für team-weite Wiederverwendung
-
-| Artlist | Wir |
-|---|---|
-| Persönliche Library (Charaktere/Locations) | ✅ |
-| **Geteilte Workspace-Library** (mehrere Seats sehen dieselben Assets) | ❌ RLS = nur `auth.uid() = user_id` |
-| **Scene Snippets** (Storyboard-Szenen wiederverwendbar speichern) | ❌ Fehlt komplett |
-| Public Marketplace / Community Cast | ❌ Out of Scope |
-
-**Status: ~25 %** — größte Lücke. Library ist heute strikt single-user.
+### Was fehlt
+- **Kuratierte System-Snippets** (von uns vorbefüllt, für alle Nutzer sichtbar) — Artlist's "Scene Library"-Äquivalent
+- **Stock-Browser** im Studio Mode + im Snippet-Picker (zum schnellen Erstellen aus Stock)
+- **One-Click „Stock → Snippet"** Workflow
 
 ---
 
-## Zusammenfassung in einer Zahl
+### Schritt 1 — DB-Erweiterung: System-Snippets + Kategorien
+- Migration auf `motion_studio_scene_snippets`:
+  - `is_system boolean default false` (kuratierte System-Templates)
+  - `category text` (z.B. `product_hero`, `lifestyle`, `talking_head`, `b_roll`, `transition`)
+  - `preview_video_url text` (Stock-Preview-Clip)
+  - `thumbnail_url text`
+  - `sort_order int default 0`
+- RLS: System-Snippets (`is_system = true`) sind für **alle authenticated users** lesbar
+- Seed: 24 kuratierte Snippets (6 Kategorien × 4 Stück) mit Pexels-Stock-URLs + fertigen Prompts
 
-**~55 % des Artlist-Casting-Levels.**
-Stark in Continuity (90 %), schwach in Multi-Vibe-Casting (40 %), Location-Scouting (35 %) und Team-Sharing (25 %).
+### Schritt 2 — Hook erweitern: `useMotionStudioLibrary`
+- `listSceneSnippets()` → optional `{ includeSystem: true, category?: string }`
+- Query um System-Snippets erweitern, parallel laden, in UI klar markieren
+
+### Schritt 3 — Neue Komponente: `CuratedSnippetGallery`
+- Bento-Grid mit System-Snippets, gefiltert nach Kategorie-Chips
+- Hover: Preview-Video autoplay (muted)
+- „Use this Scene" → fügt Snippet als Storyboard-Szene ein (übernimmt prompt + reference_image_url)
+
+### Schritt 4 — Stock-Browser im Studio Mode
+- In Studio Mode Step 3 (Storyboard) zwei neue Buttons pro Szene:
+  - **„Stock-Footage"** → öffnet `StockMediaBrowser`, ausgewähltes Asset wird als `referenceImageUrl` (oder `clipUrl` für Direkt-Use) der Szene gesetzt
+  - **„Curated Scenes"** → öffnet `CuratedSnippetGallery`
+- Wiederverwendung der existierenden `StockMediaBrowser`-Komponente (kein Duplikat)
+
+### Schritt 5 — `SceneSnippetPicker` upgraden
+- Neuer Tab oben: **„Meine Snippets" | „Kuratiert" | „Stock"**
+  - **Kuratiert**: nutzt `CuratedSnippetGallery`
+  - **Stock**: embedded Stock-Search → „Save as Snippet" Button erstellt aus Stock-Asset einen User-Snippet
+- Sortierung nach `usage_count` (Trending)
+
+### Schritt 6 — Seed-Daten erstellen
+SQL-Migration mit 24 vorgefertigten System-Snippets, z.B.:
+- *Product Hero*: „Cinematic 360° rotation around product on minimal background"
+- *Lifestyle*: „Hand picks up coffee cup, golden hour kitchen"
+- *Talking Head*: „Centered medium shot, soft window light"
+- *B-Roll Tech*: „Macro shot of typing on laptop keyboard"
+- *Transition*: „Whip-pan blur from left to right"
+- *Establishing*: „Drone shot pulling up from city street"
+
+Jedes mit:
+- Pexels Stock-Video-URL (frei lizenziert)
+- Auto-extrahiertes `last_frame_url` (für Continuity-Chaining mit Hebel 2!)
+- Pre-filled `prompt`, `duration_seconds`, `tags`
+
+### Schritt 7 — Hub & Studio-Mode CTA
+- Motion Studio Hub: neue Karte „Curated Scenes Library" (24+ ready-to-use scenes)
+- Studio Mode Step 3: prominenter „Browse Curated Scenes"-Button als Empty-State CTA
 
 ---
 
-## Vorschlag: 3 gezielte Upgrades (kein neues Modul)
+### Technische Details
+- **Edge Functions**: keine neuen — Wiederverwendung von `search-stock-videos` / `search-stock-images`
+- **Continuity-Sync**: Beim Insert eines Stock/Curated-Snippets → automatisches Triggern von `detect-scene-drift` (aus Hebel 2) gegen Vorgänger-Szene
+- **Lizenz-Hinweis**: Pexels/Pixabay-Attribution wird in `metadata.author` gespeichert + im UI als kleiner Link angezeigt
+- **Performance**: System-Snippets via `staleTime: 10min` cachen (statisch)
 
-### Upgrade A — Multi-Vibe Casting (geschätzt 1 Tag)
+### Files
+**Neu**:
+- `src/components/motion-studio/CuratedSnippetGallery.tsx`
+- `supabase/migrations/<ts>_curated_scene_snippets.sql` (Schema + 24 Seeds)
 
-- DB: neue Tabelle `motion_studio_character_variants` (1:N zu Character) mit `vibe`, `image_url`, `seed`, `is_primary`
-- Edge Function: `generate-character-sheet` um Modus `multi-vibe` ergänzen → liefert 4 Bilder in 4 Stilen (Realistic / Cinematic / Editorial / Documentary) in **einem** Gemini-Call (Bilder parallel)
-- UI: im `CharacterEditor` neuer Block "Cast" mit Grid → User klickt eine Variante an → wird `is_primary = true` (das ist die `reference_image_url`)
-- Toolkit/Composer benutzen weiterhin nur die primäre Variante → 0 Breaking-Changes
+**Geändert**:
+- `src/hooks/useMotionStudioLibrary.ts` (System-Snippet-Support)
+- `src/components/motion-studio/SceneSnippetPicker.tsx` (3-Tab-Struktur)
+- `src/pages/MotionStudio/StudioMode.tsx` (Stock + Curated Buttons in Step 3)
+- `src/pages/MotionStudio/Hub.tsx` (Curated-Library-Karte)
+- `src/types/motion-studio.ts` (`is_system`, `category`, `preview_video_url`)
 
-### Upgrade B — Location Scouting Tools (geschätzt 1 Tag)
+### Geschätzter Aufwand
+~1 Tag (großteils Glue-Code, da Edge Functions + Stock-Browser bereits existieren). Hauptarbeit: kuratierte Seed-Daten + UI-Polish.
 
-- "In Magic Edit öffnen"-Button im `LocationEditor` → übergibt die Reference-URL an Picture Studio Inpaint (existierende FLUX Fill Pro Pipeline) → speichert das Resultat als neue `motion_studio_locations`-Zeile (oder als Variante via Tabelle aus Upgrade A, generisch)
-- "Lighting-Varianten generieren"-Button → 1 Reference-Image + Prompt-Suffixe ("at sunrise / at night / overcast") → 3 Image-to-Image Generierungen (Gemini 3 Pro Image Edit)
-- Beide Outputs landen direkt in der Library, taggierbar
-
-### Upgrade C — Scene Snippets + Workspace Sharing (geschätzt 1.5 Tage)
-
-- DB: neue Tabelle `motion_studio_scene_snippets` (Felder: `name`, `prompt`, `cast_character_ids`, `location_id`, `clip_url`, `last_frame_url`, `tags`, `workspace_id` nullable)
-- Im Video Composer SceneCard → "Als Snippet speichern" + im StoryboardTab "Snippet einfügen" (Picker)
-- **Workspace Sharing**: alle drei Tabellen (`characters`, `locations`, `scene_snippets`) bekommen optional `workspace_id` und eine zweite RLS-Policy `is_workspace_member(auth.uid(), workspace_id)`. Default bleibt privat (`workspace_id = NULL`); Toggle pro Asset "Mit Team teilen"
-- Library-Picker zeigt zwei Tabs: "Meine" / "Team"
-
-### Was wir bewusst NICHT tun
-
-- Kein Public-Marketplace (Community-Cast) — out of scope, rechtlich heikel
-- Keine Re-Generierung bereits gerenderter Szenen wenn der Snippet sich ändert — Snippets sind Templates, keine Live-Bindings
-- Kein eigenes "Casting Studio" als neue Page — alles bleibt im bestehenden Library-Editor
-
----
-
-## Reihenfolge / Priorisierung
-
-1. **Upgrade A (Multi-Vibe Casting)** — größter sichtbarer Sprung in Richtung Artlist-Demo
-2. **Upgrade C (Scene Snippets + Sharing)** — eliminiert die größte funktionale Lücke
-3. **Upgrade B (Location Scouting)** — Polish, baut auf Upgrade A's Variants-Tabelle auf
-
-Mit allen drei Upgrades sind wir bei **~85–90 %** Artlist-Niveau und in Continuity weiter vorn.
-
----
-
-## Frage an dich
-
-Welche Reihenfolge soll ich umsetzen?
-
-- **Variante 1 (empfohlen):** Alle 3 in oben genannter Reihenfolge — ca. 3.5 Tage Arbeit, Casting + Sharing zuerst
-- **Variante 2 (schnellster Wow-Effekt):** Nur Upgrade A — Multi-Vibe Casting allein, danach evaluieren
-- **Variante 3 (größter Business-Wert):** Nur Upgrade C — Workspace-Sharing + Scene Snippets (Team-Feature, bessere Pro/Enterprise-Conversion)
+### Wow-Effekt
+- Nutzer kann in **<10 Sekunden** ein komplettes Storyboard aus 4 kuratierten Stock-Szenen zusammenklicken
+- „Looks like Artlist" — aber mit unserem AI-Workflow drumherum (Continuity Guardian, AI-Render, etc.)
