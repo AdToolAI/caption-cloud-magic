@@ -169,6 +169,12 @@ export default function AdDirectorWizard({
   const [useBrandKit, setUseBrandKit] = useState(true);
   const [autoVoiceover, setAutoVoiceover] = useState(true);
 
+  // Stage 2b — Campaign Scaling
+  const [autoLogoEndcard, setAutoLogoEndcard] = useState(true);
+  const [renderAllVariants, setRenderAllVariants] = useState(false);
+  const [cutdown15s, setCutdown15s] = useState(false);
+  const [cutdown6sHook, setCutdown6sHook] = useState(false);
+
   // Variant flow state
   const [variantsLoading, setVariantsLoading] = useState(false);
   const [variants, setVariants] = useState<ScriptVariant[] | null>(null);
