@@ -143,17 +143,67 @@ export default function ContinuityGuardianStrip({
     }
     setBulkRunning(true);
     try {
-      // Run sequentially to avoid hammering the gateway
-      let okCount = 0;
-      let warnCount = 0;
-      let brokenCount = 0;
+      // Phase 1: ensure anchor + candidate frames exist (sequential, cheap)
+      const items: Array<{
+        anchorImageUrl: string;
+        candidateImageUrl: string;
+        sceneId: string;
+        anchorSceneId: string;
+        projectId?: string;
+      }> = [];
       for (const p of pairs) {
-        const r = await checkPair(p);
-        if (!r) continue;
-        if (r.driftScore <= 35) okCount++;
-        else if (r.driftScore <= 65) warnCount++;
-        else brokenCount++;
+        let anchorUrl =
+          (p.prev.continuityLocked && p.prev.lockReferenceUrl) ||
+          p.prev.lastFrameUrl;
+        if (!anchorUrl && p.prev.clipUrl) {
+          const r = await extractLastFrame({
+            videoUrl: p.prev.clipUrl,
+            sceneId: p.prev.id,
+            projectId,
+            durationSeconds: p.prev.durationSeconds,
+          });
+          if (r) anchorUrl = r.lastFrameUrl;
+        }
+        let candidateUrl = p.next.referenceImageUrl ?? p.next.firstFrameUrl;
+        if (!candidateUrl && p.next.clipUrl) {
+          const r = await extractLastFrame({
+            videoUrl: p.next.clipUrl,
+            sceneId: p.next.id,
+            projectId,
+            durationSeconds: 0.15,
+          });
+          if (r) candidateUrl = r.lastFrameUrl;
+        }
+        if (anchorUrl && candidateUrl) {
+          items.push({
+            anchorImageUrl: anchorUrl,
+            candidateImageUrl: candidateUrl,
+            sceneId: p.next.id,
+            anchorSceneId: p.prev.id,
+            projectId,
+          });
+        }
       }
+
+      // Phase 2: parallel batch (concurrency 3)
+      const results = await checkDriftBatch(items, 3);
+      let okCount = 0,
+        warnCount = 0,
+        brokenCount = 0;
+      const updated = scenes.map((s) => {
+        const hit = results.find((r) => r.sceneId === s.id);
+        if (!hit?.result) return s;
+        const sc = hit.result.driftScore;
+        if (sc <= 35) okCount++;
+        else if (sc <= 65) warnCount++;
+        else brokenCount++;
+        return {
+          ...s,
+          continuityDriftScore: sc,
+          continuityDriftLabel: hit.result.label,
+        };
+      });
+      onUpdateScenes(updated);
       toast.success(
         `Continuity geprüft: ${okCount} ok · ${warnCount} drift · ${brokenCount} bruch`
       );
