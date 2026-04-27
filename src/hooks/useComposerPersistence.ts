@@ -114,6 +114,10 @@ export function useComposerPersistence() {
             language: project.language || 'de',
             brand_kit_id: project.brandKitId ?? null,
             brand_kit_auto_sync: project.brandKitAutoSync ?? false,
+            ad_meta: (project.adMeta as any) ?? null,
+            ad_variant_strategy: project.adVariantStrategy ?? project.adMeta?.variantStrategy ?? null,
+            parent_project_id: project.parentProjectId ?? null,
+            cutdown_type: project.cutdownType ?? null,
           } as any)
           .select('id')
           .single();
