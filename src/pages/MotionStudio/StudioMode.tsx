@@ -364,6 +364,13 @@ export default function StudioMode() {
         onOpenChange={setSnippetOpen}
         onInsert={insertSnippet}
       />
+      <AIDirectorBriefDialog
+        open={directorOpen}
+        onOpenChange={setDirectorOpen}
+        castNames={selectedCharacters.map((c) => c.name)}
+        locationNames={selectedLocation ? [selectedLocation.name] : []}
+        onApply={applyDirectorPlan}
+      />
     </>
   );
 }
