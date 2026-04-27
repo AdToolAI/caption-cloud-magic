@@ -3,7 +3,7 @@ import { useBrandCharacters, type BrandCharacter } from '@/hooks/useBrandCharact
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Sparkles, X, Plus } from 'lucide-react';
+import { Sparkles, X, Plus, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AddBrandCharacterDialog } from './AddBrandCharacterDialog';
 
