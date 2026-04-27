@@ -350,6 +350,11 @@ export default function AudioStudio() {
                       >
                         <tab.icon className="w-4 h-4 mr-2" />
                         {tab.label}
+                        {'badge' in tab && tab.badge && (
+                          <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/40">
+                            {tab.badge}
+                          </span>
+                        )}
                         {activeTab === tab.id && (
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
                         )}
