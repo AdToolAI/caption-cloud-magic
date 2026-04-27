@@ -116,6 +116,8 @@ export default function ContinuityGuardianStrip({
       anchorImageUrl: anchorUrl,
       candidateImageUrl: candidateUrl,
       sceneId: pair.next.id,
+      anchorSceneId: pair.prev.id,
+      projectId,
     });
     if (!result) return null;
 
