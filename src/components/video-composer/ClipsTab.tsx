@@ -385,9 +385,11 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
 
       // Phase 4 — resolve @character / @location mentions
       const resolvedSingle = resolveMentions(targetScene.aiPrompt || '', libCharacters, libLocations);
-      const finalSinglePrompt = targetScene.directorModifiers
+      const withModsSingle = targetScene.directorModifiers
         ? applyDirectorModifiers(resolvedSingle.prompt, targetScene.directorModifiers)
         : resolvedSingle.prompt;
+      const shotSuffixSingle = buildShotPromptSuffix(targetScene.shotDirector || {});
+      const finalSinglePrompt = shotSuffixSingle ? `${withModsSingle} ${shotSuffixSingle}` : withModsSingle;
 
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
         body: {
