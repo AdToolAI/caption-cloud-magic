@@ -10,6 +10,8 @@ const corsHeaders = {
 const MODEL_PRICING: Record<string, Record<string, number>> = {
   'wan-standard': { EUR: 0.10, USD: 0.10 },
   'wan-pro': { EUR: 0.15, USD: 0.15 },
+  'wan-2-6-standard': { EUR: 0.10, USD: 0.10 },
+  'wan-2-6-pro': { EUR: 0.15, USD: 0.15 },
 };
 
 const REPLICATE_MODELS: Record<string, { t2v: string; i2v: string }> = {
@@ -20,6 +22,14 @@ const REPLICATE_MODELS: Record<string, { t2v: string; i2v: string }> = {
   'wan-pro': {
     t2v: 'wan-video/wan-2.5-t2v',
     i2v: 'wan-video/wan-2.5-i2v',
+  },
+  'wan-2-6-standard': {
+    t2v: 'wan-video/wan-2.6-t2v',
+    i2v: 'wan-video/wan-2.6-i2v',
+  },
+  'wan-2-6-pro': {
+    t2v: 'wan-video/wan-2.6-t2v',
+    i2v: 'wan-video/wan-2.6-i2v',
   },
 };
 
@@ -32,7 +42,7 @@ const ASPECT_RATIO_TO_SIZE: Record<string, string> = {
 
 interface GenerateRequest {
   prompt: string;
-  model: 'wan-standard' | 'wan-pro';
+  model: 'wan-standard' | 'wan-pro' | 'wan-2-6-standard' | 'wan-2-6-pro';
   duration: number;
   aspectRatio: '16:9' | '9:16' | '1:1';
   startImageUrl?: string;
