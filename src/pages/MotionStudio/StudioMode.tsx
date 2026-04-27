@@ -125,11 +125,23 @@ export default function StudioMode() {
     );
 
   const insertSnippet = (snippet: SceneSnippet) => {
+    const isReferenceOnly =
+      (snippet.metadata as Record<string, unknown> | null)?.kind === 'reference' &&
+      !snippet.prompt?.trim();
+
+    // Reference-only stock pick: don't add a scene, just hand the user a toast.
+    // (Setting it on a specific Location/Character should happen via the editors;
+    // here we just confirm so the asset isn't lost.)
+    if (isReferenceOnly && snippet.reference_image_url) {
+      toast.success('Reference gespeichert — wende sie in der Location oder Cast an');
+      return;
+    }
+
     setScenes((prev) => [
-      ...prev.filter((s) => s.prompt.trim() || prev.length === 1 && !s.prompt.trim() ? true : true),
+      ...prev.filter((s) => (s.prompt.trim() ? true : prev.length > 1 ? false : true)),
       {
         id: `s_${Date.now()}`,
-        prompt: snippet.prompt,
+        prompt: snippet.prompt || `B-Roll · ${snippet.name}`,
         duration: snippet.duration_seconds ?? 5,
       },
     ]);
@@ -141,7 +153,7 @@ export default function StudioMode() {
     if (snippet.location_id && !selectedLocationId) {
       setSelectedLocationId(snippet.location_id);
     }
-    toast.success(`Snippet „${snippet.name}" eingefügt`);
+    toast.success(`„${snippet.name}" eingefügt`);
   };
 
   const launchInComposer = async () => {
