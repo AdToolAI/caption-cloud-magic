@@ -871,6 +871,17 @@ export default function SceneCard({
           />
         </DialogContent>
       </Dialog>
+      {scene.id && projectId && (
+        <SceneCommentSheet
+          open={commentSheetOpen}
+          onOpenChange={setCommentSheetOpen}
+          sceneId={scene.id}
+          projectId={projectId}
+          sceneLabel={`Scene ${index + 1}`}
+          currentUserId={currentUserId}
+          canEdit={true}
+        />
+      )}
     </Card>
   );
 }
