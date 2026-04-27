@@ -32,6 +32,7 @@ import type {
   ComposerCharacter,
 } from '@/types/video-composer';
 import { VISUAL_STYLES } from '@/config/composerVisualStyles';
+import { suggestShotDirectorForStyle, getStyleLabel } from '@/config/styleToShotDirector';
 import CharacterManager from './CharacterManager';
 import VideoModeSelector from './VideoModeSelector';
 import LibraryPicker, { type LibraryItem } from '@/components/motion-studio/LibraryPicker';
