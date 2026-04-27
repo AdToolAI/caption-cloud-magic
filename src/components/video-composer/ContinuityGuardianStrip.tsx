@@ -424,15 +424,30 @@ function CutChip({
         sev.bg
       )}
     >
-      <div className="flex items-center justify-between mb-1.5">
+      <div className="flex items-center justify-between mb-1.5 gap-1">
         <span className="text-[10px] font-bold tracking-wider uppercase opacity-70">
           Cut #{index}
         </span>
-        {score != null && (
-          <span className={cn('text-sm font-bold tabular-nums', sev.color)}>
-            {score}
-          </span>
-        )}
+        <div className="flex items-center gap-1">
+          {score != null && (
+            <span className={cn('text-sm font-bold tabular-nums', sev.color)}>
+              {score}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onToggleLock}
+            title={locked ? 'Anker entriegeln' : 'Anker verriegeln'}
+            className={cn(
+              'h-5 w-5 rounded flex items-center justify-center transition',
+              locked
+                ? 'bg-amber-500/25 text-amber-300 hover:bg-amber-500/40'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            )}
+          >
+            {locked ? <Lock className="h-3 w-3" /> : <LockOpen className="h-3 w-3" />}
+          </button>
+        </div>
       </div>
       <div className={cn('text-[11px] font-semibold mb-1', sev.color)}>
         {sev.label}
