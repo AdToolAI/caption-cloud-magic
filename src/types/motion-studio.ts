@@ -95,6 +95,15 @@ export interface SceneSnippet {
   attribution_name?: string | null;
   attribution_url?: string | null;
   source?: string | null;
+  /** Community sharing */
+  is_public?: boolean;
+  like_count?: number;
+  cloned_from?: string | null;
+  published_at?: string | null;
+  /** Client-side: did the current user like this snippet? */
+  liked_by_me?: boolean;
+  /** Client-side: optional display name of original author. */
+  author_name?: string | null;
 }
 
 export const SCENE_SNIPPET_CATEGORIES: { id: SceneSnippetCategory; label: string; emoji: string }[] = [

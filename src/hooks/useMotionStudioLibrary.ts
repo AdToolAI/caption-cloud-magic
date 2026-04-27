@@ -439,6 +439,24 @@ export function useMotionStudioLibrary() {
     [user],
   );
 
+  const updateSceneSnippet = useCallback(
+    async (id: string, patch: Partial<SceneSnippetDraft> & { is_public?: boolean }): Promise<SceneSnippet | null> => {
+      const { data, error } = await (supabase as any)
+        .from('motion_studio_scene_snippets')
+        .update(patch)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) {
+        toast.error(`Snippet aktualisieren fehlgeschlagen: ${error.message}`);
+        return null;
+      }
+      toast.success('Snippet aktualisiert');
+      return data as SceneSnippet;
+    },
+    [],
+  );
+
   const deleteSceneSnippet = useCallback(async (id: string): Promise<boolean> => {
     const { error } = await supabase
       .from('motion_studio_scene_snippets')
@@ -451,6 +469,133 @@ export function useMotionStudioLibrary() {
     toast.success('Snippet gelöscht');
     return true;
   }, []);
+
+  // ── Community ───────────────────────────────────────────────────────────
+  const listCommunitySnippets = useCallback(
+    async (
+      opts: { category?: string; sort?: 'top' | 'new'; search?: string; limit?: number } = {},
+    ): Promise<SceneSnippet[]> => {
+      const { category, sort = 'top', search, limit = 60 } = opts;
+      let query = (supabase as any)
+        .from('motion_studio_scene_snippets')
+        .select('*')
+        .eq('is_public', true)
+        .neq('user_id', user?.id ?? '00000000-0000-0000-0000-000000000000');
+
+      if (category) query = query.eq('category', category);
+      if (search?.trim()) {
+        const q = `%${search.trim()}%`;
+        query = query.or(`name.ilike.${q},description.ilike.${q}`);
+      }
+      if (sort === 'top') {
+        query = query.order('like_count', { ascending: false }).order('usage_count', { ascending: false });
+      } else {
+        query = query.order('published_at', { ascending: false });
+      }
+      query = query.limit(limit);
+
+      const { data, error } = await query;
+      if (error) {
+        console.warn('[listCommunitySnippets]', error);
+        toast.error('Community konnte nicht geladen werden');
+        return [];
+      }
+      const snippets = (data || []) as SceneSnippet[];
+
+      // Annotate liked_by_me for current user
+      if (user && snippets.length > 0) {
+        const ids = snippets.map((s) => s.id);
+        const { data: likes } = await supabase
+          .from('motion_studio_snippet_likes')
+          .select('snippet_id')
+          .in('snippet_id', ids)
+          .eq('user_id', user.id);
+        const likedSet = new Set((likes || []).map((l: any) => l.snippet_id));
+        return snippets.map((s) => ({ ...s, liked_by_me: likedSet.has(s.id) }));
+      }
+      return snippets;
+    },
+    [user],
+  );
+
+  const toggleSnippetLike = useCallback(
+    async (snippetId: string, currentlyLiked: boolean): Promise<boolean> => {
+      if (!user) {
+        toast.error('Bitte einloggen');
+        return currentlyLiked;
+      }
+      if (currentlyLiked) {
+        const { error } = await supabase
+          .from('motion_studio_snippet_likes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('snippet_id', snippetId);
+        if (error) {
+          toast.error('Unlike fehlgeschlagen');
+          return currentlyLiked;
+        }
+        return false;
+      } else {
+        const { error } = await supabase
+          .from('motion_studio_snippet_likes')
+          .insert({ user_id: user.id, snippet_id: snippetId });
+        if (error) {
+          toast.error('Like fehlgeschlagen');
+          return currentlyLiked;
+        }
+        return true;
+      }
+    },
+    [user],
+  );
+
+  const cloneCommunitySnippet = useCallback(
+    async (snippet: SceneSnippet): Promise<SceneSnippet | null> => {
+      if (!user) {
+        toast.error('Bitte einloggen');
+        return null;
+      }
+      const { data, error } = await (supabase as any)
+        .from('motion_studio_scene_snippets')
+        .insert({
+          user_id: user.id,
+          workspace_id: null,
+          name: `${snippet.name} (Kopie)`,
+          description: snippet.description,
+          prompt: snippet.prompt,
+          cast_character_ids: [], // belong to original author
+          location_id: null,       // belong to original author
+          clip_url: snippet.clip_url,
+          last_frame_url: snippet.last_frame_url,
+          reference_image_url: snippet.reference_image_url,
+          duration_seconds: snippet.duration_seconds,
+          tags: snippet.tags,
+          metadata: { ...(snippet.metadata || {}), cloned_from_name: snippet.name },
+          category: snippet.category ?? null,
+          thumbnail_url: snippet.thumbnail_url ?? null,
+          preview_video_url: snippet.preview_video_url ?? null,
+          is_public: false,
+          cloned_from: snippet.id,
+        })
+        .select()
+        .single();
+      if (error) {
+        toast.error(`Klonen fehlgeschlagen: ${error.message}`);
+        return null;
+      }
+      toast.success(`„${data.name}" in deine Library kopiert`);
+      return data as SceneSnippet;
+    },
+    [user],
+  );
+
+  const publishSnippet = useCallback(
+    async (id: string, isPublic: boolean): Promise<boolean> => {
+      const result = await updateSceneSnippet(id, { is_public: isPublic } as any);
+      return !!result;
+    },
+    [updateSceneSnippet],
+  );
 
   return {
     characters,
@@ -479,6 +624,13 @@ export function useMotionStudioLibrary() {
     // snippets
     listSceneSnippets,
     createSceneSnippet,
+    updateSceneSnippet,
     deleteSceneSnippet,
+    // community
+    listCommunitySnippets,
+    toggleSnippetLike,
+    cloneCommunitySnippet,
+    publishSnippet,
   };
 }
+

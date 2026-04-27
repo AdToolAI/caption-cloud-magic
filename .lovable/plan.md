@@ -1,92 +1,71 @@
-## Hebel 6: Echte Stock-Library-Integration
+## Hebel 7 — Snippet-Builder + Community-Library (~1 Tag)
 
-Wir bauen eine Live-Stock-Suche direkt in Motion Studio (und Video Composer) — auf Pexels + Pixabay — mit Server-Side Caching und „Use as Reference“ / „Use as B-Roll" Aktionen direkt aus dem Such-Modal.
+### Ist-Stand
+- DB-Tabelle `motion_studio_scene_snippets` existiert, CRUD-Hooks (`createSceneSnippet`, `listSceneSnippets`, `deleteSceneSnippet`) sind live.
+- "Meine"-Tab im `SceneSnippetPicker` erlaubt rudimentäres Sichern der aktiven Szene (nur Name).
+- Es fehlt: dedizierte Builder-UI (Tags, Kategorie, Thumbnail, Edit), Public-Sharing-Mechanik und Community-Browser.
 
-### Was es schon gibt (wiederverwenden, nicht neu bauen)
-- `supabase/functions/search-stock-videos` (Pexels + Pixabay parallel) ✓
-- `supabase/functions/search-stock-images` ✓
-- `src/components/video-composer/StockMediaBrowser.tsx` (Composer-only)
-- `SceneSnippetPicker` mit Tabs „Kuratiert / Meine Snippets"
+### Was wir bauen
 
-### Was neu kommt
+**1. Snippet-Builder Dialog (eigene UI, kein Picker-Inline mehr)**
+- Neue Komponente `SnippetBuilderDialog.tsx`:
+  - Felder: Name, Beschreibung, Kategorie (Dropdown aus `SCENE_SNIPPET_CATEGORIES`), Tags (Chip-Editor), Dauer, Prompt (mehrzeilig editierbar).
+  - Auto-Vorschlag aus aktuellem Storyboard-Scene (Prompt + last_frame_url).
+  - Thumbnail-Upload oder Auto-Capture aus `last_frame_url` (Storage: `motion-studio-library/{user_id}/snippets/`).
+  - Toggle "Öffentlich teilen" (`is_public`) mit Hinweis auf Community-Library.
+- Bearbeiten existierender Snippets über denselben Dialog (Edit-Mode via `snippet?: SceneSnippet`).
+- Auslöser: "Neues Snippet"-Button im "Meine"-Tab + Edit-Icon pro Snippet-Karte.
 
-**1. Caching-Layer (Edge + DB)**
-- Neue Tabelle `stock_search_cache` (`query`, `media_type`, `provider_mix`, `results_json`, `expires_at`, `hit_count`).
-- `search-stock-videos` und `search-stock-images` werden um Cache-Lookup erweitert: bei Treffer mit `expires_at > now()` direkt zurückgeben + `hit_count++`. TTL: 24h.
-- Optionaler Query-Param `force_refresh: true` zum Bypass.
-- RLS: nur `service_role` write, `authenticated` read.
+**2. Community-Library (4. Tab im Picker)**
+- Neuer Tab `community` neben Kuratiert / Meine / Stock.
+- Zeigt alle `is_public = true` Snippets fremder User, sortiert nach `like_count` desc + `usage_count` desc.
+- Aktionen pro Karte: "In Storyboard einfügen", "❤️ Liken", "Klonen" (kopiert Snippet in eigene Library, setzt `user_id = auth.uid()`, `is_public = false`, `cloned_from = original.id`).
+- Filter: Kategorie, Suchtext, Sort (Top / Neu).
 
-**2. StockSearchModal (Motion-Studio-tauglich)**
-- Neue Komponente `src/components/motion-studio/StockSearchModal.tsx`.
-- Tabs: **Videos | Bilder**. Suchfeld + Quick-Chips („cinematic city", „nature drone", „office team"…).
-- Result-Grid mit Thumbnail, Source-Badge (Pexels/Pixabay), Dauer, Auflösung.
-- Pro Asset zwei primäre Aktionen:
-  - **„Use as Reference"** → setzt `reference_image_url` der aktuellen Location oder Charakter-Variante (Frame-Extraction für Videos via `<video>` + canvas, dann Upload in `motion-studio-references` Storage).
-  - **„Use as B-Roll"** → fügt eine neue Szene ins Storyboard ein (Typ `b_roll`, mit `clip_url` = Pexels/Pixabay Direct URL, Cast leer, Duration = Asset-Duration capped auf 6 s).
-- Footer: Pexels/Pixabay-Attribution-Hinweis (rechtlich Pflicht).
+**3. Datenbank-Migration**
+- Spalten zu `motion_studio_scene_snippets`:
+  - `is_public boolean DEFAULT false NOT NULL`
+  - `like_count integer DEFAULT 0 NOT NULL`
+  - `cloned_from uuid REFERENCES motion_studio_scene_snippets(id) ON DELETE SET NULL`
+  - `published_at timestamptz`
+- Neue Tabelle `motion_studio_snippet_likes (user_id, snippet_id, created_at, PK(user_id, snippet_id))` mit RLS (User darf eigene Likes CRUD).
+- RLS-Policy ergänzen: `is_public = true` Snippets sind für alle authentifizierten User SELECT-bar.
+- Trigger: Like-Insert/Delete erhöht/dekrementiert `like_count` atomar.
+- Index auf `(is_public, like_count DESC)` für Community-Sortierung.
 
-**3. Integration in SceneSnippetPicker**
-- Dritter Tab **„Stock Live"** neben „Kuratiert" / „Meine Snippets" → öffnet die neue Suche eingebettet (gleiches Grid, gleiche Aktionen).
-- Aus dem StudioMode kann der User damit aus *einer* Library wählen: Curated → Mine → Stock-Live.
+**4. Hook-Erweiterungen (`useMotionStudioLibrary.ts`)**
+- `updateSceneSnippet(id, patch)` (fehlt aktuell komplett).
+- `listCommunitySnippets({ category?, sort: 'top'|'new', search? })`.
+- `toggleSnippetLike(snippetId): Promise<boolean>` (idempotent).
+- `cloneCommunitySnippet(snippetId): Promise<SceneSnippet | null>`.
+- `publishSnippet(id, isPublic)` als dünner Wrapper auf `updateSceneSnippet`.
 
-**4. Integration in Composer (StockMediaBrowser)**
-- Bestehender `StockMediaBrowser` ruft die gleichen (jetzt gecachten) Edge-Funktionen → automatischer Speed-Boost.
-- Neue Aktion „Use as Reference" zusätzlich zur bestehenden „Use as Clip".
+**5. Thumbnail-Pipeline**
+- Wenn kein `thumbnail_url` gesetzt: bei Save automatisch aus `last_frame_url` oder erster Clip-Frame eine 512px-Vorschau generieren (Reuse `extractVideoFrame.ts` falls Clip-URL vorhanden, sonst direkter Image-Upload).
 
-**5. Frame-Extraction-Helper**
-- Neue Utility `src/lib/stock/extractVideoFrame.ts` — lädt das Stock-Video, extrahiert Frame@1s als JPEG-Blob, lädt es in `motion-studio-references/{user_id}/...` hoch, gibt die public URL zurück. Nötig damit „Use as Reference" auf Videos funktioniert (Reference-Pipeline arbeitet mit Bildern).
+**6. Picker-Integration**
+- "Meine"-Tab: ersetzte Inline-Save-Box durch "Neues Snippet"-CTA, der `SnippetBuilderDialog` öffnet. Karten zeigen Edit-Icon, Like-Count, Public-Badge.
+- "Community"-Tab als 4. Tab im `Tabs`-Layout.
 
 ### Technische Details
-
-**Caching-Edge-Logik (Pseudocode):**
-```ts
-const cacheKey = `${media_type}:${query.toLowerCase().trim()}`;
-const cached = await supabase.from('stock_search_cache')
-  .select('*').eq('cache_key', cacheKey)
-  .gt('expires_at', new Date().toISOString()).maybeSingle();
-if (cached && !force_refresh) {
-  await supabase.from('stock_search_cache').update({ hit_count: cached.hit_count + 1 }).eq('id', cached.id);
-  return cached.results_json;
-}
-// otherwise: fetch Pexels+Pixabay, store in cache with TTL 24h
-```
-
-**DB-Migration:**
-```sql
-CREATE TABLE public.stock_search_cache (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  cache_key text NOT NULL UNIQUE,
-  query text NOT NULL,
-  media_type text NOT NULL CHECK (media_type IN ('video','image')),
-  results_json jsonb NOT NULL,
-  provider_counts jsonb DEFAULT '{}'::jsonb,
-  hit_count int NOT NULL DEFAULT 0,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  expires_at timestamptz NOT NULL DEFAULT now() + interval '24 hours'
-);
-CREATE INDEX ON public.stock_search_cache (expires_at);
-ALTER TABLE public.stock_search_cache ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "stock_cache_read" ON public.stock_search_cache FOR SELECT TO authenticated USING (true);
-```
-
-**API-Keys:** `PEXELS_API_KEY` und `PIXABAY_API_KEY` werden bereits in den bestehenden Edge-Funktionen erwartet. Falls einer fehlt, läuft die Funktion bereits mit dem anderen Provider weiter (graceful degradation).
+- Like-Trigger als `SECURITY DEFINER` Function mit `search_path = public`.
+- `cloneCommunitySnippet` setzt `usage_count=0`, `like_count=0`, kopiert NICHT `cast_character_ids`/`location_id` (gehören dem Originalbesitzer) — stattdessen Hinweis-Toast "Cast/Location zurücksetzen oder neu zuordnen".
+- Public-Toggle prüft Mindest-Qualität (Prompt ≥ 20 Zeichen, Name ≥ 3 Zeichen, Thumbnail vorhanden) bevor `is_public=true` erlaubt wird.
+- Keine Moderation in V1 — User können eigene Public-Snippets jederzeit auf privat zurückstellen oder löschen.
 
 ### Dateien
-- **Neu**: `supabase/migrations/<ts>_stock_search_cache.sql`
-- **Neu**: `src/components/motion-studio/StockSearchModal.tsx`
-- **Neu**: `src/lib/stock/extractVideoFrame.ts`
-- **Geändert**: `supabase/functions/search-stock-videos/index.ts` (Cache-Layer)
-- **Geändert**: `supabase/functions/search-stock-images/index.ts` (Cache-Layer)
-- **Geändert**: `src/components/motion-studio/SceneSnippetPicker.tsx` (3. Tab „Stock Live")
-- **Geändert**: `src/pages/MotionStudio/StudioMode.tsx` (B-Roll-Insertion + Reference-Set Handler)
-- **Geändert**: `src/components/video-composer/StockMediaBrowser.tsx` („Use as Reference"-Button)
+**Neu:**
+- `src/components/motion-studio/SnippetBuilderDialog.tsx`
+- `src/components/motion-studio/CommunitySnippetGallery.tsx`
+- `supabase/migrations/<ts>_snippet_sharing.sql`
 
-### Akzeptanzkriterien
-- Suche „cinematic city" liefert beim ersten Mal Pexels+Pixabay-Mix in <2s, beim zweiten Mal aus Cache in <300 ms.
-- „Use as Reference" auf Pexels-Video → extrahiert Frame, lädt hoch, setzt `reference_image_url` auf der aktuellen Location.
-- „Use as B-Roll" → neue Szene erscheint im Storyboard mit Stock-URL als Clip.
-- Attribution sichtbar im Modal-Footer.
+**Geändert:**
+- `src/hooks/useMotionStudioLibrary.ts` (neue CRUD + Like + Clone Methoden)
+- `src/components/motion-studio/SceneSnippetPicker.tsx` (4. Tab, Builder-Trigger)
+- `src/types/motion-studio.ts` (`is_public`, `like_count`, `cloned_from`)
+- `src/integrations/supabase/types.ts` (auto-regen)
 
-### Out-of-Scope (bewusst)
-- Keine Quality-Scoring-/Curation-Heuristik (klar: kuratierte Snippets bleiben die Premium-Schicht).
-- Keine eigene Lizenz-DB (Pexels/Pixabay sind beide royalty-free, Attribution wird angezeigt).
+### Out of Scope (bewusst)
+- Moderationsqueue / Reporting (kommt erst bei nennenswertem Public-Volumen).
+- Kommentare / Reviews auf Snippets.
+- Snippet-Versionierung.
