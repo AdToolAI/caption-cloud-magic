@@ -830,18 +830,20 @@ export default function VideoComposerDashboard() {
         open={showAdDirector}
         onOpenChange={setShowAdDirector}
         language={project.language}
-        onScenesGenerated={({ scenes, briefingPatch, title, adMeta }) => {
+        projectId={project.id}
+        onScenesGenerated={({ scenes, briefingPatch, title, voiceover, adMeta }) => {
           setProject((prev) => ({
             ...prev,
             title: title || prev.title,
             category: 'product-ad',
             briefing: { ...prev.briefing, ...briefingPatch },
             scenes,
+            assemblyConfig: voiceover
+              ? { ...prev.assemblyConfig, voiceover }
+              : prev.assemblyConfig,
             status: 'storyboard',
           }));
           setActiveTab('storyboard');
-          // Persist ad-director metadata onto the project row when it gets saved.
-          // (Stored client-side until ensureProjectPersisted writes to DB.)
           try {
             localStorage.setItem(
               'video-composer-ad-meta',
