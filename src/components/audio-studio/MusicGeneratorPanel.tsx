@@ -387,6 +387,7 @@ export function MusicGeneratorPanel({
                     <Download className="w-4 h-4 mr-1.5" /> MP3
                   </Button>
                 </div>
+              </div>
               <audio
                 ref={audioRef}
                 src={generatedTrack.url}
