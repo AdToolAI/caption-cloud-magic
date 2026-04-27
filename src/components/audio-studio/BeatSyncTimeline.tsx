@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Music, Zap, Upload, Loader2, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,22 +21,34 @@ interface BeatSyncTimelineProps {
   duration: number;
   currentTime: number;
   onTimeChange: (time: number) => void;
+  initialMusicUrl?: string | null;     // Pre-loaded music track (e.g. from AI Music Generator)
 }
 
 export function BeatSyncTimeline({
   audioUrl,
   duration,
   currentTime,
-  onTimeChange
+  onTimeChange,
+  initialMusicUrl,
 }: BeatSyncTimelineProps) {
   const [musicFile, setMusicFile] = useState<File | null>(null);
-  const [musicUrl, setMusicUrl] = useState<string | null>(null);
+  const [musicUrl, setMusicUrl] = useState<string | null>(initialMusicUrl ?? null);
   const [beats, setBeats] = useState<Beat[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [snapToBeats, setSnapToBeats] = useState(true);
   const [cutMarkers, setCutMarkers] = useState<number[]>([]);
   const [sensitivity, setSensitivity] = useState(50);
   const timelineRef = useRef<HTMLDivElement>(null);
+
+  // Auto-load and analyze when an external music url is provided (e.g. from MusicGenerator)
+  useEffect(() => {
+    if (initialMusicUrl && initialMusicUrl !== musicUrl) {
+      setMusicUrl(initialMusicUrl);
+      setMusicFile(null);
+      analyzeBeat(initialMusicUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMusicUrl]);
 
   const handleMusicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
