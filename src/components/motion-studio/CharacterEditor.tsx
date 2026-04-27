@@ -255,7 +255,25 @@ export default function CharacterEditor({
 
           {/* Reference Image */}
           <div className="space-y-2">
-            <Label className="text-xs">Referenzbild (optional, sehr empfohlen)</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Referenzbild (optional, sehr empfohlen)</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={generatingSheet || !draft.description.trim()}
+                onClick={handleGenerateSheet}
+                className="h-7 text-[11px] gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
+                title={!draft.description.trim() ? 'Beschreibung erforderlich' : 'Foto-realistisches 4-View Sheet erzeugen'}
+              >
+                {generatingSheet ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Wand2 className="h-3 w-3" />
+                )}
+                Sheet generieren
+              </Button>
+            </div>
 
             {!hasConsent && !character && (
               <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
