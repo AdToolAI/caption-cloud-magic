@@ -10,12 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Library, Loader2, Plus, Search, Sparkles, Trash2, Users, Globe } from 'lucide-react';
-import { toast } from 'sonner';
+import { Library, Loader2, Plus, Search, Sparkles, Trash2, Users, Globe, Pencil, Heart, Globe2 } from 'lucide-react';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import type { SceneSnippet } from '@/types/motion-studio';
 import CuratedSnippetGallery from './CuratedSnippetGallery';
 import StockSearchPanel from './StockSearchModal';
+import SnippetBuilderDialog from './SnippetBuilderDialog';
+import CommunitySnippetGallery from './CommunitySnippetGallery';
+
 
 interface SceneSnippetPickerProps {
   open: boolean;
