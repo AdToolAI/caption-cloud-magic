@@ -620,6 +620,12 @@ export default function VideoComposerDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
+            {project.id && peers.length > 0 && (
+              <CollaboratorAvatars peers={peers} />
+            )}
+            {project.id && (
+              <ShareProjectDialog projectId={project.id} isOwner={isOwner} />
+            )}
             <div className="text-right">
               <p className="text-xs text-muted-foreground">{t('videoComposer.estimatedCost')}</p>
               <p className="text-sm font-semibold text-primary">
