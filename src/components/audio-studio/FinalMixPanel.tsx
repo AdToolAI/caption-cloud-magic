@@ -122,11 +122,14 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
 
       const { error: insErr } = await supabase.from('universal_audio_assets').insert({
         user_id: user.id,
+        type: 'final_mix',
         title: `Final Mix · ${mixer.target.label}`,
         source: 'final_mix',
         processing_preset: 'final_mix',
         url: pub.publicUrl,
-        duration_seconds: Math.round(mixer.maxDuration),
+        storage_url: pub.publicUrl,
+        storage_path: fileName,
+        duration_sec: Math.round(mixer.maxDuration),
         effect_config: {
           target: mixer.target,
           measured_lufs: measuredLufs,
