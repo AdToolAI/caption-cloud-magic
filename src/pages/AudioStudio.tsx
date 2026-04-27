@@ -489,11 +489,32 @@ export default function AudioStudio() {
                         />
                       </motion.div>
                     )}
+
+                    {activeTab === 'ducking' && (
+                      <motion.div
+                        key="ducking"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <AudioDuckingPanel
+                          speechUrl={storageAudioUrl || audioUrl}
+                          musicUrl={musicUrl}
+                          transcript={transcript}
+                          speechLabel={audioFile?.name || 'Voiceover'}
+                          musicLabel="AI / Beat-Sync Track"
+                          onMixExported={() => {
+                            setLibraryRefreshKey(k => k + 1);
+                            setActiveTab('library');
+                          }}
+                        />
+                      </motion.div>
+                    )}
                   </AnimatePresence>
                 </div>
 
-                {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music tab) */}
-                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && (
+                {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music/ducking tab) */}
+                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && activeTab !== 'ducking' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
