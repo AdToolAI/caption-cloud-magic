@@ -565,6 +565,36 @@ export default function AudioStudio() {
                       </motion.div>
                     )}
 
+                    {activeTab === 'final-mix' && (
+                      <motion.div
+                        key="final-mix"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <FinalMixPanel
+                          initialSources={[
+                            ...(originalAudioUrl || enhancedAudioUrl || audioUrl ? [{
+                              id: 'voice-current',
+                              label: audioFile?.name || 'Voiceover',
+                              url: enhancedAudioUrl || originalAudioUrl || audioUrl!,
+                              kind: 'voice' as const,
+                            }] : []),
+                            ...(musicUrl ? [{
+                              id: 'music-current',
+                              label: 'Music Track',
+                              url: musicUrl,
+                              kind: 'music' as const,
+                            }] : []),
+                          ]}
+                          onMixSaved={() => {
+                            setLibraryRefreshKey(k => k + 1);
+                            toast.success('Final Mix gespeichert', { description: 'In Bibliothek verfügbar' });
+                          }}
+                        />
+                      </motion.div>
+                    )}
+
                     {activeTab === 'voices' && (
                       <motion.div
                         key="voices"
