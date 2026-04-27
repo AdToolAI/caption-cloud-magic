@@ -435,6 +435,11 @@ export default function AdDirectorWizard({
           allVariantScripts: renderAllVariants
             ? variants?.map((v) => ({ id: v.id, lines: v.lines }))
             : undefined,
+          aspectRatios: [
+            ...(aspect9x16 ? (['9:16'] as const) : []),
+            ...(aspect1x1 ? (['1:1'] as const) : []),
+            ...(aspect4x5 ? (['4:5'] as const) : []),
+          ],
         },
       });
 
