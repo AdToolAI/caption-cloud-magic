@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Library, Play, Pause, Download, Trash2, RotateCcw, 
-  Calendar, Settings2, FileAudio, Volume2, Search
+  Calendar, Settings2, FileAudio, Volume2, Search, Scissors, Loader2, Music2, Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -12,6 +12,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { EnhancementOptions } from '@/hooks/useAudioEnhancement';
+import { useStemSeparation, STEM_SEPARATION_COST_EUR } from '@/hooks/useStemSeparation';
+import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 
 interface SoundLibraryItem {
   id: string;
@@ -28,17 +30,25 @@ interface SoundLibraryItem {
 
 interface SoundLibraryProps {
   onLoadAudio?: (url: string, originalUrl?: string | null, effectConfig?: EnhancementOptions | null) => void;
+  onSendToBeatSync?: (url: string, title?: string) => void;
 }
 
-export function SoundLibrary({ onLoadAudio }: SoundLibraryProps) {
+type FilterCategory = 'all' | 'enhanced' | 'music' | 'stems';
+
+export function SoundLibrary({ onLoadAudio, onSendToBeatSync }: SoundLibraryProps) {
   const { user } = useAuth();
+  const { separateStems, loading: stemLoading } = useStemSeparation();
+  const { wallet } = useAIVideoWallet();
   const [sounds, setSounds] = useState<SoundLibraryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [category, setCategory] = useState<FilterCategory>('all');
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [stemTargetId, setStemTargetId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const currencySymbol = wallet?.currency === 'USD' ? '$' : '€';
 
-  // Fetch sounds from database
+  // Fetch sounds from database — include voicepro (enhanced), ai_generated (music) and stem assets
   useEffect(() => {
     if (!user?.id) return;
     
@@ -49,7 +59,7 @@ export function SoundLibrary({ onLoadAudio }: SoundLibraryProps) {
           .from('universal_audio_assets')
           .select('id, title, url, original_audio_url, processing_preset, effect_config, duration_sec, created_at, type, source')
           .eq('user_id', user.id)
-          .eq('source', 'voicepro')
+          .in('source', ['voicepro', 'ai_generated', 'stem_separation'])
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -78,10 +88,58 @@ export function SoundLibrary({ onLoadAudio }: SoundLibraryProps) {
   }, [user?.id]);
 
   // Filter sounds based on search
-  const filteredSounds = sounds.filter(sound => 
-    sound.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (sound.processing_preset?.toLowerCase().includes(searchQuery.toLowerCase()))
+  // Filter helpers
+  const matchesCategory = (sound: SoundLibraryItem) => {
+    if (category === 'all') return true;
+    if (category === 'enhanced') return sound.source === 'voicepro';
+    if (category === 'music') return sound.source === 'ai_generated';
+    if (category === 'stems') return sound.source === 'stem_separation';
+    return true;
+  };
+
+  const filteredSounds = sounds.filter(sound =>
+    matchesCategory(sound) && (
+      sound.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (sound.processing_preset?.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
   );
+
+  const handleStemSeparation = async (sound: SoundLibraryItem) => {
+    setStemTargetId(sound.id);
+    try {
+      const stems = await separateStems({
+        audioUrl: sound.url,
+        assetId: sound.id,
+        title: sound.title,
+      });
+      if (stems && stems.length > 0) {
+        // Re-fetch to show the new stem assets
+        const { data } = await supabase
+          .from('universal_audio_assets')
+          .select('id, title, url, original_audio_url, processing_preset, effect_config, duration_sec, created_at, type, source')
+          .eq('user_id', user!.id)
+          .in('source', ['voicepro', 'ai_generated', 'stem_separation'])
+          .order('created_at', { ascending: false });
+        if (data) {
+          setSounds(data.map(item => ({
+            id: item.id,
+            title: item.title || 'Untitled',
+            url: item.url || '',
+            original_url: item.original_audio_url,
+            processing_preset: item.processing_preset,
+            effect_config: item.effect_config as EnhancementOptions | null,
+            duration_sec: item.duration_sec ? Number(item.duration_sec) : null,
+            created_at: item.created_at || new Date().toISOString(),
+            type: item.type || 'enhanced',
+            source: item.source,
+          })));
+        }
+        setCategory('stems');
+      }
+    } finally {
+      setStemTargetId(null);
+    }
+  };
 
   // Play/pause audio
   const togglePlay = (sound: SoundLibraryItem) => {
@@ -157,7 +215,9 @@ export function SoundLibrary({ onLoadAudio }: SoundLibraryProps) {
   };
 
   // Get preset label
-  const getPresetLabel = (preset: string | null) => {
+  const getPresetLabel = (sound: SoundLibraryItem) => {
+    if (sound.source === 'ai_generated') return 'AI Music';
+    if (sound.source === 'stem_separation') return sound.processing_preset || 'Stem';
     const labels: Record<string, string> = {
       minimal: 'Minimal',
       podcast: 'Podcast',
@@ -165,7 +225,21 @@ export function SoundLibrary({ onLoadAudio }: SoundLibraryProps) {
       maximal: 'Maximal',
       custom: 'Custom'
     };
-    return labels[preset || ''] || preset || 'Standard';
+    return labels[sound.processing_preset || ''] || sound.processing_preset || 'Standard';
+  };
+
+  const FILTER_TABS: { id: FilterCategory; label: string; icon: typeof Library }[] = [
+    { id: 'all', label: 'Alle', icon: Library },
+    { id: 'enhanced', label: 'Optimiert', icon: Volume2 },
+    { id: 'music', label: 'AI Musik', icon: Music2 },
+    { id: 'stems', label: 'Stems', icon: Scissors },
+  ];
+
+  const counts = {
+    all: sounds.length,
+    enhanced: sounds.filter(s => s.source === 'voicepro').length,
+    music: sounds.filter(s => s.source === 'ai_generated').length,
+    stems: sounds.filter(s => s.source === 'stem_separation').length,
   };
 
   return (
@@ -178,7 +252,7 @@ export function SoundLibrary({ onLoadAudio }: SoundLibraryProps) {
       />
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-cyan-500/20 flex items-center justify-center">
             <Library className="w-5 h-5 text-primary" />
@@ -199,6 +273,31 @@ export function SoundLibrary({ onLoadAudio }: SoundLibraryProps) {
             className="pl-9 bg-muted/20 border-border/50"
           />
         </div>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex flex-wrap gap-1.5 mb-6">
+        {FILTER_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = category === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setCategory(tab.id)}
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all ${
+                isActive
+                  ? 'border-primary bg-primary/15 text-primary font-medium'
+                  : 'border-border/50 bg-muted/30 text-muted-foreground hover:border-primary/40'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {tab.label}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-primary/20' : 'bg-muted'}`}>
+                {counts[tab.id]}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Sound List */}
@@ -265,7 +364,7 @@ export function SoundLibrary({ onLoadAudio }: SoundLibraryProps) {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-medium truncate">{sound.title}</span>
                       <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0">
-                        {getPresetLabel(sound.processing_preset)}
+                        {getPresetLabel(sound)}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -282,6 +381,33 @@ export function SoundLibrary({ onLoadAudio }: SoundLibraryProps) {
 
                   {/* Actions */}
                   <div className="flex items-center gap-1">
+                    {onSendToBeatSync && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onSendToBeatSync(sound.url, sound.title)}
+                        className="w-9 h-9 hover:bg-primary/10 hover:text-primary"
+                        title="An Beat-Sync senden"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {sound.source !== 'stem_separation' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleStemSeparation(sound)}
+                        disabled={stemLoading}
+                        className="w-9 h-9 hover:bg-cyan-500/10 hover:text-cyan-500"
+                        title={`Stems extrahieren (${currencySymbol}${STEM_SEPARATION_COST_EUR.toFixed(2)})`}
+                      >
+                        {stemLoading && stemTargetId === sound.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Scissors className="w-4 h-4" />
+                        )}
+                      </Button>
+                    )}
                     {onLoadAudio && (
                       <Button
                         variant="ghost"

@@ -32,6 +32,7 @@ export default function AudioStudio() {
   const [showMusicGen, setShowMusicGen] = useState(false);
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
   const [musicUrl, setMusicUrl] = useState<string | null>(null);
+  const [detectedVideoBpm, setDetectedVideoBpm] = useState<number | undefined>(undefined);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
 
   const handleSendToBeatSync = useCallback((track: { url: string; title?: string }) => {
@@ -163,6 +164,7 @@ export default function AudioStudio() {
               <MusicGeneratorPanel
                 onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
                 onSendToBeatSync={handleSendToBeatSync}
+                defaultBpm={detectedVideoBpm}
               />
             </motion.div>
           ) : !audioUrl ? (
@@ -388,6 +390,7 @@ export default function AudioStudio() {
                           currentTime={currentTime}
                           onTimeChange={handleSeek}
                           initialMusicUrl={musicUrl}
+                          onBpmDetected={setDetectedVideoBpm}
                         />
                       </motion.div>
                     )}
@@ -453,6 +456,7 @@ export default function AudioStudio() {
                             setAudioUrl(url);
                             setActiveTab('compare');
                           }}
+                          onSendToBeatSync={(url, title) => handleSendToBeatSync({ url, title })}
                         />
                       </motion.div>
                     )}
@@ -479,6 +483,7 @@ export default function AudioStudio() {
                           onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
                           onOpenLibrary={() => setActiveTab('library')}
                           onSendToBeatSync={handleSendToBeatSync}
+                          defaultBpm={detectedVideoBpm}
                         />
                       </motion.div>
                     )}

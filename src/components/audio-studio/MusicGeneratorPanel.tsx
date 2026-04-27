@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Music2, Sparkles, Loader2, Play, Pause, Download, Library as LibraryIcon, Wand2, Zap, Crown, Activity, Send } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -63,6 +63,15 @@ export function MusicGeneratorPanel({
   const [generatedTrack, setGeneratedTrack] = useState<GeneratedMusicTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Sync BPM when parent supplies a freshly detected value (e.g. from BeatSyncTimeline)
+  useEffect(() => {
+    if (defaultBpm && defaultBpm !== bpm) {
+      setBpm(defaultBpm);
+      setUseBpm(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultBpm]);
 
   const tierInfo = MUSIC_TIER_PRICING[tier];
   const maxDur = tierInfo.maxDuration;

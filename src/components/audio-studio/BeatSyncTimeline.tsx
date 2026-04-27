@@ -22,6 +22,7 @@ interface BeatSyncTimelineProps {
   currentTime: number;
   onTimeChange: (time: number) => void;
   initialMusicUrl?: string | null;     // Pre-loaded music track (e.g. from AI Music Generator)
+  onBpmDetected?: (bpm: number) => void; // Forward detected BPM (e.g. to MusicGenerator)
 }
 
 export function BeatSyncTimeline({
@@ -30,10 +31,12 @@ export function BeatSyncTimeline({
   currentTime,
   onTimeChange,
   initialMusicUrl,
+  onBpmDetected,
 }: BeatSyncTimelineProps) {
   const [musicFile, setMusicFile] = useState<File | null>(null);
   const [musicUrl, setMusicUrl] = useState<string | null>(initialMusicUrl ?? null);
   const [beats, setBeats] = useState<Beat[]>([]);
+  const [detectedBpm, setDetectedBpm] = useState<number | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [snapToBeats, setSnapToBeats] = useState(true);
   const [cutMarkers, setCutMarkers] = useState<number[]>([]);
@@ -70,15 +73,21 @@ export function BeatSyncTimeline({
 
       if (error) throw error;
 
+      const bpm = data?.bpm || 120;
+
       if (data?.beats && Array.isArray(data.beats)) {
         setBeats(data.beats);
+        setDetectedBpm(bpm);
+        onBpmDetected?.(bpm);
         toast.success('Beat-Analyse abgeschlossen', {
-          description: `${data.beats.length} Beats erkannt bei ~${data.bpm || 120} BPM`
+          description: `${data.beats.length} Beats erkannt bei ~${bpm} BPM`
         });
       } else {
         // Fallback to generated beats if API returns empty
         const mockBeats = generateFallbackBeats();
         setBeats(mockBeats);
+        setDetectedBpm(bpm);
+        onBpmDetected?.(bpm);
         toast.success('Beat-Analyse abgeschlossen', {
           description: `${mockBeats.length} Beats erkannt`
         });
@@ -88,6 +97,8 @@ export function BeatSyncTimeline({
       // Fallback to generated beats
       const mockBeats = generateFallbackBeats();
       setBeats(mockBeats);
+      setDetectedBpm(120);
+      onBpmDetected?.(120);
       toast.success('Beat-Analyse abgeschlossen (lokal)', {
         description: `${mockBeats.length} Beats erkannt`
       });
@@ -323,7 +334,10 @@ export function BeatSyncTimeline({
             </div>
 
             {/* Stats */}
-            <div className="flex items-center gap-6 text-xs text-muted-foreground">
+            <div className="flex items-center gap-6 text-xs text-muted-foreground flex-wrap">
+              {detectedBpm && (
+                <span className="font-semibold text-primary">~{detectedBpm} BPM</span>
+              )}
               <span>{beats.length} Beats erkannt</span>
               <span>{beats.filter(b => b.type === 'drop').length} Drops</span>
               <span>{cutMarkers.length} Schnitte gesetzt</span>
