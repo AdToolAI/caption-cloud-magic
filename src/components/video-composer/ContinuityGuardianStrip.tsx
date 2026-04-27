@@ -236,6 +236,8 @@ export default function ContinuityGuardianStrip({
     const lockedNext: ComposerScene = {
       ...pair.next,
       referenceImageUrl: anchorUrl,
+      continuityLocked: true,
+      lockReferenceUrl: anchorUrl,
       // Reset score so user sees fresh state after repair
       continuityDriftScore: undefined,
       continuityDriftLabel: undefined,
@@ -243,8 +245,28 @@ export default function ContinuityGuardianStrip({
     onUpdateScenes(
       scenes.map((s) => (s.id === pair.next.id ? lockedNext : s))
     );
+    // Persist lock to DB (best-effort, non-blocking)
+    void setSceneLock(pair.next.id, true, anchorUrl);
     toast.success('Anker-Frame verriegelt — starte Repair-Render…');
     await onRepairScene(lockedNext);
+  };
+
+  const toggleLock = async (scene: ComposerScene) => {
+    const nextLocked = !scene.continuityLocked;
+    const ref = nextLocked
+      ? scene.lockReferenceUrl ?? scene.referenceImageUrl ?? scene.firstFrameUrl ?? null
+      : null;
+    onUpdateScenes(
+      scenes.map((s) =>
+        s.id === scene.id
+          ? { ...s, continuityLocked: nextLocked, lockReferenceUrl: ref ?? undefined }
+          : s
+      )
+    );
+    const ok = await setSceneLock(scene.id, nextLocked, ref);
+    if (ok) {
+      toast.success(nextLocked ? 'Szene verriegelt 🔒' : 'Lock gelöst');
+    }
   };
 
   const repairAllBroken = async () => {
