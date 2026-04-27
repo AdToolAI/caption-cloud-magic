@@ -534,6 +534,7 @@ export default function VideoComposerDashboard() {
     text: 'Voiceover & Untertitel',
     audio: 'Musik & Sound-Mix',
     export: 'Render & Download',
+    campaign: 'Cutdowns & A/B-Varianten',
   };
 
   const STEPS: StepItem[] = TABS.map((t) => ({
