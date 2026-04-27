@@ -1,97 +1,109 @@
-## Hebel 8: Multi-Scene Render-Pipeline mit Auto-Stitch & Director's Cut Hand-Off
+# Hebel 9: Real-Time Collaboration im Video Composer
 
-Ziel: Aus dem Video Composer wird ein echtes Production-Tool. Ein einziger Klick auf **"Render All & Stitch"** generiert alle Szenen parallel mit sichtbarem Live-Progress pro Szene, stitched sie automatisch zu einem fertigen Video und übergibt es nahtlos an den Director's Cut zur Feinbearbeitung.
+Macht den Composer team-fähig: mehrere Nutzer können dasselbe Projekt gleichzeitig sehen, Cursor-Bewegungen verfolgen und Kommentar-Threads pro Szene führen — der Enterprise-Differentiator.
 
-### Was der User bekommt
+## Was der Nutzer bekommt
 
-1. **Neuer "Render Pipeline"-Modus im Clips-Tab**
-   - Großer CTA-Button "Render All & Stitch" (zusätzlich zum bestehenden "Generate All")
-   - Zeigt Gesamt-Fortschritt: `3 / 7 Szenen fertig · ETA 2:14`
-   - Pro Szene eine kompakte Live-Karte mit:
-     - Status-Badge (Queued / Generating / Ready / Failed)
-     - Progress-Bar (0–100 %)
-     - Engine-Hinweis (Kling / Veo / Stock / Upload)
-     - Retry-Button bei Fehler ohne Abbruch der gesamten Pipeline
+1. **Share-Dialog** im Composer (`/video-composer/:projectId`)
+   - Projekt per Link mit Team-Mitgliedern teilen (E-Mail-Einladung oder Link mit Rolle: `viewer` / `editor`)
+   - Liste aller aktiven Kollaboratoren mit Avatar + Live-Status (online/offline)
 
-2. **Parallel-Queue mit kontrolliertem Concurrency**
-   - Max. 3 Szenen gleichzeitig in Generierung (verhindert Provider-Throttling)
-   - Failed Scenes blockieren den Rest **nicht** mehr → Pipeline läuft weiter, User kann am Ende einzeln retryen
-   - Realtime-Updates über bestehenden Postgres Realtime-Channel auf `motion_studio_projects`
+2. **Live-Cursor-Presence**
+   - Bei jedem aktiven Nutzer wird ein farbiger Cursor mit Namen über dem Composer-Canvas angezeigt
+   - Szenen-Karten zeigen Avatar-Badges, wenn jemand sie gerade bearbeitet ("Anna editiert")
+   - Auto-Refresh bei Änderungen via Supabase Realtime auf `composer_scenes` (kein manueller Reload)
 
-3. **Auto-Stitch nach Render**
-   - Sobald alle erfolgreichen Scenes `ready` sind, startet automatisch der Stitch-Schritt (oder optional per Bestätigungs-Toast: "7 Clips bereit — jetzt stitchen?")
-   - Stitching nutzt die bestehende Assembly-Pipeline (`render-with-remotion` / Composer-Sequence)
-   - Bei teilweisen Fehlern: User wählt "Mit fertigen Clips stitchen" oder "Erst fehlende neu generieren"
+3. **Comment-Threads pro Szene**
+   - Jede `SceneCard` bekommt ein Kommentar-Icon mit Counter
+   - Klick öffnet Side-Panel mit Thread (Markdown, @mentions, Resolve-Button)
+   - Realtime-Push bei neuen Kommentaren + Notification-Badge im Header
 
-4. **Direkt-Übergabe an Director's Cut**
-   - Nach erfolgreichem Stitch: Modal "🎬 Video bereit — wo weiter?"
-     - **"In Director's Cut öffnen"** (primär) → navigiert zu `/video-editor?source=composer&projectId=…` mit vorab geladener Video-URL
-     - "In Mediathek speichern"
-     - "Direkt herunterladen"
-   - Im Director's Cut wird das Video als neues Workspace-Projekt initialisiert, Original-Szenen-Marker bleiben optional als Cut-Hints erhalten
+4. **Conflict-Indicator**
+   - Wenn zwei Nutzer dieselbe Szene editieren, zeigt ein Warning-Toast: "Anna bearbeitet diese Szene gerade"
 
-### Technische Umsetzung
+## Technische Umsetzung
 
-**Frontend**
-- Neue Komponente `src/components/video-composer/RenderPipelinePanel.tsx`
-  - State-Machine: `idle → queueing → generating → stitching → ready | partial_failed`
-  - Nutzt `useRenderQueue` und neuen Hook `useScenePipelineProgress(projectId)` mit Supabase Realtime
-- Erweiterung `ClipsTab.tsx`: Pipeline-Panel oberhalb der Szenenliste, der bestehende "Generate All"-Button bleibt als Power-User-Option
-- Neuer Hook `src/hooks/useMultiSceneRender.ts`: orchestriert Concurrency (p-limit Pattern, max 3), Retry-Logik, Stitch-Trigger
-- `AssemblyTab.tsx`: bekommt `autoTriggered`-Flag, damit Auto-Stitch ohne erneutes Klicken läuft
-
-**Backend / Edge Functions**
-- Neue Edge Function `compose-stitch-and-handoff`:
-  - Input: `projectId`, `targetDestination: 'directors_cut' | 'library' | 'download'`
-  - Wartet bis alle Scenes `ready` sind (oder akzeptiert `allowPartial`)
-  - Ruft intern `render-with-remotion` mit der Composer-Sequence auf
-  - Schreibt fertige Render-URL in neue Tabelle `composer_pipeline_runs` und triggert Director's-Cut-Initialisierung
-- `compose-video-clips`: leichte Erweiterung — schreibt pro Scene `progress_percent` (0/25/50/100) während Generierung in `motion_studio_scenes`, damit Realtime-Updates präzise sind
-
-**Datenbank-Migration** (1 neue Tabelle, 1 neue Spalte)
+### 1. Datenbank-Migration
 ```sql
--- Track end-to-end pipeline runs for resumability + analytics
-CREATE TABLE public.composer_pipeline_runs (
+-- Kollaboratoren pro Projekt
+CREATE TABLE composer_collaborators (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id uuid NOT NULL REFERENCES motion_studio_projects(id) ON DELETE CASCADE,
+  project_id uuid REFERENCES composer_projects(id) ON DELETE CASCADE,
   user_id uuid NOT NULL,
-  status text NOT NULL DEFAULT 'queued', -- queued|generating|stitching|ready|failed|partial
-  total_scenes int NOT NULL,
-  completed_scenes int NOT NULL DEFAULT 0,
-  failed_scenes int NOT NULL DEFAULT 0,
-  stitched_video_url text,
-  director_cut_project_id uuid,
-  error_message text,
-  started_at timestamptz DEFAULT now(),
-  completed_at timestamptz,
-  created_at timestamptz DEFAULT now()
+  role text NOT NULL CHECK (role IN ('viewer','editor','owner')),
+  invited_by uuid,
+  invited_at timestamptz DEFAULT now(),
+  accepted_at timestamptz,
+  UNIQUE (project_id, user_id)
 );
-ALTER TABLE public.composer_pipeline_runs ENABLE ROW LEVEL SECURITY;
--- RLS: user can only see/manage their own runs
-ALTER PUBLICATION supabase_realtime ADD TABLE public.composer_pipeline_runs;
 
--- Add per-scene progress for live UI
-ALTER TABLE public.motion_studio_scenes
-  ADD COLUMN IF NOT EXISTS progress_percent int DEFAULT 0;
+-- Kommentare pro Szene
+CREATE TABLE composer_scene_comments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  scene_id uuid REFERENCES composer_scenes(id) ON DELETE CASCADE,
+  project_id uuid REFERENCES composer_projects(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  parent_id uuid REFERENCES composer_scene_comments(id) ON DELETE CASCADE,
+  body text NOT NULL,
+  resolved_at timestamptz,
+  resolved_by uuid,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Security-Definer-Funktion (verhindert RLS-Rekursion)
+CREATE FUNCTION can_access_composer_project(_project_id uuid, _user_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM composer_projects WHERE id = _project_id AND user_id = _user_id
+    UNION
+    SELECT 1 FROM composer_collaborators
+    WHERE project_id = _project_id AND user_id = _user_id AND accepted_at IS NOT NULL
+  );
+$$;
+
+-- RLS-Policies basieren auf can_access_composer_project()
+-- Bestehende composer_projects/scenes-Policies werden um Collaborator-Zugriff erweitert
+
+-- Realtime aktivieren
+ALTER PUBLICATION supabase_realtime ADD TABLE composer_scenes;
+ALTER PUBLICATION supabase_realtime ADD TABLE composer_scene_comments;
+ALTER PUBLICATION supabase_realtime ADD TABLE composer_collaborators;
 ```
 
-**Director's Cut Hand-Off**
-- Nutzt bestehende Studio-State-Sync-Architektur (siehe Memory `studio-state-and-export-synchronization`)
-- Beim Öffnen mit `?source=composer&projectId=…` lädt der Director's Cut die `stitched_video_url` aus `composer_pipeline_runs` und legt ein neues Studio-Projekt an mit:
-  - `source_video_url` = stitched URL
-  - Optional: Szenen-Splits als Cut-Marker auf der Timeline (basierend auf Composer-Scene-Durations)
+### 2. Realtime-Hooks
+- **`useComposerPresence(projectId)`**: nutzt `supabase.channel('composer:'+projectId)` mit `track({ user_id, name, color, cursor_x, cursor_y, active_scene_id })`. Throttled auf 50ms.
+- **`useComposerRealtime(projectId)`**: subscribet auf `postgres_changes` für `composer_scenes` + invalidiert React-Query-Cache
+- **`useSceneComments(sceneId)`**: lädt Thread + subscribet auf neue Inserts
 
-### Out-of-Scope (bewusst nicht in dieser Iteration)
-- Kein vollständiger Pause/Resume kompletter Pipeline-Runs (nur Retry pro Scene)
-- Keine Multi-User-Realtime-Collab innerhalb einer Pipeline
-- Kein Export in mehrere Formate parallel (nutzt bestehenden `render-multi-format` separat)
+### 3. UI-Komponenten (neu)
+- `src/components/video-composer/ShareProjectDialog.tsx` — Einladen via E-Mail/Link, Rollenwahl
+- `src/components/video-composer/CollaboratorAvatars.tsx` — Stacked Avatars im Header
+- `src/components/video-composer/LiveCursor.tsx` — Floating-Cursor mit Tailwind-Color
+- `src/components/video-composer/SceneCommentPanel.tsx` — Side-Sheet mit Thread + Reply
+- `src/components/video-composer/SceneCommentBadge.tsx` — Counter-Badge auf SceneCard
 
-### Aufwand & Reihenfolge
-1. Migration + neue Tabelle (~30 min)
-2. `useMultiSceneRender` Hook + `RenderPipelinePanel` UI (~6 h)
-3. Edge Function `compose-stitch-and-handoff` (~4 h)
-4. Director's Cut Auto-Init mit `?source=composer` (~3 h)
-5. Live-Progress Realtime-Wiring + Polish (~2 h)
-6. Memory-Update unter `mem://features/video-composer/multi-scene-render-pipeline.md`
+### 4. Edge Function
+- `invite-composer-collaborator/index.ts` — sendet Einladungs-E-Mail (Resend), erstellt `composer_collaborators`-Row mit `accepted_at = NULL`. Annahme via Magic-Link auf `/video-composer/:projectId?invite=<token>`.
 
-Geschätzt **~1.5–2 Tage** wie vom User skizziert.
+### 5. Integration in bestehende Komponenten
+- `VideoComposerDashboard.tsx`: Header bekommt `<CollaboratorAvatars />` + Share-Button
+- `SceneCard.tsx`: zeigt `<SceneCommentBadge />` + Avatar bei aktivem Editor
+- `Composer.tsx` (Page): mountet `<LiveCursor />` Layer + `useComposerPresence`
+
+### 6. Berechtigungen
+- `viewer`: nur Lesen + Kommentieren
+- `editor`: alles außer Löschen/Teilen
+- `owner`: alle Rechte (= `composer_projects.user_id`)
+- UI-Buttons werden basierend auf Rolle disabled
+
+## Aus dem Scope ausgeschlossen
+- Operational Transform / CRDT für gleichzeitiges Tippen im selben Feld (nur Last-Write-Wins + Conflict-Toast)
+- @mention-Autocomplete (Phase 2)
+- E-Mail-Digest für Kommentare (Phase 2)
+
+## Geschätzter Umfang
+- Migration: 1 Datei (~150 Zeilen)
+- 5 neue Komponenten + 3 Hooks
+- 1 Edge Function (Resend-Invite)
+- Integration in ~3 bestehende Composer-Files
