@@ -37,6 +37,8 @@ import StockMediaBrowser, { type StockMediaItem } from './StockMediaBrowser';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
 import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
+import SceneShotDirectorPanel from './SceneShotDirectorPanel';
+import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import StructuredPromptBuilder from '@/components/motion-studio/StructuredPromptBuilder';
 import StylePresetPicker from '@/components/motion-studio/StylePresetPicker';
