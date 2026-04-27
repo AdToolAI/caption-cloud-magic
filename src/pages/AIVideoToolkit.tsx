@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
-  Sparkles, CreditCard, History, Clapperboard, ShieldAlert, Wand2,
+  Sparkles, CreditCard, History, Clapperboard, ShieldAlert, Wand2, Lock,
 } from 'lucide-react';
 
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
