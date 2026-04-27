@@ -522,6 +522,7 @@ export function ImageGenerator() {
                     onSaveToAlbum={handleSaveToAlbum}
                     onOpenLightbox={setLightboxImage}
                     onDelete={handleDeleteImage}
+                    onUpscaled={handleUpscaled}
                   />
                 ))}
               </AnimatePresence>
@@ -545,6 +546,7 @@ export function ImageGenerator() {
         onOpenChange={(open) => !open && setLightboxImage(null)}
         onSaveToAlbum={handleSaveToAlbum}
         onDelete={handleDeleteImage}
+        onUpscaled={handleUpscaled}
       />
     </div>
   );
