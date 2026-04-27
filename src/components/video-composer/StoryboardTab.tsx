@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic } from 'lucide-react';
+import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic, Library } from 'lucide-react';
 import SceneCard from './SceneCard';
 import HybridExtendDialog from './HybridExtendDialog';
 import TalkingHeadDialog from './TalkingHeadDialog';
+import SceneSnippetPicker from '@/components/motion-studio/SceneSnippetPicker';
+import type { SceneSnippet } from '@/types/motion-studio';
 import type { ComposerScene, ClipSource, ComposerCharacter } from '@/types/video-composer';
 import { DEFAULT_TEXT_OVERLAY, getClipCost, getClipRate } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -69,6 +71,30 @@ export default function StoryboardTab({
 
   // Block Q — Talking-Head dialog state
   const [talkingHeadOpen, setTalkingHeadOpen] = useState(false);
+
+  // Scene Library (snippets)
+  const [snippetPickerOpen, setSnippetPickerOpen] = useState(false);
+
+  const insertSnippet = (snippet: SceneSnippet) => {
+    const newScene: ComposerScene = {
+      id: `scene_${Date.now()}`,
+      projectId: projectId ?? '',
+      orderIndex: scenes.length,
+      sceneType: 'custom',
+      durationSeconds: snippet.duration_seconds ?? 5,
+      clipSource: 'stock',
+      clipQuality: 'standard',
+      clipStatus: 'pending',
+      textOverlay: { ...DEFAULT_TEXT_OVERLAY },
+      transitionType: 'none',
+      transitionDuration: 0,
+      retryCount: 0,
+      costEuros: 0,
+      prompt: snippet.prompt,
+      referenceImageUrl: snippet.reference_image_url ?? snippet.last_frame_url ?? undefined,
+    } as ComposerScene;
+    onUpdateScenes([...scenes, newScene]);
+  };
 
   const openHybridDialog = (
     scene: ComposerScene,
@@ -163,6 +189,14 @@ export default function StoryboardTab({
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={addScene} className="gap-1 text-xs">
             <Plus className="h-3.5 w-3.5" /> Szene
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setSnippetPickerOpen(true)}
+            className="gap-1 text-xs"
+          >
+            <Library className="h-3.5 w-3.5" /> Scene Library
           </Button>
           <Button
             size="sm"
@@ -315,6 +349,13 @@ export default function StoryboardTab({
         onSuccess={() => {
           void onRefetchScenes?.();
         }}
+      />
+
+      {/* Scene Snippet Library */}
+      <SceneSnippetPicker
+        open={snippetPickerOpen}
+        onOpenChange={setSnippetPickerOpen}
+        onInsert={insertSnippet}
       />
     </div>
   );
