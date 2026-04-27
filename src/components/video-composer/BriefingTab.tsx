@@ -692,7 +692,45 @@ export default function BriefingTab({
                 <button
                   key={style.id}
                   type="button"
-                  onClick={() => onUpdateBriefing({ visualStyle: style.id as ComposerVisualStyle })}
+                  onClick={() => {
+                    const styleId = style.id as ComposerVisualStyle;
+                    onUpdateBriefing({ visualStyle: styleId });
+
+                    // Soft-suggest Shot Director defaults to scenes whose
+                    // shotDirector is currently empty. Manual selections are
+                    // never overwritten.
+                    if (scenes && onUpdateScenes && scenes.length > 0) {
+                      const emptyScenes = scenes.filter(
+                        (s) => !s.shotDirector || Object.values(s.shotDirector).filter(Boolean).length === 0,
+                      );
+                      if (emptyScenes.length > 0) {
+                        const { selection } = suggestShotDirectorForStyle(styleId, undefined);
+                        const updated = scenes.map((s) =>
+                          emptyScenes.find((es) => es.id === s.id)
+                            ? { ...s, shotDirector: selection }
+                            : s,
+                        );
+                        onUpdateScenes(updated);
+                        const lang2 = (language === 'de' || language === 'es' ? language : 'en') as 'de' | 'en' | 'es';
+                        const styleLabel = getStyleLabel(styleId, lang2);
+                        toast({
+                          title:
+                            lang2 === 'de'
+                              ? `Shot Director: ${styleLabel}-Defaults gesetzt`
+                              : lang2 === 'es'
+                                ? `Director de Plano: ajustes ${styleLabel} aplicados`
+                                : `Shot Director: ${styleLabel} defaults applied`,
+                          description:
+                            lang2 === 'de'
+                              ? `Auf ${emptyScenes.length} Szene(n) ohne Kamera-Auswahl. Pro Szene überschreibbar.`
+                              : lang2 === 'es'
+                                ? `En ${emptyScenes.length} escena(s) sin selección de cámara. Editable por escena.`
+                                : `Applied to ${emptyScenes.length} scene(s) with no camera selection. Editable per scene.`,
+                          duration: 3500,
+                        });
+                      }
+                    }
+                  }}
                   className={`p-3 rounded-lg border text-left transition-all ${
                     isActive
                       ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
