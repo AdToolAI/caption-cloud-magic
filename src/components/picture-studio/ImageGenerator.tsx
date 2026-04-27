@@ -263,6 +263,26 @@ export function ImageGenerator() {
     if (tier === 'standard' && variantsCount === 1) toast.success(t('picStudio.imageGenerated'));
     setJustGenerated(true);
 
+    // CI-Match-Score (Phase C — async, non-blocking)
+    if (useBrandKit && activeBrandKit && imgUrl) {
+      const palette = [
+        activeBrandKit.primary_color,
+        activeBrandKit.secondary_color,
+        activeBrandKit.accent_color,
+      ].filter(Boolean) as string[];
+      if (palette.length) {
+        computeCIMatchScore(imgUrl, palette)
+          .then(score => {
+            const key = imageId || imgUrl;
+            setCiScores(prev => ({ ...prev, [key]: score }));
+            if (score < 60) {
+              toast.warning(`CI-Match nur ${score}% — Bild weicht vom Markenstil ab`);
+            }
+          })
+          .catch(() => { /* silent */ });
+      }
+    }
+
     if (imageId && user) {
       try {
         let { data: systemAlbum } = await supabase
