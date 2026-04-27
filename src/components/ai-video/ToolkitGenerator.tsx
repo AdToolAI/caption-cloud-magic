@@ -19,9 +19,12 @@ import {
 import { ModelSelector } from './ModelSelector';
 import { VideoPromptOptimizer } from './VideoPromptOptimizer';
 import { ToolkitCastPicker, buildCastPromptSuffix } from './ToolkitCastPicker';
+import { ShotDirectorPanel } from './ShotDirectorPanel';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { BrandCharacterSelector } from '@/components/brand-characters/BrandCharacterSelector';
 import { useBrandCharacters, buildCharacterPromptInjection, type BrandCharacter } from '@/hooks/useBrandCharacters';
+import type { ShotSelection } from '@/config/shotDirector';
+import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -86,6 +89,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const { trackUsage: trackBrandUsage } = useBrandCharacters();
   const [brandCharacter, setBrandCharacter] = useState<BrandCharacter | null>(null);
 
+  /* ── Shot Director (cinematic prompt builder) ── */
+  const [shotSelection, setShotSelection] = useState<ShotSelection>({});
+
   /* ── Sync settings to model capabilities when switching ── */
   useEffect(() => {
     if (!model.durations.includes(duration)) setDuration(model.durations[0]);
@@ -145,12 +151,13 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
     setGenerating(true);
     try {
-      // Build the prompt — inject Library cast/location AND Brand Character (if locked)
+      // Build the prompt — inject Library cast/location, Brand Character (if locked) AND Shot Director cinematography
       const castSuffix = buildCastPromptSuffix(castCharacter, castLocation);
       const brandSuffix = brandCharacter
         ? `Featuring ${brandCharacter.name}: ${buildCharacterPromptInjection(brandCharacter)}.`
         : '';
-      const finalPrompt = [prompt.trim(), brandSuffix, castSuffix]
+      const shotSuffix = buildShotPromptSuffix(shotSelection);
+      const finalPrompt = [prompt.trim(), shotSuffix, brandSuffix, castSuffix]
         .filter(Boolean)
         .join('\n\n');
 
