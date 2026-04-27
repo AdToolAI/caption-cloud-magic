@@ -74,6 +74,8 @@ interface AdDirectorWizardProps {
       cutdowns: Array<'15s' | '6s-hook'>;
       autoLogoEndcard: boolean;
       allVariantScripts?: Array<{ id: string; lines: string[] }>;
+      // Stage A — multi-aspect bundling
+      aspectRatios?: Array<'16:9' | '9:16' | '1:1' | '4:5'>;
     };
   }) => void;
 }
