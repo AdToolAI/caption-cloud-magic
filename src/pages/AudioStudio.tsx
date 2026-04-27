@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film } from 'lucide-react';
+import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AudioStudioHeroHeader } from '@/components/audio-studio/AudioStudioHeroHeader';
@@ -16,6 +16,7 @@ import { MusicGeneratorPanel } from '@/components/audio-studio/MusicGeneratorPan
 import { AutoMatchPanel } from '@/components/audio-studio/AutoMatchPanel';
 import { AudioDuckingPanel } from '@/components/audio-studio/AudioDuckingPanel';
 import { StemMixerPanel } from '@/components/audio-studio/StemMixerPanel';
+import { FinalMixPanel } from '@/components/audio-studio/FinalMixPanel';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
