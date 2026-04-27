@@ -204,6 +204,10 @@ export default function AdDirectorWizard({
     setAcknowledged(false);
     setUseBrandKit(true);
     setAutoVoiceover(true);
+    setAutoLogoEndcard(true);
+    setRenderAllVariants(false);
+    setCutdown15s(false);
+    setCutdown6sHook(false);
     setVariants(null);
     setChosenVariantId(null);
     setVariantsLoading(false);
