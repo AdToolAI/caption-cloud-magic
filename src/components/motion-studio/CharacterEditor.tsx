@@ -12,6 +12,7 @@ import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useLegalConsent } from '@/hooks/useLegalConsent';
 import LibraryUploadConsentDialog from '@/components/motion-studio/LibraryUploadConsentDialog';
 import { VoicePicker } from '@/components/motion-studio/VoicePicker';
+import CastingVibeGrid from '@/components/motion-studio/CastingVibeGrid';
 import {
   EMPTY_CHARACTER_DRAFT,
   type CharacterDraft,
@@ -334,7 +335,13 @@ export default function CharacterEditor({
             )}
           </div>
 
-          {/* Beschreibung */}
+          {/* Casting · Multi-Vibe Grid (only available after first save) */}
+          {character && (
+            <div className="rounded-lg border border-border/40 bg-background/30 p-3">
+              <CastingVibeGrid character={character} />
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label className="text-xs">Aussehen (Englisch empfohlen) *</Label>
             <Textarea

@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useLegalConsent } from '@/hooks/useLegalConsent';
 import LibraryUploadConsentDialog from '@/components/motion-studio/LibraryUploadConsentDialog';
+import LocationLightingGrid from '@/components/motion-studio/LocationLightingGrid';
 import {
   EMPTY_LOCATION_DRAFT,
   type LocationDraft,
@@ -239,6 +240,13 @@ export default function LocationEditor({
               </div>
             )}
           </div>
+
+          {/* Lighting Variants Grid (only after first save & with reference image) */}
+          {location && location.reference_image_url && (
+            <div className="rounded-lg border border-border/40 bg-background/30 p-3">
+              <LocationLightingGrid location={location} />
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label className="text-xs">Beschreibung (Englisch empfohlen) *</Label>
