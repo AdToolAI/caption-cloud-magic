@@ -38,6 +38,12 @@ import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
 import MotionStudioStepSidebar, { type StepItem } from './MotionStudioStepSidebar';
 import AutoDirectorWizard from './AutoDirectorWizard';
+import ShareProjectDialog from './ShareProjectDialog';
+import CollaboratorAvatars from './CollaboratorAvatars';
+import {
+  useComposerPresence,
+  useComposerScenesRealtime,
+} from '@/hooks/useComposerCollaboration';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
@@ -140,6 +146,39 @@ export default function VideoComposerDashboard() {
   const { ensureProjectPersisted } = useComposerPersistence();
   const incrementTemplateUsage = useIncrementTemplateUsage();
   const didInitialSyncRef = useRef(false);
+
+  // ---------------- Realtime Collaboration ----------------
+  const [selfMeta, setSelfMeta] = useState<{ userId: string; name: string; email?: string } | null>(null);
+  const [projectOwnerId, setProjectOwnerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getUser().then(({ data }) => {
+      if (cancelled || !data.user) return;
+      const u = data.user;
+      const name =
+        (u.user_metadata?.full_name as string | undefined) ||
+        (u.user_metadata?.name as string | undefined) ||
+        u.email?.split('@')[0] ||
+        'Guest';
+      setSelfMeta({ userId: u.id, name, email: u.email ?? undefined });
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!project.id) { setProjectOwnerId(null); return; }
+    supabase.from('composer_projects').select('user_id').eq('id', project.id).maybeSingle()
+      .then(({ data }) => setProjectOwnerId(data?.user_id ?? null));
+  }, [project.id]);
+
+  const isOwner = !!(selfMeta && projectOwnerId && selfMeta.userId === projectOwnerId);
+
+  const { peers, trackCursor: _trackCursor, trackActiveScene: _trackActiveScene } =
+    useComposerPresence(project.id, selfMeta);
+  // Note: trackCursor/trackActiveScene are exported for child components that want
+  // to mount LiveCursorLayer over their canvas (e.g. StoryboardTab). For now we
+  // surface presence via avatars in the header — cursors are an opt-in overlay.
 
   // DB sync on mount: if the loaded draft has a project.id, hydrate scenes from DB
   useEffect(() => {
@@ -322,6 +361,9 @@ export default function VideoComposerDashboard() {
       console.warn('[VideoComposerDashboard] refetchScenesFromDb failed:', err);
     }
   }, [project.id]);
+
+  // Realtime: when ANY collaborator updates a scene in this project, refetch.
+  useComposerScenesRealtime(project.id, refetchScenesFromDb);
 
   const persistAndGoToClips = useCallback(async () => {
     setIsPersisting(true);
@@ -578,6 +620,12 @@ export default function VideoComposerDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
+            {project.id && peers.length > 0 && (
+              <CollaboratorAvatars peers={peers} />
+            )}
+            {project.id && (
+              <ShareProjectDialog projectId={project.id} isOwner={isOwner} />
+            )}
             <div className="text-right">
               <p className="text-xs text-muted-foreground">{t('videoComposer.estimatedCost')}</p>
               <p className="text-sm font-semibold text-primary">

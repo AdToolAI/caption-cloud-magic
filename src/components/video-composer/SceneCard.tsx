@@ -54,6 +54,9 @@ import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useStylePresets } from '@/hooks/useStylePresets';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import SceneCommentBadge from './SceneCommentBadge';
+import SceneCommentSheet from './SceneCommentSheet';
+import { useSceneCommentCounts } from '@/hooks/useComposerCollaboration';
 
 interface SceneCardProps {
   scene: ComposerScene;
@@ -125,6 +128,14 @@ export default function SceneCard({
   const [multiEngineOpen, setMultiEngineOpen] = useState(false);
   // Block L — Inline Compare Lab dialog open state
   const [compareLabOpen, setCompareLabOpen] = useState(false);
+  // Real-Time Collaboration — comment thread for this scene
+  const [commentSheetOpen, setCommentSheetOpen] = useState(false);
+  const { data: commentCounts } = useSceneCommentCounts(projectId);
+  const sceneCounts = (scene.id && commentCounts?.[scene.id]) || { total: 0, open: 0 };
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id));
+  }, []);
 
   // Block K-5: pull system presets to seed inspire variation
   const { systemPresets } = useStylePresets();
@@ -327,9 +338,18 @@ export default function SceneCard({
                 )}
               </div>
 
-              <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={onDelete}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {scene.id && projectId && (
+                  <SceneCommentBadge
+                    total={sceneCounts.total}
+                    open={sceneCounts.open}
+                    onClick={() => setCommentSheetOpen(true)}
+                  />
+                )}
+                <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={onDelete}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
 
             {/* Duration slider */}
@@ -851,6 +871,17 @@ export default function SceneCard({
           />
         </DialogContent>
       </Dialog>
+      {scene.id && projectId && (
+        <SceneCommentSheet
+          open={commentSheetOpen}
+          onOpenChange={setCommentSheetOpen}
+          sceneId={scene.id}
+          projectId={projectId}
+          sceneLabel={`Scene ${index + 1}`}
+          currentUserId={currentUserId}
+          canEdit={true}
+        />
+      )}
     </Card>
   );
 }

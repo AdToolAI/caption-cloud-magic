@@ -3722,6 +3722,53 @@ export type Database = {
         }
         Relationships: []
       }
+      composer_collaborators: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          id: string
+          invited_at: string
+          invited_by: string | null
+          invited_email: string | null
+          project_id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          invited_email?: string | null
+          project_id: string
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          invited_email?: string | null
+          project_id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composer_collaborators_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       composer_drift_checks: {
         Row: {
           anchor_image_url: string | null
@@ -4051,6 +4098,67 @@ export type Database = {
             columns: ["brand_kit_id"]
             isOneToOne: false
             referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      composer_scene_comments: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          parent_id: string | null
+          project_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          scene_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          project_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          scene_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          project_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          scene_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composer_scene_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scene_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composer_scene_comments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composer_scene_comments_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scenes"
             referencedColumns: ["id"]
           },
         ]
@@ -13504,6 +13612,14 @@ export type Database = {
           variant_a_id: string
           variant_b_id: string
         }[]
+      }
+      can_access_composer_project: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_edit_composer_project: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
       }
       cleanup_expired_ai_cache: { Args: never; Returns: number }
       cleanup_expired_oauth_states: { Args: never; Returns: undefined }
