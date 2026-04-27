@@ -162,7 +162,7 @@ export function useMultiSceneRender(opts: Options) {
           await updateRun({
             status: finalStatus,
             stitched_video_url: data.outputFile,
-            completed_at: new Date().toISOString() as any,
+            completed_at: new Date().toISOString(),
           });
           toast.success('🎬 Video bereit!');
           return;
