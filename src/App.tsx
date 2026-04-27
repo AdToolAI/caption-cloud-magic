@@ -120,6 +120,8 @@ const HailuoVideoStudio = lazy(() => import("./pages/HailuoVideoStudio"));
 const LumaVideoStudio = lazy(() => import("./pages/LumaVideoStudio"));
 const SoraVideoStudio = lazy(() => import("./pages/SoraVideoStudio"));
 const VeoVideoStudio = lazy(() => import("./pages/VeoVideoStudio"));
+const LTXVideoStudio = lazy(() => import("./pages/LTXVideoStudio"));
+const GrokVideoStudio = lazy(() => import("./pages/GrokVideoStudio"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 const VideoComposer = lazy(() => import("./pages/VideoComposer"));
 const MotionStudioLibrary = lazy(() => import("./pages/MotionStudio/Library"));
@@ -254,7 +256,9 @@ function AppLayout() {
          <Route path="/hailuo-video-studio" element={<HailuoVideoStudio />} />
           <Route path="/luma-video-studio" element={<LumaVideoStudio />} />
           <Route path="/sora-video-studio" element={<SoraVideoStudio />} />
-          <Route path="/veo-video-studio" element={<VeoVideoStudio />} />
+           <Route path="/veo-video-studio" element={<VeoVideoStudio />} />
+           <Route path="/ltx-video-studio" element={<LTXVideoStudio />} />
+           <Route path="/grok-video-studio" element={<GrokVideoStudio />} />
           <Route path="/compare-lab" element={<ProtectedRoute><CompareLab /></ProtectedRoute>} />
           <Route path="/audio-studio" element={<AudioStudio />} />
            <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
