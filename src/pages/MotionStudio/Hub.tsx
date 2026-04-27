@@ -38,6 +38,14 @@ interface RecentProject {
 
 const QUICK_ACTIONS = [
   {
+    title: 'Studio Mode',
+    desc: 'Geführter 4-Schritt-Flow: Cast → Location → Storyboard → Render',
+    icon: Wand2,
+    href: '/motion-studio/studio',
+    accent: 'from-primary/40 to-accent/15',
+    badge: 'NEW',
+  },
+  {
     title: 'Video Composer',
     desc: 'Szenen-basierte KI-Video-Produktion mit Continuity & Director-Presets',
     icon: Clapperboard,
