@@ -82,19 +82,32 @@ export function buildAdScenes(input: BuildAdScenesInput): BuildAdScenesResult {
   const clipQuality: ClipQuality = input.defaultClipQuality ?? 'standard';
   const transition: TransitionStyle = input.defaultTransition ?? 'crossfade';
 
+  const brand = input.brandKit ?? null;
+  const brandColor = brand?.primaryColor || brand?.accentColor || '#FFFFFF';
+  const brandName = brand?.brandName?.trim();
+
   const scenes: ComposerScene[] = framework.beats.map((beat, idx) => {
     const template: AdSceneTemplate = pickTemplateForBeat(beat.sceneType);
     const durationSeconds = durations[idx];
 
-    const filledPrompt = template.promptSkeleton
+    let filledPrompt = template.promptSkeleton
       .replace(/\{PRODUCT\}/g, input.productName || 'the product')
       .replace(/\{FEATURE\}/g, 'its key feature')
       .replace(/\{ENVIRONMENT\}/g, 'natural everyday setting');
 
+    // Brand-Kit injection: weave brand name + palette hint into hook & CTA scenes.
+    if (brandName && (beat.sceneType === 'hook' || beat.sceneType === 'cta')) {
+      filledPrompt += ` Brand identity: ${brandName}.`;
+    }
+    if (brand?.primaryColor && beat.sceneType === 'cta') {
+      filledPrompt += ` Color palette accent: ${brand.primaryColor}.`;
+    }
+
     const scriptLine = input.scriptLines?.[idx] ?? '';
+    const isCta = beat.sceneType === 'cta';
 
     return {
-      id: `ad-${input.frameworkId}-${idx}-${Date.now()}`,
+      id: `ad-${input.frameworkId}-${idx}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       projectId: '',
       orderIndex: idx,
       sceneType: beat.sceneType,
@@ -105,10 +118,11 @@ export function buildAdScenes(input: BuildAdScenesInput): BuildAdScenesResult {
       clipStatus: 'pending',
       textOverlay: {
         text: scriptLine,
-        position: beat.sceneType === 'cta' ? 'center' : 'bottom',
+        position: isCta ? 'center' : 'bottom',
         animation: 'fade-in',
-        fontSize: 48,
-        color: '#FFFFFF',
+        fontSize: isCta ? 56 : 48,
+        // Brand color on CTA, white elsewhere for contrast over video.
+        color: isCta && brand?.primaryColor ? brandColor : '#FFFFFF',
       },
       transitionType: transition,
       transitionDuration: 0.5,
