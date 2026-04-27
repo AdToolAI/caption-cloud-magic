@@ -69,11 +69,16 @@ interface AdDirectorWizardProps {
       brandKitApplied: boolean;
       variantStrategy?: string;
       complianceAcknowledgedAt: string;
+      // Stufe 2b — campaign scaling
+      renderAllVariants: boolean;
+      cutdowns: Array<'15s' | '6s-hook'>;
+      autoLogoEndcard: boolean;
+      allVariantScripts?: Array<{ id: string; lines: string[] }>;
     };
   }) => void;
 }
 
-type Step = 'format' | 'framework' | 'tonality' | 'briefing' | 'variants' | 'compliance';
+type Step = 'format' | 'framework' | 'tonality' | 'briefing' | 'variants' | 'scaling' | 'compliance';
 
 const STEPS: Step[] = [
   'format',
@@ -81,6 +86,7 @@ const STEPS: Step[] = [
   'tonality',
   'briefing',
   'variants',
+  'scaling',
   'compliance',
 ];
 
