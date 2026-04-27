@@ -6600,17 +6600,21 @@ export type Database = {
           cast_character_ids: string[] | null
           category: string | null
           clip_url: string | null
+          cloned_from: string | null
           created_at: string
           description: string | null
           duration_seconds: number | null
           id: string
+          is_public: boolean
           is_system: boolean
           last_frame_url: string | null
+          like_count: number
           location_id: string | null
           metadata: Json
           name: string
           preview_video_url: string | null
           prompt: string
+          published_at: string | null
           reference_image_url: string | null
           sort_order: number
           source: string | null
@@ -6627,17 +6631,21 @@ export type Database = {
           cast_character_ids?: string[] | null
           category?: string | null
           clip_url?: string | null
+          cloned_from?: string | null
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
           id?: string
+          is_public?: boolean
           is_system?: boolean
           last_frame_url?: string | null
+          like_count?: number
           location_id?: string | null
           metadata?: Json
           name: string
           preview_video_url?: string | null
           prompt: string
+          published_at?: string | null
           reference_image_url?: string | null
           sort_order?: number
           source?: string | null
@@ -6654,17 +6662,21 @@ export type Database = {
           cast_character_ids?: string[] | null
           category?: string | null
           clip_url?: string | null
+          cloned_from?: string | null
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
           id?: string
+          is_public?: boolean
           is_system?: boolean
           last_frame_url?: string | null
+          like_count?: number
           location_id?: string | null
           metadata?: Json
           name?: string
           preview_video_url?: string | null
           prompt?: string
+          published_at?: string | null
           reference_image_url?: string | null
           sort_order?: number
           source?: string | null
@@ -6677,6 +6689,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "motion_studio_scene_snippets_cloned_from_fkey"
+            columns: ["cloned_from"]
+            isOneToOne: false
+            referencedRelation: "motion_studio_scene_snippets"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "motion_studio_scene_snippets_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
@@ -6688,6 +6707,32 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      motion_studio_snippet_likes: {
+        Row: {
+          created_at: string
+          snippet_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          snippet_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          snippet_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_studio_snippet_likes_snippet_id_fkey"
+            columns: ["snippet_id"]
+            isOneToOne: false
+            referencedRelation: "motion_studio_scene_snippets"
             referencedColumns: ["id"]
           },
         ]
