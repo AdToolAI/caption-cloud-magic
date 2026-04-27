@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, Sparkles, FileAudio, Play, Pause, Library } from 'lucide-react';
+import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AudioStudioHeroHeader } from '@/components/audio-studio/AudioStudioHeroHeader';
@@ -13,6 +13,7 @@ import { AudioBeforeAfterComparison } from '@/components/audio-studio/AudioBefor
 import { SoundLibrary } from '@/components/audio-studio/SoundLibrary';
 import { VoiceLibraryPanel } from '@/components/audio-studio/VoiceLibraryPanel';
 import { MusicGeneratorPanel } from '@/components/audio-studio/MusicGeneratorPanel';
+import { AudioDuckingPanel } from '@/components/audio-studio/AudioDuckingPanel';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,7 +29,7 @@ export default function AudioStudio() {
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler' | 'compare' | 'library' | 'voices' | 'music'>('enhance');
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music'>('enhance');
   const [showMusicGen, setShowMusicGen] = useState(false);
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
   const [musicUrl, setMusicUrl] = useState<string | null>(null);
@@ -327,6 +328,7 @@ export default function AudioStudio() {
                     {[
                       { id: 'enhance', label: 'KI-Optimierung', icon: Wand2 },
                       { id: 'music', label: 'AI Music', icon: Music2 },
+                      { id: 'ducking', label: 'Ducking', icon: AudioLines, badge: musicUrl ? 'NEU' : undefined, disabled: !musicUrl },
                       { id: 'compare', label: 'Vergleich', icon: Volume2, disabled: !enhancedAudioUrl },
                       { id: 'transcript', label: 'Transcript', icon: Mic },
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
@@ -350,6 +352,11 @@ export default function AudioStudio() {
                       >
                         <tab.icon className="w-4 h-4 mr-2" />
                         {tab.label}
+                        {'badge' in tab && tab.badge && (
+                          <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/40">
+                            {tab.badge}
+                          </span>
+                        )}
                         {activeTab === tab.id && (
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
                         )}
@@ -487,11 +494,32 @@ export default function AudioStudio() {
                         />
                       </motion.div>
                     )}
+
+                    {activeTab === 'ducking' && (
+                      <motion.div
+                        key="ducking"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <AudioDuckingPanel
+                          speechUrl={storageAudioUrl || audioUrl}
+                          musicUrl={musicUrl}
+                          transcript={transcript}
+                          speechLabel={audioFile?.name || 'Voiceover'}
+                          musicLabel="AI / Beat-Sync Track"
+                          onMixExported={() => {
+                            setLibraryRefreshKey(k => k + 1);
+                            setActiveTab('library');
+                          }}
+                        />
+                      </motion.div>
+                    )}
                   </AnimatePresence>
                 </div>
 
-                {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music tab) */}
-                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && (
+                {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music/ducking tab) */}
+                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && activeTab !== 'ducking' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
