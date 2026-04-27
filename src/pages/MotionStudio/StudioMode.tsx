@@ -72,6 +72,18 @@ export default function StudioMode() {
   const [charEditorOpen, setCharEditorOpen] = useState(false);
   const [locEditorOpen, setLocEditorOpen] = useState(false);
   const [snippetOpen, setSnippetOpen] = useState(false);
+  const [directorOpen, setDirectorOpen] = useState(false);
+
+  const applyDirectorPlan = (plan: DirectorPlan) => {
+    if (!projectTitle.trim()) setProjectTitle(plan.title);
+    setScenes(
+      plan.scenes.map((s, i) => ({
+        id: `s_${Date.now()}_${i}`,
+        prompt: s.prompt,
+        duration: s.durationSeconds,
+      }))
+    );
+  };
 
   const stepIndex = STEPS.findIndex((s) => s.id === step);
   const isLast = stepIndex === STEPS.length - 1;
