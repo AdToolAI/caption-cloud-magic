@@ -42,6 +42,7 @@ import {
 } from '@dnd-kit/sortable';
 import { SortableSceneItem } from './SortableSceneItem';
 import ContinuityGuardianStrip from './ContinuityGuardianStrip';
+import RenderPipelinePanel from './RenderPipelinePanel';
 
 interface ClipsTabProps {
   scenes: ComposerScene[];
