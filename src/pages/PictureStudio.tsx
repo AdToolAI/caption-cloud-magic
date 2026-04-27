@@ -4,10 +4,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Footer } from "@/components/Footer";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { Sparkles, Layers, Wand2 } from "lucide-react";
+import { Sparkles, Layers, Wand2, ListChecks } from "lucide-react";
 import { PictureStudioHeader } from "@/components/picture-studio/PictureStudioHeader";
 import { ImageGenerator } from "@/components/picture-studio/ImageGenerator";
 import { MagicEditPanel } from "@/components/picture-studio/MagicEditPanel";
+import { BatchGeneratePanel } from "@/components/picture-studio/BatchGeneratePanel";
 import { useTranslation } from "@/hooks/useTranslation";
 import { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
@@ -23,6 +24,7 @@ export default function PictureStudio() {
   const TAB_CONFIG = useMemo(() => [
     { value: 'generate', label: t('picStudio.tabGenerate'), icon: Sparkles },
     { value: 'magic-edit', label: 'Magic Edit', icon: Wand2 },
+    { value: 'batch', label: 'Batch', icon: ListChecks },
     { value: 'background', label: t('picStudio.tabBackground'), icon: Layers },
   ], [t]);
 
@@ -66,6 +68,10 @@ export default function PictureStudio() {
 
               <TabsContent value="magic-edit" className="mt-0">
                 <MagicEditPanel />
+              </TabsContent>
+
+              <TabsContent value="batch" className="mt-0">
+                <BatchGeneratePanel />
               </TabsContent>
 
               <TabsContent value="background" className="mt-0">

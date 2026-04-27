@@ -8,10 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X, FolderOpen, Wallet, Zap, Crown, Gem } from "lucide-react";
+import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X, FolderOpen, Wallet, Zap, Crown, Gem, Palette, Layers } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAIVideoWallet } from "@/hooks/useAIVideoWallet";
+import { useActiveBrandKit, computeCIMatchScore } from "@/hooks/useActiveBrandKit";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageCard } from "./ImageCard";
@@ -47,8 +48,10 @@ export function ImageGenerator() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { wallet } = useAIVideoWallet();
+  const { data: activeBrandKit } = useActiveBrandKit();
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const styleRefInputRef = useRef<HTMLInputElement>(null);
   const status = { stage: '', message: '' };
 
   const STYLES = useMemo(() => [
@@ -101,6 +104,9 @@ export function ImageGenerator() {
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [justGenerated, setJustGenerated] = useState(false);
   const [variantsCount, setVariantsCount] = useState<1 | 4>(1);
+  const [styleReference, setStyleReference] = useState<string | null>(null);
+  const [useBrandKit, setUseBrandKit] = useState(false);
+  const [ciScores, setCiScores] = useState<Record<string, number>>({});
 
   const loading = replicateLoading;
   const baseCost = TIER_COSTS[tier];
@@ -134,6 +140,23 @@ export function ImageGenerator() {
     reader.readAsDataURL(file);
   };
 
+  const handleStyleRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setStyleReference(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const brandKitPayload = useBrandKit && activeBrandKit ? {
+    name: activeBrandKit.brand_name || undefined,
+    primaryColor: activeBrandKit.primary_color || undefined,
+    secondaryColor: activeBrandKit.secondary_color || undefined,
+    accentColor: activeBrandKit.accent_color || undefined,
+    mood: activeBrandKit.mood || undefined,
+  } : null;
+
   const generateOne = async (): Promise<any | null> => {
     if (tier === 'standard') {
       const { data, error } = await supabase.functions.invoke('generate-studio-image', {
@@ -160,6 +183,8 @@ export function ImageGenerator() {
         aspectRatio,
         style,
         referenceImageUrl: editMode ? referenceImage : undefined,
+        styleReferenceUrl: styleReference || undefined,
+        brandKit: brandKitPayload,
       }
     });
 
@@ -237,6 +262,26 @@ export function ImageGenerator() {
     ]);
     if (tier === 'standard' && variantsCount === 1) toast.success(t('picStudio.imageGenerated'));
     setJustGenerated(true);
+
+    // CI-Match-Score (Phase C — async, non-blocking)
+    if (useBrandKit && activeBrandKit && imgUrl) {
+      const palette = [
+        activeBrandKit.primary_color,
+        activeBrandKit.secondary_color,
+        activeBrandKit.accent_color,
+      ].filter(Boolean) as string[];
+      if (palette.length) {
+        computeCIMatchScore(imgUrl, palette)
+          .then(score => {
+            const key = imageId || imgUrl;
+            setCiScores(prev => ({ ...prev, [key]: score }));
+            if (score < 60) {
+              toast.warning(`CI-Match nur ${score}% — Bild weicht vom Markenstil ab`);
+            }
+          })
+          .catch(() => { /* silent */ });
+      }
+    }
 
     if (imageId && user) {
       try {
@@ -412,6 +457,101 @@ export function ImageGenerator() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          {/* Phase C — Style Reference + Brand-Kit Lock */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Style Reference Slot */}
+            <div className="p-3 rounded-lg border border-border/50 bg-background/30">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <Layers className="h-3.5 w-3.5 text-primary" />
+                  Style Reference
+                  <span className="text-[10px] text-muted-foreground">(Fast/Ultra)</span>
+                </Label>
+                {styleReference && (
+                  <button
+                    onClick={() => setStyleReference(null)}
+                    className="text-[10px] text-muted-foreground hover:text-destructive"
+                  >
+                    Entfernen
+                  </button>
+                )}
+              </div>
+              {styleReference ? (
+                <button
+                  type="button"
+                  onClick={() => styleRefInputRef.current?.click()}
+                  className="relative block w-full h-16 rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
+                >
+                  <img src={styleReference} className="h-full w-full object-cover" alt="Style Reference" />
+                  <div className="absolute inset-0 bg-background/70 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Upload className="h-4 w-4" />
+                  </div>
+                </button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-16 border-dashed"
+                  onClick={() => styleRefInputRef.current?.click()}
+                >
+                  <Upload className="h-3.5 w-3.5 mr-1.5" />
+                  Style-Bild hochladen
+                </Button>
+              )}
+              <input
+                ref={styleRefInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleStyleRefUpload}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1.5">
+                Übernimmt Farbpalette & Ästhetik des Referenzbilds
+              </p>
+            </div>
+
+            {/* Brand-Kit Toggle */}
+            <div className="p-3 rounded-lg border border-border/50 bg-background/30">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <Palette className="h-3.5 w-3.5 text-primary" />
+                  Brand-Kit Lock
+                </Label>
+                <Switch
+                  checked={useBrandKit}
+                  onCheckedChange={setUseBrandKit}
+                  disabled={!activeBrandKit}
+                />
+              </div>
+              {activeBrandKit ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1">
+                    {[activeBrandKit.primary_color, activeBrandKit.secondary_color, activeBrandKit.accent_color]
+                      .filter(Boolean)
+                      .slice(0, 3)
+                      .map((c, i) => (
+                        <div
+                          key={i}
+                          className="h-5 w-5 rounded-full border border-border/50"
+                          style={{ backgroundColor: c as string }}
+                        />
+                      ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {activeBrandKit.brand_name || 'Aktiver Brand-Kit'}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  Kein aktives Brand-Kit. <button onClick={() => navigate('/brand-kit')} className="text-primary underline">Anlegen</button>
+                </p>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-1.5">
+                Injiziert Brand-Farben + Mood ins Prompt
+              </p>
             </div>
           </div>
 

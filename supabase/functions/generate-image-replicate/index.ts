@@ -27,8 +27,16 @@ interface GenerateRequest {
   prompt: string;
   tier: 'fast' | 'pro' | 'ultra';
   aspectRatio?: string;
-  referenceImageUrl?: string;
+  referenceImageUrl?: string;     // Subject reference (image-to-image)
+  styleReferenceUrl?: string;     // Style reference (Phase C)
   style?: string;
+  brandKit?: {
+    name?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    accentColor?: string;
+    mood?: string;
+  } | null;
 }
 
 const STYLE_MODIFIERS: Record<string, string> = {
@@ -88,7 +96,7 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest;
-    const { prompt, tier, aspectRatio = '1:1', referenceImageUrl, style = 'realistic' } = body;
+    const { prompt, tier, aspectRatio = '1:1', referenceImageUrl, styleReferenceUrl, style = 'realistic', brandKit } = body;
 
     if (!prompt?.trim()) {
       return new Response(
@@ -141,7 +149,25 @@ serve(async (req) => {
 
     // Build enhanced prompt
     const styleModifier = STYLE_MODIFIERS[style] || STYLE_MODIFIERS.realistic;
-    const enhancedPrompt = `${prompt.trim()}. Style: ${styleModifier}.`;
+
+    // Brand-Kit injection (Phase C — CI Lock)
+    const brandParts: string[] = [];
+    if (brandKit) {
+      const colors = [brandKit.primaryColor, brandKit.secondaryColor, brandKit.accentColor]
+        .filter(Boolean)
+        .join(', ');
+      if (colors) brandParts.push(`Brand colors: ${colors}`);
+      if (brandKit.mood) brandParts.push(`Brand mood: ${brandKit.mood}`);
+      if (brandKit.name) brandParts.push(`Visual identity aligned with ${brandKit.name}`);
+    }
+    const brandSuffix = brandParts.length ? ` ${brandParts.join('. ')}.` : '';
+
+    // Style-Reference suffix
+    const styleRefSuffix = styleReferenceUrl
+      ? ` Match the visual style, color palette, and aesthetic of the provided style reference image.`
+      : '';
+
+    const enhancedPrompt = `${prompt.trim()}. Style: ${styleModifier}.${brandSuffix}${styleRefSuffix}`;
 
     // Replicate
     const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
@@ -158,21 +184,26 @@ serve(async (req) => {
     // Per-model input shape
     const replicateInput: Record<string, any> = { prompt: enhancedPrompt };
 
+    // Build image inputs (Subject + Style references)
+    const imageInputs: string[] = [];
+    if (referenceImageUrl) imageInputs.push(referenceImageUrl);
+    if (styleReferenceUrl) imageInputs.push(styleReferenceUrl);
+
     if (tier === 'fast') {
       // Seedream 4
       replicateInput.aspect_ratio = aspectRatio;
       replicateInput.size = '2K';
-      if (referenceImageUrl) replicateInput.image_input = [referenceImageUrl];
+      if (imageInputs.length) replicateInput.image_input = imageInputs;
     } else if (tier === 'pro') {
-      // Imagen 4 Ultra
+      // Imagen 4 Ultra (no image_input support — style ref only via prompt)
       replicateInput.aspect_ratio = aspectRatio;
       replicateInput.output_format = 'jpg';
       replicateInput.safety_filter_level = 'block_only_high';
     } else {
-      // Nano Banana (ultra)
+      // Nano Banana (ultra) — multi-image edit
       replicateInput.aspect_ratio = aspectRatio;
       replicateInput.output_format = 'jpg';
-      if (referenceImageUrl) replicateInput.image_input = [referenceImageUrl];
+      if (imageInputs.length) replicateInput.image_input = imageInputs;
     }
 
     console.log(`[generate-image-replicate] Tier=${tier} Cost=${currencySymbol}${cost.toFixed(2)} Model=${modelRef}`);
