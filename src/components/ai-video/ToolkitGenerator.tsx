@@ -233,6 +233,16 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         />
       </Card>
 
+      {/* ── Cast & Locations (Library) ── */}
+      <ToolkitCastPicker
+        characterId={castCharacterId}
+        locationId={castLocationId}
+        onCharacterChange={setCastCharacterId}
+        onLocationChange={setCastLocationId}
+        consistencyKey={consistencyKey}
+        supportsImageInput={model.capabilities.i2v}
+      />
+
       {/* ── Image upload (only for I2V) ── */}
       {model.capabilities.i2v && (
         <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60 space-y-3">
