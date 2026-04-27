@@ -28,14 +28,20 @@ interface SoundLibraryItem {
   source: string | null;
 }
 
+export interface ExtractedStemSet {
+  sourceTitle: string;
+  stems: Array<{ type: 'vocals' | 'drums' | 'bass' | 'other'; url: string; assetId?: string }>;
+}
+
 interface SoundLibraryProps {
   onLoadAudio?: (url: string, originalUrl?: string | null, effectConfig?: EnhancementOptions | null) => void;
   onSendToBeatSync?: (url: string, title?: string) => void;
+  onStemsExtracted?: (set: ExtractedStemSet) => void;
 }
 
 type FilterCategory = 'all' | 'enhanced' | 'music' | 'stems';
 
-export function SoundLibrary({ onLoadAudio, onSendToBeatSync }: SoundLibraryProps) {
+export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }: SoundLibraryProps) {
   const { user } = useAuth();
   const { separateStems, loading: stemLoading } = useStemSeparation();
   const { wallet } = useAIVideoWallet();
@@ -113,6 +119,8 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync }: SoundLibraryProp
         title: sound.title,
       });
       if (stems && stems.length > 0) {
+        // Notify parent so the Stem-Mixer tab can pick them up
+        onStemsExtracted?.({ sourceTitle: sound.title, stems });
         // Re-fetch to show the new stem assets
         const { data } = await supabase
           .from('universal_audio_assets')

@@ -1,68 +1,61 @@
-## Music-to-Video Auto-Match
+## Multi-Stem-Mixer
 
-Ein neuer One-Click-Workflow im Audio Studio: Nutzer lädt ein Video hoch → System analysiert Mood, Pace, Schnittfrequenz und Länge → generiert automatisch einen perfekt passenden AI-Soundtrack (richtige BPM, exakte Länge, passendes Genre/Mood). Schließt den End-to-End-Workflow „Video rein, fertiger Soundtrack raus".
+Neuer Mixer-Tab im Audio Studio, der die separierten Stems (Vocals/Drums/Bass/Other) aus
+der bestehenden Stem-Separation-Pipeline nutzbar macht. Nach „Stems extrahieren" in der
+Bibliothek öffnet sich automatisch der Mixer mit 4 Channel-Strips, Live-VU-Metern,
+Mute/Solo, Pan, Master-Volume und 6 Mix-Presets (Karaoke, Acapella, Instrumental,
+Vocal Focus, Drums+Bass, Original). Export als 48 kHz Stereo-WAV in die Bibliothek
+oder als einzelner Stem-Download.
 
 ### Was der Nutzer sieht
 
-Neuer Tab **„Auto-Match"** im Audio Studio, prominent zwischen *Music* und *Library*:
-
-1. **Drop-Zone** für Video (mp4/mov, bis 200 MB) oder „Aus Mediathek wählen"
-2. **Analyse-Phase** (10–20 s): animierte Pipeline-Anzeige
-   - Schnittfrequenz erkennen → empfohlene BPM
-   - Visuelle Mood-Klassifikation (Energy, Brightness, Pace) → Genre + Mood
-   - Exakte Videolänge → Track-Dauer
-3. **Match-Card** mit Vorschlag (z. B. „Cinematic Build-Up · 128 BPM · 47 s · Energetic")
-   - Buttons: **„Track generieren" (1-Click)** | **„Anpassen"** (öffnet Music Generator mit vor-ausgefüllten Werten)
-4. **Generierter Track** wird gespeichert, an Beat-Sync gesendet, optional direkt mit Ducking-Tab gemixt
+1. In der **Bibliothek** Track wählen → „Stems extrahieren" → Edge Function läuft
+2. Sobald 4 Stems da sind, Toast „Stems bereit zum Mixen" + automatischer Wechsel
+   in den **Stem-Mixer**-Tab
+3. **Mixer-UI**:
+   - Transport-Bar mit Play/Pause + scrubbable Timeline
+   - 6 Preset-Buttons (Karaoke macht Vocals stumm usw.)
+   - 4 Channel-Strips mit Emoji + Farb-Coding pro Stem
+     - Live-VU-Meter (RMS, animiert, Bond-Style)
+     - Volume-Slider (0–150 %, Boost möglich)
+     - Pan-Slider (L100–C–R100)
+     - M/S Buttons (Mute/Solo, Solo überschreibt Mute auf anderen Spuren)
+     - Single-Stem-Download als WAV (Icon im Channel-Header)
+   - Master-Section mit Master-Volume + Reset-Button
+4. „Mix speichern" → 48 kHz Stereo-WAV nach `audio-studio` Bucket + Eintrag in
+   `universal_audio_assets` (source = `stem_mix`, processing_preset = `stem_mix`,
+   effect_config enthält alle Channel-Settings für spätere Reproduzierbarkeit)
 
 ### Technische Architektur
 
-**Neue Edge Function** `auto-match-music-to-video`:
-- Input: `video_url`, `duration`, optional Frame-Hints aus Client
-- Schritt 1: Schnittfrequenz aus `analyze-video-scenes` (existiert) → BPM-Mapping (z. B. 0.3 cuts/s → 90 BPM, 1.0 cuts/s → 140 BPM)
-- Schritt 2: Mood-Analyse via Lovable AI (`google/gemini-3-flash-preview`) auf 4–6 Sample-Frames → JSON `{genre, mood, energy, brightness, descriptors[]}`
-- Schritt 3: Prompt-Builder kombiniert Ergebnisse zu Music-Prompt
-- Output: `{ recommendation: { bpm, durationSec, genre, mood, prompt, descriptors }, analysis: { cutsPerSecond, sceneCount, dominantMood } }`
+**Neuer Hook** `useStemMixer.ts`:
+- Decodiert alle Stems (parallel via shared AudioContext) zu AudioBuffers
+- Live-Graph: pro Stem `BufferSource → Gain → StereoPanner → Analyser → MasterGain → Destination`
+- Solo-Logik: jede Spur effektiv stumm wenn `muted` ODER (`anySolo && !solo`)
+- Volume/Pan-Updates ohne Graph-Rebuild via `linearRampToValueAtTime` (20 ms Smoothing)
+- Offline-Render via `OfflineAudioContext` mit identischem Graph
+- VU-Meter: RMS aus 128-Sample Time-Domain-Window pro Frame
+- `downloadStem(type)`: rendert nur eine Spur ohne Mute/Pan-Anwendung
 
-**Client-Flow**:
-- Neuer Hook `useMusicAutoMatch.ts`: orchestriert Frame-Extraktion (Canvas-API, ~6 Frames gleichmäßig verteilt), Edge-Call und Übergabe an `useMusicGeneration`
-- Neue Komponente `AutoMatchPanel.tsx`: Upload + Analyse-UI + Match-Card + Generate-Button
-- Wiederverwendung: `MusicGeneratorPanel` mit neuen Props `prefillPrompt`, `prefillGenre`, `prefillMood`, `prefillDuration`, `prefillBpm` für „Anpassen"-Pfad
+**Neue Komponente** `StemMixerPanel.tsx`:
+- Empty-State wenn keine Stems verfügbar (mit Hinweis auf Bibliothek)
+- 6 Mix-Presets als Quick-Buttons → Custom-Badge wenn manuell verändert
+- Channel-Border + Solo-Button-Background nutzen Stem-Farben für visuelle Identität
+- Bond-2028 Style: backdrop-blur, gradient-Cards, framer-motion auf VU-Bars
 
-### BPM-Mapping (deterministisch, transparent)
+**Geänderte Dateien**:
+- `src/components/audio-studio/SoundLibrary.tsx`: neuer `onStemsExtracted`-Callback,
+  feuert nach erfolgreichem Demucs-Run mit den 4 Stem-URLs + Original-Title
+- `src/pages/AudioStudio.tsx`: neuer Tab `'stems'`, State `stemSet`, automatischer
+  Wechsel nach Extraction, Wiring zu `setLibraryRefreshKey` für Mix-Speicherung
 
-```text
-Cuts pro Sekunde   → BPM
-< 0.2              →  75  (slow / cinematic)
-0.2 – 0.4          →  95
-0.4 – 0.7          → 115
-0.7 – 1.0          → 128
-1.0 – 1.5          → 140
-> 1.5              → 160  (high-energy / EDM)
-```
+### Kosten
 
-Mood-Override durch AI-Analyse möglich (z. B. „dark + slow cuts" → 70 BPM Drone statt 75 BPM Folk).
+Der Mixer selbst ist **kostenlos** (alles client-side Web Audio).
+Stem-Separation kostet weiterhin `STEM_SEPARATION_COST_EUR = 0.20 €` (unverändert).
 
-### Kosten & Credits
+### Out of Scope (für später)
 
-- Analyse: ~0,02 € (Lovable AI Vision auf 6 Frames) — wird **kostenlos** angeboten (Marketing-Hook)
-- Track-Generierung nutzt bestehende `generate-music-track`-Pipeline mit existierenden Tier-Preisen (€0.10 / €0.35 / €1.40)
-- Tier-Auswahl bleibt beim Nutzer im finalen Generate-Step
-
-### Dateien
-
-**Neu**:
-- `supabase/functions/auto-match-music-to-video/index.ts`
-- `src/hooks/useMusicAutoMatch.ts`
-- `src/components/audio-studio/AutoMatchPanel.tsx`
-
-**Geändert**:
-- `src/pages/AudioStudio.tsx`: neuer Tab `'auto-match'`, Wiring zu Beat-Sync und Ducking
-- `src/components/audio-studio/MusicGeneratorPanel.tsx`: Prefill-Props ergänzen
-- `supabase/config.toml`: Function-Eintrag für `auto-match-music-to-video`
-
-### Out of Scope (für spätere Iteration)
-
-- Audio-Reaktive Beat-Cuts (Video an Track anpassen statt umgekehrt)
-- Multi-Variant-Generation (3 Vorschläge parallel)
-- Stem-aware Generation (separate Drum-Spur passend zum Schnittrhythmus)
+- Per-Channel-EQ und Effekte (Reverb, Delay)
+- Multi-Track-Recording (mehrere Stem-Sets gleichzeitig)
+- Stem-Mixer-State persistieren (Mix-Templates)
