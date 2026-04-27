@@ -24,6 +24,8 @@ import {
   Sparkles,
   Wand2,
   Check,
+  Layers,
+  Scissors,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -67,11 +69,16 @@ interface AdDirectorWizardProps {
       brandKitApplied: boolean;
       variantStrategy?: string;
       complianceAcknowledgedAt: string;
+      // Stufe 2b — campaign scaling
+      renderAllVariants: boolean;
+      cutdowns: Array<'15s' | '6s-hook'>;
+      autoLogoEndcard: boolean;
+      allVariantScripts?: Array<{ id: string; lines: string[] }>;
     };
   }) => void;
 }
 
-type Step = 'format' | 'framework' | 'tonality' | 'briefing' | 'variants' | 'compliance';
+type Step = 'format' | 'framework' | 'tonality' | 'briefing' | 'variants' | 'scaling' | 'compliance';
 
 const STEPS: Step[] = [
   'format',
@@ -79,6 +86,7 @@ const STEPS: Step[] = [
   'tonality',
   'briefing',
   'variants',
+  'scaling',
   'compliance',
 ];
 
@@ -161,6 +169,12 @@ export default function AdDirectorWizard({
   const [useBrandKit, setUseBrandKit] = useState(true);
   const [autoVoiceover, setAutoVoiceover] = useState(true);
 
+  // Stage 2b — Campaign Scaling
+  const [autoLogoEndcard, setAutoLogoEndcard] = useState(true);
+  const [renderAllVariants, setRenderAllVariants] = useState(false);
+  const [cutdown15s, setCutdown15s] = useState(false);
+  const [cutdown6sHook, setCutdown6sHook] = useState(false);
+
   // Variant flow state
   const [variantsLoading, setVariantsLoading] = useState(false);
   const [variants, setVariants] = useState<ScriptVariant[] | null>(null);
@@ -190,6 +204,10 @@ export default function AdDirectorWizard({
     setAcknowledged(false);
     setUseBrandKit(true);
     setAutoVoiceover(true);
+    setAutoLogoEndcard(true);
+    setRenderAllVariants(false);
+    setCutdown15s(false);
+    setCutdown6sHook(false);
     setVariants(null);
     setChosenVariantId(null);
     setVariantsLoading(false);
@@ -213,6 +231,8 @@ export default function AdDirectorWizard({
         return productName.trim().length > 0 && productDescription.trim().length > 0;
       case 'variants':
         return !!chosenVariantId && !!variants?.length;
+      case 'scaling':
+        return true;
       case 'compliance':
         return acknowledged;
     }
@@ -310,6 +330,8 @@ export default function AdDirectorWizard({
               secondaryColor: activeBrandKit.secondary_color,
               accentColor: activeBrandKit.accent_color,
               logoUrl: activeBrandKit.logo_url,
+              fontFamily: (activeBrandKit as any).font_family ?? null,
+              tagline: (activeBrandKit as any).tagline ?? null,
             }
           : null;
 
@@ -322,6 +344,7 @@ export default function AdDirectorWizard({
         productDescription: productDescription.trim(),
         scriptLines,
         brandKit: brandKitInput,
+        appendLogoEndcard: autoLogoEndcard && !!brandKitInput?.logoUrl,
       });
 
       // Voiceover Auto-Synth (best-effort)
@@ -393,6 +416,15 @@ export default function AdDirectorWizard({
           brandKitApplied: !!brandKitInput,
           variantStrategy: chosenVariantId ?? undefined,
           complianceAcknowledgedAt: new Date().toISOString(),
+          renderAllVariants,
+          cutdowns: [
+            ...(cutdown15s ? (['15s'] as const) : []),
+            ...(cutdown6sHook ? (['6s-hook'] as const) : []),
+          ],
+          autoLogoEndcard: autoLogoEndcard && !!brandKitInput?.logoUrl,
+          allVariantScripts: renderAllVariants
+            ? variants?.map((v) => ({ id: v.id, lines: v.lines }))
+            : undefined,
         },
       });
 
@@ -769,6 +801,81 @@ export default function AdDirectorWizard({
               </div>
             )}
 
+            {step === 'scaling' && (
+              <div className="space-y-5">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  Kampagnen-Skalierung
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Optional — vervielfache deinen Spot in Cutdowns oder allen drei Skript-Varianten.
+                </p>
+
+                <div className="rounded-lg border border-border/40 bg-card/50 p-4">
+                  <div className="flex items-start gap-3">
+                    <Layers className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ad-multi-variant" className="cursor-pointer">
+                          Alle 3 A/B-Varianten rendern
+                        </Label>
+                        <Switch
+                          id="ad-multi-variant"
+                          checked={renderAllVariants}
+                          disabled={!variants || variants.length < 2}
+                          onCheckedChange={setRenderAllVariants}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Erzeugt drei Renders (Emotional / Rational / Curiosity). Voller AI-Cost × 3.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/40 bg-card/50 p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Scissors className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                    <div className="flex-1 space-y-3">
+                      <p className="text-sm font-medium">Cutdowns aus dem Master</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="cd-15s" className="cursor-pointer text-sm">+ 15-Sekunden-Cutdown</Label>
+                        <Switch id="cd-15s" checked={cutdown15s} onCheckedChange={setCutdown15s} />
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="cd-6s" className="cursor-pointer text-sm">+ 6-Sekunden-Hook (Reels)</Label>
+                        <Switch id="cd-6s" checked={cutdown6sHook} onCheckedChange={setCutdown6sHook} />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Cutdowns recyceln die Master-Clips — kein zusätzlicher AI-Cost.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/40 bg-card/50 p-4">
+                  <div className="flex items-start gap-3">
+                    <Palette className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ad-endcard" className="cursor-pointer">Auto-Logo-Endcard (2s)</Label>
+                        <Switch
+                          id="ad-endcard"
+                          checked={autoLogoEndcard && !!activeBrandKit?.logo_url}
+                          disabled={!activeBrandKit?.logo_url}
+                          onCheckedChange={setAutoLogoEndcard}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {activeBrandKit?.logo_url
+                          ? 'Statische Brand-Endcard mit Logo + Tagline. 0 AI-Credits.'
+                          : 'Lade ein Logo in dein Brand-Kit, um dies zu nutzen.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {step === 'compliance' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -818,6 +925,18 @@ export default function AdDirectorWizard({
                       {autoVoiceover
                         ? `✓ ${getTonalityVoice(tonality).voiceLabel}`
                         : '—'}
+                    </li>
+                    <li>
+                      <span className="text-foreground">Endcard:</span>{' '}
+                      {autoLogoEndcard && activeBrandKit?.logo_url ? '✓ Auto-Logo' : '—'}
+                    </li>
+                    <li>
+                      <span className="text-foreground">A/B-Renders:</span>{' '}
+                      {renderAllVariants ? '✓ Alle 3 Varianten' : '1 Variante'}
+                    </li>
+                    <li>
+                      <span className="text-foreground">Cutdowns:</span>{' '}
+                      {[cutdown15s && '15s', cutdown6sHook && '6s-Hook'].filter(Boolean).join(', ') || '—'}
                     </li>
                   </ul>
                 </div>
