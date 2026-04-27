@@ -183,6 +183,8 @@ export function ImageGenerator() {
         aspectRatio,
         style,
         referenceImageUrl: editMode ? referenceImage : undefined,
+        styleReferenceUrl: styleReference || undefined,
+        brandKit: brandKitPayload,
       }
     });
 
