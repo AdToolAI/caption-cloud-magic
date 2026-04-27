@@ -75,9 +75,9 @@ export function buildAdScenes(input: BuildAdScenesInput): BuildAdScenesResult {
     const durationSeconds = durations[idx];
 
     const filledPrompt = template.promptSkeleton
-      .replaceAll('{PRODUCT}', input.productName || 'the product')
-      .replaceAll('{FEATURE}', 'its key feature')
-      .replaceAll('{ENVIRONMENT}', 'natural everyday setting');
+      .replace(/\{PRODUCT\}/g, input.productName || 'the product')
+      .replace(/\{FEATURE\}/g, 'its key feature')
+      .replace(/\{ENVIRONMENT\}/g, 'natural everyday setting');
 
     const scriptLine = input.scriptLines?.[idx] ?? '';
 
