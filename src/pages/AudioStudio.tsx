@@ -482,6 +482,7 @@ export default function AudioStudio() {
                           onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
                           onOpenLibrary={() => setActiveTab('library')}
                           onSendToBeatSync={handleSendToBeatSync}
+                          defaultBpm={detectedVideoBpm}
                         />
                       </motion.div>
                     )}
