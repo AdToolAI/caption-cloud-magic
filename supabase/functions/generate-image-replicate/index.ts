@@ -184,21 +184,26 @@ serve(async (req) => {
     // Per-model input shape
     const replicateInput: Record<string, any> = { prompt: enhancedPrompt };
 
+    // Build image inputs (Subject + Style references)
+    const imageInputs: string[] = [];
+    if (referenceImageUrl) imageInputs.push(referenceImageUrl);
+    if (styleReferenceUrl) imageInputs.push(styleReferenceUrl);
+
     if (tier === 'fast') {
       // Seedream 4
       replicateInput.aspect_ratio = aspectRatio;
       replicateInput.size = '2K';
-      if (referenceImageUrl) replicateInput.image_input = [referenceImageUrl];
+      if (imageInputs.length) replicateInput.image_input = imageInputs;
     } else if (tier === 'pro') {
-      // Imagen 4 Ultra
+      // Imagen 4 Ultra (no image_input support — style ref only via prompt)
       replicateInput.aspect_ratio = aspectRatio;
       replicateInput.output_format = 'jpg';
       replicateInput.safety_filter_level = 'block_only_high';
     } else {
-      // Nano Banana (ultra)
+      // Nano Banana (ultra) — multi-image edit
       replicateInput.aspect_ratio = aspectRatio;
       replicateInput.output_format = 'jpg';
-      if (referenceImageUrl) replicateInput.image_input = [referenceImageUrl];
+      if (imageInputs.length) replicateInput.image_input = imageInputs;
     }
 
     console.log(`[generate-image-replicate] Tier=${tier} Cost=${currencySymbol}${cost.toFixed(2)} Model=${modelRef}`);
