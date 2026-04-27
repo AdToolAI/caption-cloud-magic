@@ -31,6 +31,7 @@ import { toast } from '@/hooks/use-toast';
 import { getTonalityVoice } from '@/config/adTonalityVoiceMap';
 import type { AdCampaignMeta } from '@/types/video-composer';
 import type { AdTonalityId } from '@/config/adTonalityProfiles';
+import AdCampaignPerformance from './AdCampaignPerformance';
 
 interface CampaignChild {
   id: string;
@@ -343,6 +344,11 @@ export default function AdCampaignTree({
             <ChildCard key={c.id} child={c} onOpen={onOpenChild} />
           ))}
         </div>
+      </section>
+
+      {/* Performance Insights */}
+      <section>
+        <AdCampaignPerformance masterProjectId={masterProjectId} onCloneWinner={onOpenChild} />
       </section>
     </div>
   );

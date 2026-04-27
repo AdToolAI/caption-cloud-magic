@@ -340,6 +340,69 @@ export type Database = {
         }
         Relationships: []
       }
+      ad_campaign_posts: {
+        Row: {
+          created_at: string
+          external_post_id: string | null
+          id: string
+          last_metrics: Json | null
+          last_synced_at: string | null
+          master_project_id: string | null
+          platform: string
+          post_url: string | null
+          posted_at: string | null
+          project_id: string
+          updated_at: string
+          user_id: string
+          variant_strategy: string | null
+        }
+        Insert: {
+          created_at?: string
+          external_post_id?: string | null
+          id?: string
+          last_metrics?: Json | null
+          last_synced_at?: string | null
+          master_project_id?: string | null
+          platform: string
+          post_url?: string | null
+          posted_at?: string | null
+          project_id: string
+          updated_at?: string
+          user_id: string
+          variant_strategy?: string | null
+        }
+        Update: {
+          created_at?: string
+          external_post_id?: string | null
+          id?: string
+          last_metrics?: Json | null
+          last_synced_at?: string | null
+          master_project_id?: string | null
+          platform?: string
+          post_url?: string | null
+          posted_at?: string | null
+          project_id?: string
+          updated_at?: string
+          user_id?: string
+          variant_strategy?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_campaign_posts_master_project_id_fkey"
+            columns: ["master_project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_campaign_posts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       addons: {
         Row: {
           code: string
