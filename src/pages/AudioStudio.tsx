@@ -561,6 +561,11 @@ export default function AudioStudio() {
                           onOpenLibrary={() => setActiveTab('library')}
                           onSendToBeatSync={handleSendToBeatSync}
                           defaultBpm={detectedVideoBpm}
+                          prefillPrompt={musicGenPrefill?.prompt}
+                          prefillGenre={musicGenPrefill?.genre}
+                          prefillMood={musicGenPrefill?.mood}
+                          prefillBpm={musicGenPrefill?.bpm}
+                          prefillDuration={musicGenPrefill?.duration}
                         />
                       </motion.div>
                     )}
