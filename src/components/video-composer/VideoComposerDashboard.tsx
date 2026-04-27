@@ -204,7 +204,7 @@ export default function VideoComposerDashboard() {
         const [{ data: projRow }, { data, error: dbError }] = await Promise.all([
           supabase
             .from('composer_projects')
-            .select('output_url, status')
+            .select('output_url, status, ad_meta, ad_variant_strategy, parent_project_id, cutdown_type')
             .eq('id', projectId)
             .maybeSingle(),
           supabase
@@ -219,6 +219,10 @@ export default function VideoComposerDashboard() {
             ...prev,
             outputUrl: projRow.output_url ?? prev.outputUrl,
             status: (projRow.status as ComposerStatus) ?? prev.status,
+            adMeta: ((projRow as any).ad_meta as AdCampaignMeta | null) ?? prev.adMeta ?? null,
+            adVariantStrategy: (projRow as any).ad_variant_strategy ?? prev.adVariantStrategy ?? null,
+            parentProjectId: (projRow as any).parent_project_id ?? prev.parentProjectId ?? null,
+            cutdownType: (projRow as any).cutdown_type ?? prev.cutdownType ?? null,
           }));
         }
 
