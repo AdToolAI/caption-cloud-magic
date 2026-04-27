@@ -280,6 +280,47 @@ export function MusicGeneratorPanel({
           <Switch checked={instrumental} onCheckedChange={setInstrumental} disabled={loading} />
         </div>
 
+        {/* BPM Match (Beat-Sync) */}
+        <div className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-primary" />
+              <div>
+                <Label className="text-sm font-medium">BPM-Match</Label>
+                <p className="text-xs text-muted-foreground">
+                  {defaultBpm
+                    ? `Tempo deines Videos: ${defaultBpm} BPM erkannt`
+                    : 'Track auf bestimmtes Tempo komponieren'}
+                </p>
+              </div>
+            </div>
+            <Switch checked={useBpm} onCheckedChange={setUseBpm} disabled={loading} />
+          </div>
+          {useBpm && (
+            <div className="flex items-center gap-3">
+              <Slider
+                value={[bpm]}
+                min={60}
+                max={180}
+                step={1}
+                onValueChange={(v) => setBpm(v[0])}
+                disabled={loading}
+                className="flex-1"
+              />
+              <Input
+                type="number"
+                min={40}
+                max={220}
+                value={bpm}
+                onChange={(e) => setBpm(Math.max(40, Math.min(220, parseInt(e.target.value) || 120)))}
+                disabled={loading}
+                className="w-20 h-9 text-center font-semibold"
+              />
+              <span className="text-xs text-muted-foreground w-8">BPM</span>
+            </div>
+          )}
+        </div>
+
         {/* Generate Button */}
         <Button
           onClick={handleGenerate}
@@ -331,10 +372,21 @@ export function MusicGeneratorPanel({
                     </Badge>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleDownload}>
-                  <Download className="w-4 h-4 mr-1.5" /> MP3
-                </Button>
-              </div>
+                <div className="flex items-center gap-2">
+                  {onSendToBeatSync && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => onSendToBeatSync(generatedTrack)}
+                      className="bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90"
+                    >
+                      <Send className="w-4 h-4 mr-1.5" /> An Beat-Sync
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={handleDownload}>
+                    <Download className="w-4 h-4 mr-1.5" /> MP3
+                  </Button>
+                </div>
               <audio
                 ref={audioRef}
                 src={generatedTrack.url}
