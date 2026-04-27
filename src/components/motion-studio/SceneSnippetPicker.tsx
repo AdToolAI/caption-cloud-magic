@@ -10,11 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Library, Loader2, Plus, Search, Sparkles, Trash2, Users } from 'lucide-react';
+import { Library, Loader2, Plus, Search, Sparkles, Trash2, Users, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import type { SceneSnippet } from '@/types/motion-studio';
 import CuratedSnippetGallery from './CuratedSnippetGallery';
+import StockSearchPanel from './StockSearchModal';
 
 interface SceneSnippetPickerProps {
   open: boolean;
@@ -131,12 +132,15 @@ export default function SceneSnippetPicker({
         </DialogHeader>
 
         <Tabs defaultValue="curated" className="w-full">
-          <TabsList className="grid grid-cols-2 w-full max-w-md">
+          <TabsList className="grid grid-cols-3 w-full max-w-md">
             <TabsTrigger value="curated" className="gap-1.5 text-xs">
               <Sparkles className="h-3.5 w-3.5" /> Kuratiert
             </TabsTrigger>
             <TabsTrigger value="mine" className="gap-1.5 text-xs">
-              <Library className="h-3.5 w-3.5" /> Meine Snippets
+              <Library className="h-3.5 w-3.5" /> Meine
+            </TabsTrigger>
+            <TabsTrigger value="stock" className="gap-1.5 text-xs">
+              <Globe className="h-3.5 w-3.5" /> Stock Live
             </TabsTrigger>
           </TabsList>
 
@@ -144,6 +148,63 @@ export default function SceneSnippetPicker({
             <CuratedSnippetGallery
               onUse={(s) => {
                 onInsert(s);
+                onOpenChange(false);
+              }}
+            />
+          </TabsContent>
+
+          <TabsContent value="stock" className="mt-4">
+            <StockSearchPanel
+              onUseAsBRoll={(clip) => {
+                const now = new Date().toISOString();
+                const snippet: SceneSnippet = {
+                  id: `stock_${Date.now()}`,
+                  user_id: null,
+                  workspace_id: null,
+                  name: `B-Roll · ${clip.source}`,
+                  description: `Stock-Clip von ${clip.author} (${clip.source})`,
+                  prompt: `B-Roll cutaway shot, cinematic, ${clip.source} stock footage`,
+                  cast_character_ids: [],
+                  location_id: null,
+                  clip_url: clip.url,
+                  last_frame_url: clip.thumbnail,
+                  reference_image_url: null,
+                  duration_seconds: clip.duration,
+                  tags: ['b-roll', 'stock', clip.source],
+                  usage_count: 0,
+                  metadata: { stock_source: clip.source, stock_author: clip.author },
+                  created_at: now,
+                  updated_at: now,
+                  attribution_name: clip.author,
+                  source: clip.source,
+                };
+                onInsert(snippet);
+                onOpenChange(false);
+              }}
+              onUseAsReference={(imageUrl, meta) => {
+                const now = new Date().toISOString();
+                const snippet: SceneSnippet = {
+                  id: `stock_ref_${Date.now()}`,
+                  user_id: null,
+                  workspace_id: null,
+                  name: `Reference · ${meta.source}`,
+                  description: `Reference-Anker von ${meta.author} (${meta.source})`,
+                  prompt: '',
+                  cast_character_ids: [],
+                  location_id: null,
+                  clip_url: null,
+                  last_frame_url: imageUrl,
+                  reference_image_url: imageUrl,
+                  duration_seconds: null,
+                  tags: ['reference', 'stock', meta.source],
+                  usage_count: 0,
+                  metadata: { stock_source: meta.source, stock_author: meta.author, kind: 'reference' },
+                  created_at: now,
+                  updated_at: now,
+                  attribution_name: meta.author,
+                  source: meta.source,
+                };
+                onInsert(snippet);
                 onOpenChange(false);
               }}
             />

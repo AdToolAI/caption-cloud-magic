@@ -9966,6 +9966,42 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_search_cache: {
+        Row: {
+          cache_key: string
+          created_at: string
+          expires_at: string
+          hit_count: number
+          id: string
+          media_type: string
+          provider_counts: Json
+          query: string
+          results_json: Json
+        }
+        Insert: {
+          cache_key: string
+          created_at?: string
+          expires_at?: string
+          hit_count?: number
+          id?: string
+          media_type: string
+          provider_counts?: Json
+          query: string
+          results_json: Json
+        }
+        Update: {
+          cache_key?: string
+          created_at?: string
+          expires_at?: string
+          hit_count?: number
+          id?: string
+          media_type?: string
+          provider_counts?: Json
+          query?: string
+          results_json?: Json
+        }
+        Relationships: []
+      }
       storage_files: {
         Row: {
           bucket_name: string
