@@ -416,6 +416,15 @@ export default function AdDirectorWizard({
           brandKitApplied: !!brandKitInput,
           variantStrategy: chosenVariantId ?? undefined,
           complianceAcknowledgedAt: new Date().toISOString(),
+          renderAllVariants,
+          cutdowns: [
+            ...(cutdown15s ? (['15s'] as const) : []),
+            ...(cutdown6sHook ? (['6s-hook'] as const) : []),
+          ],
+          autoLogoEndcard: autoLogoEndcard && !!brandKitInput?.logoUrl,
+          allVariantScripts: renderAllVariants
+            ? variants?.map((v) => ({ id: v.id, lines: v.lines }))
+            : undefined,
         },
       });
 
