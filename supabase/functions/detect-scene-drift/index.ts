@@ -27,6 +27,10 @@ interface RequestBody {
   candidateImageUrl: string;
   /** ID of the "next" scene — score is persisted on this row. */
   sceneId?: string;
+  /** Optional id of the "previous" (anchor) scene for history logging. */
+  anchorSceneId?: string;
+  /** Optional composer project id for history logging. */
+  projectId?: string;
 }
 
 interface DriftResult {
