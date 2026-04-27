@@ -20,6 +20,8 @@ import { ModelSelector } from './ModelSelector';
 import { VideoPromptOptimizer } from './VideoPromptOptimizer';
 import { ToolkitCastPicker, buildCastPromptSuffix } from './ToolkitCastPicker';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { BrandCharacterSelector } from '@/components/brand-characters/BrandCharacterSelector';
+import { useBrandCharacters, buildCharacterPromptInjection, type BrandCharacter } from '@/hooks/useBrandCharacters';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -80,6 +82,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   );
   const consistencyKey = `ai-${model.family}`;
 
+  /* ── Brand Character Lock (cross-studio persistent character) ── */
+  const { trackUsage: trackBrandUsage } = useBrandCharacters();
+  const [brandCharacter, setBrandCharacter] = useState<BrandCharacter | null>(null);
+
   /* ── Sync settings to model capabilities when switching ── */
   useEffect(() => {
     if (!model.durations.includes(duration)) setDuration(model.durations[0]);
@@ -139,11 +145,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
     setGenerating(true);
     try {
-      // Build the prompt — inject Library cast/location description for richer scene continuity
+      // Build the prompt — inject Library cast/location AND Brand Character (if locked)
       const castSuffix = buildCastPromptSuffix(castCharacter, castLocation);
-      const finalPrompt = castSuffix
-        ? `${prompt.trim()}\n\n${castSuffix}`
-        : prompt.trim();
+      const brandSuffix = brandCharacter
+        ? `Featuring ${brandCharacter.name}: ${buildCharacterPromptInjection(brandCharacter)}.`
+        : '';
+      const finalPrompt = [prompt.trim(), brandSuffix, castSuffix]
+        .filter(Boolean)
+        .join('\n\n');
 
       const body: Record<string, unknown> = {
         prompt: finalPrompt,
@@ -152,15 +161,19 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         aspectRatio,
       };
 
-      // i2v: prefer the user's manually uploaded startImage, else the character's reference image
-      const referenceImage = startImageUrl ?? castCharacter?.reference_image_url ?? null;
+      // i2v: Brand Character image > manual upload > library character
+      const referenceImage =
+        brandCharacter?.reference_image_url ??
+        startImageUrl ??
+        castCharacter?.reference_image_url ??
+        null;
       if (model.capabilities.i2v && referenceImage) body.startImageUrl = referenceImage;
       if (model.capabilities.audio) body.generateAudio = generateAudio;
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
 
       // Sora 2 cannot accept image input → toast hint when a character is selected
-      if (model.family === 'sora' && castCharacter) {
+      if (model.family === 'sora' && (castCharacter || brandCharacter)) {
         toast.info(
           language === 'de'
             ? 'Sora 2 nutzt nur die Beschreibung (~70 % Konsistenz). Für längere Storys → Kling oder Hailuo.'
@@ -171,6 +184,16 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       const { data, error } = await supabase.functions.invoke(model.edgeFunction, { body });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+
+      // Track Brand Character usage for analytics & usage_count increment
+      if (brandCharacter) {
+        trackBrandUsage({
+          character_id: brandCharacter.id,
+          generation_id: (data?.id ?? data?.generation_id) as string | undefined,
+          model_used: model.id,
+          module: 'ai-video-toolkit',
+        }).catch(() => {});
+      }
 
       toast.success(
         language === 'de'
@@ -233,7 +256,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         />
       </Card>
 
-      {/* ── Cast & Locations (Library) ── */}
+      {/* ── Brand Character Lock (cross-studio persistent character) ── */}
+      <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60">
+        <BrandCharacterSelector
+          value={brandCharacter?.id ?? null}
+          onChange={setBrandCharacter}
+        />
+      </Card>
+
       <ToolkitCastPicker
         characterId={castCharacterId}
         locationId={castLocationId}

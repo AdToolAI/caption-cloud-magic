@@ -1390,6 +1390,89 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_character_usage: {
+        Row: {
+          character_id: string
+          created_at: string
+          generation_id: string | null
+          id: string
+          model_used: string | null
+          module: string | null
+          user_id: string
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          generation_id?: string | null
+          id?: string
+          model_used?: string | null
+          module?: string | null
+          user_id: string
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          generation_id?: string | null
+          id?: string
+          model_used?: string | null
+          module?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_character_usage_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "brand_characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brand_characters: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_favorite: boolean
+          name: string
+          reference_image_url: string
+          storage_path: string | null
+          updated_at: string
+          usage_count: number
+          user_id: string
+          visual_identity_json: Json | null
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_favorite?: boolean
+          name: string
+          reference_image_url: string
+          storage_path?: string | null
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+          visual_identity_json?: Json | null
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_favorite?: boolean
+          name?: string
+          reference_image_url?: string
+          storage_path?: string | null
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+          visual_identity_json?: Json | null
+        }
+        Relationships: []
+      }
       brand_consistency_history: {
         Row: {
           analyzed_at: string | null

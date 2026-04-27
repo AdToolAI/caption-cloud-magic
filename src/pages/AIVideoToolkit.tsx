@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
-  Sparkles, CreditCard, History, Clapperboard, ShieldAlert, Wand2,
+  Sparkles, CreditCard, History, Clapperboard, ShieldAlert, Wand2, Lock,
 } from 'lucide-react';
 
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
@@ -199,6 +199,29 @@ export default function AIVideoToolkit() {
 
           <TabsContent value="generate" className="space-y-6">
             <FirstVideoGuide />
+            <Link
+              to="/brand-characters"
+              className="flex items-center justify-between gap-3 p-3 rounded-lg border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent hover:border-primary/40 transition group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center">
+                  <Lock className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">
+                    {language === 'de' ? 'Brand Character Lock' : 'Brand Character Lock'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {language === 'de'
+                      ? 'Speichere Charaktere einmal — nutze sie konsistent in jedem Video.'
+                      : 'Save a character once — reuse it consistently in every video.'}
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs text-primary group-hover:underline">
+                {language === 'de' ? 'Verwalten →' : 'Manage →'}
+              </span>
+            </Link>
             <ToolkitGenerator onAfterGenerate={handleAfterGenerate} />
             <details className="rounded-lg border border-border/40 bg-card/40 p-4 group">
               <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground flex items-center gap-2">
