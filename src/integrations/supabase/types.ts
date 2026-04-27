@@ -6281,6 +6281,53 @@ export type Database = {
           },
         ]
       }
+      motion_studio_character_variants: {
+        Row: {
+          character_id: string
+          created_at: string
+          id: string
+          image_url: string
+          is_primary: boolean
+          label: string | null
+          metadata: Json
+          seed: string | null
+          user_id: string
+          vibe: string
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          id?: string
+          image_url: string
+          is_primary?: boolean
+          label?: string | null
+          metadata?: Json
+          seed?: string | null
+          user_id: string
+          vibe: string
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          is_primary?: boolean
+          label?: string | null
+          metadata?: Json
+          seed?: string | null
+          user_id?: string
+          vibe?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_studio_character_variants_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "motion_studio_characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       motion_studio_characters: {
         Row: {
           consent_recorded_at: string | null
@@ -6299,6 +6346,7 @@ export type Database = {
           usage_count: number
           user_id: string
           voice_id: string | null
+          workspace_id: string | null
         }
         Insert: {
           consent_recorded_at?: string | null
@@ -6317,6 +6365,7 @@ export type Database = {
           usage_count?: number
           user_id: string
           voice_id?: string | null
+          workspace_id?: string | null
         }
         Update: {
           consent_recorded_at?: string | null
@@ -6335,8 +6384,64 @@ export type Database = {
           usage_count?: number
           user_id?: string
           voice_id?: string | null
+          workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "motion_studio_characters_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      motion_studio_location_variants: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          is_primary: boolean
+          label: string | null
+          location_id: string
+          metadata: Json
+          seed: string | null
+          user_id: string
+          vibe: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          is_primary?: boolean
+          label?: string | null
+          location_id: string
+          metadata?: Json
+          seed?: string | null
+          user_id: string
+          vibe: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          is_primary?: boolean
+          label?: string | null
+          location_id?: string
+          metadata?: Json
+          seed?: string | null
+          user_id?: string
+          vibe?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_studio_location_variants_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "motion_studio_locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       motion_studio_locations: {
         Row: {
@@ -6353,6 +6458,7 @@ export type Database = {
           updated_at: string
           usage_count: number
           user_id: string
+          workspace_id: string | null
         }
         Insert: {
           consent_recorded_at?: string | null
@@ -6368,6 +6474,7 @@ export type Database = {
           updated_at?: string
           usage_count?: number
           user_id: string
+          workspace_id?: string | null
         }
         Update: {
           consent_recorded_at?: string | null
@@ -6383,8 +6490,92 @@ export type Database = {
           updated_at?: string
           usage_count?: number
           user_id?: string
+          workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "motion_studio_locations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      motion_studio_scene_snippets: {
+        Row: {
+          cast_character_ids: string[] | null
+          clip_url: string | null
+          created_at: string
+          description: string | null
+          duration_seconds: number | null
+          id: string
+          last_frame_url: string | null
+          location_id: string | null
+          metadata: Json
+          name: string
+          prompt: string
+          reference_image_url: string | null
+          tags: string[] | null
+          updated_at: string
+          usage_count: number
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          cast_character_ids?: string[] | null
+          clip_url?: string | null
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          last_frame_url?: string | null
+          location_id?: string | null
+          metadata?: Json
+          name: string
+          prompt: string
+          reference_image_url?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          cast_character_ids?: string[] | null
+          clip_url?: string | null
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          last_frame_url?: string | null
+          location_id?: string | null
+          metadata?: Json
+          name?: string
+          prompt?: string
+          reference_image_url?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_studio_scene_snippets_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "motion_studio_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_studio_scene_snippets_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       motion_studio_style_presets: {
         Row: {
