@@ -249,11 +249,7 @@ export default function VideoComposerDashboard() {
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
-            promptSlots: ((row as any).prompt_slots as any) ?? local?.promptSlots,
-            promptMode: ((row as any).prompt_mode as any) ?? local?.promptMode,
-            promptSlotOrder: ((row as any).prompt_slot_order as any) ?? local?.promptSlotOrder,
-            appliedStylePresetId: ((row as any).applied_style_preset_id as any) ?? local?.appliedStylePresetId,
-            // Block M — Hybrid Production
+            shotDirector: ((row as any).shot_director as any) ?? local?.shotDirector ?? {},
             hybridMode: ((row as any).hybrid_mode as any) ?? local?.hybridMode,
             firstFrameUrl: ((row as any).first_frame_url as any) ?? local?.firstFrameUrl,
             lastFrameUrl: ((row as any).last_frame_url as any) ?? local?.lastFrameUrl,
