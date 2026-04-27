@@ -96,7 +96,7 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest;
-    const { prompt, tier, aspectRatio = '1:1', referenceImageUrl, style = 'realistic' } = body;
+    const { prompt, tier, aspectRatio = '1:1', referenceImageUrl, styleReferenceUrl, style = 'realistic', brandKit } = body;
 
     if (!prompt?.trim()) {
       return new Response(
