@@ -54,8 +54,25 @@ export function useContinuityDrift() {
           label: data.label ?? '',
           recommendation: data.recommendation ?? 'ok',
         };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Drift-Check fehlgeschlagen';
+      } catch (err: any) {
+        // Try to surface the actual edge-function error body for debugging
+        let msg = err instanceof Error ? err.message : 'Drift-Check fehlgeschlagen';
+        try {
+          const ctx = err?.context;
+          if (ctx?.body) {
+            const text = typeof ctx.body === 'string' ? ctx.body : await ctx.text?.();
+            if (text) {
+              try {
+                const parsed = JSON.parse(text);
+                if (parsed?.error) msg = `${msg} — ${parsed.error}`;
+              } catch {
+                msg = `${msg} — ${text.slice(0, 160)}`;
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
         console.error('[useContinuityDrift] error:', err);
         toast.error(msg);
         return null;
