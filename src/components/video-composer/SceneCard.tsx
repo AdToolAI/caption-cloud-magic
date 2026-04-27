@@ -54,6 +54,9 @@ import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useStylePresets } from '@/hooks/useStylePresets';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import SceneCommentBadge from './SceneCommentBadge';
+import SceneCommentSheet from './SceneCommentSheet';
+import { useSceneCommentCounts } from '@/hooks/useComposerCollaboration';
 
 interface SceneCardProps {
   scene: ComposerScene;
