@@ -32,7 +32,7 @@ export default function AudioStudio() {
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music' | 'auto-match' | 'stems'>('enhance');
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music' | 'auto-match' | 'stems' | 'final-mix'>('enhance');
   const [stemSet, setStemSet] = useState<{ sourceTitle: string; stems: Array<{ type: 'vocals' | 'drums' | 'bass' | 'other'; url: string; assetId?: string }> } | null>(null);
   const [showMusicGen, setShowMusicGen] = useState(false);
   const [showAutoMatch, setShowAutoMatch] = useState(false);
