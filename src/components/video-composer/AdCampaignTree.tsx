@@ -29,7 +29,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { getTonalityVoice } from '@/config/adTonalityVoiceMap';
-import type { AdCampaignMeta, AdTonalityId } from '@/types/video-composer';
+import type { AdCampaignMeta } from '@/types/video-composer';
+import type { AdTonalityId } from '@/config/adTonalityProfiles';
 
 interface CampaignChild {
   id: string;
