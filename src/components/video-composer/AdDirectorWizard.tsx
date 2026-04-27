@@ -13,8 +13,18 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowRight, ChevronLeft, Loader2, Sparkles, Wand2 } from 'lucide-react';
+import {
+  ArrowRight,
+  ChevronLeft,
+  Loader2,
+  Mic2,
+  Palette,
+  Sparkles,
+  Wand2,
+  Check,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,8 +35,14 @@ import {
   type AdGoalId,
 } from '@/config/adStoryFrameworks';
 import { AD_TONALITY_PROFILES, type AdTonalityId } from '@/config/adTonalityProfiles';
+import { getTonalityVoice } from '@/config/adTonalityVoiceMap';
 import { buildAdScenes } from '@/lib/adDirector/buildAdScenes';
-import type { ComposerScene, ComposerBriefing } from '@/types/video-composer';
+import { useActiveBrandKit } from '@/hooks/useActiveBrandKit';
+import type {
+  ComposerScene,
+  ComposerBriefing,
+  VoiceoverConfig,
+} from '@/types/video-composer';
 import AdComplianceDisclaimer from './AdComplianceDisclaimer';
 
 type Lang = 'de' | 'en' | 'es';
@@ -35,23 +51,36 @@ interface AdDirectorWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   language?: string;
+  /** Current composer project id — needed for voiceover storage path. Optional;
+   *  when missing we fall back to a synthetic id. */
+  projectId?: string;
   onScenesGenerated: (payload: {
     scenes: ComposerScene[];
     briefingPatch: Partial<ComposerBriefing>;
     title: string;
+    voiceover?: VoiceoverConfig;
     adMeta: {
       framework: AdFrameworkId;
       tonality: AdTonalityId;
       format: AdFormatId;
       goal: AdGoalId;
+      brandKitApplied: boolean;
+      variantStrategy?: string;
       complianceAcknowledgedAt: string;
     };
   }) => void;
 }
 
-type Step = 'format' | 'framework' | 'tonality' | 'briefing' | 'compliance';
+type Step = 'format' | 'framework' | 'tonality' | 'briefing' | 'variants' | 'compliance';
 
-const STEPS: Step[] = ['format', 'framework', 'tonality', 'briefing', 'compliance'];
+const STEPS: Step[] = [
+  'format',
+  'framework',
+  'tonality',
+  'briefing',
+  'variants',
+  'compliance',
+];
 
 const FORMATS: Array<{ id: AdFormatId; label: string; desc: string; sec: number }> = [
   { id: 'tvc-15', label: 'TVC 15s', desc: 'Reels / Pre-Roll', sec: 15 },
@@ -67,13 +96,55 @@ const GOALS: Array<{ id: AdGoalId; label: { de: string; en: string; es: string }
   { id: 'launch', label: { de: 'Launch', en: 'Launch', es: 'Lanzamiento' } },
 ];
 
+interface ScriptVariant {
+  id: string;
+  label: string;
+  lines: string[];
+  error?: string | null;
+}
+
+const VARIANT_LABELS: Record<string, { de: string; en: string; es: string; desc: { de: string; en: string; es: string } }> = {
+  emotional: {
+    de: 'Emotional Hook',
+    en: 'Emotional Hook',
+    es: 'Gancho Emocional',
+    desc: {
+      de: 'Pathos. Menschliche Wahrheit zuerst.',
+      en: 'Pathos. Human truth first.',
+      es: 'Pathos. Verdad humana primero.',
+    },
+  },
+  rational: {
+    de: 'Rational / Benefit',
+    en: 'Rational / Benefit',
+    es: 'Racional / Beneficio',
+    desc: {
+      de: 'Klarer Nutzen. Beweise. Zahlen.',
+      en: 'Clear benefit. Proof. Numbers.',
+      es: 'Beneficio claro. Pruebas. Cifras.',
+    },
+  },
+  curiosity: {
+    de: 'Curiosity Gap',
+    en: 'Curiosity Gap',
+    es: 'Brecha de Curiosidad',
+    desc: {
+      de: 'Unerwartet. Widerspruch. Fragezeichen.',
+      en: 'Unexpected. Contradiction. Question mark.',
+      es: 'Inesperado. Contradicción. Interrogante.',
+    },
+  },
+};
+
 export default function AdDirectorWizard({
   open,
   onOpenChange,
   language = 'de',
+  projectId,
   onScenesGenerated,
 }: AdDirectorWizardProps) {
   const lang = (['de', 'en', 'es'].includes(language) ? language : 'de') as Lang;
+  const { data: activeBrandKit } = useActiveBrandKit();
 
   const [step, setStep] = useState<Step>('format');
   const [format, setFormat] = useState<AdFormatId>('tvc-30');
@@ -85,6 +156,16 @@ export default function AdDirectorWizard({
   const [usps, setUsps] = useState('');
   const [targetAudience, setTargetAudience] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
+
+  // Stage 2 toggles
+  const [useBrandKit, setUseBrandKit] = useState(true);
+  const [autoVoiceover, setAutoVoiceover] = useState(true);
+
+  // Variant flow state
+  const [variantsLoading, setVariantsLoading] = useState(false);
+  const [variants, setVariants] = useState<ScriptVariant[] | null>(null);
+  const [chosenVariantId, setChosenVariantId] = useState<string | null>(null);
+
   const [generating, setGenerating] = useState(false);
 
   const stepIdx = STEPS.indexOf(step);
@@ -107,6 +188,11 @@ export default function AdDirectorWizard({
     setUsps('');
     setTargetAudience('');
     setAcknowledged(false);
+    setUseBrandKit(true);
+    setAutoVoiceover(true);
+    setVariants(null);
+    setChosenVariantId(null);
+    setVariantsLoading(false);
     setGenerating(false);
   };
 
@@ -125,13 +211,78 @@ export default function AdDirectorWizard({
         return !!tonality;
       case 'briefing':
         return productName.trim().length > 0 && productDescription.trim().length > 0;
+      case 'variants':
+        return !!chosenVariantId && !!variants?.length;
       case 'compliance':
         return acknowledged;
     }
   };
 
-  const goNext = () => {
+  const fetchVariants = async () => {
+    setVariantsLoading(true);
+    setVariants(null);
+    setChosenVariantId(null);
+    const uspList = usps
+      .split('\n')
+      .map((u) => u.trim())
+      .filter(Boolean);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-ad-script', {
+        body: {
+          frameworkId: framework,
+          tonalityId: tonality,
+          format,
+          goal,
+          language: lang,
+          productName: productName.trim(),
+          productDescription: productDescription.trim(),
+          usps: uspList,
+          targetAudience: targetAudience.trim(),
+          generateVariants: true,
+          brandName: useBrandKit ? activeBrandKit?.brand_name ?? '' : '',
+        },
+      });
+      if (error) throw error;
+      const vs = (data?.variants ?? []) as ScriptVariant[];
+      const okVariants = vs.filter((v) => v.lines.length > 0);
+      if (!okVariants.length) {
+        toast({
+          title: 'Skript-Generator nicht verfügbar',
+          description: 'Du kannst den Spot ohne Voiceover-Text fortsetzen.',
+        });
+        // Synthetic empty variant so the flow continues.
+        const fallback: ScriptVariant = {
+          id: 'manual',
+          label: 'Manuell',
+          lines: [],
+        };
+        setVariants([fallback]);
+        setChosenVariantId('manual');
+      } else {
+        setVariants(okVariants);
+        setChosenVariantId(okVariants[0].id);
+      }
+    } catch (err: any) {
+      console.error('[AdDirectorWizard] variants failed:', err);
+      toast({
+        title: 'Skript-Varianten fehlgeschlagen',
+        description: err?.message ?? 'Bitte erneut versuchen.',
+        variant: 'destructive',
+      });
+      const fallback: ScriptVariant = { id: 'manual', label: 'Manuell', lines: [] };
+      setVariants([fallback]);
+      setChosenVariantId('manual');
+    } finally {
+      setVariantsLoading(false);
+    }
+  };
+
+  const goNext = async () => {
     if (!isStepValid(step)) return;
+    // When leaving briefing → variants, fetch them eagerly.
+    if (step === 'briefing' && !variants) {
+      await fetchVariants();
+    }
     if (canNext) setStep(STEPS[stepIdx + 1]);
   };
 
@@ -148,33 +299,20 @@ export default function AdDirectorWizard({
         .map((u) => u.trim())
         .filter(Boolean);
 
-      // 1. Ask the edge function for scripted lines per beat (best-effort).
-      let scriptLines: string[] = [];
-      try {
-        const { data, error } = await supabase.functions.invoke('generate-ad-script', {
-          body: {
-            frameworkId: framework,
-            tonalityId: tonality,
-            format,
-            goal,
-            language: lang,
-            productName: productName.trim(),
-            productDescription: productDescription.trim(),
-            usps: uspList,
-            targetAudience: targetAudience.trim(),
-          },
-        });
-        if (error) throw error;
-        if (Array.isArray(data?.lines)) scriptLines = data.lines as string[];
-      } catch (err) {
-        console.warn('[AdDirectorWizard] script generation failed, falling back to empty lines:', err);
-        toast({
-          title: 'Skript-Generator nicht verfügbar',
-          description: 'Szenen werden ohne Voiceover-Text erstellt — du kannst sie im Studio ergänzen.',
-        });
-      }
+      const chosen = variants?.find((v) => v.id === chosenVariantId);
+      const scriptLines = chosen?.lines ?? [];
 
-      // 2. Build ComposerScene[] from framework + templates + scripts.
+      const brandKitInput =
+        useBrandKit && activeBrandKit
+          ? {
+              brandName: activeBrandKit.brand_name,
+              primaryColor: activeBrandKit.primary_color,
+              secondaryColor: activeBrandKit.secondary_color,
+              accentColor: activeBrandKit.accent_color,
+              logoUrl: activeBrandKit.logo_url,
+            }
+          : null;
+
       const built = buildAdScenes({
         frameworkId: framework,
         format,
@@ -183,11 +321,62 @@ export default function AdDirectorWizard({
         productName: productName.trim(),
         productDescription: productDescription.trim(),
         scriptLines,
+        brandKit: brandKitInput,
       });
+
+      // Voiceover Auto-Synth (best-effort)
+      let voiceoverConfig: VoiceoverConfig | undefined;
+      if (autoVoiceover && scriptLines.length > 0) {
+        try {
+          const fullScript = scriptLines.filter(Boolean).join('. ').replace(/\.\.+/g, '.').trim();
+          const voiceCfg = getTonalityVoice(tonality);
+          const voProjectId = projectId || `ad-director-${Date.now()}`;
+
+          const { data: voData, error: voError } = await supabase.functions.invoke(
+            'generate-voiceover',
+            {
+              body: {
+                text: fullScript,
+                voiceId: voiceCfg.voiceId,
+                stability: voiceCfg.stability,
+                similarityBoost: voiceCfg.similarityBoost,
+                style: voiceCfg.style,
+                useSpeakerBoost: voiceCfg.useSpeakerBoost,
+                speed: voiceCfg.speed,
+                projectId: voProjectId,
+              },
+            },
+          );
+          if (voError) throw voError;
+          if (voData?.audioUrl) {
+            voiceoverConfig = {
+              enabled: true,
+              voiceId: voData.voiceId || voiceCfg.voiceId,
+              voiceName: voData.voiceUsed || voiceCfg.voiceLabel,
+              script: fullScript,
+              audioUrl: voData.audioUrl,
+              speed: voiceCfg.speed,
+              stability: voiceCfg.stability,
+              similarityBoost: voiceCfg.similarityBoost,
+              styleExaggeration: voiceCfg.style,
+              useSpeakerBoost: voiceCfg.useSpeakerBoost,
+              durationSeconds: voData.duration,
+            };
+          }
+        } catch (voErr: any) {
+          console.warn('[AdDirectorWizard] voiceover synth failed:', voErr);
+          toast({
+            title: 'Voiceover nicht erstellt',
+            description:
+              'Die Szenen wurden erzeugt — du kannst den Voiceover im Studio nachträglich generieren.',
+          });
+        }
+      }
 
       onScenesGenerated({
         scenes: built.scenes,
         title: `${productName.trim()} — ${format.toUpperCase()}`,
+        voiceover: voiceoverConfig,
         briefingPatch: {
           productName: productName.trim(),
           productDescription: productDescription.trim(),
@@ -201,13 +390,17 @@ export default function AdDirectorWizard({
           tonality,
           format,
           goal,
+          brandKitApplied: !!brandKitInput,
+          variantStrategy: chosenVariantId ?? undefined,
           complianceAcknowledgedAt: new Date().toISOString(),
         },
       });
 
       toast({
         title: 'Ad Director erstellt',
-        description: `${built.scenes.length} Szenen · ${Math.round(built.totalDurationSec)}s · ${tonalityProfile.label[lang]}`,
+        description: `${built.scenes.length} Szenen · ${Math.round(built.totalDurationSec)}s${
+          voiceoverConfig ? ' · Voiceover ✓' : ''
+        }${brandKitInput ? ' · Brand-Kit ✓' : ''}`,
       });
       handleClose(false);
     } catch (err: any) {
@@ -230,11 +423,11 @@ export default function AdDirectorWizard({
             <Sparkles className="h-5 w-5 text-primary" />
             Ad Director Mode
             <Badge variant="outline" className="ml-2 text-[10px] uppercase tracking-wider">
-              Stage 1
+              Stage 2
             </Badge>
           </DialogTitle>
           <DialogDescription>
-            Professionelle TVC- und Long-Form-Werbespots in 5 Schritten.
+            Professionelle TVC- und Long-Form-Werbespots mit Brand-Kit, A/B-Varianten und Auto-Voiceover.
           </DialogDescription>
         </DialogHeader>
 
@@ -424,6 +617,155 @@ export default function AdDirectorWizard({
                     />
                   </div>
                 </div>
+
+                {/* Stage 2 — Brand Kit + Voiceover toggles */}
+                <div className="rounded-lg border border-border/40 bg-card/50 p-4 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Stage 2 Optionen
+                  </p>
+
+                  <div className="flex items-start gap-3">
+                    <Palette className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ad-brandkit" className="cursor-pointer">
+                          Brand-Kit verwenden
+                        </Label>
+                        <Switch
+                          id="ad-brandkit"
+                          checked={useBrandKit && !!activeBrandKit}
+                          disabled={!activeBrandKit}
+                          onCheckedChange={setUseBrandKit}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {activeBrandKit
+                          ? `Aktives Kit: ${activeBrandKit.brand_name ?? 'Unbenannt'} — Farben & Brand-Name werden in CTA + Hooks gewoben.`
+                          : 'Kein aktives Brand-Kit gefunden. Erstelle eins unter Brand Kit, um es hier nutzen zu können.'}
+                      </p>
+                      {activeBrandKit && useBrandKit && (
+                        <div className="flex items-center gap-1.5 mt-2">
+                          {[
+                            activeBrandKit.primary_color,
+                            activeBrandKit.secondary_color,
+                            activeBrandKit.accent_color,
+                          ]
+                            .filter(Boolean)
+                            .map((c, i) => (
+                              <span
+                                key={i}
+                                className="h-4 w-4 rounded-full border border-border/60"
+                                style={{ backgroundColor: c as string }}
+                                title={c as string}
+                              />
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 pt-1 border-t border-border/40">
+                    <Mic2 className="h-4 w-4 mt-3 text-primary shrink-0" />
+                    <div className="flex-1 pt-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ad-vo" className="cursor-pointer">
+                          Voiceover automatisch generieren
+                        </Label>
+                        <Switch
+                          id="ad-vo"
+                          checked={autoVoiceover}
+                          onCheckedChange={setAutoVoiceover}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Stimme passend zur Tonalität:{' '}
+                        <span className="text-foreground font-medium">
+                          {getTonalityVoice(tonality).voiceLabel}
+                        </span>{' '}
+                        (ElevenLabs).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 'variants' && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  A/B Skript-Varianten
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Wähle die Variante, die am besten zu deinem Spot passt — alle drei nutzen dieselbe Tonalität, aber unterschiedliche Hook-Strategien.
+                </p>
+
+                {variantsLoading && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generiere 3 Varianten parallel…
+                  </div>
+                )}
+
+                {!variantsLoading && variants && (
+                  <div className="space-y-2">
+                    {variants.map((v) => {
+                      const meta = VARIANT_LABELS[v.id];
+                      const selected = chosenVariantId === v.id;
+                      return (
+                        <Card
+                          key={v.id}
+                          onClick={() => setChosenVariantId(v.id)}
+                          className={cn(
+                            'p-4 cursor-pointer transition-all hover:border-primary/60',
+                            selected && 'border-primary ring-1 ring-primary/40 bg-primary/5',
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div>
+                              <p className="font-semibold text-sm">
+                                {meta?.[lang] ?? v.label}
+                              </p>
+                              {meta?.desc?.[lang] && (
+                                <p className="text-[11px] text-muted-foreground">
+                                  {meta.desc[lang]}
+                                </p>
+                              )}
+                            </div>
+                            {selected && (
+                              <Check className="h-4 w-4 text-primary shrink-0" />
+                            )}
+                          </div>
+                          {v.lines.length > 0 ? (
+                            <ol className="space-y-1 text-xs text-foreground/80 list-decimal list-inside">
+                              {v.lines.map((line, i) => (
+                                <li key={i} className="leading-snug">
+                                  {line || <span className="text-muted-foreground italic">—</span>}
+                                </li>
+                              ))}
+                            </ol>
+                          ) : (
+                            <p className="text-xs text-muted-foreground italic">
+                              Keine Skript-Zeilen — Spot wird ohne Voiceover-Text erstellt.
+                            </p>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {!variantsLoading && variants && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={fetchVariants}
+                    className="w-full"
+                  >
+                    <Wand2 className="h-3.5 w-3.5 mr-2" />
+                    Neu generieren
+                  </Button>
+                )}
               </div>
             )}
 
@@ -459,6 +801,24 @@ export default function AdDirectorWizard({
                     <li>
                       <span className="text-foreground">Produkt:</span> {productName || '—'}
                     </li>
+                    <li>
+                      <span className="text-foreground">Variante:</span>{' '}
+                      {chosenVariantId
+                        ? VARIANT_LABELS[chosenVariantId]?.[lang] ?? chosenVariantId
+                        : '—'}
+                    </li>
+                    <li>
+                      <span className="text-foreground">Brand-Kit:</span>{' '}
+                      {useBrandKit && activeBrandKit
+                        ? `✓ ${activeBrandKit.brand_name ?? 'aktiv'}`
+                        : '—'}
+                    </li>
+                    <li>
+                      <span className="text-foreground">Voiceover:</span>{' '}
+                      {autoVoiceover
+                        ? `✓ ${getTonalityVoice(tonality).voiceLabel}`
+                        : '—'}
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -471,7 +831,7 @@ export default function AdDirectorWizard({
             type="button"
             variant="ghost"
             onClick={goBack}
-            disabled={!canBack || generating}
+            disabled={!canBack || generating || variantsLoading}
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
             Zurück
@@ -494,11 +854,17 @@ export default function AdDirectorWizard({
             <Button
               type="button"
               onClick={goNext}
-              disabled={!isStepValid(step)}
+              disabled={!isStepValid(step) || variantsLoading}
               className="gap-2"
             >
-              Weiter
-              <ArrowRight className="h-4 w-4" />
+              {variantsLoading && step === 'briefing' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Weiter
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </Button>
           )}
         </DialogFooter>
