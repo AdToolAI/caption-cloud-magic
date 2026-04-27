@@ -1,94 +1,116 @@
+# Plan — Konsolidierung zum "Unified AI Video Toolkit"
 
-# Plan — AI Video Studio Erweiterung: LTX 2.0 Pro, Grok Imagine & Wan 2.6
+## Deine Entscheidung
 
-## Ausgangslage
+Statt 9 Einzel-Studios + Toolkit parallel zu pflegen → **eine** unified Page als primäre Erfahrung. Weniger Feature-Sprawl, klarere UX, einfacherer Wartungsaufwand.
 
-Unser **AI Video Studio Hub** (`/ai-video-studio`) bietet bereits 7 Provider-Studios:
-Kling 3.0, Veo 3.1, Wan 2.5, Hailuo 2.3, Luma Ray 2, Seedance 2.0, Sora 2.
+## Strategie: Sanfte Konsolidierung in 2 Stufen
 
-**Was Artlist anbietet, das uns fehlt:**
-- **LTX Video 2.0 Pro** (Lightricks) — schneller, günstiger Open-Source-Champion
-- **Grok Imagine** (xAI) — viraler "Spicy Mode", neuer Player
-- **Wan 2.6** — neuere Variante unseres bestehenden Wan 2.5
+### Stufe 1 (jetzt): Toolkit als neue Standard-Erfahrung
 
-Alle drei Modelle sind über **Replicate** verfügbar — das passt nahtlos in unsere bestehende Architektur (Kling, Hailuo, Seedance, Luma, Wan laufen alle über `replicate.run()` in Edge Functions).
+Die neue Seite `/ai-video-studio` wird das **Unified Toolkit** — kein separater Hub mehr, kein Toolkit-Toggle.
+
+**Eine Seite, alles drin:**
+- Modell-Dropdown (gruppiert: Empfohlen / Schnell & Günstig / Premium / Audio-fähig)
+- Universeller Prompt-Block mit `VideoPromptOptimizer`
+- Image-Upload (erscheint nur bei I2V-fähigen Modellen)
+- Smart Settings: Dauer, Aspect Ratio, Resolution — dynamisch aus Modell-Capabilities
+- Live-Cost-Schätzung
+- Generate-Button → ruft die richtige bestehende Edge Function auf
+- Tab "Verlauf" (bestehende `VideoGenerationHistory`)
+- Tab "Credits" (bestehende `AIVideoCreditPurchase`)
+
+### Stufe 2 (jetzt): Einzel-Studios werden Redirects
+
+Die 9 Studio-Pages (`/kling-video-studio`, `/sora-video-studio`, etc.) werden zu **Redirects** auf das Toolkit mit vorausgewähltem Modell:
+
+```
+/kling-video-studio  →  /ai-video-studio?model=kling-3-omni
+/sora-video-studio   →  /ai-video-studio?model=sora-2-standard
+/wan-video-studio    →  /ai-video-studio?model=wan-2-6-standard
+... (alle 9)
+```
+
+Vorteile:
+- Bestehende Links (Welcome-Bonus, FirstVideoGuide, Dashboard-Hero, Onboarding-Progress) funktionieren weiter
+- SEO-Indexe bleiben erhalten (HTTP-Redirect-äquivalent über Router)
+- Bookmarks der User brechen nicht
+- User landet sofort im Toolkit mit "ihrem" Modell vorausgewählt
+
+Die alten Studio-Komponenten-Dateien werden **gelöscht** (Code-Cleanup):
+- `src/pages/KlingVideoStudio.tsx`, `SoraVideoStudio.tsx`, `WanVideoStudio.tsx`, `HailuoVideoStudio.tsx`, `LumaVideoStudio.tsx`, `SeedanceVideoStudio.tsx`, `VeoVideoStudio.tsx`, `LTXVideoStudio.tsx`, `GrokVideoStudio.tsx`
 
 ## Was gebaut wird
 
-### 1. LTX 2.0 Pro Studio (`/ltx-video-studio`)
+### Neue Dateien
 
-Neuer Provider mit eigenem Studio im "James Bond 2028"-Stil — analog zu `WanVideoStudio.tsx`.
+**`src/config/aiVideoModelRegistry.ts`** — Single Source of Truth, aggregiert alle 9 Modelle:
+```typescript
+{
+  id: 'kling-3-omni',
+  name: 'Kling 3.0',
+  provider: 'Kuaishou',
+  edgeFunction: 'generate-kling-video',
+  group: 'recommended', // recommended | fast | premium | audio
+  capabilities: { t2v: true, i2v: true, audio: false },
+  durations: [3, 5, 8, 10, 15],
+  resolutions: ['720p', '1080p'],
+  aspectRatios: ['16:9', '9:16', '1:1'],
+  costPerSecond: { EUR: 0.30, USD: 0.30 },
+  badge: 'Empfohlen',
+  requiresAccess: null, // oder 'sora2' für Sora
+}
+```
 
-- Modell auf Replicate: `lightricks/ltx-video-2-pro`
-- 2 Qualitätsstufen: **Standard** (720p) und **Pro** (1080p, längere Clips)
-- Dauer: 4s / 6s / 8s
-- Modi: Text-to-Video + Image-to-Video
-- Aspect Ratios: 16:9, 9:16, 1:1
-- Pricing-Range: ~€0.08–0.12/s (LTX ist deutlich günstiger als Sora/Veo)
+**`src/pages/AIVideoToolkit.tsx`** — Neue unified Toolkit-Page (ersetzt `AIVideoStudio.tsx`)
 
-### 2. Grok Imagine Studio (`/grok-video-studio`)
+**`src/components/ai-video/ModelSelector.tsx`** — Gruppiertes Dropdown mit Pricing & Badges
 
-Eigenes Studio mit Hinweis auf "Bold Mode" (kein expliziter Spicy-Modus — wir bleiben Brand-safe für unsere Compliance, siehe AI Video Hub Legal-Compliance).
+**`src/components/ai-video/ToolkitGenerator.tsx`** — Universal Generator mit dynamischen Settings
 
-- Modell auf Replicate: `x-ai/grok-imagine` (sobald verfügbar; falls Replicate noch keinen Public-Endpoint hat, wird das Studio mit Banner "Bald verfügbar" deployed und der Generate-Button deaktiviert)
-- Dauer: 6s / 12s
-- Modi: Text-to-Video + Image-to-Video mit nativer Audio-Spur
-- Pricing: TBD nach Replicate-Pricing — Platzhalter ~€0.20/s
+### Edits
 
-### 3. Wan 2.6 Upgrade
+- **`src/App.tsx`** — `/ai-video-studio` zeigt jetzt `AIVideoToolkit`; alle 9 alten Studio-Routen werden zu `<Navigate to="/ai-video-studio?model=...">` Redirects
+- **`src/pages/AIVideoStudio.tsx`** — gelöscht und durch `AIVideoToolkit.tsx` ersetzt
+- **9 alte Studio-Pages** — gelöscht
+- **`src/config/hubConfig.ts`** — bleibt, zeigt nur noch "AI Video Studio" (= Toolkit)
 
-Bestehendes `WanVideoStudio.tsx` bekommt einen neuen Modell-Toggle:
-- **Wan 2.5** (bestehend) — bleibt für Kontinuität
-- **Wan 2.6** (neu) — bessere Motion-Konsistenz, gleiche Preise
+### Edge Functions, Wallet, History
 
-Die Edge Function `generate-wan-video` wird erweitert, sodass bei `model: 'wan-2-6-standard' | 'wan-2-6-pro'` ein anderer Replicate-Slug verwendet wird.
+**Bleiben unverändert.** Die Toolkit-UI dispatcht auf die richtige Edge Function basierend auf der Registry. `useAIVideoWallet`, Credit-Refunds, History-Logik werden 1:1 wiederverwendet.
 
-### 4. Hub-Integration
+## UX-Flow
 
-`src/pages/AIVideoStudio.tsx` wird um die 2 neuen Provider-Cards ergänzt (LTX, Grok). Der Hub zeigt dann **9 Studios** und positioniert sie strategisch:
-- Kling 3.0 (Empfohlen) → Veo 3.1 (Native Audio) → **LTX 2.0 Pro (Schnell & günstig)** → Wan 2.6 (Budget) → Hailuo 2.3 → Luma Ray 2 → Seedance 2.0 → **Grok Imagine (Trending)** → Sora 2
+1. User klickt "AI Video Studio" in Sidebar → `/ai-video-studio` (Toolkit)
+2. Modell-Dropdown defaultet auf "Kling 3.0" (oder URL-Parameter `?model=...`)
+3. Settings passen sich dynamisch an (Dauer-Slider zeigt nur valide Werte, Audio-Toggle nur bei Veo/Grok, etc.)
+4. Prompt eingeben → Optional optimieren → Generate
+5. Cost-Bestätigung im Button: "Generieren · €2.40"
+6. Ergebnis erscheint in History-Tab
 
-### 5. Credits-System
+## Was sich für den User verbessert
 
-Für LTX und Grok werden zwei neue Pricing-Configs analog zu `wanVideoCredits.ts` angelegt:
-- `src/config/ltxVideoCredits.ts`
-- `src/config/grokVideoCredits.ts`
+- **Ein Klick weniger**: kein Hub-Zwischenschritt mehr
+- **Schneller Modellwechsel**: Prompt bleibt erhalten beim Switch
+- **Keine Verwirrung**: 1 Seite statt 9 Sub-Seiten
+- **Vergleichbarkeit**: Cost-per-Second direkt im Dropdown sichtbar
 
-Alle Generierungen laufen über das bestehende `ai_video_wallets` System mit automatischem **Credit-Refund bei Lambda/Replicate-Fehlern** (siehe Memory-Regel: Credit Refund Automation).
+## Risiken & Mitigation
 
-### 6. Prompt Optimizer
+- **Risiko**: Alte Sora-2-Coming-Soon-Logik (`Sora2ComingSoonGate.tsx`) referenziert `/sora-video-studio`. → Redirect funktioniert, aber wir prüfen Access-Gate im Toolkit selbst (`requiresAccess: 'sora2'` in Registry → wenn kein Access, Modell-Dropdown deaktiviert + Hinweis)
+- **Risiko**: WelcomeBonusModal & FirstVideoGuide verlinken auf Einzel-Studios. → Redirects fangen das ab; die Modell-URL-Parameter sorgen dafür, dass der User im "richtigen" Modell landet
+- **Risiko**: Code-Verlust bei gelöschten Studios. → Die Studios sind dünne Wrapper um Edge Functions + Settings — alle Logik existiert in den Edge Functions und Configs weiter
 
-Beide neuen Studios integrieren den bestehenden `VideoPromptOptimizer` (Auto-Übersetzung + cinematische Anreicherung), genau wie alle anderen Studios.
+## Lokalisierung
 
-## Technische Details
+Neue UI-Strings (DE/EN/ES) ins zentrale Translation-File. Visual-Prompts bleiben EN (Multilingual Asset Strategy).
 
-**Neue Dateien:**
-- `src/pages/LTXVideoStudio.tsx` — Studio-Seite
-- `src/pages/GrokVideoStudio.tsx` — Studio-Seite
-- `src/config/ltxVideoCredits.ts` — Modell-Konfiguration
-- `src/config/grokVideoCredits.ts` — Modell-Konfiguration
-- `supabase/functions/generate-ltx-video/index.ts` — Edge Function
-- `supabase/functions/generate-grok-video/index.ts` — Edge Function
+## Nicht im Scope
 
-**Bestehende Dateien (Edits):**
-- `src/pages/AIVideoStudio.tsx` — 2 neue Provider-Cards
-- `src/App.tsx` (oder Router) — 2 neue Routen
-- `src/config/wanVideoCredits.ts` — Wan 2.6 Modell-Einträge
-- `supabase/functions/generate-wan-video/index.ts` — Wan 2.6 Replicate-Slug-Routing
-- `supabase/config.toml` — neue Edge Functions registrieren (Timeout 180s)
+- **Compare Mode** (parallel auf 2-3 Modellen generieren) — verschoben auf separates Follow-up, falls gewünscht
+- **Saved Presets** — später
+- **Modell-Recommendation-AI** — später
 
-**Architektur-Konformität:**
-- Verifizierte Wallets, RLS-konform
-- Idempotente Credit-Refunds bei Fehlern
-- WYSIWYG-Studio-Pattern (Hub → Studio → History)
-- Lokalisierung (DE/EN/ES) — Visual-Prompts bleiben EN
-- Compliance-Banner aus dem AI Video Hub Legal-System
+## Ergebnis
 
-## Offene Punkte
-
-- **Grok Imagine auf Replicate**: Falls noch kein öffentlicher Endpoint verfügbar ist, wird das Studio mit "Coming Soon"-Banner deployed (analog zu Sora 2 für Non-Grandfathered Users). Sobald Replicate live ist, reicht eine Slug-Änderung in der Edge Function.
-- **LTX Pricing**: Final-Preise werden nach Verifikation der Replicate-Cost-Page gesetzt — aktuelle Schätzung basiert auf öffentlichen Benchmarks.
-
----
-
-**Ergebnis nach Implementierung**: 9 statt 7 Studios im Hub, Wan-Studio mit Versions-Toggle, vollständige Pricing-Configs, alle Studios mit gleichem UX-Standard.
+Eine schlanke, professionelle Toolkit-Page als primäre Video-Generierungs-Erfahrung. Alle bestehenden Links bleiben funktional via Redirects. Code-Basis schrumpft um 9 Studio-Pages. Wartung wird trivial: neues Modell hinzufügen = ein Eintrag in `aiVideoModelRegistry.ts`.
