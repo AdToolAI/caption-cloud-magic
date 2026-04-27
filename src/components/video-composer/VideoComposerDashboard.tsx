@@ -731,6 +731,8 @@ export default function VideoComposerDashboard() {
               onChangeBrandKit={(id) => setProject((p) => ({ ...p, brandKitId: id }))}
               onChangeBrandKitAutoSync={(sync) => setProject((p) => ({ ...p, brandKitAutoSync: sync }))}
               onApplyAssembly={(next) => setProject((p) => ({ ...p, assemblyConfig: next }))}
+              scenes={project.scenes}
+              onUpdateScenes={setScenes}
             />
           </TabsContent>
 
