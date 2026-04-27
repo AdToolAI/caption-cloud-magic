@@ -6,6 +6,7 @@ import type {
   AssemblyConfig,
   ComposerCategory,
   ComposerStatus,
+  AdCampaignMeta,
 } from '@/types/video-composer';
 
 /**
