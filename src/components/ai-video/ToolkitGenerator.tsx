@@ -264,6 +264,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         />
       </Card>
 
+      {/* ── Cinematic Style Presets (one-click director looks) ── */}
+      <Card className="p-4 bg-card/60 backdrop-blur-xl border-border/60">
+        <CinematicStylePresets value={shotSelection} onApply={(sel) => setShotSelection(sel)} />
+      </Card>
+
       {/* ── Shot Director (cinematic prompt builder) ── */}
       <ShotDirectorPanel
         value={shotSelection}
