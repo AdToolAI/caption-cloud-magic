@@ -140,8 +140,8 @@ export function useContinuityDrift() {
       const payload: Record<string, unknown> = { continuity_locked: locked };
       if (locked) payload.lock_reference_url = lockReferenceUrl ?? null;
       else payload.lock_reference_url = null;
-      const { error } = await supabase
-        .from('composer_scenes' as never)
+      const { error } = await (supabase as any)
+        .from('composer_scenes')
         .update(payload)
         .eq('id', sceneId);
       if (error) {
