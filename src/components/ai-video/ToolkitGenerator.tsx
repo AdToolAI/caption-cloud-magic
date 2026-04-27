@@ -20,6 +20,7 @@ import { ModelSelector } from './ModelSelector';
 import { VideoPromptOptimizer } from './VideoPromptOptimizer';
 import { ToolkitCastPicker, buildCastPromptSuffix } from './ToolkitCastPicker';
 import { ShotDirectorPanel } from './ShotDirectorPanel';
+import CinematicStylePresets from './CinematicStylePresets';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { BrandCharacterSelector } from '@/components/brand-characters/BrandCharacterSelector';
 import { useBrandCharacters, buildCharacterPromptInjection, type BrandCharacter } from '@/hooks/useBrandCharacters';
