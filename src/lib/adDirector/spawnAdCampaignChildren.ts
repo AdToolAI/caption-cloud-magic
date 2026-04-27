@@ -17,6 +17,7 @@ import type {
   ComposerScene,
   AssemblyConfig,
   ComposerBriefing,
+  AspectRatio,
 } from '@/types/video-composer';
 
 export interface SpawnInput {
