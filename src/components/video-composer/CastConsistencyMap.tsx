@@ -29,12 +29,11 @@ type Anchor = 'reference' | 'chain' | 'prompt' | 'absent';
 function getAnchor(scene: ComposerScene, character: ComposerCharacter, idx: number): Anchor {
   const shot = scene.characterShot;
   if (!shot || shot.characterId !== character.id || shot.shotType === 'absent') return 'absent';
-  // If the character has a reference image AND this is an AI scene → strongest anchor
-  if (character.referenceImageUrl && scene.clipSource?.startsWith('ai-')) return 'reference';
+  // Strong signature_items + AI scene → reference-style anchor (Sherlock-Holmes effect)
+  if (character.signatureItems?.trim() && scene.clipSource?.startsWith('ai-')) return 'reference';
   // First scene with the character → no chain possible, prompt-only
   if (idx === 0) return 'prompt';
-  // Chain anchor when previous scene also features same character
-  const prev = scene; // anchor inheritance is implicit via extract-video-last-frame
+  // Otherwise frame-chain anchor (extract-video-last-frame between AI scenes)
   return 'chain';
 }
 
@@ -107,7 +106,6 @@ export function CastConsistencyMap({ scenes, characters }: Props) {
                   <td className="p-1 sticky left-0 bg-card">
                     <div className="flex items-center gap-1.5">
                       <Avatar className="h-5 w-5">
-                        {c.referenceImageUrl && <AvatarImage src={c.referenceImageUrl} alt={c.name} />}
                         <AvatarFallback className="text-[8px]">
                           {c.name.slice(0, 2).toUpperCase()}
                         </AvatarFallback>
