@@ -163,6 +163,18 @@ export interface ComposerScene {
     mood?: string;
     filmStock?: string;
   };
+  /**
+   * Shot Director — per-scene cinematography (Framing, Angle, Movement, Lighting).
+   * Selection IDs map to `src/config/shotDirector.ts`. Appended to the AI prompt
+   * as English suffix via `buildShotPromptSuffix`. Complementary to
+   * `directorModifiers` (which covers Lens/Film Stock/Mood).
+   */
+  shotDirector?: {
+    framing?: string;
+    angle?: string;
+    movement?: string;
+    lighting?: string;
+  };
   /** Stock media metadata when clipSource === 'stock' or 'stock-image'. */
   stockMediaThumb?: string;
   stockMediaSource?: StockMediaSource;

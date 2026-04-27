@@ -23,6 +23,7 @@ import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } fr
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
 import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
+import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import {
@@ -275,9 +276,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           // Phase 4 — resolve @character / @location mentions against library
           const resolved = resolveMentions(s.aiPrompt || '', libCharacters, libLocations);
           // Phase 3 — apply director modifiers on top of the resolved prompt
-          const finalPrompt = s.directorModifiers
+          const withMods = s.directorModifiers
             ? applyDirectorModifiers(resolved.prompt, s.directorModifiers)
             : resolved.prompt;
+          // Shot Director — append per-scene cinematography suffix (English)
+          const shotSuffix = buildShotPromptSuffix(s.shotDirector || {});
+          const finalPrompt = shotSuffix ? `${withMods} ${shotSuffix}` : withMods;
           return {
             id: s.id,
             clipSource: s.clipSource,
@@ -381,9 +385,11 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
 
       // Phase 4 — resolve @character / @location mentions
       const resolvedSingle = resolveMentions(targetScene.aiPrompt || '', libCharacters, libLocations);
-      const finalSinglePrompt = targetScene.directorModifiers
+      const withModsSingle = targetScene.directorModifiers
         ? applyDirectorModifiers(resolvedSingle.prompt, targetScene.directorModifiers)
         : resolvedSingle.prompt;
+      const shotSuffixSingle = buildShotPromptSuffix(targetScene.shotDirector || {});
+      const finalSinglePrompt = shotSuffixSingle ? `${withModsSingle} ${shotSuffixSingle}` : withModsSingle;
 
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
         body: {
