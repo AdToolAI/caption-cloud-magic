@@ -110,6 +110,28 @@ function sanitizeLine(line: string): string {
   return out;
 }
 
+// Variant strategies — each describes a different angle for A/B testing.
+const VARIANT_STRATEGIES: { id: string; label: string; instruction: string }[] = [
+  {
+    id: 'emotional',
+    label: 'Emotional Hook',
+    instruction:
+      'Open with an emotional truth or feeling the audience can immediately relate to. Lean into pathos and human moments.',
+  },
+  {
+    id: 'rational',
+    label: 'Rational / Benefit',
+    instruction:
+      'Open with a clear, concrete benefit or fact. Lead with logic and proof. Numbers welcome.',
+  },
+  {
+    id: 'curiosity',
+    label: 'Curiosity Gap',
+    instruction:
+      'Open with an unexpected statement, contradiction or question that creates a curiosity gap. Make scrolling impossible.',
+  },
+];
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -127,6 +149,10 @@ Deno.serve(async (req) => {
       productDescription = '',
       usps = [],
       targetAudience = '',
+      // Stage 2: when true, return 3 variants instead of one.
+      generateVariants = false,
+      // Optional brand kit hints (used to enrich brand mentions, NOT to clone other brands).
+      brandName = '',
     } = body ?? {};
 
     if (!frameworkId || !tonalityId || !productName) {
@@ -153,11 +179,19 @@ Deno.serve(async (req) => {
 
     const langName = lang === 'de' ? 'German' : lang === 'es' ? 'Spanish' : 'English';
 
-    const systemPrompt = `You are a senior advertising copywriter. You write professional ad copy that competes with the best global brands while being legally safe (no trademarked names, no defamation, no health/finance claims you cannot back up).
+    const apiKey = Deno.env.get('LOVABLE_API_KEY');
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    const buildSystemPrompt = (extraInstruction: string) => `You are a senior advertising copywriter. You write professional ad copy that competes with the best global brands while being legally safe (no trademarked names, no defamation, no health/finance claims you cannot back up).
 
 OUTPUT LANGUAGE: ${langName}
 TONALITY RULES: ${tonalityRule}
-
+${extraInstruction ? `\nVARIANT STRATEGY: ${extraInstruction}\n` : ''}
 CRITICAL RULES:
 - Never mention real third-party brand names (no Apple, Coca-Cola, Nike, etc.).
 - Never make medical, financial or absolute superlative claims.
@@ -165,7 +199,7 @@ CRITICAL RULES:
 - Stay strictly within the tonality rules above.
 - Output one line per beat in the requested order, plain text, one per line, no numbering, no quotes.`;
 
-    const userPrompt = `PRODUCT: ${productName}
+    const userPrompt = `PRODUCT: ${productName}${brandName ? ` (Brand: ${brandName})` : ''}
 DESCRIPTION: ${productDescription}
 USPS: ${usps.join(' | ') || '(none provided)'}
 TARGET AUDIENCE: ${targetAudience || '(not specified)'}
@@ -175,54 +209,65 @@ ${beatList}
 
 Write exactly ${beats.length} lines. One line per beat. No numbering, no extra text.`;
 
-    const apiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+    const callAi = async (extraInstruction: string): Promise<string[]> => {
+      const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: buildSystemPrompt(extraInstruction) },
+            { role: 'user', content: userPrompt },
+          ],
+        }),
+      });
+
+      if (!aiRes.ok) {
+        const errText = await aiRes.text();
+        console.error('[generate-ad-script] AI gateway error:', aiRes.status, errText);
+        throw new Error(`AI gateway error: ${aiRes.status}`);
+      }
+
+      const aiJson = await aiRes.json();
+      const text: string = aiJson?.choices?.[0]?.message?.content ?? '';
+
+      const rawLines = text
+        .split(/\r?\n/)
+        .map((l: string) => l.trim())
+        .filter(Boolean)
+        .map((l: string) => l.replace(/^(\d+[.)]|[-•])\s*/, ''));
+
+      const lines: string[] = [];
+      for (let i = 0; i < beats.length; i++) {
+        lines.push(sanitizeLine(rawLines[i] ?? ''));
+      }
+      return lines;
+    };
+
+    if (!generateVariants) {
+      const lines = await callAi('');
+      return new Response(JSON.stringify({ lines }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
     }
 
-    const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-      }),
-    });
+    // Generate 3 variants in parallel
+    const settled = await Promise.allSettled(
+      VARIANT_STRATEGIES.map((v) => callAi(v.instruction)),
+    );
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error('[generate-ad-script] AI gateway error:', aiRes.status, errText);
-      return new Response(
-        JSON.stringify({ error: 'AI gateway error', detail: errText.slice(0, 500) }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
+    const variants = settled.map((res, i) => ({
+      id: VARIANT_STRATEGIES[i].id,
+      label: VARIANT_STRATEGIES[i].label,
+      lines: res.status === 'fulfilled' ? res.value : [],
+      error: res.status === 'rejected' ? String(res.reason) : null,
+    }));
 
-    const aiJson = await aiRes.json();
-    const text: string = aiJson?.choices?.[0]?.message?.content ?? '';
-
-    const rawLines = text
-      .split(/\r?\n/)
-      .map((l: string) => l.trim())
-      .filter(Boolean)
-      // strip leading numbering like "1.", "1)", "- ", "• "
-      .map((l: string) => l.replace(/^(\d+[.)]|[-•])\s*/, ''));
-
-    const lines: string[] = [];
-    for (let i = 0; i < beats.length; i++) {
-      lines.push(sanitizeLine(rawLines[i] ?? ''));
-    }
-
-    return new Response(JSON.stringify({ lines }), {
+    return new Response(JSON.stringify({ variants }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
