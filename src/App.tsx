@@ -245,6 +245,7 @@ function AppLayout() {
           {/* Unified AI Video Toolkit — replaces former individual studios */}
           <Route path="/ai-video-studio" element={<AIVideoToolkit />} />
           <Route path="/ai-video-toolkit" element={<Navigate to="/ai-video-studio" replace />} />
+          <Route path="/brand-characters" element={<ProtectedRoute><BrandCharacters /></ProtectedRoute>} />
           <Route path="/kling-video-studio" element={<Navigate to="/ai-video-studio?model=kling-3-standard" replace />} />
           <Route path="/seedance-video-studio" element={<Navigate to="/ai-video-studio?model=seedance-standard" replace />} />
           <Route path="/wan-video-studio" element={<Navigate to="/ai-video-studio?model=wan-2-6-standard" replace />} />
