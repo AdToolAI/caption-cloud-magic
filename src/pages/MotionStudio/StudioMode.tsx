@@ -291,6 +291,7 @@ export default function StudioMode() {
               scenes={scenes}
               onChange={setScenes}
               onOpenSnippets={() => setSnippetOpen(true)}
+              onOpenDirector={() => setDirectorOpen(true)}
               selectedCharacters={selectedCharacters}
               selectedLocation={selectedLocation}
             />
