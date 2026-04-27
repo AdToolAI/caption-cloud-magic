@@ -839,9 +839,10 @@ export default function VideoComposerDashboard() {
                       adMeta: project.adMeta,
                     });
                     if (spawned.length > 0) {
+                      const hasCutdowns = spawned.some(s => s.kind === 'cutdown');
                       toast({
                         title: 'Kampagne erweitert 🎬',
-                        description: `${spawned.length} zusätzliche Variante(n) erstellt: ${spawned.map(s => s.label).join(', ')}`,
+                        description: `${spawned.length} Variante(n): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}`,
                       });
                       setActiveTab('campaign');
                     }
