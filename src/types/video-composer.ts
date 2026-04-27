@@ -200,7 +200,18 @@ export interface ComposerScene {
    * always pinned at the end). Persisted in `composer_scenes.prompt_slot_order`.
    */
   promptSlotOrder?: Array<'subject' | 'action' | 'setting' | 'timeWeather' | 'style'>;
+  /**
+   * UUID FK to `motion_studio_style_presets.id` — set by the manual
+   * StylePresetPicker in the composer. MUST be a valid UUID or undefined.
+   */
   appliedStylePresetId?: string;
+  /**
+   * Slug of a clientside Cinematic Style Preset (see
+   * `src/config/cinematicStylePresets.ts`, e.g. 'commercial-glossy').
+   * Set by the Ad Director when it auto-builds scenes. NOT a UUID.
+   * Persisted as `composer_scenes.cinematic_preset_slug` (TEXT).
+   */
+  cinematicPresetSlug?: string;
   /**
    * Block M — Hybrid Production.
    * `hybridMode` marks how this scene was created from another scene:
