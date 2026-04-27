@@ -24,6 +24,7 @@ export default function PictureStudio() {
   const TAB_CONFIG = useMemo(() => [
     { value: 'generate', label: t('picStudio.tabGenerate'), icon: Sparkles },
     { value: 'magic-edit', label: 'Magic Edit', icon: Wand2 },
+    { value: 'batch', label: 'Batch', icon: ListChecks },
     { value: 'background', label: t('picStudio.tabBackground'), icon: Layers },
   ], [t]);
 
