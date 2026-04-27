@@ -112,16 +112,7 @@ const PlatformAnalytics = lazy(() => import("./pages/Analytics/PlatformAnalytics
 const Admin = lazy(() => import("./pages/Admin"));
 const LambdaHealth = lazy(() => import("./pages/admin/LambdaHealth"));
 
-const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
-const KlingVideoStudio = lazy(() => import("./pages/KlingVideoStudio"));
-const SeedanceVideoStudio = lazy(() => import("./pages/SeedanceVideoStudio"));
-const WanVideoStudio = lazy(() => import("./pages/WanVideoStudio"));
-const HailuoVideoStudio = lazy(() => import("./pages/HailuoVideoStudio"));
-const LumaVideoStudio = lazy(() => import("./pages/LumaVideoStudio"));
-const SoraVideoStudio = lazy(() => import("./pages/SoraVideoStudio"));
-const VeoVideoStudio = lazy(() => import("./pages/VeoVideoStudio"));
-const LTXVideoStudio = lazy(() => import("./pages/LTXVideoStudio"));
-const GrokVideoStudio = lazy(() => import("./pages/GrokVideoStudio"));
+const AIVideoToolkit = lazy(() => import("./pages/AIVideoToolkit"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 const VideoComposer = lazy(() => import("./pages/VideoComposer"));
 const MotionStudioLibrary = lazy(() => import("./pages/MotionStudio/Library"));
@@ -249,16 +240,18 @@ function AppLayout() {
           <Route path="/white-label" element={<WhiteLabel />} />
           <Route path="/instagram-publishing" element={<InstagramPublishing />} />
           <Route path="/composer" element={<Composer />} />
-          <Route path="/ai-video-studio" element={<AIVideoStudio />} />
-          <Route path="/kling-video-studio" element={<KlingVideoStudio />} />
-         <Route path="/seedance-video-studio" element={<SeedanceVideoStudio />} />
-         <Route path="/wan-video-studio" element={<WanVideoStudio />} />
-         <Route path="/hailuo-video-studio" element={<HailuoVideoStudio />} />
-          <Route path="/luma-video-studio" element={<LumaVideoStudio />} />
-          <Route path="/sora-video-studio" element={<SoraVideoStudio />} />
-           <Route path="/veo-video-studio" element={<VeoVideoStudio />} />
-           <Route path="/ltx-video-studio" element={<LTXVideoStudio />} />
-           <Route path="/grok-video-studio" element={<GrokVideoStudio />} />
+          {/* Unified AI Video Toolkit — replaces former individual studios */}
+          <Route path="/ai-video-studio" element={<AIVideoToolkit />} />
+          <Route path="/ai-video-toolkit" element={<Navigate to="/ai-video-studio" replace />} />
+          <Route path="/kling-video-studio" element={<Navigate to="/ai-video-studio?model=kling-3-standard" replace />} />
+          <Route path="/seedance-video-studio" element={<Navigate to="/ai-video-studio?model=seedance-standard" replace />} />
+          <Route path="/wan-video-studio" element={<Navigate to="/ai-video-studio?model=wan-2-6-standard" replace />} />
+          <Route path="/hailuo-video-studio" element={<Navigate to="/ai-video-studio?model=hailuo-standard" replace />} />
+          <Route path="/luma-video-studio" element={<Navigate to="/ai-video-studio?model=luma-standard" replace />} />
+          <Route path="/sora-video-studio" element={<Navigate to="/ai-video-studio?model=sora-2-standard" replace />} />
+          <Route path="/veo-video-studio" element={<Navigate to="/ai-video-studio?model=veo-3.1-fast" replace />} />
+          <Route path="/ltx-video-studio" element={<Navigate to="/ai-video-studio?model=ltx-standard" replace />} />
+          <Route path="/grok-video-studio" element={<Navigate to="/ai-video-studio?model=grok-imagine" replace />} />
           <Route path="/compare-lab" element={<ProtectedRoute><CompareLab /></ProtectedRoute>} />
           <Route path="/audio-studio" element={<AudioStudio />} />
            <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
