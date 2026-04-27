@@ -3933,6 +3933,10 @@ export type Database = {
           clip_source: string
           clip_status: string
           clip_url: string | null
+          continuity_auto_repair: boolean
+          continuity_checked_at: string | null
+          continuity_drift_label: string | null
+          continuity_drift_score: number | null
           continuity_source_scene_id: string | null
           cost_euros: number
           created_at: string
@@ -3981,6 +3985,10 @@ export type Database = {
           clip_source?: string
           clip_status?: string
           clip_url?: string | null
+          continuity_auto_repair?: boolean
+          continuity_checked_at?: string | null
+          continuity_drift_label?: string | null
+          continuity_drift_score?: number | null
           continuity_source_scene_id?: string | null
           cost_euros?: number
           created_at?: string
@@ -4029,6 +4037,10 @@ export type Database = {
           clip_source?: string
           clip_status?: string
           clip_url?: string | null
+          continuity_auto_repair?: boolean
+          continuity_checked_at?: string | null
+          continuity_drift_label?: string | null
+          continuity_drift_score?: number | null
           continuity_source_scene_id?: string | null
           cost_euros?: number
           created_at?: string
