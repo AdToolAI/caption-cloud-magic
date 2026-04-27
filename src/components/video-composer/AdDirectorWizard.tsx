@@ -926,6 +926,18 @@ export default function AdDirectorWizard({
                         ? `✓ ${getTonalityVoice(tonality).voiceLabel}`
                         : '—'}
                     </li>
+                    <li>
+                      <span className="text-foreground">Endcard:</span>{' '}
+                      {autoLogoEndcard && activeBrandKit?.logo_url ? '✓ Auto-Logo' : '—'}
+                    </li>
+                    <li>
+                      <span className="text-foreground">A/B-Renders:</span>{' '}
+                      {renderAllVariants ? '✓ Alle 3 Varianten' : '1 Variante'}
+                    </li>
+                    <li>
+                      <span className="text-foreground">Cutdowns:</span>{' '}
+                      {[cutdown15s && '15s', cutdown6sHook && '6s-Hook'].filter(Boolean).join(', ') || '—'}
+                    </li>
                   </ul>
                 </div>
               </div>
