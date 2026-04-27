@@ -194,15 +194,15 @@ export default function StudioMode() {
         project_id: inserted.id,
         order_index: idx,
         scene_type: 'custom',
-        prompt: s.prompt,
+        ai_prompt: s.prompt,
         duration_seconds: s.duration,
-        cast_character_ids: selectedCharIds,
-        location_id: selectedLocationId,
-        status: 'pending',
+        mentioned_character_ids: selectedCharIds,
+        mentioned_location_ids: selectedLocationId ? [selectedLocationId] : [],
+        clip_status: 'pending',
       }));
 
       const { error: scErr } = await supabase
-        .from('composer_scenes' as any)
+        .from('composer_scenes')
         .insert(sceneRows as any);
       if (scErr) {
         // Non-fatal — composer can still load briefing & let user edit
