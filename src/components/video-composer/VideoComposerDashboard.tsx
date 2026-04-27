@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle, RotateCcw, Mic, Sparkles } from 'lucide-react';
+import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle, RotateCcw, Mic, Sparkles, Megaphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -38,6 +38,7 @@ import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
 import MotionStudioStepSidebar, { type StepItem } from './MotionStudioStepSidebar';
 import AutoDirectorWizard from './AutoDirectorWizard';
+import AdDirectorWizard from './AdDirectorWizard';
 import ShareProjectDialog from './ShareProjectDialog';
 import CollaboratorAvatars from './CollaboratorAvatars';
 import {
@@ -143,6 +144,7 @@ export default function VideoComposerDashboard() {
   // Auto-open template picker when starting fresh (no draft on mount)
   const [showTemplatePicker, setShowTemplatePicker] = useState(() => !loadDraft());
   const [showAutoDirector, setShowAutoDirector] = useState(false);
+  const [showAdDirector, setShowAdDirector] = useState(false);
   const { ensureProjectPersisted } = useComposerPersistence();
   const incrementTemplateUsage = useIncrementTemplateUsage();
   const didInitialSyncRef = useRef(false);
@@ -637,6 +639,15 @@ export default function VideoComposerDashboard() {
             <Button
               variant="default"
               size="sm"
+              onClick={() => setShowAdDirector(true)}
+              className="gap-2 bg-gradient-to-r from-amber-500/90 to-amber-600/90 hover:opacity-90 text-amber-950"
+            >
+              <Megaphone className="h-4 w-4" />
+              <span className="hidden sm:inline">Ad Director</span>
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
               onClick={() => setShowAutoDirector(true)}
               className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:opacity-90"
             >
@@ -813,6 +824,31 @@ export default function VideoComposerDashboard() {
         open={showAutoDirector}
         onOpenChange={setShowAutoDirector}
         defaultLanguage={project.language}
+      />
+
+      <AdDirectorWizard
+        open={showAdDirector}
+        onOpenChange={setShowAdDirector}
+        language={project.language}
+        onScenesGenerated={({ scenes, briefingPatch, title, adMeta }) => {
+          setProject((prev) => ({
+            ...prev,
+            title: title || prev.title,
+            category: 'product-ad',
+            briefing: { ...prev.briefing, ...briefingPatch },
+            scenes,
+            status: 'storyboard',
+          }));
+          setActiveTab('storyboard');
+          // Persist ad-director metadata onto the project row when it gets saved.
+          // (Stored client-side until ensureProjectPersisted writes to DB.)
+          try {
+            localStorage.setItem(
+              'video-composer-ad-meta',
+              JSON.stringify({ ...adMeta }),
+            );
+          } catch { /* ignore */ }
+        }}
       />
 
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
