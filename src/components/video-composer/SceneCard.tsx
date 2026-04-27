@@ -687,6 +687,12 @@ export default function SceneCard({
                   onChange={(directorModifiers) => onUpdate({ directorModifiers })}
                 />
 
+                <CinematicStylePresets
+                  value={scene.shotDirector || {}}
+                  onApply={(sel) => onUpdate({ shotDirector: sel })}
+                  compact
+                />
+
                 <SceneShotDirectorPanel
                   value={scene.shotDirector || {}}
                   onChange={(shotDirector) => onUpdate({ shotDirector })}
