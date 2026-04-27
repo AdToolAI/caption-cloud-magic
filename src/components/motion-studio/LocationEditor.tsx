@@ -51,6 +51,7 @@ export default function LocationEditor({
           reference_image_url: location.reference_image_url,
           lighting_notes: location.lighting_notes,
           tags: location.tags,
+          workspace_id: location.workspace_id ?? null,
         });
       } else {
         setDraft(EMPTY_LOCATION_DRAFT);
