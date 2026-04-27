@@ -59,3 +59,41 @@ Stem-Separation kostet weiterhin `STEM_SEPARATION_COST_EUR = 0.20 €` (unverän
 - Per-Channel-EQ und Effekte (Reverb, Delay)
 - Multi-Track-Recording (mehrere Stem-Sets gleichzeitig)
 - Stem-Mixer-State persistieren (Mix-Templates)
+
+## Final Mix Export Hub
+
+Multi-Source Mixer-Hub im Audio Studio, der alle Audio-Quellen (Voiceover, AI Music,
+Stem-Mix, SFX, externe URLs) zu einem finalen sendefertigen WAV mit Loudness-
+Normalisierung kombiniert. Vorhandene Quellen aus dem Editor (aktuelles Voiceover +
+zuletzt geladener Music-Track) werden beim Öffnen des Tabs automatisch eingefügt.
+
+### Was der Nutzer sieht
+1. **Sources-Liste**: Vorbelegte Voice/Music + manuell per URL oder Upload erweiterbar
+2. Pro Source: Volume (0–150 %), Pan (L–R), Mute, Start-Offset, Lösch-Button
+3. **Transport**: Play/Pause + scrubbare Master-Timeline + Master-Volume
+4. **Loudness-Ziel**: 5 Presets (Spotify/YouTube –14 LUFS, Broadcast –23, Cinema –27, Off)
+   + „Lautheit messen“-Button mit Δ-Anzeige zum Ziel
+5. **Export**: Bibliothek (`universal_audio_assets`, source = `final_mix`) ODER direkter
+   WAV-Download
+
+### Technische Architektur
+**Hook** `useFinalMixer.ts`:
+- Decodiert alle Sources parallel, hält AudioBuffers in einer Map
+- Live-Graph: pro Source `BufferSource → Gain → StereoPanner → MasterGain → Destination`
+- Offset-aware Playback (Sources können zeitversetzt starten)
+- Live-Updates für Volume/Pan via `linearRampToValueAtTime` (20 ms Smoothing)
+- **Loudness-Messung**: vereinfachter ITU-R BS.1770-4 mit K-Weighting-Approximation
+  (1st-order high-pass), 400 ms Blocks @ 75 % Overlap, Absolute Gating @ –70 LUFS,
+  Relative Gating @ –10 LU. Liefert Integrated LUFS + True-Peak (Sample-Peak)
+- **Normalisierung**: Linear-Gain auf Δ zum Ziel, gecappt auf ±12 dB, mit Soft-Clip
+  (tanh) zum Schutz vor Übersteuerung
+- Offline-Render via `OfflineAudioContext` (48 kHz Stereo) → 16-bit PCM WAV
+
+**Komponente** `FinalMixPanel.tsx`:
+- 4 Karten-Sektionen (Header, Sources, Transport+Master, Loudness, Export)
+- Auto-Add `initialSources` beim Mount (aus `AudioStudio.tsx` State)
+- Ampel-Farben für Δ-LUFS (≤1 grün, ≤3 amber, sonst rose)
+- Bond-2028 Style: gradient-Cards, blur, motion auf Sources-Liste
+
+### Kosten
+**Komplett kostenlos** — alles client-side Web Audio + Storage-Upload für gespeicherte Mixe.

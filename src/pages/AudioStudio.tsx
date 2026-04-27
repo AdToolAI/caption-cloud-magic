@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film } from 'lucide-react';
+import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AudioStudioHeroHeader } from '@/components/audio-studio/AudioStudioHeroHeader';
@@ -16,6 +16,7 @@ import { MusicGeneratorPanel } from '@/components/audio-studio/MusicGeneratorPan
 import { AutoMatchPanel } from '@/components/audio-studio/AutoMatchPanel';
 import { AudioDuckingPanel } from '@/components/audio-studio/AudioDuckingPanel';
 import { StemMixerPanel } from '@/components/audio-studio/StemMixerPanel';
+import { FinalMixPanel } from '@/components/audio-studio/FinalMixPanel';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,7 +32,7 @@ export default function AudioStudio() {
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music' | 'auto-match' | 'stems'>('enhance');
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music' | 'auto-match' | 'stems' | 'final-mix'>('enhance');
   const [stemSet, setStemSet] = useState<{ sourceTitle: string; stems: Array<{ type: 'vocals' | 'drums' | 'bass' | 'other'; url: string; assetId?: string }> } | null>(null);
   const [showMusicGen, setShowMusicGen] = useState(false);
   const [showAutoMatch, setShowAutoMatch] = useState(false);
@@ -402,6 +403,7 @@ export default function AudioStudio() {
                       { id: 'music', label: 'AI Music', icon: Music2 },
                       { id: 'ducking', label: 'Ducking', icon: AudioLines, badge: musicUrl ? 'NEU' : undefined, disabled: !musicUrl },
                       { id: 'stems', label: 'Stem-Mixer', icon: AudioLines, badge: stemSet ? `${stemSet.stems.length}` : 'NEU', disabled: !stemSet },
+                      { id: 'final-mix', label: 'Final Mix', icon: Layers, badge: 'NEU' },
                       { id: 'compare', label: 'Vergleich', icon: Volume2, disabled: !enhancedAudioUrl },
                       { id: 'transcript', label: 'Transcript', icon: Mic },
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
@@ -563,6 +565,36 @@ export default function AudioStudio() {
                       </motion.div>
                     )}
 
+                    {activeTab === 'final-mix' && (
+                      <motion.div
+                        key="final-mix"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <FinalMixPanel
+                          initialSources={[
+                            ...(originalAudioUrl || enhancedAudioUrl || audioUrl ? [{
+                              id: 'voice-current',
+                              label: audioFile?.name || 'Voiceover',
+                              url: enhancedAudioUrl || originalAudioUrl || audioUrl!,
+                              kind: 'voice' as const,
+                            }] : []),
+                            ...(musicUrl ? [{
+                              id: 'music-current',
+                              label: 'Music Track',
+                              url: musicUrl,
+                              kind: 'music' as const,
+                            }] : []),
+                          ]}
+                          onMixSaved={() => {
+                            setLibraryRefreshKey(k => k + 1);
+                            toast.success('Final Mix gespeichert', { description: 'In Bibliothek verfügbar' });
+                          }}
+                        />
+                      </motion.div>
+                    )}
+
                     {activeTab === 'voices' && (
                       <motion.div
                         key="voices"
@@ -640,7 +672,7 @@ export default function AudioStudio() {
                 </div>
 
                 {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music/ducking/auto-match tab) */}
-                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && activeTab !== 'ducking' && activeTab !== 'auto-match' && (
+                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && activeTab !== 'ducking' && activeTab !== 'auto-match' && activeTab !== 'final-mix' && activeTab !== 'stems' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
