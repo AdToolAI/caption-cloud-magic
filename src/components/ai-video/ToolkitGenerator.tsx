@@ -185,6 +185,16 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
+      // Track Brand Character usage for analytics & usage_count increment
+      if (brandCharacter) {
+        trackBrandUsage({
+          character_id: brandCharacter.id,
+          generation_id: (data?.id ?? data?.generation_id) as string | undefined,
+          model_used: model.id,
+          module: 'ai-video-toolkit',
+        }).catch(() => {});
+      }
+
       toast.success(
         language === 'de'
           ? `Video wird generiert (${model.name}). Kosten: ${symbol}${cost.toFixed(2)}`
