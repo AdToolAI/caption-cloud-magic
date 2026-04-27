@@ -365,6 +365,7 @@ export default function VideoComposerDashboard() {
   // Realtime: when ANY collaborator updates a scene in this project, refetch.
   useComposerScenesRealtime(project.id, refetchScenesFromDb);
 
+  const persistAndGoToClips = useCallback(async () => {
     setIsPersisting(true);
     try {
       const result = await ensureProjectPersisted(project);
