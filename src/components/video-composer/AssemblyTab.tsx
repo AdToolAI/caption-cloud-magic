@@ -59,7 +59,7 @@ const FALLBACKS: Record<string, string> = {
   renderVideo: 'Video rendern',
 };
 
-export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly, scenes }: AssemblyTabProps) {
+export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly, scenes, onMasterRenderComplete }: AssemblyTabProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
