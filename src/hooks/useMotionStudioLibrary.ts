@@ -407,7 +407,7 @@ export function useMotionStudioLibrary() {
   const createSceneSnippet = useCallback(
     async (draft: SceneSnippetDraft): Promise<SceneSnippet | null> => {
       if (!user) return null;
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('motion_studio_scene_snippets')
         .insert({ ...draft, user_id: user.id })
         .select()
