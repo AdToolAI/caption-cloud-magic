@@ -12,6 +12,8 @@ export interface MusicGenerationParams {
   genre?: string;
   mood?: string;
   instrumental?: boolean;
+  bpm?: number;          // Optional target BPM (e.g. match a video tempo)
+  key?: string;          // Optional musical key
 }
 
 export interface GeneratedMusicTrack {
