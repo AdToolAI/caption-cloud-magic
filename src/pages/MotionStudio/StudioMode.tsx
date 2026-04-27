@@ -32,6 +32,7 @@ import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import CharacterEditor from '@/components/motion-studio/CharacterEditor';
 import LocationEditor from '@/components/motion-studio/LocationEditor';
 import SceneSnippetPicker from '@/components/motion-studio/SceneSnippetPicker';
+import AIDirectorBriefDialog, { type DirectorPlan } from '@/components/motion-studio/AIDirectorBriefDialog';
 import type {
   MotionStudioCharacter,
   MotionStudioLocation,
