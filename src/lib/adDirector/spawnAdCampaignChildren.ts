@@ -34,10 +34,11 @@ export interface SpawnInput {
 
 export interface SpawnedChild {
   id: string;
-  kind: 'cutdown' | 'variant';
+  kind: 'cutdown' | 'variant' | 'aspect';
   label: string;
   cutdownType?: CutdownType;
   variantStrategy?: string;
+  aspectRatio?: AspectRatio;
 }
 
 const VARIANT_LABEL: Record<string, string> = {
