@@ -683,6 +683,10 @@ timeout_sec = 120
 verify_jwt = false
 timeout_sec = 120
 
+[functions.upscale-image]
+verify_jwt = false
+timeout_sec = 180
+
 [functions.director-cut-remove-burned-subtitles]
 verify_jwt = false
 timeout_sec = 300

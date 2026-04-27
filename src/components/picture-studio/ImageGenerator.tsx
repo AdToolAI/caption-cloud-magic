@@ -100,9 +100,11 @@ export function ImageGenerator() {
   const [selectedImageForAlbum, setSelectedImageForAlbum] = useState<GeneratedImage | null>(null);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [justGenerated, setJustGenerated] = useState(false);
+  const [variantsCount, setVariantsCount] = useState<1 | 4>(1);
 
   const loading = replicateLoading;
-  const cost = TIER_COSTS[tier];
+  const baseCost = TIER_COSTS[tier];
+  const cost = baseCost * variantsCount;
   const currency = wallet?.currency || 'EUR';
   const currencySymbol = currency === 'USD' ? '$' : '€';
   const balance = wallet?.balance_euros ?? 0;
@@ -132,6 +134,51 @@ export function ImageGenerator() {
     reader.readAsDataURL(file);
   };
 
+  const generateOne = async (): Promise<any | null> => {
+    if (tier === 'standard') {
+      const { data, error } = await supabase.functions.invoke('generate-studio-image', {
+        body: {
+          prompt: prompt.trim(),
+          style,
+          aspectRatio,
+          quality: 'fast',
+          editMode,
+          referenceImageUrl: editMode ? referenceImage : undefined,
+        }
+      });
+      if (error) throw error;
+      if (data?.ok === false) throw new Error(data.error || 'Generation failed');
+      if (data?.error) throw new Error(data.error);
+      return data?.image || null;
+    }
+
+    // Premium tier — Replicate via €-Wallet
+    const { data, error } = await supabase.functions.invoke('generate-image-replicate', {
+      body: {
+        prompt: prompt.trim(),
+        tier,
+        aspectRatio,
+        style,
+        referenceImageUrl: editMode ? referenceImage : undefined,
+      }
+    });
+
+    if (error) {
+      const fnError: any = error;
+      if (fnError.context && typeof fnError.context.json === 'function') {
+        const body = await fnError.context.json();
+        if (body?.code === 'INSUFFICIENT_CREDITS' || body?.code === 'NO_WALLET') {
+          const err: any = new Error(body.error);
+          err.needsPurchase = true;
+          throw err;
+        }
+        throw new Error(body?.error || fnError.message);
+      }
+      throw error;
+    }
+    return data?.image || null;
+  };
+
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast.error(t('picStudio.promptRequired'));
@@ -148,76 +195,34 @@ export function ImageGenerator() {
       return;
     }
 
-    if (tier === 'standard') {
-      // Lovable AI Gateway (Gemini) — gratis im Abo, kein Credit-Abzug
-      setReplicateLoading(true);
-      try {
-        const { data, error } = await supabase.functions.invoke('generate-studio-image', {
-          body: {
-            prompt: prompt.trim(),
-            style,
-            aspectRatio,
-            quality: 'fast',
-            editMode,
-            referenceImageUrl: editMode ? referenceImage : undefined,
-          }
-        });
-
-        if (error) throw error;
-        if (data?.ok === false) {
-          throw new Error(data.error || 'Generation failed');
-        }
-        if (data?.error) throw new Error(data.error);
-
-        if (data?.image) {
-          await handleGenerationSuccess(data.image);
-          toast.success(t('picStudio.imageGenerated'));
-        }
-      } catch (error: any) {
-        toast.error(error.message || t('picStudio.imageGenerationError'));
-      } finally {
-        setReplicateLoading(false);
-      }
-      return;
-    }
-
-    // Premium tier — Replicate via €-Wallet
     setReplicateLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-image-replicate', {
-        body: {
-          prompt: prompt.trim(),
-          tier,
-          aspectRatio,
-          style,
-          referenceImageUrl: editMode ? referenceImage : undefined,
-        }
-      });
+      const tasks = Array.from({ length: variantsCount }, () => generateOne());
+      const results = await Promise.allSettled(tasks);
 
-      if (error) {
-        const fnError: any = error;
-        if (fnError.context && typeof fnError.context.json === 'function') {
-          try {
-            const body = await fnError.context.json();
-            if (body?.code === 'INSUFFICIENT_CREDITS' || body?.code === 'NO_WALLET') {
-              toast.error(body.error);
-              navigate('/ai-video-purchase-credits');
-              return;
-            }
-            throw new Error(body?.error || fnError.message);
-          } catch (e: any) {
-            throw e;
+      let successCount = 0;
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value) {
+          await handleGenerationSuccess(r.value);
+          successCount++;
+        } else if (r.status === 'rejected') {
+          if ((r.reason as any)?.needsPurchase) {
+            toast.error(r.reason.message);
+            navigate('/ai-video-purchase-credits');
+            setReplicateLoading(false);
+            return;
           }
+          console.error('[ImageGenerator] variant failed:', r.reason);
         }
-        throw error;
       }
 
-      if (data?.image) {
-        await handleGenerationSuccess(data.image);
-        toast.success(`Bild generiert! Verbleibend: ${currencySymbol}${(data.newBalance ?? 0).toFixed(2)}`);
+      if (successCount === 0) {
+        toast.error('Bildgenerierung fehlgeschlagen');
+      } else if (variantsCount > 1) {
+        toast.success(`${successCount} von ${variantsCount} Varianten generiert`);
       }
     } catch (error: any) {
-      toast.error(error.message || 'Bildgenerierung fehlgeschlagen');
+      toast.error(error.message || t('picStudio.imageGenerationError'));
     } finally {
       setReplicateLoading(false);
     }
@@ -230,7 +235,7 @@ export function ImageGenerator() {
       { ...image, url: imgUrl, prompt: prompt.trim(), style, aspectRatio },
       ...prev,
     ]);
-    if (tier === 'standard') toast.success(t('picStudio.imageGenerated'));
+    if (tier === 'standard' && variantsCount === 1) toast.success(t('picStudio.imageGenerated'));
     setJustGenerated(true);
 
     if (imageId && user) {
@@ -298,6 +303,22 @@ export function ImageGenerator() {
       console.error(err);
       toast.error(t('picStudio.deleteError'));
     }
+  };
+
+  const handleUpscaled = (upscaled: { id?: string; url: string; previewUrl: string; factor: 2 | 4; parentId: string | null }, original: any) => {
+    setGeneratedImages(prev => [
+      {
+        id: upscaled.id,
+        url: upscaled.url,
+        prompt: original.prompt,
+        style: original.style,
+        aspectRatio: original.aspectRatio,
+        upscale_factor: upscaled.factor,
+        parent_id: upscaled.parentId,
+      } as any,
+      ...prev,
+    ]);
+    setJustGenerated(true);
   };
 
   return (
@@ -394,7 +415,7 @@ export function ImageGenerator() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Switch checked={editMode} onCheckedChange={(v) => { setEditMode(v); if (!v) setReferenceImage(null); }} />
               <Label className="text-sm">{t('picStudio.imageToImage')}</Label>
@@ -426,6 +447,27 @@ export function ImageGenerator() {
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
               </div>
             )}
+
+            {/* Variations Toggle */}
+            <div className="flex items-center gap-2 ml-auto">
+              <Label className="text-sm text-muted-foreground">Varianten:</Label>
+              <div className="flex items-center rounded-lg border border-border/50 bg-background/30 p-0.5">
+                {([1, 4] as const).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setVariantsCount(n)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                      variantsCount === n
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {n}× {n === 4 && <span className="opacity-70">Bilder</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <Button
@@ -480,6 +522,7 @@ export function ImageGenerator() {
                     onSaveToAlbum={handleSaveToAlbum}
                     onOpenLightbox={setLightboxImage}
                     onDelete={handleDeleteImage}
+                    onUpscaled={handleUpscaled}
                   />
                 ))}
               </AnimatePresence>
@@ -503,6 +546,7 @@ export function ImageGenerator() {
         onOpenChange={(open) => !open && setLightboxImage(null)}
         onSaveToAlbum={handleSaveToAlbum}
         onDelete={handleDeleteImage}
+        onUpscaled={handleUpscaled}
       />
     </div>
   );

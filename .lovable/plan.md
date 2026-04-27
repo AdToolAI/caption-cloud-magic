@@ -1,99 +1,99 @@
-## Multi-Stem-Mixer
+# KI Picture Studio – Phase 2 Roadmap
 
-Neuer Mixer-Tab im Audio Studio, der die separierten Stems (Vocals/Drums/Bass/Other) aus
-der bestehenden Stem-Separation-Pipeline nutzbar macht. Nach „Stems extrahieren" in der
-Bibliothek öffnet sich automatisch der Mixer mit 4 Channel-Strips, Live-VU-Metern,
-Mute/Solo, Pan, Master-Volume und 6 Mix-Presets (Karaoke, Acapella, Instrumental,
-Vocal Focus, Drums+Bass, Original). Export als 48 kHz Stereo-WAV in die Bibliothek
-oder als einzelner Stem-Download.
+## Was ist heute schon da
+- **Generieren-Tab**: 4 Quality-Tiers (Standard/Fast/Pro/Ultra mit Gemini, Seedream 4, Imagen 4 Ultra, Nano Banana 2), 21 Stile, 7 Aspect Ratios, Image-to-Image mit Reference Upload, Auto-Save in System-Album.
+- **Smart Background-Tab**: Background Removal/Replacement.
+- **Wallet-Integration**: €-Credits + Insufficient-Credits Flow.
 
-### Was der Nutzer sieht
+## Was im Vergleich zu Artlist / Midjourney / Firefly / Magnific noch fehlt
 
-1. In der **Bibliothek** Track wählen → „Stems extrahieren" → Edge Function läuft
-2. Sobald 4 Stems da sind, Toast „Stems bereit zum Mixen" + automatischer Wechsel
-   in den **Stem-Mixer**-Tab
-3. **Mixer-UI**:
-   - Transport-Bar mit Play/Pause + scrubbable Timeline
-   - 6 Preset-Buttons (Karaoke macht Vocals stumm usw.)
-   - 4 Channel-Strips mit Emoji + Farb-Coding pro Stem
-     - Live-VU-Meter (RMS, animiert, Bond-Style)
-     - Volume-Slider (0–150 %, Boost möglich)
-     - Pan-Slider (L100–C–R100)
-     - M/S Buttons (Mute/Solo, Solo überschreibt Mute auf anderen Spuren)
-     - Single-Stem-Download als WAV (Icon im Channel-Header)
-   - Master-Section mit Master-Volume + Reset-Button
-4. „Mix speichern" → 48 kHz Stereo-WAV nach `audio-studio` Bucket + Eintrag in
-   `universal_audio_assets` (source = `stem_mix`, processing_preset = `stem_mix`,
-   effect_config enthält alle Channel-Settings für spätere Reproduzierbarkeit)
+Hier die **6 wichtigsten Features**, sortiert nach Impact-pro-Aufwand:
 
-### Technische Architektur
+### 1. AI Upscaler (4K / 8K) — *highest impact*
+Generierte Bilder werden meist in 1024–2048px geliefert. Für Print, Ads und große Displays braucht es 4K+. Konkurrenz: Magnific, Topaz Gigapixel, Firefly „Enhance".
+- **Modell**: `philz1337x/clarity-upscaler` oder `nightmareai/real-esrgan` via Replicate
+- **UI**: „Upscale 2x / 4x"-Button im ImageCard-Hover und im StudioLightbox
+- **Kosten**: ~$0.05/Bild (Pass-through ins €-Wallet)
 
-**Neuer Hook** `useStemMixer.ts`:
-- Decodiert alle Stems (parallel via shared AudioContext) zu AudioBuffers
-- Live-Graph: pro Stem `BufferSource → Gain → StereoPanner → Analyser → MasterGain → Destination`
-- Solo-Logik: jede Spur effektiv stumm wenn `muted` ODER (`anySolo && !solo`)
-- Volume/Pan-Updates ohne Graph-Rebuild via `linearRampToValueAtTime` (20 ms Smoothing)
-- Offline-Render via `OfflineAudioContext` mit identischem Graph
-- VU-Meter: RMS aus 128-Sample Time-Domain-Window pro Frame
-- `downloadStem(type)`: rendert nur eine Spur ohne Mute/Pan-Anwendung
+### 2. Variations (4 Bilder pro Prompt) — *Midjourney-Killer-Feature*
+Aktuell wird **1 Bild pro Generation** erzeugt. Midjourney/Firefly liefern standardmäßig 4 Varianten zur Auswahl.
+- Toggle „1 / 4 Variants" im Generator
+- Bei 4 Varianten parallele Promise.all-Requests an dieselbe Edge-Function
+- Grid-Anzeige mit „Verfeinern"-Button pro Variante (re-rolls mit gleichem Seed + leichter Prompt-Variation)
 
-**Neue Komponente** `StemMixerPanel.tsx`:
-- Empty-State wenn keine Stems verfügbar (mit Hinweis auf Bibliothek)
-- 6 Mix-Presets als Quick-Buttons → Custom-Badge wenn manuell verändert
-- Channel-Border + Solo-Button-Background nutzen Stem-Farben für visuelle Identität
-- Bond-2028 Style: backdrop-blur, gradient-Cards, framer-motion auf VU-Bars
+### 3. Inpainting / Outpainting (Magic Edit)
+Teile eines Bildes mit Maske ersetzen oder Canvas erweitern. Konkurrenz: Photoshop Generative Fill, Firefly, Ideogram Magic Fill.
+- Neuer Tab **„Magic Edit"** im Picture Studio
+- Canvas-Editor mit Brush-Tool für Maske
+- Outpainting: Aspect-Ratio-Switcher erweitert das Canvas und füllt mit AI
+- **Modell**: `black-forest-labs/flux-fill-pro` oder Gemini Nano Banana Edit-Mode
+- Reuse von vorhandener `background-projects` Storage-Bucket
 
-**Geänderte Dateien**:
-- `src/components/audio-studio/SoundLibrary.tsx`: neuer `onStemsExtracted`-Callback,
-  feuert nach erfolgreichem Demucs-Run mit den 4 Stem-URLs + Original-Title
-- `src/pages/AudioStudio.tsx`: neuer Tab `'stems'`, State `stemSet`, automatischer
-  Wechsel nach Extraction, Wiring zu `setLibraryRefreshKey` für Mix-Speicherung
+### 4. Style-Transfer & Reference-Style-Lock
+Bild + „Mach es im Stil von <Reference>". Heute existiert nur Image-to-Image (1 Reference), aber kein **Style-Reference-System** wie Midjourney `--sref`.
+- 2-Slot-System: „Subject Reference" + „Style Reference"
+- Optional: Brand-Kit Style Lock — Nutzer speichert eine Reference dauerhaft als „Markenstil", wird auto-injected
+- **Modell**: Nano Banana 2 Multi-Image-Edit oder `black-forest-labs/flux-redux`
 
-### Kosten
+### 5. Batch-Generation aus Prompt-Liste
+Mehrere Prompts auf einmal durchlaufen lassen (z. B. 10 Produktbilder für E-Commerce / Ad-Carousel).
+- CSV-Upload oder Multi-Line-Textarea („1 Prompt pro Zeile")
+- Queue-System mit Progress-Bar und Cost-Preview *vor* Start
+- Reuse `useRenderQueue` / `useBatchVideoCreation` Pattern
 
-Der Mixer selbst ist **kostenlos** (alles client-side Web Audio).
-Stem-Separation kostet weiterhin `STEM_SEPARATION_COST_EUR = 0.20 €` (unverändert).
+### 6. Brand-Kit Auto-Apply (CI-Treue)
+Es existiert bereits `useBrandKitAutoApply` und `analyze-image-v2` mit CI-Color-Match. Aktuell wird das im Picture Studio **nicht** genutzt.
+- Toggle „Brand-Kit aktiv" im Generator
+- Auto-Inject von Brand-Farben + Font-Hinweisen ins Prompt
+- Nach Generation: ImageAnalysisPanel mit CI-Match-Score (0–100%)
+- Warnung wenn Score < 60%
 
-### Out of Scope (für später)
+---
 
-- Per-Channel-EQ und Effekte (Reverb, Delay)
-- Multi-Track-Recording (mehrere Stem-Sets gleichzeitig)
-- Stem-Mixer-State persistieren (Mix-Templates)
+## Empfohlene Reihenfolge (3 Phasen)
 
-## Final Mix Export Hub
+```text
+Phase A (sofort, ~1 Lovable-Loop):
+  1. AI Upscaler 2x/4x  ← schneller Win, sofort wertvoll
+  2. Variations 1/4     ← User-Experience-Boost
 
-Multi-Source Mixer-Hub im Audio Studio, der alle Audio-Quellen (Voiceover, AI Music,
-Stem-Mix, SFX, externe URLs) zu einem finalen sendefertigen WAV mit Loudness-
-Normalisierung kombiniert. Vorhandene Quellen aus dem Editor (aktuelles Voiceover +
-zuletzt geladener Music-Track) werden beim Öffnen des Tabs automatisch eingefügt.
+Phase B (~1 Loop):
+  3. Magic Edit (Inpaint + Outpaint Canvas-Tab)
 
-### Was der Nutzer sieht
-1. **Sources-Liste**: Vorbelegte Voice/Music + manuell per URL oder Upload erweiterbar
-2. Pro Source: Volume (0–150 %), Pan (L–R), Mute, Start-Offset, Lösch-Button
-3. **Transport**: Play/Pause + scrubbare Master-Timeline + Master-Volume
-4. **Loudness-Ziel**: 5 Presets (Spotify/YouTube –14 LUFS, Broadcast –23, Cinema –27, Off)
-   + „Lautheit messen“-Button mit Δ-Anzeige zum Ziel
-5. **Export**: Bibliothek (`universal_audio_assets`, source = `final_mix`) ODER direkter
-   WAV-Download
+Phase C (~1 Loop):
+  4. Style-Reference 2-Slot
+  5. Batch-Generation
+  6. Brand-Kit Lock + CI-Score
+```
 
-### Technische Architektur
-**Hook** `useFinalMixer.ts`:
-- Decodiert alle Sources parallel, hält AudioBuffers in einer Map
-- Live-Graph: pro Source `BufferSource → Gain → StereoPanner → MasterGain → Destination`
-- Offset-aware Playback (Sources können zeitversetzt starten)
-- Live-Updates für Volume/Pan via `linearRampToValueAtTime` (20 ms Smoothing)
-- **Loudness-Messung**: vereinfachter ITU-R BS.1770-4 mit K-Weighting-Approximation
-  (1st-order high-pass), 400 ms Blocks @ 75 % Overlap, Absolute Gating @ –70 LUFS,
-  Relative Gating @ –10 LU. Liefert Integrated LUFS + True-Peak (Sample-Peak)
-- **Normalisierung**: Linear-Gain auf Δ zum Ziel, gecappt auf ±12 dB, mit Soft-Clip
-  (tanh) zum Schutz vor Übersteuerung
-- Offline-Render via `OfflineAudioContext` (48 kHz Stereo) → 16-bit PCM WAV
+## Technische Details (für Phase A)
 
-**Komponente** `FinalMixPanel.tsx`:
-- 4 Karten-Sektionen (Header, Sources, Transport+Master, Loudness, Export)
-- Auto-Add `initialSources` beim Mount (aus `AudioStudio.tsx` State)
-- Ampel-Farben für Δ-LUFS (≤1 grün, ≤3 amber, sonst rose)
-- Bond-2028 Style: gradient-Cards, blur, motion auf Sources-Liste
+**Edge Functions (neu):**
+- `upscale-image` — Replicate `clarity-upscaler`, akzeptiert `imageId` oder `imageUrl`, Wallet-Debit, Storage-Save in `background-projects/{user_id}/upscaled/`
+- `generate-image-variations` — Wrapper, der `generate-image-replicate` n-mal parallel aufruft, gemeinsame Wallet-Reservation
 
-### Kosten
-**Komplett kostenlos** — alles client-side Web Audio + Storage-Upload für gespeicherte Mixe.
+**Frontend (Phase A):**
+- `ImageCard.tsx` → neuer Hover-Button „Upscale" mit Dropdown 2x/4x
+- `StudioLightbox.tsx` → „Upscale & Download"-Action
+- `ImageGenerator.tsx` → Switch „4 Varianten generieren" (4× Cost-Preview + 4× parallel)
+- Neuer State `upscalingImageId` für Spinner-Overlay
+
+**Wallet-Logik:**
+- Upscale 2x: $0.03  /  4x: $0.06
+- Variations: Cost × 4, Pre-Check `balance >= cost*4`
+
+**DB:**
+- `studio_images.parent_id` (uuid, nullable) → Verknüpfung Variante↔Original und Upscale↔Original
+- `studio_images.upscale_factor` (int, nullable)
+
+---
+
+## Was ich NICHT vorschlage
+- **Eigenes Model-Training (LoRA/DreamBooth)** — zu komplex, zu teuer pro User, geringe Adoption
+- **3D-Generation** — kein Marketing-Use-Case, hohe Kosten
+- **Video-aus-Bild im Picture Studio** — gehört in AI Video Studio (existiert bereits)
+
+---
+
+## Frage an dich
+Welche Phase starten wir? **Empfehlung: Phase A (Upscaler + Variations)** — höchster sofort spürbarer Mehrwert, ~1 Loop Aufwand, beide Features sind „Killer-Demos" in jedem Sales-Pitch.
