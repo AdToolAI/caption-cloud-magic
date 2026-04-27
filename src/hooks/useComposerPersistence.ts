@@ -161,6 +161,7 @@ export function useComposerPersistence() {
               cost_euros: scene.costEuros,
               character_shot: (scene.characterShot ?? null) as any,
               director_modifiers: (scene.directorModifiers ?? {}) as any,
+              shot_director: (scene.shotDirector ?? {}) as any,
               prompt_slots: (scene.promptSlots ?? null) as any,
               prompt_mode: scene.promptMode ?? null,
               prompt_slot_order: (scene.promptSlotOrder ?? null) as any,
