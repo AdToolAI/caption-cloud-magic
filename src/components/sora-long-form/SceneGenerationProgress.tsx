@@ -137,6 +137,28 @@ export function SceneGenerationProgress({
     await onUpdateProject({ status: 'generating' });
 
     try {
+      // Inject Shot Director cinematography suffix into pending scenes' prompts.
+      // Uses a marker so re-runs stay idempotent.
+      const SHOT_MARKER = '\n\n[SHOT]:';
+      const pendingToUpdate = scenes.filter(
+        (s) => (s.status === 'pending' || s.status === 'failed') && s.shot_director && Object.keys(s.shot_director).length > 0
+      );
+      if (pendingToUpdate.length > 0) {
+        const { buildShotPromptSuffix } = await import('@/lib/shotDirector/buildShotPromptSuffix');
+        await Promise.all(
+          pendingToUpdate.map(async (s) => {
+            const suffix = buildShotPromptSuffix(s.shot_director || {});
+            if (!suffix) return;
+            const base = s.prompt.split(SHOT_MARKER)[0].trim();
+            const merged = `${base}${SHOT_MARKER} ${suffix}`;
+            await supabase
+              .from('sora_long_form_scenes')
+              .update({ prompt: merged })
+              .eq('id', s.id);
+          })
+        );
+      }
+
       const { data, error } = await supabase.functions.invoke('generate-sora-chain', {
         body: { projectId: project.id, model: project.model, aspectRatio: project.aspect_ratio },
       });

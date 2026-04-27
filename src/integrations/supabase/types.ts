@@ -10121,6 +10121,7 @@ export type Database = {
           reference_image_url: string | null
           replicate_prediction_id: string | null
           scene_order: number
+          shot_director: Json
           status: string
           transition_duration: number | null
           transition_type: string | null
@@ -10137,6 +10138,7 @@ export type Database = {
           reference_image_url?: string | null
           replicate_prediction_id?: string | null
           scene_order: number
+          shot_director?: Json
           status?: string
           transition_duration?: number | null
           transition_type?: string | null
@@ -10153,6 +10155,7 @@ export type Database = {
           reference_image_url?: string | null
           replicate_prediction_id?: string | null
           scene_order?: number
+          shot_director?: Json
           status?: string
           transition_duration?: number | null
           transition_type?: string | null

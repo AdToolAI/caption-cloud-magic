@@ -14,6 +14,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { calculateSceneCost } from '@/types/sora-long-form';
 import type { Sora2LongFormProject, Sora2Scene, SceneDuration, TransitionType } from '@/types/sora-long-form';
+import SceneShotDirectorPanel from '@/components/video-composer/SceneShotDirectorPanel';
+import CinematicStylePresets from '@/components/ai-video/CinematicStylePresets';
+import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
+import type { ShotSelection } from '@/config/shotDirector';
 
 interface SceneConfiguratorProps {
   project: Sora2LongFormProject;
@@ -173,6 +177,37 @@ export function SceneConfigurator({
                 />
                 <p className="text-xs text-muted-foreground mt-1">{t('soraLf.describeInEnglish')}</p>
               </div>
+
+              {/* Cinematic Looks (presets) — one-click director styles */}
+              <CinematicStylePresets
+                value={(currentScene.shot_director ?? {}) as ShotSelection}
+                onApply={(selection) => updateScene(selectedScene, { shot_director: selection })}
+                compact
+              />
+
+              {/* Per-scene Shot Director — framing/angle/movement/lighting */}
+              <SceneShotDirectorPanel
+                value={(currentScene.shot_director ?? {}) as ShotSelection}
+                onChange={(next) => updateScene(selectedScene, { shot_director: next })}
+                language={language}
+              />
+
+              {/* Final prompt preview */}
+              {(() => {
+                const suffix = buildShotPromptSuffix((currentScene.shot_director ?? {}) as ShotSelection);
+                if (!suffix) return null;
+                return (
+                  <div className="rounded-md border border-primary/20 bg-primary/5 p-2 text-[11px]">
+                    <div className="font-medium text-primary mb-1">
+                      {language === 'de' ? 'Finaler Prompt' : language === 'es' ? 'Prompt final' : 'Final prompt'}
+                    </div>
+                    <div className="text-foreground/80 leading-snug">
+                      {currentScene.prompt}{' '}
+                      <span className="text-primary/80">{suffix}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

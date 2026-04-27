@@ -19,6 +19,7 @@ export interface Sora2Scene {
   transition_type: TransitionType;
   transition_duration: number;
   cost_euros: number;
+  shot_director?: Record<string, string>;
   created_at?: string;
   updated_at?: string;
 }
