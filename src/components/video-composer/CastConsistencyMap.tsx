@@ -14,7 +14,7 @@
 
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Users, Image as ImageIcon, Link2, Circle } from 'lucide-react';
 import type { ComposerCharacter, ComposerScene } from '@/types/video-composer';
