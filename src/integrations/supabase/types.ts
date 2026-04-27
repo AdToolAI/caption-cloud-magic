@@ -4290,6 +4290,7 @@ export type Database = {
           replicate_prediction_id: string | null
           retry_count: number
           scene_type: string
+          shot_director: Json | null
           stock_keywords: string | null
           subject_track: Json | null
           talking_head_aspect: string | null
@@ -4346,6 +4347,7 @@ export type Database = {
           replicate_prediction_id?: string | null
           retry_count?: number
           scene_type?: string
+          shot_director?: Json | null
           stock_keywords?: string | null
           subject_track?: Json | null
           talking_head_aspect?: string | null
@@ -4402,6 +4404,7 @@ export type Database = {
           replicate_prediction_id?: string | null
           retry_count?: number
           scene_type?: string
+          shot_director?: Json | null
           stock_keywords?: string | null
           subject_track?: Json | null
           talking_head_aspect?: string | null
