@@ -41,6 +41,12 @@ interface MusicGeneratorPanelProps {
   onOpenLibrary?: () => void;
   onSendToBeatSync?: (track: GeneratedMusicTrack) => void;
   defaultBpm?: number;     // e.g. video BPM detected from beat-sync
+  // Prefill values from Auto-Match (or other upstream flows)
+  prefillPrompt?: string;
+  prefillGenre?: string;
+  prefillMood?: string;
+  prefillDuration?: number;
+  prefillBpm?: number;
 }
 
 export function MusicGeneratorPanel({
@@ -48,18 +54,33 @@ export function MusicGeneratorPanel({
   onOpenLibrary,
   onSendToBeatSync,
   defaultBpm,
+  prefillPrompt,
+  prefillGenre,
+  prefillMood,
+  prefillDuration,
+  prefillBpm,
 }: MusicGeneratorPanelProps) {
   const { generateMusic, loading } = useMusicGeneration();
   const { wallet } = useAIVideoWallet();
 
-  const [prompt, setPrompt] = useState('');
+  const matchMoodIdx = (mood?: string): number => {
+    if (!mood) return 2;
+    const m = mood.toLowerCase();
+    const idx = MOOD_LABELS.findIndex(l => l.toLowerCase() === m);
+    if (idx >= 0) return idx;
+    if (m === 'energetic' || m === 'hype' || m === 'uplifting') return 4;
+    if (m === 'calm' || m === 'mellow') return 0;
+    return 2;
+  };
+
+  const [prompt, setPrompt] = useState(prefillPrompt || '');
   const [tier, setTier] = useState<MusicTier>('standard');
-  const [duration, setDuration] = useState(30);
-  const [genre, setGenre] = useState<string>('cinematic');
-  const [moodIdx, setMoodIdx] = useState(2);
+  const [duration, setDuration] = useState(prefillDuration || 30);
+  const [genre, setGenre] = useState<string>(prefillGenre || 'cinematic');
+  const [moodIdx, setMoodIdx] = useState(matchMoodIdx(prefillMood));
   const [instrumental, setInstrumental] = useState(true);
-  const [useBpm, setUseBpm] = useState<boolean>(!!defaultBpm);
-  const [bpm, setBpm] = useState<number>(defaultBpm || 120);
+  const [useBpm, setUseBpm] = useState<boolean>(!!(defaultBpm || prefillBpm));
+  const [bpm, setBpm] = useState<number>(prefillBpm || defaultBpm || 120);
   const [generatedTrack, setGeneratedTrack] = useState<GeneratedMusicTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -72,6 +93,16 @@ export function MusicGeneratorPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultBpm]);
+
+  // Re-apply prefill values when they change (e.g. user opens "Customize" again)
+  useEffect(() => {
+    if (prefillPrompt !== undefined) setPrompt(prefillPrompt);
+    if (prefillGenre) setGenre(prefillGenre);
+    if (prefillMood) setMoodIdx(matchMoodIdx(prefillMood));
+    if (prefillDuration) setDuration(prefillDuration);
+    if (prefillBpm) { setBpm(prefillBpm); setUseBpm(true); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillPrompt, prefillGenre, prefillMood, prefillDuration, prefillBpm]);
 
   const tierInfo = MUSIC_TIER_PRICING[tier];
   const maxDur = tierInfo.maxDuration;
