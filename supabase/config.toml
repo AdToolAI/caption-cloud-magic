@@ -736,3 +736,11 @@ timeout_sec = 180
 [functions.auto-match-music-to-video]
 verify_jwt = true
 timeout_sec = 60
+
+[functions.generate-ltx-video]
+verify_jwt = true
+timeout_sec = 180
+
+[functions.generate-grok-video]
+verify_jwt = true
+timeout_sec = 180
