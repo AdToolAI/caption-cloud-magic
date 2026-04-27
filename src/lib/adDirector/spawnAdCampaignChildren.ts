@@ -87,6 +87,18 @@ async function createChildProject(args: {
 }): Promise<string | null> {
   const { userId, input, scenes, titleSuffix, cutdownType, variantStrategy } = args;
 
+  // Cutdown children: master VO would desync (30s VO on a 15s/6s cut). Disable
+  // it by default and surface a hint so the user can re-synthesize a fresh VO
+  // matching the new duration. A/B variant siblings keep the master VO.
+  const childAssembly = cutdownType
+    ? {
+        ...input.assemblyConfig,
+        voiceover: input.assemblyConfig?.voiceover
+          ? { ...input.assemblyConfig.voiceover, enabled: false }
+          : input.assemblyConfig?.voiceover,
+      }
+    : input.assemblyConfig;
+
   const { data: inserted, error: insErr } = await supabase
     .from('composer_projects')
     .insert({
@@ -95,7 +107,7 @@ async function createChildProject(args: {
       category: 'product-ad',
       briefing: input.briefing as any,
       status: 'storyboard',
-      assembly_config: input.assemblyConfig as any,
+      assembly_config: childAssembly as any,
       total_cost_euros: 0,
       language: input.language,
       brand_kit_id: input.brandKitId ?? null,
