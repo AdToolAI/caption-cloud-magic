@@ -267,6 +267,7 @@ export default function VideoComposerDashboard() {
             promptMode: ((row as any).prompt_mode as any) ?? local?.promptMode,
             promptSlotOrder: ((row as any).prompt_slot_order as any) ?? local?.promptSlotOrder,
             appliedStylePresetId: ((row as any).applied_style_preset_id as any) ?? local?.appliedStylePresetId,
+            cinematicPresetSlug: ((row as any).cinematic_preset_slug as any) ?? local?.cinematicPresetSlug,
             // Block M — Hybrid Production
             hybridMode: ((row as any).hybrid_mode as any) ?? local?.hybridMode,
             firstFrameUrl: ((row as any).first_frame_url as any) ?? local?.firstFrameUrl,
