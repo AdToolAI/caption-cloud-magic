@@ -30,17 +30,25 @@ interface SoundLibraryItem {
 
 interface SoundLibraryProps {
   onLoadAudio?: (url: string, originalUrl?: string | null, effectConfig?: EnhancementOptions | null) => void;
+  onSendToBeatSync?: (url: string, title?: string) => void;
 }
 
-export function SoundLibrary({ onLoadAudio }: SoundLibraryProps) {
+type FilterCategory = 'all' | 'enhanced' | 'music' | 'stems';
+
+export function SoundLibrary({ onLoadAudio, onSendToBeatSync }: SoundLibraryProps) {
   const { user } = useAuth();
+  const { separateStems, loading: stemLoading } = useStemSeparation();
+  const { wallet } = useAIVideoWallet();
   const [sounds, setSounds] = useState<SoundLibraryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [category, setCategory] = useState<FilterCategory>('all');
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [stemTargetId, setStemTargetId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const currencySymbol = wallet?.currency === 'USD' ? '$' : '€';
 
-  // Fetch sounds from database
+  // Fetch sounds from database — include voicepro (enhanced), ai_generated (music) and stem assets
   useEffect(() => {
     if (!user?.id) return;
     
@@ -51,7 +59,7 @@ export function SoundLibrary({ onLoadAudio }: SoundLibraryProps) {
           .from('universal_audio_assets')
           .select('id, title, url, original_audio_url, processing_preset, effect_config, duration_sec, created_at, type, source')
           .eq('user_id', user.id)
-          .eq('source', 'voicepro')
+          .in('source', ['voicepro', 'ai_generated', 'stem_separation'])
           .order('created_at', { ascending: false });
 
         if (error) throw error;
