@@ -22,6 +22,8 @@ interface AssemblyTabProps {
   assemblyConfig: AssemblyConfig;
   onUpdateAssembly: (config: Partial<AssemblyConfig>) => void;
   scenes: ComposerScene[];
+  /** Fired exactly once when a render completes successfully. */
+  onMasterRenderComplete?: (videoUrl: string) => void;
 }
 
 type RenderStatus = 'idle' | 'pending' | 'rendering' | 'completed' | 'failed';
@@ -57,7 +59,7 @@ const FALLBACKS: Record<string, string> = {
   renderVideo: 'Video rendern',
 };
 
-export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly, scenes }: AssemblyTabProps) {
+export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly, scenes, onMasterRenderComplete }: AssemblyTabProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -209,6 +211,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
             setTimeout(() => {
               toast({ title: tt('savedToLibrary'), description: tt('savedToLibraryDesc') });
             }, 800);
+            try { onMasterRenderComplete?.(finalUrl); } catch { /* ignore */ }
             return;
           }
           if (row?.status === 'failed') {

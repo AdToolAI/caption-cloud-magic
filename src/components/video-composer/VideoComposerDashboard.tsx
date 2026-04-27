@@ -30,9 +30,10 @@ import type {
   ClipStatus,
   ClipSource,
   ClipQuality,
+  AdCampaignMeta,
 } from '@/types/video-composer';
 import { getClipCost } from '@/types/video-composer';
-import { useComposerPersistence, persistAssemblyConfig } from '@/hooks/useComposerPersistence';
+import { useComposerPersistence, persistAssemblyConfig, persistAdMeta } from '@/hooks/useComposerPersistence';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
@@ -41,6 +42,8 @@ import AutoDirectorWizard from './AutoDirectorWizard';
 import AdDirectorWizard from './AdDirectorWizard';
 import ShareProjectDialog from './ShareProjectDialog';
 import CollaboratorAvatars from './CollaboratorAvatars';
+import AdCampaignTree from './AdCampaignTree';
+import { spawnAdCampaignChildren } from '@/lib/adDirector/spawnAdCampaignChildren';
 import {
   useComposerPresence,
   useComposerScenesRealtime,
@@ -48,7 +51,7 @@ import {
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
-type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export';
+type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export' | 'campaign';
 
 interface LocalProject {
   id?: string;
@@ -63,11 +66,15 @@ interface LocalProject {
   outputUrl?: string;
   brandKitId?: string | null;
   brandKitAutoSync?: boolean;
+  adMeta?: AdCampaignMeta | null;
+  adVariantStrategy?: string | null;
+  parentProjectId?: string | null;
+  cutdownType?: string | null;
 }
 
 const STORAGE_KEY = 'video-composer-draft';
 const TAB_STORAGE_KEY = 'video-composer-draft-tab';
-const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'clips', 'text', 'audio', 'export'];
+const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'clips', 'text', 'audio', 'export', 'campaign'];
 
 function loadDraft(): LocalProject | null {
   try {
@@ -197,7 +204,7 @@ export default function VideoComposerDashboard() {
         const [{ data: projRow }, { data, error: dbError }] = await Promise.all([
           supabase
             .from('composer_projects')
-            .select('output_url, status')
+            .select('output_url, status, ad_meta, ad_variant_strategy, parent_project_id, cutdown_type')
             .eq('id', projectId)
             .maybeSingle(),
           supabase
@@ -212,6 +219,10 @@ export default function VideoComposerDashboard() {
             ...prev,
             outputUrl: projRow.output_url ?? prev.outputUrl,
             status: (projRow.status as ComposerStatus) ?? prev.status,
+            adMeta: ((projRow as any).ad_meta as AdCampaignMeta | null) ?? prev.adMeta ?? null,
+            adVariantStrategy: (projRow as any).ad_variant_strategy ?? prev.adVariantStrategy ?? null,
+            parentProjectId: (projRow as any).parent_project_id ?? prev.parentProjectId ?? null,
+            cutdownType: (projRow as any).cutdown_type ?? prev.cutdownType ?? null,
           }));
         }
 
@@ -374,6 +385,11 @@ export default function VideoComposerDashboard() {
     try {
       const result = await ensureProjectPersisted(project);
       setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
+      // If this is an Ad Director project, ensure ad_meta is up-to-date even
+      // when the project row already existed (subsequent wizard runs).
+      if (project.adMeta) {
+        persistAdMeta(result.projectId, project.adMeta).catch(() => {});
+      }
       setActiveTab('clips');
     } catch (err: any) {
       console.error('[VideoComposerDashboard] persist failed:', err);
@@ -482,6 +498,7 @@ export default function VideoComposerDashboard() {
     }
   }, [project.id]);
 
+  const showCampaignTab = !!project.adMeta;
   const TABS = [
     { id: 'briefing' as TabId, label: t('videoComposer.briefing'), icon: FileText },
     { id: 'storyboard' as TabId, label: t('videoComposer.storyboard'), icon: LayoutGrid },
@@ -489,6 +506,9 @@ export default function VideoComposerDashboard() {
     { id: 'text' as TabId, label: t('videoComposer.voiceSubtitles'), icon: Mic },
     { id: 'audio' as TabId, label: t('videoComposer.music'), icon: Music },
     { id: 'export' as TabId, label: t('videoComposer.export'), icon: Download },
+    ...(showCampaignTab
+      ? [{ id: 'campaign' as TabId, label: 'Kampagne', icon: Megaphone }]
+      : []),
   ];
 
   // Workflow accessibility & completion logic for the step sidebar
@@ -527,6 +547,7 @@ export default function VideoComposerDashboard() {
     text: 'Voiceover & Untertitel',
     audio: 'Musik & Sound-Mix',
     export: 'Render & Download',
+    campaign: 'Cutdowns & A/B-Varianten',
   };
 
   const STEPS: StepItem[] = TABS.map((t) => ({
@@ -803,9 +824,52 @@ export default function VideoComposerDashboard() {
                 assemblyConfig={project.assemblyConfig}
                 onUpdateAssembly={updateAssembly}
                 scenes={project.scenes}
+                onMasterRenderComplete={async () => {
+                  if (!project.id || !project.adMeta || project.parentProjectId) return;
+                  try {
+                    const spawned = await spawnAdCampaignChildren({
+                      masterProjectId: project.id,
+                      masterTitle: project.title,
+                      briefing: project.briefing,
+                      scenes: project.scenes,
+                      assemblyConfig: project.assemblyConfig,
+                      language: project.language,
+                      brandKitId: project.brandKitId,
+                      brandKitAutoSync: project.brandKitAutoSync,
+                      adMeta: project.adMeta,
+                    });
+                    if (spawned.length > 0) {
+                      toast({
+                        title: 'Kampagne erweitert 🎬',
+                        description: `${spawned.length} zusätzliche Variante(n) erstellt: ${spawned.map(s => s.label).join(', ')}`,
+                      });
+                      setActiveTab('campaign');
+                    }
+                  } catch (err) {
+                    console.warn('[Dashboard] spawn campaign children failed:', err);
+                  }
+                }}
               />
               <NLEExportPanel projectId={project.id} />
             </div>
+          </TabsContent>
+
+          <TabsContent value="campaign">
+            <AdCampaignTree
+              masterProjectId={project.parentProjectId ?? project.id}
+              masterTitle={project.title}
+              masterStatus={project.status}
+              masterOutputUrl={project.outputUrl}
+              adMeta={project.adMeta}
+              onOpenChild={(childId) => {
+                // Reset draft and load the child project on next mount
+                try {
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...defaultProject, id: childId }));
+                  localStorage.setItem(TAB_STORAGE_KEY, 'export' as TabId);
+                } catch { /* ignore */ }
+                window.location.reload();
+              }}
+            />
           </TabsContent>
             </Tabs>
           </div>
@@ -842,8 +906,16 @@ export default function VideoComposerDashboard() {
               ? { ...prev.assemblyConfig, voiceover }
               : prev.assemblyConfig,
             status: 'storyboard',
+            adMeta: adMeta as AdCampaignMeta,
+            adVariantStrategy: adMeta?.variantStrategy ?? null,
           }));
           setActiveTab('storyboard');
+          // Persist ad meta to DB if project is already saved (debounced); the
+          // initial insert in ensureProjectPersisted will pick up adMeta from
+          // state for fresh projects.
+          if (project.id) {
+            persistAdMeta(project.id, adMeta as AdCampaignMeta).catch(() => {});
+          }
           try {
             localStorage.setItem(
               'video-composer-ad-meta',

@@ -6,6 +6,7 @@ import type {
   AssemblyConfig,
   ComposerCategory,
   ComposerStatus,
+  AdCampaignMeta,
 } from '@/types/video-composer';
 
 /**
@@ -45,6 +46,23 @@ export async function persistBrandKit(
   }
 }
 
+/** Persist Ad Director campaign metadata. */
+export async function persistAdMeta(
+  projectId: string,
+  adMeta: AdCampaignMeta | null,
+  variantStrategy?: string | null,
+): Promise<void> {
+  if (!projectId) return;
+  const { error } = await supabase
+    .from('composer_projects')
+    .update({
+      ad_meta: (adMeta as any) ?? null,
+      ad_variant_strategy: variantStrategy ?? adMeta?.variantStrategy ?? null,
+    } as any)
+    .eq('id', projectId);
+  if (error) console.warn('[persistence] persistAdMeta failed:', error);
+}
+
 export interface PersistableProject {
   id?: string;
   title: string;
@@ -57,6 +75,10 @@ export interface PersistableProject {
   language: string;
   brandKitId?: string | null;
   brandKitAutoSync?: boolean;
+  adMeta?: AdCampaignMeta | null;
+  adVariantStrategy?: string | null;
+  parentProjectId?: string | null;
+  cutdownType?: string | null;
 }
 
 export interface PersistResult {
@@ -92,6 +114,10 @@ export function useComposerPersistence() {
             language: project.language || 'de',
             brand_kit_id: project.brandKitId ?? null,
             brand_kit_auto_sync: project.brandKitAutoSync ?? false,
+            ad_meta: (project.adMeta as any) ?? null,
+            ad_variant_strategy: project.adVariantStrategy ?? project.adMeta?.variantStrategy ?? null,
+            parent_project_id: project.parentProjectId ?? null,
+            cutdown_type: project.cutdownType ?? null,
           } as any)
           .select('id')
           .single();
