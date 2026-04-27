@@ -145,11 +145,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
     setGenerating(true);
     try {
-      // Build the prompt — inject Library cast/location description for richer scene continuity
+      // Build the prompt — inject Library cast/location AND Brand Character (if locked)
       const castSuffix = buildCastPromptSuffix(castCharacter, castLocation);
-      const finalPrompt = castSuffix
-        ? `${prompt.trim()}\n\n${castSuffix}`
-        : prompt.trim();
+      const brandSuffix = brandCharacter
+        ? `Featuring ${brandCharacter.name}: ${buildCharacterPromptInjection(brandCharacter)}.`
+        : '';
+      const finalPrompt = [prompt.trim(), brandSuffix, castSuffix]
+        .filter(Boolean)
+        .join('\n\n');
 
       const body: Record<string, unknown> = {
         prompt: finalPrompt,
@@ -158,15 +161,19 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         aspectRatio,
       };
 
-      // i2v: prefer the user's manually uploaded startImage, else the character's reference image
-      const referenceImage = startImageUrl ?? castCharacter?.reference_image_url ?? null;
+      // i2v: Brand Character image > manual upload > library character
+      const referenceImage =
+        brandCharacter?.reference_image_url ??
+        startImageUrl ??
+        castCharacter?.reference_image_url ??
+        null;
       if (model.capabilities.i2v && referenceImage) body.startImageUrl = referenceImage;
       if (model.capabilities.audio) body.generateAudio = generateAudio;
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
 
       // Sora 2 cannot accept image input → toast hint when a character is selected
-      if (model.family === 'sora' && castCharacter) {
+      if (model.family === 'sora' && (castCharacter || brandCharacter)) {
         toast.info(
           language === 'de'
             ? 'Sora 2 nutzt nur die Beschreibung (~70 % Konsistenz). Für längere Storys → Kling oder Hailuo.'
