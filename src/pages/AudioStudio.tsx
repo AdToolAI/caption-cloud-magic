@@ -565,6 +565,27 @@ export default function AudioStudio() {
                       </motion.div>
                     )}
 
+                    {activeTab === 'auto-match' && (
+                      <motion.div
+                        key="auto-match"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <AutoMatchPanel
+                          onTrackGenerated={(track) => {
+                            setLibraryRefreshKey(k => k + 1);
+                            handleSendToBeatSync({ url: track.url, title: track.title });
+                          }}
+                          onCustomize={(prefill) => {
+                            setMusicGenPrefill(prefill);
+                            setActiveTab('music');
+                          }}
+                          onSendToBeatSync={handleSendToBeatSync}
+                        />
+                      </motion.div>
+                    )}
+
                     {activeTab === 'ducking' && (
                       <motion.div
                         key="ducking"
@@ -588,8 +609,8 @@ export default function AudioStudio() {
                   </AnimatePresence>
                 </div>
 
-                {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music/ducking tab) */}
-                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && activeTab !== 'ducking' && (
+                {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music/ducking/auto-match tab) */}
+                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && activeTab !== 'ducking' && activeTab !== 'auto-match' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
