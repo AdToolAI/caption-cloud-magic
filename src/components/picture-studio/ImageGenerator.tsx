@@ -321,19 +321,6 @@ export function ImageGenerator() {
     setJustGenerated(true);
   };
 
-      const pathMatch = url.pathname.match(/\/object\/public\/background-projects\/(.+)/);
-      if (pathMatch) {
-        await supabase.storage.from('background-projects').remove([pathMatch[1]]);
-      }
-      await supabase.from('studio_images').delete().eq('id', image.id);
-      setGeneratedImages(prev => prev.filter(img => img.id !== image.id));
-      toast.success(t('picStudio.imageDeleted'));
-    } catch (err) {
-      console.error(err);
-      toast.error(t('picStudio.deleteError'));
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Wallet-Header */}
