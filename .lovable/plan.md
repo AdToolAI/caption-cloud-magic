@@ -1,154 +1,140 @@
+# Plan: Ad Director Vollausbau (A + B + C)
 
-# Stufe 2b — Top-Marken-Werbung vollständig
-
-Schließt die Lücken aus Stufe 2: vollständige CI-Anwendung (Logo-Endcard, Brand-Font, gesamte Palette) und echte Kampagnen-Skalierung (Cutdowns, Aspect-Ratio-Variants, A/B-Video-Renders mit Performance-Tracking).
-
----
-
-## 1. Brand-Identity Vollausbau
-
-### 1a. Auto-Logo-Endcard (neue Final-Szene)
-- Wenn Brand-Kit aktiv ist und das Framework keine eigene `cta`-Endcard hat (oder zusätzlich gewünscht), wird automatisch eine **Logo-Endcard-Szene** angehängt (2s).
-- Neuer `sceneType: 'brand-endcard'` mit `clipSource: 'static-endcard'` — gerendert via Remotion-Composition statt AI-Modell (kostet 0 Credits).
-- Inhalt: Brand-BG (primary_color), Logo zentriert, optionale Tagline aus Brand-Kit, Fade-in.
-
-### 1b. Brand-Font in Text-Overlays
-- `useActiveBrandKit` liefert bereits `font_family` — neues Feld `fontFamily` in `textOverlay` durchreichen.
-- Composer-Renderer (Remotion + Studio-Preview) nutzt es; Fallback: `Inter`.
-
-### 1c. Vollständige Brand-Palette
-- Aktuell nur `primaryColor` auf CTA — neu: jedes Overlay bekommt Farbrolle (`primary` / `secondary` / `accent` / `neutral`) statt fixer Hex-Werte.
-- `buildAdScenes` mappt Beat-Typ → Farbrolle (Hook=accent, Problem=neutral, Solution=primary, CTA=primary, Endcard=primary).
-
-### 1d. Style-Reference für Video-Modelle
-- Wenn `brand_kit.logo_url` oder `brand_kit.style_reference_url` existiert, wird die URL als `referenceImage` an `generate-clip-*` Edge Functions weitergegeben (Modelle die `image_input` unterstützen: Wan, Kling, Hailuo, Seedance).
-- Sicherstellen: Kein Logo-Bleed in AI-Frames — Reference wird nur als „style hint" genutzt (Prompt-Suffix: *„maintain brand color palette and visual mood, do NOT include the logo itself"*).
+Drei aufeinander aufbauende Stages. Jede Stage ist eigenständig auslieferbar — wir können nach A oder B stoppen, wenn der Fokus woanders hin wandert.
 
 ---
 
-## 2. Kampagnen-Skalierung
+## Stage A — Polish & Verifikation (klein, ~1 Loop)
 
-### 2a. Cutdown-Generator (Master → Kurzversionen)
-- Im Wizard neu: **„Cutdown-Strategie"** (optional, nach Variants-Step).
-- Optionen: `nur Master` / `+ 15s Cutdown` / `+ 6s Hook-Cutdown` / `Vollpaket (30 + 15 + 6)`.
-- Logik in neuer Utility `buildCutdowns.ts`:
-  - **15s aus 30s**: behalte Hook + Solution + CTA (skip Problem + Social-Proof).
-  - **6s Hook-Cut**: nur Hook + ein-Wort-CTA-Overlay.
-- Pro Cutdown wird ein eigenes `composer_projects`-Kind angelegt mit `parent_project_id` + `cutdown_type` Tag.
+Ziel: Die existierende Ad-Director-Pipeline rund machen, sodass Top-Marken-Werbung in einem Klick Multi-Format-Output liefert.
 
-### 2b. Multi-Aspect-Ratio-Render-Bundle
-- Neuer Schritt nach Compose-Done: **„Plattform-Bundle rendern"** Button im Composer.
-- Optionen: `9:16 (Reels/TikTok/Shorts)`, `1:1 (Feed)`, `16:9 (YouTube/Web)`, `4:5 (Instagram Portrait)`.
-- Nutzt existierende `generate-video-variants` Edge Function (bereits live, schreibt in `video_variants`-Tabelle).
-- Smart-Crop-Hint: Bei 9:16 wird Subtitle-Position auf `center` gezwungen, Text-Größe +20%.
+### A1. End-to-End Smoke-Test
+- Echten Master-Render durchlaufen lassen (Brief → Skript → Clips → Lambda-Render)
+- Verifizieren dass `spawnAdCampaignChildren` triggert und Children sauber im `composer_projects`-Table landen
+- Campaign-Tab öffnen und prüfen dass alle Children mit Status-Badges erscheinen
+- Falls Bugs auftauchen: fixen (typische Verdächtige: RLS auf neuen Spalten, missing brand_kit hydration, idempotency-Check)
 
-### 2c. A/B-Video-Render (echte Skript-Varianten als separate Renders)
-- Bisher: 3 Skript-Varianten generiert → User wählt EINE → 1 Render.
-- Neu: Toggle **„Alle 3 Varianten rendern"** im Variants-Step.
-- Erzeugt 3 parallele `composer_projects` mit identischen Szenen-Strukturen, aber unterschiedlichen `textOverlay.text` + Voiceover-Audio pro Variante.
-- Variant-Strategy (`emotional` / `rational` / `curiosity`) wird in `composer_projects.ad_variant_strategy` persistiert.
+### A2. VO-Re-Synth-Button im Cutdown-Child
+- In `AdCampaignTree.tsx` für Children mit `cutdown_type !== null`: Button "🎙️ VO neu synthetisieren"
+- Klick öffnet Mini-Dialog: nur Voice (vorausgewählt aus Master) und Skript-Text (auto-zusammengesetzt aus Cutdown-Szenen)
+- Ruft `generate-voiceover` direkt auf, schreibt URL in `assembly_config.voiceover` des Childs
+- Toast bei Erfolg, kein Wizard-Redirect nötig
 
-### 2d. Performance-Tracking-Skelett (Read-Only)
-- Neue View `ad_variant_performance` join'd `composer_projects` → `video_variants` → `social_posts` → `social_post_metrics`.
-- Liefert pro Variante: views, engagement_rate, CTR.
-- Surface in neuem Tab im Composer-Dashboard: **„Kampagnen-Insights"** (lesend, kein Tracking-Code-Injection).
+### A3. Multi-Aspect-Render-Bundling
+- **Existiert bereits**: `render-multi-format` und `render-multi-format-batch` Edge Functions sind da — wir nutzen die.
+- Im `AdDirectorWizard.tsx` Scaling-Step neuen Toggle: "Multi-Aspect Bundle" mit Checkboxen für 9:16 / 1:1 / 4:5 (16:9 = Master default)
+- Felder ins `ad_meta` JSONB: `aspectRatios: ('9:16' | '1:1' | '4:5')[]`
+- In `spawnAdCampaignChildren.ts`: zusätzlich für jedes Aspect-Ratio ein Child spawnen mit `assembly_config.aspect_ratio` überschrieben
+- Children re-rendern automatisch via existierender Render-Pipeline (kein neuer Code nötig, nur anderer Aspect-Param)
+- `AdCampaignTree.tsx` zeigt Aspect-Badges (📱 9:16, ⬛ 1:1, 📐 4:5) neben Cutdowns/Variants
 
----
-
-## 3. Persistierung & Datenmodell
-
-### Migration: `composer_projects` erweitern
-Neue Spalten:
-- `ad_meta jsonb` — Framework, Tonality, Format, Goal, Brand-Kit-Snapshot, Compliance-Timestamp
-- `ad_variant_strategy text` — `emotional` / `rational` / `curiosity` / null
-- `parent_project_id uuid` — für Cutdowns (referenziert Master-Projekt)
-- `cutdown_type text` — `master` / `15s` / `6s-hook` / null
-
-Index: `(parent_project_id, cutdown_type)` für Kampagnen-Übersicht.
-
-RLS: erbt vorhandene `composer_projects` Policies — nichts Neues nötig.
+### A4. Memory-Update
+- `mem://features/video-composer/ad-director-architecture.md` um Aspect-Ratio-Logik erweitern
 
 ---
 
-## 4. UI-Änderungen
+## Stage B — Performance Layer (mittel)
 
-### AdDirectorWizard (Erweiterung)
-- Step `variants`: Toggle „Alle 3 Varianten rendern" (default off).
-- Neuer Step `scaling` (zwischen variants und compliance):
-  - Cutdown-Auswahl
-  - Aspect-Ratio-Bundle-Vorauswahl
-  - Auto-Logo-Endcard Toggle (default on wenn Brand-Kit vorhanden)
-- Compliance-Step zeigt Zusammenfassung: „X Renders werden erzeugt (Master + 2 Cutdowns × 3 Aspects = 9 Videos)".
+Ziel: Welche Variante performt im Markt am besten? Daten-Loop schließen.
 
-### Composer-Dashboard
-- Neuer Tab **„Kampagne"** (nur sichtbar wenn `ad_meta` gesetzt):
-  - Master + Cutdowns Tree-View
-  - Aspect-Variants pro Knoten
-  - Performance-Insights (sobald Posts publiziert)
+### B1. DB-Erweiterung: Campaign-Posts-Mapping
+Neue Tabelle `ad_campaign_posts`:
+- `id`, `composer_project_id` (FK auf Master oder Child), `social_post_id` (FK auf existierende `social_posts`), `platform`, `posted_at`
+- Trigger: wenn ein Composer-Output via Social Publishing gepostet wird, automatisch hier eintragen
 
----
+### B2. Performance-Insights-Tab im Campaign-Baum
+- Neuer Tab "Performance" in `AdCampaignTree` (sichtbar wenn ≥1 Post existiert)
+- Zeigt pro Variant/Cutdown/Aspect: Reach, Engagement-Rate, CTR, Cost-per-View
+- Daten aus `social_posts` + `social_post_metrics` (existieren bereits via `sync-social-posts-v2`)
+- Visualisierung: Sortierbare Tabelle + Top-Performer-Highlight (Krone-Icon auf bestem Asset)
 
-## 5. Kosten- & Credit-Strategie
+### B3. AI-Insight-Generator
+- Edge Function `analyze-ad-campaign-performance` (nutzt Lovable AI Gateway / Gemini 2.5 Flash)
+- Input: alle Metriken der Kampagne, Skript-Texte, Tonality-Map
+- Output: Plain-Text-Insight ("Emotional Hook hat 3.2x bessere CTR als Rational. Auf 9:16 läuft alles 40% besser.")
+- Im Performance-Tab als "💡 AI Insights"-Card oben
 
-- **Auto-Logo-Endcard**: 0 Credits (statisches Remotion-Render, ~1s extra).
-- **Cutdowns**: kein Re-Render der AI-Clips — wir cutten die Master-Clips zurecht (FFmpeg in `render-multi-format`). Nur Composer-Render-Kosten (~50 Credits pro Cutdown).
-- **A/B-Video-Render**: Voller AI-Cost × 3 — User sieht Cost-Estimate vor Bestätigung im Compliance-Step.
-- **Aspect-Bundle**: Composer-Render-Kosten × Anzahl Aspects, KEIN AI-Re-Render (gleicher Master-Clip wird neu kadriert).
-- Credit-Refund-Automation greift bei jedem Teilfehler (existierende `refund_ai_video_credits` RPC).
-
----
-
-## 6. Technische Details
-
-### Neue Dateien
-- `src/lib/adDirector/buildCutdowns.ts` — Master → Cutdown-Szenen-Mapper
-- `src/lib/adDirector/buildEndcard.ts` — Logo-Endcard-Szene-Builder
-- `src/components/video-composer/AdCampaignTree.tsx` — Kampagne-Tab
-- `src/remotion/templates/BrandEndcard.tsx` — Statische Endcard-Composition
-- `supabase/functions/render-cutdown/index.ts` — FFmpeg-basiertes Cut-Down (nutzt vorhandenen Master)
-- `supabase/migrations/<ts>_ad_director_campaign_scaling.sql`
-
-### Geänderte Dateien
-- `src/components/video-composer/AdDirectorWizard.tsx` — Steps + Toggles
-- `src/lib/adDirector/buildAdScenes.ts` — Color-Roles + Endcard-Anhang + Style-Ref-URL
-- `src/types/video-composer.ts` — `ColorRole`, `cutdownType`, `parentProjectId`, `adMeta`
-- `src/components/video-composer/VideoComposerDashboard.tsx` — Kampagne-Tab
-- `supabase/functions/generate-clip-*` (Wan, Kling, Hailuo, Seedance) — `referenceImage` Pass-through
-
-### Wiederverwendete Infrastruktur
-- ✅ `video_variants` Tabelle (existiert)
-- ✅ `generate-video-variants` Edge Function (existiert)
-- ✅ `render-multi-format` Edge Function (existiert)
-- ✅ `useVideoVariants` Hook (existiert)
-- ✅ `useActiveBrandKit` Hook (existiert)
+### B4. A/B-Winner-to-Master-Loop
+- Button "Diese Variante zum neuen Master machen" auf der Top-Performer-Variante
+- Klont das Child als neues Master-Project, kann dann frische Cutdowns/Aspects spawnen
+- Schließt den Optimierungs-Loop: Test → Measure → Double-down
 
 ---
 
-## 7. Sicherheit & Compliance
+## Stage C — Email Campaign Director (groß)
 
-- Style-Reference-Prompts enthalten explizite Anti-Logo-Klausel.
-- Kein neuer User-Input → keine zusätzliche Input-Validation nötig (alle Eingaben gehen über bestehenden Wizard).
-- Cost-Estimate vor jedem Multi-Render-Trigger (Compliance-Step zeigt geschätzte Credits + Anzahl Outputs).
+Ziel: Den bewährten Wizard-Pattern auf eine zweite Vertikale anwenden — Email Marketing.
+
+### C1. Neue Route + Hub-Eintrag
+- `/email-director` als Standalone-Page (analog zum Video Composer)
+- Hub-Tile im Navigations-System mit Mail-Icon
+
+### C2. Email Director Wizard (4 Steps)
+- **Step 1 — Briefing**: Produkt/Service, Zielgruppe, Sprache, Brand-Kit
+- **Step 2 — Goal**: Newsletter / Promotion / Re-Engagement / Onboarding-Sequenz
+- **Step 3 — Tonality**: Friendly, Urgent, Sophisticated, Casual (mappt auf Schreibstil)
+- **Step 4 — Variants**: A/B-Toggle für Subject Lines (3 Varianten generieren)
+
+### C3. AI-Backend
+- Edge Function `generate-email-campaign` (Lovable AI Gateway, Gemini 2.5 Pro)
+- Liefert pro Variante: Subject (3 A/B), Preheader, Body (HTML + Plain-Text), CTA-Button-Text
+- Body als simples Block-System: Hero-Bild, Headline, Paragraph, CTA, Footer
+
+### C4. DB-Tabelle `email_campaigns`
+- `id`, `user_id`, `title`, `goal`, `tonality`, `language`, `brand_kit_id`
+- `subjects` (JSONB Array mit 3 Varianten), `selected_subject_id`, `body_blocks` (JSONB)
+- `status` (`draft` | `scheduled` | `sent`), `parent_campaign_id` für A/B-Children
+
+### C5. Editor + Preview
+- Block-basierter Editor (re-use `react-quill` falls schon vorhanden, sonst minimaler Custom-Editor)
+- Live-Preview rechts: rendert HTML mit Brand-Colors/Font auto-injiziert
+- Test-Send via Resend-Connector (existiert bereits)
+
+### C6. A/B-Spawn (analog zu Video)
+- "Render All Variants" Button → spawnt für jede Subject-Variante ein eigenes `email_campaigns`-Row
+- Preview-Cards für alle 3 Subjects nebeneinander
+
+### C7. Send-Pipeline
+- Connector-Auswahl: Resend (default) oder Gmail-Connector falls verbunden
+- Send-Dialog: Recipient List (CSV-Upload oder manuelle Liste), Schedule (now / later)
+- Edge Function `send-email-campaign` versendet via gewähltem Connector
+- Tracking-Pixel + UTM-Tags für Performance-Loop (verbindet zu Stage B Insights)
+
+### C8. Memory
+- `mem://features/email-director/architecture` mit voller Pipeline-Doku
 
 ---
 
-## 8. Out of Scope (für später)
+## Reihenfolge & Abhängigkeiten
 
-- Real-Time A/B-Test-Auto-Optimierung (eigene Tabelle `ab_test_variants` existiert, aber Tracking-Logik gehört in eine eigene Stufe 3).
-- Programmatic-Buying-Integration (Meta Ads API, TikTok Ads API).
-- Brand-Voice-Konsistenz-Check zwischen Tonality und gespeicherter Brand-Voice.
+```text
+Stage A  ─── unabhängig, sofort umsetzbar
+   │
+   ▼
+Stage B  ─── braucht social_posts-Mapping (neue Tabelle)
+   │        Insights & Winner-Loop
+   ▼
+Stage C  ─── unabhängig von B, kann parallel laufen
+            Verbindet sich später mit B's Performance-Layer
+```
+
+**Empfehlung**: Stage A in einem Loop, dann Pause für User-Test. Stage B + C können parallel oder seriell — wenn du Performance-Daten brauchst um Email-Templates zu validieren, B zuerst.
 
 ---
 
-## 9. Reihenfolge der Umsetzung (1 Implementierungs-Loop)
+## Technische Eckpunkte
 
-1. Migration: `composer_projects` erweitern.
-2. Brand-Endcard Remotion-Template + `buildEndcard.ts`.
-3. `buildAdScenes` mit Color-Roles + Style-Ref + Endcard-Anhang.
-4. `buildCutdowns.ts` + `render-cutdown` Edge Function.
-5. AdDirectorWizard: neuer `scaling`-Step + Variants-Toggle.
-6. Composer-Dashboard: Kampagne-Tab + AdCampaignTree.
-7. Style-Reference-Pass-through in 4 Clip-Edge-Functions.
-8. Build-Verify + Edge-Function-Deploy.
+- **Keine neuen Connectors nötig** für A + B (alles existiert: ElevenLabs für VO, Resend für Email, Lovable AI Gateway, Social-Connectors)
+- **Migrations**: 1 neue Tabelle in Stage B (`ad_campaign_posts`), 1 neue Tabelle in Stage C (`email_campaigns`), JSONB-Erweiterung in Stage A (`ad_meta.aspectRatios`)
+- **Edge Functions neu**: `analyze-ad-campaign-performance` (B), `generate-email-campaign` + `send-email-campaign` (C)
+- **Re-use**: `render-multi-format` (A), `sync-social-posts-v2` (B), `generate-voiceover` (A), Resend-Connector (C)
 
-Geschätzter Umfang: 1 Loop, ~12 Dateien.
+---
+
+## Was nicht im Plan ist (bewusst weggelassen)
+
+- Influencer Brief Generator — kann später als Stage D folgen, ist aber in der Wertschöpfung kleiner als Email Director
+- Eigene Email-Template-Bibliothek (Marketplace) — Scope-Creep, erst nach echter Nutzung entscheiden
+- Multi-Language A/B in Email — die Lokalisierungs-Pipeline (EN/DE/ES) ist bereits da, aber A/B-Tests pro Sprache wären eigene Stage E
+
+Bereit umzusetzen, sobald du grünes Licht gibst. Gerne auch nur Stage A approven und nach dem Smoke-Test entscheiden, ob B/C noch dran kommen.
