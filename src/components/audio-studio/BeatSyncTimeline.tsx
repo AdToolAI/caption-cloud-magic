@@ -36,6 +36,7 @@ export function BeatSyncTimeline({
   const [musicFile, setMusicFile] = useState<File | null>(null);
   const [musicUrl, setMusicUrl] = useState<string | null>(initialMusicUrl ?? null);
   const [beats, setBeats] = useState<Beat[]>([]);
+  const [detectedBpm, setDetectedBpm] = useState<number | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [snapToBeats, setSnapToBeats] = useState(true);
   const [cutMarkers, setCutMarkers] = useState<number[]>([]);
