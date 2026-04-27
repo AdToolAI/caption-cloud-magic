@@ -403,16 +403,19 @@ function CutChip({
   checking,
   onCheck,
   onRepair,
+  onToggleLock,
 }: {
   index: number;
   pair: PairState;
   checking: boolean;
   onCheck: () => void;
   onRepair: () => void;
+  onToggleLock: () => void;
 }) {
   const score = pair.next.continuityDriftScore ?? null;
   const label = pair.next.continuityDriftLabel ?? '';
   const sev = driftSeverity(score);
+  const locked = !!pair.prev.continuityLocked;
 
   return (
     <div
