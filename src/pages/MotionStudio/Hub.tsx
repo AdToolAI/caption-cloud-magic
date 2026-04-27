@@ -11,6 +11,7 @@ import {
   Clapperboard,
   Wand2,
   Layers,
+  Library,
   Zap,
   PlayCircle,
   Plus,
@@ -43,6 +44,14 @@ const QUICK_ACTIONS = [
     icon: Wand2,
     href: '/motion-studio/studio',
     accent: 'from-primary/40 to-accent/15',
+    badge: 'NEW',
+  },
+  {
+    title: 'Curated Scene Library',
+    desc: '24+ ready-to-use Stock-Szenen — Product Hero, Lifestyle, Talking Head, Establishing & mehr.',
+    icon: Library,
+    href: '/motion-studio/studio',
+    accent: 'from-accent/30 to-primary/10',
     badge: 'NEW',
   },
   {

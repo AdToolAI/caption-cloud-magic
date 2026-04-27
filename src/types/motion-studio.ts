@@ -58,10 +58,19 @@ export interface LocationVariant {
   created_at: string;
 }
 
+/** Curated category for system snippets (Artlist-style scene library). */
+export type SceneSnippetCategory =
+  | 'product_hero'
+  | 'lifestyle'
+  | 'talking_head'
+  | 'b_roll_tech'
+  | 'establishing'
+  | 'transition';
+
 /** A reusable story-building block. */
 export interface SceneSnippet {
   id: string;
-  user_id: string;
+  user_id: string | null;
   workspace_id: string | null;
   name: string;
   description: string;
@@ -77,7 +86,25 @@ export interface SceneSnippet {
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  /** True for curated platform-provided templates. */
+  is_system?: boolean;
+  category?: SceneSnippetCategory | string | null;
+  preview_video_url?: string | null;
+  thumbnail_url?: string | null;
+  sort_order?: number;
+  attribution_name?: string | null;
+  attribution_url?: string | null;
+  source?: string | null;
 }
+
+export const SCENE_SNIPPET_CATEGORIES: { id: SceneSnippetCategory; label: string; emoji: string }[] = [
+  { id: 'product_hero', label: 'Product Hero', emoji: '📦' },
+  { id: 'lifestyle', label: 'Lifestyle', emoji: '☕' },
+  { id: 'talking_head', label: 'Talking Head', emoji: '🎤' },
+  { id: 'b_roll_tech', label: 'B-Roll Tech', emoji: '💻' },
+  { id: 'establishing', label: 'Establishing', emoji: '🌆' },
+  { id: 'transition', label: 'Transition', emoji: '✨' },
+];
 
 export type CharacterDraft = Omit<
   MotionStudioCharacter,

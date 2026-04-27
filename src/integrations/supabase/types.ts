@@ -6516,60 +6516,84 @@ export type Database = {
       }
       motion_studio_scene_snippets: {
         Row: {
+          attribution_name: string | null
+          attribution_url: string | null
           cast_character_ids: string[] | null
+          category: string | null
           clip_url: string | null
           created_at: string
           description: string | null
           duration_seconds: number | null
           id: string
+          is_system: boolean
           last_frame_url: string | null
           location_id: string | null
           metadata: Json
           name: string
+          preview_video_url: string | null
           prompt: string
           reference_image_url: string | null
+          sort_order: number
+          source: string | null
           tags: string[] | null
+          thumbnail_url: string | null
           updated_at: string
           usage_count: number
-          user_id: string
+          user_id: string | null
           workspace_id: string | null
         }
         Insert: {
+          attribution_name?: string | null
+          attribution_url?: string | null
           cast_character_ids?: string[] | null
+          category?: string | null
           clip_url?: string | null
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
           id?: string
+          is_system?: boolean
           last_frame_url?: string | null
           location_id?: string | null
           metadata?: Json
           name: string
+          preview_video_url?: string | null
           prompt: string
           reference_image_url?: string | null
+          sort_order?: number
+          source?: string | null
           tags?: string[] | null
+          thumbnail_url?: string | null
           updated_at?: string
           usage_count?: number
-          user_id: string
+          user_id?: string | null
           workspace_id?: string | null
         }
         Update: {
+          attribution_name?: string | null
+          attribution_url?: string | null
           cast_character_ids?: string[] | null
+          category?: string | null
           clip_url?: string | null
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
           id?: string
+          is_system?: boolean
           last_frame_url?: string | null
           location_id?: string | null
           metadata?: Json
           name?: string
+          preview_video_url?: string | null
           prompt?: string
           reference_image_url?: string | null
+          sort_order?: number
+          source?: string | null
           tags?: string[] | null
+          thumbnail_url?: string | null
           updated_at?: string
           usage_count?: number
-          user_id?: string
+          user_id?: string | null
           workspace_id?: string | null
         }
         Relationships: [

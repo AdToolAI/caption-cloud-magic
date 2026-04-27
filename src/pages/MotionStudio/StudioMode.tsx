@@ -671,6 +671,27 @@ function StoryboardStep({
         </Card>
       )}
 
+      {/* Curated CTA — only when storyboard is empty */}
+      {scenes.filter((s) => s.prompt.trim()).length === 0 && (
+        <Card
+          className="p-5 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-accent/5 cursor-pointer hover:border-primary/50 transition-all group"
+          onClick={onOpenSnippets}
+        >
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+              <Sparkles className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold">Schnellstart mit kuratierten Szenen</h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                24+ ready-to-use Templates: Product Hero, Lifestyle, Talking Head, Establishing & mehr.
+              </p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-1 transition-transform" />
+          </div>
+        </Card>
+      )}
+
       <ScrollArea className="max-h-[55vh]">
         <ol className="space-y-3 pr-3">
           {scenes.map((scene, idx) => (
