@@ -399,7 +399,7 @@ export function ImageGenerator() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Switch checked={editMode} onCheckedChange={(v) => { setEditMode(v); if (!v) setReferenceImage(null); }} />
               <Label className="text-sm">{t('picStudio.imageToImage')}</Label>
@@ -431,6 +431,27 @@ export function ImageGenerator() {
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
               </div>
             )}
+
+            {/* Variations Toggle */}
+            <div className="flex items-center gap-2 ml-auto">
+              <Label className="text-sm text-muted-foreground">Varianten:</Label>
+              <div className="flex items-center rounded-lg border border-border/50 bg-background/30 p-0.5">
+                {([1, 4] as const).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setVariantsCount(n)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                      variantsCount === n
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {n}× {n === 4 && <span className="opacity-70">Bilder</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <Button
