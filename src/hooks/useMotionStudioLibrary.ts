@@ -391,18 +391,35 @@ export function useMotionStudioLibrary() {
   }, []);
 
   // ── Scene Snippets ──────────────────────────────────────────────────────
-  const listSceneSnippets = useCallback(async (): Promise<SceneSnippet[]> => {
-    if (!user) return [];
-    const { data, error } = await supabase
-      .from('motion_studio_scene_snippets')
-      .select('*')
-      .order('updated_at', { ascending: false });
-    if (error) {
-      console.warn('[listSceneSnippets]', error);
-      return [];
-    }
-    return (data || []) as SceneSnippet[];
-  }, [user]);
+  const listSceneSnippets = useCallback(
+    async (
+      opts: { includeSystem?: boolean; onlySystem?: boolean; category?: string } = {},
+    ): Promise<SceneSnippet[]> => {
+      const { includeSystem = true, onlySystem = false, category } = opts;
+      if (!user && !onlySystem) return [];
+
+      let query = supabase
+        .from('motion_studio_scene_snippets')
+        .select('*');
+
+      if (onlySystem) {
+        query = query.eq('is_system', true);
+      } else if (!includeSystem) {
+        query = query.eq('is_system', false);
+      }
+      if (category) query = query.eq('category', category);
+
+      const { data, error } = await query.order('sort_order', { ascending: true })
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.warn('[listSceneSnippets]', error);
+        return [];
+      }
+      return (data || []) as unknown as SceneSnippet[];
+    },
+    [user],
+  );
 
   const createSceneSnippet = useCallback(
     async (draft: SceneSnippetDraft): Promise<SceneSnippet | null> => {
