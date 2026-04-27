@@ -14,6 +14,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { calculateSceneCost } from '@/types/sora-long-form';
 import type { Sora2LongFormProject, Sora2Scene, SceneDuration, TransitionType } from '@/types/sora-long-form';
+import SceneShotDirectorPanel from '@/components/video-composer/SceneShotDirectorPanel';
+import CinematicStylePresets from '@/components/ai-video/CinematicStylePresets';
+import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
+import type { ShotSelection } from '@/config/shotDirector';
 
 interface SceneConfiguratorProps {
   project: Sora2LongFormProject;
