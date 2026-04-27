@@ -858,8 +858,16 @@ export default function VideoComposerDashboard() {
               ? { ...prev.assemblyConfig, voiceover }
               : prev.assemblyConfig,
             status: 'storyboard',
+            adMeta: adMeta as AdCampaignMeta,
+            adVariantStrategy: adMeta?.variantStrategy ?? null,
           }));
           setActiveTab('storyboard');
+          // Persist ad meta to DB if project is already saved (debounced); the
+          // initial insert in ensureProjectPersisted will pick up adMeta from
+          // state for fresh projects.
+          if (project.id) {
+            persistAdMeta(project.id, adMeta as AdCampaignMeta).catch(() => {});
+          }
           try {
             localStorage.setItem(
               'video-composer-ad-meta',
