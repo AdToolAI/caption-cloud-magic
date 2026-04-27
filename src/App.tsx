@@ -113,6 +113,7 @@ const Admin = lazy(() => import("./pages/Admin"));
 const LambdaHealth = lazy(() => import("./pages/admin/LambdaHealth"));
 
 const AIVideoToolkit = lazy(() => import("./pages/AIVideoToolkit"));
+const BrandCharacters = lazy(() => import("./pages/BrandCharacters"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 const VideoComposer = lazy(() => import("./pages/VideoComposer"));
 const MotionStudioLibrary = lazy(() => import("./pages/MotionStudio/Library"));
