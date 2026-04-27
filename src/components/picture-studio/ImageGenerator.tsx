@@ -140,6 +140,23 @@ export function ImageGenerator() {
     reader.readAsDataURL(file);
   };
 
+  const handleStyleRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setStyleReference(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const brandKitPayload = useBrandKit && activeBrandKit ? {
+    name: activeBrandKit.brand_name || undefined,
+    primaryColor: activeBrandKit.primary_color || undefined,
+    secondaryColor: activeBrandKit.secondary_color || undefined,
+    accentColor: activeBrandKit.accent_color || undefined,
+    mood: activeBrandKit.mood || undefined,
+  } : null;
+
   const generateOne = async (): Promise<any | null> => {
     if (tier === 'standard') {
       const { data, error } = await supabase.functions.invoke('generate-studio-image', {
