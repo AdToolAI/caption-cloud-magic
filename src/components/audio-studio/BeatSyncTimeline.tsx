@@ -73,15 +73,21 @@ export function BeatSyncTimeline({
 
       if (error) throw error;
 
+      const bpm = data?.bpm || 120;
+
       if (data?.beats && Array.isArray(data.beats)) {
         setBeats(data.beats);
+        setDetectedBpm(bpm);
+        onBpmDetected?.(bpm);
         toast.success('Beat-Analyse abgeschlossen', {
-          description: `${data.beats.length} Beats erkannt bei ~${data.bpm || 120} BPM`
+          description: `${data.beats.length} Beats erkannt bei ~${bpm} BPM`
         });
       } else {
         // Fallback to generated beats if API returns empty
         const mockBeats = generateFallbackBeats();
         setBeats(mockBeats);
+        setDetectedBpm(bpm);
+        onBpmDetected?.(bpm);
         toast.success('Beat-Analyse abgeschlossen', {
           description: `${mockBeats.length} Beats erkannt`
         });
@@ -91,6 +97,8 @@ export function BeatSyncTimeline({
       // Fallback to generated beats
       const mockBeats = generateFallbackBeats();
       setBeats(mockBeats);
+      setDetectedBpm(120);
+      onBpmDetected?.(120);
       toast.success('Beat-Analyse abgeschlossen (lokal)', {
         description: `${mockBeats.length} Beats erkannt`
       });
