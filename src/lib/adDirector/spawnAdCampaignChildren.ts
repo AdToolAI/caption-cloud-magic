@@ -160,18 +160,29 @@ export async function spawnAdCampaignChildren(
   // Idempotency: don't spawn twice for the same master.
   const { data: existing } = await supabase
     .from('composer_projects')
-    .select('id, cutdown_type, ad_variant_strategy')
+    .select('id, cutdown_type, ad_variant_strategy, briefing')
     .eq('parent_project_id', input.masterProjectId);
   if (existing && existing.length > 0) {
-    return existing.map((row: any) => ({
-      id: row.id,
-      kind: row.cutdown_type ? 'cutdown' : 'variant',
-      label: row.cutdown_type
-        ? (CUTDOWN_LABEL[row.cutdown_type as CutdownType] ?? row.cutdown_type)
-        : (VARIANT_LABEL[row.ad_variant_strategy] ?? row.ad_variant_strategy ?? 'Variant'),
-      cutdownType: row.cutdown_type as CutdownType | undefined,
-      variantStrategy: row.ad_variant_strategy ?? undefined,
-    }));
+    return existing.map((row: any) => {
+      const isAspect =
+        typeof row.ad_variant_strategy === 'string' &&
+        row.ad_variant_strategy.startsWith('aspect:');
+      const ar = isAspect
+        ? (row.ad_variant_strategy.slice('aspect:'.length) as AspectRatio)
+        : undefined;
+      return {
+        id: row.id,
+        kind: row.cutdown_type ? 'cutdown' : isAspect ? 'aspect' : 'variant',
+        label: row.cutdown_type
+          ? (CUTDOWN_LABEL[row.cutdown_type as CutdownType] ?? row.cutdown_type)
+          : isAspect
+          ? `Format ${ar}`
+          : (VARIANT_LABEL[row.ad_variant_strategy] ?? row.ad_variant_strategy ?? 'Variant'),
+        cutdownType: row.cutdown_type as CutdownType | undefined,
+        variantStrategy: isAspect ? undefined : (row.ad_variant_strategy ?? undefined),
+        aspectRatio: ar,
+      } as SpawnedChild;
+    });
   }
 
   // 1. Cutdowns
@@ -225,6 +236,33 @@ export async function spawnAdCampaignChildren(
           variantStrategy: v.id,
         });
       }
+    }
+  }
+
+  // 3. Multi-Aspect siblings — clone master scenes 1:1 with a different
+  // briefing.aspectRatio. No extra AI cost — Remotion crops/letterboxes to fit.
+  // Master's own aspect ratio is excluded from spawning.
+  const masterAspect = input.briefing.aspectRatio;
+  const wantedAspects = (adMeta.aspectRatios ?? []).filter(
+    (ar) => ar && ar !== masterAspect,
+  );
+  for (const ar of wantedAspects) {
+    const childId = await createChildProject({
+      userId: user.id,
+      input,
+      scenes: input.scenes,
+      titleSuffix: `Format ${ar}`,
+      cutdownType: null,
+      variantStrategy: `aspect:${ar}`,
+      aspectRatio: ar,
+    });
+    if (childId) {
+      spawned.push({
+        id: childId,
+        kind: 'aspect',
+        label: `Format ${ar}`,
+        aspectRatio: ar,
+      });
     }
   }
 
