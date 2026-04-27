@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library } from 'lucide-react';
+import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AudioStudioHeroHeader } from '@/components/audio-studio/AudioStudioHeroHeader';
@@ -13,6 +13,7 @@ import { AudioBeforeAfterComparison } from '@/components/audio-studio/AudioBefor
 import { SoundLibrary } from '@/components/audio-studio/SoundLibrary';
 import { VoiceLibraryPanel } from '@/components/audio-studio/VoiceLibraryPanel';
 import { MusicGeneratorPanel } from '@/components/audio-studio/MusicGeneratorPanel';
+import { AutoMatchPanel } from '@/components/audio-studio/AutoMatchPanel';
 import { AudioDuckingPanel } from '@/components/audio-studio/AudioDuckingPanel';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
@@ -29,12 +30,24 @@ export default function AudioStudio() {
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music'>('enhance');
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music' | 'auto-match'>('enhance');
   const [showMusicGen, setShowMusicGen] = useState(false);
+  const [showAutoMatch, setShowAutoMatch] = useState(false);
+  const [musicGenPrefill, setMusicGenPrefill] = useState<{
+    prompt: string; genre: string; mood: string; bpm: number; duration: number;
+  } | null>(null);
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
   const [musicUrl, setMusicUrl] = useState<string | null>(null);
   const [detectedVideoBpm, setDetectedVideoBpm] = useState<number | undefined>(undefined);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
+
+  const handleCustomizeFromAutoMatch = useCallback((prefill: {
+    prompt: string; genre: string; mood: string; bpm: number; duration: number;
+  }) => {
+    setMusicGenPrefill(prefill);
+    setShowAutoMatch(false);
+    setShowMusicGen(true);
+  }, []);
 
   const handleSendToBeatSync = useCallback((track: { url: string; title?: string }) => {
     setMusicUrl(track.url);
