@@ -305,6 +305,35 @@ export function ImageGenerator() {
     }
   };
 
+  const handleUpscaled = (upscaled: { id?: string; url: string; previewUrl: string; factor: 2 | 4; parentId: string | null }, original: any) => {
+    setGeneratedImages(prev => [
+      {
+        id: upscaled.id,
+        url: upscaled.url,
+        prompt: original.prompt,
+        style: original.style,
+        aspectRatio: original.aspectRatio,
+        upscale_factor: upscaled.factor,
+        parent_id: upscaled.parentId,
+      } as any,
+      ...prev,
+    ]);
+    setJustGenerated(true);
+  };
+
+      const pathMatch = url.pathname.match(/\/object\/public\/background-projects\/(.+)/);
+      if (pathMatch) {
+        await supabase.storage.from('background-projects').remove([pathMatch[1]]);
+      }
+      await supabase.from('studio_images').delete().eq('id', image.id);
+      setGeneratedImages(prev => prev.filter(img => img.id !== image.id));
+      toast.success(t('picStudio.imageDeleted'));
+    } catch (err) {
+      console.error(err);
+      toast.error(t('picStudio.deleteError'));
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Wallet-Header */}
