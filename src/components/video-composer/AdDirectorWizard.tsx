@@ -876,6 +876,7 @@ export default function AdDirectorWizard({
               </div>
             )}
 
+            {step === 'compliance' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                   Compliance & Bestätigung
