@@ -211,6 +211,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
             setTimeout(() => {
               toast({ title: tt('savedToLibrary'), description: tt('savedToLibraryDesc') });
             }, 800);
+            try { onMasterRenderComplete?.(finalUrl); } catch { /* ignore */ }
             return;
           }
           if (row?.status === 'failed') {
