@@ -381,6 +381,33 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync }: SoundLibraryProp
 
                   {/* Actions */}
                   <div className="flex items-center gap-1">
+                    {onSendToBeatSync && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onSendToBeatSync(sound.url, sound.title)}
+                        className="w-9 h-9 hover:bg-primary/10 hover:text-primary"
+                        title="An Beat-Sync senden"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {sound.source !== 'stem_separation' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleStemSeparation(sound)}
+                        disabled={stemLoading}
+                        className="w-9 h-9 hover:bg-cyan-500/10 hover:text-cyan-500"
+                        title={`Stems extrahieren (${currencySymbol}${STEM_SEPARATION_COST_EUR.toFixed(2)})`}
+                      >
+                        {stemLoading && stemTargetId === sound.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Scissors className="w-4 h-4" />
+                        )}
+                      </Button>
+                    )}
                     {onLoadAudio && (
                       <Button
                         variant="ghost"
