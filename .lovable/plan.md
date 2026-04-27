@@ -1,80 +1,68 @@
-## Audio Ducking — Speech-aware Music Mixing
+## Music-to-Video Auto-Match
 
-Wenn Nutzer Voiceover/Sprache + Musik kombinieren, wird die Musik bisher als konstanter Layer abgespielt. Profi-Workflow erfordert **Ducking**: Musik automatisch um -6 bis -18 dB absenken, sobald gesprochen wird, und sanft wieder hochfahren in Sprechpausen. Dieses Feature schließt die letzte Pro-Lücke im Audio Studio und macht jeden generierten/uploadeten Track sofort sendefähig — komplett im Browser, kein zusätzlicher Server-Render.
+Ein neuer One-Click-Workflow im Audio Studio: Nutzer lädt ein Video hoch → System analysiert Mood, Pace, Schnittfrequenz und Länge → generiert automatisch einen perfekt passenden AI-Soundtrack (richtige BPM, exakte Länge, passendes Genre/Mood). Schließt den End-to-End-Workflow „Video rein, fertiger Soundtrack raus".
 
-### Was der Nutzer bekommt
+### Was der Nutzer sieht
 
-1. **Neuer Tab „Ducking"** im Audio Studio, sichtbar sobald sowohl ein Voiceover/Speech-Track (das hochgeladene Original) als auch ein Music-Track (aus Beat-Sync, AI Music oder Library) vorhanden ist
-2. **Live-Preview**: Beide Tracks gemischt im Browser via Web Audio API, mit Echtzeit-Ducking
-3. **Visualisierung**: Zwei übereinander liegende Waveforms (Speech oben, Music unten) plus eine **Ducking-Hüllkurve** (Volume-Automation als Linie über dem Music-Track), die zeigt, wann/wie stark abgesenkt wird
-4. **Presets**: „Subtil" (-6 dB), „Standard" (-12 dB), „Aggressiv" (-18 dB), „Custom"
-5. **Feintuning**: 4 Slider — Threshold (ab welcher Sprach-Lautstärke duckt), Reduktion (in dB), Attack (wie schnell runter, 50–500 ms), Release (wie langsam hoch, 200–2000 ms)
-6. **Export**: „Gemischten Track exportieren" → rendert offline in WAV/MP3, speichert als neues Asset in `universal_audio_assets` mit `source: 'ducked_mix'`. Direkt in Beat-Sync und Director's Cut nutzbar
-7. **„An Director's Cut senden"** Button → übernimmt den fertigen Mix als Audio-Layer
+Neuer Tab **„Auto-Match"** im Audio Studio, prominent zwischen *Music* und *Library*:
 
-### UX-Flow (typisch)
+1. **Drop-Zone** für Video (mp4/mov, bis 200 MB) oder „Aus Mediathek wählen"
+2. **Analyse-Phase** (10–20 s): animierte Pipeline-Anzeige
+   - Schnittfrequenz erkennen → empfohlene BPM
+   - Visuelle Mood-Klassifikation (Energy, Brightness, Pace) → Genre + Mood
+   - Exakte Videolänge → Track-Dauer
+3. **Match-Card** mit Vorschlag (z. B. „Cinematic Build-Up · 128 BPM · 47 s · Energetic")
+   - Buttons: **„Track generieren" (1-Click)** | **„Anpassen"** (öffnet Music Generator mit vor-ausgefüllten Werten)
+4. **Generierter Track** wird gespeichert, an Beat-Sync gesendet, optional direkt mit Ducking-Tab gemixt
 
-```text
-1. User uploaded Voiceover.mp3
-2. User generiert AI Music Track ODER lädt Track in Beat-Sync
-3. Tab „Ducking" wird automatisch sichtbar (rot pulsierender Indikator: NEU)
-4. Klick → Beide Waveforms erscheinen, Standard-Preset (-12 dB) aktiv
-5. Play → Live gemischt hörbar, Ducking-Hüllkurve animiert mit Playhead
-6. Anpassen → „Exportieren" → Mix in Library + Toast „Mix gespeichert · 2:34"
-```
+### Technische Architektur
 
-### Technische Umsetzung
+**Neue Edge Function** `auto-match-music-to-video`:
+- Input: `video_url`, `duration`, optional Frame-Hints aus Client
+- Schritt 1: Schnittfrequenz aus `analyze-video-scenes` (existiert) → BPM-Mapping (z. B. 0.3 cuts/s → 90 BPM, 1.0 cuts/s → 140 BPM)
+- Schritt 2: Mood-Analyse via Lovable AI (`google/gemini-3-flash-preview`) auf 4–6 Sample-Frames → JSON `{genre, mood, energy, brightness, descriptors[]}`
+- Schritt 3: Prompt-Builder kombiniert Ergebnisse zu Music-Prompt
+- Output: `{ recommendation: { bpm, durationSec, genre, mood, prompt, descriptors }, analysis: { cutsPerSecond, sceneCount, dominantMood } }`
 
-#### Speech-Detection-Strategie (kein Server-Aufruf bei jedem Render)
+**Client-Flow**:
+- Neuer Hook `useMusicAutoMatch.ts`: orchestriert Frame-Extraktion (Canvas-API, ~6 Frames gleichmäßig verteilt), Edge-Call und Übergabe an `useMusicGeneration`
+- Neue Komponente `AutoMatchPanel.tsx`: Upload + Analyse-UI + Match-Card + Generate-Button
+- Wiederverwendung: `MusicGeneratorPanel` mit neuen Props `prefillPrompt`, `prefillGenre`, `prefillMood`, `prefillDuration`, `prefillBpm` für „Anpassen"-Pfad
 
-Zwei-Pfad-Ansatz, abhängig davon ob Transkript vorhanden ist:
-
-- **Pfad A — Transkript vorhanden** (Standard, da `transcribe-audio` Edge Function bereits Word-Timestamps liefert): Das vorhandene `transcript`-State-Array (`{word, start, end, type}`) wird zu **Speech-Aktivitäts-Intervallen** zusammengefasst (zusammenhängende Wörter mit < 300ms Gap = ein Sprach-Block). Das ergibt eine deterministische, präzise Ducking-Hüllkurve ohne weitere API-Calls.
-- **Pfad B — Kein Transkript**: Client-seitige RMS-Energie-Analyse via `OfflineAudioContext` (chunks à 50 ms, Threshold-basiert). Bereits in der Codebase als Pattern vorhanden für Waveform-Generierung. Kein zusätzlicher API-Call.
-
-#### Live-Preview mit Web Audio API
+### BPM-Mapping (deterministisch, transparent)
 
 ```text
-SpeechAudio ──► GainNode (1.0) ──┐
-                                 ├──► Destination
-MusicAudio ──► GainNode (Auto) ──┘
-                    ▲
-                    │
-              VolumeAutomation
-              (linearRampToValueAtTime an Speech-Intervall-Grenzen)
+Cuts pro Sekunde   → BPM
+< 0.2              →  75  (slow / cinematic)
+0.2 – 0.4          →  95
+0.4 – 0.7          → 115
+0.7 – 1.0          → 128
+1.0 – 1.5          → 140
+> 1.5              → 160  (high-energy / EDM)
 ```
 
-Beim Play wird die Music-GainNode-Automation einmalig vor-programmiert (`gain.linearRampToValueAtTime(0.25, t_attack)` an jedem Speech-Start, `gain.linearRampToValueAtTime(1.0, t_release)` an jedem Speech-Ende). Synchron mit `<audio>`-Playhead.
+Mood-Override durch AI-Analyse möglich (z. B. „dark + slow cuts" → 70 BPM Drone statt 75 BPM Folk).
 
-#### Offline-Export
+### Kosten & Credits
 
-`OfflineAudioContext` mit identischem Graph rendert den Mix in einem Pass (mehrfach schneller als Echtzeit). Resultat → `audioBufferToWav` (Helper existiert bereits in `src/lib/audioToWav.ts`) → Upload nach `audio-studio` Storage Bucket → Insert in `universal_audio_assets` mit `type: 'mix'`, `effect_config: { type: 'duck', threshold, reduction_db, attack_ms, release_ms }`.
+- Analyse: ~0,02 € (Lovable AI Vision auf 6 Frames) — wird **kostenlos** angeboten (Marketing-Hook)
+- Track-Generierung nutzt bestehende `generate-music-track`-Pipeline mit existierenden Tier-Preisen (€0.10 / €0.35 / €1.40)
+- Tier-Auswahl bleibt beim Nutzer im finalen Generate-Step
 
-### Neue Dateien
+### Dateien
 
-- `src/components/audio-studio/AudioDuckingPanel.tsx` — Hauptkomponente (Preset-Karten, Slider, Dual-Waveform mit Hüllkurven-Overlay, Export-Button)
-- `src/components/audio-studio/DuckingEnvelopeOverlay.tsx` — SVG-Overlay über der Music-Waveform für die Volume-Automation
-- `src/hooks/useAudioDucking.ts` — Hook: kapselt AudioContext-Lifecycle, Speech-Intervall-Berechnung, Live-Preview-Steuerung, Offline-Export
-- `src/lib/duckingEnvelope.ts` — reine Logik: `transcriptToSpeechIntervals()`, `intervalsToGainAutomation()`, `rmsBasedSpeechDetection(audioBuffer)`
+**Neu**:
+- `supabase/functions/auto-match-music-to-video/index.ts`
+- `src/hooks/useMusicAutoMatch.ts`
+- `src/components/audio-studio/AutoMatchPanel.tsx`
 
-### Geänderte Dateien
+**Geändert**:
+- `src/pages/AudioStudio.tsx`: neuer Tab `'auto-match'`, Wiring zu Beat-Sync und Ducking
+- `src/components/audio-studio/MusicGeneratorPanel.tsx`: Prefill-Props ergänzen
+- `supabase/config.toml`: Function-Eintrag für `auto-match-music-to-video`
 
-- `src/pages/AudioStudio.tsx` — neuer Tab `'ducking'` in `activeTab`-Union zwischen `beat-sync` und `filler`; Sichtbarkeits-Logik (Tab nur enabled wenn Speech-Audio + Music-Track vorhanden); State-Sharing für `musicUrl` und `transcript` an das Panel
-- Kein Backend nötig: keine neue Edge Function, keine DB-Migration, kein Credit-Verbrauch (Mixing läuft komplett client-seitig). Der Export speichert nur in einen existierenden Bucket.
+### Out of Scope (für spätere Iteration)
 
-### Akzeptanzkriterien
-
-1. Tab erscheint nur, wenn Voiceover-Audio (von Upload) UND Music-Track (von Beat-Sync, AI Music oder Library) geladen sind
-2. Live-Preview ist hörbar synchron — Musik geht innerhalb von 100 ms hörbar runter, sobald Sprache einsetzt
-3. Ducking-Hüllkurve visualisiert die exakte Volume-Automation als animierte Linie
-4. Preset-Wechsel updated Hüllkurve und Live-Mix sofort (< 50 ms)
-5. Export erzeugt valide WAV/MP3-Datei in Original-Länge, Mix klingt identisch zur Live-Preview
-6. Exportierter Track erscheint sofort in Sound Library (mit Filter „Mixes")
-7. „An Director's Cut senden"-Button hängt den Mix als Audio-Track an die Timeline
-8. Funktioniert ohne Transkript via RMS-Fallback (etwas weniger präzise, aber brauchbar)
-
-### Out of Scope (V2)
-
-- **Multi-Source-Ducking**: aktuell nur 1 Speech + 1 Music. Mehrere Music-Layer kommen später
-- **Side-Chain-Compression mit Look-Ahead**: aktueller Ansatz nutzt feste Attack/Release-Werte, kein dynamischer Compressor
-- **Musik-Mastering** (LUFS-Normalisierung auf -14 LUFS für Streaming) — eigener Schritt, eigenes Feature
+- Audio-Reaktive Beat-Cuts (Video an Track anpassen statt umgekehrt)
+- Multi-Variant-Generation (3 Vorschläge parallel)
+- Stem-aware Generation (separate Drum-Spur passend zum Schnittrhythmus)

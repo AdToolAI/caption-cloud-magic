@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library } from 'lucide-react';
+import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AudioStudioHeroHeader } from '@/components/audio-studio/AudioStudioHeroHeader';
@@ -13,6 +13,7 @@ import { AudioBeforeAfterComparison } from '@/components/audio-studio/AudioBefor
 import { SoundLibrary } from '@/components/audio-studio/SoundLibrary';
 import { VoiceLibraryPanel } from '@/components/audio-studio/VoiceLibraryPanel';
 import { MusicGeneratorPanel } from '@/components/audio-studio/MusicGeneratorPanel';
+import { AutoMatchPanel } from '@/components/audio-studio/AutoMatchPanel';
 import { AudioDuckingPanel } from '@/components/audio-studio/AudioDuckingPanel';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
@@ -29,12 +30,24 @@ export default function AudioStudio() {
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music'>('enhance');
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music' | 'auto-match'>('enhance');
   const [showMusicGen, setShowMusicGen] = useState(false);
+  const [showAutoMatch, setShowAutoMatch] = useState(false);
+  const [musicGenPrefill, setMusicGenPrefill] = useState<{
+    prompt: string; genre: string; mood: string; bpm: number; duration: number;
+  } | null>(null);
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
   const [musicUrl, setMusicUrl] = useState<string | null>(null);
   const [detectedVideoBpm, setDetectedVideoBpm] = useState<number | undefined>(undefined);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
+
+  const handleCustomizeFromAutoMatch = useCallback((prefill: {
+    prompt: string; genre: string; mood: string; bpm: number; duration: number;
+  }) => {
+    setMusicGenPrefill(prefill);
+    setShowAutoMatch(false);
+    setShowMusicGen(true);
+  }, []);
 
   const handleSendToBeatSync = useCallback((track: { url: string; title?: string }) => {
     setMusicUrl(track.url);
@@ -147,7 +160,31 @@ export default function AudioStudio() {
         <AudioStudioHeroHeader />
 
         <AnimatePresence mode="wait">
-          {showMusicGen ? (
+          {showAutoMatch ? (
+            <motion.div
+              key="auto-match-standalone"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mt-8 space-y-4"
+            >
+              <Button
+                variant="ghost"
+                onClick={() => setShowAutoMatch(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ← Zurück zum Audio Studio
+              </Button>
+              <AutoMatchPanel
+                onTrackGenerated={(track) => {
+                  setLibraryRefreshKey(k => k + 1);
+                  handleSendToBeatSync({ url: track.url, title: track.title });
+                }}
+                onCustomize={handleCustomizeFromAutoMatch}
+                onSendToBeatSync={handleSendToBeatSync}
+              />
+            </motion.div>
+          ) : showMusicGen ? (
             <motion.div
               key="music-gen-standalone"
               initial={{ opacity: 0, y: 20 }}
@@ -157,7 +194,7 @@ export default function AudioStudio() {
             >
               <Button
                 variant="ghost"
-                onClick={() => setShowMusicGen(false)}
+                onClick={() => { setShowMusicGen(false); setMusicGenPrefill(null); }}
                 className="text-muted-foreground hover:text-foreground"
               >
                 ← Zurück zum Audio Studio
@@ -166,6 +203,11 @@ export default function AudioStudio() {
                 onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
                 onSendToBeatSync={handleSendToBeatSync}
                 defaultBpm={detectedVideoBpm}
+                prefillPrompt={musicGenPrefill?.prompt}
+                prefillGenre={musicGenPrefill?.genre}
+                prefillMood={musicGenPrefill?.mood}
+                prefillBpm={musicGenPrefill?.bpm}
+                prefillDuration={musicGenPrefill?.duration}
               />
             </motion.div>
           ) : !audioUrl ? (
@@ -176,6 +218,33 @@ export default function AudioStudio() {
               exit={{ opacity: 0, y: -20 }}
               className="mt-8 space-y-6"
             >
+              {/* Auto-Match Teaser (TOP) */}
+              <Card
+                onClick={() => setShowAutoMatch(true)}
+                className="relative overflow-hidden cursor-pointer backdrop-blur-xl bg-gradient-to-br from-cyan-500/10 via-card/60 to-primary/10 border-cyan-500/30 hover:border-cyan-500/60 hover:shadow-[0_0_40px_rgba(34,211,238,0.25)] transition-all p-5 group"
+              >
+                <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500/15 rounded-full blur-[60px] pointer-events-none" />
+                <div className="relative flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500 to-primary flex items-center justify-center shrink-0">
+                    <Film className="w-7 h-7 text-primary-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-xs font-bold tracking-wider text-cyan-400">NEU · KOSTENLOS</span>
+                      <h3 className="text-lg font-bold">Music-to-Video Auto-Match</h3>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400">1-Click</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Video hochladen → KI analysiert Mood, BPM &amp; Länge → automatisch passender AI-Soundtrack.
+                    </p>
+                  </div>
+                  <Button className="bg-gradient-to-r from-cyan-500 to-primary hover:opacity-90 shrink-0 hidden sm:flex">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Auto-Match starten
+                  </Button>
+                </div>
+              </Card>
+
               {/* AI Music Generator Teaser */}
               <Card 
                 onClick={() => setShowMusicGen(true)}
@@ -327,6 +396,7 @@ export default function AudioStudio() {
                   <div className="flex gap-2 flex-wrap">
                     {[
                       { id: 'enhance', label: 'KI-Optimierung', icon: Wand2 },
+                      { id: 'auto-match', label: 'Auto-Match', icon: Film, badge: 'NEU' },
                       { id: 'music', label: 'AI Music', icon: Music2 },
                       { id: 'ducking', label: 'Ducking', icon: AudioLines, badge: musicUrl ? 'NEU' : undefined, disabled: !musicUrl },
                       { id: 'compare', label: 'Vergleich', icon: Volume2, disabled: !enhancedAudioUrl },
@@ -491,6 +561,32 @@ export default function AudioStudio() {
                           onOpenLibrary={() => setActiveTab('library')}
                           onSendToBeatSync={handleSendToBeatSync}
                           defaultBpm={detectedVideoBpm}
+                          prefillPrompt={musicGenPrefill?.prompt}
+                          prefillGenre={musicGenPrefill?.genre}
+                          prefillMood={musicGenPrefill?.mood}
+                          prefillBpm={musicGenPrefill?.bpm}
+                          prefillDuration={musicGenPrefill?.duration}
+                        />
+                      </motion.div>
+                    )}
+
+                    {activeTab === 'auto-match' && (
+                      <motion.div
+                        key="auto-match"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <AutoMatchPanel
+                          onTrackGenerated={(track) => {
+                            setLibraryRefreshKey(k => k + 1);
+                            handleSendToBeatSync({ url: track.url, title: track.title });
+                          }}
+                          onCustomize={(prefill) => {
+                            setMusicGenPrefill(prefill);
+                            setActiveTab('music');
+                          }}
+                          onSendToBeatSync={handleSendToBeatSync}
                         />
                       </motion.div>
                     )}
@@ -518,8 +614,8 @@ export default function AudioStudio() {
                   </AnimatePresence>
                 </div>
 
-                {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music/ducking tab) */}
-                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && activeTab !== 'ducking' && (
+                {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music/ducking/auto-match tab) */}
+                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && activeTab !== 'ducking' && activeTab !== 'auto-match' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
