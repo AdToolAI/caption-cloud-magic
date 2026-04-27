@@ -481,3 +481,25 @@ export const CATEGORY_LABELS: Record<ComposerCategory, { de: string; en: string;
   storytelling: { de: 'Storytelling', en: 'Storytelling', es: 'Storytelling' },
   custom: { de: 'Allgemeiner Editor', en: 'General Editor', es: 'Editor General' },
 };
+
+// ─── Ad Director — campaign metadata persisted on composer_projects.ad_meta ──
+export type AdCutdownType = '15s' | '6s-hook';
+
+export interface AdCampaignVariantScript {
+  id: string;
+  lines: string[];
+}
+
+export interface AdCampaignMeta {
+  framework: string;
+  tonality: string;
+  format: string;
+  goal: string;
+  brandKitApplied: boolean;
+  variantStrategy?: string;
+  complianceAcknowledgedAt: string;
+  renderAllVariants: boolean;
+  cutdowns: AdCutdownType[];
+  autoLogoEndcard: boolean;
+  allVariantScripts?: AdCampaignVariantScript[];
+}
