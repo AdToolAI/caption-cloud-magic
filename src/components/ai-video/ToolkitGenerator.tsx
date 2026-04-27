@@ -82,6 +82,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   );
   const consistencyKey = `ai-${model.family}`;
 
+  /* ── Brand Character Lock (cross-studio persistent character) ── */
+  const { trackUsage: trackBrandUsage } = useBrandCharacters();
+  const [brandCharacter, setBrandCharacter] = useState<BrandCharacter | null>(null);
+
   /* ── Sync settings to model capabilities when switching ── */
   useEffect(() => {
     if (!model.durations.includes(duration)) setDuration(model.durations[0]);
