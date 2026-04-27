@@ -112,16 +112,7 @@ const PlatformAnalytics = lazy(() => import("./pages/Analytics/PlatformAnalytics
 const Admin = lazy(() => import("./pages/Admin"));
 const LambdaHealth = lazy(() => import("./pages/admin/LambdaHealth"));
 
-const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
-const KlingVideoStudio = lazy(() => import("./pages/KlingVideoStudio"));
-const SeedanceVideoStudio = lazy(() => import("./pages/SeedanceVideoStudio"));
-const WanVideoStudio = lazy(() => import("./pages/WanVideoStudio"));
-const HailuoVideoStudio = lazy(() => import("./pages/HailuoVideoStudio"));
-const LumaVideoStudio = lazy(() => import("./pages/LumaVideoStudio"));
-const SoraVideoStudio = lazy(() => import("./pages/SoraVideoStudio"));
-const VeoVideoStudio = lazy(() => import("./pages/VeoVideoStudio"));
-const LTXVideoStudio = lazy(() => import("./pages/LTXVideoStudio"));
-const GrokVideoStudio = lazy(() => import("./pages/GrokVideoStudio"));
+const AIVideoToolkit = lazy(() => import("./pages/AIVideoToolkit"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 const VideoComposer = lazy(() => import("./pages/VideoComposer"));
 const MotionStudioLibrary = lazy(() => import("./pages/MotionStudio/Library"));
