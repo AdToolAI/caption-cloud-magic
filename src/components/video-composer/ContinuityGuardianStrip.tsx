@@ -348,6 +348,17 @@ export default function ContinuityGuardianStrip({
             )}
             Alles prüfen
           </Button>
+          {projectId && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setHistoryOpen(true)}
+              className="gap-1.5"
+            >
+              <History className="h-3.5 w-3.5" />
+              Verlauf
+            </Button>
+          )}
           {summary.warn + summary.broken > 0 && (
             <Button
               size="sm"
@@ -372,9 +383,16 @@ export default function ContinuityGuardianStrip({
             checking={checkingPairId === p.next.id}
             onCheck={() => checkPair(p)}
             onRepair={() => repairPair(p)}
+            onToggleLock={() => toggleLock(p.prev)}
           />
         ))}
       </div>
+
+      <ContinuityHistoryDrawer
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        projectId={projectId}
+      />
     </Card>
   );
 }
