@@ -38,6 +38,12 @@ import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
 import MotionStudioStepSidebar, { type StepItem } from './MotionStudioStepSidebar';
 import AutoDirectorWizard from './AutoDirectorWizard';
+import ShareProjectDialog from './ShareProjectDialog';
+import CollaboratorAvatars from './CollaboratorAvatars';
+import {
+  useComposerPresence,
+  useComposerScenesRealtime,
+} from '@/hooks/useComposerCollaboration';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
