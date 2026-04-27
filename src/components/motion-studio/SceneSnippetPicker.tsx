@@ -6,13 +6,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Library, Loader2, Plus, Search, Trash2, Users } from 'lucide-react';
+import { Library, Loader2, Plus, Search, Sparkles, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import type { SceneSnippet } from '@/types/motion-studio';
+import CuratedSnippetGallery from './CuratedSnippetGallery';
 
 interface SceneSnippetPickerProps {
   open: boolean;
