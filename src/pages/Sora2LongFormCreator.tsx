@@ -127,6 +127,7 @@ function Sora2LongFormCreatorInner() {
               transition_type: scene.transition_type,
               transition_duration: scene.transition_duration,
               cost_euros: scene.cost_euros,
+              shot_director: scene.shot_director ?? {},
             })),
             { onConflict: 'id' }
           );
