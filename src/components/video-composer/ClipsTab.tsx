@@ -41,6 +41,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { SortableSceneItem } from './SortableSceneItem';
+import ContinuityGuardianStrip from './ContinuityGuardianStrip';
 
 interface ClipsTabProps {
   scenes: ComposerScene[];
