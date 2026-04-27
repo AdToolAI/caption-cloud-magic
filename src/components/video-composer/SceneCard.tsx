@@ -128,6 +128,14 @@ export default function SceneCard({
   const [multiEngineOpen, setMultiEngineOpen] = useState(false);
   // Block L — Inline Compare Lab dialog open state
   const [compareLabOpen, setCompareLabOpen] = useState(false);
+  // Real-Time Collaboration — comment thread for this scene
+  const [commentSheetOpen, setCommentSheetOpen] = useState(false);
+  const { data: commentCounts } = useSceneCommentCounts(projectId);
+  const sceneCounts = (scene.id && commentCounts?.[scene.id]) || { total: 0, open: 0 };
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id));
+  }, []);
 
   // Block K-5: pull system presets to seed inspire variation
   const { systemPresets } = useStylePresets();
