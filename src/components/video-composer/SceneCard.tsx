@@ -686,12 +686,21 @@ export default function SceneCard({
                   onChange={(directorModifiers) => onUpdate({ directorModifiers })}
                 />
 
+                <SceneShotDirectorPanel
+                  value={scene.shotDirector || {}}
+                  onChange={(shotDirector) => onUpdate({ shotDirector })}
+                  language={lang}
+                />
+
                 {(() => {
                   const hasMods = scene.directorModifiers && Object.values(scene.directorModifiers).some(Boolean);
+                  const hasShot = scene.shotDirector && Object.values(scene.shotDirector).some(Boolean);
                   const resolved = resolveMentions(scene.aiPrompt || '', libCharacters, libLocations);
                   const hasMentions = resolved.matches.length > 0;
-                  if (!hasMods && !hasMentions) return null;
-                  const finalPrompt = applyDirectorModifiers(resolved.prompt, scene.directorModifiers || {});
+                  if (!hasMods && !hasMentions && !hasShot) return null;
+                  const withMods = applyDirectorModifiers(resolved.prompt, scene.directorModifiers || {});
+                  const shotSuffix = buildShotPromptSuffix(scene.shotDirector || {});
+                  const finalPrompt = [withMods, shotSuffix].filter(Boolean).join(' ');
                   return (
                     <div className="rounded-md border border-dashed border-primary/30 bg-background/40 p-2">
                       <div className="flex items-center justify-between mb-1">
