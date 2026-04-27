@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, CreditCard, History, Video, Film, Wand2, Clapperboard, Eye, Camera, ShieldAlert, Volume2 } from 'lucide-react';
+import { Sparkles, CreditCard, History, Video, Film, Wand2, Clapperboard, Eye, Camera, ShieldAlert, Volume2, Zap, TrendingUp } from 'lucide-react';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
@@ -122,13 +122,25 @@ export default function AIVideoStudio() {
       topBadge: { label: audioNativeLabel, variant: 'default' as const },
     },
     {
-      name: 'Wan 2.5',
+      name: 'LTX Video 2.0 Pro',
+      provider: 'Lightricks',
+      description: language === 'de' ? 'Schnellster Generator im Hub · bestes Preis-Leistungs-Verhältnis' : language === 'es' ? 'Generador más rápido · mejor relación calidad-precio' : 'Fastest generator in the hub · best price-performance ratio',
+      features: ['Text-to-Video', 'Image-to-Video', 'Schnell', '720p–1080p'],
+      pricing: `${currSymbol}0.08–0.12/s`,
+      maxDuration: '8s',
+      quality: '1080p',
+      link: '/ltx-video-studio',
+      icon: Zap,
+      topBadge: { label: language === 'de' ? '⚡ Schnell & Günstig' : '⚡ Fast & Cheap', variant: 'default' as const },
+    },
+    {
+      name: 'Wan 2.6',
       provider: 'Wan Video',
-      description: language === 'de' ? 'Schnelle Generierung mit gutem Preis-Leistungs-Verhältnis' : 'Fast generation with excellent price-performance ratio',
-      features: ['Text-to-Video', 'Image-to-Video', 'Budget-friendly'],
+      description: language === 'de' ? 'Schnelle Generierung mit gutem Preis-Leistungs-Verhältnis (jetzt mit 2.6 Update)' : 'Fast generation with excellent price-performance ratio (now with 2.6 update)',
+      features: ['Text-to-Video', 'Image-to-Video', 'Wan 2.5 + 2.6', 'Budget-friendly'],
       pricing: `${currSymbol}0.10–0.15/s`,
       maxDuration: '10s',
-      quality: '720p',
+      quality: '1080p',
       link: '/wan-video-studio',
       icon: Wand2,
     },
@@ -164,6 +176,29 @@ export default function AIVideoStudio() {
       quality: '720p',
       link: '/seedance-video-studio',
       icon: Video,
+    },
+    {
+      name: 'Seedance 2.0',
+      provider: 'ByteDance',
+      description: language === 'de' ? 'Kreative Tanzvideos & dynamische Bewegungsszenen' : 'Creative dance videos & dynamic motion scenes',
+      features: ['Text-to-Video', 'Image-to-Video', 'Dance Motion'],
+      pricing: `${currSymbol}0.10–0.21/s`,
+      maxDuration: '10s',
+      quality: '720p',
+      link: '/seedance-video-studio',
+      icon: Video,
+    },
+    {
+      name: 'Grok Imagine',
+      provider: 'xAI',
+      description: language === 'de' ? 'Trending KI-Videos mit nativer Audio-Spur · ideal für virale Inhalte' : language === 'es' ? 'Vídeos virales con audio nativo' : 'Trending AI videos with native audio · ideal for viral content',
+      features: ['Text-to-Video', 'Image-to-Video', 'Native Audio', '1080p'],
+      pricing: `${currSymbol}0.20/s`,
+      maxDuration: '12s',
+      quality: '1080p',
+      link: '/grok-video-studio',
+      icon: TrendingUp,
+      topBadge: { label: language === 'de' ? '🔥 Trending' : '🔥 Trending', variant: 'default' as const },
     },
     {
       name: 'Sora 2',
