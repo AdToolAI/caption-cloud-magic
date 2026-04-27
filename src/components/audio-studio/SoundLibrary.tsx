@@ -364,7 +364,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync }: SoundLibraryProp
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-medium truncate">{sound.title}</span>
                       <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0">
-                        {getPresetLabel(sound.processing_preset)}
+                        {getPresetLabel(sound)}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
