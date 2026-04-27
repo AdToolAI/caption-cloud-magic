@@ -22,6 +22,7 @@ interface BeatSyncTimelineProps {
   currentTime: number;
   onTimeChange: (time: number) => void;
   initialMusicUrl?: string | null;     // Pre-loaded music track (e.g. from AI Music Generator)
+  onBpmDetected?: (bpm: number) => void; // Forward detected BPM (e.g. to MusicGenerator)
 }
 
 export function BeatSyncTimeline({
@@ -30,6 +31,7 @@ export function BeatSyncTimeline({
   currentTime,
   onTimeChange,
   initialMusicUrl,
+  onBpmDetected,
 }: BeatSyncTimelineProps) {
   const [musicFile, setMusicFile] = useState<File | null>(null);
   const [musicUrl, setMusicUrl] = useState<string | null>(initialMusicUrl ?? null);
