@@ -502,4 +502,12 @@ export interface AdCampaignMeta {
   cutdowns: AdCutdownType[];
   autoLogoEndcard: boolean;
   allVariantScripts?: AdCampaignVariantScript[];
+  /**
+   * Stage A — Multi-Aspect-Bundling. When set, the spawner clones the master
+   * into additional sibling projects with the briefing's aspectRatio swapped to
+   * each ratio in this list. The master's own ratio is excluded from spawning.
+   * No extra AI cost — children reuse the master's clip URLs verbatim and the
+   * Remotion renderer crops/letterboxes per child briefing.aspectRatio.
+   */
+  aspectRatios?: AspectRatio[];
 }

@@ -74,6 +74,8 @@ interface AdDirectorWizardProps {
       cutdowns: Array<'15s' | '6s-hook'>;
       autoLogoEndcard: boolean;
       allVariantScripts?: Array<{ id: string; lines: string[] }>;
+      // Stage A — multi-aspect bundling
+      aspectRatios?: Array<'16:9' | '9:16' | '1:1' | '4:5'>;
     };
   }) => void;
 }
@@ -175,6 +177,11 @@ export default function AdDirectorWizard({
   const [cutdown15s, setCutdown15s] = useState(false);
   const [cutdown6sHook, setCutdown6sHook] = useState(false);
 
+  // Stage A — Multi-Aspect-Bundling
+  const [aspect9x16, setAspect9x16] = useState(false);
+  const [aspect1x1, setAspect1x1] = useState(false);
+  const [aspect4x5, setAspect4x5] = useState(false);
+
   // Variant flow state
   const [variantsLoading, setVariantsLoading] = useState(false);
   const [variants, setVariants] = useState<ScriptVariant[] | null>(null);
@@ -208,6 +215,9 @@ export default function AdDirectorWizard({
     setRenderAllVariants(false);
     setCutdown15s(false);
     setCutdown6sHook(false);
+    setAspect9x16(false);
+    setAspect1x1(false);
+    setAspect4x5(false);
     setVariants(null);
     setChosenVariantId(null);
     setVariantsLoading(false);
@@ -425,6 +435,11 @@ export default function AdDirectorWizard({
           allVariantScripts: renderAllVariants
             ? variants?.map((v) => ({ id: v.id, lines: v.lines }))
             : undefined,
+          aspectRatios: [
+            ...(aspect9x16 ? (['9:16'] as const) : []),
+            ...(aspect1x1 ? (['1:1'] as const) : []),
+            ...(aspect4x5 ? (['4:5'] as const) : []),
+          ],
         },
       });
 
@@ -852,6 +867,30 @@ export default function AdDirectorWizard({
                   </div>
                 </div>
 
+
+                <div className="rounded-lg border border-border/40 bg-card/50 p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Layers className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                    <div className="flex-1 space-y-3">
+                      <p className="text-sm font-medium">Multi-Format-Bundling</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ar-9x16" className="cursor-pointer text-sm">+ 9:16 (Reels / Shorts / TikTok)</Label>
+                        <Switch id="ar-9x16" checked={aspect9x16} onCheckedChange={setAspect9x16} />
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ar-1x1" className="cursor-pointer text-sm">+ 1:1 (Feed-Quadrat)</Label>
+                        <Switch id="ar-1x1" checked={aspect1x1} onCheckedChange={setAspect1x1} />
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ar-4x5" className="cursor-pointer text-sm">+ 4:5 (Instagram-Portrait)</Label>
+                        <Switch id="ar-4x5" checked={aspect4x5} onCheckedChange={setAspect4x5} />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Klont den Master in Format-Varianten — kein zusätzlicher AI-Cost. Master bleibt 16:9.
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 <div className="rounded-lg border border-border/40 bg-card/50 p-4">
                   <div className="flex items-start gap-3">
                     <Palette className="h-4 w-4 mt-0.5 text-primary shrink-0" />
@@ -937,6 +976,10 @@ export default function AdDirectorWizard({
                     <li>
                       <span className="text-foreground">Cutdowns:</span>{' '}
                       {[cutdown15s && '15s', cutdown6sHook && '6s-Hook'].filter(Boolean).join(', ') || '—'}
+                    </li>
+                    <li>
+                      <span className="text-foreground">Multi-Format:</span>{' '}
+                      {[aspect9x16 && '9:16', aspect1x1 && '1:1', aspect4x5 && '4:5'].filter(Boolean).join(', ') || '—'}
                     </li>
                   </ul>
                 </div>
