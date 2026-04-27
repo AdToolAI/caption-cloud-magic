@@ -4110,6 +4110,12 @@ export type Database = {
       }
       composer_projects: {
         Row: {
+          ad_compliance_acknowledged: boolean
+          ad_compliance_acknowledged_at: string | null
+          ad_format: string | null
+          ad_framework: string | null
+          ad_goal: string | null
+          ad_tonality: string | null
           assembly_config: Json
           auto_director_config: Json | null
           brand_kit_auto_sync: boolean
@@ -4132,6 +4138,12 @@ export type Database = {
           video_mode: string | null
         }
         Insert: {
+          ad_compliance_acknowledged?: boolean
+          ad_compliance_acknowledged_at?: string | null
+          ad_format?: string | null
+          ad_framework?: string | null
+          ad_goal?: string | null
+          ad_tonality?: string | null
           assembly_config?: Json
           auto_director_config?: Json | null
           brand_kit_auto_sync?: boolean
@@ -4154,6 +4166,12 @@ export type Database = {
           video_mode?: string | null
         }
         Update: {
+          ad_compliance_acknowledged?: boolean
+          ad_compliance_acknowledged_at?: string | null
+          ad_format?: string | null
+          ad_framework?: string | null
+          ad_goal?: string | null
+          ad_tonality?: string | null
           assembly_config?: Json
           auto_director_config?: Json | null
           brand_kit_auto_sync?: boolean
