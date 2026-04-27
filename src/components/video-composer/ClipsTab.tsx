@@ -276,9 +276,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           // Phase 4 — resolve @character / @location mentions against library
           const resolved = resolveMentions(s.aiPrompt || '', libCharacters, libLocations);
           // Phase 3 — apply director modifiers on top of the resolved prompt
-          const finalPrompt = s.directorModifiers
+          const withMods = s.directorModifiers
             ? applyDirectorModifiers(resolved.prompt, s.directorModifiers)
             : resolved.prompt;
+          // Shot Director — append per-scene cinematography suffix (English)
+          const shotSuffix = buildShotPromptSuffix(s.shotDirector || {});
+          const finalPrompt = shotSuffix ? `${withMods} ${shotSuffix}` : withMods;
           return {
             id: s.id,
             clipSource: s.clipSource,
