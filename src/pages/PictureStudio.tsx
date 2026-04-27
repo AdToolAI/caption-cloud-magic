@@ -70,6 +70,10 @@ export default function PictureStudio() {
                 <MagicEditPanel />
               </TabsContent>
 
+              <TabsContent value="batch" className="mt-0">
+                <BatchGeneratePanel />
+              </TabsContent>
+
               <TabsContent value="background" className="mt-0">
                 <Suspense fallback={
                   <div className="flex items-center justify-center py-20">
