@@ -22,6 +22,8 @@ interface AssemblyTabProps {
   assemblyConfig: AssemblyConfig;
   onUpdateAssembly: (config: Partial<AssemblyConfig>) => void;
   scenes: ComposerScene[];
+  /** Fired exactly once when a render completes successfully. */
+  onMasterRenderComplete?: (videoUrl: string) => void;
 }
 
 type RenderStatus = 'idle' | 'pending' | 'rendering' | 'completed' | 'failed';
