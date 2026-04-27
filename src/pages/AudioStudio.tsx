@@ -32,6 +32,7 @@ export default function AudioStudio() {
   const [showMusicGen, setShowMusicGen] = useState(false);
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
   const [musicUrl, setMusicUrl] = useState<string | null>(null);
+  const [detectedVideoBpm, setDetectedVideoBpm] = useState<number | undefined>(undefined);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
 
   const handleSendToBeatSync = useCallback((track: { url: string; title?: string }) => {
