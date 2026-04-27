@@ -622,12 +622,14 @@ function StoryboardStep({
   scenes,
   onChange,
   onOpenSnippets,
+  onOpenDirector,
   selectedCharacters,
   selectedLocation,
 }: {
   scenes: DraftScene[];
   onChange: (s: DraftScene[]) => void;
   onOpenSnippets: () => void;
+  onOpenDirector: () => void;
   selectedCharacters: MotionStudioCharacter[];
   selectedLocation: MotionStudioLocation | null;
 }) {
@@ -651,10 +653,16 @@ function StoryboardStep({
         subtitle="Beschreibe Szene für Szene was passiert. Cast & Location werden automatisch in jeden Prompt eingewoben."
         action={
           <div className="flex gap-2">
+            <Button
+              onClick={onOpenDirector}
+              className="gap-2 bg-gradient-to-r from-primary to-accent"
+            >
+              <Wand2 className="h-4 w-4" /> AI-Director
+            </Button>
             <Button variant="outline" onClick={onOpenSnippets} className="gap-2">
               <Library className="h-4 w-4" /> Snippets
             </Button>
-            <Button onClick={addScene} className="gap-2">
+            <Button variant="outline" onClick={addScene} className="gap-2">
               <Plus className="h-4 w-4" /> Szene
             </Button>
           </div>
