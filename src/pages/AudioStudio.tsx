@@ -396,6 +396,7 @@ export default function AudioStudio() {
                   <div className="flex gap-2 flex-wrap">
                     {[
                       { id: 'enhance', label: 'KI-Optimierung', icon: Wand2 },
+                      { id: 'auto-match', label: 'Auto-Match', icon: Film, badge: 'NEU' },
                       { id: 'music', label: 'AI Music', icon: Music2 },
                       { id: 'ducking', label: 'Ducking', icon: AudioLines, badge: musicUrl ? 'NEU' : undefined, disabled: !musicUrl },
                       { id: 'compare', label: 'Vergleich', icon: Volume2, disabled: !enhancedAudioUrl },
