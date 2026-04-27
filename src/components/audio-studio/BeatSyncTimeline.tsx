@@ -334,7 +334,10 @@ export function BeatSyncTimeline({
             </div>
 
             {/* Stats */}
-            <div className="flex items-center gap-6 text-xs text-muted-foreground">
+            <div className="flex items-center gap-6 text-xs text-muted-foreground flex-wrap">
+              {detectedBpm && (
+                <span className="font-semibold text-primary">~{detectedBpm} BPM</span>
+              )}
               <span>{beats.length} Beats erkannt</span>
               <span>{beats.filter(b => b.type === 'drop').length} Drops</span>
               <span>{cutMarkers.length} Schnitte gesetzt</span>
