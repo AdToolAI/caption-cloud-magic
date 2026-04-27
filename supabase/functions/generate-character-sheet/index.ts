@@ -8,22 +8,25 @@ const corsHeaders = {
 /**
  * Character Sheet Generator
  * --------------------------------------------------------------
- * Two modes:
- *   • mode = "explainer" (legacy)  → cartoon/flat/3D animation reference
- *   • mode = "realistic" (Library) → cinematic 4-view sheet for AI Video Studio
- *                                     (Front · ¾ · Profile · Expression)
- *                                     The first/largest view is best suited as
- *                                     i2v reference image (Kling/Hailuo/Wan).
+ * Modes:
+ *   • mode = "explainer"   (legacy)  → cartoon/flat/3D animation reference
+ *   • mode = "realistic"   (Library) → cinematic 4-view sheet for AI Video Studio
+ *                                       (Front · ¾ · Profile · Expression)
+ *   • mode = "multi-vibe"  (Casting) → 4 PARALLEL single-image generations,
+ *                                       one per stylistic "vibe" so the user
+ *                                       can pick the look they like best.
+ *                                       Returns variants[{ vibe, imageUrl, seed }].
  */
 
-type Mode = 'explainer' | 'realistic';
+type Mode = 'explainer' | 'realistic' | 'multi-vibe';
 
 interface RequestBody {
   mode?: Mode;
-  // realistic mode
+  // realistic / multi-vibe
   name?: string;
   description?: string;
   signatureItems?: string;
+  vibes?: string[];               // multi-vibe only — defaults to 4 standard vibes
   // explainer mode (legacy)
   gender?: string;
   ageRange?: string;
@@ -47,6 +50,27 @@ const AGE_DESCRIPTIONS: Record<string, string> = {
   'adult': 'adult (30-50 years old)',
   'senior': 'senior adult (50+ years old)',
 };
+
+/**
+ * Vibe palette — each entry describes a casting "look" for the same person.
+ * Keep in English only (visual prompts must stay English for model quality).
+ */
+const VIBE_PROMPTS: Record<string, string> = {
+  realistic:
+    'Photorealistic, natural daylight, candid documentary feel, neutral color grading, 50mm lens, soft skin texture, sharp focus.',
+  cinematic:
+    'Cinematic film still, dramatic Rembrandt lighting, shallow depth of field, anamorphic 35mm look, teal-and-orange color grade, moody atmosphere.',
+  editorial:
+    'High-fashion editorial portrait, polished studio lighting, glossy magazine aesthetic, refined posing, crisp tonality, premium luxury feel.',
+  documentary:
+    'Gritty observational documentary style, available natural light, slight film grain, muted earthy palette, honest unposed expression, lived-in textures.',
+  noir:
+    'Classic film noir, hard low-key chiaroscuro lighting, deep shadows, monochrome with subtle warm tint, smoke-filled atmosphere.',
+  vintage:
+    'Vintage 1970s analog photography, warm faded tones, light leaks, Kodachrome color science, retro wardrobe styling preserved as described.',
+};
+
+const DEFAULT_VIBES = ['realistic', 'cinematic', 'editorial', 'documentary'];
 
 function buildExplainerPrompt(b: RequestBody): string {
   const styleDesc = EXPLAINER_STYLES[b.style || 'flat-design'] || EXPLAINER_STYLES['flat-design'];
@@ -96,6 +120,62 @@ CRITICAL CONSISTENCY RULES:
 Output: one high-resolution composite image, wide aspect ratio, suitable for image-to-video reference.`;
 }
 
+function buildVibePrompt(b: RequestBody, vibe: string): string {
+  const desc = (b.description || '').trim();
+  const sig = (b.signatureItems || '').trim();
+  const name = (b.name || 'character').trim();
+  const vibeStyle = VIBE_PROMPTS[vibe] || VIBE_PROMPTS.realistic;
+
+  return `Single full-body PORTRAIT of a recurring on-screen character for an AI video pipeline.
+Subject (${name}): ${desc || 'cinematic protagonist'}.
+${sig ? `Signature wardrobe & objects (must always be present): ${sig}.` : ''}
+
+VIBE: ${vibe.toUpperCase()} — ${vibeStyle}
+
+Composition:
+- Full body, three-quarter angle, looking towards camera
+- Confident neutral expression
+- Clean uncluttered background suitable as image-to-video reference
+- Wide vertical 3:4 aspect
+
+CRITICAL: photorealistic when vibe is realistic/cinematic/documentary; no text, no logos, no watermarks, no captions.
+Same person identity should be obvious across all vibe variants if compared side-by-side.`;
+}
+
+async function generateOne(prompt: string, apiKey: string): Promise<string | null> {
+  const models = [
+    'google/gemini-3-pro-image-preview',
+    'google/gemini-3.1-flash-image-preview',
+    'google/gemini-2.5-flash-image-preview',
+  ];
+  for (const model of models) {
+    try {
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: prompt }],
+          modalities: ['image', 'text'],
+        }),
+      });
+      if (!response.ok) {
+        console.warn(`[character-sheet] ${model} → HTTP ${response.status}`);
+        continue;
+      }
+      const data = await response.json();
+      const url = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (url) return url as string;
+    } catch (err) {
+      console.warn(`[character-sheet] ${model} threw`, err);
+    }
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -108,64 +188,61 @@ serve(async (req) => {
     }
 
     const body = (await req.json()) as RequestBody;
-    const mode: Mode = body.mode === 'realistic' ? 'realistic' : 'explainer';
+    const mode: Mode =
+      body.mode === 'realistic' ? 'realistic' :
+      body.mode === 'multi-vibe' ? 'multi-vibe' :
+      'explainer';
 
+    // ─── multi-vibe casting: parallel generation of 4 looks ───
+    if (mode === 'multi-vibe') {
+      const vibes = (body.vibes && body.vibes.length > 0 ? body.vibes : DEFAULT_VIBES)
+        .filter((v) => typeof v === 'string')
+        .slice(0, 6); // hard cap
+
+      console.log(`[character-sheet] multi-vibe: generating ${vibes.length} variants`);
+
+      const results = await Promise.all(
+        vibes.map(async (vibe) => {
+          const prompt = buildVibePrompt(body, vibe);
+          const imageUrl = await generateOne(prompt, LOVABLE_API_KEY);
+          return imageUrl
+            ? { vibe, imageUrl, seed: crypto.randomUUID(), error: null }
+            : { vibe, imageUrl: null, seed: null, error: 'generation failed' };
+        })
+      );
+
+      const successCount = results.filter((r) => r.imageUrl).length;
+      if (successCount === 0) {
+        throw new Error('All vibe generations failed');
+      }
+
+      return new Response(
+        JSON.stringify({
+          mode,
+          variants: results,
+          successCount,
+          totalCount: vibes.length,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // ─── single composite (realistic / explainer) ───
     const prompt = mode === 'realistic'
       ? buildRealisticPrompt(body)
       : buildExplainerPrompt(body);
 
     console.log(`[character-sheet] mode=${mode} prompt=${prompt.slice(0, 200)}…`);
 
-    // Pro -> Flash fallback chain (matches platform reliability policy)
-    const models = mode === 'realistic'
-      ? ['google/gemini-3-pro-image-preview', 'google/gemini-3.1-flash-image-preview', 'google/gemini-2.5-flash-image-preview']
-      : ['google/gemini-2.5-flash-image-preview'];
-
-    let imageData: string | null = null;
-    let lastError: string | null = null;
-
-    for (const model of models) {
-      try {
-        const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            messages: [{ role: 'user', content: prompt }],
-            modalities: ['image', 'text'],
-          }),
-        });
-        if (!response.ok) {
-          lastError = `${model}: ${response.status}`;
-          console.warn('[character-sheet] model failed, trying next:', lastError);
-          continue;
-        }
-        const data = await response.json();
-        const candidate = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-        if (candidate) {
-          imageData = candidate;
-          console.log(`[character-sheet] success with ${model}`);
-          break;
-        }
-        lastError = `${model}: no image in response`;
-      } catch (err) {
-        lastError = `${model}: ${err instanceof Error ? err.message : String(err)}`;
-      }
-    }
-
+    const imageData = await generateOne(prompt, LOVABLE_API_KEY);
     if (!imageData) {
-      throw new Error(lastError || 'No image generated');
+      throw new Error('No image generated');
     }
-
-    const styleSeed = crypto.randomUUID();
 
     return new Response(
       JSON.stringify({
         imageUrl: imageData,
-        styleSeed,
+        styleSeed: crypto.randomUUID(),
         prompt,
         mode,
       }),

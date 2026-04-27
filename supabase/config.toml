@@ -628,6 +628,11 @@ verify_jwt = true
 
 [functions.generate-character-sheet]
 verify_jwt = true
+timeout_sec = 180
+
+[functions.generate-location-vibes]
+verify_jwt = true
+timeout_sec = 180
 
 [functions.explainer-consultant]
 verify_jwt = true

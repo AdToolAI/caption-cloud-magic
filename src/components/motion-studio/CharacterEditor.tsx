@@ -62,6 +62,7 @@ export default function CharacterEditor({
           reference_image_seed: character.reference_image_seed,
           voice_id: character.voice_id,
           tags: character.tags,
+          workspace_id: character.workspace_id ?? null,
         });
       } else {
         setDraft(EMPTY_CHARACTER_DRAFT);

@@ -1,74 +1,104 @@
-## Status: Scene & Character Continuity — wo wir wirklich stehen
+## Status: Casting & Scene Building — wo wir wirklich stehen
 
-### Was wir bereits haben (mehr als gedacht!)
+Vergleich mit Artlists vier Säulen ihres "Casting & Scene Building"-Pakets:
 
-**1. Character & Location Library (Motion Studio Pro)** — `/motion-studio/library`
-- Persistente Charaktere mit `name`, `description`, `signature_items` (z. B. „rote Lederjacke"), `reference_image_url`, `voice_id`, `tags`
-- Persistente Locations mit Lighting-Notes und Reference-Image
-- `@charakter` / `@location` Mention-Editor in Prompts → wird beim Generieren automatisch zu vollem Prompt hydriert
-- Wenn genau **ein** Charakter/Location getaggt ist, wird das Reference-Image als i2v-Anker an das Modell übergeben
+### Säule 1: Charaktere casten (mehrere Vibes pro Person)
 
-**2. Frame-to-Shot Continuity** (Edge Function `extract-video-last-frame`)
-- Letzter Frame jeder Szene wird automatisch extrahiert und als `start_image` für die nächste Szene benutzt
-- Im **Video Composer** integriert (Szenen-basierte Pipeline mit Realtime-Updates)
-- Hook `useFrameContinuity` ist überall verfügbar
+| Artlist | Wir |
+|---|---|
+| 1 Beschreibung → 4–8 Visualisierungen → User wählt Vibe | ⚠️ Teilweise: `generate-character-sheet` macht jetzt 4-View-Sheet (Front/3-4/Profile/Expression) eines **einzigen** Looks |
+| Multi-Vibe Picker ("Realistic / Cinematic / Editorial / Documentary") | ❌ Fehlt |
+| Mehrere `reference_image_url`s pro Charakter | ❌ Schema hat nur 1 URL |
 
-**3. Hybrid Extend** (Edge Function `hybrid-extend-scene`) — _stärker als Artlist hier_
-- 4 Modi: Forward, Backward, Bridge (zwischen 2 Szenen morphen), Style-Ref
-- Backward & Bridge nutzen `end_image` (nur Kling & Luma supporten das)
+**Status: ~40 %** — der Sheet-Generator existiert, aber liefert nur eine ästhetische Variante. Casting bedeutet *mehrere Optionen vergleichen*.
 
-**4. Multi-Model Consistency Ranking** (`modelConsistencyRanking.ts`)
-- 5★ Kling (true i2v) · 4★ Hailuo, Wan, Seedance, Veo · 3★ Luma · 2★ Sora (prompt-only)
-- UI zeigt Sterne pro Modell, damit User die richtige Engine für Continuity wählt
+### Säule 2: Locations scouten (umfärben, Objekte platzieren)
 
-**5. Sora Long-Form Chain** (`generate-sora-chain`) — auto-extrahiert Frames zwischen Sora-Clips für 12s+ Storys
+| Artlist | Wir |
+|---|---|
+| Location-Library mit Reference-Image | ✅ `motion_studio_locations` |
+| Wände umfärben / Möbel verschieben (Inpaint) | ⚠️ Magic Edit (FLUX Fill Pro) existiert im Picture Studio — aber **nicht** vom Location-Editor aus aufrufbar |
+| Lighting-Varianten (Tag / Nacht / Golden Hour) | ❌ Fehlt |
+| Multi-Angle-Sheet (Wide / Medium / Detail) | ❌ Fehlt |
 
-**6. Character Shot Picker** im Video Composer
-- Pro Szene wählbar: Wide / Medium / Close-up / Absent
-- Sherlock-Holmes-Anchor-Injection: Charakterbeschreibung wird shot-typ-spezifisch in den Prompt gepatcht
+**Status: ~35 %** — Backend & Inpaint-Engine sind da, nur die Brücke vom Location-Editor zu Magic Edit fehlt.
 
-### Wo wir hinter Artlist liegen
+### Säule 3: Story-Sequenzen mit Kontinuität über mehrere Shots
 
-| Feature | Artlist | Wir |
-|---|---|---|
-| Character Library mit Reference-Image | ✅ | ✅ |
-| Auto-Frame-Continuity zwischen Shots | ✅ | ✅ (nur in Video Composer & Sora Long-Form) |
-| **„Single Click 10-Shot Story" Wizard** | ✅ | ❌ Nur Sora Long-Form, nicht model-übergreifend |
-| **Character Sheet (Multi-View Generator)** | ✅ Front/Side/3-4 Expressions | ⚠️ existiert nur für Explainer-Cartoons, nicht für realistische i2v |
-| **Cast Consistency Map** (Visual Übersicht aller Szenen + welche Chars erscheinen) | ✅ | ❌ |
-| **Continuity Toggle direkt im AI Video Toolkit** | ✅ | ❌ Toolkit greift nicht auf Library zu |
+| Artlist | Wir |
+|---|---|
+| Frame-to-Shot Continuity | ✅ `extract-video-last-frame` + Hook |
+| Hybrid Extend (Bridge zwischen Szenen) | ✅ Stärker als Artlist (4 Modi) |
+| Cast Consistency Map | ✅ Letztes Update — fest im Storyboard |
+| Sora Long-Form Chain (12 s+) | ✅ |
+| Cast & Locations Picker im Toolkit | ✅ `ToolkitCastPicker` |
 
-### Konkreter Vorschlag: 3 gezielte Upgrades (kein neues Modul!)
+**Status: ~90 %** — Hier sind wir auf Augenhöhe oder besser.
 
-**Upgrade 1 — Character Sheet Generator für realistische Charaktere** (Library)
-- Neuer Button im `CharacterEditor`: „Generate Character Sheet"
-- Nutzt Gemini 3 Pro Image Preview oder Flux: erzeugt ein **4-View Sheet** (Front · Profile · ¾ View · Expression) aus einer einzigen Beschreibung oder einem Upload
-- Das beste Bild wird als `reference_image_url` gespeichert + `reference_image_seed` für Reproduzierbarkeit
-- Erweitert die bestehende `generate-character-sheet` Edge Function um realistic/cinematic-Modi
+### Säule 4: Scene Library für team-weite Wiederverwendung
 
-**Upgrade 2 — Library im AI Video Toolkit verfügbar machen**
-- Im `ToolkitGenerator` einen kleinen „Cast & Locations"-Block ergänzen (1 Char + 1 Location auswählen via Popover)
-- Wenn ausgewählt → Reference-Image wird automatisch als i2v-Input an die Edge Function übergeben (alle Modelle ≥ 3★ in der Ranking-Map)
-- Bei Sora 2 (prompt-only) → Visual Description wird stattdessen in den Prompt injiziert + Toast-Hinweis „Sora hält Charaktere nur ~70 % konsistent — Kling für längere Stories"
+| Artlist | Wir |
+|---|---|
+| Persönliche Library (Charaktere/Locations) | ✅ |
+| **Geteilte Workspace-Library** (mehrere Seats sehen dieselben Assets) | ❌ RLS = nur `auth.uid() = user_id` |
+| **Scene Snippets** (Storyboard-Szenen wiederverwendbar speichern) | ❌ Fehlt komplett |
+| Public Marketplace / Community Cast | ❌ Out of Scope |
 
-**Upgrade 3 — „Story Mode" im Video Composer** (Cast Consistency Map)
-- Neuer Tab/Sidebar-Block „Cast Map": zeigt eine Mini-Tabelle Szene 1–10 × Charaktere mit grünen/grauen Punkten (wo welcher Char auftritt)
-- Per Szene auf einen Klick: „Continuity off / Frame-Anchor / Reference-Image" toggle
-- Nutzt bereits vorhandene `extract-video-last-frame` + `characterShot`-Logik — nur eine UI-Übersicht, keine neue Backend-Logik
+**Status: ~25 %** — größte Lücke. Library ist heute strikt single-user.
+
+---
+
+## Zusammenfassung in einer Zahl
+
+**~55 % des Artlist-Casting-Levels.**
+Stark in Continuity (90 %), schwach in Multi-Vibe-Casting (40 %), Location-Scouting (35 %) und Team-Sharing (25 %).
+
+---
+
+## Vorschlag: 3 gezielte Upgrades (kein neues Modul)
+
+### Upgrade A — Multi-Vibe Casting (geschätzt 1 Tag)
+
+- DB: neue Tabelle `motion_studio_character_variants` (1:N zu Character) mit `vibe`, `image_url`, `seed`, `is_primary`
+- Edge Function: `generate-character-sheet` um Modus `multi-vibe` ergänzen → liefert 4 Bilder in 4 Stilen (Realistic / Cinematic / Editorial / Documentary) in **einem** Gemini-Call (Bilder parallel)
+- UI: im `CharacterEditor` neuer Block "Cast" mit Grid → User klickt eine Variante an → wird `is_primary = true` (das ist die `reference_image_url`)
+- Toolkit/Composer benutzen weiterhin nur die primäre Variante → 0 Breaking-Changes
+
+### Upgrade B — Location Scouting Tools (geschätzt 1 Tag)
+
+- "In Magic Edit öffnen"-Button im `LocationEditor` → übergibt die Reference-URL an Picture Studio Inpaint (existierende FLUX Fill Pro Pipeline) → speichert das Resultat als neue `motion_studio_locations`-Zeile (oder als Variante via Tabelle aus Upgrade A, generisch)
+- "Lighting-Varianten generieren"-Button → 1 Reference-Image + Prompt-Suffixe ("at sunrise / at night / overcast") → 3 Image-to-Image Generierungen (Gemini 3 Pro Image Edit)
+- Beide Outputs landen direkt in der Library, taggierbar
+
+### Upgrade C — Scene Snippets + Workspace Sharing (geschätzt 1.5 Tage)
+
+- DB: neue Tabelle `motion_studio_scene_snippets` (Felder: `name`, `prompt`, `cast_character_ids`, `location_id`, `clip_url`, `last_frame_url`, `tags`, `workspace_id` nullable)
+- Im Video Composer SceneCard → "Als Snippet speichern" + im StoryboardTab "Snippet einfügen" (Picker)
+- **Workspace Sharing**: alle drei Tabellen (`characters`, `locations`, `scene_snippets`) bekommen optional `workspace_id` und eine zweite RLS-Policy `is_workspace_member(auth.uid(), workspace_id)`. Default bleibt privat (`workspace_id = NULL`); Toggle pro Asset "Mit Team teilen"
+- Library-Picker zeigt zwei Tabs: "Meine" / "Team"
 
 ### Was wir bewusst NICHT tun
 
-- **Keine neue Engine** für Character Re-ID — wir lehnen uns an Klings true-i2v an (besser als Artlists eigener Stack)
-- **Keinen separaten „Continuity Mode"** als eigene Page — alles bleibt im Video Composer & Toolkit
-- **Kein Auto-Storyboard aus 1 Prompt** über alle 9 Modelle — das ist Sora-Long-Form's Job, soll nicht dupliziert werden
+- Kein Public-Marketplace (Community-Cast) — out of scope, rechtlich heikel
+- Keine Re-Generierung bereits gerenderter Szenen wenn der Snippet sich ändert — Snippets sind Templates, keine Live-Bindings
+- Kein eigenes "Casting Studio" als neue Page — alles bleibt im bestehenden Library-Editor
 
-### Antwort auf deine Frage
+---
 
-Wir sind **bei ~75 % des Artlist-Niveaus**. Frame-Continuity, Library und @-Mentions stehen. Was fehlt sind drei UX-Brücken:
-1. Character Sheet auf Knopfdruck (1 Tag Aufwand)
-2. Library-Picker im neuen Toolkit (0,5 Tage)
-3. Cast Map im Composer (1 Tag)
+## Reihenfolge / Priorisierung
 
-Mit diesen 3 Upgrades sind wir auf Augenhöhe mit Artlist Studios — und durch **Hybrid Extend (Bridge-Mode)** sogar darüber hinaus.
+1. **Upgrade A (Multi-Vibe Casting)** — größter sichtbarer Sprung in Richtung Artlist-Demo
+2. **Upgrade C (Scene Snippets + Sharing)** — eliminiert die größte funktionale Lücke
+3. **Upgrade B (Location Scouting)** — Polish, baut auf Upgrade A's Variants-Tabelle auf
 
-**Soll ich diese 3 Upgrades umsetzen, oder priorisieren wir zuerst nur Upgrade 2 (Library im Toolkit) als schnellen Win?**
+Mit allen drei Upgrades sind wir bei **~85–90 %** Artlist-Niveau und in Continuity weiter vorn.
+
+---
+
+## Frage an dich
+
+Welche Reihenfolge soll ich umsetzen?
+
+- **Variante 1 (empfohlen):** Alle 3 in oben genannter Reihenfolge — ca. 3.5 Tage Arbeit, Casting + Sharing zuerst
+- **Variante 2 (schnellster Wow-Effekt):** Nur Upgrade A — Multi-Vibe Casting allein, danach evaluieren
+- **Variante 3 (größter Business-Wert):** Nur Upgrade C — Workspace-Sharing + Scene Snippets (Team-Feature, bessere Pro/Enterprise-Conversion)
