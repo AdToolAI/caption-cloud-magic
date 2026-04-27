@@ -236,6 +236,7 @@ export function useComposerPersistence() {
               prompt_mode: scene.promptMode ?? null,
               prompt_slot_order: (scene.promptSlotOrder ?? null) as any,
               applied_style_preset_id: scene.appliedStylePresetId ?? null,
+              cinematic_preset_slug: scene.cinematicPresetSlug ?? null,
               // Block M — Hybrid Production
               hybrid_mode: scene.hybridMode ?? null,
               first_frame_url: scene.firstFrameUrl ?? null,
