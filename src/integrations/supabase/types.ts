@@ -4115,7 +4115,9 @@ export type Database = {
           ad_format: string | null
           ad_framework: string | null
           ad_goal: string | null
+          ad_meta: Json | null
           ad_tonality: string | null
+          ad_variant_strategy: string | null
           assembly_config: Json
           auto_director_config: Json | null
           brand_kit_auto_sync: boolean
@@ -4123,10 +4125,12 @@ export type Database = {
           briefing: Json
           category: string
           created_at: string
+          cutdown_type: string | null
           id: string
           is_test_run: boolean
           language: string
           output_url: string | null
+          parent_project_id: string | null
           smart_reframe_enabled: boolean
           status: string
           storyboard: Json
@@ -4143,7 +4147,9 @@ export type Database = {
           ad_format?: string | null
           ad_framework?: string | null
           ad_goal?: string | null
+          ad_meta?: Json | null
           ad_tonality?: string | null
+          ad_variant_strategy?: string | null
           assembly_config?: Json
           auto_director_config?: Json | null
           brand_kit_auto_sync?: boolean
@@ -4151,10 +4157,12 @@ export type Database = {
           briefing?: Json
           category?: string
           created_at?: string
+          cutdown_type?: string | null
           id?: string
           is_test_run?: boolean
           language?: string
           output_url?: string | null
+          parent_project_id?: string | null
           smart_reframe_enabled?: boolean
           status?: string
           storyboard?: Json
@@ -4171,7 +4179,9 @@ export type Database = {
           ad_format?: string | null
           ad_framework?: string | null
           ad_goal?: string | null
+          ad_meta?: Json | null
           ad_tonality?: string | null
+          ad_variant_strategy?: string | null
           assembly_config?: Json
           auto_director_config?: Json | null
           brand_kit_auto_sync?: boolean
@@ -4179,10 +4189,12 @@ export type Database = {
           briefing?: Json
           category?: string
           created_at?: string
+          cutdown_type?: string | null
           id?: string
           is_test_run?: boolean
           language?: string
           output_url?: string | null
+          parent_project_id?: string | null
           smart_reframe_enabled?: boolean
           status?: string
           storyboard?: Json
@@ -4199,6 +4211,13 @@ export type Database = {
             columns: ["brand_kit_id"]
             isOneToOne: false
             referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composer_projects_parent_project_id_fkey"
+            columns: ["parent_project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
             referencedColumns: ["id"]
           },
         ]
