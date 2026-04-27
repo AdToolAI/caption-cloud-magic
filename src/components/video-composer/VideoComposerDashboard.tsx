@@ -824,9 +824,52 @@ export default function VideoComposerDashboard() {
                 assemblyConfig={project.assemblyConfig}
                 onUpdateAssembly={updateAssembly}
                 scenes={project.scenes}
+                onMasterRenderComplete={async () => {
+                  if (!project.id || !project.adMeta || project.parentProjectId) return;
+                  try {
+                    const spawned = await spawnAdCampaignChildren({
+                      masterProjectId: project.id,
+                      masterTitle: project.title,
+                      briefing: project.briefing,
+                      scenes: project.scenes,
+                      assemblyConfig: project.assemblyConfig,
+                      language: project.language,
+                      brandKitId: project.brandKitId,
+                      brandKitAutoSync: project.brandKitAutoSync,
+                      adMeta: project.adMeta,
+                    });
+                    if (spawned.length > 0) {
+                      toast({
+                        title: 'Kampagne erweitert 🎬',
+                        description: `${spawned.length} zusätzliche Variante(n) erstellt: ${spawned.map(s => s.label).join(', ')}`,
+                      });
+                      setActiveTab('campaign');
+                    }
+                  } catch (err) {
+                    console.warn('[Dashboard] spawn campaign children failed:', err);
+                  }
+                }}
               />
               <NLEExportPanel projectId={project.id} />
             </div>
+          </TabsContent>
+
+          <TabsContent value="campaign">
+            <AdCampaignTree
+              masterProjectId={project.parentProjectId ?? project.id}
+              masterTitle={project.title}
+              masterStatus={project.status}
+              masterOutputUrl={project.outputUrl}
+              adMeta={project.adMeta}
+              onOpenChild={(childId) => {
+                // Reset draft and load the child project on next mount
+                try {
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...defaultProject, id: childId }));
+                  localStorage.setItem(TAB_STORAGE_KEY, 'export' as TabId);
+                } catch { /* ignore */ }
+                window.location.reload();
+              }}
+            />
           </TabsContent>
             </Tabs>
           </div>
