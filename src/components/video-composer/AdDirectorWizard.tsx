@@ -801,7 +801,81 @@ export default function AdDirectorWizard({
               </div>
             )}
 
-            {step === 'compliance' && (
+            {step === 'scaling' && (
+              <div className="space-y-5">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  Kampagnen-Skalierung
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Optional — vervielfache deinen Spot in Cutdowns oder allen drei Skript-Varianten.
+                </p>
+
+                <div className="rounded-lg border border-border/40 bg-card/50 p-4">
+                  <div className="flex items-start gap-3">
+                    <Layers className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ad-multi-variant" className="cursor-pointer">
+                          Alle 3 A/B-Varianten rendern
+                        </Label>
+                        <Switch
+                          id="ad-multi-variant"
+                          checked={renderAllVariants}
+                          disabled={!variants || variants.length < 2}
+                          onCheckedChange={setRenderAllVariants}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Erzeugt drei Renders (Emotional / Rational / Curiosity). Voller AI-Cost × 3.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/40 bg-card/50 p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Scissors className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                    <div className="flex-1 space-y-3">
+                      <p className="text-sm font-medium">Cutdowns aus dem Master</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="cd-15s" className="cursor-pointer text-sm">+ 15-Sekunden-Cutdown</Label>
+                        <Switch id="cd-15s" checked={cutdown15s} onCheckedChange={setCutdown15s} />
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="cd-6s" className="cursor-pointer text-sm">+ 6-Sekunden-Hook (Reels)</Label>
+                        <Switch id="cd-6s" checked={cutdown6sHook} onCheckedChange={setCutdown6sHook} />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Cutdowns recyceln die Master-Clips — kein zusätzlicher AI-Cost.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/40 bg-card/50 p-4">
+                  <div className="flex items-start gap-3">
+                    <Palette className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ad-endcard" className="cursor-pointer">Auto-Logo-Endcard (2s)</Label>
+                        <Switch
+                          id="ad-endcard"
+                          checked={autoLogoEndcard && !!activeBrandKit?.logo_url}
+                          disabled={!activeBrandKit?.logo_url}
+                          onCheckedChange={setAutoLogoEndcard}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {activeBrandKit?.logo_url
+                          ? 'Statische Brand-Endcard mit Logo + Tagline. 0 AI-Credits.'
+                          : 'Lade ein Logo in dein Brand-Kit, um dies zu nutzen.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                   Compliance & Bestätigung
