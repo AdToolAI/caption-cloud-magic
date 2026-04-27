@@ -88,10 +88,58 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync }: SoundLibraryProp
   }, [user?.id]);
 
   // Filter sounds based on search
-  const filteredSounds = sounds.filter(sound => 
-    sound.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (sound.processing_preset?.toLowerCase().includes(searchQuery.toLowerCase()))
+  // Filter helpers
+  const matchesCategory = (sound: SoundLibraryItem) => {
+    if (category === 'all') return true;
+    if (category === 'enhanced') return sound.source === 'voicepro';
+    if (category === 'music') return sound.source === 'ai_generated';
+    if (category === 'stems') return sound.source === 'stem_separation';
+    return true;
+  };
+
+  const filteredSounds = sounds.filter(sound =>
+    matchesCategory(sound) && (
+      sound.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (sound.processing_preset?.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
   );
+
+  const handleStemSeparation = async (sound: SoundLibraryItem) => {
+    setStemTargetId(sound.id);
+    try {
+      const stems = await separateStems({
+        audioUrl: sound.url,
+        assetId: sound.id,
+        title: sound.title,
+      });
+      if (stems && stems.length > 0) {
+        // Re-fetch to show the new stem assets
+        const { data } = await supabase
+          .from('universal_audio_assets')
+          .select('id, title, url, original_audio_url, processing_preset, effect_config, duration_sec, created_at, type, source')
+          .eq('user_id', user!.id)
+          .in('source', ['voicepro', 'ai_generated', 'stem_separation'])
+          .order('created_at', { ascending: false });
+        if (data) {
+          setSounds(data.map(item => ({
+            id: item.id,
+            title: item.title || 'Untitled',
+            url: item.url || '',
+            original_url: item.original_audio_url,
+            processing_preset: item.processing_preset,
+            effect_config: item.effect_config as EnhancementOptions | null,
+            duration_sec: item.duration_sec ? Number(item.duration_sec) : null,
+            created_at: item.created_at || new Date().toISOString(),
+            type: item.type || 'enhanced',
+            source: item.source,
+          })));
+        }
+        setCategory('stems');
+      }
+    } finally {
+      setStemTargetId(null);
+    }
+  };
 
   // Play/pause audio
   const togglePlay = (sound: SoundLibraryItem) => {
