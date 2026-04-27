@@ -867,6 +867,30 @@ export default function AdDirectorWizard({
                   </div>
                 </div>
 
+
+                <div className="rounded-lg border border-border/40 bg-card/50 p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Layers className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                    <div className="flex-1 space-y-3">
+                      <p className="text-sm font-medium">Multi-Format-Bundling</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ar-9x16" className="cursor-pointer text-sm">+ 9:16 (Reels / Shorts / TikTok)</Label>
+                        <Switch id="ar-9x16" checked={aspect9x16} onCheckedChange={setAspect9x16} />
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ar-1x1" className="cursor-pointer text-sm">+ 1:1 (Feed-Quadrat)</Label>
+                        <Switch id="ar-1x1" checked={aspect1x1} onCheckedChange={setAspect1x1} />
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ar-4x5" className="cursor-pointer text-sm">+ 4:5 (Instagram-Portrait)</Label>
+                        <Switch id="ar-4x5" checked={aspect4x5} onCheckedChange={setAspect4x5} />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Klont den Master in Format-Varianten — kein zusätzlicher AI-Cost. Master bleibt 16:9.
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 <div className="rounded-lg border border-border/40 bg-card/50 p-4">
                   <div className="flex items-start gap-3">
                     <Palette className="h-4 w-4 mt-0.5 text-primary shrink-0" />
