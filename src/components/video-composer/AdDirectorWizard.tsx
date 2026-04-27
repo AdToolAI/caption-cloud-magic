@@ -330,6 +330,8 @@ export default function AdDirectorWizard({
               secondaryColor: activeBrandKit.secondary_color,
               accentColor: activeBrandKit.accent_color,
               logoUrl: activeBrandKit.logo_url,
+              fontFamily: (activeBrandKit as any).font_family ?? null,
+              tagline: (activeBrandKit as any).tagline ?? null,
             }
           : null;
 
@@ -342,6 +344,7 @@ export default function AdDirectorWizard({
         productDescription: productDescription.trim(),
         scriptLines,
         brandKit: brandKitInput,
+        appendLogoEndcard: autoLogoEndcard && !!brandKitInput?.logoUrl,
       });
 
       // Voiceover Auto-Synth (best-effort)
