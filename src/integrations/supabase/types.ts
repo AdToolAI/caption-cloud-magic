@@ -3722,6 +3722,76 @@ export type Database = {
         }
         Relationships: []
       }
+      composer_drift_checks: {
+        Row: {
+          anchor_image_url: string | null
+          anchor_scene_id: string | null
+          candidate_image_url: string | null
+          candidate_scene_id: string | null
+          created_at: string
+          drift_score: number | null
+          id: string
+          label: string | null
+          metadata: Json
+          project_id: string
+          recommendation: string | null
+          repair_action: string | null
+          repaired: boolean
+        }
+        Insert: {
+          anchor_image_url?: string | null
+          anchor_scene_id?: string | null
+          candidate_image_url?: string | null
+          candidate_scene_id?: string | null
+          created_at?: string
+          drift_score?: number | null
+          id?: string
+          label?: string | null
+          metadata?: Json
+          project_id: string
+          recommendation?: string | null
+          repair_action?: string | null
+          repaired?: boolean
+        }
+        Update: {
+          anchor_image_url?: string | null
+          anchor_scene_id?: string | null
+          candidate_image_url?: string | null
+          candidate_scene_id?: string | null
+          created_at?: string
+          drift_score?: number | null
+          id?: string
+          label?: string | null
+          metadata?: Json
+          project_id?: string
+          recommendation?: string | null
+          repair_action?: string | null
+          repaired?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composer_drift_checks_anchor_scene_id_fkey"
+            columns: ["anchor_scene_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composer_drift_checks_candidate_scene_id_fkey"
+            columns: ["candidate_scene_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composer_drift_checks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       composer_exports: {
         Row: {
           actual_cost_euros: number | null
@@ -3937,6 +4007,7 @@ export type Database = {
           continuity_checked_at: string | null
           continuity_drift_label: string | null
           continuity_drift_score: number | null
+          continuity_locked: boolean
           continuity_source_scene_id: string | null
           cost_euros: number
           created_at: string
@@ -3948,7 +4019,9 @@ export type Database = {
           hybrid_mode: string | null
           hybrid_target_scene_id: string | null
           id: string
+          last_drift_check_at: string | null
           last_frame_url: string | null
+          lock_reference_url: string | null
           mentioned_character_ids: string[] | null
           mentioned_location_ids: string[] | null
           order_index: number
@@ -3989,6 +4062,7 @@ export type Database = {
           continuity_checked_at?: string | null
           continuity_drift_label?: string | null
           continuity_drift_score?: number | null
+          continuity_locked?: boolean
           continuity_source_scene_id?: string | null
           cost_euros?: number
           created_at?: string
@@ -4000,7 +4074,9 @@ export type Database = {
           hybrid_mode?: string | null
           hybrid_target_scene_id?: string | null
           id?: string
+          last_drift_check_at?: string | null
           last_frame_url?: string | null
+          lock_reference_url?: string | null
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
           order_index?: number
@@ -4041,6 +4117,7 @@ export type Database = {
           continuity_checked_at?: string | null
           continuity_drift_label?: string | null
           continuity_drift_score?: number | null
+          continuity_locked?: boolean
           continuity_source_scene_id?: string | null
           cost_euros?: number
           created_at?: string
@@ -4052,7 +4129,9 @@ export type Database = {
           hybrid_mode?: string | null
           hybrid_target_scene_id?: string | null
           id?: string
+          last_drift_check_at?: string | null
           last_frame_url?: string | null
+          lock_reference_url?: string | null
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
           order_index?: number
