@@ -10015,11 +10015,14 @@ export type Database = {
           image_url: string
           metadata_json: Json | null
           model_used: string | null
+          parent_id: string | null
           prompt: string | null
           source: string
           style: string | null
           thumbnail_url: string | null
+          upscale_factor: number | null
           user_id: string
+          variation_index: number | null
         }
         Insert: {
           album_id?: string | null
@@ -10029,11 +10032,14 @@ export type Database = {
           image_url: string
           metadata_json?: Json | null
           model_used?: string | null
+          parent_id?: string | null
           prompt?: string | null
           source?: string
           style?: string | null
           thumbnail_url?: string | null
+          upscale_factor?: number | null
           user_id: string
+          variation_index?: number | null
         }
         Update: {
           album_id?: string | null
@@ -10043,11 +10049,14 @@ export type Database = {
           image_url?: string
           metadata_json?: Json | null
           model_used?: string | null
+          parent_id?: string | null
           prompt?: string | null
           source?: string
           style?: string | null
           thumbnail_url?: string | null
+          upscale_factor?: number | null
           user_id?: string
+          variation_index?: number | null
         }
         Relationships: [
           {
@@ -10055,6 +10064,13 @@ export type Database = {
             columns: ["album_id"]
             isOneToOne: false
             referencedRelation: "studio_albums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_images_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "studio_images"
             referencedColumns: ["id"]
           },
         ]
