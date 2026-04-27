@@ -30,6 +30,15 @@ import {
 } from '@/config/adSceneTemplates';
 import type { AdTonalityId } from '@/config/adTonalityProfiles';
 
+/** Subset of brand-kit fields used to style the ad scenes. */
+export interface AdBrandKitInput {
+  brandName?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  accentColor?: string | null;
+  logoUrl?: string | null;
+}
+
 export interface BuildAdScenesInput {
   frameworkId: AdFrameworkId;
   format: AdFormatId;
@@ -42,6 +51,9 @@ export interface BuildAdScenesInput {
   defaultTransition?: TransitionStyle;
   /** Per-beat AI-generated voiceover/subtitle line, indexed by beat order. */
   scriptLines?: string[];
+  /** Active brand kit — when provided, brand colors are used for text overlays
+   * and the brand name is woven into hook + CTA prompts. */
+  brandKit?: AdBrandKitInput | null;
 }
 
 export interface BuildAdScenesResult {
