@@ -30,7 +30,8 @@ export default function AudioStudio() {
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music' | 'auto-match'>('enhance');
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music' | 'auto-match' | 'stems'>('enhance');
+  const [stemSet, setStemSet] = useState<{ sourceTitle: string; stems: Array<{ type: 'vocals' | 'drums' | 'bass' | 'other'; url: string; assetId?: string }> } | null>(null);
   const [showMusicGen, setShowMusicGen] = useState(false);
   const [showAutoMatch, setShowAutoMatch] = useState(false);
   const [musicGenPrefill, setMusicGenPrefill] = useState<{
@@ -399,6 +400,7 @@ export default function AudioStudio() {
                       { id: 'auto-match', label: 'Auto-Match', icon: Film, badge: 'NEU' },
                       { id: 'music', label: 'AI Music', icon: Music2 },
                       { id: 'ducking', label: 'Ducking', icon: AudioLines, badge: musicUrl ? 'NEU' : undefined, disabled: !musicUrl },
+                      { id: 'stems', label: 'Stem-Mixer', icon: AudioLines, badge: stemSet ? `${stemSet.stems.length}` : 'NEU', disabled: !stemSet },
                       { id: 'compare', label: 'Vergleich', icon: Volume2, disabled: !enhancedAudioUrl },
                       { id: 'transcript', label: 'Transcript', icon: Mic },
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
@@ -534,6 +536,28 @@ export default function AudioStudio() {
                             setActiveTab('compare');
                           }}
                           onSendToBeatSync={(url, title) => handleSendToBeatSync({ url, title })}
+                          onStemsExtracted={(set) => {
+                            setStemSet(set);
+                            setActiveTab('stems');
+                            toast.success('Stems bereit zum Mixen', {
+                              description: `${set.stems.length} Spuren in den Stem-Mixer geladen`,
+                            });
+                          }}
+                        />
+                      </motion.div>
+                    )}
+
+                    {activeTab === 'stems' && stemSet && (
+                      <motion.div
+                        key="stems"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <StemMixerPanel
+                          stems={stemSet.stems}
+                          sourceTitle={stemSet.sourceTitle}
+                          onMixSaved={() => setLibraryRefreshKey(k => k + 1)}
                         />
                       </motion.div>
                     )}
