@@ -215,6 +215,9 @@ export default function AdDirectorWizard({
     setRenderAllVariants(false);
     setCutdown15s(false);
     setCutdown6sHook(false);
+    setAspect9x16(false);
+    setAspect1x1(false);
+    setAspect4x5(false);
     setVariants(null);
     setChosenVariantId(null);
     setVariantsLoading(false);
