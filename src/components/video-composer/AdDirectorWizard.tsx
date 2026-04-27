@@ -231,6 +231,8 @@ export default function AdDirectorWizard({
         return productName.trim().length > 0 && productDescription.trim().length > 0;
       case 'variants':
         return !!chosenVariantId && !!variants?.length;
+      case 'scaling':
+        return true;
       case 'compliance':
         return acknowledged;
     }
