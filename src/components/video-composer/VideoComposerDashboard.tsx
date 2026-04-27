@@ -74,7 +74,7 @@ interface LocalProject {
 
 const STORAGE_KEY = 'video-composer-draft';
 const TAB_STORAGE_KEY = 'video-composer-draft-tab';
-const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'clips', 'text', 'audio', 'export'];
+const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'clips', 'text', 'audio', 'export', 'campaign'];
 
 function loadDraft(): LocalProject | null {
   try {
