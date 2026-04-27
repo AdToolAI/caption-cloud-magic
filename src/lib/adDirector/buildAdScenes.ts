@@ -175,7 +175,9 @@ export function buildAdScenes(input: BuildAdScenesInput): BuildAdScenesResult {
       costEuros: 0,
       directorModifiers: {},
       shotDirector: { ...template.shotDirector },
-      appliedStylePresetId: template.cinematicPresetId,
+      // NOTE: cinematicPresetId is a clientside SLUG (e.g. 'commercial-glossy'),
+      // NOT a UUID — must NOT be written to applied_style_preset_id (UUID FK).
+      cinematicPresetSlug: template.cinematicPresetId,
     };
   });
 
