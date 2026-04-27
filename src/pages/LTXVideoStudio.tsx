@@ -7,32 +7,32 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Label } from '@/components/ui/label';
-import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, ArrowLeft, Wand2, Clock } from 'lucide-react';
+import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload, ArrowLeft, Wand2, Clock, Zap } from 'lucide-react';
 import { VideoPromptOptimizer } from '@/components/ai-video/VideoPromptOptimizer';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
-import { WAN_VIDEO_MODELS, WanVideoModel, WanAspectRatio } from '@/config/wanVideoCredits';
+import { LTX_VIDEO_MODELS, LTXVideoModel, LTXAspectRatio } from '@/config/ltxVideoCredits';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useSearchParams, Link } from 'react-router-dom';
-import { getCurrencyForLanguage, formatPrice } from '@/lib/currency';
+import { getCurrencyForLanguage } from '@/lib/currency';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Currency } from '@/config/pricing';
 
-export default function WanVideoStudio() {
+export default function LTXVideoStudio() {
   const { user } = useAuth();
-  const { language, t } = useTranslation();
+  const { language } = useTranslation();
   const { wallet, loading: walletLoading, refetch: refetchWallet } = useAIVideoWallet();
   const [generating, setGenerating] = useState(false);
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('generate');
 
   const [prompt, setPrompt] = useState('');
-  const [model, setModel] = useState<WanVideoModel>('wan-standard');
-  const [duration, setDuration] = useState(5);
-  const [aspectRatio, setAspectRatio] = useState<WanAspectRatio>('16:9');
+  const [model, setModel] = useState<LTXVideoModel>('ltx-standard');
+  const [duration, setDuration] = useState(4);
+  const [aspectRatio, setAspectRatio] = useState<LTXAspectRatio>('16:9');
 
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -41,15 +41,14 @@ export default function WanVideoStudio() {
   const [showPromptOptimizer, setShowPromptOptimizer] = useState(false);
 
   const currency: Currency = getCurrencyForLanguage(language);
-  const modelConfig = WAN_VIDEO_MODELS[model];
+  const modelConfig = LTX_VIDEO_MODELS[model];
   const costPerSecond = modelConfig.costPerSecond[currency];
   const cost = duration * costPerSecond;
   const canAfford = wallet && wallet.balance_euros >= cost;
   const currencySymbol = currency === 'USD' ? '$' : '€';
 
   useEffect(() => {
-    const payment = searchParams.get('payment');
-    if (payment === 'success') {
+    if (searchParams.get('payment') === 'success') {
       toast.success('Credits erfolgreich gekauft!');
       refetchWallet();
     }
@@ -58,8 +57,7 @@ export default function WanVideoStudio() {
   const uploadFile = async (file: File): Promise<string | null> => {
     if (!user) return null;
     const ext = file.name.split('.').pop();
-    const path = `${user.id}/wan-${Date.now()}.${ext}`;
-
+    const path = `${user.id}/ltx-${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from('ai-video-reference').upload(path, file, { upsert: true });
     if (error) {
       toast.error('Upload fehlgeschlagen');
@@ -83,28 +81,17 @@ export default function WanVideoStudio() {
       setActiveTab('credits');
       return;
     }
-
     setGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-wan-video', {
-        body: {
-          prompt: prompt.trim(),
-          model,
-          duration,
-          aspectRatio,
-          startImageUrl,
-        },
+      const { data, error } = await supabase.functions.invoke('generate-ltx-video', {
+        body: { prompt: prompt.trim(), model, duration, aspectRatio, startImageUrl },
       });
-
       if (error) throw error;
       if (data?.error) {
-        if (data.code === 'INSUFFICIENT_CREDITS' || data.code === 'NO_WALLET') {
-          setActiveTab('credits');
-        }
+        if (data.code === 'INSUFFICIENT_CREDITS' || data.code === 'NO_WALLET') setActiveTab('credits');
         throw new Error(data.error);
       }
-
-      toast.success(`Wan 2.5 Video wird generiert! Kosten: ${currencySymbol}${cost.toFixed(2)}`);
+      toast.success(`LTX Video wird generiert! Kosten: ${currencySymbol}${cost.toFixed(2)}`);
       refetchWallet();
       setActiveTab('history');
     } catch (err: any) {
@@ -117,28 +104,26 @@ export default function WanVideoStudio() {
   return (
     <>
       <Helmet>
-        <title>Wan 2.5 / 2.6 Video Studio | AI Video Generator</title>
-        <meta name="description" content="Generate AI videos with Wan 2.5 and the new Wan 2.6 - Fast Text-to-Video and Image-to-Video" />
+        <title>LTX Video 2.0 Pro Studio | AI Video Generator</title>
+        <meta name="description" content="Generate AI videos with LTX Video 2.0 by Lightricks - Fast, affordable, high quality" />
       </Helmet>
 
       <div className="container mx-auto px-4 py-6 max-w-5xl">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">Wan Video Studio</h1>
-              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">2.5 + 2.6</Badge>
+              <h1 className="text-2xl font-bold">LTX Video 2.0 Pro Studio</h1>
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                <Zap className="h-3 w-3 mr-1" />Schnell & Günstig
+              </Badge>
             </div>
             <p className="text-muted-foreground text-sm mt-1">
-              Wan 2.5 & 2.6 • Text-to-Video & Image-to-Video • 5 oder 10 Sekunden
+              Lightricks LTX 2.0 • 4 / 6 / 8 Sekunden • Text-to-Video & Image-to-Video
             </p>
           </div>
           <div className="flex items-center gap-3">
             <Link to="/ai-video-studio">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                AI Video Studio
-              </Button>
+              <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />AI Video Studio</Button>
             </Link>
             {wallet && (
               <Badge variant="outline" className="text-base px-3 py-1">
@@ -158,7 +143,6 @@ export default function WanVideoStudio() {
           <TabsContent value="generate">
             <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
               <div className="space-y-5">
-                {/* Prompt */}
                 <Card className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <Label className="text-sm font-medium">Prompt</Label>
@@ -169,30 +153,27 @@ export default function WanVideoStudio() {
                   <Textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="A golden retriever running through autumn leaves in slow motion, cinematic dolly shot, warm golden hour lighting, 4K quality"
+                    placeholder="A cinematic shot of waves crashing on a rocky shore at sunset, slow motion, golden hour lighting"
                     className="min-h-[100px]"
                     maxLength={2000}
                   />
                   <p className="text-xs text-muted-foreground mt-1">{prompt.length}/2000</p>
                   <div className="mt-2 p-2 rounded-md bg-muted/50 border border-border/50">
                     <p className="text-xs text-muted-foreground">
-                      💡 <strong>Tipp:</strong> Wan 2.5 ist besonders gut bei schnellen, flüssigen Bewegungen. Beschreibe Kamerabewegungen und Beleuchtung auf Englisch für beste Ergebnisse.
+                      💡 <strong>Tipp:</strong> LTX ist ideal für schnelle Iterationen — bestes Preis-Leistungs-Verhältnis im Hub. Nutze englische Prompts für maximale Qualität.
                     </p>
                   </div>
                 </Card>
 
-                {/* Model Selection */}
                 <Card className="p-4">
                   <Label className="text-sm font-medium mb-3 block">Modell</Label>
                   <div className="grid grid-cols-2 gap-3">
-                    {(Object.entries(WAN_VIDEO_MODELS) as [WanVideoModel, typeof WAN_VIDEO_MODELS[WanVideoModel]][]).map(([key, m]) => (
+                    {(Object.entries(LTX_VIDEO_MODELS) as [LTXVideoModel, typeof LTX_VIDEO_MODELS[LTXVideoModel]][]).map(([key, m]) => (
                       <button
                         key={key}
                         onClick={() => setModel(key)}
                         className={`p-3 rounded-lg border text-left transition-all ${
-                          model === key
-                            ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-                            : 'border-border hover:border-primary/40'
+                          model === key ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-border hover:border-primary/40'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1">
@@ -205,122 +186,66 @@ export default function WanVideoStudio() {
                   </div>
                 </Card>
 
-                {/* Duration Selection */}
                 <Card className="p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <Label className="text-sm font-medium flex items-center gap-1.5">
-                      <Clock className="h-4 w-4" />Dauer
-                    </Label>
+                    <Label className="text-sm font-medium flex items-center gap-1.5"><Clock className="h-4 w-4" />Dauer</Label>
                     <span className="text-sm font-semibold text-primary">{currencySymbol}{cost.toFixed(2)}</span>
                   </div>
-                  <ToggleGroup
-                    type="single"
-                    value={String(duration)}
-                    onValueChange={(v) => v && setDuration(Number(v))}
-                    className="w-full"
-                  >
-                    <ToggleGroupItem value="5" className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                      5 Sekunden
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="10" className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                      10 Sekunden
-                    </ToggleGroupItem>
+                  <ToggleGroup type="single" value={String(duration)} onValueChange={(v) => v && setDuration(Number(v))} className="w-full">
+                    <ToggleGroupItem value="4" className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">4s</ToggleGroupItem>
+                    <ToggleGroupItem value="6" className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">6s</ToggleGroupItem>
+                    <ToggleGroupItem value="8" className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">8s</ToggleGroupItem>
                   </ToggleGroup>
                 </Card>
 
-                {/* Aspect Ratio */}
                 <Card className="p-4">
                   <Label className="text-sm font-medium mb-3 block">Seitenverhältnis</Label>
                   <div className="flex gap-2">
-                    {(['16:9', '9:16', '1:1'] as WanAspectRatio[]).map((ar) => (
-                      <Button
-                        key={ar}
-                        variant={aspectRatio === ar ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setAspectRatio(ar)}
-                      >
+                    {(['16:9', '9:16', '1:1'] as LTXAspectRatio[]).map((ar) => (
+                      <Button key={ar} variant={aspectRatio === ar ? 'default' : 'outline'} size="sm" onClick={() => setAspectRatio(ar)}>
                         {ar === '16:9' ? '🖥️ 16:9' : ar === '9:16' ? '📱 9:16' : '⬜ 1:1'}
                       </Button>
                     ))}
                   </div>
                 </Card>
 
-                {/* Image-to-Video */}
                 <Card className="p-4">
                   <Label className="text-sm font-medium mb-3 block">
                     <ImagePlus className="h-4 w-4 inline mr-1" />Image-to-Video (optional)
                   </Label>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">Startbild hochladen</p>
-                    {startImageUrl ? (
-                      <div className="relative">
-                        <img src={startImageUrl} alt="Start" className="w-full h-32 object-cover rounded-lg" />
-                        <Button size="icon" variant="destructive" className="absolute top-1 right-1 h-6 w-6" onClick={() => setStartImageUrl(null)}>
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button variant="outline" size="sm" className="w-full" onClick={() => startImageRef.current?.click()} disabled={uploadingImage}>
-                        {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
-                        Bild hochladen
+                  {startImageUrl ? (
+                    <div className="relative">
+                      <img src={startImageUrl} alt="Start" className="w-full h-32 object-cover rounded-lg" />
+                      <Button size="icon" variant="destructive" className="absolute top-1 right-1 h-6 w-6" onClick={() => setStartImageUrl(null)}>
+                        <X className="h-3 w-3" />
                       </Button>
-                    )}
-                    <input ref={startImageRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
-                  </div>
+                    </div>
+                  ) : (
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => startImageRef.current?.click()} disabled={uploadingImage}>
+                      {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+                      Bild hochladen
+                    </Button>
+                  )}
+                  <input ref={startImageRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
                 </Card>
               </div>
 
-              {/* Sidebar */}
               <div className="space-y-4">
                 <Card className="p-4 sticky top-4">
                   <h3 className="font-semibold mb-3">Zusammenfassung</h3>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Modell</span>
-                      <span>{WAN_VIDEO_MODELS[model].name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Qualität</span>
-                      <span>{WAN_VIDEO_MODELS[model].quality}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Dauer</span>
-                      <span>{duration}s</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Format</span>
-                      <span>{aspectRatio}</span>
-                    </div>
-                    {startImageUrl && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Modus</span>
-                        <span>Image-to-Video</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between"><span className="text-muted-foreground">Modell</span><span>{modelConfig.name}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Qualität</span><span>{modelConfig.quality}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Dauer</span><span>{duration}s</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Format</span><span>{aspectRatio}</span></div>
+                    {startImageUrl && <div className="flex justify-between"><span className="text-muted-foreground">Modus</span><span>Image-to-Video</span></div>}
                     <hr className="my-2" />
-                    <div className="flex justify-between font-semibold text-base">
-                      <span>Kosten</span>
-                      <span className="text-primary">{currencySymbol}{cost.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Guthaben</span>
-                      <span>{wallet ? `${currencySymbol}${wallet.balance_euros.toFixed(2)}` : '...'}</span>
-                    </div>
+                    <div className="flex justify-between font-semibold text-base"><span>Kosten</span><span className="text-primary">{currencySymbol}{cost.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-xs text-muted-foreground"><span>Guthaben</span><span>{wallet ? `${currencySymbol}${wallet.balance_euros.toFixed(2)}` : '...'}</span></div>
                   </div>
-
-                  <Button
-                    className="w-full mt-4"
-                    size="lg"
-                    onClick={handleGenerate}
-                    disabled={generating || !prompt.trim() || !canAfford || walletLoading}
-                  >
-                    {generating ? (
-                      <><Loader2 className="h-4 w-4 animate-spin mr-2" />Generiere...</>
-                    ) : (
-                      <><Sparkles className="h-4 w-4 mr-2" />Video generieren</>
-                    )}
+                  <Button className="w-full mt-4" size="lg" onClick={handleGenerate} disabled={generating || !prompt.trim() || !canAfford || walletLoading}>
+                    {generating ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Generiere...</> : <><Sparkles className="h-4 w-4 mr-2" />Video generieren</>}
                   </Button>
-
                   {!canAfford && !walletLoading && (
                     <p className="text-xs text-destructive mt-2 text-center">
                       Nicht genügend Credits.{' '}
@@ -328,28 +253,12 @@ export default function WanVideoStudio() {
                     </p>
                   )}
                 </Card>
-
-                <Card className="p-4">
-                  <h4 className="font-medium text-sm mb-2">Preisübersicht</h4>
-                  <div className="text-xs space-y-1 text-muted-foreground">
-                    <div className="flex justify-between"><span>Standard 5s</span><span>{currencySymbol}0.50</span></div>
-                    <div className="flex justify-between"><span>Standard 10s</span><span>{currencySymbol}1.00</span></div>
-                    <hr className="my-1" />
-                    <div className="flex justify-between"><span>Pro 5s</span><span>{currencySymbol}0.75</span></div>
-                    <div className="flex justify-between"><span>Pro 10s</span><span>{currencySymbol}1.50</span></div>
-                  </div>
-                </Card>
               </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="credits">
-            <AIVideoCreditPurchase />
-          </TabsContent>
-
-          <TabsContent value="history">
-            <VideoGenerationHistory />
-          </TabsContent>
+          <TabsContent value="credits"><AIVideoCreditPurchase /></TabsContent>
+          <TabsContent value="history"><VideoGenerationHistory /></TabsContent>
         </Tabs>
       </div>
 

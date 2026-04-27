@@ -8,44 +8,26 @@ const corsHeaders = {
 };
 
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'wan-standard': { EUR: 0.10, USD: 0.10 },
-  'wan-pro': { EUR: 0.15, USD: 0.15 },
-  'wan-2-6-standard': { EUR: 0.10, USD: 0.10 },
-  'wan-2-6-pro': { EUR: 0.15, USD: 0.15 },
+  'grok-imagine': { EUR: 0.20, USD: 0.20 },
 };
 
-const REPLICATE_MODELS: Record<string, { t2v: string; i2v: string }> = {
-  'wan-standard': {
-    t2v: 'wan-video/wan-2.5-t2v',
-    i2v: 'wan-video/wan-2.5-i2v',
-  },
-  'wan-pro': {
-    t2v: 'wan-video/wan-2.5-t2v',
-    i2v: 'wan-video/wan-2.5-i2v',
-  },
-  'wan-2-6-standard': {
-    t2v: 'wan-video/wan-2.6-t2v',
-    i2v: 'wan-video/wan-2.6-i2v',
-  },
-  'wan-2-6-pro': {
-    t2v: 'wan-video/wan-2.6-t2v',
-    i2v: 'wan-video/wan-2.6-i2v',
-  },
-};
+// xAI Grok Imagine — text-to-video and image-to-video with native audio
+// NOTE: Adjust the slug here once xAI publishes the official Replicate endpoint.
+const REPLICATE_MODEL_SLUG = 'x-ai/grok-imagine';
 
-// Wan 2.5 size mapping for T2V
-const ASPECT_RATIO_TO_SIZE: Record<string, string> = {
-  '16:9': '1280*720',
-  '9:16': '720*1280',
-  '1:1': '720*720',
+const ASPECT_RATIO_TO_SIZE: Record<string, { width: number; height: number }> = {
+  '16:9': { width: 1280, height: 720 },
+  '9:16': { width: 720, height: 1280 },
+  '1:1': { width: 768, height: 768 },
 };
 
 interface GenerateRequest {
   prompt: string;
-  model: 'wan-standard' | 'wan-pro' | 'wan-2-6-standard' | 'wan-2-6-pro';
+  model: 'grok-imagine';
   duration: number;
   aspectRatio: '16:9' | '9:16' | '1:1';
   startImageUrl?: string;
+  enableAudio?: boolean;
 }
 
 serve(async (req) => {
@@ -62,10 +44,8 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    
-    if (authError || !user) {
-      throw new Error("Unauthorized");
-    }
+
+    if (authError || !user) throw new Error("Unauthorized");
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -73,30 +53,27 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest;
-    const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl } = body;
+    const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, enableAudio = true } = body;
 
-    // Wan 2.5 only supports 5 or 10 seconds — snap to nearest valid value
-    const duration = rawDuration >= 8 ? 10 : 5;
+    // Snap to allowed values: 6 or 12
+    const duration = rawDuration <= 6 ? 6 : 12;
 
     const isImageToVideo = !!startImageUrl;
-    const mode = isImageToVideo ? 'Image-to-Video' : 'Text-to-Video';
-    console.log(`[generate-wan-video] Mode: ${mode}, Duration: ${duration}s`);
+    console.log(`[generate-grok-video] Mode: ${isImageToVideo ? 'I2V' : 'T2V'}, Duration: ${duration}s, Audio: ${enableAudio}`);
 
-    // Get wallet currency
+    // Wallet currency
     const { data: walletPreview } = await supabaseClient
       .from('ai_video_wallets')
       .select('currency')
       .eq('user_id', user.id)
       .single();
-
     const currency = walletPreview?.currency || 'EUR';
 
-    // Calculate cost
-    const modelPricing = MODEL_PRICING[model] || MODEL_PRICING['wan-standard'];
+    const modelPricing = MODEL_PRICING[model] || MODEL_PRICING['grok-imagine'];
     const costPerSecond = modelPricing[currency] || modelPricing['EUR'];
     const totalCost = duration * costPerSecond;
 
-    // Rate limit check
+    // Rate limit
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { count } = await supabaseAdmin
       .from('ai_video_generations')
@@ -111,7 +88,7 @@ serve(async (req) => {
       );
     }
 
-    // Check wallet balance
+    // Wallet balance
     const { data: wallet, error: walletError } = await supabaseAdmin
       .from('ai_video_wallets')
       .select('balance_euros, currency')
@@ -137,10 +114,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[generate-wan-video] Cost: ${currencySymbol}${totalCost.toFixed(2)}, Balance: ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
-
     // Create generation record
-    const resolution = (model === 'wan-pro' || model === 'wan-2-6-pro') ? '1080p' : '720p';
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
@@ -149,7 +123,7 @@ serve(async (req) => {
         model,
         duration_seconds: duration,
         aspect_ratio: aspectRatio,
-        resolution,
+        resolution: '1080p',
         cost_per_second: costPerSecond,
         total_cost_euros: totalCost,
         status: 'pending',
@@ -167,7 +141,7 @@ serve(async (req) => {
     );
 
     if (deductError || newBalance === null || newBalance === undefined) {
-      console.error('[generate-wan-video] Deduct credits error:', deductError);
+      console.error('[generate-grok-video] Deduct credits error:', deductError);
       await supabaseAdmin
         .from('ai_video_generations')
         .update({ status: 'failed', error_message: 'Failed to deduct credits' })
@@ -175,50 +149,39 @@ serve(async (req) => {
       throw new Error("Failed to deduct credits");
     }
 
-    console.log(`[generate-wan-video] Credits deducted. New balance: ${currencySymbol}${newBalance.toFixed(2)}`);
-
-    // Initialize Replicate
+    // Replicate
     const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
     if (!REPLICATE_API_KEY) throw new Error('REPLICATE_API_KEY not configured');
-
     const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
-    // Webhook URL
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const webhookUrl = `${SUPABASE_URL}/functions/v1/replicate-webhook`;
 
-    // Select model
-    const modelConfig = REPLICATE_MODELS[model] || REPLICATE_MODELS['wan-standard'];
-    const replicateModel = isImageToVideo ? modelConfig.i2v : modelConfig.t2v;
+    const size = ASPECT_RATIO_TO_SIZE[aspectRatio] || ASPECT_RATIO_TO_SIZE['16:9'];
 
-    // Build input — Wan 2.5 uses different params than WaveSpeed
     const replicateInput: Record<string, any> = {
       prompt,
       duration,
+      width: size.width,
+      height: size.height,
+      audio: enableAudio,
     };
 
     if (isImageToVideo) {
       replicateInput.image = startImageUrl;
-      replicateInput.resolution = resolution; // I2V uses "resolution" param
-    } else {
-      replicateInput.size = ASPECT_RATIO_TO_SIZE[aspectRatio] || '1280*720'; // T2V uses "size" param
     }
 
-    console.log(`[generate-wan-video] Using model: ${replicateModel}`);
-    console.log(`[generate-wan-video] Replicate input:`, JSON.stringify({
-      ...replicateInput,
-      prompt: prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''),
-    }));
+    console.log(`[generate-grok-video] Using model: ${REPLICATE_MODEL_SLUG}`);
 
     try {
       const prediction = await replicate.predictions.create({
-        model: replicateModel,
+        model: REPLICATE_MODEL_SLUG,
         input: replicateInput,
         webhook: webhookUrl,
         webhook_events_filter: ['start', 'completed']
       });
 
-      console.log(`[generate-wan-video] ✅ Prediction created: ${prediction.id}`);
+      console.log(`[generate-grok-video] ✅ Prediction created: ${prediction.id}`);
 
       await supabaseAdmin
         .from('ai_video_generations')
@@ -230,7 +193,7 @@ serve(async (req) => {
         .eq('id', generation.id);
 
     } catch (replicateError: any) {
-      console.error('[generate-wan-video] ❌ Replicate Error:', replicateError);
+      console.error('[generate-grok-video] ❌ Replicate Error:', replicateError);
 
       await supabaseAdmin
         .from('ai_video_generations')
@@ -249,14 +212,26 @@ serve(async (req) => {
       });
 
       if (refundError) {
-        console.error('[generate-wan-video] Refund failed:', refundError);
+        console.error('[generate-grok-video] Refund failed:', refundError);
       } else {
-        console.log(`[generate-wan-video] ✅ ${currencySymbol}${totalCost.toFixed(2)} refunded`);
+        console.log(`[generate-grok-video] ✅ ${currencySymbol}${totalCost.toFixed(2)} refunded`);
+      }
+
+      // If model not yet available on Replicate
+      const errMsg = String(replicateError?.message || '').toLowerCase();
+      if (errMsg.includes('not found') || errMsg.includes('does not exist')) {
+        return new Response(
+          JSON.stringify({
+            error: "Grok Imagine ist auf Replicate noch nicht öffentlich verfügbar. Credits wurden zurückerstattet.",
+            code: "MODEL_UNAVAILABLE"
+          }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       if (replicateError?.response?.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Rate limit reached. Credits refunded. Please wait and try again.", code: "REPLICATE_RATE_LIMIT" }),
+          JSON.stringify({ error: "Rate limit reached. Credits refunded.", code: "REPLICATE_RATE_LIMIT" }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -280,7 +255,7 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error("[generate-wan-video] Error:", error);
+    console.error("[generate-grok-video] Error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
