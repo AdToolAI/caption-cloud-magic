@@ -10,11 +10,15 @@ import {
   Zap,
   AlertTriangle,
   Check,
+  Lock,
+  LockOpen,
+  History,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useFrameContinuity } from '@/hooks/useFrameContinuity';
 import { useContinuityDrift, driftSeverity } from '@/hooks/useContinuityDrift';
+import ContinuityHistoryDrawer from './ContinuityHistoryDrawer';
 import type { ComposerScene } from '@/types/video-composer';
 
 interface ContinuityGuardianStripProps {
