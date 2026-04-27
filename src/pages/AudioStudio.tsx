@@ -389,6 +389,7 @@ export default function AudioStudio() {
                           currentTime={currentTime}
                           onTimeChange={handleSeek}
                           initialMusicUrl={musicUrl}
+                          onBpmDetected={setDetectedVideoBpm}
                         />
                       </motion.div>
                     )}
