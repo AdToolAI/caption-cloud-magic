@@ -27,8 +27,16 @@ interface GenerateRequest {
   prompt: string;
   tier: 'fast' | 'pro' | 'ultra';
   aspectRatio?: string;
-  referenceImageUrl?: string;
+  referenceImageUrl?: string;     // Subject reference (image-to-image)
+  styleReferenceUrl?: string;     // Style reference (Phase C)
   style?: string;
+  brandKit?: {
+    name?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    accentColor?: string;
+    mood?: string;
+  } | null;
 }
 
 const STYLE_MODIFIERS: Record<string, string> = {
