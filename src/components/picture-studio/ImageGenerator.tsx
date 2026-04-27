@@ -134,6 +134,51 @@ export function ImageGenerator() {
     reader.readAsDataURL(file);
   };
 
+  const generateOne = async (): Promise<any | null> => {
+    if (tier === 'standard') {
+      const { data, error } = await supabase.functions.invoke('generate-studio-image', {
+        body: {
+          prompt: prompt.trim(),
+          style,
+          aspectRatio,
+          quality: 'fast',
+          editMode,
+          referenceImageUrl: editMode ? referenceImage : undefined,
+        }
+      });
+      if (error) throw error;
+      if (data?.ok === false) throw new Error(data.error || 'Generation failed');
+      if (data?.error) throw new Error(data.error);
+      return data?.image || null;
+    }
+
+    // Premium tier — Replicate via €-Wallet
+    const { data, error } = await supabase.functions.invoke('generate-image-replicate', {
+      body: {
+        prompt: prompt.trim(),
+        tier,
+        aspectRatio,
+        style,
+        referenceImageUrl: editMode ? referenceImage : undefined,
+      }
+    });
+
+    if (error) {
+      const fnError: any = error;
+      if (fnError.context && typeof fnError.context.json === 'function') {
+        const body = await fnError.context.json();
+        if (body?.code === 'INSUFFICIENT_CREDITS' || body?.code === 'NO_WALLET') {
+          const err: any = new Error(body.error);
+          err.needsPurchase = true;
+          throw err;
+        }
+        throw new Error(body?.error || fnError.message);
+      }
+      throw error;
+    }
+    return data?.image || null;
+  };
+
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast.error(t('picStudio.promptRequired'));
@@ -150,76 +195,34 @@ export function ImageGenerator() {
       return;
     }
 
-    if (tier === 'standard') {
-      // Lovable AI Gateway (Gemini) — gratis im Abo, kein Credit-Abzug
-      setReplicateLoading(true);
-      try {
-        const { data, error } = await supabase.functions.invoke('generate-studio-image', {
-          body: {
-            prompt: prompt.trim(),
-            style,
-            aspectRatio,
-            quality: 'fast',
-            editMode,
-            referenceImageUrl: editMode ? referenceImage : undefined,
-          }
-        });
-
-        if (error) throw error;
-        if (data?.ok === false) {
-          throw new Error(data.error || 'Generation failed');
-        }
-        if (data?.error) throw new Error(data.error);
-
-        if (data?.image) {
-          await handleGenerationSuccess(data.image);
-          toast.success(t('picStudio.imageGenerated'));
-        }
-      } catch (error: any) {
-        toast.error(error.message || t('picStudio.imageGenerationError'));
-      } finally {
-        setReplicateLoading(false);
-      }
-      return;
-    }
-
-    // Premium tier — Replicate via €-Wallet
     setReplicateLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-image-replicate', {
-        body: {
-          prompt: prompt.trim(),
-          tier,
-          aspectRatio,
-          style,
-          referenceImageUrl: editMode ? referenceImage : undefined,
-        }
-      });
+      const tasks = Array.from({ length: variantsCount }, () => generateOne());
+      const results = await Promise.allSettled(tasks);
 
-      if (error) {
-        const fnError: any = error;
-        if (fnError.context && typeof fnError.context.json === 'function') {
-          try {
-            const body = await fnError.context.json();
-            if (body?.code === 'INSUFFICIENT_CREDITS' || body?.code === 'NO_WALLET') {
-              toast.error(body.error);
-              navigate('/ai-video-purchase-credits');
-              return;
-            }
-            throw new Error(body?.error || fnError.message);
-          } catch (e: any) {
-            throw e;
+      let successCount = 0;
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value) {
+          await handleGenerationSuccess(r.value);
+          successCount++;
+        } else if (r.status === 'rejected') {
+          if ((r.reason as any)?.needsPurchase) {
+            toast.error(r.reason.message);
+            navigate('/ai-video-purchase-credits');
+            setReplicateLoading(false);
+            return;
           }
+          console.error('[ImageGenerator] variant failed:', r.reason);
         }
-        throw error;
       }
 
-      if (data?.image) {
-        await handleGenerationSuccess(data.image);
-        toast.success(`Bild generiert! Verbleibend: ${currencySymbol}${(data.newBalance ?? 0).toFixed(2)}`);
+      if (successCount === 0) {
+        toast.error('Bildgenerierung fehlgeschlagen');
+      } else if (variantsCount > 1) {
+        toast.success(`${successCount} von ${variantsCount} Varianten generiert`);
       }
     } catch (error: any) {
-      toast.error(error.message || 'Bildgenerierung fehlgeschlagen');
+      toast.error(error.message || t('picStudio.imageGenerationError'));
     } finally {
       setReplicateLoading(false);
     }
