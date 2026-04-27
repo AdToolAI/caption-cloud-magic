@@ -21,6 +21,7 @@ export interface PipelineRun {
   stitched_video_url: string | null;
   destination: 'directors_cut' | 'library' | 'download';
   error_message: string | null;
+  completed_at?: string | null;
 }
 
 interface Options {
