@@ -116,6 +116,7 @@ const AIVideoToolkit = lazy(() => import("./pages/AIVideoToolkit"));
 const BrandCharacters = lazy(() => import("./pages/BrandCharacters"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 const VideoComposer = lazy(() => import("./pages/VideoComposer"));
+const EmailDirector = lazy(() => import("./pages/EmailDirector"));
 const MotionStudioLibrary = lazy(() => import("./pages/MotionStudio/Library"));
 const MotionStudioHub = lazy(() => import("./pages/MotionStudio/Hub"));
 const MotionStudioStudioMode = lazy(() => import("./pages/MotionStudio/StudioMode"));
@@ -259,6 +260,7 @@ function AppLayout() {
           <Route path="/audio-studio" element={<AudioStudio />} />
            <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
            <Route path="/video-composer" element={<VideoComposer />} />
+           <Route path="/email-director" element={<ProtectedRoute><EmailDirector /></ProtectedRoute>} />
            <Route path="/motion-studio" element={<MotionStudioHub />} />
            <Route path="/motion-studio/studio" element={<MotionStudioStudioMode />} />
            <Route path="/motion-studio/library" element={<MotionStudioLibrary />} />
