@@ -555,6 +555,11 @@ export function ImageGenerator() {
             </div>
           </div>
 
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch checked={editMode} onCheckedChange={(v) => { setEditMode(v); if (!v) setReferenceImage(null); }} />
+              <Label className="text-sm">{t('picStudio.imageToImage')}</Label>
+            </div>
             {editMode && (
               <div className="flex items-center gap-2">
                 {referenceImage ? (
