@@ -117,8 +117,8 @@ export default function WanVideoStudio() {
   return (
     <>
       <Helmet>
-        <title>Wan 2.5 Video Studio | AI Video Generator</title>
-        <meta name="description" content="Generate AI videos with Wan 2.5 - Fast Text-to-Video and Image-to-Video" />
+        <title>Wan 2.5 / 2.6 Video Studio | AI Video Generator</title>
+        <meta name="description" content="Generate AI videos with Wan 2.5 and the new Wan 2.6 - Fast Text-to-Video and Image-to-Video" />
       </Helmet>
 
       <div className="container mx-auto px-4 py-6 max-w-5xl">
@@ -126,11 +126,11 @@ export default function WanVideoStudio() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">Wan 2.5 Video Studio</h1>
-              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">Neu</Badge>
+              <h1 className="text-2xl font-bold">Wan Video Studio</h1>
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">2.5 + 2.6</Badge>
             </div>
             <p className="text-muted-foreground text-sm mt-1">
-              Text-to-Video & Image-to-Video • 5 oder 10 Sekunden
+              Wan 2.5 & 2.6 • Text-to-Video & Image-to-Video • 5 oder 10 Sekunden
             </p>
           </div>
           <div className="flex items-center gap-3">
