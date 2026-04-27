@@ -162,6 +162,7 @@ export default function AudioStudio() {
               </Button>
               <MusicGeneratorPanel
                 onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
+                onSendToBeatSync={handleSendToBeatSync}
               />
             </motion.div>
           ) : !audioUrl ? (
@@ -386,6 +387,7 @@ export default function AudioStudio() {
                           duration={duration}
                           currentTime={currentTime}
                           onTimeChange={handleSeek}
+                          initialMusicUrl={musicUrl}
                         />
                       </motion.div>
                     )}
@@ -476,6 +478,7 @@ export default function AudioStudio() {
                         <MusicGeneratorPanel
                           onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
                           onOpenLibrary={() => setActiveTab('library')}
+                          onSendToBeatSync={handleSendToBeatSync}
                         />
                       </motion.div>
                     )}
