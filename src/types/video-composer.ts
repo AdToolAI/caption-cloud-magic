@@ -205,6 +205,17 @@ export interface ComposerScene {
   lastFrameUrl?: string;
   endReferenceImageUrl?: string;
   hybridTargetSceneId?: string;
+  /**
+   * Continuity Guardian (Reference-Chaining 2.0).
+   * `continuityDriftScore` (0-100) is computed by `detect-scene-drift` against
+   * the previous scene's last frame. Lower = more consistent. `…Label` is a
+   * short human-readable diff summary (e.g. "lighting changed, character missing").
+   * `continuityAutoRepair` opts the scene into automatic re-generation
+   * with a locked reference image when drift exceeds the threshold.
+   */
+  continuityDriftScore?: number;
+  continuityDriftLabel?: string;
+  continuityAutoRepair?: boolean;
 }
 
 export type SubtitlePosition = 'top' | 'bottom';

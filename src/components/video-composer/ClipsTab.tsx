@@ -41,6 +41,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { SortableSceneItem } from './SortableSceneItem';
+import ContinuityGuardianStrip from './ContinuityGuardianStrip';
 
 interface ClipsTabProps {
   scenes: ComposerScene[];
@@ -563,6 +564,14 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Continuity Guardian — Reference-Chaining 2.0 */}
+      <ContinuityGuardianStrip
+        scenes={scenes}
+        projectId={projectId}
+        onUpdateScenes={onUpdateScenes}
+        onRepairScene={(s) => handleGenerateSingle(s)}
+      />
 
       {/* Clip Cards */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

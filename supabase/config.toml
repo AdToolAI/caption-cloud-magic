@@ -749,3 +749,7 @@ timeout_sec = 180
 [functions.generate-grok-video]
 verify_jwt = true
 timeout_sec = 180
+
+[functions.detect-scene-drift]
+verify_jwt = true
+timeout_sec = 60

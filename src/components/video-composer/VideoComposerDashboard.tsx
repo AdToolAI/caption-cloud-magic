@@ -220,6 +220,9 @@ export default function VideoComposerDashboard() {
             lastFrameUrl: ((row as any).last_frame_url as any) ?? local?.lastFrameUrl,
             endReferenceImageUrl: ((row as any).end_reference_image_url as any) ?? local?.endReferenceImageUrl,
             hybridTargetSceneId: ((row as any).hybrid_target_scene_id as any) ?? local?.hybridTargetSceneId,
+            continuityDriftScore: ((row as any).continuity_drift_score as any) ?? local?.continuityDriftScore,
+            continuityDriftLabel: ((row as any).continuity_drift_label as any) ?? local?.continuityDriftLabel,
+            continuityAutoRepair: ((row as any).continuity_auto_repair as any) ?? local?.continuityAutoRepair,
           };
         });
 
@@ -308,6 +311,9 @@ export default function VideoComposerDashboard() {
             lastFrameUrl: ((row as any).last_frame_url as any) ?? local?.lastFrameUrl,
             endReferenceImageUrl: ((row as any).end_reference_image_url as any) ?? local?.endReferenceImageUrl,
             hybridTargetSceneId: ((row as any).hybrid_target_scene_id as any) ?? local?.hybridTargetSceneId,
+            continuityDriftScore: ((row as any).continuity_drift_score as any) ?? local?.continuityDriftScore,
+            continuityDriftLabel: ((row as any).continuity_drift_label as any) ?? local?.continuityDriftLabel,
+            continuityAutoRepair: ((row as any).continuity_auto_repair as any) ?? local?.continuityAutoRepair,
           };
         });
         return { ...prev, scenes: dbScenes };
