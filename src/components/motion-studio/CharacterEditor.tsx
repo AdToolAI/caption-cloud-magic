@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Upload, X, Sparkles, User, Lightbulb, ShieldCheck } from 'lucide-react';
+import { Loader2, Upload, X, Sparkles, User, Lightbulb, ShieldCheck, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useLegalConsent } from '@/hooks/useLegalConsent';
 import LibraryUploadConsentDialog from '@/components/motion-studio/LibraryUploadConsentDialog';
@@ -46,6 +47,7 @@ export default function CharacterEditor({
   const [saving, setSaving] = useState(false);
   const [showConsentDialog, setShowConsentDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [generatingSheet, setGeneratingSheet] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Reset bei jedem Öffnen
@@ -115,6 +117,60 @@ export default function CharacterEditor({
       await performUpload(file);
     }
   }, [pendingFile, performUpload]);
+
+  /** Generate a 4-view photorealistic character sheet via edge function. */
+  const handleGenerateSheet = useCallback(async () => {
+    if (!draft.description.trim()) {
+      toast.error('Bitte zuerst eine Beschreibung („Aussehen") eingeben');
+      return;
+    }
+    setGeneratingSheet(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-character-sheet', {
+        body: {
+          mode: 'realistic',
+          name: draft.name,
+          description: draft.description,
+          signatureItems: draft.signature_items,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.imageUrl) throw new Error('Kein Bild generiert');
+
+      // Convert data: URL → File and upload to library bucket for persistence
+      try {
+        const blob = await (await fetch(data.imageUrl)).blob();
+        const file = new File([blob], `sheet-${Date.now()}.png`, { type: 'image/png' });
+        const tmpId = character?.id ?? `tmp-${Date.now()}`;
+        const url = await uploadLibraryImage(file, 'character', tmpId);
+        if (url) {
+          setDraft((d) => ({
+            ...d,
+            reference_image_url: url,
+            reference_image_seed: data.styleSeed ?? d.reference_image_seed,
+          }));
+          toast.success('Character Sheet generiert ✨');
+          return;
+        }
+      } catch (uploadErr) {
+        console.warn('[character-sheet] storage upload failed, using direct url', uploadErr);
+      }
+
+      // Fallback: use the data URL directly
+      setDraft((d) => ({
+        ...d,
+        reference_image_url: data.imageUrl,
+        reference_image_seed: data.styleSeed ?? d.reference_image_seed,
+      }));
+      toast.success('Character Sheet generiert ✨');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Generierung fehlgeschlagen';
+      toast.error(msg);
+    } finally {
+      setGeneratingSheet(false);
+    }
+  }, [draft.name, draft.description, draft.signature_items, character?.id, uploadLibraryImage]);
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
@@ -199,7 +255,25 @@ export default function CharacterEditor({
 
           {/* Reference Image */}
           <div className="space-y-2">
-            <Label className="text-xs">Referenzbild (optional, sehr empfohlen)</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Referenzbild (optional, sehr empfohlen)</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={generatingSheet || !draft.description.trim()}
+                onClick={handleGenerateSheet}
+                className="h-7 text-[11px] gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
+                title={!draft.description.trim() ? 'Beschreibung erforderlich' : 'Foto-realistisches 4-View Sheet erzeugen'}
+              >
+                {generatingSheet ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Wand2 className="h-3 w-3" />
+                )}
+                Sheet generieren
+              </Button>
+            </div>
 
             {!hasConsent && !character && (
               <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">

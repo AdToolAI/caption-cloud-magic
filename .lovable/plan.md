@@ -1,116 +1,74 @@
-# Plan — Konsolidierung zum "Unified AI Video Toolkit"
+## Status: Scene & Character Continuity — wo wir wirklich stehen
 
-## Deine Entscheidung
+### Was wir bereits haben (mehr als gedacht!)
 
-Statt 9 Einzel-Studios + Toolkit parallel zu pflegen → **eine** unified Page als primäre Erfahrung. Weniger Feature-Sprawl, klarere UX, einfacherer Wartungsaufwand.
+**1. Character & Location Library (Motion Studio Pro)** — `/motion-studio/library`
+- Persistente Charaktere mit `name`, `description`, `signature_items` (z. B. „rote Lederjacke"), `reference_image_url`, `voice_id`, `tags`
+- Persistente Locations mit Lighting-Notes und Reference-Image
+- `@charakter` / `@location` Mention-Editor in Prompts → wird beim Generieren automatisch zu vollem Prompt hydriert
+- Wenn genau **ein** Charakter/Location getaggt ist, wird das Reference-Image als i2v-Anker an das Modell übergeben
 
-## Strategie: Sanfte Konsolidierung in 2 Stufen
+**2. Frame-to-Shot Continuity** (Edge Function `extract-video-last-frame`)
+- Letzter Frame jeder Szene wird automatisch extrahiert und als `start_image` für die nächste Szene benutzt
+- Im **Video Composer** integriert (Szenen-basierte Pipeline mit Realtime-Updates)
+- Hook `useFrameContinuity` ist überall verfügbar
 
-### Stufe 1 (jetzt): Toolkit als neue Standard-Erfahrung
+**3. Hybrid Extend** (Edge Function `hybrid-extend-scene`) — _stärker als Artlist hier_
+- 4 Modi: Forward, Backward, Bridge (zwischen 2 Szenen morphen), Style-Ref
+- Backward & Bridge nutzen `end_image` (nur Kling & Luma supporten das)
 
-Die neue Seite `/ai-video-studio` wird das **Unified Toolkit** — kein separater Hub mehr, kein Toolkit-Toggle.
+**4. Multi-Model Consistency Ranking** (`modelConsistencyRanking.ts`)
+- 5★ Kling (true i2v) · 4★ Hailuo, Wan, Seedance, Veo · 3★ Luma · 2★ Sora (prompt-only)
+- UI zeigt Sterne pro Modell, damit User die richtige Engine für Continuity wählt
 
-**Eine Seite, alles drin:**
-- Modell-Dropdown (gruppiert: Empfohlen / Schnell & Günstig / Premium / Audio-fähig)
-- Universeller Prompt-Block mit `VideoPromptOptimizer`
-- Image-Upload (erscheint nur bei I2V-fähigen Modellen)
-- Smart Settings: Dauer, Aspect Ratio, Resolution — dynamisch aus Modell-Capabilities
-- Live-Cost-Schätzung
-- Generate-Button → ruft die richtige bestehende Edge Function auf
-- Tab "Verlauf" (bestehende `VideoGenerationHistory`)
-- Tab "Credits" (bestehende `AIVideoCreditPurchase`)
+**5. Sora Long-Form Chain** (`generate-sora-chain`) — auto-extrahiert Frames zwischen Sora-Clips für 12s+ Storys
 
-### Stufe 2 (jetzt): Einzel-Studios werden Redirects
+**6. Character Shot Picker** im Video Composer
+- Pro Szene wählbar: Wide / Medium / Close-up / Absent
+- Sherlock-Holmes-Anchor-Injection: Charakterbeschreibung wird shot-typ-spezifisch in den Prompt gepatcht
 
-Die 9 Studio-Pages (`/kling-video-studio`, `/sora-video-studio`, etc.) werden zu **Redirects** auf das Toolkit mit vorausgewähltem Modell:
+### Wo wir hinter Artlist liegen
 
-```
-/kling-video-studio  →  /ai-video-studio?model=kling-3-omni
-/sora-video-studio   →  /ai-video-studio?model=sora-2-standard
-/wan-video-studio    →  /ai-video-studio?model=wan-2-6-standard
-... (alle 9)
-```
+| Feature | Artlist | Wir |
+|---|---|---|
+| Character Library mit Reference-Image | ✅ | ✅ |
+| Auto-Frame-Continuity zwischen Shots | ✅ | ✅ (nur in Video Composer & Sora Long-Form) |
+| **„Single Click 10-Shot Story" Wizard** | ✅ | ❌ Nur Sora Long-Form, nicht model-übergreifend |
+| **Character Sheet (Multi-View Generator)** | ✅ Front/Side/3-4 Expressions | ⚠️ existiert nur für Explainer-Cartoons, nicht für realistische i2v |
+| **Cast Consistency Map** (Visual Übersicht aller Szenen + welche Chars erscheinen) | ✅ | ❌ |
+| **Continuity Toggle direkt im AI Video Toolkit** | ✅ | ❌ Toolkit greift nicht auf Library zu |
 
-Vorteile:
-- Bestehende Links (Welcome-Bonus, FirstVideoGuide, Dashboard-Hero, Onboarding-Progress) funktionieren weiter
-- SEO-Indexe bleiben erhalten (HTTP-Redirect-äquivalent über Router)
-- Bookmarks der User brechen nicht
-- User landet sofort im Toolkit mit "ihrem" Modell vorausgewählt
+### Konkreter Vorschlag: 3 gezielte Upgrades (kein neues Modul!)
 
-Die alten Studio-Komponenten-Dateien werden **gelöscht** (Code-Cleanup):
-- `src/pages/KlingVideoStudio.tsx`, `SoraVideoStudio.tsx`, `WanVideoStudio.tsx`, `HailuoVideoStudio.tsx`, `LumaVideoStudio.tsx`, `SeedanceVideoStudio.tsx`, `VeoVideoStudio.tsx`, `LTXVideoStudio.tsx`, `GrokVideoStudio.tsx`
+**Upgrade 1 — Character Sheet Generator für realistische Charaktere** (Library)
+- Neuer Button im `CharacterEditor`: „Generate Character Sheet"
+- Nutzt Gemini 3 Pro Image Preview oder Flux: erzeugt ein **4-View Sheet** (Front · Profile · ¾ View · Expression) aus einer einzigen Beschreibung oder einem Upload
+- Das beste Bild wird als `reference_image_url` gespeichert + `reference_image_seed` für Reproduzierbarkeit
+- Erweitert die bestehende `generate-character-sheet` Edge Function um realistic/cinematic-Modi
 
-## Was gebaut wird
+**Upgrade 2 — Library im AI Video Toolkit verfügbar machen**
+- Im `ToolkitGenerator` einen kleinen „Cast & Locations"-Block ergänzen (1 Char + 1 Location auswählen via Popover)
+- Wenn ausgewählt → Reference-Image wird automatisch als i2v-Input an die Edge Function übergeben (alle Modelle ≥ 3★ in der Ranking-Map)
+- Bei Sora 2 (prompt-only) → Visual Description wird stattdessen in den Prompt injiziert + Toast-Hinweis „Sora hält Charaktere nur ~70 % konsistent — Kling für längere Stories"
 
-### Neue Dateien
+**Upgrade 3 — „Story Mode" im Video Composer** (Cast Consistency Map)
+- Neuer Tab/Sidebar-Block „Cast Map": zeigt eine Mini-Tabelle Szene 1–10 × Charaktere mit grünen/grauen Punkten (wo welcher Char auftritt)
+- Per Szene auf einen Klick: „Continuity off / Frame-Anchor / Reference-Image" toggle
+- Nutzt bereits vorhandene `extract-video-last-frame` + `characterShot`-Logik — nur eine UI-Übersicht, keine neue Backend-Logik
 
-**`src/config/aiVideoModelRegistry.ts`** — Single Source of Truth, aggregiert alle 9 Modelle:
-```typescript
-{
-  id: 'kling-3-omni',
-  name: 'Kling 3.0',
-  provider: 'Kuaishou',
-  edgeFunction: 'generate-kling-video',
-  group: 'recommended', // recommended | fast | premium | audio
-  capabilities: { t2v: true, i2v: true, audio: false },
-  durations: [3, 5, 8, 10, 15],
-  resolutions: ['720p', '1080p'],
-  aspectRatios: ['16:9', '9:16', '1:1'],
-  costPerSecond: { EUR: 0.30, USD: 0.30 },
-  badge: 'Empfohlen',
-  requiresAccess: null, // oder 'sora2' für Sora
-}
-```
+### Was wir bewusst NICHT tun
 
-**`src/pages/AIVideoToolkit.tsx`** — Neue unified Toolkit-Page (ersetzt `AIVideoStudio.tsx`)
+- **Keine neue Engine** für Character Re-ID — wir lehnen uns an Klings true-i2v an (besser als Artlists eigener Stack)
+- **Keinen separaten „Continuity Mode"** als eigene Page — alles bleibt im Video Composer & Toolkit
+- **Kein Auto-Storyboard aus 1 Prompt** über alle 9 Modelle — das ist Sora-Long-Form's Job, soll nicht dupliziert werden
 
-**`src/components/ai-video/ModelSelector.tsx`** — Gruppiertes Dropdown mit Pricing & Badges
+### Antwort auf deine Frage
 
-**`src/components/ai-video/ToolkitGenerator.tsx`** — Universal Generator mit dynamischen Settings
+Wir sind **bei ~75 % des Artlist-Niveaus**. Frame-Continuity, Library und @-Mentions stehen. Was fehlt sind drei UX-Brücken:
+1. Character Sheet auf Knopfdruck (1 Tag Aufwand)
+2. Library-Picker im neuen Toolkit (0,5 Tage)
+3. Cast Map im Composer (1 Tag)
 
-### Edits
+Mit diesen 3 Upgrades sind wir auf Augenhöhe mit Artlist Studios — und durch **Hybrid Extend (Bridge-Mode)** sogar darüber hinaus.
 
-- **`src/App.tsx`** — `/ai-video-studio` zeigt jetzt `AIVideoToolkit`; alle 9 alten Studio-Routen werden zu `<Navigate to="/ai-video-studio?model=...">` Redirects
-- **`src/pages/AIVideoStudio.tsx`** — gelöscht und durch `AIVideoToolkit.tsx` ersetzt
-- **9 alte Studio-Pages** — gelöscht
-- **`src/config/hubConfig.ts`** — bleibt, zeigt nur noch "AI Video Studio" (= Toolkit)
-
-### Edge Functions, Wallet, History
-
-**Bleiben unverändert.** Die Toolkit-UI dispatcht auf die richtige Edge Function basierend auf der Registry. `useAIVideoWallet`, Credit-Refunds, History-Logik werden 1:1 wiederverwendet.
-
-## UX-Flow
-
-1. User klickt "AI Video Studio" in Sidebar → `/ai-video-studio` (Toolkit)
-2. Modell-Dropdown defaultet auf "Kling 3.0" (oder URL-Parameter `?model=...`)
-3. Settings passen sich dynamisch an (Dauer-Slider zeigt nur valide Werte, Audio-Toggle nur bei Veo/Grok, etc.)
-4. Prompt eingeben → Optional optimieren → Generate
-5. Cost-Bestätigung im Button: "Generieren · €2.40"
-6. Ergebnis erscheint in History-Tab
-
-## Was sich für den User verbessert
-
-- **Ein Klick weniger**: kein Hub-Zwischenschritt mehr
-- **Schneller Modellwechsel**: Prompt bleibt erhalten beim Switch
-- **Keine Verwirrung**: 1 Seite statt 9 Sub-Seiten
-- **Vergleichbarkeit**: Cost-per-Second direkt im Dropdown sichtbar
-
-## Risiken & Mitigation
-
-- **Risiko**: Alte Sora-2-Coming-Soon-Logik (`Sora2ComingSoonGate.tsx`) referenziert `/sora-video-studio`. → Redirect funktioniert, aber wir prüfen Access-Gate im Toolkit selbst (`requiresAccess: 'sora2'` in Registry → wenn kein Access, Modell-Dropdown deaktiviert + Hinweis)
-- **Risiko**: WelcomeBonusModal & FirstVideoGuide verlinken auf Einzel-Studios. → Redirects fangen das ab; die Modell-URL-Parameter sorgen dafür, dass der User im "richtigen" Modell landet
-- **Risiko**: Code-Verlust bei gelöschten Studios. → Die Studios sind dünne Wrapper um Edge Functions + Settings — alle Logik existiert in den Edge Functions und Configs weiter
-
-## Lokalisierung
-
-Neue UI-Strings (DE/EN/ES) ins zentrale Translation-File. Visual-Prompts bleiben EN (Multilingual Asset Strategy).
-
-## Nicht im Scope
-
-- **Compare Mode** (parallel auf 2-3 Modellen generieren) — verschoben auf separates Follow-up, falls gewünscht
-- **Saved Presets** — später
-- **Modell-Recommendation-AI** — später
-
-## Ergebnis
-
-Eine schlanke, professionelle Toolkit-Page als primäre Video-Generierungs-Erfahrung. Alle bestehenden Links bleiben funktional via Redirects. Code-Basis schrumpft um 9 Studio-Pages. Wartung wird trivial: neues Modell hinzufügen = ein Eintrag in `aiVideoModelRegistry.ts`.
+**Soll ich diese 3 Upgrades umsetzen, oder priorisieren wir zuerst nur Upgrade 2 (Library im Toolkit) als schnellen Win?**

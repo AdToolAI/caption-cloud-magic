@@ -18,6 +18,8 @@ import {
 
 import { ModelSelector } from './ModelSelector';
 import { VideoPromptOptimizer } from './VideoPromptOptimizer';
+import { ToolkitCastPicker, buildCastPromptSuffix } from './ToolkitCastPicker';
+import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -63,6 +65,20 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showOptimizer, setShowOptimizer] = useState(false);
+
+  /* ── Library Cast & Locations (Scene Continuity) ── */
+  const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
+  const [castCharacterId, setCastCharacterId] = useState<string | null>(null);
+  const [castLocationId, setCastLocationId] = useState<string | null>(null);
+  const castCharacter = useMemo(
+    () => libCharacters.find((c) => c.id === castCharacterId) ?? null,
+    [libCharacters, castCharacterId],
+  );
+  const castLocation = useMemo(
+    () => libLocations.find((l) => l.id === castLocationId) ?? null,
+    [libLocations, castLocationId],
+  );
+  const consistencyKey = `ai-${model.family}`;
 
   /* ── Sync settings to model capabilities when switching ── */
   useEffect(() => {
@@ -123,16 +139,34 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
     setGenerating(true);
     try {
+      // Build the prompt — inject Library cast/location description for richer scene continuity
+      const castSuffix = buildCastPromptSuffix(castCharacter, castLocation);
+      const finalPrompt = castSuffix
+        ? `${prompt.trim()}\n\n${castSuffix}`
+        : prompt.trim();
+
       const body: Record<string, unknown> = {
-        prompt: prompt.trim(),
+        prompt: finalPrompt,
         model: model.id,
         duration,
         aspectRatio,
       };
-      if (model.capabilities.i2v && startImageUrl) body.startImageUrl = startImageUrl;
+
+      // i2v: prefer the user's manually uploaded startImage, else the character's reference image
+      const referenceImage = startImageUrl ?? castCharacter?.reference_image_url ?? null;
+      if (model.capabilities.i2v && referenceImage) body.startImageUrl = referenceImage;
       if (model.capabilities.audio) body.generateAudio = generateAudio;
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
+
+      // Sora 2 cannot accept image input → toast hint when a character is selected
+      if (model.family === 'sora' && castCharacter) {
+        toast.info(
+          language === 'de'
+            ? 'Sora 2 nutzt nur die Beschreibung (~70 % Konsistenz). Für längere Storys → Kling oder Hailuo.'
+            : 'Sora 2 uses only the description (~70 % consistency). For longer stories switch to Kling or Hailuo.',
+        );
+      }
 
       const { data, error } = await supabase.functions.invoke(model.edgeFunction, { body });
       if (error) throw error;
@@ -198,6 +232,16 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           className="resize-none bg-background/40 border-border/40 focus:border-primary/40"
         />
       </Card>
+
+      {/* ── Cast & Locations (Library) ── */}
+      <ToolkitCastPicker
+        characterId={castCharacterId}
+        locationId={castLocationId}
+        onCharacterChange={setCastCharacterId}
+        onLocationChange={setCastLocationId}
+        consistencyKey={consistencyKey}
+        supportsImageInput={model.capabilities.i2v}
+      />
 
       {/* ── Image upload (only for I2V) ── */}
       {model.capabilities.i2v && (
