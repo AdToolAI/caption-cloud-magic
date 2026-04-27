@@ -15,6 +15,7 @@ import { VoiceLibraryPanel } from '@/components/audio-studio/VoiceLibraryPanel';
 import { MusicGeneratorPanel } from '@/components/audio-studio/MusicGeneratorPanel';
 import { AutoMatchPanel } from '@/components/audio-studio/AutoMatchPanel';
 import { AudioDuckingPanel } from '@/components/audio-studio/AudioDuckingPanel';
+import { StemMixerPanel } from '@/components/audio-studio/StemMixerPanel';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
