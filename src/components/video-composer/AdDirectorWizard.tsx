@@ -24,6 +24,8 @@ import {
   Sparkles,
   Wand2,
   Check,
+  Layers,
+  Scissors,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
