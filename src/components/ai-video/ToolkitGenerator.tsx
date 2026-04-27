@@ -18,6 +18,8 @@ import {
 
 import { ModelSelector } from './ModelSelector';
 import { VideoPromptOptimizer } from './VideoPromptOptimizer';
+import { ToolkitCastPicker, buildCastPromptSuffix } from './ToolkitCastPicker';
+import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -63,6 +65,20 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showOptimizer, setShowOptimizer] = useState(false);
+
+  /* ── Library Cast & Locations (Scene Continuity) ── */
+  const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
+  const [castCharacterId, setCastCharacterId] = useState<string | null>(null);
+  const [castLocationId, setCastLocationId] = useState<string | null>(null);
+  const castCharacter = useMemo(
+    () => libCharacters.find((c) => c.id === castCharacterId) ?? null,
+    [libCharacters, castCharacterId],
+  );
+  const castLocation = useMemo(
+    () => libLocations.find((l) => l.id === castLocationId) ?? null,
+    [libLocations, castLocationId],
+  );
+  const consistencyKey = `ai-${model.family}`;
 
   /* ── Sync settings to model capabilities when switching ── */
   useEffect(() => {
