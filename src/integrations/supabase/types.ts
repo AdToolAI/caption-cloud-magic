@@ -5689,6 +5689,54 @@ export type Database = {
         }
         Relationships: []
       }
+      email_campaigns: {
+        Row: {
+          briefing: string
+          created_at: string
+          goal: string | null
+          id: string
+          language: string
+          metadata: Json
+          status: string
+          subjects: Json
+          title: string
+          tonality: string | null
+          updated_at: string
+          user_id: string
+          variants: Json
+        }
+        Insert: {
+          briefing: string
+          created_at?: string
+          goal?: string | null
+          id?: string
+          language?: string
+          metadata?: Json
+          status?: string
+          subjects?: Json
+          title: string
+          tonality?: string | null
+          updated_at?: string
+          user_id: string
+          variants?: Json
+        }
+        Update: {
+          briefing?: string
+          created_at?: string
+          goal?: string | null
+          id?: string
+          language?: string
+          metadata?: Json
+          status?: string
+          subjects?: Json
+          title?: string
+          tonality?: string | null
+          updated_at?: string
+          user_id?: string
+          variants?: Json
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           category: string
