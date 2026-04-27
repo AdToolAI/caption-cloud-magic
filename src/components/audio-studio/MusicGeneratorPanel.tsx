@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Music2, Sparkles, Loader2, Play, Pause, Download, Library as LibraryIcon, Wand2, Zap, Crown } from 'lucide-react';
+import { Music2, Sparkles, Loader2, Play, Pause, Download, Library as LibraryIcon, Wand2, Zap, Crown, Activity, Send } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { useMusicGeneration, MUSIC_TIER_PRICING, type MusicTier, type GeneratedMusicTrack } from '@/hooks/useMusicGeneration';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { cn } from '@/lib/utils';
@@ -38,9 +39,16 @@ const MOOD_LABELS = ['Calm', 'Mellow', 'Steady', 'Energetic', 'Hype'];
 interface MusicGeneratorPanelProps {
   onTrackGenerated?: (track: GeneratedMusicTrack) => void;
   onOpenLibrary?: () => void;
+  onSendToBeatSync?: (track: GeneratedMusicTrack) => void;
+  defaultBpm?: number;     // e.g. video BPM detected from beat-sync
 }
 
-export function MusicGeneratorPanel({ onTrackGenerated, onOpenLibrary }: MusicGeneratorPanelProps) {
+export function MusicGeneratorPanel({
+  onTrackGenerated,
+  onOpenLibrary,
+  onSendToBeatSync,
+  defaultBpm,
+}: MusicGeneratorPanelProps) {
   const { generateMusic, loading } = useMusicGeneration();
   const { wallet } = useAIVideoWallet();
 
@@ -50,6 +58,8 @@ export function MusicGeneratorPanel({ onTrackGenerated, onOpenLibrary }: MusicGe
   const [genre, setGenre] = useState<string>('cinematic');
   const [moodIdx, setMoodIdx] = useState(2);
   const [instrumental, setInstrumental] = useState(true);
+  const [useBpm, setUseBpm] = useState<boolean>(!!defaultBpm);
+  const [bpm, setBpm] = useState<number>(defaultBpm || 120);
   const [generatedTrack, setGeneratedTrack] = useState<GeneratedMusicTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -77,6 +87,7 @@ export function MusicGeneratorPanel({ onTrackGenerated, onOpenLibrary }: MusicGe
       genre,
       mood: MOOD_LABELS[moodIdx].toLowerCase(),
       instrumental,
+      bpm: useBpm ? bpm : undefined,
     });
     if (track) {
       setGeneratedTrack(track);
@@ -269,6 +280,47 @@ export function MusicGeneratorPanel({ onTrackGenerated, onOpenLibrary }: MusicGe
           <Switch checked={instrumental} onCheckedChange={setInstrumental} disabled={loading} />
         </div>
 
+        {/* BPM Match (Beat-Sync) */}
+        <div className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-primary" />
+              <div>
+                <Label className="text-sm font-medium">BPM-Match</Label>
+                <p className="text-xs text-muted-foreground">
+                  {defaultBpm
+                    ? `Tempo deines Videos: ${defaultBpm} BPM erkannt`
+                    : 'Track auf bestimmtes Tempo komponieren'}
+                </p>
+              </div>
+            </div>
+            <Switch checked={useBpm} onCheckedChange={setUseBpm} disabled={loading} />
+          </div>
+          {useBpm && (
+            <div className="flex items-center gap-3">
+              <Slider
+                value={[bpm]}
+                min={60}
+                max={180}
+                step={1}
+                onValueChange={(v) => setBpm(v[0])}
+                disabled={loading}
+                className="flex-1"
+              />
+              <Input
+                type="number"
+                min={40}
+                max={220}
+                value={bpm}
+                onChange={(e) => setBpm(Math.max(40, Math.min(220, parseInt(e.target.value) || 120)))}
+                disabled={loading}
+                className="w-20 h-9 text-center font-semibold"
+              />
+              <span className="text-xs text-muted-foreground w-8">BPM</span>
+            </div>
+          )}
+        </div>
+
         {/* Generate Button */}
         <Button
           onClick={handleGenerate}
@@ -320,9 +372,21 @@ export function MusicGeneratorPanel({ onTrackGenerated, onOpenLibrary }: MusicGe
                     </Badge>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleDownload}>
-                  <Download className="w-4 h-4 mr-1.5" /> MP3
-                </Button>
+                <div className="flex items-center gap-2">
+                  {onSendToBeatSync && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => onSendToBeatSync(generatedTrack)}
+                      className="bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90"
+                    >
+                      <Send className="w-4 h-4 mr-1.5" /> An Beat-Sync
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={handleDownload}>
+                    <Download className="w-4 h-4 mr-1.5" /> MP3
+                  </Button>
+                </div>
               </div>
               <audio
                 ref={audioRef}

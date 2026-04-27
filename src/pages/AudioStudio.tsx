@@ -31,7 +31,16 @@ export default function AudioStudio() {
   const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler' | 'compare' | 'library' | 'voices' | 'music'>('enhance');
   const [showMusicGen, setShowMusicGen] = useState(false);
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
+  const [musicUrl, setMusicUrl] = useState<string | null>(null);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
+
+  const handleSendToBeatSync = useCallback((track: { url: string; title?: string }) => {
+    setMusicUrl(track.url);
+    setActiveTab('beat-sync');
+    toast.success('Track in Beat-Sync geladen', {
+      description: track.title ? `"${track.title}" bereit für Beat-Matching` : undefined,
+    });
+  }, []);
 
   const handleLoadedMetadata = () => {
     if (mediaRef.current) {
@@ -153,6 +162,7 @@ export default function AudioStudio() {
               </Button>
               <MusicGeneratorPanel
                 onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
+                onSendToBeatSync={handleSendToBeatSync}
               />
             </motion.div>
           ) : !audioUrl ? (
@@ -377,6 +387,7 @@ export default function AudioStudio() {
                           duration={duration}
                           currentTime={currentTime}
                           onTimeChange={handleSeek}
+                          initialMusicUrl={musicUrl}
                         />
                       </motion.div>
                     )}
@@ -467,6 +478,7 @@ export default function AudioStudio() {
                         <MusicGeneratorPanel
                           onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
                           onOpenLibrary={() => setActiveTab('library')}
+                          onSendToBeatSync={handleSendToBeatSync}
                         />
                       </motion.div>
                     )}

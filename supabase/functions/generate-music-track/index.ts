@@ -30,12 +30,18 @@ interface GenerateMusicRequest {
   genre?: string;
   mood?: string;
   instrumental?: boolean;
+  bpm?: number;          // Optional target BPM (e.g. match video tempo)
+  key?: string;          // Optional musical key (e.g. "C minor")
 }
 
 function buildEnhancedPrompt(req: GenerateMusicRequest): string {
   const parts = [req.prompt.trim()];
   if (req.genre && req.genre !== 'any') parts.push(`Genre: ${req.genre}`);
   if (req.mood) parts.push(`Mood: ${req.mood}`);
+  if (req.bpm && req.bpm >= 40 && req.bpm <= 220) {
+    parts.push(`Tempo: exactly ${Math.round(req.bpm)} BPM`);
+  }
+  if (req.key) parts.push(`Key: ${req.key}`);
   if (req.instrumental) parts.push('instrumental, no vocals');
   parts.push('high quality, professional production, studio mastered');
   return parts.join('. ');
@@ -73,7 +79,7 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateMusicRequest;
-    const { prompt, tier, durationSeconds = 30, genre, mood, instrumental = true } = body;
+    const { prompt, tier, durationSeconds = 30, genre, mood, instrumental = true, bpm, key } = body;
 
     // Validation
     if (!prompt?.trim() || prompt.length > 500) {
@@ -274,6 +280,8 @@ serve(async (req) => {
           enhanced_prompt: enhancedPrompt,
           engine: engineUsed,
           instrumental,
+          bpm: bpm || null,
+          key: key || null,
         },
       })
       .select()
