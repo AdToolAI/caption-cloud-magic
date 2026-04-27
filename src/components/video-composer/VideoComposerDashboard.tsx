@@ -30,9 +30,10 @@ import type {
   ClipStatus,
   ClipSource,
   ClipQuality,
+  AdCampaignMeta,
 } from '@/types/video-composer';
 import { getClipCost } from '@/types/video-composer';
-import { useComposerPersistence, persistAssemblyConfig } from '@/hooks/useComposerPersistence';
+import { useComposerPersistence, persistAssemblyConfig, persistAdMeta } from '@/hooks/useComposerPersistence';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
@@ -41,6 +42,8 @@ import AutoDirectorWizard from './AutoDirectorWizard';
 import AdDirectorWizard from './AdDirectorWizard';
 import ShareProjectDialog from './ShareProjectDialog';
 import CollaboratorAvatars from './CollaboratorAvatars';
+import AdCampaignTree from './AdCampaignTree';
+import { spawnAdCampaignChildren } from '@/lib/adDirector/spawnAdCampaignChildren';
 import {
   useComposerPresence,
   useComposerScenesRealtime,
@@ -48,7 +51,7 @@ import {
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
-type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export';
+type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export' | 'campaign';
 
 interface LocalProject {
   id?: string;
@@ -63,6 +66,10 @@ interface LocalProject {
   outputUrl?: string;
   brandKitId?: string | null;
   brandKitAutoSync?: boolean;
+  adMeta?: AdCampaignMeta | null;
+  adVariantStrategy?: string | null;
+  parentProjectId?: string | null;
+  cutdownType?: string | null;
 }
 
 const STORAGE_KEY = 'video-composer-draft';
