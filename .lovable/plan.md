@@ -1,90 +1,80 @@
-## 🎵 AI Music Generator – Audio Studio Erweiterung
+## Audio Ducking — Speech-aware Music Mixing
 
-Füllt die letzte Lücke gegen Artlist AI Music. Nutzt **ElevenLabs Music API** als Hauptengine (Studio-Qualität, bis 5 Min, vollständig kommerziell nutzbar) und **Replicate MusicGen (Meta)** als günstigen Fallback. Beide Keys sind bereits im Projekt konfiguriert.
+Wenn Nutzer Voiceover/Sprache + Musik kombinieren, wird die Musik bisher als konstanter Layer abgespielt. Profi-Workflow erfordert **Ducking**: Musik automatisch um -6 bis -18 dB absenken, sobald gesprochen wird, und sanft wieder hochfahren in Sprechpausen. Dieses Feature schließt die letzte Pro-Lücke im Audio Studio und macht jeden generierten/uploadeten Track sofort sendefähig — komplett im Browser, kein zusätzlicher Server-Render.
 
-### 🎯 Strategische Entscheidung: Warum nicht Suno?
+### Was der Nutzer bekommt
 
-- **Suno**: Keine offizielle Public API, nur inoffizielle Reverse-Engineered Wrapper → rechtlich riskant, Lizenz-Grauzone bei kommerzieller Nutzung
-- **ElevenLabs Music** ✅: Offizielle API, Studio-Qualität, voller kommerzieller Lizenz-Stack, bereits in unserem Tech-Stack (TTS), `ELEVENLABS_API_KEY` schon konfiguriert
-- **Replicate MusicGen (Meta)** ✅: Open-Source-Modell, günstig (~$0.02 / 8s), Fallback für längere/instrumentale Tracks
+1. **Neuer Tab „Ducking"** im Audio Studio, sichtbar sobald sowohl ein Voiceover/Speech-Track (das hochgeladene Original) als auch ein Music-Track (aus Beat-Sync, AI Music oder Library) vorhanden ist
+2. **Live-Preview**: Beide Tracks gemischt im Browser via Web Audio API, mit Echtzeit-Ducking
+3. **Visualisierung**: Zwei übereinander liegende Waveforms (Speech oben, Music unten) plus eine **Ducking-Hüllkurve** (Volume-Automation als Linie über dem Music-Track), die zeigt, wann/wie stark abgesenkt wird
+4. **Presets**: „Subtil" (-6 dB), „Standard" (-12 dB), „Aggressiv" (-18 dB), „Custom"
+5. **Feintuning**: 4 Slider — Threshold (ab welcher Sprach-Lautstärke duckt), Reduktion (in dB), Attack (wie schnell runter, 50–500 ms), Release (wie langsam hoch, 200–2000 ms)
+6. **Export**: „Gemischten Track exportieren" → rendert offline in WAV/MP3, speichert als neues Asset in `universal_audio_assets` mit `source: 'ducked_mix'`. Direkt in Beat-Sync und Director's Cut nutzbar
+7. **„An Director's Cut senden"** Button → übernimmt den fertigen Mix als Audio-Layer
 
-### 💰 Pricing (konsistent mit AI Credits System – 30%/70% Marge wie Bilder/Videos)
+### UX-Flow (typisch)
 
-| Tier | Engine | Dauer | Kosten ElevenLabs | User-Preis |
-|------|--------|-------|---|---|
-| **Quick** | MusicGen (Replicate) | bis 30s | ~$0.04 | **€0.10** |
-| **Standard** | ElevenLabs Music | bis 60s | ~$0.20 | **€0.35** |
-| **Pro** | ElevenLabs Music | bis 5 Min | ~$0.80 | **€1.40** |
+```text
+1. User uploaded Voiceover.mp3
+2. User generiert AI Music Track ODER lädt Track in Beat-Sync
+3. Tab „Ducking" wird automatisch sichtbar (rot pulsierender Indikator: NEU)
+4. Klick → Beide Waveforms erscheinen, Standard-Preset (-12 dB) aktiv
+5. Play → Live gemischt hörbar, Ducking-Hüllkurve animiert mit Playhead
+6. Anpassen → „Exportieren" → Mix in Library + Toast „Mix gespeichert · 2:34"
+```
 
-Abgerechnet über das bestehende `ai_video_wallets` (Euro-Cent) → konsistent mit Picture Studio und allen Video-Studios. Nutzer sieht "AI Credits".
+### Technische Umsetzung
 
-### 🏗️ Architektur
+#### Speech-Detection-Strategie (kein Server-Aufruf bei jedem Render)
 
-#### 1. Neue Edge Function: `generate-music-track`
-- **Input**: `{ prompt, duration_seconds, tier: 'quick'|'standard'|'pro', genre?, mood?, instrumental? }`
-- **Flow**:
-  1. Auth check + Wallet-Balance prüfen via RPC
-  2. Tier-Routing: `quick` → Replicate MusicGen, `standard`/`pro` → ElevenLabs `/v1/music`
-  3. Audio-Bytes empfangen → in `audio-studio` Storage Bucket speichern (Pfad: `{user_id}/music/{timestamp}.mp3`)
-  4. Eintrag in `universal_audio_assets` mit `type: 'music'`, `source: 'ai_generated'`, `processing_preset: tier`, prompt im `effect_config`
-  5. `deduct_ai_video_credits` RPC → idempotent über `generation_id`
-  6. Bei Fehler: Refund automatisch (gemäß Memory `failure-credit-refund-automation`)
-- Timeout: 120s in `supabase/config.toml`
+Zwei-Pfad-Ansatz, abhängig davon ob Transkript vorhanden ist:
 
-#### 2. Neue Komponente: `MusicGeneratorPanel.tsx` (`src/components/audio-studio/`)
-- **Hero-Header** im James-Bond-2028 Stil (Glassmorphism, Gold/Cyan)
-- **Prompt-Textarea** mit Beispielen ("Cinematic orchestral build-up", "Lo-fi chill beats with rain")
-- **Genre-Chips**: Cinematic, Electronic, Hip-Hop, Lo-Fi, Corporate, Ambient, Rock, Pop, Classical, Jazz
-- **Mood-Slider**: Energy (Calm ↔ Hype), Brightness (Dark ↔ Bright)
-- **Duration-Slider**: 10s – 300s (mit Tier-Anzeige live)
-- **Instrumental Toggle**: Mit/ohne Vocals
-- **Tier-Selector**: 3 Karten (Quick / Standard / Pro) mit Live-Preis-Badge
-- **Generate Button**: Zeigt Endpreis (z.B. "Generate · 35 Credits")
-- **Result Preview**: Waveform-Player (wiederverwendet `TranscriptWaveformEditor`-Style), Download, "In Bibliothek speichern" (automatisch), "An Beat-Sync senden" → wechselt Tab
+- **Pfad A — Transkript vorhanden** (Standard, da `transcribe-audio` Edge Function bereits Word-Timestamps liefert): Das vorhandene `transcript`-State-Array (`{word, start, end, type}`) wird zu **Speech-Aktivitäts-Intervallen** zusammengefasst (zusammenhängende Wörter mit < 300ms Gap = ein Sprach-Block). Das ergibt eine deterministische, präzise Ducking-Hüllkurve ohne weitere API-Calls.
+- **Pfad B — Kein Transkript**: Client-seitige RMS-Energie-Analyse via `OfflineAudioContext` (chunks à 50 ms, Threshold-basiert). Bereits in der Codebase als Pattern vorhanden für Waveform-Generierung. Kein zusätzlicher API-Call.
 
-#### 3. Integration in `AudioStudio.tsx`
-- Neuer Tab `'music'` in der bestehenden `activeTab` State-Union (zwischen `enhance` und `library`)
-- Tab-Icon: `Music2` (lucide), Label: "AI Music"
-- Generierte Tracks erscheinen automatisch in **SoundLibrary** und **BeatSyncTimeline** (gleiche Tabelle `universal_audio_assets`)
+#### Live-Preview mit Web Audio API
 
-#### 4. Lokalisierung (EN / DE / ES)
-Pro Memory-Regel: UI komplett übersetzt, **Prompt-Beispiele bleiben Englisch** für beste Modell-Qualität.
+```text
+SpeechAudio ──► GainNode (1.0) ──┐
+                                 ├──► Destination
+MusicAudio ──► GainNode (Auto) ──┘
+                    ▲
+                    │
+              VolumeAutomation
+              (linearRampToValueAtTime an Speech-Intervall-Grenzen)
+```
 
-### 📦 Dateien (Erstellen / Ändern)
+Beim Play wird die Music-GainNode-Automation einmalig vor-programmiert (`gain.linearRampToValueAtTime(0.25, t_attack)` an jedem Speech-Start, `gain.linearRampToValueAtTime(1.0, t_release)` an jedem Speech-Ende). Synchron mit `<audio>`-Playhead.
 
-**Neu:**
-- `supabase/functions/generate-music-track/index.ts`
-- `src/components/audio-studio/MusicGeneratorPanel.tsx`
-- `src/hooks/useMusicGeneration.ts` (Wrapper für Edge-Function-Call + Toast + Wallet-Refresh)
+#### Offline-Export
 
-**Geändert:**
-- `src/pages/AudioStudio.tsx` → Tab + Routing
-- `src/components/audio-studio/AudioStudioHeroHeader.tsx` → Pill "AI Music Gen" hinzufügen
-- `supabase/config.toml` → Function-Block mit `verify_jwt = true` und 120s Timeout
-- `src/i18n/*.json` (3 Sprachen)
+`OfflineAudioContext` mit identischem Graph rendert den Mix in einem Pass (mehrfach schneller als Echtzeit). Resultat → `audioBufferToWav` (Helper existiert bereits in `src/lib/audioToWav.ts`) → Upload nach `audio-studio` Storage Bucket → Insert in `universal_audio_assets` mit `type: 'mix'`, `effect_config: { type: 'duck', threshold, reduction_db, attack_ms, release_ms }`.
 
-### 🔐 Sicherheit & Robustheit
-- JWT-Verifizierung an, User-ID aus Auth-Context (nie aus Body)
-- Storage-Pfad: `{user_id}/music/...` → respektiert RLS-Policy aus Memory `background-projects-rls-path-constraint`
-- Prompt-Sanitization (max 500 chars, Zod-Schema)
-- Rate-Limit: max 10 Generierungen / Stunde / User (Upstash Redis, schon konfiguriert)
-- Idempotenter Refund bei API-Fehler oder Timeout
-- Fallback-Kette: ElevenLabs `429` → automatischer Retry nach 3s, danach Refund + klare Toast-Message
+### Neue Dateien
 
-### ✅ Akzeptanzkriterien
-1. Nutzer generiert 30s Lo-Fi Track für €0.10 → Track in <15s in Library, abspielbar, downloadbar
-2. Wallet-Balance wird **erst nach erfolgreicher Generierung** abgebucht (Reserve → Commit Pattern)
-3. Track erscheint sofort in `BeatSyncTimeline` für Video-Editing
-4. Bei API-Fail: Credits werden automatisch refunded, Toast zeigt klaren Fehler
-5. Mobile-responsive (1193px Viewport bereits getestet, plus 375px)
-6. Vollständig DE/EN/ES lokalisiert
+- `src/components/audio-studio/AudioDuckingPanel.tsx` — Hauptkomponente (Preset-Karten, Slider, Dual-Waveform mit Hüllkurven-Overlay, Export-Button)
+- `src/components/audio-studio/DuckingEnvelopeOverlay.tsx` — SVG-Overlay über der Music-Waveform für die Volume-Automation
+- `src/hooks/useAudioDucking.ts` — Hook: kapselt AudioContext-Lifecycle, Speech-Intervall-Berechnung, Live-Preview-Steuerung, Offline-Export
+- `src/lib/duckingEnvelope.ts` — reine Logik: `transcriptToSpeechIntervals()`, `intervalsToGainAutomation()`, `rmsBasedSpeechDetection(audioBuffer)`
 
-### 🚀 Nicht im Scope (Phase 2)
-- Stem-Separation (Vocals/Drums/Bass extrahieren)
-- Voice-Cloning für Custom Vocals
-- BPM-Match zu vorhandenem Video (wäre logischer V2-Schritt mit `analyze-music-bpm` Function, die schon existiert)
-- Marketplace für Community-Tracks
+### Geänderte Dateien
 
----
+- `src/pages/AudioStudio.tsx` — neuer Tab `'ducking'` in `activeTab`-Union zwischen `beat-sync` und `filler`; Sichtbarkeits-Logik (Tab nur enabled wenn Speech-Audio + Music-Track vorhanden); State-Sharing für `musicUrl` und `transcript` an das Panel
+- Kein Backend nötig: keine neue Edge Function, keine DB-Migration, kein Credit-Verbrauch (Mixing läuft komplett client-seitig). Der Export speichert nur in einen existierenden Bucket.
 
-**Soll ich loslegen?**
+### Akzeptanzkriterien
+
+1. Tab erscheint nur, wenn Voiceover-Audio (von Upload) UND Music-Track (von Beat-Sync, AI Music oder Library) geladen sind
+2. Live-Preview ist hörbar synchron — Musik geht innerhalb von 100 ms hörbar runter, sobald Sprache einsetzt
+3. Ducking-Hüllkurve visualisiert die exakte Volume-Automation als animierte Linie
+4. Preset-Wechsel updated Hüllkurve und Live-Mix sofort (< 50 ms)
+5. Export erzeugt valide WAV/MP3-Datei in Original-Länge, Mix klingt identisch zur Live-Preview
+6. Exportierter Track erscheint sofort in Sound Library (mit Filter „Mixes")
+7. „An Director's Cut senden"-Button hängt den Mix als Audio-Track an die Timeline
+8. Funktioniert ohne Transkript via RMS-Fallback (etwas weniger präzise, aber brauchbar)
+
+### Out of Scope (V2)
+
+- **Multi-Source-Ducking**: aktuell nur 1 Speech + 1 Music. Mehrere Music-Layer kommen später
+- **Side-Chain-Compression mit Look-Ahead**: aktueller Ansatz nutzt feste Attack/Release-Werte, kein dynamischer Compressor
+- **Musik-Mastering** (LUFS-Normalisierung auf -14 LUFS für Streaming) — eigener Schritt, eigenes Feature
