@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Music2, Sparkles, Loader2, Play, Pause, Download, Library as LibraryIcon, Wand2, Zap, Crown, Activity, Send } from 'lucide-react';
 import { Card } from '@/components/ui/card';
