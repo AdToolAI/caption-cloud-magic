@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useLegalConsent } from '@/hooks/useLegalConsent';
 import LibraryUploadConsentDialog from '@/components/motion-studio/LibraryUploadConsentDialog';
+import LocationLightingGrid from '@/components/motion-studio/LocationLightingGrid';
 import {
   EMPTY_LOCATION_DRAFT,
   type LocationDraft,

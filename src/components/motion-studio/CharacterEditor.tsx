@@ -12,6 +12,7 @@ import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useLegalConsent } from '@/hooks/useLegalConsent';
 import LibraryUploadConsentDialog from '@/components/motion-studio/LibraryUploadConsentDialog';
 import { VoicePicker } from '@/components/motion-studio/VoicePicker';
+import CastingVibeGrid from '@/components/motion-studio/CastingVibeGrid';
 import {
   EMPTY_CHARACTER_DRAFT,
   type CharacterDraft,
