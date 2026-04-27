@@ -62,6 +62,10 @@ interface BriefingTabProps {
   onChangeBrandKit?: (id: string | null) => void;
   onChangeBrandKitAutoSync?: (sync: boolean) => void;
   onApplyAssembly?: (next: AssemblyConfig) => void;
+  /** Existing scenes (for Style → Shot Director soft-suggest). */
+  scenes?: ComposerScene[];
+  /** Callback to update scenes when style soft-suggest applies defaults. */
+  onUpdateScenes?: (scenes: ComposerScene[]) => void;
 }
 
 /**
