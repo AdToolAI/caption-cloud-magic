@@ -977,6 +977,10 @@ export default function AdDirectorWizard({
                       <span className="text-foreground">Cutdowns:</span>{' '}
                       {[cutdown15s && '15s', cutdown6sHook && '6s-Hook'].filter(Boolean).join(', ') || '—'}
                     </li>
+                    <li>
+                      <span className="text-foreground">Multi-Format:</span>{' '}
+                      {[aspect9x16 && '9:16', aspect1x1 && '1:1', aspect4x5 && '4:5'].filter(Boolean).join(', ') || '—'}
+                    </li>
                   </ul>
                 </div>
               </div>
