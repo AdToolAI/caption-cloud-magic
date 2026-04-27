@@ -119,6 +119,8 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
         title: sound.title,
       });
       if (stems && stems.length > 0) {
+        // Notify parent so the Stem-Mixer tab can pick them up
+        onStemsExtracted?.({ sourceTitle: sound.title, stems });
         // Re-fetch to show the new stem assets
         const { data } = await supabase
           .from('universal_audio_assets')
