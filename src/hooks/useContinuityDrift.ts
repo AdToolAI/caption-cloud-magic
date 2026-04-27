@@ -115,8 +115,8 @@ export function useContinuityDrift() {
   /** Loads the drift-check history for a project. */
   const fetchHistory = useCallback(
     async (projectId: string, limit = 50): Promise<DriftHistoryEntry[]> => {
-      const { data, error } = await supabase
-        .from('composer_drift_checks' as never)
+      const { data, error } = await (supabase as any)
+        .from('composer_drift_checks')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false })
