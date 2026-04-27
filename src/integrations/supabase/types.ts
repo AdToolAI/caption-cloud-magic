@@ -3913,6 +3913,71 @@ export type Database = {
           },
         ]
       }
+      composer_pipeline_runs: {
+        Row: {
+          allow_partial: boolean | null
+          completed_at: string | null
+          completed_scenes: number
+          created_at: string | null
+          destination: string | null
+          director_cut_project_id: string | null
+          error_message: string | null
+          failed_scenes: number
+          id: string
+          project_id: string
+          started_at: string | null
+          status: string
+          stitched_video_url: string | null
+          total_scenes: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          allow_partial?: boolean | null
+          completed_at?: string | null
+          completed_scenes?: number
+          created_at?: string | null
+          destination?: string | null
+          director_cut_project_id?: string | null
+          error_message?: string | null
+          failed_scenes?: number
+          id?: string
+          project_id: string
+          started_at?: string | null
+          status?: string
+          stitched_video_url?: string | null
+          total_scenes?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          allow_partial?: boolean | null
+          completed_at?: string | null
+          completed_scenes?: number
+          created_at?: string | null
+          destination?: string | null
+          director_cut_project_id?: string | null
+          error_message?: string | null
+          failed_scenes?: number
+          id?: string
+          project_id?: string
+          started_at?: string | null
+          status?: string
+          stitched_video_url?: string | null
+          total_scenes?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composer_pipeline_runs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       composer_projects: {
         Row: {
           assembly_config: Json
@@ -4025,6 +4090,7 @@ export type Database = {
           mentioned_character_ids: string[] | null
           mentioned_location_ids: string[] | null
           order_index: number
+          progress_percent: number | null
           project_id: string
           prompt_mode: string | null
           prompt_slot_order: string[] | null
@@ -4080,6 +4146,7 @@ export type Database = {
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
           order_index?: number
+          progress_percent?: number | null
           project_id: string
           prompt_mode?: string | null
           prompt_slot_order?: string[] | null
@@ -4135,6 +4202,7 @@ export type Database = {
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
           order_index?: number
+          progress_percent?: number | null
           project_id?: string
           prompt_mode?: string | null
           prompt_slot_order?: string[] | null

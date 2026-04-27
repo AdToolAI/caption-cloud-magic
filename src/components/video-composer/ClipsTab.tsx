@@ -42,6 +42,7 @@ import {
 } from '@dnd-kit/sortable';
 import { SortableSceneItem } from './SortableSceneItem';
 import ContinuityGuardianStrip from './ContinuityGuardianStrip';
+import RenderPipelinePanel from './RenderPipelinePanel';
 
 interface ClipsTabProps {
   scenes: ComposerScene[];
@@ -458,6 +459,15 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto">
+      {/* Hebel 8: Multi-Scene Render Pipeline (Render All & Stitch → Director's Cut) */}
+      <RenderPipelinePanel
+        projectId={projectId}
+        scenes={scenes}
+        pendingCount={pendingScenes.length}
+        failedCount={scenes.filter((s) => s.clipStatus === 'failed').length}
+        isAllReady={allReady}
+        onGenerateAll={handleGenerateAll}
+      />
       {/* Re-Roll Hint Banner */}
       {!rerollHintDismissed && scenes.some(s => s.clipSource.startsWith('ai-')) && (
         <div className="relative p-3 rounded-lg border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-500/5 flex items-start gap-3">
