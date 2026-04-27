@@ -345,6 +345,11 @@ export default function AdCampaignTree({
           ))}
         </div>
       </section>
+
+      {/* Performance Insights */}
+      <section>
+        <AdCampaignPerformance masterProjectId={masterProjectId} onCloneWinner={onOpenChild} />
+      </section>
     </div>
   );
 }
