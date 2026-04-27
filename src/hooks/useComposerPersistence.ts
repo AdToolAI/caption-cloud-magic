@@ -46,6 +46,23 @@ export async function persistBrandKit(
   }
 }
 
+/** Persist Ad Director campaign metadata. */
+export async function persistAdMeta(
+  projectId: string,
+  adMeta: AdCampaignMeta | null,
+  variantStrategy?: string | null,
+): Promise<void> {
+  if (!projectId) return;
+  const { error } = await supabase
+    .from('composer_projects')
+    .update({
+      ad_meta: (adMeta as any) ?? null,
+      ad_variant_strategy: variantStrategy ?? adMeta?.variantStrategy ?? null,
+    } as any)
+    .eq('id', projectId);
+  if (error) console.warn('[persistence] persistAdMeta failed:', error);
+}
+
 export interface PersistableProject {
   id?: string;
   title: string;
@@ -58,6 +75,10 @@ export interface PersistableProject {
   language: string;
   brandKitId?: string | null;
   brandKitAutoSync?: boolean;
+  adMeta?: AdCampaignMeta | null;
+  adVariantStrategy?: string | null;
+  parentProjectId?: string | null;
+  cutdownType?: string | null;
 }
 
 export interface PersistResult {
