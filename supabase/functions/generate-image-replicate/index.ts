@@ -149,7 +149,25 @@ serve(async (req) => {
 
     // Build enhanced prompt
     const styleModifier = STYLE_MODIFIERS[style] || STYLE_MODIFIERS.realistic;
-    const enhancedPrompt = `${prompt.trim()}. Style: ${styleModifier}.`;
+
+    // Brand-Kit injection (Phase C — CI Lock)
+    const brandParts: string[] = [];
+    if (brandKit) {
+      const colors = [brandKit.primaryColor, brandKit.secondaryColor, brandKit.accentColor]
+        .filter(Boolean)
+        .join(', ');
+      if (colors) brandParts.push(`Brand colors: ${colors}`);
+      if (brandKit.mood) brandParts.push(`Brand mood: ${brandKit.mood}`);
+      if (brandKit.name) brandParts.push(`Visual identity aligned with ${brandKit.name}`);
+    }
+    const brandSuffix = brandParts.length ? ` ${brandParts.join('. ')}.` : '';
+
+    // Style-Reference suffix
+    const styleRefSuffix = styleReferenceUrl
+      ? ` Match the visual style, color palette, and aesthetic of the provided style reference image.`
+      : '';
+
+    const enhancedPrompt = `${prompt.trim()}. Style: ${styleModifier}.${brandSuffix}${styleRefSuffix}`;
 
     // Replicate
     const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
