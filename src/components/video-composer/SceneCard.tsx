@@ -338,9 +338,18 @@ export default function SceneCard({
                 )}
               </div>
 
-              <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={onDelete}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {scene.id && projectId && (
+                  <SceneCommentBadge
+                    total={sceneCounts.total}
+                    open={sceneCounts.open}
+                    onClick={() => setCommentSheetOpen(true)}
+                  />
+                )}
+                <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={onDelete}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
 
             {/* Duration slider */}
