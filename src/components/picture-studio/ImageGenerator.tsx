@@ -100,9 +100,11 @@ export function ImageGenerator() {
   const [selectedImageForAlbum, setSelectedImageForAlbum] = useState<GeneratedImage | null>(null);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [justGenerated, setJustGenerated] = useState(false);
+  const [variantsCount, setVariantsCount] = useState<1 | 4>(1);
 
   const loading = replicateLoading;
-  const cost = TIER_COSTS[tier];
+  const baseCost = TIER_COSTS[tier];
+  const cost = baseCost * variantsCount;
   const currency = wallet?.currency || 'EUR';
   const currencySymbol = currency === 'USD' ? '$' : '€';
   const balance = wallet?.balance_euros ?? 0;
