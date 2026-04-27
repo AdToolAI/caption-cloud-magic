@@ -403,6 +403,7 @@ export default function AudioStudio() {
                       { id: 'music', label: 'AI Music', icon: Music2 },
                       { id: 'ducking', label: 'Ducking', icon: AudioLines, badge: musicUrl ? 'NEU' : undefined, disabled: !musicUrl },
                       { id: 'stems', label: 'Stem-Mixer', icon: AudioLines, badge: stemSet ? `${stemSet.stems.length}` : 'NEU', disabled: !stemSet },
+                      { id: 'final-mix', label: 'Final Mix', icon: Layers, badge: 'NEU' },
                       { id: 'compare', label: 'Vergleich', icon: Volume2, disabled: !enhancedAudioUrl },
                       { id: 'transcript', label: 'Transcript', icon: Mic },
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
