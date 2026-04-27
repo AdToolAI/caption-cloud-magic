@@ -104,6 +104,9 @@ export function ImageGenerator() {
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [justGenerated, setJustGenerated] = useState(false);
   const [variantsCount, setVariantsCount] = useState<1 | 4>(1);
+  const [styleReference, setStyleReference] = useState<string | null>(null);
+  const [useBrandKit, setUseBrandKit] = useState(false);
+  const [ciScores, setCiScores] = useState<Record<string, number>>({});
 
   const loading = replicateLoading;
   const baseCost = TIER_COSTS[tier];
