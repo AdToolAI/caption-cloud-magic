@@ -106,5 +106,3 @@ export const BrandCharacterSelector = ({
   );
 };
 
-// Re-export Star for the SelectItem inline use above
-import { Star } from 'lucide-react';
