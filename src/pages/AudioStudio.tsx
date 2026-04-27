@@ -326,6 +326,7 @@ export default function AudioStudio() {
                     {[
                       { id: 'enhance', label: 'KI-Optimierung', icon: Wand2 },
                       { id: 'music', label: 'AI Music', icon: Music2 },
+                      { id: 'ducking', label: 'Ducking', icon: AudioLines, badge: musicUrl ? 'NEU' : undefined, disabled: !musicUrl },
                       { id: 'compare', label: 'Vergleich', icon: Volume2, disabled: !enhancedAudioUrl },
                       { id: 'transcript', label: 'Transcript', icon: Mic },
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
