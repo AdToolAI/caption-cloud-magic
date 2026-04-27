@@ -53,8 +53,9 @@ export default function ContinuityGuardianStrip({
   onRepairScene,
 }: ContinuityGuardianStripProps) {
   const { extractLastFrame } = useFrameContinuity();
-  const { checkDrift, checkingPairId } = useContinuityDrift();
+  const { checkDrift, checkDriftBatch, setSceneLock, checkingPairId } = useContinuityDrift();
   const [bulkRunning, setBulkRunning] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Only compute pairs where BOTH sides are AI-generated and READY
   const pairs: PairState[] = useMemo(() => {
