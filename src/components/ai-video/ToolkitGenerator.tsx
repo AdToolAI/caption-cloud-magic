@@ -256,7 +256,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         />
       </Card>
 
-      {/* ── Cast & Locations (Library) ── */}
+      {/* ── Brand Character Lock (cross-studio persistent character) ── */}
+      <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60">
+        <BrandCharacterSelector
+          value={brandCharacter?.id ?? null}
+          onChange={setBrandCharacter}
+        />
+      </Card>
+
       <ToolkitCastPicker
         characterId={castCharacterId}
         locationId={castLocationId}
