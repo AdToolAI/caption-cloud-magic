@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Library, Play, Pause, Download, Trash2, RotateCcw, 
-  Calendar, Settings2, FileAudio, Volume2, Search
+  Calendar, Settings2, FileAudio, Volume2, Search, Scissors, Loader2, Music2, Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -12,6 +12,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { EnhancementOptions } from '@/hooks/useAudioEnhancement';
+import { useStemSeparation, STEM_SEPARATION_COST_EUR } from '@/hooks/useStemSeparation';
+import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 
 interface SoundLibraryItem {
   id: string;
