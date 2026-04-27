@@ -86,12 +86,13 @@ async function createChildProject(args: {
   titleSuffix: string;
   cutdownType: CutdownType | null;
   variantStrategy: string | null;
+  aspectRatio?: AspectRatio | null;
 }): Promise<string | null> {
-  const { userId, input, scenes, titleSuffix, cutdownType, variantStrategy } = args;
+  const { userId, input, scenes, titleSuffix, cutdownType, variantStrategy, aspectRatio } = args;
 
   // Cutdown children: master VO would desync (30s VO on a 15s/6s cut). Disable
   // it by default and surface a hint so the user can re-synthesize a fresh VO
-  // matching the new duration. A/B variant siblings keep the master VO.
+  // matching the new duration. A/B variant + aspect siblings keep the master VO.
   const childAssembly = cutdownType
     ? {
         ...input.assemblyConfig,
@@ -101,13 +102,19 @@ async function createChildProject(args: {
       }
     : input.assemblyConfig;
 
+  // For aspect-ratio siblings, override briefing.aspectRatio so the renderer
+  // picks the correct canvas dimensions (Remotion crops/letterboxes accordingly).
+  const childBriefing = aspectRatio
+    ? { ...input.briefing, aspectRatio }
+    : input.briefing;
+
   const { data: inserted, error: insErr } = await supabase
     .from('composer_projects')
     .insert({
       user_id: userId,
       title: `${input.masterTitle} — ${titleSuffix}`,
       category: 'product-ad',
-      briefing: input.briefing as any,
+      briefing: childBriefing as any,
       status: 'storyboard',
       assembly_config: childAssembly as any,
       total_cost_euros: 0,
