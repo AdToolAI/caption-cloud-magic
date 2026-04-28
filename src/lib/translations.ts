@@ -6610,7 +6610,7 @@ export const translations: Record<Language, any> = {
       fromScenes: "Aus Szenen",
       aiGenerator: "KI-Generator",
       autoScriptLoading: "KI schreibt dein Skript …",
-      autoScriptError: "Auto-Skript fehlgeschlagen – nutze den Button „KI-Generator".",
+      autoScriptError: "Auto-Skript fehlgeschlagen – nutze den Button „KI-Generator“.",
       voiceTuning: "Stimm-Feinabstimmung",
       speed: "Geschwindigkeit",
       words: "Wörter",
