@@ -1,4 +1,4 @@
-import { User, Footprints, Hand, Eye, Sun, Minus, UserSquare2 } from 'lucide-react';
+import { User, Footprints, Hand, Eye, Sun, Minus, UserSquare2, X } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -7,7 +7,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 import type { CharacterShot, CharacterShotType, ComposerCharacter } from '@/types/video-composer';
+
+type Lang = 'en' | 'de' | 'es';
+const REMOVE_LABEL: Record<Lang, string> = {
+  en: 'Remove character from this scene',
+  de: 'Charakter aus dieser Szene entfernen',
+  es: 'Quitar personaje de esta escena',
+};
 
 export const SHOT_TYPE_META: Record<
   CharacterShotType,
@@ -60,21 +68,26 @@ interface PickerProps {
   characters: ComposerCharacter[];
   value?: CharacterShot;
   onChange: (next?: CharacterShot) => void;
+  language?: Lang;
 }
 
 /**
  * Manual override for the per-scene character shot strategy.
  * Renders nothing when no characters are defined in the briefing.
  */
-export function CharacterShotPicker({ characters, value, onChange }: PickerProps) {
+export function CharacterShotPicker({ characters, value, onChange, language = 'en' }: PickerProps) {
   if (!characters || characters.length === 0) return null;
 
+  const lang: Lang = (language as Lang) ?? 'en';
   const charId = value?.characterId || '__none__';
   const shotType: CharacterShotType = value?.shotType || 'absent';
+  const hasCharacter = charId !== '__none__';
+  const noneLabel = lang === 'de' ? '— keiner —' : lang === 'es' ? '— ninguno —' : '— none —';
+  const characterLabel = lang === 'de' ? 'Charakter:' : lang === 'es' ? 'Personaje:' : 'Character:';
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      <span className="text-[10px] text-muted-foreground">Charakter:</span>
+      <span className="text-[10px] text-muted-foreground">{characterLabel}</span>
       <Select
         value={charId}
         onValueChange={(v) => {
@@ -89,7 +102,7 @@ export function CharacterShotPicker({ characters, value, onChange }: PickerProps
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="__none__" className="text-xs">— keiner —</SelectItem>
+          <SelectItem value="__none__" className="text-xs">{noneLabel}</SelectItem>
           {characters.map((c) => (
             <SelectItem key={c.id} value={c.id} className="text-xs">
               {c.name}
@@ -98,29 +111,51 @@ export function CharacterShotPicker({ characters, value, onChange }: PickerProps
         </SelectContent>
       </Select>
 
-      {charId !== '__none__' && (
-        <Select
-          value={shotType}
-          onValueChange={(v) => onChange({ characterId: charId, shotType: v as CharacterShotType })}
-        >
-          <SelectTrigger className="h-6 w-auto gap-1 text-[10px] border-border/40 bg-background/50 px-2">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SHOT_ORDER.map((t) => {
-              const m = SHOT_TYPE_META[t];
-              const Icon = m.icon;
-              return (
-                <SelectItem key={t} value={t} className="text-xs">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Icon className="h-3 w-3" />
-                    {m.label}
-                  </span>
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
+      {hasCharacter && (
+        <>
+          <Select
+            value={shotType}
+            onValueChange={(v) => onChange({ characterId: charId, shotType: v as CharacterShotType })}
+          >
+            <SelectTrigger className="h-6 w-auto gap-1 text-[10px] border-border/40 bg-background/50 px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SHOT_ORDER.map((t) => {
+                const m = SHOT_TYPE_META[t];
+                const Icon = m.icon;
+                return (
+                  <SelectItem key={t} value={t} className="text-xs">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Icon className="h-3 w-3" />
+                      {m.label}
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => onChange(undefined)}
+                  aria-label={REMOVE_LABEL[lang]}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {REMOVE_LABEL[lang]}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </>
       )}
     </div>
   );
