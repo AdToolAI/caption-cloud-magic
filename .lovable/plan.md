@@ -1,47 +1,93 @@
-## Problem
+## Ziel
 
-Im Video Composer (Schritt 04 — Voiceover & Untertitel) wird das KI-generierte Skript für ein 60-Sekunden-Video oft viel zu kurz (z. B. nur ~8 Sekunden Sprechzeit / 20 Wörter). Der `defaultDuration` (totalSceneDuration) wird zwar bereits aus dem Storyboard übergeben, aber:
+Jeder einzeln generierte KI-Clip aus dem Motion Studio (Video Composer) soll **automatisch** in der **Mediathek → Tab "KI"** als eigenständiges Asset gespeichert werden — auch wenn:
 
-1. Der Prompt in `generate-voiceover-script` formuliert die Vorgabe weich ("approximately X seconds") und das Modell unterschreitet die Vorgabe massiv.
-2. Es gibt keine Pufferlogik — der Wunsch ist, dass der VO **2–3 Sekunden vor Ende** des Videos endet.
-3. Das Modell `gemini-2.5-flash` ohne strukturierten Tool-Call neigt zu freien JSON-Antworten und ignoriert numerische Constraints.
+- das Gesamt-Video später nicht fertig rendert,
+- der User die Szene **neu generiert** (alte Version bleibt zusätzlich erhalten),
+- der User das Projekt verwirft.
 
-## Lösung
+Der User hat dadurch jederzeit Zugriff auf alle bezahlten KI-Szenen und kann sie wiederverwenden.
 
-### 1. Pufferlogik im Frontend (`VoiceoverScriptGenerator.tsx`)
+---
 
-Beim Öffnen aus dem Composer wird `defaultDuration` = totale Szenendauer übergeben. Wir berechnen daraus eine **effektive Sprechdauer**:
+## Aktuelle Situation (Kurz)
 
+- `compose-clip-webhook` lädt fertige Replicate-Clips in `ai-videos/composer/{projectId}/{sceneId}.mp4` und schreibt nur `composer_scenes.clip_url`.
+- Die Mediathek "KI" liest aus `video_creations` mit `metadata.source` ∈ `{sora-2-ai, director-cut-enhancement, directors-cut, universal-creator}`.
+- Composer-Clips erscheinen dort **nie**. Bei Regenerate wird `clip_url` einfach überschrieben → alte Version geht verloren.
+
+---
+
+## Plan
+
+### 1. Composer-Clips automatisch in `video_creations` archivieren
+
+Erweitere **`supabase/functions/compose-clip-webhook/index.ts`** (Status `succeeded`):
+
+Nach erfolgreichem Upload nach `ai-videos/composer/...` einen `video_creations`-Eintrag erstellen mit:
+
+```ts
+metadata: {
+  source: 'motion-studio-clip',     // neue Kennung, wird in MediaLibrary als 'ai' gemappt
+  project_id: projectId,
+  scene_id: sceneId,
+  scene_order: scene.order_index,
+  prompt: scene.ai_prompt,
+  model: scene.clip_source,          // ai-hailuo / ai-kling / ai-veo / ...
+  duration_seconds: scene.duration_seconds,
+  reference_image_url: scene.reference_image_url ?? null,
+  superseded: false,
+}
 ```
-speakingTarget = max(8, defaultDuration - 2.5)
+
+Idempotenz: vorher per `contains('metadata', { scene_id, source: 'motion-studio-clip', superseded: false })` prüfen, damit Doppelposts vermieden werden.
+
+### 2. Regenerate: alte Version als "superseded" behalten
+
+Vor dem Erzeugen des neuen Eintrags alle bestehenden aktiven Clips für dieselbe `scene_id` auf `metadata.superseded = true` setzen und ein `superseded_at`-Timestamp ergänzen. So bleiben alle Versionen einer Szene erhalten und sind in der Mediathek sichtbar — die jüngste mit Badge "Aktuell", ältere mit Badge "Vorgängerversion".
+
+### 3. Mediathek: Composer-Quelle anzeigen
+
+In **`src/pages/MediaLibrary.tsx`** (Zeilen ~291–306) die Source-Map erweitern:
+
+```ts
+const isMotionStudio = metadata?.source === 'motion-studio-clip';
+source: (isSoraAI || isDirectorCutEnhancement || isDirectorsCut || isMotionStudio)
+  ? 'ai' as const : ...
+title: isMotionStudio
+  ? `Motion Studio Szene ${metadata.scene_order + 1}: ${metadata.prompt?.slice(0, 40) ?? ''}`
+  : ...
 ```
 
-Dieser Wert wird als initialer Slider-Wert gesetzt UND als `targetDuration` an die Edge Function geschickt. Der UI-Slider zeigt weiterhin den effektiven VO-Wert; ein kleiner Hinweistext erklärt: „Endet ca. 2–3s vor Videoende (Gesamt: 60s)".
+Optional kleines Badge "Vorgängerversion" wenn `metadata.superseded === true`.
 
-### 2. Edge Function `generate-voiceover-script` härten
+### 4. Auch bereits hochgeladene Stock-Videos & Eigene-Uploads ausschließen
 
-- **Tool-Calling statt freies JSON**: Auf strukturierte Ausgabe via `tools` umstellen (analog zur `extract structured output` Best Practice). Das erzwingt exakt `{ script, tips }`.
-- **Harte Längen-Constraints im System-Prompt** (DE/EN/ES):
-  - Definiere `minWords = round(targetDuration * 2.3)`  
-  - Definiere `maxWords = round(targetDuration * 2.7)` (Sprechrate ~150 WPM = 2.5 Wörter/s, ±10% Toleranz)
-  - Prompt enthält explizit: „Das Skript MUSS zwischen `minWords` und `maxWords` Wörter haben. Kürzere oder längere Antworten sind nicht erlaubt."
-- **Validierung & Auto-Retry (max 1×)**: Nach der ersten Antwort Wortanzahl prüfen. Liegt sie unter `minWords * 0.85`, einmal nachfassen mit korrigierender User-Message: „Dein Skript war nur N Wörter, benötigt werden mindestens M. Schreibe es länger."
-- Modell auf `google/gemini-2.5-pro` heben für die Skript-Generierung (deutlich bessere Constraint-Treue als Flash bei längeren Texten); Flash bleibt nur Fallback.
+`source: 'motion-studio-clip'` wird **nur** für echte KI-Generierungen (Hailuo, Kling, Veo, Wan, Luma, Seedance, Hailuo, Sora) gesetzt — nicht für `clip_source: 'upload' | 'stock' | 'image'`. Damit bleibt die KI-Mediathek sauber.
 
-### 3. UI-Klarheit (`VoiceoverScriptGenerator.tsx`)
+### 5. Refund-Pfad bleibt unverändert
 
-- Label-Anpassung: „Ziel-Sprechdauer: 57s _(Video: 60s, Puffer 3s)_" wenn ein `defaultDuration` aus dem Composer kommt.
-- Nach Generierung prüft das Frontend zusätzlich: liegt `estimatedDuration` deutlich unter Target, zeige eine Warnung mit „Erneut generieren"-Button (statt stilles Akzeptieren).
+Failed-Clips erzeugen weiterhin **keinen** Mediathek-Eintrag (es gibt ja nichts zu speichern) und die bestehende Credit-Refund-Logik bleibt erhalten.
 
-## Geänderte Dateien
+---
 
-- `supabase/functions/generate-voiceover-script/index.ts` — Tool-Calling, harte min/max Word-Range, Retry-Logic, Modell-Upgrade.
-- `src/components/universal-creator/VoiceoverScriptGenerator.tsx` — Puffer-Berechnung (T-2.5s), Label mit Video-Gesamtlänge, Warnung bei Untermaß.
-- `src/components/video-composer/VoiceSubtitlesTab.tsx` — keine strukturelle Änderung; `defaultDuration` wird bereits korrekt übergeben.
+## Technische Details (für Devs)
 
-## Erwartetes Ergebnis
+**Geänderte Dateien:**
 
-- 60s-Video → Slider zeigt 57s, AI generiert ~131–154 Wörter (statt 20).
-- 30s-Video → 27s Target, ~62–73 Wörter.
-- 15s-Video → 12.5s Target, ~29–34 Wörter.
-- Skript endet zuverlässig 2–3s vor Videoende, lässt Raum für Logo-Endcard / Outro.
+| Datei | Änderung |
+|---|---|
+| `supabase/functions/compose-clip-webhook/index.ts` | Nach erfolgreichem Storage-Upload: alte aktive Clips derselben `scene_id` auf `superseded=true` setzen, dann neuen `video_creations`-Insert mit `metadata.source = 'motion-studio-clip'`. |
+| `src/pages/MediaLibrary.tsx` | `isMotionStudio`-Check in der Source-Map ergänzen, Title generieren, optional `superseded`-Badge. |
+
+**Keine DB-Migration nötig** — `video_creations.metadata` ist bereits ein freies `jsonb`.
+
+**Speicherquota:** Eintrag erscheint im 500-Video-Limit der Mediathek. Da die Datei in `ai-videos/composer/...` schon liegt, entstehen keine zusätzlichen Storage-Kosten — nur ein DB-Row.
+
+---
+
+## Ergebnis für den User
+
+- Jede generierte Szene ist sofort nach dem Render in der Mediathek → KI sichtbar.
+- Bei Regenerate bleibt die alte Version verfügbar (z. B. um sie später in einem anderen Projekt zu verwenden).
+- Selbst wenn der finale Composer-Render scheitert oder der User abbricht, sind alle Einzelszenen gerettet.
