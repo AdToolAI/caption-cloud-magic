@@ -292,10 +292,15 @@ export default function MediaLibrary() {
         const isDirectorCutEnhancement = metadata?.source === 'director-cut-enhancement';
         const isDirectorsCut = metadata?.source === 'directors-cut';
         const isUniversalCreator = metadata?.source === 'universal-creator';
-        
+        const isMotionStudioClip = metadata?.source === 'motion-studio-clip';
+        const isSuperseded = metadata?.superseded === true;
+        const motionModel = typeof metadata?.model === 'string'
+          ? metadata.model.replace(/^ai-/, '').replace(/^\w/, (c: string) => c.toUpperCase())
+          : 'AI';
+
         return {
           id: video.id,
-          source: (isSoraAI || isDirectorCutEnhancement || isDirectorsCut) 
+          source: (isSoraAI || isDirectorCutEnhancement || isDirectorsCut || isMotionStudioClip)
             ? 'ai' as const 
             : isUniversalCreator ? 'video-creator' as const : 'upload' as const,
           type: 'video' as const,
@@ -305,18 +310,22 @@ export default function MediaLibrary() {
               ? `KI-Szene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`
               : isDirectorsCut
                 ? `Director's Cut - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
-                : isUniversalCreator
-                  ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
-                  : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
+                : isMotionStudioClip
+                  ? `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`
+                  : isUniversalCreator
+                    ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
+                    : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
           caption: isSoraAI 
             ? `Sora 2 ${metadata?.model === 'sora-2-pro' ? 'Pro' : 'Standard'} · ${metadata?.duration_seconds}s`
             : isDirectorCutEnhancement
               ? `Director's Cut · Sora 2 ${metadata?.model === 'sora-2-pro' ? 'Pro' : 'Standard'} · ${metadata?.duration_seconds}s`
               : isDirectorsCut
                 ? 'Exportiert mit Universal Director\'s Cut'
-                : isUniversalCreator
-                  ? 'Gerendert mit Universal Creator'
-                  : '',
+                : isMotionStudioClip
+                  ? `${motionModel} · ${metadata?.duration_seconds ?? '?'}s${metadata?.prompt ? ` · ${String(metadata.prompt).slice(0, 50)}…` : ''}`
+                  : isUniversalCreator
+                    ? 'Gerendert mit Universal Creator'
+                    : '',
           url: video.output_url || '',
           thumbUrl: video.output_url || '',
           createdAt: video.created_at,
