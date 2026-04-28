@@ -22,10 +22,9 @@ import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
-import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
-import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
-import { resolveMentions } from '@/lib/motion-studio/mentionParser';
+import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import {
   DndContext,
   closestCenter,
