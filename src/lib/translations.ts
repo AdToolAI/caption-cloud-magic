@@ -11209,6 +11209,8 @@ export const translations: Record<Language, any> = {
       voScriptPlaceholder: "El texto de la locución para tu video…",
       fromScenes: "Desde escenas",
       aiGenerator: "Generador IA",
+      autoScriptLoading: "La IA está escribiendo tu guion …",
+      autoScriptError: "Auto-guion fallido — usa el botón ‘Generador IA’.",
       voiceTuning: "Ajuste de Voz",
       speed: "Velocidad",
       words: "palabras",
