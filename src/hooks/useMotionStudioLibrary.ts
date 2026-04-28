@@ -168,15 +168,6 @@ export function useMotionStudioLibrary() {
     },
     [user, loadAll]
   );
-        return null;
-      }
-      const created = data as MotionStudioLocation;
-      setLocations((prev) => [created, ...prev]);
-      toast.success(`„${created.name}" wurde gespeichert`);
-      return created;
-    },
-    [user]
-  );
 
   const updateLocation = useCallback(
     async (id: string, patch: Partial<LocationDraft>): Promise<boolean> => {
