@@ -26,7 +26,8 @@ serve(async (req) => {
     );
 
     const payload = await req.json();
-    console.log(`[compose-clip-webhook] Scene: ${sceneId}, Status: ${payload.status}`);
+    // v2 — archive every AI clip to Media Library (KI tab)
+    console.log(`[compose-clip-webhook v2] Scene: ${sceneId}, Status: ${payload.status}`);
 
     const { id: predictionId, status, output, error: predError } = payload;
 
