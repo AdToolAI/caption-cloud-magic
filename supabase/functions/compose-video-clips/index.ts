@@ -467,28 +467,35 @@ serve(async (req) => {
 
         } else if (scene.clipSource === 'ai-wan') {
           // Wan 2.5 via Replicate — supports i2v when reference image present
+          const isI2V = !!scene.referenceImageUrl;
           await supabaseAdmin
             .from('composer_scenes')
-            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .update({
+              clip_status: 'generating',
+              clip_quality: quality,
+              clip_lead_in_trim_seconds: computeLeadInTrim('ai-wan', isI2V),
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', scene.id);
 
-          const wanModel = scene.referenceImageUrl
+          const wanModel = isI2V
             ? 'wan-video/wan-2.5-i2v'
             : 'wan-video/wan-2.5-t2v';
           // Wan 2.5 only supports 5 or 10 seconds — snap to nearest allowed value
           const wanDuration = snapDuration(scene.durationSeconds, [5, 10]);
           const wanInput: Record<string, unknown> = {
-            prompt: enrichPrompt(scene.aiPrompt),
-            negative_prompt: NEGATIVE_PROMPT_PARAM,
+            prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
+            negative_prompt: negativeFor(isI2V),
             duration: wanDuration,
             aspect_ratio: '16:9',
             resolution: quality === 'pro' ? '1080p' : '720p',
           };
           console.log(`[compose-video-clips] Wan scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${wanDuration}s`);
-          if (scene.referenceImageUrl) {
+          if (isI2V) {
             wanInput.image = scene.referenceImageUrl;
-            console.log(`[compose-video-clips] Wan scene ${scene.id} uses i2v reference`);
+            console.log(`[compose-video-clips] Wan scene ${scene.id} uses i2v reference (lead-in trim ${computeLeadInTrim('ai-wan', true)}s)`);
           }
+
 
           const prediction = await replicate.predictions.create({
             model: wanModel,
