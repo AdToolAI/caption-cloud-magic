@@ -668,6 +668,16 @@ export default function VideoComposerDashboard() {
     };
   }, []);
 
+  // Allow child components (e.g. Export-step Music Card) to switch tabs via event.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as TabId | undefined;
+      if (detail && TAB_ORDER.includes(detail)) setActiveTab(detail);
+    };
+    window.addEventListener('composer:goto-tab', handler as EventListener);
+    return () => window.removeEventListener('composer:goto-tab', handler as EventListener);
+  }, []);
+
   const totalDuration = project.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
   const liveCost = project.scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
 
