@@ -53,6 +53,8 @@ import {
   type PromptSlots,
 } from '@/lib/motion-studio/structuredPromptStitcher';
 import { clipSourceToModelKey } from '@/lib/motion-studio/promptTokenLimits';
+import { ModelSelector } from '@/components/ai-video/ModelSelector';
+import { COMPOSER_AVAILABLE_MODELS, modelIdToSource, sourceToModelId } from '@/lib/video-composer/modelMapping';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useStylePresets } from '@/hooks/useStylePresets';
 import { supabase } from '@/integrations/supabase/client';
