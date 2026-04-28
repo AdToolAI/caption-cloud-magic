@@ -7,6 +7,16 @@ function snapDuration(seconds: number, allowed: number[]): number {
     Math.abs(val - seconds) < Math.abs(best - seconds) ? val : best
   , allowed[0]);
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Extract retry_after seconds from a Replicate 429 error body, default 8s. */
+function parseRetryAfter(msg: string): number {
+  const m = msg.match(/"retry_after"\s*:\s*(\d+)/);
+  if (m) return Math.max(parseInt(m[1], 10), 1);
+  const m2 = msg.match(/retry_after"?\s*:\s*(\d+)/);
+  return m2 ? Math.max(parseInt(m2[1], 10), 1) : 8;
+}
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Replicate from "https://esm.sh/replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
@@ -280,6 +290,11 @@ serve(async (req) => {
     const SUPPORTED_AI_SOURCES = new Set([
       'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo', 'ai-sora', 'ai-image',
     ]);
+
+    // Throttle for Sora 2: Replicate enforces ~1 request / 5–10s on openai/sora-2.
+    // We track the last Sora call and gate subsequent calls so we don't get 429-storms.
+    const SORA_MIN_INTERVAL_MS = 7000;
+    let lastSoraCallAt = 0;
 
     // Process each scene
     for (const scene of scenes) {
@@ -659,10 +674,13 @@ serve(async (req) => {
 
           const soraModel = quality === 'pro' ? 'openai/sora-2-pro' : 'openai/sora-2';
           const soraDuration = snapDuration(scene.durationSeconds, [4, 8, 12]);
+          // Sora 2 only accepts the enum values "portrait" or "landscape" (NOT "16:9").
+          // Composer is currently always 16:9 → landscape. If a portrait composer ever ships,
+          // map 9:16 / 3:4 to "portrait" here.
           const soraInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt, scene.characterShot, isI2V),
             duration: soraDuration,
-            aspect_ratio: '16:9',
+            aspect_ratio: 'landscape',
             resolution: quality === 'pro' ? '1080p' : '720p',
           };
           console.log(`[compose-video-clips] Sora scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${soraDuration}s (${soraModel})`);
@@ -671,13 +689,41 @@ serve(async (req) => {
             console.log(`[compose-video-clips] Sora scene ${scene.id} uses i2v reference (lead-in trim ${computeLeadInTrim('ai-sora', true)}s)`);
           }
 
+          // Throttle: ensure we don't fire two Sora calls within SORA_MIN_INTERVAL_MS.
+          const sinceLast = Date.now() - lastSoraCallAt;
+          if (lastSoraCallAt > 0 && sinceLast < SORA_MIN_INTERVAL_MS) {
+            const waitMs = SORA_MIN_INTERVAL_MS - sinceLast;
+            console.log(`[compose-video-clips] Sora throttle: waiting ${waitMs}ms before scene ${scene.id}`);
+            await sleep(waitMs);
+          }
 
-          const prediction = await replicate.predictions.create({
-            model: soraModel,
-            input: soraInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
-            webhook_events_filter: ["completed"],
-          });
+          // Submit with one automatic retry on 429 (respecting retry_after).
+          let prediction;
+          try {
+            prediction = await replicate.predictions.create({
+              model: soraModel,
+              input: soraInput,
+              webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+              webhook_events_filter: ["completed"],
+            });
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            if (errMsg.includes('429') || errMsg.toLowerCase().includes('too many requests')) {
+              const retryAfterSec = parseRetryAfter(errMsg);
+              const backoffMs = (retryAfterSec + 2) * 1000;
+              console.warn(`[compose-video-clips] Sora 429 on scene ${scene.id} — retrying in ${backoffMs}ms`);
+              await sleep(backoffMs);
+              prediction = await replicate.predictions.create({
+                model: soraModel,
+                input: soraInput,
+                webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+                webhook_events_filter: ["completed"],
+              });
+            } else {
+              throw err;
+            }
+          }
+          lastSoraCallAt = Date.now();
 
           await supabaseAdmin
             .from('composer_scenes')
