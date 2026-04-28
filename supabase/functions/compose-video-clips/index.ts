@@ -216,7 +216,7 @@ serve(async (req) => {
       return prefix ? prefix + prompt : prompt;
     };
 
-    const enrichPrompt = (prompt?: string, shot?: { characterId: string; shotType: CharacterShotType }): string => {
+    const enrichPrompt = (prompt?: string, shot?: { characterId: string; shotType: CharacterShotType }, isImageToVideo = false): string => {
       const base = (prompt || "cinematic footage").trim();
       const withChar = injectCharacter(base, shot);
       // Strip any old "no on-screen text..." negative suffix that the wizard/storyboard
@@ -232,8 +232,14 @@ serve(async (req) => {
       if (!lower.includes("clean cinematic composition")) {
         result = result.replace(/[,.]\s*$/, "") + POSITIVE_CLEAN_CUE;
       }
+      // i2v-only: nudge model to start motion immediately (anti-freeze-frame).
+      if (isImageToVideo && !lower.includes("motion already in progress")) {
+        result = result.replace(/[,.]\s*$/, "") + POSITIVE_I2V_MOTION_CUE;
+      }
       return result;
     };
+    const negativeFor = (isImageToVideo: boolean): string =>
+      isImageToVideo ? (NEGATIVE_PROMPT_PARAM + NEGATIVE_PROMPT_I2V_EXTRA) : NEGATIVE_PROMPT_PARAM;
 
     const results: Array<{ sceneId: string; status: string; predictionId?: string; clipUrl?: string; error?: string }> = [];
 
