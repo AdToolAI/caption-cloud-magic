@@ -1,80 +1,45 @@
-# Reference-Image-Freeze am Szenenanfang fixen
-
 ## Problem
 
-Wenn eine Composer-Szene mit einem Referenzbild generiert wird (Image-to-Video bei Hailuo, Kling, Wan, Seedance, Luma, Veo, Sora), zeigen die Provider in den ersten ~0.1–0.5s häufig das Referenzbild als Standbild, bevor sich Bewegung aufbaut. Beim Stitching im Director's Cut sieht man dann pro Szene kurz das Bild "aufploppen", dann erst startet die eigentliche Animation. Das wirkt unsauber.
+Im Export-Tab des Video Composers gibt es zwei Probleme im Screenshot:
 
-Ursache liegt nicht im Frontend-Player, sondern im **gerenderten MP4** der Image-to-Video-Modelle.
+1. **„Kosten werden berechnet …" lädt endlos** — die Skeleton-Box im `CostEstimationPanel` bleibt dauerhaft sichtbar, weil die Edge Function `estimate-render-cost` (oder das Wallet) während eines aktiven Renders nicht antwortet bzw. fehlschlägt. Der Panel hängt im Loading/Errored-Zustand fest und blendet sich auch nicht aus, sobald der Render läuft.
+2. **Render-Button zeigt `{89}%` statt `89%`** — der deutsche/spanische Translation-Key `renderingPercent` ist als `"Video wird gerendert … {{percent}}%"` formatiert (Mustache-Doppelklammern), aber unser `useTranslation`-Hook ersetzt nur einfache Klammern `{percent}`. Dadurch bleibt das Platzhalter-Literal sichtbar.
+3. **Renderkosten sollen wegfallen** — du verdienst bereits an den AI-Clips, also sollen €0,10 Render-Pauschale + komplettes Cost-Estimation-Panel (Remotion vs. Shotstack Vergleich, Wallet-Warnungen) raus.
 
-## Lösung in 3 Ebenen
+## Lösung
 
-### 1) Prompt-Hardening (sofortige Wirkung, kostenlos)
+### 1. Renderkosten komplett entfernen
 
-In `supabase/functions/compose-video-clips/index.ts` → `enrichPrompt()` einen i2v-spezifischen Suffix einfügen, wenn `referenceImageUrl` gesetzt ist:
+**`src/components/video-composer/AssemblyTab.tsx`**
+- `renderCost = 0.10` → `0`, Zeile mit „Rendering €0.10" aus der Kostenübersicht entfernen.
+- Den gesamten `<CostEstimationPanel />`-Block (Zeile 640–647) entfernen, plus Import (Zeile 14) und ungenutzte Props.
+- Render-Button-Label bleibt `Video rendern (€{totalCost})`, jetzt ohne Render-Aufschlag.
 
+**`src/components/video-composer/CostEstimationPanel.tsx`**
+- Datei kann gelöscht werden (wird nur in `AssemblyTab.tsx` importiert).
+
+### 2. Render-Button-Platzhalter `{89}%` fixen
+
+**`src/lib/translations.ts`** — drei Sprachen (EN/DE/ES) auf einfache Klammern umstellen, damit unser eigener Interpolator greift:
+```ts
+renderingPercent: "Video wird gerendert … {percent}%"   // DE
+renderingPercent: "Rendering video… {percent}%"         // EN
+renderingPercent: "Renderizando video… {percent}%"      // ES
 ```
-"start with motion already in progress, no static opening frame, immediate camera movement from frame 1, no freeze, no still hold"
-```
+(Der Fallback in `AssemblyTab` unterstützt bereits beide Formate, daher reicht das Translation-Update.)
 
-Und in `NEGATIVE_PROMPT_PARAM`:
-```
-"static first frame, frozen opening, still image hold at start, motionless beginning"
-```
+### 3. Kommunikation in der Cost-Summary
 
-Wirkt v.a. bei Kling 3 Omni, Wan 2.5, Seedance, Luma, Veo — Hailuo respektiert es teilweise.
+In der „Kostenübersicht"-Card (Zeile 478–511) wird der Render-Eintrag entfernt. Die Summe besteht dann nur noch aus Clips + (optional) Voiceover. Hintergrundmusik bleibt €0,00.
 
-### 2) Lead-In-Trim beim Compositing (Hauptfix)
+## Geänderte Dateien
 
-In `supabase/functions/compose-clip-webhook/index.ts` (wo der fertige Clip gespeichert wird), pro i2v-Clip einen **Trim-Offset** in der DB ablegen — z.B. `clip_lead_in_trim_seconds` (default 0.25s für Hailuo, 0.15s für Kling/Wan/Seedance/Luma/Veo/Sora, 0s für ai-image und Stock).
+- `src/components/video-composer/AssemblyTab.tsx` — Render-Kosten und Cost-Estimation-Panel entfernen
+- `src/components/video-composer/CostEstimationPanel.tsx` — Datei löschen
+- `src/lib/translations.ts` — `renderingPercent` in DE/EN/ES auf `{percent}` umstellen
 
-Migration:
-```sql
-ALTER TABLE composer_scenes 
-  ADD COLUMN clip_lead_in_trim_seconds NUMERIC DEFAULT 0;
-```
+## Erwartetes Ergebnis
 
-Dieser Wert wird:
-- **A)** im Composer-Preview-Player als `currentTime`-Startoffset gesetzt (`<video>` mit `onLoadedMetadata` → `el.currentTime = trim`)
-- **B)** beim **"Render All & Stitch"**-Schritt, der den Director's Cut speist, als `start_offset` pro Clip in den Director's-Cut-State übergeben (siehe `multi-scene-render-pipeline` Memo). Director's Cut respektiert `start_offset` bereits (Timeline-Editing-Controls).
-
-Vorteil: Keine Re-Encoding-Kosten, deterministisch, pro Modell konfigurierbar, vom User in der UI überschreibbar.
-
-### 3) UI-Override (transparent für User)
-
-In `SceneCard.tsx` neben dem Reference-Image-Slot ein kleines **"Lead-In-Trim"-Slider-Control** (0–0.5s in 0.05-Schritten) anzeigen, **nur** wenn `referenceImageUrl` gesetzt UND `clipSource` ein i2v-Provider ist. Default kommt aus dem provider-spezifischen Wert; User kann fein justieren.
-
-Tooltip: *"Schneidet die ersten Millisekunden weg, in denen das Referenzbild noch eingefroren ist."*
-
-## Files
-
-**Backend**
-- `supabase/functions/compose-video-clips/index.ts` — `enrichPrompt()` + `NEGATIVE_PROMPT_PARAM` für i2v
-- `supabase/functions/compose-clip-webhook/index.ts` — beim Webhook-Complete `clip_lead_in_trim_seconds` setzen (provider-spezifischer Default, falls noch nicht vom User überschrieben)
-- Neue Migration: Spalte `clip_lead_in_trim_seconds` auf `composer_scenes`
-
-**Frontend**
-- `src/types/video-composer.ts` — Feld `clipLeadInTrimSeconds?: number`
-- `src/components/video-composer/VideoComposerDashboard.tsx` — Mapping snake_case ↔ camelCase
-- `src/components/video-composer/SceneClipProgress.tsx` — `<video>` mit `onLoadedMetadata` → setzt `currentTime` auf `clipLeadInTrimSeconds`
-- `src/components/video-composer/SceneCard.tsx` — Slider-Control für Lead-In-Trim (nur i2v + reference vorhanden)
-- `src/lib/video-composer/multiSceneRender.ts` (oder dort wo der Director's-Cut-Handover passiert) — Übergibt `start_offset = clipLeadInTrimSeconds` pro Clip
-
-## Provider-Defaults
-
-| Provider | Default Trim |
-|---|---|
-| Hailuo | 0.25s |
-| Kling 3 Omni | 0.15s |
-| Wan 2.5 | 0.20s |
-| Seedance | 0.15s |
-| Luma Ray 2 | 0.10s |
-| Veo | 0.10s |
-| Sora 2 | 0.15s |
-| ai-image (Ken Burns) | 0s |
-| stock / upload | 0s |
-
-Werte sind konservativ — schneiden nur den eingefrorenen Anteil weg, nicht echte Bewegung.
-
-## Memo-Update
-
-Memo `mem://architecture/video-composer/engine-normalization-policy` ergänzen um den Lead-In-Trim-Mechanismus, damit zukünftige Provider-Integrationen (neue Modelle) den Default direkt mitsetzen.
+- Im Export-Tab erscheint kein „Kosten werden berechnet …"-Block mehr.
+- Render-Button zeigt korrekt z. B. `Video wird gerendert … 89%`.
+- Kostenübersicht enthält nur noch Clip-/Voiceover-Posten — kein €0,10-Render-Aufschlag.

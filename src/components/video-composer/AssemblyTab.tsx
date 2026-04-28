@@ -11,7 +11,6 @@ import { useTranslation } from '@/hooks/useTranslation';
 import ColorGradingSelector from './ColorGradingSelector';
 import WatermarkEditor from './WatermarkEditor';
 import ComposerSequencePreview from './ComposerSequencePreview';
-import CostEstimationPanel from './CostEstimationPanel';
 import ExportPresetPanel from './ExportPresetPanel';
 import type { AssemblyConfig, ComposerScene, WatermarkConfig } from '@/types/video-composer';
 import { DEFAULT_WATERMARK_CONFIG, getClipCost } from '@/types/video-composer';
@@ -90,8 +89,8 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
 
   const clipCost = scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
   const voCost = assemblyConfig.voiceover?.enabled ? 0.05 : 0;
-  const renderCost = 0.10;
-  const totalCost = clipCost + voCost + renderCost;
+  const renderCost = 0;
+  const totalCost = clipCost + voCost;
 
   const readyClips = scenes.filter(s => s.clipStatus === 'ready' && s.clipUrl);
   const allReady = readyClips.length === scenes.length && scenes.length > 0;
@@ -498,10 +497,6 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
                 <span className="text-emerald-400">€0.00</span>
               </div>
             )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('videoComposer.rendering')}</span>
-              <span>€{renderCost.toFixed(2)}</span>
-            </div>
             <div className="border-t border-border/40 pt-1.5 flex justify-between font-semibold text-sm">
               <span>{t('videoComposer.total')}</span>
               <span className="text-primary">€{totalCost.toFixed(2)}</span>
@@ -637,14 +632,6 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         </Card>
       )}
 
-      {/* Cost Estimation — radical price transparency before render */}
-      {!videoUrl && renderStatus !== 'completed' && (
-        <CostEstimationPanel
-          scenes={scenes}
-          assemblyConfig={assemblyConfig}
-          templateId={project?.template_id || project?.templateId}
-        />
-      )}
 
       {/* Render Button */}
       <div className="flex justify-end">
