@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -156,38 +156,74 @@ export default function AdDirectorWizard({
   const lang = (['de', 'en', 'es'].includes(language) ? language : 'de') as Lang;
   const { data: activeBrandKit } = useActiveBrandKit();
 
-  const [step, setStep] = useState<Step>('format');
-  const [format, setFormat] = useState<AdFormatId>('tvc-30');
-  const [goal, setGoal] = useState<AdGoalId>('conversion');
-  const [framework, setFramework] = useState<AdFrameworkId>('problem-solution');
-  const [tonality, setTonality] = useState<AdTonalityId>('minimal-premium');
-  const [productName, setProductName] = useState('');
-  const [productDescription, setProductDescription] = useState('');
-  const [usps, setUsps] = useState('');
-  const [targetAudience, setTargetAudience] = useState('');
-  const [acknowledged, setAcknowledged] = useState(false);
+  // Persist wizard state per-project so leaving Motion Studio doesn't reset progress.
+  const storageKey = `ad-director-wizard:${projectId || 'no-project'}`;
+  const persisted = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  const [step, setStep] = useState<Step>(persisted?.step ?? 'format');
+  const [format, setFormat] = useState<AdFormatId>(persisted?.format ?? 'tvc-30');
+  const [goal, setGoal] = useState<AdGoalId>(persisted?.goal ?? 'conversion');
+  const [framework, setFramework] = useState<AdFrameworkId>(persisted?.framework ?? 'problem-solution');
+  const [tonality, setTonality] = useState<AdTonalityId>(persisted?.tonality ?? 'minimal-premium');
+  const [productName, setProductName] = useState(persisted?.productName ?? '');
+  const [productDescription, setProductDescription] = useState(persisted?.productDescription ?? '');
+  const [usps, setUsps] = useState(persisted?.usps ?? '');
+  const [targetAudience, setTargetAudience] = useState(persisted?.targetAudience ?? '');
+  const [acknowledged, setAcknowledged] = useState(persisted?.acknowledged ?? false);
 
   // Stage 2 toggles
-  const [useBrandKit, setUseBrandKit] = useState(true);
-  const [autoVoiceover, setAutoVoiceover] = useState(true);
+  const [useBrandKit, setUseBrandKit] = useState(persisted?.useBrandKit ?? true);
+  const [autoVoiceover, setAutoVoiceover] = useState(persisted?.autoVoiceover ?? true);
 
   // Stage 2b — Campaign Scaling
-  const [autoLogoEndcard, setAutoLogoEndcard] = useState(true);
-  const [renderAllVariants, setRenderAllVariants] = useState(false);
-  const [cutdown15s, setCutdown15s] = useState(false);
-  const [cutdown6sHook, setCutdown6sHook] = useState(false);
+  const [autoLogoEndcard, setAutoLogoEndcard] = useState(persisted?.autoLogoEndcard ?? true);
+  const [renderAllVariants, setRenderAllVariants] = useState(persisted?.renderAllVariants ?? false);
+  const [cutdown15s, setCutdown15s] = useState(persisted?.cutdown15s ?? false);
+  const [cutdown6sHook, setCutdown6sHook] = useState(persisted?.cutdown6sHook ?? false);
 
   // Stage A — Multi-Aspect-Bundling
-  const [aspect9x16, setAspect9x16] = useState(false);
-  const [aspect1x1, setAspect1x1] = useState(false);
-  const [aspect4x5, setAspect4x5] = useState(false);
+  const [aspect9x16, setAspect9x16] = useState(persisted?.aspect9x16 ?? false);
+  const [aspect1x1, setAspect1x1] = useState(persisted?.aspect1x1 ?? false);
+  const [aspect4x5, setAspect4x5] = useState(persisted?.aspect4x5 ?? false);
 
   // Variant flow state
   const [variantsLoading, setVariantsLoading] = useState(false);
-  const [variants, setVariants] = useState<ScriptVariant[] | null>(null);
-  const [chosenVariantId, setChosenVariantId] = useState<string | null>(null);
+  const [variants, setVariants] = useState<ScriptVariant[] | null>(persisted?.variants ?? null);
+  const [chosenVariantId, setChosenVariantId] = useState<string | null>(persisted?.chosenVariantId ?? null);
 
   const [generating, setGenerating] = useState(false);
+
+  // Save state to sessionStorage on every change so navigation away preserves progress.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify({
+        step, format, goal, framework, tonality,
+        productName, productDescription, usps, targetAudience, acknowledged,
+        useBrandKit, autoVoiceover,
+        autoLogoEndcard, renderAllVariants, cutdown15s, cutdown6sHook,
+        aspect9x16, aspect1x1, aspect4x5,
+        variants, chosenVariantId,
+      }));
+    } catch { /* ignore quota errors */ }
+  }, [
+    storageKey, step, format, goal, framework, tonality,
+    productName, productDescription, usps, targetAudience, acknowledged,
+    useBrandKit, autoVoiceover,
+    autoLogoEndcard, renderAllVariants, cutdown15s, cutdown6sHook,
+    aspect9x16, aspect1x1, aspect4x5,
+    variants, chosenVariantId,
+  ]);
+
 
   const stepIdx = STEPS.indexOf(step);
   const canBack = stepIdx > 0;
@@ -222,6 +258,7 @@ export default function AdDirectorWizard({
     setChosenVariantId(null);
     setVariantsLoading(false);
     setGenerating(false);
+    try { sessionStorage.removeItem(storageKey); } catch { /* noop */ }
   };
 
   const handleClose = (next: boolean) => {
