@@ -496,11 +496,14 @@ serve(async (req) => {
             .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
             .eq('id', scene.id);
 
+          // Luma Ray 2 only supports 5 or 9 seconds — snap to nearest allowed value
+          const lumaDuration = snapDuration(scene.durationSeconds, [5, 9]);
           const lumaInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt),
-            duration: Math.min(Math.max(scene.durationSeconds, 5), 10),
+            duration: lumaDuration,
             aspect_ratio: '16:9',
           };
+          console.log(`[compose-video-clips] Luma scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${lumaDuration}s`);
           if (scene.referenceImageUrl) {
             lumaInput.start_image = scene.referenceImageUrl;
             console.log(`[compose-video-clips] Luma scene ${scene.id} uses start_image keyframe`);
