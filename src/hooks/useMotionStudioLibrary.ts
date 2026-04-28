@@ -140,14 +140,34 @@ export function useMotionStudioLibrary() {
   // ── Locations ───────────────────────────────────────────────────────────
   const createLocation = useCallback(
     async (draft: LocationDraft): Promise<MotionStudioLocation | null> => {
-      if (!user) return null;
+      const {
+        data: { user: liveUser },
+      } = await supabase.auth.getUser();
+      const effectiveUser = user ?? liveUser ?? null;
+      if (!effectiveUser) {
+        toast.error('Nicht angemeldet — bitte erneut einloggen');
+        return null;
+      }
       const { data, error } = await supabase
         .from('motion_studio_locations')
-        .insert({ ...draft, user_id: user.id })
+        .insert({ ...draft, user_id: effectiveUser.id })
         .select()
         .single();
       if (error) {
         toast.error(`Location speichern fehlgeschlagen: ${error.message}`);
+        return null;
+      }
+      const created = data as MotionStudioLocation;
+      setLocations((prev) => {
+        if (prev.some((l) => l.id === created.id)) return prev;
+        return [created, ...prev];
+      });
+      toast.success(`„${created.name}" wurde gespeichert`);
+      loadAll();
+      return created;
+    },
+    [user, loadAll]
+  );
         return null;
       }
       const created = data as MotionStudioLocation;
