@@ -268,6 +268,15 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         }
       }
 
+      // Visibility: confirm what's actually being shipped to the renderer.
+      const musicCfg = assemblyConfig?.music;
+      console.info('[Composer] Render payload check:', {
+        voiceover: assemblyConfig?.voiceover?.enabled && assemblyConfig?.voiceover?.audioUrl ? 'set' : 'none',
+        music: musicCfg?.enabled && musicCfg?.trackUrl ? (musicCfg.trackName || 'set') : 'none',
+        musicVolumePct: musicCfg?.volume ?? null,
+        subtitles: assemblyConfig?.subtitles?.enabled ? `${assemblyConfig.subtitles.segments?.length ?? 0} segs` : 'off',
+      });
+
       const { data, error } = await supabase.functions.invoke('compose-video-assemble', {
         body: { projectId: project?.id },
       });
