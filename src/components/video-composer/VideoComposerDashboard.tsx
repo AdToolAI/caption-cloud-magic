@@ -797,14 +797,39 @@ export default function VideoComposerDashboard() {
       {/* Header */}
       <div className="border-b border-border/40 bg-card/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {(() => {
+              const currentIdx = TAB_ORDER.indexOf(activeTab);
+              const prevId = currentIdx > 0 ? TAB_ORDER[currentIdx - 1] : null;
+              const prevLabel = prevId
+                ? (TABS.find((tt) => tt.id === prevId)?.label ?? '')
+                : '';
+              const prevTitle = prevId
+                ? `${t('videoComposer.previousStep')}: ${prevLabel}`
+                : t('videoComposer.firstStep');
+              return (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => prevId && setActiveTab(prevId)}
+                  disabled={!prevId}
+                  title={prevTitle}
+                  aria-label={prevTitle}
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              );
+            })()}
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate(-1)}
+              onClick={() => navigate('/home')}
+              title={t('videoComposer.exitStudio')}
+              aria-label={t('videoComposer.exitStudio')}
               className="text-muted-foreground hover:text-foreground"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <LogOut className="h-4 w-4" />
             </Button>
             <div>
               <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
