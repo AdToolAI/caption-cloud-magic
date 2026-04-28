@@ -516,7 +516,7 @@ export default function AdDirectorWizard({
         </DialogHeader>
 
         {/* Step indicator */}
-        <div className="flex items-center gap-2 px-1 pb-2">
+        <div className="shrink-0 flex items-center gap-2 px-6 pb-3">
           {STEPS.map((s, i) => (
             <div
               key={s}
@@ -528,8 +528,8 @@ export default function AdDirectorWizard({
           ))}
         </div>
 
-        <ScrollArea className="flex-1 min-h-0 pr-2">
-          <div className="space-y-6 pb-2">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6">
+          <div className="space-y-6 pb-6">
             {step === 'format' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
