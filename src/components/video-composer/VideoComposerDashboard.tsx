@@ -351,7 +351,7 @@ export default function VideoComposerDashboard() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [project.id]);
 
   /**
    * Block M — Refetch scenes from DB on demand (e.g. after a Hybrid Extend
