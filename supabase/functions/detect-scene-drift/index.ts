@@ -188,7 +188,25 @@ serve(async (req) => {
                 },
                 {
                   type: "text",
-                  text: "Return only the JSON.",
+                  text: (() => {
+                    const ctx = body.context ?? {};
+                    const lines: string[] = [];
+                    if (ctx.sceneType || ctx.nextSceneType) {
+                      lines.push(
+                        `Scene types: prev="${ctx.sceneType ?? "?"}", next="${ctx.nextSceneType ?? "?"}".`
+                      );
+                    }
+                    lines.push(
+                      `expectsSameCharacter: ${ctx.expectsSameCharacter ? "true" : "false"}.`
+                    );
+                    if (ctx.nextPrompt) {
+                      lines.push(
+                        `Next-shot intent: ${String(ctx.nextPrompt).slice(0, 240)}`
+                      );
+                    }
+                    lines.push("Return only the JSON.");
+                    return lines.join("\n");
+                  })(),
                 },
               ],
             },
