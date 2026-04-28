@@ -52,17 +52,25 @@ interface BrandContext {
   brandValues: string[];
 }
 
+// Engines that the Composer pipeline (compose-video-clips) actually
+// implements. We never plan a scene with an engine outside this list.
+const SUPPORTED_COMPOSER_ENGINES = ['ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo'] as const;
+
 const ENGINE_BY_PREF: Record<EnginePref, string[]> = {
   auto:    ['ai-hailuo', 'ai-seedance', 'ai-wan', 'ai-kling', 'ai-luma'],
-  premium: ['ai-kling', 'ai-luma', 'ai-sora'],
+  premium: ['ai-kling', 'ai-luma', 'ai-veo'],
   budget:  ['ai-wan', 'ai-seedance', 'ai-hailuo'],
 };
 
 // Cost per second per engine (standard quality, mirrors compose-video-clips)
 const COST_PER_SEC: Record<string, number> = {
-  'ai-hailuo': 0.15, 'ai-kling': 0.15, 'ai-sora': 0.25,
+  'ai-hailuo': 0.15, 'ai-kling': 0.15, 'ai-veo': 0.20,
   'ai-wan': 0.10, 'ai-seedance': 0.12, 'ai-luma': 0.20,
 };
+
+const FALLBACK_ENGINE = 'ai-hailuo';
+const normalizeEngine = (e: string): string =>
+  SUPPORTED_COMPOSER_ENGINES.includes(e as any) ? e : FALLBACK_ENGINE;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
