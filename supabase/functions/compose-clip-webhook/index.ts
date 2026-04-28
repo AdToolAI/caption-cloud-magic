@@ -66,6 +66,85 @@ serve(async (req) => {
         })
         .eq('id', sceneId);
 
+      // 📚 Auto-archive every generated AI clip into the Media Library (KI tab).
+      // Even if the full project never finishes, or the user later regenerates the
+      // scene, the user keeps access to every clip they paid credits for.
+      try {
+        const { data: sceneFull } = await supabase
+          .from('composer_scenes')
+          .select('order_index, duration_seconds, ai_prompt, clip_source, reference_image_url, project_id')
+          .eq('id', sceneId)
+          .single();
+
+        const { data: projectMeta } = await supabase
+          .from('composer_projects')
+          .select('user_id, name')
+          .eq('id', projectId)
+          .single();
+
+        const isRealAiClip =
+          sceneFull?.clip_source &&
+          typeof sceneFull.clip_source === 'string' &&
+          sceneFull.clip_source.startsWith('ai-');
+
+        if (sceneFull && projectMeta?.user_id && isRealAiClip) {
+          // Mark previous active library entries for this scene as superseded
+          // so that regenerations keep the older versions visible.
+          const { data: previousEntries } = await supabase
+            .from('video_creations')
+            .select('id, metadata')
+            .eq('user_id', projectMeta.user_id)
+            .contains('metadata', { source: 'motion-studio-clip', scene_id: sceneId });
+
+          if (previousEntries && previousEntries.length > 0) {
+            const supersededAt = new Date().toISOString();
+            for (const prev of previousEntries) {
+              const prevMeta = (prev.metadata || {}) as Record<string, unknown>;
+              if (prevMeta.superseded === true) continue;
+              await supabase
+                .from('video_creations')
+                .update({
+                  metadata: { ...prevMeta, superseded: true, superseded_at: supersededAt },
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', prev.id);
+            }
+          }
+
+          const newMetadata = {
+            source: 'motion-studio-clip',
+            project_id: projectId,
+            project_name: projectMeta.name ?? null,
+            scene_id: sceneId,
+            scene_order: sceneFull.order_index ?? 0,
+            prompt: sceneFull.ai_prompt ?? '',
+            model: sceneFull.clip_source,
+            duration_seconds: sceneFull.duration_seconds ?? null,
+            reference_image_url: sceneFull.reference_image_url ?? null,
+            superseded: false,
+          };
+
+          const { error: archiveError } = await supabase
+            .from('video_creations')
+            .insert({
+              user_id: projectMeta.user_id,
+              output_url: permanentUrl,
+              status: 'completed',
+              credits_used: 0,
+              metadata: newMetadata,
+            });
+
+          if (archiveError) {
+            console.error('[compose-clip-webhook] Library archive failed:', archiveError);
+          } else {
+            console.log(`[compose-clip-webhook] 📚 Archived scene ${sceneId} to Media Library (KI)`);
+          }
+        }
+      } catch (archiveErr) {
+        // Never fail the webhook because of archive issues
+        console.error('[compose-clip-webhook] archive error:', archiveErr);
+      }
+
       // 🎬 BLOCK F — Continuity Auto-Trigger
       // Fire-and-forget: extract last frame so the NEXT scene can chain off it.
       // We do this only if the next scene exists and has no reference image yet.
