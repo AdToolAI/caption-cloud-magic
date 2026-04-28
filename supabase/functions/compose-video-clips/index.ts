@@ -297,6 +297,7 @@ serve(async (req) => {
     let lastSoraCallAt = 0;
 
     // Process each scene
+    for (const scene of scenes) {
       // Defensive: rewrite unsupported AI engines to a working default.
       if (scene.clipSource.startsWith('ai-') && !SUPPORTED_AI_SOURCES.has(scene.clipSource)) {
         console.warn(`[compose-video-clips] Scene ${scene.id} clipSource '${scene.clipSource}' not supported by composer — falling back to ai-hailuo.`);
