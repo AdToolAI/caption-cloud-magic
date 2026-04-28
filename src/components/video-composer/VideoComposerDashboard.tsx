@@ -299,6 +299,7 @@ export default function VideoComposerDashboard() {
             referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
             clipUrl: row.clip_url ?? undefined,
             clipStatus: (row.clip_status || 'pending') as ClipStatus,
+            clipLeadInTrimSeconds: Number(((row as any).clip_lead_in_trim_seconds as any) ?? local?.clipLeadInTrimSeconds ?? 0),
             textOverlay: row.text_overlay ?? local?.textOverlay ?? {
               text: '',
               position: 'bottom',
@@ -397,6 +398,7 @@ export default function VideoComposerDashboard() {
             referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
             clipUrl: row.clip_url ?? undefined,
             clipStatus: (row.clip_status || 'pending') as ClipStatus,
+            clipLeadInTrimSeconds: Number(((row as any).clip_lead_in_trim_seconds as any) ?? local?.clipLeadInTrimSeconds ?? 0),
             textOverlay: row.text_overlay ?? local?.textOverlay ?? {
               text: '', position: 'bottom', animation: 'fade-in', fontSize: 48, color: '#FFFFFF',
             },

@@ -141,6 +141,13 @@ export interface ComposerScene {
   characterShot?: CharacterShot;
   clipUrl?: string;
   clipStatus: ClipStatus;
+  /**
+   * Seconds to skip at the start of clipUrl playback.
+   * Hides the frozen reference-image opening frame that i2v providers
+   * (Hailuo, Kling, Wan, Seedance, Luma, Veo, Sora) produce in the first
+   * 3-12 frames. Default 0 for stock / upload / ai-image.
+   */
+  clipLeadInTrimSeconds?: number;
   textOverlay: TextOverlayConfig;
   transitionType: TransitionStyle;
   transitionDuration: number;
