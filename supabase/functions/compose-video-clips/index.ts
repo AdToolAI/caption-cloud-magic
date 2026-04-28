@@ -1,5 +1,12 @@
-// compose-video-clips v2.2.0 — visual style injection
+// compose-video-clips v2.3.0 — duration snap for Luma/Wan/Seedance
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+
+/** Snap an arbitrary duration (seconds) to the nearest provider-allowed discrete value. */
+function snapDuration(seconds: number, allowed: number[]): number {
+  return allowed.reduce((best, val) =>
+    Math.abs(val - seconds) < Math.abs(best - seconds) ? val : best
+  , allowed[0]);
+}
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Replicate from "https://esm.sh/replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
