@@ -159,21 +159,24 @@ serve(async (req) => {
       return jsonResponse({ error: "DB_ERROR", message: projErr?.message ?? "Failed to create project" }, 500);
     }
 
-    // Bulk insert scenes
-    const sceneRows = scenes.map((s) => ({
-      project_id: project.id,
-      order_index: s.orderIndex,
-      scene_type: s.sceneType,
-      duration_seconds: s.durationSeconds,
-      clip_source: s.recommendedEngine,
-      ai_prompt: s.aiPrompt,
-      clip_status: 'pending',
-      text_overlay: s.textOverlay ?? {},
-      transition_type: 'fade',
-      transition_duration: 0.5,
-      clip_quality: 'standard',
-      cost_euros: (COST_PER_SEC[s.recommendedEngine] ?? 0.15) * s.durationSeconds,
-    }));
+    // Bulk insert scenes — normalize unsupported engines defensively
+    const sceneRows = scenes.map((s) => {
+      const engine = normalizeEngine(s.recommendedEngine);
+      return {
+        project_id: project.id,
+        order_index: s.orderIndex,
+        scene_type: s.sceneType,
+        duration_seconds: s.durationSeconds,
+        clip_source: engine,
+        ai_prompt: s.aiPrompt,
+        clip_status: 'pending',
+        text_overlay: s.textOverlay ?? {},
+        transition_type: 'fade',
+        transition_duration: 0.5,
+        clip_quality: 'standard',
+        cost_euros: (COST_PER_SEC[engine] ?? 0.15) * s.durationSeconds,
+      };
+    });
 
     const { data: insertedScenes, error: scenesErr } = await supabaseAdmin
       .from('composer_scenes')
