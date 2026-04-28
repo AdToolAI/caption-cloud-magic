@@ -248,7 +248,7 @@ serve(async (req) => {
     // upstream planner (Auto-Director, manual choice) can never leave a
     // scene stranded in 'pending' forever.
     const SUPPORTED_AI_SOURCES = new Set([
-      'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo', 'ai-image',
+      'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo', 'ai-sora', 'ai-image',
     ]);
 
     // Process each scene
