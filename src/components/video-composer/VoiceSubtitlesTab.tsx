@@ -156,6 +156,99 @@ export default function VoiceSubtitlesTab({
     }
   };
 
+  // ── Auto-generate script from briefing + scenes on first visit ───
+  const mapBriefingTone = (tn?: string): string => {
+    switch (tn) {
+      case 'excited':
+      case 'energetic':
+        return 'enthusiastic';
+      case 'professional':
+      case 'corporate':
+        return 'professional';
+      case 'inspiring':
+      case 'visionary':
+        return 'inspiring';
+      case 'playful':
+      case 'witty':
+        return 'playful';
+      case 'serious':
+      case 'authoritative':
+        return 'authoritative';
+      default:
+        return 'friendly';
+    }
+  };
+
+  const buildBriefingIdea = (): string => {
+    if (!briefing) return '';
+    const parts: string[] = [];
+    if (briefing.productName?.trim()) parts.push(briefing.productName.trim());
+    if (briefing.productDescription?.trim()) parts.push(briefing.productDescription.trim());
+    if (Array.isArray(briefing.usps) && briefing.usps.length > 0) {
+      const usps = briefing.usps.map(u => u?.trim()).filter(Boolean).slice(0, 5);
+      if (usps.length) parts.push(`Key benefits: ${usps.join(', ')}`);
+    }
+    if (briefing.targetAudience?.trim()) parts.push(`Target audience: ${briefing.targetAudience.trim()}`);
+    return parts.join('. ');
+  };
+
+  useEffect(() => {
+    if (autoTriedRef.current) return;
+    if (!voiceover?.enabled) return;
+    if (voiceover.script && voiceover.script.trim().length > 0) return;
+    if (!scenes || scenes.length === 0) return;
+
+    autoTriedRef.current = true;
+    setAutoError(false);
+    setAutoGenerating(true);
+
+    const idea = buildBriefingIdea();
+    const tone = mapBriefingTone(briefing?.tone);
+    const sceneInputs = scenes.map((s, i) => ({
+      order: typeof s.orderIndex === 'number' ? s.orderIndex : i,
+      durationSeconds: Math.max(0.5, Number(s.durationSeconds) || 0),
+      description: s.aiPrompt || s.textOverlay?.text || undefined,
+      sceneType: s.sceneType,
+    }));
+
+    const fallbackIdea =
+      language === 'en'
+        ? 'Tell a coherent story that matches the storyboard scenes.'
+        : language === 'es'
+        ? 'Cuenta una historia coherente que coincida con las escenas del guion gráfico.'
+        : 'Erzähle eine zusammenhängende Geschichte, die zu den Storyboard-Szenen passt.';
+
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-voiceover-script', {
+          body: {
+            mode: 'from_scenes',
+            idea: idea || fallbackIdea,
+            tone,
+            language,
+            scenes: sceneInputs,
+          },
+        });
+        if (error) throw error;
+        const script: string | undefined = data?.script;
+        if (!script || !script.trim()) throw new Error('Empty script');
+        const cur = voiceoverRef.current;
+        if (cur && !(cur.script && cur.script.trim().length > 0)) {
+          onUpdateAssembly({
+            voiceover: { ...cur, script, autoScriptGenerated: true },
+          });
+        }
+      } catch (err) {
+        console.warn('[VoiceSubtitlesTab] auto script generation failed:', err);
+        setAutoError(true);
+      } finally {
+        setAutoGenerating(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceover?.enabled, scenes.length]);
+
+
   const handleGenerateVoiceover = async () => {
     if (!voiceover?.script?.trim()) {
       toast({ title: t('videoComposer.scriptMissing'), variant: 'destructive' });
